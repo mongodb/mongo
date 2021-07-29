@@ -63,9 +63,6 @@ public:
 
     std::shared_ptr<Instance> getOrCreateInstance(OperationContext* opCtx, BSONObj initialState);
 
-    // TODO SERVER-53283 remove the following function after 5.0 became last LTS
-    void waitForAllCoordinatorsToComplete(OperationContext* opCtx) const;
-
 private:
     ExecutorFuture<void> _rebuildService(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                          const CancellationToken& token) override;
@@ -73,12 +70,6 @@ private:
     void _waitForRecoveryCompletion(OperationContext* opCtx) const;
     void _afterStepDown() override;
     size_t _countCoordinatorDocs(OperationContext* opCtx);
-
-    // TODO SERVER-53283 remove the following 3 variables after 5.0 became last LTS
-    mutable Mutex _completionMutex =
-        MONGO_MAKE_LATCH("ShardingDDLCoordinatorService::_completionMutex");
-    size_t _numActiveCoordinators{0};
-    mutable stdx::condition_variable _completedCV;
 
     mutable Mutex _mutex = MONGO_MAKE_LATCH("ShardingDDLCoordinatorService::_mutex");
 

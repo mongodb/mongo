@@ -37,7 +37,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/async_requests_sender.h"
-#include "mongo/s/request_types/flush_database_cache_updates_gen.h"
 #include "mongo/s/request_types/flush_routing_table_cache_updates_gen.h"
 
 namespace mongo {
@@ -52,17 +51,6 @@ void tellShardsToRefreshCollection(OperationContext* opCtx,
     auto cmd = _flushRoutingTableCacheUpdatesWithWriteConcern(nss);
     cmd.setSyncFromConfig(true);
     cmd.setDbName(nss.db());
-    auto cmdObj = CommandHelpers::appendMajorityWriteConcern(cmd.toBSON({}));
-    sendCommandToShards(opCtx, NamespaceString::kAdminDb, cmdObj, shardIds, executor);
-}
-
-void tellShardsToRefreshDatabase(OperationContext* opCtx,
-                                 const std::vector<ShardId>& shardIds,
-                                 const std::string& dbName,
-                                 const std::shared_ptr<executor::TaskExecutor>& executor) {
-    auto cmd = _flushDatabaseCacheUpdatesWithWriteConcern(dbName);
-    cmd.setSyncFromConfig(true);
-    cmd.setDbName(dbName);
     auto cmdObj = CommandHelpers::appendMajorityWriteConcern(cmd.toBSON({}));
     sendCommandToShards(opCtx, NamespaceString::kAdminDb, cmdObj, shardIds, executor);
 }

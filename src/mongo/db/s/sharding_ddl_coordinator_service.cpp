@@ -96,12 +96,6 @@ ShardingDDLCoordinatorService* ShardingDDLCoordinatorService::getService(Operati
 std::shared_ptr<ShardingDDLCoordinatorService::Instance>
 ShardingDDLCoordinatorService::constructInstance(BSONObj initialState) {
     auto coord = constructShardingDDLCoordinatorInstance(this, std::move(initialState));
-
-    {
-        stdx::lock_guard lg(_completionMutex);
-        ++_numActiveCoordinators;
-    }
-
     coord->getConstructionCompletionFuture()
         .thenRunOn(getInstanceCleanupExecutor())
         .getAsync([this](auto status) {
@@ -115,25 +109,7 @@ ShardingDDLCoordinatorService::constructInstance(BSONObj initialState) {
                 _recoveredCV.notify_all();
             }
         });
-
-    coord->getCompletionFuture()
-        .thenRunOn(getInstanceCleanupExecutor())
-        .getAsync([this](auto status) {
-            stdx::lock_guard lg(_completionMutex);
-            if (--_numActiveCoordinators == 0) {
-                _completedCV.notify_all();
-            }
-        });
-
     return coord;
-}
-
-void ShardingDDLCoordinatorService::waitForAllCoordinatorsToComplete(
-    OperationContext* opCtx) const {
-    _waitForRecoveryCompletion(opCtx);
-    stdx::unique_lock lk(_completionMutex);
-    opCtx->waitForConditionOrInterrupt(
-        _completedCV, lk, [this]() { return _numActiveCoordinators == 0; });
 }
 
 

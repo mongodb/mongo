@@ -60,12 +60,10 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/tenant_migration_donor_service.h"
 #include "mongo/db/repl/tenant_migration_recipient_service.h"
-#include "mongo/db/s/balancer/balancer.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
-#include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/views/view_catalog.h"
@@ -345,10 +343,6 @@ public:
 
         boost::optional<Timestamp> changeTimestamp;
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-            // TODO(SERVER-53283): Remove the call to requestPause()
-            // to allow the execution of balancer rounds during setFCV().
-            auto scopedBalancerPauseRequest = Balancer::get(opCtx)->requestPause();
-
             // The Config Server creates a new ID (i.e., timestamp) when it receives an upgrade or
             // downgrade request. Alternatively, the request refers to a previously aborted
             // operation for which the local FCV document must contain the ID to be reused.
@@ -408,13 +402,6 @@ public:
 
             if (request.getPhase() == SetFCVPhaseEnum::kStart) {
                 invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
-                if (actualVersion > requestedVersion) {
-                    // No more ShardingDDLCoordinators will start because we have already switched
-                    // the FCV value to kDowngrading. Wait for the ongoing ones to finish.
-                    setFCVCommandLock.unlock();
-                    ShardingDDLCoordinatorService::getService(opCtx)
-                        ->waitForAllCoordinatorsToComplete(opCtx);
-                }
                 // If we are only running phase-1, then we are done
                 return true;
             }
@@ -510,10 +497,6 @@ private:
                 !failUpgrading.shouldFail());
 
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-            // TODO SERVER-53283: This block can removed once 5.0 becomes last-lts.
-            if (requestedVersion == FeatureCompatibility::Version::kFullyDowngradedTo50) {
-                ShardingCatalogManager::get(opCtx)->upgradeMetadataFor50Phase1(opCtx);
-            }
 
             // Tell the shards to enter phase-2 of setFCV (fully upgraded)
             auto requestPhase2 = request;
@@ -523,11 +506,6 @@ private:
             uassertStatusOK(
                 ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
                     opCtx, CommandHelpers::appendMajorityWriteConcern(requestPhase2.toBSON({}))));
-
-            // TODO SERVER-53283: This block can removed once 5.0 becomes last-lts.
-            if (requestedVersion == FeatureCompatibility::Version::kFullyDowngradedTo50) {
-                ShardingCatalogManager::get(opCtx)->upgradeMetadataFor50Phase2(opCtx);
-            }
 
             // Always abort the reshardCollection regardless of version to ensure that it will run
             // on a consistent version from start to finish. This will ensure that it will be able
@@ -606,14 +584,6 @@ private:
             // to apply the oplog entries correctly.
             abortAllReshardCollection(opCtx);
 
-            // TODO SERVER-53283: This block can removed once 5.0 becomes last-lts.
-            if (requestedVersion < FeatureCompatibility::Version::kFullyDowngradedTo50) {
-                ShardingCatalogManager::get(opCtx)->downgradeMetadataToPre50Phase1(opCtx);
-
-                // TODO: SERVER-55912 remove after 5.0 becomes last-lts.
-                dropReshardingCollectionsOnConfig(opCtx);
-            }
-
             // Tell the shards to enter phase-2 of setFCV (fully downgraded)
             auto requestPhase2 = request;
             requestPhase2.setFromConfigServer(true);
@@ -622,11 +592,6 @@ private:
             uassertStatusOK(
                 ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
                     opCtx, CommandHelpers::appendMajorityWriteConcern(requestPhase2.toBSON({}))));
-
-            // TODO SERVER-53283: This block can removed once 5.0 becomes last-lts.
-            if (requestedVersion < FeatureCompatibility::Version::kFullyDowngradedTo50) {
-                ShardingCatalogManager::get(opCtx)->downgradeMetadataToPre50Phase2(opCtx);
-            }
         } else if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
             // TODO: SERVER-55912 remove after 5.0 becomes last-lts.
             if (requestedVersion < FeatureCompatibility::Version::kFullyDowngradedTo50) {

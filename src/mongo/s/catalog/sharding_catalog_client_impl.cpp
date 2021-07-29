@@ -157,16 +157,12 @@ AggregateCommandRequest makeCollectionAndChunksAggregation(OperationContext* opC
     stages.emplace_back(DocumentSourceMatch::create(
         Doc{{CollectionType::kNssFieldName, nss.toString()}}.toBson(), expCtx));
 
-    // 2. Four $unionWith stages, each one of them guarded by a mutually exclusive condition on
-    // metadata format ('timestamp' exists) and whether the refresh is incremental ('lastmodEpoch'
-    // matches sinceVersion.epoch), so that only a single one of them will possibly execute their
-    // $lookup stage. This is necessary because the query optimizer is not able to use indexes when
-    // a $match inside a $lookup includes a $cond operator. Also note that depending on the metadata
-    // format (indicated by the presence of 'timestamp'), we have different guarantees about what
-    // indexes are present (ns_1_lastmod_1 or uuid_1_lastmod_1), so we must avoid possibly executing
-    // a $lookup that would need an inexistent index, even if it was to return empty results.
+    // 2. Two $unionWith stages guarded by a mutually exclusive condition on whether the refresh is
+    // incremental ('lastmodEpoch' matches sinceVersion.epoch), so that only a single one of them
+    // will possibly execute their $lookup stage. This is necessary because the query optimizer is
+    // not able to use indexes when a $match inside a $lookup includes a $cond operator.
     //
-    // The $lookup stages get the config.chunks documents according to the metadata format and the
+    // The $lookup stages get the config.chunks documents according to the
     // type of refresh (incremental or full), sorted by ascending 'lastmod'. The $lookup is
     // immediately followed by $unwind to take advantage of the $lookup + $unwind coalescence
     // optimization which avoids creating large intermediate documents.
@@ -183,47 +179,6 @@ AggregateCommandRequest makeCollectionAndChunksAggregation(OperationContext* opC
     //         coll: "collections",
     //         pipeline: [
     //             { $match: { _id: <nss> } },
-    //             { $match: { timestamp: { $exists: 0 } } },
-    //             { $match: { lastmodEpoch: <sinceVersion.epoch> } },
-    //             {
-    //                 $lookup: {
-    //                     from: "chunks",
-    //                     as: "chunks",
-    //                     let: { local_ns: "$_id" },
-    //                     pipeline: [
-    //                         {
-    //                             $match: {
-    //                                 $expr: {
-    //                                     $eq: ["$ns", "$$local_ns"],
-    //                                 },
-    //                             }
-    //                         },
-    //                         { $match: { lastmod: { $gte: <sinceVersion> } } },
-    //                         {
-    //                             $sort: {
-    //                                 lastmod: 1
-    //                             }
-    //                         }
-    //                     ]
-    //                 }
-    //             },
-    //             {
-    //                 $unwind: {
-    //                     path: "$chunks"
-    //                 }
-    //             },
-    //             {
-    //                 $project: { _id: false, chunks: true }
-    //             }
-    //         ]
-    //     }
-    // },
-    // {
-    //     $unionWith: {
-    //         coll: "collections",
-    //         pipeline: [
-    //             { $match: { _id: <nss> } },
-    //             { $match: { timestamp: { $exists: 1 } } },
     //             { $match: { lastmodEpoch: <sinceVersion.epoch> } },
     //             {
     //                 $lookup: {
@@ -263,46 +218,6 @@ AggregateCommandRequest makeCollectionAndChunksAggregation(OperationContext* opC
     //         coll: "collections",
     //         pipeline: [
     //             { $match: { _id: <nss> } },
-    //             { $match: { timestamp: { $exists: 0 } } },
-    //             { $match: { lastmodEpoch: { $ne: <sinceVersion.epoch> } } },
-    //             {
-    //                 $lookup: {
-    //                     from: "chunks",
-    //                     as: "chunks",
-    //                     let: { local_ns: "$_id" },
-    //                     pipeline: [
-    //                         {
-    //                             $match: {
-    //                                 $expr: {
-    //                                     $eq: ["$ns", "$$local_ns"],
-    //                                 },
-    //                             }
-    //                         },
-    //                         {
-    //                             $sort: {
-    //                                 lastmod: 1
-    //                             }
-    //                         }
-    //                     ]
-    //                 }
-    //             },
-    //             {
-    //                 $unwind: {
-    //                     path: "$chunks"
-    //                 }
-    //             },
-    //             {
-    //                 $project: { _id: false, chunks: true }
-    //             },
-    //         ]
-    //     }
-    // },
-    // {
-    //     $unionWith: {
-    //         coll: "collections",
-    //         pipeline: [
-    //             { $match: { _id: <nss> } },
-    //             { $match: { timestamp: { $exists: 1 } } },
     //             { $match: { lastmodEpoch: { $ne: <sinceVersion.epoch> } } },
     //             {
     //                 $lookup: {
@@ -336,15 +251,13 @@ AggregateCommandRequest makeCollectionAndChunksAggregation(OperationContext* opC
     //         ]
     //     }
     // }
-    const auto buildUnionWithFn = [&](bool withUUID, bool incremental) {
+    const auto buildUnionWithFn = [&](bool incremental) {
         const auto lastmodEpochMatch = Doc{{incremental ? "$eq" : "$ne", sinceVersion.epoch()}};
 
-        const auto letExpr = withUUID ? Doc{{"local_uuid", "$" + CollectionType::kUuidFieldName}}
-                                      : Doc{{"local_ns", "$" + CollectionType::kNssFieldName}};
+        const auto letExpr = Doc{{"local_uuid", "$" + CollectionType::kUuidFieldName}};
 
-        const auto eqNsOrUuidExpr = withUUID
-            ? Arr{Value{"$" + ChunkType::collectionUUID.name()}, Value{"$$local_uuid"_sd}}
-            : Arr{Value{"$" + ChunkType::ns.name()}, Value{"$$local_ns"_sd}};
+        const auto uuidExpr =
+            Arr{Value{"$" + ChunkType::collectionUUID.name()}, Value{"$$local_uuid"_sd}};
 
         constexpr auto chunksLookupOutputFieldName = "chunks"_sd;
 
@@ -354,7 +267,7 @@ AggregateCommandRequest makeCollectionAndChunksAggregation(OperationContext* opC
                 {"as", chunksLookupOutputFieldName},
                 {"let", letExpr},
                 {"pipeline",
-                 Arr{Value{Doc{{"$match", Doc{{"$expr", Doc{{"$eq", eqNsOrUuidExpr}}}}}}},
+                 Arr{Value{Doc{{"$match", Doc{{"$expr", Doc{{"$eq", uuidExpr}}}}}}},
                      incremental
                          ? Value{Doc{{"$match",
                                       Doc{{ChunkType::lastmod.name(),
@@ -367,9 +280,6 @@ AggregateCommandRequest makeCollectionAndChunksAggregation(OperationContext* opC
             {"coll", CollectionType::ConfigNS.coll()},
             {"pipeline",
              Arr{Value{Doc{{"$match", Doc{{CollectionType::kNssFieldName, nss.toString()}}}}},
-                 Value{
-                     Doc{{"$match",
-                          Doc{{CollectionType::kTimestampFieldName, Doc{{"$exists", withUUID}}}}}}},
                  Value{Doc{{"$match", Doc{{CollectionType::kEpochFieldName, lastmodEpochMatch}}}}},
                  Value{Doc{{"$lookup", lookupPipeline}}},
                  Value{Doc{{"$unwind", Doc{{"path", "$" + chunksLookupOutputFieldName}}}}},
@@ -377,30 +287,12 @@ AggregateCommandRequest makeCollectionAndChunksAggregation(OperationContext* opC
                      {"$project", Doc{{"_id", false}, {chunksLookupOutputFieldName, true}}}}}}}};
     };
 
-    // TODO SERVER-53283: Once 5.0 has branched out this stage is no longer necessary.
     stages.emplace_back(DocumentSourceUnionWith::createFromBson(
-        Doc{{"$unionWith", buildUnionWithFn(false /* withUUID */, true /* incremental */)}}
-            .toBson()
-            .firstElement(),
+        Doc{{"$unionWith", buildUnionWithFn(true /* incremental */)}}.toBson().firstElement(),
         expCtx));
 
     stages.emplace_back(DocumentSourceUnionWith::createFromBson(
-        Doc{{"$unionWith", buildUnionWithFn(true /* withUUID */, true /* incremental */)}}
-            .toBson()
-            .firstElement(),
-        expCtx));
-
-    // TODO SERVER-53283: Once 5.0 has branched out this stage is no longer necessary.
-    stages.emplace_back(DocumentSourceUnionWith::createFromBson(
-        Doc{{"$unionWith", buildUnionWithFn(false /* withUUID */, false /* incremental */)}}
-            .toBson()
-            .firstElement(),
-        expCtx));
-
-    stages.emplace_back(DocumentSourceUnionWith::createFromBson(
-        Doc{{"$unionWith", buildUnionWithFn(true /* withUUID */, false /* incremental */)}}
-            .toBson()
-            .firstElement(),
+        Doc{{"$unionWith", buildUnionWithFn(false /* incremental */)}}.toBson().firstElement(),
         expCtx));
 
     auto pipeline = Pipeline::create(std::move(stages), expCtx);
