@@ -90,6 +90,8 @@ public:
                                            const BSONObj& query,
                                            const BSONObj& update) = 0;
 
+    virtual void clearFilteringMetadata(OperationContext* opCtx) = 0;
+
     /**
      * Creates the temporary resharding collection locally.
      *
@@ -134,6 +136,8 @@ public:
     void updateCoordinatorDocument(OperationContext* opCtx,
                                    const BSONObj& query,
                                    const BSONObj& update) override;
+
+    void clearFilteringMetadata(OperationContext* opCtx) override;
 
 private:
     template <typename Callable>

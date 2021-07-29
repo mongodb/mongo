@@ -306,6 +306,9 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_finishR
 
                        if (!_isAlsoDonor) {
                            auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+
+                           _externalState->clearFilteringMetadata(opCtx.get());
+
                            RecoverableCriticalSectionService::get(opCtx.get())
                                ->releaseRecoverableCriticalSection(
                                    opCtx.get(),
@@ -850,6 +853,17 @@ void ReshardingRecipientService::RecipientStateMachine::insertStateDocument(
     store.add(opCtx, recipientDoc, kNoWaitWriteConcern);
 }
 
+void ReshardingRecipientService::RecipientStateMachine::commit() {
+    stdx::lock_guard<Latch> lk(_mutex);
+    tassert(ErrorCodes::ReshardCollectionInProgress,
+            "Attempted to commit the resharding operation in an incorrect state",
+            _recipientCtx.getState() >= RecipientStateEnum::kStrictConsistency);
+
+    if (!_coordinatorHasDecisionPersisted.getFuture().isReady()) {
+        _coordinatorHasDecisionPersisted.emplaceValue();
+    }
+}
+
 void ReshardingRecipientService::RecipientStateMachine::_updateRecipientDocument(
     RecipientShardContext&& newRecipientCtx,
     boost::optional<ReshardingRecipientService::RecipientStateMachine::CloneDetails>&& cloneDetails,
@@ -891,7 +905,10 @@ void ReshardingRecipientService::RecipientStateMachine::_updateRecipientDocument
                  updateBuilder.done(),
                  kNoWaitWriteConcern);
 
-    _recipientCtx = newRecipientCtx;
+    {
+        stdx::lock_guard<Latch> lk(_mutex);
+        _recipientCtx = newRecipientCtx;
+    }
 
     if (cloneDetails) {
         _cloneTimestamp = cloneDetails->cloneTimestamp;

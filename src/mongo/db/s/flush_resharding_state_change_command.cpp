@@ -39,7 +39,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
+#include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog_cache_loader.h"
@@ -51,10 +51,6 @@ namespace {
 class FlushReshardingStateChangeCmd final : public TypedCommand<FlushReshardingStateChangeCmd> {
 public:
     using Request = _flushReshardingStateChange;
-
-    FlushReshardingStateChangeCmd()
-        : TypedCommand<FlushReshardingStateChangeCmd>(Request::kCommandName,
-                                                      Request::kCommandAlias) {}
 
     std::string help() const override {
         return "Internal command used by the resharding coordinator to flush state changes to the "
@@ -105,7 +101,7 @@ public:
                     "Can't call _flushReshardingStateChange if in read-only mode",
                     !storageGlobalParams.readOnly);
 
-            resharding::refreshShardVersion(opCtx, ns());
+            onShardVersionMismatch(opCtx, ns(), boost::none /* shardVersionReceived */);
 
             CatalogCacheLoader::get(opCtx).waitForCollectionFlush(opCtx, ns());
 

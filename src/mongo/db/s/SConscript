@@ -361,6 +361,7 @@ env.Library(
         'sharding_state_command.cpp',
         'shardsvr_abort_reshard_collection_command.cpp',
         'shardsvr_cleanup_reshard_collection_command.cpp',
+        'shardsvr_commit_reshard_collection_command.cpp',
         'shardsvr_create_collection_command.cpp',
         'shardsvr_create_collection_participant_command.cpp',
         'shardsvr_drop_collection_command.cpp',

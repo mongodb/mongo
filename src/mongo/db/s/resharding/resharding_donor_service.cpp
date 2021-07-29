@@ -50,6 +50,7 @@
 #include "mongo/db/s/recoverable_critical_section_service.h"
 #include "mongo/db/s/resharding/resharding_change_event_o2_field_gen.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
+#include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
 #include "mongo/db/s/resharding/resharding_future_util.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
@@ -169,6 +170,10 @@ public:
                 "query"_attr = query,
                 "update"_attr = update);
         }
+    }
+
+    void clearFilteringMetadata(OperationContext* opCtx) {
+        resharding::clearFilteringMetadata(opCtx, true /* scheduleAsyncRefresh */);
     }
 };
 
@@ -344,6 +349,9 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
 
                {
                    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+
+                   _externalState->clearFilteringMetadata(opCtx.get());
+
                    RecoverableCriticalSectionService::get(opCtx.get())
                        ->releaseRecoverableCriticalSection(
                            opCtx.get(),
@@ -904,6 +912,17 @@ void ReshardingDonorService::DonorStateMachine::insertStateDocument(
     store.add(opCtx, donorDoc, kNoWaitWriteConcern);
 }
 
+void ReshardingDonorService::DonorStateMachine::commit() {
+    stdx::lock_guard<Latch> lk(_mutex);
+    tassert(ErrorCodes::ReshardCollectionInProgress,
+            "Attempted to commit the resharding operation in an incorrect state",
+            _donorCtx.getState() >= DonorStateEnum::kBlockingWrites);
+
+    if (!_coordinatorHasDecisionPersisted.getFuture().isReady()) {
+        _coordinatorHasDecisionPersisted.emplaceValue();
+    }
+}
+
 void ReshardingDonorService::DonorStateMachine::_updateDonorDocument(
     DonorShardContext&& newDonorCtx) {
     auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
@@ -926,6 +945,7 @@ void ReshardingDonorService::DonorStateMachine::_updateDonorDocument(
         wuow.commit();
     });
 
+    stdx::lock_guard<Latch> lk(_mutex);
     _donorCtx = newDonorCtx;
 }
 

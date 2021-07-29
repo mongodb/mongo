@@ -55,6 +55,7 @@
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/abort_reshard_collection_gen.h"
+#include "mongo/s/request_types/commit_reshard_collection_gen.h"
 #include "mongo/s/request_types/flush_resharding_state_change_gen.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/s/write_ops/batched_command_response.h"
@@ -1028,7 +1029,7 @@ void markCompleted(const Status& status) {
 BSONObj createFlushReshardingStateChangeCommand(const NamespaceString& nss,
                                                 const UUID& reshardingUUID) {
     _flushReshardingStateChange cmd(nss);
-    cmd.setDbName(nss.db());
+    cmd.setDbName(NamespaceString::kAdminDb);
     cmd.setReshardingUUID(reshardingUUID);
     return cmd.toBSON(
         BSON(WriteConcernOptions::kWriteConcernField << WriteConcernOptions::Majority));
@@ -1036,12 +1037,11 @@ BSONObj createFlushReshardingStateChangeCommand(const NamespaceString& nss,
 
 BSONObj createShardsvrCommitReshardCollectionCmd(const NamespaceString& nss,
                                                  const UUID& reshardingUUID) {
-    BSONObjBuilder cmdBuilder;
-    cmdBuilder.append(_flushReshardingStateChange::kCommandAlias, nss.toString());
-    reshardingUUID.appendToBuilder(&cmdBuilder,
-                                   _flushReshardingStateChange::kReshardingUUIDFieldName);
-    cmdBuilder.append(WriteConcernOptions::kWriteConcernField, WriteConcernOptions::Majority);
-    return cmdBuilder.obj();
+    ShardsvrCommitReshardCollection cmd(nss);
+    cmd.setDbName(NamespaceString::kAdminDb);
+    cmd.setReshardingUUID(reshardingUUID);
+    return cmd.toBSON(
+        BSON(WriteConcernOptions::kWriteConcernField << WriteConcernOptions::Majority));
 }
 
 ExecutorFuture<ReshardingCoordinatorDocument>
