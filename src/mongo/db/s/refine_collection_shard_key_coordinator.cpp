@@ -51,6 +51,10 @@ SemiFuture<void> RefineCollectionShardKeyCoordinator::runImpl(
     return ExecutorFuture<void>(executor, Status::OK())
         .then([this, anchor = shared_from_this()]() {
             ThreadClient tc{"RefineCollectionShardKeyCoordinator", _serviceContext};
+            {
+                stdx::lock_guard<Client> lk(*tc.get());
+                tc->setSystemOperationKillableByStepdown(lk);
+            }
             auto opCtxHolder = tc->makeOperationContext();
             auto* opCtx = opCtxHolder.get();
             _forwardableOpMetadata.setOn(opCtx);

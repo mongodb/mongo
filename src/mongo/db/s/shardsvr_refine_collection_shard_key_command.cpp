@@ -61,6 +61,8 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
+            opCtx->setAlwaysInterruptAtStepDownOrUp();
+
             auto refineCoordinator = std::make_shared<RefineCollectionShardKeyCoordinator>(
                 opCtx, ns(), request().getNewShardKey());
             refineCoordinator->run(opCtx).get(opCtx);
