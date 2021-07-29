@@ -2,7 +2,7 @@
  * Tests that replSetInitiate eventually succeeds despite temporary DNS outage.
  *
  * @tags: [
- *   disabled_due_to_server_58295
+ *   multiversion_incompatible
  * ]
  */
 
