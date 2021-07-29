@@ -75,11 +75,15 @@ def idl_scanner(node, env, path):
     for i in range(len(flags)):
         if flags[i] == "--include":
             include_paths.append(flags[i + 1])
+    resolver = idlc.CompilerImportResolver(include_paths)
 
-    with open(str(node), encoding="utf-8") as file_stream:
-        parsed_doc = idlc.parser.parse(
-            file_stream, str(node), idlc.CompilerImportResolver(include_paths)
-        )
+    try:
+        with open(str(node), encoding="utf-8") as file_stream:
+            parsed_doc = idlc.parser.parse(
+                file_stream, str(node), resolver
+            )
+    except OSError:
+        return nodes_deps_list
 
     if not parsed_doc.errors and parsed_doc.spec.imports is not None:
         nodes_deps_list.extend(
