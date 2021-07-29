@@ -1,5 +1,6 @@
 # Mongo compile
 Cheetah3 # src/mongo/base/generate_error_codes.py
+packaging
 psutil
 regex
 requirements_parser

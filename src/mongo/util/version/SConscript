@@ -18,7 +18,7 @@ generateReleases = env.Command(
         'releases.yml',
     ],
     action=[
-        '$PYTHON ${SOURCES[0]} -o ${TARGETS[0]} ${SOURCES[1]} ${SOURCES[2]}',
+        '$PYTHON ${SOURCES[0]} -o ${TARGETS[0]} ${SOURCES[1]} ${SOURCES[2]} ${MONGO_VERSION}',
     ],
 )
 
