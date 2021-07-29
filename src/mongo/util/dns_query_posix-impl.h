@@ -54,6 +54,8 @@
 
 #include <boost/noncopyable.hpp>
 
+#include "mongo/util/duration.h"
+
 namespace mongo {
 namespace dns {
 // The anonymous namespace is safe, in this header, as it is not really a header.  It is only used
@@ -191,6 +193,10 @@ public:
 
     DNSQueryType getType() const {
         return static_cast<DNSQueryType>(this->_resource_record.type);
+    }
+
+    Seconds getTtl() const {
+        return Seconds(ns_rr_ttl(this->_resource_record));
     }
 
 private:

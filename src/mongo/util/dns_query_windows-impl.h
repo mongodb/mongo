@@ -48,6 +48,7 @@
 
 #include <boost/noncopyable.hpp>
 
+#include "mongo/util/duration.h"
 #include "mongo/util/errno_util.h"
 
 using std::begin;
@@ -157,6 +158,10 @@ public:
 
     DNSQueryType getType() const {
         return static_cast<DNSQueryType>(this->_record->wType);
+    }
+
+    Seconds getTtl() const {
+        return Seconds(this->_record->dwTtl);
     }
 
 

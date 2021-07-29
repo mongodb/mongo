@@ -36,10 +36,12 @@ using namespace std::literals::string_literals;
 
 namespace {
 std::string getFirstARecord(const std::string& service) {
-    auto res = mongo::dns::lookupARecords(service);
+    auto resPair = mongo::dns::lookupARecords(service);
+    ASSERT_GT(resPair.size(), 0);
+    auto res = resPair.front().first;
     if (res.empty())
         return "";
-    return res.front();
+    return res;
 }
 
 TEST(MongoDnsQuery, basic) {

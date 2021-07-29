@@ -62,26 +62,23 @@ using namespace std::literals::string_literals;
 
 namespace mongo {
 
-/**
- * Returns a string with the IP address or domain name listed...
- */
-std::vector<std::string> dns::lookupARecords(const std::string& service) {
+std::vector<std::pair<std::string, Seconds>> dns::lookupARecords(const std::string& service) {
     DNSQueryState dnsQuery;
     auto response = dnsQuery.lookup(service, DNSQueryClass::kInternet, DNSQueryType::kAddress);
 
-    std::vector<std::string> rv;
+    std::vector<std::pair<std::string, Seconds>> res;
 
     for (const auto& entry : response) {
         try {
             if (entry.getType() == DNSQueryType::kCNAME) {
                 return lookupARecords(entry.cnameEntry());
             }
-            rv.push_back(entry.addressEntry());
+            res.emplace_back(entry.addressEntry(), entry.getTtl());
         } catch (const ExceptionFor<ErrorCodes::DNSRecordTypeMismatch>&) {
         }
     }
 
-    if (rv.empty()) {
+    if (res.empty()) {
         StringBuilder oss;
         oss << "Looking up " << service << " A record yielded ";
         if (response.size() == 0) {
@@ -92,7 +89,7 @@ std::vector<std::string> dns::lookupARecords(const std::string& service) {
         uasserted(ErrorCodes::DNSProtocolError, oss.str());
     }
 
-    return rv;
+    return res;
 }
 
 std::vector<dns::SRVHostEntry> dns::lookupSRVRecords(const std::string& service) {
