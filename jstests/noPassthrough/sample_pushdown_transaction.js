@@ -3,7 +3,7 @@
  * reproduce SERVER-57642.
  *
  * Requires WiredTiger for random cursor support.
- * @tags: [requires_wiredtiger, requires_replication]
+ * @tags: [requires_wiredtiger, requires_replication, uses_transactions]
  */
 (function() {
     'use strict';
