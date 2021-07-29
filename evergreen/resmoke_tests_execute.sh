@@ -18,7 +18,6 @@ if [[ ${disable_unit_tests} = "false" && ! -f ${skip_tests} ]]; then
   if [[ -f "patch_test_tags.tgz" ]]; then
     tags_build_variant="${build_variant}"
 
-    # TODO SERVER-56382: create a more robust mapping between query builders and existing required builders.
     if [[ "${build_variant}" =~ .*"-query-patch-only" ]]; then
       # Use the RHEL 8 all feature flags variant for the classic engine variant. The original
       # classic engine variant is not a required builder and therefore not captured in patch

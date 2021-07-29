@@ -12,7 +12,6 @@ pushd coredb-patchbuild-optimizer
 # Copy the Evergreen config file into the working directory.
 cp ../.evergreen.yml .
 
-# TODO SERVER-56382: use the real requirements file.
 $python -m pip install tornado==6.1 motor==2.4
 # Reusing bfsuggestion's password here to avoid having to
 # go through the process of adding a new Evergreen project expansion.

@@ -2628,7 +2628,7 @@ tasks:
 
 ## lint ##
 - name: lint_pylinters
-  tags: []
+  tags: ["lint"]
   commands:
     - command: timeout.update
       params:
@@ -2647,7 +2647,7 @@ tasks:
         targets: lint-pylinters
 
 - name: lint_clang_format
-  tags: []
+  tags: ["lint"]
   commands:
     - command: timeout.update
       params:
@@ -2666,7 +2666,7 @@ tasks:
         targets: lint-clang-format
 
 - name: lint_eslint
-  tags: []
+  tags: ["lint"]
   commands:
     - command: timeout.update
       params:
@@ -2685,7 +2685,7 @@ tasks:
         targets: lint-eslint
 
 - name: lint_cpplint
-  tags: []
+  tags: ["lint"]
   commands:
     - command: timeout.update
       params:
@@ -2704,7 +2704,7 @@ tasks:
         targets: lint-lint.py
 
 - name: lint_yaml
-  tags: []
+  tags: ["lint"]
   depends_on: []
   commands:
   - command: manifest.load
@@ -2723,7 +2723,7 @@ tasks:
         - "src/evergreen/lint_yaml.sh"
 
 - name: lint_shellscripts
-  tags: []
+  tags: ["lint"]
   commands:
   - command: manifest.load
   - func: "git get project and add git tag"
@@ -2738,7 +2738,7 @@ tasks:
         - "src/evergreen/lint_shellscripts.sh"
 
 - name: lint_errorcodes
-  tags: []
+  tags: ["lint"]
   commands:
     - command: manifest.load
     - func: "git get project and add git tag"
@@ -9094,14 +9094,8 @@ buildvariants:
     distros:
     - rhel80-xlarge
   - name: build_variant_gen
-  - name: lint_pylinters
-  - name: lint_clang_format
-  - name: lint_eslint
-  - name: lint_cpplint
+  - name: .lint
   - name: lint_fuzzer_sanity_patch
-  - name: lint_yaml
-  - name: lint_shellscripts
-  - name: lint_errorcodes
   - name: test_api_version_compatibility
   - name: burn_in_tests_gen
   - name: burn_in_tests_multiversion_gen
@@ -9335,7 +9329,7 @@ buildvariants:
       --mongodSetParameters="{internalQueryEnableSlotBasedExecutionEngine: true}"
       --additionalFeatureFlags=featureFlagTimeseriesCollection
   tasks:
-  - name: compile_test_and_package_parallel_core_stream_TG
+  - name: compile_and_archive_dist_test_TG
     distros:
       - rhel80-large
 # Disable the following tests as they are not aware of feature flags.
@@ -9351,6 +9345,7 @@ buildvariants:
   - name: .change_streams
   - name: .change_stream_fuzzer
   - name: .concurrency !.large !.ubsan !.debug_only
+  - name: .lint
   - name: .jscore !.sharding !.decimal !cst_jscore_passthrough
   - name: .jstestfuzz !.flow_control
   - name: .query_fuzzer
@@ -11720,15 +11715,28 @@ buildvariants:
   tasks:
   - name: selected_tests_gen
 
-- name: commit-queue
+- <<: *enterprise-rhel-80-64-bit-dynamic-required-template
+  name: commit-queue
   display_name: "~ Commit Queue"
-  modules:
-  - enterprise
-  run_on:
-    - rhel80-small
   batchtime: 10080 # 7 days
   stepback: false
   tasks:
+  - name: validate_commit_message
+  - name: check_for_todos
+  - name: compile_test_and_package_parallel_core_stream_TG
+    distros:
+      - rhel80-xlarge-commitqueue
+  - name: compile_test_and_package_parallel_unittest_stream_TG
+    distros:
+      - rhel80-xlarge-commitqueue
+  - name: compile_test_and_package_parallel_dbtest_stream_TG
+    distros:
+      - rhel80-xlarge-commitqueue
+  - name: jsCore
+    distros:
+      - rhel80-xlarge-commitqueue
+  - name: .lint
+  - name: test_api_version_compatibility
   - name: validate_commit_message
   - name: check_for_todos
 
@@ -11814,22 +11822,27 @@ buildvariants:
 - <<: *enterprise-rhel-80-64-bit-dynamic-sbe-engine
   name: enterprise-rhel-80-64-bit-dynamic-sbe-engine-query-patch-only
   display_name: "~ Shared Library Enterprise RHEL 8.0 Query Patch Only (SBE Execution Engine)"
-  batchtime: 7776000 # 90 days. This is a patch-only variant.
+  batchtime: 10080 # 7 days. This is a patch-only variant but we run on mainline to pick up task history.
   expansions:
     <<: *enterprise-rhel-80-64-bit-dynamic-sbe-engine-expansions
     jstestfuzz_num_generated_files: 20
     jstestfuzz_concurrent_num_files: 5
     target_resmoke_time: 30
     max_sub_suites: 3
+    test_flags: >-
+      --mongodSetParameters="{internalQueryEnableSlotBasedExecutionEngine: true}"
+      --additionalFeatureFlags=featureFlagTimeseriesCollection
+      --excludeWithAnyTags=resource_intensive
 
 # Intentionally derive from SBE to run the SBE tests with all feature flags.
-- <<: *enterprise-rhel-80-64-bit-dynamic-sbe-engine
+- <<: *enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-template
   name: enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-query-patch-only
   display_name: "~ Shared Library Enterprise RHEL 8.0 Query Patch Only (all feature flags)"
-  batchtime: 7776000 # 90 days. This is a patch-only variant.
+  batchtime: 10080 # 7 days. This is a patch-only variant but we run on mainline to pick up task history.
   expansions:
     <<: *enterprise-rhel-80-64-bit-dynamic-all-feature-flags-expansions
     jstestfuzz_num_generated_files: 20
     jstestfuzz_concurrent_num_files: 5
     target_resmoke_time: 30
     max_sub_suites: 3
+    test_flags: --runAllFeatureFlagTests --excludeWithAnyTags=resource_intensive
