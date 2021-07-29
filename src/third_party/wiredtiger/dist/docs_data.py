@@ -11,6 +11,9 @@ class ArchDocPage:
 # List of all architecture subsections
 ##########################################
 arch_doc_pages = [
+    ArchDocPage('arch-backup',
+        ['WT_CURSOR_BACKUP'],
+        ['src/cursor/cur_backup.c', 'src/cursor/cur_backup_incr.c']),
     ArchDocPage('arch-block',
         ['WT_BLOCK', 'WT_BLOCK_CKPT', 'WT_BLOCK_DESC', 'WT_BLOCK_HEADER',
          'WT_BM', 'WT_EXTLIST'],
