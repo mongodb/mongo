@@ -364,7 +364,7 @@ public:
     /** count number of objects in collection ns that match the query criteria specified
         throws UserAssertion if database returns an error
     */
-    virtual long long count(const NamespaceStringOrUUID nsOrUuid,
+    virtual long long count(NamespaceStringOrUUID nsOrUuid,
                             const BSONObj& query = BSONObj(),
                             int options = 0,
                             int limit = 0,
@@ -450,8 +450,8 @@ public:
      * @param authorizedDatabases Only return the databases the user is authorized on
      */
     std::vector<BSONObj> getDatabaseInfos(const BSONObj& filter = BSONObj(),
-                                          const bool nameOnly = false,
-                                          const bool authorizedDatabases = false);
+                                          bool nameOnly = false,
+                                          bool authorizedDatabases = false);
 
     bool exists(const std::string& ns);
 
@@ -792,7 +792,7 @@ protected:
     /** if the element contains a not primary error */
     bool isNotPrimaryErrorString(const BSONElement& e);
 
-    BSONObj _countCmd(const NamespaceStringOrUUID nsOrUuid,
+    BSONObj _countCmd(NamespaceStringOrUUID nsOrUuid,
                       const BSONObj& query,
                       int options,
                       int limit,

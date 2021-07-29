@@ -80,7 +80,7 @@ public:
      * The document 'options' is typically obtained from the 'wiredTiger' field of
      * CollectionOptions::storageEngine.
      */
-    static StatusWith<std::string> parseOptionsField(const BSONObj options);
+    static StatusWith<std::string> parseOptionsField(BSONObj options);
 
     /**
      * Creates a configuration string suitable for 'config' parameter in WT_SESSION::create().

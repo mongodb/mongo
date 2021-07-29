@@ -60,7 +60,7 @@ public:
      * [1, 2) and (3, 4] and the index bounds on field 'b' are [-Infinity, Infinity].
      */
     static Status boundsMatch(const BSONObj& testBounds,
-                              const IndexBounds trueBounds,
+                              IndexBounds trueBounds,
                               bool relaxBoundsCheck);
 
     /**

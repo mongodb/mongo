@@ -129,7 +129,8 @@ public:
     }
 
     template <typename H>
-    friend H AbslHashValue(H h, const ProcessId pid) {
+    friend H AbslHashValue(
+        H h, const ProcessId pid) {  // NOLINT(readability-avoid-const-params-in-decls)
         return H::combine(std::move(h), pid.asUInt32());
     }
 

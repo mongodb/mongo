@@ -79,7 +79,7 @@ std::pair<std::vector<repl::OplogEntry>, bool> _readTransactionOperationsFromOpl
     OperationContext* opCtx,
     const repl::OplogEntry& lastEntryInTxn,
     const std::vector<repl::OplogEntry*>& cachedOps,
-    const bool checkForCommands) noexcept;
+    bool checkForCommands) noexcept;
 
 /**
  * Apply `prepareTransaction` oplog entry.

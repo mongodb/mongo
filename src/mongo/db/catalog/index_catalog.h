@@ -144,7 +144,7 @@ public:
 
     class ReadyIndexesIterator : public IndexIterator {
     public:
-        ReadyIndexesIterator(OperationContext* const opCtx,
+        ReadyIndexesIterator(OperationContext* opCtx,
                              IndexCatalogEntryContainer::const_iterator beginIterator,
                              IndexCatalogEntryContainer::const_iterator endIterator);
 
@@ -163,7 +163,7 @@ public:
          * on. If the caller will keep control of the container for the entire iterator lifetime,
          * it should pass in a null value.
          */
-        AllIndexesIterator(OperationContext* const opCtx,
+        AllIndexesIterator(OperationContext* opCtx,
                            std::unique_ptr<std::vector<IndexCatalogEntry*>> ownedContainer);
 
     private:
@@ -187,7 +187,7 @@ public:
     virtual std::unique_ptr<IndexCatalog> clone() const = 0;
 
     // Must be called before used.
-    virtual Status init(OperationContext* const opCtx, Collection* collection) = 0;
+    virtual Status init(OperationContext* opCtx, Collection* collection) = 0;
 
     // ---- accessors -----
 
@@ -195,30 +195,29 @@ public:
 
     virtual bool haveAnyIndexesInProgress() const = 0;
 
-    virtual int numIndexesTotal(OperationContext* const opCtx) const = 0;
+    virtual int numIndexesTotal(OperationContext* opCtx) const = 0;
 
-    virtual int numIndexesReady(OperationContext* const opCtx) const = 0;
+    virtual int numIndexesReady(OperationContext* opCtx) const = 0;
 
-    virtual int numIndexesInProgress(OperationContext* const opCtx) const = 0;
+    virtual int numIndexesInProgress(OperationContext* opCtx) const = 0;
 
-    virtual bool haveIdIndex(OperationContext* const opCtx) const = 0;
+    virtual bool haveIdIndex(OperationContext* opCtx) const = 0;
 
     /**
      * Returns the spec for the id index to create by default for this collection.
      */
     virtual BSONObj getDefaultIdIndexSpec(const CollectionPtr& collection) const = 0;
 
-    virtual const IndexDescriptor* findIdIndex(OperationContext* const opCtx) const = 0;
+    virtual const IndexDescriptor* findIdIndex(OperationContext* opCtx) const = 0;
 
     /**
      * Find index by name.  The index name uniquely identifies an index.
      *
      * @return null if cannot find
      */
-    virtual const IndexDescriptor* findIndexByName(
-        OperationContext* const opCtx,
-        const StringData name,
-        const bool includeUnfinishedIndexes = false) const = 0;
+    virtual const IndexDescriptor* findIndexByName(OperationContext* opCtx,
+                                                   StringData name,
+                                                   bool includeUnfinishedIndexes = false) const = 0;
 
     /**
      * Find index by matching key pattern and options. The key pattern, collation spec, and partial
@@ -227,10 +226,10 @@ public:
      * @return null if cannot find index, otherwise the index with a matching signature.
      */
     virtual const IndexDescriptor* findIndexByKeyPatternAndOptions(
-        OperationContext* const opCtx,
+        OperationContext* opCtx,
         const BSONObj& key,
         const BSONObj& indexSpec,
-        const bool includeUnfinishedIndexes = false) const = 0;
+        bool includeUnfinishedIndexes = false) const = 0;
 
     /**
      * Find indexes with a matching key pattern, putting them into the vector 'matches'.  The key
@@ -238,11 +237,10 @@ public:
      *
      * Consider using 'findIndexByName' if expecting to match one index.
      */
-    virtual void findIndexesByKeyPattern(
-        OperationContext* const opCtx,
-        const BSONObj& key,
-        const bool includeUnfinishedIndexes,
-        std::vector<const IndexDescriptor*>* const matches) const = 0;
+    virtual void findIndexesByKeyPattern(OperationContext* opCtx,
+                                         const BSONObj& key,
+                                         bool includeUnfinishedIndexes,
+                                         std::vector<const IndexDescriptor*>* matches) const = 0;
 
     /**
      * Returns an index suitable for shard key range scans.
@@ -257,15 +255,15 @@ public:
      *
      * If no such index exists, returns NULL.
      */
-    virtual const IndexDescriptor* findShardKeyPrefixedIndex(OperationContext* const opCtx,
+    virtual const IndexDescriptor* findShardKeyPrefixedIndex(OperationContext* opCtx,
                                                              const CollectionPtr& collection,
                                                              const BSONObj& shardKey,
-                                                             const bool requireSingleKey) const = 0;
+                                                             bool requireSingleKey) const = 0;
 
-    virtual void findIndexByType(OperationContext* const opCtx,
+    virtual void findIndexByType(OperationContext* opCtx,
                                  const std::string& type,
                                  std::vector<const IndexDescriptor*>& matches,
-                                 const bool includeUnfinishedIndexes = false) const = 0;
+                                 bool includeUnfinishedIndexes = false) const = 0;
 
     /**
      * Reload the index definition for 'oldDesc' from the CollectionCatalogEntry.  'oldDesc'
@@ -279,15 +277,15 @@ public:
      * The caller must hold the collection X lock and ensure no index builds are in progress
      * on the collection.
      */
-    virtual const IndexDescriptor* refreshEntry(OperationContext* const opCtx,
+    virtual const IndexDescriptor* refreshEntry(OperationContext* opCtx,
                                                 Collection* collection,
-                                                const IndexDescriptor* const oldDesc) = 0;
+                                                const IndexDescriptor* oldDesc) = 0;
 
     /**
      * Returns a pointer to the index catalog entry associated with 'desc'. Throws if there is no
      * such index. Never returns nullptr.
      */
-    virtual const IndexCatalogEntry* getEntry(const IndexDescriptor* const desc) const = 0;
+    virtual const IndexCatalogEntry* getEntry(const IndexDescriptor* desc) const = 0;
 
     /**
      * Returns a pointer to the index catalog entry associated with 'desc', where the caller assumes
@@ -306,7 +304,7 @@ public:
      * Returns an iterator for the index descriptors in this IndexCatalog.
      */
     virtual std::unique_ptr<IndexIterator> getIndexIterator(
-        OperationContext* const opCtx, const bool includeUnfinishedIndexes) const = 0;
+        OperationContext* opCtx, bool includeUnfinishedIndexes) const = 0;
 
     // ---- index set modifiers ------
 
@@ -325,9 +323,9 @@ public:
      * empty collection can be rolled back as part of a larger WUOW. Returns the full specification
      * of the created index, as it is stored in this index catalog.
      */
-    virtual StatusWith<BSONObj> createIndexOnEmptyCollection(OperationContext* const opCtx,
+    virtual StatusWith<BSONObj> createIndexOnEmptyCollection(OperationContext* opCtx,
                                                              Collection* collection,
-                                                             const BSONObj spec) = 0;
+                                                             BSONObj spec) = 0;
 
     /**
      * Checks the spec 'original' to make sure nothing is incorrectly set and cleans up any legacy
@@ -338,7 +336,7 @@ public:
      * already being built.
      */
     virtual StatusWith<BSONObj> prepareSpecForCreate(
-        OperationContext* const opCtx,
+        OperationContext* opCtx,
         const CollectionPtr& collection,
         const BSONObj& original,
         const boost::optional<ResumeIndexInfo>& resumeInfo) const = 0;
@@ -358,10 +356,10 @@ public:
      * they are not, then IndexBuildAlreadyInProgress errors can be thrown.
      */
     virtual std::vector<BSONObj> removeExistingIndexes(
-        OperationContext* const opCtx,
+        OperationContext* opCtx,
         const CollectionPtr& collection,
         const std::vector<BSONObj>& indexSpecsToBuild,
-        const bool removeIndexBuildsToo) const = 0;
+        bool removeIndexBuildsToo) const = 0;
 
     /**
      * Filters out ready and in-progress indexes that already exist and returns the remaining
@@ -374,7 +372,7 @@ public:
      * via replica set cloning or chunk migrations.
      */
     virtual std::vector<BSONObj> removeExistingIndexesNoChecks(
-        OperationContext* const opCtx,
+        OperationContext* opCtx,
         const CollectionPtr& collection,
         const std::vector<BSONObj>& indexSpecsToBuild) const = 0;
 
@@ -397,18 +395,18 @@ public:
      * The caller must hold the collection X lock and ensure no index builds are in progress on the
      * collection.
      */
-    virtual Status dropIndex(OperationContext* const opCtx,
+    virtual Status dropIndex(OperationContext* opCtx,
                              Collection* collection,
-                             const IndexDescriptor* const desc) = 0;
+                             const IndexDescriptor* desc) = 0;
 
     /**
      * Drops an unfinished index given its descriptor.
      *
      * The caller must hold the collection X lock.
      */
-    virtual Status dropUnfinishedIndex(OperationContext* const opCtx,
+    virtual Status dropUnfinishedIndex(OperationContext* opCtx,
                                        Collection* collection,
-                                       const IndexDescriptor* const desc) = 0;
+                                       const IndexDescriptor* desc) = 0;
 
     /**
      * Drops the index given its catalog entry.
@@ -433,9 +431,9 @@ public:
      *
      * See IndexCatalogEntry::setMultikey().
      */
-    virtual void setMultikeyPaths(OperationContext* const opCtx,
+    virtual void setMultikeyPaths(OperationContext* opCtx,
                                   const CollectionPtr& coll,
-                                  const IndexDescriptor* const desc,
+                                  const IndexDescriptor* desc,
                                   const KeyStringSet& multikeyMetadataKeys,
                                   const MultikeyPaths& multikeyPaths) const = 0;
 
@@ -447,10 +445,10 @@ public:
      *
      * This method may throw.
      */
-    virtual Status indexRecords(OperationContext* const opCtx,
+    virtual Status indexRecords(OperationContext* opCtx,
                                 const CollectionPtr& collection,
                                 const std::vector<BsonRecord>& bsonRecords,
-                                int64_t* const keysInsertedOut) const = 0;
+                                int64_t* keysInsertedOut) const = 0;
 
     /**
      * Both 'keysInsertedOut' and 'keysDeletedOut' are required and will be set to the number of
@@ -458,24 +456,24 @@ public:
      *
      * This method may throw.
      */
-    virtual Status updateRecord(OperationContext* const opCtx,
+    virtual Status updateRecord(OperationContext* opCtx,
                                 const CollectionPtr& coll,
                                 const BSONObj& oldDoc,
                                 const BSONObj& newDoc,
                                 const RecordId& recordId,
-                                int64_t* const keysInsertedOut,
-                                int64_t* const keysDeletedOut) const = 0;
+                                int64_t* keysInsertedOut,
+                                int64_t* keysDeletedOut) const = 0;
 
     /**
      * When 'keysDeletedOut' is not null, it will be set to the number of index keys removed by
      * this operation.
      */
-    virtual void unindexRecord(OperationContext* const opCtx,
+    virtual void unindexRecord(OperationContext* opCtx,
                                const CollectionPtr& collection,
                                const BSONObj& obj,
                                const RecordId& loc,
-                               const bool noWarn,
-                               int64_t* const keysDeletedOut) const = 0;
+                               bool noWarn,
+                               int64_t* keysDeletedOut) const = 0;
 
     /*
      * Attempt compaction on all ready indexes to regain disk space, if the storage engine's index

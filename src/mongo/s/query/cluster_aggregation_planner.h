@@ -78,7 +78,7 @@ struct AggregationTargeter {
     static AggregationTargeter make(
         OperationContext* opCtx,
         const NamespaceString& executionNss,
-        const std::function<std::unique_ptr<Pipeline, PipelineDeleter>()> buildPipelineFn,
+        std::function<std::unique_ptr<Pipeline, PipelineDeleter>()> buildPipelineFn,
         boost::optional<ChunkManager> cm,
         stdx::unordered_set<NamespaceString> involvedNamespaces,
         bool hasChangeStream,

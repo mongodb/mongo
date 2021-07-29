@@ -56,7 +56,7 @@ public:
     }
 
     static boost::intrusive_ptr<DocumentSourceChangeStreamAddPostImage> createFromBson(
-        const BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
+        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     /**
      * Only modifies a single path: "fullDocument".

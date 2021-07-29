@@ -153,7 +153,7 @@ public:
      *
      * In the case the passed version is boost::none, nothing will be done.
      */
-    void onStaleDatabaseVersion(const StringData dbName,
+    void onStaleDatabaseVersion(StringData dbName,
                                 const boost::optional<DatabaseVersion>& wantedVersion);
 
     /**
@@ -275,7 +275,7 @@ private:
 
         } _stats;
 
-        void _updateRefreshesStats(const bool isIncremental, const bool add);
+        void _updateRefreshesStats(bool isIncremental, bool add);
     };
 
     StatusWith<ChunkManager> _getCollectionRoutingInfoAt(OperationContext* opCtx,

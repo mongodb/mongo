@@ -139,7 +139,7 @@ BSONObj createPassthroughCommandForShard(
 BSONObj createCommandForTargetedShards(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                        Document serializedCommand,
                                        const SplitPipeline& splitPipeline,
-                                       const boost::optional<ShardedExchangePolicy> exchangeSpec,
+                                       boost::optional<ShardedExchangePolicy> exchangeSpec,
                                        bool needsMerge,
                                        boost::optional<BSONObj> readConcern = boost::none);
 

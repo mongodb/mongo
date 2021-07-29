@@ -109,7 +109,7 @@ private:
          * The returned event will eventually be signaled.
          */
         StatusWith<executor::TaskExecutor::EventHandle> start(
-            const executor::TaskExecutor::RemoteCommandCallbackFn cb);
+            executor::TaskExecutor::RemoteCommandCallbackFn cb);
 
         /**
          * Informs the runner to cancel further processing.

@@ -107,12 +107,12 @@ public:
     bool getDraining() const {
         return _draining.value_or(false);
     }
-    void setDraining(const bool draining);
+    void setDraining(bool draining);
 
     long long getMaxSizeMB() const {
         return _maxSizeMB.value_or(0);
     }
-    void setMaxSizeMB(const long long maxSizeMB);
+    void setMaxSizeMB(long long maxSizeMB);
 
     std::vector<std::string> getTags() const {
         return _tags.value_or(std::vector<std::string>());
@@ -122,7 +122,7 @@ public:
     ShardState getState() const {
         return _state.value_or(ShardState::kNotShardAware);
     }
-    void setState(const ShardState state);
+    void setState(ShardState state);
 
     Timestamp getTopologyTime() const {
         return _topologyTime.value_or(Timestamp());

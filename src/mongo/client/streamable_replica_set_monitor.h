@@ -236,16 +236,15 @@ private:
     void onTopologyDescriptionChangedEvent(sdam::TopologyDescriptionPtr previousDescription,
                                            sdam::TopologyDescriptionPtr newDescription) override;
 
-    void onServerHeartbeatSucceededEvent(const HostAndPort& hostAndPort,
-                                         const BSONObj reply) override;
+    void onServerHeartbeatSucceededEvent(const HostAndPort& hostAndPort, BSONObj reply) override;
 
     void onServerHandshakeFailedEvent(const HostAndPort& address,
                                       const Status& status,
-                                      const BSONObj reply) override;
+                                      BSONObj reply) override;
 
     void onServerHeartbeatFailureEvent(Status errorStatus,
                                        const HostAndPort& hostAndPort,
-                                       const BSONObj reply) override;
+                                       BSONObj reply) override;
 
     void onServerPingFailedEvent(const HostAndPort& hostAndPort, const Status& status) override;
 
@@ -254,7 +253,7 @@ private:
 
     void onServerHandshakeCompleteEvent(sdam::HelloRTT durationMs,
                                         const HostAndPort& hostAndPort,
-                                        const BSONObj reply) override;
+                                        BSONObj reply) override;
 
     // Get a pointer to the current primary's ServerDescription
     // To ensure a consistent view of the Topology either _currentPrimary or _currentTopology should

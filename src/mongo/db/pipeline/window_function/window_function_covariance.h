@@ -40,7 +40,7 @@ class WindowFunctionCovariance : public WindowFunctionState {
 public:
     static inline const Value kDefault = Value(BSONNULL);
 
-    WindowFunctionCovariance(ExpressionContext* const expCtx, bool isSamp);
+    WindowFunctionCovariance(ExpressionContext* expCtx, bool isSamp);
 
     void add(Value value) override;
 

@@ -434,8 +434,7 @@ private:
      * This will be called when we check the first batch of results and our last fetched optime does
      * not equal the first document in that batch. This function should never return Status::OK().
      */
-    Status _checkTooStaleToSyncFromSource(const OpTime lastFetched,
-                                          const OpTime firstOpTimeInDocument);
+    Status _checkTooStaleToSyncFromSource(OpTime lastFetched, OpTime firstOpTimeInDocument);
 
     // Protects member data of this OplogFetcher.
     mutable Mutex _mutex = MONGO_MAKE_LATCH("OplogFetcher::_mutex");

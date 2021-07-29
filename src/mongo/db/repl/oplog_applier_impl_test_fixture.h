@@ -308,7 +308,7 @@ bool collectionExists(OperationContext* opCtx, const NamespaceString& nss);
  */
 void createIndex(OperationContext* opCtx,
                  const NamespaceString& nss,
-                 const UUID collUUID,
+                 UUID collUUID,
                  const BSONObj& spec);
 
 }  // namespace repl

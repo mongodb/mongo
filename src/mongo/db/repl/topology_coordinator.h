@@ -279,7 +279,7 @@ public:
                                              const MemberState& memberState,
                                              const OpTime& previousOpTimeFetched,
                                              Date_t now,
-                                             const ReadPreference readPreference);
+                                             ReadPreference readPreference);
 
     /**
      * Sets the reported mode of this node to one of RS_SECONDARY, RS_STARTUP2, RS_ROLLBACK or
@@ -512,7 +512,7 @@ public:
      * Marks a member as down from our perspective and returns a bool which indicates if we can no
      * longer see a majority of the nodes and thus should step down.
      */
-    bool setMemberAsDown(Date_t now, const int memberIndex);
+    bool setMemberAsDown(Date_t now, int memberIndex);
 
     /**
      * Goes through the memberData and determines which member that is currently live
@@ -703,7 +703,7 @@ public:
     /**
      * Set the outgoing heartbeat message from self
      */
-    void setMyHeartbeatMessage(const Date_t now, const std::string& s);
+    void setMyHeartbeatMessage(Date_t now, const std::string& s);
 
     /**
      * Prepares a ReplSetMetadata object describing the current term, primary, and lastOp
@@ -743,7 +743,7 @@ public:
     /**
      * Transitions to the candidate role if the node is electable.
      */
-    Status becomeCandidateIfElectable(const Date_t now, StartElectionReasonEnum reason);
+    Status becomeCandidateIfElectable(Date_t now, StartElectionReasonEnum reason);
 
     /**
      * Updates the storage engine read committed support in the TopologyCoordinator options after
@@ -754,7 +754,7 @@ public:
     /**
      * Reset the booleans to record the last heartbeat restart for the target node.
      */
-    void restartHeartbeat(const Date_t now, const HostAndPort& target);
+    void restartHeartbeat(Date_t now, const HostAndPort& target);
 
     /**
      * Increments the counter field of the current TopologyVersion.
@@ -828,7 +828,7 @@ public:
     /**
      * Records the ping for the given host. For use only in testing.
      */
-    void setPing_forTest(const HostAndPort& host, const Milliseconds ping);
+    void setPing_forTest(const HostAndPort& host, Milliseconds ping);
 
     // Returns _electionTime.  Only used in unittests.
     Timestamp getElectionTime() const;
@@ -946,7 +946,7 @@ private:
 
     // Checks if the node can see a healthy primary of equal or greater priority to the
     // candidate. If so, returns the index of that node. Otherwise returns -1.
-    int _findHealthyPrimaryOfEqualOrGreaterPriority(const int candidateIndex) const;
+    int _findHealthyPrimaryOfEqualOrGreaterPriority(int candidateIndex) const;
 
     // Is our optime close enough to the latest known optime to call for a priority takeover.
     bool _amIFreshEnoughForPriorityTakeover() const;
@@ -956,8 +956,7 @@ private:
     bool _amIFreshEnoughForCatchupTakeover() const;
 
     // Returns reason why "self" member is unelectable
-    UnelectableReasonMask _getMyUnelectableReason(const Date_t now,
-                                                  StartElectionReasonEnum reason) const;
+    UnelectableReasonMask _getMyUnelectableReason(Date_t now, StartElectionReasonEnum reason) const;
 
     // Returns reason why memberIndex is unelectable
     UnelectableReasonMask _getUnelectableReason(int memberIndex) const;
@@ -984,7 +983,7 @@ private:
      * Returns information we have on the state of the node identified by memberId.  Returns
      * nullptr if memberId is not found in the configuration.
      */
-    MemberData* _findMemberDataByMemberId(const int memberId);
+    MemberData* _findMemberDataByMemberId(int memberId);
 
     /**
      * Performs updating "_currentPrimaryIndex" for processHeartbeatResponse().

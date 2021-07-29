@@ -43,7 +43,7 @@ using Sense = AccumulatorMinMax::Sense;
  */
 class AccumulatorN : public AccumulatorState {
 public:
-    AccumulatorN(ExpressionContext* const expCtx);
+    AccumulatorN(ExpressionContext* expCtx);
 
 protected:
     // Initialize 'n' with 'input'. In particular, verifies that 'input' is a positive integer.
@@ -52,7 +52,7 @@ protected:
     // Parses 'args' for the 'n' and 'output' arguments that are common to the 'N' family of
     // accumulators.
     static std::tuple<boost::intrusive_ptr<Expression>, boost::intrusive_ptr<Expression>> parseArgs(
-        ExpressionContext* const expCtx, const BSONObj& args, VariablesParseState vps);
+        ExpressionContext* expCtx, const BSONObj& args, VariablesParseState vps);
 
     // Helper which appends the 'n' and 'output' fields to 'md'.
     static void serializeHelper(const boost::intrusive_ptr<Expression>& initializer,
@@ -72,14 +72,14 @@ private:
 };
 class AccumulatorMinMaxN : public AccumulatorN {
 public:
-    AccumulatorMinMaxN(ExpressionContext* const expCtx, Sense sense);
+    AccumulatorMinMaxN(ExpressionContext* expCtx, Sense sense);
 
     /**
      * Verifies that 'elem' is an object, delegates argument parsing to 'AccumulatorN::parseArgs',
      * and constructs an AccumulationExpression representing $minN or $maxN depending on 's'.
      */
     template <Sense s>
-    static AccumulationExpression parseMinMaxN(ExpressionContext* const expCtx,
+    static AccumulationExpression parseMinMaxN(ExpressionContext* expCtx,
                                                BSONElement elem,
                                                VariablesParseState vps);
 
@@ -118,7 +118,7 @@ public:
 
     static const char* getName();
 
-    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* const expCtx);
+    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx);
 };
 
 class AccumulatorMaxN : public AccumulatorMinMaxN {
@@ -129,6 +129,6 @@ public:
 
     static const char* getName();
 
-    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* const expCtx);
+    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx);
 };
 }  // namespace mongo

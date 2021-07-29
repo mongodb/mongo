@@ -145,11 +145,10 @@ public:
      * before forwarding an aggregation command on an unsharded collection, in order to verify that
      * the involved namespaces are allowed to be sharded.
      */
-    void verifyIsSupported(
-        OperationContext* opCtx,
-        const std::function<bool(OperationContext*, const NamespaceString&)> isSharded,
-        const boost::optional<ExplainOptions::Verbosity> explain,
-        bool enableMajorityReadConcern) const;
+    void verifyIsSupported(OperationContext* opCtx,
+                           std::function<bool(OperationContext*, const NamespaceString&)> isSharded,
+                           boost::optional<ExplainOptions::Verbosity> explain,
+                           bool enableMajorityReadConcern) const;
 
     /**
      * Returns true if the first stage in the pipeline does not require an input source.

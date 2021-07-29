@@ -142,7 +142,7 @@ public:
      */
     bool gossipOut(OperationContext* opCtx,
                    BSONObjBuilder* outMessage,
-                   const transport::Session::TagMask defaultClientSessionTags = 0) const;
+                   transport::Session::TagMask defaultClientSessionTags = 0) const;
 
     /**
      * Read the necessary fields from inMessage in order to update the current time, based on this
@@ -152,7 +152,7 @@ public:
     void gossipIn(OperationContext* opCtx,
                   const BSONObj& inMessage,
                   bool couldBeUnauthenticated,
-                  const transport::Session::TagMask defaultClientSessionTags = 0);
+                  transport::Session::TagMask defaultClientSessionTags = 0);
 
     /**
      * Returns true if the clock is enabled and can be used. Defaults to true.

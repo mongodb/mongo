@@ -93,7 +93,7 @@ public:
     long long getUptime() const {
         return _uptime.get();
     }
-    void setUptime(const long long uptime);
+    void setUptime(long long uptime);
 
     bool getWaiting() const {
         return _waiting.get();
@@ -101,7 +101,7 @@ public:
     bool isWaitingSet() const {
         return _waiting.is_initialized();
     }
-    void setWaiting(const bool waiting);
+    void setWaiting(bool waiting);
 
     const std::string& getMongoVersion() const {
         return _mongoVersion.get();
@@ -114,7 +114,7 @@ public:
     long long getConfigVersion() const {
         return _configVersion.get();
     }
-    void setConfigVersion(const long long configVersion);
+    void setConfigVersion(long long configVersion);
 
     std::vector<std::string> getAdvisoryHostFQDNs() const {
         return _advisoryHostFQDNs.value_or(std::vector<std::string>());

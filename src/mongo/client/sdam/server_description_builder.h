@@ -46,16 +46,16 @@ public:
 
     // server identity
     ServerDescriptionBuilder& withAddress(const HostAndPort& address);
-    ServerDescriptionBuilder& withType(const ServerType type);
+    ServerDescriptionBuilder& withType(ServerType type);
     ServerDescriptionBuilder& withMe(const HostAndPort& me);
-    ServerDescriptionBuilder& withTag(const std::string key, const std::string value);
-    ServerDescriptionBuilder& withSetName(const std::string setName);
+    ServerDescriptionBuilder& withTag(std::string key, std::string value);
+    ServerDescriptionBuilder& withSetName(std::string setName);
 
     // network attributes
     ServerDescriptionBuilder& withRtt(const HelloRTT& rtt);
     ServerDescriptionBuilder& withError(const std::string& error);
     ServerDescriptionBuilder& withLogicalSessionTimeoutMinutes(
-        const boost::optional<int> logicalSessionTimeoutMinutes);
+        boost::optional<int> logicalSessionTimeoutMinutes);
 
     // server capabilities
     ServerDescriptionBuilder& withMinWireVersion(int minVersion);
@@ -63,7 +63,7 @@ public:
 
     // server 'time'
     ServerDescriptionBuilder& withLastWriteDate(const Date_t& lastWriteDate);
-    ServerDescriptionBuilder& withOpTime(const repl::OpTime opTime);
+    ServerDescriptionBuilder& withOpTime(repl::OpTime opTime);
     ServerDescriptionBuilder& withLastUpdateTime(const Date_t& lastUpdateTime);
 
     // topology membership
@@ -71,7 +71,7 @@ public:
     ServerDescriptionBuilder& withHost(const HostAndPort& host);
     ServerDescriptionBuilder& withPassive(const HostAndPort& passive);
     ServerDescriptionBuilder& withArbiter(const HostAndPort& arbiter);
-    ServerDescriptionBuilder& withSetVersion(const int setVersion);
+    ServerDescriptionBuilder& withSetVersion(int setVersion);
     ServerDescriptionBuilder& withElectionId(const OID& electionId);
     ServerDescriptionBuilder& withTopologyVersion(TopologyVersion topologyVersion);
 

@@ -403,7 +403,7 @@ private:
     /**
      * Notify any command registers that are waiting.
      */
-    void notifyPendingRegisters(const Status s);
+    void notifyPendingRegisters(Status s);
 
     /**
      * Upload collected metrics.

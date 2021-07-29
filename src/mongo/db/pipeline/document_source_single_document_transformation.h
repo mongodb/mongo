@@ -53,7 +53,7 @@ public:
     DocumentSourceSingleDocumentTransformation(
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
         std::unique_ptr<TransformerInterface> parsedTransform,
-        const StringData name,
+        StringData name,
         bool independentOfAnyCollection);
 
     // virtuals from DocumentSource

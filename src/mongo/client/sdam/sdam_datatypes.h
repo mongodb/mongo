@@ -54,9 +54,9 @@ enum class TopologyType {
     kUnknown
 };
 const std::vector<TopologyType> allTopologyTypes();
-std::string toString(const TopologyType topologyType);
+std::string toString(TopologyType topologyType);
 StatusWith<TopologyType> parseTopologyType(StringData strTopologyType);
-std::ostream& operator<<(std::ostream& os, const TopologyType topologyType);
+std::ostream& operator<<(std::ostream& os, TopologyType topologyType);
 
 enum class ServerType {
     kStandalone,
@@ -69,9 +69,9 @@ enum class ServerType {
     kUnknown
 };
 const std::vector<ServerType> allServerTypes();
-std::string toString(const ServerType serverType);
+std::string toString(ServerType serverType);
 StatusWith<ServerType> parseServerType(StringData strServerType);
-std::ostream& operator<<(std::ostream& os, const ServerType serverType);
+std::ostream& operator<<(std::ostream& os, ServerType serverType);
 
 using HelloRTT = Microseconds;
 

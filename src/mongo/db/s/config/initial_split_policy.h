@@ -61,8 +61,8 @@ public:
     static std::unique_ptr<InitialSplitPolicy> calculateOptimizationStrategy(
         OperationContext* opCtx,
         const ShardKeyPattern& shardKeyPattern,
-        const std::int64_t numInitialChunks,
-        const bool presplitHashedZones,
+        std::int64_t numInitialChunks,
+        bool presplitHashedZones,
         const boost::optional<std::vector<BSONObj>>& initialSplitPoints,
         const std::vector<TagsType>& tags,
         size_t numShards,

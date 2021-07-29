@@ -594,7 +594,7 @@ public:
          */
         void _setReadOnlyForParticipant(OperationContext* opCtx,
                                         const ShardId& shard,
-                                        const Participant::ReadOnly readOnly);
+                                        Participant::ReadOnly readOnly);
 
         /**
          * Updates relevant metrics when the router receives an explicit abort from the client.

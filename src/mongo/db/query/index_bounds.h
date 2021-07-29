@@ -266,7 +266,7 @@ public:
      */
     static Location findIntervalForField(const BSONElement& elt,
                                          const OrderedIntervalList& oil,
-                                         const int expectedDirection,
+                                         int expectedDirection,
                                          size_t* newIntervalIndex);
 
 private:

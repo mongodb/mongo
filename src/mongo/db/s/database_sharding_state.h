@@ -53,7 +53,7 @@ public:
      */
     using DSSLock = ShardingStateLock<DatabaseShardingState>;
 
-    DatabaseShardingState(const StringData dbName);
+    DatabaseShardingState(StringData dbName);
     ~DatabaseShardingState() = default;
 
     /**
@@ -63,15 +63,15 @@ public:
      * Must be called with some lock held on the database being looked up and the returned
      * pointer must not be stored.
      */
-    static DatabaseShardingState* get(OperationContext* opCtx, const StringData dbName);
+    static DatabaseShardingState* get(OperationContext* opCtx, StringData dbName);
 
     /**
      * Obtain a pointer to the DatabaseShardingState that remains safe to access without holding
      * a database lock. Should be called instead of the regular get() if no database lock is held.
      * The returned DatabaseShardingState instance should not be modified!
      */
-    static std::shared_ptr<DatabaseShardingState> getSharedForLockFreeReads(
-        OperationContext* opCtx, const StringData dbName);
+    static std::shared_ptr<DatabaseShardingState> getSharedForLockFreeReads(OperationContext* opCtx,
+                                                                            StringData dbName);
 
     /**
      * Checks if this shard is the primary shard for the given DB.

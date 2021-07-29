@@ -132,7 +132,7 @@ public:
      * If 'db' matches the 'db' in the namespace the client sent versions for, returns the database
      * version sent by the client (if any), else returns boost::none.
      */
-    boost::optional<DatabaseVersion> getDbVersion(const StringData dbName) const;
+    boost::optional<DatabaseVersion> getDbVersion(StringData dbName) const;
 
     /**
      * This call is a no op if there isn't a currently active migration critical section. Otherwise

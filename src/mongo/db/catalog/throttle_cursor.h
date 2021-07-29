@@ -142,7 +142,7 @@ public:
      * In addition to throttling, while the thread is waiting, its operation context remains
      * interruptible.
      */
-    void awaitIfNeeded(OperationContext* opCtx, const int64_t dataSize);
+    void awaitIfNeeded(OperationContext* opCtx, int64_t dataSize);
 
     void turnThrottlingOff() {
         _shouldNotThrottle = true;

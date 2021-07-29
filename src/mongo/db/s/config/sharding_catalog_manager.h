@@ -376,7 +376,7 @@ public:
     void updateShardingCatalogEntryForCollectionInTxn(OperationContext* opCtx,
                                                       const NamespaceString& nss,
                                                       const CollectionType& coll,
-                                                      const bool upsert,
+                                                      bool upsert,
                                                       TxnNumber txnNumber);
 
 
@@ -406,7 +406,7 @@ public:
     StatusWith<std::string> addShard(OperationContext* opCtx,
                                      const std::string* shardProposedName,
                                      const ConnectionString& shardConnectionString,
-                                     const long long maxSize);
+                                     long long maxSize);
 
     /**
      * Tries to remove a shard. To completely remove a shard from a sharded cluster,

@@ -1065,9 +1065,9 @@ public:
      * internal operations occurs (i.e. step up, step down, or rollback). Also logs the metrics.
      */
     virtual void updateAndLogStateTransitionMetrics(
-        const ReplicationCoordinator::OpsKillingStateTransitionEnum stateTransition,
-        const size_t numOpsKilled,
-        const size_t numOpsRunning) const = 0;
+        ReplicationCoordinator::OpsKillingStateTransitionEnum stateTransition,
+        size_t numOpsKilled,
+        size_t numOpsRunning) const = 0;
 
     /**
      * Increment the server TopologyVersion and fulfill the promise of any currently waiting

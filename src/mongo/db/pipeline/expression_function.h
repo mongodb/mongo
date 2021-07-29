@@ -40,7 +40,7 @@ namespace mongo {
  */
 class ExpressionFunction final : public Expression {
 public:
-    static boost::intrusive_ptr<Expression> parse(ExpressionContext* const expCtx,
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
                                                   BSONElement expr,
                                                   const VariablesParseState& vps);
 
@@ -83,7 +83,7 @@ public:
     static constexpr auto kJavaScript = "js";
 
 private:
-    ExpressionFunction(ExpressionContext* const expCtx,
+    ExpressionFunction(ExpressionContext* expCtx,
                        boost::intrusive_ptr<Expression> passedArgs,
                        bool assignFirstArgToThis,
                        std::string funcSourceString,

@@ -54,8 +54,8 @@ public:
      */
     virtual void set(OperationContext* opCtx,
                      const LogicalSessionId& lsid,
-                     const TxnNumber txnNumber,
-                     const CoordinatorAction action) = 0;
+                     TxnNumber txnNumber,
+                     CoordinatorAction action) = 0;
 
     /**
      * Output the state into BSON previously associated with this OperationContext instance.

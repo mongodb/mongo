@@ -215,7 +215,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                              const OplogEntryOrGroupedInserts& opOrGroupedInserts,
                              bool alwaysUpsert,
                              OplogApplication::Mode mode,
-                             const bool isDataConsistent,
+                             bool isDataConsistent,
                              IncrementOpsAppliedStatsFn incrementOpsAppliedStats = {});
 
 /**

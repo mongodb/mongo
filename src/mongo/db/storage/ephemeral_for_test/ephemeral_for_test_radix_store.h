@@ -594,7 +594,7 @@ public:
     }
 
     std::pair<const_iterator, bool> insert(value_type&& value) {
-        const Key& key = std::move(value).first;
+        const Key& key = value.first;
 
         Node* node = _findNode(key);
         if (node != nullptr || key.size() == 0)
@@ -604,7 +604,7 @@ public:
     }
 
     std::pair<const_iterator, bool> update(value_type&& value) {
-        const Key& key = std::move(value).first;
+        const Key& key = value.first;
 
         // Ensure that the item to be updated exists.
         auto item = RadixStore::find(key);

@@ -70,7 +70,7 @@ protected:
                                     const NamespaceString& ns,
                                     const BSONObj& query,
                                     const BSONObj& update,
-                                    const bool upsert);
+                                    bool upsert);
 
     /**
      * Deletes a document to this config server to the specified namespace.
@@ -78,7 +78,7 @@ protected:
     Status deleteToConfigCollection(OperationContext* opCtx,
                                     const NamespaceString& ns,
                                     const BSONObj& doc,
-                                    const bool multi);
+                                    bool multi);
 
     /**
      * Reads a single document from a collection living on the config server.
@@ -136,7 +136,7 @@ protected:
     /**
      * Inserts a document for the database into the config.databases collection.
      */
-    void setupDatabase(const std::string& dbName, const ShardId primaryShard, const bool sharded);
+    void setupDatabase(const std::string& dbName, ShardId primaryShard, bool sharded);
 
     /**
      * Returns the indexes definitions defined on a given collection.

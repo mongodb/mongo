@@ -58,7 +58,7 @@ public:
     /**
      * Reset the String with the new UTF-8 source data, reusing the underlying buffer when possible.
      */
-    void resetData(const StringData utf8_src);
+    void resetData(StringData utf8_src);
 
     /**
      * Takes a substring of the current String and puts it in another String.
@@ -147,7 +147,7 @@ private:
     /**
      * Helper method for converting a UTF-8 string to a UTF-32 string.
      */
-    void setData(const StringData utf8_src);
+    void setData(StringData utf8_src);
 
     /**
      * Unified implementation of substrToBuf and toLowerToBuf.

@@ -167,7 +167,7 @@ public:
      * Returns batch of insert operations to be attached to a transaction
      */
     static BatchedCommandRequest buildInsertOp(const NamespaceString& nss,
-                                               const std::vector<BSONObj> docs);
+                                               std::vector<BSONObj> docs);
 
     /*
      * Returns batch of update operations to be attached to a transaction

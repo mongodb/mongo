@@ -64,7 +64,7 @@ public:
         "TenantMigrationRecipientService"_sd;
     static constexpr StringData kNoopMsg = "Resume token noop"_sd;
 
-    explicit TenantMigrationRecipientService(ServiceContext* const serviceContext);
+    explicit TenantMigrationRecipientService(ServiceContext* serviceContext);
     ~TenantMigrationRecipientService() = default;
 
     StringData getServiceName() const final;
@@ -82,7 +82,7 @@ public:
 
     class Instance final : public PrimaryOnlyService::TypedInstance<Instance> {
     public:
-        explicit Instance(ServiceContext* const serviceContext,
+        explicit Instance(ServiceContext* serviceContext,
                           const TenantMigrationRecipientService* recipientService,
                           BSONObj stateDoc);
 
@@ -419,8 +419,8 @@ public:
          * should resume from. The oplog applier should resume applying entries that have a greater
          * optime than the returned value.
          */
-        OpTime _getOplogResumeApplyingDonorOptime(const OpTime startApplyingDonorOpTime,
-                                                  const OpTime cloneFinishedRecipientOpTime) const;
+        OpTime _getOplogResumeApplyingDonorOptime(OpTime startApplyingDonorOpTime,
+                                                  OpTime cloneFinishedRecipientOpTime) const;
 
         /*
          * Starts the tenant cloner.

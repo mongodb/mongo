@@ -80,7 +80,7 @@ public:
             boost::optional<Status> abortReason;
         };
 
-        explicit Instance(ServiceContext* const serviceContext,
+        explicit Instance(ServiceContext* serviceContext,
                           const TenantMigrationDonorService* donorService,
                           const BSONObj& initialState);
 
@@ -208,7 +208,7 @@ public:
          */
         ExecutorFuture<repl::OpTime> _updateStateDoc(
             std::shared_ptr<executor::ScopedTaskExecutor> executor,
-            const TenantMigrationDonorStateEnum nextState,
+            TenantMigrationDonorStateEnum nextState,
             const CancellationToken& token);
 
         /**

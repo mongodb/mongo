@@ -119,7 +119,7 @@ public:
      *   the tree (i.e. index numbers in the tags refer to entries in this vector)
      */
     static StatusWith<std::unique_ptr<PlanCacheIndexTree>> cacheDataFromTaggedTree(
-        const MatchExpression* const taggedTree, const std::vector<IndexEntry>& relevantIndices);
+        const MatchExpression* taggedTree, const std::vector<IndexEntry>& relevantIndices);
 
     /**
      * @param filter -- an untagged MatchExpression
@@ -139,7 +139,7 @@ public:
      * Does not take ownership of either filter or indexTree.
      */
     static Status tagAccordingToCache(MatchExpression* filter,
-                                      const PlanCacheIndexTree* const indexTree,
+                                      const PlanCacheIndexTree* indexTree,
                                       const std::map<IndexEntry::Identifier, size_t>& indexMap);
 
     /**

@@ -134,7 +134,7 @@ private:
  */
 Status checkQuorumForInitiate(executor::TaskExecutor* executor,
                               const ReplSetConfig& rsConfig,
-                              const int myIndex,
+                              int myIndex,
                               long long term);
 
 /**
@@ -154,7 +154,7 @@ Status checkQuorumForInitiate(executor::TaskExecutor* executor,
  */
 Status checkQuorumForReconfig(executor::TaskExecutor* executor,
                               const ReplSetConfig& rsConfig,
-                              const int myIndex,
+                              int myIndex,
                               long long term);
 
 }  // namespace repl

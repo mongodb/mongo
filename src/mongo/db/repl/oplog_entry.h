@@ -93,7 +93,7 @@ public:
     static ReplOperation makeInsertOperation(const NamespaceString& nss,
                                              UUID uuid,
                                              const BSONObj& docToInsert);
-    static ReplOperation makeUpdateOperation(const NamespaceString nss,
+    static ReplOperation makeUpdateOperation(NamespaceString nss,
                                              UUID uuid,
                                              const BSONObj& update,
                                              const BSONObj& criteria);
@@ -101,11 +101,11 @@ public:
                                              UUID uuid,
                                              const BSONObj& docToDelete);
 
-    static ReplOperation makeCreateCommand(const NamespaceString nss,
+    static ReplOperation makeCreateCommand(NamespaceString nss,
                                            const mongo::CollectionOptions& options,
                                            const BSONObj& idIndex);
 
-    static ReplOperation makeCreateIndexesCommand(const NamespaceString nss,
+    static ReplOperation makeCreateIndexesCommand(NamespaceString nss,
                                                   CollectionUUID uuid,
                                                   const BSONObj& indexDoc);
 
@@ -305,7 +305,7 @@ public:
     static StatusWith<DurableOplogEntry> parse(const BSONObj& object);
 
     DurableOplogEntry(OpTime opTime,
-                      const boost::optional<int64_t> hash,
+                      boost::optional<int64_t> hash,
                       OpTypeEnum opType,
                       const NamespaceString& nss,
                       const boost::optional<UUID>& uuid,

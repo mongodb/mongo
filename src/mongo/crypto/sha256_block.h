@@ -43,12 +43,12 @@ struct SHA256BlockTraits {
 
     static constexpr StringData name = "SHA256Block"_sd;
 
-    static void computeHash(std::initializer_list<ConstDataRange> input, HashType* const output);
+    static void computeHash(std::initializer_list<ConstDataRange> input, HashType* output);
 
     static void computeHmac(const uint8_t* key,
                             size_t keyLen,
                             std::initializer_list<ConstDataRange> input,
-                            HashType* const output);
+                            HashType* output);
 };
 
 using SHA256Block = HashBlock<SHA256BlockTraits>;

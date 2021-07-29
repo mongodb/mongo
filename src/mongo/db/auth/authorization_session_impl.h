@@ -147,7 +147,7 @@ public:
 
     bool isImpersonating() const override;
 
-    Status checkCursorSessionPrivilege(OperationContext* const opCtx,
+    Status checkCursorSessionPrivilege(OperationContext* opCtx,
                                        boost::optional<LogicalSessionId> cursorSessionId) override;
 
     void verifyContract(const AuthorizationContract* contract) const override;

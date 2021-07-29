@@ -99,17 +99,17 @@ public:
      * @param block if true, block the thread until the child has exited
      * @param exit_code[out] if set, and an exit code is available, the code will be stored here
      * @return true if the process has exited, false otherwise */
-    bool waitForPid(const ProcessId pid, const bool block, int* const exit_code = nullptr);
+    bool waitForPid(ProcessId pid, bool block, int* exit_code = nullptr);
     /** check if a child process is alive. Never blocks
      * @param pid the processid
      * @param exit_code[out] if set, and an exit code is available, the code will be stored here
      * @return true if the process has exited, false otherwise */
-    bool isPidDead(const ProcessId pids, int* const exit_code = nullptr);
+    bool isPidDead(ProcessId pids, int* exit_code = nullptr);
     void getRegisteredPorts(std::vector<int>& ports);
     void getRegisteredPids(std::vector<ProcessId>& pids);
 
 private:
-    void updatePidExitCode(const ProcessId pid, int exitCode);
+    void updatePidExitCode(ProcessId pid, int exitCode);
 
 private:
     stdx::unordered_set<ProcessId> _registeredPids;

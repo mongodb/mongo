@@ -58,8 +58,8 @@ public:
      * Inserts the documents into the collection record store, and indexes them with the
      * MultiIndexBlock on the side.
      */
-    virtual Status insertDocuments(const std::vector<BSONObj>::const_iterator begin,
-                                   const std::vector<BSONObj>::const_iterator end) = 0;
+    virtual Status insertDocuments(std::vector<BSONObj>::const_iterator begin,
+                                   std::vector<BSONObj>::const_iterator end) = 0;
     /**
      * Called when inserts are done and indexes can be committed.
      */

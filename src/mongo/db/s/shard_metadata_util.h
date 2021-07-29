@@ -142,7 +142,7 @@ StatusWith<ShardDatabaseType> readShardDatabasesEntry(OperationContext* opCtx, S
 Status updateShardCollectionsEntry(OperationContext* opCtx,
                                    const BSONObj& query,
                                    const BSONObj& update,
-                                   const bool upsert);
+                                   bool upsert);
 
 /**
  * Updates the databases collection entry matching 'query' with 'update' using local write
@@ -158,7 +158,7 @@ Status updateShardDatabasesEntry(OperationContext* opCtx,
                                  const BSONObj& query,
                                  const BSONObj& update,
                                  const BSONObj& inc,
-                                 const bool upsert);
+                                 bool upsert);
 
 /**
  * Reads the shard server's chunks collection corresponding to 'nss' or 'uuid' for chunks matching

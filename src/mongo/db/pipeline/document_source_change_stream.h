@@ -193,7 +193,7 @@ public:
      * Helper used by various change stream stages. Used for asserting that a certain Value of a
      * field has a certain type. Will uassert() if the field does not have the expected type.
      */
-    static void checkValueType(const Value v, const StringData fieldName, BSONType expectedType);
+    static void checkValueType(Value v, StringData fieldName, BSONType expectedType);
 
     /**
      * Extracts the resume token from the given spec. If a 'startAtOperationTime' is specified,

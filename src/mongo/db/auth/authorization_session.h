@@ -287,7 +287,7 @@ public:
     // when the session is accessible.  Returns a `mongo::Status` with information regarding the
     // nature of session inaccessibility when the session is not accessible.
     virtual Status checkCursorSessionPrivilege(
-        OperationContext* const opCtx, boost::optional<LogicalSessionId> cursorSessionId) = 0;
+        OperationContext* opCtx, boost::optional<LogicalSessionId> cursorSessionId) = 0;
 
     // Verify the authorization contract. If contract == nullptr, no check is performed.
     virtual void verifyContract(const AuthorizationContract* contract) const = 0;

@@ -124,7 +124,7 @@ public:
     /**
      * Returns true if this index is multikey, and returns false otherwise.
      */
-    bool isMultikey(OperationContext* const opCtx, const CollectionPtr& collection) const final;
+    bool isMultikey(OperationContext* opCtx, const CollectionPtr& collection) const final;
 
     /**
      * Returns the path components that cause this index to be multikey if this index supports
@@ -158,7 +158,7 @@ public:
                      const KeyStringSet& multikeyMetadataKeys,
                      const MultikeyPaths& multikeyPaths) const final;
 
-    void forceSetMultikey(OperationContext* const opCtx,
+    void forceSetMultikey(OperationContext* opCtx,
                           const CollectionPtr& coll,
                           bool isMultikey,
                           const MultikeyPaths& multikeyPaths) const final;

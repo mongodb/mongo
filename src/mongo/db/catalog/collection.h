@@ -333,29 +333,29 @@ public:
 
     virtual bool requiresIdIndex() const = 0;
 
-    virtual Snapshotted<BSONObj> docFor(OperationContext* const opCtx, RecordId loc) const = 0;
+    virtual Snapshotted<BSONObj> docFor(OperationContext* opCtx, RecordId loc) const = 0;
 
     /**
      * @param out - contents set to the right docs if exists, or nothing.
      * @return true iff loc exists
      */
-    virtual bool findDoc(OperationContext* const opCtx,
+    virtual bool findDoc(OperationContext* opCtx,
                          RecordId loc,
-                         Snapshotted<BSONObj>* const out) const = 0;
+                         Snapshotted<BSONObj>* out) const = 0;
 
-    virtual std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* const opCtx,
-                                                            const bool forward = true) const = 0;
+    virtual std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* opCtx,
+                                                            bool forward = true) const = 0;
 
     /**
      * Deletes the document with the given RecordId from the collection. For a description of the
      * parameters, see the overloaded function below.
      */
-    virtual void deleteDocument(OperationContext* const opCtx,
+    virtual void deleteDocument(OperationContext* opCtx,
                                 StmtId stmtId,
                                 RecordId loc,
-                                OpDebug* const opDebug,
-                                const bool fromMigrate = false,
-                                const bool noWarn = false,
+                                OpDebug* opDebug,
+                                bool fromMigrate = false,
+                                bool noWarn = false,
                                 StoreDeletedDoc storeDeletedDoc = StoreDeletedDoc::Off) const = 0;
 
     /**
@@ -370,13 +370,13 @@ public:
      * 'noWarn' if unindexing the record causes an error, if noWarn is true the error
      * will not be logged.
      */
-    virtual void deleteDocument(OperationContext* const opCtx,
+    virtual void deleteDocument(OperationContext* opCtx,
                                 Snapshotted<BSONObj> doc,
                                 StmtId stmtId,
                                 RecordId loc,
-                                OpDebug* const opDebug,
-                                const bool fromMigrate = false,
-                                const bool noWarn = false,
+                                OpDebug* opDebug,
+                                bool fromMigrate = false,
+                                bool noWarn = false,
                                 StoreDeletedDoc storeDeletedDoc = StoreDeletedDoc::Off) const = 0;
 
     /*
@@ -386,11 +386,11 @@ public:
      *
      * 'opDebug' Optional argument. When not null, will be used to record operation statistics.
      */
-    virtual Status insertDocuments(OperationContext* const opCtx,
-                                   const std::vector<InsertStatement>::const_iterator begin,
-                                   const std::vector<InsertStatement>::const_iterator end,
-                                   OpDebug* const opDebug,
-                                   const bool fromMigrate = false) const = 0;
+    virtual Status insertDocuments(OperationContext* opCtx,
+                                   std::vector<InsertStatement>::const_iterator begin,
+                                   std::vector<InsertStatement>::const_iterator end,
+                                   OpDebug* opDebug,
+                                   bool fromMigrate = false) const = 0;
 
     /**
      * this does NOT modify the doc before inserting
@@ -398,16 +398,16 @@ public:
      *
      * 'opDebug' Optional argument. When not null, will be used to record operation statistics.
      */
-    virtual Status insertDocument(OperationContext* const opCtx,
+    virtual Status insertDocument(OperationContext* opCtx,
                                   const InsertStatement& doc,
-                                  OpDebug* const opDebug,
-                                  const bool fromMigrate = false) const = 0;
+                                  OpDebug* opDebug,
+                                  bool fromMigrate = false) const = 0;
 
     /**
      * Callers must ensure no document validation is performed for this collection when calling
      * this method.
      */
-    virtual Status insertDocumentsForOplog(OperationContext* const opCtx,
+    virtual Status insertDocumentsForOplog(OperationContext* opCtx,
                                            std::vector<Record>* records,
                                            const std::vector<Timestamp>& timestamps) const = 0;
 
@@ -419,7 +419,7 @@ public:
      * NOTE: It is up to caller to commit the indexes.
      */
     virtual Status insertDocumentForBulkLoader(
-        OperationContext* const opCtx,
+        OperationContext* opCtx,
         const BSONObj& doc,
         const OnRecordInsertedFn& onRecordInserted) const = 0;
 
@@ -432,13 +432,13 @@ public:
      * 'opDebug' Optional argument. When not null, will be used to record operation statistics.
      * @return the post update location of the doc (may or may not be the same as oldLocation)
      */
-    virtual RecordId updateDocument(OperationContext* const opCtx,
+    virtual RecordId updateDocument(OperationContext* opCtx,
                                     RecordId oldLocation,
                                     const Snapshotted<BSONObj>& oldDoc,
                                     const BSONObj& newDoc,
-                                    const bool indexesAffected,
-                                    OpDebug* const opDebug,
-                                    CollectionUpdateArgs* const args) const = 0;
+                                    bool indexesAffected,
+                                    OpDebug* opDebug,
+                                    CollectionUpdateArgs* args) const = 0;
 
     virtual bool updateWithDamagesSupported() const = 0;
 
@@ -450,12 +450,12 @@ public:
      * @return the contents of the updated record.
      */
     virtual StatusWith<RecordData> updateDocumentWithDamages(
-        OperationContext* const opCtx,
+        OperationContext* opCtx,
         RecordId loc,
         const Snapshotted<RecordData>& oldRec,
-        const char* const damageSource,
+        const char* damageSource,
         const mutablebson::DamageVector& damages,
-        CollectionUpdateArgs* const args) const = 0;
+        CollectionUpdateArgs* args) const = 0;
 
     // -----------
 
@@ -467,7 +467,7 @@ public:
      * The caller should hold a collection X lock and ensure there are no index builds in progress
      * on the collection.
      */
-    virtual Status truncate(OperationContext* const opCtx) = 0;
+    virtual Status truncate(OperationContext* opCtx) = 0;
 
     /**
      * Truncate documents newer than the document at 'end' from the capped
@@ -478,9 +478,9 @@ public:
      * The caller should hold a collection X lock and ensure there are no index builds in progress
      * on the collection.
      */
-    virtual void cappedTruncateAfter(OperationContext* const opCtx,
+    virtual void cappedTruncateAfter(OperationContext* opCtx,
                                      RecordId end,
-                                     const bool inclusive) const = 0;
+                                     bool inclusive) const = 0;
 
     /**
      * Returns a non-ok Status if validator is not legal for this collection.
@@ -498,12 +498,10 @@ public:
      * An empty validator removes all validation.
      * Requires an exclusive lock on the collection.
      */
-    virtual void setValidator(OperationContext* const opCtx, Validator validator) = 0;
+    virtual void setValidator(OperationContext* opCtx, Validator validator) = 0;
 
-    virtual Status setValidationLevel(OperationContext* const opCtx,
-                                      ValidationLevelEnum newLevel) = 0;
-    virtual Status setValidationAction(OperationContext* const opCtx,
-                                       ValidationActionEnum newAction) = 0;
+    virtual Status setValidationLevel(OperationContext* opCtx, ValidationLevelEnum newLevel) = 0;
+    virtual Status setValidationAction(OperationContext* opCtx, ValidationActionEnum newAction) = 0;
 
     virtual boost::optional<ValidationLevelEnum> getValidationLevel() const = 0;
     virtual boost::optional<ValidationActionEnum> getValidationAction() const = 0;
@@ -676,26 +674,26 @@ public:
      */
     virtual std::shared_ptr<CappedInsertNotifier> getCappedInsertNotifier() const = 0;
 
-    virtual long long numRecords(OperationContext* const opCtx) const = 0;
+    virtual long long numRecords(OperationContext* opCtx) const = 0;
 
-    virtual long long dataSize(OperationContext* const opCtx) const = 0;
+    virtual long long dataSize(OperationContext* opCtx) const = 0;
 
 
     /**
      * Returns true if the collection does not contain any records.
      */
-    virtual bool isEmpty(OperationContext* const opCtx) const = 0;
+    virtual bool isEmpty(OperationContext* opCtx) const = 0;
 
-    virtual int averageObjectSize(OperationContext* const opCtx) const = 0;
+    virtual int averageObjectSize(OperationContext* opCtx) const = 0;
 
-    virtual uint64_t getIndexSize(OperationContext* const opCtx,
-                                  BSONObjBuilder* const details = nullptr,
-                                  const int scale = 1) const = 0;
+    virtual uint64_t getIndexSize(OperationContext* opCtx,
+                                  BSONObjBuilder* details = nullptr,
+                                  int scale = 1) const = 0;
 
     /**
      * Returns the number of unused, free bytes used by all indexes on disk.
      */
-    virtual uint64_t getIndexFreeStorageBytes(OperationContext* const opCtx) const = 0;
+    virtual uint64_t getIndexFreeStorageBytes(OperationContext* opCtx) const = 0;
 
     /**
      * If return value is not boost::none, reads with majority read concern using an older snapshot
@@ -703,7 +701,7 @@ public:
      */
     virtual boost::optional<Timestamp> getMinimumVisibleSnapshot() const = 0;
 
-    virtual void setMinimumVisibleSnapshot(const Timestamp name) = 0;
+    virtual void setMinimumVisibleSnapshot(Timestamp name) = 0;
 
     /**
      * Returns the time-series options for this buckets collection, or boost::none if not a

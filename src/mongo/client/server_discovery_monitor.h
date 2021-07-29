@@ -85,8 +85,8 @@ private:
     // request.
     StatusWith<executor::TaskExecutor::CallbackHandle> _scheduleSingleHello();
 
-    void _onHelloSuccess(const BSONObj bson);
-    void _onHelloFailure(const Status& status, const BSONObj bson);
+    void _onHelloSuccess(BSONObj bson);
+    void _onHelloFailure(const Status& status, BSONObj bson);
 
     Milliseconds _overrideRefreshPeriod(Milliseconds original);
     Milliseconds _currentRefreshPeriod(WithLock, bool scheduleImmediately);

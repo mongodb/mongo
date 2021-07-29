@@ -94,7 +94,7 @@ public:
 
     /// ---------------------
 
-    virtual void setIsReady(const bool newIsReady) = 0;
+    virtual void setIsReady(bool newIsReady) = 0;
 
     virtual void setDropped() = 0;
     virtual bool isDropped() const = 0;
@@ -104,8 +104,7 @@ public:
     /**
      * Returns true if this index is multikey and false otherwise.
      */
-    virtual bool isMultikey(OperationContext* const opCtx,
-                            const CollectionPtr& collection) const = 0;
+    virtual bool isMultikey(OperationContext* opCtx, const CollectionPtr& collection) const = 0;
 
     /**
      * Returns the path components that cause this index to be multikey if this index supports
@@ -116,7 +115,7 @@ public:
      * returns a vector with size equal to the number of elements in the index key pattern where
      * each element in the vector is an empty set.
      */
-    virtual MultikeyPaths getMultikeyPaths(OperationContext* const opCtx,
+    virtual MultikeyPaths getMultikeyPaths(OperationContext* opCtx,
                                            const CollectionPtr& collection) const = 0;
 
     /**
@@ -134,7 +133,7 @@ public:
      * namespace, index name, and multikey paths on the OperationContext rather than set the index
      * as multikey here.
      */
-    virtual void setMultikey(OperationContext* const opCtx,
+    virtual void setMultikey(OperationContext* opCtx,
                              const CollectionPtr& coll,
                              const KeyStringSet& multikeyMetadataKeys,
                              const MultikeyPaths& multikeyPaths) const = 0;
@@ -147,7 +146,7 @@ public:
      * This may also be used to allow indexes built before 3.4 to start tracking multikey path
      * metadata in the catalog.
      */
-    virtual void forceSetMultikey(OperationContext* const opCtx,
+    virtual void forceSetMultikey(OperationContext* opCtx,
                                   const CollectionPtr& coll,
                                   bool isMultikey,
                                   const MultikeyPaths& multikeyPaths) const = 0;
@@ -183,7 +182,7 @@ public:
      */
     virtual boost::optional<Timestamp> getMinimumVisibleSnapshot() const = 0;
 
-    virtual void setMinimumVisibleSnapshot(const Timestamp name) = 0;
+    virtual void setMinimumVisibleSnapshot(Timestamp name) = 0;
 };
 
 class IndexCatalogEntryContainer {

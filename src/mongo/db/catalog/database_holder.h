@@ -63,7 +63,7 @@ public:
      * Retrieves an already opened database or returns nullptr. Must be called with the database
      * locked in at least IS-mode.
      */
-    virtual Database* getDb(OperationContext* const opCtx, const StringData ns) const = 0;
+    virtual Database* getDb(OperationContext* opCtx, StringData ns) const = 0;
 
     /**
      * Fetches the ViewCatalog decorating the Database matching 'dbName', or returns nullptr if the
@@ -74,7 +74,7 @@ public:
      * to ensure the Database object is safe to access. This class' internal mutex provides
      * concurrency protection around looking up and accessing the Database object matching 'dbName.
      */
-    virtual std::shared_ptr<const ViewCatalog> getViewCatalog(OperationContext* const opCtx,
+    virtual std::shared_ptr<const ViewCatalog> getViewCatalog(OperationContext* opCtx,
                                                               StringData dbName) const = 0;
 
     /**
@@ -84,9 +84,9 @@ public:
      * @param justCreated Returns whether the database was newly created (true) or it already
      *          existed (false). Can be NULL if this information is not necessary.
      */
-    virtual Database* openDb(OperationContext* const opCtx,
-                             const StringData ns,
-                             bool* const justCreated = nullptr) = 0;
+    virtual Database* openDb(OperationContext* opCtx,
+                             StringData ns,
+                             bool* justCreated = nullptr) = 0;
 
     /**
      * Physically drops the specified opened database and removes it from the server's metadata. It
@@ -102,7 +102,7 @@ public:
      * Closes the specified database. Must be called with the database locked in X-mode.
      * No background jobs must be in progress on the database when this function is called.
      */
-    virtual void close(OperationContext* opCtx, const StringData ns) = 0;
+    virtual void close(OperationContext* opCtx, StringData ns) = 0;
 
     /**
      * Closes all opened databases. Must be called with the global lock acquired in X-mode.
@@ -115,7 +115,7 @@ public:
     /**
      * Returns the set of existing database names that differ only in casing.
      */
-    virtual std::set<std::string> getNamesWithConflictingCasing(const StringData name) = 0;
+    virtual std::set<std::string> getNamesWithConflictingCasing(StringData name) = 0;
 
     /**
      * Returns all the database names (including those which are empty).

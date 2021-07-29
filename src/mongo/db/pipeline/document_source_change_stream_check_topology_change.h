@@ -52,7 +52,7 @@ public:
     static constexpr StringData kStageName = "$_internalChangeStreamCheckTopologyChange"_sd;
 
     static boost::intrusive_ptr<DocumentSourceChangeStreamCheckTopologyChange> createFromBson(
-        const BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
+        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     static boost::intrusive_ptr<DocumentSourceChangeStreamCheckTopologyChange> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx) {

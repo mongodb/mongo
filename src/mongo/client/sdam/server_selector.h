@@ -57,7 +57,7 @@ public:
      * ServerDescription(s). The server is selected randomly from those that match the criteria.
      */
     virtual boost::optional<ServerDescriptionPtr> selectServer(
-        const TopologyDescriptionPtr topologyDescription,
+        TopologyDescriptionPtr topologyDescription,
         const ReadPreferenceSetting& criteria,
         const std::vector<HostAndPort>& excludedHosts = std::vector<HostAndPort>()) = 0;
 
@@ -70,12 +70,12 @@ public:
     explicit SdamServerSelector(const SdamConfiguration& config);
 
     boost::optional<std::vector<ServerDescriptionPtr>> selectServers(
-        const TopologyDescriptionPtr topologyDescription,
+        TopologyDescriptionPtr topologyDescription,
         const ReadPreferenceSetting& criteria,
         const std::vector<HostAndPort>& excludedHosts = std::vector<HostAndPort>()) override;
 
     boost::optional<ServerDescriptionPtr> selectServer(
-        const TopologyDescriptionPtr topologyDescription,
+        TopologyDescriptionPtr topologyDescription,
         const ReadPreferenceSetting& criteria,
         const std::vector<HostAndPort>& excludedHosts = std::vector<HostAndPort>()) override;
 
@@ -84,7 +84,7 @@ public:
 
 private:
     void _getCandidateServers(std::vector<ServerDescriptionPtr>* result,
-                              const TopologyDescriptionPtr topologyDescription,
+                              TopologyDescriptionPtr topologyDescription,
                               const ReadPreferenceSetting& criteria,
                               const std::vector<HostAndPort>& excludedHosts);
 

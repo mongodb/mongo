@@ -63,12 +63,12 @@ public:
      * interpretations of ratio.
      */
     struct SamplingParameters {
-        explicit SamplingParameters(const double ratio, const int rndMax, const int rndValue);
+        explicit SamplingParameters(double ratio, int rndMax, int rndValue);
 
         /**
          * Construct with a value from rnd().
          */
-        explicit SamplingParameters(const double ratio, const int rndMax, RandomFunc rnd);
+        explicit SamplingParameters(double ratio, int rndMax, RandomFunc rnd);
 
         /**
          * Construct with a value from defaultRandomFunc().
@@ -101,9 +101,9 @@ public:
      */
     static std::vector<HostAndPort> getMirroringTargets(
         const std::shared_ptr<const repl::HelloResponse>& isMaster,
-        const double ratio,
+        double ratio,
         RandomFunc rnd = defaultRandomFunc(),
-        const int rndMax = defaultRandomMax()) noexcept;
+        int rndMax = defaultRandomMax()) noexcept;
 };
 
 }  // namespace mongo

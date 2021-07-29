@@ -169,16 +169,15 @@ public:
      * This function should only be used internally. "nss", "uuid", "o2", and the opTimes should
      * never be exposed to users (for instance through the appendOplogNote command).
      */
-    virtual void onInternalOpMessage(
-        OperationContext* opCtx,
-        const NamespaceString& nss,
-        const boost::optional<UUID> uuid,
-        const BSONObj& msgObj,
-        const boost::optional<BSONObj> o2MsgObj,
-        const boost::optional<repl::OpTime> preImageOpTime,
-        const boost::optional<repl::OpTime> postImageOpTime,
-        const boost::optional<repl::OpTime> prevWriteOpTimeInTransaction,
-        const boost::optional<OplogSlot> slot) = 0;
+    virtual void onInternalOpMessage(OperationContext* opCtx,
+                                     const NamespaceString& nss,
+                                     boost::optional<UUID> uuid,
+                                     const BSONObj& msgObj,
+                                     boost::optional<BSONObj> o2MsgObj,
+                                     boost::optional<repl::OpTime> preImageOpTime,
+                                     boost::optional<repl::OpTime> postImageOpTime,
+                                     boost::optional<repl::OpTime> prevWriteOpTimeInTransaction,
+                                     boost::optional<OplogSlot> slot) = 0;
 
     /**
      * Logs a no-op with "msgObj" in the o field into oplog.
@@ -508,7 +507,7 @@ class OpObserver::ReservedTimes {
     ReservedTimes& operator=(const ReservedTimes&) = delete;
 
 public:
-    explicit ReservedTimes(OperationContext* const opCtx);
+    explicit ReservedTimes(OperationContext* opCtx);
     ~ReservedTimes();
 
     const Times& get() const {

@@ -56,7 +56,7 @@ public:
         const DocumentSourceChangeStreamSpec& spec);
 
     static boost::intrusive_ptr<DocumentSourceChangeStreamAddPreImage> createFromBson(
-        const BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
+        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     DocumentSourceChangeStreamAddPreImage(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                           FullDocumentBeforeChangeModeEnum mode)

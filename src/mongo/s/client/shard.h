@@ -227,7 +227,7 @@ public:
      * retriable errors must be done differently.
      */
     BatchedCommandResponse runBatchWriteCommand(OperationContext* opCtx,
-                                                const Milliseconds maxTimeMS,
+                                                Milliseconds maxTimeMS,
                                                 const BatchedCommandRequest& batchRequest,
                                                 RetryPolicy retryPolicy);
 
@@ -246,7 +246,7 @@ public:
         const NamespaceString& nss,
         const BSONObj& query,
         const BSONObj& sort,
-        const boost::optional<long long> limit,
+        boost::optional<long long> limit,
         const boost::optional<BSONObj>& hint = boost::none);
 
     /**

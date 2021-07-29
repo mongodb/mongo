@@ -215,7 +215,7 @@ public:
     /**
      * Returns the document with missing shard key values set to null.
      */
-    BSONObj emplaceMissingShardKeyValuesForDocument(const BSONObj doc) const;
+    BSONObj emplaceMissingShardKeyValuesForDocument(BSONObj doc) const;
 
     /**
      * Given a simple BSON query, extracts the shard key corresponding to the key pattern

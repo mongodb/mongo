@@ -264,7 +264,7 @@ private:
      * corresponding operation track request from the operation track requests queue.
      */
     void _addToTransferModsQueue(const BSONObj& idObj,
-                                 const char op,
+                                 char op,
                                  const repl::OpTime& opTime,
                                  const repl::OpTime& prePostImageOpTime);
 

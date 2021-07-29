@@ -465,10 +465,10 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         """Generate the declarations for the class constructors."""
         struct_type_info = struct_types.get_struct_info(struct)
 
-        constructor = struct_type_info.get_constructor_method()
+        constructor = struct_type_info.get_constructor_method(gen_header=True)
         self._writer.write_line(constructor.get_declaration())
 
-        required_constructor = struct_type_info.get_required_constructor_method()
+        required_constructor = struct_type_info.get_required_constructor_method(gen_header=True)
         if len(required_constructor.args) != len(constructor.args):
             self._writer.write_line(required_constructor.get_declaration())
 
@@ -574,7 +574,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         param_type = cpp_type_info.get_storage_type()
 
         if not cpp_types.is_primitive_type(param_type):
-            param_type += '&'
+            param_type = 'const ' + param_type + '&'
 
         template_params = {
             'method_name': _get_field_member_validator_name(field),
@@ -583,9 +583,9 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
 
         with self._with_template(template_params):
             # Declare method implemented in C++ file.
-            self._writer.write_template('void ${method_name}(const ${param_type} value);')
+            self._writer.write_template('void ${method_name}(${param_type} value);')
             self._writer.write_template(
-                'void ${method_name}(IDLParserErrorContext& ctxt, const ${param_type} value);')
+                'void ${method_name}(IDLParserErrorContext& ctxt, ${param_type} value);')
 
         self._writer.write_empty_line()
 

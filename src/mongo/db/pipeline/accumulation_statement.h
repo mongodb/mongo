@@ -177,7 +177,7 @@ public:
      *
      * Throws an AssertionException if parsing fails.
      */
-    static AccumulationStatement parseAccumulationStatement(ExpressionContext* const expCtx,
+    static AccumulationStatement parseAccumulationStatement(ExpressionContext* expCtx,
                                                             const BSONElement& elem,
                                                             const VariablesParseState& vps);
 

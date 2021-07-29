@@ -50,14 +50,14 @@ public:
     static ShardingLogging* get(OperationContext* operationContext);
 
     Status logAction(OperationContext* opCtx,
-                     const StringData what,
-                     const StringData ns,
+                     StringData what,
+                     StringData ns,
                      const BSONObj& detail);
 
     Status logChangeChecked(
         OperationContext* opCtx,
-        const StringData what,
-        const StringData ns,
+        StringData what,
+        StringData ns,
         const BSONObj& detail = BSONObj(),
         const WriteConcernOptions& writeConcern = ShardingCatalogClient::kMajorityWriteConcern);
 
@@ -94,9 +94,9 @@ private:
      * @param writeConcern Write concern options to use for logging
      */
     Status _log(OperationContext* opCtx,
-                const StringData logCollName,
-                const StringData what,
-                const StringData operationNSS,
+                StringData logCollName,
+                StringData what,
+                StringData operationNSS,
                 const BSONObj& detail,
                 const WriteConcernOptions& writeConcern);
 

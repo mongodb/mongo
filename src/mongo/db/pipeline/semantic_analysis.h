@@ -70,8 +70,8 @@ boost::optional<StringMap<std::string>> renamedPaths(const std::set<std::string>
  * 'end' should be an iterator referring to the past-the-end stage.
  */
 boost::optional<StringMap<std::string>> renamedPaths(
-    const Pipeline::SourceContainer::const_iterator start,
-    const Pipeline::SourceContainer::const_iterator end,
+    Pipeline::SourceContainer::const_iterator start,
+    Pipeline::SourceContainer::const_iterator end,
     const std::set<std::string>& pathsOfInterest,
     boost::optional<std::function<bool(DocumentSource*)>> additionalStageValidatorCallback =
         boost::none);
@@ -87,8 +87,8 @@ boost::optional<StringMap<std::string>> renamedPaths(
  * (the 'reverse end').
  */
 boost::optional<StringMap<std::string>> renamedPaths(
-    const Pipeline::SourceContainer::const_reverse_iterator start,
-    const Pipeline::SourceContainer::const_reverse_iterator end,
+    Pipeline::SourceContainer::const_reverse_iterator start,
+    Pipeline::SourceContainer::const_reverse_iterator end,
     const std::set<std::string>& pathsOfInterest,
     boost::optional<std::function<bool(DocumentSource*)>> additionalStageValidatorCallback =
         boost::none);
@@ -102,8 +102,8 @@ boost::optional<StringMap<std::string>> renamedPaths(
  * fails 'additionalStageValidatorCallback', or returns 'end' if no such stage exists.
  */
 std::pair<Pipeline::SourceContainer::const_iterator, StringMap<std::string>>
-findLongestViablePrefixPreservingPaths(const Pipeline::SourceContainer::const_iterator start,
-                                       const Pipeline::SourceContainer::const_iterator end,
+findLongestViablePrefixPreservingPaths(Pipeline::SourceContainer::const_iterator start,
+                                       Pipeline::SourceContainer::const_iterator end,
                                        const std::set<std::string>& pathsOfInterest,
                                        boost::optional<std::function<bool(DocumentSource*)>>
                                            additionalStageValidatorCallback = boost::none);

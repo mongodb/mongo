@@ -67,7 +67,7 @@ protected:
      * Inserts a document into the config.databases collection to indicate that "dbName" is sharded
      * with primary "primaryShard".
      */
-    void setUpDatabase(const std::string& dbName, const ShardId primaryShard);
+    void setUpDatabase(const std::string& dbName, ShardId primaryShard);
 
     /**
      * Inserts a document into the config.collections collection to indicate that "collName" is

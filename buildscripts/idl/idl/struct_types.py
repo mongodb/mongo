@@ -154,14 +154,14 @@ class StructTypeInfoBase(object, metaclass=ABCMeta):
     """Base class for struct and command code generation."""
 
     @abstractmethod
-    def get_constructor_method(self):
-        # type: () -> MethodInfo
+    def get_constructor_method(self, gen_header=False):
+        # type: (bool) -> MethodInfo
         """Get the constructor method for a struct."""
         pass
 
     @abstractmethod
-    def get_required_constructor_method(self):
-        # type: () -> MethodInfo
+    def get_required_constructor_method(self, gen_header=False):
+        # type: (bool) -> MethodInfo
         """Get the constructor method for a struct with parameters for required fields."""
         pass
 
@@ -243,13 +243,13 @@ class _StructTypeInfo(StructTypeInfoBase):
         """Create a _StructTypeInfo instance."""
         self._struct = struct
 
-    def get_constructor_method(self):
-        # type: () -> MethodInfo
+    def get_constructor_method(self, gen_header=False):
+        # type: (bool) -> MethodInfo
         class_name = common.title_case(self._struct.cpp_name)
         return MethodInfo(class_name, class_name, [])
 
-    def get_required_constructor_method(self):
-        # type: () -> MethodInfo
+    def get_required_constructor_method(self, gen_header=False):
+        # type: (bool) -> MethodInfo
         class_name = common.title_case(self._struct.cpp_name)
         return MethodInfo(class_name, class_name, _get_required_parameters(self._struct))
 
@@ -369,14 +369,16 @@ class _IgnoredCommandTypeInfo(_CommandBaseTypeInfo):
         pass
 
 
-def _get_command_type_parameter(command):
-    # type: (ast.Command) -> str
+def _get_command_type_parameter(command, gen_header=False):
+    # type: (ast.Command, bool) -> str
     """Get the parameter for the command type."""
     cpp_type_info = cpp_types.get_cpp_type(command.command_field)
     # Use the storage type for the constructor argument since the generated code will use std::move.
     member_type = cpp_type_info.get_storage_type()
-
-    return "const %s %s" % (member_type, common.camel_case(command.command_field.cpp_name))
+    result = f"{member_type} {common.camel_case(command.command_field.cpp_name)}"
+    if not gen_header or '&' in result:
+        result = 'const ' + result
+    return result
 
 
 class _CommandFromType(_CommandBaseTypeInfo):
@@ -389,18 +391,18 @@ class _CommandFromType(_CommandBaseTypeInfo):
         self._command = command
         super(_CommandFromType, self).__init__(command)
 
-    def get_constructor_method(self):
-        # type: () -> MethodInfo
+    def get_constructor_method(self, gen_header=False):
+        # type: (bool) -> MethodInfo
         class_name = common.title_case(self._struct.cpp_name)
 
-        arg = _get_command_type_parameter(self._command)
+        arg = _get_command_type_parameter(self._command, gen_header)
         return MethodInfo(class_name, class_name, [arg], explicit=True)
 
-    def get_required_constructor_method(self):
-        # type: () -> MethodInfo
+    def get_required_constructor_method(self, gen_header=False):
+        # type: (bool) -> MethodInfo
         class_name = common.title_case(self._struct.cpp_name)
 
-        arg = _get_command_type_parameter(self._command)
+        arg = _get_command_type_parameter(self._command, gen_header)
         return MethodInfo(class_name, class_name, [arg] + _get_required_parameters(self._struct),
                           explicit=True)
 
@@ -451,16 +453,24 @@ class _CommandWithNamespaceTypeInfo(_CommandBaseTypeInfo):
 
         super(_CommandWithNamespaceTypeInfo, self).__init__(command)
 
-    def get_constructor_method(self):
-        # type: () -> MethodInfo
-        class_name = common.title_case(self._struct.cpp_name)
-        return MethodInfo(class_name, class_name, ['const NamespaceString nss'], explicit=True)
+    @staticmethod
+    def _get_nss_param(gen_header):
+        nss_param = 'NamespaceString nss'
+        if not gen_header:
+            nss_param = 'const ' + nss_param
+        return nss_param
 
-    def get_required_constructor_method(self):
-        # type: () -> MethodInfo
+    def get_constructor_method(self, gen_header=False):
+        # type: (bool) -> MethodInfo
         class_name = common.title_case(self._struct.cpp_name)
-        return MethodInfo(class_name, class_name,
-                          ['const NamespaceString nss'] + _get_required_parameters(self._struct))
+        return MethodInfo(class_name, class_name, [self._get_nss_param(gen_header)], explicit=True)
+
+    def get_required_constructor_method(self, gen_header=False):
+        # type: (bool) -> MethodInfo
+        class_name = common.title_case(self._struct.cpp_name)
+        return MethodInfo(
+            class_name, class_name,
+            [self._get_nss_param(gen_header)] + _get_required_parameters(self._struct))
 
     def get_serializer_method(self):
         # type: () -> MethodInfo
@@ -524,18 +534,24 @@ class _CommandWithUUIDNamespaceTypeInfo(_CommandBaseTypeInfo):
 
         super(_CommandWithUUIDNamespaceTypeInfo, self).__init__(command)
 
-    def get_constructor_method(self):
-        # type: () -> MethodInfo
-        class_name = common.title_case(self._struct.cpp_name)
-        return MethodInfo(class_name, class_name, ['const NamespaceStringOrUUID nssOrUUID'],
-                          explicit=True)
+    @staticmethod
+    def _get_nss_param(gen_header):
+        nss_param = 'NamespaceStringOrUUID nssOrUUID'
+        if not gen_header:
+            nss_param = 'const ' + nss_param
+        return nss_param
 
-    def get_required_constructor_method(self):
-        # type: () -> MethodInfo
+    def get_constructor_method(self, gen_header=False):
+        # type: (bool) -> MethodInfo
+        class_name = common.title_case(self._struct.cpp_name)
+        return MethodInfo(class_name, class_name, [self._get_nss_param(gen_header)], explicit=True)
+
+    def get_required_constructor_method(self, gen_header=False):
+        # type: (bool) -> MethodInfo
         class_name = common.title_case(self._struct.cpp_name)
         return MethodInfo(
             class_name, class_name,
-            ['const NamespaceStringOrUUID nssOrUUID'] + _get_required_parameters(self._struct))
+            [self._get_nss_param(gen_header)] + _get_required_parameters(self._struct))
 
     def get_serializer_method(self):
         # type: () -> MethodInfo

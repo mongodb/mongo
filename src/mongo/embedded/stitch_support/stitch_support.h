@@ -226,8 +226,8 @@ stitch_support_v1_init(stitch_support_v1_status* status);
  * Returns STITCH_SUPPORT_V1_ERROR_LIBRARY_NOT_INITIALIZED and modifies 'status' if
  * stitch_support_v1_lib_init() has not been called previously.
  */
-STITCH_SUPPORT_API int MONGO_API_CALL
-stitch_support_v1_fini(stitch_support_v1_lib* const lib, stitch_support_v1_status* const status);
+STITCH_SUPPORT_API int MONGO_API_CALL stitch_support_v1_fini(stitch_support_v1_lib* lib,
+                                                             stitch_support_v1_status* status);
 
 /**
  * A collator object represents a parsed collation. A single collator can be used by multiple
@@ -246,10 +246,8 @@ typedef struct stitch_support_v1_collator stitch_support_v1_collator;
  * This function will fail if the collationBSON is invalid. On failure, it returns NULL and
  * populates the 'status' object if it is not NULL.
  */
-STITCH_SUPPORT_API stitch_support_v1_collator* MONGO_API_CALL
-stitch_support_v1_collator_create(stitch_support_v1_lib* lib,
-                                  const uint8_t* collationBSON,
-                                  stitch_support_v1_status* const status);
+STITCH_SUPPORT_API stitch_support_v1_collator* MONGO_API_CALL stitch_support_v1_collator_create(
+    stitch_support_v1_lib* lib, const uint8_t* collationBSON, stitch_support_v1_status* status);
 
 /**
  * Destroys a valid stitch_support_v1_collator object.
@@ -304,7 +302,7 @@ stitch_support_v1_matcher_create(stitch_support_v1_lib* lib,
  * This function does not report failures.
  */
 STITCH_SUPPORT_API void MONGO_API_CALL
-stitch_support_v1_matcher_destroy(stitch_support_v1_matcher* const matcher);
+stitch_support_v1_matcher_destroy(stitch_support_v1_matcher* matcher);
 
 /**
  * Check if the 'documentBSON' input matches the predicate represented by the 'matcher' object.
@@ -380,7 +378,7 @@ stitch_support_v1_projection_create(stitch_support_v1_lib* lib,
  * This function does not report failures.
  */
 STITCH_SUPPORT_API void MONGO_API_CALL
-stitch_support_v1_projection_destroy(stitch_support_v1_projection* const projection);
+stitch_support_v1_projection_destroy(stitch_support_v1_projection* projection);
 
 /**
  * Apply a projection to an input document, writing the resulting BSON to a newly allocated 'output'
@@ -393,7 +391,7 @@ stitch_support_v1_projection_destroy(stitch_support_v1_projection* const project
  * trigger an assertion failure.
  */
 STITCH_SUPPORT_API uint8_t* MONGO_API_CALL
-stitch_support_v1_projection_apply(stitch_support_v1_projection* const projection,
+stitch_support_v1_projection_apply(stitch_support_v1_projection* projection,
                                    const uint8_t* documentBSON,
                                    stitch_support_v1_status* status);
 
@@ -406,7 +404,7 @@ stitch_support_v1_projection_apply(stitch_support_v1_projection* const projectio
  * the matcher matches the input document.
  */
 STITCH_SUPPORT_API bool MONGO_API_CALL
-stitch_support_v1_projection_requires_match(stitch_support_v1_projection* const projection);
+stitch_support_v1_projection_requires_match(stitch_support_v1_projection* projection);
 
 /**
  * An update details object stores the list of paths modified by a call to
@@ -503,7 +501,7 @@ stitch_support_v1_update_create(stitch_support_v1_lib* lib,
  * This function does not report failures.
  */
 STITCH_SUPPORT_API void MONGO_API_CALL
-stitch_support_v1_update_destroy(stitch_support_v1_update* const update);
+stitch_support_v1_update_destroy(stitch_support_v1_update* update);
 
 /**
  * Apply an update to an input document writing the resulting BSON to a newly allocated output
@@ -516,7 +514,7 @@ stitch_support_v1_update_destroy(stitch_support_v1_update* const update);
  * trigger an assertion failure.
  */
 STITCH_SUPPORT_API uint8_t* MONGO_API_CALL
-stitch_support_v1_update_apply(stitch_support_v1_update* const update,
+stitch_support_v1_update_apply(stitch_support_v1_update* update,
                                const uint8_t* documentBSON,
                                stitch_support_v1_update_details* update_details,
                                stitch_support_v1_status* status);
@@ -542,8 +540,8 @@ stitch_support_v1_update_apply(stitch_support_v1_update* const update,
  * an '_id' field, this function does not populate an '_id' field if one is not in the match or
  * update document.
  */
-STITCH_SUPPORT_API uint8_t* MONGO_API_CALL stitch_support_v1_update_upsert(
-    stitch_support_v1_update* const update, stitch_support_v1_status* status);
+STITCH_SUPPORT_API uint8_t* MONGO_API_CALL
+stitch_support_v1_update_upsert(stitch_support_v1_update* update, stitch_support_v1_status* status);
 
 /**
  * Returns true iff applying this update requires a matcher that matches the input document, as is
@@ -554,7 +552,7 @@ STITCH_SUPPORT_API uint8_t* MONGO_API_CALL stitch_support_v1_update_upsert(
  * matches the input document.
  */
 STITCH_SUPPORT_API bool MONGO_API_CALL
-stitch_support_v1_update_requires_match(stitch_support_v1_update* const update);
+stitch_support_v1_update_requires_match(stitch_support_v1_update* update);
 
 /**
  * Free the memory of a BSON buffer returned by stitch_support_v1_projection_apply() or

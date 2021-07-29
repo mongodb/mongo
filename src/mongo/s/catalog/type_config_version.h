@@ -92,12 +92,12 @@ public:
     int getMinCompatibleVersion() const {
         return _minCompatibleVersion.get();
     }
-    void setMinCompatibleVersion(const int minCompatibleVersion);
+    void setMinCompatibleVersion(int minCompatibleVersion);
 
     int getCurrentVersion() const {
         return _currentVersion.get();
     }
-    void setCurrentVersion(const int currentVersion);
+    void setCurrentVersion(int currentVersion);
 
     const OID& getClusterId() const {
         return _clusterId.get();

@@ -82,7 +82,7 @@ public:
     const Date_t getPing() const {
         return _ping.get();
     }
-    void setPing(const Date_t ping);
+    void setPing(Date_t ping);
 
 private:
     // Convention: (M)andatory, (O)ptional, (S)pecial rule.

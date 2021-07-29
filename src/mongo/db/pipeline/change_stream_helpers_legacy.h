@@ -37,7 +37,6 @@ namespace mongo::change_stream_legacy {
  * pipeline stages.
  */
 std::list<boost::intrusive_ptr<DocumentSource>> buildPipeline(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const DocumentSourceChangeStreamSpec spec);
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, DocumentSourceChangeStreamSpec spec);
 
 }  // namespace mongo::change_stream_legacy

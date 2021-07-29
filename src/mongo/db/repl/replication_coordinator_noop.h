@@ -297,9 +297,9 @@ public:
     void incrementTopologyVersion() final;
 
     void updateAndLogStateTransitionMetrics(
-        const ReplicationCoordinator::OpsKillingStateTransitionEnum stateTransition,
-        const size_t numOpsKilled,
-        const size_t numOpsRunning) const final;
+        ReplicationCoordinator::OpsKillingStateTransitionEnum stateTransition,
+        size_t numOpsKilled,
+        size_t numOpsRunning) const final;
 
     TopologyVersion getTopologyVersion() const final;
 

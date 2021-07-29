@@ -540,10 +540,11 @@ private:
             auto p(std::move(promisesToSet.back()));
             promisesToSet.pop_back();
 
-            if (promisesToSet.empty())
+            if (promisesToSet.empty()) {
                 p->setFrom(std::move(result));
-            else
-                p->setFrom(result);
+                break;
+            }
+            p->setFrom(result);
         }
 
         return mustDoAnotherLoop

@@ -233,8 +233,8 @@ std::size_t hashValue(TypeTags tag,
 /**
  * Overloads for writing values and tags to stream.
  */
-std::ostream& operator<<(std::ostream& os, const TypeTags tag);
-str::stream& operator<<(str::stream& str, const TypeTags tag);
+std::ostream& operator<<(std::ostream& os, TypeTags tag);
+str::stream& operator<<(str::stream& str, TypeTags tag);
 std::ostream& operator<<(std::ostream& os, const std::pair<TypeTags, Value>& value);
 str::stream& operator<<(str::stream& str, const std::pair<TypeTags, Value>& value);
 
@@ -310,7 +310,8 @@ template <class T>
 using dont_deduce = typename dont_deduce_t<T>::type;
 
 template <typename T>
-Value bitcastFrom(const dont_deduce<T> in) noexcept {
+Value bitcastFrom(
+    const dont_deduce<T> in) noexcept {  // NOLINT(readability-avoid-const-params-in-decls)
     static_assert(std::is_pointer_v<T> || std::is_integral_v<T> || std::is_floating_point_v<T>);
 
     static_assert(sizeof(Value) >= sizeof(T));
@@ -342,7 +343,7 @@ Value bitcastFrom(const dont_deduce<T> in) noexcept {
 }
 
 template <typename T>
-T bitcastTo(const Value in) noexcept {
+T bitcastTo(const Value in) noexcept {  // NOLINT(readability-avoid-const-params-in-decls)
     static_assert(std::is_pointer_v<T> || std::is_integral_v<T> || std::is_floating_point_v<T> ||
                   std::is_same_v<Decimal128, T>);
 

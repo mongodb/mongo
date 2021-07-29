@@ -170,8 +170,8 @@ public:
     std::vector<std::shared_ptr<const IndexCatalogEntry>> getAllReadyEntriesShared() const override;
 
     using IndexIterator = IndexCatalog::IndexIterator;
-    std::unique_ptr<IndexIterator> getIndexIterator(
-        OperationContext* const opCtx, const bool includeUnfinishedIndexes) const override;
+    std::unique_ptr<IndexIterator> getIndexIterator(OperationContext* opCtx,
+                                                    bool includeUnfinishedIndexes) const override;
 
     // ---- index set modifiers ------
 
@@ -195,13 +195,13 @@ public:
         const BSONObj& original,
         const boost::optional<ResumeIndexInfo>& resumeInfo = boost::none) const override;
 
-    std::vector<BSONObj> removeExistingIndexes(OperationContext* const opCtx,
+    std::vector<BSONObj> removeExistingIndexes(OperationContext* opCtx,
                                                const CollectionPtr& collection,
                                                const std::vector<BSONObj>& indexSpecsToBuild,
-                                               const bool removeIndexBuildsToo) const override;
+                                               bool removeIndexBuildsToo) const override;
 
     std::vector<BSONObj> removeExistingIndexesNoChecks(
-        OperationContext* const opCtx,
+        OperationContext* opCtx,
         const CollectionPtr& collection,
         const std::vector<BSONObj>& indexSpecsToBuild) const override;
 
@@ -222,9 +222,9 @@ public:
     Status dropIndex(OperationContext* opCtx,
                      Collection* collection,
                      const IndexDescriptor* desc) override;
-    Status dropUnfinishedIndex(OperationContext* const opCtx,
+    Status dropUnfinishedIndex(OperationContext* opCtx,
                                Collection* collection,
-                               const IndexDescriptor* const desc) override;
+                               const IndexDescriptor* desc) override;
 
     Status dropIndexEntry(OperationContext* opCtx,
                           Collection* collection,
@@ -243,7 +243,7 @@ public:
 
     // ---- modify single index
 
-    void setMultikeyPaths(OperationContext* const opCtx,
+    void setMultikeyPaths(OperationContext* opCtx,
                           const CollectionPtr& coll,
                           const IndexDescriptor* desc,
                           const KeyStringSet& multikeyMetadataKeys,
@@ -265,13 +265,13 @@ public:
     /**
      * See IndexCatalog::updateRecord
      */
-    Status updateRecord(OperationContext* const opCtx,
+    Status updateRecord(OperationContext* opCtx,
                         const CollectionPtr& coll,
                         const BSONObj& oldDoc,
                         const BSONObj& newDoc,
                         const RecordId& recordId,
-                        int64_t* const keysInsertedOut,
-                        int64_t* const keysDeletedOut) const override;
+                        int64_t* keysInsertedOut,
+                        int64_t* keysDeletedOut) const override;
     /**
      * When 'keysDeletedOut' is not null, it will be set to the number of index keys removed by
      * this operation.
@@ -342,14 +342,14 @@ private:
                          const std::vector<BsonRecord>& bsonRecords,
                          int64_t* keysInsertedOut) const;
 
-    Status _updateRecord(OperationContext* const opCtx,
+    Status _updateRecord(OperationContext* opCtx,
                          const CollectionPtr& coll,
                          const IndexCatalogEntry* index,
                          const BSONObj& oldDoc,
                          const BSONObj& newDoc,
                          const RecordId& recordId,
-                         int64_t* const keysInsertedOut,
-                         int64_t* const keysDeletedOut) const;
+                         int64_t* keysInsertedOut,
+                         int64_t* keysDeletedOut) const;
 
     void _unindexKeys(OperationContext* opCtx,
                       const CollectionPtr& collection,
@@ -358,7 +358,7 @@ private:
                       const BSONObj& obj,
                       RecordId loc,
                       bool logIfError,
-                      int64_t* const keysDeletedOut) const;
+                      int64_t* keysDeletedOut) const;
 
     void _unindexRecord(OperationContext* opCtx,
                         const CollectionPtr& collection,
@@ -411,7 +411,7 @@ private:
     Status _doesSpecConflictWithExisting(OperationContext* opCtx,
                                          const CollectionPtr& collection,
                                          const BSONObj& spec,
-                                         const bool includeUnfinishedIndexes) const;
+                                         bool includeUnfinishedIndexes) const;
 
     /**
      * Returns true if the replica set member's config has {buildIndexes:false} set, which means

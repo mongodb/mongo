@@ -149,11 +149,9 @@ public:
 
 protected:
     std::pair<rpc::UniqueReply, DBClientBase*> processResponse(rpc::UniqueReply result,
-                                                               const StringData databaseName);
+                                                               StringData databaseName);
 
-    BSONObj encryptDecryptCommand(const BSONObj& object,
-                                  bool encrypt,
-                                  const StringData databaseName);
+    BSONObj encryptDecryptCommand(const BSONObj& object, bool encrypt, StringData databaseName);
 
     JS::Value getCollection() const;
 

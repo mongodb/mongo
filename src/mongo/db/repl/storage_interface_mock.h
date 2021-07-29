@@ -64,8 +64,8 @@ public:
     virtual ~CollectionBulkLoaderMock() = default;
     Status init(const std::vector<BSONObj>& secondaryIndexSpecs) override;
 
-    Status insertDocuments(const std::vector<BSONObj>::const_iterator begin,
-                           const std::vector<BSONObj>::const_iterator end) override;
+    Status insertDocuments(std::vector<BSONObj>::const_iterator begin,
+                           std::vector<BSONObj>::const_iterator end) override;
     Status commit() override;
 
     std::string toString() const override {

@@ -549,7 +549,7 @@ public:
     /**
      * Appends a Discriminator byte and kEnd byte to a key string.
      */
-    void appendDiscriminator(const Discriminator discriminator);
+    void appendDiscriminator(Discriminator discriminator);
 
     /**
      * Resets to an empty state.
@@ -635,12 +635,12 @@ protected:
     void _appendArray(const BSONArray& val, bool invert, const StringTransformFn& f);
     void _appendSetAsArray(const BSONElementSet& val, bool invert, const StringTransformFn& f);
     void _appendObject(const BSONObj& val, bool invert, const StringTransformFn& f);
-    void _appendNumberDouble(const double num, bool invert);
-    void _appendNumberLong(const long long num, bool invert);
-    void _appendNumberInt(const int num, bool invert);
-    void _appendNumberDecimal(const Decimal128 num, bool invert);
+    void _appendNumberDouble(double num, bool invert);
+    void _appendNumberLong(long long num, bool invert);
+    void _appendNumberInt(int num, bool invert);
+    void _appendNumberDecimal(Decimal128 num, bool invert);
 
-    void _appendRecordIdLong(const int64_t val);
+    void _appendRecordIdLong(int64_t val);
     void _appendRecordIdStr(const char* val, int size);
 
     /**
@@ -657,12 +657,12 @@ protected:
     void _appendBson(const BSONObj& obj, bool invert, const StringTransformFn& f);
     void _appendSmallDouble(double value, DecimalContinuationMarker dcm, bool invert);
     void _appendLargeDouble(double value, DecimalContinuationMarker dcm, bool invert);
-    void _appendInteger(const long long num, bool invert);
+    void _appendInteger(long long num, bool invert);
     void _appendPreshiftedIntegerPortion(uint64_t value, bool isNegative, bool invert);
 
-    void _appendDoubleWithoutTypeBits(const double num, DecimalContinuationMarker dcm, bool invert);
-    void _appendHugeDecimalWithoutTypeBits(const Decimal128 dec, bool invert);
-    void _appendTinyDecimalWithoutTypeBits(const Decimal128 dec, const double bin, bool invert);
+    void _appendDoubleWithoutTypeBits(double num, DecimalContinuationMarker dcm, bool invert);
+    void _appendHugeDecimalWithoutTypeBits(Decimal128 dec, bool invert);
+    void _appendTinyDecimalWithoutTypeBits(Decimal128 dec, double bin, bool invert);
     void _appendEnd();
 
     template <typename T>

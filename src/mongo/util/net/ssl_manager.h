@@ -478,16 +478,16 @@ void tlsEmitWarningExpiringClientCertificate(const SSLX509Name& peer, Days days)
  * Logs the SSL information by dispatching to either logCert() or logCRL().
  */
 void logSSLInfo(const SSLInformationToLog& info,
-                const int logNumPEM = 4913010,
-                const int logNumCluster = 4913011,
-                const int logNumCrl = 4913012);
+                int logNumPEM = 4913010,
+                int logNumCluster = 4913011,
+                int logNumCrl = 4913012);
 
 /**
  * Logs the certificate.
  * @param certType human-readable description of the certificate type.
  */
-void logCert(const CertInformationToLog& cert, StringData certType, const int logNum);
-void logCRL(const CRLInformationToLog& crl, const int logNum);
+void logCert(const CertInformationToLog& cert, StringData certType, int logNum);
+void logCRL(const CRLInformationToLog& crl, int logNum);
 
 }  // namespace mongo
 #endif  // #ifdef MONGO_CONFIG_SSL

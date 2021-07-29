@@ -82,7 +82,7 @@ private:
     OptionDescription() = delete;
     OptionDescription(const std::string& dottedName,
                       const std::string& singleName,
-                      const OptionType type,
+                      OptionType type,
                       const std::string& description,
                       const std::vector<std::string>& deprecatedDottedNames = {},
                       const std::vector<std::string>& deprecatedSingleNames = {});

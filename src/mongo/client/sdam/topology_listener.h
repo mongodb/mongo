@@ -104,17 +104,16 @@ public:
                                            TopologyDescriptionPtr newDescription) override;
     virtual void onServerHandshakeCompleteEvent(HelloRTT duration,
                                                 const HostAndPort& address,
-                                                const BSONObj reply = BSONObj()) override;
+                                                BSONObj reply = BSONObj()) override;
 
     void onServerHandshakeFailedEvent(const HostAndPort& address,
                                       const Status& status,
-                                      const BSONObj reply);
+                                      BSONObj reply);
 
-    void onServerHeartbeatSucceededEvent(const HostAndPort& hostAndPort,
-                                         const BSONObj reply) override;
+    void onServerHeartbeatSucceededEvent(const HostAndPort& hostAndPort, BSONObj reply) override;
     void onServerHeartbeatFailureEvent(Status errorStatus,
                                        const HostAndPort& hostAndPort,
-                                       const BSONObj reply) override;
+                                       BSONObj reply) override;
     void onServerPingFailedEvent(const HostAndPort& hostAndPort, const Status& status) override;
     void onServerPingSucceededEvent(HelloRTT duration, const HostAndPort& hostAndPort) override;
 

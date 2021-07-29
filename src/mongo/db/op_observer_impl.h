@@ -109,13 +109,13 @@ public:
                   const OplogDeleteEntryArgs& args) final;
     void onInternalOpMessage(OperationContext* opCtx,
                              const NamespaceString& nss,
-                             const boost::optional<UUID> uuid,
+                             boost::optional<UUID> uuid,
                              const BSONObj& msgObj,
-                             const boost::optional<BSONObj> o2MsgObj,
-                             const boost::optional<repl::OpTime> preImageOpTime,
-                             const boost::optional<repl::OpTime> postImageOpTime,
-                             const boost::optional<repl::OpTime> prevWriteOpTimeInTransaction,
-                             const boost::optional<OplogSlot> slot) final;
+                             boost::optional<BSONObj> o2MsgObj,
+                             boost::optional<repl::OpTime> preImageOpTime,
+                             boost::optional<repl::OpTime> postImageOpTime,
+                             boost::optional<repl::OpTime> prevWriteOpTimeInTransaction,
+                             boost::optional<OplogSlot> slot) final;
     void onCreateCollection(OperationContext* opCtx,
                             const CollectionPtr& coll,
                             const NamespaceString& collectionName,

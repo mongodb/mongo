@@ -268,9 +268,9 @@ private:
     static inline void unref(ErrorInfo* error);
 };
 
-inline bool operator==(const ErrorCodes::Error lhs, const Status& rhs);
+inline bool operator==(ErrorCodes::Error lhs, const Status& rhs);
 
-inline bool operator!=(const ErrorCodes::Error lhs, const Status& rhs);
+inline bool operator!=(ErrorCodes::Error lhs, const Status& rhs);
 
 std::ostream& operator<<(std::ostream& os, const Status& status);
 

@@ -101,7 +101,7 @@ private:
      *
      * If any problem occurs then the operation will stop and return that error Status.
      */
-    Status addToSetsWithNewFieldName(StringData name, const mutablebson::Element val);
+    Status addToSetsWithNewFieldName(StringData name, mutablebson::Element val);
 
     /**
      * Convenience method which calls addToSets after

@@ -76,7 +76,7 @@ public:
     TenantOplogBatcher(const std::string& tenantId,
                        RandomAccessOplogBuffer* oplogBuffer,
                        std::shared_ptr<executor::TaskExecutor> executor,
-                       const Timestamp resumeBatchingTs);
+                       Timestamp resumeBatchingTs);
 
     virtual ~TenantOplogBatcher();
 

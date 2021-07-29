@@ -67,7 +67,7 @@ std::vector<RemoteCursor> establishCursors(
     OperationContext* opCtx,
     std::shared_ptr<executor::TaskExecutor> executor,
     const NamespaceString& nss,
-    const ReadPreferenceSetting readPref,
+    ReadPreferenceSetting readPref,
     const std::vector<std::pair<ShardId, BSONObj>>& remotes,
     bool allowPartialResults,
     Shard::RetryPolicy retryPolicy = Shard::RetryPolicy::kIdempotent);

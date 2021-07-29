@@ -69,9 +69,9 @@ public:
     static const BSONField<bool> partitioned;
     static const BSONField<int> enterCriticalSectionCounter;
 
-    ShardDatabaseType(const std::string dbName,
+    ShardDatabaseType(std::string dbName,
                       DatabaseVersion version,
-                      const ShardId primary,
+                      ShardId primary,
                       bool partitioned);
 
     /**

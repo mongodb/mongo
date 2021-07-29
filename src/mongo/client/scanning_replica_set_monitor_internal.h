@@ -107,7 +107,7 @@ public:
 
         void markFailed(const Status& status);
 
-        bool matches(const ReadPreference pref) const;
+        bool matches(ReadPreference pref) const;
 
         /**
          * Checks if the given tag matches the tag attached to this node.

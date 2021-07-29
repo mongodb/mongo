@@ -139,7 +139,7 @@ private:
      */
     void _ensureCollection(Client* client,
                            CancelableOperationContextFactory factory,
-                           const NamespaceString nss);
+                           NamespaceString nss);
     AggregateCommandRequest _makeAggregateCommandRequest(Client* client,
                                                          CancelableOperationContextFactory factory);
     ExecutorFuture<void> _reschedule(std::shared_ptr<executor::TaskExecutor> executor,

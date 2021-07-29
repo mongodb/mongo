@@ -116,7 +116,7 @@ StatusWith<ProtocolSet> parseProtocolSet(StringData repr);
  * Validates client and server wire version. The server is returned from isMaster, and the client is
  * from WireSpec.instance().
  */
-Status validateWireVersion(const WireVersionInfo client, const WireVersionInfo server);
+Status validateWireVersion(WireVersionInfo client, WireVersionInfo server);
 
 /**
  * Struct to pass around information about protocol set and wire version.
@@ -135,7 +135,7 @@ StatusWith<ProtocolSetAndWireVersionInfo> parseProtocolSetFromIsMasterReply(
 /**
  * Computes supported protocols from wire versions.
  */
-ProtocolSet computeProtocolSet(const WireVersionInfo version);
+ProtocolSet computeProtocolSet(WireVersionInfo version);
 
 }  // namespace rpc
 }  // namespace mongo

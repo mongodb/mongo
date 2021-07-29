@@ -81,7 +81,7 @@ public:
 
     virtual const std::string& name() const = 0;
 
-    virtual void clearTmpCollections(OperationContext* const opCtx) const = 0;
+    virtual void clearTmpCollections(OperationContext* opCtx) const = 0;
 
     /**
      * Sets the 'drop-pending' state of this Database.
@@ -96,9 +96,9 @@ public:
      */
     virtual bool isDropPending(OperationContext* opCtx) const = 0;
 
-    virtual void getStats(OperationContext* const opCtx,
-                          BSONObjBuilder* const output,
-                          const double scale = 1) const = 0;
+    virtual void getStats(OperationContext* opCtx,
+                          BSONObjBuilder* output,
+                          double scale = 1) const = 0;
 
     /**
      * dropCollection() will refuse to drop system collections. Use dropCollectionEvenIfSystem() if
@@ -111,15 +111,15 @@ public:
      * collection.
      * N.B. Namespace argument is passed by value as it may otherwise disappear or change.
      */
-    virtual Status dropCollection(OperationContext* const opCtx,
+    virtual Status dropCollection(OperationContext* opCtx,
                                   NamespaceString nss,
                                   repl::OpTime dropOpTime = {}) const = 0;
-    virtual Status dropCollectionEvenIfSystem(OperationContext* const opCtx,
+    virtual Status dropCollectionEvenIfSystem(OperationContext* opCtx,
                                               NamespaceString nss,
                                               repl::OpTime dropOpTime = {},
                                               bool markFromMigrate = false) const = 0;
 
-    virtual Status dropView(OperationContext* const opCtx, NamespaceString viewName) const = 0;
+    virtual Status dropView(OperationContext* opCtx, NamespaceString viewName) const = 0;
 
     /**
      * A MODE_IX collection lock must be held for this call. Throws a WriteConflictException error
@@ -129,23 +129,23 @@ public:
      * well as creating it. Otherwise the loop will endlessly throw WCEs: the caller must check that
      * the collection exists to break free.
      */
-    virtual Collection* createCollection(OperationContext* const opCtx,
+    virtual Collection* createCollection(OperationContext* opCtx,
                                          const NamespaceString& nss,
                                          const CollectionOptions& options = CollectionOptions(),
-                                         const bool createDefaultIndexes = true,
+                                         bool createDefaultIndexes = true,
                                          const BSONObj& idIndex = BSONObj()) const = 0;
 
-    virtual Status createView(OperationContext* const opCtx,
+    virtual Status createView(OperationContext* opCtx,
                               const NamespaceString& viewName,
                               const CollectionOptions& options) const = 0;
 
     /**
      * Arguments are passed by value as they otherwise would be changing as result of renaming.
      */
-    virtual Status renameCollection(OperationContext* const opCtx,
+    virtual Status renameCollection(OperationContext* opCtx,
                                     NamespaceString fromNss,
                                     NamespaceString toNss,
-                                    const bool stayTemp) const = 0;
+                                    bool stayTemp) const = 0;
 
     virtual const NamespaceString& getSystemViewsName() const = 0;
 

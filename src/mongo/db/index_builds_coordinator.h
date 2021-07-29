@@ -232,8 +232,8 @@ public:
      * being aborted by another caller.
      */
     std::vector<UUID> abortCollectionIndexBuilds(OperationContext* opCx,
-                                                 const NamespaceString collectionNss,
-                                                 const UUID collectionUUID,
+                                                 NamespaceString collectionNss,
+                                                 UUID collectionUUID,
                                                  const std::string& reason);
 
     /**

@@ -140,7 +140,7 @@ public:
     /**
      * Sets the expression to use to determine the group id of each document.
      */
-    void setIdExpression(const boost::intrusive_ptr<Expression> idExpression);
+    void setIdExpression(boost::intrusive_ptr<Expression> idExpression);
 
     /**
      * Returns true if this $group stage represents a 'global' $group which is merging together

@@ -75,7 +75,7 @@ public:
         OperationContext* opCtx,
         const CollectionPtr* collection,
         PlanYieldPolicy::YieldPolicy yieldPolicy,
-        const Direction direction = FORWARD,
+        Direction direction = FORWARD,
         boost::optional<RecordId> resumeAfterRecordId = boost::none,
         boost::optional<RecordId> minRecord = boost::none,
         boost::optional<RecordId> maxRecord = boost::none);

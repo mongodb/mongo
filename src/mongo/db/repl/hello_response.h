@@ -234,10 +234,9 @@ public:
 
     void setElectionId(const OID& electionId);
 
-    void setLastWrite(const OpTime& lastWriteOpTime, const time_t lastWriteDate);
+    void setLastWrite(const OpTime& lastWriteOpTime, time_t lastWriteDate);
 
-    void setLastMajorityWrite(const OpTime& lastMajorityWriteOpTime,
-                              const time_t lastMajorityWriteDate);
+    void setLastMajorityWrite(const OpTime& lastMajorityWriteOpTime, time_t lastMajorityWriteDate);
 
     /**
      * Marks _configSet as false, which will cause future calls to toBSON/addToBSON to ignore

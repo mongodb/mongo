@@ -155,7 +155,7 @@ public:
      */
     void onServerHandshakeCompleteEvent(sdam::HelloRTT durationMs,
                                         const HostAndPort& address,
-                                        const BSONObj reply = BSONObj());
+                                        BSONObj reply = BSONObj());
 
     /**
      * Drop corresponding SingleServerPingMonitors if the server is not included in the

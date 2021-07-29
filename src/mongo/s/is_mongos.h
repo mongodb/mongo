@@ -39,7 +39,7 @@ bool isMongos();
 /**
  * Set the global state flag indicating whether the running process is `mongos` or not.
  */
-void setMongos(const bool state = true);
+void setMongos(bool state = true);
 
 /**
  * Returns whether this node is config server or a shard.

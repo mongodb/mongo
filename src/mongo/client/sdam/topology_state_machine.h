@@ -89,7 +89,7 @@ private:
                                   ServerDescriptionPtr newServerDescription,
                                   bool newServer);
     void removeServerDescription(TopologyDescription& topologyDescription,
-                                 const HostAndPort serverAddress);
+                                 HostAndPort serverAddress);
 
     void modifyTopologyType(TopologyDescription& topologyDescription, TopologyType topologyType);
     void modifySetName(TopologyDescription& topologyDescription,

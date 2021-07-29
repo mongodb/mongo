@@ -40,12 +40,11 @@ public:
     TopologyListenerMock() = default;
     virtual ~TopologyListenerMock() = default;
 
-    void onServerHeartbeatSucceededEvent(const HostAndPort& hostAndPort,
-                                         const BSONObj reply) override;
+    void onServerHeartbeatSucceededEvent(const HostAndPort& hostAndPort, BSONObj reply) override;
 
     void onServerHeartbeatFailureEvent(Status errorStatus,
                                        const HostAndPort& hostAndPort,
-                                       const BSONObj reply) override;
+                                       BSONObj reply) override;
 
     /**
      * Returns true if _serverIsMasterReplies contains an element corresponding to hostAndPort.

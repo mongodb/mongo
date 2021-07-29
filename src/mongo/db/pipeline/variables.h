@@ -160,8 +160,7 @@ public:
     /**
      * Seed let parameters with the given BSONObj.
      */
-    void seedVariablesWithLetParameters(ExpressionContext* const expCtx,
-                                        const BSONObj letParameters);
+    void seedVariablesWithLetParameters(ExpressionContext* expCtx, BSONObj letParameters);
 
     bool hasValue(Variables::Id id) const {
         return _definitions.find(id) != _definitions.end();

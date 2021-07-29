@@ -491,7 +491,7 @@ public:
     /** Set the value of this Element to a numeric type appropriate to hold the given
      *  SafeNum value.
      */
-    Status setValueSafeNum(const SafeNum value);
+    Status setValueSafeNum(SafeNum value);
 
     /** Set the value of this Element to the value from another Element.
      *

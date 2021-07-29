@@ -66,7 +66,7 @@ public:
     static std::vector<S2CellId> get2dsphereCovering(const S2Region& region);
 
     static void S2CellIdsToIntervals(const std::vector<S2CellId>& intervalSet,
-                                     const S2IndexVersion indexVersion,
+                                     S2IndexVersion indexVersion,
                                      OrderedIntervalList* oilOut);
 
     // Creates an ordered interval list from range intervals and

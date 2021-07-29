@@ -139,7 +139,7 @@ public:
      */
     static boost::intrusive_ptr<GranularityRounder> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        const std::vector<double> baseSeries,
+        std::vector<double> baseSeries,
         std::string name);
     Value roundUp(Value value);
     Value roundDown(Value value);

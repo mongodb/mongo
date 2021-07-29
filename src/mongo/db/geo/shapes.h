@@ -347,8 +347,8 @@ struct GeometryCollection {
 //   - Polygon (from STRICT_SPHERE TO SPHERE)
 //
 struct ShapeProjection {
-    static bool supportsProject(const PointWithCRS& point, const CRS crs);
-    static bool supportsProject(const PolygonWithCRS& polygon, const CRS crs);
+    static bool supportsProject(const PointWithCRS& point, CRS crs);
+    static bool supportsProject(const PolygonWithCRS& polygon, CRS crs);
     static void projectInto(PointWithCRS* point, CRS crs);
     static void projectInto(PolygonWithCRS* point, CRS crs);
 };

@@ -360,9 +360,9 @@ public:
     virtual void finishRecoveryIfEligible(OperationContext* opCtx) override;
 
     virtual void updateAndLogStateTransitionMetrics(
-        const ReplicationCoordinator::OpsKillingStateTransitionEnum stateTransition,
-        const size_t numOpsKilled,
-        const size_t numOpsRunning) const override;
+        ReplicationCoordinator::OpsKillingStateTransitionEnum stateTransition,
+        size_t numOpsKilled,
+        size_t numOpsRunning) const override;
 
     virtual void setCanAcceptNonLocalWrites(bool canAcceptNonLocalWrites);
 

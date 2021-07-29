@@ -223,7 +223,7 @@ private:
      *
      * Note: Errors are ignored and no retry is done
      */
-    void _sendKillCursors(const CursorId id, const NamespaceString& nss);
+    void _sendKillCursors(CursorId id, const NamespaceString& nss);
 
     /**
      * Returns whether the fetcher is in shutdown.

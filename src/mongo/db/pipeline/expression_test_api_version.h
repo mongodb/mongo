@@ -42,7 +42,7 @@ public:
     static constexpr auto kUnstableField = "unstable";
     static constexpr auto kDeprecatedField = "deprecated";
 
-    static boost::intrusive_ptr<Expression> parse(ExpressionContext* const expCtx,
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
                                                   BSONElement expr,
                                                   const VariablesParseState& vps);
 
@@ -59,7 +59,7 @@ public:
     }
 
 private:
-    ExpressionTestApiVersion(ExpressionContext* const expCtx, bool unstable, bool deprecated);
+    ExpressionTestApiVersion(ExpressionContext* expCtx, bool unstable, bool deprecated);
     void _doAddDependencies(DepsTracker* deps) const final override;
 
     bool _unstable;

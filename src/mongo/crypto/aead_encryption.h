@@ -70,20 +70,17 @@ Status aeadDecryptDataFrame(FLEDecryptionFrame& dataframe);
  * Uses AEAD_AES_256_CBC_HMAC_SHA_512 encryption to encrypt a local datakey.
  * Writes output to out.
  */
-Status aeadEncryptLocalKMS(const SymmetricKey& key,
-                           const ConstDataRange in,
-                           uint8_t* out,
-                           size_t outLen);
+Status aeadEncryptLocalKMS(const SymmetricKey& key, ConstDataRange in, uint8_t* out, size_t outLen);
 /**
  * Internal calls for the aeadEncryption algorithm. Only used for testing.
  */
 Status aeadEncryptWithIV(ConstDataRange key,
                          const uint8_t* in,
-                         const size_t inLen,
+                         size_t inLen,
                          const uint8_t* iv,
-                         const size_t ivLen,
+                         size_t ivLen,
                          const uint8_t* associatedData,
-                         const uint64_t associatedDataLen,
+                         uint64_t associatedDataLen,
                          ConstDataRange dataLenBitsEncodedStorage,
                          uint8_t* out,
                          size_t outLen);
@@ -94,7 +91,7 @@ Status aeadEncryptWithIV(ConstDataRange key,
 Status aeadDecrypt(const SymmetricKey& key,
                    ConstDataRange ciphertext,
                    const uint8_t* associatedData,
-                   const uint64_t associatedDataLen,
+                   uint64_t associatedDataLen,
                    uint8_t* out,
                    size_t* outLen);
 
@@ -103,7 +100,7 @@ Status aeadDecrypt(const SymmetricKey& key,
  * to out.
  */
 Status aeadDecryptLocalKMS(const SymmetricKey& key,
-                           const ConstDataRange cipher,
+                           ConstDataRange cipher,
                            uint8_t* out,
                            size_t* outLen);
 

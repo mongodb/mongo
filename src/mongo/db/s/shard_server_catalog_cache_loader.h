@@ -242,7 +242,7 @@ private:
          * Iterates over the task list to retrieve the enqueued metadata. Only retrieves collects
          * data from tasks that have terms matching the specified 'term'.
          */
-        EnqueuedMetadataResults getEnqueuedMetadataForTerm(const long long term) const;
+        EnqueuedMetadataResults getEnqueuedMetadataForTerm(long long term) const;
 
 
     private:
@@ -429,9 +429,7 @@ private:
      * Only run on the shard primary.
      */
     std::pair<bool, EnqueuedMetadataResults> _getEnqueuedMetadata(
-        const NamespaceString& nss,
-        const ChunkVersion& catalogCacheSinceVersion,
-        const long long term);
+        const NamespaceString& nss, const ChunkVersion& catalogCacheSinceVersion, long long term);
 
     /**
      * First ensures that this server is a majority primary in the case of a replica set with two

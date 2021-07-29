@@ -42,7 +42,7 @@ class ExpressionInternalJsEmit final : public Expression {
 public:
     static constexpr auto kExpressionName = "$_internalJsEmit"_sd;
 
-    static boost::intrusive_ptr<Expression> parse(ExpressionContext* const expCtx,
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
                                                   BSONElement expr,
                                                   const VariablesParseState& vps);
 
@@ -88,7 +88,7 @@ public:
     } _emitState;
 
 private:
-    ExpressionInternalJsEmit(ExpressionContext* const expCtx,
+    ExpressionInternalJsEmit(ExpressionContext* expCtx,
                              boost::intrusive_ptr<Expression> thisRef,
                              std::string funcSourceString);
 

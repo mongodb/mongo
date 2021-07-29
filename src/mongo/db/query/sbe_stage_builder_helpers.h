@@ -74,8 +74,8 @@ std::unique_ptr<sbe::EExpression> makeIsMember(std::unique_ptr<sbe::EExpression>
  */
 std::unique_ptr<sbe::EExpression> generateNullOrMissing(const sbe::EVariable& var);
 
-std::unique_ptr<sbe::EExpression> generateNullOrMissing(const sbe::FrameId frameId,
-                                                        const sbe::value::SlotId slotId);
+std::unique_ptr<sbe::EExpression> generateNullOrMissing(sbe::FrameId frameId,
+                                                        sbe::value::SlotId slotId);
 
 /**
  * Generates an EExpression that checks if the input expression is a non-numeric type _assuming

@@ -117,7 +117,7 @@ public:
     virtual StatusWith<std::unique_ptr<CollectionBulkLoader>> createCollectionForBulkLoading(
         const NamespaceString& nss,
         const CollectionOptions& options,
-        const BSONObj idIndexSpec,
+        BSONObj idIndexSpec,
         const std::vector<BSONObj>& secondaryIndexSpecs) = 0;
 
     /**
@@ -170,7 +170,7 @@ public:
     virtual Status createCollection(OperationContext* opCtx,
                                     const NamespaceString& nss,
                                     const CollectionOptions& options,
-                                    const bool createIdIndex = true,
+                                    bool createIdIndex = true,
                                     const BSONObj& idIndexSpec = BSONObj()) = 0;
 
     /**

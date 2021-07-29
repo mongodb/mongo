@@ -75,7 +75,7 @@ public:
     Privilege(Privilege&&) = default;
     Privilege& operator=(Privilege&&) = default;
 
-    Privilege(const ResourcePattern& resource, const ActionType action);
+    Privilege(const ResourcePattern& resource, ActionType action);
     Privilege(const ResourcePattern& resource, const ActionSet& actions);
 
     const ResourcePattern& getResourcePattern() const {
@@ -90,11 +90,11 @@ public:
     void removeActions(const ActionSet& actionsToRemove);
 
     // Checks if the given action is present in the Privilege.
-    bool includesAction(const ActionType action) const;
+    bool includesAction(ActionType action) const;
     // Checks if the given actions are present in the Privilege.
     bool includesActions(const ActionSet& actions) const;
 
-    static Privilege fromBSON(const BSONElement obj);
+    static Privilege fromBSON(BSONElement obj);
     static Privilege fromBSON(BSONObj obj);
     BSONObj toBSON() const;
 

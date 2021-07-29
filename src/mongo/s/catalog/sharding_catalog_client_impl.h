@@ -62,7 +62,7 @@ public:
     static Status updateShardingCatalogEntryForCollection(OperationContext* opCtx,
                                                           const NamespaceString& nss,
                                                           const CollectionType& coll,
-                                                          const bool upsert);
+                                                          bool upsert);
 
     DatabaseType getDatabase(OperationContext* opCtx,
                              StringData db,

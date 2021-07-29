@@ -50,7 +50,7 @@ public:
         const boost::intrusive_ptr<ExpressionContext>&);
 
     static boost::intrusive_ptr<DocumentSourceReshardingIterateTransaction> createFromBson(
-        const BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
+        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
 

@@ -132,7 +132,7 @@ public:
                                    double locksPerOp,
                                    std::uint64_t lagMillis,
                                    std::uint64_t thresholdLagMillis);
-    void _trimSamples(const Timestamp trimSamplesTo);
+    void _trimSamples(Timestamp trimSamplesTo);
 
     // Sample of (timestamp, ops, lock acquisitions) where ops and lock acquisitions are
     // observations of the corresponding counter at (roughly) <timestamp>.

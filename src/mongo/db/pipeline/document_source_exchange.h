@@ -200,7 +200,7 @@ public:
      * while waiting.
      */
     DocumentSourceExchange(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                           const boost::intrusive_ptr<Exchange> exchange,
+                           boost::intrusive_ptr<Exchange> exchange,
                            size_t consumerId,
                            std::unique_ptr<ResourceYielder> yielder);
 

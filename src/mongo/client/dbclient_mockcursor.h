@@ -42,7 +42,7 @@ class DBClientMockCursor : public DBClientCursor {
 public:
     DBClientMockCursor(mongo::DBClientBase* client,
                        const BSONArray& mockCollection,
-                       const bool provideResumeToken = false,
+                       bool provideResumeToken = false,
                        unsigned long batchSize = 0);
 
     virtual ~DBClientMockCursor() {}

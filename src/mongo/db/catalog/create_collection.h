@@ -67,7 +67,7 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                                    const std::string& dbName,
                                    const OptionalCollectionUUID& ui,
                                    const BSONObj& cmdObj,
-                                   const bool allowRenameOutOfTheWay,
+                                   bool allowRenameOutOfTheWay,
                                    boost::optional<BSONObj> idIndex = boost::none);
 
 }  // namespace mongo

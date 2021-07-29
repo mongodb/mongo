@@ -150,7 +150,7 @@ public:
     static std::unique_ptr<Pipeline, PipelineDeleter> makePipeline(
         const std::vector<BSONObj>& rawPipeline,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        const MakePipelineOptions opts = MakePipelineOptions{});
+        MakePipelineOptions opts = MakePipelineOptions{});
 
     static std::unique_ptr<Pipeline, PipelineDeleter> makePipelineFromViewDefinition(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,

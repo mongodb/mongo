@@ -46,10 +46,10 @@ public:
         return kName.rawData();
     }
 
-    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* const expCtx,
+    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx,
                                                          StringData funcSource);
 
-    static AccumulationExpression parseInternalJsReduce(ExpressionContext* const expCtx,
+    static AccumulationExpression parseInternalJsReduce(ExpressionContext* expCtx,
                                                         BSONElement elem,
                                                         VariablesParseState vps);
 
@@ -86,13 +86,13 @@ public:
 
     // An AccumulatorState instance only owns its "static" arguments: those that don't need to be
     // evaluated per input document.
-    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* const expCtx,
+    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx,
                                                          std::string init,
                                                          std::string accumulate,
                                                          std::string merge,
                                                          boost::optional<std::string> finalize);
 
-    static AccumulationExpression parse(ExpressionContext* const expCtx,
+    static AccumulationExpression parse(ExpressionContext* expCtx,
                                         BSONElement elem,
                                         VariablesParseState vps);
 

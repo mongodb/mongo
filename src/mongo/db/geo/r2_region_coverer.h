@@ -129,9 +129,9 @@ class R2CellUnion : boost::noncopyable {
 public:
     void init(const std::vector<GeoHash>& cellIds);
     // Returns true if the cell union contains the given cell id.
-    bool contains(const GeoHash cellId) const;
+    bool contains(GeoHash cellId) const;
     // Return true if the cell union intersects the given cell id.
-    bool intersects(const GeoHash cellId) const;
+    bool intersects(GeoHash cellId) const;
     std::string toString() const;
 
     // Direct access to the underlying vector.

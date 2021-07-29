@@ -59,7 +59,7 @@ bool isSelf(const HostAndPort& hostAndPort, ServiceContext* ctx);
  * Note: this only works on Linux and Windows. All calls should be properly ifdef'd,
  * otherwise an invariant will be triggered.
  */
-std::vector<std::string> getBoundAddrs(const bool ipv6enabled);
+std::vector<std::string> getBoundAddrs(bool ipv6enabled);
 
 }  // namespace repl
 }  // namespace mongo

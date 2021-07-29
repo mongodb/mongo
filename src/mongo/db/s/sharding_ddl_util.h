@@ -108,7 +108,7 @@ void shardedRenameMetadata(OperationContext* opCtx,
  */
 void checkShardedRenamePreconditions(OperationContext* opCtx,
                                      const NamespaceString& toNss,
-                                     const bool dropTarget);
+                                     bool dropTarget);
 
 /**
  * Throws if the DB primary shards of the provided namespaces differs.

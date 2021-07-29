@@ -58,7 +58,7 @@ public:
     static Future<Handle> connect(
         const HostAndPort& peer,
         transport::ConnectSSLMode sslMode,
-        ServiceContext* const context,
+        ServiceContext* context,
         transport::ReactorHandle reactor,
         Milliseconds timeout,
         std::shared_ptr<const transport::SSLConnectionContext> transientSSLContext = nullptr);
@@ -86,8 +86,7 @@ public:
                                          BSONObj specAuth,
                                          auth::SpeculativeAuthType speculativeAuthtype);
 
-    Future<void> initWireVersion(const std::string& appName,
-                                 executor::NetworkConnectionHook* const hook);
+    Future<void> initWireVersion(const std::string& appName, executor::NetworkConnectionHook* hook);
 
     void cancel(const BatonHandle& baton = nullptr);
 

@@ -95,7 +95,7 @@ public:
     State getState() const {
         return _state.get();
     }
-    void setState(const State state);
+    void setState(State state);
 
     const std::string& getProcess() const {
         return _process.get();

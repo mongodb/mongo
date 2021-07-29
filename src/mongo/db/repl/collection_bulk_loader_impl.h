@@ -68,8 +68,8 @@ public:
 
     virtual Status init(const std::vector<BSONObj>& secondaryIndexSpecs) override;
 
-    virtual Status insertDocuments(const std::vector<BSONObj>::const_iterator begin,
-                                   const std::vector<BSONObj>::const_iterator end) override;
+    virtual Status insertDocuments(std::vector<BSONObj>::const_iterator begin,
+                                   std::vector<BSONObj>::const_iterator end) override;
     virtual Status commit() override;
 
     CollectionBulkLoaderImpl::Stats getStats() const;
@@ -86,16 +86,16 @@ private:
     /**
      * For capped collections, each document will be inserted in its own WriteUnitOfWork.
      */
-    Status _insertDocumentsForCappedCollection(const std::vector<BSONObj>::const_iterator begin,
-                                               const std::vector<BSONObj>::const_iterator end);
+    Status _insertDocumentsForCappedCollection(std::vector<BSONObj>::const_iterator begin,
+                                               std::vector<BSONObj>::const_iterator end);
 
     /**
      * For uncapped collections, we will insert documents in batches of size
      * collectionBulkLoaderBatchSizeInBytes or up to one document size greater. All insertions in a
      * given batch will be inserted in one WriteUnitOfWork.
      */
-    Status _insertDocumentsForUncappedCollection(const std::vector<BSONObj>::const_iterator begin,
-                                                 const std::vector<BSONObj>::const_iterator end);
+    Status _insertDocumentsForUncappedCollection(std::vector<BSONObj>::const_iterator begin,
+                                                 std::vector<BSONObj>::const_iterator end);
 
     /**
      * Adds document and associated RecordId to index blocks after inserting into RecordStore.

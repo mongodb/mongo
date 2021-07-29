@@ -119,14 +119,13 @@ private:
     void parseTypeFromHelloReply(BSONObj helloReply);
 
 
-    void calculateRtt(const boost::optional<HelloRTT> currentRtt,
-                      const boost::optional<HelloRTT> lastRtt);
+    void calculateRtt(boost::optional<HelloRTT> currentRtt, boost::optional<HelloRTT> lastRtt);
     void saveLastWriteInfo(BSONObj lastWriteBson);
 
-    void storeHostListIfPresent(const std::string key,
-                                const BSONObj response,
+    void storeHostListIfPresent(std::string key,
+                                BSONObj response,
                                 std::set<HostAndPort>& destination);
-    void saveHosts(const BSONObj response);
+    void saveHosts(BSONObj response);
     void saveTags(BSONObj tagsObj);
     void saveElectionId(BSONElement electionId);
     void saveTopologyVersion(BSONElement topologyVersionField);

@@ -99,7 +99,7 @@ public:
     static void shutdown();
 
 protected:
-    explicit ReplicaSetMonitor(const std::function<void()> cleanupCallback);
+    explicit ReplicaSetMonitor(std::function<void()> cleanupCallback);
 
 private:
     /**

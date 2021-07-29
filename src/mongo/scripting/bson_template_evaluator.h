@@ -146,7 +146,7 @@ private:
     VarMap _varMap;
 
     // evaluates a BSON element. This is internally called by the top level evaluate method.
-    Status _evalElem(const BSONElement in, BSONObjBuilder& out);
+    Status _evalElem(BSONElement in, BSONObjBuilder& out);
 
     // evaluates a BSON object. This is internally called by the top level evaluate method
     // and the _evalElem method.

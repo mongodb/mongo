@@ -88,6 +88,6 @@ static constexpr auto kDefaultBuilderParams =
 std::unique_ptr<ProjectionExecutor> buildProjectionExecutor(
     boost::intrusive_ptr<ExpressionContext> expCtx,
     const projection_ast::Projection* projection,
-    const ProjectionPolicies policies,
+    ProjectionPolicies policies,
     BuilderParamsBitSet params);
 }  // namespace mongo::projection_executor

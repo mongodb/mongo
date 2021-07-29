@@ -134,7 +134,7 @@ private:
     Status _applyOplogEntryOrGroupedInserts(OperationContext* opCtx,
                                             const OplogEntryOrGroupedInserts& entryOrGroupedInserts,
                                             OplogApplication::Mode oplogApplicationMode,
-                                            const bool isDataConsistent);
+                                            bool isDataConsistent);
     std::vector<std::vector<const OplogEntry*>> _fillWriterVectors(OperationContext* opCtx,
                                                                    TenantOplogBatch* batch);
 

@@ -67,7 +67,7 @@ public:
     void parse(const write_ops::UpdateModification& updateExpr,
                const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>& arrayFilters,
                boost::optional<BSONObj> constants = boost::none,
-               const bool multi = false);
+               bool multi = false);
 
     /**
      * Fills in document with any fields in the query which are valid.
@@ -211,7 +211,7 @@ public:
 
 private:
     /** Create the modifier and add it to the back of the modifiers vector */
-    inline Status addAndParse(const modifiertable::ModifierType type, const BSONElement& elem);
+    inline Status addAndParse(modifiertable::ModifierType type, const BSONElement& elem);
 
     //
     // immutable properties after parsing

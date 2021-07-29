@@ -68,7 +68,7 @@ void onShardVersionMismatch(OperationContext* opCtx,
  * recover any ongoing migrations if runRecover is true.
  */
 SharedSemiFuture<void> recoverRefreshShardVersion(ServiceContext* serviceContext,
-                                                  const NamespaceString nss,
+                                                  NamespaceString nss,
                                                   bool runRecover);
 
 /**
@@ -97,11 +97,11 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
  */
 Status onDbVersionMismatchNoExcept(
     OperationContext* opCtx,
-    const StringData dbName,
+    StringData dbName,
     const DatabaseVersion& clientDbVersion,
     const boost::optional<DatabaseVersion>& serverDbVersion) noexcept;
 
-void forceDatabaseRefresh(OperationContext* opCtx, const StringData dbName);
+void forceDatabaseRefresh(OperationContext* opCtx, StringData dbName);
 
 /**
  * RAII-style class that enters the migration critical section and refresh the filtering

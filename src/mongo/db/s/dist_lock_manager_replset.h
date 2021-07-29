@@ -103,7 +103,7 @@ private:
      * the lock expiration threshold.
      */
     StatusWith<bool> isLockExpired(OperationContext* opCtx,
-                                   const LocksType lockDoc,
+                                   LocksType lockDoc,
                                    const Milliseconds& lockExpiration);
 
     long long _waitForRecovery(OperationContext* opCtx);

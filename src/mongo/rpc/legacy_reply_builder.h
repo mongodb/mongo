@@ -61,7 +61,7 @@ public:
 
     Protocol getProtocol() const final;
 
-    void reserveBytes(const std::size_t bytes) final;
+    void reserveBytes(std::size_t bytes) final;
 
 private:
     BufBuilder _builder;

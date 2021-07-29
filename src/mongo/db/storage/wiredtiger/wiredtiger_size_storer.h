@@ -76,9 +76,7 @@ public:
         AtomicWord<bool> _dirty;
     };
 
-    WiredTigerSizeStorer(WT_CONNECTION* conn,
-                         const std::string& storageUri,
-                         const bool readOnly = false);
+    WiredTigerSizeStorer(WT_CONNECTION* conn, const std::string& storageUri, bool readOnly = false);
     ~WiredTigerSizeStorer();
 
     /**

@@ -238,7 +238,7 @@ public:
      * "when" defaults to now().
      */
     RemoteCommandRequest scheduleErrorResponse(const Status& response);
-    RemoteCommandRequest scheduleErrorResponse(const TaskExecutor::ResponseStatus response);
+    RemoteCommandRequest scheduleErrorResponse(TaskExecutor::ResponseStatus response);
     RemoteCommandRequest scheduleErrorResponse(NetworkOperationIterator noi,
                                                const Status& response);
     RemoteCommandRequest scheduleErrorResponse(NetworkOperationIterator noi,

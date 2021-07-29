@@ -95,11 +95,11 @@ public:
 
     bool VirtualContainsPoint(S2Point const& p) const;
 
-    void Encode(Encoder* const encoder) const;
+    void Encode(Encoder* encoder) const;
 
-    bool Decode(Decoder* const decoder);
+    bool Decode(Decoder* decoder);
 
-    bool DecodeWithinScope(Decoder* const decoder);
+    bool DecodeWithinScope(Decoder* decoder);
 
 private:
     std::unique_ptr<S2Loop> _loop;

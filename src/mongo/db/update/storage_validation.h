@@ -56,8 +56,8 @@ Status storageValidIdField(const mongo::BSONElement& element);
  * during validation.
  */
 void storageValid(const mutablebson::Document& doc,
-                  const bool allowTopLevelDollarPrefixes,
-                  const bool shouldValidate,
+                  bool allowTopLevelDollarPrefixes,
+                  bool shouldValidate,
                   bool* containsDotsAndDollarsField);
 
 /**
@@ -75,10 +75,10 @@ void storageValid(const mutablebson::Document& doc,
  * during validation.
  */
 void storageValid(mutablebson::ConstElement elem,
-                  const bool deep,
+                  bool deep,
                   std::uint32_t recursionLevel,
-                  const bool allowTopLevelDollarPrefixes,
-                  const bool shouldValidate,
+                  bool allowTopLevelDollarPrefixes,
+                  bool shouldValidate,
                   bool* containsDotsAndDollarsField);
 
 }  // namespace storage_validation

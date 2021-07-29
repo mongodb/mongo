@@ -72,7 +72,7 @@ struct Helpers {
     static BSONObj findOneForTesting(OperationContext* opCtx,
                                      const CollectionPtr& collection,
                                      const BSONObj& query,
-                                     const bool invariantOnError = true);
+                                     bool invariantOnError = true);
 
     /**
      * Similar to the 'findOne()' overload above, except returns the RecordId of the first matching

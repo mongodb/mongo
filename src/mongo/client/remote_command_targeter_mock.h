@@ -82,7 +82,7 @@ public:
     /**
      * Sets the return value for the next call to connectionString.
      */
-    void setConnectionStringReturnValue(const ConnectionString returnValue);
+    void setConnectionStringReturnValue(ConnectionString returnValue);
 
     /**
      * Sets the return value for the next call to findHost.
