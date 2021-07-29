@@ -54,6 +54,7 @@ public:
         if (_front == nullptr) {
             _front = _back = request;
         } else {
+            invariant(_front->prev == nullptr);
             request->next = _front;
 
             _front->prev = request;
@@ -69,6 +70,8 @@ public:
         if (_front == nullptr) {
             _front = _back = request;
         } else {
+            invariant(_back);
+            invariant(_back->next == nullptr);
             request->prev = _back;
 
             _back->next = request;
@@ -78,12 +81,14 @@ public:
 
     void remove(LockRequest* request) {
         if (request->prev != nullptr) {
+            invariant(request->prev->next == request);
             request->prev->next = request->next;
         } else {
             _front = request->next;
         }
 
         if (request->next != nullptr) {
+            invariant(request->next->prev == request);
             request->next->prev = request->prev;
         } else {
             _back = request->prev;
@@ -91,6 +96,9 @@ public:
 
         request->prev = nullptr;
         request->next = nullptr;
+
+        invariant((_front == nullptr) == (_back == nullptr),
+                  str::stream() << "_front=" << (void*)_front << ", _back=" << (void*)_back);
     }
 
     void reset() {
