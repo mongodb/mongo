@@ -70,6 +70,8 @@ public:
     static constexpr auto kPrecision = Milliseconds(5);
 };
 
+/*
+ * TODO SERVER-58959: fix and enable the test.
 TEST(Interruptible, WaitUntilDeadline) {
     auto interruptible = std::make_unique<DummyInterruptible>();
     const auto sleepFor = Milliseconds(500);
@@ -87,6 +89,7 @@ TEST(Interruptible, WaitUntilDeadline) {
     ASSERT_LTE(end, deadline + DummyInterruptible::kPrecision);
     ASSERT_FALSE(interruptible->isWaitingForConditionOrInterrupt());
 }
+*/
 
 }  // namespace
 }  // namespace mongo
