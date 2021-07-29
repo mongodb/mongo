@@ -32,7 +32,6 @@
 #include "mongo/base/counter.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/random.h"
 #include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/util/duration.h"
 
@@ -70,9 +69,10 @@ public:
 private:
     void _addMockNetworkResponseThread();
 
+    static int32_t nextRandomInt32(int32_t max);
+
     const std::shared_ptr<TaskExecutor> _executor;
     const boost::optional<NetworkInterfaceMock*> _netMock;
-    PseudoRandom _random;
 
     // Statistics.
     Counter64 _completedWorks;

@@ -30,6 +30,7 @@
 
 #include "mongo/executor/executor_stress_test_fixture.h"
 #include "mongo/logv2/log.h"
+#include "mongo/platform/random.h"
 #include "mongo/rpc/topology_version_gen.h"
 #include "mongo/unittest/integration_test.h"
 #include "mongo/util/net/hostandport.h"
@@ -43,7 +44,6 @@ ThreadPoolExecutorStressTestEngine::ThreadPoolExecutorStressTestEngine(
     Milliseconds waitBeforeTermination)
     : _executor(std::move(executor)),
       _netMock(netMock),
-      _random(SecureRandom().nextInt64()),
       _waitBeforeTermination(waitBeforeTermination) {
     _timer.reset();
     _terminate.store(false);
@@ -93,7 +93,7 @@ void ThreadPoolExecutorStressTestEngine::addRandomCancelationThreads(int count) 
                 }
             }
 
-            if (auto shouldCancel = _random.nextInt32(2) == 0; shouldCancel && cb) {
+            if (auto shouldCancel = nextRandomInt32(2) == 0; shouldCancel && cb) {
                 _executor->cancel(cb);
             } else if (cb) {
                 _executor->wait(cb);
@@ -201,6 +201,11 @@ void ThreadPoolExecutorStressTestEngine::waitAndCleanup() {
 
     _threadAssertionMonitor->notifyDone();
     _threadAssertionMonitor.reset();
+}
+
+int32_t ThreadPoolExecutorStressTestEngine::nextRandomInt32(int32_t max) {
+    static thread_local PseudoRandom random(SecureRandom().nextInt64());
+    return random.nextInt32(max);
 }
 
 
