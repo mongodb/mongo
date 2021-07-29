@@ -79,6 +79,7 @@ private:
     void _storePrevious(BSONElement elem);
     void _writeLiteralFromPrevious();
     void _incrementSimple8bCount();
+    bool _usesDeltaOfDelta(BSONType type);
 
     Simple8bBuilder<uint64_t> _createSimple8bBuilder();
 
@@ -86,6 +87,8 @@ private:
     std::unique_ptr<char[]> _prev;
     int _prevSize = 0;
     int _prevCapacity = 0;
+    // This is only used for types that use delta of delta.
+    int64_t _prevDelta = 0;
 
     // Simple-8b builder for storing compressed deltas
     Simple8bBuilder<uint64_t> _simple8bBuilder;

@@ -53,12 +53,29 @@ public:
         return _elementMemory.front().firstElement();
     }
 
+    BSONElement createTimestamp(Timestamp val) {
+        BSONObjBuilder ob;
+        ob.append("0"_sd, val);
+        _elementMemory.emplace_front(ob.obj());
+        return _elementMemory.front().firstElement();
+    }
+
     static uint64_t deltaInt32(BSONElement val, BSONElement prev) {
         return Simple8bTypeUtil::encodeInt64(val.Int() - prev.Int());
     }
 
     static uint64_t deltaInt64(BSONElement val, BSONElement prev) {
         return Simple8bTypeUtil::encodeInt64(val.Long() - prev.Long());
+    }
+
+    uint64_t deltaOfDeltaTimestamp(BSONElement val, BSONElement prev) {
+        return Simple8bTypeUtil::encodeInt64(val.timestamp().asULL() - prev.timestamp().asULL());
+    }
+
+    static uint64_t deltaOfDeltaTimestamp(BSONElement val, BSONElement prev, BSONElement prevprev) {
+        int64_t prevTimestampDelta = prev.timestamp().asULL() - prevprev.timestamp().asULL();
+        int64_t currTimestampDelta = val.timestamp().asULL() - prev.timestamp().asULL();
+        return Simple8bTypeUtil::encodeInt64(currTimestampDelta - prevTimestampDelta);
     }
 
     template <typename It>
@@ -131,7 +148,6 @@ private:
     std::forward_list<BSONObj> _elementMemory;
 };
 
-
 TEST_F(BSONColumnTest, BasicValue) {
     BSONColumnBuilder cb("test"_sd);
 
@@ -200,7 +216,7 @@ TEST_F(BSONColumnTest, LargeDeltaIsLiteral) {
     auto first = createElementInt64(1);
     cb.append(first);
 
-    auto second = createElementInt64(0x7FFFFFFFFFFFFFFF);
+    auto second = createElementInt64(std::numeric_limits<int64_t>::max());
     cb.append(second);
 
     BufBuilder expected;
@@ -218,7 +234,7 @@ TEST_F(BSONColumnTest, LargeDeltaIsLiteralAfterSimple8b) {
     cb.append(zero);
     cb.append(zero);
 
-    auto large = createElementInt64(0x7FFFFFFFFFFFFFFF);
+    auto large = createElementInt64(std::numeric_limits<int64_t>::max());
     cb.append(large);
     cb.append(large);
 
@@ -317,6 +333,125 @@ TEST_F(BSONColumnTest, Simple8bAfterTypeChange) {
     appendLiteral(expected, elemInt64);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlock(expected, 0);
+    appendEOO(expected);
+
+    verifyBinary(cb.finalize(), expected);
+}
+
+TEST_F(BSONColumnTest, Simple8bTimestamp) {
+    BSONColumnBuilder cb("test"_sd);
+
+    auto first = createTimestamp(Timestamp(0));
+    auto second = createTimestamp(Timestamp(1));
+
+    cb.append(first);
+    cb.append(second);
+    cb.append(second);
+
+    BufBuilder expected;
+    appendLiteral(expected, first);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    std::vector<uint64_t> expectedDeltaOfDeltas{deltaOfDeltaTimestamp(second, first),
+                                                deltaOfDeltaTimestamp(second, second, first)};
+    appendSimple8bBlocks(expected, expectedDeltaOfDeltas, 1);
+    appendEOO(expected);
+
+    verifyBinary(cb.finalize(), expected);
+}
+
+TEST_F(BSONColumnTest, Simple8bTimestampNegativeDeltaOfDelta) {
+    BSONColumnBuilder cb("test"_sd);
+
+    auto first = createTimestamp(Timestamp(3));
+    auto second = createTimestamp(Timestamp(5));
+    auto third = createTimestamp(Timestamp(6));
+
+    cb.append(first);
+    cb.append(second);
+    cb.append(third);
+
+    BufBuilder expected;
+    appendLiteral(expected, first);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    std::vector<uint64_t> expectedDeltaOfDeltas{deltaOfDeltaTimestamp(second, first),
+                                                deltaOfDeltaTimestamp(third, second, first)};
+    appendSimple8bBlocks(expected, expectedDeltaOfDeltas, 1);
+    appendEOO(expected);
+
+    verifyBinary(cb.finalize(), expected);
+}
+
+TEST_F(BSONColumnTest, Simple8bTimestampAfterChangeBack) {
+    BSONColumnBuilder cb("test"_sd);
+
+    auto first = createTimestamp(Timestamp(0));
+    auto second = createTimestamp(Timestamp(1));
+    auto elemInt32 = createElementInt32(0);
+
+    cb.append(first);
+    cb.append(second);
+    cb.append(elemInt32);
+    cb.append(first);  // Test confirms that _prevTimestampDelta gets reset to 0.
+    cb.append(second);
+
+    BufBuilder expected;
+
+    appendLiteral(expected, first);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlock(expected, deltaOfDeltaTimestamp(second, first));
+
+    appendLiteral(expected, elemInt32);
+
+    appendLiteral(expected, first);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlock(expected, deltaOfDeltaTimestamp(second, first));
+
+    appendEOO(expected);
+
+    verifyBinary(cb.finalize(), expected);
+}
+
+TEST_F(BSONColumnTest, LargeDeltaOfDeltaTimestamp) {
+    BSONColumnBuilder cb("test"_sd);
+
+    auto first = createTimestamp(Timestamp(0));
+    cb.append(first);
+
+    auto second = createTimestamp(Timestamp(std::numeric_limits<int64_t>::max()));
+    cb.append(second);
+
+    BufBuilder expected;
+    appendLiteral(expected, first);
+    appendLiteral(expected, second);
+    appendEOO(expected);
+
+    verifyBinary(cb.finalize(), expected);
+}
+
+TEST_F(BSONColumnTest, LargeDeltaOfDeltaIsLiteralAfterSimple8bTimestamp) {
+    BSONColumnBuilder cb("test"_sd);
+
+    auto zero = createTimestamp(Timestamp(0));
+    cb.append(zero);
+    cb.append(zero);
+
+    auto large = createTimestamp(Timestamp(std::numeric_limits<int64_t>::max()));
+    cb.append(large);
+    cb.append(large);
+
+    // Semi-large number so that the delta-of-delta will fit into a Simple8b word.
+    auto semiLarge = createTimestamp(Timestamp(0x7FFFFFFFFF000000));
+    cb.append(semiLarge);
+
+    BufBuilder expected;
+    appendLiteral(expected, zero);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlock(expected, deltaOfDeltaTimestamp(zero, zero));
+    appendLiteral(expected, large);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    std::vector<uint64_t> expectedDeltaOfDeltas{deltaOfDeltaTimestamp(large, large),
+                                                deltaOfDeltaTimestamp(semiLarge, large, large)};
+    appendSimple8bBlocks(expected, expectedDeltaOfDeltas, 1);
     appendEOO(expected);
 
     verifyBinary(cb.finalize(), expected);

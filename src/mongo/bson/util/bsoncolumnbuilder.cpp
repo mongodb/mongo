@@ -54,7 +54,7 @@ BSONColumnBuilder& BSONColumnBuilder::append(BSONElement elem) {
     auto previous = _previous();
 
     // If we detect a type change (or this is first value). Flush all pending values in Simple-8b
-    // and write uncompressed literal.
+    // and write uncompressed literal. Reset all default values.
     if (previous.type() != elem.type()) {
         _storePrevious(elem);
         _simple8bBuilder.flush();
@@ -62,23 +62,30 @@ BSONColumnBuilder& BSONColumnBuilder::append(BSONElement elem) {
         return *this;
     }
 
-    // Store delta in Simple-8b if types match
-    int64_t delta = 0;
-    if (!elem.binaryEqualValues(previous)) {
+    // Depending on the type, delta or delta-of-delta is stored in Simple-8b.
+    int64_t value = 0;
+    if (_usesDeltaOfDelta(type) || !elem.binaryEqualValues(previous)) {
         switch (type) {
             case NumberInt:
-                delta = elem._numberInt() - previous._numberInt();
+                value = elem._numberInt() - previous._numberInt();
                 break;
             case NumberLong:
-                delta = elem._numberLong() - previous._numberLong();
+                value = elem._numberLong() - previous._numberLong();
                 break;
+            case bsonTimestamp: {
+                int64_t currTimestampDelta =
+                    elem.timestamp().asULL() - previous.timestamp().asULL();
+                value = currTimestampDelta - _prevDelta;
+                _prevDelta = currTimestampDelta;
+                break;
+            }
             default:
                 // Nothing else is implemented yet
                 invariant(false);
         };
     }
 
-    bool result = _simple8bBuilder.append(Simple8bTypeUtil::encodeInt64(delta));
+    bool result = _simple8bBuilder.append(Simple8bTypeUtil::encodeInt64(value));
     _storePrevious(elem);
 
     // Store uncompressed literal if value is outside of range of encodable values.
@@ -127,9 +134,11 @@ void BSONColumnBuilder::_storePrevious(BSONElement elem) {
 
 void BSONColumnBuilder::_writeLiteralFromPrevious() {
     // Write literal without field name and reset control byte to force new one to be written when
-    // appending next value
+    // appending next value.
     _bufBuilder.appendBuf(_prev.get(), _prevSize);
     _controlByteOffset = 0;
+    // There is no previous timestamp delta. Set to default.
+    _prevDelta = 0;
 }
 
 void BSONColumnBuilder::_incrementSimple8bCount() {
@@ -164,6 +173,10 @@ Simple8bBuilder<uint64_t> BSONColumnBuilder::_createSimple8bBuilder() {
         _bufBuilder.appendNum(block);
         return true;
     });
+}
+
+bool BSONColumnBuilder::_usesDeltaOfDelta(BSONType type) {
+    return type == bsonTimestamp;
 }
 
 }  // namespace mongo
