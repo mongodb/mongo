@@ -48,22 +48,22 @@
 ##
 #set $latest = Version(re.sub(r'-.*', '', $mongo_version))
 ## Highest release less than latest.
-#set $last_rapid = $fcvs[bisect.bisect_left($fcvs, $latest) - 1]
+#set $last_continuous = $fcvs[bisect.bisect_left($fcvs, $latest) - 1]
 ## Highest major release less than latest.
-#set global $last_major = $majors[bisect.bisect_left($majors, $latest) - 1]
+#set global $last_lts = $majors[bisect.bisect_left($majors, $latest) - 1]
 ##
 ## Format a Version as `{major}_{minor}`.
 #def $underscores(v): ${'{}_{}'.format(v.major, v.minor)}
-#def $fcv_prefix(v):${'kFullyDowngradedTo_' if v == $last_major else 'kVersion_'}
+#def $fcv_prefix(v):${'kFullyDowngradedTo_' if v == $last_lts else 'kVersion_'}
 #def $fcv_cpp_name(v):${'{}{}'.format($fcv_prefix(v), $underscores(v))}
 
 namespace mongo::multiversion {
 
 enum class FeatureCompatibilityVersion {
     kInvalid,
-    kUnsetDefaultBehavior_$underscores($last_major),
-## Generate FCV constants for all versions from last_major to latest, inclusive.
-#for $fcv in $fcvs[bisect.bisect_left($fcvs, $last_major):bisect.bisect_right($fcvs, $latest)]:
+    kUnsetDefaultBehavior_$underscores($last_lts),
+## Generate FCV constants for all versions from last_lts to latest, inclusive.
+#for $fcv in $fcvs[bisect.bisect_left($fcvs, $last_lts):bisect.bisect_right($fcvs, $latest)]:
     $fcv_cpp_name($fcv),
 #end for
 };
@@ -71,8 +71,8 @@ enum class FeatureCompatibilityVersion {
 ## Calculate number of versions since v4.4.
 constexpr size_t kSince_$underscores(Version('4.4')) = ${len($fcvs) - 1};
 
-// Last major was "$last_major".
-constexpr size_t kSinceLastMajor = ${len($fcvs) - bisect.bisect_left($fcvs, $last_major) - 1};
+// Last LTS was "$last_lts".
+constexpr size_t kSinceLastLTS = ${len($fcvs) - bisect.bisect_left($fcvs, $last_lts) - 1};
 
 class GenericFCV {
 #def define_fcv_alias($id, v):
@@ -80,8 +80,8 @@ static constexpr auto $id = FeatureCompatibilityVersion::$fcv_cpp_name(v);#slurp
 #end def
 public:
     $define_fcv_alias('kLatest', $latest)
-    $define_fcv_alias('kLastRapid', $last_rapid)
-    $define_fcv_alias('kLastMajor', $last_major)
+    $define_fcv_alias('kLastContinuous', $last_continuous)
+    $define_fcv_alias('kLastLTS', $last_lts)
 };
 
 }  // namespace mongo::multiversion
