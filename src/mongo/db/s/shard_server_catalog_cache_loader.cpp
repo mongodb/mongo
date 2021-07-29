@@ -44,6 +44,7 @@
 #include "mongo/s/catalog/type_shard_collection.h"
 #include "mongo/s/catalog/type_shard_database.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/database_version_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
@@ -458,6 +459,22 @@ void ShardServerCatalogCacheLoader::getDatabase(
         auto context = _contexts.makeOperationContext(*Client::getCurrent());
         auto const opCtx = context.opCtx();
 
+        // Metadata on the "admin" and "config" databases are generated at the shard server level.
+        // Indeed, the "config.databases" collection managed by the config servers does not contain
+        // information about these databases.
+        if (name == NamespaceString::kAdminDb) {
+            DatabaseType dbType(
+                name, ShardRegistry::kConfigServerShardId, false, databaseVersion::makeFixed());
+            callbackFn(opCtx, std::move(dbType));
+            return;
+        }
+        if (name == NamespaceString::kConfigDb) {
+            DatabaseType dbType(
+                name, ShardRegistry::kConfigServerShardId, true, databaseVersion::makeFixed());
+            callbackFn(opCtx, std::move(dbType));
+            return;
+        }
+
         try {
             {
                 // We may have missed an OperationContextGroup interrupt since this operation began
@@ -476,7 +493,7 @@ void ShardServerCatalogCacheLoader::getDatabase(
                 _runSecondaryGetDatabase(opCtx, name, callbackFn);
             }
         } catch (const DBException& ex) {
-            callbackFn(context.opCtx(), ex.toStatus());
+            callbackFn(opCtx, ex.toStatus());
         }
     });
 }
