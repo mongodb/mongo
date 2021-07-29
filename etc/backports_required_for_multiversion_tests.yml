@@ -212,6 +212,8 @@ last-lts:
       test_file: jstests/replsets/cluster_chaining_override.js
     - ticket: SERVER-57729
       test_file: jstests/core/timeseries/timeseries_bucket_drop.js
+    - ticket: SERVER-56800
+      test_file: jstests/sharding/cwwc_conflict_add_shard.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
