@@ -3114,6 +3114,22 @@ tasks:
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
       name: aggregation_timeseries_fuzzer
 
+## Standalone generational fuzzer for checking optimized and unoptimized change stream pipelines ##
+- <<: *jstestfuzz_template
+  name: change_stream_optimization_fuzzer_gen
+  tags: ["change_stream_fuzzer"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      <<: *jstestfuzz_config_vars
+      num_files: 5
+      num_tasks: 5
+      jstestfuzz_vars: --diffTestingMode optimization
+      npm_command: change-stream-fuzzer
+      suite: generational_fuzzer
+      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+      name: change_stream_optimization_fuzzer
+
 ## jstestfuzz standalone fuzzer for checking find and aggregate equivalence ##
 - <<: *jstestfuzz_template
   name: query_fuzzer_standalone_gen
@@ -8959,6 +8975,7 @@ buildvariants:
   - name: unittest_shell_hang_analyzer_gen
   - name: .causally_consistent !.sharding
   - name: .change_streams
+  - name: .change_stream_fuzzer
   - name: .misc_js
   - name: .concurrency !.large !.ubsan !.no_txns !.debug_only
   - name: .concurrency .large !.ubsan !.no_txns !.debug_only
@@ -9089,6 +9106,7 @@ buildvariants:
   - name: unittest_shell_hang_analyzer_gen
   - name: .causally_consistent !.sharding
   - name: .change_streams
+  - name: .change_stream_fuzzer
   - name: .misc_js
   - name: .concurrency !.large !.ubsan !.no_txns !.debug_only
   - name: .concurrency .large !.ubsan !.no_txns !.debug_only
@@ -9208,6 +9226,7 @@ buildvariants:
   - name: unittest_shell_hang_analyzer_gen
   - name: .causally_consistent !.sharding
   - name: .change_streams
+  - name: .change_stream_fuzzer
   - name: .misc_js
   - name: .concurrency !.large !.ubsan !.no_txns !.debug_only
   - name: .concurrency .large !.ubsan !.no_txns !.debug_only
@@ -9319,6 +9338,7 @@ buildvariants:
   - name: .aggfuzzer
   - name: .aggregation !.no_async !.secondary_reads !.sharded !.unwind !aggregation_disabled_optimization
   - name: .change_streams
+  - name: .change_stream_fuzzer
   - name: .concurrency !.large !.ubsan !.debug_only
   - name: .jscore !.sharding !.decimal !cst_jscore_passthrough
   - name: .jstestfuzz !.flow_control
@@ -10747,6 +10767,7 @@ buildvariants:
   - name: .auth !.multiversion
   - name: .causally_consistent !.wo_snapshot !.durable_history
   - name: .change_streams !.secondary_reads
+  - name: .change_stream_fuzzer
   - name: .misc_js
   - name: .concurrency !.ubsan !.no_txns !.debug_only !.kill_terminate
     distros:
