@@ -38,6 +38,11 @@ def parse_input(trace_doc, dbg_path_resolver):
 
     frames = []
     for frame in trace_doc["backtrace"]:
+        if "b" not in frame:
+            print(
+                f"Ignoring frame {frame} as it's missing the `b` field; See SERVER-58863 for discussions"
+            )
+            continue
         soinfo = base_addr_map.get(frame["b"], {})
         elf_type = soinfo.get("elfType", 0)
         if elf_type == 3:

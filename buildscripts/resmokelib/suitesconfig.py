@@ -4,6 +4,7 @@ import collections
 import optparse
 import os
 
+import buildscripts.resmokelib.utils.filesystem as fs
 from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib import utils
@@ -134,13 +135,13 @@ class ExplicitSuiteConfig(SuiteConfigInterface):
         """Get the suite config object in the given file."""
         # Named executors or suites are specified as the basename of the file, without the .yml
         # extension.
-        if not utils.is_yaml_file(pathname) and not os.path.dirname(pathname):
+        if not fs.is_yaml_file(pathname) and not os.path.dirname(pathname):
             if pathname not in _config.NAMED_SUITES:  # pylint: disable=unsupported-membership-test
                 # Expand 'pathname' to full path.
                 return None
             pathname = _config.NAMED_SUITES[pathname]  # pylint: disable=unsubscriptable-object
 
-        if not utils.is_yaml_file(pathname) or not os.path.isfile(pathname):
+        if not fs.is_yaml_file(pathname) or not os.path.isfile(pathname):
             raise optparse.OptionValueError("Expected a suite YAML config, but got '%s'" % pathname)
         return utils.load_yaml_file(pathname)
 
@@ -160,7 +161,7 @@ class MatrixSuiteConfig(SuiteConfigInterface):
             if ext in (".yml", ".yaml"):
                 pathname = os.path.join(root, filename)
 
-                if not utils.is_yaml_file(pathname) or not os.path.isfile(pathname):
+                if not fs.is_yaml_file(pathname) or not os.path.isfile(pathname):
                     raise optparse.OptionValueError(
                         "Expected a suite YAML config, but got '%s'" % pathname)
                 all_files[short_name] = load_yaml_file(pathname)

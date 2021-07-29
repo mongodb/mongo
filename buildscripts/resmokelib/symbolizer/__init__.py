@@ -13,11 +13,11 @@ from buildscripts.resmokelib.plugin import PluginInterface, Subcommand
 from buildscripts.resmokelib.setup_multiversion.setup_multiversion import SetupMultiversion, _DownloadOptions
 from buildscripts.resmokelib.utils import evergreen_conn
 
-LOGGER = structlog.getLogger(__name__)
-
 _HELP = """
 Symbolize a backtrace JSON file given an Evergreen Task ID.
 """
+
+LOGGER = None
 
 _MESSAGE = """TODO"""
 
@@ -79,7 +79,7 @@ class Symbolizer(Subcommand):
             return
 
         for module_name, diff in module_diffs.items():
-            # TODO enterprise
+            # TODO: enterprise.
             if "mongodb-mongo-" in module_name:
                 with open(os.path.join(self.dest_dir, "patch.diff"), 'w') as git_diff_file:
                     git_diff_file.write(diff)
@@ -104,12 +104,12 @@ class Symbolizer(Subcommand):
             subprocess.run(["rm", "source.zip"], cwd=src_parent_dir, check=True)
 
             # Do a little dance to get the downloaded source into `self.dest_dir`
-            src_dir = os.listdir(src_parent_dir)
-            if len(src_dir) != 1:
-                raise ValueError(
-                    f"expected exactly 1 directory containing source file, got {src_dir}")
-            src_dir = src_dir[0]
-            os.rename(os.path.join(src_parent_dir, src_dir), self.dest_dir)
+            src_dir = os.path.join(src_parent_dir, f"mongo-{revision}")
+            if not os.path.isdir(src_dir):
+                raise FileNotFoundError(
+                    f"source file directory {src_dir} not found; please reach out to #server-testing for assistance"
+                )
+            os.rename(src_dir, self.dest_dir)
 
         except subprocess.CalledProcessError as err:
             LOGGER.error(err.stdout)
@@ -211,6 +211,8 @@ class SymbolizerPlugin(PluginInterface):
             return None
 
         setup_logging(parsed_args.debug)
+        global LOGGER  # pylint: disable=global-statement
+        LOGGER = structlog.getLogger(__name__)
 
         task_id = parsed_args.task_id
         binary_name = parsed_args.binary_name

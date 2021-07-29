@@ -9,8 +9,8 @@ import time
 import bson
 import pymongo.errors
 
+import buildscripts.resmokelib.utils.filesystem as fs
 from buildscripts.resmokelib import errors
-from buildscripts.resmokelib import utils
 from buildscripts.resmokelib.testing.fixtures import interface as fixture_interface
 from buildscripts.resmokelib.testing.fixtures import replicaset
 from buildscripts.resmokelib.testing.fixtures import shardedcluster
@@ -295,9 +295,9 @@ class FileBasedStepdownLifecycle(object):
         # It is possible something went wrong during the test's execution and prevented the
         # "permitted" and "idle_request" files from being created. We therefore don't consider it an
         # error if they don't exist after the test has finished.
-        utils.remove_if_exists(self.__stepdown_files.permitted)
-        utils.remove_if_exists(self.__stepdown_files.idle_request)
-        utils.remove_if_exists(self.__stepdown_files.idle_ack)
+        fs.remove_if_exists(self.__stepdown_files.permitted)
+        fs.remove_if_exists(self.__stepdown_files.idle_request)
+        fs.remove_if_exists(self.__stepdown_files.idle_ack)
 
     def stop(self):
         """Signal to the stepdown thread that it should exit.

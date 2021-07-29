@@ -11,6 +11,8 @@ import zipfile
 import requests
 import structlog
 
+from buildscripts.resmokelib.utils.filesystem import mkdtemp_in_build_dir
+
 S3_BUCKET = "mciuploads"
 
 LOGGER = structlog.getLogger(__name__)
@@ -29,7 +31,7 @@ def download_from_s3(url):
         raise DownloadError("Download URL not found")
 
     LOGGER.info("Downloading.", url=url)
-    filename = os.path.join(tempfile.gettempdir(), url.split('/')[-1].split('?')[0])
+    filename = os.path.join(mkdtemp_in_build_dir(), url.split('/')[-1].split('?')[0])
 
     with requests.get(url, stream=True) as reader:
         with open(filename, 'wb') as file_handle:
@@ -67,7 +69,7 @@ def extract_archive(archive_file, install_dir):
     """Uncompress file and return root of extracted directory."""
 
     LOGGER.info("Extracting archive data.", archive=archive_file, install_dir=install_dir)
-    temp_dir = tempfile.mkdtemp()
+    temp_dir = mkdtemp_in_build_dir()
     archive_name = os.path.basename(archive_file)
     _, file_suffix = os.path.splitext(archive_name)
 
