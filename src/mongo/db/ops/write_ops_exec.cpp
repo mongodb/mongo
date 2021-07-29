@@ -575,16 +575,17 @@ SingleWriteResult makeWriteResultForInsertOrDeleteRetry() {
 // TODO: SERVER-58774 Remove this function and combine it with
 // timeseries::queryOnlyDependsOnMetaField.
 // TODO: SERVER-58382 Handle time-series collections without a metaField.
+template <typename OpEntry>
 bool isTimeseriesMetaFieldOnlyQuery(OperationContext* opCtx,
                                     const NamespaceString& ns,
-                                    const BSONObj& query,
+                                    const OpEntry& opEntry,
                                     const LegacyRuntimeConstants& runtimeConstants,
                                     const boost::optional<BSONObj>& letParams) {
 
     boost::intrusive_ptr<ExpressionContext> expCtx(
         new ExpressionContext(opCtx, nullptr, ns, runtimeConstants, letParams));
 
-    std::vector<BSONObj> rawPipeline{BSON("$match" << query)};
+    std::vector<BSONObj> rawPipeline{BSON("$match" << opEntry.getQuery())};
     DepsTracker dependencies = Pipeline::parse(rawPipeline, expCtx)->getDependencies({});
     return std::all_of(
         dependencies.fields.begin(), dependencies.fields.end(), [](const auto& dependency) {
@@ -1128,13 +1129,12 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
                 "Time-series buckets collection is missing time-series options",
                 timeseriesOptions);
 
-        // TODO: SERVER-58774 Create a new helper function in timeseries_update_delete_util.cpp for
-        // the query translation and validation.
         mutablebson::Document queryDoc(request.getQuery());
         if (timeseriesOptions->getMetaField()) {
             timeseries::replaceTimeseriesQueryMetaFieldName(queryDoc.root(),
                                                             *timeseriesOptions->getMetaField());
         }
+        request.setQuery(queryDoc.getObject());
 
         // Only translate the hint if it is specified by index spec.
         if (request.getHint().firstElement().fieldNameStringData() != "$hint"_sd ||
@@ -1148,12 +1148,7 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
                 str::stream() << "Cannot perform a delete on a time-series collection "
                                  "when querying on a field that is not the metaField: "
                               << ns,
-                isTimeseriesMetaFieldOnlyQuery(
-                    opCtx, ns, queryDoc.getObject(), runtimeConstants, letParams));
-
-        request.setQuery(BSON("$and" << BSON_ARRAY(BSON("control.closed" << BSON("$ne" << true))
-                                                   << queryDoc.getObject())));
-
+                isTimeseriesMetaFieldOnlyQuery(opCtx, ns, request, runtimeConstants, letParams));
         uassert(ErrorCodes::IllegalOperation,
                 str::stream() << "Cannot perform a delete with limit: 1 on a "
                                  "time-series collection: "
