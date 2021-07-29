@@ -18,6 +18,8 @@ class CleanupConcurrencyWorkloads(interface.Hook):
     except for 'exclude_dbs' and the collection used by the test/workloads.
     """
 
+    IS_BACKGROUND = False
+
     def __init__(  #pylint: disable=too-many-arguments
             self, hook_logger, fixture, exclude_dbs=None, same_collection=False, same_db=False):
         """Initialize CleanupConcurrencyWorkloads."""

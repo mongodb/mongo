@@ -1,9 +1,8 @@
 /**
  * Tests $mod match expression with NaN, Infinity and large value inputs.
- * @tags: [
- *   # This test exercises a changed behavior, thus prevent it running in multi-version variants.
- *   requires_fcv_51,
- * ]
+ *
+ * This test exercises a changed behavior, thus prevent it running in multi-version variants.
+ * @tags: [requires_fcv_51]
  */
 (function() {
 "use strict";

@@ -11,6 +11,8 @@ class CleanEveryN(interface.Hook):
     On mongod-related fixtures, this will clear the dbpath.
     """
 
+    IS_BACKGROUND = False
+
     DEFAULT_N = 20
 
     def __init__(self, hook_logger, fixture, n=DEFAULT_N):

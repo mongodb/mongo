@@ -12,6 +12,8 @@ class CheckReplDBHash(jsfile.DataConsistencyHook):
     match on the primary and secondaries.
     """
 
+    IS_BACKGROUND = False
+
     def __init__(  # pylint: disable=super-init-not-called
             self, hook_logger, fixture, shell_options=None):
         """Initialize CheckReplDBHash."""

@@ -13,6 +13,8 @@ from buildscripts.resmokelib.testing.hooks import jsfile
 class EnableSpuriousWriteConflicts(interface.Hook):
     """Toggles write conflicts."""
 
+    IS_BACKGROUND = False
+
     def __init__(  # pylint: disable=too-many-arguments
             self, hook_logger, fixture, shell_options=None):
         """Initialize ToggleWriteConflicts."""

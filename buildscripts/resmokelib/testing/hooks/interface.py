@@ -24,12 +24,20 @@ class Hook(object, metaclass=registry.make_registry_metaclass(_HOOKS)):  # pylin
 
     REGISTERED_NAME = registry.LEAVE_UNREGISTERED
 
+    # Whether the hook runs in the background of a test. Typically background jobs start their own threads,
+    # except for Server-side background activity like initial sync, which is also considered background.
+    IS_BACKGROUND = None
+
     def __init__(self, hook_logger, fixture, description):
         """Initialize the Hook with the specified fixture."""
 
         self.logger = hook_logger
         self.fixture = fixture
         self.description = description
+
+        if self.IS_BACKGROUND is None:
+            raise ValueError(
+                "Concrete Hook subclasses must override the IS_BACKGROUND class property")
 
     def before_suite(self, test_report):
         """Test runner calls this exactly once before they start running the suite."""

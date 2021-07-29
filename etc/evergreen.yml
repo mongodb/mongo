@@ -1,4 +1,4 @@
-#####################################################
+####################################################
 #                  YAML Conventions                 #
 #####################################################
 # Please see our conventions document at
@@ -5692,6 +5692,17 @@ tasks:
     vars:
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger
+
+- <<: *gen_task_template
+  name: retryable_writes_downgrade_passthrough_gen
+  tags: ["multiversion_passthrough"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      suite: retryable_writes_downgrade_passthrough
+      resmoke_args: --storageEngine=wiredTiger
+      require_multiversion: true
+      implicit_multiversion: true
 
 - <<: *gen_task_template
   name: logical_session_cache_replication_default_refresh_jscore_passthrough_gen

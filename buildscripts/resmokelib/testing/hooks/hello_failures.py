@@ -17,6 +17,8 @@ from . import jsfile
 class HelloDelays(interface.Hook):
     """Sets Hello fault injections."""
 
+    IS_BACKGROUND = False
+
     def __init__(self, hook_logger, fixture):
         """Initialize HelloDelays."""
         description = "Sets Hello fault injections"

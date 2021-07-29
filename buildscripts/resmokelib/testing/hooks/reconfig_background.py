@@ -13,6 +13,8 @@ from buildscripts.resmokelib.testing.hooks.background_job import _BackgroundJob,
 class DoReconfigInBackground(jsfile.JSHook):
     """A hook for running a safe reconfig against a replica set while a test is running."""
 
+    IS_BACKGROUND = True
+
     def __init__(self, hook_logger, fixture, shell_options=None):
         """Initialize DoReconfigInBackground."""
         description = "Run reconfigs against the primary while the test is running."

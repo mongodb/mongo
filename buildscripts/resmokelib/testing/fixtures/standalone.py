@@ -17,7 +17,7 @@ class MongoDFixture(interface.Fixture):
 
     def __init__(  # pylint: disable=too-many-arguments
             self, logger, job_num, fixturelib, mongod_executable=None, mongod_options=None,
-            dbpath_prefix=None, preserve_dbpath=False):
+            dbpath_prefix=None, preserve_dbpath=False, port=None):
         """Initialize MongoDFixture with different options for the mongod process."""
         interface.Fixture.__init__(self, logger, job_num, fixturelib, dbpath_prefix=dbpath_prefix)
         self.mongod_options = self.fixturelib.make_historic(
@@ -48,7 +48,7 @@ class MongoDFixture(interface.Fixture):
             self.preserve_dbpath = preserve_dbpath
 
         self.mongod = None
-        self.port = fixturelib.get_next_port(job_num)
+        self.port = port or fixturelib.get_next_port(job_num)
         self.mongod_options["port"] = self.port
 
     def setup(self):

@@ -3,9 +3,12 @@
  * yet. This test should be updated or removed in a future release when we have more confidence that
  * the behavior and syntax is stable.
  *
+ *  TODO: SERVER-58962 remove requires_fcv_51 from this file or change the test code.
+ *
  * @tags: [
  *   requires_fcv_51,
  *   uses_api_parameters,
+ *   requires_fcv_51,
  * ]
  */
 

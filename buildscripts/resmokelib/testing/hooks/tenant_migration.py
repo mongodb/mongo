@@ -23,6 +23,8 @@ class ContinuousTenantMigration(interface.Hook):  # pylint: disable=too-many-ins
 
     DESCRIPTION = ("Continuous tenant migrations")
 
+    IS_BACKGROUND = True
+
     def __init__(self, hook_logger, fixture, shell_options):
         """Initialize the ContinuousTenantMigration.
 

@@ -10,6 +10,8 @@ from buildscripts.resmokelib.testing.hooks import interface
 class WaitForReplication(interface.Hook):
     """Wait for replication to complete."""
 
+    IS_BACKGROUND = False
+
     def __init__(self, hook_logger, fixture):
         """Initialize WaitForReplication."""
         description = "WaitForReplication waits on a replica set"

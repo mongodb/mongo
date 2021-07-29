@@ -9,6 +9,8 @@ from buildscripts.resmokelib.testing.hooks import jsfile
 class CheckOrphansDeleted(jsfile.DataConsistencyHook):
     """Check if the range deleter failed to delete any orphan documents."""
 
+    IS_BACKGROUND = False
+
     def __init__(self, hook_logger, fixture, shell_options=None):
         """Initialize CheckOrphansDeleted."""
 

@@ -14,6 +14,8 @@ from buildscripts.resmokelib.testing.hooks.background_job import _BackgroundJob,
 class AggregateResourceConsumptionMetricsInBackground(jsfile.JSHook):
     """A hook to run $operationMetrics stage in the background."""
 
+    IS_BACKGROUND = True
+
     def __init__(self, hook_logger, fixture, shell_options=None):
         """Initialize AggregateResourceConsumptionMetricsInBackground."""
         description = "Run background $operationMetrics on all mongods while a test is running"

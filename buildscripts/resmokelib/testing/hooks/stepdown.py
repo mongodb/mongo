@@ -6,7 +6,6 @@ import random
 import threading
 import time
 
-import bson
 import pymongo.errors
 
 import buildscripts.resmokelib.utils.filesystem as fs
@@ -24,11 +23,13 @@ class ContinuousStepdown(interface.Hook):  # pylint: disable=too-many-instance-a
     DESCRIPTION = ("Continuous stepdown (steps down the primary of replica sets at regular"
                    " intervals)")
 
+    IS_BACKGROUND = True
+
     def __init__(  # pylint: disable=too-many-arguments
             self, hook_logger, fixture, config_stepdown=True, shard_stepdown=True,
             stepdown_interval_ms=8000, terminate=False, kill=False,
             use_stepdown_permitted_file=False, wait_for_mongos_retarget=False,
-            stepdown_via_heartbeats=True, background_reconfig=False, auth_options=None):
+            background_reconfig=False, auth_options=None, should_downgrade=False):
         """Initialize the ContinuousStepdown.
 
         Args:
@@ -42,7 +43,6 @@ class ContinuousStepdown(interface.Hook):  # pylint: disable=too-many-instance-a
             use_stepdown_permitted_file: use a file to control if stepdown thread should do a stepdown.
             wait_for_mongos_retarget: whether to run validate on all mongoses for each collection
                 in each database, after pausing the stepdown thread.
-            stepdown_via_heartbeats: step up secondaries instead of stepping down primary.
 
         Note that the "terminate" and "kill" arguments are named after the "SIGTERM" and
         "SIGKILL" signals that are used to stop the process. On Windows, there are no signals,
@@ -55,7 +55,6 @@ class ContinuousStepdown(interface.Hook):  # pylint: disable=too-many-instance-a
         self._shard_stepdown = shard_stepdown
         self._stepdown_interval_secs = float(stepdown_interval_ms) / 1000
         self._wait_for_mongos_retarget = wait_for_mongos_retarget
-        self._stepdown_via_heartbeats = stepdown_via_heartbeats
 
         self._rs_fixtures = []
         self._mongos_fixtures = []
@@ -67,6 +66,7 @@ class ContinuousStepdown(interface.Hook):  # pylint: disable=too-many-instance-a
 
         self._background_reconfig = background_reconfig
         self._auth_options = auth_options
+        self._should_downgrade = should_downgrade
 
         # The stepdown file names need to match the same construction as found in
         # jstests/concurrency/fsm_libs/resmoke_runner.js.
@@ -91,8 +91,7 @@ class ContinuousStepdown(interface.Hook):  # pylint: disable=too-many-instance-a
         self._stepdown_thread = _StepdownThread(
             self.logger, self._mongos_fixtures, self._rs_fixtures, self._stepdown_interval_secs,
             self._terminate, self._kill, lifecycle, self._wait_for_mongos_retarget,
-            self._stepdown_via_heartbeats, self._background_reconfig, self._fixture,
-            self._auth_options)
+            self._background_reconfig, self._fixture, self._auth_options, self._should_downgrade)
         self.logger.info("Starting the stepdown thread.")
         self._stepdown_thread.start()
 
@@ -353,8 +352,8 @@ class FileBasedStepdownLifecycle(object):
 class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-attributes
     def __init__(  # pylint: disable=too-many-arguments
             self, logger, mongos_fixtures, rs_fixtures, stepdown_interval_secs, terminate, kill,
-            stepdown_lifecycle, wait_for_mongos_retarget, stepdown_via_heartbeats,
-            background_reconfig, fixture, auth_options=None):
+            stepdown_lifecycle, wait_for_mongos_retarget, background_reconfig, fixture,
+            auth_options=None, should_downgrade=False):
         """Initialize _StepdownThread."""
         threading.Thread.__init__(self, name="StepdownThread")
         self.daemon = True
@@ -370,10 +369,10 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
         self._kill = kill
         self.__lifecycle = stepdown_lifecycle
         self._should_wait_for_mongos_retarget = wait_for_mongos_retarget
-        self._stepdown_via_heartbeats = stepdown_via_heartbeats
         self._background_reconfig = background_reconfig
         self._fixture = fixture
         self._auth_options = auth_options
+        self._should_downgrade = should_downgrade
 
         self._last_exec = time.time()
         # Event set when the thread has been stopped using the 'stop()' method.
@@ -493,7 +492,7 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
     # pylint: disable=R0912,R0914,R0915
     def _step_down(self, rs_fixture):
         try:
-            primary = rs_fixture.get_primary(timeout_secs=self._stepdown_interval_secs)
+            old_primary = rs_fixture.get_primary(timeout_secs=self._stepdown_interval_secs)
         except errors.ServerFailure:
             # We ignore the ServerFailure exception because it means a primary wasn't available.
             # We'll try again after self._stepdown_interval_secs seconds.
@@ -501,141 +500,49 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
 
         secondaries = rs_fixture.get_secondaries()
 
-        # Check that the fixture is still running before stepping down or killing the primary.
-        # This ensures we still detect some cases in which the fixture has already crashed.
-        if not rs_fixture.is_running():
-            raise errors.ServerFailure("ReplicaSetFixture {} expected to be running in"
-                                       " ContinuousStepdown, but wasn't.".format(
-                                           rs_fixture.replset_name))
+        if self._terminate:
+            if not rs_fixture.stop_primary(old_primary, self._background_reconfig, self._kill):
+                return
+
+        if self._should_downgrade:
+            new_primary = rs_fixture.change_version_and_restart_node(old_primary,
+                                                                     self._auth_options)
+        else:
+
+            def step_up_secondary():
+                while secondaries:
+                    chosen = random.choice(secondaries)
+                    if not rs_fixture.stepup_node(chosen, self._auth_options):
+                        secondaries.remove(chosen)
+                    else:
+                        return chosen
+
+            new_primary = step_up_secondary()
 
         if self._terminate:
-            # If we're running with background reconfigs, it's possible to be in a scenario
-            # where we kill a necessary voting node (i.e. in a 5 node repl set), only 2 are
-            # voting. In this scenario, we want to avoid killing the primary because no
-            # secondary can step up.
-            if self._background_reconfig:
-                # stagger the kill thread so that it runs a little after the reconfig thread
-                time.sleep(1)
-                voting_members = rs_fixture.get_voting_members()
+            rs_fixture.restart_node(old_primary)
 
-                self.logger.info("Current voting members: %s", voting_members)
-
-                if len(voting_members) <= 3:
-                    # Do not kill or terminate the primary if we don't have enough voting nodes to
-                    # elect a new primary.
-                    return
-
-            should_kill = self._kill and random.choice([True, False])
-            action = "Killing" if should_kill else "Terminating"
-            self.logger.info("%s the primary on port %d of replica set '%s'.", action, primary.port,
-                             rs_fixture.replset_name)
-
-            # We send the mongod process the signal to exit but don't immediately wait for it to
-            # exit because clean shutdown may take a while and we want to restore write availability
-            # as quickly as possible.
-            teardown_mode = fixture_interface.TeardownMode.KILL if should_kill else fixture_interface.TeardownMode.TERMINATE
-            primary.mongod.stop(mode=teardown_mode)
-        elif not self._stepdown_via_heartbeats:
-            self.logger.info("Stepping down the primary on port %d of replica set '%s'.",
-                             primary.port, rs_fixture.replset_name)
-            try:
-                client = self._create_client(primary)
-                client.admin.command(
-                    bson.SON([
-                        ("replSetStepDown", self._stepdown_duration_secs),
-                        ("force", True),
-                    ]))
-            except pymongo.errors.AutoReconnect:
-                # AutoReconnect exceptions are expected as connections are closed during stepdown.
-                pass
-            except pymongo.errors.PyMongoError:
-                self.logger.exception(
-                    "Error while stepping down the primary on port %d of replica set '%s'.",
-                    primary.port, rs_fixture.replset_name)
-                raise
-
-        # We have skipped stepping down the primary if we want to step up secondaries instead. Here,
-        # we simply need to pick an arbitrary secondary to run for election which will lead to
-        # unconditional stepdown on the primary.
-        #
-        # If we have terminated/killed/stepped down the primary above, write availability has lost.
-        # We pick an arbitrary secondary to run for election immediately in order to avoid a long
-        # period where the replica set doesn't have write availability. If none of the secondaries
-        # are eligible, or their election attempt fails, then we'll run the replSetStepUp command on
-        # 'primary' to ensure we have write availability sooner than the
-        # self._stepdown_duration_secs duration expires.
-        while secondaries:
-            chosen = random.choice(secondaries)
-
-            self.logger.info("Attempting to step up the secondary on port %d of replica set '%s'.",
-                             chosen.port, rs_fixture.replset_name)
-
-            try:
-                client = self._create_client(chosen)
-                client.admin.command("replSetStepUp")
-                break
-            except pymongo.errors.OperationFailure:
-                # OperationFailure exceptions are expected when the election attempt fails due to
-                # not receiving enough votes. This can happen when the 'chosen' secondary's opTime
-                # is behind that of other secondaries. We handle this by attempting to elect a
-                # different secondary.
-                self.logger.info("Failed to step up the secondary on port %d of replica set '%s'.",
-                                 chosen.port, rs_fixture.replset_name)
-                secondaries.remove(chosen)
-            except pymongo.errors.AutoReconnect:
-                # It is possible for a replSetStepUp to fail with AutoReconnect if that node goes
-                # into Rollback (which causes it to close any open connections).
-                pass
-
-        if self._terminate:
-            self.logger.info("Waiting for the old primary on port %d of replica set '%s' to exit.",
-                             primary.port, rs_fixture.replset_name)
-
-            primary.mongod.wait()
-
-            self.logger.info("Attempting to restart the old primary on port %d of replica set '%s.",
-                             primary.port, rs_fixture.replset_name)
-
-            # Restart the mongod on the old primary and wait until we can contact it again. Keep the
-            # original preserve_dbpath to restore after restarting the mongod.
-            original_preserve_dbpath = primary.preserve_dbpath
-            primary.preserve_dbpath = True
-            try:
-                primary.setup()
-                self.logger.info(fixture_interface.create_fixture_table(self._fixture))
-                primary.await_ready()
-            finally:
-                primary.preserve_dbpath = original_preserve_dbpath
-        elif not self._stepdown_via_heartbeats:
-            # If we chose to step up a secondary instead, the primary was never stepped down via the
-            # replSetStepDown command and thus will not have a stepdown period. So we can skip
-            # running {replSetFreeze: 0}. Otherwise, the replSetStepDown command run earlier
-            # introduced a stepdown period on the former primary and so we have to run the
-            # {replSetFreeze: 0} command to ensure the former primary is electable in the next
-            # round of _step_down().
-            client = self._create_client(primary)
-            client.admin.command({"replSetFreeze": 0})
-        elif secondaries:
+        if secondaries:
             # We successfully stepped up a secondary, wait for the former primary to step down via
             # heartbeats. We need to wait for the former primary to step down to complete this step
             # down round and to avoid races between the ContinuousStepdown hook and other test hooks
             # that may depend on the health of the replica set.
             self.logger.info(
                 "Successfully stepped up the secondary on port %d of replica set '%s'.",
-                chosen.port, rs_fixture.replset_name)
+                new_primary.port, rs_fixture.replset_name)
             while True:
                 try:
-                    client = self._create_client(primary)
+                    client = self._create_client(old_primary)
                     is_secondary = client.admin.command("isMaster")["secondary"]
                     if is_secondary:
                         break
                 except pymongo.errors.AutoReconnect:
                     pass
                 self.logger.info("Waiting for primary on port %d of replica set '%s' to step down.",
-                                 primary.port, rs_fixture.replset_name)
+                                 old_primary.port, rs_fixture.replset_name)
                 time.sleep(0.2)  # Wait a little bit before trying again.
-            self.logger.info("Primary on port %d of replica set '%s' stepped down.", primary.port,
-                             rs_fixture.replset_name)
+            self.logger.info("Primary on port %d of replica set '%s' stepped down.",
+                             old_primary.port, rs_fixture.replset_name)
 
         if not secondaries:
             # If we failed to step up one of the secondaries, then we run the replSetStepUp to try
@@ -643,11 +550,12 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
             # self._stepdown_duration_secs seconds to restore write availability to the cluster.
             # Since the former primary may have been killed, we need to wait until it has been
             # restarted by retrying replSetStepUp.
+
             retry_time_secs = rs_fixture.AWAIT_REPL_TIMEOUT_MINS * 60
             retry_start_time = time.time()
             while True:
                 try:
-                    client = self._create_client(primary)
+                    client = self._create_client(old_primary)
                     client.admin.command("replSetStepUp")
                     break
                 except pymongo.errors.OperationFailure:
@@ -660,8 +568,9 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
 
         # Bump the counter for the chosen secondary to indicate that the replSetStepUp command
         # executed successfully.
-        key = "{}/{}".format(rs_fixture.replset_name,
-                             chosen.get_internal_connection_string() if secondaries else "none")
+        key = "{}/{}".format(
+            rs_fixture.replset_name,
+            new_primary.get_internal_connection_string() if secondaries else "none")
         self._step_up_stats[key] += 1
 
     def _do_wait_for_mongos_retarget(self):  # pylint: disable=too-many-branches

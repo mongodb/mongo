@@ -8,6 +8,8 @@ from buildscripts.resmokelib.testing.hooks import jsfile
 class CheckReplOplogs(jsfile.DataConsistencyHook):  # pylint: disable=non-parent-init-called,super-init-not-called
     """Check that local.oplog.rs matches on the primary and secondaries."""
 
+    IS_BACKGROUND = False
+
     def __init__(  # pylint: disable=super-init-not-called
             self, hook_logger, fixture, shell_options=None):
         """Initialize CheckReplOplogs."""

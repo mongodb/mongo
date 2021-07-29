@@ -30,21 +30,27 @@ def make_process(*args, **kwargs):
 
     # Add the current working directory and /data/multiversion to the PATH.
     env_vars = kwargs.get("env_vars", {}).copy()
-    path = [
-        os.getcwd(),
-        config.DEFAULT_MULTIVERSION_DIR,
-    ]
+    path = get_path_env_var(env_vars)
 
-    # If installDir is provided, add it early to the path
     if config.INSTALL_DIR is not None:
-        path.append(config.INSTALL_DIR)
         env_vars["INSTALL_DIR"] = config.INSTALL_DIR
-
-    path.append(env_vars.get("PATH", os.environ.get("PATH", "")))
 
     env_vars["PATH"] = os.pathsep.join(path)
     kwargs["env_vars"] = env_vars
     return process_cls(*args, **kwargs)
+
+
+def get_path_env_var(env_vars):
+    """Return the path base on provided environment variable."""
+    path = [
+        os.getcwd(),
+        config.DEFAULT_MULTIVERSION_DIR,
+    ]
+    # If installDir is provided, add it early to the path
+    if config.INSTALL_DIR is not None:
+        path.append(config.INSTALL_DIR)
+    path.append(env_vars.get("PATH", os.environ.get("PATH", "")))
+    return path
 
 
 def mongod_program(logger, job_num, executable, process_kwargs, mongod_options):

@@ -15,6 +15,8 @@ from buildscripts.resmokelib.testing.hooks.background_job import _BackgroundJob,
 class ValidateCollectionsInBackground(jsfile.JSHook):
     """A hook to run background collection validation against test servers while a test is running."""
 
+    IS_BACKGROUND = True
+
     def __init__(self, hook_logger, fixture, shell_options=None):
         """Initialize ValidateCollectionsInBackground."""
         description = "Run background collection validation against all mongods while a test is running"

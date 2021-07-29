@@ -14,6 +14,8 @@ from buildscripts.resmokelib.testing.hooks.background_job import _BackgroundJob,
 class CheckReplDBHashInBackground(jsfile.JSHook):
     """A hook for comparing the dbhashes of all replica set members while a test is running."""
 
+    IS_BACKGROUND = True
+
     def __init__(self, hook_logger, fixture, shell_options=None):
         """Initialize CheckReplDBHashInBackground."""
         description = "Check dbhashes of all replica set members while a test is running"

@@ -52,10 +52,19 @@ class FixtureBuilder(ABC, metaclass=registry.make_registry_metaclass(_BUILDERS, 
         return
 
 
+class BinVersionEnum(object):
+    """Enumeration version types."""
+
+    OLD = 'old'
+    NEW = 'new'
+
+
 class ReplSetBuilder(FixtureBuilder):
     """Builder class for fixtures support replication."""
 
     REGISTERED_NAME = "ReplicaSetFixture"
+    latest_class = "MongoDFixture"
+    multiversion_class_suffix = "_multiversion_class_suffix"
 
     def build_fixture(self, logger, job_num, fixturelib, *args, **kwargs):  # pylint: disable=too-many-locals
         """Build a replica set."""
@@ -76,48 +85,47 @@ class ReplSetBuilder(FixtureBuilder):
         kwargs["mongod_executable"] = mongod_executable
         num_nodes = kwargs["num_nodes"]
         latest_mongod = mongod_executable
-        latest_class = "MongoDFixture"
-        executables = []
-        classes = []
-        fcv = None
 
-        multiversion_class_suffix = "_" + old_bin_version
-        shell_version = {
-            config.MultiversionOptions.LAST_LTS:
-                multiversionconstants.LAST_LTS_MONGO_BINARY,
-            config.MultiversionOptions.LAST_CONTINUOUS:
-                multiversionconstants.LAST_CONTINUOUS_MONGO_BINARY
-        }[old_bin_version]
+        fcv = multiversionconstants.LATEST_FCV
 
-        mongod_version = {
-            config.MultiversionOptions.LAST_LTS:
-                multiversionconstants.LAST_LTS_MONGOD_BINARY,
-            config.MultiversionOptions.LAST_CONTINUOUS:
-                multiversionconstants.LAST_CONTINUOUS_MONGOD_BINARY
-        }[old_bin_version]
+        executables = {BinVersionEnum.NEW: latest_mongod}
+        classes = {BinVersionEnum.NEW: self.latest_class}
 
-        if mixed_bin_versions is None:
-            executables = [latest_mongod for x in range(num_nodes)]
-            classes = [latest_class for x in range(num_nodes)]
-        else:
+        # Default to NEW for all bin versions; may be overridden below.
+        mongod_binary_versions = [BinVersionEnum.NEW for _ in range(num_nodes)]
+
+        is_multiversion = mixed_bin_versions is not None
+        if is_multiversion:
+            old_shell_version = {
+                config.MultiversionOptions.LAST_LTS:
+                    multiversionconstants.LAST_LTS_MONGO_BINARY,
+                config.MultiversionOptions.LAST_CONTINUOUS:
+                    multiversionconstants.LAST_CONTINUOUS_MONGO_BINARY
+            }[old_bin_version]
+
+            old_mongod_version = {
+                config.MultiversionOptions.LAST_LTS:
+                    multiversionconstants.LAST_LTS_MONGOD_BINARY,
+                config.MultiversionOptions.LAST_CONTINUOUS:
+                    multiversionconstants.LAST_CONTINUOUS_MONGOD_BINARY
+            }[old_bin_version]
+
+            executables[BinVersionEnum.OLD] = old_mongod_version
+            classes[BinVersionEnum.OLD] = f"{self.latest_class}{self.multiversion_class_suffix}"
+
+            load_version(version_path_suffix=self.multiversion_class_suffix,
+                         shell_path=old_shell_version)
 
             is_config_svr = "configsvr" in replset_config_options and replset_config_options[
                 "configsvr"]
-            load_version(version_path_suffix=multiversion_class_suffix, shell_path=shell_version)
 
             if not is_config_svr:
-                executables = [
-                    latest_mongod if (x == "new") else mongod_version for x in mixed_bin_versions
-                ]
-                classes = [
-                    latest_class if (x == "new") else f"{latest_class}{multiversion_class_suffix}"
-                    for x in mixed_bin_versions
-                ]
-            if is_config_svr:
+                mongod_binary_versions = [x for x in mixed_bin_versions]
+            else:
+
                 # Our documented recommended path for upgrading shards lets us assume that config
                 # server nodes will always be fully upgraded before shard nodes.
-                executables = [latest_mongod, latest_mongod]
-                classes = [latest_class, latest_class]
+                mongod_binary_versions = [BinVersionEnum.NEW] * 2
 
             num_versions = len(mixed_bin_versions)
             fcv = {
@@ -134,8 +142,9 @@ class ReplSetBuilder(FixtureBuilder):
         replset = _FIXTURES[self.REGISTERED_NAME](logger, job_num, fixturelib, *args, **kwargs)
 
         replset.set_fcv(fcv)
-        for i in range(replset.num_nodes):
-            node = self._new_mongod(replset, i, executables[i], classes[i])
+        for node_index in range(replset.num_nodes):
+            node = self._new_mongod(replset, node_index, executables, classes,
+                                    mongod_binary_versions[node_index], is_multiversion)
             replset.install_mongod(node)
 
         if replset.start_initial_sync_node:
@@ -143,19 +152,39 @@ class ReplSetBuilder(FixtureBuilder):
                 replset.initial_sync_node_idx = replset.num_nodes
                 # TODO: This adds the linear chain and steady state param now, is that ok?
                 replset.initial_sync_node = self._new_mongod(replset, replset.initial_sync_node_idx,
-                                                             latest_mongod, latest_class)
+                                                             executables, classes,
+                                                             BinVersionEnum.NEW, is_multiversion)
 
         return replset
 
     @classmethod
-    def _new_mongod(cls, replset, index, executable, mongod_class):
+    def _new_mongod(cls, replset, replset_node_index, executables, classes, cur_version,
+                    is_multiversion):
+        # pylint: disable=too-many-arguments
         """Return a standalone.MongoDFixture configured to be used as replica-set member."""
-        mongod_logger = replset.get_logger_for_mongod(index)
-        mongod_options = replset.get_options_for_mongod(index)
+        mongod_logger = replset.get_logger_for_mongod(replset_node_index)
+        mongod_options = replset.get_options_for_mongod(replset_node_index)
 
-        return make_fixture(mongod_class, mongod_logger, replset.job_num,
-                            mongod_executable=executable, mongod_options=mongod_options,
-                            preserve_dbpath=replset.preserve_dbpath)
+        new_fixture_port = None
+        old_fixture = None
+
+        # There is more than one class for mongod, this means we're in multiversion mode.
+        if is_multiversion:
+            old_fixture = make_fixture(classes[BinVersionEnum.OLD], mongod_logger, replset.job_num,
+                                       mongod_executable=executables[BinVersionEnum.OLD],
+                                       mongod_options=mongod_options,
+                                       preserve_dbpath=replset.preserve_dbpath)
+
+            # Assign the same port for old and new fixtures so upgrade/downgrade can be done without
+            # changing the replicaset config.
+            new_fixture_port = old_fixture.port
+
+        new_fixture = make_fixture(classes[BinVersionEnum.NEW], mongod_logger, replset.job_num,
+                                   mongod_executable=executables[BinVersionEnum.NEW],
+                                   mongod_options=mongod_options,
+                                   preserve_dbpath=replset.preserve_dbpath, port=new_fixture_port)
+
+        return FixtureContainer(new_fixture, old_fixture, cur_version)
 
 
 def load_version(version_path_suffix=None, shell_path=None):
@@ -165,7 +194,7 @@ def load_version(version_path_suffix=None, shell_path=None):
         retrieve_dir = os.path.relpath(os.path.join(RETRIEVE_DIR, version_path_suffix))
         if not os.path.exists(retrieve_dir):
             try:
-                # Avoud circular import
+                # Avoid circular import
                 import buildscripts.evergreen_gen_multiversion_tests as gen_tests
                 commit = gen_tests.get_backports_required_hash_for_shell_version(
                     mongo_shell_path=shell_path)
@@ -190,3 +219,48 @@ def retrieve_fixtures(directory, commit):
         output = os.path.join(directory, blob.name)
         with io.BytesIO(blob.data_stream.read()) as retrieved, open(output, "w") as file:
             file.write(retrieved.read().decode("utf-8"))
+
+
+class FixtureContainer(object):
+    """Provide automatic state change between old and new fixture."""
+
+    attributes = ["_fixtures", "cur_version_cls", "get_cur_version"]
+
+    def __init__(self, new_fixture, old_fixture=None, cur_version=None):
+        """Initialize FixtureContainer."""
+
+        if old_fixture is not None:
+            self._fixtures = {BinVersionEnum.NEW: new_fixture, BinVersionEnum.OLD: old_fixture}
+            self.cur_version_cls = self._fixtures[cur_version]
+        else:
+            # No need to support dictionary of fixture classes if only a single version of
+            # fixtures is used.
+            self._fixtures = None
+            self.cur_version_cls = new_fixture
+
+    def change_version_if_needed(self, node):
+        """
+        Upgrade or downgrade the fixture version to be different to that of `node`.
+
+        @returns a boolean of whether the version was changed.
+        """
+        if self.cur_version_cls == node.get_cur_version():
+            for ver, cls in self._fixtures.items():
+                if ver != node.get_cur_version():
+                    self.cur_version_cls = cls
+            return True
+        else:
+            return False
+
+    def get_cur_version(self):
+        """Get current fixture version from FixtureContainer."""
+        return self.cur_version_cls
+
+    def __getattr__(self, name):
+        return self.cur_version_cls.__getattribute__(name)
+
+    def __setattr__(self, key, value):
+        if key in FixtureContainer.attributes:
+            return object.__setattr__(self, key, value)
+        else:
+            return self.cur_version_cls.__setattr__(key, value)

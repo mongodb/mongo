@@ -22,6 +22,8 @@ class PeriodicKillSecondaries(interface.Hook):
     to the primary after an unclean shutdown.
     """
 
+    IS_BACKGROUND = False
+
     DEFAULT_PERIOD_SECS = 30
 
     def __init__(self, hook_logger, rs_fixture, period_secs=DEFAULT_PERIOD_SECS):

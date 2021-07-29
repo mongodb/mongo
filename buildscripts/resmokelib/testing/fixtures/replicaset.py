@@ -1,6 +1,7 @@
 """Replica set fixture for executing JSTests against."""
 
 import os.path
+import random
 import time
 
 import bson
@@ -10,8 +11,35 @@ import pymongo.write_concern
 
 import buildscripts.resmokelib.testing.fixtures.interface as interface
 
+USE_LEGACY_MULTIVERSION = False
 
-class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-instance-attributes
+
+def compare_timestamp(timestamp1, timestamp2):
+    """Compare the timestamp object ts part."""
+    if timestamp1.time == timestamp2.time:
+        if timestamp1.inc < timestamp2.inc:
+            return -1
+        elif timestamp1.inc > timestamp2.inc:
+            return 1
+        else:
+            return 0
+    elif timestamp1.time < timestamp2.time:
+        return -1
+    else:
+        return 1
+
+
+def compare_optime(optime1, optime2):
+    """Compare timestamp object t part."""
+    if optime1["t"] > optime2["t"]:
+        return 1
+    elif optime1["t"] < optime2["t"]:
+        return -1
+    else:
+        return compare_timestamp(optime1["ts"], optime2["ts"])
+
+
+class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-instance-attributes, too-many-public-methods
     """Fixture which provides JSTests with a replica set to run against."""
 
     # Error response codes copied from mongo/base/error_codes.yml.
@@ -513,10 +541,163 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
                     # of isMaster requests.
                     continue
 
+    def stop_primary(self, primary, background_reconfig, kill):
+        """Stop the primary node method."""
+        # Check that the fixture is still running before stepping down or killing the primary.
+        # This ensures we still detect some cases in which the fixture has already crashed.
+        if not self.is_running():
+            raise pymongo.errors.ServerFailure("ReplicaSetFixture {} expected to be running in"
+                                               " ContinuousStepdown, but wasn't.".format(
+                                                   self.replset_name))
+
+        # If we're running with background reconfigs, it's possible to be in a scenario
+        # where we kill a necessary voting node (i.e. in a 5 node repl set), only 2 are
+        # voting. In this scenario, we want to avoid killing the primary because no
+        # secondary can step up.
+        if background_reconfig:
+            # stagger the kill thread so that it runs a little after the reconfig thread
+            time.sleep(1)
+            voting_members = self.get_voting_members()
+
+            self.logger.info("Current voting members: %s", voting_members)
+
+            if len(voting_members) <= 3:
+                # Do not kill or terminate the primary if we don't have enough voting nodes to
+                # elect a new primary.
+                return False
+
+        should_kill = kill and random.choice([True, False])
+        action = "Killing" if should_kill else "Terminating"
+        self.logger.info("%s the primary on port %d of replica set '%s'.", action, primary.port,
+                         self.replset_name)
+
+        # We send the mongod process the signal to exit but don't immediately wait for it to
+        # exit because clean shutdown may take a while and we want to restore write availability
+        # as quickly as possible.
+        teardown_mode = interface.TeardownMode.KILL if should_kill else interface.TeardownMode.TERMINATE
+        primary.mongod.stop(mode=teardown_mode)
+        return True
+
+    def change_version_and_restart_node(self, primary, auth_options):
+        """
+        Select Secondary for stepUp.
+
+        Ensure its version is different to that
+        of the old primary; change the version of the Secondary is needed.
+        """
+
+        def get_chosen_node_from_replsetstatus(status_member_infos):
+            max_optime = None
+            chosen_index = None
+            # We always select the secondary with highest optime to setup.
+            for member_info in status_member_infos:
+                if member_info.get("self", False):
+                    # Ignore self, which is the old primary and not eligible
+                    # to be re-elected in downgrade multiversion cluster.
+                    continue
+                optime_dict = member_info["optime"]
+                if max_optime is None:
+                    chosen_index = member_info["_id"]
+                    max_optime = optime_dict
+                else:
+                    if compare_optime(optime_dict, max_optime) > 0:
+                        chosen_index = member_info["_id"]
+                        max_optime = optime_dict
+
+                if chosen_index is None or max_optime is None:
+                    raise self.fixturelib.ServerFailure(
+                        "Failed to find a secondary eligible for "
+                        f"election; index: {chosen_index}, optime: {max_optime}")
+
+                return self.nodes[chosen_index]
+
+        primary_client = interface.authenticate(primary.mongo_client(), auth_options)
+        retry_time_secs = self.AWAIT_REPL_TIMEOUT_MINS * 60
+        retry_start_time = time.time()
+
+        while True:
+            member_infos = primary_client.admin.command({"replSetGetStatus": 1})["members"]
+            chosen_node = get_chosen_node_from_replsetstatus(member_infos)
+
+            if chosen_node.change_version_if_needed(primary):
+                self.logger.info(
+                    "Waiting for the chosen secondary on port %d of replica set '%s' to exit.",
+                    chosen_node.port, self.replset_name)
+
+                teardown_mode = interface.TeardownMode.TERMINATE
+                chosen_node.mongod.stop(mode=teardown_mode)
+                chosen_node.mongod.wait()
+
+                self.logger.info(
+                    "Attempting to restart the chosen secondary on port %d of replica set '%s.",
+                    chosen_node.port, self.replset_name)
+
+                chosen_node.setup()
+                self.logger.info(interface.create_fixture_table(self))
+                chosen_node.await_ready()
+
+            if self.stepup_node(chosen_node, auth_options):
+                break
+
+            if time.time() - retry_start_time > retry_time_secs:
+                raise pymongo.errors.ServerFailure(
+                    "The old primary on port {} of replica set {} did not step up in"
+                    " {} seconds.".format(chosen_node.port, self.replset_name, retry_time_secs))
+
+        return chosen_node
+
+    def stepup_node(self, node, auth_options):
+        """Try to step up the given node; return whether the attempt was successful."""
+        try:
+            self.logger.info(
+                "Attempting to step up the chosen secondary on port %d of replica set '%s.",
+                node.port, self.replset_name)
+            client = interface.authenticate(node.mongo_client(), auth_options)
+            client.admin.command("replSetStepUp")
+            return True
+        except pymongo.errors.OperationFailure:
+            # OperationFailure exceptions are expected when the election attempt fails due to
+            # not receiving enough votes. This can happen when the 'chosen' secondary's opTime
+            # is behind that of other secondaries. We handle this by attempting to elect a
+            # different secondary.
+            self.logger.info("Failed to step up the secondary on port %d of replica set '%s'.",
+                             node.port, self.replset_name)
+            return False
+        except pymongo.errors.AutoReconnect:
+            # It is possible for a replSetStepUp to fail with AutoReconnect if that node goes
+            # into Rollback (which causes it to close any open connections).
+            return False
+
+    def restart_node(self, chosen):
+        """Restart the new step up node."""
+        self.logger.info("Waiting for the old primary on port %d of replica set '%s' to exit.",
+                         chosen.port, self.replset_name)
+
+        chosen.mongod.wait()
+
+        self.logger.info("Attempting to restart the old primary on port %d of replica set '%s.",
+                         chosen.port, self.replset_name)
+
+        # Restart the mongod on the old primary and wait until we can contact it again. Keep the
+        # original preserve_dbpath to restore after restarting the mongod.
+        original_preserve_dbpath = chosen.preserve_dbpath
+        chosen.preserve_dbpath = True
+        try:
+            chosen.setup()
+            self.logger.info(interface.create_fixture_table(self))
+            chosen.await_ready()
+        finally:
+            chosen.preserve_dbpath = original_preserve_dbpath
+
     def get_secondaries(self):
         """Return a list of secondaries from the replica set."""
         primary = self.get_primary()
         return [node for node in self.nodes if node.port != primary.port]
+
+    def get_secondary_indices(self):
+        """Return a list of secondary indices from the replica set."""
+        primary = self.get_primary()
+        return [index for index, node in enumerate(self.nodes) if node.port != primary.port]
 
     def get_voting_members(self):
         """Return the number of voting nodes in the replica set."""

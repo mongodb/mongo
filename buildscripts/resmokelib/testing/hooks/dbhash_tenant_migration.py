@@ -12,6 +12,8 @@ class CheckTenantMigrationDBHash(jsfile.DataConsistencyHook):
     match on the primaries of the donor and recipient
     """
 
+    IS_BACKGROUND = False
+
     def __init__(  # pylint: disable=super-init-not-called
             self, hook_logger, fixture, shell_options=None):
         """Initialize CheckTenantMigrationDBHash."""

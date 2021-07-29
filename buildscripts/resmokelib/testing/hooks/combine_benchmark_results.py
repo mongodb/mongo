@@ -19,6 +19,8 @@ class CombineBenchmarkResults(interface.Hook):
 
     DESCRIPTION = "Combine JSON results from individual benchmarks"
 
+    IS_BACKGROUND = False
+
     def __init__(self, hook_logger, fixture):
         """Initialize CombineBenchmarkResults."""
         interface.Hook.__init__(self, hook_logger, fixture, CombineBenchmarkResults.DESCRIPTION)

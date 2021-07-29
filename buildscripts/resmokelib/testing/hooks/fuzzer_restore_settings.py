@@ -12,6 +12,8 @@ from buildscripts.resmokelib.testing.hooks import jsfile
 class FuzzerRestoreSettings(jsfile.JSHook):
     """Cleans up unwanted changes from fuzzer."""
 
+    IS_BACKGROUND = False
+
     def __init__(self, hook_logger, fixture, shell_options=None):
         """Run fuzzer cleanup."""
         description = "Clean up unwanted changes from fuzzer"

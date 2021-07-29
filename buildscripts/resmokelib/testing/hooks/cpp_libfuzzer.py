@@ -12,7 +12,9 @@ from buildscripts.resmokelib.testing.hooks import interface
 class LibfuzzerHook(interface.Hook):  # pylint: disable=too-many-instance-attributes
     """Merges inputs after a fuzzer run."""
 
-    DESCRIPTION = ("Merges inputs after a fuzzer run")
+    DESCRIPTION = "Merges inputs after a fuzzer run"
+
+    IS_BACKGROUND = False
 
     def __init__(self, hook_logger, fixture):
         """Initialize the ContinuousStepdown.

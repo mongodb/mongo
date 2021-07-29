@@ -17,8 +17,6 @@ class HookTestArchival(object):
         self.archive_instance = archive_instance
         archive_config = utils.default_if_none(archive_config, {})
 
-        self.on_success = archive_config.get("on_success", False)
-
         self.tests = []
         self.archive_all = False
         if "tests" in archive_config:
@@ -50,8 +48,7 @@ class HookTestArchival(object):
         """
 
         success = result.success
-        should_archive = (config.ARCHIVE_FILE and self.archive_instance
-                          and (not success or self.on_success))
+        should_archive = (config.ARCHIVE_FILE and self.archive_instance) and not success
 
         if not should_archive:
             return

@@ -31,6 +31,8 @@ class BackgroundInitialSync(interface.Hook):
 
     DEFAULT_N = cleanup.CleanEveryN.DEFAULT_N
 
+    IS_BACKGROUND = True
+
     def __init__(self, hook_logger, fixture, n=DEFAULT_N, shell_options=None):
         """Initialize BackgroundInitialSync."""
         if not isinstance(fixture, replicaset.ReplicaSetFixture):
@@ -45,14 +47,13 @@ class BackgroundInitialSync(interface.Hook):
         self.random_restarts = 0
         self._shell_options = shell_options
 
-    def after_test(self, test, test_report):
-        """After test execution."""
-        self.tests_run += 1
-
+    def before_test(self, test, test_report):
+        """Before test execution."""
         hook_test_case = BackgroundInitialSyncTestCase.create_after_test(
             test.logger, test, self, self._shell_options)
         hook_test_case.configure(self.fixture)
         hook_test_case.run_dynamic_test(test_report)
+        self.tests_run += 1
 
 
 class BackgroundInitialSyncTestCase(jsfile.DynamicJSTestCase):
@@ -144,6 +145,8 @@ class IntermediateInitialSync(interface.Hook):
     """
 
     DEFAULT_N = cleanup.CleanEveryN.DEFAULT_N
+
+    IS_BACKGROUND = False
 
     def __init__(self, hook_logger, fixture, n=DEFAULT_N):
         """Initialize IntermediateInitialSync."""

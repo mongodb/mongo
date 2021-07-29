@@ -9,7 +9,7 @@ from buildscripts import feature_flag_tags_check
 class TestFindTestsInGitDiff(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.requires_fcv_tag = "requires_fcv_50"
+        cls.requires_fcv_tag = "requires_fcv_51"
         cls.original_requires_fcv_tag = feature_flag_tags_check.REQUIRES_FCV_TAG
         feature_flag_tags_check.REQUIRES_FCV_TAG = cls.requires_fcv_tag
 

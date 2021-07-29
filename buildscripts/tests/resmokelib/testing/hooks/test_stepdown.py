@@ -36,7 +36,6 @@ class TestStepdownThread(unittest.TestCase):
             kill=False,
             stepdown_lifecycle=_stepdown.FlagBasedStepdownLifecycle(),
             wait_for_mongos_retarget=False,
-            stepdown_via_heartbeats=True,
             background_reconfig=False,
             fixture=shardcluster_fixture,
         )

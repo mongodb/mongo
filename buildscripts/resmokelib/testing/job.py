@@ -197,11 +197,16 @@ class Job(object):  # pylint: disable=too-many-instance-attributes
                     "%s not running after %s" % (self.fixture, test.short_description()))
         finally:
             success = self.report.find_test_info(test).status == "pass"
+
+            # Stop background hooks first since they can interfere with fixture startup and teardown
+            # done as part of archival.
+            self._run_hooks_after_tests(test, background=True)
+
             if self.archival:
                 result = TestResult(test=test, hook=None, success=success)
                 self.archival.archive(self.logger, result, self.manager)
 
-        self._run_hooks_after_tests(test)
+            self._run_hooks_after_tests(test, background=False)
 
     def _run_hook(self, hook, hook_function, test):
         """Provide helper to run hook and archival."""
@@ -247,15 +252,19 @@ class Job(object):  # pylint: disable=too-many-instance-attributes
             self.report.stopTest(test)
             raise
 
-    def _run_hooks_after_tests(self, test):
+    def _run_hooks_after_tests(self, test, background=False):
         """Run the after_test method on each of the hooks.
 
         Swallows any TestFailure exceptions if set to continue on
         failure, and reraises any other exceptions.
+
+        @param test: the test after which we run the hooks.
+        @param background: whether to run background hooks.
         """
         try:
             for hook in self.hooks:
-                self._run_hook(hook, hook.after_test, test)
+                if hook.IS_BACKGROUND == background:
+                    self._run_hook(hook, hook.after_test, test)
 
         except errors.StopExecution:
             raise
