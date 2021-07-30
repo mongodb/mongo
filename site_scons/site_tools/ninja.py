@@ -1027,8 +1027,14 @@ def generate_command(env, node, action, targets, sources, executor=None):
 
 
 def get_generic_shell_command(env, node, action, targets, sources, executor=None):
+
+    if env.get('NINJA_TEMPLATE'):
+        rule = 'TEMPLATE'
+    else:
+        rule = 'CMD'
+
     return (
-        "CMD",
+        rule,
         {
             "cmd": generate_command(env, node, action, targets, sources, executor=None),
             "env": get_command_env(env),
