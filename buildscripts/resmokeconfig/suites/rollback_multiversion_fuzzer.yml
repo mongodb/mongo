@@ -17,7 +17,9 @@ executor:
             replication:
               heartbeats: 2
               rollback: 2
+              verbosity: 1
             storage:
               recovery: 3
+              verbosity: 1
           rollbackShutdowns: true
           useRandomBinVersionsWithinReplicaSet: true
