@@ -90,11 +90,11 @@ function assertExplainEq(unionExplain, regularExplain) {
                 unionStage.$unionWith.pipeline[0].$cursor.executionStats.executionStages;
             const realStats = regularExplain.executionStats.executionStages;
             assert(docEqWithIgnoredFields(unionSubStats, realStats),
-                   buildErrorString(unionSubStats, realStats));
+                   buildErrorString(unionSubStats, realStats, "stages"));
         } else {
             const realExplain = regularExplain.stages;
             assert(arrayEqWithIgnoredFields(unionSubExplain, realExplain),
-                   buildErrorString(unionSubExplain, realExplain));
+                   buildErrorString(unionSubExplain, realExplain, "stages"));
         }
     }
 }
@@ -221,4 +221,15 @@ assertExplainEq(result, expectedResult);
 
 // Test a nested $unionWith which itself should perform an index scan.
 testPipeline([{$unionWith: {coll: indexedColl.getName(), pipeline: [{$match: {val: {$gt: 0}}}]}}]);
+
+// Similar test as above, except the $match is pushed down to the inner pipeline as part of a
+// rewrite optimization.
+const res = db.adminCommand({getParameter: 1, "failpoint.disablePipelineOptimization": 1});
+assert.commandWorked(res);
+if (!res["failpoint.disablePipelineOptimization"].mode) {
+    result = collA.explain("executionStats")
+                 .aggregate([{$unionWith: indexedColl.getName()}, {$match: {val: {$gt: 2}}}]);
+    expectedResult = indexedColl.explain("executionStats").aggregate([{$match: {val: {$gt: 2}}}]);
+    assertExplainEq(result, expectedResult);
+}
 })();
