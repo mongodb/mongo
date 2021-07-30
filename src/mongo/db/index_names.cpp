@@ -38,6 +38,7 @@ using std::string;
 
 const string IndexNames::GEO_2D = "2d";
 const string IndexNames::GEO_2DSPHERE = "2dsphere";
+const string IndexNames::GEO_2DSPHERE_BUCKET = "2dsphere_bucket";
 const string IndexNames::TEXT = "text";
 const string IndexNames::HASHED = "hashed";
 const string IndexNames::BTREE = "";
@@ -49,6 +50,7 @@ const StringMap<IndexType> kIndexNameToType = {
     {IndexNames::GEO_2D, INDEX_2D},
     {IndexNames::GEO_HAYSTACK, INDEX_HAYSTACK},
     {IndexNames::GEO_2DSPHERE, INDEX_2DSPHERE},
+    {IndexNames::GEO_2DSPHERE_BUCKET, INDEX_2DSPHERE_BUCKET},
     {IndexNames::TEXT, INDEX_TEXT},
     {IndexNames::HASHED, INDEX_HASHED},
     {IndexNames::WILDCARD, INDEX_WILDCARD},

@@ -46,6 +46,7 @@
 #include "mongo/db/index/s2_common.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/query/collation/collation_index_key.h"
+#include "mongo/db/timeseries/timeseries_dotted_path_support.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -165,6 +166,91 @@ bool getS2GeoKeys(const BSONObj& document,
 }
 
 /**
+ * Fills 'out' with the S2 keys that should be generated for 'elements' in a 2dsphere_bucket index.
+ *
+ * Returns true if an indexed element of the document uses multiple cells for its covering, and
+ * returns false otherwise.
+ */
+bool getS2BucketGeoKeys(const BSONObj& document,
+                        const BSONElementSet& elements,
+                        const S2IndexingParams& params,
+                        const std::vector<KeyString::HeapBuilder>& keysToAdd,
+                        std::vector<KeyString::HeapBuilder>* out,
+                        KeyString::Version keyStringVersion,
+                        Ordering ordering) {
+    bool generatedMultipleCells = false;
+    if (!elements.empty()) {
+        /**
+         * We're going to build a MultiPoint GeoJSON that contains all the distinct points in the
+         * bucket. The S2RegionCoverer will index that the best it can within the cell limits we
+         * impose. In order to re-use S2GetKeysForElement, we need to wrap the GeoJSON as a
+         * sub-document of our constructed BSON so we can pass it as an element. In the end, we're
+         * building a document like:
+         * {
+         *   "shape": {
+         *     "type": "MultiPoint",
+         *     "coords": [
+         *        ...
+         *     ]
+         *   }
+         * }
+         */
+        BSONObjBuilder builder;
+        {
+            BSONObjBuilder shape(builder.subobjStart("shape"));
+            shape.append("type", "MultiPoint");
+            BSONArrayBuilder coordinates(shape.subarrayStart("coordinates"));
+            for (BSONElementSet::iterator i = elements.begin(); i != elements.end(); ++i) {
+                GeometryContainer container;
+                auto status = container.parseFromStorage(*i, false);
+                uassert(183934,
+                        str::stream() << "Can't extract geo keys: " << redact(document) << "  "
+                                      << status.reason(),
+                        status.isOK());
+                uassert(
+                    183493,
+                    str::stream()
+                        << "Time-series collections '2dsphere' indexes only support point data: "
+                        << redact(document),
+                    container.isPoint());
+
+                auto point = container.getPoint();
+                BSONArrayBuilder pointData(coordinates.subarrayStart());
+                coordinates.append(point.oldPoint.x);
+                coordinates.append(point.oldPoint.y);
+            }
+        }
+        BSONObj geometry = builder.obj();
+
+        vector<S2CellId> cells;
+        Status status = S2GetKeysForElement(geometry.firstElement(), params, &cells);
+        uassert(167551,
+                str::stream() << "Can't extract geo keys: " << redact(document) << "  "
+                              << status.reason(),
+                status.isOK());
+
+        uassert(167561,
+                str::stream() << "Unable to generate keys for (likely malformed) geometry: "
+                              << redact(document),
+                cells.size() > 0);
+
+        for (vector<S2CellId>::const_iterator it = cells.begin(); it != cells.end(); ++it) {
+            S2CellIdToIndexKeyStringAppend(
+                *it, params.indexVersion, keysToAdd, out, keyStringVersion, ordering);
+        }
+
+        generatedMultipleCells = cells.size() > 1;
+    }
+
+    if (0 == out->size()) {
+        appendToS2Keys(keysToAdd, out, keyStringVersion, ordering, [](KeyString::HeapBuilder& ks) {
+            ks.appendNull();
+        });
+    }
+    return generatedMultipleCells;
+}
+
+/**
  * Fills 'out' with the keys that should be generated for an array value 'obj' in a 2dsphere index.
  * A key is generated for each element of the array value 'obj'.
  */
@@ -229,9 +315,9 @@ bool getS2OneLiteralKey(const BSONElement& elt,
 }
 
 /**
- * Fills 'out' with the non-geo keys that should be generated for 'elements' in a 2dsphere index. If
- * any element in 'elements' is an array value, then a key is generated for each element of that
- * array value.
+ * Fills 'out' with the non-geo keys that should be generated for 'elements' in a 2dsphere
+ * index. If any element in 'elements' is an array value, then a key is generated for each
+ * element of that array value.
  *
  * Returns true if any element of 'elements' is an array value and returns false otherwise.
  */
@@ -556,6 +642,104 @@ void ExpressionKeysPrivate::getS2Keys(SharedBufferFragmentBuilder& pooledBufferB
         LOGV2_WARNING(23755,
                       "Insert of geo object generated a high number of keys. num keys: "
                       "{numKeys} obj inserted: {obj}",
+                      "Insert of geo object generated a large number of keys",
+                      "obj"_attr = redact(obj),
+                      "numKeys"_attr = keysToAdd.size());
+    }
+
+    invariant(keys->empty());
+    auto keysSequence = keys->extract_sequence();
+    for (auto& ks : keysToAdd) {
+        if (id) {
+            ks.appendRecordId(*id);
+        }
+        keysSequence.push_back(ks.release());
+    }
+    keys->adopt_sequence(std::move(keysSequence));
+}
+
+void ExpressionKeysPrivate::getS2BucketKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
+                                            const BSONObj& obj,
+                                            const BSONObj& keyPattern,
+                                            const S2IndexingParams& params,
+                                            KeyStringSet* keys,
+                                            MultikeyPaths* multikeyPaths,
+                                            KeyString::Version keyStringVersion,
+                                            Ordering ordering,
+                                            boost::optional<RecordId> id) {
+    std::vector<KeyString::HeapBuilder> keysToAdd;
+
+    // Does one of our documents have a geo field?
+    bool haveGeoField = false;
+
+    if (multikeyPaths) {
+        invariant(multikeyPaths->empty());
+        multikeyPaths->resize(keyPattern.nFields());
+    }
+
+    size_t posInIdx = 0;
+
+    // We output keys in the same order as the fields we index.
+    for (const auto& keyElem : keyPattern) {
+        // First, we get the keys that this field adds.  Either they're added literally from
+        // the value of the field, or they're transformed if the field is geo.
+        BSONElementSet fieldElements;
+        const bool expandArrayOnTrailingField = false;
+        MultikeyComponents* arrayComponents = multikeyPaths ? &(*multikeyPaths)[posInIdx] : nullptr;
+        timeseries::dotted_path_support::extractAllElementsAlongBucketPath(
+            obj, keyElem.fieldName(), fieldElements, expandArrayOnTrailingField, arrayComponents);
+
+        // Trailing array values aren't being expanded, so we still need to determine whether the
+        // last component of the indexed path 'keyElem.fieldName()' causes the index to be multikey.
+        // We say that it does if
+        //   (a) the last component of the indexed path ever refers to an array value (regardless of
+        //       the number of array elements)
+        //   (b) the last component of the indexed path ever refers to GeoJSON data that requires
+        //       multiple cells for its covering.
+        bool lastPathComponentCausesIndexToBeMultikey;
+        std::vector<KeyString::HeapBuilder> updatedKeysToAdd;
+
+        // null, undefined, {} and [] should all behave like there is no geo field. So we look for
+        // these cases and ignore those measurements if we find them.
+        for (auto it = fieldElements.begin(); it != fieldElements.end();) {
+            decltype(it) next = std::next(it);
+            if (it->isNull() || Undefined == it->type() ||
+                (it->isABSONObj() && 0 == it->Obj().nFields())) {
+                fieldElements.erase(it);
+            }
+            it = next;
+        }
+
+        // 2dsphere indices require that at least one geo field to be present in a
+        // document in order to index it.
+        if (fieldElements.size() > 0) {
+            haveGeoField = true;
+        }
+
+        lastPathComponentCausesIndexToBeMultikey = getS2BucketGeoKeys(
+            obj, fieldElements, params, keysToAdd, &updatedKeysToAdd, keyStringVersion, ordering);
+
+        // We expect there to be the missing field element present in the keys if data is
+        // missing.  So, this should be non-empty.
+        invariant(!updatedKeysToAdd.empty());
+
+        if (multikeyPaths && lastPathComponentCausesIndexToBeMultikey) {
+            const size_t pathLengthOfThisField = FieldRef{keyElem.fieldNameStringData()}.numParts();
+            invariant(pathLengthOfThisField > 0);
+            (*multikeyPaths)[posInIdx].insert(pathLengthOfThisField - 1);
+        }
+
+        keysToAdd = std::move(updatedKeysToAdd);
+        ++posInIdx;
+    }
+
+    // Make sure that there's at least one geo field present in the doc
+    if (!haveGeoField) {
+        return;
+    }
+
+    if (keysToAdd.size() > params.maxKeysPerInsert) {
+        LOGV2_WARNING(237551,
                       "Insert of geo object generated a large number of keys",
                       "obj"_attr = redact(obj),
                       "numKeys"_attr = keysToAdd.size());

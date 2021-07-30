@@ -5,77 +5,78 @@ Import("env")
 env = env.Clone()
 
 env.Library(
-        target='index_descriptor',
-        source=[
-            'index_descriptor.cpp',
-        ],
-        LIBDEPS_PRIVATE=[
-            '$BUILD_DIR/mongo/base',
-            '$BUILD_DIR/mongo/db/catalog/index_catalog',
-            '$BUILD_DIR/mongo/db/index_names',
-            '$BUILD_DIR/mongo/db/matcher/expressions',
-            '$BUILD_DIR/mongo/db/namespace_string',
-            '$BUILD_DIR/mongo/db/query/collation/collator_factory_interface',
-        ],
+    target='index_descriptor',
+    source=[
+        'index_descriptor.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/catalog/index_catalog',
+        '$BUILD_DIR/mongo/db/index_names',
+        '$BUILD_DIR/mongo/db/matcher/expressions',
+        '$BUILD_DIR/mongo/db/namespace_string',
+        '$BUILD_DIR/mongo/db/query/collation/collator_factory_interface',
+    ],
 )
 
 env.Library(
-        target='duplicate_key_tracker',
-        source=[
-            'duplicate_key_tracker.cpp',
-        ],
-        LIBDEPS=[
-            '$BUILD_DIR/mongo/db/service_context',
-        ],
-        LIBDEPS_PRIVATE=[
-            '$BUILD_DIR/mongo/base',
-            '$BUILD_DIR/mongo/db/curop',
-            '$BUILD_DIR/mongo/db/storage/execution_context',
-            '$BUILD_DIR/mongo/db/storage/index_entry_comparison',
-        ],
+    target='duplicate_key_tracker',
+    source=[
+        'duplicate_key_tracker.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/service_context',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/curop',
+        '$BUILD_DIR/mongo/db/storage/execution_context',
+        '$BUILD_DIR/mongo/db/storage/index_entry_comparison',
+    ],
 )
 
 env.Library(
-        target='skipped_record_tracker',
-        source=[
-            'skipped_record_tracker.cpp',
-        ],
-        LIBDEPS=[
-            '$BUILD_DIR/mongo/db/concurrency/write_conflict_exception',
-            '$BUILD_DIR/mongo/db/service_context',
-        ],
-        LIBDEPS_PRIVATE=[
-            '$BUILD_DIR/mongo/base',
-            '$BUILD_DIR/mongo/db/curop',
-        ],
+    target='skipped_record_tracker',
+    source=[
+        'skipped_record_tracker.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/concurrency/write_conflict_exception',
+        '$BUILD_DIR/mongo/db/service_context',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/curop',
+    ],
 )
 
 env.Library(
-        target='key_generator',
-        source=[
-            'btree_key_generator.cpp',
-            'expression_keys_private.cpp',
-            'sort_key_generator.cpp',
-            'wildcard_key_generator.cpp',
-        ],
-        LIBDEPS=[
-            '$BUILD_DIR/mongo/base',
-            '$BUILD_DIR/mongo/db/bson/dotted_path_support',
-            '$BUILD_DIR/mongo/db/exec/projection_executor',
-            '$BUILD_DIR/mongo/db/exec/working_set',
-            '$BUILD_DIR/mongo/db/fts/base_fts',
-            '$BUILD_DIR/mongo/db/geo/geoparser',
-            '$BUILD_DIR/mongo/db/index_names',
-            '$BUILD_DIR/mongo/db/mongohasher',
-            '$BUILD_DIR/mongo/db/pipeline/document_path_support',
-            '$BUILD_DIR/mongo/db/query/collation/collator_interface',
-            '$BUILD_DIR/mongo/db/query/projection_ast',
-            '$BUILD_DIR/mongo/db/query/sort_pattern',
-            '$BUILD_DIR/mongo/db/record_id_helpers',
-            '$BUILD_DIR/third_party/s2/s2',
-            'expression_params',
-            'index_descriptor',
-        ],
+    target='key_generator',
+    source=[
+        'btree_key_generator.cpp',
+        'expression_keys_private.cpp',
+        'sort_key_generator.cpp',
+        'wildcard_key_generator.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/bson/dotted_path_support',
+        '$BUILD_DIR/mongo/db/exec/projection_executor',
+        '$BUILD_DIR/mongo/db/exec/working_set',
+        '$BUILD_DIR/mongo/db/fts/base_fts',
+        '$BUILD_DIR/mongo/db/geo/geoparser',
+        '$BUILD_DIR/mongo/db/index_names',
+        '$BUILD_DIR/mongo/db/mongohasher',
+        '$BUILD_DIR/mongo/db/pipeline/document_path_support',
+        '$BUILD_DIR/mongo/db/query/collation/collator_interface',
+        '$BUILD_DIR/mongo/db/query/projection_ast',
+        '$BUILD_DIR/mongo/db/query/sort_pattern',
+        '$BUILD_DIR/mongo/db/record_id_helpers',
+        '$BUILD_DIR/mongo/db/timeseries/timeseries_dotted_path_support',
+        '$BUILD_DIR/third_party/s2/s2',
+        'expression_params',
+        'index_descriptor',
+    ],
 )
 
 env.Benchmark(
@@ -88,21 +89,21 @@ env.Benchmark(
 )
 
 env.Library(
-        target='expression_params',
-        source=[
-            'expression_params.cpp',
-            's2_common.cpp'
-        ],
-        LIBDEPS=[
-            '$BUILD_DIR/mongo/base',
-            '$BUILD_DIR/mongo/bson/util/bson_extract',
-            '$BUILD_DIR/mongo/db/geo/geometry',
-            '$BUILD_DIR/mongo/db/geo/geoparser',
-            '$BUILD_DIR/mongo/db/mongohasher',
-            '$BUILD_DIR/mongo/db/query/collation/collator_interface',
-            '$BUILD_DIR/mongo/db/storage/key_string',
-            '$BUILD_DIR/third_party/s2/s2',
-        ]
+    target='expression_params',
+    source=[
+        'expression_params.cpp',
+        's2_common.cpp'
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/bson/util/bson_extract',
+        '$BUILD_DIR/mongo/db/geo/geometry',
+        '$BUILD_DIR/mongo/db/geo/geoparser',
+        '$BUILD_DIR/mongo/db/mongohasher',
+        '$BUILD_DIR/mongo/db/query/collation/collator_interface',
+        '$BUILD_DIR/mongo/db/storage/key_string',
+        '$BUILD_DIR/third_party/s2/s2',
+    ]
 )
 
 env.Library(
@@ -153,6 +154,7 @@ env.Library(
         "hash_access_method.cpp",
         "index_access_method_factory_impl.cpp",
         "s2_access_method.cpp",
+        "s2_bucket_access_method.cpp",
         "wildcard_access_method.cpp",
     ],
     LIBDEPS=[
@@ -186,6 +188,7 @@ env.CppUnitTest(
         'btree_key_generator_test.cpp',
         'hash_key_generator_test.cpp',
         's2_key_generator_test.cpp',
+        's2_bucket_key_generator_test.cpp',
         'sort_key_generator_test.cpp',
         'wildcard_key_generator_test.cpp',
     ],

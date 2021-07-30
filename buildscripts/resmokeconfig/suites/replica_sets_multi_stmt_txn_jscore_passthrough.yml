@@ -59,7 +59,7 @@ selector:
   - jstests/core/sortj.js
   - jstests/core/sort_with_meta_operator.js
   - jstests/core/tailable_skip_limit.js
-  - jstests/core/timeseries/timeseries_special_indexes.js
+  - jstests/core/timeseries/timeseries_special_indexes_metadata.js
   - jstests/core/type_array.js
   - jstests/core/uniqueness.js
   - jstests/core/unset2.js

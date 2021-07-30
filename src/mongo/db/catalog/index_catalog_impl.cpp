@@ -53,6 +53,7 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/s2_access_method.h"
+#include "mongo/db/index/s2_bucket_access_method.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"
@@ -567,6 +568,10 @@ StatusWith<BSONObj> adjustIndexSpecObject(const BSONObj& obj) {
 
     if (IndexNames::GEO_2DSPHERE == pluginName) {
         return S2AccessMethod::fixSpec(obj);
+    }
+
+    if (IndexNames::GEO_2DSPHERE_BUCKET == pluginName) {
+        return S2BucketAccessMethod::fixSpec(obj);
     }
 
     return obj;

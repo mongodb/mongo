@@ -67,6 +67,11 @@ public:
     bool isPoint() const;
 
     /**
+     * Returns the point data, if this geometry is a point.
+     */
+    PointWithCRS getPoint() const;
+
+    /**
      * Reports the CRS of the contained geometry.
      * TODO: Rework once we have collections of multiple CRSes
      */

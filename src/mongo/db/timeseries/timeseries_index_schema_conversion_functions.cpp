@@ -33,6 +33,7 @@
 
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 
+#include "mongo/db/index_names.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
@@ -127,6 +128,8 @@ StatusWith<BSONObj> createBucketsSpecFromTimeseriesSpec(const TimeseriesOptions&
             }
         }
 
+        // Indexes on measurement fields are only supported when the 'gTimeseriesMetricIndexes'
+        // feature flag is enabled.
         if (!feature_flags::gTimeseriesMetricIndexes.isEnabledAndIgnoreFCV()) {
             auto reason = str::stream();
             reason << "Invalid index spec for time-series collection: "
@@ -141,15 +144,23 @@ StatusWith<BSONObj> createBucketsSpecFromTimeseriesSpec(const TimeseriesOptions&
             return {ErrorCodes::BadValue, reason};
         }
 
-        // Indexes on measurement fields are only supported when the 'gTimeseriesMetricIndexes'
-        // feature flag is enabled.
+        // 2dsphere indexes on measurements are allowed, but need to be re-written to
+        // point to the data field and use the special 2dsphere_bucket index type.
+        if (elem.valueStringData() == IndexNames::GEO_2DSPHERE) {
+            builder.append(str::stream() << timeseries::kBucketDataFieldName << "."
+                                         << elem.fieldNameStringData(),
+                           IndexNames::GEO_2DSPHERE_BUCKET);
+            continue;
+        }
+
+        // No other special index types are allowed on timeseries measurements.
         if (!elem.isNumber()) {
             return {
                 ErrorCodes::BadValue,
                 str::stream() << "Invalid index spec for time-series collection: "
                               << redact(timeseriesIndexSpecBSON)
                               << ". Indexes on measurement fields must be ascending or descending "
-                                 "(numbers only): "
+                                 "(numbers only), or '2dsphere': "
                               << elem};
         }
 
@@ -171,7 +182,7 @@ StatusWith<BSONObj> createBucketsSpecFromTimeseriesSpec(const TimeseriesOptions&
     }
 
     return builder.obj();
-}
+}  // namespace
 }  // namespace
 
 StatusWith<BSONObj> createBucketsIndexSpecFromTimeseriesIndexSpec(
@@ -235,6 +246,14 @@ boost::optional<BSONObj> createTimeseriesIndexSpecFromBucketsIndexSpec(
             // neither the time field nor the metaField field. Therefore, we will not convert the
             // index spec.
             return {};
+        }
+
+        if (elem.fieldNameStringData().startsWith(timeseries::kBucketDataFieldName + ".") &&
+            elem.valueStringData() == IndexNames::GEO_2DSPHERE_BUCKET) {
+            builder.append(
+                elem.fieldNameStringData().substr(timeseries::kBucketDataFieldName.size() + 1),
+                IndexNames::GEO_2DSPHERE);
+            continue;
         }
 
         if (!isIndexOnControl(elem.fieldNameStringData())) {

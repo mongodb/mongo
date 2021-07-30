@@ -45,6 +45,7 @@ enum IndexType {
     INDEX_2D,
     INDEX_HAYSTACK,
     INDEX_2DSPHERE,
+    INDEX_2DSPHERE_BUCKET,
     INDEX_TEXT,
     INDEX_HASHED,
     INDEX_WILDCARD,
@@ -59,6 +60,7 @@ public:
     static const std::string BTREE;
     static const std::string GEO_2D;
     static const std::string GEO_2DSPHERE;
+    static const std::string GEO_2DSPHERE_BUCKET;
     static const std::string GEO_HAYSTACK;
     static const std::string HASHED;
     static const std::string TEXT;

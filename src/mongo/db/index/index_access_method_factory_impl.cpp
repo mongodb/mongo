@@ -38,6 +38,7 @@
 #include "mongo/db/index/fts_access_method.h"
 #include "mongo/db/index/hash_access_method.h"
 #include "mongo/db/index/s2_access_method.h"
+#include "mongo/db/index/s2_bucket_access_method.h"
 #include "mongo/db/index/wildcard_access_method.h"
 #include "mongo/logv2/log.h"
 
@@ -53,6 +54,8 @@ std::unique_ptr<IndexAccessMethod> IndexAccessMethodFactoryImpl::make(
         return std::make_unique<HashAccessMethod>(entry, std::move(sortedDataInterface));
     else if (IndexNames::GEO_2DSPHERE == type)
         return std::make_unique<S2AccessMethod>(entry, std::move(sortedDataInterface));
+    else if (IndexNames::GEO_2DSPHERE_BUCKET == type)
+        return std::make_unique<S2BucketAccessMethod>(entry, std::move(sortedDataInterface));
     else if (IndexNames::TEXT == type)
         return std::make_unique<FTSAccessMethod>(entry, std::move(sortedDataInterface));
     else if (IndexNames::GEO_2D == type)

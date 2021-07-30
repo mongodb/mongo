@@ -38,6 +38,7 @@ env.Library(
         'timeseries_index_schema_conversion_functions.cpp',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/index_names',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         'timeseries_idl',
     ],
@@ -54,6 +55,16 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/collection_catalog',
+    ],
+)
+
+env.Library(
+    target='timeseries_dotted_path_support',
+    source=[
+        'timeseries_dotted_path_support.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
     ],
 )
 
