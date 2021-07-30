@@ -39,33 +39,52 @@
 ##
 #set $mvc_file = open($releases_yml_path, 'r')
 #set $mvc_doc = yaml.safe_load($mvc_file)
-#set $fcvs = $mvc_doc['featureCompatibilityVersions']
-#set $majors = $mvc_doc['majorReleases']
+#set $mvc_fcvs = $mvc_doc['featureCompatibilityVersions']
+#set $mvc_majors = $mvc_doc['majorReleases']
 ##
 ## Transform strings to versions.
-#set $fcvs = list(map(Version, $fcvs))
-#set $majors = list(map(Version, $majors))
-##
-#set $latest = Version(re.sub(r'-.*', '', $mongo_version))
+#set global $fcvs = list(map(Version, $mvc_fcvs))
+#set $majors = list(map(Version, $mvc_majors))
+
+#set global $latest = Version(re.sub(r'-.*', '', $mongo_version))
 ## Highest release less than latest.
-#set $last_continuous = $fcvs[bisect.bisect_left($fcvs, $latest) - 1]
-## Highest major release less than latest.
+#set global $last_continuous = $fcvs[bisect.bisect_left($fcvs, $latest) - 1]
+## Highest LTS release less than latest.
 #set global $last_lts = $majors[bisect.bisect_left($majors, $latest) - 1]
+##
+#set global $generic_fcvs = {'LastLTS': $last_lts, 'LastContinuous': $last_continuous, 'Latest': $latest}
 ##
 ## Format a Version as `{major}_{minor}`.
 #def $underscores(v): ${'{}_{}'.format(v.major, v.minor)}
-#def $fcv_prefix(v):${'kFullyDowngradedTo_' if v == $last_lts else 'kVersion_'}
-#def $fcv_cpp_name(v):${'{}{}'.format($fcv_prefix(v), $underscores(v))}
+#def $fcv_prefix(v): ${'kFullyDowngradedTo_' if v == $last_lts else 'kVersion_'}
+#def $fcv_cpp_name(v): ${'{}{}'.format($fcv_prefix(v), $underscores(v))}
+#def define_transition_alias($transition, $first, $second):
+k$(transition)_$(underscores($first))_To_$(underscores($second))#slurp
+#end def
 
 namespace mongo::multiversion {
+<%
+fcvs = self.getVar('fcvs')
+last_lts, last_continuous, latest = self.getVar('last_lts'), self.getVar('last_continuous'), self.getVar('latest')
+generic_fcvs = self.getVar('generic_fcvs')
+downgrading = 'DowngradingFrom'
+upgrading = 'UpgradingFrom'
 
+fcv_list = []
+for fcv in fcvs[bisect.bisect_left(fcvs, last_lts):bisect.bisect_right(fcvs, latest)]:
+    fcv_list.append(self.fcv_cpp_name(fcv))
+    if fcv in generic_fcvs.values():
+        for v in filter(lambda x : x > fcv, generic_fcvs.values()):
+            fcv_list.append(self.define_transition_alias(downgrading, v, fcv))
+            fcv_list.append(self.define_transition_alias(upgrading, fcv, v))
+%>
 enum class FeatureCompatibilityVersion {
     kInvalid,
     kUnsetDefaultBehavior_$underscores($last_lts),
-## Generate FCV constants for all versions from last_lts to latest, inclusive.
-#for $fcv in $fcvs[bisect.bisect_left($fcvs, $last_lts):bisect.bisect_right($fcvs, $latest)]:
-    $fcv_cpp_name($fcv),
-#end for
+
+    #for $fcv in $fcv_list:
+    $fcv,
+    #end for
 };
 
 ## Calculate number of versions since v4.4.
@@ -78,10 +97,34 @@ class GenericFCV {
 #def define_fcv_alias($id, v):
 static constexpr auto $id = FeatureCompatibilityVersion::$fcv_cpp_name(v);#slurp
 #end def
+##
+#def define_generic_transition_alias($transition, $first_name, $first_value, $second_name, $second_value):
+static constexpr auto k$transition$(first_name)To$(second_name) = #slurp
+FeatureCompatibilityVersion::$define_transition_alias($transition, $first_value, $second_value);#slurp
+#end def
+##
+#def define_generic_invalid_alias($transition, $first, $second):
+static constexpr auto k$transition$(first)To$(second) = FeatureCompatibilityVersion::kInvalid;#slurp
+#end def
+##
+<%
+generic_transition_list = []
+for fcv, fcv_val in generic_fcvs.items():
+    for v, v_val in filter(lambda x: x[1] > fcv_val, generic_fcvs.items()):
+        generic_transition_list.append(self.define_generic_transition_alias(downgrading, v, v_val, fcv, fcv_val))
+        generic_transition_list.append(self.define_generic_transition_alias(upgrading, fcv, fcv_val, v, v_val))
+if generic_fcvs['LastContinuous'] == generic_fcvs['LastLTS']:
+    generic_transition_list.append(self.define_generic_invalid_alias(upgrading, 'LastLTS', 'LastContinuous'))
+    generic_transition_list.append(self.define_generic_invalid_alias(downgrading, 'LastContinuous', 'LastLTS'))
+%>
 public:
     $define_fcv_alias('kLatest', $latest)
     $define_fcv_alias('kLastContinuous', $last_continuous)
     $define_fcv_alias('kLastLTS', $last_lts)
+
+    #for $fcv in $generic_transition_list:
+    $fcv
+    #end for
 };
 
 }  // namespace mongo::multiversion
