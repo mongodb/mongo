@@ -39,6 +39,7 @@ structs:
     fields:
       coll:
         description: The collection to union with.
+        optional: true
         type: string
       pipeline:
         description: An optional pipeline to apply to the collection being unioned.

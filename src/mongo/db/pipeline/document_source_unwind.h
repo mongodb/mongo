@@ -78,7 +78,8 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const std::string& path,
         bool includeNullIfEmptyOrMissing,
-        const boost::optional<std::string>& includeArrayIndex);
+        const boost::optional<std::string>& includeArrayIndex,
+        bool strict = false);
 
     std::string getUnwindPath() const {
         return _unwindPath.fullPath();
@@ -103,7 +104,8 @@ private:
     DocumentSourceUnwind(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                          const FieldPath& fieldPath,
                          bool includeNullIfEmptyOrMissing,
-                         const boost::optional<FieldPath>& includeArrayIndex);
+                         const boost::optional<FieldPath>& includeArrayIndex,
+                         bool strict);
 
     GetNextResult doGetNext() final;
 
