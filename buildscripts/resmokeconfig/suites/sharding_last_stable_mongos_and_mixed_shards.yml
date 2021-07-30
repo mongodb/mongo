@@ -180,6 +180,8 @@ selector:
   - jstests/sharding/time_zone_info_mongos.js
   # Remove if/once SERVER-50547 is backported to 4.0.
   - jstests/sharding/pipeline_length_limit.js
+  # Remove once SERVER-55648 is backported to v4.0
+  - jstests/sharding/retryable_mongos_write_errors.js
 executor:
   config:
     shell_options:
