@@ -36,6 +36,7 @@
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/session_catalog.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/future.h"
 #include "mongo/unittest/barrier.h"
@@ -52,6 +53,8 @@ protected:
     SessionCatalog* catalog() {
         return SessionCatalog::get(getServiceContext());
     }
+
+    RAIIServerParameterControllerForTest _controller{"featureFlagInternalTransactions", true};
 };
 
 class SessionCatalogTestWithDefaultOpCtx : public SessionCatalogTest {
@@ -76,6 +79,14 @@ private:
     const OperationContext* _opCtx;
     const bool _wasInDirectClient;
 };
+
+TEST_F(SessionCatalogTest, GetParentSessionId) {
+    auto parentLsid = makeLogicalSessionIdForTest();
+    ASSERT(!getParentSessionId(parentLsid).has_value());
+    ASSERT_EQ(parentLsid,
+              *getParentSessionId(makeLogicalSessionIdWithTxnNumberForTest(parentLsid)));
+    ASSERT_EQ(parentLsid, *getParentSessionId(makeLogicalSessionIdWithTxnUUIDForTest(parentLsid)));
+}
 
 TEST_F(SessionCatalogTestWithDefaultOpCtx, CheckoutAndReleaseSession) {
     _opCtx->setLogicalSessionId(makeLogicalSessionIdForTest());
@@ -106,6 +117,19 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, CheckoutAndReleaseSessionWithTxnUUID)
     auto session = OperationContextSession::get(_opCtx);
     ASSERT(session);
     ASSERT_EQ(*_opCtx->getLogicalSessionId(), session->getSessionId());
+}
+
+TEST_F(SessionCatalogTestWithDefaultOpCtx,
+       CannotCheckoutSessionWithParentSessionIfFeatureFlagIsNotEnabled) {
+    RAIIServerParameterControllerForTest controller{"featureFlagInternalTransactions", false};
+
+    _opCtx->setLogicalSessionId(makeLogicalSessionIdWithTxnNumberForTest());
+    ASSERT_THROWS_CODE(OperationContextSession(_opCtx), DBException, ErrorCodes::InvalidOptions);
+
+    _opCtx->setLogicalSessionId(makeLogicalSessionIdWithTxnUUIDForTest());
+    ASSERT_THROWS_CODE(OperationContextSession(_opCtx), DBException, ErrorCodes::InvalidOptions);
+
+    ASSERT_EQ(0UL, catalog()->size());
 }
 
 TEST_F(SessionCatalogTestWithDefaultOpCtx, CannotCheckOutParentSessionOfCheckedOutSession) {

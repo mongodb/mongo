@@ -47,6 +47,7 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/service_liaison_mock.h"
 #include "mongo/db/sessions_collection_mock.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/stdx/future.h"
 #include "mongo/unittest/ensure_fcv.h"
 #include "mongo/unittest/unittest.h"
@@ -118,68 +119,172 @@ private:
     std::shared_ptr<MockSessionsCollectionImpl> _sessions;
 
     std::unique_ptr<LogicalSessionCache> _cache;
+
+    RAIIServerParameterControllerForTest _controller{"featureFlagInternalTransactions", true};
 };
+
+TEST_F(LogicalSessionCacheTest, ParentAndChildSessionsHaveEqualLogicalSessionRecord) {
+    auto parentLsid = makeLogicalSessionIdForTest();
+    auto lastUse = Date_t::now();
+    auto parentSessionRecord = makeLogicalSessionRecord(parentLsid, lastUse);
+
+    auto childSessionRecord0 =
+        makeLogicalSessionRecord(makeLogicalSessionIdWithTxnNumberForTest(parentLsid), lastUse);
+    ASSERT_BSONOBJ_EQ(parentSessionRecord.toBSON(), childSessionRecord0.toBSON());
+
+    auto childSessionRecord1 =
+        makeLogicalSessionRecord(makeLogicalSessionIdWithTxnUUIDForTest(parentLsid), lastUse);
+    ASSERT_BSONOBJ_EQ(parentSessionRecord.toBSON(), childSessionRecord1.toBSON());
+}
 
 // Test that promoting from the cache updates the lastUse date of records
 TEST_F(LogicalSessionCacheTest, VivifyUpdatesLastUse) {
-    auto lsid = makeLogicalSessionIdForTest();
+    auto runTest = [&](const LogicalSessionId& lsid) {
+        auto start = service()->now();
 
-    auto start = service()->now();
+        // Insert the record into the sessions collection with 'start'
+        ASSERT_OK(cache()->startSession(opCtx(), makeLogicalSessionRecord(lsid, start)));
 
-    // Insert the record into the sessions collection with 'start'
-    ASSERT_OK(cache()->startSession(opCtx(), makeLogicalSessionRecord(lsid, start)));
+        // Fast forward time and promote
+        service()->fastForward(Milliseconds(500));
+        ASSERT_OK(cache()->vivify(opCtx(), lsid));
 
-    // Fast forward time and promote
-    service()->fastForward(Milliseconds(500));
-    ASSERT_OK(cache()->vivify(opCtx(), lsid));
+        // Now that we promoted, lifetime of session should be extended
+        service()->fastForward(kSessionTimeout - Milliseconds(500));
+        ASSERT_OK(cache()->vivify(opCtx(), lsid));
 
-    // Now that we promoted, lifetime of session should be extended
-    service()->fastForward(kSessionTimeout - Milliseconds(500));
-    ASSERT_OK(cache()->vivify(opCtx(), lsid));
+        // We promoted again, so lifetime extended again
+        service()->fastForward(kSessionTimeout - Milliseconds(500));
+        ASSERT_OK(cache()->vivify(opCtx(), lsid));
 
-    // We promoted again, so lifetime extended again
-    service()->fastForward(kSessionTimeout - Milliseconds(500));
-    ASSERT_OK(cache()->vivify(opCtx(), lsid));
+        // Fast forward and promote
+        service()->fastForward(kSessionTimeout - Milliseconds(10));
+        ASSERT_OK(cache()->vivify(opCtx(), lsid));
 
-    // Fast forward and promote
-    service()->fastForward(kSessionTimeout - Milliseconds(10));
-    ASSERT_OK(cache()->vivify(opCtx(), lsid));
+        // Lifetime extended again
+        service()->fastForward(Milliseconds(11));
+        ASSERT_OK(cache()->vivify(opCtx(), lsid));
+    };
 
-    // Lifetime extended again
-    service()->fastForward(Milliseconds(11));
-    ASSERT_OK(cache()->vivify(opCtx(), lsid));
+    runTest(makeLogicalSessionIdForTest());
+    runTest(makeLogicalSessionIdWithTxnNumberForTest());
+    runTest(makeLogicalSessionIdWithTxnUUIDForTest());
+}
+
+TEST_F(LogicalSessionCacheTest, VivifyUpdatesLastUseOfParentSession) {
+    auto runTest = [&](const LogicalSessionId& parentLsid, const LogicalSessionId& childLsid) {
+        ASSERT_OK(
+            cache()->startSession(opCtx(), makeLogicalSessionRecord(parentLsid, service()->now())));
+        service()->fastForward(Minutes(1));
+        ASSERT_OK(cache()->vivify(opCtx(), childLsid));
+        ASSERT_OK(cache()->refreshNow(opCtx()));
+
+        auto records = sessions()->sessions();
+        ASSERT_EQ(1, records.size());
+        ASSERT_EQ(service()->now(), records.begin()->second.getLastUse());
+        sessions()->clearSessions();
+    };
+
+    auto parentLsid = makeLogicalSessionIdForTest();
+    runTest(parentLsid, makeLogicalSessionIdWithTxnNumberForTest(parentLsid));
+    runTest(parentLsid, makeLogicalSessionIdWithTxnUUIDForTest(parentLsid));
+    runTest(makeLogicalSessionIdWithTxnNumberForTest(parentLsid),
+            makeLogicalSessionIdWithTxnUUIDForTest(parentLsid));
+}
+
+TEST_F(LogicalSessionCacheTest, CannotVivifySessionWithParentSessionIfFeatureFlagIsNotEnabled) {
+    RAIIServerParameterControllerForTest controller{"featureFlagInternalTransactions", false};
+    ASSERT_THROWS_CODE(cache()->vivify(opCtx(), makeLogicalSessionIdWithTxnNumberForTest()),
+                       DBException,
+                       ErrorCodes::InvalidOptions);
+    ASSERT_THROWS_CODE(cache()->vivify(opCtx(), makeLogicalSessionIdWithTxnUUIDForTest()),
+                       DBException,
+                       ErrorCodes::InvalidOptions);
+    ASSERT_EQ(0UL, cache()->size());
 }
 
 // Test the startSession method
 TEST_F(LogicalSessionCacheTest, StartSession) {
-    auto record = makeLogicalSessionRecord(makeLogicalSessionIdForTest(), service()->now());
-    auto lsid = record.getId();
+    auto runTest = [&](const LogicalSessionId& lsid0, const LogicalSessionId& lsid1) {
+        auto parentLsid0 = getParentSessionId(lsid0);
+        auto record = makeLogicalSessionRecord(lsid0, service()->now());
 
-    // Test starting a new session
-    ASSERT_OK(cache()->startSession(opCtx(), record));
+        // Test starting a new session
+        ASSERT_OK(cache()->startSession(opCtx(), record));
 
-    // Record will not be in the collection yet; refresh must happen first.
-    ASSERT(!sessions()->has(lsid));
+        // Record will not be in the collection yet; refresh must happen first.
+        ASSERT(!sessions()->has(lsid0));
 
-    // Do refresh, cached records should get flushed to collection.
-    ASSERT(cache()->refreshNow(opCtx()).isOK());
-    ASSERT(sessions()->has(lsid));
+        // Do refresh, cached records should get flushed to collection.
+        ASSERT(cache()->refreshNow(opCtx()).isOK());
+        if (parentLsid0) {
+            ASSERT(!sessions()->has(lsid0));
+            ASSERT(sessions()->has(*parentLsid0));
+        } else {
+            ASSERT(sessions()->has(lsid0));
+        }
 
-    // Try to start the same session again, should succeed.
-    ASSERT_OK(cache()->startSession(opCtx(), record));
+        // Try to start the same session again, should succeed.
+        ASSERT_OK(cache()->startSession(opCtx(), record));
 
-    // Try to start a session that is already in the sessions collection but
-    // is not in our local cache, should succeed.
-    auto record2 = makeLogicalSessionRecord(makeLogicalSessionIdForTest(), service()->now());
-    sessions()->add(record2);
-    ASSERT_OK(cache()->startSession(opCtx(), record2));
+        // Try to start a session that is already in the sessions collection but
+        // is not in our local cache, should succeed.
+        auto record1 = makeLogicalSessionRecord(lsid1, service()->now());
+        sessions()->add(record1);
+        ASSERT_OK(cache()->startSession(opCtx(), record1));
 
-    // Try to start a session that has expired from our cache, and is no
-    // longer in the sessions collection, should succeed
-    service()->fastForward(Milliseconds(kSessionTimeout.count() + 5));
-    sessions()->remove(lsid);
-    ASSERT(!sessions()->has(lsid));
-    ASSERT_OK(cache()->startSession(opCtx(), record));
+        // Try to start a session that has expired from our cache, and is no
+        // longer in the sessions collection, should succeed
+        service()->fastForward(Milliseconds(kSessionTimeout.count() + 5));
+        sessions()->remove(parentLsid0 ? *parentLsid0 : lsid0);
+        if (parentLsid0) {
+            ASSERT(!sessions()->has(lsid0));
+            ASSERT(!sessions()->has(*parentLsid0));
+        } else {
+            ASSERT(!sessions()->has(lsid0));
+        }
+        ASSERT_OK(cache()->startSession(opCtx(), record));
+    };
+
+    runTest(makeLogicalSessionIdForTest(), makeLogicalSessionIdForTest());
+    runTest(makeLogicalSessionIdWithTxnNumberForTest(), makeLogicalSessionIdWithTxnNumberForTest());
+    runTest(makeLogicalSessionIdWithTxnUUIDForTest(), makeLogicalSessionIdWithTxnUUIDForTest());
+}
+
+// Test the endSessions method.
+TEST_F(LogicalSessionCacheTest, EndSessions) {
+    const auto lsids = []() -> std::vector<LogicalSessionId> {
+        auto lsid0 = makeLogicalSessionIdForTest();
+        auto lsid1 = makeLogicalSessionIdForTest();
+        auto lsid2 = makeLogicalSessionIdWithTxnNumberForTest(lsid1);
+        auto lsid3 = makeLogicalSessionIdWithTxnUUIDForTest(lsid1);
+        return {lsid0, lsid1, lsid2, lsid3};
+    }();
+
+    for (const auto& lsid : lsids) {
+        ASSERT_OK(cache()->startSession(opCtx(), makeLogicalSessionRecord(lsid, service()->now())));
+    }
+    ASSERT_EQ(2UL, cache()->size());
+
+    // Verify that it is invalid to pass an lsid with a parent lsid into endSessions.
+    ASSERT_THROWS_CODE(cache()->endSessions({lsids[2]}), DBException, ErrorCodes::InvalidOptions);
+    ASSERT_THROWS_CODE(cache()->endSessions({lsids[3]}), DBException, ErrorCodes::InvalidOptions);
+
+    cache()->endSessions({lsids[0], lsids[1]});
+}
+
+// Test the peekCached method.
+TEST_F(LogicalSessionCacheTest, PeekCached) {
+    auto lsid0 = makeLogicalSessionIdForTest();
+    auto record0 = makeLogicalSessionRecord(lsid0, service()->now());
+    ASSERT_OK(cache()->startSession(opCtx(), record0));
+    ASSERT_BSONOBJ_EQ(record0.toBSON(), cache()->peekCached(lsid0)->toBSON());
+
+    // Verify that it is invalid to pass an lsid with a parent lsid into peekCached.
+    auto lsid1 = makeLogicalSessionIdWithTxnNumberForTest(lsid0);
+    ASSERT_THROWS_CODE(cache()->peekCached(lsid1), DBException, ErrorCodes::InvalidOptions);
+    auto lsid2 = makeLogicalSessionIdWithTxnUUIDForTest(lsid0);
+    ASSERT_THROWS_CODE(cache()->peekCached(lsid2), DBException, ErrorCodes::InvalidOptions);
 }
 
 // Test that session cache properly expires lsids after 30 minutes of no use

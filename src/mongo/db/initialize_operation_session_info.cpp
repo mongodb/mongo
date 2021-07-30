@@ -94,6 +94,12 @@ OperationSessionInfoFromClient initializeOperationSessionInfo(OperationContext* 
             return {};
         }
 
+        if (getParentSessionId(lsid)) {
+            uassert(ErrorCodes::InvalidOptions,
+                    "Internal sessions are not supported outside of transactions",
+                    osi.getTxnNumber() && osi.getAutocommit() && !osi.getAutocommit().value());
+        }
+
         opCtx->setLogicalSessionId(std::move(lsid));
         uassertStatusOK(lsc->vivify(opCtx, opCtx->getLogicalSessionId().get()));
     } else {

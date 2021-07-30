@@ -33,6 +33,7 @@
 
 #include "mongo/db/logical_session_cache_impl.h"
 
+#include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/operation_context.h"
@@ -93,8 +94,17 @@ Status LogicalSessionCacheImpl::startSession(OperationContext* opCtx,
 }
 
 Status LogicalSessionCacheImpl::vivify(OperationContext* opCtx, const LogicalSessionId& lsid) {
+    auto parentLsid = getParentSessionId(lsid);
+    if (parentLsid) {
+        uassert(ErrorCodes::InvalidOptions,
+                "Internal transactions are not enabled",
+                feature_flags::gFeatureFlagInternalTransactions.isEnabled(
+                    serverGlobalParams.featureCompatibility));
+    }
+
     stdx::lock_guard lg(_mutex);
-    auto it = _activeSessions.find(lsid);
+
+    auto it = _activeSessions.find(parentLsid ? *parentLsid : lsid);
     if (it == _activeSessions.end())
         return _addToCacheIfNotFull(lg, makeLogicalSessionRecord(opCtx, lsid, _service->now()));
 
@@ -374,6 +384,11 @@ void LogicalSessionCacheImpl::_refresh(Client* client) {
 }
 
 void LogicalSessionCacheImpl::endSessions(const LogicalSessionIdSet& sessions) {
+    for (const auto& lsid : sessions) {
+        uassert(ErrorCodes::InvalidOptions,
+                str::stream() << "Cannot specify a session id with parent session id " << lsid,
+                !getParentSessionId(lsid));
+    }
     stdx::lock_guard<Latch> lk(_mutex);
     _endingSessions.insert(begin(sessions), end(sessions));
 }
@@ -435,9 +450,13 @@ std::vector<LogicalSessionId> LogicalSessionCacheImpl::listIds(
 }
 
 boost::optional<LogicalSessionRecord> LogicalSessionCacheImpl::peekCached(
-    const LogicalSessionId& id) const {
+    const LogicalSessionId& lsid) const {
+    uassert(ErrorCodes::InvalidOptions,
+            str::stream() << "Cannot specify a session id with parent session id " << lsid,
+            !getParentSessionId(lsid));
+
     stdx::lock_guard<Latch> lk(_mutex);
-    const auto it = _activeSessions.find(id);
+    const auto it = _activeSessions.find(lsid);
     if (it == _activeSessions.end()) {
         return boost::none;
     }

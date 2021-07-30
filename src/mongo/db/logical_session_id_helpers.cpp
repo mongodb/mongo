@@ -85,6 +85,18 @@ boost::optional<LogicalSessionId> getParentSessionId(const LogicalSessionId& ses
 LogicalSessionId makeLogicalSessionId(const LogicalSessionFromClient& fromClient,
                                       OperationContext* opCtx,
                                       std::initializer_list<Privilege> allowSpoof) {
+    uassert(ErrorCodes::InvalidOptions,
+            "Cannot specify both txnNumber and txnUUID in lsid",
+            !fromClient.getTxnNumber() || !fromClient.getTxnUUID());
+
+    uassert(ErrorCodes::InvalidOptions,
+            "Cannot specify txnNumber in lsid without specifying stmtId",
+            !fromClient.getTxnNumber() || fromClient.getStmtId());
+
+    uassert(ErrorCodes::InvalidOptions,
+            "Cannot specify stmtId in lsid without specifying txnNumber",
+            !fromClient.getStmtId() || fromClient.getTxnNumber());
+
     LogicalSessionId lsid;
 
     lsid.setId(fromClient.getId());
@@ -157,9 +169,13 @@ LogicalSessionRecord makeLogicalSessionRecord(OperationContext* opCtx, Date_t la
 }
 
 LogicalSessionRecord makeLogicalSessionRecord(const LogicalSessionId& lsid, Date_t lastUse) {
+    LogicalSessionId id{};
     LogicalSessionRecord lsr{};
 
-    lsr.setId(lsid);
+    id.setId(lsid.getId());
+    id.setUid(lsid.getUid());
+
+    lsr.setId(id);
     lsr.setLastUse(lastUse);
 
     return lsr;

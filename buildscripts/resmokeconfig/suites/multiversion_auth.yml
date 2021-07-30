@@ -25,6 +25,10 @@ selector:
   # Skip any tests that run with auth explicitly.
   - jstests/multiVersion/load_keys_on_upgrade.js
 
+  # TODO (SERVER-59343): Investigate AuthorizationSession error after running setFCV in
+  # internal_sessions.js in multiversion_auth suite.
+  - jstests/multiVersion/internal_sessions.js
+
   exclude_with_any_tags:
   - featureFlagToaster
   - featureFlagSpoon

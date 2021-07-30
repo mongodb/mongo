@@ -35,6 +35,9 @@
 
 #include <memory>
 
+#include "mongo/db/internal_transactions_feature_flag_gen.h"
+#include "mongo/db/logical_session_id_helpers.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 
@@ -73,6 +76,11 @@ SessionCatalog* SessionCatalog::get(ServiceContext* service) {
 
 SessionCatalog::ScopedCheckedOutSession SessionCatalog::_checkOutSessionWithParentSession(
     OperationContext* opCtx, const LogicalSessionId& lsid, boost::optional<KillToken> killToken) {
+    uassert(ErrorCodes::InvalidOptions,
+            "Internal transactions are not enabled",
+            feature_flags::gFeatureFlagInternalTransactions.isEnabled(
+                serverGlobalParams.featureCompatibility));
+
     if (killToken) {
         invariant(killToken->lsidToKill == lsid);
     } else {

@@ -143,6 +143,99 @@ TEST_F(LogicalSessionIdTest, ConstructorFromClientWithoutPassedUid) {
     ASSERT_EQ(lsid.getUid(), user->getDigest());
 }
 
+TEST_F(LogicalSessionIdTest, ConstructorFromClientWithTxnNumberAndStmtId) {
+    auto id = UUID::gen();
+    TxnNumber txnNumber(35);
+    StmtId stmtId(0);
+    User* user = addSimpleUser(UserName("simple", "test"));
+
+    LogicalSessionFromClient req;
+    req.setId(id);
+    req.getInternalSessionFields().setTxnNumber(txnNumber);
+    req.getInternalSessionFields().setStmtId(stmtId);
+
+    LogicalSessionId lsid = makeLogicalSessionId(req, _opCtx.get());
+    ASSERT_EQ(lsid.getId(), id);
+    ASSERT_EQ(lsid.getUid(), user->getDigest());
+    ASSERT_EQ(*lsid.getTxnNumber(), txnNumber);
+    ASSERT_EQ(*lsid.getStmtId(), stmtId);
+}
+
+TEST_F(LogicalSessionIdTest, ConstructorFromClientWithTxnUUID) {
+    auto id = UUID::gen();
+    auto txnUUID = UUID::gen();
+    User* user = addSimpleUser(UserName("simple", "test"));
+
+    LogicalSessionFromClient req;
+    req.setId(id);
+    req.getInternalSessionFields().setTxnUUID(txnUUID);
+
+    LogicalSessionId lsid = makeLogicalSessionId(req, _opCtx.get());
+    ASSERT_EQ(lsid.getId(), id);
+    ASSERT_EQ(lsid.getUid(), user->getDigest());
+    ASSERT_EQ(*lsid.getTxnUUID(), txnUUID);
+}
+
+TEST_F(LogicalSessionIdTest, ConstructorFromClientWithTxnNumberWithoutStmtId) {
+    auto id = UUID::gen();
+    TxnNumber txnNumber(35);
+    addSimpleUser(UserName("simple", "test"));
+
+    LogicalSessionFromClient req;
+    req.setId(id);
+    req.getInternalSessionFields().setTxnNumber(txnNumber);
+
+    ASSERT_THROWS_CODE(
+        makeLogicalSessionId(req, _opCtx.get()), DBException, ErrorCodes::InvalidOptions);
+}
+
+TEST_F(LogicalSessionIdTest, ConstructorFromClientWithTxnUUIDWithStmtId) {
+    auto id = UUID::gen();
+    auto txnUUID = UUID::gen();
+    StmtId stmtId(0);
+    addSimpleUser(UserName("simple", "test"));
+
+    LogicalSessionFromClient req;
+    req.setId(id);
+    req.getInternalSessionFields().setTxnUUID(txnUUID);
+    req.getInternalSessionFields().setStmtId(stmtId);
+
+    ASSERT_THROWS_CODE(
+        makeLogicalSessionId(req, _opCtx.get()), DBException, ErrorCodes::InvalidOptions);
+}
+
+TEST_F(LogicalSessionIdTest, ConstructorFromClientWithTxnNumberAndTxnUUID) {
+    auto id = UUID::gen();
+    TxnNumber txnNumber(35);
+    auto txnUUID = UUID::gen();
+    addSimpleUser(UserName("simple", "test"));
+
+    LogicalSessionFromClient req;
+    req.setId(id);
+    req.getInternalSessionFields().setTxnNumber(txnNumber);
+    req.getInternalSessionFields().setTxnUUID(txnUUID);
+
+    ASSERT_THROWS_CODE(
+        makeLogicalSessionId(req, _opCtx.get()), DBException, ErrorCodes::InvalidOptions);
+}
+
+TEST_F(LogicalSessionIdTest, ConstructorFromClientWithTxnNumberAndTxnUUIDAndStmtId) {
+    auto id = UUID::gen();
+    TxnNumber txnNumber(35);
+    auto txnUUID = UUID::gen();
+    StmtId stmtId(0);
+    addSimpleUser(UserName("simple", "test"));
+
+    LogicalSessionFromClient req;
+    req.setId(id);
+    req.getInternalSessionFields().setTxnNumber(txnNumber);
+    req.getInternalSessionFields().setTxnUUID(txnUUID);
+    req.getInternalSessionFields().setStmtId(stmtId);
+
+    ASSERT_THROWS_CODE(
+        makeLogicalSessionId(req, _opCtx.get()), DBException, ErrorCodes::InvalidOptions);
+}
+
 TEST_F(LogicalSessionIdTest, ConstructorFromClientWithoutPassedUidAndWithoutAuthedUser) {
     auto id = UUID::gen();
 

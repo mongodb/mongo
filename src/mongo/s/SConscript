@@ -148,7 +148,6 @@ env.Library(
         'chunk_version.idl',
         'database_version.cpp',
         'database_version.idl',
-        'internal_transactions_feature_flag.idl',
         'load_balancer_feature_flag.idl',
         'mongod_and_mongos_server_parameters.idl',
         'request_types/abort_reshard_collection.idl',

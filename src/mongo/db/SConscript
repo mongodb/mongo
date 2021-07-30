@@ -642,6 +642,18 @@ env.Library(
 )
 
 env.Library(
+    target='internal_transactions_feature_flag',
+    source=[
+        'internal_transactions_feature_flag.idl',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/idl/feature_flag',
+        '$BUILD_DIR/mongo/idl/server_parameter',
+        'server_options_core',
+    ]
+)
+
+env.Library(
     target='session_catalog',
     source=[
         'session_catalog.cpp',
@@ -652,6 +664,7 @@ env.Library(
         'logical_session_id_helpers',
     ],
     LIBDEPS_PRIVATE=[
+        'internal_transactions_feature_flag',
         'service_context',
     ]
 )
@@ -1517,6 +1530,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/s/sharding_api_d',
+        'internal_transactions_feature_flag',
     ]
 )
 
