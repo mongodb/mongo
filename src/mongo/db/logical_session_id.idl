@@ -56,10 +56,28 @@ types:
     deserializer: "mongo::BSONElement::_numberInt"
 
 structs:
+  InternalSessionFields:
+    description: "Internal sessiond id fields"
+    strict: true
+    fields:
+      txnNumber:
+        description: "Used for internal sessions only."
+        type: TxnNumber
+        optional: true
+      stmtId:
+        description: "Used for internal sessions only."
+        type: StmtId
+        optional: true
+      txnUUID:
+        description: "Used for internal sessions only."
+        type: uuid
+        optional: true
 
   LogicalSessionId:
     description: "A struct representing a LogicalSessionId"
     strict: true
+    chained_structs:
+      InternalSessionFields: InternalSessionFields
     fields:
       id: uuid
       uid: sha256Block
@@ -92,6 +110,8 @@ structs:
   LogicalSessionFromClient:
     description: "A struct representing a LogicalSessionId from external clients"
     strict: true
+    chained_structs:
+      InternalSessionFields: InternalSessionFields
     fields:
       id: uuid
       uid:

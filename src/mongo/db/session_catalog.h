@@ -34,6 +34,7 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/logical_session_id.h"
+#include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/session.h"
 #include "mongo/db/session_killer.h"
@@ -136,22 +137,39 @@ private:
     using SessionRuntimeInfoMap = LogicalSessionIdMap<std::unique_ptr<SessionRuntimeInfo>>;
 
     /**
+     * Blocking method, which checks-out the session with the given 'lsid'.
+     */
+    ScopedCheckedOutSession _checkOutSessionWithParentSession(OperationContext* opCtx,
+                                                              const LogicalSessionId& lsid,
+                                                              boost::optional<KillToken> killToken);
+    ScopedCheckedOutSession _checkOutSessionWithoutParentSession(
+        OperationContext* opCtx,
+        const LogicalSessionId& lsid,
+        boost::optional<KillToken> killToken);
+
+    /**
      * Blocking method, which checks-out the session set on 'opCtx'.
      */
     ScopedCheckedOutSession _checkOutSession(OperationContext* opCtx);
 
     /**
-     * Creates or returns the session runtime info for 'lsid' from the '_sessions' map. The returned
-     * pointer is guaranteed to be linked on the map for as long as the mutex is held.
+     * Returns the session runtime info for 'lsid' from the '_sessions' map. The returned pointer
+     * is guaranteed to be linked on the map for as long as the mutex is held.
      */
-    SessionRuntimeInfo* _getOrCreateSessionRuntimeInfo(WithLock,
-                                                       OperationContext* opCtx,
-                                                       const LogicalSessionId& lsid);
+    SessionRuntimeInfo* _getSessionRuntimeInfo(WithLock lk, const LogicalSessionId& lsid);
+
+    /**
+     * Creates or returns the session runtime info for 'lsid' from the '_sessions' map. The
+     * returned pointer is guaranteed to be linked on the map for as long as the mutex is held.
+     */
+    SessionRuntimeInfo* _getOrCreateSessionRuntimeInfo(WithLock lk, const LogicalSessionId& lsid);
 
     /**
      * Makes a session, previously checked out through 'checkoutSession', available again.
      */
-    void _releaseSession(SessionRuntimeInfo* sri, boost::optional<KillToken> killToken);
+    void _releaseSession(SessionRuntimeInfo* sri,
+                         SessionRuntimeInfo* parentSri,
+                         boost::optional<KillToken> killToken);
 
     // Protects the state below
     mutable Mutex _mutex =
@@ -169,12 +187,25 @@ class SessionCatalog::ScopedCheckedOutSession {
 public:
     ScopedCheckedOutSession(SessionCatalog& catalog,
                             SessionCatalog::SessionRuntimeInfo* sri,
+                            SessionCatalog::SessionRuntimeInfo* parentSri,
                             boost::optional<SessionCatalog::KillToken> killToken)
-        : _catalog(catalog), _sri(sri), _killToken(std::move(killToken)) {}
+        : _catalog(catalog), _sri(sri), _parentSri(parentSri), _killToken(std::move(killToken)) {
+        if (_parentSri) {
+            invariant(getParentSessionId(_sri->session.getSessionId()) ==
+                      _parentSri->session.getSessionId());
+        }
+        if (_killToken) {
+            invariant(_sri->session.getSessionId() == _killToken->lsidToKill);
+        }
+    }
 
     ScopedCheckedOutSession(ScopedCheckedOutSession&& other)
-        : _catalog(other._catalog), _sri(other._sri), _killToken(std::move(other._killToken)) {
+        : _catalog(other._catalog),
+          _sri(other._sri),
+          _parentSri(other._parentSri),
+          _killToken(std::move(other._killToken)) {
         other._sri = nullptr;
+        other._parentSri = nullptr;
     }
 
     ScopedCheckedOutSession& operator=(ScopedCheckedOutSession&&) = delete;
@@ -183,7 +214,7 @@ public:
 
     ~ScopedCheckedOutSession() {
         if (_sri) {
-            _catalog._releaseSession(_sri, std::move(_killToken));
+            _catalog._releaseSession(_sri, _parentSri, std::move(_killToken));
         }
     }
 
@@ -204,6 +235,7 @@ private:
     SessionCatalog& _catalog;
 
     SessionCatalog::SessionRuntimeInfo* _sri;
+    SessionCatalog::SessionRuntimeInfo* _parentSri;
     boost::optional<SessionCatalog::KillToken> _killToken;
 };
 
@@ -260,11 +292,10 @@ public:
     }
 
     /**
-     * Returns a pointer to the current operation running on this Session, or nullptr if there is no
-     * operation currently running on this Session.
+     * Returns true if there is an operation currently running on this Session.
      */
-    OperationContext* currentOperation() const {
-        return _session->_checkoutOpCtx;
+    bool hasCurrentOperation() const {
+        return _session->_checkoutOpCtx || _session->_childSessionCheckoutOpCtx;
     }
 
     /**
@@ -323,6 +354,20 @@ private:
      * Returns whether 'kill' has been called on this session.
      */
     bool _killed() const;
+
+    /**
+     * Returns true if this Session can be checked out.
+     */
+    bool _isAvailableForCheckOut(bool forKill) const {
+        return !hasCurrentOperation() && (forKill || !_killed());
+    }
+
+    /**
+     * Returns true if this Session should be be deleted from the map.
+     */
+    bool _shouldBeReaped(int numWaitingToCheckOut) const {
+        return _markedForReap && !_killed() && !hasCurrentOperation() && !numWaitingToCheckOut;
+    }
 
     Session* _session;
     stdx::unique_lock<Client> _clientLock;

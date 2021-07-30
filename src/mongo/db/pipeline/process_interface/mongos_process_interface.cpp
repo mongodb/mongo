@@ -260,7 +260,7 @@ void MongosProcessInterface::_reportCurrentOpsForIdleSessions(OperationContext* 
                               : KillAllSessionsByPatternSet{{}});
 
     sessionCatalog->scanSessions({std::move(sessionFilter)}, [&](const ObservableSession& session) {
-        if (!session.currentOperation()) {
+        if (!session.hasCurrentOperation()) {
             auto op =
                 TransactionRouter::get(session).reportState(opCtx, false /* sessionIsActive */);
             if (!op.isEmpty()) {

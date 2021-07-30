@@ -75,12 +75,22 @@ SHA256Block getLogicalSessionUserDigestFor(StringData user, StringData db) {
     return SHA256Block::computeHash({ConstDataRange(fn.c_str(), fn.size())});
 }
 
+boost::optional<LogicalSessionId> getParentSessionId(const LogicalSessionId& sessionId) {
+    if (sessionId.getTxnNumber() || sessionId.getTxnUUID()) {
+        return LogicalSessionId{sessionId.getId(), sessionId.getUid()};
+    }
+    return boost::none;
+}
+
 LogicalSessionId makeLogicalSessionId(const LogicalSessionFromClient& fromClient,
                                       OperationContext* opCtx,
                                       std::initializer_list<Privilege> allowSpoof) {
     LogicalSessionId lsid;
 
     lsid.setId(fromClient.getId());
+    lsid.getInternalSessionFields().setTxnNumber(fromClient.getTxnNumber());
+    lsid.getInternalSessionFields().setStmtId(fromClient.getStmtId());
+    lsid.getInternalSessionFields().setTxnUUID(fromClient.getTxnUUID());
 
     if (fromClient.getUid()) {
         auto authSession = AuthorizationSession::get(opCtx->getClient());
@@ -203,9 +213,7 @@ namespace logical_session_id_helpers {
 
 void serializeLsidAndTxnNumber(OperationContext* opCtx, BSONObjBuilder* builder) {
     OperationSessionInfo sessionInfo;
-    if (opCtx->getLogicalSessionId()) {
-        sessionInfo.setSessionId(*opCtx->getLogicalSessionId());
-    }
+    sessionInfo.setSessionId(opCtx->getLogicalSessionId());
     sessionInfo.setTxnNumber(opCtx->getTxnNumber());
     sessionInfo.serialize(builder);
 }

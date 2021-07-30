@@ -65,12 +65,18 @@ private:
     // The id of the session with which this object is associated
     const LogicalSessionId _sessionId;
 
+    // These fields are only safe to read or write while holding the SessionCatalog::_mutex. In
+    // practice, it is only used inside of the SessionCatalog itself.
+
     // A pointer back to the currently running operation on this Session, or nullptr if there
     // is no operation currently running for the Session.
-    //
-    // This field is only safe to read or write while holding the SessionCatalog::_mutex. In
-    // practice, it is only used inside of the SessionCatalog itself.
     OperationContext* _checkoutOpCtx{nullptr};
+
+    // A pointer to the operation currently running on one of the child Sessions of this Session,
+    // or nullptr if this is Session does not have any child Session or if there is no operation
+    // currently running on any of its child Sessions. Used to block this Session and other child
+    // Sessions from being checked out if there is already a checked-out child Session.
+    OperationContext* _childSessionCheckoutOpCtx{nullptr};
 
     // Keeps the last time this session was checked-out
     Date_t _lastCheckout{Date_t::now()};

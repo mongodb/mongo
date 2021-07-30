@@ -649,6 +649,7 @@ env.Library(
     LIBDEPS=[
         'kill_sessions',
         'logical_session_id',
+        'logical_session_id_helpers',
     ],
     LIBDEPS_PRIVATE=[
         'service_context',

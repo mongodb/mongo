@@ -50,6 +50,11 @@ SHA256Block getLogicalSessionUserDigestForLoggedInUser(const OperationContext* o
 SHA256Block getLogicalSessionUserDigestFor(StringData user, StringData db);
 
 /**
+ * Returns the parent session id for the given session id if there is one.
+ */
+boost::optional<LogicalSessionId> getParentSessionId(const LogicalSessionId& sessionId);
+
+/**
  * Factory functions to generate logical session records.
  */
 LogicalSessionId makeLogicalSessionId(const LogicalSessionFromClient& lsid,

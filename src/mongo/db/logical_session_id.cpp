@@ -42,6 +42,23 @@ LogicalSessionId makeLogicalSessionIdForTest() {
     return lsid;
 }
 
+LogicalSessionId makeLogicalSessionIdWithTxnNumberForTest(
+    boost::optional<LogicalSessionId> parentLsid, boost::optional<StmtId> stmtId) {
+    auto lsid = parentLsid ? LogicalSessionId(parentLsid->getId(), parentLsid->getUid())
+                           : makeLogicalSessionIdForTest();
+    lsid.getInternalSessionFields().setTxnNumber(0);
+    lsid.getInternalSessionFields().setStmtId(stmtId ? *stmtId : 0);
+    return lsid;
+}
+
+LogicalSessionId makeLogicalSessionIdWithTxnUUIDForTest(
+    boost::optional<LogicalSessionId> parentLsid) {
+    auto lsid = parentLsid ? LogicalSessionId(parentLsid->getId(), parentLsid->getUid())
+                           : makeLogicalSessionIdForTest();
+    lsid.getInternalSessionFields().setTxnUUID(UUID::gen());
+    return lsid;
+}
+
 LogicalSessionRecord makeLogicalSessionRecordForTest() {
     LogicalSessionRecord record{};
 
