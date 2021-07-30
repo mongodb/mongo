@@ -31,9 +31,12 @@
 
 #include "mongo/scripting/mozjs/countdownlatch.h"
 
+#include <cmath>
+
 #include "mongo/platform/mutex.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
+#include "mongo/scripting/mozjs/valuewriter.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/unordered_map.h"
 
@@ -130,40 +133,52 @@ namespace {
 CountDownLatchHolder globalCountDownLatchHolder;
 }  // namespace
 
-void CountDownLatchInfo::Functions::_new::call(JSContext* cx, JS::CallArgs args) {
+/**
+ * The argument for _new is a count value. We restrict it to be a 32 bit integer.
+ *
+ * The argument for _await/_countDown/_getCount is an id for CountDownLatch instance returned from
+ * _new call. It must be a 32 bit integer.
+ */
+auto uassertGet(JS::CallArgs args, unsigned int i) {
     uassert(ErrorCodes::JSInterpreterFailure, "need exactly one argument", args.length() == 1);
-    uassert(
-        ErrorCodes::JSInterpreterFailure, "argument must be an integer", args.get(0).isNumber());
 
-    args.rval().setInt32(globalCountDownLatchHolder.make(args.get(0).toNumber()));
+    auto int32Arg = args.get(i);
+    if (int32Arg.isDouble()) {
+        uassert(ErrorCodes::JSInterpreterFailure,
+                "argument must not be an NaN",
+                !int32Arg.isDouble() || !std::isnan(int32Arg.toDouble()));
+        auto val = int32Arg.toDouble();
+        uassert(ErrorCodes::JSInterpreterFailure,
+                "argument must be a 32 bit integer",
+                INT_MIN <= val && val <= INT_MAX);
+
+        return static_cast<int32_t>(val);
+    }
+
+    uassert(
+        ErrorCodes::JSInterpreterFailure, "argument must be a 32 bit integer", int32Arg.isInt32());
+
+    return int32Arg.toInt32();
+}
+
+void CountDownLatchInfo::Functions::_new::call(JSContext* cx, JS::CallArgs args) {
+    args.rval().setInt32(globalCountDownLatchHolder.make(uassertGet(args, 0)));
 }
 
 void CountDownLatchInfo::Functions::_await::call(JSContext* cx, JS::CallArgs args) {
-    uassert(ErrorCodes::JSInterpreterFailure, "need exactly one argument", args.length() == 1);
-    uassert(
-        ErrorCodes::JSInterpreterFailure, "argument must be an integer", args.get(0).isNumber());
-
-    globalCountDownLatchHolder.await(args.get(0).toNumber());
+    globalCountDownLatchHolder.await(uassertGet(args, 0));
 
     args.rval().setUndefined();
 }
 
 void CountDownLatchInfo::Functions::_countDown::call(JSContext* cx, JS::CallArgs args) {
-    uassert(ErrorCodes::JSInterpreterFailure, "need exactly one argument", args.length() == 1);
-    uassert(
-        ErrorCodes::JSInterpreterFailure, "argument must be an integer", args.get(0).isNumber());
-
-    globalCountDownLatchHolder.countDown(args.get(0).toNumber());
+    globalCountDownLatchHolder.countDown(uassertGet(args, 0));
 
     args.rval().setUndefined();
 }
 
 void CountDownLatchInfo::Functions::_getCount::call(JSContext* cx, JS::CallArgs args) {
-    uassert(ErrorCodes::JSInterpreterFailure, "need exactly one argument", args.length() == 1);
-    uassert(
-        ErrorCodes::JSInterpreterFailure, "argument must be an integer", args.get(0).isNumber());
-
-    args.rval().setInt32(globalCountDownLatchHolder.getCount(args.get(0).toNumber()));
+    args.rval().setInt32(globalCountDownLatchHolder.getCount(uassertGet(args, 0)));
 }
 
 /**
