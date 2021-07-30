@@ -33,7 +33,6 @@ const timeFieldName = "time";
 const metaFieldName = "tag";
 const collName = 't';
 const dbName = jsTestName();
-const bucketsCollNamespace = dbName + '.system.buckets.' + collName;
 
 const testCases = {
     DROP_COLLECTION: 0,
@@ -76,11 +75,10 @@ const validateDeleteIndex =
             collName,
             expectedErrorCode,
             dbName));
+        const coll = testDB.getCollection(collName);
 
         const childOp =
-            waitForCurOpByFailPoint(testDB, bucketsCollNamespace, "hangDuringBatchRemove")[0];
-
-        const coll = testDB.getCollection(collName);
+            waitForCurOpByFailPoint(testDB, coll.getFullName(), "hangDuringBatchRemove")[0];
 
         // Drop the collection in all test cases.
         assert(coll.drop());

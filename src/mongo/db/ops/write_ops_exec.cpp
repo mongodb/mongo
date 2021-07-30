@@ -1063,7 +1063,9 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
     auto& curOp = *CurOp::get(opCtx);
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        curOp.setNS_inlock(ns.ns());
+        curOp.setNS_inlock(source == OperationSource::kTimeseriesDelete
+                               ? ns.getTimeseriesViewNamespace().ns()
+                               : ns.ns());
         curOp.setNetworkOp_inlock(dbDelete);
         curOp.setLogicalOp_inlock(LogicalOp::opDelete);
         curOp.setOpDescription_inlock(op.toBSON());
