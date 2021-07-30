@@ -29,7 +29,8 @@ function verifyViewPipeline(coll) {
 }
 
 (function testSeconds() {
-    let coll = db.granularitySeconds;
+    let coll = db.bucket_granularity_granularitySeconds;
+    let bucketsColl = db.getCollection('system.buckets.' + coll.getName());
     coll.drop();
 
     assert.commandWorked(db.createCollection(
@@ -39,18 +40,19 @@ function verifyViewPipeline(coll) {
     assert.commandWorked(coll.insert({t: ISODate("2021-04-22T20:00:00.000Z")}));
     assert.commandWorked(coll.insert({t: ISODate("2021-04-22T20:00:03.000Z")}));
     assert.commandWorked(coll.insert({t: ISODate("2021-04-22T20:00:59.999Z")}));
-    assert.eq(1, db.system.buckets.granularitySeconds.find().itcount());
+    assert.eq(1, bucketsColl.find().itcount());
 
     // Expect bucket max span to be one hour. A new measurement outside of this range should create
     // a new bucket.
     assert.commandWorked(coll.insert({t: ISODate("2021-04-22T20:59:59.999Z")}));
-    assert.eq(1, db.system.buckets.granularitySeconds.find().itcount());
+    assert.eq(1, bucketsColl.find().itcount());
     assert.commandWorked(coll.insert({t: ISODate("2021-04-22T21:00:00.000Z")}));
-    assert.eq(2, db.system.buckets.granularitySeconds.find().itcount());
+    assert.eq(2, bucketsColl.find().itcount());
 })();
 
 (function testMinutes() {
-    let coll = db.granularityMinutes;
+    let coll = db.bucket_granularity_granularityMinutes;
+    let bucketsColl = db.getCollection('system.buckets.' + coll.getName());
     coll.drop();
 
     assert.commandWorked(db.createCollection(
@@ -60,18 +62,19 @@ function verifyViewPipeline(coll) {
     assert.commandWorked(coll.insert({t: ISODate("2021-04-22T20:00:00.000Z")}));
     assert.commandWorked(coll.insert({t: ISODate("2021-04-22T20:22:02.000Z")}));
     assert.commandWorked(coll.insert({t: ISODate("2021-04-22T20:59:59.999Z")}));
-    assert.eq(1, db.system.buckets.granularityMinutes.find().itcount());
+    assert.eq(1, bucketsColl.find().itcount());
 
     // Expect bucket max span to be one day. A new measurement outside of this range should create
     // a new bucket.
     assert.commandWorked(coll.insert({t: ISODate("2021-04-23T19:59:59.999Z")}));
-    assert.eq(1, db.system.buckets.granularityMinutes.find().itcount());
+    assert.eq(1, bucketsColl.find().itcount());
     assert.commandWorked(coll.insert({t: ISODate("2021-04-23T20:00:00.000Z")}));
-    assert.eq(2, db.system.buckets.granularityMinutes.find().itcount());
+    assert.eq(2, bucketsColl.find().itcount());
 })();
 
 (function testHours() {
-    let coll = db.granularityHours;
+    let coll = db.bucket_granularity_granularityHours;
+    let bucketsColl = db.getCollection('system.buckets.' + coll.getName());
     coll.drop();
 
     assert.commandWorked(
@@ -81,18 +84,19 @@ function verifyViewPipeline(coll) {
     assert.commandWorked(coll.insert({t: ISODate("2021-04-22T00:00:00.000Z")}));
     assert.commandWorked(coll.insert({t: ISODate("2021-04-22T20:11:03.000Z")}));
     assert.commandWorked(coll.insert({t: ISODate("2021-04-22T23:59:59.999Z")}));
-    assert.eq(1, db.system.buckets.granularityHours.find().itcount());
+    assert.eq(1, bucketsColl.find().itcount());
 
     // Expect bucket max span to be 30 days. A new measurement outside of this range should create
     // a new bucket.
     assert.commandWorked(coll.insert({t: ISODate("2021-05-21T23:59:59.999Z")}));
-    assert.eq(1, db.system.buckets.granularityHours.find().itcount());
+    assert.eq(1, bucketsColl.find().itcount());
     assert.commandWorked(coll.insert({t: ISODate("2021-05-22T00:00:00.000Z")}));
-    assert.eq(2, db.system.buckets.granularityHours.find().itcount());
+    assert.eq(2, bucketsColl.find().itcount());
 })();
 
 (function testIncreasingSecondsToMinutes() {
-    let coll = db.granularitySecondsToMinutes;
+    let coll = db.bucket_granularity_granularitySecondsToMinutes;
+    let bucketsColl = db.getCollection('system.buckets.' + coll.getName());
     coll.drop();
 
     assert.commandWorked(db.createCollection(
@@ -103,14 +107,14 @@ function verifyViewPipeline(coll) {
     assert.commandWorked(coll.insert({t: ISODate("2021-04-22T20:00:00.000Z")}));
     assert.commandWorked(coll.insert({t: ISODate("2021-04-22T20:00:03.000Z")}));
     assert.commandWorked(coll.insert({t: ISODate("2021-04-22T20:00:59.999Z")}));
-    assert.eq(1, db.system.buckets.granularitySecondsToMinutes.find().itcount());
+    assert.eq(1, bucketsColl.find().itcount());
 
     // Expect bucket max span to be one hour. A new measurement outside of this range should create
     // a new bucket.
     assert.commandWorked(coll.insert({t: ISODate("2021-04-22T20:59:59.999Z")}));
-    assert.eq(1, db.system.buckets.granularitySecondsToMinutes.find().itcount());
+    assert.eq(1, bucketsColl.find().itcount());
     assert.commandWorked(coll.insert({t: ISODate("2021-04-22T21:00:00.000Z")}));
-    assert.eq(2, db.system.buckets.granularitySecondsToMinutes.find().itcount());
+    assert.eq(2, bucketsColl.find().itcount());
 
     // Now let's bump to minutes and make sure we get the expected behavior
     assert.commandWorked(
@@ -121,19 +125,20 @@ function verifyViewPipeline(coll) {
     assert.commandWorked(coll.insert({t: ISODate("2021-04-23T20:00:00.000Z")}));
     assert.commandWorked(coll.insert({t: ISODate("2021-04-23T20:22:02.000Z")}));
     assert.commandWorked(coll.insert({t: ISODate("2021-04-23T20:59:59.999Z")}));
-    assert.eq(2, db.system.buckets.granularitySecondsToMinutes.find().itcount());
+    assert.eq(2, bucketsColl.find().itcount());
 
     // Expect bucket max span to be one day. A new measurement outside of this range should create
     // a new bucket.
     assert.commandWorked(coll.insert({t: ISODate("2021-04-23T21:00:00.000Z")}));
-    assert.eq(3, db.system.buckets.granularitySecondsToMinutes.find().itcount());
+    assert.eq(3, bucketsColl.find().itcount());
 
     // Make sure when we query, we use the new bucket max span to make sure we get all matches
     assert.eq(4, coll.find({t: {$gt: ISODate("2021-04-23T19:00:00.000Z")}}).itcount());
 })();
 
 (function testIncreasingSecondsToHours() {
-    let coll = db.granularitySecondsToHours;
+    let coll = db.bucket_granularity_granularitySecondsToHours;
+    let bucketsColl = db.getCollection('system.buckets.' + coll.getName());
     coll.drop();
 
     assert.commandWorked(db.createCollection(
@@ -144,14 +149,14 @@ function verifyViewPipeline(coll) {
     assert.commandWorked(coll.insert({t: ISODate("2021-04-22T20:00:00.000Z")}));
     assert.commandWorked(coll.insert({t: ISODate("2021-04-22T20:00:03.000Z")}));
     assert.commandWorked(coll.insert({t: ISODate("2021-04-22T20:00:59.999Z")}));
-    assert.eq(1, db.system.buckets.granularitySecondsToHours.find().itcount());
+    assert.eq(1, bucketsColl.find().itcount());
 
     // Expect bucket max span to be one hour. A new measurement outside of this range should create
     // a new bucket.
     assert.commandWorked(coll.insert({t: ISODate("2021-04-22T20:59:59.999Z")}));
-    assert.eq(1, db.system.buckets.granularitySecondsToHours.find().itcount());
+    assert.eq(1, bucketsColl.find().itcount());
     assert.commandWorked(coll.insert({t: ISODate("2021-04-22T21:00:00.000Z")}));
-    assert.eq(2, db.system.buckets.granularitySecondsToHours.find().itcount());
+    assert.eq(2, bucketsColl.find().itcount());
 
     assert.commandWorked(
         db.runCommand({collMod: coll.getName(), timeseries: {granularity: 'hours'}}));
@@ -161,19 +166,20 @@ function verifyViewPipeline(coll) {
     assert.commandWorked(coll.insert({t: ISODate("2021-05-22T00:00:00.000Z")}));
     assert.commandWorked(coll.insert({t: ISODate("2021-05-22T18:11:03.000Z")}));
     assert.commandWorked(coll.insert({t: ISODate("2021-05-22T20:59:59.999Z")}));
-    assert.eq(2, db.system.buckets.granularitySecondsToHours.find().itcount());
+    assert.eq(2, bucketsColl.find().itcount());
 
     // Expect bucket max span to be 30 days. A new measurement outside of this range should create
     // a new bucket.
     assert.commandWorked(coll.insert({t: ISODate("2021-05-22T21:00:00.001Z")}));
-    assert.eq(3, db.system.buckets.granularitySecondsToHours.find().itcount());
+    assert.eq(3, bucketsColl.find().itcount());
 
     // Make sure when we query, we use the new bucket max span to make sure we get all matches
     assert.eq(4, coll.find({t: {$gt: ISODate("2021-05-21T00:00:00.000Z")}}).itcount());
 })();
 
 (function testIncreasingMinutesToHours() {
-    let coll = db.granularityMinutesToHours;
+    let coll = db.bucket_granularity_granularityMinutesToHours;
+    let bucketsColl = db.getCollection('system.buckets.' + coll.getName());
     coll.drop();
 
     assert.commandWorked(db.createCollection(
@@ -184,14 +190,14 @@ function verifyViewPipeline(coll) {
     assert.commandWorked(coll.insert({t: ISODate("2021-04-22T20:00:00.000Z")}));
     assert.commandWorked(coll.insert({t: ISODate("2021-04-22T20:22:02.000Z")}));
     assert.commandWorked(coll.insert({t: ISODate("2021-04-22T20:59:59.999Z")}));
-    assert.eq(1, db.system.buckets.granularityMinutesToHours.find().itcount());
+    assert.eq(1, bucketsColl.find().itcount());
 
     // Expect bucket max span to be one day. A new measurement outside of this range should create
     // a new bucket.
     assert.commandWorked(coll.insert({t: ISODate("2021-04-23T19:59:59.999Z")}));
-    assert.eq(1, db.system.buckets.granularityMinutesToHours.find().itcount());
+    assert.eq(1, bucketsColl.find().itcount());
     assert.commandWorked(coll.insert({t: ISODate("2021-04-23T20:00:00.000Z")}));
-    assert.eq(2, db.system.buckets.granularityMinutesToHours.find().itcount());
+    assert.eq(2, bucketsColl.find().itcount());
 
     assert.commandWorked(
         db.runCommand({collMod: coll.getName(), timeseries: {granularity: 'hours'}}));
@@ -201,19 +207,19 @@ function verifyViewPipeline(coll) {
     assert.commandWorked(coll.insert({t: ISODate("2021-05-23T00:00:00.000Z")}));
     assert.commandWorked(coll.insert({t: ISODate("2021-05-23T18:11:03.000Z")}));
     assert.commandWorked(coll.insert({t: ISODate("2021-05-23T19:59:59.999Z")}));
-    assert.eq(2, db.system.buckets.granularityMinutesToHours.find().itcount());
+    assert.eq(2, bucketsColl.find().itcount());
 
     // Expect bucket max span to be 30 days. A new measurement outside of this range should create
     // a new bucket.
     assert.commandWorked(coll.insert({t: ISODate("2021-05-23T20:00:00.001Z")}));
-    assert.eq(3, db.system.buckets.granularityMinutesToHours.find().itcount());
+    assert.eq(3, bucketsColl.find().itcount());
 
     // Make sure when we query, we use the new bucket max span to make sure we get all matches
     assert.eq(4, coll.find({t: {$gt: ISODate("2021-05-22T00:00:00.000Z")}}).itcount());
 })();
 
 (function testReducingGranularityFails() {
-    let coll = db.reducingGranularityFails;
+    let coll = db.bucket_granularity_reducingGranularityFails;
     coll.drop();
 
     assert.commandWorked(db.createCollection(
