@@ -14,7 +14,7 @@
 
 load("jstests/multiVersion/libs/multi_rs.js");         // For upgradeSet.
 load("jstests/multiVersion/libs/verify_versions.js");  // For binVersion.
-load("jstests/noPassthrough/libs/index_build.js");     // For waitForIndexBuildToStop.
+load("jstests/libs/override_methods/causally_consistent_index_builds.js");
 
 const preBackportVersion = "4.2.1";
 const preBackportNodeOptions = {
@@ -39,34 +39,56 @@ assert.binVersion(testDB.getMongo(), preBackportVersion);
 
 // Insert bad documents using older version.
 const indexName = "pqr_hashed";
-assert.commandWorked(coll.createIndex({"p.q.r": "hashed"}, {"name": indexName}));
 assert.commandWorked(coll.insert({_id: 1, p: []}));
 assert.commandWorked(coll.insert({_id: 2, p: {q: [1]}}));
 assert.commandWorked(coll.insert({_id: 3, p: [{q: 1}]}));
 assert.commandWorked(coll.insert({_id: 4, a: 1, p: [{q: 1}]}));
 assert.commandWorked(coll.insert({_id: 5, a: 1, p: [{q: 1}]}));
+assert.commandWorked(coll.createIndex({"p.q.r": "hashed"}, {"name": indexName}));
 
 // Assert that the collection has expected number of documents and index keys.
 function assertCollectionHasExpectedDocs(targetColl, expectedNumDocs) {
-    const collState = {
-        documents: targetColl.find().toArray(),
-        indexKeys: targetColl.find().hint({"p.q.r": "hashed"}).returnKey().toArray()
-    };
-    assert.eq(collState.documents.length, expectedNumDocs, collState);
-    assert.eq(collState.indexKeys.length, expectedNumDocs, collState);
+    function getCollState() {
+        return {
+            documents: targetColl.find().toArray(),
+            indexKeys: targetColl.find().hint({"p.q.r": "hashed"}).returnKey().toArray()
+        };
+    }
+    assert.soon(
+        () => {
+            const collState = getCollState();
+            return collState.documents.length === expectedNumDocs &&
+                collState.indexKeys.length === expectedNumDocs;
+        },
+        () => {
+            return tojson(getCollState());
+        });
 }
 
 // Assert that both nodes in the replica set have the expected number of documents/index keys.
 function assertBothNodesHaveExpectedDocs(expectedNumDocs) {
-    // Wait for the index build to stop on the primary.
-    IndexBuildTest.waitForIndexBuildToStop(testDB, collName, indexName);
+    // Wait for both indexes to be present on the primary.
+    assert.soon(
+        () => {
+            return testDB[collName].getIndexes().length === 2;
+        },
+        () => {
+            return tojson(testDB[collName].getIndexes());
+        });
     assertCollectionHasExpectedDocs(coll, expectedNumDocs);
 
     rst.awaitReplication();
     const secondaryDB = rst.getSecondary().getDB(jsTestName());
     const secondaryColl = secondaryDB[collName];
-    // Wait for the index build to stop on the secondary.
-    IndexBuildTest.waitForIndexBuildToStop(secondaryDB, collName, indexName);
+
+    // Wait for both indexes to be present on the secondary.
+    assert.soon(
+        () => {
+            return secondaryColl.getIndexes().length === 2;
+        },
+        () => {
+            return tojson(secondaryColl.getIndexes());
+        });
     assertCollectionHasExpectedDocs(secondaryColl, expectedNumDocs);
 }
 
