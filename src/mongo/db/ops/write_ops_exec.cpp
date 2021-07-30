@@ -714,13 +714,9 @@ WriteResult performInserts(OperationContext* opCtx,
 
 static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
                                                const NamespaceString& ns,
-                                               const UpdateRequest& updateRequest,
+                                               UpdateRequest* updateRequest,
                                                OperationSource source,
                                                bool* containsDotsAndDollarsField) {
-    const ExtensionsCallbackReal extensionsCallback(opCtx, &updateRequest.getNamespaceString());
-    ParsedUpdate parsedUpdate(opCtx, &updateRequest, extensionsCallback);
-    uassertStatusOK(parsedUpdate.parseRequest());
-
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &hangDuringBatchUpdate,
         opCtx,
@@ -752,18 +748,64 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
         }
 
         // If this is an upsert, which is an insert, we must have a collection.
-        // An update on a non-existant collection is okay and handled later.
-        if (!updateRequest.isUpsert())
+        // An update on a non-existent collection is okay and handled later.
+        if (!updateRequest->isUpsert())
             break;
 
         collection.reset();  // unlock.
         makeCollection(opCtx, ns);
     }
 
+    if (source == OperationSource::kTimeseriesUpdate) {
+        uassert(ErrorCodes::NamespaceNotFound,
+                "Could not find time-series buckets collection for update",
+                collection);
+
+        auto timeseriesOptions = collection->getCollection()->getTimeseriesOptions();
+        uassert(ErrorCodes::InvalidOptions,
+                "Time-series buckets collection is missing time-series options",
+                timeseriesOptions);
+
+        auto metaField = timeseriesOptions->getMetaField();
+        uassert(ErrorCodes::InvalidOptions,
+                "Cannot perform an update on a time-series collection with no metaField",
+                metaField);
+
+        uassert(
+            ErrorCodes::InvalidOptions,
+            str::stream() << "multi:false updates are not supported for time-series collections: "
+                          << ns,
+            updateRequest->isMulti());
+
+        // Get the original update query and check that it only depends on the metaField.
+        const auto& updateQuery = updateRequest->getQuery();
+        uassert(ErrorCodes::InvalidOptions,
+                str::stream() << "Cannot perform an update on a time-series collection "
+                                 "when querying on a field that is not the metaField "
+                              << *metaField << ": " << ns,
+                timeseries::queryOnlyDependsOnMetaField(opCtx, ns, updateQuery, *metaField));
+
+        // Get the original set of modifications to apply and check that they only
+        // modify the metaField.
+        const auto& updateMod = updateRequest->getUpdateModification();
+        uassert(ErrorCodes::InvalidOptions,
+                str::stream() << "Update on a time-series collection must only "
+                                 "modify the metaField "
+                              << *metaField << ": " << ns,
+                timeseries::updateOnlyModifiesMetaField(opCtx, ns, updateMod, *metaField));
+
+        updateRequest->setQuery(timeseries::translateQuery(updateQuery, *metaField));
+        updateRequest->setUpdateModification(timeseries::translateUpdate(updateMod, *metaField));
+    }
+
     if (const auto& coll = collection->getCollection()) {
         // Transactions are not allowed to operate on capped collections.
         uassertStatusOK(checkIfTransactionOnCappedColl(opCtx, coll));
     }
+
+    const ExtensionsCallbackReal extensionsCallback(opCtx, &updateRequest->getNamespaceString());
+    ParsedUpdate parsedUpdate(opCtx, updateRequest, extensionsCallback);
+    uassertStatusOK(parsedUpdate.parseRequest());
 
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &hangWithLockDuringBatchUpdate, opCtx, "hangWithLockDuringBatchUpdate");
@@ -835,8 +877,7 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
     globalOpCounters.gotUpdate();
     ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForUpdate(opCtx->getWriteConcern());
     auto& curOp = *CurOp::get(opCtx);
-    if (source != OperationSource::kTimeseriesInsert &&
-        source != OperationSource::kTimeseriesUpdate) {
+    if (source != OperationSource::kTimeseriesInsert) {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         curOp.setNS_inlock(ns.ns());
         curOp.setNetworkOp_inlock(dbUpdate);
@@ -868,7 +909,7 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
         try {
             bool containsDotsAndDollarsField = false;
             const auto ret =
-                performSingleUpdateOp(opCtx, ns, request, source, &containsDotsAndDollarsField);
+                performSingleUpdateOp(opCtx, ns, &request, source, &containsDotsAndDollarsField);
 
             if (containsDotsAndDollarsField) {
                 // If it's an upsert, increment 'inserts' metric, otherwise increment 'updates'.
@@ -946,8 +987,7 @@ WriteResult performUpdates(OperationContext* opCtx,
         auto& parentCurOp = *CurOp::get(opCtx);
         const Command* cmd = parentCurOp.getCommand();
         boost::optional<CurOp> curOp;
-        if (source != OperationSource::kTimeseriesInsert &&
-            source != OperationSource::kTimeseriesUpdate) {
+        if (source != OperationSource::kTimeseriesInsert) {
             curOp.emplace(opCtx);
 
             stdx::lock_guard<Client> lk(*opCtx->getClient());
@@ -960,82 +1000,23 @@ WriteResult performUpdates(OperationContext* opCtx,
         });
         try {
             lastOpFixer.startingOp();
-            // TODO: SERVER-58896 Move this translation logic to performSingleUpdateOp().
-            out.results.push_back([&] {
-                if (source == kTimeseriesUpdate) {
-                    auto collection =
-                        CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForRead(
-                            opCtx, wholeOp.getNamespace().makeTimeseriesBucketsNamespace());
-                    uassert(ErrorCodes::NamespaceNotFound,
-                            "Could not find time-series buckets collection for update",
-                            collection);
 
-                    auto timeseriesOptions = collection->getTimeseriesOptions();
-                    uassert(ErrorCodes::InvalidOptions,
-                            "Time-series buckets collection is missing time-series options",
-                            timeseriesOptions);
+            // A time-series insert can combine multiple writes into a single operation, and thus
+            // can have multiple statement ids associated with it if it is retryable.
+            auto stmtIds = source == OperationSource::kTimeseriesInsert && wholeOp.getStmtIds()
+                ? *wholeOp.getStmtIds()
+                : std::vector<StmtId>{stmtId};
 
-                    boost::optional<StringData> metaField = timeseriesOptions->getMetaField();
-
-                    uassert(
-                        ErrorCodes::InvalidOptions,
-                        str::stream()
-                            << "multi:false updates are not supported for time-series collections: "
-                            << wholeOp.getNamespace(),
-                        singleOp.getMulti());
-
-                    // Get the original update query and check that it only depends on the
-                    // metaField.
-                    const auto& updateQuery = singleOp.getQ();
-                    uassert(ErrorCodes::InvalidOptions,
-                            str::stream() << "Cannot perform an update on a time-series collection "
-                                             "when querying on a field that is not the metaField: "
-                                          << wholeOp.getNamespace(),
-                            metaField &&
-                                timeseries::queryOnlyDependsOnMetaField(
-                                    opCtx, wholeOp.getNamespace(), updateQuery, *metaField));
-
-                    // Get the original set of modifications to apply and check that they only
-                    // modify the metaField.
-                    const auto& updateMod = singleOp.getU();
-                    uassert(ErrorCodes::InvalidOptions,
-                            str::stream() << "Update on a time-series collection must only "
-                                             "modify the metaField: "
-                                          << wholeOp.getNamespace(),
-                            metaField &&
-                                timeseries::updateOnlyModifiesMetaField(
-                                    opCtx, wholeOp.getNamespace(), updateMod, *metaField));
-
-                    auto stmtIds =
-                        wholeOp.getStmtIds() ? *wholeOp.getStmtIds() : std::vector<StmtId>{stmtId};
-                    const auto& translatedOp = timeseries::translateUpdate(
-                        metaField ? timeseries::translateQuery(updateQuery, *metaField)
-                                  : updateQuery,
-                        updateMod,
-                        *metaField);
-
-                    return performSingleUpdateOpWithDupKeyRetry(
-                        opCtx,
-                        wholeOp.getNamespace().makeTimeseriesBucketsNamespace(),
-                        stmtIds,
-                        translatedOp,
-                        runtimeConstants,
-                        wholeOp.getLet(),
-                        source);
-                }
-                // A time-series insert can combine multiple writes into a single operation, and
-                // thus can have multiple statement ids associated with it if it is retryable.
-                auto stmtIds = source == OperationSource::kTimeseriesInsert && wholeOp.getStmtIds()
-                    ? *wholeOp.getStmtIds()
-                    : std::vector<StmtId>{stmtId};
-                return performSingleUpdateOpWithDupKeyRetry(opCtx,
-                                                            wholeOp.getNamespace(),
-                                                            stmtIds,
-                                                            singleOp,
-                                                            runtimeConstants,
-                                                            wholeOp.getLet(),
-                                                            source);
-            }());
+            out.results.emplace_back(performSingleUpdateOpWithDupKeyRetry(
+                opCtx,
+                source == OperationSource::kTimeseriesUpdate
+                    ? wholeOp.getNamespace().makeTimeseriesBucketsNamespace()
+                    : wholeOp.getNamespace(),
+                stmtIds,
+                singleOp,
+                runtimeConstants,
+                wholeOp.getLet(),
+                source));
             lastOpFixer.finishedOpSuccessfully();
         } catch (const DBException& ex) {
             const bool canContinue = handleError(opCtx,

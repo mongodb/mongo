@@ -59,20 +59,20 @@ bool updateOnlyModifiesMetaField(OperationContext* opCtx,
                                  StringData metaField);
 
 /**
- * Translates the given query to a query on the time-series collection's underlying buckets
- * collection. Creates and returns a translated query document where all occurrences of metaField in
- * query are replaced with the literal "meta". Requires that the given metaField is not empty.
+ * Translates the given query on the time-series collection to a query on the time-series
+ * collection's underlying buckets collection. Creates and returns a translated query document where
+ * all occurrences of metaField in query are replaced with the literal "meta". Requires that the
+ * given metaField is not empty.
  */
 BSONObj translateQuery(const BSONObj& query, StringData metaField);
 
-/**
- * Given a translated query and set of untranslated updates to apply, creates and returns a
- * translated update on the time-series collection's underlying buckets collection. Specifically,
- * returns an UpdateOpEntry whose query is translatedQuery and its update is updateMod where all
- * occurrences of the given metaField in updateMod are replaced with the literal "meta". Requires
- * that updateMod is is not a replacement document.
+
+/*
+ * Translates the given update on the time-series collection to an update on the time-series
+ * collection's underlying buckets collection. Creates and returns a translated UpdateModification
+ * where all occurrences of metaField in updateMod are replaced with the literal "meta". Requires
+ * that updateMod is not a replacement document and that the given metaField is not empty.
  */
-write_ops::UpdateOpEntry translateUpdate(const BSONObj& translatedQuery,
-                                         const write_ops::UpdateModification& updateMod,
-                                         StringData metaField);
+write_ops::UpdateModification translateUpdate(const write_ops::UpdateModification& updateMod,
+                                              StringData metaField);
 }  // namespace mongo::timeseries

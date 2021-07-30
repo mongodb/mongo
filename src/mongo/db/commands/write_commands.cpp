@@ -1140,7 +1140,23 @@ public:
             write_ops::UpdateCommandReply updateReply;
 
             if (isTimeseries(opCtx, ns())) {
-                _performTimeseriesUpdates(opCtx, &updateReply);
+                uassert(ErrorCodes::InvalidOptions,
+                        "Time-series updates are not enabled",
+                        feature_flags::gTimeseriesUpdatesAndDeletes.isEnabled(
+                            serverGlobalParams.featureCompatibility));
+                uassert(ErrorCodes::OperationNotSupportedInTransaction,
+                        str::stream() << "Cannot perform a multi-document transaction on a "
+                                         "time-series collection: "
+                                      << ns(),
+                        !opCtx->inMultiDocumentTransaction());
+
+                auto reply = write_ops_exec::performUpdates(
+                    opCtx, request(), OperationSource::kTimeseriesUpdate);
+                populateReply(opCtx,
+                              !request().getWriteCommandRequestBase().getOrdered(),
+                              request().getUpdates().size(),
+                              std::move(reply),
+                              &updateReply);
                 return updateReply;
             }
 
@@ -1245,30 +1261,6 @@ public:
                                    BSONObj(),
                                    _commandObj,
                                    &bodyBuilder);
-        }
-
-        write_ops::UpdateCommandReply* _performTimeseriesUpdates(
-            OperationContext* opCtx, write_ops::UpdateCommandReply* updateReply) const {
-            uassert(ErrorCodes::InvalidOptions,
-                    "Time-series updates are not enabled",
-                    feature_flags::gTimeseriesUpdatesAndDeletes.isEnabled(
-                        serverGlobalParams.featureCompatibility));
-            uassert(
-                ErrorCodes::OperationNotSupportedInTransaction,
-                str::stream()
-                    << "Cannot perform a multi-document transaction on a time-series collection: "
-                    << ns(),
-                !opCtx->inMultiDocumentTransaction());
-
-            auto reply = write_ops_exec::performUpdates(
-                opCtx, request(), OperationSource::kTimeseriesUpdate);
-            populateReply(opCtx,
-                          !request().getWriteCommandRequestBase().getOrdered(),
-                          request().getUpdates().size(),
-                          std::move(reply),
-                          updateReply);
-
-            return updateReply;
         }
 
         BSONObj _commandObj;
