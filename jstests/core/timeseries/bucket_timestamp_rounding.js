@@ -18,7 +18,7 @@
 (function() {
 
 (function testSeconds() {
-    let coll = db.granularitySeconds;
+    let coll = db.bucket_timestamp_rounding_granularitySeconds;
     coll.drop();
 
     assert.commandWorked(db.createCollection(
@@ -29,13 +29,14 @@
     // And that going backwards, but after the rounding point, doesn't open a new bucket.
     assert.commandWorked(coll.insert({t: ISODate("2021-04-22T20:10:05.000Z")}));
 
-    const buckets = db.system.buckets.granularitySeconds.find().toArray();
+    const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
+    const buckets = bucketsColl.find().toArray();
     assert.eq(1, buckets.length);
     assert.eq(buckets[0].control.min.t, ISODate("2021-04-22T20:10:00.000Z"));
 })();
 
 (function testMinutes() {
-    let coll = db.granularityMinutes;
+    let coll = db.bucket_timestamp_rounding_granularityMinutes;
     coll.drop();
 
     assert.commandWorked(db.createCollection(
@@ -46,13 +47,14 @@
     // And that going backwards, but after the rounding point, doesn't open a new bucket.
     assert.commandWorked(coll.insert({t: ISODate("2021-04-22T20:05:00.000Z")}));
 
-    const buckets = db.system.buckets.granularityMinutes.find().toArray();
+    const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
+    const buckets = bucketsColl.find().toArray();
     assert.eq(1, buckets.length);
     assert.eq(buckets[0].control.min.t, ISODate("2021-04-22T20:00:00.000Z"));
 })();
 
 (function testHours() {
-    let coll = db.granularityHours;
+    let coll = db.bucket_timestamp_rounding_granularityHours;
     coll.drop();
 
     assert.commandWorked(
@@ -63,13 +65,14 @@
     // And that going backwards, but after the rounding point, doesn't open a new bucket.
     assert.commandWorked(coll.insert({t: ISODate("2021-04-22T10:00:00.000Z")}));
 
-    const buckets = db.system.buckets.granularityHours.find().toArray();
+    const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
+    const buckets = bucketsColl.find().toArray();
     assert.eq(1, buckets.length);
     assert.eq(buckets[0].control.min.t, ISODate("2021-04-22T00:00:00.000Z"));
 })();
 
 (function testSecondsToMinutes() {
-    let coll = db.granularitySecondsToMinutes;
+    let coll = db.bucket_timestamp_rounding_granularitySecondsToMinutes;
     coll.drop();
 
     assert.commandWorked(db.createCollection(
@@ -80,7 +83,8 @@
     // And that going backwards, but after the rounding point, doesn't open a new bucket.
     assert.commandWorked(coll.insert({t: ISODate("2021-04-22T20:10:05.000Z")}));
 
-    let buckets = db.system.buckets.granularitySecondsToMinutes.find().toArray();
+    const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
+    let buckets = bucketsColl.find().toArray();
     assert.eq(1, buckets.length);
     assert.eq(buckets[0].control.min.t, ISODate("2021-04-22T20:10:00.000Z"));
 
@@ -93,13 +97,13 @@
     // And that going backwards, but after the rounding point, doesn't open another new bucket.
     assert.commandWorked(coll.insert({t: ISODate("2021-04-24T20:05:00.000Z")}));
 
-    buckets = db.system.buckets.granularitySecondsToMinutes.find().toArray();
+    buckets = bucketsColl.find().toArray();
     assert.eq(2, buckets.length);
     assert.eq(buckets[1].control.min.t, ISODate("2021-04-24T20:00:00.000Z"));
 })();
 
 (function testMinutesToHours() {
-    let coll = db.granularityMinutesToHours;
+    let coll = db.bucket_timestamp_rounding_granularityMinutesToHours;
     coll.drop();
 
     assert.commandWorked(db.createCollection(
@@ -110,7 +114,8 @@
     // And that going backwards, but after the rounding point, doesn't open a new bucket.
     assert.commandWorked(coll.insert({t: ISODate("2021-04-22T20:05:00.000Z")}));
 
-    let buckets = db.system.buckets.granularityMinutesToHours.find().toArray();
+    let bucketsColl = db.getCollection('system.buckets.' + coll.getName());
+    let buckets = bucketsColl.find().toArray();
     assert.eq(1, buckets.length);
     assert.eq(buckets[0].control.min.t, ISODate("2021-04-22T20:00:00.000Z"));
 
@@ -123,7 +128,7 @@
     // And that going backwards, but after the rounding point, doesn't open another new bucket.
     assert.commandWorked(coll.insert({t: ISODate("2021-06-24T10:00:00.000Z")}));
 
-    buckets = db.system.buckets.granularityMinutesToHours.find().toArray();
+    buckets = bucketsColl.find().toArray();
     assert.eq(2, buckets.length);
     assert.eq(buckets[1].control.min.t, ISODate("2021-06-24T00:00:00.000Z"));
 })();
