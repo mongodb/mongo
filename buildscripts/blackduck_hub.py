@@ -422,6 +422,23 @@ def _test_version_info():
     assert VersionInfo('7.0.2.2') <= VersionInfo('8.0.2')
 
 
+def _retry_on_except(count, func):
+    # Retry func() COUNT times until func() does not raise an exception
+    # pylint: disable=bare-except
+    retry = 0
+    while retry < count:
+
+        try:
+            return func()
+        except:
+            exception_info = sys.exc_info()[0]
+            LOGGER.error("Failed to execute retriable function (%s), retrying", exception_info)
+
+        retry += 1
+
+    raise ValueError("Failed to run query after retries %s" % (count))
+
+
 class Component:
     """
     Black Duck Component description.
@@ -469,7 +486,17 @@ class Component:
             versions_url = component["component"] + f"/versions?sort=releasedon%20desc&limit={limit}"
 
             LOGGER.info("Retrieving version information via %s", versions_url)
-            vjson = hub.execute_get(versions_url).json()
+
+            def get_version_info():
+                vjson = hub.execute_get(versions_url).json()
+
+                if "items" not in vjson:
+                    LOGGER.warn("Missing items in response: %s", vjson)
+                    raise ValueError("Missing items in response for " + versions_url)
+
+                return vjson
+
+            vjson = _retry_on_except(5, get_version_info)
 
             versions = [(ver["versionName"], ver["releasedOn"]) for ver in vjson["items"]]
 
@@ -558,6 +585,15 @@ def _query_blackduck():
     global BLACKDUCK_PROJECT_URL
 
     hub = HubInstance()
+
+    LOGGER.info("Getting version from blackduck")
+    version = hub.execute_get(hub.get_urlbase() + "/api/current-version").json()
+    LOGGER.info("Version: %s", version)
+
+    # Get a list of all projects, this is a privileged call and will fail if we do not have a valid license
+    LOGGER.info("Get All Projects")
+    projects = hub.get_projects()
+    LOGGER.info("Projects: %s", projects)
 
     LOGGER.info("Fetching project %s from blackduck", BLACKDUCK_PROJECT)
     project = hub.get_project_by_name(BLACKDUCK_PROJECT)
