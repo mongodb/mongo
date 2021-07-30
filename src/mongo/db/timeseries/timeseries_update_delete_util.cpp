@@ -193,9 +193,9 @@ BSONObj translateQuery(const BSONObj& query, StringData metaField) {
     return queryDoc.getObject();
 }
 
-write_ops::UpdateOpEntry translateUpdate(const BSONObj& translatedQuery,
-                                         const write_ops::UpdateModification& updateMod,
-                                         StringData metaField) {
+write_ops::UpdateModification translateUpdate(const write_ops::UpdateModification& updateMod,
+                                              StringData metaField) {
+    invariant(!metaField.empty());
     // Make a mutable copy of the updates to apply where we can replace all occurrences
     // of the metaField with "meta". The update is either a document or a pipeline.
     switch (updateMod.type()) {
@@ -224,13 +224,7 @@ write_ops::UpdateOpEntry translateUpdate(const BSONObj& translatedQuery,
                 }
             }
 
-            // Create a new UpdateOpEntry and add it to the list of translated
-            // updates to perform.
-            write_ops::UpdateOpEntry newOpEntry(
-                translatedQuery,
-                write_ops::UpdateModification::parseFromClassicUpdate(updateDoc.getObject()));
-            newOpEntry.setMulti(true);
-            return newOpEntry;
+            return write_ops::UpdateModification::parseFromClassicUpdate(updateDoc.getObject());
         }
         case write_ops::UpdateModification::Type::kPipeline: {
             std::vector<BSONObj> translatedPipeline;
@@ -273,10 +267,7 @@ write_ops::UpdateOpEntry translateUpdate(const BSONObj& translatedQuery,
                 // Add the translated pipeline.
                 translatedPipeline.push_back(stageDoc.getObject());
             }
-            write_ops::UpdateOpEntry newOpEntry(translatedQuery,
-                                                write_ops::UpdateModification(translatedPipeline));
-            newOpEntry.setMulti(true);
-            return newOpEntry;
+            return write_ops::UpdateModification(translatedPipeline);
         }
         case write_ops::UpdateModification::Type::kDelta:
             MONGO_UNREACHABLE;
