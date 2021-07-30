@@ -149,7 +149,9 @@ Status FileRotateSink::rotate(bool rename,
 
         auto newFile = openFile(filename, false);
         if (newFile.isOK()) {
+            invariant(file.second);
             remove_stream(file.second);
+            file.second->close();
             file.second = newFile.getValue();
             add_stream(file.second);
         }
