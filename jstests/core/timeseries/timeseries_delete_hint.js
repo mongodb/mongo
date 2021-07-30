@@ -30,7 +30,8 @@ if (!TimeseriesTest.timeseriesUpdatesAndDeletesEnabled(db.getMongo())) {
 const timeFieldName = "time";
 const metaFieldName = "tag";
 const collName = 't';
-const bucketsCollNamespace = jsTestName() + '.system.buckets.' + collName;
+const dbName = jsTestName();
+const collNamespace = dbName + '.' + collName;
 
 const validateDeleteIndex = (docsToInsert,
                              expectedRemainingDocs,
@@ -39,7 +40,7 @@ const validateDeleteIndex = (docsToInsert,
                              indexes,
                              expectedPlan,
                              {expectedErrorCode = null} = {}) => {
-    const testDB = db.getSiblingDB(jsTestName());
+    const testDB = db.getSiblingDB(dbName);
     const awaitTestDelete = startParallelShell(funWithArgs(
         function(docsToInsert,
                  expectedRemainingDocs,
@@ -49,8 +50,9 @@ const validateDeleteIndex = (docsToInsert,
                  timeFieldName,
                  metaFieldName,
                  collName,
+                 dbName,
                  expectedErrorCode) {
-            const testDB = db.getSiblingDB(jsTestName());
+            const testDB = db.getSiblingDB(dbName);
             const coll = testDB.getCollection(collName);
 
             assert.commandWorked(testDB.createCollection(
@@ -80,11 +82,12 @@ const validateDeleteIndex = (docsToInsert,
         timeFieldName,
         metaFieldName,
         collName,
+        dbName,
         expectedErrorCode));
 
     for (let childCount = 0; childCount < deleteQuery.length; ++childCount) {
-        const childCurOp = waitForCurOpByFailPoint(
-            testDB, bucketsCollNamespace, "hangBeforeChildRemoveOpFinishes")[0];
+        const childCurOp =
+            waitForCurOpByFailPoint(testDB, collNamespace, "hangBeforeChildRemoveOpFinishes")[0];
 
         // Assert the plan uses the expected index.
         if (!expectedErrorCode) {
@@ -96,7 +99,7 @@ const validateDeleteIndex = (docsToInsert,
         assert.commandWorked(testDB.adminCommand(
             {configureFailPoint: "hangBeforeChildRemoveOpFinishes", mode: "off"}));
 
-        waitForCurOpByFailPoint(testDB, bucketsCollNamespace, "hangBeforeChildRemoveOpIsPopped");
+        waitForCurOpByFailPoint(testDB, collNamespace, "hangBeforeChildRemoveOpIsPopped");
 
         // Enable the hangBeforeChildRemoveOpFinishes fail point if this is not the last child.
         if (childCount + 1 < deleteQuery.length) {
