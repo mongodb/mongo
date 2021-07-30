@@ -2,7 +2,7 @@
  * Verifies the effect of setting disableResumableRangeDeleter to true on a shard.
  *
  * requires_persistence - This test restarts shards and expects them to remember their data.
- * @tags: [requires_persistence, disabled_due_to_server_58295]
+ * @tags: [requires_persistence]
  */
 (function() {
 
@@ -92,41 +92,50 @@ st.rs0.restart(0, {
 jsTest.log("Shard0 should now be able to re-receive the chunk it failed to receive earlier.");
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard0.shardName}));
 
-jsTest.log(
-    "Restart shard0 with a delay between range deletions and a low wait timeout, this way, with a large enough collection, there will be a timeout on a recipient when waiting for the range deleter task to finish.");
+// TODO SERVER-58912: remove mixed bin versions check when 6.0 becomes LTS, the test requires the
+// parameter receiveChunkWaitForRangeDeleterTimeoutMS which is not available in 5.0.
+if (jsTestOptions().useRandomBinVersionsWithinReplicaSet || jsTestOptions().shardMixedBinVersions) {
+    jsTest.log(
+        "Skipping checking receiveChunkWaitForRangeDeleterTimeoutMS parameter due to the fact that it is not implemented on 5.0");
+} else {
+    jsTest.log(
+        "Restart shard0 with a delay between range deletions and a low wait timeout, this way, with a large enough collection, there will be a timeout on a recipient when waiting for the range deleter task to finish.");
 
-st.rs0.restart(0, {
-    remember: true,
-    appendOptions: true,
-    startClean: false,
-    setParameter: {rangeDeleterBatchDelayMS: 60000, receiveChunkWaitForRangeDeleterTimeoutMS: 500}
-});
+    st.rs0.restart(0, {
+        remember: true,
+        appendOptions: true,
+        startClean: false,
+        setParameter:
+            {rangeDeleterBatchDelayMS: 60000, receiveChunkWaitForRangeDeleterTimeoutMS: 500}
+    });
 
-st.rs1.restart(0, {
-    remember: true,
-    appendOptions: true,
-    startClean: false,
-    setParameter: {disableResumableRangeDeleter: false}
-});
+    st.rs1.restart(0, {
+        remember: true,
+        appendOptions: true,
+        startClean: false,
+        setParameter: {disableResumableRangeDeleter: false}
+    });
 
-let bulkOp = st.s.getCollection(ns).initializeUnorderedBulkOp();
+    let bulkOp = st.s.getCollection(ns).initializeUnorderedBulkOp();
 
-let str = randomStr();
-for (let i = -129; i <= 129; ++i) {
-    bulkOp.insert({_id: i, str: str});
+    let str = randomStr();
+    for (let i = -129; i <= 129; ++i) {
+        bulkOp.insert({_id: i, str: str});
+    }
+
+    bulkOp.execute();
+
+    // Move a chunk to shard1, this will start the range deletion on shard0.
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard1.shardName}));
+
+    // Move the same chunk back, this will make this migration to wait for the range to be deleted.
+    jsTest.log(
+        "Shard0 should not be able to receive a chunk because the range deletion on an intersecting range is taking too long");
+    assert.commandFailedWithCode(
+        st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard0.shardName}),
+        ErrorCodes.OperationFailed);
 }
-
-bulkOp.execute();
-
-// Move a chunk to shard1, this will start the range deletion on shard0.
-assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard1.shardName}));
-
-// Move the same chunk back, this will make this migration to wait for the range to be deleted.
-jsTest.log(
-    "Shard0 should not be able to receive a chunk because the range deletion on an intersecting range is taking too long");
-assert.commandFailedWithCode(
-    st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard0.shardName}),
-    ErrorCodes.OperationFailed);
 
 st.stop();
 })();
