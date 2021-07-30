@@ -203,8 +203,16 @@ void incrementChunkOnInsertOrUpdate(OperationContext* opCtx,
     if (!fromMigrate) {
         const auto balancerConfig = Grid::get(opCtx)->getBalancerConfiguration();
 
-        if (balancerConfig->getShouldAutoSplit() &&
-            chunkWritesTracker->shouldSplit(balancerConfig->getMaxChunkSizeBytes())) {
+        const uint64_t maxChunkSizeBytes = [&] {
+            const boost::optional<uint64_t> csb = chunkManager.maxChunkSizeBytes();
+            if (csb) {
+                return *csb;
+            }
+            return balancerConfig->getMaxChunkSizeBytes();
+        }();
+
+        if (balancerConfig->getShouldAutoSplit() && chunkManager.allowAutoSplit() &&
+            chunkWritesTracker->shouldSplit(maxChunkSizeBytes)) {
             auto chunkSplitStateDriver =
                 ChunkSplitStateDriver::tryInitiateSplit(chunkWritesTracker);
             if (chunkSplitStateDriver) {

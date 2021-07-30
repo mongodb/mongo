@@ -180,6 +180,7 @@ public:
         const boost::optional<Timestamp>& timestamp,
         boost::optional<TypeCollectionTimeseriesFields> timeseriesFields,
         boost::optional<TypeCollectionReshardingFields> reshardingFields,
+        boost::optional<uint64_t> maxChunkSizeBytes,
         bool allowMigrations,
         const std::vector<ChunkType>& chunks);
 
@@ -197,6 +198,7 @@ public:
      */
     RoutingTableHistory makeUpdated(
         boost::optional<TypeCollectionReshardingFields> reshardingFields,
+        boost::optional<uint64_t> maxChunkSizeBytes,
         bool allowMigrations,
         const std::vector<ChunkType>& changedChunks) const;
 
@@ -323,6 +325,11 @@ public:
         return _allowMigrations;
     }
 
+    // collection default chunk size or +inf, iff no splits should happen
+    boost::optional<uint64_t> maxChunkSizeBytes() const {
+        return _maxChunkSizeBytes;
+    }
+
 private:
     friend class ChunkManager;
 
@@ -333,6 +340,7 @@ private:
                         bool unique,
                         boost::optional<TypeCollectionTimeseriesFields> timeseriesFields,
                         boost::optional<TypeCollectionReshardingFields> reshardingFields,
+                        boost::optional<uint64_t> maxChunkSizeBytes,
                         bool allowMigrations,
                         ChunkMap chunkMap);
 
@@ -361,6 +369,8 @@ private:
     // resharding operation, and that these fields were present in the config.collections entry
     // for this collection.
     boost::optional<TypeCollectionReshardingFields> _reshardingFields;
+
+    boost::optional<uint64_t> _maxChunkSizeBytes;
 
     bool _allowMigrations;
 
@@ -530,6 +540,10 @@ public:
      * to provide a stable view of its constituent shards.
      */
     bool allowMigrations() const;
+
+    bool allowAutoSplit() const;
+
+    boost::optional<uint64_t> maxChunkSizeBytes() const;
 
     const ShardId& dbPrimary() const {
         return _dbPrimary;

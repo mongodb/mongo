@@ -91,7 +91,7 @@ public:
     virtual StatusWith<SplitInfoVector> selectChunksToSplit(OperationContext* opCtx) = 0;
 
     /**
-     * Given a valid namespace returns all the Migrations the balancer would need to perform
+     * Given a valid namespace returns all the splits the balancer would need to perform
      * with the current state
      */
     virtual StatusWith<SplitInfoVector> selectChunksToSplit(OperationContext* opCtx,

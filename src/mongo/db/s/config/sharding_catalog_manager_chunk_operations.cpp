@@ -1805,4 +1805,10 @@ void ShardingCatalogManager::setAllowMigrationsAndBumpOneChunk(
         executor);
 }
 
+void ShardingCatalogManager::bumpCollectionMinorVersionInTxn(OperationContext* opCtx,
+                                                             const NamespaceString& nss,
+                                                             TxnNumber txnNumber) const {
+    bumpCollectionMinorVersion(opCtx, nss, txnNumber);
+}
+
 }  // namespace mongo

@@ -195,27 +195,6 @@ BSONObj findExtremeKeyForShard(OperationContext* opCtx,
     return shardKeyPattern.extractShardKeyFromDoc(end);
 }
 
-/**
- * Checks if autobalance is enabled on the current sharded collection.
- */
-bool isAutoBalanceEnabled(OperationContext* opCtx,
-                          const NamespaceString& nss,
-                          BalancerConfiguration* balancerConfig) {
-    if (!balancerConfig->shouldBalanceForAutoSplit())
-        return false;
-
-    try {
-        return Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss).getAllowBalance();
-    } catch (const DBException& ex) {
-        LOGV2(21903,
-              "Auto-split for {namespace} failed to load collection metadata: {error}",
-              "Auto-split failed to load collection metadata",
-              "namespace"_attr = nss,
-              "error"_attr = redact(ex));
-        return false;
-    }
-}
-
 const auto getChunkSplitter = ServiceContext::declareDecoration<ChunkSplitter>();
 
 }  // namespace
@@ -285,6 +264,28 @@ void ChunkSplitter::trySplitting(std::shared_ptr<ChunkSplitStateDriver> chunkSpl
         });
 }
 
+/**
+ * Checks if autobalance is enabled on the current sharded collection.
+ */
+bool isAutoBalanceEnabled(OperationContext* opCtx,
+                          const NamespaceString& nss,
+                          BalancerConfiguration* balancerConfig) {
+    if (!balancerConfig->shouldBalanceForAutoSplit()) {
+        return false;
+    }
+
+    try {
+        return Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss).getAllowBalance();
+    } catch (const DBException& ex) {
+        LOGV2(21903,
+              "Auto-split for {namespace} failed to load collection metadata: {error}",
+              "Auto-split failed to load collection metadata",
+              "namespace"_attr = nss,
+              "error"_attr = redact(ex));
+        return false;
+    }
+}
+
 void ChunkSplitter::_runAutosplit(std::shared_ptr<ChunkSplitStateDriver> chunkSplitStateDriver,
                                   const NamespaceString& nss,
                                   const BSONObj& min,
@@ -320,11 +321,17 @@ void ChunkSplitter::_runAutosplit(std::shared_ptr<ChunkSplitStateDriver> chunkSp
         // Ensure we have the most up-to-date balancer configuration
         uassertStatusOK(balancerConfig->refreshAndCheck(opCtx.get()));
 
-        if (!balancerConfig->getShouldAutoSplit()) {
+        if (!balancerConfig->getShouldAutoSplit() || !cm.allowAutoSplit()) {
             return;
         }
 
-        const uint64_t maxChunkSizeBytes = balancerConfig->getMaxChunkSizeBytes();
+        const uint64_t maxChunkSizeBytes = [&] {
+            if (cm.maxChunkSizeBytes()) {
+                return *cm.maxChunkSizeBytes();
+            }
+            return balancerConfig->getMaxChunkSizeBytes();
+        }();
+        invariant(ChunkSizeSettingsType::checkMaxChunkSizeValid(maxChunkSizeBytes));
 
         LOGV2_DEBUG(21906,
                     1,

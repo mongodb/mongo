@@ -75,6 +75,8 @@ public:
             bool collShardKeyIsUnique,
             boost::optional<TypeCollectionTimeseriesFields> collTimeseriesFields,
             boost::optional<TypeCollectionReshardingFields> collReshardingFields,
+            boost::optional<int64_t> maxChunkSizeBytes,
+            bool allowAutoSplit,
             bool allowMigrations,
             std::vector<ChunkType> chunks);
 
@@ -93,6 +95,10 @@ public:
         // If the collection is currently undergoing a resharding operation, the optional will be
         // populated.
         boost::optional<TypeCollectionReshardingFields> reshardingFields;
+
+        boost::optional<int64_t> maxChunkSizeBytes;
+
+        bool allowAutoSplit;
 
         bool allowMigrations;
 

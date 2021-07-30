@@ -36,6 +36,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/s/balancer_configuration.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -91,6 +92,11 @@ void CollectionType::setKeyPattern(KeyPattern keyPattern) {
 void CollectionType::setDefaultCollation(const BSONObj& defaultCollation) {
     if (!defaultCollation.isEmpty())
         setPre50CompatibleDefaultCollation(defaultCollation);
+}
+
+void CollectionType::setMaxChunkSizeBytes(int64_t value) {
+    uassert(ErrorCodes::BadValue, "Default chunk size is out of range", value > 0);
+    CollectionTypeBase::setMaxChunkSizeBytes(value);
 }
 
 }  // namespace mongo

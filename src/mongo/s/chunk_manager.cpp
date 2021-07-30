@@ -320,6 +320,7 @@ RoutingTableHistory::RoutingTableHistory(
     bool unique,
     boost::optional<TypeCollectionTimeseriesFields> timeseriesFields,
     boost::optional<TypeCollectionReshardingFields> reshardingFields,
+    boost::optional<uint64_t> maxChunkSizeBytes,
     bool allowMigrations,
     ChunkMap chunkMap)
     : _nss(std::move(nss)),
@@ -329,6 +330,7 @@ RoutingTableHistory::RoutingTableHistory(
       _unique(unique),
       _timeseriesFields(std::move(timeseriesFields)),
       _reshardingFields(std::move(reshardingFields)),
+      _maxChunkSizeBytes(maxChunkSizeBytes),
       _allowMigrations(allowMigrations),
       _chunkMap(std::move(chunkMap)),
       _shardVersions(_chunkMap.constructShardVersionMap()) {}
@@ -691,6 +693,20 @@ bool ChunkManager::allowMigrations() const {
     return _rt->optRt->allowMigrations();
 }
 
+bool ChunkManager::allowAutoSplit() const {
+    const auto maxChunkSize = maxChunkSizeBytes();
+    if (!maxChunkSize)
+        return true;
+
+    return *maxChunkSize != 0;
+}
+
+boost::optional<uint64_t> ChunkManager::maxChunkSizeBytes() const {
+    if (!_rt->optRt)
+        return boost::none;
+    return _rt->optRt->maxChunkSizeBytes();
+}
+
 std::string ChunkManager::toString() const {
     return _rt->optRt ? _rt->optRt->toString() : "UNSHARDED";
 }
@@ -757,18 +773,21 @@ RoutingTableHistory RoutingTableHistory::makeNew(
     const boost::optional<Timestamp>& timestamp,
     boost::optional<TypeCollectionTimeseriesFields> timeseriesFields,
     boost::optional<TypeCollectionReshardingFields> reshardingFields,
+    boost::optional<uint64_t> maxChunkSizeBytes,
     bool allowMigrations,
     const std::vector<ChunkType>& chunks) {
+
+    auto changedChunkInfos = flatten(chunks);
     return RoutingTableHistory(std::move(nss),
                                std::move(uuid),
                                std::move(shardKeyPattern),
                                std::move(defaultCollator),
                                std::move(unique),
                                std::move(timeseriesFields),
-                               boost::none,
+                               std::move(reshardingFields),
+                               maxChunkSizeBytes,
                                allowMigrations,
-                               ChunkMap{epoch, timestamp})
-        .makeUpdated(std::move(reshardingFields), allowMigrations, chunks);
+                               ChunkMap{epoch, timestamp}.createMerged(changedChunkInfos));
 }
 
 // Note that any new parameters added to RoutingTableHistory::makeUpdated() must also be added to
@@ -776,6 +795,7 @@ RoutingTableHistory RoutingTableHistory::makeNew(
 // it may overlap with the enqueued metadata.
 RoutingTableHistory RoutingTableHistory::makeUpdated(
     boost::optional<TypeCollectionReshardingFields> reshardingFields,
+    boost::optional<uint64_t> maxChunkSizeBytes,
     bool allowMigrations,
     const std::vector<ChunkType>& changedChunks) const {
     auto changedChunkInfos = flatten(changedChunks);
@@ -791,6 +811,7 @@ RoutingTableHistory RoutingTableHistory::makeUpdated(
                                isUnique(),
                                _timeseriesFields,
                                std::move(reshardingFields),
+                               maxChunkSizeBytes,
                                allowMigrations,
                                std::move(chunkMap));
 }
@@ -822,6 +843,7 @@ RoutingTableHistory RoutingTableHistory::makeUpdatedReplacingTimestamp(
                                _unique,
                                _timeseriesFields,
                                _reshardingFields,
+                               _maxChunkSizeBytes,
                                _allowMigrations,
                                std::move(newMap));
 }

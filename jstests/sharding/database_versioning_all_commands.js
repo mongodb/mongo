@@ -289,6 +289,7 @@ let testCases = {
     commitReshardCollection: {skip: "always targets the config server"},
     commitTransaction: {skip: "unversioned and uses special targetting rules"},
     compact: {skip: "not allowed through mongos"},
+    configureCollectionAutoSplitter: {skip: "does not forward command to primary shard"},
     configureFailPoint: {skip: "executes locally on mongos (not sent to any remote node)"},
     connPoolStats: {skip: "executes locally on mongos (not sent to any remote node)"},
     connPoolSync: {skip: "executes locally on mongos (not sent to any remote node)"},

@@ -606,6 +606,19 @@ CatalogCache::CollectionCache::LookupResult CatalogCache::CollectionCache::_look
 
         auto collectionAndChunks = _catalogCacheLoader.getChunksSince(nss, lookupVersion).get();
 
+        const auto maxChunkSize = [&]() -> boost::optional<uint64_t> {
+            if (!collectionAndChunks.allowAutoSplit) {
+                // maxChunkSize = 0 is an invalid chunkSize so we use it to detect noAutoSplit
+                // on the steady-state path in incrementChunkOnInsertOrUpdate(...)
+                return 0;
+            }
+            if (collectionAndChunks.maxChunkSizeBytes) {
+                invariant(collectionAndChunks.maxChunkSizeBytes.get() > 0);
+                return uint64_t(*collectionAndChunks.maxChunkSizeBytes);
+            }
+            return boost::none;
+        }();
+
         auto newRoutingHistory = [&] {
             // If we have routing info already and it's for the same collection epoch, we're
             // updating. Otherwise, we're making a whole new routing table.
@@ -616,10 +629,12 @@ CatalogCache::CollectionCache::LookupResult CatalogCache::CollectionCache::_look
                     return existingHistory->optRt
                         ->makeUpdatedReplacingTimestamp(collectionAndChunks.creationTime)
                         .makeUpdated(collectionAndChunks.reshardingFields,
+                                     maxChunkSize,
                                      collectionAndChunks.allowMigrations,
                                      collectionAndChunks.changedChunks);
                 } else {
                     return existingHistory->optRt->makeUpdated(collectionAndChunks.reshardingFields,
+                                                               maxChunkSize,
                                                                collectionAndChunks.allowMigrations,
                                                                collectionAndChunks.changedChunks);
                 }
@@ -644,6 +659,7 @@ CatalogCache::CollectionCache::LookupResult CatalogCache::CollectionCache::_look
                                                 collectionAndChunks.creationTime,
                                                 collectionAndChunks.timeseriesFields,
                                                 std::move(collectionAndChunks.reshardingFields),
+                                                maxChunkSize,
                                                 collectionAndChunks.allowMigrations,
                                                 collectionAndChunks.changedChunks);
         }();

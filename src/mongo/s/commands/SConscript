@@ -36,6 +36,7 @@ env.Library(
         'cluster_commit_transaction_cmd.cpp',
         'cluster_commit_reshard_collection_cmd.cpp',
         'cluster_compact_cmd.cpp',
+        'cluster_configure_collection_auto_split.cpp',
         'cluster_control_balancer_cmd.cpp',
         'cluster_count_cmd.cpp',
         'cluster_create_cmd.cpp',

@@ -123,6 +123,8 @@ Status persistCollectionAndChangedChunks(OperationContext* opCtx,
     update.setDefaultCollation(collAndChunks.defaultCollation);
     update.setTimeseriesFields(collAndChunks.timeseriesFields);
     update.setReshardingFields(collAndChunks.reshardingFields);
+    update.setMaxChunkSizeBytes(collAndChunks.maxChunkSizeBytes);
+    update.setAllowAutoSplit(collAndChunks.allowAutoSplit);
     update.setAllowMigrations(collAndChunks.allowMigrations);
 
     // Mark the chunk metadata as refreshing, so that secondaries are aware of refresh.
@@ -285,6 +287,8 @@ CollectionAndChangedChunks getPersistedMetadataSinceVersion(OperationContext* op
                                       shardCollectionEntry.getUnique(),
                                       shardCollectionEntry.getTimeseriesFields(),
                                       shardCollectionEntry.getReshardingFields(),
+                                      shardCollectionEntry.getMaxChunkSizeBytes(),
+                                      shardCollectionEntry.getAllowAutoSplit(),
                                       shardCollectionEntry.getAllowMigrations(),
                                       std::move(changedChunks)};
 }
@@ -1029,6 +1033,8 @@ StatusWith<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_getLoader
         // The collection info in enqueued metadata may be more recent than the persisted metadata
         persisted.creationTime = enqueued.creationTime;
         persisted.reshardingFields = std::move(enqueued.reshardingFields);
+        persisted.maxChunkSizeBytes = enqueued.maxChunkSizeBytes;
+        persisted.allowAutoSplit = enqueued.allowAutoSplit;
         persisted.allowMigrations = enqueued.allowMigrations;
 
         return persisted;
@@ -1609,6 +1615,8 @@ ShardServerCatalogCacheLoader::CollAndChunkTaskList::getEnqueuedMetadataForTerm(
 
             // Keep the most recent version of these fields
             collAndChunks.allowMigrations = task.collectionAndChangedChunks->allowMigrations;
+            collAndChunks.maxChunkSizeBytes = task.collectionAndChangedChunks->maxChunkSizeBytes;
+            collAndChunks.allowAutoSplit = task.collectionAndChangedChunks->allowAutoSplit;
             collAndChunks.reshardingFields = task.collectionAndChangedChunks->reshardingFields;
         }
     }

@@ -94,6 +94,9 @@ sh.help = function() {
     print(
         "\tsh.balancerCollectionStatus(fullName)       " +
         "returns wheter the specified collection is balanced or the balancer needs to take more actions on it");
+    print(
+        "\tsh.configureCollectionAutoSplitter(fullName, params)       " +
+        "configure both the default chunk size and the auto-splitting behaviour for a collection");
 };
 
 sh.status = function(verbose, configDB) {
@@ -551,6 +554,14 @@ sh._shardingStatusStr = function(indent, s) {
 
 sh.balancerCollectionStatus = function(coll) {
     return sh._adminCommand({balancerCollectionStatus: coll}, true);
+};
+
+sh.configureCollectionAutoSplitter = function(coll) {
+    let cmd = {configureCollectionAutoSplitter: coll};
+    if (opts) {
+        cmd = Object.assign(cmd, opts);
+    }
+    return sh._adminCommand(cmd, true);
 };
 
 function printShardingStatus(configDB, verbose) {

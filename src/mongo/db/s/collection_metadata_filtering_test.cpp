@@ -75,6 +75,7 @@ protected:
             boost::none /* timestamp */,
             timeseriesFields,
             boost::none,
+            boost::none,
             true,
             [&] {
                 ChunkVersion version(1, 0, epoch, boost::none /* timestamp */);

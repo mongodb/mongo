@@ -77,6 +77,7 @@ protected:
                                                boost::none /* timestamp */,
                                                boost::none /* timeseriesFields */,
                                                boost::none,
+                                               boost::none /* chunkSizeBytes */,
                                                true,
                                                {std::move(chunk)});
 

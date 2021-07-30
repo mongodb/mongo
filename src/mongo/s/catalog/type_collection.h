@@ -84,6 +84,9 @@ public:
     static constexpr auto kKeyPatternFieldName = kPre50CompatibleKeyPatternFieldName;
     static constexpr auto kUuidFieldName = kPre50CompatibleUuidFieldName;
     static constexpr auto kAllowMigrationsFieldName = kPre50CompatibleAllowMigrationsFieldName;
+
+    using CollectionTypeBase::kMaxChunkSizeBytesFieldName;
+    using CollectionTypeBase::kNoAutoSplitFieldName;
     using CollectionTypeBase::kNssFieldName;
     using CollectionTypeBase::kReshardingFieldsFieldName;
     using CollectionTypeBase::kTimeseriesFieldsFieldName;
@@ -92,6 +95,7 @@ public:
     using CollectionTypeBase::kUpdatedAtFieldName;
 
     // Make getters and setters accessible.
+    using CollectionTypeBase::getMaxChunkSizeBytes;
     using CollectionTypeBase::getNss;
     using CollectionTypeBase::getReshardingFields;
     using CollectionTypeBase::getTimeseriesFields;
@@ -146,6 +150,12 @@ public:
         return getPre50CompatibleDefaultCollation().get_value_or(BSONObj());
     }
     void setDefaultCollation(const BSONObj& defaultCollation);
+
+    void setMaxChunkSizeBytes(int64_t value);
+
+    bool getAllowAutoSplit() const {
+        return !getNoAutoSplit();
+    }
 
     bool getAllowBalance() const {
         return !getNoBalance();

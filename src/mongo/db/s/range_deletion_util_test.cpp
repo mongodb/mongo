@@ -108,6 +108,7 @@ public:
             boost::none /* timestamp */,
             boost::none /* timeseriesFields */,
             boost::none,
+            boost::none /* chunkSizeBytes */,
             true,
             {ChunkType{kNss,
                        ChunkRange{BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY)},

@@ -96,6 +96,7 @@ CollectionMetadata makeCollectionMetadataImpl(
                                                       boost::none /* timestamp */,
                                                       boost::none /* timeseriesFields */,
                                                       std::move(reshardingFields),
+                                                      boost::none /* chunkSizeBytes */,
                                                       true,
                                                       allChunks)),
                      kChunkManager),

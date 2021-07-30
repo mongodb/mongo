@@ -332,6 +332,13 @@ public:
                                            const boost::optional<UUID>& collectionUUID,
                                            bool allowMigrations);
 
+    /**
+     * Bump the minor version of the newest chunk on each shard
+     */
+    void bumpCollectionMinorVersionInTxn(OperationContext* opCtx,
+                                         const NamespaceString& nss,
+                                         TxnNumber txnNumber) const;
+
     //
     // Database Operations
     //
@@ -371,6 +378,12 @@ public:
                                                       const CollectionType& coll,
                                                       const bool upsert,
                                                       TxnNumber txnNumber);
+
+
+    void configureCollectionAutoSplit(OperationContext* opCtx,
+                                      const NamespaceString& nss,
+                                      boost::optional<int64_t> maxChunkSizeBytes,
+                                      boost::optional<bool> enableAutoSplitter);
 
     //
     // Shard Operations

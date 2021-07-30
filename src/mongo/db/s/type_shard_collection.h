@@ -51,11 +51,13 @@ public:
     using ShardCollectionTypeBase::kUuidFieldName;
 
     // Make getters and setters accessible.
+    using ShardCollectionTypeBase::getAllowAutoSplit;
     using ShardCollectionTypeBase::getDefaultCollation;
     using ShardCollectionTypeBase::getEnterCriticalSectionCounter;
     using ShardCollectionTypeBase::getEpoch;
     using ShardCollectionTypeBase::getKeyPattern;
     using ShardCollectionTypeBase::getLastRefreshedCollectionVersion;
+    using ShardCollectionTypeBase::getMaxChunkSizeBytes;
     using ShardCollectionTypeBase::getNss;
     using ShardCollectionTypeBase::getRefreshing;
     using ShardCollectionTypeBase::getReshardingFields;
@@ -63,11 +65,13 @@ public:
     using ShardCollectionTypeBase::getTimestamp;
     using ShardCollectionTypeBase::getUnique;
     using ShardCollectionTypeBase::getUuid;
+    using ShardCollectionTypeBase::setAllowAutoSplit;
     using ShardCollectionTypeBase::setDefaultCollation;
     using ShardCollectionTypeBase::setEnterCriticalSectionCounter;
     using ShardCollectionTypeBase::setEpoch;
     using ShardCollectionTypeBase::setKeyPattern;
     using ShardCollectionTypeBase::setLastRefreshedCollectionVersion;
+    using ShardCollectionTypeBase::setMaxChunkSizeBytes;
     using ShardCollectionTypeBase::setNss;
     using ShardCollectionTypeBase::setRefreshing;
     using ShardCollectionTypeBase::setReshardingFields;

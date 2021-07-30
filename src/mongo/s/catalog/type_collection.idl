@@ -117,6 +117,14 @@ structs:
                 type: bool
                 description: "Uniqueness of the sharding key."
                 default: false
+            maxChunkSizeBytes: 
+                type: safeInt64
+                description: "Max chunk size in bytes."
+                optional: true
+            noAutoSplit: 
+                type: bool
+                description: "Specifies whether the auto-splitter should be running or not for this collection."
+                default: false
             noBalance:
                 type: bool
                 description: "Consulted by the Balancer only and indicates whether this collection

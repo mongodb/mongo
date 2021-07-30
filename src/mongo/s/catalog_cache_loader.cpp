@@ -50,6 +50,8 @@ CatalogCacheLoader::CollectionAndChangedChunks::CollectionAndChangedChunks(
     bool collShardKeyIsUnique,
     boost::optional<TypeCollectionTimeseriesFields> collTimeseriesFields,
     boost::optional<TypeCollectionReshardingFields> collReshardingFields,
+    boost::optional<int64_t> maxChunkSizeBytes,
+    bool allowAutoSplit,
     bool allowMigrations,
     std::vector<ChunkType> chunks)
     : epoch(std::move(collEpoch)),
@@ -60,6 +62,8 @@ CatalogCacheLoader::CollectionAndChangedChunks::CollectionAndChangedChunks(
       shardKeyIsUnique(collShardKeyIsUnique),
       timeseriesFields(std::move(collTimeseriesFields)),
       reshardingFields(std::move(collReshardingFields)),
+      maxChunkSizeBytes(std::move(maxChunkSizeBytes)),
+      allowAutoSplit(allowAutoSplit),
       allowMigrations(allowMigrations),
       changedChunks(std::move(chunks)) {}
 

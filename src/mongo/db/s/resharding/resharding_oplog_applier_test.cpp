@@ -192,6 +192,7 @@ public:
                                                boost::none /* timestamp */,
                                                boost::none /* timeseriesFields */,
                                                boost::none,
+                                               boost::none /* chunkSizeBytes */,
                                                false,
                                                chunks);
 

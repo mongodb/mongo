@@ -55,6 +55,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
+#include "mongo/db/s/sharding_util.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/task_executor.h"
@@ -460,6 +461,86 @@ void ShardingCatalogManager::updateShardingCatalogEntryForCollectionInTxn(
     }
 }
 
+
+void ShardingCatalogManager::configureCollectionAutoSplit(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    boost::optional<int64_t> maxChunkSizeBytes,
+    boost::optional<bool> enableAutoSplitter) {
+
+    uassert(ErrorCodes::InvalidOptions,
+            "invalid collection auto splitter config update",
+            maxChunkSizeBytes || enableAutoSplitter);
+
+    const auto coll = Grid::get(opCtx)->catalogClient()->getCollection(
+        opCtx, nss, repl::ReadConcernLevel::kLocalReadConcern);
+
+    short updatedFields = 0;
+    BSONObjBuilder updateCmd;
+    {
+        BSONObjBuilder setBuilder(updateCmd.subobjStart("$set"));
+        if (maxChunkSizeBytes) {
+            // verify we got a positive integer in range [1MB, 1GB]
+            uassert(ErrorCodes::InvalidOptions,
+                    str::stream() << "Chunk size '" << *maxChunkSizeBytes
+                                  << "' out of range [1MB, 1GB]",
+                    *maxChunkSizeBytes > 0 &&
+                        ChunkSizeSettingsType::checkMaxChunkSizeValid(*maxChunkSizeBytes));
+
+            setBuilder.append(CollectionType::kMaxChunkSizeBytesFieldName, *maxChunkSizeBytes);
+            updatedFields++;
+
+            // TODO: SERVER-58908 add defragmentation getter / setter logic
+        }
+        if (enableAutoSplitter) {
+            const bool doSplit = enableAutoSplitter.get();
+            setBuilder.append(CollectionType::kNoAutoSplitFieldName, !doSplit);
+            updatedFields++;
+        }
+    }
+
+    if (updatedFields == 0) {
+        return;
+    }
+
+    const auto cm = Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfo(opCtx, nss);
+    std::set<ShardId> shardsIds;
+    cm.getAllShardIds(&shardsIds);
+
+    withTransaction(
+        opCtx, CollectionType::ConfigNS, [&](OperationContext* opCtx, TxnNumber txnNumber) {
+            const auto update = updateCmd.obj();
+
+            const auto query =
+                BSON(CollectionType::kNssFieldName << nss.ns() << CollectionType::kUuidFieldName
+                                                   << coll.getUuid());
+            const auto res = writeToConfigDocumentInTxn(
+                opCtx,
+                CollectionType::ConfigNS,
+                BatchedCommandRequest::buildUpdateOp(CollectionType::ConfigNS,
+                                                     query,
+                                                     update /* update */,
+                                                     false /* upsert */,
+                                                     false /* multi */),
+                txnNumber);
+            const auto numDocsModified = UpdateOp::parseResponse(res).getN();
+            uassert(ErrorCodes::ConflictingOperationInProgress,
+                    str::stream() << "Expected to match one doc for query " << query
+                                  << " but matched " << numDocsModified,
+                    numDocsModified == 1);
+
+            bumpCollectionMinorVersionInTxn(opCtx, nss, txnNumber);
+        });
+
+
+    const auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+    sharding_util::tellShardsToRefreshCollection(
+        opCtx,
+        {std::make_move_iterator(shardsIds.begin()), std::make_move_iterator(shardsIds.end())},
+        nss,
+        executor);
+}
+
 void ShardingCatalogManager::renameShardedMetadata(
     OperationContext* opCtx,
     const NamespaceString& from,
@@ -499,6 +580,5 @@ void ShardingCatalogManager::renameShardedMetadata(
                                                ShardingCatalogClient::kLocalWriteConcern);
     }
 }
-
 
 }  // namespace mongo

@@ -117,6 +117,7 @@ protected:
                                                          boost::none,
                                                          boost::none /* timeseriesFields */,
                                                          boost::none,
+                                                         boost::none /* chunkSizeBytes */,
                                                          true,
                                                          {std::move(chunk)})),
                         boost::none);
