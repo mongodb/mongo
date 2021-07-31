@@ -1252,11 +1252,14 @@ buildvariants:
     depends_on: *_compile_amazon2
     tasks: &shardlitetasks
       - name: schedule_patch_auto_tasks
+        batchtime: 1440
       - name: schedule_variant_auto_tasks
+        batchtime: 1440
       - name: bestbuy_agg
       - name: bestbuy_agg_merge_different_db
       - name: bestbuy_agg_merge_same_db
       - name: bestbuy_agg_merge_target_hashed
+        batchtime: 1440
       - name: bestbuy_agg_merge_wordcount
       - name: bestbuy_query
       - name: change_streams_latency
@@ -1266,10 +1269,15 @@ buildvariants:
       - name: linkbench
       - name: mixed_workloads
       - name: mongos_workloads
+        batchtime: 1440
       - name: mongos_large_catalog_workloads
+        batchtime: 1440
       - name: move_chunk_large_chunk_map_workloads
+        batchtime: 1440
       - name: move_chunk_workloads
+        batchtime: 1440
       - name: move_chunk_waiting_workloads
+        batchtime: 1440
       - name: retryable_writes_workloads
       - name: smoke_test
 
