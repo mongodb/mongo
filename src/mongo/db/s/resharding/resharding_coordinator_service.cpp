@@ -488,17 +488,11 @@ void insertChunkAndTagDocsForTempNss(OperationContext* opCtx,
 
 void removeChunkAndTagsDocs(OperationContext* opCtx,
                             const NamespaceString& ns,
-                            const boost::optional<UUID>& collUUID,
+                            const UUID& collUUID,
                             TxnNumber txnNumber) {
     // Remove all chunk documents for the original nss. We do not know how many chunk docs currently
     // exist, so cannot pass a value for expectedNumModified
-    const auto chunksQuery = [&]() {
-        if (collUUID) {
-            return BSON(ChunkType::collectionUUID() << *collUUID);
-        } else {
-            return BSON(ChunkType::ns(ns.ns()));
-        }
-    }();
+    const auto chunksQuery = BSON(ChunkType::collectionUUID() << collUUID);
 
     ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
         opCtx,
@@ -535,35 +529,16 @@ void removeConfigMetadataForTempNss(OperationContext* opCtx,
     (void)ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
         opCtx, CollectionType::ConfigNS, delCollEntryRequest, txnNumber);
 
-    const auto reshardingTempUUID = coordinatorDoc.getReshardingUUID();
-
-    removeChunkAndTagsDocs(
-        opCtx, coordinatorDoc.getTempReshardingNss(), reshardingTempUUID, txnNumber);
+    removeChunkAndTagsDocs(opCtx,
+                           coordinatorDoc.getTempReshardingNss(),
+                           coordinatorDoc.getReshardingUUID(),
+                           txnNumber);
 }
 
 void updateChunkAndTagsDocsForTempNss(OperationContext* opCtx,
                                       const ReshardingCoordinatorDocument& coordinatorDoc,
                                       OID newCollectionEpoch,
-                                      boost::optional<Timestamp> newCollectionTimestamp,
                                       TxnNumber txnNumber) {
-    // If the collection entry has a timestamp, this means the metadata has been upgraded to the 5.0
-    // format in which case chunks are indexed by UUID and do not contain Epochs. Therefore, only
-    // the update to config.collections is sufficient.
-    if (!newCollectionTimestamp) {
-        auto chunksRequest = BatchedCommandRequest::buildUpdateOp(
-            ChunkType::ConfigNS,
-            BSON(ChunkType::ns(coordinatorDoc.getTempReshardingNss().ns())),  // query
-            BSON("$set" << BSON(ChunkType::ns << coordinatorDoc.getSourceNss().ns()
-                                              << ChunkType::epoch
-                                              << newCollectionEpoch)),  // update
-            false,                                                      // upsert
-            true                                                        // multi
-        );
-
-        auto chunksRes = ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
-            opCtx, ChunkType::ConfigNS, chunksRequest, txnNumber);
-    }
-
     auto hint = BSON("ns" << 1 << "min" << 1);
     auto tagsRequest = BatchedCommandRequest::buildUpdateOp(
         TagsType::ConfigNS,
@@ -630,7 +605,7 @@ CollectionType createTempReshardingCollectionType(
 void writeDecisionPersistedState(OperationContext* opCtx,
                                  const ReshardingCoordinatorDocument& coordinatorDoc,
                                  OID newCollectionEpoch,
-                                 boost::optional<Timestamp> newCollectionTimestamp) {
+                                 Timestamp newCollectionTimestamp) {
     // No need to bump originalNss version because its epoch will be changed.
     executeMetadataChangesInTxn(opCtx, [&](OperationContext* opCtx, TxnNumber txnNumber) {
         // Update the config.reshardingOperations entry
@@ -648,15 +623,9 @@ void writeDecisionPersistedState(OperationContext* opCtx,
         // Remove all chunk and tag documents associated with the original collection, then
         // update the chunk and tag docs currently associated with the temp nss to be associated
         // with the original nss
-
-        boost::optional<UUID> collUUID;
-        if (newCollectionTimestamp) {
-            collUUID = coordinatorDoc.getSourceUUID();
-        }
-
-        removeChunkAndTagsDocs(opCtx, coordinatorDoc.getSourceNss(), collUUID, txnNumber);
-        updateChunkAndTagsDocsForTempNss(
-            opCtx, coordinatorDoc, newCollectionEpoch, newCollectionTimestamp, txnNumber);
+        removeChunkAndTagsDocs(
+            opCtx, coordinatorDoc.getSourceNss(), coordinatorDoc.getSourceUUID(), txnNumber);
+        updateChunkAndTagsDocsForTempNss(opCtx, coordinatorDoc, newCollectionEpoch, txnNumber);
     });
 }
 
@@ -1671,11 +1640,15 @@ Future<void> ReshardingCoordinatorService::ReshardingCoordinator::_commit(
     // The new epoch and timestamp to use for the resharded collection to indicate that the
     // collection is a new incarnation of the namespace
     auto newCollectionEpoch = OID::gen();
-    auto now = VectorClock::get(opCtx.get())->getTime();
-    const auto newCollectionTimestamp = now.clusterTime().asTimestamp();
+    auto newCollectionTimestamp = [&] {
+        const auto now = VectorClock::get(opCtx.get())->getTime();
+        return now.clusterTime().asTimestamp();
+    }();
 
-    resharding::writeDecisionPersistedState(
-        opCtx.get(), updatedCoordinatorDoc, newCollectionEpoch, newCollectionTimestamp);
+    resharding::writeDecisionPersistedState(opCtx.get(),
+                                            updatedCoordinatorDoc,
+                                            std::move(newCollectionEpoch),
+                                            std::move(newCollectionTimestamp));
 
     // Update the in memory state
     installCoordinatorDoc(opCtx.get(), updatedCoordinatorDoc);

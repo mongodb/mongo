@@ -52,7 +52,7 @@ CollectionType createTempReshardingCollectionType(
 void writeDecisionPersistedState(OperationContext* opCtx,
                                  const ReshardingCoordinatorDocument& coordinatorDoc,
                                  OID newCollectionEpoch,
-                                 boost::optional<Timestamp> newCollectionTimestamp);
+                                 Timestamp newCollectionTimestamp);
 
 void insertCoordDocAndChangeOrigCollEntry(OperationContext* opCtx,
                                           const ReshardingCoordinatorDocument& coordinatorDoc);

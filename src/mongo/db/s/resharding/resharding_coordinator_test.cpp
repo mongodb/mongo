@@ -418,12 +418,11 @@ protected:
         ASSERT(!onDiskReshardingFields.getDonorFields());
     }
 
-    void readChunkCatalogEntriesAndAssertMatchExpected(
-        OperationContext* opCtx,
-        const UUID& uuid,
-        std::vector<ChunkType> expectedChunks,
-        const OID& collEpoch,
-        const boost::optional<Timestamp>& collTimestamp) {
+    void readChunkCatalogEntriesAndAssertMatchExpected(OperationContext* opCtx,
+                                                       const UUID& uuid,
+                                                       std::vector<ChunkType> expectedChunks,
+                                                       const OID& collEpoch,
+                                                       const Timestamp& collTimestamp) {
         DBDirectClient client(opCtx);
         std::vector<ChunkType> foundChunks;
         auto cursor = client.query(ChunkType::ConfigNS, Query(BSON("uuid" << uuid)));
@@ -686,16 +685,14 @@ protected:
     NamespaceString _originalNss = NamespaceString("db.foo");
     UUID _originalUUID = UUID::gen();
     OID _originalEpoch = OID::gen();
-    // TODO: SERVER-58990 Initialize it with a Timestamp.
-    boost::optional<Timestamp> _originalTimestamp;
+    Timestamp _originalTimestamp{3};
 
     NamespaceString _tempNss = NamespaceString("db.system.resharding." + _originalUUID.toString());
     UUID _reshardingUUID = UUID::gen();
     OID _tempEpoch = OID::gen();
 
     OID _finalEpoch = OID::gen();
-    boost::optional<Timestamp>
-        _finalTimestamp;  // TODO: SERVER-58990 Initialize it with a Timestamp.
+    Timestamp _finalTimestamp{6};
 
     ShardKeyPattern _oldShardKey = ShardKeyPattern(BSON("oldSK" << 1));
     ShardKeyPattern _newShardKey = ShardKeyPattern(BSON("newSK" << 1));
