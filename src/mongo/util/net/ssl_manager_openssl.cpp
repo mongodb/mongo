@@ -2279,8 +2279,19 @@ Status SSLManagerOpenSSL::initSSLContext(SSL_CTX* context,
         }
     }
 
-#ifdef SSL_OP_NO_RENEGOTIATION
-    options |= SSL_OP_NO_RENEGOTIATION;
+#if OPENSSL_VERSION_NUMBER >= 0x10100000
+    // OpenSSL pre-1.1.0 isn't ABI compatable enough to ever work, so skip it.
+#ifndef SSL_OP_NO_RENEGOTIATION
+#define SSL_OP_NO_RENEGOTIATION 0x40000000U
+#endif
+    if (OpenSSL_version_num() >= 0x10100080) {
+        /* SSL_OP_NO_RENEGOTIATION added in 1.1.0h (0x10100080)
+         * but we might be compiling with 1.1.0(a-g).
+         * Allow this option to be specified at runtime
+         * in this specific window.
+         */
+        options |= SSL_OP_NO_RENEGOTIATION;
+    }
 #endif
 
     ::SSL_CTX_set_options(context, options);
