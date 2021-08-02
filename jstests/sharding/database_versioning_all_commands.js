@@ -116,6 +116,9 @@ function testCommandAfterMovePrimary(testCase, st, dbName, collName) {
     // Run the test case's command.
     if (testCase.runsAgainstAdminDb) {
         assert.commandWorked(st.s0.adminCommand(command));
+    } else if (testCase.expectedFailureCode) {
+        assert.commandFailedWithCode(st.s0.getDB(dbName).runCommand(command),
+                                     testCase.expectedFailureCode);
     } else {
         assert.commandWorked(st.s0.getDB(dbName).runCommand(command));
     }
@@ -197,6 +200,9 @@ function testCommandAfterDropRecreateDatabase(testCase, st) {
     // Run the test case's command.
     if (testCase.runsAgainstAdminDb) {
         assert.commandWorked(st.s0.adminCommand(command));
+    } else if (testCase.expectedFailureCode) {
+        assert.commandFailedWithCode(st.s0.getDB(dbName).runCommand(command),
+                                     testCase.expectedFailureCode);
     } else {
         assert.commandWorked(st.s0.getDB(dbName).runCommand(command));
     }
@@ -613,6 +619,8 @@ let testCases = {
         run: {
             sendsDbVersion: true,
             explicitlyCreateCollection: true,
+            // The command should fail if there is no active index build on the collection.
+            expectedFailureCode: ErrorCodes.IndexNotFound,
             command: function(dbName, collName) {
                 return {
                     setIndexCommitQuorum: collName,

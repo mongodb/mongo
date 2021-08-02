@@ -68,6 +68,8 @@ last-continuous:
       test_file: jstests/replsets/sessions_collection_reaping.js
     - ticket: SERVER-58203
       test_file: jstests/sharding/query/pipeline_length_limit.js
+    - ticket: SERVER-56887
+      test_file: jstests/sharding/database_versioning_all_commands.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -116,7 +118,7 @@ last-lts:
       test_file: jstests/replsets/check_replication_hello_response_fields.js
     - ticket: SERVER-50640
       test_file: jstests/core/views/views_all_commands.js
-    - ticket: SERVER-50640
+    - ticket: SERVER-56887
       test_file: jstests/sharding/database_versioning_all_commands.js
     - ticket: SERVER-49988
       test_file: jstests/sharding/hello_response_validation.js
