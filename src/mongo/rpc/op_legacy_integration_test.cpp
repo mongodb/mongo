@@ -184,6 +184,9 @@ TEST(OpLegacy, DeprecatedReadOpsCounters) {
               getDeprecatedOpCount(serverStatusReply, "total"));
 }
 
+// The dochub link for deprecation warning messages.
+static constexpr auto docLink = "https://dochub.mongodb.org/core/legacy-opcode-compatibility";
+
 // Check whether the most recent "deprecation" entry in the log matches the given opName and
 // severity (if the 'severity' string isn't empty). Return 'false' if no deprecation entries found.
 bool wasLogged(DBClientBase* conn, const std::string& opName, const std::string& severity) {
@@ -194,6 +197,7 @@ bool wasLogged(DBClientBase* conn, const std::string& opName, const std::string&
     for (auto it = logEntries.rbegin(); it != logEntries.rend(); ++it) {
         auto entry = it->String();
         if (entry.find("\"id\":5578800") != std::string::npos) {
+            ASSERT_TRUE(entry.find(docLink) != std::string::npos);
             const bool severityMatches = severity.empty() ||
                 (entry.find(std::string("\"s\":\"") + severity + "\"") != std::string::npos);
             const bool opNameMatches =

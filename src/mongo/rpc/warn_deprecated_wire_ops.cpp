@@ -105,7 +105,8 @@ void warnDeprecation(Client& client, StringData op) {
 
     LOGV2_DEBUG(5578800,
                 getSeveritySource().get(clientKey).toInt(),
-                "Deprecated operation requested",
+                "Deprecated operation requested. For more details see "
+                "https://dochub.mongodb.org/core/legacy-opcode-compatibility",
                 "op"_attr = op,
                 "clientInfo"_attr = clientInfo);
 }
