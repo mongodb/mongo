@@ -73,6 +73,8 @@ MONGO_FAIL_POINT_DEFINE(skipExpiringOldChunkHistory);
 
 const WriteConcernOptions kNoWaitWriteConcern(1, WriteConcernOptions::SyncMode::UNSET, Seconds(0));
 
+constexpr StringData kCollectionVersionField = "collectionVersion"_sd;
+
 /**
  * Append min, max and version information from chunk to the buffer for logChange purposes.
  */
@@ -384,7 +386,7 @@ ChunkVersion getDonorShardVersion(OperationContext* opCtx,
     return swDonorShardVersion.getValue();
 }
 
-// Helper function to get collection version and donor shard version following a merge/split
+// Helper function to get collection version and donor shard version following a merge
 BSONObj getShardAndCollectionVersion(OperationContext* opCtx,
                                      const CollectionType& coll,
                                      const ShardId& fromShard) {
@@ -401,8 +403,8 @@ BSONObj getShardAndCollectionVersion(OperationContext* opCtx,
             shardVersion.isOlderOrEqualThan(collectionVersion));
 
     BSONObjBuilder result;
-    collectionVersion.appendWithField(&result, "collectionVersion");
-    shardVersion.appendWithField(&result, "shardVersion");
+    collectionVersion.appendWithField(&result, kCollectionVersionField);
+    shardVersion.appendWithField(&result, ChunkVersion::kShardVersionField);
 
     return result.obj();
 }
@@ -707,11 +709,6 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkSplit(
         return applyOpsStatus;
     }
 
-    // The current implementation of the split chunk is not idempotent (SERVER-51805).
-    // Best effort: in order to reduce the probability of having an error, try to execute the
-    // getShardAndCollectionVersion as soon as the batch of updates is completed
-    const auto shardAndCollVersion = getShardAndCollectionVersion(opCtx, coll, ShardId(shardName));
-
     // log changes
     BSONObjBuilder logDetail;
     {
@@ -750,7 +747,10 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkSplit(
         }
     }
 
-    return shardAndCollVersion;
+    BSONObjBuilder response;
+    currentMaxVersion.appendWithField(&response, kCollectionVersionField);
+    currentMaxVersion.appendWithField(&response, ChunkVersion::kShardVersionField);
+    return response.obj();
 }
 
 StatusWith<BSONObj> ShardingCatalogManager::commitChunkMerge(
@@ -1150,10 +1150,10 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
     if (currentChunk.getShard() == toShard) {
         // The commit was already done successfully
         BSONObjBuilder response;
-        currentCollectionVersion.appendWithField(&response, "collectionVersion");
+        currentCollectionVersion.appendWithField(&response, kCollectionVersionField);
         const auto currentShardVersion =
             getDonorShardVersion(opCtx, coll, fromShard, currentCollectionVersion);
-        currentShardVersion.appendWithField(&response, "shardVersion");
+        currentShardVersion.appendWithField(&response, ChunkVersion::kShardVersionField);
         // Makes sure that the last thing we read in getCurrentChunk and
         // getShardAndCollectionVersion gets majority written before to return from this command,
         // otherwise next RoutingInfo cache refresh from the shard may not see those newest
@@ -1270,13 +1270,14 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
     BSONObjBuilder response;
     if (!newControlChunk) {
         // We migrated the last chunk from the donor shard.
-        newMigratedChunk.getVersion().appendWithField(&response, "collectionVersion");
+        newMigratedChunk.getVersion().appendWithField(&response, kCollectionVersionField);
         const ChunkVersion donorShardVersion(
             0, 0, currentCollectionVersion.epoch(), currentCollectionVersion.getTimestamp());
-        donorShardVersion.appendWithField(&response, "shardVersion");
+        donorShardVersion.appendWithField(&response, ChunkVersion::kShardVersionField);
     } else {
-        newControlChunk.get().getVersion().appendWithField(&response, "collectionVersion");
-        newControlChunk.get().getVersion().appendWithField(&response, "shardVersion");
+        newControlChunk.get().getVersion().appendWithField(&response, kCollectionVersionField);
+        newControlChunk.get().getVersion().appendWithField(&response,
+                                                           ChunkVersion::kShardVersionField);
     }
     return response.obj();
 }
