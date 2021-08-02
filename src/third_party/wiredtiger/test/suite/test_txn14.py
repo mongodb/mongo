@@ -46,7 +46,6 @@ class test_txn14(wttest.WiredTigerTestCase, suite_subprocess):
     sync_list = [
         ('write', dict(sync='off')),
         ('sync', dict(sync='on')),
-        ('bg', dict(sync='background')),
     ]
     scenarios = make_scenarios(sync_list)
 
@@ -70,12 +69,6 @@ class test_txn14(wttest.WiredTigerTestCase, suite_subprocess):
             c[i+self.entries] = i + self.entries + 1
         c.close()
         self.session.log_flush(cfgarg)
-        if self.sync == 'background':
-            # If doing a background flush, wait 30 seconds. I have seen an
-            # individual log file's fsync take more than a second on some
-            # systems, and we've seen timeouts at 10 seconds on systems
-            # with slow I/O. So give it time to flush perhaps a few files.
-            self.session.transaction_sync('timeout_ms=30000')
         simulate_crash_restart(self, ".", "RESTART")
         c = self.session.open_cursor(self.t1, None, None)
         i = 0

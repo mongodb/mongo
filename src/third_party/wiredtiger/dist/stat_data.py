@@ -573,7 +573,6 @@ conn_stats = [
     TxnStat('txn_set_ts_oldest_upd', 'set timestamp oldest updates'),
     TxnStat('txn_set_ts_stable', 'set timestamp stable calls'),
     TxnStat('txn_set_ts_stable_upd', 'set timestamp stable updates'),
-    TxnStat('txn_sync', 'transaction sync calls'),
     TxnStat('txn_timestamp_oldest_active_read', 'transaction read timestamp of the oldest active reader', 'no_clear,no_scale'),
     TxnStat('txn_walk_sessions', 'transaction walk of concurrent sessions'),
 
@@ -585,7 +584,6 @@ conn_stats = [
     YieldStat('child_modify_blocked_page', 'page reconciliation yielded due to child modification'),
     YieldStat('conn_close_blocked_lsm', 'connection close yielded for lsm manager shutdown'),
     YieldStat('dhandle_lock_blocked', 'data handle lock yielded'),
-    YieldStat('log_server_sync_blocked', 'log server sync yielded for log write'),
     YieldStat('page_busy_blocked', 'page acquire busy blocked'),
     YieldStat('page_del_rollback_blocked', 'page delete rollback time sleeping for state change (usecs)'),
     YieldStat('page_forcible_evict_blocked', 'page acquire eviction blocked'),

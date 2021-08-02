@@ -1537,9 +1537,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
          */
         if (F_ISSET(txn, WT_TXN_SYNC_SET))
             WT_ERR_MSG(session, EINVAL, "Sync already set during begin_transaction");
-        if (WT_STRING_MATCH("background", cval.str, cval.len))
-            txn->txn_logsync = WT_LOG_BACKGROUND;
-        else if (WT_STRING_MATCH("off", cval.str, cval.len))
+        if (WT_STRING_MATCH("off", cval.str, cval.len))
             txn->txn_logsync = 0;
         /*
          * We don't need to check for "on" here because that is the default to inherit from the

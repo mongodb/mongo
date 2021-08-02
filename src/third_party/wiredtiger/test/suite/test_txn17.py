@@ -68,12 +68,5 @@ class test_txn17(wttest.WiredTigerTestCase, suite_subprocess):
                 '/not permitted in a running transaction/')
         self.session.rollback_transaction()
 
-        # Cannot call transaction_sync while a transaction is running.
-        self.session.begin_transaction()
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.session.transaction_sync(),
-                '/not permitted in a running transaction/')
-        self.session.rollback_transaction()
-
 if __name__ == '__main__':
     wttest.run()

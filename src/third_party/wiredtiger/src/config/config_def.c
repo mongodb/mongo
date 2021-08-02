@@ -227,8 +227,7 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_commit_transaction[] = {
   {"commit_timestamp", "string", NULL, NULL, NULL, 0},
   {"durable_timestamp", "string", NULL, NULL, NULL, 0},
   {"operation_timeout_ms", "int", NULL, "min=1", NULL, 0},
-  {"sync", "string", NULL, "choices=[\"background\",\"off\",\"on\"]", NULL, 0},
-  {NULL, NULL, NULL, NULL, NULL, 0}};
+  {"sync", "string", NULL, "choices=[\"off\",\"on\"]", NULL, 0}, {NULL, NULL, NULL, NULL, NULL, 0}};
 
 static const WT_CONFIG_CHECK confchk_WT_SESSION_compact[] = {
   {"timeout", "int", NULL, NULL, NULL, 0}, {NULL, NULL, NULL, NULL, NULL, 0}};
@@ -343,8 +342,7 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_join[] = {
   {NULL, NULL, NULL, NULL, NULL, 0}};
 
 static const WT_CONFIG_CHECK confchk_WT_SESSION_log_flush[] = {
-  {"sync", "string", NULL, "choices=[\"background\",\"off\",\"on\"]", NULL, 0},
-  {NULL, NULL, NULL, NULL, NULL, 0}};
+  {"sync", "string", NULL, "choices=[\"off\",\"on\"]", NULL, 0}, {NULL, NULL, NULL, NULL, NULL, 0}};
 
 static const WT_CONFIG_CHECK confchk_WT_SESSION_open_cursor_debug_subconfigs[] = {
   {"release_evict", "boolean", NULL, NULL, NULL, 0}, {NULL, NULL, NULL, NULL, NULL, 0}};
@@ -404,9 +402,6 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_timestamp_transaction[] = {
   {"durable_timestamp", "string", NULL, NULL, NULL, 0},
   {"prepare_timestamp", "string", NULL, NULL, NULL, 0},
   {"read_timestamp", "string", NULL, NULL, NULL, 0}, {NULL, NULL, NULL, NULL, NULL, 0}};
-
-static const WT_CONFIG_CHECK confchk_WT_SESSION_transaction_sync[] = {
-  {"timeout_ms", "int", NULL, NULL, NULL, 0}, {NULL, NULL, NULL, NULL, NULL, 0}};
 
 static const WT_CONFIG_CHECK confchk_WT_SESSION_verify[] = {
   {"dump_address", "boolean", NULL, NULL, NULL, 0}, {"dump_blocks", "boolean", NULL, NULL, NULL, 0},
@@ -1244,7 +1239,6 @@ static const WT_CONFIG_ENTRY config_entries[] = {{"WT_CONNECTION.add_collator", 
     "commit_timestamp=,durable_timestamp=,prepare_timestamp=,"
     "read_timestamp=",
     confchk_WT_SESSION_timestamp_transaction, 4},
-  {"WT_SESSION.transaction_sync", "timeout_ms=1200000", confchk_WT_SESSION_transaction_sync, 1},
   {"WT_SESSION.truncate", "", NULL, 0}, {"WT_SESSION.upgrade", "", NULL, 0},
   {"WT_SESSION.verify",
     "dump_address=false,dump_blocks=false,dump_layout=false,"

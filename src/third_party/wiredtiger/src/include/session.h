@@ -138,9 +138,6 @@ struct __wt_session_impl {
     WT_TXN_ISOLATION isolation;
     WT_TXN *txn; /* Transaction state */
 
-#define WT_SESSION_BG_SYNC_MSEC 1200000
-    WT_LSN bg_sync_lsn; /* Background sync operation LSN. */
-
     void *block_manager; /* Block-manager support */
     int (*block_manager_cleanup)(WT_SESSION_IMPL *);
 

@@ -15,11 +15,10 @@
 /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WT_LOG_BACKGROUND 0x01u
-#define WT_LOG_DSYNC 0x02u
-#define WT_LOG_FLUSH 0x04u
-#define WT_LOG_FSYNC 0x08u
-#define WT_LOG_SYNC_ENABLED 0x10u
+#define WT_LOG_DSYNC 0x1u
+#define WT_LOG_FLUSH 0x2u
+#define WT_LOG_FSYNC 0x4u
+#define WT_LOG_SYNC_ENABLED 0x8u
 /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
 
 #define WT_LOGOP_IGNORE 0x80000000
@@ -257,7 +256,6 @@ struct __wt_log {
      * System LSNs
      */
     WT_LSN alloc_lsn;       /* Next LSN for allocation */
-    WT_LSN bg_sync_lsn;     /* Latest background sync LSN */
     WT_LSN ckpt_lsn;        /* Last checkpoint LSN */
     WT_LSN dirty_lsn;       /* LSN of last non-synced write */
     WT_LSN first_lsn;       /* First LSN */
