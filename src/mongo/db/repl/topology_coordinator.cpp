@@ -3268,9 +3268,9 @@ void TopologyCoordinator::processReplSetRequestVotes(const ReplSetRequestVotesAr
         return;
     }
 
-    if (args.getConfigVersionAndTerm() != _rsConfig.getConfigVersionAndTerm()) {
+    if (args.getConfigVersionAndTerm() < _rsConfig.getConfigVersionAndTerm()) {
         response->setVoteGranted(false);
-        response->setReason("candidate's config with {} differs from mine with {}"_format(
+        response->setReason("candidate's config with {} is older than mine with {}"_format(
             args.getConfigVersionAndTerm(), _rsConfig.getConfigVersionAndTerm()));
     } else if (args.getTerm() < _term) {
         response->setVoteGranted(false);
@@ -3292,8 +3292,15 @@ void TopologyCoordinator::processReplSetRequestVotes(const ReplSetRequestVotesAr
             _rsConfig.getMemberAt(_lastVote.getCandidateIndex()).getHostAndPort(),
             _lastVote.getTerm()));
     } else {
+        bool isSameConfig = args.getConfigVersionAndTerm() == _rsConfig.getConfigVersionAndTerm();
         int betterPrimary = _findHealthyPrimaryOfEqualOrGreaterPriority(args.getCandidateIndex());
-        if (_selfConfig().isArbiter() && betterPrimary >= 0) {
+        // Do not grant vote if we are arbiter and can see a healthy primary of greater or equal
+        // priority, to prevent primary flapping when there are two nodes that can't talk to each
+        // other but we that can talk to both as arbiter. We only do this if the voter's config
+        // is same as ours, otherwise the primary information might be stale and we might not be
+        // arbiter in the candidate's newer config. We might also hit an invariant described in
+        // SERVER-46387 without the check for same config.
+        if (isSameConfig && _selfConfig().isArbiter() && betterPrimary >= 0) {
             response->setVoteGranted(false);
             response->setReason(
                 "can see a healthy primary ({}) of equal or greater priority"_format(

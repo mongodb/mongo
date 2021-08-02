@@ -214,6 +214,8 @@ last-lts:
       test_file: jstests/core/timeseries/timeseries_bucket_drop.js
     - ticket: SERVER-56800
       test_file: jstests/sharding/cwwc_conflict_add_shard.js
+    - ticket: SERVER-57262
+      test_file: jstests/replsets/catchup_takeover_with_higher_config.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:

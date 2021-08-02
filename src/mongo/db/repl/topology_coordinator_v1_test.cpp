@@ -3261,7 +3261,7 @@ public:
 TEST_F(ConfigTermAndVersionVoteTest, DataNodeDoesNotGrantVoteWhenConfigVersionIsLower) {
     auto response = testWithArbiter(false, 1, 2);
     ASSERT_EQUALS(
-        "candidate's config with {version: 1, term: 2} differs from mine with"
+        "candidate's config with {version: 1, term: 2} is older than mine with"
         " {version: 2, term: 2}",
         response.getReason());
 }
@@ -3269,7 +3269,7 @@ TEST_F(ConfigTermAndVersionVoteTest, DataNodeDoesNotGrantVoteWhenConfigVersionIs
 TEST_F(ConfigTermAndVersionVoteTest, ArbiterDoesNotGrantVoteWhenConfigVersionIsLower) {
     auto response = testWithArbiter(true, 1, 2);
     ASSERT_EQUALS(
-        "candidate's config with {version: 1, term: 2} differs from mine with"
+        "candidate's config with {version: 1, term: 2} is older than mine with"
         " {version: 2, term: 2}",
         response.getReason());
 }
@@ -3277,7 +3277,7 @@ TEST_F(ConfigTermAndVersionVoteTest, ArbiterDoesNotGrantVoteWhenConfigVersionIsL
 TEST_F(ConfigTermAndVersionVoteTest, DataNodeDoesNotGrantVoteWhenConfigTermIsLower) {
     auto response = testWithArbiter(false, 2, 1);
     ASSERT_EQUALS(
-        "candidate's config with {version: 2, term: 1} differs from mine with"
+        "candidate's config with {version: 2, term: 1} is older than mine with"
         " {version: 2, term: 2}",
         response.getReason());
 }
@@ -3285,7 +3285,7 @@ TEST_F(ConfigTermAndVersionVoteTest, DataNodeDoesNotGrantVoteWhenConfigTermIsLow
 TEST_F(ConfigTermAndVersionVoteTest, ArbiterDoesNotGrantVoteWhenConfigTermIsLower) {
     auto response = testWithArbiter(true, 2, 1);
     ASSERT_EQUALS(
-        "candidate's config with {version: 2, term: 1} differs from mine with"
+        "candidate's config with {version: 2, term: 1} is older than mine with"
         " {version: 2, term: 2}",
         response.getReason());
 }
@@ -3453,7 +3453,7 @@ TEST_F(TopoCoordTest, NodeDoesNotGrantDryRunVoteWhenConfigVersionIsLower) {
 
     getTopoCoord().processReplSetRequestVotes(args, &response);
     ASSERT_EQUALS(
-        "candidate's config with {version: 0, term: 1} differs from mine with {version: 1, term: "
+        "candidate's config with {version: 0, term: 1} is older than mine with {version: 1, term: "
         "1}",
         response.getReason());
     ASSERT_EQUALS(1, response.getTerm());
@@ -3508,7 +3508,7 @@ TEST_F(TopoCoordTest, NodeDoesNotGrantDryRunVoteWhenTermIsStale) {
     ASSERT_FALSE(response.getVoteGranted());
 }
 
-TEST_F(TopoCoordTest, NodeDoesNotGrantVoteWhenTermIsHigherButConfigVersionIsLower) {
+TEST_F(TopoCoordTest, NodeGrantsVoteWhenTermIsHigherButConfigVersionIsLower) {
     updateConfig(BSON("_id"
                       << "rs0"
                       << "version" << 2 << "term" << 1LL << "members"
@@ -3539,11 +3539,7 @@ TEST_F(TopoCoordTest, NodeDoesNotGrantVoteWhenTermIsHigherButConfigVersionIsLowe
     getTopoCoord().processReplSetRequestVotes(args, &response);
     // Candidates config(t, v) is (2, 1) and our config is (1, 2). Even though the candidate's
     // config version is lower, we grant our vote because the candidate's config term is higher.
-    ASSERT_FALSE(response.getVoteGranted());
-    ASSERT_EQ(
-        "candidate's config with {version: 1, term: 2} differs from mine with {version: 2, term: "
-        "1}",
-        response.getReason());
+    ASSERT_TRUE(response.getVoteGranted());
 }
 
 TEST_F(TopoCoordTest, GrantDryRunVoteEvenWhenTermHasBeenSeen) {
