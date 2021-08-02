@@ -7,14 +7,6 @@
 (function() {
 "use strict";
 
-/**
- * TODO (SERVER-57575): Re-enable test on Windows.
- */
-if (_isWindows()) {
-    jsTestLog("Skipping test on Windows");
-    return;
-}
-
 let rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
