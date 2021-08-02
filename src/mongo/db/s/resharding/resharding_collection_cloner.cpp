@@ -258,8 +258,12 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingCollectionCloner::_restartP
 bool ReshardingCollectionCloner::doOneBatch(OperationContext* opCtx, Pipeline& pipeline) {
     pipeline.reattachToOperationContext(opCtx);
     ON_BLOCK_EXIT([&pipeline] { pipeline.detachFromOperationContext(); });
+
+    Timer latencyTimer;
     auto batch = resharding::data_copy::fillBatchForInsert(
         pipeline, resharding::gReshardingCollectionClonerBatchSizeInBytes.load());
+    _env->metrics()->onCollClonerFillBatchForInsert(
+        duration_cast<Milliseconds>(latencyTimer.elapsed()));
 
     if (batch.empty()) {
         return false;

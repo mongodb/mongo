@@ -143,7 +143,8 @@ function verifyCurrentOpOutput(reshardingTest, inputCollection) {
     };
 
     if (!reshardingTest.isMixedVersionCluster()) {
-        expectedRecipientMetrics.oplogBatchApplyLatencyMillis = undefined;
+        expectedRecipientMetrics.oplogApplierApplyBatchLatencyMillis = undefined;
+        expectedRecipientMetrics.collClonerFillBatchForInsertLatencyMillis = undefined;
     }
 
     reshardingTest.recipientShardNames.forEach(function(shardName) {

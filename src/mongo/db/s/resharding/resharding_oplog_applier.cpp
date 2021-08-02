@@ -116,7 +116,8 @@ SemiFuture<void> ReshardingOplogApplier::_applyBatch(
             return status;
         })
         .onCompletion([this, latencyTimer](Status status) {
-            _env->metrics()->onApplyOplogBatch(duration_cast<Milliseconds>(latencyTimer.elapsed()));
+            _env->metrics()->onOplogApplierApplyBatch(
+                duration_cast<Milliseconds>(latencyTimer.elapsed()));
             return status;
         })
         .semi();

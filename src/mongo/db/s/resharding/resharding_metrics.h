@@ -106,8 +106,12 @@ public:
     void enterCriticalSection(Date_t start);
     void leaveCriticalSection(Date_t end);
 
-    // Records latency and throughput of batch oplog applies during resharding.
-    void onApplyOplogBatch(Milliseconds latency);
+    // Records latency and throughput of calls to ReshardingOplogApplier::_applyBatch
+    void onOplogApplierApplyBatch(Milliseconds latency);
+
+    // Records latency and throughput of calls to resharding::data_copy::fillBatchForInsert
+    // in ReshardingCollectionCloner::doOneBatch
+    void onCollClonerFillBatchForInsert(Milliseconds latency);
 
     // Allows updating "oplog entries to apply" metrics when the recipient is in applying state.
     void onOplogEntriesFetched(int64_t entries) noexcept;
