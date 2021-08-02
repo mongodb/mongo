@@ -48,6 +48,8 @@ last-continuous:
       test_file: jstests/sharding/resharding_secondary_recovers_temp_ns_metadata.js
     - ticket: SERVER-51943
       test_file: jstests/replsets/tenant_migration_fetch_committed_transactions_retry.js
+    - ticket: SERVER-56887
+      test_file: jstests/sharding/database_versioning_all_commands.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -96,7 +98,7 @@ last-lts:
       test_file: jstests/replsets/check_replication_hello_response_fields.js
     - ticket: SERVER-50640
       test_file: jstests/core/views/views_all_commands.js
-    - ticket: SERVER-50640
+    - ticket: SERVER-56887
       test_file: jstests/sharding/database_versioning_all_commands.js
     - ticket: SERVER-49988
       test_file: jstests/sharding/hello_response_validation.js

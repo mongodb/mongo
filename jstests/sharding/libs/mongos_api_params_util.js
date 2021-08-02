@@ -1173,6 +1173,8 @@ let MongosAPIParametersUtil = (function() {
                 inAPIVersion1: false,
                 shardCommandName: "setIndexCommitQuorum",
                 permittedInTxn: false,
+                // The command should fail if there is no active index build on the collection.
+                expectedFailureCode: ErrorCodes.IndexNotFound,
                 command: () => ({
                     setIndexCommitQuorum: "collection",
                     indexNames: ["index"],
@@ -1594,7 +1596,11 @@ let MongosAPIParametersUtil = (function() {
 
             const res = context.db.runCommand(commandWithAPIParams);
             jsTestLog(`Command result: ${tojson(res)}`);
-            assert.commandWorked(res);
+            if (runOrExplain.expectedFailureCode) {
+                assert.commandFailedWithCode(res, runOrExplain.expectedFailureCode);
+            } else {
+                assert.commandWorked(res);
+            }
 
             if (inTransaction) {
                 const commitCmd = {
