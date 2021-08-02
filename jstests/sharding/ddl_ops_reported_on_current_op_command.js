@@ -3,7 +3,7 @@
  * currentOp command.
  *
  * @tags: [
- *   disabled_due_to_server_58295,
+ *   featureFlagShardingFullDDLSupport
  * ]
  */
 (function() {
@@ -59,24 +59,49 @@ let getCurrentOpOfDDL = (ddlOpThread, desc) => {
     assert.eq(shardKey, currOp[0].command.shardKey);
 }
 
-{
-    jsTestLog('Check refine collection shard key shows in current op');
+// TODO SERVER-58912: remove mixed bin versions check when 6.0 becomes LTS, the test requires both
+// refineCollectionShardKey and movePrimary to use the new DDLCoordinator.
+if (jsTestOptions().useRandomBinVersionsWithinReplicaSet || jsTestOptions().shardMixedBinVersions) {
+    jsTest.log(
+        "Skipping checking refineCollectionShardKey and movePrimary due to the fact that they're not using a DDLCoordinator on 5.0");
+} else {
+    {
+        jsTestLog('Check refine collection shard key shows in current op');
 
-    let newShardKey = {_id: 1, x: 1};
-    st.s.getCollection(nss).createIndex(newShardKey);
-    let ddlOpThread = new Thread((mongosConnString, nss, newShardKey) => {
-        let mongos = new Mongo(mongosConnString);
-        mongos.adminCommand({refineCollectionShardKey: nss, key: newShardKey});
-    }, st.s0.host, nss, newShardKey);
+        let newShardKey = {_id: 1, x: 1};
+        st.s.getCollection(nss).createIndex(newShardKey);
+        let ddlOpThread = new Thread((mongosConnString, nss, newShardKey) => {
+            let mongos = new Mongo(mongosConnString);
+            mongos.adminCommand({refineCollectionShardKey: nss, key: newShardKey});
+        }, st.s0.host, nss, newShardKey);
 
-    let currOp = getCurrentOpOfDDL(ddlOpThread, 'RefineCollectionShardKeyCoordinator');
+        let currOp = getCurrentOpOfDDL(ddlOpThread, 'RefineCollectionShardKeyCoordinator');
 
-    // There must be one operation running with the appropiate ns.
-    assert.eq(1, currOp.length);
-    assert.eq(nss, currOp[0].ns);
-    assert(currOp[0].hasOwnProperty('command'));
-    assert(currOp[0].command.hasOwnProperty('newShardKey'));
-    assert.eq(newShardKey, currOp[0].command.newShardKey);
+        // There must be one operation running with the appropiate ns.
+        assert.eq(1, currOp.length);
+        assert.eq(nss, currOp[0].ns);
+        assert(currOp[0].hasOwnProperty('command'));
+        assert(currOp[0].command.hasOwnProperty('newShardKey'));
+        assert.eq(newShardKey, currOp[0].command.newShardKey);
+    }
+
+    {
+        jsTestLog('Check move primary shows in current op');
+
+        let ddlOpThread = new Thread((mongosConnString, dbName, destShard) => {
+            let mongos = new Mongo(mongosConnString);
+            mongos.adminCommand({movePrimary: dbName, to: destShard});
+        }, st.s0.host, kDbName, st.shard0.shardName);
+
+        let currOp = getCurrentOpOfDDL(ddlOpThread, 'MovePrimaryCoordinator');
+
+        // There must be one operation running with the appropiate ns.
+        assert.eq(1, currOp.length);
+        assert.eq(kDbName, currOp[0].ns);
+        assert(currOp[0].command.hasOwnProperty('request'));
+        assert(currOp[0].command.request.hasOwnProperty('toShardId'));
+        assert.eq(st.shard0.shardName, currOp[0].command.request.toShardId);
+    }
 }
 
 {
@@ -96,24 +121,6 @@ let getCurrentOpOfDDL = (ddlOpThread, desc) => {
     // It must have the target collection.
     assert(currOp[0].hasOwnProperty('command'));
     assert.docEq({to: toNss, dropTarget: true, stayTemp: false}, currOp[0].command);
-}
-
-{
-    jsTestLog('Check move primary shows in current op');
-
-    let ddlOpThread = new Thread((mongosConnString, dbName, destShard) => {
-        let mongos = new Mongo(mongosConnString);
-        mongos.adminCommand({movePrimary: dbName, to: destShard});
-    }, st.s0.host, kDbName, st.shard0.shardName);
-
-    let currOp = getCurrentOpOfDDL(ddlOpThread, 'MovePrimaryCoordinator');
-
-    // There must be one operation running with the appropiate ns.
-    assert.eq(1, currOp.length);
-    assert.eq(kDbName, currOp[0].ns);
-    assert(currOp[0].command.hasOwnProperty('request'));
-    assert(currOp[0].command.request.hasOwnProperty('toShardId'));
-    assert.eq(st.shard0.shardName, currOp[0].command.request.toShardId);
 }
 
 {
