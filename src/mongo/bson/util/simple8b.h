@@ -34,12 +34,14 @@
 #include <vector>
 
 #include "mongo/bson/util/builder.h"
+#include "mongo/platform/int128.h"
 
 namespace mongo {
 
 /**
  * Simple8bBuilder compresses a series of integers into chains of 64 bit Simple8b word.
  */
+template <typename T>
 class Simple8bBuilder {
 public:
     // Number of different type of selectors and their extensions available
@@ -51,7 +53,7 @@ public:
      * Otherwise, Appends a value to the Simple8b chain of words.
      * Return true if successfully appended and false otherwise.
      */
-    bool append(uint64_t val);
+    bool append(T val);
 
     /**
      * Appends an empty bucket to handle missing values. This works by incrementing an underlying
@@ -84,11 +86,11 @@ public:
      * in the cpp file.
      */
     struct PendingValue {
-        PendingValue(uint64_t val,
+        PendingValue(T val,
                      std::array<uint8_t, kNumOfSelectorTypes> bitCount,
                      std::array<uint8_t, kNumOfSelectorTypes> trailingZerosCount,
                      bool skip);
-        uint64_t val;
+        T val;
         std::array<uint8_t, kNumOfSelectorTypes> bitCount = {0, 0, 0, 0};
         // This is not the total number of trailing zeros, but the trailing zeros that will be
         // stored given the selector chosen.
@@ -101,7 +103,7 @@ private:
      * Appends a value to the Simple8b chain of words.
      * Return true if successfully appended and false otherwise.
      */
-    bool _appendValue(uint64_t value, bool tryRle);
+    bool _appendValue(T value, bool tryRle);
 
     /**
      * Appends a skip to _pendingValues and forms a new Simple8b word if there is no space.
@@ -201,6 +203,7 @@ private:
 /**
  * Simple8b provides an interface to read Simple8b encoded data built by Simple8bBuilder above
  */
+template <typename T>
 class Simple8b {
 public:
     class Iterator {
@@ -210,10 +213,10 @@ public:
         // typedefs expected in iterators
         using iterator_category = std::forward_iterator_tag;
         using difference_type = ptrdiff_t;
-        using value_type = boost::optional<uint64_t>;
+        using value_type = boost::optional<T>;
         // pointer and reference is not used but some traits look for them
-        using pointer = const boost::optional<uint64_t>*;
-        using reference = const boost::optional<uint64_t>&;
+        using pointer = const boost::optional<T>*;
+        using reference = const boost::optional<T>&;
 
         /**
          * Returns the number of values in the current Simple8b block that the iterator is
@@ -264,7 +267,7 @@ public:
         // Current Simple8b block in native endian
         uint64_t _current;
 
-        boost::optional<uint64_t> _value;
+        boost::optional<T> _value;
 
         // Mask for getting a single Simple-8b slot
         uint64_t _mask;

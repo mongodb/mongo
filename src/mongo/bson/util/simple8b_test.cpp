@@ -36,8 +36,8 @@
 
 using namespace mongo;
 
-void assertValuesEqual(const Simple8b& actual,
-                       const std::vector<boost::optional<uint64_t>>& expected) {
+template <typename T>
+void assertValuesEqual(const Simple8b<T>& actual, const std::vector<boost::optional<T>>& expected) {
     auto it = actual.begin();
     auto end = actual.end();
     size_t i = 0;
@@ -50,9 +50,10 @@ void assertValuesEqual(const Simple8b& actual,
     ASSERT_EQ(i, expected.size());
 }
 
-Simple8bBuilder buildSimple8b(const std::vector<boost::optional<uint64_t>>& expectedValues) {
-    Simple8bBuilder builder;
-    for (const auto& elem : expectedValues) {
+template <typename T>
+Simple8bBuilder<T> buildSimple8b(const std::vector<boost::optional<T>>& expectedInts) {
+    Simple8bBuilder<T> builder;
+    for (const auto& elem : expectedInts) {
         if (elem) {
             ASSERT_TRUE(builder.append(*elem));
         } else {
@@ -63,10 +64,10 @@ Simple8bBuilder buildSimple8b(const std::vector<boost::optional<uint64_t>>& expe
     return builder;
 }
 
-void testSimple8b(const std::vector<boost::optional<uint64_t>>& expectedValues,
+template <typename T>
+void testSimple8b(const std::vector<boost::optional<T>>& expectedInts,
                   const std::vector<uint8_t>& expectedBinary) {
-    Simple8bBuilder builder = buildSimple8b(expectedValues);
-
+    Simple8bBuilder<T> builder = buildSimple8b<T>(expectedInts);
     auto data = builder.data();
     auto len = builder.len();
 
@@ -75,20 +76,21 @@ void testSimple8b(const std::vector<boost::optional<uint64_t>>& expectedValues,
         ASSERT_EQ(memcmp(data, expectedBinary.data(), builder.len()), 0);
     }
 
-    Simple8b s8b(builder.data(), builder.len());
-    assertValuesEqual(s8b, expectedValues);
+    Simple8b<T> s8b(builder.data(), builder.len());
+    assertValuesEqual<T>(s8b, expectedInts);
 }
 
-void testSimple8b(const std::vector<boost::optional<uint64_t>>& expectedValues) {
-    Simple8bBuilder builder = buildSimple8b(expectedValues);
+template <typename T>
+void testSimple8b(const std::vector<boost::optional<T>>& expectedInts) {
+    Simple8bBuilder<T> builder = buildSimple8b<T>(expectedInts);
 
-    Simple8b s8b(builder.data(), builder.len());
-    assertValuesEqual(s8b, expectedValues);
+    Simple8b<T> s8b(builder.data(), builder.len());
+    assertValuesEqual<T>(s8b, expectedInts);
 }
 
 TEST(Simple8b, NoValues) {
-    std::vector<boost::optional<uint64_t>> expectedInts;
-    std::vector<uint8_t> expectedBinary;
+    std::vector<boost::optional<uint64_t>> expectedInts = {};
+    std::vector<uint8_t> expectedBinary = {};
     testSimple8b(expectedInts, expectedBinary);
 }
 
@@ -104,7 +106,6 @@ TEST(Simple8b, OnlySkip) {
 
 TEST(Simple8b, OneValue) {
     std::vector<boost::optional<uint64_t>> expectedInts = {1};
-
     // The selector is 14 and there is only 1 bucket with the value 1.
     std::vector<uint8_t> expectedBinary{0x1E, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0};  // 1st word.
 
@@ -120,7 +121,6 @@ TEST(Simple8b, MaxValue) {
 
     testSimple8b(expectedInts, expectedBinary);
 }
-
 TEST(Simple8b, MultipleValues) {
     std::vector<boost::optional<uint64_t>> expectedInts = {1, 2, 3};
 
@@ -437,7 +437,7 @@ TEST(Simple8b, WordOfSkips) {
 }
 
 TEST(Simple8b, MultipleFlushes) {
-    Simple8bBuilder s8b;
+    Simple8bBuilder<uint64_t> s8b;
 
     std::vector<uint64_t> values = {1};
     for (size_t i = 0; i < values.size(); ++i) {
@@ -451,7 +451,7 @@ TEST(Simple8b, MultipleFlushes) {
         ASSERT_TRUE(s8b.append(values[i]));
     }
 
-    std::vector<uint8_t> expectedChar{
+    std::vector<uint8_t> expectedBinary{
         // The selector is 14 and there is only 1 bucket with the value 1.
         0x1E,
         0x0,
@@ -476,10 +476,10 @@ TEST(Simple8b, MultipleFlushes) {
 
     char* hex = s8b.data();
     size_t len = s8b.len();
-    ASSERT_EQ(len, expectedChar.size());
+    ASSERT_EQ(len, expectedBinary.size());
 
     for (size_t i = 0; i < len; ++i) {
-        ASSERT_EQ(static_cast<uint8_t>(*hex), expectedChar[i]) << i;
+        ASSERT_EQ(static_cast<uint8_t>(*hex), expectedBinary[i]) << i;
         ++hex;
     }
 }
@@ -902,5 +902,63 @@ TEST(Simple8b, RleFront) {
         0x0,  // 1st word.
     };
 
+    testSimple8b(expectedInts, expectedBinary);
+}
+
+TEST(Simple8b, EightSelectorLargeBase) {
+    // 8462480737302404222943232 = 111 + 80 zeros. This should be stored as (0111 10100) where the
+    // second value of 20 is the nibble shift of 4*20. The first value is 0111 because we store at
+    // least 4 values. This should be encoded as [1000] [(0111) (10100)] x6 [1000] =
+    // 81E8F47A3D1E8F48
+    uint128_t val("8462480737302404222943232");
+    std::vector<boost::optional<uint128_t>> expectedInts = {val, val, val, val, val, val};
+    std::vector<uint8_t> expectedBinary = {0x48, 0x8F, 0x1E, 0x3D, 0x7A, 0xF4, 0xE8, 0x81};
+    testSimple8b(expectedInts, expectedBinary);
+}
+
+TEST(Simple8b, Selector8LargeBaseTestAndSkip) {
+    // 8462480737302404222943232 = 111 + 80 zeros. This should be stored as (0111 10100) where the
+    // second value of 20 is the nibble shift of 4*20. The first value is 0111 because we store at
+    // least 4 values. With skip this should be encoded as: [1000] [(1111) (11111) (0111) (10100)]
+    // x3 [1000] = 83FEF4FFBD3FEF48
+    uint128_t val("8462480737302404222943232");
+    std::vector<boost::optional<uint128_t>> expectedInts;
+    for (uint32_t i = 0; i < 3; i++) {
+        expectedInts.push_back(val);
+        expectedInts.push_back(boost::none);
+    }
+    std::vector<uint8_t> expectedBinary = {0x48, 0xEF, 0x3F, 0xBD, 0xFF, 0xF4, 0xFE, 0x83};
+    testSimple8b(expectedInts, expectedBinary);
+}
+
+TEST(Simple8b, Selector8LargeSkipEncoding) {
+    // A perfect skip value is one that aligns perfectly with the boundary. 1111 with 124 zeros does
+    // that.
+    // This should be encoded as
+    // [1001] [(001111 11111) x 5] [1000] = 91FF3FE7FCFF9FF8
+    uint128_t val("319014718988379809496913694467282698240");
+    std::vector<boost::optional<uint128_t>> expectedInts = {val, val, val, val, val};
+    std::vector<uint8_t> expectedBinary = {0xF8, 0x9F, 0xFF, 0xFC, 0xE7, 0x3F, 0xFF, 0x91};
+    testSimple8b(expectedInts, expectedBinary);
+}
+
+TEST(Simple8b, Selector8LargeNibbleShift) {
+    // 170141183460469231731687303715884105728= 1 + 127 zeros. This is a value that should have 3
+    // trailing zeros due to nibble. So we should encode as: [1000] [(1000) (11111)] x6 [1000] =
+    // 823F1F8FC7E3F1F8
+    uint128_t val("170141183460469231731687303715884105728");
+    std::vector<boost::optional<uint128_t>> expectedInts = {val, val, val, val, val, val};
+    std::vector<uint8_t> expectedBinary = {0xF8, 0xF1, 0xE3, 0xC7, 0x8F, 0x1F, 0x3F, 0x82};
+    testSimple8b(expectedInts, expectedBinary);
+}
+
+TEST(Simple8b, Test128WithSmallValue) {
+    // This tests that if we use a small int128_t, we still correctly store.
+    // 57344 = 1110000000000000 = 3 value bits and 13 zeros
+    // This should be encoded with alternating skips as:
+    // [0010] [(111) (1101)] x 8 [0111] = 2FBF7EFDFBF7EFD7
+    uint128_t val = 57344;
+    std::vector<boost::optional<uint128_t>> expectedInts = {val, val, val, val, val, val, val, val};
+    std::vector<uint8_t> expectedBinary = {0xD7, 0xEF, 0xF7, 0xFB, 0xFD, 0x7E, 0xBF, 0x2F};
     testSimple8b(expectedInts, expectedBinary);
 }
