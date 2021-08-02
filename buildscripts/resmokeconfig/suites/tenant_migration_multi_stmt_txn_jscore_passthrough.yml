@@ -227,7 +227,6 @@ selector:
   - jstests/core/field_name_validation.js
   - jstests/core/insert_illegal_doc.js
   - jstests/core/positional_projection.js
-  - jstests/core/projection_expr_mod.js
   - jstests/core/push_sort.js
   - jstests/core/update_dbref.js
 

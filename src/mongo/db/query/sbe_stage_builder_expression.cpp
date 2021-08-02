@@ -124,14 +124,6 @@ struct ExpressionVisitorContext {
         return {std::move(expr), stageOrLimitCoScan(std::move(stage), planNodeId)};
     }
 
-    // Function which pops 'n' arguments from the stack. This is useful when an expression can be
-    // simplified and its remaining arguments are no longer needed.
-    void clearExprs(size_t n) {
-        for (size_t idx = 0; idx < n; ++idx) {
-            [[maybe_unused]] auto expr = popExpr();
-        }
-    };
-
     StageBuilderState& state;
 
     EvalStack<> evalStack;
@@ -312,32 +304,6 @@ std::unique_ptr<sbe::EExpression> generateRegexNullResponse(StringData exprName)
         return sbe::makeE<sbe::EConstant>(arrTag, arrVal);
     }
     return sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0);
-}
-
-// Return true if 'expr' is nullish, false otherwise.
-bool compileTimeNullCheck(const ExpressionConstant& expr) {
-    return expr.getValue().nullish();
-}
-
-// Return true if 'expr' is a string, false otherwise.
-bool compileTimeStringCheck(const ExpressionConstant& expr) {
-    return expr.getValue().getType() == BSONType::String;
-}
-
-// Return true if 'expr' is an empty string, false otherwise. Callers must ensure 'expr' is a
-// string.
-bool compileTimeEmptyStringCheck(const ExpressionConstant& expr) {
-    return expr.getValue().getString().empty();
-}
-
-// Return true if 'expr' is either a number, false otherwise.
-bool compileTimeNumericCheck(const ExpressionConstant& expr) {
-    return isNumericBSONType(expr.getValue().getType());
-}
-
-// Return true if 'expr' is either a number or a date, false otherwise.
-bool compileTimeNumberDateCheck(const ExpressionConstant& expr) {
-    return compileTimeNumericCheck(expr) || expr.getValue().getType() == BSONType::Date;
 }
 
 class ExpressionPreVisitor final : public ExpressionConstVisitor {
@@ -766,39 +732,11 @@ public:
         _context->ensureArity(arity);
         auto frameId = _context->state.frameId();
 
-        auto generateNotNumberOrDateVar = [](const sbe::EVariable& var) {
+        auto generateNotNumberOrDate = [frameId](const sbe::value::SlotId slotId) {
+            sbe::EVariable var{frameId, slotId};
             return makeBinaryOp(sbe::EPrimBinary::logicAnd,
                                 makeNot(makeFunction("isNumber", var.clone())),
                                 makeNot(makeFunction("isDate", var.clone())));
-        };
-        auto generateNotNumberOrDate =
-            [frameId, generateNotNumberOrDateVar](const sbe::value::SlotId slotId) {
-                sbe::EVariable var{frameId, slotId};
-                return generateNotNumberOrDateVar(var);
-            };
-
-        const auto notNumberOrDateError =
-            "only numbers and dates are allowed in an $add expression";
-
-        auto makeNullAndTypeCases = [&](std::vector<std::unique_ptr<sbe::EExpression>> nullChecks,
-                                        std::vector<std::unique_ptr<sbe::EExpression>> typeChecks,
-                                        ErrorCodes::Error code) -> std::vector<CaseValuePair> {
-            auto checkNullAllArguments =
-                accumulateChecks(std::move(nullChecks), sbe::EPrimBinary::logicOr);
-            auto checkNotNumberOrDateAllArguments =
-                accumulateChecks(std::move(typeChecks), sbe::EPrimBinary::logicOr);
-            std::vector<CaseValuePair> cases;
-            cases.reserve(arity);
-            if (checkNullAllArguments) {
-                cases.emplace_back(std::move(checkNullAllArguments),
-                                   makeConstant(sbe::value::TypeTags::Null, 0));
-            }
-
-            if (checkNotNumberOrDateAllArguments) {
-                cases.emplace_back(std::move(checkNotNumberOrDateAllArguments),
-                                   sbe::makeE<sbe::EFail>(code, notNumberOrDateError));
-            }
-            return cases;
         };
 
         if (arity == 2) {
@@ -808,65 +746,42 @@ public:
             sbe::EVariable lhsVar{frameId, 0};
             sbe::EVariable rhsVar{frameId, 1};
 
-            const auto& children = expr->getChildren();
-            auto lhsExpr = children[0];
-            auto rhsExpr = children[1];
-            std::vector<std::unique_ptr<sbe::EExpression>> checkExprsNull;
-            std::vector<std::unique_ptr<sbe::EExpression>> checkExprsNotNumberOrDate;
+            auto addExpr = makeLocalBind(
+                _context->state.frameIdGenerator,
+                [&](sbe::EVariable lhsIsDate, sbe::EVariable rhsIsDate) {
+                    return buildMultiBranchConditional(
+                        CaseValuePair{makeBinaryOp(sbe::EPrimBinary::logicOr,
+                                                   generateNullOrMissing(frameId, 0),
+                                                   generateNullOrMissing(frameId, 1)),
+                                      sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0)},
+                        CaseValuePair{
+                            makeBinaryOp(sbe::EPrimBinary::logicOr,
+                                         generateNotNumberOrDate(0),
+                                         generateNotNumberOrDate(1)),
+                            sbe::makeE<sbe::EFail>(
+                                ErrorCodes::Error{4974201},
+                                "only numbers and dates are allowed in an $add expression")},
+                        CaseValuePair{
+                            makeBinaryOp(
+                                sbe::EPrimBinary::logicAnd, lhsIsDate.clone(), rhsIsDate.clone()),
+                            sbe::makeE<sbe::EFail>(ErrorCodes::Error{4974202},
+                                                   "only one date allowed in an $add expression")},
+                        // An EPrimBinary::add expression, which compiles directly into an "add"
+                        // instruction, efficiently handles the general case for for $add with
+                        // exactly two operands, but when one of the operands is a date, we need to
+                        // use the "doubleDoubleSum" function to perform the required conversions.
+                        CaseValuePair{
+                            makeBinaryOp(
+                                sbe::EPrimBinary::logicOr, lhsIsDate.clone(), rhsIsDate.clone()),
+                            makeFunction("doubleDoubleSum", lhsVar.clone(), rhsVar.clone())},
+                        makeBinaryOp(sbe::EPrimBinary::add, lhsVar.clone(), rhsVar.clone()));
+                },
+                makeFunction("isDate", lhsVar.clone()),
+                makeFunction("isDate", rhsVar.clone()));
 
-            auto constCallback = [&](const ExpressionConstant& val) {
-                if (compileTimeNullCheck(val)) {
-                    _context->pushExpr(makeConstant(sbe::value::TypeTags::Null, 0));
-                    return true;
-                }
-                uassert(5412906, notNumberOrDateError, compileTimeNumberDateCheck(val));
-                return false;
-            };
-
-            auto nonConstCallback = [&](size_t idx) -> void {
-                checkExprsNull.push_back(generateNullOrMissing(frameId, idx));
-                checkExprsNotNumberOrDate.push_back(generateNotNumberOrDate(idx));
-            };
-
-            if (generateExpressionArgument(
-                    lhsExpr.get(), constCallback, std::bind(nonConstCallback, 0)) ||
-                generateExpressionArgument(
-                    rhsExpr.get(), constCallback, std::bind(nonConstCallback, 1))) {
-                return;
-            }
-
-            auto cases = makeNullAndTypeCases(std::move(checkExprsNull),
-                                              std::move(checkExprsNotNumberOrDate),
-                                              ErrorCodes::Error{4974201});
-
-            binds.emplace_back(makeFunction("isDate", lhsVar.clone()));
-            binds.emplace_back(makeFunction("isDate", rhsVar.clone()));
-            sbe::EVariable lhsIsDateVar{frameId, 2};
-            sbe::EVariable rhsIsDateVar{frameId, 3};
-
-            auto addExpr = [&] {
-                cases.emplace_back(CaseValuePair{
-                    makeBinaryOp(
-                        sbe::EPrimBinary::logicAnd, lhsIsDateVar.clone(), rhsIsDateVar.clone()),
-                    sbe::makeE<sbe::EFail>(ErrorCodes::Error{4974202},
-                                           "only one date allowed in an $add expression")});
-
-                // An EPrimBinary::add expression, which compiles directly into an "add"
-                // instruction, efficiently handles the general case for for $add with
-                // exactly two operands, but when one of the operands is a date, we need to
-                // use the "doubleDoubleSum" function to perform the required conversions.
-                cases.emplace_back(CaseValuePair{
-                    makeBinaryOp(
-                        sbe::EPrimBinary::logicOr, lhsIsDateVar.clone(), rhsIsDateVar.clone()),
-                    makeFunction("doubleDoubleSum", lhsVar.clone(), rhsVar.clone())});
-                return buildMultiBranchConditionalFromCaseValuePairs(
-                    std::move(cases),
-                    makeBinaryOp(sbe::EPrimBinary::add, lhsVar.clone(), rhsVar.clone()));
-            }();
             _context->pushExpr(
                 sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(addExpr)));
         } else {
-            const auto& children = expr->getChildren();
             std::vector<std::unique_ptr<sbe::EExpression>> binds;
             std::vector<std::unique_ptr<sbe::EExpression>> argVars;
             std::vector<std::unique_ptr<sbe::EExpression>> checkExprsNull;
@@ -875,44 +790,44 @@ public:
             argVars.reserve(arity);
             checkExprsNull.reserve(arity);
             checkExprsNotNumberOrDate.reserve(arity);
-            size_t nonConstArgs = 0;
-            for (size_t idx = arity; idx > 0; --idx) {
-                if (generateExpressionArgument(
-                        children[idx - 1].get(),
-                        [&](const ExpressionConstant& val) {
-                            if (compileTimeNullCheck(val)) {
-                                _context->clearExprs(idx);
-                                _context->pushExpr(makeConstant(sbe::value::TypeTags::Null, 0));
-                                return true;
-                            }
-                            uassert(5412900, notNumberOrDateError, compileTimeNumberDateCheck(val));
-                            argVars.push_back(_context->popExpr());
-                            return false;
-                        },
-                        [&]() {
-                            binds.push_back(_context->popExpr());
-                            argVars.push_back(makeVariable(frameId, nonConstArgs));
-                            checkExprsNull.push_back(generateNullOrMissing(frameId, nonConstArgs));
-                            checkExprsNotNumberOrDate.push_back(
-                                generateNotNumberOrDate(nonConstArgs));
-                            ++nonConstArgs;
-                        })) {
-                    return;
-                }
+            for (size_t idx = 0; idx < arity; ++idx) {
+                binds.push_back(_context->popExpr());
+                argVars.push_back(sbe::makeE<sbe::EVariable>(frameId, idx));
+
+                checkExprsNull.push_back(generateNullOrMissing(frameId, idx));
+                checkExprsNotNumberOrDate.push_back(generateNotNumberOrDate(idx));
             }
 
-            // At this point 'argVars' vector contains arguments of $add expression in the reversed
+            // At this point 'binds' vector contains arguments of $add expression in the reversed
             // order. We need to reverse it back to perform summation in the right order below.
             // Summation in different order can lead to different result because of accumulated
             // precision errors from floating point types.
-            std::reverse(std::begin(argVars), std::end(argVars));
+            std::reverse(std::begin(binds), std::end(binds));
 
-            auto cases = makeNullAndTypeCases(std::move(checkExprsNull),
-                                              std::move(checkExprsNotNumberOrDate),
-                                              ErrorCodes::Error{4974203});
-            auto addExpr = buildMultiBranchConditionalFromCaseValuePairs(
-                std::move(cases),
-                sbe::makeE<sbe::EFunction>("doubleDoubleSum", std::move(argVars)));
+            using iter_t = std::vector<std::unique_ptr<sbe::EExpression>>::iterator;
+            auto checkNullAllArguments = std::accumulate(
+                std::move_iterator<iter_t>(checkExprsNull.begin() + 1),
+                std::move_iterator<iter_t>(checkExprsNull.end()),
+                std::move(checkExprsNull.front()),
+                [](auto&& acc, auto&& ex) {
+                    return makeBinaryOp(sbe::EPrimBinary::logicOr, std::move(acc), std::move(ex));
+                });
+            auto checkNotNumberOrDateAllArguments = std::accumulate(
+                std::move_iterator<iter_t>(checkExprsNotNumberOrDate.begin() + 1),
+                std::move_iterator<iter_t>(checkExprsNotNumberOrDate.end()),
+                std::move(checkExprsNotNumberOrDate.front()),
+                [](auto&& acc, auto&& ex) {
+                    return makeBinaryOp(sbe::EPrimBinary::logicOr, std::move(acc), std::move(ex));
+                });
+            auto addExpr = sbe::makeE<sbe::EIf>(
+                std::move(checkNullAllArguments),
+                sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0),
+                sbe::makeE<sbe::EIf>(
+                    std::move(checkNotNumberOrDateAllArguments),
+                    sbe::makeE<sbe::EFail>(
+                        ErrorCodes::Error{4974203},
+                        "only numbers and dates are allowed in an $add expression"),
+                    sbe::makeE<sbe::EFunction>("doubleDoubleSum", std::move(argVars))));
             _context->pushExpr(
                 sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(addExpr)));
         }
@@ -2189,11 +2104,6 @@ public:
         auto frameId = _context->state.frameId();
         auto rhs = _context->popExpr();
         auto lhs = _context->popExpr();
-
-        const auto& children = expr->getChildren();
-        auto lhsPtr = children[0].get();
-        auto rhsPtr = children[1].get();
-
         auto binds = sbe::makeEs(std::move(lhs), std::move(rhs));
         sbe::EVariable lhsVar{frameId, 0};
         sbe::EVariable rhsVar{frameId, 1};
@@ -2201,98 +2111,29 @@ public:
         // If the rhs is a small integral double, convert it to int32 to match $mod MQL semantics.
         auto numericConvert32 =
             sbe::makeE<sbe::ENumericConvert>(rhsVar.clone(), sbe::value::TypeTags::NumberInt32);
+        auto rhsExpr = buildMultiBranchConditional(
+            CaseValuePair{
+                makeBinaryOp(
+                    sbe::EPrimBinary::logicAnd,
+                    sbe::makeE<sbe::ETypeMatch>(
+                        rhsVar.clone(), getBSONTypeMask(sbe::value::TypeTags::NumberDouble)),
+                    makeNot(sbe::makeE<sbe::ETypeMatch>(
+                        lhsVar.clone(), getBSONTypeMask(sbe::value::TypeTags::NumberDouble)))),
+                makeFunction("fillEmpty", std::move(numericConvert32), rhsVar.clone())},
+            rhsVar.clone());
 
-        const auto errorMsg = "$mod only supports numeric types"_sd;
+        auto modExpr = buildMultiBranchConditional(
+            CaseValuePair{makeBinaryOp(sbe::EPrimBinary::logicOr,
+                                       generateNullOrMissing(lhsVar),
+                                       generateNullOrMissing(rhsVar)),
+                          sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0)},
+            CaseValuePair{makeBinaryOp(sbe::EPrimBinary::logicOr,
+                                       generateNonNumericCheck(lhsVar),
+                                       generateNonNumericCheck(rhsVar)),
+                          sbe::makeE<sbe::EFail>(ErrorCodes::Error{5154000},
+                                                 "$mod only supports numeric types")},
+            makeFunction("mod", lhsVar.clone(), std::move(rhsExpr)));
 
-        std::vector<CaseValuePair> modCases;
-        std::vector<std::unique_ptr<sbe::EExpression>> nullChecks;
-        std::vector<std::unique_ptr<sbe::EExpression>> numericChecks;
-        std::vector<std::unique_ptr<sbe::EExpression>> numericConversionChecks;
-
-        bool shouldDoTypeConversion = true;
-        auto constCallback =
-            [&](const ExpressionConstant& constant, ErrorCodes::Error code, bool isLhs) {
-                if (compileTimeNullCheck(constant)) {
-                    _context->pushExpr(makeConstant(sbe::value::TypeTags::Null, 0));
-                    return true;
-                }
-                uassert(code, errorMsg, compileTimeNumericCheck(constant));
-                auto doubleCmp = constant.getValue().getType() == BSONType::NumberDouble;
-
-                // We are checking whether the LHS is NOT a double.
-                if (isLhs) {
-                    doubleCmp = !doubleCmp;
-                }
-
-                shouldDoTypeConversion = shouldDoTypeConversion && doubleCmp;
-                return false;
-            };
-
-        auto nonConstCallback = [&](const sbe::EVariable& var, bool isLhs) {
-            nullChecks.emplace_back(generateNullOrMissing(var));
-            numericChecks.emplace_back(generateNonNumericCheck(var));
-            auto typeExpr = sbe::makeE<sbe::ETypeMatch>(
-                var.clone(), getBSONTypeMask(sbe::value::TypeTags::NumberDouble));
-
-            // We want to know if the LHS is NOT a double.
-            if (isLhs) {
-                typeExpr = makeNot(std::move(typeExpr));
-            }
-            numericConversionChecks.emplace_back(std::move(typeExpr));
-        };
-
-        using namespace std::placeholders;
-        if (generateExpressionArgument(
-                rhsPtr,
-                std::bind(constCallback, _1, ErrorCodes::Error{5412904}, false),
-                std::bind(nonConstCallback, std::cref(rhsVar), false)) ||
-            generateExpressionArgument(
-                lhsPtr,
-                std::bind(constCallback, _1, ErrorCodes::Error{5412905}, true),
-                std::bind(nonConstCallback, std::cref(lhsVar), true))) {
-            return;
-        }
-
-        auto rhsExpr = [&]() {
-            if (!shouldDoTypeConversion) {
-                return rhsVar.clone();
-            }
-
-            if (auto typeConversionCheck = accumulateChecks(std::move(numericConversionChecks),
-                                                            sbe::EPrimBinary::logicAnd)) {
-                return buildMultiBranchConditional(
-                    CaseValuePair{
-                        std::move(typeConversionCheck),
-                        makeFunction("fillEmpty", std::move(numericConvert32), rhsVar.clone())},
-                    rhsVar.clone());
-            } else {
-                // Both values are constants, so perform the type conversion on rhs manually.
-                auto rhsConstPtr = dynamic_cast<ExpressionConstant*>(rhsPtr);
-                tassert(5412907, "Right hand side for $mod should be a constant", rhsConstPtr);
-                auto lhsConstPtr = dynamic_cast<ExpressionConstant*>(lhsPtr);
-                tassert(5412908, "Left hand side for $mod should be a constant", lhsConstPtr);
-                return lhsConstPtr->getValue().getType() == NumberLong
-                    ? makeConstant(sbe::value::TypeTags::NumberInt64,
-                                   rhsConstPtr->getValue().coerceToLong())
-                    : makeConstant(sbe::value::TypeTags::NumberInt32,
-                                   rhsConstPtr->getValue().coerceToInt());
-            }
-        }();
-
-        if (auto checkIsNullOrMissing =
-                accumulateChecks(std::move(nullChecks), sbe::EPrimBinary::logicOr)) {
-            modCases.emplace_back(std::move(checkIsNullOrMissing),
-                                  makeConstant(sbe::value::TypeTags::Null, 0));
-        }
-
-        if (auto checkNumeric =
-                accumulateChecks(std::move(numericChecks), sbe::EPrimBinary::logicOr)) {
-            modCases.emplace_back(std::move(checkNumeric),
-                                  sbe::makeE<sbe::EFail>(ErrorCodes::Error{5154000}, errorMsg));
-        }
-
-        auto modExpr = buildMultiBranchConditionalFromCaseValuePairs(
-            std::move(modCases), makeFunction("mod", lhsVar.clone(), std::move(rhsExpr)));
         _context->pushExpr(
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(modExpr)));
     }
@@ -2590,16 +2431,22 @@ public:
         auto frameId = _context->state.frameId();
         std::vector<std::unique_ptr<sbe::EExpression>> args;
         std::vector<std::unique_ptr<sbe::EExpression>> binds;
+        sbe::EVariable stringExpressionRef(frameId, 0);
+        sbe::EVariable delimiterRef(frameId, 1);
 
-        auto children = expr->getChildren();
-        tassert(5412919, "$split must have exactly 2 children", children.size() == 2);
+        invariant(expr->getChildren().size() == 2);
         _context->ensureArity(2);
-
-        auto delimExpr = children[1].get();
-        auto stringExpr = children[0].get();
 
         auto delimiter = _context->popExpr();
         auto stringExpression = _context->popExpr();
+
+        // Add stringExpression to arguments.
+        binds.push_back(std::move(stringExpression));
+        args.push_back(stringExpressionRef.clone());
+
+        // Add delimiter to arguments.
+        binds.push_back(std::move(delimiter));
+        args.push_back(delimiterRef.clone());
 
         auto [emptyStrTag, emptyStrVal] = sbe::value::makeNewString("");
         auto [arrayWithEmptyStringTag, arrayWithEmptyStringVal] = sbe::value::makeNewArray();
@@ -2613,108 +2460,41 @@ public:
                                          const sbe::EVariable& var) {
             return makeBinaryOp(sbe::EPrimBinary::eq,
                                 var.clone(),
-                                makeConstant(emptyStrTag, emptyStrVal),
+                                sbe::makeE<sbe::EConstant>(emptyStrTag, emptyStrVal),
                                 _context->state.env);
         };
 
-        std::vector<CaseValuePair> cases;
-        std::vector<std::unique_ptr<sbe::EExpression>> nullChecks;
+        auto checkIsNullOrMissing = makeBinaryOp(sbe::EPrimBinary::logicOr,
+                                                 generateNullOrMissing(stringExpressionRef),
+                                                 generateNullOrMissing(delimiterRef));
 
         // In order to maintain MQL semantics, first check both the string expression
-        // (first argument), and delimiter string (second argument) for null, undefined, or
+        // (first agument), and delimiter string (second argument) for null, undefined, or
         // missing, and if either is nullish make the entire expression return null. Only
         // then make further validity checks against the input. Fail if the delimiter is an empty
         // string. Return [""] if the string expression is an empty string.
-        sbe::value::SlotId varId = 0;
-        const auto splitStringError = "$split string expression must be a string";
-        auto splitStringConstCallback = [&,
-                                         arrayWithEmptyStringTag = arrayWithEmptyStringTag,
-                                         arrayWithEmptyStringVal = arrayWithEmptyStringVal](
-                                            const ExpressionConstant& val) {
-            if (compileTimeNullCheck(val)) {
-                _context->pushExpr(makeConstant(sbe::value::TypeTags::Null, 0));
-                return true;
-            }
-            uassert(5412901, splitStringError, compileTimeStringCheck(val));
-            if (compileTimeEmptyStringCheck(val)) {
-                _context->pushExpr(makeConstant(arrayWithEmptyStringTag, arrayWithEmptyStringVal));
-                return true;
-            }
-            args.push_back(std::move(stringExpression));
-            return false;
-        };
-
-        auto splitStringNonConstCallback = [&,
-                                            arrayWithEmptyStringTag = arrayWithEmptyStringTag,
-                                            arrayWithEmptyStringVal = arrayWithEmptyStringVal]() {
-            sbe::EVariable stringExpressionRef(frameId, varId);
-            varId++;
-
-            // Add string expression to arguments.
-            binds.push_back(std::move(stringExpression));
-            args.push_back(stringExpressionRef.clone());
-
-            // Add error checks.
-            nullChecks.push_back(generateNullOrMissing(stringExpressionRef));
-            cases.emplace_back(
-                generateNonStringCheck(stringExpressionRef),
-                sbe::makeE<sbe::EFail>(ErrorCodes::Error{5155402}, splitStringError));
-
-            // Empty string check.
-            cases.emplace_back(generateIsEmptyString(stringExpressionRef),
-                               makeConstant(arrayWithEmptyStringTag, arrayWithEmptyStringVal));
-        };
-
-        if (generateExpressionArgument(
-                stringExpr, splitStringConstCallback, splitStringNonConstCallback)) {
-            return;
-        }
-
-        const auto delimStringError = "$split delimiter must be a string";
-        const auto delimNonEmptyStringError = "$split delimiter must not be an empty string";
-        auto delimConstCallback = [&](const ExpressionConstant& val) {
-            if (compileTimeNullCheck(val)) {
-                _context->pushExpr(makeConstant(sbe::value::TypeTags::Null, 0));
-                return true;
-            }
-            uassert(5412902, delimStringError, compileTimeStringCheck(val));
-            uassert(5412903, delimNonEmptyStringError, !compileTimeEmptyStringCheck(val));
-            args.push_back(std::move(delimiter));
-            return false;
-        };
-
-        auto delimNonConstCallback = [&]() {
-            sbe::EVariable delimiterRef(frameId, varId);
-
-            // Add delimiter to arguments.
-            binds.push_back(std::move(delimiter));
-            args.push_back(delimiterRef.clone());
-
-            // Add error checks.
-            nullChecks.push_back(generateNullOrMissing(delimiterRef));
-            cases.emplace_back(
+        auto totalSplitFunc = buildMultiBranchConditional(
+            CaseValuePair{std::move(checkIsNullOrMissing),
+                          sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0)},
+            CaseValuePair{generateNonStringCheck(stringExpressionRef),
+                          sbe::makeE<sbe::EFail>(
+                              ErrorCodes::Error{5155402},
+                              str::stream() << "$split string expression must be a string")},
+            CaseValuePair{
                 generateNonStringCheck(delimiterRef),
-                sbe::makeE<sbe::EFail>(ErrorCodes::Error{5155400}, delimStringError));
-            cases.emplace_back(
-                generateIsEmptyString(delimiterRef),
-                sbe::makeE<sbe::EFail>(ErrorCodes::Error{5155401}, delimNonEmptyStringError));
-        };
+                sbe::makeE<sbe::EFail>(ErrorCodes::Error{5155400},
+                                       str::stream() << "$split delimiter must be a string")},
+            CaseValuePair{generateIsEmptyString(delimiterRef),
+                          sbe::makeE<sbe::EFail>(
+                              ErrorCodes::Error{5155401},
+                              str::stream() << "$split delimiter must not be an empty string")},
+            sbe::makeE<sbe::EIf>(
+                generateIsEmptyString(stringExpressionRef),
+                sbe::makeE<sbe::EConstant>(arrayWithEmptyStringTag, arrayWithEmptyStringVal),
+                sbe::makeE<sbe::EFunction>("split", std::move(args))));
 
-        if (generateExpressionArgument(delimExpr, delimConstCallback, delimNonConstCallback)) {
-            return;
-        }
-
-        if (auto checkIsNullOrMissing =
-                accumulateChecks(std::move(nullChecks), sbe::EPrimBinary::logicOr)) {
-            cases.emplace(cases.begin(),
-                          std::move(checkIsNullOrMissing),
-                          makeConstant(sbe::value::TypeTags::Null, 0));
-        }
-
-        auto splitFunc = buildMultiBranchConditionalFromCaseValuePairs(
-            std::move(cases), sbe::makeE<sbe::EFunction>("split", std::move(args)));
         _context->pushExpr(
-            sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(splitFunc)));
+            sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(totalSplitFunc)));
     }
     void visit(const ExpressionSqrt* expr) final {
         auto frameId = _context->state.frameId();
@@ -3824,24 +3604,6 @@ private:
 
         _context->pushExpr(
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(dateAddExpr)));
-    }
-
-
-    /**
-     * Generates an expression argument depending on whether 'expr' is a constant or not. Returns
-     * 'true' if 'constCallback' generates a terminal value and no further generation is required
-     * (for instance, if 'expr' is determined to be null, we can simply push 'null'), false
-     * otherwise.
-     */
-    bool generateExpressionArgument(
-        const Expression* expr,
-        const std::function<bool(const ExpressionConstant& val)>& constCallback,
-        const std::function<void()>& nonConstCallback) {
-        if (auto constExpr = dynamic_cast<const ExpressionConstant*>(expr)) {
-            return constCallback(*constExpr);
-        }
-        nonConstCallback();
-        return false;
     }
 
     void unsupportedExpression(const char* op) const {

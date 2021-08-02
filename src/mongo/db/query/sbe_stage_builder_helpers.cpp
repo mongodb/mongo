@@ -183,19 +183,6 @@ std::unique_ptr<sbe::EExpression> buildMultiBranchConditional(
     return defaultCase;
 }
 
-std::unique_ptr<sbe::EExpression> accumulateChecks(
-    std::vector<std::unique_ptr<sbe::EExpression>> checks, sbe::EPrimBinary::Op op) {
-    using iter_t = std::vector<std::unique_ptr<sbe::EExpression>>::iterator;
-    if (checks.empty()) {
-        return nullptr;
-    }
-    return std::accumulate(
-        std::move_iterator<iter_t>(checks.begin() + 1),
-        std::move_iterator<iter_t>(checks.end()),
-        std::move(checks.front()),
-        [&op](auto&& acc, auto&& ex) { return makeBinaryOp(op, std::move(acc), std::move(ex)); });
-}
-
 std::unique_ptr<sbe::EExpression> buildMultiBranchConditionalFromCaseValuePairs(
     std::vector<CaseValuePair> caseValuePairs, std::unique_ptr<sbe::EExpression> defaultValue) {
     return std::accumulate(

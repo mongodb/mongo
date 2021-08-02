@@ -6,13 +6,7 @@
 
 load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and testExpression.
 load("jstests/libs/sbe_assert_error_override.js");
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 
-// TODO SERVER-58095: When the classic engine is used, it will eagerly return null values, even
-// if some of its arguments are invalid. This is not the case when SBE is enabled because of the
-// order in which arguments are evaluated. In certain cases, errors will be thrown or the empty
-// string will be returned instead of null.
-const sbeEnabled = checkSBEEnabled(db);
 const coll = db.split;
 
 coll.drop();
@@ -48,17 +42,7 @@ testExpression(coll, {$split: [null, "abc"]}, null);
 // Ensure that $split produces null when given missing fields as input.
 testExpression(coll, {$split: ["$a", "a"]}, null);
 testExpression(coll, {$split: ["a", "$a"]}, null);
-testExpression(coll, {$split: ["$a", null]}, null);
-testExpression(coll, {$split: [null, "$a"]}, null);
 testExpression(coll, {$split: ["$missing", {$toLower: "$missing"}]}, null);
-
-// SBE expression translation will detect our empty string, whereas the classic engine will
-// detect that "$a" is missing and return null.
-if (sbeEnabled) {
-    testExpression(coll, {$split: ["", "$a"]}, [""]);
-} else {
-    testExpression(coll, {$split: ["", "$a"]}, null);
-}
 
 //
 // Error Code tests with constant-folding optimization.
@@ -94,34 +78,4 @@ pipeline = {
     $project: {split: {$split: ["abc", ""]}}
 };
 assertErrorCode(coll, pipeline, 40087);
-
-const stringNumericArg = {
-    $split: [1, "$a"]
-};
-if (sbeEnabled) {
-    pipeline = {$project: {split: stringNumericArg}};
-    assertErrorCode(coll, pipeline, 40085);
-} else {
-    testExpression(coll, stringNumericArg, null);
-}
-
-const splitNumArg = {
-    $split: ["$b", 1]
-};
-if (sbeEnabled) {
-    pipeline = {$project: {split: splitNumArg}};
-    assertErrorCode(coll, pipeline, 40086);
-} else {
-    testExpression(coll, splitNumArg, null);
-}
-
-const emptyStringDelim = {
-    $split: ["$abc", ""]
-};
-if (sbeEnabled) {
-    pipeline = {$project: {split: emptyStringDelim}};
-    assertErrorCode(coll, pipeline, 40087);
-} else {
-    testExpression(coll, emptyStringDelim, null);
-}
 })();

@@ -182,7 +182,6 @@ selector:
   - jstests/core/updatel.js
   - jstests/core/write_result.js
   - jstests/core/positional_projection.js
-  - jstests/core/projection_expr_mod.js
 
   # Trick for bypassing mongo shell validation in the test doesn't work because txn_override
   # retry logic will hit the shell validation.

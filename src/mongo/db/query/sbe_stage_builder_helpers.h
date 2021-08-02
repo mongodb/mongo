@@ -165,12 +165,6 @@ std::unique_ptr<sbe::EExpression> buildMultiBranchConditionalFromCaseValuePairs(
     std::vector<CaseValuePair> caseValuePairs, std::unique_ptr<sbe::EExpression> defaultValue);
 
 /**
- * Given a vector of 'checks', all of which return true/false, accumulate them using 'op'.
- */
-std::unique_ptr<sbe::EExpression> accumulateChecks(
-    std::vector<std::unique_ptr<sbe::EExpression>> checks, sbe::EPrimBinary::Op op);
-
-/**
  * Insert a limit stage on top of the 'input' stage.
  */
 std::unique_ptr<sbe::PlanStage> makeLimitTree(std::unique_ptr<sbe::PlanStage> inputStage,

@@ -72,22 +72,6 @@ error =
     assert.throws(() => coll.find({}, {f: {$mod: ["$a", NumberLong(0)]}, _id: 0, n: 1}).toArray());
 assert.commandFailedWithCode(error, 16610);
 
-// Confirm that $mod doesn't accept non-numeric input.
-error = assert.throws(
-    () => coll.find({}, {f: {$mod: ["$a", "don't accept strings!"]}, _id: 0, n: 1}).toArray());
-assert.commandFailedWithCode(error, 16611);
-
-error = assert.throws(
-    () => coll.find({}, {f: {$mod: ["don't accept strings!", "$a"]}, _id: 0, n: 1}).toArray());
-assert.commandFailedWithCode(error, 16611);
-
-error = assert.throws(() => coll.find({}, {f: {$mod: ["$a", [1, 2, 3]]}, _id: 0, n: 1}).toArray());
-assert.commandFailedWithCode(error, 16611);
-
-error = assert.throws(
-    () => coll.find({}, {f: {$mod: [{a: 1, b: 2, c: 3}, "$a"]}, _id: 0, n: 1}).toArray());
-assert.commandFailedWithCode(error, 16611);
-
 // Clear collection again and reset.
 assert(coll.drop());
 assert.commandWorked(coll.insert({a: 10}));
@@ -99,10 +83,4 @@ assert.eq(coll.findOne({}, {f: {$mod: ["$a", -Infinity]}, _id: 0}), {f: 10});
 assert.eq(coll.findOne({}, {f: {$mod: [Infinity, "$a"]}, _id: 0}), {f: NaN});
 assert.eq(coll.findOne({}, {f: {$mod: [-Infinity, "$a"]}, _id: 0}), {f: NaN});
 assert.eq(coll.findOne({}, {f: {$mod: [NaN, "$a"]}, _id: 0}), {f: NaN});
-
-// Confirm expected behavior for null and missing values.
-assert.eq(coll.findOne({}, {f: {$mod: ["$a", 2]}, _id: 0}), {f: 0});
-assert.eq(coll.findOne({}, {f: {$mod: [11, "$a"]}, _id: 0}), {f: 1});
-assert.eq(coll.findOne({}, {f: {$mod: [null, "$a"]}, _id: 0}), {f: null});
-assert.eq(coll.findOne({}, {f: {$mod: ["$a", null]}, _id: 0}), {f: null});
 })();
