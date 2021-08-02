@@ -86,12 +86,14 @@ env.CppUnitTest(
         'bucket_catalog_test.cpp',
         'minmax_test.cpp',
         'timeseries_index_schema_conversion_functions_test.cpp',
-        'timeseries_options_test.cpp'
+        'timeseries_options_test.cpp',
+        'timeseries_update_delete_util_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/catalog/catalog_test_fixture',
         'bucket_catalog',
         'timeseries_index_schema_conversion_functions',
         'timeseries_options',
+        'timeseries_update_delete_util',
     ],
 )

@@ -226,6 +226,21 @@ TimeseriesTest.run((insert) => {
             limit: 0
         }]);
 
+    // TODO: SERVER-59092 Uncomment this test.
+    // // Query for documents using $jsonSchema with the metaField required.
+    // testDelete([nestedObjA, nestedObjB, nestedObjC],
+    //            [],
+    //            3,
+    //            [{q: {"$jsonSchema": {"$required": [metaFieldName]}}, limit: 0}]);
+
+    // TODO: SERVER-59092 Uncomment this test.
+    // // Query for documents using $jsonSchema with a field that is not the metaField required.
+    // testDelete([nestedObjA, nestedObjB, nestedObjC],
+    //            [nestedObjA, nestedObjB, nestedObjC],
+    //            0,
+    //            [{q: {"$jsonSchema": {"$required": [metaFieldName, "measurement"]}}, limit: 0}],
+    //            {expectedErrorCode: ErrorCodes.InvalidOptions});
+
     /******************* Tests deleting from a collection without a metaField ********************/
     // Remove all documents.
     testDelete([{[timeFieldName]: ISODate(), "meta": "A"}], [], 1, [{q: {}, limit: 0}], {
