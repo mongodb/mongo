@@ -502,8 +502,9 @@ env.Library(
 )
 
 env.Library(
-    target='user_cache_acquisition_stats',
+    target='user_acquisition_stats',
     source=[
+        'ldap_operation_stats.cpp',
         'user_cache_acquisition_stats.cpp'
     ],
     LIBDEPS_PRIVATE=[

@@ -165,7 +165,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         'auth/auth',
-        'auth/user_cache_acquisition_stats',
+        'auth/user_acquisition_stats',
         'prepare_conflict_tracker',
         'stats/resource_consumption_metrics',
     ],

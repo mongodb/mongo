@@ -44,12 +44,6 @@ namespace mongo {
 class UserCacheAcquisitionStats {
     using AccessInterval = std::pair<Microseconds, Microseconds>;
 
-    /*
-     * The RAII handle has access to private members of UserCacheAcquisitionStats but only exposes
-     * _recordCacheAccessStart() and _recordCacheAccessEnd().
-     */
-    friend class UserCacheAcquisitionStatsHandle;
-
 public:
     UserCacheAcquisitionStats() = default;
     ~UserCacheAcquisitionStats() = default;
@@ -74,27 +68,34 @@ public:
      */
     void toString(StringBuilder* sb, TickSource* tickSource) const;
 
-private:
     /**
-     * Records the start time of a new cache access attempt.
-     */
-    void _recordCacheAccessStart(Client* client, TickSource* tickSource) {
-        stdx::lock_guard<Client> lk(*client);
-        _cacheAccessStartTime = tickSource->ticksTo<Microseconds>(tickSource->getTicks());
+     * Increments the number of cache acquisition attempts.
+     **/
+    void incrementAcquisitionAttempts() {
         ++_totalStartedAcquisitionAttempts;
     }
 
     /**
-     * Records the completion of a cache access attempt by setting the end time. The start time must
-     * already be set.
-     */
-    void _recordCacheAccessEnd(Client* client, TickSource* tickSource) {
-        stdx::lock_guard<Client> lk(*client);
-        invariant(_cacheAccessStartTime != Microseconds{0});
-        _cacheAccessEndTime = tickSource->ticksTo<Microseconds>(tickSource->getTicks());
+     * Increments the number of cache acquisition attempts.
+     **/
+    void incrementAcquisitionCompletions() {
         ++_totalCompletedAcquisitionAttempts;
     }
 
+    /**
+     * Setters for the Cache Access start and end time.
+     **/
+
+    void setCacheAccessStartTime(Microseconds startTime) {
+        _cacheAccessStartTime = startTime;
+    }
+
+    void setCacheAccessEndTime(Microseconds endTime) {
+        invariant(_cacheAccessStartTime != Microseconds{0});
+        _cacheAccessEndTime = endTime;
+    }
+
+private:
     /**
      * Computes and returns total time spent on all cache accesses.
      */
@@ -110,6 +111,7 @@ private:
      */
     std::uint64_t _totalCompletedAcquisitionAttempts{0};
 
+
     /**
      * Start and end times of user cache access. If the access is still
      * pending, then the end time will be 0.
@@ -117,57 +119,4 @@ private:
     Microseconds _cacheAccessStartTime{Microseconds{0}};
     Microseconds _cacheAccessEndTime{Microseconds{0}};
 };
-
-/**
- * RAII handle that is used to mutate a UserCacheAcquisitionStats object. It automatically records
- * the start of a cache access attempt upon construction and provides access to
- * UserCacheAcquisitionStats::recordCacheAccessEnd(). Additionally, it guarantees that an ongoing
- * user cache attempt will be recorded as complete as soon as the handle goes out of scope. This
- * ensures that UserCacheAcquisitionStats::recordCacheAccessEnd() will be called even if an
- * exception is thrown.
- */
-class UserCacheAcquisitionStatsHandle {
-public:
-    UserCacheAcquisitionStatsHandle() = delete;
-
-    UserCacheAcquisitionStatsHandle(UserCacheAcquisitionStats* statsParam,
-                                    Client* client,
-                                    TickSource* tickSource)
-        : _stats(statsParam), _client(client), _tickSource(tickSource) {
-        _stats->_recordCacheAccessStart(_client, _tickSource);
-    }
-
-    UserCacheAcquisitionStatsHandle(const UserCacheAcquisitionStatsHandle&) = delete;
-    UserCacheAcquisitionStatsHandle& operator=(const UserCacheAcquisitionStatsHandle&) = delete;
-
-    UserCacheAcquisitionStatsHandle(UserCacheAcquisitionStatsHandle&& handle)
-        : _stats(std::exchange(handle._stats, nullptr)),
-          _client(std::move(handle._client)),
-          _tickSource(std::move(handle._tickSource)) {}
-
-    UserCacheAcquisitionStatsHandle& operator=(UserCacheAcquisitionStatsHandle&& handle) {
-        _stats = std::exchange(handle._stats, nullptr);
-        _client = std::move(handle._client);
-        _tickSource = std::move(handle._tickSource);
-
-        return *this;
-    }
-
-    ~UserCacheAcquisitionStatsHandle() {
-        recordCacheAccessEnd();
-    }
-
-    void recordCacheAccessEnd() {
-        if (_stats) {
-            _stats->_recordCacheAccessEnd(_client, _tickSource);
-        }
-        _stats = nullptr;
-    }
-
-private:
-    UserCacheAcquisitionStats* _stats;
-    Client* _client;
-    TickSource* _tickSource;
-};
-
 }  // namespace mongo

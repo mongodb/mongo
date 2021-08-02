@@ -495,15 +495,17 @@ StatusWith<UserHandle> AuthorizationManagerImpl::acquireUser(OperationContext* o
 
     // Track wait time and user cache access statistics for the current op for logging. An extra
     // second of delay is added via the failpoint for testing.
-    auto userCacheAcquisitionStats = CurOp::get(opCtx)->getMutableUserCacheAcquisitionStats(
-        opCtx->getClient(), opCtx->getServiceContext()->getTickSource());
+    UserAcquisitionStatsHandle userAcquisitionStatsHandle =
+        UserAcquisitionStatsHandle(CurOp::get(opCtx)->getMutableUserAcquisitionStats(),
+                                   opCtx->getServiceContext()->getTickSource(),
+                                   kCache);
     if (authUserCacheSleep.shouldFail()) {
         sleepsecs(1);
     }
 
     auto cachedUser = _userCache.acquire(opCtx, request);
 
-    userCacheAcquisitionStats.recordCacheAccessEnd();
+    userAcquisitionStatsHandle.recordTimerEnd();
     invariant(cachedUser);
 
     LOGV2_DEBUG(20226, 1, "Returning user from cache", "user"_attr = userName);
