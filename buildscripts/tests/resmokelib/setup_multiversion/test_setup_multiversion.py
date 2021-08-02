@@ -43,7 +43,7 @@ class TestSetupMultiversionBase(unittest.TestCase):
             install_dir="install",
             link_dir="link",
             edition=edition,
-            platform=platform,
+            mv_platform=platform,
             architecture=architecture,
             use_latest=False,
             versions=["4.2.1"],

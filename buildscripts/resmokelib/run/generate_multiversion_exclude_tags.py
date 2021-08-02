@@ -2,11 +2,9 @@
 import logging
 import os
 import re
-import sys
 import tempfile
 from collections import defaultdict
 from subprocess import check_output
-from sys import platform
 
 import requests
 
@@ -14,6 +12,7 @@ from buildscripts.ciconfig import tags as _tags
 from buildscripts.resmokelib import multiversionconstants
 from buildscripts.resmokelib.config import MultiversionOptions
 from buildscripts.resmokelib.core.programs import get_path_env_var
+from buildscripts.resmokelib.utils import is_windows
 from buildscripts.util.fileops import read_yaml_file
 
 BACKPORT_REQUIRED_TAG = "backport_required_multiversion"
@@ -26,15 +25,16 @@ BACKPORTS_REQUIRED_BASE_URL = "https://raw.githubusercontent.com/mongodb/mongo"
 
 def get_backports_required_hash_for_shell_version(mongo_shell_path=None):
     """Parse the old shell binary to get the commit hash."""
-    env_vars = {}
-    path = get_path_env_var(env_vars=env_vars)
-    env_vars["PATH"] = os.pathsep.join(path)
+    env_vars = os.environ.copy()
+    paths = get_path_env_var(env_vars=env_vars)
+    env_vars["PATH"] = os.pathsep.join(paths)
 
-    if platform.startswith("win"):
-        shell_version = check_output([mongo_shell_path + ".exe", "--version"],
-                                     env=env_vars).decode('utf-8')
-    else:
-        shell_version = check_output([mongo_shell_path, "--version"], env=env_vars).decode('utf-8')
+    mongo_shell = mongo_shell_path
+    if is_windows():
+        mongo_shell = mongo_shell_path + ".exe"
+
+    shell_version = check_output(f"{mongo_shell} --version", shell=True,
+                                 env=env_vars).decode('utf-8')
     for line in shell_version.splitlines():
         if "gitVersion" in line:
             version_line = line.split(':')[1]

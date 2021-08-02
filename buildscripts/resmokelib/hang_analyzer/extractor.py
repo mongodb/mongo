@@ -2,6 +2,7 @@
 
 import glob
 import os
+import platform
 import shutil
 import tarfile
 import time
@@ -9,6 +10,8 @@ import time
 from buildscripts.resmokelib import config
 from buildscripts.resmokelib.run import compare_start_time
 from buildscripts.resmokelib.setup_multiversion.setup_multiversion import SetupMultiversion
+from buildscripts.resmokelib.utils import is_windows
+from buildscripts.resmokelib.utils.filesystem import build_hygienic_bin_path
 
 _DEBUG_FILE_BASE_NAMES = ['mongo', 'mongod', 'mongos']
 
@@ -65,7 +68,7 @@ def _extracted_files_to_copy():
     out = []
     for ext in ['debug', 'dSYM', 'pdb']:
         for file in _DEBUG_FILE_BASE_NAMES:
-            haystack = os.path.join('dist-test', 'bin', '{file}.{ext}'.format(file=file, ext=ext))
+            haystack = build_hygienic_bin_path(child='{file}.{ext}'.format(file=file, ext=ext))
             for needle in glob.glob(haystack):
                 out.append((needle, os.path.join(os.getcwd(), os.path.basename(needle))))
     return out
@@ -77,11 +80,11 @@ def download_debug_symbols(root_logger, download_url):
 
     while True:
         try:
+            install_dir_list = []
             SetupMultiversion.setup_mongodb(artifacts_url=None, binaries_url=None,
-                                            symbols_url=download_url, install_dir=os.getcwd())
-
+                                            symbols_url=download_url, install_dir=os.getcwd(),
+                                            install_dir_list=install_dir_list)
             break
-
         except tarfile.ReadError:
             root_logger.info("Debug symbols unavailable after %s secs, retrying in %s secs",
                              compare_start_time(time.time()), retry_secs)

@@ -12,6 +12,7 @@ from buildscripts import mongosymb
 from buildscripts.resmokelib.plugin import PluginInterface, Subcommand
 from buildscripts.resmokelib.setup_multiversion.setup_multiversion import SetupMultiversion, _DownloadOptions
 from buildscripts.resmokelib.utils import evergreen_conn
+from buildscripts.resmokelib.utils.filesystem import build_hygienic_bin_path
 
 _HELP = """
 Symbolize a backtrace JSON file given an Evergreen Task ID.
@@ -151,8 +152,8 @@ class Symbolizer(Subcommand):
             raise ValueError(f"Must not specify path_to_executable, the original path that "
                              f"generated the symbols will be used: {sym_search_path}")
         # TODO: support non-hygienic builds.
-        self.mongosym_args.path_to_executable = os.path.join(self.dest_dir, "dist-test", "bin",
-                                                             self.bin_name)
+        self.mongosym_args.path_to_executable = build_hygienic_bin_path(
+            parent=self.dest_dir, child=self.bin_name)
 
         self.mongosym_args.src_dir_to_move = self.dest_dir
 

@@ -16,7 +16,7 @@ import yaml
 
 from buildscripts.resmokelib.plugin import PluginInterface, Subcommand
 from buildscripts.resmokelib.setup_multiversion import config, download, github_conn
-from buildscripts.resmokelib.utils import evergreen_conn
+from buildscripts.resmokelib.utils import evergreen_conn, is_windows
 
 SUBCOMMAND = "setup-multiversion"
 
@@ -44,17 +44,17 @@ class SetupMultiversion(Subcommand):
     """Main class for the setup multiversion subcommand."""
 
     # pylint: disable=too-many-instance-attributes
-    def __init__(self, download_options, install_dir="", link_dir="", platform=None, edition=None,
-                 architecture=None, use_latest=None, versions=None, evergreen_config=None,
-                 github_oauth_token=None, debug=None, ignore_failed_push=False):
+    def __init__(self, download_options, install_dir="", link_dir="", mv_platform=None,
+                 edition=None, architecture=None, use_latest=None, versions=None,
+                 evergreen_config=None, github_oauth_token=None, debug=None,
+                 ignore_failed_push=False):
         """Initialize."""
         setup_logging(debug)
-        cwd = os.getcwd()
-        self.install_dir = os.path.join(cwd, install_dir)
-        self.link_dir = os.path.join(cwd, link_dir)
+        self.install_dir = os.path.abspath(install_dir)
+        self.link_dir = os.path.abspath(link_dir)
 
         self.edition = edition.lower() if edition else None
-        self.platform = platform.lower() if platform else None
+        self.platform = mv_platform.lower() if mv_platform else None
         self.architecture = architecture.lower() if architecture else None
         self.use_latest = use_latest
         self.versions = versions
@@ -71,6 +71,9 @@ class SetupMultiversion(Subcommand):
         with open(config.SETUP_MULTIVERSION_CONFIG) as file_handle:
             raw_yaml = yaml.safe_load(file_handle)
         self.config = config.SetupMultiversionConfig(raw_yaml)
+
+        self._is_windows = is_windows()
+        self._windows_bin_install_dirs = []
 
     @staticmethod
     def _get_bin_suffix(version, evg_project_id):
@@ -108,7 +111,6 @@ class SetupMultiversion(Subcommand):
                 install_dir = os.path.join(self.install_dir, version)
 
                 self.download_and_extract_from_urls(urls, bin_suffix, install_dir)
-
             except (github_conn.GithubConnError, evergreen_conn.EvergreenConnError,
                     download.DownloadError) as ex:
                 LOGGER.error(ex)
@@ -130,7 +132,18 @@ class SetupMultiversion(Subcommand):
                 download_symbols_url = urls.get(" mongo-debugsymbols.zip", None)
 
         self.setup_mongodb(artifacts_url, binaries_url, download_symbols_url, install_dir,
-                           bin_suffix, self.link_dir)
+                           bin_suffix, link_dir=self.link_dir,
+                           install_dir_list=self._windows_bin_install_dirs)
+
+        if self._is_windows:
+            self._write_windows_install_paths(self._windows_bin_install_dirs)
+
+    @staticmethod
+    def _write_windows_install_paths(paths):
+        with open(config.WINDOWS_BIN_PATHS_FILE, "w") as out:
+            out.write(os.pathsep.join(paths))
+
+        LOGGER.info(f"Finished writing binary paths on Windows to {config.WINDOWS_BIN_PATHS_FILE}")
 
     def get_latest_urls(self, version):
         """Return latest urls."""
@@ -204,7 +217,7 @@ class SetupMultiversion(Subcommand):
 
     @staticmethod
     def setup_mongodb(artifacts_url, binaries_url, symbols_url, install_dir, bin_suffix=None,
-                      link_dir=None):
+                      link_dir=None, install_dir_list=None):
         # pylint: disable=too-many-arguments
         """Download, extract and symlink."""
 
@@ -225,7 +238,17 @@ class SetupMultiversion(Subcommand):
                     try_download(url)
 
         if binaries_url is not None:
-            download.symlink_version(bin_suffix, install_dir, link_dir)
+            if not link_dir:
+                raise ValueError("link_dir must be specified if downloading binaries")
+
+            if not is_windows():
+                link_dir = download.symlink_version(bin_suffix, install_dir, link_dir)
+            else:
+                LOGGER.info(
+                    "Linking to install_dir on Windows; executable have to live in different working"
+                    " directories to avoid DLLs for different versions clobbering each other")
+                link_dir = download.symlink_version(bin_suffix, install_dir, None)
+            install_dir_list.append(link_dir)
 
     def get_buildvariant_name(self, major_minor_version):
         """Return buildvariant name.
@@ -269,7 +292,7 @@ class SetupMultiversionPlugin(PluginInterface):
                                             da=args.download_artifacts)
 
         return SetupMultiversion(install_dir=args.install_dir, link_dir=args.link_dir,
-                                 platform=args.platform, edition=args.edition,
+                                 mv_platform=args.platform, edition=args.edition,
                                  architecture=args.architecture, use_latest=args.use_latest,
                                  versions=args.versions, download_options=download_options,
                                  evergreen_config=args.evergreen_config,

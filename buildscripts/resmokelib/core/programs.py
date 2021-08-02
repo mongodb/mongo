@@ -42,10 +42,7 @@ def make_process(*args, **kwargs):
 
 def get_path_env_var(env_vars):
     """Return the path base on provided environment variable."""
-    path = [
-        os.getcwd(),
-        config.DEFAULT_MULTIVERSION_DIR,
-    ]
+    path = [os.getcwd()] + config.DEFAULT_MULTIVERSION_DIRS
     # If installDir is provided, add it early to the path
     if config.INSTALL_DIR is not None:
         path.append(config.INSTALL_DIR)
