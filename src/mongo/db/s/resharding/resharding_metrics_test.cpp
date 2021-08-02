@@ -49,7 +49,9 @@ namespace {
 using namespace fmt::literals;
 
 constexpr auto kOpTimeRemaining = "remainingOperationTimeEstimatedSecs"_sd;
-constexpr auto kOplogBatchApplyLatencyMillis = "oplogBatchApplyLatencyMillis";
+constexpr auto kOplogApplierApplyBatchLatencyMillis = "oplogApplierApplyBatchLatencyMillis";
+constexpr auto kCollClonerFillBatchForInsertLatencyMillis =
+    "collClonerFillBatchForInsertLatencyMillis";
 
 class ReshardingMetricsTest : public ServiceContextTest {
 public:
@@ -129,15 +131,18 @@ public:
             << fmt::format("{}: {}", errMsg, report.toString());
     };
 
-    void appendExpectedHistogramResult(BSONObjBuilder& builder,
+    void appendExpectedHistogramResult(BSONObjBuilder* bob,
+                                       std::string tag,
                                        const std::vector<int64_t>& latencies) {
-        IntegerHistogram<kLatencyHistogramBucketsCount> hist(kOplogBatchApplyLatencyMillis,
-                                                             latencyHistogramBuckets);
+        IntegerHistogram<kLatencyHistogramBucketsCount> hist(tag, latencyHistogramBuckets);
         for (size_t i = 0; i < latencies.size(); i++) {
             hist.increment(latencies[i]);
         }
 
-        hist.append(builder, false);
+        BSONObjBuilder histogramBuilder;
+        hist.append(histogramBuilder, false);
+        BSONObj histogram = histogramBuilder.obj();
+        bob->appendElements(histogram);
     }
 
 private:
@@ -589,21 +594,34 @@ TEST_F(ReshardingMetricsTest, CurrentOpReportForRecipient) {
 
     BSONObjBuilder expectedBuilder(std::move(expectedPrefix));
 
-    // Append histogram data for batch oplog applies.
-    appendExpectedHistogramResult(expectedBuilder, {});
-    BSONObj expected = expectedBuilder.obj();
+    // Append histogram latency data.
+    appendExpectedHistogramResult(&expectedBuilder, kOplogApplierApplyBatchLatencyMillis, {});
+    appendExpectedHistogramResult(&expectedBuilder, kCollClonerFillBatchForInsertLatencyMillis, {});
+
+    BSONObj expected = expectedBuilder.done();
 
     const auto report = getMetrics()->reportForCurrentOp(options);
     ASSERT_BSONOBJ_EQ(expected, report);
 }
 
-TEST_F(ReshardingMetricsTest, TestOplogBatchLatencyHistogramForRecipient) {
-    const std::vector<int64_t> latencies_1{3, 427, 0, 6004, 320, 10056, 12300, 105, 70};
-    const std::vector<int64_t> latencies_2{800, 20, 5, 1025, 10567};
+TEST_F(ReshardingMetricsTest, TestHistogramMetricsForRecipient) {
+    const std::vector<int64_t> applyLatencies_1{3, 427, 0, 6004, 320, 10056, 12300, 105, 70};
+    const std::vector<int64_t> applyLatencies_2{800, 20, 5, 1025, 10567};
+    const std::vector<int64_t> insertLatencies_1{120, 7, 110, 50, 0, 16500, 77000, 667, 7980};
+    const std::vector<int64_t> insertLatencies_2{12450, 2400, 760, 57, 2};
 
-    std::vector<int64_t> allLatencies;
-    allLatencies.insert(allLatencies.end(), latencies_1.begin(), latencies_1.end());
-    allLatencies.insert(allLatencies.end(), latencies_2.begin(), latencies_2.end());
+    const auto combineLatencies = [](std::vector<int64_t>* allLatencies,
+                                     const std::vector<int64_t>& latencies_1,
+                                     const std::vector<int64_t>& latencies_2) {
+        allLatencies->insert(allLatencies->end(), latencies_1.begin(), latencies_1.end());
+        allLatencies->insert(allLatencies->end(), latencies_2.begin(), latencies_2.end());
+    };
+
+    std::vector<int64_t> allApplyLatencies;
+    combineLatencies(&allApplyLatencies, applyLatencies_1, applyLatencies_2);
+    std::vector<int64_t> allInsertLatencies;
+    combineLatencies(&allInsertLatencies, insertLatencies_1, insertLatencies_2);
+
 
     const ReshardingMetrics::ReporterOptions options(
         ReshardingMetrics::Role::kRecipient,
@@ -612,31 +630,54 @@ TEST_F(ReshardingMetricsTest, TestOplogBatchLatencyHistogramForRecipient) {
         BSON("id" << 1),
         false);
 
-    // First test that histogram metrics appear in currentOp. Next, test that histogram metrics
-    // accumulate in cumulativeOp.
-    const size_t kNumTests = 2;
-    std::vector<int64_t> testLatencies[kNumTests] = {latencies_1, latencies_2};
-    std::vector<int64_t> expectedLatencies[kNumTests] = {latencies_1, allLatencies};
+    // Test that all histogram metrics appear in both currentOp and cumulativeOp.
+    const size_t kNumTests = 4;
+    std::vector<int64_t> testLatencies[kNumTests] = {
+        applyLatencies_1, applyLatencies_2, insertLatencies_1, insertLatencies_2};
+    std::vector<int64_t> expectedLatencies[kNumTests] = {
+        applyLatencies_1, allApplyLatencies, insertLatencies_1, allInsertLatencies};
     OpReportType testReportTypes[kNumTests] = {OpReportType::CurrentOpReportRecipientRole,
+                                               OpReportType::CumulativeReport,
+                                               OpReportType::CurrentOpReportRecipientRole,
                                                OpReportType::CumulativeReport};
+    std::string histogramTag[kNumTests] = {kOplogApplierApplyBatchLatencyMillis,
+                                           kOplogApplierApplyBatchLatencyMillis,
+                                           kCollClonerFillBatchForInsertLatencyMillis,
+                                           kCollClonerFillBatchForInsertLatencyMillis};
 
     auto testLatencyHistogram = [&](std::vector<int64_t> latencies,
                                     OpReportType reportType,
-                                    std::vector<int64_t> expectedLatencies) {
+                                    std::vector<int64_t> expectedLatencies,
+                                    std::string histogramTag) {
+        LOGV2(57700,
+              "TestHistogramMetricsForRecipient test case",
+              "reportType"_attr = reportType,
+              "histogramTag"_attr = histogramTag);
+
         startOperation(ReshardingMetrics::Role::kRecipient);
 
-        getMetrics()->setRecipientState(RecipientStateEnum::kApplying);
+        RecipientStateEnum state = (histogramTag.compare(kOplogApplierApplyBatchLatencyMillis) == 0
+                                        ? RecipientStateEnum::kApplying
+                                        : RecipientStateEnum::kCloning);
+        getMetrics()->setRecipientState(state);
+
         for (size_t i = 0; i < latencies.size(); i++) {
-            getMetrics()->onApplyOplogBatch(Milliseconds(latencies[i]));
+            if (histogramTag.compare(kOplogApplierApplyBatchLatencyMillis) == 0) {
+                getMetrics()->onOplogApplierApplyBatch(Milliseconds(latencies[i]));
+            } else if (histogramTag.compare(kCollClonerFillBatchForInsertLatencyMillis) == 0) {
+                getMetrics()->onCollClonerFillBatchForInsert(Milliseconds(latencies[i]));
+            } else {
+                MONGO_UNREACHABLE;
+            }
         }
 
         const auto report = getReport(reportType);
-        const auto buckets = report[kOplogBatchApplyLatencyMillis];
+        const auto buckets = report[histogramTag];
 
         BSONObjBuilder expectedBuilder;
-        appendExpectedHistogramResult(expectedBuilder, expectedLatencies);
-        const auto expectedHist = expectedBuilder.obj();
-        const auto expectedBuckets = expectedHist[kOplogBatchApplyLatencyMillis];
+        appendExpectedHistogramResult(&expectedBuilder, histogramTag, expectedLatencies);
+        const auto expectedHist = expectedBuilder.done();
+        const auto expectedBuckets = expectedHist[histogramTag];
 
         ASSERT_EQ(buckets.woCompare(expectedBuckets), 0);
 
@@ -645,7 +686,8 @@ TEST_F(ReshardingMetricsTest, TestOplogBatchLatencyHistogramForRecipient) {
     };
 
     for (size_t i = 0; i < kNumTests; i++) {
-        testLatencyHistogram(testLatencies[i], testReportTypes[i], expectedLatencies[i]);
+        testLatencyHistogram(
+            testLatencies[i], testReportTypes[i], expectedLatencies[i], histogramTag[i]);
     }
 }
 

@@ -141,7 +141,8 @@ function verifyCurrentOpOutput(reshardingTest, inputCollection) {
         "totalApplyTimeElapsedSecs": undefined,
         "recipientState": undefined,
         "opStatus": "running",
-        "oplogBatchApplyLatencyMillis": undefined,
+        "oplogApplierApplyBatchLatencyMillis": undefined,
+        "collClonerFillBatchForInsertLatencyMillis": undefined,
     };
 
     reshardingTest.recipientShardNames.forEach(function(shardName) {
