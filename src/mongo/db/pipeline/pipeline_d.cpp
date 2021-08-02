@@ -187,8 +187,11 @@ createRandomCursorExecutor(const CollectionPtr& coll,
     } else if (expCtx->ns.isTimeseriesBucketsCollection()) {
         // We can't take ARHASH optimization path for a direct $sample on the system.buckets
         // collection because data is in compressed form. If we did have a direct $sample on the
-        // system.buckets collection, then the 'bucketUnpacker' would not be set up properly.
-        if (!bucketUnpacker) {
+        // system.buckets collection, then the 'bucketUnpacker' would not be set up properly. We
+        // also should bail out early if a $sample is made against a time series collection that is
+        // empty. If we don't the 'minAdvancedToWorkRatio' can be nan/-nan depending on the
+        // architecture.
+        if (!(bucketUnpacker && numRecords)) {
             return std::pair{nullptr, false};
         }
 
