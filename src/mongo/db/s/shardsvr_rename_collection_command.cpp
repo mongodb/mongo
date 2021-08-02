@@ -34,6 +34,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/s/rename_collection_coordinator.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
+#include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/cluster_commands_helpers.h"
@@ -82,6 +83,10 @@ public:
                                   << " must be called with majority writeConcern, got "
                                   << opCtx->getWriteConcern().wMode,
                     opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+
+            if (fromNss.db() != toNss.db()) {
+                sharding_ddl_util::checkDbPrimariesOnTheSameShard(opCtx, fromNss, toNss);
+            }
 
             validateNamespacesForRenameCollection(opCtx, fromNss, toNss);
 
