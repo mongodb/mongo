@@ -60,7 +60,7 @@ OpMsgRequest opMsgRequestFromLegacyRequest(const Message& message) {
                           << ") for $cmd type ns - can only be 1 or -1",
             qm.ntoreturn == 1 || qm.ntoreturn == -1);
 
-    return rpc::upconvertRequest(
+    return upconvertRequest(
         ns.db(), qm.query.shareOwnershipWith(message.sharedBuffer()), qm.queryOptions);
 }
 

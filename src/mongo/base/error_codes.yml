@@ -443,6 +443,8 @@ error_codes:
 
     - {code: 351, name: ChangeStreamStartAfterInvalidate, extra: ChangeStreamStartAfterInvalidateInfo}
     
+    - {code: 352, name: UnsupportedOpQueryCommand}
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)

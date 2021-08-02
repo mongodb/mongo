@@ -409,54 +409,6 @@ TEST_F(DBClientCursorTest, DBClientCursorMoreThrowsExceptionWhenMoreToComeFlagSe
     ASSERT_THROWS_CODE(cursor.more(), DBException, 50935);
 }
 
-TEST_F(DBClientCursorTest, DBClientCursorIgnoresExhaustForOpQueryMessages) {
-    // Set up the DBClientCursor and a mock client connection. If we set the server RPC protocol to
-    // OpQuery, then when we assemble a command request in DBClientCursor, we will make a command
-    // style OpQuery request, as opposed to an OpMsg request. We want to make sure that for command
-    // style OpQuery requests, we ignore the exhaust option, and that cursor queries work normally.
-    DBClientConnectionForTest conn;
-    conn.setSupportedProtocols(rpc::supports::kOpQueryOnly);
-
-    const NamespaceString nss("test", "coll");
-    DBClientCursor cursor(
-        &conn, NamespaceStringOrUUID(nss), Query().obj, 0, 0, nullptr, QueryOption_Exhaust, 0);
-    cursor.setBatchSize(0);
-
-    // Set up mock 'find' response.
-    const long long cursorId = 42;
-    Message findResponseMsg = mockFindResponse(nss, cursorId, {});
-
-    conn.setCallResponse(findResponseMsg);
-    ASSERT(cursor.init());
-
-    // Verify that the initial 'find' request was sent.
-    auto m = conn.getLastSentMessage();
-    ASSERT(!m.empty());
-    QueryMessage queryMsg(m);
-    ASSERT_EQ(queryMsg.query.getStringField("find"), nss.coll());
-    ASSERT_EQ(queryMsg.query["batchSize"].number(), 0);
-    ASSERT_EQ(0, queryMsg.queryOptions);
-
-    // Create and set a non-exhaust getMore response.
-    cursor.setBatchSize(2);
-    auto getMoreResponseMsg = mockGetMoreResponse(nss, cursorId, {docObj(1), docObj(2)});
-    conn.setCallResponse(getMoreResponseMsg);
-
-    // Trigger another 'getMore' request.
-    conn.clearLastSentMessage();
-    ASSERT(cursor.more());
-
-    // Make sure the sent request has no exhaust query options set.
-    m = conn.getLastSentMessage();
-    ASSERT(!m.empty());
-    queryMsg = QueryMessage(m);
-    ASSERT_EQ(queryMsg.query["getMore"].number(), cursorId);
-    ASSERT_EQ(queryMsg.query["collection"].str(), nss.coll());
-    ASSERT_EQ(0, queryMsg.queryOptions);
-    ASSERT_BSONOBJ_EQ(docObj(1), cursor.next());
-    ASSERT_BSONOBJ_EQ(docObj(2), cursor.next());
-}
-
 TEST_F(DBClientCursorTest, DBClientCursorPassesReadOnceFlag) {
 
     // Set up the DBClientCursor and a mock client connection.

@@ -56,4 +56,17 @@ void warnDeprecation(Client& client, StringData op);
  */
 Status onUpdateOfWireOpsWarningPeriod(const int&);
 
+/**
+ * Logs a warning message and throws if 'cmd' is not an allowed 'OP_QUERY' command.
+ *
+ * OP_QUERY commands are no longer serviced by mongos or mongod processes, with the following
+ * exceptions.
+ *
+ * - The isMaster/ismaster/hello OP_QUERY commands are allowed for connection handshake.
+ *
+ * - The _isSelf/saslContinue/saslStart OP_QUERY commands are allowed for intra-cluster
+ * communication in a mixed version cluster. V5.0 nodes may send those commands as OP_QUERY ones.
+ */
+void checkAllowedOpQueryCommand(Client& client, StringData cmd);
+
 }  // namespace mongo

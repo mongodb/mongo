@@ -834,15 +834,13 @@ private:
 
     /**
      * The rpc protocols this client supports.
-     *
      */
-    rpc::ProtocolSet _clientRPCProtocols{rpc::supports::kAll};
+    rpc::ProtocolSet _clientRPCProtocols{rpc::supports::kOpMsgOnly};
 
     /**
-     * The rpc protocol the remote server(s) support. We support 'opQueryOnly' by default unless
-     * we detect support for OP_MSG at connection time.
+     * The rpc protocol the remote server(s) support.
      */
-    rpc::ProtocolSet _serverRPCProtocols{rpc::supports::kOpQueryOnly};
+    rpc::ProtocolSet _serverRPCProtocols{rpc::supports::kOpMsgOnly};
 
     rpc::RequestMetadataWriter _metadataWriter;
     rpc::ReplyMetadataReader _metadataReader;

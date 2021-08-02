@@ -37,6 +37,7 @@
 #include <string>
 
 #include "mongo/db/client.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/rpc/deprecated_wire_ops_gen.h"
@@ -108,4 +109,24 @@ void warnDeprecation(Client& client, StringData op) {
                 "op"_attr = op,
                 "clientInfo"_attr = clientInfo);
 }
+
+void checkAllowedOpQueryCommand(Client& client, StringData cmd) {
+    static constexpr std::array allowedOpQueryCommands{
+        "_isSelf"_sd,
+        "hello"_sd,
+        "isMaster"_sd,
+        "ismaster"_sd,
+        "saslContinue"_sd,
+        "saslStart"_sd,
+    };
+
+    if (std::find(allowedOpQueryCommands.begin(), allowedOpQueryCommands.end(), cmd) ==
+        allowedOpQueryCommands.end()) {
+        warnDeprecation(client, networkOpToString(dbQuery));
+        globalOpCounters.gotQueryDeprecated();
+        uasserted(ErrorCodes::UnsupportedOpQueryCommand,
+                  "Unsupported OP_QUERY command: {}"_format(cmd));
+    }
+}
+
 }  // namespace mongo

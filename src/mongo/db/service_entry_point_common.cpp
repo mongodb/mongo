@@ -1432,11 +1432,6 @@ void ExecCommandDatabase::_initiateCommand() {
         globalOpCounters.gotCommand();
     }
 
-    if (!isHello() && _execContext->getMessage().operation() == dbQuery) {
-        warnDeprecation(*client, networkOpToString(dbQuery));
-        globalOpCounters.gotQueryDeprecated();
-    }
-
     // Parse the 'maxTimeMS' command option, and use it to set a deadline for the operation on the
     // OperationContext. The 'maxTimeMS' option unfortunately has a different meaning for a getMore
     // command, where it is used to communicate the maximum time to wait for new inserts on tailable
@@ -1731,7 +1726,13 @@ void curOpCommandSetup(OperationContext* opCtx, const OpMsgRequest& request) {
 }
 
 Future<void> parseCommand(std::shared_ptr<HandleRequest::ExecutionContext> execContext) try {
-    execContext->setRequest(rpc::opMsgRequestFromAnyProtocol(execContext->getMessage()));
+    const auto& msg = execContext->getMessage();
+    auto opMsgReq = rpc::opMsgRequestFromAnyProtocol(msg);
+    if (msg.operation() == dbQuery) {
+        checkAllowedOpQueryCommand(*(execContext->getOpCtx()->getClient()),
+                                   opMsgReq.getCommandName());
+    }
+    execContext->setRequest(opMsgReq);
     return Status::OK();
 } catch (const DBException& ex) {
     // Need to set request as `makeCommandResponse` expects an empty request on failure.

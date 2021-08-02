@@ -864,11 +864,6 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
         _shouldAffectCommandCounter = true;
     }
 
-    if (_parc->_opType == dbQuery && !_parc->_isHello.get()) {
-        warnDeprecation(*opCtx->getClient(), networkOpToString(dbQuery));
-        globalOpCounters.gotQueryDeprecated();
-    }
-
     return Status::OK();
 }
 
@@ -1158,7 +1153,11 @@ private:
 void ClientCommand::_parseMessage() try {
     const auto& msg = _rec->getMessage();
     _rec->setReplyBuilder(rpc::makeReplyBuilder(rpc::protocolForMessage(msg)));
-    _rec->setRequest(rpc::opMsgRequestFromAnyProtocol(msg));
+    auto opMsgReq = rpc::opMsgRequestFromAnyProtocol(msg);
+    if (msg.operation() == dbQuery) {
+        checkAllowedOpQueryCommand(*(_rec->getOpCtx()->getClient()), opMsgReq.getCommandName());
+    }
+    _rec->setRequest(opMsgReq);
 } catch (const DBException& ex) {
     // If this error needs to fail the connection, propagate it out.
     if (ErrorCodes::isConnectionFatalMessageParseError(ex.code()))

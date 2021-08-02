@@ -891,8 +891,7 @@ private:
         auto svcCtx = _client->getServiceContext();
         auto sep = svcCtx->getServiceEntryPoint();
         auto opMsgRequest = OpMsgRequest::fromDBAndBody(kAdminDB, cmdBuilder->obj());
-        auto requestMessage = rpc::messageFromOpMsgRequest(
-            rpc::supports::kAll, rpc::supports::kOpQueryOnly, opMsgRequest);
+        auto requestMessage = rpc::messageFromOpMsgRequest(rpc::Protocol::kOpMsg, opMsgRequest);
 
         // Switch to our local client and create a short-lived opCtx for this transaction op.
         AlternativeClientRegion clientRegion(_client);
