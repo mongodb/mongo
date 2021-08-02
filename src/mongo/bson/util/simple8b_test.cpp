@@ -69,8 +69,11 @@ void testSimple8b(const std::vector<boost::optional<uint64_t>>& expectedValues,
 
     auto data = builder.data();
     auto len = builder.len();
+
     ASSERT_EQ(len, expectedBinary.size());
-    ASSERT_EQ(memcmp(data, expectedBinary.data(), builder.len()), 0);
+    if (len > 0) {
+        ASSERT_EQ(memcmp(data, expectedBinary.data(), builder.len()), 0);
+    }
 
     Simple8b s8b(builder.data(), builder.len());
     assertValuesEqual(s8b, expectedValues);
