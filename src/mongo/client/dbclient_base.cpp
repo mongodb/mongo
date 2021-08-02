@@ -119,15 +119,11 @@ enum QueryOptions DBClientBase::_lookupAvailableOptions() {
 }
 
 rpc::ProtocolSet DBClientBase::getClientRPCProtocols() const {
-    return _clientRPCProtocols;
+    return rpc::supports::kOpMsgOnly;
 }
 
 rpc::ProtocolSet DBClientBase::getServerRPCProtocols() const {
     return _serverRPCProtocols;
-}
-
-void DBClientBase::setClientRPCProtocols(rpc::ProtocolSet protocols) {
-    _clientRPCProtocols = std::move(protocols);
 }
 
 void DBClientBase::_setServerRPCProtocols(rpc::ProtocolSet protocols) {

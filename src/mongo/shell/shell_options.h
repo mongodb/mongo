@@ -77,8 +77,6 @@ struct ShellGlobalParams {
     bool shouldRetryWrites = false;
     bool shouldUseImplicitSessions = true;
 
-    boost::optional<rpc::ProtocolSet> rpcProtocols = boost::none;
-
     int jsHeapLimitMB = 0;
     bool nokillop = false;
     Seconds idleSessionTimeout = Seconds{0};

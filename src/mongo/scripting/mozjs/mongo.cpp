@@ -72,7 +72,6 @@ const JSFunctionSpec MongoBase::methods[] = {
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(isReplicaSetConnection, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(_markNodeAsFailed, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(logout, MongoExternalInfo),
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(setClientRPCProtocols, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(getMinWireVersion, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(getMaxWireVersion, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(isReplicaSetMember, MongoExternalInfo),
@@ -478,24 +477,6 @@ void MongoBase::Functions::getClientRPCProtocols::call(JSContext* cx, JS::CallAr
     auto protoStr = clientRPCProtocols.getValue().toString();
 
     ValueReader(cx, args.rval()).fromStringData(protoStr);
-}
-
-void MongoBase::Functions::setClientRPCProtocols::call(JSContext* cx, JS::CallArgs args) {
-    auto conn = getConnection(args);
-
-    if (args.length() != 1)
-        uasserted(ErrorCodes::BadValue, "setClientRPCProtocols needs 1 arg");
-    if (!args.get(0).isString())
-        uasserted(ErrorCodes::BadValue, "first argument to setClientRPCProtocols must be a string");
-
-    std::string rpcProtosStr = ValueWriter(cx, args.get(0)).toString();
-
-    auto clientRPCProtocols = rpc::parseProtocolSet(rpcProtosStr);
-    uassertStatusOK(clientRPCProtocols);
-
-    conn->setClientRPCProtocols(clientRPCProtocols.getValue());
-
-    args.rval().setUndefined();
 }
 
 void MongoBase::Functions::getServerRPCProtocols::call(JSContext* cx, JS::CallArgs args) {

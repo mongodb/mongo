@@ -629,11 +629,6 @@ void onConnect(DBClientBase& c, StringData uri) {
         return;
     }
 
-    // Only override the default rpcProtocols if they were set on the command line.
-    if (shellGlobalParams.rpcProtocols) {
-        c.setClientRPCProtocols(*shellGlobalParams.rpcProtocols);
-    }
-
     connectionRegistry.registerConnection(c, uri);
 }
 

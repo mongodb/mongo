@@ -171,8 +171,6 @@ public:
     rpc::ProtocolSet getClientRPCProtocols() const;
     rpc::ProtocolSet getServerRPCProtocols() const;
 
-    void setClientRPCProtocols(rpc::ProtocolSet clientProtocols);
-
     /**
      * actualServer is set to the actual server where they call went if there was a choice (for
      * example SecondaryOk).
@@ -831,11 +829,6 @@ private:
                                       int options);
 
     auth::RunCommandHook _makeAuthRunCommandHook();
-
-    /**
-     * The rpc protocols this client supports.
-     */
-    rpc::ProtocolSet _clientRPCProtocols{rpc::supports::kOpMsgOnly};
 
     /**
      * The rpc protocol the remote server(s) support.
