@@ -29,15 +29,12 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
-#include "mongo/db/s/dist_lock_manager.h"
 #include "mongo/db/s/shard_key_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
@@ -57,8 +54,6 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            const NamespaceString& nss = ns();
-
             uassert(ErrorCodes::IllegalOperation,
                     "_configsvrRefineCollectionShardKey can only be run on config servers",
                     serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
@@ -72,27 +67,6 @@ public:
                     "Cannot refine collection shard key while the node is being upgraded or "
                     "downgraded",
                     !fcvRegion->isUpgradingOrDowngrading());
-
-            const boost::optional<bool>& isFromPrimaryShard = request().getIsFromPrimaryShard();
-            if (isFromPrimaryShard && *isFromPrimaryShard) {
-                // If the request has been received from the primary shard, the distributed lock has
-                // already been acquired.
-                return _internalRun(opCtx);
-            }
-
-            // TODO SERVER-54810 don't acquire distributed lock on CSRS after 5.0 has branched out.
-            // The request has been received from a last-lts router, acquire distlocks on the
-            // namespace's database and collection.
-            DistLockManager::ScopedDistLock dbDistLock(uassertStatusOK(
-                DistLockManager::get(opCtx)->lock(opCtx,
-                                                  nss.db(),
-                                                  "refineCollectionShardKey",
-                                                  DistLockManager::kDefaultLockTimeout)));
-            DistLockManager::ScopedDistLock collDistLock(uassertStatusOK(
-                DistLockManager::get(opCtx)->lock(opCtx,
-                                                  nss.ns(),
-                                                  "refineCollectionShardKey",
-                                                  DistLockManager::kDefaultLockTimeout)));
 
             _internalRun(opCtx);
         }

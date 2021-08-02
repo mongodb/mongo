@@ -95,9 +95,6 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
             ConfigsvrRefineCollectionShardKey configsvrRefineCollShardKey(
                 nss(), _newShardKey.toBSON(), cm.getVersion().epoch());
             configsvrRefineCollShardKey.setDbName(nss().db().toString());
-            // TODO SERVER-54810 don't set `setIsFromPrimaryShard` once 5.0 becomes last-LTS
-            configsvrRefineCollShardKey.setIsFromPrimaryShard(true);
-
             auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
             try {
