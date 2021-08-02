@@ -90,7 +90,6 @@ static constexpr uint8_t kRleMultiplier = 120;
 
 // Mask to obtain the base and extended selectors.
 static constexpr uint64_t kBaseSelectorMask = 0x000000000000000F;
-static constexpr uint64_t kExtendedSelectorMask = 0x00000000000000F0;
 
 // Selectors are always of size 4
 static constexpr uint8_t kSelectorBits = 4;
@@ -123,6 +122,9 @@ constexpr std::array<uint8_t, 4> kTrailingZerosMask = {
 constexpr std::array<uint8_t, 4> kTrailingZerosMultiplier = {
     0, 1, kNibbleShiftSize, kNibbleShiftSize};
 
+// Transfer from the base selector to the shift size.
+constexpr std::array<uint8_t, 15> kBaseSelectorToShiftSize = {
+    0, 0, 0, 0, 0, 0, 0, 4, 4, 0, 0, 0, 0, 0};
 
 // Transfer from a selector to a specific extension type
 // This is for selector 7 and 8 extensions where the selector value is passed along with
@@ -648,13 +650,16 @@ uint64_t Simple8bBuilder<T>::_encode(Func func, uint8_t selectorIdx, uint8_t ext
     invariant(
         !(selectorIdx > kMaxSelector[extensionType] || selectorIdx < kMinSelector[extensionType]));
 
-    uint64_t encodedWord = kExtensionToBaseSelector[extensionType][selectorIdx];
+    uint8_t baseSelector = kExtensionToBaseSelector[extensionType][selectorIdx];
+    uint8_t bitShiftExtension = kBaseSelectorToShiftSize[baseSelector];
+    uint64_t encodedWord = baseSelector;
     uint8_t bitsPerInteger = kBitsPerIntForSelector[extensionType][selectorIdx];
     uint8_t integersCoded = kIntsStoreForSelector[extensionType][selectorIdx];
     uint64_t unshiftedMask = kDecodeMask[extensionType][selectorIdx];
     uint8_t bitsForTrailingZeros = kTrailingZeroBitSize[extensionType];
     for (uint8_t i = 0; i < integersCoded; ++i) {
-        uint8_t shiftSize = (bitsPerInteger + bitsForTrailingZeros) * i + kSelectorBits;
+        uint8_t shiftSize =
+            (bitsPerInteger + bitsForTrailingZeros) * i + kSelectorBits + bitShiftExtension;
         uint64_t currEncodedWord;
         if (_pendingValues[i].skip) {
             currEncodedWord = unshiftedMask;
@@ -664,7 +669,7 @@ uint64_t Simple8bBuilder<T>::_encode(Func func, uint8_t selectorIdx, uint8_t ext
         encodedWord |= currEncodedWord << shiftSize;
     }
     if (extensionType != kBaseSelector) {
-        encodedWord |= (uint64_t(selectorIdx) << 60);
+        encodedWord |= (uint64_t(selectorIdx) << kSelectorBits);
     }
     return encodedWord;
 }
@@ -688,36 +693,39 @@ template <typename T>
 void Simple8b<T>::Iterator::_loadBlock() {
     _current = LittleEndian<uint64_t>::load(*_pos);
 
-    uint8_t selector = _current & kBaseSelectorMask;
+    _selector = _current & kBaseSelectorMask;
+    uint8_t selectorExtension = ((_current >> kSelectorBits) & kBaseSelectorMask);
 
     // If RLE selector, just load remaining count. Keep value from previous.
-    if (selector == kRleSelector) {
+    if (_selector == kRleSelector) {
         // Set shift to something larger than 64bit to force a new block to be loaded when
         // we've extinguished RLE count.
         _shift = (sizeof(_current) * 8) + 1;
-        _rleRemaining = _rleCountInCurrent() - 1;
+        _rleRemaining = _rleCountInCurrent(selectorExtension) - 1;
         return;
     }
 
-    uint8_t extensionType = kBaseSelector;
+    _extensionType = kBaseSelector;
+    uint8_t extensionBits = 0;
 
     // If Selectors 7 or 8 check if we are using extended selectors
-    if (selector == 7 || selector == 8) {
-        uint8_t selectorExtension = ((_current >> 60) & kBaseSelectorMask);
-        extensionType = kSelectorToExtension[selector - 7][selectorExtension];
+    if (_selector == 7 || _selector == 8) {
+        _extensionType = kSelectorToExtension[_selector - 7][selectorExtension];
         // Use the extended selector if extension is != 0
-        if (extensionType != kBaseSelector) {
-            selector = selectorExtension;
+        if (_extensionType != kBaseSelector) {
+            _selector = selectorExtension;
+            // Make shift the size of 2 selectors to handle extensions
         }
+        extensionBits = 4;
     }
 
     // Initialize all variables needed to advance the iterator for this block
-    _mask = kDecodeMask[extensionType][selector];
-    _countMask = kTrailingZerosMask[extensionType];
-    _countBits = kTrailingZeroBitSize[extensionType];
-    _countMultiplier = kTrailingZerosMultiplier[extensionType];
-    _bitsPerValue = kBitsPerIntForSelector[extensionType][selector] + _countBits;
-    _shift = kSelectorBits;
+    _mask = kDecodeMask[_extensionType][_selector];
+    _countMask = kTrailingZerosMask[_extensionType];
+    _countBits = kTrailingZeroBitSize[_extensionType];
+    _countMultiplier = kTrailingZerosMultiplier[_extensionType];
+    _bitsPerValue = kBitsPerIntForSelector[_extensionType][_selector] + _countBits;
+    _shift = kSelectorBits + extensionBits;
     _rleRemaining = 0;
 
     // Finally load the first value in the block.
@@ -742,22 +750,18 @@ void Simple8b<T>::Iterator::_loadValue() {
 }
 
 template <typename T>
-uint16_t Simple8b<T>::Iterator::_rleCountInCurrent() const {
-    return (((_current & kExtendedSelectorMask) >> kSelectorBits) + 1) * kRleMultiplier;
+size_t Simple8b<T>::Iterator::blockSize() const {
+    if (_selector == kRleSelector) {
+        uint8_t selectorExtension = (_current >> kSelectorBits) & kBaseSelectorMask;
+        return _rleCountInCurrent(selectorExtension);
+    }
+    return kIntsStoreForSelector[_extensionType][_selector];
 }
 
 template <typename T>
-size_t Simple8b<T>::Iterator::blockSize() const {
-    uint8_t selector = _current & kBaseSelectorMask;
-    uint8_t extensionType = kBaseSelector;
-    if (selector == 7 || selector == 8) {
-        uint8_t selectorExtension = ((_current >> 60) & kBaseSelectorMask);
-        extensionType = kSelectorToExtension[selector - 7][selectorExtension];
-        if (extensionType != kBaseSelector) {
-            selector = selectorExtension;
-        }
-    }
-    return kIntsStoreForSelector[extensionType][selector];
+uint16_t Simple8b<T>::Iterator::_rleCountInCurrent(uint8_t selectorExtension) const {
+    // SelectorExtension holds the rle count in this case
+    return (selectorExtension + 1) * kRleMultiplier;
 }
 
 template <typename T>

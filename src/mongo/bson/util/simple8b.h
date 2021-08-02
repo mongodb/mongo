@@ -253,7 +253,7 @@ public:
         /**
          * RLE count, may only be called if iterator is positioned on an RLE block
          */
-        uint16_t _rleCountInCurrent() const;
+        uint16_t _rleCountInCurrent(uint8_t selectorExtension) const;
 
         const uint64_t* _pos;
         const uint64_t* _end;
@@ -285,6 +285,12 @@ public:
 
         // Multiplier of the value in count to get number of zeros
         uint8_t _countMultiplier;
+
+        // Holds the current simple8b block's selector
+        uint8_t _selector;
+
+        // Holds the current simple8b blocks's extension type
+        uint8_t _extensionType;
     };
 
     /**

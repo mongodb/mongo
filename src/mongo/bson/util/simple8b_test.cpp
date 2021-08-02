@@ -166,7 +166,7 @@ TEST(Simple8b, EncodeWithTrailingDirtyBits) {
     // The selector is 8 and there are 7 bucket with the same value 0b00000001.
     // The last 4 bits are dirty/unused.
     std::vector<uint8_t> expectedBinary{
-        0x18, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x0};  // 1st word.
+        0x08, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01};  // 1st word.
 
     testSimple8b(expectedInts, expectedBinary);
 }
@@ -248,14 +248,14 @@ TEST(Simple8b, BreakPendingIntoMultipleSimple8bBlocks) {
         0x24,  // 2nd word.
         // The selector is 7 and there are 8 bucket of 0b01 except the last bucket which is 0b1111.
         // 0xE0 = 0b11100000 and 0x1 = 0x00000001 and together the last bucket is 0b1111.
-        0x17,
-        0x8,
-        0x4,
-        0x2,
+        0x07,
         0x81,
         0x40,
-        0xE0,
-        0x1  // 3rd word.
+        0x20,
+        0x10,
+        0x08,
+        0x04,
+        0x1E  // 3rd word.
     };
 
     testSimple8b(expectedInts, expectedBinary);
@@ -495,22 +495,21 @@ TEST(Simple8b, MultipleFlushes) {
 TEST(Simple8b, Selector7BaseTest) {
     // 57344 = 1110000000000000 = 3 value bits and 13 zeros
     // This should be encoded as:
-    // [0010] [(111) (1101)] x 8 [0111] = 602C00B0607D81F7
+    // [(111) (1101)] x 8 [0010] [0111] = FBF7EFDFBF7EFD27
     // This is in hex: 2FBF7EFDFBF7EFD7
     uint64_t val = 57344;
 
     std::vector<boost::optional<uint64_t>> expectedInts(8, val);
 
     // test that buffer was correct
-    std::vector<uint8_t> expectedBinary = {0xD7, 0xEF, 0xF7, 0xFB, 0xFD, 0x7E, 0xBF, 0x2F};
+    std::vector<uint8_t> expectedBinary = {0x27, 0xFD, 0x7E, 0xBF, 0xDF, 0xEF, 0xF7, 0xFB};
     testSimple8b(expectedInts, expectedBinary);
 }
 
 TEST(Simple8b, Selector7BaseTestAndSkips) {
     // 57344 = 1110000000000000 = 3 value bits and 13 zeros
     // This should be encoded with alternating skips as:
-    // [0010] [(111) (1111) (111) (1101)] x 4 [0111] = 602C00B0607D81F7
-
+    // [(111) (1111) (111) (1101)] x 4 [0010] [0111] = FFF7FFDFFF7FFD27
     uint64_t val = 57344;
     std::vector<boost::optional<uint64_t>> expectedInts;
 
@@ -520,7 +519,7 @@ TEST(Simple8b, Selector7BaseTestAndSkips) {
     }
 
     // test that buffer was correct
-    std::vector<uint8_t> expectedBinary = {0xD7, 0xFF, 0xF7, 0xFF, 0xFD, 0x7F, 0xFF, 0x2F};
+    std::vector<uint8_t> expectedBinary = {0x27, 0xFD, 0x7F, 0xFF, 0xDF, 0xFF, 0xF7, 0xFF};
     testSimple8b(expectedInts, expectedBinary);
 }
 
@@ -529,8 +528,7 @@ TEST(Simple8b, Selector7SingleZero) {
     // This should not be encoded with selector 7  since it will take 4 extra bits to store the
     // count of zeros
     // This should be encoded as:
-    // [0000] [11110] x 12 [0101] = F7BDEF7BDEF7BDE5
-
+    // [11110] x 12 [0101] = F7BDEF7BDEF7BDE5
     uint64_t val = 30;
     std::vector<boost::optional<uint64_t>> expectedInts(12, val);
 
@@ -543,13 +541,12 @@ TEST(Simple8b, Selector7SkipEncoding) {
     // 229376 = 111000000000000000 = 3 value bits and 15 zeros which would be stored as 111-1111
     // using selector 7. However, we will add a padding bit to store as 0111-1111
     // This should be encoded as:
-    // [0011] [(0111) (1111)] x7 [0111] = 37F7F7F7F7F7F7F7
-
+    // [(0111) (1111)] x7 [0011] [0111] = 7F7F7F7F7F7F7F37
     uint64_t val = 229376;
     std::vector<boost::optional<uint64_t>> expectedInts(7, val);
 
     // test that buffer was correct
-    std::vector<uint8_t> expectedBinary = {0xF7, 0xF7, 0xF7, 0xF7, 0xF7, 0xF7, 0xF7, 0x37};
+    std::vector<uint8_t> expectedBinary = {0x37, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F};
     testSimple8b(expectedInts, expectedBinary);
 }
 
@@ -557,8 +554,8 @@ TEST(Simpl8b, Selector7IntegrationWithBaseEncoding) {
     // Base value = 1011 = 11
     // Selector 7 value = 12615680 = 110000000001 + 15 zeros.
     // We should encode this as:
-    // [0110] [(01100000001) (1111)] x 2 [(00000001011) (0000)] x 2 [0111] = 6607D81F02C00B07
-
+    // [(01100000001) (1111)] x 2 [(00000001011) (0000)] x 2 [0110] [0111] = 607
+    // D81F02C00B067
     uint64_t val = 11;
     std::vector<boost::optional<uint64_t>> expectedInts(2, val);
 
@@ -566,7 +563,7 @@ TEST(Simpl8b, Selector7IntegrationWithBaseEncoding) {
     expectedInts.insert(expectedInts.end(), 2, val);
 
     // test that buffer was correct
-    std::vector<uint8_t> expectedBinary = {0x07, 0x0B, 0xC0, 0x02, 0x1F, 0xD8, 0x07, 0x66};
+    std::vector<uint8_t> expectedBinary = {0x67, 0xB0, 0x00, 0x2C, 0xF0, 0x81, 0x7D, 0x60};
     testSimple8b(expectedInts, expectedBinary);
 }
 
@@ -574,8 +571,8 @@ TEST(Simpl8b, Selector7IntegrationWithBaseEncodingOppositeDirection) {
     // Base value = 1011 = 11
     // Selector 7 value = 12615680 = 110000000001 + 15 zeros.
     // We should encode this as:
-    // [0110] [(00000001011) (0000)] x 2 [(01100000001) (1111)] x 2 [0111] = 602C00B0607D81F7
-
+    // [(00000001011) (0000)] x 2 [(01100000001) (1111)] x 2 [0110] [0111] = 2C0
+    // 0B0607D81F67
 
     uint64_t val = 12615680;
     std::vector<boost::optional<uint64_t>> expectedInts(2, val);
@@ -584,20 +581,21 @@ TEST(Simpl8b, Selector7IntegrationWithBaseEncodingOppositeDirection) {
     expectedInts.insert(expectedInts.end(), 2, val);
 
     // test that buffer was correct
-    std::vector<uint8_t> expectedBinary = {0xF7, 0x81, 0x7D, 0x060, 0xB0, 0x00, 0x2C, 0x60};
+    std::vector<uint8_t> expectedBinary = {0x67, 0x1F, 0xD8, 0x07, 0x06, 0x0B, 0xC0, 0x02};
     testSimple8b(expectedInts, expectedBinary);
 }
 
 TEST(Simple8b, Selector8SmallBaseTest) {
     // 0x500000 = 101 + 20 zeros. This should be stored as (0101 0101) where the second value of 4
     // is the nibble shift of 5*4. The first value is 0101 because we store at least 4 bits. This
-    // should be encoded as [0001] [(0101) (0101)] x 7 [1000] = 1555555555555551
-
+    // should be encoded as
+    // [(0101) (0101)] x 7 [0001] [1000] = 7575757575757518
+    //
     uint64_t val = 0x500000;
     std::vector<boost::optional<uint64_t>> expectedInts(7, val);
 
     // test that buffer was correct
-    std::vector<uint8_t> expectedBinary = {0x58, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x15};
+    std::vector<uint8_t> expectedBinary = {0x18, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55};
     testSimple8b(expectedInts, expectedBinary);
 }
 
@@ -606,8 +604,7 @@ TEST(Simple8b, Selector8SmallBaseTestAndSkip) {
     // the nibble shift of 4*4. The first value is 0111 because we  store at least 4 values. Then we
     // have a value of all 1s for skip.
     // This should be encoded as
-    // [1000] [(0111) (0101)] [(1111 1111) (0111 0101)] x 3 [1000] = 175FF75FF75FF758
-
+    // [(0111) (0101)] [(1111 1111) (0111 0101)] x 3 [0001] [1000] = 75FF75FF75FF7518
     uint64_t val = 7340032;
     std::vector<boost::optional<uint64_t>> expectedInts;
     expectedInts.push_back(val);
@@ -617,16 +614,17 @@ TEST(Simple8b, Selector8SmallBaseTestAndSkip) {
     }
 
     // test that buffer was correct
-    std::vector<uint8_t> expectedBinary = {0x58, 0xF7, 0x5F, 0xF7, 0x5F, 0xF7, 0x5F, 0x17};
+    std::vector<uint8_t> expectedBinary = {0x18, 0x75, 0xFF, 0x75, 0xFF, 0x75, 0xFF, 0x75};
     testSimple8b(expectedInts, expectedBinary);
 }
 
 TEST(Simple8b, Selector8SmallSkipEncoding) {
     // A perfect skip value is one that aligns perfectly with the boundary. 1111 with 60 zeros does
     // that. They need to be padded with an extra zero and cause the Selector to be 2 instead of 1
-    // bumping out the last skip to the next block. This should be encoded as [0010] [(01111 1111) x
-    // 6] [1000] = 23FEFFFFBFFFEFF8
-
+    // bumping out the last skip to the next block.
+    // This should be encoded as
+    // [(01111 1111) x 6] [0010] [1000] = 3FEFFFFBFFFEFF28
+    //
     uint64_t val = 17293822569102704640ull;
     std::vector<boost::optional<uint64_t>> expectedInts;
     for (uint32_t i = 0; i < 3; i++) {
@@ -634,52 +632,32 @@ TEST(Simple8b, Selector8SmallSkipEncoding) {
         expectedInts.push_back(boost::none);
     }
 
-    // This will spill over in its own Simple-8b block
-    expectedInts.push_back(boost::none);
-
     // test that buffer was correct
-    std::vector<uint8_t> expectedBinary = {0xF8,
-                                           0xEF,
-                                           0xFF,
-                                           0xBF,
-                                           0xFF,
-                                           0xFF,
-                                           0xFE,
-                                           0x23,
-                                           0xFE,
-                                           0xFF,
-                                           0xFF,
-                                           0xFF,
-                                           0xFF,
-                                           0xFF,
-                                           0xFF,
-                                           0xFF};
+    std::vector<uint8_t> expectedBinary = {0x28, 0xFF, 0xFE, 0xFF, 0xFB, 0xFF, 0xEF, 0x3F};
     testSimple8b(expectedInts, expectedBinary);
 }
 
 TEST(Simple8b, Selector8SmallNibbleShift) {
     // 7864320 = 1111 + 19 zeros. This is a value that should have 3 trailing zeros due to nibble.
     // So we should encode as:
-    // [0011] [(1111000) (0100)] x 5 [1000] = 3784F09E13C27848
-
+    // [(1111000) (0100)] x 4 [0011] [1000] = 784F09E13C278438
     uint64_t val = 7864320;
     std::vector<boost::optional<uint64_t>> expectedInts(5, val);
 
     // test that buffer was correct
-    std::vector<uint8_t> expectedBinary = {0x48, 0x78, 0xC2, 0x13, 0x9E, 0xF0, 0x84, 0x37};
+    std::vector<uint8_t> expectedBinary = {0x38, 0x84, 0x27, 0x3C, 0xE1, 0x09, 0x4F, 0x78};
     testSimple8b(expectedInts, expectedBinary);
 }
 
 TEST(Simple8b, Selector8SmallBitsAndNibble) {
     // 549789368320 = 1(13 zeros)1 + 25 zeros. This is a value that should have 1 trailing zeros due
     // to nibble. So we should encode as:
-    // [0110] [(0000001(13 zeros)10) (0110)] x2 [1000] = 6008002600800268
-
+    // [(0000001(13 zeros)10) (0110)] x2 [0110] [1000] = 80026008002668
     uint64_t val = 549789368320;
     std::vector<boost::optional<uint64_t>> expectedInts(2, val);
 
     // test that buffer was correct
-    std::vector<uint8_t> expectedBinary = {0x68, 0x02, 0x80, 0x00, 0x26, 0x00, 0x08, 0x60};
+    std::vector<uint8_t> expectedBinary = {0x68, 0x26, 0x00, 0x08, 0x60, 0x02, 0x80, 0x00};
     testSimple8b(expectedInts, expectedBinary);
 }
 
@@ -689,7 +667,7 @@ TEST(Simple8b, Selector8SmallAddSelector7FirstThen8) {
     // selector 8 which is 7340032 (3 ones and 20 zeros). We should choose a selector requiring 4
     // valu bits to store these.
     // This should be encoded as
-    // [0001] [(0111) (0101) x 3] [(1110 0011) x 4] [1000] = 1757575E3E3E3E38
+    // [(0111) (0101) x 3] [(1110 0011) x 4] [0001] [1000] = 757575E3E3E3E318
     uint64_t val = 57344;
     std::vector<boost::optional<uint64_t>> expectedInts(4, val);
 
@@ -697,7 +675,7 @@ TEST(Simple8b, Selector8SmallAddSelector7FirstThen8) {
     expectedInts.insert(expectedInts.end(), 3, val);
 
     // test that buffer was correct
-    std::vector<uint8_t> expectedBinary = {0x38, 0x3E, 0x3E, 0x3E, 0x5E, 0x57, 0x57, 0x17};
+    std::vector<uint8_t> expectedBinary = {0x18, 0xE3, 0xE3, 0xE3, 0xE3, 0x75, 0x75, 0x75};
     testSimple8b(expectedInts, expectedBinary);
 }
 
@@ -706,7 +684,7 @@ TEST(Simple8b, Selector8SmallAddBaseSelectorThen7Then8) {
     // encoding. The first value of 6 is 110 which should be encoded as 0110 0000. The 57344 should
     // be encoded as 3 ones and 13 zeros. The next value requires selector 8 which is 7340032 (3
     // ones and 20 zeros). We should choose a selector requiring 4 valu bits to store these. This
-    // sohould be encoded as: [0001] [(0111) (0101) x 2] [(1110 0011) x 4] [0110 0000] [1000] =
+    // sohould be encoded as: [(0111) (0101) x 3] [(1110 0011) x 3] [0110 0000] [0001] [1000] =
     // 17575E3E3E3E3608
     uint64_t val = 6;
     std::vector<boost::optional<uint64_t>> expectedInts(1, val);
@@ -718,7 +696,7 @@ TEST(Simple8b, Selector8SmallAddBaseSelectorThen7Then8) {
     expectedInts.insert(expectedInts.end(), 2, val);
 
     // test that buffer was correct 17474E3E3E3E3608
-    std::vector<uint8_t> expectedBinary = {0x08, 0x36, 0x3E, 0x3E, 0x3E, 0x5E, 0x57, 0x17};
+    std::vector<uint8_t> expectedBinary = {0x18, 0x60, 0xE3, 0xE3, 0xE3, 0xE3, 0x75, 0x75};
     testSimple8b(expectedInts, expectedBinary);
 }
 
@@ -728,7 +706,8 @@ TEST(Simple8b, Selector8SmallStartWith8SelectorAndAddSmallerValues) {
     // and 20 zeros).  The 57344 should
     // be encoded as 3 ones and 13 zeros. The next value of 6 is 110 which should be encoded as 0110
     // 0000. We should choose a selector requiring 4 value bits to store these. This should be
-    // encoded as [0001] [0110 0000] [(1110 0011) x 3] [(0111) (0101) x 3] = 160E3E3E37575758
+    // encoded as
+    // [0110 0000] [(1110 0011) x 3] [(0111) (0101) x 3] [0001] [1000] = 60E3E3E375757518
 
     uint64_t val = 7340032;
     std::vector<boost::optional<uint64_t>> expectedInts(3, val);
@@ -740,7 +719,7 @@ TEST(Simple8b, Selector8SmallStartWith8SelectorAndAddSmallerValues) {
     expectedInts.insert(expectedInts.end(), 1, val);
 
     // test that buffer was correct
-    std::vector<uint8_t> expectedBinary = {0x58, 0x57, 0x57, 0x37, 0x3E, 0x3E, 0x0E, 0x16};
+    std::vector<uint8_t> expectedBinary = {0x18, 0x75, 0x75, 0x75, 0xE3, 0xE3, 0xE3, 0x60};
     testSimple8b(expectedInts, expectedBinary);
 }
 
@@ -916,26 +895,26 @@ TEST(Simple8b, RleFront) {
 TEST(Simple8b, EightSelectorLargeBase) {
     // 8462480737302404222943232 = 111 + 80 zeros. This should be stored as (0111 10100) where the
     // second value of 20 is the nibble shift of 4*20. The first value is 0111 because we store at
-    // least 4 values. This should be encoded as [1000] [(0111) (10100)] x6 [1000] =
+    // least 4 values. This should be encoded as [(0111) (10100)] x6 [1000] [1000] = //
     // 81E8F47A3D1E8F48
     uint128_t val("8462480737302404222943232");
     std::vector<boost::optional<uint128_t>> expectedInts = {val, val, val, val, val, val};
-    std::vector<uint8_t> expectedBinary = {0x48, 0x8F, 0x1E, 0x3D, 0x7A, 0xF4, 0xE8, 0x81};
+    std::vector<uint8_t> expectedBinary = {0x88, 0xF4, 0xE8, 0xD1, 0xA3, 0x47, 0x8F, 0x1E};
     testSimple8b(expectedInts, expectedBinary);
 }
 
 TEST(Simple8b, Selector8LargeBaseTestAndSkip) {
     // 8462480737302404222943232 = 111 + 80 zeros. This should be stored as (0111 10100) where the
     // second value of 20 is the nibble shift of 4*20. The first value is 0111 because we store at
-    // least 4 values. With skip this should be encoded as: [1000] [(1111) (11111) (0111) (10100)]
-    // x3 [1000] = 83FEF4FFBD3FEF48
+    // least 4 values. With skip this should be encoded as:
+    // [(1111) (11111) (0111) (10100)] x3 [1000] = 83FEF4FFBD3FEF48
     uint128_t val("8462480737302404222943232");
     std::vector<boost::optional<uint128_t>> expectedInts;
     for (uint32_t i = 0; i < 3; i++) {
         expectedInts.push_back(val);
         expectedInts.push_back(boost::none);
     }
-    std::vector<uint8_t> expectedBinary = {0x48, 0xEF, 0x3F, 0xBD, 0xFF, 0xF4, 0xFE, 0x83};
+    std::vector<uint8_t> expectedBinary = {0x88, 0xF4, 0xFE, 0xD3, 0xFB, 0x4F, 0xEF, 0x3F};
     testSimple8b(expectedInts, expectedBinary);
 }
 
@@ -943,20 +922,20 @@ TEST(Simple8b, Selector8LargeSkipEncoding) {
     // A perfect skip value is one that aligns perfectly with the boundary. 1111 with 124 zeros does
     // that.
     // This should be encoded as
-    // [1001] [(001111 11111) x 5] [1000] = 91FF3FE7FCFF9FF8
+    // [(001111 11111) x 5] [1001] [1000] = 1FF3FE7FCFF9FF98
     uint128_t val("319014718988379809496913694467282698240");
     std::vector<boost::optional<uint128_t>> expectedInts = {val, val, val, val, val};
-    std::vector<uint8_t> expectedBinary = {0xF8, 0x9F, 0xFF, 0xFC, 0xE7, 0x3F, 0xFF, 0x91};
+    std::vector<uint8_t> expectedBinary = {0x98, 0xFF, 0xF9, 0xCF, 0x7F, 0xFE, 0xF3, 0x1F};
     testSimple8b(expectedInts, expectedBinary);
 }
 
 TEST(Simple8b, Selector8LargeNibbleShift) {
     // 170141183460469231731687303715884105728= 1 + 127 zeros. This is a value that should have 3
-    // trailing zeros due to nibble. So we should encode as: [1000] [(1000) (11111)] x6 [1000] =
-    // 823F1F8FC7E3F1F8
+    // trailing zeros due to nibble. So we should encode as:
+    // [(1000) (11111)] x6 [1000] [1000] = 23F1F8FC7E3F1F88
     uint128_t val("170141183460469231731687303715884105728");
     std::vector<boost::optional<uint128_t>> expectedInts = {val, val, val, val, val, val};
-    std::vector<uint8_t> expectedBinary = {0xF8, 0xF1, 0xE3, 0xC7, 0x8F, 0x1F, 0x3F, 0x82};
+    std::vector<uint8_t> expectedBinary = {0x88, 0x1F, 0x3F, 0x7E, 0xFC, 0xF8, 0xF1, 0x23};
     testSimple8b(expectedInts, expectedBinary);
 }
 
@@ -964,9 +943,20 @@ TEST(Simple8b, Test128WithSmallValue) {
     // This tests that if we use a small int128_t, we still correctly store.
     // 57344 = 1110000000000000 = 3 value bits and 13 zeros
     // This should be encoded with alternating skips as:
-    // [0010] [(111) (1101)] x 8 [0111] = 2FBF7EFDFBF7EFD7
+    // [(111) (1101)] x 8 [0010] [0111] = FBF7EFDFBF7EFD27
     uint128_t val = 57344;
     std::vector<boost::optional<uint128_t>> expectedInts = {val, val, val, val, val, val, val, val};
-    std::vector<uint8_t> expectedBinary = {0xD7, 0xEF, 0xF7, 0xFB, 0xFD, 0x7E, 0xBF, 0x2F};
+    std::vector<uint8_t> expectedBinary = {0x27, 0xFD, 0x7E, 0xBF, 0xDF, 0xEF, 0xF7, 0xFB};
+    testSimple8b(expectedInts, expectedBinary);
+}
+
+TEST(Simple8b, Selector7FullSelector1) {
+    // Selector 7 value = 64 = 1 + 6 zeros.
+    // We should encode this as:
+    // [(01) (0110)] x 9 [0001] [0111] = 1659659659659617
+    std::vector<boost::optional<uint64_t>> expectedInts(9, 64);
+
+    // test that buffer was correct
+    std::vector<uint8_t> expectedBinary = {0x17, 0x96, 0x65, 0x59, 0x96, 0x65, 0x59, 0x16};
     testSimple8b(expectedInts, expectedBinary);
 }
