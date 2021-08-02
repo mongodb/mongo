@@ -22,6 +22,8 @@
 last-continuous:
   # Tests that should be excluded from ALL multiversion suites should be listed here.
   all:
+    - ticket: SERVER-57262
+      test_file: jstests/replsets/catchup_takeover_with_higher_config.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -192,6 +194,8 @@ last-lts:
       test_file: jstests/sharding/movechunk_parallel.js
     - ticket: SERVER-52906
       test_file: jstests/sharding/txn_writes_during_movechunk.js
+    - ticket: SERVER-57262
+      test_file: jstests/replsets/catchup_takeover_with_higher_config.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
