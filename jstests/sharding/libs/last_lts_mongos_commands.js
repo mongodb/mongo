@@ -11,6 +11,7 @@ const commandsAddedToMongosSinceLastLTS = [
     "abortReshardCollection",
     "cleanupReshardCollection",
     "commitReshardCollection",
+    "configureCollectionAutoSplitter",
     "reshardCollection",
     "rotateCertificates",
     "testDeprecation",
