@@ -3,8 +3,7 @@
  * currentOp command.
  *
  * @tags: [
- *   featureFlagShardingFullDDLSupport,
- *   disabled_due_to_server_58295
+ *   disabled_due_to_server_58295,
  * ]
  */
 (function() {

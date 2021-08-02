@@ -29,73 +29,18 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/s/dist_lock_manager.h"
 #include "mongo/db/s/rename_collection_coordinator.h"
-#include "mongo/db/s/sharded_rename_collection_gen.h"
-#include "mongo/db/s/sharding_ddl_50_upgrade_downgrade.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
-#include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/cluster_commands_helpers.h"
-#include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 
 namespace mongo {
 namespace {
-
-bool isCollectionSharded(OperationContext* opCtx, const NamespaceString& nss) {
-    try {
-        Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss);
-        return true;
-    } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-        // The collection is unsharded or doesn't exist
-        return false;
-    }
-}  // namespace
-
-bool renameIsAllowedOnNS(const NamespaceString& nss) {
-    if (nss.isSystem()) {
-        return nss.isLegalClientSystemNS(serverGlobalParams.featureCompatibility);
-    }
-
-    return !nss.isOnInternalDb();
-}
-
-RenameCollectionResponse renameCollectionLegacy(OperationContext* opCtx,
-                                                const ShardsvrRenameCollection& request,
-                                                const NamespaceString& fromNss) {
-    const auto& toNss = request.getTo();
-
-    auto fromDbDistLock = uassertStatusOK(DistLockManager::get(opCtx)->lock(
-        opCtx, fromNss.db(), "renameCollection", DistLockManager::kDefaultLockTimeout));
-
-    auto fromCollDistLock = uassertStatusOK(DistLockManager::get(opCtx)->lock(
-        opCtx, fromNss.ns(), "renameCollection", DistLockManager::kDefaultLockTimeout));
-
-    auto toCollDistLock = uassertStatusOK(DistLockManager::get(opCtx)->lock(
-        opCtx, toNss.ns(), "renameCollection", DistLockManager::kDefaultLockTimeout));
-
-    // Make sure that source and target collection are not sharded
-    uassert(ErrorCodes::IllegalOperation,
-            str::stream() << "source namespace '" << fromNss << "' must not be sharded",
-            !isCollectionSharded(opCtx, fromNss));
-    uassert(ErrorCodes::IllegalOperation,
-            str::stream() << "cannot rename to sharded collection '" << toNss << "'",
-            !isCollectionSharded(opCtx, toNss));
-
-    RenameCollectionOptions options{request.getDropTarget(), request.getStayTemp()};
-    validateAndRunRenameCollection(opCtx, fromNss, toNss, options);
-
-    return RenameCollectionResponse(ChunkVersion::UNSHARDED());
-}
 
 class ShardsvrRenameCollectionCommand final : public TypedCommand<ShardsvrRenameCollectionCommand> {
 public:
@@ -131,19 +76,6 @@ public:
             uassertStatusOK(shardingState->canAcceptShardedCommands());
 
             opCtx->setAlwaysInterruptAtStepDownOrUp();
-
-            FixedFCVRegion fixedFCVRegion(opCtx);
-
-            const bool useNewPath =
-                feature_flags::gShardingFullDDLSupport.isEnabled(*fixedFCVRegion);
-
-            if (fromNss.db() != toNss.db()) {
-                sharding_ddl_util::checkDbPrimariesOnTheSameShard(opCtx, fromNss, toNss);
-            }
-
-            if (!useNewPath) {
-                return renameCollectionLegacy(opCtx, req, fromNss);
-            }
 
             uassert(ErrorCodes::InvalidOptions,
                     str::stream() << Request::kCommandName

@@ -17,7 +17,6 @@
  *   # This test just performs rename operations that can't be executed in transactions
  *   does_not_support_transactions,
  *   # Can be removed once PM-1965-Milestone-1 is completed.
- *   featureFlagShardingFullDDLSupport
  *  ]
  */
 

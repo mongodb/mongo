@@ -686,7 +686,7 @@ protected:
     NamespaceString _originalNss = NamespaceString("db.foo");
     UUID _originalUUID = UUID::gen();
     OID _originalEpoch = OID::gen();
-    // TODO: SERVER-53066 Initialize it with a Timestamp.
+    // TODO: SERVER-58990 Initialize it with a Timestamp.
     boost::optional<Timestamp> _originalTimestamp;
 
     NamespaceString _tempNss = NamespaceString("db.system.resharding." + _originalUUID.toString());
@@ -695,7 +695,7 @@ protected:
 
     OID _finalEpoch = OID::gen();
     boost::optional<Timestamp>
-        _finalTimestamp;  // TODO: SERVER-53066 Initialize it with a Timestamp.
+        _finalTimestamp;  // TODO: SERVER-58990 Initialize it with a Timestamp.
 
     ShardKeyPattern _oldShardKey = ShardKeyPattern(BSON("oldSK" << 1));
     ShardKeyPattern _newShardKey = ShardKeyPattern(BSON("newSK" << 1));

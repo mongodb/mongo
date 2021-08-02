@@ -5,7 +5,6 @@
  *
  * @tags: [
  *   requires_sharding,
- *   featureFlagShardingFullDDLSupport,
  * ]
  */
 'use strict';

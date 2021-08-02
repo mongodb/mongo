@@ -10,7 +10,6 @@
  *   does_not_support_add_remove_shards,
  *   # Requires all nodes to be running the latest binary.
  *   multiversion_incompatible,
- *   featureFlagShardingFullDDLSupport,
  *  ]
  */
 

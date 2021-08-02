@@ -7,7 +7,6 @@
  *   requires_sharding,
  *   # TODO (SERVER-56879): Support add/remove shards in new DDL paths
  *   does_not_support_add_remove_shards,
- *   featureFlagShardingFullDDLSupport,
  *  ]
  */
 

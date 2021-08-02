@@ -188,7 +188,6 @@ env.Library(
         'shard_cannot_refresh_due_to_locks_held_exception.cpp',
         'shard_id.cpp',
         'shard_invalidated_for_targeting_exception.cpp',
-        'sharding_ddl_50_upgrade_downgrade.idl',
         'stale_exception.cpp',
         'type_collection_timeseries_fields.idl',
         'would_change_owning_shard_exception.cpp',

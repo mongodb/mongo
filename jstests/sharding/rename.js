@@ -33,19 +33,6 @@ jsTest.log('Testing renaming sharded collections');
 assert.commandWorked(
     s.s0.adminCommand({shardCollection: 'test.shardedColl', key: {_id: 'hashed'}}));
 
-const DDLFeatureFlagParam = assert.commandWorked(
-    s.configRS.getPrimary().adminCommand({getParameter: 1, featureFlagShardingFullDDLSupport: 1}));
-const isDDLFeatureFlagEnabled = DDLFeatureFlagParam.featureFlagShardingFullDDLSupport.value;
-// Ensure renaming to or from a sharded collection fails in the legacy path.
-if (!isDDLFeatureFlagEnabled) {
-    // Renaming from a sharded collection
-    assert.commandFailed(db.shardedColl.renameCollection('somethingElse'));
-
-    // Renaming to a sharded collection with dropTarget=true
-    const dropTarget = true;
-    assert.commandFailed(db.bar.renameCollection('shardedColl', dropTarget));
-}
-
 // Renaming to a sharded collection without dropTarget=true
 assert.commandFailed(db.bar.renameCollection('shardedColl'));
 

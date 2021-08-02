@@ -14,7 +14,6 @@
  *   does_not_support_stepdowns,
  *   # Can be removed once PM-1965-Milestone-1 is completed.
  *   does_not_support_transactions,
- *   featureFlagShardingFullDDLSupport
  *  ]
  */
 
