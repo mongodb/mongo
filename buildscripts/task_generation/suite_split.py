@@ -325,7 +325,8 @@ class SuiteSplitService:
 
         test_lists = self.split_strategy(tests_runtimes, execution_time_secs,
                                          self.config.max_sub_suites,
-                                         self.config.max_tests_per_suite)
+                                         self.config.max_tests_per_suite,
+                                         LOGGER.bind(task=params.task_name))
 
         return self.test_lists_to_suite(test_lists, params, tests_runtimes, test_stats)
 

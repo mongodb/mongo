@@ -1,5 +1,5 @@
 """Strategies for splitting tests into multiple sub-suites."""
-from typing import List, Callable, Optional
+from typing import List, Callable, Optional, Any
 
 import structlog
 
@@ -7,7 +7,7 @@ from buildscripts.util.teststats import TestRuntime
 
 LOGGER = structlog.getLogger(__name__)
 
-SplitStrategy = Callable[[List[TestRuntime], int, int, int], List[List[str]]]
+SplitStrategy = Callable[[List[TestRuntime], int, int, int, Any], List[List[str]]]
 FallbackStrategy = Callable[[List[str], int], List[List[str]]]
 
 
@@ -52,8 +52,8 @@ def _new_suite_needed(current_suite: List[TestRuntime], test_runtime: float,
 
 
 def greedy_division(tests_runtimes: List[TestRuntime], max_time_seconds: float,
-                    max_suites: Optional[int] = None,
-                    max_tests_per_suite: Optional[int] = None) -> List[List[str]]:
+                    max_suites: Optional[int] = None, max_tests_per_suite: Optional[int] = None,
+                    logger: Any = LOGGER) -> List[List[str]]:
     """
     Divide the given tests into suites.
 
@@ -70,18 +70,19 @@ def greedy_division(tests_runtimes: List[TestRuntime], max_time_seconds: float,
     :param max_time_seconds: Maximum runtime to add to a single bucket.
     :param max_suites: Maximum number of suites to create.
     :param max_tests_per_suite: Maximum number of tests to add to a single suite.
+    :param logger: Logger to write log output to.
     :return: List of Suite objects representing grouping of tests.
     """
     suites = []
     last_test_processed = len(tests_runtimes)
-    LOGGER.debug("Determines suites for runtime", max_runtime_seconds=max_time_seconds,
+    logger.debug("Determines suites for runtime", max_runtime_seconds=max_time_seconds,
                  max_suites=max_suites, max_tests_per_suite=max_tests_per_suite)
     current_test_list = []
     for idx, test_instance in enumerate(tests_runtimes):
-        LOGGER.debug("Adding test", test=test_instance)
+        logger.debug("Adding test", test=test_instance)
         if _new_suite_needed(current_test_list, test_instance.runtime, max_time_seconds,
                              max_tests_per_suite):
-            LOGGER.debug("Finished suite", test_runtime=test_instance.runtime,
+            logger.debug("Finished suite", test_runtime=test_instance.runtime,
                          max_time=max_time_seconds)
             if current_test_list:
                 suites.append(current_test_list)

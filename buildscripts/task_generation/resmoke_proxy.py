@@ -82,6 +82,7 @@ class ResmokeProxyService:
         :param generated_suite_filename: The name to use as the file name for generated suite file.
         :param test_list: List of tests used in suites.
         :param create_misc_suite: Whether or not a _misc suite file should be created.
+        :param build_variant: Build variant suite file is being rendered for.
         :return: Dictionary of rendered resmoke config files.
         """
         # pylint: disable=too-many-arguments
