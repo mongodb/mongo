@@ -49,8 +49,8 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
     ]
 
     restart_options = [
-        ('shutdown', dict(crash='false')),
-        ('crash', dict(crash='true')),
+        ('shutdown', dict(crash=False)),
+        ('crash', dict(crash=True)),
     ]
 
     scenarios = make_scenarios(in_memory_values, key_format_values, restart_options)
@@ -134,8 +134,17 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         upd_aborted = stat_cursor[stat.conn.txn_rts_upd_aborted][2]
         keys_removed = stat_cursor[stat.conn.txn_rts_keys_removed][2]
-        self.assertGreater(upd_aborted, 0)
-        self.assertGreater(keys_removed, 0)
+
+        # After restart (not crash) the stats for the aborted updates will be 0, as the updates
+        # will be aborted during shutdown, and on startup there will be no updates to be aborted.
+        # This is similar case with keys removed.
+        if not self.in_memory and not self.crash:
+            self.assertEqual(upd_aborted, 0)
+            self.assertEqual(keys_removed, 0)
+        else:
+            self.assertGreater(upd_aborted, 0)
+            self.assertGreater(keys_removed, 0)
+
         stat_cursor.close()
 
     def test_rollback_to_stable_with_history(self):
@@ -217,6 +226,15 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         upd_aborted = stat_cursor[stat.conn.txn_rts_upd_aborted][2]
         hs_removed = stat_cursor[stat.conn.txn_rts_hs_removed][2]
-        self.assertGreater(upd_aborted, 0)
+
+        # After restart (not crash) the stats for the aborted updates and history store removed will be 0,
+        # as the updates aborted and history store removed will occur during shutdown, and on startup there
+        # will be no updates to be removed.
         if not self.in_memory:
-            self.assertGreater(hs_removed, 0)
+            if self.crash:
+                self.assertGreater(hs_removed, 0)
+            else:
+                self.assertEqual(hs_removed, 0)
+                self.assertEqual(upd_aborted, 0)
+        else:
+            self.assertGreater(upd_aborted, 0)
