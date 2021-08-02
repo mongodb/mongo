@@ -82,10 +82,6 @@ public:
     // Returns a vector of strings representing the actions in the ActionSet.
     std::vector<std::string> getActionsAsStrings() const;
 
-    // Takes a comma-separated std::string of action type std::string representations and returns
-    // an int bitmask of the actions.
-    static Status parseActionSetFromString(const std::string& actionsString, ActionSet* result);
-
     // Takes a vector of action type std::string representations and writes into *result an
     // ActionSet of all valid actions encountered.
     // If it encounters any actions that it doesn't recognize, will put those into

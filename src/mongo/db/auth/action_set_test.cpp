@@ -38,37 +38,48 @@
 namespace mongo {
 namespace {
 
-TEST(ActionSetTest, ParseActionSetFromString) {
+TEST(ActionSetTest, ParseActionSetFromStringVector) {
     ActionSet result;
-    ASSERT_OK(ActionSet::parseActionSetFromString("find,insert,update,remove", &result));
+    std::vector<std::string> actions1 = {"find", "insert", "update", "remove"};
+    std::vector<std::string> actions2 = {"update", "find", "remove", "insert"};
+    std::vector<std::string> unrecognized;
+
+    ASSERT_OK(ActionSet::parseActionSetFromStringVector(actions1, &result, &unrecognized));
     ASSERT_TRUE(result.contains(ActionType::find));
     ASSERT_TRUE(result.contains(ActionType::insert));
     ASSERT_TRUE(result.contains(ActionType::update));
     ASSERT_TRUE(result.contains(ActionType::remove));
+    ASSERT_TRUE(unrecognized.empty());
 
     // Order of the strings doesn't matter
-    ASSERT_OK(ActionSet::parseActionSetFromString("update,find,remove,insert", &result));
+    ASSERT_OK(ActionSet::parseActionSetFromStringVector(actions2, &result, &unrecognized));
     ASSERT_TRUE(result.contains(ActionType::find));
     ASSERT_TRUE(result.contains(ActionType::insert));
     ASSERT_TRUE(result.contains(ActionType::update));
     ASSERT_TRUE(result.contains(ActionType::remove));
+    ASSERT_TRUE(unrecognized.empty());
 
-    ASSERT_OK(ActionSet::parseActionSetFromString("find", &result));
+    ASSERT_OK(ActionSet::parseActionSetFromStringVector({"find"}, &result, &unrecognized));
 
     ASSERT_TRUE(result.contains(ActionType::find));
     ASSERT_FALSE(result.contains(ActionType::insert));
     ASSERT_FALSE(result.contains(ActionType::update));
     ASSERT_FALSE(result.contains(ActionType::remove));
+    ASSERT_TRUE(unrecognized.empty());
 
-    ASSERT_OK(ActionSet::parseActionSetFromString("", &result));
+    ASSERT_OK(ActionSet::parseActionSetFromStringVector({""}, &result, &unrecognized));
 
     ASSERT_FALSE(result.contains(ActionType::find));
     ASSERT_FALSE(result.contains(ActionType::insert));
     ASSERT_FALSE(result.contains(ActionType::update));
     ASSERT_FALSE(result.contains(ActionType::remove));
+    ASSERT_TRUE(unrecognized.size() == 1);
+    ASSERT_TRUE(unrecognized.front().empty());
 
-    ASSERT_EQUALS(ErrorCodes::FailedToParse,
-                  ActionSet::parseActionSetFromString("INVALID INPUT", &result).code());
+    unrecognized.clear();
+    ASSERT_OK(ActionSet::parseActionSetFromStringVector({"INVALID INPUT"}, &result, &unrecognized));
+    ASSERT_TRUE(unrecognized.size() == 1);
+    ASSERT_TRUE(unrecognized.front() == "INVALID INPUT");
 }
 
 TEST(ActionSetTest, ToString) {
@@ -99,9 +110,14 @@ TEST(ActionSetTest, ToString) {
 
 TEST(ActionSetTest, IsSupersetOf) {
     ActionSet set1, set2, set3;
-    ASSERT_OK(ActionSet::parseActionSetFromString("find,update,insert", &set1));
-    ASSERT_OK(ActionSet::parseActionSetFromString("find,update,remove", &set2));
-    ASSERT_OK(ActionSet::parseActionSetFromString("find,update", &set3));
+    std::vector<std::string> actions1 = {"find", "update", "insert"};
+    std::vector<std::string> actions2 = {"find", "update", "remove"};
+    std::vector<std::string> actions3 = {"find", "update"};
+    std::vector<std::string> unrecognized;
+
+    ASSERT_OK(ActionSet::parseActionSetFromStringVector(actions1, &set1, &unrecognized));
+    ASSERT_OK(ActionSet::parseActionSetFromStringVector(actions2, &set2, &unrecognized));
+    ASSERT_OK(ActionSet::parseActionSetFromStringVector(actions3, &set3, &unrecognized));
 
     ASSERT_FALSE(set1.isSupersetOf(set2));
     ASSERT_TRUE(set1.isSupersetOf(set3));
@@ -115,8 +131,10 @@ TEST(ActionSetTest, IsSupersetOf) {
 
 TEST(ActionSetTest, anyAction) {
     ActionSet set;
+    std::vector<std::string> actions = {"anyAction"};
+    std::vector<std::string> unrecognized;
 
-    ASSERT_OK(ActionSet::parseActionSetFromString("anyAction", &set));
+    ASSERT_OK(ActionSet::parseActionSetFromStringVector(actions, &set, &unrecognized));
     ASSERT_TRUE(set.contains(ActionType::find));
     ASSERT_TRUE(set.contains(ActionType::insert));
     ASSERT_TRUE(set.contains(ActionType::anyAction));

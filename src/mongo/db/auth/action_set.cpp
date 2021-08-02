@@ -93,22 +93,6 @@ bool ActionSet::isSupersetOf(const ActionSet& other) const {
     return (_actions & other._actions) == other._actions;
 }
 
-Status ActionSet::parseActionSetFromString(const std::string& actionsString, ActionSet* result) {
-    std::vector<std::string> actionsList;
-    str::splitStringDelim(actionsString, &actionsList, ',');
-    std::vector<std::string> unrecognizedActions;
-    Status status = parseActionSetFromStringVector(actionsList, result, &unrecognizedActions);
-    invariant(status);
-    if (unrecognizedActions.empty()) {
-        return Status::OK();
-    }
-    std::string unrecognizedActionsString;
-    str::joinStringDelim(unrecognizedActions, &unrecognizedActionsString, ',');
-    return Status(ErrorCodes::FailedToParse,
-                  str::stream() << "Unrecognized action privilege strings: "
-                                << unrecognizedActionsString);
-}
-
 Status ActionSet::parseActionSetFromStringVector(const std::vector<std::string>& actionsVector,
                                                  ActionSet* result,
                                                  std::vector<std::string>* unrecognizedActions) {
