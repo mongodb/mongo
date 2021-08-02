@@ -16,6 +16,7 @@ env.Library(
         'collection_sharding_state.cpp',
         'database_sharding_state.cpp',
         'operation_sharding_state.cpp',
+        'resharding_donor_write_router.cpp',
         'sharding_migration_critical_section.cpp',
         'sharding_state.cpp',
         'transaction_coordinator_curop.cpp',
