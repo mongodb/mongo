@@ -46,6 +46,7 @@ components:
     local_directory_path: src/third_party/abseil-cpp-master
     team_owner: "Service Architecture"
     # Note: abseil exists in Black Duck, but not OpenHub
+    upgrade_suppression: TODO SERVER-58675
 
   Aladdin MD5:
     homepage_url: N/A
@@ -107,6 +108,7 @@ components:
     release_monitoring_id: 11526
     local_directory_path: src/third_party/fmt
     team_owner: "Security"
+    upgrade_suppression: TODO SERVER-57876
 
   google/s2geometry:
     homepage_url: https://github.com/google/s2geometry
@@ -330,6 +332,7 @@ components:
     local_directory_path: src/third_party/peglib
     team_owner: "Query"
     # Note: peglib exists in Black Duck, but not OpenHub
+    upgrade_suppression: TODO SERVER-57940
 
   zlib:
     homepage_url: https://www.zlib.net/
