@@ -162,7 +162,7 @@ void _extractAllElementsAlongBucketPath(const BSONObj& obj,
         }
         case 2: {
             // Unbucketing magic happens here.
-            for (const BSONElement e : obj) {
+            for (const BSONElement& e : obj) {
                 std::string subPath = e.fieldName();
                 if (!path.empty()) {
                     subPath.append("." + path);
