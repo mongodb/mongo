@@ -1,10 +1,6 @@
 /**
  * Checks that DDL command that use step-down resilient coordinators are shown when calling the
  * currentOp command.
- *
- * @tags: [
- *   featureFlagShardingFullDDLSupport
- * ]
  */
 (function() {
 'use strict';
