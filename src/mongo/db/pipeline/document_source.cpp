@@ -44,7 +44,6 @@
 #include "mongo/db/pipeline/document_source_sequential_document_cache.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
-#include "mongo/db/pipeline/semantic_analysis.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
@@ -141,41 +140,6 @@ intrusive_ptr<DocumentSource> DocumentSource::optimize() {
 namespace {
 
 /**
- * Returns a pair of pointers to $match stages, either of which can be null. The first entry in the
- * pair is a $match stage that can be moved before this stage, the second is a $match stage that
- * must remain after this stage.
- */
-std::pair<boost::intrusive_ptr<DocumentSourceMatch>, boost::intrusive_ptr<DocumentSourceMatch>>
-splitMatchByModifiedFields(const boost::intrusive_ptr<DocumentSourceMatch>& match,
-                           const DocumentSource::GetModPathsReturn& modifiedPathsRet) {
-    // Attempt to move some or all of this $match before this stage.
-    std::set<std::string> modifiedPaths;
-    switch (modifiedPathsRet.type) {
-        case DocumentSource::GetModPathsReturn::Type::kNotSupported:
-            // We don't know what paths this stage might modify, so refrain from swapping.
-            return {nullptr, match};
-        case DocumentSource::GetModPathsReturn::Type::kAllPaths:
-            // This stage modifies all paths, so cannot be swapped with a $match at all.
-            return {nullptr, match};
-        case DocumentSource::GetModPathsReturn::Type::kFiniteSet:
-            modifiedPaths = std::move(modifiedPathsRet.paths);
-            break;
-        case DocumentSource::GetModPathsReturn::Type::kAllExcept: {
-            DepsTracker depsTracker;
-            match->getDependencies(&depsTracker);
-
-            auto preservedPaths = modifiedPathsRet.paths;
-            for (auto&& rename : modifiedPathsRet.renames) {
-                preservedPaths.insert(rename.first);
-            }
-            modifiedPaths =
-                semantic_analysis::extractModifiedDependencies(depsTracker.fields, preservedPaths);
-        }
-    }
-    return std::move(*match).splitSourceBy(modifiedPaths, modifiedPathsRet.renames);
-}
-
-/**
  * Verifies whether or not a $group is able to swap with a succeeding $match stage. While ordinarily
  * $group can swap with a $match, it cannot if the following $match has an $exists predicate on _id,
  * and the $group has exactly one field as the $group key.  This is because every document will have
@@ -209,7 +173,8 @@ bool DocumentSource::pushMatchBefore(Pipeline::SourceContainer::iterator itr,
         // $match does not contain a text search predicate, which we do not attempt to optimize
         // because such a $match must already be the first stage in the pipeline. We can attempt to
         // swap the $match or part of the $match before ourselves.
-        auto splitMatch = splitMatchByModifiedFields(nextMatch, getModifiedPaths());
+        auto splitMatch =
+            DocumentSourceMatch::splitMatchByModifiedFields(nextMatch, getModifiedPaths());
         invariant(splitMatch.first || splitMatch.second);
 
         if (splitMatch.first) {

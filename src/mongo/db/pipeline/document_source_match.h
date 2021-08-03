@@ -78,6 +78,16 @@ public:
         const std::string& path,
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
+    /**
+     * Returns a pair of pointers to $match stages, either of which can be null. The first entry in
+     * the pair is a $match stage that can be moved before this stage, the second is a $match stage
+     * that must remain after this stage.
+     */
+    static std::pair<boost::intrusive_ptr<DocumentSourceMatch>,
+                     boost::intrusive_ptr<DocumentSourceMatch>>
+    splitMatchByModifiedFields(const boost::intrusive_ptr<DocumentSourceMatch>& match,
+                               const DocumentSource::GetModPathsReturn& modifiedPathsRet);
+
     DocumentSourceMatch(std::unique_ptr<MatchExpression> expr,
                         const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSource(kStageName, expCtx) {
@@ -123,7 +133,7 @@ public:
      * $and.
      */
     Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                     Pipeline::SourceContainer* container) final;
+                                                     Pipeline::SourceContainer* container) override;
 
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
 

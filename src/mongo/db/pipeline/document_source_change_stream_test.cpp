@@ -35,13 +35,16 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/bson/bson_helper.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_mock.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_object_match.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/pipeline/change_stream_rewrite_helpers.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_change_stream_add_post_image.h"
@@ -51,7 +54,7 @@
 #include "mongo/db/pipeline/document_source_change_stream_lookup_pre_image.h"
 #include "mongo/db/pipeline/document_source_change_stream_oplog_match.h"
 #include "mongo/db/pipeline/document_source_change_stream_transform.h"
-#include "mongo/db/pipeline/document_source_change_stream_unwind_transactions.h"
+#include "mongo/db/pipeline/document_source_change_stream_unwind_transaction.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_mock.h"
@@ -443,6 +446,10 @@ bool getCSOptimizationFeatureFlagValue() {
     return feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV();
 }
 
+bool getCSRewriteFeatureFlagValue() {
+    return feature_flags::gFeatureFlagChangeStreamsRewrite.isEnabledAndIgnoreFCV();
+}
+
 bool isChangeStreamsPreAndPostImagesEnabled() {
     return feature_flags::gFeatureFlagChangeStreamsPreAndPostImages.isEnabledAndIgnoreFCV();
 }
@@ -476,8 +483,11 @@ public:
     explicit ChangeStreamPipelineOptimizationTest() : ChangeStreamStageTest() {}
 
     void run() {
-        RAIIServerParameterControllerForTest controller("featureFlagChangeStreamsOptimization",
-                                                        true);
+        RAIIServerParameterControllerForTest controllerOptimization(
+            "featureFlagChangeStreamsOptimization", true);
+        ASSERT(getCSOptimizationFeatureFlagValue());
+        RAIIServerParameterControllerForTest controllerRewrite("featureFlagChangeStreamsRewrite",
+                                                               true);
         ASSERT(getCSOptimizationFeatureFlagValue());
         ChangeStreamStageTest::run();
     }
@@ -3449,6 +3459,7 @@ TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamWithSingleMatch) {
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
                            "$_internalChangeStreamUnwindTransaction",
+                           "$match",
                            "$_internalChangeStreamTransform",
                            "$_internalChangeStreamCheckInvalidate",
                            "$_internalChangeStreamCheckResumability",
@@ -3471,6 +3482,7 @@ TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamWithMultipleMatch) {
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
                            "$_internalChangeStreamUnwindTransaction",
+                           "$match",
                            "$_internalChangeStreamTransform",
                            "$_internalChangeStreamCheckInvalidate",
                            "$_internalChangeStreamCheckResumability",
@@ -3498,6 +3510,7 @@ TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamWithMultipleMatchAndRes
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
                            "$_internalChangeStreamUnwindTransaction",
+                           "$match",
                            "$_internalChangeStreamTransform",
                            "$_internalChangeStreamCheckInvalidate",
                            "$_internalChangeStreamCheckResumability",
@@ -3594,6 +3607,7 @@ TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamWithProjectMatchAndResu
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
                            "$_internalChangeStreamUnwindTransaction",
+                           "$match",
                            "$_internalChangeStreamTransform",
                            "$_internalChangeStreamCheckInvalidate",
                            "$_internalChangeStreamCheckResumability",
@@ -3928,6 +3942,7 @@ TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamWithAllStagesAndResumeT
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
                            "$_internalChangeStreamUnwindTransaction",
+                           "$match",
                            "$_internalChangeStreamTransform",
                            "$_internalChangeStreamCheckInvalidate",
                            "$_internalChangeStreamCheckResumability",
@@ -3943,5 +3958,169 @@ TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamWithAllStagesAndResumeT
                            "$_internalChangeStreamEnsureResumeTokenPresent"});
 }
 
+using ChangeStreamRewriteTest = AggregationContextFixture;
+
+TEST_F(ChangeStreamRewriteTest, RewritePredicateOnFieldOperationType) {
+    auto statusWithMatchExpression =
+        MatchExpressionParser::parse(fromjson("{'fullDocument.foo': 1, operationType: 'insert'}"),
+                                     getExpCtx(),
+                                     ExtensionsCallbackNoop(),
+                                     Pipeline::kAllowedMatcherFeatures);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        getExpCtx(), statusWithMatchExpression.getValue().get(), {"operationType"});
+    ASSERT(rewrittenMatchExpression);
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(rewrittenPredicate, fromjson("{op: {$eq: 'i'}}"));
+}
+
+TEST_F(ChangeStreamRewriteTest, RewriteOrPredicateOnFieldOperationType) {
+    auto statusWithMatchExpression = MatchExpressionParser::parse(
+        fromjson("{$or: [{operationType: 'insert'}, {operationType: 'update'}]}"),
+        getExpCtx(),
+        ExtensionsCallbackNoop(),
+        Pipeline::kAllowedMatcherFeatures);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        getExpCtx(), statusWithMatchExpression.getValue().get(), {"operationType"});
+    ASSERT(rewrittenMatchExpression);
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(rewrittenPredicate, fromjson("{$or: [{op: {$eq: 'i'}}, {op: {$eq: 'u'}}]}"));
+}
+
+TEST_F(ChangeStreamRewriteTest, RewriteOrPredicateOnRenameableFields) {
+    auto statusWithMatchExpression = MatchExpressionParser::parse(
+        fromjson("{$or: [{clusterTime: {$type: [17]}}, {lsid: {$type: [16]}}]}"),
+        getExpCtx(),
+        ExtensionsCallbackNoop(),
+        Pipeline::kAllowedMatcherFeatures);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        getExpCtx(), statusWithMatchExpression.getValue().get(), {"clusterTime", "lsid"});
+    ASSERT(rewrittenMatchExpression);
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
+                      fromjson("{$or: [{ts: {$type: [17]}}, {lsid: {$type: [16]}}]}"));
+}
+
+TEST_F(ChangeStreamRewriteTest, InexactRewriteOfAndWithUnrewritableChild) {
+    // Note that rewrite of {operationType: {$gt: ...}} is currently not supported.
+    auto statusWithMatchExpression = MatchExpressionParser::parse(
+        fromjson("{$and: [{lsid: {$type: [16]}}, {operationType: {$gt: 0}}]}"),
+        getExpCtx(),
+        ExtensionsCallbackNoop(),
+        Pipeline::kAllowedMatcherFeatures);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression =
+        change_stream_rewrite::rewriteFilterForFields(getExpCtx(),
+                                                      statusWithMatchExpression.getValue().get(),
+                                                      {"clusterTime", "lsid", "operationType"});
+    ASSERT(rewrittenMatchExpression);
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(rewrittenPredicate, fromjson("{$and: [{lsid: {$type: [16]}}]}"));
+}
+
+TEST_F(ChangeStreamRewriteTest, CannotRewriteOrWithUnrewritableChild) {
+    // Note that rewrite of {operationType: {$gt: ...}} is currently not supported.
+    auto statusWithMatchExpression = MatchExpressionParser::parse(
+        fromjson("{$and: [{clusterTime: {$type: [17]}}, "
+                 "{$or: [{lsid: {$type: [16]}}, {operationType: {$gt: 0}}]}]}"),
+        getExpCtx(),
+        ExtensionsCallbackNoop(),
+        Pipeline::kAllowedMatcherFeatures);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression =
+        change_stream_rewrite::rewriteFilterForFields(getExpCtx(),
+                                                      statusWithMatchExpression.getValue().get(),
+                                                      {"clusterTime", "lsid", "operationType"});
+    ASSERT(rewrittenMatchExpression);
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(rewrittenPredicate, fromjson("{$and: [{ts: {$type: [17]}}]}"));
+}
+
+TEST_F(ChangeStreamRewriteTest, InexactRewriteOfNorWithUnrewritableChild) {
+    // Note that rewrite of {operationType: {$gt: ...}} is currently not supported.
+    auto statusWithMatchExpression = MatchExpressionParser::parse(
+        fromjson("{$and: [{clusterTime: {$type: [17]}}, "
+                 "{$nor: [{lsid: {$type: [16]}}, {operationType: {$gt: 0}}]}]}"),
+        getExpCtx(),
+        ExtensionsCallbackNoop(),
+        Pipeline::kAllowedMatcherFeatures);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression =
+        change_stream_rewrite::rewriteFilterForFields(getExpCtx(),
+                                                      statusWithMatchExpression.getValue().get(),
+                                                      {"clusterTime", "lsid", "operationType"});
+    ASSERT(rewrittenMatchExpression);
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
+                      fromjson("{$and: [{ts: {$type: [17]}}, {$nor: [{lsid: {$type: [16]}}]}]}"));
+}
+
+TEST_F(ChangeStreamRewriteTest, CanRewriteExprWhenAllFieldsAreRenameable) {
+    auto statusWithMatchExpression = MatchExpressionParser::parse(
+        fromjson(
+            "{$expr: {$and: [{$eq: [{$tsSecond: '$clusterTime'}, 0]}, {$isNumber: '$lsid'}]}}"),
+        getExpCtx(),
+        ExtensionsCallbackNoop(),
+        Pipeline::kAllowedMatcherFeatures);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        getExpCtx(), statusWithMatchExpression.getValue().get(), {"clusterTime", "lsid"});
+    ASSERT(rewrittenMatchExpression);
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
+                      fromjson("{$expr: {$and: [{$eq: [{$tsSecond: ['$ts']}, {$const: 0}]}, "
+                               "{$isNumber: ['$lsid']}]}}"));
+}
+
+TEST_F(ChangeStreamRewriteTest, CannotRewriteExprWhenAnyFieldIsNotRenameable) {
+    auto statusWithMatchExpression = MatchExpressionParser::parse(
+        fromjson("{$expr: {$and: [{$eq: [{$tsSecond: '$clusterTime'}, 0]}, "
+                 "{$eq: ['$operationType', 'insert']}]}}"),
+        getExpCtx(),
+        ExtensionsCallbackNoop(),
+        Pipeline::kAllowedMatcherFeatures);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        getExpCtx(), statusWithMatchExpression.getValue().get(), {"clusterTime", "lsid"});
+    ASSERT(!rewrittenMatchExpression);
+}
+
+TEST_F(ChangeStreamRewriteTest, CannotInexactlyRewriteNegatedPredicate) {
+    // Note that rewrite of {operationType: {$gt: ...}} is currently not supported. The rewrite must
+    // discard the _entire_ $and, because it is the child of $nor, and the rewrite cannot use
+    // inexact rewrites of any children of $not or $nor.
+    auto statusWithMatchExpression = MatchExpressionParser::parse(
+        fromjson("{$nor: [{clusterTime: {$type: [17]}}, "
+                 "{$and: [{lsid: {$type: [16]}}, {operationType: {$gt: 0}}]}]}"),
+        getExpCtx(),
+        ExtensionsCallbackNoop(),
+        Pipeline::kAllowedMatcherFeatures);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression =
+        change_stream_rewrite::rewriteFilterForFields(getExpCtx(),
+                                                      statusWithMatchExpression.getValue().get(),
+                                                      {"operationType", "clusterTime", "lsid"});
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(rewrittenPredicate, fromjson("{$nor: [{ts: {$type: [17]}}]}"));
+}
 }  // namespace
 }  // namespace mongo

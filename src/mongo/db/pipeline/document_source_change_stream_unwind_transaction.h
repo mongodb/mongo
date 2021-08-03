@@ -77,6 +77,9 @@ public:
 protected:
     DocumentSource::GetNextResult doGetNext() override;
 
+    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
+                                                     Pipeline::SourceContainer* container) final;
+
 private:
     DocumentSourceChangeStreamUnwindTransaction(
         std::string nsRegex, const boost::intrusive_ptr<ExpressionContext>& expCtx);

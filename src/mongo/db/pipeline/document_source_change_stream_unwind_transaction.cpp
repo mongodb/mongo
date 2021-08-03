@@ -31,8 +31,9 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/pipeline/document_source_change_stream_unwind_transactions.h"
+#include "mongo/db/pipeline/document_source_change_stream_unwind_transaction.h"
 
+#include "mongo/db/pipeline/change_stream_filter_helpers.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/transaction_history_iterator.h"
 
@@ -367,5 +368,85 @@ void DocumentSourceChangeStreamUnwindTransaction::TransactionOpIterator::
             "committed transaction.");
         uasserted(ErrorCodes::ChangeStreamHistoryLost, ex.reason());
     }
+}
+
+namespace change_stream_filter {
+/**
+ * Build a filter, similar to the optimized oplog filter, designed to reject oplog entries that we
+ * know would eventually get rejected by the 'userMatch' filter if they continued through the rest
+ * of the pipeline.
+ *
+ * NB: The new filter may contain references to strings in the BSONObj that 'userMatch' originated
+ * from. Callers that keep the new filter long-term should serialize and re-parse it to guard
+ * against the possibility of stale string references.
+ */
+std::unique_ptr<MatchExpression> buildUnwindTransactionFilter(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, const MatchExpression* userMatch) {
+    auto unwoundOplogFilter = std::make_unique<OrMatchExpression>();
+
+    // We do not expect to see any "c" (command) or "n" noop entries within transactions, which
+    // means that they have already been through the earlier DocumentSourceChangeStreamOplogMatch
+    // filter and do not need to be tested again.
+    unwoundOplogFilter->add(std::make_unique<EqualityMatchExpression>("op"_sd, Value("c"_sd)));
+    unwoundOplogFilter->add(std::make_unique<EqualityMatchExpression>("op"_sd, Value("n"_sd)));
+
+    // As an optimization, this filter will cull any operations that could not be filtered during
+    // the oplog scan because they were within a transaction.
+    unwoundOplogFilter->add(buildOperationFilter(expCtx, userMatch));
+
+    // Perform a final optimization pass on the complete filter before returning.
+    return MatchExpression::optimize(std::move(unwoundOplogFilter));
+}
+}  // namespace change_stream_filter
+
+Pipeline::SourceContainer::iterator DocumentSourceChangeStreamUnwindTransaction::doOptimizeAt(
+    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+    tassert(5687205, "Iterator mismatch during optimization", *itr == this);
+
+    auto unwindStageItr = itr;
+    auto nextChangeStreamStageItr = std::next(itr);
+
+    if (!feature_flags::gFeatureFlagChangeStreamsRewrite.isEnabledAndIgnoreFCV()) {
+        return nextChangeStreamStageItr;
+    }
+
+    // If the stage immediately following this one is a $match, then this optimzation was already
+    // applied and should not be applied again.
+    if (std::next(itr) != container->end() && dynamic_cast<DocumentSourceMatch*>(itr->get())) {
+        return nextChangeStreamStageItr;
+    }
+
+    // Seek to the stage that immediately follows the change streams stages.
+    itr = std::find_if_not(itr, container->end(), [](const auto& stage) {
+        return stage->constraints().isChangeStreamStage();
+    });
+
+    if (itr == container->end()) {
+        // This pipeline is just the change stream.
+        return itr;
+    }
+
+    auto matchStage = dynamic_cast<DocumentSourceMatch*>(itr->get());
+    if (!matchStage) {
+        // This function only attempts to optimize a $match that immediately follows expanded
+        // $changeStream stages. That does not apply here, and we resume optimization at the last
+        // change stream stage, in case a "swap" optimization can apply between it and the stage
+        // that follows it.  For example, $project stages can swap in front of the last change
+        // stream stages.
+        return std::prev(itr);
+    }
+
+    // Build a filter which discards unwound transaction operations which would have been
+    // filtered out later in the pipeline by the user's $match filter.
+    auto unwindTransactionFilter = change_stream_filter::buildUnwindTransactionFilter(
+        pExpCtx, matchStage->getMatchExpression());
+
+    // Create a new $match stage from the filter and add it to the pipeline.
+    auto unwoundTransactionMatch =
+        DocumentSourceMatch::create(unwindTransactionFilter->serialize(), pExpCtx);
+    container->insert(std::next(unwindStageItr), std::move(unwoundTransactionMatch));
+
+    // Continue optimization at the next change stream stage.
+    return nextChangeStreamStageItr;
 }
 }  // namespace mongo

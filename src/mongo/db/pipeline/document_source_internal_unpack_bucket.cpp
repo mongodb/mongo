@@ -103,17 +103,6 @@ auto getIncludeExcludeProjectAndType(DocumentSource* src) {
     return std::pair{BSONObj{}, false};
 }
 
-// Optimize the given pipeline after the $_internalUnpackBucket stage pointed to by 'itr'.
-void optimizeEndOfPipeline(Pipeline::SourceContainer::iterator itr,
-                           Pipeline::SourceContainer* container) {
-    // We must create a new SourceContainer representing the subsection of the pipeline we wish to
-    // optimize, since otherwise calls to optimizeAt() will overrun these limits.
-    auto endOfPipeline = Pipeline::SourceContainer(std::next(itr), container->end());
-    Pipeline::optimizeContainer(&endOfPipeline);
-    container->erase(std::next(itr), container->end());
-    container->splice(std::next(itr), endOfPipeline);
-}
-
 /**
  * Creates an ObjectId initialized with an appropriate timestamp corresponding to 'rhs' and
  * returns it as a Value.
@@ -914,7 +903,7 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
     // Optimize the pipeline after this stage to merge $match stages and push them forward.
     if (!_optimizedEndOfPipeline) {
         _optimizedEndOfPipeline = true;
-        optimizeEndOfPipeline(itr, container);
+        Pipeline::optimizeEndOfPipeline(itr, container);
 
         if (std::next(itr) == container->end()) {
             return container->end();

@@ -44,6 +44,7 @@
 #include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/semantic_analysis.h"
 #include "mongo/util/ctype.h"
 #include "mongo/util/str.h"
 
@@ -469,6 +470,37 @@ boost::intrusive_ptr<DocumentSourceMatch> DocumentSourceMatch::descendMatchOnPat
     BSONObjBuilder query;
     matchExpr->serialize(&query);
     return new DocumentSourceMatch(query.obj(), expCtx);
+}
+
+std::pair<boost::intrusive_ptr<DocumentSourceMatch>, boost::intrusive_ptr<DocumentSourceMatch>>
+DocumentSourceMatch::splitMatchByModifiedFields(
+    const boost::intrusive_ptr<DocumentSourceMatch>& match,
+    const DocumentSource::GetModPathsReturn& modifiedPathsRet) {
+    // Attempt to move some or all of this $match before this stage.
+    std::set<std::string> modifiedPaths;
+    switch (modifiedPathsRet.type) {
+        case DocumentSource::GetModPathsReturn::Type::kNotSupported:
+            // We don't know what paths this stage might modify, so refrain from swapping.
+            return {nullptr, match};
+        case DocumentSource::GetModPathsReturn::Type::kAllPaths:
+            // This stage modifies all paths, so cannot be swapped with a $match at all.
+            return {nullptr, match};
+        case DocumentSource::GetModPathsReturn::Type::kFiniteSet:
+            modifiedPaths = std::move(modifiedPathsRet.paths);
+            break;
+        case DocumentSource::GetModPathsReturn::Type::kAllExcept: {
+            DepsTracker depsTracker;
+            match->getDependencies(&depsTracker);
+
+            auto preservedPaths = modifiedPathsRet.paths;
+            for (auto&& rename : modifiedPathsRet.renames) {
+                preservedPaths.insert(rename.first);
+            }
+            modifiedPaths =
+                semantic_analysis::extractModifiedDependencies(depsTracker.fields, preservedPaths);
+        }
+    }
+    return std::move(*match).splitSourceBy(modifiedPaths, modifiedPathsRet.renames);
 }
 
 intrusive_ptr<DocumentSourceMatch> DocumentSourceMatch::create(

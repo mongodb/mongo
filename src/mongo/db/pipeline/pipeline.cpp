@@ -670,6 +670,18 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::makePipeline(
     return pipeline;
 }
 
+Pipeline::SourceContainer::iterator Pipeline::optimizeEndOfPipeline(
+    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+    // We must create a new SourceContainer representing the subsection of the pipeline we wish to
+    // optimize, since otherwise calls to optimizeAt() will overrun these limits.
+    auto endOfPipeline = Pipeline::SourceContainer(std::next(itr), container->end());
+    Pipeline::optimizeContainer(&endOfPipeline);
+    container->erase(std::next(itr), container->end());
+    container->splice(std::next(itr), endOfPipeline);
+
+    return std::next(itr);
+}
+
 std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::makePipelineFromViewDefinition(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     ExpressionContext::ResolvedNamespace resolvedNs,

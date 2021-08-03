@@ -48,7 +48,7 @@
 #include "mongo/db/pipeline/document_source_change_stream_lookup_pre_image.h"
 #include "mongo/db/pipeline/document_source_change_stream_oplog_match.h"
 #include "mongo/db/pipeline/document_source_change_stream_transform.h"
-#include "mongo/db/pipeline/document_source_change_stream_unwind_transactions.h"
+#include "mongo/db/pipeline/document_source_change_stream_unwind_transaction.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/expression.h"
@@ -61,6 +61,19 @@
 #include "mongo/db/vector_clock.h"
 
 namespace mongo {
+namespace {
+std::string regexEscape(StringData source) {
+    std::string result = "";
+    std::string escapes = "*+|()^?[]./\\$";
+    for (const char& c : source) {
+        if (escapes.find(c) != std::string::npos) {
+            result.append("\\");
+        }
+        result += c;
+    }
+    return result;
+}
+}  // namespace
 
 using boost::intrusive_ptr;
 using boost::optional;
@@ -127,18 +140,6 @@ DocumentSourceChangeStream::ChangeStreamType DocumentSourceChangeStream::getChan
 }
 
 std::string DocumentSourceChangeStream::getNsRegexForChangeStream(const NamespaceString& nss) {
-    auto regexEscape = [](const std::string& source) {
-        std::string result = "";
-        std::string escapes = "*+|()^?[]./\\$";
-        for (const char& c : source) {
-            if (escapes.find(c) != std::string::npos) {
-                result.append("\\");
-            }
-            result += c;
-        }
-        return result;
-    };
-
     auto type = getChangeStreamType(nss);
     switch (type) {
         case ChangeStreamType::kSingleCollection:
@@ -152,6 +153,36 @@ std::string DocumentSourceChangeStream::getNsRegexForChangeStream(const Namespac
             // Match all namespaces that start with any db name other than admin, config, or local,
             // followed by ".", then NOT followed by '$' or 'system.'.
             return kRegexAllDBs + "\\." + kRegexAllCollections;
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
+std::string DocumentSourceChangeStream::getCollRegexForChangeStream(const NamespaceString& nss) {
+    auto type = getChangeStreamType(nss);
+    switch (type) {
+        case ChangeStreamType::kSingleCollection:
+            // Match the target collection exactly.
+            return "^" + regexEscape(nss.coll()) + "$";
+        case ChangeStreamType::kSingleDatabase:
+        case ChangeStreamType::kAllChangesForCluster:
+            // Match any collection; database filtering will be done elsewhere.
+            return "^" + kRegexAllCollections;
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
+std::string DocumentSourceChangeStream::getCmdNsRegexForChangeStream(const NamespaceString& nss) {
+    auto type = getChangeStreamType(nss);
+    switch (type) {
+        case ChangeStreamType::kSingleCollection:
+        case ChangeStreamType::kSingleDatabase:
+            // Match the target database command namespace exactly.
+            return "^" + regexEscape(nss.getCommandNS().ns()) + "$";
+        case ChangeStreamType::kAllChangesForCluster:
+            // Match all command namespaces on any database.
+            return kRegexAllDBs + "\\." + kRegexCmdColl;
         default:
             MONGO_UNREACHABLE;
     }

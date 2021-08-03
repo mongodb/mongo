@@ -181,6 +181,8 @@ public:
      */
     static ChangeStreamType getChangeStreamType(const NamespaceString& nss);
     static std::string getNsRegexForChangeStream(const NamespaceString& nss);
+    static std::string getCollRegexForChangeStream(const NamespaceString& nss);
+    static std::string getCmdNsRegexForChangeStream(const NamespaceString& nss);
 
     /**
      * Parses a $changeStream stage from 'elem' and produces the $match and transformation

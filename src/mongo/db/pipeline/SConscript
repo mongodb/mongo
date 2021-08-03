@@ -347,7 +347,9 @@ env.Library(
     target="change_stream_pipeline",
     source=[
         'change_stream_document_diff_parser.cpp',
+        'change_stream_filter_helpers.cpp',
         'change_stream_helpers_legacy.cpp',
+        'change_stream_rewrite_helpers.cpp',
         'document_source_change_stream.cpp',
         'document_source_change_stream_add_post_image.cpp',
         'document_source_change_stream_check_invalidate.cpp',
@@ -359,7 +361,7 @@ env.Library(
         'document_source_change_stream_lookup_pre_image.cpp',
         'document_source_change_stream_oplog_match.cpp',
         'document_source_change_stream_transform.cpp',
-        'document_source_change_stream_unwind_transactions.cpp',
+        'document_source_change_stream_unwind_transaction.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/pipeline/pipeline',

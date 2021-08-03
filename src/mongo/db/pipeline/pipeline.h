@@ -152,6 +152,15 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         MakePipelineOptions opts = MakePipelineOptions{});
 
+    /**
+     * Optimize the given pipeline after the stage that 'itr' points to.
+     *
+     * Returns a valid iterator that points to the new "end of the pipeline": i.e., the stage that
+     * comes after 'itr' in the newly optimized pipeline.
+     */
+    static Pipeline::SourceContainer::iterator optimizeEndOfPipeline(
+        Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container);
+
     static std::unique_ptr<Pipeline, PipelineDeleter> makePipelineFromViewDefinition(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         ExpressionContext::ResolvedNamespace resolvedNs,

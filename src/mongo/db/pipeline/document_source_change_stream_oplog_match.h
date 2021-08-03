@@ -42,17 +42,24 @@ public:
     static constexpr StringData kStageName = "$_internalChangeStreamOplogMatch"_sd;
 
     DocumentSourceChangeStreamOplogMatch(BSONObj filter,
+                                         Timestamp clusterTime,
+                                         bool showMigrationEvents,
                                          const boost::intrusive_ptr<ExpressionContext>& expCtx)
-        : DocumentSourceMatch(std::move(filter), expCtx) {
-        // A change stream pipeline should always create a tailable + awaitData cursor.
+        : DocumentSourceMatch(std::move(filter), expCtx),
+          _clusterTime(clusterTime),
+          _showMigrationEvents(showMigrationEvents) {
         expCtx->tailableMode = TailableModeEnum::kTailableAndAwaitData;
     }
 
     DocumentSourceChangeStreamOplogMatch(const DocumentSourceChangeStreamOplogMatch& other)
-        : DocumentSourceMatch(other) {}
+        : DocumentSourceMatch(other) {
+        _clusterTime = other._clusterTime;
+        _showMigrationEvents = other._showMigrationEvents;
+        _optimizedEndOfPipeline = other._optimizedEndOfPipeline;
+    }
 
-    virtual boost::intrusive_ptr<DocumentSourceMatch> clone() const {
-        return make_intrusive<std::decay_t<decltype(*this)>>(*this);
+    boost::intrusive_ptr<DocumentSourceMatch> clone() const final {
+        return new auto(*this);
     }
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
@@ -78,8 +85,34 @@ public:
         return ChangeStreamStageSerializationInterface::serializeToValue(explain);
     }
 
+protected:
+    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
+                                                     Pipeline::SourceContainer* container) final;
+
 private:
+    /**
+     * This constructor is only used for deserializing from BSON, in which case there are no values
+     * for the '_clusterTime' and '_showMigrationEvents' fields. We leave those fields as
+     * boost::none and assume that they will not be needed. We also assume that optimizations have
+     * have already been applied.
+     */
+    DocumentSourceChangeStreamOplogMatch(BSONObj filter,
+                                         const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : DocumentSourceMatch(std::move(filter), expCtx), _optimizedEndOfPipeline(true) {
+        expCtx->tailableMode = TailableModeEnum::kTailableAndAwaitData;
+    }
+
     Value serializeLegacy(boost::optional<ExplainOptions::Verbosity> explain) const final;
     Value serializeLatest(boost::optional<ExplainOptions::Verbosity> explain) const final;
+
+    // Needed for re-creating the filter during optimization. Note that we do not serialize these
+    // fields. The filter in a serialized DocumentSourceOplogMatch is considered final, so there is
+    // no need to re-create it.
+    boost::optional<Timestamp> _clusterTime;
+    OptionalBool _showMigrationEvents;
+
+    // Used to avoid infinte optimization loops. Note that we do not serialize this field, because
+    // we assume that DocumentSourceOplogMatch is always serialized after optimization.
+    bool _optimizedEndOfPipeline = false;
 };
 }  // namespace mongo
