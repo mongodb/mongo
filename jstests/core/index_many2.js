@@ -2,6 +2,7 @@
 // collection.
 // @tags: [assumes_no_implicit_index_creation]
 
+(function() {
 const t = db.index_many2;
 t.drop();
 
@@ -53,3 +54,4 @@ t.dropIndexes("*");
 assert.eq(1, t.getIndexKeys().length, "Expected only one index after dropping indexes via '*'");
 
 jsTestLog("Test index_many2.js complete.");
+})();
