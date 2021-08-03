@@ -2,8 +2,7 @@
  * Tests that index building is properly completed when a migration aborts.
  *
  * @tags: [requires_majority_read_concern, incompatible_with_eft,
- * incompatible_with_windows_tls, incompatible_with_macos, requires_persistence,
- * disabled_due_to_server_58295]
+ * incompatible_with_windows_tls, incompatible_with_macos, requires_persistence]
  */
 
 (function() {
@@ -26,7 +25,6 @@ const kDbName = tenantMigrationTest.tenantDB(kTenantId, "testDB");
 const kEmptyCollName = "testEmptyColl";
 const kNonEmptyCollName = "testNonEmptyColl";
 const kNewCollName1 = "testNewColl1";
-const kNewCollName2 = "testNewColl2";
 
 const donorPrimary = tenantMigrationTest.getDonorPrimary();
 
@@ -52,6 +50,11 @@ const db = donorPrimary.getDB(kDbName);
 assert.commandWorked(db[kNonEmptyCollName].insert([{a: 1, b: 1}, {a: 2, b: 2}, {a: 3, b: 3}]));
 assert.commandWorked(db.createCollection(kEmptyCollName));
 
+// Failpoint to count the number of times the tenant migration access blocker has checked if an
+// index build is allowed.
+let fpCheckIndexBuildable =
+    configureFailPoint(donorPrimary, "haveCheckedIfIndexBuildableDuringTenantMigration");
+
 // Start an index build and pause it after acquiring a slot but before registering itself.
 const indexBuildFp = configureFailPoint(donorPrimary, "hangAfterAcquiringIndexBuildSlot");
 jsTestLog("Starting the racy index build");
@@ -73,14 +76,16 @@ dataSyncFp.wait();
 indexBuildFp.off();
 
 // Wait for the racy index to check migration status.
-checkLog.containsJson(donorPrimary, 4886202);
+fpCheckIndexBuildable.wait();
+fpCheckIndexBuildable.off();
 
 // Should be able to create an index on a non-existent collection.  Since the collection is
 // guaranteed to be empty and to have always been empty, this is safe.
 assert.commandWorked(db[kNewCollName1].createIndex({a: 1}));
 
-// Clear the log so we can wait for the new index builds to start.
-assert.commandWorked(donorPrimary.adminCommand({clearLog: "global"}));
+// Reset the counter.
+fpCheckIndexBuildable =
+    configureFailPoint(donorPrimary, "haveCheckedIfIndexBuildableDuringTenantMigration");
 
 // Attempts to create indexes on existing collections should block.
 const emptyIndexThread1 =
@@ -91,7 +96,12 @@ const nonEmptyIndexThread1 =
 nonEmptyIndexThread1.start();
 
 // Wait for both indexes to check tenant migration status.
-assert.soon(() => checkLog.checkContainsWithCountJson(donorPrimary, 4886202, undefined, 2));
+assert.commandWorked(donorPrimary.adminCommand({
+    waitForFailPoint: "haveCheckedIfIndexBuildableDuringTenantMigration",
+    timesEntered: fpCheckIndexBuildable.timesEntered + 2,
+    maxTimeMS: kDefaultWaitForFailPointTimeout
+}));
+fpCheckIndexBuildable.off();
 
 // Allow the migration to move to the blocking state.
 const blockingFp =
@@ -102,8 +112,9 @@ assert.soon(
         tenantMigrationTest.getTenantMigrationAccessBlocker(donorPrimary, kTenantId).donor.state ===
         TenantMigrationTest.DonorAccessState.kBlockWritesAndReads);
 
-// Clear the log so we can wait for the new index builds to start.
-assert.commandWorked(donorPrimary.adminCommand({clearLog: "global"}));
+// Reset the counter.
+fpCheckIndexBuildable =
+    configureFailPoint(donorPrimary, "haveCheckedIfIndexBuildableDuringTenantMigration");
 
 // Attempts to create indexes on existing collections should still block.
 const emptyIndexThread2 =
@@ -112,8 +123,14 @@ emptyIndexThread2.start();
 const nonEmptyIndexThread2 =
     new Thread(createIndexShouldFail, donorPrimary.host, kDbName, kNonEmptyCollName, {b: 1});
 nonEmptyIndexThread2.start();
+
 // Wait for all indexes to check tenant migration status.
-assert.soon(() => checkLog.checkContainsWithCountJson(donorPrimary, 4886202, undefined, 2));
+assert.commandWorked(donorPrimary.adminCommand({
+    waitForFailPoint: "haveCheckedIfIndexBuildableDuringTenantMigration",
+    timesEntered: fpCheckIndexBuildable.timesEntered + 2,
+    maxTimeMS: kDefaultWaitForFailPointTimeout
+}));
+fpCheckIndexBuildable.off();
 
 // Allow the migration to abort.
 const abortFp = configureFailPoint(donorPrimary, "abortTenantMigrationBeforeLeavingBlockingState");

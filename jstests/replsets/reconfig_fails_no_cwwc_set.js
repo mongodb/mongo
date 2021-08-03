@@ -1,8 +1,6 @@
 /**
  * Test that a reconfig that would change the implicit default write concern fails.
  * In order to perform such a reconfig, users must set a cluster-wide write concern.
- *
- * @tags: [disabled_due_to_server_58295]
  */
 
 (function() {

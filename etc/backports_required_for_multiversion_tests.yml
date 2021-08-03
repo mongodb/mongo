@@ -58,6 +58,8 @@ last-continuous:
       test_file: jstests/sharding/reconfig_fails_no_cwwc_set_sharding.js
     - ticket: SERVER-59057
       test_file: jstests/replsets/rollback_transaction_table.js
+    - ticket: SERVER-58353
+      test_file: jstests/replsets/tenant_migration_aborted_buildindex.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -282,6 +284,8 @@ last-lts:
       test_file: jstests/sharding/reconfig_fails_no_cwwc_set_sharding.js
     - ticket: SERVER-59057
       test_file: jstests/replsets/rollback_transaction_table.js
+    - ticket: SERVER-58353
+      test_file: jstests/replsets/tenant_migration_aborted_buildindex.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:

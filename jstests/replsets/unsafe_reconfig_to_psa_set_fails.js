@@ -10,8 +10,6 @@
  * node to a PSA architecture. This involves running two reconfigs. The first reconfig should
  * add/configure the secondary to have {votes: 1, priority: 0}, to prevent it from being electable.
  * The second reconfig should then increase its priority to the desired level.
- *
- * @tags: [disabled_due_to_server_58295]
  */
 
 (function() {

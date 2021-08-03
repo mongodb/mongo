@@ -1622,13 +1622,13 @@ var ReplSetTest = function(opts) {
                     const serverStatus =
                         assert.commandWorked(node.getDB("admin").runCommand({serverStatus: 1}));
                     const currVersion = serverStatus.version;
-                    const binVersionLatest =
-                        MongoRunner.areBinVersionsTheSame(MongoRunner.getBinVersionFor(currVersion),
-                                                          MongoRunner.getBinVersionFor("latest"));
+                    const olderThan50 = MongoRunner.compareBinVersions(
+                                            MongoRunner.getBinVersionFor("5.0"),
+                                            MongoRunner.getBinVersionFor(currVersion)) === 1;
 
-                    // Only set the following server parameters for nodes running on the latest
-                    // binary version.
-                    if (!binVersionLatest) {
+                    // The following params are available only on versions greater than or equal to
+                    // 5.0.
+                    if (olderThan50) {
                         continue;
                     }
 
