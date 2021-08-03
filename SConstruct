@@ -481,7 +481,7 @@ add_option('cache-signature-mode',
 )
 
 add_option("cxx-std",
-    choices=["17"],
+    choices=["17", "20"],
     default="17",
     help="Select the C++ language standard to build with",
 )
@@ -3107,10 +3107,16 @@ def doConfigure(myenv):
     if myenv.ToolchainIs('msvc'):
         if get_option('cxx-std') == "17":
             myenv.AppendUnique(CCFLAGS=['/std:c++17'])
+        elif get_option('cxx-std') == "20":
+            myenv.AppendUnique(CCFLAGS=['/std:c++20'])
     else:
         if get_option('cxx-std') == "17":
             if not AddToCXXFLAGSIfSupported(myenv, '-std=c++17'):
                 myenv.ConfError('Compiler does not honor -std=c++17')
+        elif get_option('cxx-std') == "20":
+            if not AddToCXXFLAGSIfSupported(myenv, '-std=c++20'):
+                myenv.ConfError('Compiler does not honor -std=c++20')
+
 
         if not AddToCFLAGSIfSupported(myenv, '-std=c11'):
             myenv.ConfError("C++17 mode selected for C++ files, but can't enable C11 for C files")
@@ -3131,12 +3137,29 @@ def doConfigure(myenv):
         context.Result(ret)
         return ret
 
+    def CheckCxx20(context):
+        test_body = """
+        #if __cplusplus < 202002L
+        #error
+        #endif
+        #include <compare>
+        [[maybe_unused]] constexpr auto spaceship_operator_is_a_cxx20_feature = 2 <=> 4;
+        """
+
+        context.Message('Checking for C++20... ')
+        ret = context.TryCompile(textwrap.dedent(test_body), ".cpp")
+        context.Result(ret)
+        return ret
+
     conf = Configure(myenv, help=False, custom_tests = {
         'CheckCxx17' : CheckCxx17,
+        'CheckCxx20' : CheckCxx20,
     })
 
     if get_option('cxx-std') == "17" and not conf.CheckCxx17():
         myenv.ConfError('C++17 support is required to build MongoDB')
+    elif get_option('cxx-std') == "20" and not conf.CheckCxx20():
+        myenv.ConfError('C++20 support was not detected')
 
     conf.Finish()
 
