@@ -636,7 +636,7 @@ int64_t Simple8bBuilder<T>::_encodeLargestPossibleWord(uint8_t extensionType) {
     }
 
     _pendingValues.erase(_pendingValues.begin(), _pendingValues.begin() + integersCoded);
-    _currMaxBitLen = {0, 0, 0, 0};
+    _currMaxBitLen = kMinDataBits;
     for (auto val : _pendingValues) {
         _updateSimple8bCurrentState(val);
     }

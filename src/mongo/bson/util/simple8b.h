@@ -47,6 +47,9 @@ public:
     // Number of different type of selectors and their extensions available
     static constexpr uint8_t kNumOfSelectorTypes = 4;
 
+    // The min number of meaningful bits each selector can store
+    static constexpr std::array<uint8_t, 4> kMinDataBits = {1, 2, 4, 4};
+
     // Callback to handle writing of finalized Simple-8b blocks. Machine Endian byte order.
     using WriteFn = std::function<void(uint64_t)>;
     Simple8bBuilder(WriteFn writeFunc);
@@ -174,7 +177,7 @@ private:
     // These variables hold the max amount of bits for each value in _pendingValues. They are
     // updated whenever values are added or removed from _pendingValues to always reflect the max
     // value in the deque.
-    std::array<uint8_t, kNumOfSelectorTypes> _currMaxBitLen = {0, 0, 0, 0};
+    std::array<uint8_t, kNumOfSelectorTypes> _currMaxBitLen = kMinDataBits;
     std::array<uint8_t, kNumOfSelectorTypes> _currTrailingZerosCount = {0, 0, 0, 0};
 
     // This holds the last valid selector compression method that succeded for
