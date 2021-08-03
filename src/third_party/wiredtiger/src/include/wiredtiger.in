@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2020 MongoDB, Inc.
+ * Copyright (c) 2014-present MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -506,15 +506,14 @@ struct __wt_cursor {
 	 * The WT_CURSOR::modify method can only be called from within an
 	 * explicit transaction configured at the snapshot isolation level.
 	 *
-	 * The WT_CURSOR::modify method stores a change record in cache and
-	 * writes a change record to the log instead of the usual complete
-	 * values. Note that WT_CURSOR::modify is generally slower than the
-	 * WT_CURSOR::update method, and can result in slower reads because
-	 * the complete value must be assembled during retrieval. The
-	 * WT_CURSOR::modify method is intended for applications modifying
-	 * large records where there is cache or I/O pressure, that is,
-	 * applications that will benefit when data updates require less cache
-	 * and they write less logging information.
+	 * The WT_CURSOR::modify method stores a change record in cache and writes a change record
+	 * to the log instead of the usual complete values. Using WT_CURSOR::modify will result in
+	 * slower reads, and slower writes than the WT_CURSOR::insert or WT_CURSOR::update methods,
+	 * because of the need to assemble the complete value in both the read and write paths. The
+	 * WT_CURSOR::modify method is intended for applications where memory and log amplification
+	 * are issues (in other words, applications where there is cache or I/O pressure and the
+	 * application wants to trade performance for a smaller working set in cache and smaller
+	 * log records).
 	 *
 	 * @snippet ex_all.c Modify an existing record
 	 *

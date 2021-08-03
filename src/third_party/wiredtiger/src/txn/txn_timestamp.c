@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2020 MongoDB, Inc.
+ * Copyright (c) 2014-present MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -283,10 +283,11 @@ __txn_global_query_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t *tsp, cons
          */
         if (ts == WT_TS_NONE)
             return (WT_NOTFOUND);
-    } else if (WT_STRING_MATCH("last_checkpoint", cval.str, cval.len))
-        /* Read-only value forever. No lock needed. */
+    } else if (WT_STRING_MATCH("last_checkpoint", cval.str, cval.len)) {
+        /* Read-only value forever. Make sure we don't used a cached version. */
+        WT_BARRIER();
         ts = txn_global->last_ckpt_timestamp;
-    else if (WT_STRING_MATCH("oldest", cval.str, cval.len)) {
+    } else if (WT_STRING_MATCH("oldest", cval.str, cval.len)) {
         if (!txn_global->has_oldest_timestamp)
             return (WT_NOTFOUND);
         ts = txn_global->oldest_timestamp;

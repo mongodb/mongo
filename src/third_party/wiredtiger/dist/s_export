@@ -12,7 +12,10 @@ Darwin)
 *)
 	# We require GNU nm, which may not be installed.
 	type nm > /dev/null 2>&1 &&
-	    (nm --version | grep 'GNU nm') > /dev/null 2>&1 || exit 0
+	    (nm --version | grep 'GNU nm') > /dev/null 2>&1 || {
+	    echo "$0 skipped: GNU nm not found"
+	    exit 0
+	}
 	NM='nm --extern-only --defined-only --print-file-name $f | egrep -v "__bss_start|_edata|_end|_fini|_init"'
 	;;
 esac
@@ -51,5 +54,5 @@ for d in .. ../build_posix; do
 	done
 done
 
-echo "skipped: libwiredtiger.[a|so|dylib] not found"
+echo "$0 skipped: libwiredtiger.[a|so|dylib] not found"
 exit 0

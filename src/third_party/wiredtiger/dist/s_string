@@ -11,7 +11,7 @@ export LC_ALL
 
 # If aspell has not been installed, quit
 type aspell > /dev/null 2>&1 || {
-	echo 'skipped: aspell not found'
+	echo "$0 skipped: aspell not found"
 	exit 0
 }
 

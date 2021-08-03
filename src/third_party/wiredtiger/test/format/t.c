@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2020 MongoDB, Inc.
+ * Public Domain 2014-present MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -209,8 +209,6 @@ main(int argc, char *argv[])
      * file, used when running checks.
      */
     if (g.reopen || g.replay) {
-        if (config != NULL)
-            testutil_die(EINVAL, "-c incompatible with -R or -r");
         if (access(g.home_config, R_OK) != 0)
             testutil_die(ENOENT, "%s", g.home_config);
         config = g.home_config;

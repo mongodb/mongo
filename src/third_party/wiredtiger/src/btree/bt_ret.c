@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2020 MongoDB, Inc.
+ * Copyright (c) 2014-present MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -120,7 +120,7 @@ __value_return(WT_CURSOR_BTREE *cbt)
  * modifications in an update list. We'd prefer not to allocate memory in a return path, so add a
  * few additional slots to the array we use to build up a list of modify records to apply.
  */
-#define WT_MODIFY_ARRAY_SIZE (WT_MAX_MODIFY_UPDATE + 10)
+#define WT_MODIFY_ARRAY_SIZE (WT_MODIFY_UPDATE_MIN + 10)
 
 /*
  * __wt_value_return_upd --

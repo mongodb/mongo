@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2020 MongoDB, Inc.
+ * Copyright (c) 2014-present MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -26,6 +26,9 @@ __conn_dhandle_config_clear(WT_SESSION_IMPL *session)
         __wt_free(session, *a);
     __wt_free(session, dhandle->cfg);
     __wt_free(session, dhandle->meta_base);
+#ifdef HAVE_DIAGNOSTIC
+    __wt_free(session, dhandle->orig_meta_base);
+#endif
 }
 
 /*
@@ -85,6 +88,9 @@ __conn_dhandle_config_set(WT_SESSION_IMPL *session)
         cfg[3] = NULL;
         WT_ERR(__wt_strdup(session, WT_CONFIG_BASE(session, file_meta), &dhandle->cfg[0]));
         WT_ASSERT(session, dhandle->meta_base == NULL);
+#ifdef HAVE_DIAGNOSTIC
+        WT_ASSERT(session, dhandle->orig_meta_base == NULL);
+#endif
         WT_ERR(__wt_config_collapse(session, cfg, &tmp));
         /*
          * Now strip out the checkpoint related items from the configuration string and that is now
@@ -102,6 +108,14 @@ __conn_dhandle_config_set(WT_SESSION_IMPL *session)
     }
     dhandle->cfg[1] = metaconf;
     dhandle->meta_base = base;
+    dhandle->meta_base_length = base == NULL ? 0 : strlen(base);
+#ifdef HAVE_DIAGNOSTIC
+    /*  Save the original metadata value for further check to avoid writing corrupted data. */
+    if (base == NULL)
+        dhandle->orig_meta_base = NULL;
+    else
+        WT_ERR(__wt_strdup(session, base, &dhandle->orig_meta_base));
+#endif
     return (0);
 
 err:
