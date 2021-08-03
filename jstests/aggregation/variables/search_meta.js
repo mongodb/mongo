@@ -1,5 +1,9 @@
 /**
- * Verify the error behavior of '$$SEARCH_META' when it is not properly configured.
+ * Verify the error behavior of '$$SEARCH_META' when it is not properly configured. $$SEARCH_META
+ * throws if used in aggregations on sharded collections.
+ * @tags: [
+ *   assumes_unsharded_collection,
+ * ]
  */
 (function() {
 "use strict";
