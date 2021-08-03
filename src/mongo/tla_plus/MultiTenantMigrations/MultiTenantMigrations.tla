@@ -10,7 +10,7 @@
 \*
 \* To run the model-checker, first edit the constants in MCMultiTenantMigrations.cfg if desired,
 \* then:
-\*     cd src/mongo/db/repl/tla_plus
+\*     cd src/mongo/tla_plus
 \*     ./model-check.sh MultiTenantMigrations
 \*
 

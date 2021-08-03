@@ -8,7 +8,7 @@
 \* This is the formal specification for the Raft consensus algorithm in MongoDB.
 \*
 \* To run the model-checker, first edit the constants in MCRaftMongo.cfg if desired, then:
-\*     cd src/mongo/db/repl/tla_plus
+\*     cd src/mongo/tla_plus
 \*     ./model-check.sh RaftMongo
 
 EXTENDS Integers, FiniteSets, Sequences
