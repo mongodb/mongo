@@ -423,9 +423,9 @@ class SConsToNinjaTranslator:
 class NinjaState:
     """Maintains state of Ninja build system as it's translated from SCons."""
 
-    def __init__(self, env, writer_class):
+    def __init__(self, env, ninja_syntax):
         self.env = env
-        self.writer_class = writer_class
+        self.writer_class = ninja_syntax.Writer
         self.__generated = False
         self.translator = SConsToNinjaTranslator(env)
         self.generated_suffixes = env.get("NINJA_GENERATED_SOURCE_SUFFIXES", [])
@@ -442,18 +442,18 @@ class NinjaState:
         # shell quoting on whatever platform it's run on. Here we use it
         # to make the SCONS_INVOCATION variable properly quoted for things
         # like CCFLAGS
-        escape = env.get("ESCAPE", lambda x: x)
+        scons_escape = env.get("ESCAPE", lambda x: x)
 
         self.variables = {
             "COPY": "cmd.exe /c 1>NUL copy" if sys.platform == "win32" else "cp",
             "SCONS_INVOCATION": "{} {} __NINJA_NO=1 $out".format(
                 sys.executable,
                 " ".join(
-                    [escape(arg) for arg in sys.argv if arg not in COMMAND_LINE_TARGETS]
+                    [ninja_syntax.escape(scons_escape(arg)) for arg in sys.argv if arg not in COMMAND_LINE_TARGETS]
                 ),
             ),
             "SCONS_INVOCATION_W_TARGETS": "{} {}".format(
-                sys.executable, " ".join([escape(arg) for arg in sys.argv])
+                sys.executable, " ".join([ninja_syntax.escape(scons_escape(arg)) for arg in sys.argv])
             ),
             # This must be set to a global default per:
             # https://ninja-build.org/manual.html
@@ -1612,7 +1612,7 @@ def generate(env):
     ninja_syntax = importlib.import_module(ninja_syntax_mod_name.replace(".py", ""))
 
     global NINJA_STATE
-    NINJA_STATE = NinjaState(env, ninja_syntax.Writer)
+    NINJA_STATE = NinjaState(env, ninja_syntax)
 
     # Here we will force every builder to use an emitter which makes the ninja
     # file depend on it's target. This forces the ninja file to the bottom of
