@@ -175,6 +175,9 @@ function runTest(downgradeFCV) {
     rst.awaitReplication();
     checkFCV(primaryAdminDB, downgradeFCV);
     checkFCV(secondaryAdminDB, downgradeFCV);
+    // The new configuration may not have been installed on the secondary yet, though it has reached
+    // the secondary.
+    rst.waitForConfigReplication(primary);
 
     // All hello requests should have been responded to after the FCV change.
     numAwaitingTopologyChangeOnPrimary =
@@ -260,6 +263,9 @@ function runTest(downgradeFCV) {
         rst.awaitReplication();
         checkFCV(primaryAdminDB, lastLTSFCV);
         checkFCV(secondaryAdminDB, lastLTSFCV);
+        // The new configuration may not have been installed on the secondary yet, though it has
+        // reached the secondary.
+        rst.waitForConfigReplication(primary);
 
         primaryResponseAfterDowngrade = helloAsInternalClient();
         assert(primaryResponseAfterDowngrade.hasOwnProperty("topologyVersion"),
