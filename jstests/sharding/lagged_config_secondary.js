@@ -1,9 +1,6 @@
 /**
  * Test that mongos times out when the config server replica set only contains nodes that
  * are behind the majority opTime.
- * @tags: [
- *   disabled_due_to_server_58295
- * ]
  */
 
 load("jstests/libs/logv2_helpers.js");
