@@ -54,6 +54,8 @@ last-continuous:
       test_file: jstests/replsets/write_concern_write_to_local.js
     - ticket: SERVER-56846
       test_file: jstests/sharding/reconfig_fails_no_cwwc_set_sharding.js
+    - ticket: SERVER-59057
+      test_file: jstests/replsets/rollback_transaction_table.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -276,6 +278,8 @@ last-lts:
       test_file: jstests/replsets/write_concern_write_to_local.js
     - ticket: SERVER-56846
       test_file: jstests/sharding/reconfig_fails_no_cwwc_set_sharding.js
+    - ticket: SERVER-59057
+      test_file: jstests/replsets/rollback_transaction_table.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
