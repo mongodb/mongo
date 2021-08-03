@@ -39,7 +39,7 @@
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/type_collection_timeseries_fields_gen.h"
+#include "mongo/s/type_collection_common_types_gen.h"
 #include "mongo/util/duration.h"
 
 namespace mongo {

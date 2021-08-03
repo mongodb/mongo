@@ -34,7 +34,7 @@ imports:
     - "mongo/db/keypattern.idl"
     - "mongo/s/chunk_version.idl"
     - "mongo/s/resharding/type_collection_fields.idl"
-    - "mongo/s/type_collection_timeseries_fields.idl"
+    - "mongo/s/type_collection_common_types.idl"
 
 structs:
     CollectionTypeBase:
@@ -152,4 +152,24 @@ structs:
                 type: TypeCollectionTimeseriesFields
                 description: "Time-series collection fields. Only set when this is a time-series
                               buckets collection."
+                optional: true
+            supportingLongName:
+                type: SupportingLongNameStatus
+                description: "When set, the maximum name length of sharded collections is aligned
+                              with that of non-sharded collections, which is 255 bytes from MongoDB
+                              version 4.4 and 120 bytes with earlier versions. Otherwise, the limit
+                              for shared collections is reduced by 20 bytes, regardless of the
+                              version of MongoDB.
+
+                              With version 5.1, the support for long names is implicitly enabled on
+                              all collections by upgrading the feature compatibility version (FCV).
+                              With FCV lower than 5.1 but using binaries supporting the feature,
+                              the support for long names is disabled by default and requires an
+                              explicit enabling on the specific collection. Otherwise, the feature
+                              cannot be enabled in any way as unsupported by the binaries.
+
+                              From a technical perspective, enabling the feature, the
+                              system.cache.chunks.<NS> collections are created or renamed using the
+                              sharded collection UUID, instead of the namespace, as part of their
+                              names, i.e., system.cache.chunks.<UUID>."
                 optional: true

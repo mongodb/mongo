@@ -171,6 +171,10 @@ public:
         else
             setPre50CompatibleAllowMigrations(false);
     }
+
+    SupportingLongNameStatusEnum getSupportingLongName() const;
+
+    void setSupportingLongName(SupportingLongNameStatusEnum value);
 };
 
 }  // namespace mongo

@@ -38,7 +38,7 @@
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/chunk_version.h"
-#include "mongo/s/type_collection_timeseries_fields_gen.h"
+#include "mongo/s/type_collection_common_types_gen.h"
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/uuid.h"
 

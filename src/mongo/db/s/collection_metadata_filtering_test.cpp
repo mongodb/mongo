@@ -34,7 +34,7 @@
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/type_collection_timeseries_fields_gen.h"
+#include "mongo/s/type_collection_common_types_gen.h"
 
 namespace mongo {
 namespace {

@@ -39,3 +39,25 @@ structs:
         inline_chained_structs: true
         chained_structs:
             TimeseriesOptions: TimeseriesOptions
+
+enums:
+    SupportingLongNameStatus:
+        description: "Enumeration representing different status of the support for long collection
+                      names."
+        type: string
+        values:
+            # The support for long collection names is disabled. This happen when either the
+            # persisted collection metadata (i.e., config.collections and config.cache.collections)
+            # comes from binaries that do not support the feature or the feature is supported by the
+            # binaries but it has not been explicitly enabled.
+            kDisabled: "disabled"
+
+            # The support for long collection names has been explicitly enabled. This happens when
+            # the binaries support the feature and the collection has been explicitly set to support
+            # a long name.
+            kExplicitlyEnabled: "explicitly_enabled"
+
+            # The support for long collection names has been implicitly enabled. This happens when
+            # the binaries support the feature and by setting the feature compatibility version
+            # (FCV) to 5.1.
+            kImplicitlyEnabled: "implicitly_enabled"

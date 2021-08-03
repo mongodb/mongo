@@ -42,7 +42,7 @@
 #include "mongo/s/database_version.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/s/shard_key_pattern.h"
-#include "mongo/s/type_collection_timeseries_fields_gen.h"
+#include "mongo/s/type_collection_common_types_gen.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/read_through_cache.h"

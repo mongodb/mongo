@@ -86,4 +86,16 @@ void ShardCollectionType::setAllowMigrations(bool allowMigrations) {
         setPre50CompatibleAllowMigrations(false);
 }
 
+SupportingLongNameStatusEnum ShardCollectionType::getSupportingLongName() const {
+    return ShardCollectionTypeBase::getSupportingLongName().get_value_or(
+        SupportingLongNameStatusEnum::kDisabled);
+}
+
+void ShardCollectionType::setSupportingLongName(SupportingLongNameStatusEnum value) {
+    ShardCollectionTypeBase::setSupportingLongName(
+        value == SupportingLongNameStatusEnum::kDisabled
+            ? boost::none
+            : boost::optional<SupportingLongNameStatusEnum>(value));
+}
+
 }  // namespace mongo

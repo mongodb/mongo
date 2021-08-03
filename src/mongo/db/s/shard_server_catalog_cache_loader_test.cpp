@@ -37,7 +37,7 @@
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog_cache_loader_mock.h"
-#include "mongo/s/type_collection_timeseries_fields_gen.h"
+#include "mongo/s/type_collection_common_types_gen.h"
 
 namespace mongo {
 namespace {

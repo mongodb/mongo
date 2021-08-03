@@ -101,6 +101,10 @@ public:
         return getPre50CompatibleAllowMigrations().get_value_or(true);
     }
     void setAllowMigrations(bool allowMigrations);
+
+    SupportingLongNameStatusEnum getSupportingLongName() const;
+
+    void setSupportingLongName(SupportingLongNameStatusEnum value);
 };
 
 }  // namespace mongo

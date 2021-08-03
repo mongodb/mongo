@@ -99,4 +99,16 @@ void CollectionType::setMaxChunkSizeBytes(int64_t value) {
     CollectionTypeBase::setMaxChunkSizeBytes(value);
 }
 
+SupportingLongNameStatusEnum CollectionType::getSupportingLongName() const {
+    return CollectionTypeBase::getSupportingLongName().get_value_or(
+        SupportingLongNameStatusEnum::kDisabled);
+}
+
+void CollectionType::setSupportingLongName(SupportingLongNameStatusEnum value) {
+    CollectionTypeBase::setSupportingLongName(
+        value == SupportingLongNameStatusEnum::kDisabled
+            ? boost::none
+            : boost::optional<SupportingLongNameStatusEnum>(value));
+}
+
 }  // namespace mongo
