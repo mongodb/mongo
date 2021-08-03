@@ -395,6 +395,18 @@ void testAllowedCommand(const char* command, ErrorCodes::Error code = ErrorCodes
               getDeprecatedOpCount(serverStatusReply, "query"));
 }
 
+TEST(OpLegacy, IsSelfCommandViaOpQuery) {
+    testAllowedCommand("{_isSelf: 1}");
+}
+
+TEST(OpLegacy, BuildinfoCommandViaOpQuery) {
+    testAllowedCommand("{buildinfo: 1}");
+}
+
+TEST(OpLegacy, BuildInfoCommandViaOpQuery) {
+    testAllowedCommand("{buildInfo: 1}");
+}
+
 TEST(OpLegacy, HelloCommandViaOpQuery) {
     testAllowedCommand("{hello: 1}");
 }
@@ -405,10 +417,6 @@ TEST(OpLegacy, IsMasterCommandViaOpQuery) {
 
 TEST(OpLegacy, IsmasterCommandViaOpQuery) {
     testAllowedCommand("{ismaster: 1}");
-}
-
-TEST(OpLegacy, IsSelfCommandViaOpQuery) {
-    testAllowedCommand("{_isSelf: 1}");
 }
 
 TEST(OpLegacy, SaslStartCommandViaOpQuery) {
