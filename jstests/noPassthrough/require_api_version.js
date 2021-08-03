@@ -133,7 +133,8 @@ function requireApiVersionOnShardOrConfigServerTest() {
         "mongod should not be able to start up with --shardsvr and requireApiVersion=true");
 
     assert.throws(
-        () => MongoRunner.runMongod({configsvr: "", setParameter: {"requireApiVersion": 1}}),
+        () => MongoRunner.runMongod(
+            {configsvr: "", replSet: "dummy", setParameter: {"requireApiVersion": 1}}),
         [],
         "mongod should not be able to start up with --configsvr and requireApiVersion=true");
 
