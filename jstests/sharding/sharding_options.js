@@ -29,24 +29,40 @@ testGetCmdLineOptsMongod({config: "jstests/libs/config_files/enable_paranoia.jso
 // Sharding Role
 jsTest.log("Testing \"configsvr\" command line option");
 var expectedResult = {
-    "parsed": {"sharding": {"clusterRole": "configsvr"}, "storage": {"journal": {"enabled": true}}}
+    "parsed": {
+        "sharding": {"clusterRole": "configsvr"},
+        "replication": {"replSet": "dummy"},
+        "storage": {"journal": {"enabled": true}}
+    }
 };
-testGetCmdLineOptsMongod({configsvr: "", journal: ""}, expectedResult);
+testGetCmdLineOptsMongod({configsvr: "", journal: "", replSet: "dummy"}, expectedResult);
 
 jsTest.log("Testing \"shardsvr\" command line option");
 expectedResult = {
-    "parsed": {"sharding": {"clusterRole": "shardsvr"}}
+    "parsed": {"sharding": {"clusterRole": "shardsvr"}, "replication": {"replSet": "dummy"}}
 };
-testGetCmdLineOptsMongod({shardsvr: ""}, expectedResult);
+testGetCmdLineOptsMongod({shardsvr: "", replSet: "dummy"}, expectedResult);
 
-jsTest.log("Testing \"sharding.clusterRole\" config file option");
+jsTest.log("Testing \"sharding.clusterRole = shardsvr\" config file option");
 expectedResult = {
     "parsed": {
-        "config": "jstests/libs/config_files/set_shardingrole.json",
-        "sharding": {"clusterRole": "configsvr"}
+        "config": "jstests/libs/config_files/set_shardingrole_shardsvr.json",
+        "sharding": {"clusterRole": "shardsvr"},
+        "replication": {"replSetName": "dummy"}
     }
 };
-testGetCmdLineOptsMongod({config: "jstests/libs/config_files/set_shardingrole.json"},
+testGetCmdLineOptsMongod({config: "jstests/libs/config_files/set_shardingrole_shardsvr.json"},
+                         expectedResult);
+
+jsTest.log("Testing \"sharding.clusterRole = configsvr\" config file option");
+expectedResult = {
+    "parsed": {
+        "config": "jstests/libs/config_files/set_shardingrole_configsvr.json",
+        "sharding": {"clusterRole": "configsvr"},
+        "replication": {"replSetName": "dummy"}
+    }
+};
+testGetCmdLineOptsMongod({config: "jstests/libs/config_files/set_shardingrole_configsvr.json"},
                          expectedResult);
 
 // Test that we preserve switches explicitly set to false in config files.  See SERVER-13439.
