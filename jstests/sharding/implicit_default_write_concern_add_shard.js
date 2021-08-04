@@ -12,11 +12,17 @@ load("jstests/replsets/rslib.js");  // For reconfig and isConfigCommitted.
 function addNonArbiterNode(nodeId, rst) {
     const config = rst.getReplSetConfigFromNode();
     config.members.push({_id: nodeId, host: rst.add().host});
-    config.version++;
     reconfig(rst, config);
     assert.soon(() => isConfigCommitted(rst.getPrimary()));
     rst.waitForConfigReplication(rst.getPrimary());
     rst.awaitReplication();
+    // When we add a new node to a replica set, we temporarily add the "newlyAdded" field so that it
+    // is non-voting until it completes initial sync.
+    // This waits for the primary to see that the node has transitioned to a secondary, recovering,
+    // or rollback state to ensure that we can do the automatic reconfig to remove the "newlyAdded"
+    // field so that the node can actually vote so replication coordinator can update implicit
+    // default write-concern depending on the newly added voting member.
+    rst.waitForAllNewlyAddedRemovals();
 }
 
 function testAddShard(CWWCSet, isPSASet, fixAddShard) {
