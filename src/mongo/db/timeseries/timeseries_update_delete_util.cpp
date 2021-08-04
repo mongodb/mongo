@@ -65,13 +65,15 @@ std::string getRenamedField(StringData field, StringData newField) {
  * Replaces the first occurrence of the metaField in the given field of the given mutablebson
  * element with the literal "meta", accounting for uses of the metaField with dot notation.
  * shouldReplaceFieldValue is set for $expr queries when "$" + the metaField should be substituted
- * for "$meta".
+ * for "$meta", isTopLevelField is set for elements which potentially contain a top-level field
+ * name, and parentIsArray is set for elements with an array as a parent.
  */
 void replaceQueryMetaFieldName(mutablebson::Element elem,
                                StringData field,
                                StringData metaField,
-                               bool shouldReplaceFieldValue = false) {
-    if (isMetaFieldFirstElementOfDottedPathField(field, metaField)) {
+                               bool shouldReplaceFieldValue = false,
+                               bool isTopLevelField = true) {
+    if (isTopLevelField && isMetaFieldFirstElementOfDottedPathField(field, metaField)) {
         invariantStatusOK(elem.rename(getRenamedField(field, "meta")));
     }
     // Substitute element fieldValue with "$meta" if element is a subField of $expr, not a subField
@@ -87,11 +89,15 @@ void replaceQueryMetaFieldName(mutablebson::Element elem,
 /**
  * Recurses through the mutablebson element query and replaces any occurrences of the metaField with
  * "meta" accounting for queries that may be in dot notation. shouldReplaceFieldValue is set for
- * $expr queries when "$" + the metaField should be substituted for "$meta".
+ * $expr queries when "$" + the metaField should be substituted for "$meta", isTopLevelField is set
+ * for elements which potentially contain a top-level field name, and parentIsArray is set for
+ * elements with an array as a parent.
  */
 void replaceQueryMetaFieldName(mutablebson::Element elem,
                                StringData metaField,
-                               bool shouldReplaceFieldValue = false) {
+                               bool shouldReplaceFieldValue = false,
+                               bool isTopLevelField = true,
+                               bool parentIsArray = false) {
     // Replace any occurences of the metaField in the top-level required fields of the JSON Schema
     // object with "meta".
     if (elem.getFieldName() == "$jsonSchema") {
@@ -119,10 +125,16 @@ void replaceQueryMetaFieldName(mutablebson::Element elem,
     }
     shouldReplaceFieldValue = (elem.getFieldName() != "$literal") &&
         (shouldReplaceFieldValue || (elem.getFieldName() == "$expr"));
-    replaceQueryMetaFieldName(elem, elem.getFieldName(), metaField, shouldReplaceFieldValue);
+    replaceQueryMetaFieldName(
+        elem, elem.getFieldName(), metaField, shouldReplaceFieldValue, isTopLevelField);
+    isTopLevelField = parentIsArray && elem.isType(BSONType::Object);
+    parentIsArray = elem.isType(BSONType::Array);
     for (size_t i = 0; i < elem.countChildren(); ++i) {
-        // TODO: SERVER-59104 Remove usages of findNthChild().
-        replaceQueryMetaFieldName(elem.findNthChild(i), metaField, shouldReplaceFieldValue);
+        replaceQueryMetaFieldName(elem.findNthChild(i),
+                                  metaField,
+                                  shouldReplaceFieldValue,
+                                  isTopLevelField,
+                                  parentIsArray);
     }
 }
 }  // namespace
@@ -181,7 +193,10 @@ bool updateOnlyModifiesMetaField(OperationContext* opCtx,
 BSONObj translateQuery(const BSONObj& query, StringData metaField) {
     invariant(!metaField.empty());
     mutablebson::Document queryDoc(query);
-    replaceQueryMetaFieldName(queryDoc.root(), metaField);
+    // The mutablebson root element is an array with a single object if the query is non-empty.
+    if (queryDoc.root().hasChildren()) {
+        replaceQueryMetaFieldName(queryDoc.root()[0], metaField);
+    }
     return queryDoc.getObject();
 }
 
