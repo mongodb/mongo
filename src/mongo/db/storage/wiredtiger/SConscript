@@ -122,6 +122,7 @@ wtEnv.Library(
     LIBDEPS_TAGS=[
         'lint-allow-nonprivate-on-deps-dependents',
         'lint-allow-bidirectional-edges',
+        'lint-allow-dangling-dep-dependent',
     ],
 )
 

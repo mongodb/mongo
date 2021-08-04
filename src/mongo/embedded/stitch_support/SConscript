@@ -1,12 +1,10 @@
 # -*- mode: python; -*-
 
+from functools import partial
+import libdeps
+
 Import("env")
 Import("get_option")
-
-if get_option('build-tools') == 'next':
-    import libdeps_next as libdeps
-else:
-    import libdeps
 
 env = env.Clone()
 
@@ -24,9 +22,11 @@ if get_option('link-model') == 'static':
         ],
     )
 elif get_option('link-model') == 'dynamic-sdk':
-    stitchSupportEnv['LIBDEPS_SHLIBEMITTER'] = libdeps.make_libdeps_emitter(
-        'SharedArchive',
-        libdeps.dependency_visibility_honored
+    # TODO(SERVER-59134): This fails to honor the libdeps-debug flag
+    stitchSupportEnv['LIBDEPS_SHLIBEMITTER'] = partial(
+        libdeps.libdeps_emitter,
+        builder='SharedArchive',
+        visibility_map=libdeps.dependency_visibility_honored,
     )
 
 # Please see the note in ../mongo_embedded/SConscript about how to
