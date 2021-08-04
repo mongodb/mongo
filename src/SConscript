@@ -3,78 +3,19 @@
 # This is the principle SConscript file, invoked by the SConstruct.  Its job is
 # to delegate to any and all per-module SConscript files.
 
-from functools import partial
-
-from site_scons.mongo import insort_wrapper
-
 import SCons
 
 Import('env')
-Import('get_option')
-Import('has_option')
 Import('module_sconscripts')
 
-
-def shim_hack(target, source, env, inject_target=None, exclusions=None):
-    if exclusions is None:
-        exclusions = set(inject_target)
-    elif isinstance(exclusions, str):
-        exclusions = {exclusions, inject_target}
-    elif isinstance(exclusions, (list, set)):
-        exclusions = set(exclusions)
-        exclusions.add(inject_target)
-
-    # If we allowed conftests to become dependent, any TryLink
-    # that happened after we made the below modifications would
-    # cause the configure steps to try to compile tcmalloc and any
-    # of its dependencies. Oops!
-    if any('conftest' in str(t) for t in target):
-        return target, source
-
-    # It is possible that 'env' isn't a unique
-    # OverrideEnvironment, since if you didn't pass any kw args
-    # into your builder call, you just reuse the env you were
-    # called with. That could mean that we see the same
-    # environment here multiple times. But that is really OK,
-    # since the operation we are performing would be performed on
-    # all of them anyway.
-    libdeps_no_inherit = set(env.get('LIBDEPS_NO_INHERIT', []))
-    exclusions.update(libdeps_no_inherit)
-
-    if f"$BUILD_DIR/{inject_target}" not in exclusions:
-        lds = env.get('LIBDEPS', [])
-        shim_target = f"$BUILD_DIR/{inject_target}"
-        if shim_target not in lds:
-            insort_wrapper(lds, shim_target)
-            env['LIBDEPS'] = lds
-
-    return target, source
-
-
-def hack_builder_emitters(env, hack_method):
-    for builder_name in ('Program', 'SharedLibrary', 'LoadableModule', 'StaticLibrary'):
-        builder = env['BUILDERS'][builder_name]
-        base_emitter = builder.emitter
-        builder.emitter = SCons.Builder.ListEmitter([hack_method, base_emitter])
-
-
-if get_option("build-tools") == "next":
-    # Add any "global" dependencies here. This is where we make every build node
-    # depend on a list of other build nodes, such as an allocator or libunwind
-    # or libstdx or similar.
-    env.AppendUnique(
-        LIBDEPS_GLOBAL=[
-            '$BUILD_DIR/third_party/shim_allocator',
-        ],
-    )
-else:
-    hack_builder_emitters(
-        env,
-        partial(
-            shim_hack,
-            inject_target='third_party/shim_allocator',
-            exclusions='gperftools/gperftools'))
-
+# Add any "global" dependencies here. This is where we make every build node
+# depend on a list of other build nodes, such as an allocator or libunwind
+# or libstdx or similar.
+env.AppendUnique(
+    LIBDEPS_GLOBAL=[
+        '$BUILD_DIR/third_party/shim_allocator',
+    ],
+)
 
 # NOTE: We must do third_party first as it adds methods to the environment
 # that we need in the mongo sconscript

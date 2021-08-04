@@ -275,6 +275,7 @@ class SConsToNinjaTranslator:
             return None
 
         build = {}
+        env = node.env if node.env else self.env
 
         # Ideally this should never happen, and we do try to filter
         # Ninja builders out of being sources of ninja builders but I
@@ -286,17 +287,22 @@ class SConsToNinjaTranslator:
             build = self.handle_func_action(node, action)
         elif isinstance(action, SCons.Action.LazyAction):
             # pylint: disable=protected-access
-            action = action._generate_cache(node.env if node.env else self.env)
+            action = action._generate_cache(env)
             build = self.action_to_ninja_build(node, action=action)
         elif isinstance(action, SCons.Action.ListAction):
             build = self.handle_list_action(node, action)
         elif isinstance(action, COMMAND_TYPES):
-            build = get_command(node.env if node.env else self.env, node, action)
+            build = get_command(env, node, action)
         else:
             raise Exception("Got an unbuildable ListAction for: {}".format(str(node)))
 
         if build is not None:
             build["order_only"] = get_order_only(node)
+
+        if 'conftest' not in str(node):
+            node_callback = getattr(node.attributes, "ninja_build_callback", None)
+            if callable(node_callback):
+                node_callback(env, node, build)
 
         return build
 
@@ -417,9 +423,9 @@ class SConsToNinjaTranslator:
 class NinjaState:
     """Maintains state of Ninja build system as it's translated from SCons."""
 
-    def __init__(self, env, writer_class):
+    def __init__(self, env, ninja_syntax):
         self.env = env
-        self.writer_class = writer_class
+        self.writer_class = ninja_syntax.Writer
         self.__generated = False
         self.translator = SConsToNinjaTranslator(env)
         self.generated_suffixes = env.get("NINJA_GENERATED_SOURCE_SUFFIXES", [])
@@ -436,18 +442,18 @@ class NinjaState:
         # shell quoting on whatever platform it's run on. Here we use it
         # to make the SCONS_INVOCATION variable properly quoted for things
         # like CCFLAGS
-        escape = env.get("ESCAPE", lambda x: x)
+        scons_escape = env.get("ESCAPE", lambda x: x)
 
         self.variables = {
             "COPY": "cmd.exe /c 1>NUL copy" if sys.platform == "win32" else "cp",
             "SCONS_INVOCATION": "{} {} __NINJA_NO=1 $out".format(
                 sys.executable,
                 " ".join(
-                    [escape(arg) for arg in sys.argv if arg not in COMMAND_LINE_TARGETS]
+                    [ninja_syntax.escape(scons_escape(arg)) for arg in sys.argv if arg not in COMMAND_LINE_TARGETS]
                 ),
             ),
             "SCONS_INVOCATION_W_TARGETS": "{} {}".format(
-                sys.executable, " ".join([escape(arg) for arg in sys.argv])
+                sys.executable, " ".join([ninja_syntax.escape(scons_escape(arg)) for arg in sys.argv])
             ),
             # This must be set to a global default per:
             # https://ninja-build.org/manual.html
@@ -568,10 +574,10 @@ class NinjaState:
                 "restat": 1,
             },
         }
-
+        num_jobs = self.env.get('NINJA_MAX_JOBS', self.env.GetOption("num_jobs"))
         self.pools = {
-            "local_pool": self.env.GetOption("num_jobs"),
-            "install_pool": self.env.GetOption("num_jobs") / 2,
+            "local_pool": num_jobs,
+            "install_pool": num_jobs / 2,
             "scons_pool": 1,
         }
 
@@ -637,12 +643,14 @@ class NinjaState:
         ninja.variable("builddir", get_path(self.env['NINJA_BUILDDIR']))
 
         for pool_name, size in self.pools.items():
-            ninja.pool(pool_name, size)
+            ninja.pool(pool_name, min(self.env.get('NINJA_MAX_JOBS', size), size))
 
         for var, val in self.variables.items():
             ninja.variable(var, val)
 
         for rule, kwargs in self.rules.items():
+            if self.env.get('NINJA_MAX_JOBS') is not None and 'pool' not in kwargs:
+                kwargs['pool'] = 'local_pool'
             ninja.rule(rule, **kwargs)
 
         generated_source_files = sorted({
@@ -942,13 +950,13 @@ def get_command_env(env):
             # doesn't make builds on paths with spaces (Ninja and SCons issues)
             # nor expanding response file paths with spaces (Ninja issue) work.
             value = value.replace(r' ', r'$ ')
-            command_env += "{}='{}' ".format(key, value)
+            command_env += "export {}='{}';".format(key, value)
 
     env["NINJA_ENV_VAR_CACHE"] = command_env
     return command_env
 
 
-def gen_get_response_file_command(env, rule, tool, tool_is_dynamic=False):
+def gen_get_response_file_command(env, rule, tool, tool_is_dynamic=False, custom_env={}):
     """Generate a response file command provider for rule name."""
 
     # If win32 using the environment with a response file command will cause
@@ -996,6 +1004,11 @@ def gen_get_response_file_command(env, rule, tool, tool_is_dynamic=False):
         variables[rule] = cmd
         if use_command_env:
             variables["env"] = get_command_env(env)
+
+            for key, value in custom_env.items():
+                variables["env"] += env.subst(
+                    f"export {key}={value};", target=targets, source=sources, executor=executor
+                ) + " "
         return rule, variables, [tool_command]
 
     return get_response_file_command
@@ -1103,9 +1116,18 @@ def get_command(env, node, action):  # pylint: disable=too-many-branches
             implicit.append(provider_dep)
             continue
 
+        # in some case the tool could be in the local directory and be suppled without the ext
+        # such as in windows, so append the executable suffix and check.
+        prog_suffix = sub_env.get('PROGSUFFIX', '')
+        provider_dep_ext = provider_dep if provider_dep.endswith(prog_suffix) else provider_dep + prog_suffix
+        if os.path.exists(provider_dep_ext):
+            implicit.append(provider_dep_ext)
+            continue
+
         # Many commands will assume the binary is in the path, so
         # we accept this as a possible input from a given command.
-        provider_dep_abspath = sub_env.WhereIs(provider_dep)
+
+        provider_dep_abspath = sub_env.WhereIs(provider_dep) or sub_env.WhereIs(provider_dep, path=os.environ["PATH"])
         if provider_dep_abspath:
             implicit.append(provider_dep_abspath)
             continue
@@ -1182,7 +1204,7 @@ def register_custom_rule_mapping(env, pre_subst_string, rule):
     __NINJA_RULE_MAPPING[pre_subst_string] = rule
 
 
-def register_custom_rule(env, rule, command, description="", deps=None, pool=None, use_depfile=False):
+def register_custom_rule(env, rule, command, description="", deps=None, pool=None, use_depfile=False, use_response_file=False, response_file_content="$rspc"):
     """Allows specification of Ninja rules from inside SCons files."""
     rule_obj = {
         "command": command,
@@ -1198,6 +1220,10 @@ def register_custom_rule(env, rule, command, description="", deps=None, pool=Non
     if pool is not None:
         rule_obj["pool"] = pool
 
+    if use_response_file:
+        rule_obj["rspfile"] = "$out.rsp"
+        rule_obj["rspfile_content"] = response_file_content
+
     env[NINJA_RULES][rule] = rule_obj
 
 
@@ -1205,6 +1231,9 @@ def register_custom_pool(env, pool, size):
     """Allows the creation of custom Ninja pools"""
     env[NINJA_POOLS][pool] = size
 
+def set_build_node_callback(env, node, callback):
+    if 'conftest' not in str(node):
+        setattr(node.attributes, "ninja_build_callback", callback)
 
 def ninja_csig(original):
     """Return a dummy csig"""
@@ -1323,6 +1352,13 @@ def ninja_always_serial(self, num, taskmaster):
     self.job = SCons.Job.Serial(taskmaster)
 
 
+def ninja_print_conf_log(s, target, source, env):
+    """Command line print only for conftest to generate a correct conf log."""
+    if target and "conftest" in str(target[0]):
+        action = SCons.Action._ActionAction()
+        action.print_cmd_line(s, target, source, env)
+
+
 class NinjaNoResponseFiles(SCons.Platform.TempFileMunge):
     """Overwrite the __call__ method of SCons' TempFileMunge to not delete."""
 
@@ -1386,7 +1422,9 @@ def generate(env):
     # Provide a way for custom rule authors to easily access command
     # generation.
     env.AddMethod(get_generic_shell_command, "NinjaGetGenericShellCommand")
+    env.AddMethod(get_command, "NinjaGetCommand")
     env.AddMethod(gen_get_response_file_command, "NinjaGenResponseFileProvider")
+    env.AddMethod(set_build_node_callback, "NinjaSetBuildNodeCallback")
 
     # Provides a way for users to handle custom FunctionActions they
     # want to translate to Ninja.
@@ -1538,7 +1576,7 @@ def generate(env):
     SCons.Executor.Executor._get_unchanged_targets = SCons.Executor.Executor._get_targets
 
     # Replace false action messages with nothing.
-    env["PRINT_CMD_LINE_FUNC"] = ninja_noop
+    env["PRINT_CMD_LINE_FUNC"] = ninja_print_conf_log
 
     # This reduces unnecessary subst_list calls to add the compiler to
     # the implicit dependencies of targets. Since we encode full paths
@@ -1574,7 +1612,7 @@ def generate(env):
     ninja_syntax = importlib.import_module(ninja_syntax_mod_name.replace(".py", ""))
 
     global NINJA_STATE
-    NINJA_STATE = NinjaState(env, ninja_syntax.Writer)
+    NINJA_STATE = NinjaState(env, ninja_syntax)
 
     # Here we will force every builder to use an emitter which makes the ninja
     # file depend on it's target. This forces the ninja file to the bottom of

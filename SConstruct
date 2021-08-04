@@ -817,7 +817,7 @@ env_vars.Add('CXXFLAGS',
     converter=variable_shlex_converter)
 
 default_destdir = '$BUILD_ROOT/install'
-if get_option('ninja') != 'disabled' and get_option('build-tools') == 'next':
+if get_option('ninja') != 'disabled':
     # Workaround for SERVER-53952 where issues wih different
     # ninja files building to the same install dir. Different
     # ninja files need to build to different install dirs.
@@ -1865,21 +1865,13 @@ if env['_LIBDEPS'] == '$_LIBDEPS_OBJS':
     # command but instead runs a function.
     env["BUILDERS"]["StaticLibrary"].action = SCons.Action.Action(write_uuid_to_file, "Generating placeholder library $TARGET")
 
-if get_option('build-tools') == 'next':
-    import libdeps_next as libdeps
+import libdeps
 
-    libdeps.setup_environment(
-        env,
-        emitting_shared=(link_model.startswith("dynamic")),
-        debug=get_option('libdeps-debug'),
-        linting=get_option('libdeps-linting'))
-else:
-    import libdeps
-
-    libdeps.setup_environment(
-        env,
-        emitting_shared=(link_model.startswith("dynamic")),
-        linting=get_option('libdeps-linting'))
+libdeps.setup_environment(
+    env,
+    emitting_shared=(link_model.startswith("dynamic")),
+    debug=get_option('libdeps-debug'),
+    linting=get_option('libdeps-linting'))
 
 # Both the abidw tool and the thin archive tool must be loaded after
 # libdeps, so that the scanners they inject can see the library
@@ -4523,7 +4515,7 @@ if get_option('ninja') != 'disabled':
 
     env['NINJA_REGENERATE_DEPS'] = ninja_generate_deps
 
-    if get_option('build-tools') == 'next' and env.TargetOSIs("windows"):
+    if env.TargetOSIs("windows"):
         # This is a workaround on windows for SERVER-48691 where the line length
         # in response files is too long:
         # https://developercommunity.visualstudio.com/content/problem/441978/fatal-error-lnk1170-line-in-command-file-contains.html
@@ -5300,6 +5292,5 @@ for i, s in enumerate(BUILD_TARGETS):
 
 # Do any final checks the Libdeps linter may need to do once all
 # SConscripts have been read but before building begins.
-if get_option('build-tools') == 'next':
-    libdeps.LibdepLinter(env).final_checks()
-    libdeps.generate_libdeps_graph(env)
+libdeps.LibdepLinter(env).final_checks()
+libdeps.generate_libdeps_graph(env)

@@ -493,6 +493,12 @@ def generate(env):
     # seems fragile. If you find your local machine being overrun by
     # jobs, figure out what sort they are and extend this part of the
     # setup.
+    def icerun_generator(target, source, env, for_signature):
+            if "conftest" not in str(target[0]):
+                return '$ICERUN'
+            return ''
+    env['ICERUN_GENERATOR'] = icerun_generator
+
     icerun_commands = [
         "ARCOM",
         "LINKCOM",
@@ -502,7 +508,7 @@ def generate(env):
 
     for command in icerun_commands:
         if command in env:
-            env[command] = " ".join(["$( $ICERUN $)", env[command]])
+            env[command] = " ".join(["$( $ICERUN_GENERATOR $)", env[command]])
 
     # Uncomment these to debug your icecc integration
     if env['ICECREAM_DEBUG']:

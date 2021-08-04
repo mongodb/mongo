@@ -51,20 +51,39 @@ automatically added when missing.
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-from collections import OrderedDict
+from collections import defaultdict
+from functools import partial
+import enum
 import copy
+import json
 import os
+import sys
+import glob
 import textwrap
+import hashlib
+import json
+import fileinput
+
+try:
+    import networkx
+    from buildscripts.libdeps.libdeps.graph import EdgeProps, NodeProps, LibdepsGraph
+except ImportError:
+    pass
 
 import SCons.Errors
 import SCons.Scanner
 import SCons.Util
+import SCons
+from SCons.Script import COMMAND_LINE_TARGETS
+
 
 
 class Constants:
     Libdeps = "LIBDEPS"
     LibdepsCached = "LIBDEPS_cached"
     LibdepsDependents = "LIBDEPS_DEPENDENTS"
+    LibdepsGlobal = "LIBDEPS_GLOBAL"
+    LibdepsNoInherit = "LIBDEPS_NO_INHERIT"
     LibdepsInterface ="LIBDEPS_INTERFACE"
     LibdepsPrivate = "LIBDEPS_PRIVATE"
     LibdepsTags = "LIBDEPS_TAGS"
@@ -75,9 +94,26 @@ class Constants:
     SysLibdepsCached = "SYSLIBDEPS_cached"
     SysLibdepsPrivate = "SYSLIBDEPS_PRIVATE"
 
-class dependency:
-    Public, Private, Interface = list(range(3))
 
+class deptype(tuple, enum.Enum):
+    Global: tuple = (0, 'GLOBAL')
+    Public: tuple = (1, 'PUBLIC')
+    Private: tuple = (2, 'PRIVATE')
+    Interface: tuple = (3, 'INTERFACE')
+
+    def __lt__(self, other):
+        if self.__class__ is other.__class__:
+            return self.value[0] < other.value[0]
+        return NotImplemented
+
+    def __str__(self):
+        return self.value[1]
+
+    def __int__(self):
+        return self.value[0]
+
+
+class dependency:
     def __init__(self, value, deptype, listed_name):
         self.target_node = value
         self.dependency_type = deptype
@@ -85,6 +121,7 @@ class dependency:
 
     def __str__(self):
         return str(self.target_node)
+
 
 class FlaggedLibdep:
     """
@@ -198,6 +235,8 @@ class LibdepLinter:
     linting_rules_run = 0
     registered_linting_time = False
 
+    dangling_dep_dependents = set()
+
     @staticmethod
     def _make_linter_decorator():
         """
@@ -212,9 +251,30 @@ class LibdepLinter:
 
         linter_rule_func.all = funcs
         return linter_rule_func
-    linter_rule = _make_linter_decorator.__func__()
 
-    def __init__(self, env, target):
+    linter_rule = _make_linter_decorator.__func__()
+    linter_final_check = _make_linter_decorator.__func__()
+
+    @classmethod
+    def _skip_linting(cls):
+        return cls.skip_linting
+
+    @classmethod
+    def _start_timer(cls):
+        # Record time spent linting if we are in print mode.
+        if cls.print_linter_errors:
+            from timeit import default_timer as timer
+            return timer()
+
+    @classmethod
+    def _stop_timer(cls, start, num_rules):
+        # Record time spent linting if we are in print mode.
+        if cls.print_linter_errors:
+            from timeit import default_timer as timer
+            cls.linting_time += timer() - start
+            cls.linting_rules_run += num_rules
+
+    def __init__(self, env, target=None):
         self.env = env
         self.target = target
         self.unique_libs = set()
@@ -239,13 +299,9 @@ class LibdepLinter:
 
         # Build performance optimization if you
         # are sure your build is clean.
-        if self.__class__.skip_linting:
+        if self._skip_linting():
             return
-
-        # Record time spent linting if we are in print mode.
-        if self.__class__.print_linter_errors:
-            from timeit import default_timer as timer
-            start = timer()
+        start = self._start_timer()
 
         linter_rules = [
             getattr(self, linter_rule)
@@ -256,9 +312,24 @@ class LibdepLinter:
             for linter_rule in linter_rules:
                 linter_rule(libdep)
 
-        if self.__class__.print_linter_errors:
-            self.__class__.linting_time += timer() - start
-            self.__class__.linting_rules_run += (len(linter_rules)*len(libdeps))
+        self._stop_timer(start, len(linter_rules)*len(libdeps))
+
+    def final_checks(self):
+        # Build performance optimization if you
+        # are sure your build is clean.
+        if self._skip_linting():
+            return
+        start = self._start_timer()
+
+        linter_rules = [
+            getattr(self.__class__, rule)
+            for rule in self.__class__.linter_final_check.all
+        ]
+
+        for linter_rule in linter_rules:
+            linter_rule(self)
+
+        self._stop_timer(start, len(linter_rules))
 
     def _raise_libdep_lint_exception(self, message):
         """
@@ -296,9 +367,16 @@ class LibdepLinter:
     def _get_deps_dependents(self, env=None):
         """ util function to get all types of DEPS_DEPENDENTS"""
         target_env = env if env else self.env
-        deps_dependents = target_env.get(Constants.LibdepsDependents, [])
+        deps_dependents = target_env.get(Constants.LibdepsDependents, []).copy()
         deps_dependents += target_env.get(Constants.ProgdepsDependents, [])
         return deps_dependents
+
+    def _get_deps_dependents_with_types(self, builder, type):
+        return [
+            (dependent[0], builder) if isinstance(dependent, tuple) else
+            (dependent, builder)
+            for dependent in self.env.get(type, [])
+        ]
 
     @linter_rule
     def linter_rule_leaf_node_no_deps(self, libdep):
@@ -315,6 +393,11 @@ class LibdepLinter:
         if self._check_for_lint_tags('lint-leaf-node-allowed-dep', libdep.target_node.env):
             return
 
+        # Global dependencies will apply to leaf nodes, so they should
+        # be automatically exempted.
+        if libdep.dependency_type == deptype.Global:
+            return
+
         target_type = self.target[0].builder.get_name(self.env)
         lib = os.path.basename(str(libdep))
         self._raise_libdep_lint_exception(
@@ -322,6 +405,37 @@ class LibdepLinter:
                 {target_type} '{self.target[0]}' has dependency '{lib}' and is marked explicitly as a leaf node,
                 and '{lib}' does not exempt itself as an exception to the rule."""
             ))
+
+    @linter_rule
+    def linter_rule_no_dangling_deps(self, libdep):
+        """
+        LIBDEP RULE:
+            All reverse dependency edges must point to a node which will be built.
+        """
+        if self._check_for_lint_tags('lint-allow-dangling-dep-dependent'):
+            return
+
+        # Gather the DEPS_DEPENDENTS and store them for a final check to make sure they were
+        # eventually defined as being built by some builder
+        libdep_libbuilder = self.target[0].builder.get_name(self.env)
+        deps_depends = self._get_deps_dependents_with_types(libdep_libbuilder, Constants.LibdepsDependents)
+        deps_depends += self._get_deps_dependents_with_types("Program", Constants.ProgdepsDependents)
+        self.__class__.dangling_dep_dependents.update(deps_depends)
+
+    @linter_final_check
+    def linter_rule_no_dangling_dep_final_check(self):
+        # At this point the SConscripts have defined all the build items,
+        # and so we can go check any DEPS_DEPENDENTS listed and make sure a builder
+        # was instanciated to build them.
+        for dep_dependent in self.__class__.dangling_dep_dependents:
+            dep_node = _get_node_with_ixes(self.env, dep_dependent[0], dep_dependent[1])
+            if not dep_node.has_builder():
+                self._raise_libdep_lint_exception(
+                    textwrap.dedent(f"""\
+                        Found reverse dependency linked to node '{dep_node}'
+                        which will never be built by any builder.
+                        Remove the reverse dependency or add a way to build it."""
+                    ))
 
     @linter_rule
     def linter_rule_no_public_deps(self, libdep):
@@ -333,7 +447,7 @@ class LibdepLinter:
         if not self._check_for_lint_tags('lint-no-public-deps', inclusive_tag=True):
             return
 
-        if libdep.dependency_type != dependency.Private:
+        if libdep.dependency_type not in (deptype.Global, deptype.Private):
             # Check if the libdep exempts itself from this rule.
             if self._check_for_lint_tags('lint-public-dep-allowed', libdep.target_node.env):
                 return
@@ -399,7 +513,7 @@ class LibdepLinter:
             return
 
         if (self.target[0].builder.get_name(self.env) == "Program"
-            and libdep.dependency_type != dependency.Public):
+            and libdep.dependency_type not in (deptype.Global, deptype.Public)):
 
             lib = os.path.basename(str(libdep))
             self._raise_libdep_lint_exception(
@@ -445,7 +559,7 @@ class LibdepLinter:
         if self._check_for_lint_tags('lint-allow-nonprivate-on-deps-dependents'):
             return
 
-        if (libdep.dependency_type != dependency.Private
+        if (libdep.dependency_type != deptype.Private and libdep.dependency_type != deptype.Global
             and len(self._get_deps_dependents()) > 0):
 
             target_type = self.target[0].builder.get_name(self.env)
@@ -476,26 +590,29 @@ class LibdepLinter:
 
                 target_type = self.target[0].builder.get_name(self.env)
                 self._raise_libdep_lint_exception(textwrap.dedent(f"""\
-                    Found non-list type '{libdeps_list}' while evaluating {dep_type_val} for {target_type} '{self.target[0]}'
-                    {dep_type_val} must be setup as a list."""
+                    Found non-list type '{libdeps_list}' while evaluating {dep_type_val[1]} for {target_type} '{self.target[0]}'
+                    {dep_type_val[1]} must be setup as a list."""
                 ))
 
 dependency_visibility_ignored = {
-    dependency.Public: dependency.Public,
-    dependency.Private: dependency.Public,
-    dependency.Interface: dependency.Public,
+    deptype.Global: deptype.Public,
+    deptype.Interface: deptype.Public,
+    deptype.Public: deptype.Public,
+    deptype.Private: deptype.Public,
 }
 
 dependency_visibility_honored = {
-    dependency.Public: dependency.Public,
-    dependency.Private: dependency.Private,
-    dependency.Interface: dependency.Interface,
+    deptype.Global: deptype.Private,
+    deptype.Interface: deptype.Interface,
+    deptype.Public: deptype.Public,
+    deptype.Private: deptype.Private,
 }
 
 dep_type_to_env_var = {
-    dependency.Public: Constants.Libdeps,
-    dependency.Private: Constants.LibdepsPrivate,
-    dependency.Interface: Constants.LibdepsInterface,
+    deptype.Global: Constants.LibdepsGlobal,
+    deptype.Interface: Constants.LibdepsInterface,
+    deptype.Public: Constants.Libdeps,
+    deptype.Private: Constants.LibdepsPrivate,
 }
 
 class DependencyCycleError(SCons.Errors.UserError):
@@ -516,17 +633,23 @@ class LibdepLinterError(SCons.Errors.UserError):
 class MissingSyslibdepError(SCons.Errors.UserError):
     """Exception representing a discongruent usages of libdeps"""
 
-def __get_sorted_direct_libdeps(node):
-    direct_sorted = getattr(node.attributes, "libdeps_direct_sorted", False)
-    if not direct_sorted:
+def _get_sorted_direct_libdeps(node):
+    direct_sorted = getattr(node.attributes, "libdeps_direct_sorted", None)
+    if direct_sorted is None:
         direct = getattr(node.attributes, "libdeps_direct", [])
         direct_sorted = sorted(direct, key=lambda t: str(t.target_node))
         setattr(node.attributes, "libdeps_direct_sorted", direct_sorted)
     return direct_sorted
 
 
-def __libdeps_visit(n, marked, tsorted, walking):
-    if n.target_node in marked:
+class LibdepsVisitationMark(enum.IntEnum):
+    UNMARKED = 0
+    MARKED_PRIVATE = 1
+    MARKED_PUBLIC = 2
+
+
+def _libdeps_visit_private(n, marked, walking, debug=False):
+    if marked[n.target_node] >= LibdepsVisitationMark.MARKED_PRIVATE:
         return
 
     if n.target_node in walking:
@@ -535,11 +658,78 @@ def __libdeps_visit(n, marked, tsorted, walking):
     walking.add(n.target_node)
 
     try:
-        for child in __get_sorted_direct_libdeps(n.target_node):
-            if child.dependency_type != dependency.Private:
-                __libdeps_visit(child, marked, tsorted, walking=walking)
+        for child in _get_sorted_direct_libdeps(n.target_node):
+            _libdeps_visit_private(child, marked, walking)
 
-        marked.add(n.target_node)
+        marked[n.target_node] = LibdepsVisitationMark.MARKED_PRIVATE
+
+    except DependencyCycleError as e:
+        if len(e.cycle_nodes) == 1 or e.cycle_nodes[0] != e.cycle_nodes[-1]:
+            e.cycle_nodes.insert(0, n.target_node)
+        raise
+
+    finally:
+        walking.remove(n.target_node)
+
+
+def _libdeps_visit(n, tsorted, marked, walking, debug=False):
+    # The marked dictionary tracks which sorts of visitation a node
+    # has received. Values for a given node can be UNMARKED/absent,
+    # MARKED_PRIVATE, or MARKED_PUBLIC. These are to be interpreted as
+    # follows:
+    #
+    # 0/UNMARKED: Node is not not marked.
+    #
+    # MARKED_PRIVATE: Node has only been explored as part of looking
+    # for cycles under a LIBDEPS_PRIVATE edge.
+    #
+    # MARKED_PUBLIC: Node has been explored and any of its transiive
+    # dependencies have been incorporated into `tsorted`.
+    #
+    # The __libdeps_visit_private function above will only mark things
+    # at with MARKED_PRIVATE, while __libdeps_visit will mark things
+    # MARKED_PUBLIC.
+    if marked[n.target_node] == LibdepsVisitationMark.MARKED_PUBLIC:
+        return
+
+    # The walking set is used for cycle detection. We record all our
+    # predecessors in our depth-first search, and if we observe one of
+    # our predecessors as a child, we know we have a cycle.
+    if n.target_node in walking:
+        raise DependencyCycleError(n.target_node)
+
+    walking.add(n.target_node)
+
+    if debug:
+        print(f"    * {n.dependency_type} => {n.listed_name}")
+
+    try:
+        children = _get_sorted_direct_libdeps(n.target_node)
+
+        # We first walk all of our public dependencies so that we can
+        # put full marks on anything that is in our public transitive
+        # graph. We then do a second walk into any private nodes to
+        # look for cycles. While we could do just one walk over the
+        # children, it is slightly faster to do two passes, since if
+        # the algorithm walks into a private edge early, it would do a
+        # lot of non-productive (except for cycle checking) walking
+        # and marking, but if another public path gets into that same
+        # subtree, then it must walk and mark it again to raise it to
+        # the public mark level. Whereas, if the algorithm first walks
+        # the whole public tree, then those are all productive marks
+        # and add to tsorted, and then the private walk will only need
+        # to examine those things that are only reachable via private
+        # edges.
+
+        for child in children:
+            if child.dependency_type != deptype.Private:
+                _libdeps_visit(child, tsorted, marked, walking, debug)
+
+        for child in children:
+            if child.dependency_type == deptype.Private:
+                _libdeps_visit_private(child, marked, walking, debug)
+
+        marked[n.target_node] = LibdepsVisitationMark.MARKED_PUBLIC
         tsorted.append(n.target_node)
 
     except DependencyCycleError as e:
@@ -547,8 +737,11 @@ def __libdeps_visit(n, marked, tsorted, walking):
             e.cycle_nodes.insert(0, n.target_node)
         raise
 
+    finally:
+        walking.remove(n.target_node)
 
-def __get_libdeps(node):
+
+def _get_libdeps(node, debug=False):
     """Given a SCons Node, return its library dependencies, topologically sorted.
 
     Computes the dependencies if they're not already cached.
@@ -556,123 +749,146 @@ def __get_libdeps(node):
 
     cache = getattr(node.attributes, Constants.LibdepsCached, None)
     if cache is not None:
+        if debug:
+            print("  Cache:")
+            for dep in cache:
+                print(f"    * {str(dep)}")
         return cache
 
+    if debug:
+        print(f"  Edges:")
+
     tsorted = []
-    marked = set()
+
+    marked = defaultdict(lambda: LibdepsVisitationMark.UNMARKED)
     walking = set()
 
-    for child in __get_sorted_direct_libdeps(node):
-        if child.dependency_type != dependency.Interface:
-            __libdeps_visit(child, marked, tsorted, walking)
-
+    for child in _get_sorted_direct_libdeps(node):
+        if child.dependency_type != deptype.Interface:
+            _libdeps_visit(child, tsorted, marked, walking, debug=debug)
     tsorted.reverse()
-    setattr(node.attributes, Constants.LibdepsCached, tsorted)
 
+    setattr(node.attributes, Constants.LibdepsCached, tsorted)
     return tsorted
 
 
-def __missing_syslib(name):
+def _missing_syslib(name):
     return Constants.MissingLibdep + name
 
 
-def update_scanner(builder):
+def update_scanner(env, builder_name=None, debug=False):
     """Update the scanner for "builder" to also scan library dependencies."""
 
+    builder = env["BUILDERS"][builder_name]
     old_scanner = builder.target_scanner
 
     if old_scanner:
         path_function = old_scanner.path_function
-
-        def new_scanner(node, env, path=()):
-            result = old_scanner.function(node, env, path)
-            result.extend(__get_libdeps(node))
-            return result
-
     else:
         path_function = None
 
-        def new_scanner(node, env, path=()):
-            return __get_libdeps(node)
+    def new_scanner(node, env, path=()):
+        if debug:
+            print(f"LIBDEPS SCANNER: {str(node)}")
+            print(f"  Declared dependencies:")
+            print(f"    global: {env.get(Constants.LibdepsGlobal, None)}")
+            print(f"    private: {env.get(Constants.LibdepsPrivate, None)}")
+            print(f"    public: {env.get(Constants.Libdeps, None)}")
+            print(f"    interface: {env.get(Constants.LibdepsInterface, None)}")
+            print(f"    no_inherit: {env.get(Constants.LibdepsNoInherit, None)}")
+
+        if old_scanner:
+            result = old_scanner.function(node, env, path)
+        else:
+            result = []
+        result.extend(_get_libdeps(node, debug=debug))
+        if debug:
+            print(f"  Build dependencies:")
+            print('\n'.join(['    * ' + str(t) for t in result]))
+            print('\n')
+        return result
 
     builder.target_scanner = SCons.Scanner.Scanner(
         function=new_scanner, path_function=path_function
     )
 
 
-def get_libdeps(source, target, env, for_signature):
+def get_libdeps(source, target, env, for_signature, debug=False):
     """Implementation of the special _LIBDEPS environment variable.
 
     Expands to the library dependencies for a target.
     """
 
     target = env.Flatten([target])
-    return __get_libdeps(target[0])
+    return _get_libdeps(target[0], debug=debug)
 
 
-def get_libdeps_objs(source, target, env, for_signature):
+def get_libdeps_objs(source, target, env, for_signature, debug=False):
     objs = []
-    for lib in get_libdeps(source, target, env, for_signature):
+    for lib in get_libdeps(source, target, env, for_signature, debug=debug):
         # This relies on Node.sources being order stable build-to-build.
         objs.extend(lib.sources)
     return objs
 
-def make_get_syslibdeps_callable(shared):
 
-    def get_syslibdeps(source, target, env, for_signature):
-        """ Given a SCons Node, return its system library dependencies.
+def stringify_deps(env, deps):
+    lib_link_prefix = env.subst("$LIBLINKPREFIX")
+    lib_link_suffix = env.subst("$LIBLINKSUFFIX")
 
-        These are the dependencies listed with SYSLIBDEPS, and are linked using -l.
-        """
+    # Elements of libdeps are either strings (str or unicode), or they're File objects.
+    # If they're File objects, they can be passed straight through.  If they're strings,
+    # they're believed to represent library short names, that should be prefixed with -l
+    # or the compiler-specific equivalent.  I.e., 'm' becomes '-lm', but 'File("m.a") is passed
+    # through whole cloth.
+    return [f"{lib_link_prefix}{d}{lib_link_suffix}" if isinstance(d, str) else d for d in deps]
 
-        deps = getattr(target[0].attributes, Constants.SysLibdepsCached, None)
-        if deps is None:
 
-            # Get the sys libdeps for the current node
-            deps = target[0].get_env().Flatten(target[0].get_env().get(Constants.SysLibdepsPrivate) or [])
-            deps += target[0].get_env().Flatten(target[0].get_env().get(Constants.SysLibdeps) or [])
+def get_syslibdeps(source, target, env, for_signature, debug=False, shared=True):
+    """ Given a SCons Node, return its system library dependencies.
 
-            for lib in __get_libdeps(target[0]):
+    These are the dependencies listed with SYSLIBDEPS, and are linked using -l.
+    """
 
-                # For each libdep get its syslibdeps, and then check to see if we can
-                # add it to the deps list. For static build we will also include private
-                # syslibdeps to be transitive. For a dynamic build we will only make
-                # public libdeps transitive.
-                syslibs = []
-                if not shared:
-                    syslibs += lib.get_env().get(Constants.SysLibdepsPrivate) or []
-                syslibs += lib.get_env().get(Constants.SysLibdeps) or []
+    deps = getattr(target[0].attributes, Constants.SysLibdepsCached, None)
+    if deps is None:
 
-                # Validate the libdeps, a configure check has already checked what
-                # syslibdeps are available so we can hard fail here if a syslibdep
-                # is being attempted to be linked with.
-                for syslib in syslibs:
-                    if not syslib:
-                        continue
+        # Get the syslibdeps for the current node
+        deps = target[0].get_env().Flatten(copy.copy(target[0].get_env().get(Constants.SysLibdepsPrivate)) or [])
+        deps += target[0].get_env().Flatten(target[0].get_env().get(Constants.SysLibdeps) or [])
 
-                    if isinstance(syslib, str) and syslib.startswith(Constants.MissingLibdep):
-                        MissingSyslibdepError(textwrap.dedent(f"""\
+        for lib in _get_libdeps(target[0]):
+
+            # For each libdep get its syslibdeps, and then check to see if we can
+            # add it to the deps list. For static build we will also include private
+            # syslibdeps to be transitive. For a dynamic build we will only make
+            # public libdeps transitive.
+            syslibs = []
+            if not shared:
+                syslibs += lib.get_env().get(Constants.SysLibdepsPrivate) or []
+            syslibs += lib.get_env().get(Constants.SysLibdeps) or []
+
+            # Validate the libdeps, a configure check has already checked what
+            # syslibdeps are available so we can hard fail here if a syslibdep
+            # is being attempted to be linked with.
+            for syslib in syslibs:
+                if not syslib:
+                    continue
+
+                if isinstance(syslib, str) and syslib.startswith(Constants.MissingLibdep):
+                    raise MissingSyslibdepError(textwrap.dedent(f"""\
+                        LibdepsError:
                             Target '{str(target[0])}' depends on the availability of a
                             system provided library for '{syslib[len(Constants.MissingLibdep):]}',
                             but no suitable library was found during configuration."""
-                        ))
+                    ))
 
-                    deps.append(syslib)
+                deps.append(syslib)
 
-            setattr(target[0].attributes, Constants.SysLibdepsCached, deps)
+        setattr(target[0].attributes, Constants.SysLibdepsCached, deps)
+    return stringify_deps(env, deps)
 
-        lib_link_prefix = env.subst("$LIBLINKPREFIX")
-        lib_link_suffix = env.subst("$LIBLINKSUFFIX")
-        # Elements of syslibdeps are either strings (str or unicode), or they're File objects.
-        # If they're File objects, they can be passed straight through.  If they're strings,
-        # they're believed to represent library short names, that should be prefixed with -l
-        # or the compiler-specific equivalent.  I.e., 'm' becomes '-lm', but 'File("m.a") is passed
-        # through whole cloth.
-        return [f"{lib_link_prefix}{d}{lib_link_suffix}" if isinstance(d, str) else d for d in deps]
 
-    return get_syslibdeps
-
-def __append_direct_libdeps(node, prereq_nodes):
+def _append_direct_libdeps(node, prereq_nodes):
     # We do not bother to decorate nodes that are not actual Objects
     if type(node) == str:
         return
@@ -681,7 +897,7 @@ def __append_direct_libdeps(node, prereq_nodes):
     node.attributes.libdeps_direct.extend(prereq_nodes)
 
 
-def __get_flagged_libdeps(source, target, env, for_signature):
+def _get_flagged_libdeps(source, target, env, for_signature):
     for lib in get_libdeps(source, target, env, for_signature):
         # Make sure lib is a Node so we can get the env to check for flags.
         libnode = lib
@@ -694,7 +910,7 @@ def __get_flagged_libdeps(source, target, env, for_signature):
         yield cur_lib
 
 
-def __get_node_with_ixes(env, node, node_builder_type):
+def _get_node_with_ixes(env, node, node_builder_type):
     """
     Gets the node passed in node with the correct ixes applied
     for the given builder type.
@@ -710,7 +926,7 @@ def __get_node_with_ixes(env, node, node_builder_type):
     # to run SCons performance intensive 'subst' each time
     cache_key = (id(env), node_builder_type)
     try:
-        prefix, suffix = __get_node_with_ixes.node_type_ixes[cache_key]
+        prefix, suffix = _get_node_with_ixes.node_type_ixes[cache_key]
     except KeyError:
         prefix = node_builder.get_prefix(env)
         suffix = node_builder.get_suffix(env)
@@ -721,108 +937,185 @@ def __get_node_with_ixes(env, node, node_builder_type):
         if suffix == ".dll":
             suffix = ".lib"
 
-        __get_node_with_ixes.node_type_ixes[cache_key] = (prefix, suffix)
+        _get_node_with_ixes.node_type_ixes[cache_key] = (prefix, suffix)
 
     node_with_ixes = SCons.Util.adjustixes(node, prefix, suffix)
     return node_factory(node_with_ixes)
 
-__get_node_with_ixes.node_type_ixes = dict()
+_get_node_with_ixes.node_type_ixes = dict()
 
-def make_libdeps_emitter(
-    dependency_builder,
-    dependency_map=dependency_visibility_ignored,
-    ignore_progdeps=False,
-):
-    def libdeps_emitter(target, source, env):
-        """SCons emitter that takes values from the LIBDEPS environment variable and
-        converts them to File node objects, binding correct path information into
-        those File objects.
+def add_node_from(env, node):
 
-        Emitters run on a particular "target" node during the initial execution of
-        the SConscript file, rather than during the later build phase.  When they
-        run, the "env" environment's working directory information is what you
-        expect it to be -- that is, the working directory is considered to be the
-        one that contains the SConscript file.  This allows specification of
-        relative paths to LIBDEPS elements.
+    env.GetLibdepsGraph().add_nodes_from([(
+        str(node.abspath),
+        {
+            NodeProps.bin_type.name: node.builder.get_name(env),
+        })])
 
-        This emitter also adds LIBSUFFIX and LIBPREFIX appropriately.
+def add_edge_from(env, from_node, to_node, visibility, direct):
 
-        NOTE: For purposes of LIBDEPS_DEPENDENTS propagation, only the first member
-        of the "target" list is made a prerequisite of the elements of LIBDEPS_DEPENDENTS.
-        """
+    env.GetLibdepsGraph().add_edges_from([(
+        from_node,
+        to_node,
+        {
+            EdgeProps.direct.name: direct,
+            EdgeProps.visibility.name: int(visibility)
+        })])
 
-        # Get all the libdeps from the env so we can
-        # can append them to the current target_node.
-        libdeps = []
-        for dep_type in sorted(dependency_map.keys()):
+def add_libdeps_node(env, target, libdeps):
 
-            # Libraries may not be stored as a list in the env,
-            # so we must convert single library strings to a list.
-            libs = env.get(dep_type_to_env_var[dep_type])
-            if not SCons.Util.is_List(libs):
-                libs = [libs]
+    if str(target).endswith(env["SHLIBSUFFIX"]):
+        node = _get_node_with_ixes(env, str(target.abspath), target.get_builder().get_name(env))
+        add_node_from(env, node)
 
-            for lib in libs:
-                if not lib:
-                    continue
-                lib_with_ixes = __get_node_with_ixes(env, lib, dependency_builder)
+        for libdep in libdeps:
+            if str(libdep.target_node).endswith(env["SHLIBSUFFIX"]):
+                add_edge_from(
+                    env,
+                    str(node.abspath),
+                    str(libdep.target_node.abspath),
+                    visibility=libdep.dependency_type,
+                    direct=True)
+
+
+def get_libdeps_nodes(env, target, builder, debug=False, visibility_map=None):
+    if visibility_map is None:
+        visibility_map = dependency_visibility_ignored
+
+    if not SCons.Util.is_List(target):
+        target = [target]
+
+    # Get the current list of nodes not to inherit on each target
+    no_inherit = set(env.get(Constants.LibdepsNoInherit, []))
+
+    # Get all the libdeps from the env so we can
+    # can append them to the current target_node.
+    libdeps = []
+    for dep_type in sorted(visibility_map.keys()):
+
+        if dep_type == deptype.Global:
+            if any("conftest" in str(t) for t in target):
+                # Ignore global dependencies for conftests
+                continue
+
+        # Libraries may not be stored as a list in the env,
+        # so we must convert single library strings to a list.
+        libs = env.get(dep_type_to_env_var[dep_type], []).copy()
+        if not SCons.Util.is_List(libs):
+            libs = [libs]
+
+        for lib in libs:
+            if not lib:
+                continue
+
+            lib_with_ixes = _get_node_with_ixes(env, lib, builder)
+
+            if lib in no_inherit:
+                if debug and not any("conftest" in str(t) for t in target):
+                    print(f"     {dep_type[1]} =/> {lib}")
+
+            else:
+                if debug and not any("conftest" in str(t) for t in target):
+                    print(f"     {dep_type[1]} => {lib}")
+
                 libdeps.append(dependency(lib_with_ixes, dep_type, lib))
 
-        # Lint the libdeps to make sure they are following the rules.
-        # This will skip some or all of the checks depending on the options
-        # and LIBDEPS_TAGS used.
-        if not any("conftest" in str(t) for t in target):
-            LibdepLinter(env, target).lint_libdeps(libdeps)
+    return libdeps
 
-        # We ignored the dependency_map until now because we needed to use
-        # original dependency value for linting. Now go back through and
-        # use the map to convert to the desired dependencies, for example
-        # all Public in the static linking case.
-        for libdep in libdeps:
-            libdep.dependency_type = dependency_map[libdep.dependency_type]
 
+def libdeps_emitter(target, source, env, debug=False, builder=None, visibility_map=None, ignore_progdeps=False):
+    """SCons emitter that takes values from the LIBDEPS environment variable and
+    converts them to File node objects, binding correct path information into
+    those File objects.
+
+    Emitters run on a particular "target" node during the initial execution of
+    the SConscript file, rather than during the later build phase.  When they
+    run, the "env" environment's working directory information is what you
+    expect it to be -- that is, the working directory is considered to be the
+    one that contains the SConscript file.  This allows specification of
+    relative paths to LIBDEPS elements.
+
+    This emitter also adds LIBSUFFIX and LIBPREFIX appropriately.
+
+    NOTE: For purposes of LIBDEPS_DEPENDENTS propagation, only the first member
+    of the "target" list is made a prerequisite of the elements of LIBDEPS_DEPENDENTS.
+    """
+
+    if visibility_map is None:
+        visibility_map = dependency_visibility_ignored
+
+    if debug and not any("conftest" in str(t) for t in target):
+        print(f"LIBDEPS EMITTER: {str(target[0])}")
+        print(f"  Declared dependencies:")
+        print(f"    global: {env.get(Constants.LibdepsGlobal, None)}")
+        print(f"    private: {env.get(Constants.LibdepsPrivate, None)}")
+        print(f"    public: {env.get(Constants.Libdeps, None)}")
+        print(f"    interface: {env.get(Constants.LibdepsInterface, None)}")
+        print(f"    no_inherit: {env.get(Constants.LibdepsNoInherit, None)}")
+        print(f"  Edges:")
+
+    libdeps = get_libdeps_nodes(env, target, builder, debug, visibility_map)
+
+    if debug and not any("conftest" in str(t) for t in target):
+        print(f"\n")
+
+    # Lint the libdeps to make sure they are following the rules.
+    # This will skip some or all of the checks depending on the options
+    # and LIBDEPS_TAGS used.
+    if not any("conftest" in str(t) for t in target):
+        LibdepLinter(env, target).lint_libdeps(libdeps)
+
+    if env.get('SYMBOLDEPSSUFFIX', None):
         for t in target:
-            # target[0] must be a Node and not a string, or else libdeps will fail to
-            # work properly.
-            __append_direct_libdeps(t, libdeps)
+            add_libdeps_node(env, t, libdeps)
 
-        for dependent in env.get(Constants.LibdepsDependents, []):
+    # We ignored the visibility_map until now because we needed to use
+    # original dependency value for linting. Now go back through and
+    # use the map to convert to the desired dependencies, for example
+    # all Public in the static linking case.
+    for libdep in libdeps:
+        libdep.dependency_type = visibility_map[libdep.dependency_type]
+
+    for t in target:
+        # target[0] must be a Node and not a string, or else libdeps will fail to
+        # work properly.
+        _append_direct_libdeps(t, libdeps)
+
+    for dependent in env.get(Constants.LibdepsDependents, []):
+        if dependent is None:
+            continue
+
+        visibility = deptype.Private
+        if isinstance(dependent, tuple):
+            visibility = dependent[1]
+            dependent = dependent[0]
+
+        dependentNode = _get_node_with_ixes(
+            env, dependent, builder
+        )
+        _append_direct_libdeps(
+            dependentNode, [dependency(target[0], visibility_map[visibility], dependent)]
+        )
+
+    if not ignore_progdeps:
+        for dependent in env.get(Constants.ProgdepsDependents, []):
             if dependent is None:
                 continue
 
-            visibility = dependency.Private
+            visibility = deptype.Public
             if isinstance(dependent, tuple):
+                # TODO: Error here? Non-public PROGDEPS_DEPENDENTS probably are meaningless
                 visibility = dependent[1]
                 dependent = dependent[0]
 
-            dependentNode = __get_node_with_ixes(
-                env, dependent, dependency_builder
+            dependentNode = _get_node_with_ixes(
+                env, dependent, "Program"
             )
-            __append_direct_libdeps(
-                dependentNode, [dependency(target[0], dependency_map[visibility], dependent)]
+            _append_direct_libdeps(
+                dependentNode, [dependency(target[0], visibility_map[visibility], dependent)]
             )
 
-        if not ignore_progdeps:
-            for dependent in env.get(Constants.ProgdepsDependents, []):
-                if dependent is None:
-                    continue
-
-                visibility = dependency.Public
-                if isinstance(dependent, tuple):
-                    # TODO: Error here? Non-public PROGDEPS_DEPENDENTS probably are meaningless
-                    visibility = dependent[1]
-                    dependent = dependent[0]
-
-                dependentNode = __get_node_with_ixes(
-                    env, dependent, "Program"
-                )
-                __append_direct_libdeps(
-                    dependentNode, [dependency(target[0], dependency_map[visibility], dependent)]
-                )
-
-        return target, source
-
-    return libdeps_emitter
+    return target, source
 
 
 def expand_libdeps_tags(source, target, env, for_signature):
@@ -841,7 +1134,7 @@ def expand_libdeps_with_flags(source, target, env, for_signature):
     # below a bit cleaner.
     prev_libdep = None
 
-    for flagged_libdep in __get_flagged_libdeps(source, target, env, for_signature):
+    for flagged_libdep in _get_flagged_libdeps(source, target, env, for_signature):
 
         # If there are no flags to process we can move on to the next lib.
         # start_index wont mater in the case because if there are no flags
@@ -882,8 +1175,109 @@ def expand_libdeps_with_flags(source, target, env, for_signature):
 
     return libdeps_with_flags
 
+def generate_libdeps_graph(env):
+    if env.get('SYMBOLDEPSSUFFIX', None):
 
-def setup_environment(env, emitting_shared=False, linting='on'):
+        find_symbols = env.Dir("$BUILD_DIR").path + "/libdeps/find_symbols"
+        libdeps_graph = env.GetLibdepsGraph()
+
+        symbol_deps = []
+        for symbols_file, target_node in env.get('LIBDEPS_SYMBOL_DEP_FILES', []):
+
+            direct_libdeps = []
+            for direct_libdep in _get_sorted_direct_libdeps(target_node):
+                add_node_from(env, direct_libdep.target_node)
+                add_edge_from(
+                    env,
+                    str(target_node.abspath),
+                    str(direct_libdep.target_node.abspath),
+                    visibility=int(direct_libdep.dependency_type),
+                    direct=True)
+                direct_libdeps.append(direct_libdep.target_node.abspath)
+
+            for libdep in _get_libdeps(target_node):
+                if libdep.abspath not in direct_libdeps:
+                    add_node_from(env, libdep)
+                    add_edge_from(
+                        env,
+                        str(target_node.abspath),
+                        str(libdep.abspath),
+                        visibility=int(deptype.Public),
+                        direct=False)
+            if env['PLATFORM'] == 'darwin':
+                sep = ' '
+            else:
+                sep = ':'
+            ld_path = sep.join([os.path.dirname(str(libdep)) for libdep in _get_libdeps(target_node)])
+            symbol_deps.append(env.Command(
+                target=symbols_file,
+                source=target_node,
+                action=SCons.Action.Action(
+                    f'{find_symbols} $SOURCE "{ld_path}" $TARGET',
+                    "Generating $SOURCE symbol dependencies" if not env['VERBOSE'] else "")))
+
+        def write_graph_hash(env, target, source):
+
+            with open(target[0].path, 'w') as f:
+                json_str = json.dumps(networkx.readwrite.json_graph.node_link_data(env.GetLibdepsGraph()), sort_keys=True).encode('utf-8')
+                f.write(hashlib.sha256(json_str).hexdigest())
+
+        graph_hash = env.Command(target="$BUILD_DIR/libdeps/graph_hash.sha256",
+                    source=symbol_deps,
+                    action=SCons.Action.FunctionAction(
+                        write_graph_hash,
+                        {"cmdstr": None}))
+        env.Depends(graph_hash, [
+                        env.File("#SConstruct")] +
+                        glob.glob("**/SConscript", recursive=True) +
+                        [os.path.abspath(__file__),
+                        env.File('$BUILD_DIR/mongo/util/version_constants.h')])
+
+        graph_node = env.Command(
+            target=env.get('LIBDEPS_GRAPH_FILE', None),
+            source=symbol_deps,
+            action=SCons.Action.FunctionAction(
+                generate_graph,
+                {"cmdstr": "Generating libdeps graph"}))
+
+        env.Depends(graph_node, [graph_hash] + env.Glob("#buildscripts/libdeps/libdeps/*"))
+
+def generate_graph(env, target, source):
+
+    libdeps_graph = env.GetLibdepsGraph()
+
+    for symbol_deps_file in source:
+        with open(str(symbol_deps_file)) as f:
+            symbols = {}
+            try:
+                for symbol, lib in json.load(f).items():
+                    # ignore symbols from external libraries,
+                    # they will just clutter the graph
+                    if lib.startswith(env.Dir("$BUILD_DIR").path):
+                        if lib not in symbols:
+                            symbols[lib] = []
+                        symbols[lib].append(symbol)
+            except json.JSONDecodeError:
+                env.FatalError(f"Failed processing json file: {str(symbol_deps_file)}")
+
+            for libdep in symbols:
+                from_node = os.path.abspath(str(symbol_deps_file)[:-len(env['SYMBOLDEPSSUFFIX'])])
+                to_node = os.path.abspath(libdep).strip()
+                libdeps_graph.add_edges_from([(
+                    from_node,
+                    to_node,
+                    {EdgeProps.symbols.name: " ".join(symbols[libdep]) })])
+                node = env.File(str(symbol_deps_file)[:-len(env['SYMBOLDEPSSUFFIX'])])
+                add_node_from(env, node)
+
+    libdeps_graph_file = f"{env.Dir('$BUILD_DIR').path}/libdeps/libdeps.graphml"
+    networkx.write_graphml(libdeps_graph, libdeps_graph_file, named_key_ids=True)
+    with fileinput.FileInput(libdeps_graph_file, inplace=True) as file:
+        for line in file:
+            print(line.replace(str(env.Dir("$BUILD_DIR").abspath + os.sep), ''), end='')
+
+
+def setup_environment(env, emitting_shared=False, debug='off', linting='on'):
     """Set up the given build environment to do LIBDEPS tracking."""
 
     LibdepLinter.skip_linting = linting == 'off'
@@ -895,38 +1289,113 @@ def setup_environment(env, emitting_shared=False, linting='on'):
         env["_LIBDEPS"] = "$_LIBDEPS_LIBS"
 
     env["_LIBDEPS_TAGS"] = expand_libdeps_tags
-    env["_LIBDEPS_GET_LIBS"] = get_libdeps
-    env["_LIBDEPS_OBJS"] = get_libdeps_objs
-    env["_SYSLIBDEPS"] = make_get_syslibdeps_callable(emitting_shared)
+    env["_LIBDEPS_GET_LIBS"] = partial(get_libdeps, debug=debug)
+    env["_LIBDEPS_OBJS"] = partial(get_libdeps_objs, debug=debug)
+    env["_SYSLIBDEPS"] = partial(get_syslibdeps, debug=debug, shared=emitting_shared)
 
     env[Constants.Libdeps] = SCons.Util.CLVar()
     env[Constants.SysLibdeps] = SCons.Util.CLVar()
 
-    # We need a way for environments to alter just which libdeps
-    # emitter they want, without altering the overall program or
-    # library emitter which may have important effects. The
-    # substitution rules for emitters are a little strange, so build
-    # ourselves a little trampoline to use below so we don't have to
-    # deal with it.
-    def make_indirect_emitter(variable):
-        def indirect_emitter(target, source, env):
-            return env[variable](target, source, env)
+    # Create the alias for graph generation, the existence of this alias
+    # on the command line will cause the libdeps-graph generation to be
+    # configured.
+    env['LIBDEPS_GRAPH_ALIAS'] = env.Alias(
+        'generate-libdeps-graph',
+        "${BUILD_DIR}/libdeps/libdeps.graphml")[0]
 
-        return indirect_emitter
+    if str(env['LIBDEPS_GRAPH_ALIAS']) in COMMAND_LINE_TARGETS:
+
+        # Detect if the current system has the tools to perform the generation.
+        if env.GetOption('ninja') != 'disabled':
+            env.FatalError("Libdeps graph generation is not supported with ninja builds.")
+        if not emitting_shared:
+            env.FatalError("Libdeps graph generation currently only supports dynamic builds.")
+
+        if env['PLATFORM'] == 'darwin':
+            required_bins = ['awk', 'sed', 'otool', 'nm']
+        else:
+            required_bins = ['awk', 'grep', 'ldd', 'nm']
+        for bin in required_bins:
+            if not env.WhereIs(bin):
+                env.FatalError(f"'{bin}' not found, Libdeps graph generation requires {bin}.")
+
+
+        # The find_symbols binary is a small fast C binary which will extract the missing
+        # symbols from the target library, and discover what linked libraries supply it. This
+        # setups the binary to be built.
+        find_symbols_env = env.Clone()
+        find_symbols_env.VariantDir('${BUILD_DIR}/libdeps', 'buildscripts/libdeps', duplicate = 0)
+        find_symbols_node = find_symbols_env.Program(
+            target='${BUILD_DIR}/libdeps/find_symbols',
+            source=['${BUILD_DIR}/libdeps/find_symbols.c'],
+            CFLAGS=['-O3'])
+
+        # Here we are setting up some functions which will return single instance of the
+        # network graph and symbol deps list. We also setup some environment variables
+        # which are used along side the functions.
+        symbol_deps = []
+        def append_symbol_deps(env, symbol_deps_file):
+            env.Depends(env['LIBDEPS_GRAPH_FILE'], symbol_deps_file[0])
+            symbol_deps.append(symbol_deps_file)
+        env.AddMethod(append_symbol_deps, "AppendSymbolDeps")
+
+        env['LIBDEPS_SYMBOL_DEP_FILES'] = symbol_deps
+        env['LIBDEPS_GRAPH_FILE'] = env.File("${BUILD_DIR}/libdeps/libdeps.graphml")
+        env['LIBDEPS_GRAPH_SCHEMA_VERSION'] = 3
+        env["SYMBOLDEPSSUFFIX"] = '.symbol_deps'
+
+        libdeps_graph = LibdepsGraph()
+        libdeps_graph.graph['invocation'] = " ".join([env['ESCAPE'](str(sys.executable))] + [env['ESCAPE'](arg) for arg in sys.argv])
+        libdeps_graph.graph['git_hash'] = env['MONGO_GIT_HASH']
+        libdeps_graph.graph['graph_schema_version'] = env['LIBDEPS_GRAPH_SCHEMA_VERSION']
+        libdeps_graph.graph['build_dir'] = env.Dir('$BUILD_DIR').path
+        libdeps_graph.graph['deptypes'] = json.dumps({key: value[0] for key, value in deptype.__members__.items() if isinstance(value, tuple)})
+
+        def get_libdeps_graph(env):
+            return libdeps_graph
+        env.AddMethod(get_libdeps_graph, "GetLibdepsGraph")
+
+        # Now we will setup an emitter, and an additional action for several
+        # of the builder involved with dynamic builds.
+        def libdeps_graph_emitter(target, source, env):
+            if "conftest" not in str(target[0]):
+                symbol_deps_file = env.File(str(target[0]) + env['SYMBOLDEPSSUFFIX'])
+                env.Depends(symbol_deps_file, '${BUILD_DIR}/libdeps/find_symbols')
+                env.AppendSymbolDeps((symbol_deps_file,target[0]))
+
+            return target, source
+
+        for builder_name in ("Program", "SharedLibrary", "LoadableModule"):
+            builder = env['BUILDERS'][builder_name]
+            base_emitter = builder.emitter
+            new_emitter = SCons.Builder.ListEmitter([base_emitter, libdeps_graph_emitter])
+            builder.emitter = new_emitter
+
 
     env.Append(
-        LIBDEPS_LIBEMITTER=make_libdeps_emitter("StaticLibrary"),
-        LIBEMITTER=make_indirect_emitter("LIBDEPS_LIBEMITTER"),
-        LIBDEPS_SHAREMITTER=make_libdeps_emitter("SharedArchive", ignore_progdeps=True),
-        SHAREMITTER=make_indirect_emitter("LIBDEPS_SHAREMITTER"),
-        LIBDEPS_SHLIBEMITTER=make_libdeps_emitter(
-            "SharedLibrary", dependency_visibility_honored
+        LIBDEPS_LIBEMITTER=partial(
+            libdeps_emitter,
+            debug=debug,
+            builder="StaticLibrary"),
+        LIBEMITTER=lambda target, source, env: env["LIBDEPS_LIBEMITTER"](target, source, env),
+        LIBDEPS_SHAREMITTER=partial(
+            libdeps_emitter,
+            debug=debug,
+            builder="SharedArchive", ignore_progdeps=True),
+        SHAREMITTER=lambda target, source, env: env["LIBDEPS_SHAREMITTER"](target, source, env),
+        LIBDEPS_SHLIBEMITTER=partial(
+            libdeps_emitter,
+            debug=debug,
+            builder="SharedLibrary",
+            visibility_map=dependency_visibility_honored
         ),
-        SHLIBEMITTER=make_indirect_emitter("LIBDEPS_SHLIBEMITTER"),
-        LIBDEPS_PROGEMITTER=make_libdeps_emitter(
-            "SharedLibrary" if emitting_shared else "StaticLibrary"
+        SHLIBEMITTER=lambda target, source, env: env["LIBDEPS_SHLIBEMITTER"](target, source, env),
+        LIBDEPS_PROGEMITTER=partial(
+            libdeps_emitter,
+            debug=debug,
+            builder="SharedLibrary" if emitting_shared else "StaticLibrary"
         ),
-        PROGEMITTER=make_indirect_emitter("LIBDEPS_PROGEMITTER"),
+        PROGEMITTER=lambda target, source, env: env["LIBDEPS_PROGEMITTER"](target, source, env),
     )
 
     env["_LIBDEPS_LIBS_WITH_TAGS"] = expand_libdeps_with_flags
@@ -940,7 +1409,7 @@ def setup_environment(env, emitting_shared=False, linting='on'):
     env.Prepend(_LIBFLAGS="$_LIBDEPS_TAGS $_LIBDEPS $_SYSLIBDEPS ")
     for builder_name in ("Program", "SharedLibrary", "LoadableModule", "SharedArchive"):
         try:
-            update_scanner(env["BUILDERS"][builder_name])
+            update_scanner(env, builder_name, debug=debug)
         except KeyError:
             pass
 
@@ -955,7 +1424,7 @@ def setup_conftests(conf):
             if result:
                 context.env[var] = lib
                 return context.Result(result)
-        context.env[var] = __missing_syslib(name)
+        context.env[var] = _missing_syslib(name)
         return context.Result(result)
 
     conf.AddTest("FindSysLibDep", FindSysLibDep)
