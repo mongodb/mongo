@@ -54,19 +54,17 @@ ShardedFixture.prototype.runExecPhase = function runExecPhase(test) {
     const docs = [{_id: 1}];
     let shardIdentities = [];
     let readOnlyShards = [];
-    let operationTimes = [];
 
     for (let i = 0; i < this.nShards; ++i) {
         let primary = this.st["rs" + i].getPrimary();
         shardIdentities.push(
             primary.getDB("admin").getCollection("system.version").findOne({_id: "shardIdentity"}));
         assert.neq(null, shardIdentities[i]);
-        // Get operation time so the read only shard recover all the info.
-        operationTimes.push(
-            assert
-                .commandWorked(primary.getDB('_temporary_db')
-                                   .runCommand({insert: '_temporary_coll' + i, documents: docs}))
-                .operationTime);
+        assert.commandWorked(primary.getDB('_temporary_db').runCommand({
+            insert: '_temporary_coll' + i,
+            documents: docs,
+            writeConcern: {w: "majority"}
+        }));
     }
 
     this.st.stopAllShards({noCleanData: true, restart: true, skipValidation: true});
@@ -75,7 +73,6 @@ ShardedFixture.prototype.runExecPhase = function runExecPhase(test) {
     for (let i = 0; i < this.nShards; ++i) {
         let dbPath = this.dbPaths[i];
         let port = this.ports[i];
-        let operationTime = operationTimes[i];
 
         jsTestLog("Renaming local.system collection on shard " + i);
 
@@ -110,7 +107,6 @@ ShardedFixture.prototype.runExecPhase = function runExecPhase(test) {
             queryableBackupMode: "",
             restart: true,
             shardsvr: "",
-            setParameter: {recoverToOplogTimestamp: tojson({timestamp: operationTime})}
         }));
     }
 
