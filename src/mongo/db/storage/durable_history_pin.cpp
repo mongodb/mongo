@@ -101,4 +101,15 @@ void DurableHistoryRegistry::reconcilePins(OperationContext* opCtx) {
     }
 }
 
+void DurableHistoryRegistry::clearPins(OperationContext* opCtx) {
+    StorageEngine* engine = opCtx->getServiceContext()->getStorageEngine();
+    if (!engine->supportsRecoveryTimestamp()) {
+        return;
+    }
+
+    for (auto& pin : _pins) {
+        engine->unpinOldestTimestamp(pin->getName());
+    }
+}
+
 }  // namespace mongo

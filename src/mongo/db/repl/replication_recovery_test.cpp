@@ -50,6 +50,7 @@
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/session_txn_record_gen.h"
+#include "mongo/db/storage/durable_history_pin.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/transaction_participant.h"
@@ -188,6 +189,7 @@ private:
         auto service = getServiceContext();
         StorageInterface::set(service, std::make_unique<StorageInterfaceRecovery>());
         _storageInterface = static_cast<StorageInterfaceRecovery*>(StorageInterface::get(service));
+        DurableHistoryRegistry::set(service, std::make_unique<DurableHistoryRegistry>());
 
         _createOpCtx();
         _consistencyMarkers = std::make_unique<ReplicationConsistencyMarkersMock>();
