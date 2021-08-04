@@ -603,6 +603,26 @@ Status ShardingCatalogManager::setFeatureCompatibilityVersionOnShards(OperationC
     return Status::OK();
 }
 
+void ShardingCatalogManager::_unsetFieldsFromChunkDocuments(OperationContext* opCtx,
+                                                            const BSONObj& fields) {
+    auto unsetChunkFields = [&]() {
+        updateConfigDocumentDBDirect(opCtx,
+                                     ChunkType::ConfigNS,
+                                     {} /* query */,
+                                     BSON("$unset" << fields) /* update */,
+                                     false /* upsert */,
+                                     true /* multi */);
+    };
+
+    // First pass to unset fields from most chunk documents, pontentially missing new ones being
+    // written.
+    unsetChunkFields();
+
+    // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and move.
+    Lock::ExclusiveLock lk(opCtx->lockState(), _kChunkOpLock);
+    unsetChunkFields();  // Second pass to unset fields from eventual new chunk documents.
+}
+
 void ShardingCatalogManager::_removePre50LegacyMetadata(OperationContext* opCtx) {
     const auto catalogClient = Grid::get(opCtx)->catalogClient();
     // Delete all documents which have {dropped: true} from config.collections
@@ -948,19 +968,10 @@ void ShardingCatalogManager::_upgradeCollectionsAndChunksEntriesTo50Phase2(
     OperationContext* opCtx) {
     LOGV2(5276706, "Starting upgrade of config.chunks (phase 2)");
 
-    // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
-    // migrations.
-    Lock::ExclusiveLock lk(opCtx->lockState(), _kChunkOpLock);
-
-    // Unset ns, epoch and timestamp for all chunks on config.chunks
-    updateConfigDocumentDBDirect(
-        opCtx,
-        ChunkType::ConfigNS,
-        {} /* query */,
-        BSON("$unset" << BSON(ChunkType::ns("") << ChunkType::epoch() << ""
-                                                << ChunkType::timestamp() << "")) /* update */,
-        false /* upsert */,
-        true /* multi */);
+    // Unset namespace, epoch and timestamp fields from config.chunks documents
+    const auto nsEpochTimestamp =
+        BSON(ChunkType::ns("") << ChunkType::epoch() << "" << ChunkType::timestamp() << "");
+    _unsetFieldsFromChunkDocuments(opCtx, nsEpochTimestamp);
 
     LOGV2(5276707, "Successfully upgraded config.chunks (phase 2)");
 }
@@ -1098,18 +1109,8 @@ void ShardingCatalogManager::_downgradeCollectionsAndChunksEntriesToPre50Phase2(
     OperationContext* opCtx) {
     LOGV2(5276709, "Starting downgrade of config.chunks (phase 2)");
 
-    // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
-    // migrations.
-    Lock::ExclusiveLock lk(opCtx->lockState(), _kChunkOpLock);
-
-    // Unset the uuid for all chunks on config.chunks
-    updateConfigDocumentDBDirect(
-        opCtx,
-        ChunkType::ConfigNS,
-        {} /* query */,
-        BSON("$unset" << BSON(ChunkType::collectionUUID() << "")) /* update */,
-        false /* upsert */,
-        true /* multi */);
+    // Unset the uuid field from config.chunks documents
+    _unsetFieldsFromChunkDocuments(opCtx, BSON(ChunkType::collectionUUID() << ""));
 
     LOGV2(5276710, "Successfully downgraded config.chunks (phase 2)");
 }

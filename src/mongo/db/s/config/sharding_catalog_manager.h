@@ -598,6 +598,16 @@ private:
                                                       const std::string& shardName,
                                                       const std::string& zoneName);
 
+    /*
+     * Unset the specified fields from all documents in config.chunks.
+     *
+     * The removal is happening in two steps:
+     * - "Unsafe" delete updating all the documents without affecting the balancer activity.
+     * - "Safe" delete holding the chunks lock and updating documents potentially written during the
+     * previous step.
+     */
+    void _unsetFieldsFromChunkDocuments(OperationContext* opCtx, const BSONObj& fields);
+
     /**
      * Removes all entries from the config server's config.collections where 'dropped' is true.
      *
