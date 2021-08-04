@@ -46,7 +46,7 @@ class DecimalCounter {
 public:
     static_assert(std::is_unsigned<T>::value, "DecimalCounter requires an unsigned type");
 
-    DecimalCounter<T>(T start = 0) : _lastDigitIndex(_getLastDigitIndex(start)), _counter(start) {}
+    DecimalCounter(T start = 0) : _lastDigitIndex(_getLastDigitIndex(start)), _counter(start) {}
 
     constexpr operator StringData() const {
         return {_digits, static_cast<size_t>(_lastDigitIndex + 1)};

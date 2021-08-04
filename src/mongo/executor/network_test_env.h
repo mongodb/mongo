@@ -84,9 +84,9 @@ public:
     template <class T>
     class FutureHandle {
     public:
-        FutureHandle<T>(stdx::future<T> future,
-                        executor::TaskExecutor* executor,
-                        executor::NetworkInterfaceMock* network)
+        FutureHandle(stdx::future<T> future,
+                     executor::TaskExecutor* executor,
+                     executor::NetworkInterfaceMock* network)
             : _future(std::move(future)), _executor(executor), _network(network) {}
 
         FutureHandle(FutureHandle&& other) = default;

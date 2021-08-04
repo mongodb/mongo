@@ -274,7 +274,7 @@ ModifierNode::ModifyResult PushNode::insertElementsWithPosition(
         std::accumulate(std::next(valuesToPush.begin()),
                         valuesToPush.end(),
                         firstElementToInsert,
-                        [&document](auto& insertAfter, auto& valueToInsert) {
+                        [&document](auto&& insertAfter, auto& valueToInsert) {
                             auto nextElementToInsert =
                                 document.makeElementWithNewFieldName(StringData(), valueToInsert);
                             invariant(insertAfter.addSiblingRight(nextElementToInsert));

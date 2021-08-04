@@ -32,6 +32,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_min_length.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -83,7 +84,7 @@ TEST(InternalSchemaMinLengthMatchExpression, TreatsMultiByteCodepointAsOneCharac
     InternalSchemaMinLengthMatchExpression nonMatchingMinLength("a", 2);
 
     // This string has one code point, so it should meet minimum length 1 but not minimum length 2.
-    constexpr auto testString = u8"\U0001f4a9";
+    const auto testString = u8"\U0001f4a9"_as_char_ptr;
     ASSERT_TRUE(matchingMinLength.matchesBSON(BSON("a" << testString)));
     ASSERT_FALSE(nonMatchingMinLength.matchesBSON(BSON("a" << testString)));
 }
@@ -93,12 +94,12 @@ TEST(InternalSchemaMinLengthMatchExpression, CorectlyCountsUnicodeCodepoints) {
     InternalSchemaMinLengthMatchExpression nonMatchingMinLength("a", 6);
 
     // A test string that contains single-byte, 2-byte, 3-byte, and 4-byte code points.
-    constexpr auto testString =
-        u8":"            // Single-byte character
-        u8"\u00e9"       // 2-byte character
-        u8")"            // Single-byte character
-        u8"\U0001f4a9"   // 4-byte character
-        u8"\U000020ac";  // 3-byte character
+    const auto testString =
+        u8":"                        // Single-byte character
+        u8"\u00e9"                   // 2-byte character
+        u8")"                        // Single-byte character
+        u8"\U0001f4a9"               // 4-byte character
+        u8"\U000020ac"_as_char_ptr;  // 3-byte character
 
     // This string has five code points, so it should meet minimum length 5 but not minimum
     // length 6.

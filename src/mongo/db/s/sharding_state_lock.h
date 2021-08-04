@@ -47,22 +47,18 @@ public:
      * Locks the sharding state object with the sharding state object's ResourceMutex in MODE_IS.
      * When the object goes out of scope, the ResourceMutex will be unlocked.
      */
-    static ShardingStateLock<ShardingState> lockShared(OperationContext* opCtx,
-                                                       ShardingState* state);
+    static ShardingStateLock lockShared(OperationContext* opCtx, ShardingState* state);
 
     /**
      * Follows the same functionality as the ShardingStateLock lock method, except that
      * lockExclusive takes the ResourceMutex in MODE_X.
      */
-    static ShardingStateLock<ShardingState> lockExclusive(OperationContext* opCtx,
-                                                          ShardingState* state);
+    static ShardingStateLock lockExclusive(OperationContext* opCtx, ShardingState* state);
 
 private:
     using StateLock = stdx::variant<Lock::SharedLock, Lock::ExclusiveLock>;
 
-    ShardingStateLock<ShardingState>(OperationContext* opCtx,
-                                     ShardingState* state,
-                                     LockMode lockMode);
+    ShardingStateLock(OperationContext* opCtx, ShardingState* state, LockMode lockMode);
 
     // The lock created and locked upon construction of a ShardingStateLock object. It locks the
     // ResourceMutex taken from the ShardingState class, passed in on construction.

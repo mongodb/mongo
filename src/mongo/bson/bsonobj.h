@@ -730,11 +730,11 @@ public:
         return &_cur;
     }
 
-    bool operator==(const BSONObjStlIterator& other) {
-        return _cur.rawdata() == other._cur.rawdata();
+    friend bool operator==(const BSONObjStlIterator& lhs, const BSONObjStlIterator& rhs) {
+        return lhs._cur.rawdata() == rhs._cur.rawdata();
     }
-    bool operator!=(const BSONObjStlIterator& other) {
-        return !(*this == other);
+    friend bool operator!=(const BSONObjStlIterator& lhs, const BSONObjStlIterator& rhs) {
+        return !(lhs == rhs);
     }
 
 private:

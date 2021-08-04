@@ -38,7 +38,7 @@
 namespace mongo::c_node_disambiguation {
 namespace {
 
-auto disambiguateCNode(const CNode& cst) {
+ProjectionType disambiguateCNode(const CNode& cst) {
     return stdx::visit(
         visit_helper::Overloaded{
             [](const CNode::ObjectChildren& children) {

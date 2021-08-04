@@ -53,6 +53,7 @@ private:
 /** Context of a deinitialization process. Passed as a parameter to deinitialization functions. */
 class DeinitializerContext {
 public:
+    DeinitializerContext() = default;
     DeinitializerContext(const DeinitializerContext&) = delete;
     DeinitializerContext& operator=(const DeinitializerContext&) = delete;
 };

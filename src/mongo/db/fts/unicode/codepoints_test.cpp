@@ -49,12 +49,12 @@ TEST(UnicodeCodepoints, Diacritics) {
 
     for (auto cp : marks) {
         ASSERT(codepointIsDiacritic(cp));
-        ASSERT_EQ(codepointRemoveDiacritics(cp), char32_t(0));
+        ASSERT_EQ(static_cast<std::uint32_t>(codepointRemoveDiacritics(cp)), std::uint32_t(0));
     }
 
     for (auto cp : not_marks) {
         ASSERT(!codepointIsDiacritic(cp));
-        ASSERT_NE(codepointRemoveDiacritics(cp), char32_t(0));
+        ASSERT_NE(static_cast<std::uint32_t>(codepointRemoveDiacritics(cp)), std::uint32_t(0));
     }
 }
 
@@ -83,7 +83,8 @@ TEST(UnicodeCodepoints, RemoveDiacritics) {
     const char32_t clean[] = {0x61, 0x65, 0x6E, 0x61, 0x63};
 
     for (auto i = 0; i < 5; ++i) {
-        ASSERT_EQUALS(clean[i], codepointRemoveDiacritics(originals[i]));
+        ASSERT_EQUALS(static_cast<std::uint32_t>(clean[i]),
+                      static_cast<std::uint32_t>(codepointRemoveDiacritics(originals[i])));
     }
 
     for (char32_t cp = 0; cp <= maxCP; cp++) {
@@ -98,20 +99,23 @@ TEST(UnicodeCodepoints, ToLower) {
     const char32_t lower[] = {0xE1, 0xEA, 0xF1, 0xE5, 0xE7};
 
     for (auto i = 0; i < 5; ++i) {
-        ASSERT_EQUALS(lower[i], codepointToLower(upper[i]));
+        ASSERT_EQUALS(static_cast<std::uint32_t>(lower[i]),
+                      static_cast<std::uint32_t>(codepointToLower(upper[i])));
     }
 }
 
 TEST(UnicodeCodepoints, ToLowerIsFixedPoint) {
     for (char32_t cp = 0; cp <= maxCP; cp++) {
-        ASSERT_EQ(codepointToLower(cp), codepointToLower(codepointToLower(cp)));
+        ASSERT_EQ(static_cast<std::uint32_t>(codepointToLower(cp)),
+                  static_cast<std::uint32_t>(codepointToLower(codepointToLower(cp))));
     }
 }
 
 TEST(UnicodeCodepoints, RemoveDiacriticsIsFixedPoint) {
     for (char32_t cp = 0; cp <= maxCP; cp++) {
-        ASSERT_EQ(codepointRemoveDiacritics(cp),
-                  codepointRemoveDiacritics(codepointRemoveDiacritics(cp)));
+        ASSERT_EQ(
+            static_cast<std::uint32_t>(codepointRemoveDiacritics(cp)),
+            static_cast<std::uint32_t>(codepointRemoveDiacritics(codepointRemoveDiacritics(cp))));
     }
 }
 

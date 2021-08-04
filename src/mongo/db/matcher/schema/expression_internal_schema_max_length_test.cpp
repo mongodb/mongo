@@ -84,7 +84,7 @@ TEST(InternalSchemaMaxLengthMatchExpression, TreatsMultiByteCodepointAsOneCharac
     InternalSchemaMaxLengthMatchExpression matchingMaxLength("a", 1);
 
     // This string has one code point, so it should meet maximum length 1 but not maximum length 0.
-    constexpr auto testString = u8"\U0001f4a9";
+    const auto testString = u8"\U0001f4a9"_as_char_ptr;
     ASSERT_FALSE(nonMatchingMaxLength.matchesBSON(BSON("a" << testString)));
     ASSERT_TRUE(matchingMaxLength.matchesBSON(BSON("a" << testString)));
 }
@@ -94,12 +94,12 @@ TEST(InternalSchemaMaxLengthMatchExpression, CorectlyCountsUnicodeCodepoints) {
     InternalSchemaMaxLengthMatchExpression matchingMaxLength("a", 5);
 
     // A test string that contains single-byte, 2-byte, 3-byte, and 4-byte codepoints.
-    constexpr auto testString =
-        u8":"            // Single-byte character
-        u8"\u00e9"       // 2-byte character
-        u8")"            // Single-byte character
-        u8"\U0001f4a9"   // 4-byte character
-        u8"\U000020ac";  // 3-byte character
+    const auto testString =
+        u8":"                        // Single-byte character
+        u8"\u00e9"                   // 2-byte character
+        u8")"                        // Single-byte character
+        u8"\U0001f4a9"               // 4-byte character
+        u8"\U000020ac"_as_char_ptr;  // 3-byte character
 
     // This string has five code points, so it should meet maximum length 5 but not maximum
     // length 4.

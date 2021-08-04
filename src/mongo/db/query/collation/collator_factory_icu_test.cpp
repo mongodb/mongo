@@ -849,7 +849,7 @@ TEST(CollatorFactoryICUTest, PrimaryStrengthCollatorIgnoresCaseAndAccents) {
     ASSERT_OK(collator.getStatus());
 
     // u8"\u00E1" is latin small letter a with acute.
-    ASSERT_EQ(collator.getValue()->compare("a", u8"\u00E1"), 0);
+    ASSERT_EQ(collator.getValue()->compare("a", u8"\u00E1"_as_char_ptr), 0);
     ASSERT_EQ(collator.getValue()->compare("a", "A"), 0);
 }
 
@@ -861,7 +861,7 @@ TEST(CollatorFactoryICUTest, SecondaryStrengthCollatorsIgnoresCaseButNotAccents)
     ASSERT_OK(collator.getStatus());
 
     // u8"\u00E1" is latin small letter a with acute.
-    ASSERT_LT(collator.getValue()->compare("a", u8"\u00E1"), 0);
+    ASSERT_LT(collator.getValue()->compare("a", u8"\u00E1"_as_char_ptr), 0);
     ASSERT_EQ(collator.getValue()->compare("a", "A"), 0);
 }
 
@@ -873,7 +873,7 @@ TEST(CollatorFactoryICUTest, TertiaryStrengthCollatorConsidersCaseAndAccents) {
     ASSERT_OK(collator.getStatus());
 
     // u8"\u00E1" is latin small letter a with acute.
-    ASSERT_LT(collator.getValue()->compare("a", u8"\u00E1"), 0);
+    ASSERT_LT(collator.getValue()->compare("a", u8"\u00E1"_as_char_ptr), 0);
     ASSERT_LT(collator.getValue()->compare("a", "A"), 0);
 }
 
@@ -885,7 +885,7 @@ TEST(CollatorFactoryICUTest, PrimaryStrengthCaseLevelTrue) {
     ASSERT_OK(collator.getStatus());
 
     // u8"\u00E1" is latin small letter a with acute.
-    ASSERT_EQ(collator.getValue()->compare("a", u8"\u00E1"), 0);
+    ASSERT_EQ(collator.getValue()->compare("a", u8"\u00E1"_as_char_ptr), 0);
     ASSERT_LT(collator.getValue()->compare("a", "A"), 0);
 }
 
@@ -899,7 +899,7 @@ TEST(CollatorFactoryICUTest, PrimaryStrengthCaseLevelTrueCaseFirstUpper) {
     ASSERT_OK(collator.getStatus());
 
     // u8"\u00E1" is latin small letter a with acute.
-    ASSERT_EQ(collator.getValue()->compare("a", u8"\u00E1"), 0);
+    ASSERT_EQ(collator.getValue()->compare("a", u8"\u00E1"_as_char_ptr), 0);
     ASSERT_LT(collator.getValue()->compare("A", "a"), 0);
 }
 
@@ -974,7 +974,7 @@ TEST(CollatorFactoryICUTest, SecondaryStrengthBackwardsFalse) {
     ASSERT_OK(collator.getStatus());
 
     // u8"\u00E1" is latin small letter a with acute.
-    ASSERT_LT(collator.getValue()->compare(u8"a\u00E1", u8"\u00E1a"), 0);
+    ASSERT_LT(collator.getValue()->compare(u8"a\u00E1"_as_char_ptr, u8"\u00E1a"_as_char_ptr), 0);
 }
 
 TEST(CollatorFactoryICUTest, SecondaryStrengthBackwardsTrue) {
@@ -985,7 +985,7 @@ TEST(CollatorFactoryICUTest, SecondaryStrengthBackwardsTrue) {
     ASSERT_OK(collator.getStatus());
 
     // u8"\u00E1" is latin small letter a with acute.
-    ASSERT_GT(collator.getValue()->compare(u8"a\u00E1", u8"\u00E1a"), 0);
+    ASSERT_GT(collator.getValue()->compare(u8"a\u00E1"_as_char_ptr, u8"\u00E1a"_as_char_ptr), 0);
 }
 
 TEST(CollatorFactoryICUTest, FactoryMadeCollatorComparisonKeysCorrectEnUS) {

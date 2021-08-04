@@ -47,7 +47,8 @@
 #include "mongo/platform/bits.h"
 #include "mongo/util/ctype.h"
 
-namespace mongo::str {
+namespace mongo {
+namespace str {
 
 /** the idea here is to make one liners easy.  e.g.:
 
@@ -417,4 +418,29 @@ boost::optional<size_t> parseUnsignedBase10Integer(StringData integer);
  */
 std::string convertDoubleToString(double d, int prec = 17);
 
-}  // namespace mongo::str
+}  // namespace str
+
+inline namespace literals {
+/**
+ * In C++20, the "u8" prefix yields a new type, char8_t. However, many of our
+ * interfaces really want to deal in plain char*. Since the u8 is about the encoding
+ * not the type, provide a widget that converts the type back to a const char*. So when
+ * you say:
+ *
+ *     const auto testString = u8"..."_as_char_ptr;
+ *
+ * You get back a vanilla const char* but to something with a known
+ * encoding. In C++17 mode, there is nothing to do.
+ */
+#if defined(__cpp_char8_t) && (__cpp_char8_t >= 201811L)
+inline auto operator"" _as_char_ptr(const char8_t* p, std::size_t s) {
+    return static_cast<const char*>(static_cast<const void*>(p));
+}
+#else
+inline auto operator"" _as_char_ptr(const char* p, std::size_t s) {
+    return p;
+}
+#endif
+}  // namespace literals
+
+}  // namespace mongo
