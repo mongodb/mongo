@@ -459,6 +459,13 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         exitCleanly(EXIT_BADOPTIONS);
     }
 
+    if (storageGlobalParams.repair && replSettings.usingReplSets()) {
+        LOGV2_ERROR(5019200,
+                    "Cannot specify both repair and replSet at the same time (remove --replSet to "
+                    "be able to --repair)");
+        exitCleanly(EXIT_BADOPTIONS);
+    }
+
     logMongodStartupWarnings(storageGlobalParams, serverGlobalParams, serviceContext);
 
     {
