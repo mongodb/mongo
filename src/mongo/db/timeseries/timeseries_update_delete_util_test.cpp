@@ -277,6 +277,36 @@ TEST_F(TimeseriesUpdateDeleteUtilTest, TranslateQuery) {
                  "properties" << BSON(
                      "meta" << BSON("properties" << BSON(_metaField << BSON("bsonType"
                                                                             << "string")))))));
+
+    // Translate query with a field with the same name as the metaField as a subfield of the
+    // metaField.
+    ASSERT_BSONOBJ_EQ(
+        timeseries::translateQuery(BSON(_metaField << BSON(_metaField << "a")), _metaField),
+        BSON("meta" << BSON(_metaField << "a")));
+
+    // Translate query with a field with the same name as the metaField as a subfield of a field
+    // that is not the metaField.
+    ASSERT_BSONOBJ_EQ(timeseries::translateQuery(BSON("a" << BSON(_metaField << "a")), _metaField),
+                      BSON("a" << BSON(_metaField << "a")));
+
+    // Translate query with the metaField nested within nested operators.
+    ASSERT_BSONOBJ_EQ(
+        timeseries::translateQuery(
+            BSON("$and" << BSON_ARRAY(
+                     "$or" << BSON_ARRAY(BSON(_metaField << BSON("$ne"
+                                                                 << "A"))
+                                         << BSON("a" << BSON(_metaField << BSON("$eq"
+                                                                                << "B"))))
+                           << BSON(_metaField << BSON("b"
+                                                      << "B")))),
+            _metaField),
+        BSON("$and" << BSON_ARRAY("$or"
+                                  << BSON_ARRAY(BSON("meta" << BSON("$ne"
+                                                                    << "A"))
+                                                << BSON("a" << BSON(_metaField << BSON("$eq"
+                                                                                       << "B"))))
+                                  << BSON("meta" << BSON("b"
+                                                         << "B")))));
 }
 }  // namespace
 }  // namespace mongo

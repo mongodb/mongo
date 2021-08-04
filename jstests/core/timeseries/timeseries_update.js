@@ -785,6 +785,28 @@ TimeseriesTest.run((insert) => {
         nModifiedBuckets: 2,
     });
 
+    // Query for documents on the metaField with the metaField nested within nested operators.
+    testUpdate({
+        initialDocList: [doc1, doc2, doc3],
+        updateList: [{
+            q: {
+                "$and": [
+                    {
+                        "$or": [
+                            {[metaFieldName]: {"$ne": "B"}},
+                            {[metaFieldName]: {"a": {"$eq": "B"}}}
+                        ]
+                    },
+                    {[metaFieldName]: {a: "A", b: "B"}}
+                ]
+            },
+            u: {$set: {[metaFieldName]: "a"}},
+            multi: true
+        }],
+        resultDocList: [{_id: 1, [timeFieldName]: dateTime, [metaFieldName]: "a"}, doc2, doc3],
+        nModifiedBuckets: 1
+    });
+
     /************************** Tests updating with an update pipeline **************************/
     // Modify the metaField, which should fail since update pipelines are not supported.
     testUpdate({

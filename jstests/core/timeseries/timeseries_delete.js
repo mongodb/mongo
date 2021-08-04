@@ -275,6 +275,22 @@ TimeseriesTest.run((insert) => {
                }],
                {expectedErrorCode: ErrorCodes.InvalidOptions});
 
+    // Query on the metaField with the metaField nested within nested operators.
+    testDelete([objA, objB, objC], [objB, objC], 1, [{
+                   q: {
+                       "$and": [
+                           {
+                               "$or": [
+                                   {[metaFieldName]: {"$ne": "B"}},
+                                   {[metaFieldName]: {"a": {"$eq": "B"}}}
+                               ]
+                           },
+                           {[metaFieldName]: {"a": "A"}}
+                       ]
+                   },
+                   limit: 0
+               }]);
+
     /******************* Tests deleting from a collection without a metaField ********************/
     // Remove all documents.
     testDelete([{[timeFieldName]: ISODate(), "meta": "A"}], [], 1, [{q: {}, limit: 0}], {
