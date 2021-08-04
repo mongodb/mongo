@@ -351,8 +351,6 @@ public:
         if (reshardingFields)
             collType.setReshardingFields(std::move(reshardingFields.get()));
 
-        // TODO SERVER-53330: Evaluate whether or not we can include
-        // CoordinatorStateEnum::kInitializing in this if statement.
         if (coordinatorDoc.getState() == CoordinatorStateEnum::kDone ||
             coordinatorDoc.getState() == CoordinatorStateEnum::kAborting) {
             collType.setAllowMigrations(true);
