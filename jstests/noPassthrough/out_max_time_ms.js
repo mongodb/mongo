@@ -13,7 +13,8 @@ load("jstests/libs/profiler.js");         // For profilerHasSingleMatchingEntryO
 const kDBName = "test";
 const kSourceCollName = "out_max_time_ms_source";
 const kDestCollName = "out_max_time_ms_dest";
-const nDocs = 10;
+// Picked `1000` documents to force the `$out` stage to write several batches.
+const nDocs = 1000;
 
 /**
  * Helper for populating the collection.
