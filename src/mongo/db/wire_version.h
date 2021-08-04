@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/version/releases.h"
 
 namespace mongo {
 
@@ -95,19 +96,15 @@ enum WireVersion {
     // Supports features available from 5.0 and onwards.
     WIRE_VERSION_50 = 13,
 
-    // Supports features available from 5.1 and onwards.
-    WIRE_VERSION_51 = 14,
-
-    // Set this to the highest value in this enum - it will be the default maxWireVersion for
-    // the WireSpec values.
-    LATEST_WIRE_VERSION = WIRE_VERSION_51,
+    // Calculate the latest wire version using the number of releases since 4.4.
+    LATEST_WIRE_VERSION = RESUMABLE_INITIAL_SYNC + multiversion::kSince_4_4,
 
     // Set this to LATEST_WIRE_VERSION - 1.
     LAST_CONT_WIRE_VERSION = LATEST_WIRE_VERSION - 1,
 
-    // Set this to the wire version of the previous LTS version. We expect to update this after
-    // each LTS release.
-    LAST_LTS_WIRE_VERSION = WIRE_VERSION_50,
+    // Calculate the last LTS wire version using the latest wire version minus the number of
+    // releases since last LTS.
+    LAST_LTS_WIRE_VERSION = LATEST_WIRE_VERSION - multiversion::kSinceLastLTS,
 };
 
 /**
