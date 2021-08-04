@@ -388,7 +388,7 @@ const DeprecatedWireOpsTest = function() {
      */
     this.runDeprecatedWireOpPeriodTest = (setUp, tearDown, periodInSeconds) => {
         const [conn, testDB, connId, coll] = setUp(periodInSeconds);
-        const periodInMs = 5 * periodInSeconds * 1000 + 200;
+        const periodInMs = periodInSeconds * 1000 + 200;
         const assertLegacyOpWarningMsgCount = (expectedOpKind, expectedCount) =>
             assertLegacyOpWarningMsgCountOn(testDB, connId, expectedOpKind, expectedCount);
 
@@ -403,11 +403,13 @@ const DeprecatedWireOpsTest = function() {
             },
             /*legacyOpAction*/
             () => {
-                coll.insert({a: 1, b: 2});
+                // This test case is timing-sensitive. Can't wait for votes and journaling.
+                const noVotesNoJournalingWc = {w: 0, j: false};
+                coll.insert({a: 1, b: 2}, noVotesNoJournalingWc);
                 ++nLegacyOpMsgExpected;
-                coll.insert({a: 1, b: 2});
-                coll.insert({a: 1, b: 2});
-                coll.insert({a: 1, b: 2});
+                coll.insert({a: 1, b: 2}, noVotesNoJournalingWc);
+                coll.insert({a: 1, b: 2}, noVotesNoJournalingWc);
+                coll.insert({a: 1, b: 2}, noVotesNoJournalingWc);
             },
             /*verifyAction*/
             () => assertLegacyOpWarningMsgCount("insert", nLegacyOpMsgExpected),
