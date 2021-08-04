@@ -52,6 +52,7 @@ static constexpr StringData kMetaFieldName = "metaField"_sd;
 
 // These are hard-coded field names in index specs.
 static constexpr StringData kKeyFieldName = "key"_sd;
+static constexpr StringData kOriginalSpecFieldName = "originalSpec"_sd;
 
 static const StringDataSet kAllowedCollectionCreationOptions{
     CreateCommand::kStorageEngineFieldName,

@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -83,12 +84,13 @@ void testBothWaysIndexSpecConversion(const TimeseriesOptions& timeseriesOptions,
 
     // Test buckets => time-series schema conversion.
 
-    auto timeseriesIndexSpecResult = timeseries::createTimeseriesIndexSpecFromBucketsIndexSpec(
-        timeseriesOptions, bucketsIndexSpec);
+    auto timeseriesIndexSpecResult = timeseries::createTimeseriesIndexFromBucketsIndex(
+        timeseriesOptions, BSON(timeseries::kKeyFieldName << bucketsIndexSpec));
 
     if (testShouldSucceed) {
         ASSERT(timeseriesIndexSpecResult);
-        ASSERT_BSONOBJ_EQ(timeseriesIndexSpec, timeseriesIndexSpecResult.get());
+        ASSERT_BSONOBJ_EQ(timeseriesIndexSpec,
+                          timeseriesIndexSpecResult->getObjectField(timeseries::kKeyFieldName));
     } else {
         // A buckets collection index spec that does not conform to the supported time-series index
         // spec schema should be converted to an empty time-series index spec result.

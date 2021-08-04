@@ -87,6 +87,7 @@ public:
     static constexpr StringData kTextVersionFieldName = "textIndexVersion"_sd;
     static constexpr StringData kUniqueFieldName = "unique"_sd;
     static constexpr StringData kWeightsFieldName = "weights"_sd;
+    static constexpr StringData kOriginalSpecFieldName = "originalSpec"_sd;
 
     /**
      * infoObj is a copy of the index-describing BSONObj contained in the catalog.

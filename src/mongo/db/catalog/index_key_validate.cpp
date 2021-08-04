@@ -93,6 +93,7 @@ static std::set<StringData> allowedFieldNames = {
     IndexDescriptor::kTextVersionFieldName,
     IndexDescriptor::kUniqueFieldName,
     IndexDescriptor::kWeightsFieldName,
+    IndexDescriptor::kOriginalSpecFieldName,
     // Index creation under legacy writeMode can result in an index spec with an _id field.
     "_id"};
 
@@ -277,6 +278,7 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& in
     bool hasVersionField = false;
     bool hasCollationField = false;
     bool hasWeightsField = false;
+    bool hasOriginalSpecField = false;
     bool apiStrict = opCtx && APIParameters::get(opCtx).getAPIStrict().value_or(false);
 
     auto fieldNamesValidStatus = validateIndexSpecFieldNames(indexSpec);
@@ -378,6 +380,21 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& in
 
             hasVersionField = true;
             resolvedIndexVersion = requestedIndexVersion;
+        } else if (IndexDescriptor::kOriginalSpecFieldName == indexSpecElemFieldName) {
+            if (indexSpecElem.type() != BSONType::Object) {
+                return {ErrorCodes::TypeMismatch,
+                        str::stream()
+                            << "The field '" << IndexDescriptor::kOriginalSpecFieldName
+                            << "' must be an object, but got " << typeName(indexSpecElem.type())};
+            }
+
+            if (indexSpecElem.Obj().isEmpty()) {
+                return {ErrorCodes::BadValue,
+                        str::stream() << "The field '" << IndexDescriptor::kOriginalSpecFieldName
+                                      << "' cannot be an empty object."};
+            }
+
+            hasOriginalSpecField = true;
         } else if (IndexDescriptor::kCollationFieldName == indexSpecElemFieldName) {
             if (indexSpecElem.type() != BSONType::Object) {
                 return {ErrorCodes::TypeMismatch,
@@ -547,6 +564,18 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& in
         BSONObj versionObj = BSON(IndexDescriptor::kIndexVersionFieldName
                                   << static_cast<int>(*resolvedIndexVersion));
         modifiedSpec = modifiedSpec.addField(versionObj.firstElement());
+    }
+
+    if (hasOriginalSpecField) {
+        StatusWith<BSONObj> modifiedOriginalSpec = validateIndexSpec(
+            opCtx, indexSpec.getObjectField(IndexDescriptor::kOriginalSpecFieldName));
+        if (!modifiedOriginalSpec.isOK()) {
+            return modifiedOriginalSpec.getStatus();
+        }
+
+        BSONObj specToAdd =
+            BSON(IndexDescriptor::kOriginalSpecFieldName << modifiedOriginalSpec.getValue());
+        modifiedSpec = modifiedSpec.addField(specToAdd.firstElement());
     }
 
     return modifiedSpec;

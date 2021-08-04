@@ -1631,7 +1631,7 @@ StatusWith<std::vector<BSONObj>> CollectionImpl::addCollationDefaultsToIndexSpec
                 << "failed to add collation information to index spec for index creation: "
                 << originalIndexSpec);
         }
-        const auto& newIndexSpec = validateResult.getValue();
+        BSONObj newIndexSpec = validateResult.getValue();
 
         auto keyPattern = newIndexSpec[IndexDescriptor::kKeyPatternFieldName].Obj();
         if (IndexDescriptor::isIdIndexPattern(keyPattern)) {
@@ -1654,6 +1654,18 @@ StatusWith<std::vector<BSONObj>> CollectionImpl::addCollationDefaultsToIndexSpec
                                       << (collator ? collator->getSpec().toBSON()
                                                    : CollationSpec::kSimpleSpec)};
             }
+        }
+
+        if (originalIndexSpec.hasField(IndexDescriptor::kOriginalSpecFieldName)) {
+            // Validation was already performed above.
+            BSONObj newOriginalIndexSpec = invariant(index_key_validate::validateIndexSpecCollation(
+                opCtx,
+                originalIndexSpec.getObjectField(IndexDescriptor::kOriginalSpecFieldName),
+                collator));
+
+            BSONObj specToAdd =
+                BSON(IndexDescriptor::kOriginalSpecFieldName << newOriginalIndexSpec);
+            newIndexSpec = newIndexSpec.addField(specToAdd.firstElement());
         }
 
         newIndexSpecs.push_back(newIndexSpec);

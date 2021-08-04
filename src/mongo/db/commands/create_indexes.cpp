@@ -59,6 +59,7 @@
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/two_phase_index_build_knobs_gen.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/timeseries/timeseries_options.h"
@@ -665,6 +666,13 @@ std::unique_ptr<CreateIndexesCommand> makeTimeseriesCreateIndexesCommand(
                           "TTL indexes are not supported on time-series collections");
             }
         }
+
+        if (feature_flags::gTimeseriesMetricIndexes.isEnabledAndIgnoreFCV()) {
+            // Store the original user index definition on the transformed index definition for the
+            // time-series buckets collection.
+            builder.appendObject(IndexDescriptor::kOriginalSpecFieldName, origIndex.objdata());
+        }
+
         indexes.push_back(builder.obj());
     }
 

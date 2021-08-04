@@ -182,19 +182,29 @@ StatusWith<BSONObj> createBucketsSpecFromTimeseriesSpec(const TimeseriesOptions&
     }
 
     return builder.obj();
-}  // namespace
-}  // namespace
-
-StatusWith<BSONObj> createBucketsIndexSpecFromTimeseriesIndexSpec(
-    const TimeseriesOptions& timeseriesOptions, const BSONObj& timeseriesIndexSpecBSON) {
-    return createBucketsSpecFromTimeseriesSpec(timeseriesOptions, timeseriesIndexSpecBSON, false);
 }
 
-StatusWith<BSONObj> createBucketsShardKeySpecFromTimeseriesShardKeySpec(
-    const TimeseriesOptions& timeseriesOptions, const BSONObj& timeseriesShardKeySpecBSON) {
-    return createBucketsSpecFromTimeseriesSpec(timeseriesOptions, timeseriesShardKeySpecBSON, true);
-}
-
+/**
+ * Maps the buckets collection index spec 'bucketsIndexSpecBSON' to the index schema of the
+ * time-series collection using the information provided in 'timeseriesOptions'.
+ *
+ * If 'bucketsIndexSpecBSON' does not match a valid time-series index format, then boost::none is
+ * returned.
+ *
+ * Conversion Example:
+ * On a time-series collection with 'tm' time field and 'mm' metadata field,
+ * we may see a compound index on the underlying bucket collection mapped from:
+ * {
+ *     'meta.tag1': 1,
+ *     'control.min.tm': 1,
+ *     'control.max.tm': 1
+ * }
+ * to an index on the time-series collection:
+ * {
+ *     'mm.tag1': 1,
+ *     'tm': 1
+ * }
+ */
 boost::optional<BSONObj> createTimeseriesIndexSpecFromBucketsIndexSpec(
     const TimeseriesOptions& timeseriesOptions, const BSONObj& bucketsIndexSpecBSON) {
     auto timeField = timeseriesOptions.getTimeField();
@@ -320,8 +330,24 @@ boost::optional<BSONObj> createTimeseriesIndexSpecFromBucketsIndexSpec(
     return builder.obj();
 }
 
+}  // namespace
+
+StatusWith<BSONObj> createBucketsIndexSpecFromTimeseriesIndexSpec(
+    const TimeseriesOptions& timeseriesOptions, const BSONObj& timeseriesIndexSpecBSON) {
+    return createBucketsSpecFromTimeseriesSpec(timeseriesOptions, timeseriesIndexSpecBSON, false);
+}
+
+StatusWith<BSONObj> createBucketsShardKeySpecFromTimeseriesShardKeySpec(
+    const TimeseriesOptions& timeseriesOptions, const BSONObj& timeseriesShardKeySpecBSON) {
+    return createBucketsSpecFromTimeseriesSpec(timeseriesOptions, timeseriesShardKeySpecBSON, true);
+}
+
 boost::optional<BSONObj> createTimeseriesIndexFromBucketsIndex(
     const TimeseriesOptions& timeseriesOptions, const BSONObj& bucketsIndex) {
+    if (bucketsIndex.hasField(kOriginalSpecFieldName)) {
+        // This buckets index has the original user index definition available, return it.
+        return bucketsIndex.getObjectField(kOriginalSpecFieldName);
+    }
     if (bucketsIndex.hasField(kKeyFieldName)) {
         auto timeseriesKeyValue = createTimeseriesIndexSpecFromBucketsIndexSpec(
             timeseriesOptions, bucketsIndex.getField(kKeyFieldName).Obj());

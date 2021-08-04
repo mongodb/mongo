@@ -123,6 +123,9 @@ structs:
             dropDups:
                 type: safeBool
                 optional: true
+            originalSpec:
+                type: object_owned
+                optional: true
             #
             # An index build in progress appears with these two fields. They're required, but marked
             # optional to permit the built index format using the fields above instead.

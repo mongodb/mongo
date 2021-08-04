@@ -56,30 +56,6 @@ StatusWith<BSONObj> createBucketsShardKeySpecFromTimeseriesShardKeySpec(
     const TimeseriesOptions& timeseriesOptions, const BSONObj& timeseriesIndexSpecBSON);
 
 /**
- * Maps the buckets collection index spec 'bucketsIndexSpecBSON' to the index schema of the
- * time-series collection using the information provided in 'timeseriesOptions'.
- *
- * If 'bucketsIndexSpecBSON' does not match a valid time-series index format, then boost::none is
- * returned.
- *
- * Conversion Example:
- * On a time-series collection with 'tm' time field and 'mm' metadata field,
- * we may see a compound index on the underlying bucket collection mapped from:
- * {
- *     'meta.tag1': 1,
- *     'control.min.tm': 1,
- *     'control.max.tm': 1
- * }
- * to an index on the time-series collection:
- * {
- *     'mm.tag1': 1,
- *     'tm': 1
- * }
- */
-boost::optional<BSONObj> createTimeseriesIndexSpecFromBucketsIndexSpec(
-    const TimeseriesOptions& timeseriesOptions, const BSONObj& bucketsIndexSpecBSON);
-
-/**
  * Returns a time-series collection index spec equivalent to the given 'bucketsIndex' using the
  * time-series specifications provided in 'timeseriesOptions'. Returns boost::none if the
  * buckets index is not supported on a time-series collection.

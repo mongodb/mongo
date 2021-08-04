@@ -79,20 +79,19 @@ BSONObj makeTimeseriesIndexStats(const TimeseriesConversionOptions& bucketSpec,
     BSONObjBuilder builder;
     for (const auto& elem : bucketsIndexStatsBSON) {
         if (elem.fieldNameStringData() == ListIndexesReplyItem::kKeyFieldName) {
-            auto timeseriesKey = timeseries::createTimeseriesIndexSpecFromBucketsIndexSpec(
-                timeseriesOptions, elem.Obj());
-            if (!timeseriesKey) {
-                return {};
-            }
-            builder.append(ListIndexesReplyItem::kKeyFieldName, *timeseriesKey);
+            // This field is appended below.
             continue;
         }
         if (elem.fieldNameStringData() == ListIndexesReplyItem::kSpecFieldName) {
-            auto timeseriesSpec = makeTimeseriesIndexStats(bucketSpec, elem.Obj());
-            if (timeseriesSpec.isEmpty()) {
+            auto timeseriesSpec =
+                timeseries::createTimeseriesIndexFromBucketsIndex(timeseriesOptions, elem.Obj());
+            if (!timeseriesSpec) {
                 return {};
             }
-            builder.append("spec", timeseriesSpec);
+
+            builder.append(ListIndexesReplyItem::kSpecFieldName, *timeseriesSpec);
+            builder.append(ListIndexesReplyItem::kKeyFieldName,
+                           timeseriesSpec->getObjectField(IndexDescriptor::kKeyPatternFieldName));
             continue;
         }
         builder.append(elem);
