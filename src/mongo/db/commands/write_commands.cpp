@@ -1131,8 +1131,8 @@ public:
 
         write_ops::UpdateCommandReply typedRun(OperationContext* opCtx) final try {
             transactionChecks(opCtx, ns());
-
             write_ops::UpdateCommandReply updateReply;
+            OperationSource source = OperationSource::kStandard;
 
             if (isTimeseries(opCtx, ns())) {
                 uassert(ErrorCodes::InvalidOptions,
@@ -1144,15 +1144,7 @@ public:
                                          "time-series collection: "
                                       << ns(),
                         !opCtx->inMultiDocumentTransaction());
-
-                auto reply = write_ops_exec::performUpdates(
-                    opCtx, request(), OperationSource::kTimeseriesUpdate);
-                populateReply(opCtx,
-                              !request().getWriteCommandRequestBase().getOrdered(),
-                              request().getUpdates().size(),
-                              std::move(reply),
-                              &updateReply);
-                return updateReply;
+                source = OperationSource::kTimeseriesUpdate;
             }
 
             long long nModified = 0;
@@ -1161,7 +1153,7 @@ public:
             // 'postProcessHandler' and should not be accessed afterwards.
             std::vector<write_ops::Upserted> upsertedInfoVec;
 
-            auto reply = write_ops_exec::performUpdates(opCtx, request());
+            auto reply = write_ops_exec::performUpdates(opCtx, request(), source);
 
             // Handler to process each 'SingleWriteResult'.
             auto singleWriteHandler = [&](const SingleWriteResult& opResult, int index) {
