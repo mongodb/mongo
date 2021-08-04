@@ -60,6 +60,8 @@ last-continuous:
       test_file: jstests/replsets/rollback_transaction_table.js
     - ticket: SERVER-58353
       test_file: jstests/replsets/tenant_migration_aborted_buildindex.js
+    - ticket: SERVER-53335
+      test_file: jstests/sharding/query/collation_shard_targeting_hashed_shard_key.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
