@@ -1565,8 +1565,7 @@ def main(parser_actions, options):  # pylint: disable=too-many-branches,too-many
         LOGGER.info("Local collection validation: %d %s", ret, output)
         if ret:
             network_error = (
-                f"[js_test:run_validate_collections] Error: network error while attempting "
-                f"to run command 'isMaster' on host '{host_port}'")
+                f"network error while attempting to run command 'isMaster' on host '{host_port}'")
             # Mark this error as ssh failure, since it happens during the first test loop before
             # the first server crash and likely related to port forwarding not working, which
             # uses ssh tunnel command.
