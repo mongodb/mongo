@@ -92,10 +92,36 @@ void replaceQueryMetaFieldName(mutablebson::Element elem,
 void replaceQueryMetaFieldName(mutablebson::Element elem,
                                StringData metaField,
                                bool shouldReplaceFieldValue = false) {
+    // Replace any occurences of the metaField in the top-level required fields of the JSON Schema
+    // object with "meta".
+    if (elem.getFieldName() == "$jsonSchema") {
+        mutablebson::Element requiredElem = elem.findFirstChildNamed("required");
+        if (requiredElem.ok()) {
+            for (auto subElem = requiredElem.leftChild(); subElem.ok();
+                 subElem = subElem.rightSibling()) {
+                if (isMetaFieldFirstElementOfDottedPathField(subElem.getValueString(), metaField)) {
+                    invariantStatusOK(
+                        subElem.setValueString(getRenamedField(subElem.getValueString(), "meta")));
+                }
+            }
+        }
+        mutablebson::Element propertiesElem = elem.findFirstChildNamed("properties");
+        if (propertiesElem.ok()) {
+            mutablebson::Element metaFieldElem = propertiesElem.findFirstChildNamed(metaField);
+            if (metaFieldElem.ok() &&
+                isMetaFieldFirstElementOfDottedPathField(metaFieldElem.getFieldName(), metaField)) {
+
+                invariantStatusOK(
+                    metaFieldElem.rename(getRenamedField(metaFieldElem.getFieldName(), "meta")));
+            }
+        }
+        return;
+    }
     shouldReplaceFieldValue = (elem.getFieldName() != "$literal") &&
         (shouldReplaceFieldValue || (elem.getFieldName() == "$expr"));
     replaceQueryMetaFieldName(elem, elem.getFieldName(), metaField, shouldReplaceFieldValue);
     for (size_t i = 0; i < elem.countChildren(); ++i) {
+        // TODO: SERVER-59104 Remove usages of findNthChild().
         replaceQueryMetaFieldName(elem.findNthChild(i), metaField, shouldReplaceFieldValue);
     }
 }

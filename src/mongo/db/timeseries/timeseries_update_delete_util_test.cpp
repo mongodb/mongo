@@ -108,6 +108,44 @@ TEST_F(TimeseriesUpdateDeleteUtilTest, QueryOnlyDependsOnMetaField) {
         _ns,
         BSON("$jsonSchema" << BSON("required" << BSON_ARRAY("measurement"))),
         _metaField));
+
+    // Query using $jsonSchema with a field that is the metaField in dot notation required.
+    ASSERT_TRUE(timeseries::queryOnlyDependsOnMetaField(
+        _opCtx.get(),
+        _ns,
+        BSON("$jsonSchema" << BSON("required" << BSON_ARRAY(_metaField + ".a"))),
+        _metaField));
+
+    // Query using $jsonSchema with the metaField required and an optional field that is not the
+    // metaField.
+    ASSERT_FALSE(timeseries::queryOnlyDependsOnMetaField(
+        _opCtx.get(),
+        _ns,
+        BSON("$jsonSchema" << BSON("required"
+                                   << BSON_ARRAY(_metaField) << "properties"
+                                   << BSON("measurement" << BSON("description"
+                                                                 << "can be any value")))),
+        _metaField));
+
+    // Query using $jsonSchema with the metaField required and the metaField as a property.
+    ASSERT_TRUE(timeseries::queryOnlyDependsOnMetaField(
+        _opCtx.get(),
+        _ns,
+        BSON("$jsonSchema" << BSON("required" << BSON_ARRAY(_metaField) << "properties"
+                                              << BSON(_metaField << BSON("bsonType"
+                                                                         << "string")))),
+        _metaField));
+
+    // Query using $jsonSchema with a field that is not the metaField as a property of the
+    // metaField.
+    ASSERT_TRUE(timeseries::queryOnlyDependsOnMetaField(
+        _opCtx.get(),
+        _ns,
+        BSON("$jsonSchema" << BSON(
+                 "properties" << BSON(_metaField
+                                      << BSON("properties" << BSON("a" << BSON("bsonType"
+                                                                               << "string")))))),
+        _metaField));
 }
 
 TEST_F(TimeseriesUpdateDeleteUtilTest, QueryOnlyDependsOnMetaFieldLet) {
@@ -183,20 +221,62 @@ TEST_F(TimeseriesUpdateDeleteUtilTest, TranslateQuery) {
         BSON("$expr" << BSON("$eq" << BSON_ARRAY("$meta.b" << BSON("$literal"
                                                                    << "$" + _metaField)))));
 
-    // TODO: SERVER-59092 Uncomment this test.
-    // // Translate query using $jsonSchema with the metaField required.
-    // ASSERT_BSONOBJ_EQ(
-    //     timeseries::translateQuery(
-    //         BSON("$jsonSchema" << BSON("required" << BSON_ARRAY(_metaField))), _metaField),
-    //     BSON("$jsonSchema" << BSON("required" << BSON_ARRAY("meta"))));
+    // Translate query using $jsonSchema with the metaField required.
+    ASSERT_BSONOBJ_EQ(
+        timeseries::translateQuery(
+            BSON("$jsonSchema" << BSON("required" << BSON_ARRAY(_metaField))), _metaField),
+        BSON("$jsonSchema" << BSON("required" << BSON_ARRAY("meta"))));
 
-    // TODO: SERVER-59092 Uncomment this test.
-    // // Translate query using $jsonSchema with a field that is not the metaField required.
-    // ASSERT_BSONOBJ_EQ(
-    //     timeseries::translateQuery(
-    //         BSON("$jsonSchema" << BSON("required" << BSON_ARRAY(_metaField << _metaField +
-    //         "a"))), _metaField),
-    //     BSON("$jsonSchema" << BSON("required" << BSON_ARRAY("meta" << _metaField + "a"))));
+    // Translate query using $jsonSchema a field that is not the metaField required.
+    ASSERT_BSONOBJ_EQ(
+        timeseries::translateQuery(
+            BSON("$jsonSchema" << BSON("required" << BSON_ARRAY("measurement"))), _metaField),
+        BSON("$jsonSchema" << BSON("required" << BSON_ARRAY("measurement"))));
+
+    // Translate query using $jsonSchema with the metaField in dot notation required.
+    ASSERT_BSONOBJ_EQ(
+        timeseries::translateQuery(
+            BSON("$jsonSchema" << BSON("required" << BSON_ARRAY(_metaField + ".a"))), _metaField),
+        BSON("$jsonSchema" << BSON("required" << BSON_ARRAY("meta.a"))));
+
+    // Translate query using $jsonSchema with the metaField required and a required subfield of the
+    // metaField with the same name as the metaField.
+    ASSERT_BSONOBJ_EQ(
+        timeseries::translateQuery(
+            BSON("$jsonSchema" << BSON(
+                     "required" << BSON_ARRAY(_metaField) << "properties"
+                                << BSON(_metaField << BSON("required" << BSON_ARRAY(_metaField))))),
+            _metaField),
+        BSON("$jsonSchema" << BSON("required"
+                                   << BSON_ARRAY("meta") << "properties"
+                                   << BSON("meta" << BSON("required" << BSON_ARRAY(_metaField))))));
+
+    // Translate query using $jsonSchema with the metaField required and the metaField as a
+    // property.
+    ASSERT_BSONOBJ_EQ(
+        timeseries::translateQuery(
+            BSON("$jsonSchema" << BSON("required" << BSON_ARRAY(_metaField) << "properties"
+                                                  << BSON(_metaField << BSON("bsonType"
+                                                                             << "string")))),
+            _metaField),
+        BSON("$jsonSchema" << BSON("required" << BSON_ARRAY("meta") << "properties"
+                                              << BSON("meta" << BSON("bsonType"
+                                                                     << "string")))));
+
+    // Translate query using $jsonSchema with a field with the same name as the metaField as a
+    // property of the metaField.
+    ASSERT_BSONOBJ_EQ(
+        timeseries::translateQuery(
+            BSON("$jsonSchema" << BSON("properties"
+                                       << BSON(_metaField
+                                               << BSON("properties"
+                                                       << BSON(_metaField << BSON("bsonType"
+                                                                                  << "string")))))),
+            _metaField),
+        BSON("$jsonSchema" << BSON(
+                 "properties" << BSON(
+                     "meta" << BSON("properties" << BSON(_metaField << BSON("bsonType"
+                                                                            << "string")))))));
 }
 }  // namespace
 }  // namespace mongo

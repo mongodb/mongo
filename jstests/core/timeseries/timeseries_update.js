@@ -615,6 +615,88 @@ TimeseriesTest.run((insert) => {
         nModifiedBuckets: 4,
     });
 
+    // Query for documents using $jsonSchema with the metaField required.
+    testUpdate({
+        initialDocList: [doc1, doc2, doc3],
+        updateList: [{
+            q: {"$jsonSchema": {"required": [metaFieldName]}},
+            u: {$set: {[metaFieldName]: "a"}},
+            multi: true
+        }],
+        resultDocList: [
+            {_id: 1, [timeFieldName]: dateTime, [metaFieldName]: "a"},
+            {_id: 2, [timeFieldName]: dateTime, [metaFieldName]: "a", f: [{"k": "K", "v": "V"}]},
+            doc3
+        ],
+        nModifiedBuckets: 2
+    });
+
+    // Query for documents using $jsonSchema with the metaField in dot notation required.
+    testUpdate({
+        initialDocList: [doc1, doc2, doc3],
+        updateList: [{
+            q: {"$jsonSchema": {"required": [metaFieldName + ".a"]}},
+            u: {$set: {[metaFieldName]: "a"}},
+            multi: true
+        }],
+        resultDocList: [{_id: 1, [timeFieldName]: dateTime, [metaFieldName]: "a"}, doc2, doc3],
+        nModifiedBuckets: 1
+    });
+
+    // Query for documents using $jsonSchema with a field that is not the metaField required.
+    testUpdate({
+        initialDocList: [doc1, doc2, doc3],
+        updateList: [{
+            q: {"$jsonSchema": {"required": [metaFieldName, timeFieldName]}},
+            u: {$set: {[metaFieldName]: "a"}},
+            multi: true
+        }],
+        resultDocList: [doc1, doc2, doc3],
+        nModifiedBuckets: 0,
+        failCode: ErrorCodes.InvalidOptions
+    });
+
+    const nestedMetaObj =
+        {_id: 6, [timeFieldName]: dateTime, [metaFieldName]: {[metaFieldName]: "A"}};
+
+    // Query for documents using $jsonSchema with the metaField required and a required subfield of
+    // the metaField with the same name as the metaField.
+    testUpdate({
+        initialDocList: [doc1, nestedMetaObj],
+        updateList: [{
+            q: {
+                "$jsonSchema": {
+                    "required": [metaFieldName],
+
+                    "properties": {[metaFieldName]: {"required": [metaFieldName]}}
+                }
+            },
+            u: {$set: {[metaFieldName]: "a"}},
+            multi: true
+        }],
+        resultDocList: [doc1, {_id: 6, [timeFieldName]: dateTime, [metaFieldName]: "a"}],
+        nModifiedBuckets: 1
+    });
+
+    // Query for documents using $jsonSchema with the metaField required and an optional field that
+    // is not the metaField.
+    testUpdate({
+        initialDocList: [doc1, nestedMetaObj],
+        updateList: [{
+            q: {
+                "$jsonSchema": {
+                    "required": [metaFieldName],
+                    "properties": {"measurement": {description: "can be any value"}}
+                }
+            },
+            u: {$set: {[metaFieldName]: "a"}},
+            multi: true
+        }],
+        resultDocList: [doc1, nestedMetaObj],
+        nModifiedBuckets: 0,
+        failCode: ErrorCodes.InvalidOptions
+    });
+
     /************************** Tests updating with an update pipeline **************************/
     // Modify the metaField, which should fail since update pipelines are not supported.
     testUpdate({

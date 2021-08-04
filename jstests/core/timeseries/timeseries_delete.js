@@ -226,20 +226,54 @@ TimeseriesTest.run((insert) => {
             limit: 0
         }]);
 
-    // TODO: SERVER-59092 Uncomment this test.
-    // // Query for documents using $jsonSchema with the metaField required.
-    // testDelete([nestedObjA, nestedObjB, nestedObjC],
-    //            [],
-    //            3,
-    //            [{q: {"$jsonSchema": {"$required": [metaFieldName]}}, limit: 0}]);
+    // Query for documents using $jsonSchema with the metaField required.
+    testDelete([nestedObjA, nestedObjB, nestedObjC],
+               [],
+               3,
+               [{q: {"$jsonSchema": {"required": [metaFieldName]}}, limit: 0}]);
 
-    // TODO: SERVER-59092 Uncomment this test.
-    // // Query for documents using $jsonSchema with a field that is not the metaField required.
-    // testDelete([nestedObjA, nestedObjB, nestedObjC],
-    //            [nestedObjA, nestedObjB, nestedObjC],
-    //            0,
-    //            [{q: {"$jsonSchema": {"$required": [metaFieldName, "measurement"]}}, limit: 0}],
-    //            {expectedErrorCode: ErrorCodes.InvalidOptions});
+    // Query for documents using $jsonSchema with the metaField in dot notation required.
+    testDelete([nestedObjA, nestedObjB, nestedObjC],
+               [nestedObjB, nestedObjC],
+               1,
+               [{q: {"$jsonSchema": {"required": [metaFieldName + ".a"]}}, limit: 0}]);
+
+    // Query for documents using $jsonSchema with a field that is not the metaField required.
+    testDelete([nestedObjA, nestedObjB, nestedObjC],
+               [nestedObjA, nestedObjB, nestedObjC],
+               0,
+               [{q: {"$jsonSchema": {"required": [metaFieldName, "measurement"]}}, limit: 0}],
+               {expectedErrorCode: ErrorCodes.InvalidOptions});
+
+    const nestedMetaObj = {[timeFieldName]: ISODate(), [metaFieldName]: {[metaFieldName]: "A"}};
+
+    // Query for documents using $jsonSchema with the metaField required and a required subfield of
+    // the metaField with the same name as the metaField.
+    testDelete([objA, nestedMetaObj], [objA], 1, [{
+                   q: {
+                       "$jsonSchema": {
+                           "required": [metaFieldName],
+                           "properties": {[metaFieldName]: {"required": [metaFieldName]}}
+                       }
+                   },
+                   limit: 0
+               }]);
+
+    // Query for documents using $jsonSchema with the metaField required and an optional field that
+    // is not the metaField.
+    testDelete([objA, nestedMetaObj],
+               [objA, nestedMetaObj],
+               0,
+               [{
+                   q: {
+                       "$jsonSchema": {
+                           "required": [metaFieldName],
+                           "properties": {"measurement": {description: "can be any value"}}
+                       }
+                   },
+                   limit: 0
+               }],
+               {expectedErrorCode: ErrorCodes.InvalidOptions});
 
     /******************* Tests deleting from a collection without a metaField ********************/
     // Remove all documents.
