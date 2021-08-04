@@ -82,7 +82,16 @@ private:
     bool _usesDeltaOfDelta(BSONType type);
     bool _objectIdDeltaPossible(BSONElement elem, BSONElement prev);
 
-    Simple8bBuilder<uint64_t> _createSimple8bBuilder();
+    // Helper to append doubles to this Column builder. Returns true if append was successful and
+    // false if the value needs to be stored uncompressed.
+    bool _appendDouble(double value, double previous);
+
+    // Tries to rescale current pending values + one additional value into a new Simple8bBuilder.
+    // Returns the new Simple8bBuilder if rescaling was possible and none otherwise.
+    boost::optional<Simple8bBuilder<uint64_t>> _tryRescalePending(int64_t encoded,
+                                                                  uint8_t newScaleIndex);
+
+    Simple8bWriteFn _createBufferWriter();
 
     // Storage for the previously appended BSONElement
     std::unique_ptr<char[]> _prev;
@@ -96,6 +105,11 @@ private:
 
     // Offset to last Simple-8b control byte
     std::ptrdiff_t _controlByteOffset = 0;
+
+    // Additional variables needed for previous state
+    int64_t _prevEncoded;
+    double _lastValueInPrevBlock = 0;
+    uint8_t _scaleIndex;
 
     // Buffer for the BSON Column binary
     BufBuilder _bufBuilder;

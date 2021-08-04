@@ -39,7 +39,14 @@
 namespace mongo {
 
 /**
- * Simple8bBuilder compresses a series of integers into chains of 64 bit Simple8b word.
+ * Callback type to implement writing of 64 bit Simple8b words.
+ */
+using Simple8bWriteFn = std::function<void(uint64_t)>;
+
+/**
+ * Simple8bBuilder compresses a series of integers into chains of 64 bit Simple8b blocks.
+ *
+ * T may be uint64_t and uint128_t only.
  */
 template <typename T>
 class Simple8bBuilder {
@@ -47,29 +54,30 @@ private:
     struct PendingValue;
 
 public:
-    // Callback to handle writing of finalized Simple-8b blocks. Machine Endian byte order.
-    using WriteFn = std::function<void(uint64_t)>;
-    Simple8bBuilder(WriteFn writeFunc);
+    // Callback to handle writing of finalized Simple-8b blocks. Machine Endian byte order, the
+    // value need to be converted to Little Endian before persisting.
+    Simple8bBuilder(Simple8bWriteFn writeFunc);
     ~Simple8bBuilder();
 
     /**
-     * Checks if we can append val to an existing RLE and handles the ending of a RLE.
-     * The default RLE value at the beginning is 0.
-     * Otherwise, Appends a value to the Simple8b chain of words.
-     * Return true if successfully appended and false otherwise.
+     * Appends val to Simple8b. Returns true if the append was successful and false if the value was
+     * outside the range of possible values we can store in Simple8b.
+     *
+     * A call to append may result in multiple Simple8b blocks being finalized.
      */
     bool append(T val);
 
     /**
-     * Appends an empty bucket to handle missing values. This works by incrementing an underlying
-     * simple8b index by one and encoding a "missing value" in the simple8b block as all 1s.
+     * Appends a missing value to Simple8b.
+     *
+     * May result in a single Simple8b being finalized.
      */
     void skip();
 
     /**
-     * Stores all values for RLE or in _pendingValues into _buffered even if the Simple8b word will
-     * not be opimtal and use a larger selector than necessary because we don't have enough integers
-     * to use one wiht more slots.
+     * Flushes all buffered values into finalized Simple8b blocks.
+     *
+     * It is allowed to continue to append values after this call.
      */
     void flush();
 
@@ -113,6 +121,11 @@ public:
      */
     PendingIterator begin() const;
     PendingIterator end() const;
+
+    /**
+     * Set write callback
+     */
+    void setWriteCallback(Simple8bWriteFn writer);
 
 private:
     // Number of different type of selectors and their extensions available
@@ -259,7 +272,7 @@ private:
     std::deque<PendingValue> _pendingValues;
 
     // User-defined callback to handle writing of finalized Simple-8b blocks
-    WriteFn _writeFn;
+    Simple8bWriteFn _writeFn;
 };
 
 /**
@@ -286,7 +299,7 @@ public:
         size_t blockSize() const;
 
         /**
-         * Returns the value in Little Endian byte order at the current iterator position.
+         * Returns the value in at the current iterator position.
          */
         pointer operator->() const {
             return &_value;

@@ -74,6 +74,8 @@ public:
 
     // Array is a double as it will always be multiplied by a double and we don't want to do an
     // extra cast for
-    static constexpr std::array<double, 5> kScaleMultiplier = {1, 10, 100, 10000, 100000000};
+    static constexpr uint8_t kMemoryAsInteger = 5;
+    static constexpr std::array<double, kMemoryAsInteger> kScaleMultiplier = {
+        1, 10, 100, 10000, 100000000};
 };
 }  // namespace mongo

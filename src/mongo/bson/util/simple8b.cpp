@@ -383,7 +383,7 @@ bool Simple8bBuilder<T>::PendingIterator::operator!=(
 }
 
 template <typename T>
-Simple8bBuilder<T>::Simple8bBuilder(WriteFn writeFunc) : _writeFn(std::move(writeFunc)) {}
+Simple8bBuilder<T>::Simple8bBuilder(Simple8bWriteFn writeFunc) : _writeFn(std::move(writeFunc)) {}
 
 template <typename T>
 Simple8bBuilder<T>::~Simple8bBuilder() = default;
@@ -391,7 +391,7 @@ Simple8bBuilder<T>::~Simple8bBuilder() = default;
 template <typename T>
 bool Simple8bBuilder<T>::append(T value) {
     if (_rlePossible()) {
-        if (_lastValueInPrevWord.value() == value) {
+        if (_lastValueInPrevWord.val == value) {
             ++_rleCount;
             return true;
         }
@@ -709,6 +709,11 @@ typename Simple8bBuilder<T>::PendingIterator Simple8bBuilder<T>::begin() const {
 template <typename T>
 typename Simple8bBuilder<T>::PendingIterator Simple8bBuilder<T>::end() const {
     return PendingIterator{_pendingValues.end(), _lastValueInPrevWord.val, 0};
+}
+
+template <typename T>
+void Simple8bBuilder<T>::setWriteCallback(Simple8bWriteFn writer) {
+    _writeFn = std::move(writer);
 }
 
 template <typename T>

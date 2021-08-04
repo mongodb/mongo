@@ -239,6 +239,30 @@ TEST(Simple8b, TestMinDoubleShouldFail) {
     ASSERT_FALSE(result.has_value());
 }
 
+TEST(Simple8b, InterpretAsMemory) {
+    std::vector<double> vals = {0.0,
+                                1.12345678,
+                                std::numeric_limits<double>::max(),
+                                std::numeric_limits<double>::min(),
+                                std::numeric_limits<double>::infinity(),
+                                std::numeric_limits<double>::signaling_NaN(),
+                                std::numeric_limits<double>::quiet_NaN(),
+                                std::numeric_limits<double>::denorm_min()};
+
+    for (double val : vals) {
+        boost::optional<int64_t> result =
+            Simple8bTypeUtil::encodeDouble(val, Simple8bTypeUtil::kMemoryAsInteger);
+        ASSERT_TRUE(result);
+        ASSERT_EQ(*result, *reinterpret_cast<const int64_t*>(&val));
+
+        // Some of the special values above does not compare equal with themselves (signaling NaN).
+        // Verify that we end up with the same memory after decoding
+        double decoded =
+            Simple8bTypeUtil::decodeDouble(*result, Simple8bTypeUtil::kMemoryAsInteger);
+        ASSERT_EQ(memcmp(&decoded, &val, sizeof(val)), 0);
+    }
+}
+
 TEST(Simple8b, TestMaxInt) {
     // max int that can be stored as a double without losing precision
     double val = std::pow(2, 53);
