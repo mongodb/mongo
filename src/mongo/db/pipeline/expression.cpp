@@ -1032,6 +1032,18 @@ Value ExpressionCond::evaluate(const Document& root, Variables* variables) const
     return _children[idx]->evaluate(root, variables);
 }
 
+boost::intrusive_ptr<Expression> ExpressionCond::optimize() {
+    for (auto&& child : _children) {
+        child = child->optimize();
+    }
+
+    if (auto ifOperand = dynamic_cast<ExpressionConstant*>(_children[0].get()); ifOperand) {
+        return ifOperand->getValue().coerceToBool() ? _children[1] : _children[2];
+    }
+
+    return this;
+}
+
 intrusive_ptr<Expression> ExpressionCond::parse(ExpressionContext* const expCtx,
                                                 BSONElement expr,
                                                 const VariablesParseState& vps) {

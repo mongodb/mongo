@@ -1301,6 +1301,7 @@ public:
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
+    boost::intrusive_ptr<Expression> optimize() final;
 
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
                                                   BSONElement expr,

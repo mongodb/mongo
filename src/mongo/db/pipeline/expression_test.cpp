@@ -3463,4 +3463,58 @@ TEST(ExpressionIfNullTest,
     ASSERT_BSONOBJ_BINARY_EQ(expectedResult, expressionToBson(optimizedExprConstant));
 }
 
+TEST(ExpressionCondTest, ExpressionIfConstantTrueShouldOptimizeToThenClause) {
+    auto expCtx = ExpressionContextForTest();
+    auto vps = expCtx.variablesParseState;
+    auto expr = fromjson("{$cond: [true, {$add: [1, 2]}, 2]}");
+    auto exprCond = ExpressionCond::parse(&expCtx, expr.firstElement(), vps);
+    auto optimizedExprCond = exprCond->optimize();
+    auto exprConstant = dynamic_cast<ExpressionConstant*>(optimizedExprCond.get());
+    ASSERT_TRUE(exprConstant);
+    auto expectedResult = fromjson("{$const: 3}");
+    ASSERT_BSONOBJ_BINARY_EQ(expectedResult, expressionToBson(optimizedExprCond));
+}
+
+TEST(ExpressionCondTest, ExpressionIfConstantFalseShouldOptimizeToElseClause) {
+    auto expCtx = ExpressionContextForTest();
+    auto vps = expCtx.variablesParseState;
+    auto expr = fromjson("{$cond: [{$gt: [1, 2]}, {$add: [1, 2]}, {$subtract: [3, 1]}]}");
+    auto exprCond = ExpressionCond::parse(&expCtx, expr.firstElement(), vps);
+    auto optimizedExprCond = exprCond->optimize();
+    auto exprConstant = dynamic_cast<ExpressionConstant*>(optimizedExprCond.get());
+    ASSERT_TRUE(exprConstant);
+    auto expectedResult = fromjson("{$const: 2}");
+    ASSERT_BSONOBJ_BINARY_EQ(expectedResult, expressionToBson(optimizedExprCond));
+}
+
+TEST(ExpressionCondTest, ExpressionIfNotConstantShouldNotOptimize) {
+    auto expCtx = ExpressionContextForTest();
+    auto vps = expCtx.variablesParseState;
+    auto expr = fromjson("{$cond: [\"$a\", 1, 2]}");
+    auto exprCond = ExpressionCond::parse(&expCtx, expr.firstElement(), vps);
+    auto optimizedExprCond = exprCond->optimize();
+    auto expectedResult = fromjson("{$cond: [\"$a\", {$const: 1}, {$const: 2}]}");
+    ASSERT_BSONOBJ_BINARY_EQ(expectedResult, expressionToBson(optimizedExprCond));
+}
+
+TEST(ExpressionCondTest, ExpressionIfNotConstantShouldOptimizeBranches) {
+    auto expCtx = ExpressionContextForTest();
+    auto vps = expCtx.variablesParseState;
+    auto expr = fromjson("{$cond: [\"$a\", {$multiply: [5, 7]}, {$add: [7, 2]}]}");
+    auto exprCond = ExpressionCond::parse(&expCtx, expr.firstElement(), vps);
+    auto optimizedExprCond = exprCond->optimize();
+    auto expectedResult = fromjson("{$cond: [\"$a\", {$const: 35}, {$const: 9}]}");
+    ASSERT_BSONOBJ_BINARY_EQ(expectedResult, expressionToBson(optimizedExprCond));
+}
+
+TEST(ExpressionCondTest, ConstantCondShouldOptimizeWithNonConstantBranches) {
+    auto expCtx = ExpressionContextForTest();
+    auto vps = expCtx.variablesParseState;
+    auto expr = fromjson("{$cond: [{$eq: [1, 1]}, {$add: [\"$a\", 2]}, {$subtract: [3, \"$b\"]}]}");
+    auto exprCond = ExpressionCond::parse(&expCtx, expr.firstElement(), vps);
+    auto optimizedExprCond = exprCond->optimize();
+    auto expectedResult = fromjson("{$add: [\"$a\", {$const: 2}]}");
+    ASSERT_BSONOBJ_BINARY_EQ(expectedResult, expressionToBson(optimizedExprCond));
+}
+
 }  // namespace ExpressionTests
