@@ -32,7 +32,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops_gen.h"
-#include "mongo/db/ops/write_ops_parsers.h"
 
 namespace mongo::timeseries {
 
@@ -51,7 +50,9 @@ bool queryOnlyDependsOnMetaField(
 
 /**
  * Returns true if the given update modification only modifies the time-series collection's given
- * metaField, false otherwise. Returns false on any document replacement.
+ * metaField, false otherwise. Requires that the update is not a delta update, and throws an
+ * exception if the update is not an update document (e.g. is a pipeline update or a replacement
+ * document).
  */
 bool updateOnlyModifiesMetaField(OperationContext* opCtx,
                                  const NamespaceString& ns,
@@ -71,7 +72,7 @@ BSONObj translateQuery(const BSONObj& query, StringData metaField);
  * Translates the given update on the time-series collection to an update on the time-series
  * collection's underlying buckets collection. Creates and returns a translated UpdateModification
  * where all occurrences of metaField in updateMod are replaced with the literal "meta". Requires
- * that updateMod is not a replacement document and that the given metaField is not empty.
+ * that updateMod is an update document and that the given metaField is not empty.
  */
 write_ops::UpdateModification translateUpdate(const write_ops::UpdateModification& updateMod,
                                               StringData metaField);
