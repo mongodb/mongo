@@ -38,7 +38,7 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/lasterror.h"
+#include "mongo/db/not_primary_error_tracker.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
@@ -114,7 +114,7 @@ public:
         // Step 1
 
         Client* client = opCtx->getClient();
-        LastError::get(client).disable();
+        NotPrimaryErrorTracker::get(client).disable();
 
         const bool authoritative = cmdObj.getBoolField("authoritative");
 

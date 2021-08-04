@@ -40,7 +40,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/dbmessage.h"
-#include "mongo/db/lasterror.h"
+#include "mongo/db/not_primary_error_tracker.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/request_execution_context.h"
 #include "mongo/db/service_context.h"
@@ -110,11 +110,11 @@ void HandleRequest::setupEnvironment() {
             isSupportedRequestNetworkOp(op) &&
                 op != dbCompressed);  // Decompression should be handled above us.
 
-    // Start a new LastError session. Any exceptions thrown from here onwards will be returned
-    // to the caller (if the type of the message permits it).
+    // Start a new NotPrimaryErrorTracker session. Any exceptions thrown from here onwards will be
+    // returned to the caller (if the type of the message permits it).
     auto client = opCtx->getClient();
-    LastError::get(client).startRequest();
-    AuthorizationSession::get(opCtx->getClient())->startRequest(opCtx);
+    NotPrimaryErrorTracker::get(client).startRequest();
+    AuthorizationSession::get(client)->startRequest(opCtx);
 
     CurOp::get(opCtx)->ensureStarted();
 }

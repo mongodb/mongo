@@ -29,19 +29,16 @@
 
 #pragma once
 
-#include <string>
-
 #include "mongo/db/client.h"
-#include "mongo/db/jsobj.h"
 
 namespace mongo {
 class BSONObjBuilder;
 
 static const char kUpsertedFieldName[] = "upserted";
 
-class LastError {
+class NotPrimaryErrorTracker {
 public:
-    static const Client::Decoration<LastError> get;
+    static const Client::Decoration<NotPrimaryErrorTracker> get;
 
     /**
      * Resets the object to a newly constructed state.  If "valid" is true, marks the last-error
@@ -60,54 +57,38 @@ public:
     void disable();
 
     /**
-     * Sets the error information for the current operation, if error recording was not
-     * explicitly disabled via a call to disable() since the call to startRequest.
+     * Records the error if the error can be categorized as "NotPrimaryError".
      */
-    void setLastError(int code, std::string msg);
-
-    void recordUpdate(bool updateObjects, long long nObjects, BSONObj upsertedId);
-
-    void recordDelete(long long nDeleted);
+    void recordError(int code);
 
     bool isValid() const {
         return _valid;
     }
-    int getNPrev() const {
-        return _nPrev;
-    }
 
-    bool hadNotPrimaryError() const {
-        return _hadNotPrimaryError;
+    bool hadError() const {
+        return _hadError;
     }
 
     class Disabled {
     public:
-        explicit Disabled(LastError* le) : _le(le), _prev(le->_disabled) {
-            _le->_disabled = true;
+        explicit Disabled(NotPrimaryErrorTracker* tracker)
+            : _tracker(tracker), _prev(tracker->_disabled) {
+            _tracker->_disabled = true;
         }
 
         ~Disabled() {
-            _le->_disabled = _prev;
+            _tracker->_disabled = _prev;
         }
 
     private:
-        LastError* const _le;
+        NotPrimaryErrorTracker* const _tracker;
         const bool _prev;
     };
 
 private:
-    enum UpdatedExistingType { NotUpdate, True, False };
-
-    int _code = 0;
-    std::string _msg = {};
-    UpdatedExistingType _updatedExisting = NotUpdate;
-    // _id field value from inserted doc, returned as kUpsertedFieldName (above)
-    BSONObj _upsertedId = {};
-    long long _nObjects = 0;
-    int _nPrev = 1;
     bool _valid = false;
     bool _disabled = false;
-    bool _hadNotPrimaryError = false;
+    bool _hadError = false;
 };
 
 }  // namespace mongo

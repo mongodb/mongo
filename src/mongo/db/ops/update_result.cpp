@@ -34,7 +34,7 @@
 
 #include "mongo/db/ops/update_result.h"
 
-#include "mongo/db/lasterror.h"
+#include "mongo/db/not_primary_error_tracker.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/str.h"
 

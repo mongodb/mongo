@@ -29,72 +29,35 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/algorithm/string.hpp>
-
-#include "mongo/db/lasterror.h"
-
-#include "mongo/db/jsobj.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/db/not_primary_error_tracker.h"
 
 namespace mongo {
 
-const Client::Decoration<LastError> LastError::get = Client::declareDecoration<LastError>();
+const Client::Decoration<NotPrimaryErrorTracker> NotPrimaryErrorTracker::get =
+    Client::declareDecoration<NotPrimaryErrorTracker>();
 
-namespace {
-void appendDupKeyFields(BSONObjBuilder& builder, std::string errMsg) {
-    // errMsg format for duplicate key errors:
-    // "E11000 duplicate key error collection: test.coll index: a_1 dup key: { a: 1.0 }",
-    std::vector<std::string> results;
-    boost::split(results, errMsg, [](char c) { return c == ' '; });
-    auto collName = results[5];
-    auto indexName = results[7];
-    builder.append("ns", collName);
-    builder.append("index", indexName);
-}
-}  // namespace
-
-void LastError::reset(bool valid) {
-    *this = LastError();
+void NotPrimaryErrorTracker::reset(bool valid) {
+    *this = NotPrimaryErrorTracker();
     _valid = valid;
 }
 
-void LastError::setLastError(int code, std::string msg) {
+void NotPrimaryErrorTracker::recordError(int code) {
     if (_disabled) {
         return;
     }
     reset(true);
-    _code = code;
-    _msg = std::move(msg);
-
-    if (ErrorCodes::isNotPrimaryError(ErrorCodes::Error(_code)))
-        _hadNotPrimaryError = true;
+    if (ErrorCodes::isNotPrimaryError(ErrorCodes::Error(code)))
+        _hadError = true;
 }
 
-void LastError::recordUpdate(bool updateObjects, long long nObjects, BSONObj upsertedId) {
-    reset(true);
-    _nObjects = nObjects;
-    _updatedExisting = updateObjects ? True : False;
-
-    // We record updates containing decimal data even if decimal is disabled.
-    if (upsertedId.valid() && upsertedId.hasField(kUpsertedFieldName))
-        _upsertedId = upsertedId;
-}
-
-void LastError::recordDelete(long long nDeleted) {
-    reset(true);
-    _nObjects = nDeleted;
-}
-
-void LastError::disable() {
+void NotPrimaryErrorTracker::disable() {
     invariant(!_disabled);
     _disabled = true;
-    _nPrev--;  // caller is a command that shouldn't count as an operation
 }
 
-void LastError::startRequest() {
+void NotPrimaryErrorTracker::startRequest() {
     _disabled = false;
-    ++_nPrev;
-    _hadNotPrimaryError = false;
+    _hadError = false;
 }
 
 }  // namespace mongo

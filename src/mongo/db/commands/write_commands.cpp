@@ -41,10 +41,10 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/json.h"
-#include "mongo/db/lasterror.h"
 #include "mongo/db/matcher/doc_validation_error.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/not_primary_error_tracker.h"
 #include "mongo/db/ops/delete_request_gen.h"
 #include "mongo/db/ops/parsed_delete.h"
 #include "mongo/db/ops/parsed_update.h"
@@ -527,7 +527,7 @@ public:
 
             return insertReply;
         } catch (const DBException& ex) {
-            LastError::get(opCtx->getClient()).setLastError(ex.code(), ex.reason());
+            NotPrimaryErrorTracker::get(opCtx->getClient()).recordError(ex.code());
             throw;
         }
 
@@ -541,7 +541,7 @@ public:
                                             request().getBypassDocumentValidation(),
                                             request());
         } catch (const DBException& ex) {
-            LastError::get(opCtx->getClient()).setLastError(ex.code(), ex.reason());
+            NotPrimaryErrorTracker::get(opCtx->getClient()).recordError(ex.code());
             throw;
         }
 
@@ -1196,7 +1196,7 @@ public:
 
             return updateReply;
         } catch (const DBException& ex) {
-            LastError::get(opCtx->getClient()).setLastError(ex.code(), ex.reason());
+            NotPrimaryErrorTracker::get(opCtx->getClient()).recordError(ex.code());
             throw;
         }
 
@@ -1206,7 +1206,7 @@ public:
                                             request().getBypassDocumentValidation(),
                                             request());
         } catch (const DBException& ex) {
-            LastError::get(opCtx->getClient()).setLastError(ex.code(), ex.reason());
+            NotPrimaryErrorTracker::get(opCtx->getClient()).recordError(ex.code());
             throw;
         }
 
@@ -1353,7 +1353,7 @@ public:
 
             return deleteReply;
         } catch (const DBException& ex) {
-            LastError::get(opCtx->getClient()).setLastError(ex.code(), ex.reason());
+            NotPrimaryErrorTracker::get(opCtx->getClient()).recordError(ex.code());
             throw;
         }
 
@@ -1363,7 +1363,7 @@ public:
                                             request().getBypassDocumentValidation(),
                                             request());
         } catch (const DBException& ex) {
-            LastError::get(opCtx->getClient()).setLastError(ex.code(), ex.reason());
+            NotPrimaryErrorTracker::get(opCtx->getClient()).recordError(ex.code());
             throw;
         }
 

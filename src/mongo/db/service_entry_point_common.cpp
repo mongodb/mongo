@@ -57,10 +57,10 @@
 #include "mongo/db/initialize_operation_session_info.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/lasterror.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/logical_time_validator.h"
+#include "mongo/db/not_primary_error_tracker.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/query/find.h"
@@ -225,7 +225,7 @@ struct HandleRequest {
 };
 
 void registerError(OperationContext* opCtx, const Status& status) {
-    LastError::get(opCtx->getClient()).setLastError(status.code(), status.reason());
+    NotPrimaryErrorTracker::get(opCtx->getClient()).recordError(status.code());
     CurOp::get(opCtx)->debug().errInfo = status;
 }
 
@@ -1352,10 +1352,10 @@ void ExecCommandDatabase::_initiateCommand() {
 
     if (CommandHelpers::isHelpRequest(helpField)) {
         CurOp::get(opCtx)->ensureStarted();
-        // We disable last-error for help requests due to SERVER-11492, because config servers use
-        // help requests to determine which commands are database writes, and so must be forwarded
-        // to all config servers.
-        LastError::get(opCtx->getClient()).disable();
+        // We disable not-primary-error tracker for help requests due to SERVER-11492, because
+        // config servers use help requests to determine which commands are database writes, and so
+        // must be forwarded to all config servers.
+        NotPrimaryErrorTracker::get(opCtx->getClient()).disable();
         Command::generateHelpResponse(opCtx, replyBuilder, *command);
         iassert(Status(ErrorCodes::SkipCommandExecution,
                        "Skipping command execution for help request"));
@@ -1828,7 +1828,7 @@ DbResponse makeCommandResponse(std::shared_ptr<HandleRequest::ExecutionContext> 
 
     if (OpMsg::isFlagSet(message, OpMsg::kMoreToCome)) {
         // Close the connection to get client to go through server selection again.
-        if (LastError::get(opCtx->getClient()).hadNotPrimaryError()) {
+        if (NotPrimaryErrorTracker::get(opCtx->getClient()).hadError()) {
             if (c && c->getReadWriteType() == Command::ReadWriteType::kWrite)
                 notPrimaryUnackWrites.increment();
 
@@ -1930,7 +1930,7 @@ struct GetMoreOpRunner : SynchronousOpRunner {
  * Fire and forget network operations don't produce a `DbResponse`.
  * They override `runAndForget` instead of `run`, and this base
  * class provides a `run` that calls it and handles error reporting
- * via the `LastError` slot.
+ * via the `NotPrimaryErrorTracker` slot.
  */
 struct FireAndForgetOpRunner : SynchronousOpRunner {
     using SynchronousOpRunner::SynchronousOpRunner;
@@ -2029,7 +2029,7 @@ void HandleRequest::startOperation() {
                       !opCtx->lockState()->inAWriteUnitOfWork());
         }
     } else {
-        LastError::get(client).startRequest();
+        NotPrimaryErrorTracker::get(client).startRequest();
         AuthorizationSession::get(client)->startRequest(opCtx);
 
         // We should not be holding any locks at this point

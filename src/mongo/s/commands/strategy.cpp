@@ -49,11 +49,11 @@
 #include "mongo/db/error_labels.h"
 #include "mongo/db/initialize_api_parameters.h"
 #include "mongo/db/initialize_operation_session_info.h"
-#include "mongo/db/lasterror.h"
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/not_primary_error_tracker.h"
 #include "mongo/db/operation_time_tracker.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/query/find_common.h"
@@ -1052,7 +1052,7 @@ void ParseAndRunCommand::RunInvocation::_tapOnError(const Status& status) {
     const auto command = _parc->_rec->getCommand();
 
     command->incrementCommandsFailed();
-    LastError::get(opCtx->getClient()).setLastError(status.code(), status.reason());
+    NotPrimaryErrorTracker::get(opCtx->getClient()).recordError(status.code());
     // WriteConcern error (wcCode) is set to boost::none because:
     // 1. TransientTransaction error label handling for commitTransaction command in mongos is
     //    delegated to the shards. Mongos simply propagates the shard's response up to the client.

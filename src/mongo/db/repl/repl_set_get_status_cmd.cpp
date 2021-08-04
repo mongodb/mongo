@@ -28,7 +28,7 @@
  */
 
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/lasterror.h"
+#include "mongo/db/not_primary_error_tracker.h"
 #include "mongo/db/repl/repl_set_command.h"
 #include "mongo/db/repl/replication_coordinator.h"
 
@@ -50,7 +50,7 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         if (cmdObj["forShell"].trueValue())
-            LastError::get(opCtx->getClient()).disable();
+            NotPrimaryErrorTracker::get(opCtx->getClient()).disable();
 
         Status status = ReplicationCoordinator::get(opCtx)->checkReplEnabledForCommand(&result);
         uassertStatusOK(status);

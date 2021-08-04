@@ -46,9 +46,9 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/lasterror.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/not_primary_error_tracker.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/read_write_concern_defaults.h"
@@ -315,7 +315,7 @@ public:
            authenticated.
         */
         if (cmd.getForShell()) {
-            LastError::get(opCtx->getClient()).disable();
+            NotPrimaryErrorTracker::get(opCtx->getClient()).disable();
         }
 
         transport::Session::TagMask sessionTagsToSet = 0;

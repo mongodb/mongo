@@ -41,7 +41,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/json.h"
-#include "mongo/db/lasterror.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/idl/server_parameter_test_util.h"

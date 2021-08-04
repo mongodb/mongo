@@ -35,7 +35,7 @@
 
 #include "mongo/s/cluster_write.h"
 
-#include "mongo/db/lasterror.h"
+#include "mongo/db/not_primary_error_tracker.h"
 #include "mongo/s/chunk_manager_targeter.h"
 #include "mongo/s/grid.h"
 
@@ -47,7 +47,8 @@ void write(OperationContext* opCtx,
            BatchWriteExecStats* stats,
            BatchedCommandResponse* response,
            boost::optional<OID> targetEpoch) {
-    LastError::Disabled disableLastError(&LastError::get(opCtx->getClient()));
+    NotPrimaryErrorTracker::Disabled scopeDisabledTracker(
+        &NotPrimaryErrorTracker::get(opCtx->getClient()));
 
     ChunkManagerTargeter targeter(opCtx, request.getNS(), targetEpoch);
 

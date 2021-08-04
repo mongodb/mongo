@@ -50,8 +50,8 @@
 #include "mongo/db/exec/delete.h"
 #include "mongo/db/exec/update_stage.h"
 #include "mongo/db/introspect.h"
-#include "mongo/db/lasterror.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
+#include "mongo/db/not_primary_error_tracker.h"
 #include "mongo/db/ops/delete_request_gen.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/ops/parsed_delete.h"
@@ -254,7 +254,7 @@ bool handleError(OperationContext* opCtx,
                  const write_ops::WriteCommandRequestBase& wholeOp,
                  bool isMultiUpdate,
                  WriteResult* out) {
-    LastError::get(opCtx->getClient()).setLastError(ex.code(), ex.reason());
+    NotPrimaryErrorTracker::get(opCtx->getClient()).recordError(ex.code());
     auto& curOp = *CurOp::get(opCtx);
     curOp.debug().errInfo = ex.toStatus();
 
@@ -801,9 +801,6 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
 
     const bool didInsert = !updateResult.upsertedId.isEmpty();
     const long long nMatchedOrInserted = didInsert ? 1 : updateResult.numMatched;
-    LastError::get(opCtx->getClient())
-        .recordUpdate(updateResult.existing, nMatchedOrInserted, updateResult.upsertedId);
-
     SingleWriteResult result;
     result.setN(nMatchedOrInserted);
     result.setNModified(updateResult.numDocsModified);
@@ -1170,8 +1167,6 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
         auto&& [stats, _] = explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
         curOp.debug().execStats = std::move(stats);
     }
-
-    LastError::get(opCtx->getClient()).recordDelete(nDeleted);
 
     SingleWriteResult result;
     result.setN(nDeleted);

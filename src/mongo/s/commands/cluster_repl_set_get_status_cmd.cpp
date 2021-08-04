@@ -31,7 +31,7 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/lasterror.h"
+#include "mongo/db/not_primary_error_tracker.h"
 
 namespace mongo {
 namespace {
@@ -70,7 +70,7 @@ public:
                            std::string& errmsg,
                            BSONObjBuilder& result) {
         if (cmdObj["forShell"].trueValue()) {
-            LastError::get(cc()).disable();
+            NotPrimaryErrorTracker::get(cc()).disable();
         }
 
         errmsg = "replSetGetStatus is not supported through mongos";

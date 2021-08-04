@@ -44,7 +44,6 @@
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/json.h"
-#include "mongo/db/lasterror.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/find.h"

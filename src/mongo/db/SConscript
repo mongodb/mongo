@@ -505,9 +505,9 @@ env.Library(
 )
 
 env.Library(
-    target='lasterror',
+    target='not_primary_error_tracker',
     source=[
-        "lasterror.cpp",
+        "not_primary_error_tracker.cpp",
     ],
     LIBDEPS=[
         'service_context',
@@ -705,7 +705,7 @@ env.Library(
         'catalog_raii',
         'curop_failpoint_helpers',
         'dbdirectclient',
-        'lasterror',
+        'not_primary_error_tracker',
         'query_exec',
         'repl/repl_server_parameters',
         'stats/fill_locker_info',
@@ -723,7 +723,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/clientdriver_minimal',
         'curop',
-        'lasterror',
+        'not_primary_error_tracker',
         'ops/write_ops_parsers',
     ],
     LIBDEPS_PRIVATE=[
@@ -781,7 +781,7 @@ env.Library(
         'command_can_run_here',
         'commands/fsync_locked',
         'concurrency/lock_manager',
-        'lasterror',
+        'not_primary_error_tracker',
         'read_concern_d_impl',
         's/sharding_runtime_d',
         'service_entry_point_common',
@@ -893,7 +893,7 @@ env.Library(
         'commands/server_status_core',
         'initialize_api_parameters',
         'introspect',
-        'lasterror',
+        'not_primary_error_tracker',
         'query_exec',
         'repl/repl_server_parameters',
         'repl/replica_set_messages',
@@ -1306,7 +1306,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/db/stats/resource_consumption_metrics',
         'kill_sessions',
-        'lasterror',
+        'not_primary_error_tracker',
         'record_id_helpers',
     ],
 )

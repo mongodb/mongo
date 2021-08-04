@@ -39,7 +39,7 @@
 #include "mongo/db/commands/update_metrics.h"
 #include "mongo/db/commands/write_commands_common.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/lasterror.h"
+#include "mongo/db/not_primary_error_tracker.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
@@ -67,10 +67,10 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangAfterThrowWouldChangeOwningShardRetryableWrite);
 
-void batchErrorToLastError(const BatchedCommandRequest& request,
-                           const BatchedCommandResponse& response,
-                           LastError* error) {
-    error->reset();
+void batchErrorToNotPrimaryErrorTracker(const BatchedCommandRequest& request,
+                                        const BatchedCommandResponse& response,
+                                        NotPrimaryErrorTracker* tracker) {
+    tracker->reset();
 
     std::unique_ptr<WriteErrorDetail> commandError;
     WriteErrorDetail* lastBatchError = nullptr;
@@ -89,45 +89,11 @@ void batchErrorToLastError(const BatchedCommandRequest& request,
         if (request.getBatchType() == BatchedCommandRequest::BatchType_Insert || lastOpErrored) {
             lastBatchError = response.getErrDetails().back();
         }
-    } else {
-        // We don't care about write concern errors, these happen in legacy mode in GLE.
     }
 
     // Record an error if one exists
     if (lastBatchError) {
-        const auto& errMsg = lastBatchError->toStatus().reason();
-        error->setLastError(lastBatchError->toStatus().code(),
-                            errMsg.empty() ? "see code for details" : errMsg);
-        return;
-    }
-
-    // Record write stats otherwise
-    //
-    // NOTE: For multi-write batches, our semantics change a little because we don't have
-    // un-aggregated "n" stats
-    if (request.getBatchType() == BatchedCommandRequest::BatchType_Update) {
-        BSONObj upsertedId;
-        if (response.isUpsertDetailsSet()) {
-            // Only report the very last item's upserted id if applicable
-            if (response.getUpsertDetails().back()->getIndex() + 1 ==
-                static_cast<int>(request.sizeWriteOps())) {
-                upsertedId = response.getUpsertDetails().back()->getUpsertedID();
-            }
-        }
-
-        const int numUpserted = response.isUpsertDetailsSet() ? response.sizeUpsertDetails() : 0;
-        const auto numMatched = response.getN() - numUpserted;
-        invariant(numMatched >= 0);
-
-        // Wrap upserted id in "upserted" field
-        BSONObj leUpsertedId;
-        if (!upsertedId.isEmpty()) {
-            leUpsertedId = upsertedId.firstElement().wrap(kUpsertedFieldName);
-        }
-
-        error->recordUpdate(numMatched > 0, response.getN(), leUpsertedId);
-    } else if (request.getBatchType() == BatchedCommandRequest::BatchType_Delete) {
-        error->recordDelete(response.getN());
+        tracker->recordError(lastBatchError->toStatus().code());
     }
 }
 
@@ -475,9 +441,9 @@ private:
                 handleWouldChangeOwningShardError(opCtx, &batchedRequest, &response, stats);
         }
 
-        // Populate the lastError object based on the write response
-        batchErrorToLastError(batchedRequest, response, &LastError::get(opCtx->getClient()));
-
+        // Populate the 'NotPrimaryErrorTracker' object based on the write response
+        batchErrorToNotPrimaryErrorTracker(
+            batchedRequest, response, &NotPrimaryErrorTracker::get(opCtx->getClient()));
         size_t numAttempts;
 
         if (!response.getOk()) {
@@ -618,7 +584,7 @@ private:
         try {
             doCheckAuthorizationHook(AuthorizationSession::get(opCtx->getClient()));
         } catch (const DBException& e) {
-            LastError::get(opCtx->getClient()).setLastError(e.code(), e.reason());
+            NotPrimaryErrorTracker::get(opCtx->getClient()).recordError(e.code());
             throw;
         }
     }
