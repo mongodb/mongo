@@ -281,6 +281,11 @@ def main(ticket: Optional[str], base_dir: str, commit_message: Optional[str],
         found_todos = todo_checker.report_on_all_tickets()
 
     if found_todos:
+        print("TODOs that reference a Jira ticket associated with the current commit should not "
+              "remain in the code after the commit is merged. A TODO referencing a ticket that has "
+              "been closed and that solved the TODO's purpose can be confusing.")
+        print("To fix this error resolve any TODOs that reference the Jira ticket this commit is"
+              "associated with.")
         sys.exit(1)
     sys.exit(0)
 
