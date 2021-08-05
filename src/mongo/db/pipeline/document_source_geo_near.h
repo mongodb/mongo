@@ -70,6 +70,8 @@ public:
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 
+    boost::intrusive_ptr<DocumentSource> optimize() final;
+
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pCtx);
 
@@ -136,7 +138,7 @@ public:
      * Converts this $geoNear aggregation stage into an equivalent $near or $nearSphere query on
      * 'nearFieldName'.
      */
-    BSONObj asNearQuery(StringData nearFieldName) const;
+    BSONObj asNearQuery(StringData nearFieldName);
 
     /**
      * In a sharded cluster, this becomes a merge sort by distance, from nearest to furthest.
@@ -149,12 +151,12 @@ private:
     /**
      * Parses the fields in the object 'options', throwing if an error occurs.
      */
-    void parseOptions(BSONObj options);
+    void parseOptions(BSONObj options, const boost::intrusive_ptr<ExpressionContext>& pCtx);
 
     // These fields describe the command to run.
-    // 'coords' and 'distanceField' are required; the rest are optional.
-    BSONObj coords;  // "near" option, but near is a reserved keyword on windows
-    bool coordsIsArray;
+    // 'near' and 'distanceField' are required; the rest are optional.
+    boost::intrusive_ptr<Expression> _nearGeometry;
+
     std::unique_ptr<FieldPath> distanceField;  // Using unique_ptr because FieldPath can't be empty
     BSONObj query;
     bool spherical;

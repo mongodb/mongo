@@ -35,6 +35,7 @@
 
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/document_source_sort.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/logv2/log.h"
 
@@ -56,12 +57,15 @@ Value DocumentSourceGeoNear::serialize(boost::optional<ExplainOptions::Verbosity
         result.setField(kKeyFieldName, Value(keyFieldPath->fullPath()));
     }
 
-    if (coordsIsArray) {
-        result.setField("near", Value(BSONArray(coords)));
-    } else {
-        result.setField("near", Value(coords));
-    }
-
+    auto nearValue = [&]() -> Value {
+        if (auto constGeometry = dynamic_cast<ExpressionConstant*>(_nearGeometry.get());
+            constGeometry) {
+            return constGeometry->getValue();
+        } else {
+            return _nearGeometry->serialize(static_cast<bool>(explain));
+        }
+    }();
+    result.setField("near", nearValue);
     result.setField("distanceField", Value(distanceField->fullPath()));
 
     if (maxDistance) {
@@ -84,6 +88,11 @@ Value DocumentSourceGeoNear::serialize(boost::optional<ExplainOptions::Verbosity
     return Value(DOC(getSourceName() << result.freeze()));
 }
 
+boost::intrusive_ptr<DocumentSource> DocumentSourceGeoNear::optimize() {
+    _nearGeometry = _nearGeometry->optimize();
+    return this;
+}
+
 intrusive_ptr<DocumentSourceGeoNear> DocumentSourceGeoNear::create(
     const intrusive_ptr<ExpressionContext>& pCtx) {
     intrusive_ptr<DocumentSourceGeoNear> source(new DocumentSourceGeoNear(pCtx));
@@ -93,7 +102,7 @@ intrusive_ptr<DocumentSourceGeoNear> DocumentSourceGeoNear::create(
 intrusive_ptr<DocumentSource> DocumentSourceGeoNear::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& pCtx) {
     intrusive_ptr<DocumentSourceGeoNear> out = new DocumentSourceGeoNear(pCtx);
-    out->parseOptions(elem.embeddedObjectUserCheck());
+    out->parseOptions(elem.embeddedObjectUserCheck(), pCtx);
     return out;
 }
 
@@ -101,7 +110,8 @@ bool DocumentSourceGeoNear::hasQuery() const {
     return true;
 }
 
-void DocumentSourceGeoNear::parseOptions(BSONObj options) {
+void DocumentSourceGeoNear::parseOptions(BSONObj options,
+                                         const boost::intrusive_ptr<ExpressionContext>& pCtx) {
     // First, check for explicitly-disallowed fields.
 
     // The old geoNear command used to accept a collation. We explicitly ban it here, since the
@@ -121,11 +131,9 @@ void DocumentSourceGeoNear::parseOptions(BSONObj options) {
     uassert(50856, "$geoNear no longer supports the 'start' argument.", !options["start"]);
 
     // The "near" and "distanceField" parameters are required.
-    uassert(16605,
-            "$geoNear requires a 'near' option as an Array",
-            options["near"].isABSONObj());  // Array or Object (Object is deprecated)
-    coordsIsArray = options["near"].type() == Array;
-    coords = options["near"].embeddedObject().getOwned();
+    uassert(5860400, "$geoNear requires a 'near' argument", options["near"]);
+    _nearGeometry =
+        Expression::parseOperand(pCtx.get(), options["near"], pCtx->variablesParseState);
 
     uassert(16606,
             "$geoNear requires a 'distanceField' option as a String",
@@ -193,24 +201,25 @@ void DocumentSourceGeoNear::parseOptions(BSONObj options) {
     }
 }
 
-BSONObj DocumentSourceGeoNear::asNearQuery(StringData nearFieldName) const {
+BSONObj DocumentSourceGeoNear::asNearQuery(StringData nearFieldName) {
     BSONObjBuilder queryBuilder;
     queryBuilder.appendElements(query);
 
     BSONObjBuilder nearBuilder(queryBuilder.subobjStart(nearFieldName));
-    if (spherical) {
-        if (coordsIsArray) {
-            nearBuilder.appendArray("$nearSphere", coords);
-        } else {
-            nearBuilder.append("$nearSphere", coords);
-        }
+
+    auto opName = spherical ? "$nearSphere" : "$near";
+    optimize();
+    if (auto constGeometry = dynamic_cast<ExpressionConstant*>(_nearGeometry.get());
+        constGeometry) {
+        auto geomValue = constGeometry->getValue();
+        uassert(5860401,
+                "$geoNear requires near argument to be a GeoJSON object or a legacy point(array)",
+                geomValue.isObject() || geomValue.isArray());
+        geomValue.addToBsonObj(&nearBuilder, opName);
     } else {
-        if (coordsIsArray) {
-            nearBuilder.appendArray("$near", coords);
-        } else {
-            nearBuilder.append("$near", coords);
-        }
+        uassert(5860402, "$geoNear requires a constant near argument", constGeometry);
     }
+
     if (minDistance) {
         nearBuilder.append("$minDistance", *minDistance);
     }
@@ -226,6 +235,7 @@ bool DocumentSourceGeoNear::needsGeoNearPoint() const {
 }
 
 DepsTracker::State DocumentSourceGeoNear::getDependencies(DepsTracker* deps) const {
+    _nearGeometry->addDependencies(deps);
     // TODO (SERVER-35424): Implement better dependency tracking. For example, 'distanceField' is
     // produced by this stage, and we could inform the query system that it need not include it in
     // its response. For now, assume that we require the entire document as well as the appropriate
@@ -238,7 +248,7 @@ DepsTracker::State DocumentSourceGeoNear::getDependencies(DepsTracker* deps) con
 }
 
 DocumentSourceGeoNear::DocumentSourceGeoNear(const intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSource(kStageName, pExpCtx), coordsIsArray(false), spherical(false) {}
+    : DocumentSource(kStageName, pExpCtx), spherical(false) {}
 
 boost::optional<DocumentSource::DistributedPlanLogic>
 DocumentSourceGeoNear::distributedPlanLogic() {

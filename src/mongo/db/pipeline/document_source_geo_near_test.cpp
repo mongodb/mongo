@@ -88,10 +88,18 @@ TEST_F(DocumentSourceGeoNearTest, FailToParseIfStartOptionIsSpecified) {
                        50856);
 }
 
+TEST_F(DocumentSourceGeoNearTest, FailToParseIfRequiredNearIsMissing) {
+    auto stageObj = fromjson("{$geoNear: {distanceField: 'dist'}}");
+    ASSERT_THROWS_CODE(DocumentSourceGeoNear::createFromBson(stageObj.firstElement(), getExpCtx()),
+                       AssertionException,
+                       5860400);
+}
+
 TEST_F(DocumentSourceGeoNearTest, CanParseAndSerializeKeyField) {
     auto stageObj = fromjson("{$geoNear: {distanceField: 'dist', near: [0, 0], key: 'a.b'}}");
     auto geoNear = DocumentSourceGeoNear::createFromBson(stageObj.firstElement(), getExpCtx());
     std::vector<Value> serialized;
+    geoNear->optimize();
     geoNear->serializeToArray(serialized);
     ASSERT_EQ(serialized.size(), 1u);
     auto expectedSerialization =
