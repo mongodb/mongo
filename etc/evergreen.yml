@@ -10820,7 +10820,10 @@ buildvariants:
   - name: .jscore .common !.txns !.decimal
   # SERVER-50295: Investigate jstestfuzz time outs.
   # - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
+  # SERVER-59095: Investigate the EFT failure and re-enable the failing jstest suite on evergreen.
+  # - name: .logical_session_cache .one_sec
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
   - name: .read_write_concern .linearize
   - name: replica_sets_gen
   - name: .replica_sets .common
