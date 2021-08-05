@@ -86,4 +86,10 @@ expectedResult = {
 testGetCmdLineOptsMongod({config: "jstests/libs/config_files/disable_nomoveparanoia.ini"},
                          expectedResult);
 
+jsTest.log("Ensure starting a standalone with --shardsvr fails");
+testGetCmdLineOptsMongodFailed({shardsvr: ""});
+
+jsTest.log("Ensure starting a standalone with --configsvr fails");
+testGetCmdLineOptsMongodFailed({configsvr: ""});
+
 print(baseName + " succeeded.");
