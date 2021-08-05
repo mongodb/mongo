@@ -26,7 +26,15 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#import bisect
+ #raw
+#include <string>
+
+#include "mongo/base/string_data.h"
+#include "mongo/util/assert_util.h"
+#end raw
+##
+##
+#from bisect import bisect_left, bisect_right
 #import re
 #import yaml
 #from packaging.version import Version
@@ -48,17 +56,18 @@
 
 #set global $latest = Version(re.sub(r'-.*', '', $mongo_version))
 ## Highest release less than latest.
-#set global $last_continuous = $fcvs[bisect.bisect_left($fcvs, $latest) - 1]
+#set global $last_continuous = $fcvs[bisect_left($fcvs, $latest) - 1]
 ## Highest LTS release less than latest.
-#set global $last_lts = $majors[bisect.bisect_left($majors, $latest) - 1]
+#set global $last_lts = $majors[bisect_left($majors, $latest) - 1]
 ##
 #set global $generic_fcvs = {'LastLTS': $last_lts, 'LastContinuous': $last_continuous, 'Latest': $latest}
 ##
 ## Format a Version as `{major}_{minor}`.
-#def $underscores(v): ${'{}_{}'.format(v.major, v.minor)}
+#def underscores(v): ${'{}_{}'.format(v.major, v.minor)}
 #def $fcv_prefix(v): ${'kFullyDowngradedTo_' if v == $last_lts else 'kVersion_'}
 #def $fcv_cpp_name(v): ${'{}{}'.format($fcv_prefix(v), $underscores(v))}
-#def define_transition_alias($transition, $first, $second):
+##
+#def transition_enum_name($transition, $first, $second):
 k$(transition)_$(underscores($first))_To_$(underscores($second))#slurp
 #end def
 
@@ -67,31 +76,39 @@ namespace mongo::multiversion {
 fcvs = self.getVar('fcvs')
 last_lts, last_continuous, latest = self.getVar('last_lts'), self.getVar('last_continuous'), self.getVar('latest')
 generic_fcvs = self.getVar('generic_fcvs')
+
+# The transition when used as a cpp variable.
 downgrading = 'DowngradingFrom'
 upgrading = 'UpgradingFrom'
 
+# A list of (FCV enum name, FCV string) tuples.
 fcv_list = []
-for fcv in fcvs[bisect.bisect_left(fcvs, last_lts):bisect.bisect_right(fcvs, latest)]:
-    fcv_list.append(self.fcv_cpp_name(fcv))
+
+for fcv in fcvs[bisect_left(fcvs, last_lts):bisect_right(fcvs, latest)]:
+    fcv_list.append((self.fcv_cpp_name(fcv), fcv))
     if fcv in generic_fcvs.values():
         for v in filter(lambda x : x > fcv, generic_fcvs.values()):
-            fcv_list.append(self.define_transition_alias(downgrading, v, fcv))
-            fcv_list.append(self.define_transition_alias(upgrading, fcv, v))
+            fcv_list.extend([(self.transition_enum_name(downgrading, v, fcv),
+                              f'downgrading from {v} to {fcv}'),
+                             (self.transition_enum_name(upgrading, fcv, v),
+                              f'upgrading from {fcv} to {v}')])
 %>
+##
+##
 enum class FeatureCompatibilityVersion {
     kInvalid,
     kUnsetDefaultBehavior_$underscores($last_lts),
 
-    #for $fcv in $fcv_list:
+#for fcv, _ in fcv_list:
     $fcv,
-    #end for
+#end for
 };
 
 ## Calculate number of versions since v4.4.
 constexpr size_t kSince_$underscores(Version('4.4')) = ${len($fcvs) - 1};
 
 // Last LTS was "$last_lts".
-constexpr size_t kSinceLastLTS = ${len($fcvs) - bisect.bisect_left($fcvs, $last_lts) - 1};
+constexpr size_t kSinceLastLTS = ${len($fcvs) - bisect_left($fcvs, $last_lts) - 1};
 
 class GenericFCV {
 #def define_fcv_alias($id, v):
@@ -100,7 +117,7 @@ static constexpr auto $id = FeatureCompatibilityVersion::$fcv_cpp_name(v);#slurp
 ##
 #def define_generic_transition_alias($transition, $first_name, $first_value, $second_name, $second_value):
 static constexpr auto k$transition$(first_name)To$(second_name) = #slurp
-FeatureCompatibilityVersion::$define_transition_alias($transition, $first_value, $second_value);#slurp
+FeatureCompatibilityVersion::$transition_enum_name($transition, $first_value, $second_value);#slurp
 #end def
 ##
 #def define_generic_invalid_alias($transition, $first, $second):
@@ -122,10 +139,23 @@ public:
     $define_fcv_alias('kLastContinuous', $last_continuous)
     $define_fcv_alias('kLastLTS', $last_lts)
 
-    #for $fcv in $generic_transition_list:
+#for $fcv in $generic_transition_list:
     $fcv
-    #end for
+#end for
 };
+
+inline StringData toString(FeatureCompatibilityVersion v) {
+    switch (v) {
+        case FeatureCompatibilityVersion::kInvalid:
+            return "invalid"_sd;
+        case FeatureCompatibilityVersion::kUnsetDefaultBehavior_$underscores($last_lts):
+            return "unset"_sd;
+#for fcv, fcv_string in fcv_list:
+        case FeatureCompatibilityVersion::$fcv:
+            return "$fcv_string"_sd;
+#end for
+    }
+}
 
 }  // namespace mongo::multiversion
 
