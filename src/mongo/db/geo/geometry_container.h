@@ -31,6 +31,7 @@
 
 #include <string>
 
+#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/geo/shapes.h"
 #include "third_party/s2/s2regionunion.h"
 
@@ -172,6 +173,26 @@ private:
     std::unique_ptr<R2Region> _r2Region;
 
     BSONElement _geoElm;
+};
+
+/**
+ * Structure that holds BSON addresses (BSONElements) and the corresponding geometry parsed
+ * at those locations.
+ * Used to separate the parsing of geometries from a BSONObj (which must stay in scope) from
+ * the computation over those geometries.
+ * TODO: Merge with 2D/2DSphere key extraction?
+ */
+class StoredGeometry {
+public:
+    static StoredGeometry* parseFrom(const BSONElement& element, bool skipValidation);
+
+    static void extractGeometries(const BSONObj& doc,
+                                  const string& path,
+                                  std::vector<std::unique_ptr<StoredGeometry>>* geometries,
+                                  bool skipValidation);
+
+    BSONElement element;
+    GeometryContainer geometry;
 };
 
 }  // namespace mongo

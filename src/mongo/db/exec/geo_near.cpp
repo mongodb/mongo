@@ -57,8 +57,6 @@ namespace mongo {
 using std::abs;
 using std::unique_ptr;
 
-namespace dps = ::mongo::dotted_path_support;
-
 //
 // Shared GeoNear search functionality
 //
@@ -66,77 +64,6 @@ namespace dps = ::mongo::dotted_path_support;
 static const double kCircOfEarthInMeters = 2 * M_PI * kRadiusOfEarthInMeters;
 static const double kMaxEarthDistanceInMeters = kCircOfEarthInMeters / 2;
 static const double kMetersPerDegreeAtEquator = kCircOfEarthInMeters / 360;
-
-namespace {
-
-/**
- * Structure that holds BSON addresses (BSONElements) and the corresponding geometry parsed
- * at those locations.
- * Used to separate the parsing of geometries from a BSONObj (which must stay in scope) from
- * the computation over those geometries.
- * TODO: Merge with 2D/2DSphere key extraction?
- */
-struct StoredGeometry {
-    static StoredGeometry* parseFrom(const BSONElement& element) {
-        if (!element.isABSONObj())
-            return nullptr;
-
-        unique_ptr<StoredGeometry> stored(new StoredGeometry);
-
-        // GeoNear stage can only be run with an existing index
-        // Therefore, it is always safe to skip geometry validation
-        if (!stored->geometry.parseFromStorage(element, true).isOK())
-            return nullptr;
-        stored->element = element;
-        return stored.release();
-    }
-
-    BSONElement element;
-    GeometryContainer geometry;
-};
-}  // namespace
-
-/**
- * Find and parse all geometry elements on the appropriate field path from the document.
- */
-static void extractGeometries(const BSONObj& doc,
-                              const string& path,
-                              std::vector<std::unique_ptr<StoredGeometry>>* geometries) {
-    BSONElementSet geomElements;
-    // NOTE: Annoyingly, we cannot just expand arrays b/c single 2d points are arrays, we need
-    // to manually expand all results to check if they are geometries
-    dps::extractAllElementsAlongPath(doc, path, geomElements, false /* expand arrays */);
-
-    for (BSONElementSet::iterator it = geomElements.begin(); it != geomElements.end(); ++it) {
-        const BSONElement& el = *it;
-        unique_ptr<StoredGeometry> stored(StoredGeometry::parseFrom(el));
-
-        if (stored.get()) {
-            // Valid geometry element
-            geometries->push_back(std::move(stored));
-        } else if (el.type() == Array) {
-            // Many geometries may be in an array
-            BSONObjIterator arrIt(el.Obj());
-            while (arrIt.more()) {
-                const BSONElement nextEl = arrIt.next();
-                stored.reset(StoredGeometry::parseFrom(nextEl));
-
-                if (stored.get()) {
-                    // Valid geometry element
-                    geometries->push_back(std::move(stored));
-                } else {
-                    LOGV2_WARNING(23760,
-                                  "geoNear stage read non-geometry element in array",
-                                  "nextElement"_attr = redact(nextEl),
-                                  "element"_attr = redact(el));
-                }
-            }
-        } else {
-            LOGV2_WARNING(
-                23761, "geoNear stage read non-geometry element", "element"_attr = redact(el));
-        }
-    }
-}
 
 static double computeGeoNearDistance(const GeoNearParams& nearParams, WorkingSetMember* member) {
     //
@@ -152,7 +79,8 @@ static double computeGeoNearDistance(const GeoNearParams& nearParams, WorkingSet
 
     // Extract all the geometries out of this document for the near query
     std::vector<std::unique_ptr<StoredGeometry>> geometries;
-    extractGeometries(member->doc.value().toBson(), nearParams.nearQuery->field, &geometries);
+    StoredGeometry::extractGeometries(
+        member->doc.value().toBson(), nearParams.nearQuery->field, &geometries, true);
 
     // Compute the minimum distance of all the geometries in the document
     double minDistance = -1;
