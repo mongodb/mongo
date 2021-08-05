@@ -126,6 +126,11 @@ structs:
         fields:
             value: object
 
+    one_plain_array:
+        description: UnitTest for a single BSONArray
+        fields:
+            value: array
+
     one_plain_optional_object:
         description: UnitTest for optional BSONObj
         generate_comparison_operators: true

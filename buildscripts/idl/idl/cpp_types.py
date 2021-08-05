@@ -652,6 +652,34 @@ class _ObjectBsonCppTypeBase(BsonCppTypeBase):
         return "localObject"
 
 
+class _ArrayBsonCppTypeBase(BsonCppTypeBase):
+    """Custom C++ support for array BSON types."""
+
+    def gen_deserializer_expression(self, indented_writer, object_instance):
+        # type: (writer.IndentedTextWriter, str) -> str
+        if self._ast_type.deserializer:
+            indented_writer.write_line(
+                common.template_args('BSONArray localArray(${object_instance}.Obj());',
+                                     object_instance=object_instance))
+            return "localArray"
+
+        # Just pass the BSONObj through without trying to parse it.
+        return common.template_args('BSONArray(${object_instance}.Obj())',
+                                    object_instance=object_instance)
+
+    def has_serializer(self):
+        # type: () -> bool
+        return self._ast_type.serializer is not None
+
+    def gen_serializer_expression(self, indented_writer, expression):
+        # type: (writer.IndentedTextWriter, str) -> str
+        method_name = writer.get_method_name(self._ast_type.serializer)
+        indented_writer.write_line(
+            common.template_args('BSONArray localArray(${expression}.${method_name}());',
+                                 expression=expression, method_name=method_name))
+        return "localArray"
+
+
 class _BinDataBsonCppTypeBase(BsonCppTypeBase):
     """Custom C++ support for all binData BSON types."""
 
@@ -690,6 +718,7 @@ class _BinDataBsonCppTypeBase(BsonCppTypeBase):
 def get_bson_cpp_type(ast_type):
     # type: (ast.Type) -> Optional[BsonCppTypeBase]
     """Get a class that provides custom serialization for the given BSON type."""
+    # pylint: disable=too-many-return-statements
 
     # Does not support list of types
     if len(ast_type.bson_serialization_type) > 1:
@@ -700,6 +729,9 @@ def get_bson_cpp_type(ast_type):
 
     if ast_type.bson_serialization_type[0] == 'object':
         return _ObjectBsonCppTypeBase(ast_type)
+
+    if ast_type.bson_serialization_type[0] == 'array':
+        return _ArrayBsonCppTypeBase(ast_type)
 
     if ast_type.bson_serialization_type[0] == 'bindata':
         return _BinDataBsonCppTypeBase(ast_type)

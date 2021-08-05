@@ -1206,7 +1206,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                                             method_name=method_name, expression=expression)
 
             # BSONObjects are allowed to be pass through without deserialization
-            assert ast_type.bson_serialization_type == ['object']
+            assert ast_type.bson_serialization_type in [['object'], ['array']]
             return expression
 
         # Call a static class method with the signature:

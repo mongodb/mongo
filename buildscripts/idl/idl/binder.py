@@ -201,7 +201,7 @@ def _validate_type_properties(ctxt, idl_type, syntax_type):
                 ctxt.add_missing_ast_required_field_error(idl_type, syntax_type, idl_type.name,
                                                           "deserializer")
 
-        elif not bson_type in ["object", "bindata"]:
+        elif not bson_type in ["array", "object", "bindata"]:
             if idl_type.deserializer is None:
                 ctxt.add_missing_ast_required_field_error(idl_type, syntax_type, idl_type.name,
                                                           "deserializer")

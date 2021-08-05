@@ -152,17 +152,21 @@ void assert_same_types() {
 
 template <typename ParserT, typename TestT, BSONType Test_bson_type>
 void TestLoopback(TestT test_value) {
-    IDLParserErrorContext ctxt("root");
-
     auto testDoc = BSON("value" << test_value);
-
     auto element = testDoc.firstElement();
     ASSERT_EQUALS(element.type(), Test_bson_type);
 
-    auto testStruct = ParserT::parse(ctxt, testDoc);
+    auto testStruct = ParserT::parse({"test"}, testDoc);
     assert_same_types<decltype(testStruct.getValue()), TestT>();
 
-    ASSERT_EQUALS(testStruct.getValue(), test_value);
+    // We need to use a different unittest macro for comparing obj/array.
+    constexpr bool isObjectTest = std::is_same_v<TestT, const BSONObj&>;
+    constexpr bool isArrayTest = std::is_same_v<TestT, const BSONArray&>;
+    if constexpr (isObjectTest || isArrayTest) {
+        ASSERT_BSONOBJ_EQ(testStruct.getValue(), test_value);
+    } else {
+        ASSERT_EQUALS(testStruct.getValue(), test_value);
+    }
 
     // Positive: Test we can roundtrip from the just parsed document
     {
@@ -192,7 +196,15 @@ void TestLoopback(TestT test_value) {
 
         // Validate the operator == works
         // Use ASSERT instead of ASSERT_EQ to avoid operator<<
-        ASSERT(one_new == testStruct);
+        if constexpr (!isArrayTest) {
+            // BSONArray comparison not currently implemented.
+            ASSERT_TRUE(one_new == testStruct);
+        }
+
+        if constexpr (isObjectTest) {
+            // Only One_plain_object implements comparison ops
+            ASSERT_FALSE(one_new < testStruct);
+        }
     }
 }
 
@@ -207,46 +219,10 @@ TEST(IDLOneTypeTests, TestLoopbackTest) {
     TestLoopback<One_objectid, const OID&, jstOID>(OID::max());
     TestLoopback<One_date, const Date_t&, Date>(Date_t::now());
     TestLoopback<One_timestamp, const Timestamp&, bsonTimestamp>(Timestamp::max());
-}
-
-// Test a BSONObj can be passed through an IDL type
-TEST(IDLOneTypeTests, TestObjectLoopbackTest) {
-    IDLParserErrorContext ctxt("root");
-
-    auto testValue = BSON("Hello"
-                          << "World");
-    auto testDoc = BSON("value" << testValue);
-
-    auto element = testDoc.firstElement();
-    ASSERT_EQUALS(element.type(), Object);
-
-    auto testStruct = One_plain_object::parse(ctxt, testDoc);
-    assert_same_types<decltype(testStruct.getValue()), const BSONObj&>();
-
-    ASSERT_BSONOBJ_EQ(testStruct.getValue(), testValue);
-
-    // Positive: Test we can roundtrip from the just parsed document
-    {
-        BSONObjBuilder builder;
-        testStruct.serialize(&builder);
-        auto loopbackDoc = builder.obj();
-
-        ASSERT_BSONOBJ_EQ(testDoc, loopbackDoc);
-    }
-
-    // Positive: Test we can serialize from nothing the same document
-    {
-        BSONObjBuilder builder;
-        One_plain_object one_new;
-        one_new.setValue(testValue);
-        one_new.serialize(&builder);
-
-        auto serializedDoc = builder.obj();
-        ASSERT_BSONOBJ_EQ(testDoc, serializedDoc);
-
-        ASSERT_TRUE(one_new == testStruct);
-        ASSERT_FALSE(one_new < testStruct);
-    }
+    TestLoopback<One_plain_object, const BSONObj&, Object>(BSON("Hello"
+                                                                << "World"));
+    TestLoopback<One_plain_array, const BSONArray&, Array>(BSON_ARRAY("Hello"
+                                                                      << "World"));
 }
 
 // Test we compare an object with optional BSONObjs correctly

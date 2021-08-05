@@ -40,7 +40,7 @@ _BSON_TYPE_INFORMATION = {
     "double": {'scalar': True, 'bson_type_enum': 'NumberDouble'},
     "string": {'scalar': True, 'bson_type_enum': 'String'},
     "object": {'scalar': False, 'bson_type_enum': 'Object'},
-    # TODO: add support: "array" : { 'scalar' :  False, 'bson_type_enum' : 'Array'},
+    "array": {'scalar': False, 'bson_type_enum': 'Array'},
     "bindata": {'scalar': True, 'bson_type_enum': 'BinData'},
     "undefined": {'scalar': True, 'bson_type_enum': 'Undefined'},
     "objectid": {'scalar': True, 'bson_type_enum': 'jstOID'},

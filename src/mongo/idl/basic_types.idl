@@ -187,6 +187,17 @@ types:
         cpp_type: "mongo::BSONObj"
         deserializer: "BSONObj::getOwned"
 
+    array:
+        bson_serialization_type: array
+        description: "An unowned BSONArray without custom deserialization or seialization"
+        cpp_type: "mongo::BSONArray"
+
+    array_owned:
+        bson_serialization_type: array
+        description: "An owned BSONArray"
+        cpp_type: "mongo::BSONArray"
+        deserializer: "BSONObj::getOwned"
+
     date:
         bson_serialization_type: date
         description: "A BSON UTC DateTime"
