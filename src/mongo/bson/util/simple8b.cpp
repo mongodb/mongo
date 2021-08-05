@@ -225,63 +225,6 @@ constexpr std::array<std::array<uint8_t, 16>, 4> kIntsStoreForSelector = {
     std::array<uint8_t, 16>{0, 7, 6, 5, 4, 3, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0},
     std::array<uint8_t, 16>{0, 0, 0, 0, 0, 0, 0, 0, 6, 5, 4, 3, 2, 1, 0, 0}};
 
-// This is called in _encode while iterating through _pendingValues. For the base selector, we just
-// return val. Contains unsed vars in order to seamlessly integrate with seven and eight selector
-// extensions.
-template <typename T>
-struct BaseSelectorEncodeFunctor {
-    uint64_t operator()(const typename Simple8bBuilder<T>::PendingValue& value) {
-        return static_cast<uint64_t>(value.value());
-    };
-};
-
-// This is called in _encode while iterating through _pendingValues. It creates part of a simple8b
-// word according to the specifications of the sevenSelector extension. This value is then appended
-// to the full simple8b word in _encode.
-template <typename T>
-struct SevenSelectorEncodeFunctor {
-    uint64_t operator()(const typename Simple8bBuilder<T>::PendingValue& value) {
-        uint8_t trailingZeros = value.trailingZerosCount[kSevenSelector];
-        uint64_t currWord = trailingZeros;
-        // We do two shifts here to account for the case where trailingZeros is > kTrailingZero bit
-        // size. If we subtracted this could lead to shift by a negative value which is undefined.
-        currWord |= static_cast<uint64_t>((value.value() >> trailingZeros)
-                                          << kTrailingZeroBitSize[kSevenSelector]);
-        return currWord;
-    };
-};
-
-// This is a helper functor that is extended by the EightSelectorSmall and EightSelectorLarge encode
-// functors. It provides the logic for encoding with the eight selector where the extension type is
-// designated by the inheritance in the EightSelectorSmall and EightSelectorLarge functors.
-template <typename T, uint8_t ExtensionType>
-struct EightSelectorEncodeFunctor {
-    uint64_t operator()(const typename Simple8bBuilder<T>::PendingValue& value) {
-        // integer division. We have a nibble shift of size 4
-        uint8_t trailingZeros = value.trailingZerosCount[ExtensionType] / kNibbleShiftSize;
-        uint64_t currWord = trailingZeros;
-        // Shift to remove trailing zeros * 4 and then shift over for the 4 bits to hold
-        // the trailingZerosCount
-        currWord |= static_cast<uint64_t>((value.value() >> (trailingZeros * kNibbleShiftSize))
-                                          << kTrailingZeroBitSize[ExtensionType]);
-        return currWord;
-    }
-};
-
-// This is called in _encode while iterating through _pendingValues. It creates part of a simple8b
-// word according to the specifications of the eightSelectorSmall extension. This value is then
-// appended to the full simple8b word in _encode.
-template <typename T>
-struct EightSelectorSmallEncodeFunctor : public EightSelectorEncodeFunctor<T, kEightSelectorSmall> {
-};
-
-// This is called in _encode while iterating through _pendingValues. It creates part of a simple8b
-// word according to the specifications of the eightSelectorLarge extension. This value is then
-// appended to the full simple8b word in _encode.
-template <typename T>
-struct EightSelectorLargeEncodeFunctor : public EightSelectorEncodeFunctor<T, kEightSelectorLarge> {
-};
-
 uint8_t _countBitsWithoutLeadingZeros(uint64_t value) {
     // All 1s is reserved for skip encoding so we add 1 to value to account for that case.
     return 64 - countLeadingZeros64(value + 1);
@@ -325,6 +268,64 @@ uint8_t _getSelectorIndex(uint8_t intsNeeded, uint8_t extensionType) {
 
 }  // namespace
 
+// This is called in _encode while iterating through _pendingValues. For the base selector, we just
+// return val. Contains unsed vars in order to seamlessly integrate with seven and eight selector
+// extensions.
+template <typename T>
+struct Simple8bBuilder<T>::BaseSelectorEncodeFunctor {
+    uint64_t operator()(const PendingValue& value) {
+        return static_cast<uint64_t>(value.value());
+    };
+};
+
+// This is called in _encode while iterating through _pendingValues. It creates part of a simple8b
+// word according to the specifications of the sevenSelector extension. This value is then appended
+// to the full simple8b word in _encode.
+template <typename T>
+struct Simple8bBuilder<T>::SevenSelectorEncodeFunctor {
+    uint64_t operator()(const PendingValue& value) {
+        uint8_t trailingZeros = value.trailingZerosCount[kSevenSelector];
+        uint64_t currWord = trailingZeros;
+        // We do two shifts here to account for the case where trailingZeros is > kTrailingZero bit
+        // size. If we subtracted this could lead to shift by a negative value which is undefined.
+        currWord |= static_cast<uint64_t>((value.value() >> trailingZeros)
+                                          << kTrailingZeroBitSize[kSevenSelector]);
+        return currWord;
+    };
+};
+
+// This is a helper functor that is extended by the EightSelectorSmall and EightSelectorLarge encode
+// functors. It provides the logic for encoding with the eight selector where the extension type is
+// designated by the inheritance in the EightSelectorSmall and EightSelectorLarge functors.
+template <typename T>
+template <uint8_t ExtensionType>
+struct Simple8bBuilder<T>::EightSelectorEncodeFunctor {
+    uint64_t operator()(const PendingValue& value) {
+        // integer division. We have a nibble shift of size 4
+        uint8_t trailingZeros = value.trailingZerosCount[ExtensionType] / kNibbleShiftSize;
+        uint64_t currWord = trailingZeros;
+        // Shift to remove trailing zeros * 4 and then shift over for the 4 bits to hold
+        // the trailingZerosCount
+        currWord |= static_cast<uint64_t>((value.value() >> (trailingZeros * kNibbleShiftSize))
+                                          << kTrailingZeroBitSize[ExtensionType]);
+        return currWord;
+    }
+};
+
+// This is called in _encode while iterating through _pendingValues. It creates part of a simple8b
+// word according to the specifications of the eightSelectorSmall extension. This value is then
+// appended to the full simple8b word in _encode.
+template <typename T>
+struct Simple8bBuilder<T>::EightSelectorSmallEncodeFunctor
+    : public EightSelectorEncodeFunctor<kEightSelectorSmall> {};
+
+// This is called in _encode while iterating through _pendingValues. It creates part of a simple8b
+// word according to the specifications of the eightSelectorLarge extension. This value is then
+// appended to the full simple8b word in _encode.
+template <typename T>
+struct Simple8bBuilder<T>::EightSelectorLargeEncodeFunctor
+    : public EightSelectorEncodeFunctor<kEightSelectorLarge> {};
+
 // Base Constructor for PendingValue
 template <typename T>
 Simple8bBuilder<T>::PendingValue::PendingValue(
@@ -332,6 +333,54 @@ Simple8bBuilder<T>::PendingValue::PendingValue(
     std::array<uint8_t, kNumOfSelectorTypes> bitCount,
     std::array<uint8_t, kNumOfSelectorTypes> trailingZerosCount)
     : val(val), bitCount(bitCount), trailingZerosCount(trailingZerosCount){};
+
+template <typename T>
+Simple8bBuilder<T>::PendingIterator::PendingIterator(
+    typename std::deque<PendingValue>::const_iterator it, reference rleValue, uint32_t rleCount)
+    : _it(it), _rleValue(rleValue), _rleCount(rleCount) {}
+
+template <typename T>
+auto Simple8bBuilder<T>::PendingIterator::operator-> () const -> pointer {
+    return &operator*();
+}
+
+template <typename T>
+auto Simple8bBuilder<T>::PendingIterator::operator*() const -> reference {
+    if (_rleCount > 0)
+        return _rleValue;
+
+    return _it->val;
+}
+
+template <typename T>
+auto Simple8bBuilder<T>::PendingIterator::operator++() -> PendingIterator& {
+    if (_rleCount > 0) {
+        --_rleCount;
+        return *this;
+    }
+
+    ++_it;
+    return *this;
+}
+
+template <typename T>
+auto Simple8bBuilder<T>::PendingIterator::operator++(int) -> PendingIterator {
+    auto ret = *this;
+    ++(*this);
+    return ret;
+}
+
+template <typename T>
+bool Simple8bBuilder<T>::PendingIterator::operator==(
+    const Simple8bBuilder<T>::PendingIterator& rhs) const {
+    return _it == rhs._it && _rleCount == rhs._rleCount;
+}
+
+template <typename T>
+bool Simple8bBuilder<T>::PendingIterator::operator!=(
+    const Simple8bBuilder<T>::PendingIterator& rhs) const {
+    return !operator==(rhs);
+}
 
 template <typename T>
 Simple8bBuilder<T>::Simple8bBuilder(WriteFn writeFunc) : _writeFn(std::move(writeFunc)) {}
@@ -598,16 +647,16 @@ int64_t Simple8bBuilder<T>::_encodeLargestPossibleWord(uint8_t extensionType) {
     uint64_t encodedWord;
     switch (extensionType) {
         case kEightSelectorSmall:
-            encodedWord = _encode(EightSelectorSmallEncodeFunctor<T>(), selector, extensionType);
+            encodedWord = _encode(EightSelectorSmallEncodeFunctor(), selector, extensionType);
             break;
         case kEightSelectorLarge:
-            encodedWord = _encode(EightSelectorLargeEncodeFunctor<T>(), selector, extensionType);
+            encodedWord = _encode(EightSelectorLargeEncodeFunctor(), selector, extensionType);
             break;
         case kSevenSelector:
-            encodedWord = _encode(SevenSelectorEncodeFunctor<T>(), selector, extensionType);
+            encodedWord = _encode(SevenSelectorEncodeFunctor(), selector, extensionType);
             break;
         default:
-            encodedWord = _encode(BaseSelectorEncodeFunctor<T>(), selector, extensionType);
+            encodedWord = _encode(BaseSelectorEncodeFunctor(), selector, extensionType);
     }
 
     _pendingValues.erase(_pendingValues.begin(), _pendingValues.begin() + integersCoded);
@@ -650,6 +699,16 @@ void Simple8bBuilder<T>::_updateSimple8bCurrentState(const PendingValue& val) {
     for (uint8_t i = 0; i < kNumOfSelectorTypes; ++i) {
         _currMaxBitLen[i] = std::max(_currMaxBitLen[i], val.bitCount[i]);
     }
+}
+
+template <typename T>
+typename Simple8bBuilder<T>::PendingIterator Simple8bBuilder<T>::begin() const {
+    return {_pendingValues.begin(), _lastValueInPrevWord.val, _rleCount};
+}
+
+template <typename T>
+typename Simple8bBuilder<T>::PendingIterator Simple8bBuilder<T>::end() const {
+    return PendingIterator{_pendingValues.end(), _lastValueInPrevWord.val, 0};
 }
 
 template <typename T>

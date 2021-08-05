@@ -43,13 +43,10 @@ namespace mongo {
  */
 template <typename T>
 class Simple8bBuilder {
+private:
+    struct PendingValue;
+
 public:
-    // Number of different type of selectors and their extensions available
-    static constexpr uint8_t kNumOfSelectorTypes = 4;
-
-    // The min number of meaningful bits each selector can store
-    static constexpr std::array<uint8_t, 4> kMinDataBits = {1, 2, 4, 4};
-
     // Callback to handle writing of finalized Simple-8b blocks. Machine Endian byte order.
     using WriteFn = std::function<void(uint64_t)>;
     Simple8bBuilder(WriteFn writeFunc);
@@ -75,6 +72,51 @@ public:
      * to use one wiht more slots.
      */
     void flush();
+
+    /**
+     * Iterator for reading pending values in Simple8bBuilder that has not yet been written to
+     * Simple-8b blocks.
+     *
+     * Provides forward iteration
+     */
+    class PendingIterator {
+    public:
+        friend class Simple8bBuilder;
+        // typedefs expected in iterators
+        using iterator_category = std::forward_iterator_tag;
+        using difference_type = ptrdiff_t;
+        using value_type = boost::optional<T>;
+        using pointer = const boost::optional<T>*;
+        using reference = const boost::optional<T>&;
+
+        pointer operator->() const;
+        reference operator*() const;
+
+        PendingIterator& operator++();
+        PendingIterator operator++(int);
+        bool operator==(const PendingIterator& rhs) const;
+        bool operator!=(const PendingIterator& rhs) const;
+
+    private:
+        PendingIterator(typename std::deque<PendingValue>::const_iterator it,
+                        reference rleValue,
+                        uint32_t rleCount);
+
+        typename std::deque<PendingValue>::const_iterator _it;
+
+        const boost::optional<T>& _rleValue;
+        uint32_t _rleCount;
+    };
+
+    /**
+     * Forward iterators to read pending values
+     */
+    PendingIterator begin() const;
+    PendingIterator end() const;
+
+private:
+    // Number of different type of selectors and their extensions available
+    static constexpr uint8_t kNumOfSelectorTypes = 4;
 
     /**
      * This stores a value that has yet to be added to the buffer. It also stores the number of bits
@@ -103,7 +145,22 @@ public:
         std::array<uint8_t, kNumOfSelectorTypes> trailingZerosCount = {0, 0, 0, 0};
     };
 
-private:
+    // The min number of meaningful bits each selector can store
+    static constexpr std::array<uint8_t, 4> kMinDataBits = {1, 2, 4, 4};
+    /**
+     * Function objects to encode Simple8b blocks for the different extension types.
+     *
+     * See .cpp file for more information.
+     */
+    struct BaseSelectorEncodeFunctor;
+    struct SevenSelectorEncodeFunctor;
+
+    template <uint8_t ExtensionType>
+    struct EightSelectorEncodeFunctor;
+
+    struct EightSelectorSmallEncodeFunctor;
+    struct EightSelectorLargeEncodeFunctor;
+
     /**
      * Appends a value to the Simple8b chain of words.
      * Return true if successfully appended and false otherwise.
@@ -216,7 +273,7 @@ public:
         friend class Simple8b;
 
         // typedefs expected in iterators
-        using iterator_category = std::forward_iterator_tag;
+        using iterator_category = std::input_iterator_tag;
         using difference_type = ptrdiff_t;
         using value_type = boost::optional<T>;
         using pointer = const boost::optional<T>*;
