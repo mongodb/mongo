@@ -413,12 +413,7 @@ ExecutorFuture<void> markExternalKeysAsGarbageCollectable(
            })
         .until([token](Status status) { return shouldStopUpdatingExternalKeys(status, token); })
         .withBackoffBetweenIterations(kExponentialBackoff)
-        // Due to the issue in SERVER-54735, using AsyncTry with a scoped executor can lead to a
-        // BrokenPromise error if the executor is shut down. To work around this, schedule the
-        // AsyncTry itself on an executor that won't shut down.
-        //
-        // TODO SERVER-54735: Stop using the parent executor here.
-        .on(parentExecutor, CancellationToken::uncancelable());
+        .on(**executor, CancellationToken::uncancelable());
 }
 
 BSONObj redactStateDoc(BSONObj stateDoc) {

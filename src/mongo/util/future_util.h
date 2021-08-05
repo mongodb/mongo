@@ -76,6 +76,49 @@ auto makeExecutorFutureWith(ExecutorPtr executor, Callable&& callable) {
 }
 
 /**
+ * Wraps a `Promise` and allows replacing the default `BrokenPromise` error with a custom status.
+ *
+ * Consider the following before using or making changes to this class:
+ * * This type is marked non-movable for simplicity, but that can be done using `std::unique_ptr`.
+ * * This is wrapping and not extending `Promise` to avoid any (performance) impact on `Promise`.
+ * * There is no requirement for `_broken` to be thread-safe when this type is used appropriately.
+ */
+template <class T>
+class PromiseWithCustomBrokenStatus {
+public:
+    PromiseWithCustomBrokenStatus() = delete;
+    PromiseWithCustomBrokenStatus(PromiseWithCustomBrokenStatus&&) = delete;
+    PromiseWithCustomBrokenStatus(const PromiseWithCustomBrokenStatus&) = delete;
+
+    PromiseWithCustomBrokenStatus(Promise<T> promise, Status status)
+        : _promise(std::move(promise)), _status(std::move(status)) {
+        invariant(!_status.isOK());
+    }
+
+    ~PromiseWithCustomBrokenStatus() {
+        if (_broken) {
+            _promise.setError(_status);
+        }
+    }
+
+    template <class ResultType>
+    void setFrom(ResultType value) {
+        _broken = false;
+        _promise.setFrom(std::move(value));
+    }
+
+    void setError(Status status) {
+        _broken = false;
+        _promise.setError(std::move(status));
+    }
+
+private:
+    bool _broken = true;
+    Promise<T> _promise;
+    const Status _status;
+};
+
+/**
  * Represents an intermediate state which holds the body, condition, and delay between iterations of
  * a try-until loop.  See comments for AsyncTry for usage.
  *
@@ -136,9 +179,12 @@ private:
                 return ExecutorFuture<ReturnType>(executor, asyncTryCanceledStatus());
 
             auto [promise, future] = makePromiseFuture<ReturnType>();
+            auto wrappedPromise = std::make_unique<PromiseWithCustomBrokenStatus<ReturnType>>(
+                std::move(promise),
+                Status(ErrorCodes::ShutdownInProgress, "Terminated loop due to executor shutdown"));
 
             // Kick off the asynchronous loop.
-            runImpl(std::move(promise));
+            runImpl(std::move(wrappedPromise));
 
             return std::move(future).thenRunOn(executor);
         }
@@ -150,13 +196,13 @@ private:
          * reschedule another iteration of the loop.
          */
         template <typename ReturnType>
-        void runImpl(Promise<ReturnType> resultPromise) {
+        void runImpl(std::unique_ptr<PromiseWithCustomBrokenStatus<ReturnType>> resultPromise) {
             executor->schedule([this,
                                 self = this->shared_from_this(),
                                 resultPromise =
                                     std::move(resultPromise)](Status scheduleStatus) mutable {
                 if (!scheduleStatus.isOK()) {
-                    resultPromise.setError(std::move(scheduleStatus));
+                    resultPromise->setError(std::move(scheduleStatus));
                     return;
                 }
 
@@ -168,7 +214,7 @@ private:
                     .getAsync([this, self, resultPromise = std::move(resultPromise)](
                                   StatusOrStatusWith<ReturnType>&& swResult) mutable {
                         if (cancelToken.isCanceled()) {
-                            resultPromise.setError(asyncTryCanceledStatus());
+                            resultPromise->setError(asyncTryCanceledStatus());
                             return;
                         }
 
@@ -180,9 +226,9 @@ private:
                             }
                         }();
                         if (MONGO_unlikely(!swShouldStop.isOK())) {
-                            resultPromise.setError(swShouldStop.getStatus());
+                            resultPromise->setError(swShouldStop.getStatus());
                         } else if (swShouldStop.getValue()) {
-                            resultPromise.setFrom(std::move(swResult));
+                            resultPromise->setFrom(std::move(swResult));
                         } else {
                             // Retry after a delay.
                             executor->sleepFor(delay.getNext(), cancelToken)
@@ -193,7 +239,7 @@ private:
                                     if (s.isOK()) {
                                         runImpl(std::move(resultPromise));
                                     } else {
-                                        resultPromise.setError(std::move(s));
+                                        resultPromise->setError(std::move(s));
                                     }
                                 });
                         }
@@ -314,9 +360,12 @@ private:
                 return ExecutorFuture<ReturnType>(executor, asyncTryCanceledStatus());
 
             auto [promise, future] = makePromiseFuture<ReturnType>();
+            auto wrappedPromise = std::make_unique<PromiseWithCustomBrokenStatus<ReturnType>>(
+                std::move(promise),
+                Status(ErrorCodes::ShutdownInProgress, "Terminated loop due to executor shutdown"));
 
             // Kick off the asynchronous loop.
-            runImpl(std::move(promise));
+            runImpl(std::move(wrappedPromise));
 
             return std::move(future).thenRunOn(executor);
         }
@@ -327,12 +376,12 @@ private:
          * reschedule another iteration of the loop.
          */
         template <typename ReturnType>
-        void runImpl(Promise<ReturnType> resultPromise) {
+        void runImpl(std::unique_ptr<PromiseWithCustomBrokenStatus<ReturnType>> resultPromise) {
             executor->schedule(
                 [this, self = this->shared_from_this(), resultPromise = std::move(resultPromise)](
                     Status scheduleStatus) mutable {
                     if (!scheduleStatus.isOK()) {
-                        resultPromise.setError(std::move(scheduleStatus));
+                        resultPromise->setError(std::move(scheduleStatus));
                         return;
                     }
 
@@ -343,7 +392,7 @@ private:
                         .getAsync([this, self, resultPromise = std::move(resultPromise)](
                                       StatusOrStatusWith<ReturnType>&& swResult) mutable {
                             if (cancelToken.isCanceled()) {
-                                resultPromise.setError(asyncTryCanceledStatus());
+                                resultPromise->setError(asyncTryCanceledStatus());
                                 return;
                             }
 
@@ -355,9 +404,9 @@ private:
                                 }
                             }();
                             if (MONGO_unlikely(!swShouldStop.isOK())) {
-                                resultPromise.setError(swShouldStop.getStatus());
+                                resultPromise->setError(swShouldStop.getStatus());
                             } else if (swShouldStop.getValue()) {
-                                resultPromise.setFrom(std::move(swResult));
+                                resultPromise->setFrom(std::move(swResult));
                             } else {
                                 runImpl(std::move(resultPromise));
                             }
