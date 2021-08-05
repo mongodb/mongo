@@ -435,15 +435,15 @@ functions:
   "upload artifact":
     - command: archive.targz_pack
       params:
-        target: "wiredtiger.tgz"
-        source_dir: "wiredtiger"
+        target: ${upload_filename|wiredtiger.tgz}
+        source_dir: ${upload_source_dir|wiredtiger}
         include:
           - "./**"
     - command: s3.put
       params:
         aws_secret: ${aws_secret}
         aws_key: ${aws_key}
-        local_file: wiredtiger.tgz
+        local_file: ${upload_filename|wiredtiger.tgz}
         bucket: build_external
         permissions: public-read
         content_type: application/tar
@@ -2830,6 +2830,8 @@ buildvariants:
       --enable-strict --enable-static --prefix=$(pwd)/LOCAL_INSTALL
     test_env_vars:
       PATH=/opt/mongodbtoolchain/v3/bin:$PATH
+    upload_source_dir: mongo-tests/largescale/many-collection/dbpath/diagnostic.data
+    upload_filename: diagnostic.data.tgz
   tasks:
     - name: many-dhandle-stress-test
     - name: many-collection-test
