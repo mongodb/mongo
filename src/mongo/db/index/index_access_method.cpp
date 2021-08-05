@@ -487,7 +487,9 @@ public:
     Status insert(OperationContext* opCtx,
                   const BSONObj& obj,
                   const RecordId& loc,
-                  const InsertDeleteOptions& options) final;
+                  const InsertDeleteOptions& options,
+                  const std::function<void()>& saveCursorBeforeWrite,
+                  const std::function<void()>& restoreCursorAfterWrite) final;
 
     const MultikeyPaths& getMultikeyPaths() const final;
 
@@ -557,10 +559,13 @@ AbstractIndexAccessMethod::BulkBuilderImpl::BulkBuilderImpl(const IndexCatalogEn
       _isMultiKey(stateInfo.getIsMultikey()),
       _indexMultikeyPaths(createMultikeyPaths(stateInfo.getMultikeyPaths())) {}
 
-Status AbstractIndexAccessMethod::BulkBuilderImpl::insert(OperationContext* opCtx,
-                                                          const BSONObj& obj,
-                                                          const RecordId& loc,
-                                                          const InsertDeleteOptions& options) {
+Status AbstractIndexAccessMethod::BulkBuilderImpl::insert(
+    OperationContext* opCtx,
+    const BSONObj& obj,
+    const RecordId& loc,
+    const InsertDeleteOptions& options,
+    const std::function<void()>& saveCursorBeforeWrite,
+    const std::function<void()>& restoreCursorAfterWrite) {
     auto& executionCtx = StorageExecutionContext::get(opCtx);
 
     auto keys = executionCtx.keys();
@@ -588,7 +593,12 @@ Status AbstractIndexAccessMethod::BulkBuilderImpl::insert(OperationContext* opCt
                                 "error"_attr = status,
                                 "loc"_attr = loc,
                                 "obj"_attr = redact(obj));
+
+                    // Save and restore the cursor around the write in case it throws a WCE
+                    // internally and causes the cursor to be unpositioned.
+                    saveCursorBeforeWrite();
                     interceptor->getSkippedRecordTracker()->record(opCtx, loc);
+                    restoreCursorAfterWrite();
                 }
             });
     } catch (...) {
