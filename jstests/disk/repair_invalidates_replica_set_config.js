@@ -9,7 +9,7 @@
 
 load('jstests/disk/libs/wt_file_helper.js');
 
-// TODO (SERVER-49862): Re-enable fast count validation if possible.
+// This test triggers an unclean shutdown (an fassert), which may cause inaccurate fast counts.
 TestData.skipEnforceFastCountOnValidate = true;
 
 const dbName = "repair_invalidates_replica_set_config";
