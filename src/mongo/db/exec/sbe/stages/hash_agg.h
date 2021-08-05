@@ -34,6 +34,7 @@
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/stdx/unordered_map.h"
 
 namespace mongo {
@@ -102,6 +103,13 @@ private:
     // When this operator does not expect to be reopened (almost always) then it can close the child
     // early.
     const bool _optimizedClose{true};
+    // Memory tracking variables.
+    const long long _approxMemoryUseInBytesBeforeSpill =
+        internalQuerySBEAggApproxMemoryUseInBytesBeforeSpill.load();
+    const int _memoryUseSampleRate = internalQuerySBEAggMemoryUseSampleRate.load();
+    // Used in collaboration with memoryUseSampleRatePercentage to determine whether we should
+    // re-approximate memory usage.
+    PseudoRandom _pseudoRandom = PseudoRandom(Date_t::now().asInt64());
 
     value::SlotAccessorMap _outAccessors;
     std::vector<value::SlotAccessor*> _inKeyAccessors;

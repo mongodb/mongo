@@ -37,10 +37,115 @@
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
 #include "mongo/db/exec/sbe/stages/hash_agg.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo::sbe {
 
-using HashAggStageTest = PlanStageTestFixture;
+class HashAggStageTest : public PlanStageTestFixture {
+public:
+    void performHashAggWithSpillChecking(
+        BSONArray inputArr,
+        BSONArray expectedOutputArray,
+        bool shouldSpill = false,
+        std::unique_ptr<mongo::CollatorInterfaceMock> optionalCollator = nullptr);
+};
+
+void HashAggStageTest::performHashAggWithSpillChecking(
+    BSONArray inputArr,
+    BSONArray expectedOutputArray,
+    bool shouldSpill,
+    std::unique_ptr<mongo::CollatorInterfaceMock> optionalCollator) {
+    using namespace std::literals;
+
+    auto [inputTag, inputVal] = stage_builder::makeValue(inputArr);
+    value::ValueGuard inputGuard{inputTag, inputVal};
+
+    auto [expectedTag, expectedVal] = stage_builder::makeValue(expectedOutputArray);
+    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+
+    auto collatorSlot = generateSlotId();
+    auto shouldUseCollator = optionalCollator.get() != nullptr;
+
+    auto makeStageFn = [this, collatorSlot, shouldUseCollator](
+                           value::SlotId scanSlot, std::unique_ptr<PlanStage> scanStage) {
+        auto countsSlot = generateSlotId();
+
+        auto hashAggStage = makeS<HashAggStage>(
+            std::move(scanStage),
+            makeSV(scanSlot),
+            makeEM(countsSlot,
+                   stage_builder::makeFunction("sum",
+                                               makeE<EConstant>(value::TypeTags::NumberInt64,
+                                                                value::bitcastFrom<int64_t>(1)))),
+            makeSV(),
+            true,
+            boost::optional<value::SlotId>{shouldUseCollator, collatorSlot},
+            kEmptyPlanNodeId);
+
+        return std::make_pair(countsSlot, std::move(hashAggStage));
+    };
+
+    auto ctx = makeCompileCtx();
+
+    value::OwnedValueAccessor collatorAccessor;
+    if (shouldUseCollator) {
+        ctx->pushCorrelated(collatorSlot, &collatorAccessor);
+        collatorAccessor.reset(value::TypeTags::collator,
+                               value::bitcastFrom<CollatorInterface*>(optionalCollator.get()));
+    }
+
+    // Generate a mock scan from 'input' with a single output slot.
+    inputGuard.reset();
+    auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal);
+
+    // Prepare the tree and get the 'SlotAccessor' for the output slot.
+    if (shouldSpill) {
+        auto hashAggStage = makeStageFn(scanSlot, std::move(scanStage));
+        // 'prepareTree()' also opens the tree after preparing it thus the spilling error should
+        // occur in 'prepareTree()'.
+        ASSERT_THROWS_CODE(prepareTree(ctx.get(), hashAggStage.second.get(), hashAggStage.first),
+                           DBException,
+                           5859000);
+        return;
+    }
+
+    auto [outputSlot, stage] = makeStageFn(scanSlot, std::move(scanStage));
+    auto resultAccessor = prepareTree(ctx.get(), stage.get(), outputSlot);
+
+    // Get all the results produced.
+    auto [resultsTag, resultsVal] = getAllResults(stage.get(), resultAccessor);
+    value::ValueGuard resultsGuard{resultsTag, resultsVal};
+
+    // Sort results for stable compare, since the counts could come out in any order.
+    using ValuePair = std::pair<value::TypeTags, value::Value>;
+    std::vector<ValuePair> resultsContents;
+    auto resultsView = value::getArrayView(resultsVal);
+    for (size_t i = 0; i < resultsView->size(); i++) {
+        resultsContents.push_back(resultsView->getAt(i));
+    }
+
+    // Sort 'resultContents' in descending order.
+    std::sort(resultsContents.begin(),
+              resultsContents.end(),
+              [](const ValuePair& lhs, const ValuePair& rhs) -> bool {
+                  auto [lhsTag, lhsVal] = lhs;
+                  auto [rhsTag, rhsVal] = rhs;
+                  auto [compareTag, compareVal] =
+                      value::compareValue(lhsTag, lhsVal, rhsTag, rhsVal);
+                  ASSERT_EQ(compareTag, value::TypeTags::NumberInt32);
+                  return value::bitcastTo<int32_t>(compareVal) > 0;
+              });
+
+    auto [sortedResultsTag, sortedResultsVal] = value::makeNewArray();
+    value::ValueGuard sortedResultsGuard{sortedResultsTag, sortedResultsVal};
+    auto sortedResultsView = value::getArrayView(sortedResultsVal);
+    for (auto [tag, val] : resultsContents) {
+        auto [tagCopy, valCopy] = copyValue(tag, val);
+        sortedResultsView->push_back(tagCopy, valCopy);
+    }
+
+    assertValuesEqual(sortedResultsTag, sortedResultsVal, expectedTag, expectedVal);
+};
 
 TEST_F(HashAggStageTest, HashAggMinMaxTest) {
     using namespace std::literals;
@@ -189,103 +294,23 @@ TEST_F(HashAggStageTest, HashAggAddToSetTest) {
 }
 
 TEST_F(HashAggStageTest, HashAggCollationTest) {
-    using namespace std::literals;
-    for (auto useCollator : {false, true}) {
+    auto inputArr = BSON_ARRAY("A"
+                               << "a"
+                               << "b"
+                               << "c"
+                               << "B"
+                               << "a");
 
-        BSONArrayBuilder bab1;
-        bab1.append("A").append("a").append("b").append("c").append("B").append("a");
-        auto [inputTag, inputVal] = stage_builder::makeValue(bab1.arr());
-        value::ValueGuard inputGuard{inputTag, inputVal};
+    // Collator groups the values as: ["A", "a", "a"], ["B", "b"], ["c"].
+    auto collatorExpectedOutputArr = BSON_ARRAY(3 << 2 << 1);
+    auto lowerStringCollator =
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kToLowerString);
+    performHashAggWithSpillChecking(
+        inputArr, collatorExpectedOutputArr, false, std::move(lowerStringCollator));
 
-        BSONArrayBuilder bab2;
-        if (useCollator) {
-            // Collator groups the values as: ["A", "a", "a"], ["B", "b"], ["c"].
-            bab2.append(3).append(2).append(1);
-        } else {
-            // No Collator groups the values as: ["a", "a"], ["A"], ["B"], ["b"], ["c"].
-            bab2.append(2).append(1).append(1).append(1).append(1);
-        }
-        auto [expectedTag, expectedVal] = stage_builder::makeValue(bab2.arr());
-        value::ValueGuard expectedGuard{expectedTag, expectedVal};
-
-        auto collatorSlot = generateSlotId();
-
-        auto makeStageFn = [this, collatorSlot, useCollator](value::SlotId scanSlot,
-                                                             std::unique_ptr<PlanStage> scanStage) {
-            // Build a HashAggStage to make sure HashAgg groups use collator correctly.
-            auto countsSlot = generateSlotId();
-
-            auto hashAggStage =
-                makeS<HashAggStage>(std::move(scanStage),
-                                    makeSV(scanSlot),
-                                    makeEM(countsSlot,
-                                           stage_builder::makeFunction(
-                                               "sum",
-                                               makeE<EConstant>(value::TypeTags::NumberInt64,
-                                                                value::bitcastFrom<int64_t>(1)))),
-                                    makeSV(),
-                                    true,
-                                    boost::optional<value::SlotId>{useCollator, collatorSlot},
-                                    kEmptyPlanNodeId);
-
-            return std::make_pair(countsSlot, std::move(hashAggStage));
-        };
-
-        auto ctx = makeCompileCtx();
-
-        // Setup collator and insert it into the ctx.
-        auto collator = std::make_unique<CollatorInterfaceMock>(
-            CollatorInterfaceMock::MockType::kToLowerString);
-        value::OwnedValueAccessor collatorAccessor;
-        ctx->pushCorrelated(collatorSlot, &collatorAccessor);
-        collatorAccessor.reset(value::TypeTags::collator,
-                               value::bitcastFrom<CollatorInterface*>(collator.get()));
-
-        // Generate a mock scan from `input` with a single output slot.
-        inputGuard.reset();
-        auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal);
-
-        // Call the `makeStage` function to create the HashAggStage, passing in the mock scan
-        // subtree and the subtree's output slot.
-        auto [outputSlot, stage] = makeStageFn(scanSlot, std::move(scanStage));
-
-        // Prepare the tree and get the `SlotAccessor` for the output slot.
-        auto resultAccessor = prepareTree(ctx.get(), stage.get(), outputSlot);
-
-        // Get all the results produced.
-        auto [resultsTag, resultsVal] = getAllResults(stage.get(), resultAccessor);
-        value::ValueGuard resultsGuard{resultsTag, resultsVal};
-
-        // Sort results for stable compare, since the counts could come out in any order
-        using valuePair = std::pair<value::TypeTags, value::Value>;
-        std::vector<valuePair> resultsContents;
-        auto resultsView = value::getArrayView(resultsVal);
-        for (size_t i = 0; i < resultsView->size(); i++) {
-            resultsContents.push_back(resultsView->getAt(i));
-        }
-
-        // Sort 'resultContents' in descending order
-        std::sort(resultsContents.begin(),
-                  resultsContents.end(),
-                  [](const valuePair& lhs, const valuePair& rhs) -> bool {
-                      auto [lhsTag, lhsVal] = lhs;
-                      auto [rhsTag, rhsVal] = rhs;
-                      auto [compareTag, compareVal] =
-                          value::compareValue(lhsTag, lhsVal, rhsTag, rhsVal);
-                      ASSERT_EQ(compareTag, value::TypeTags::NumberInt32);
-                      return value::bitcastTo<int32_t>(compareVal) > 0;
-                  });
-
-        auto [sortedResultsTag, sortedResultsVal] = value::makeNewArray();
-        value::ValueGuard sortedResultsGuard{sortedResultsTag, sortedResultsVal};
-        auto sortedResultsView = value::getArrayView(sortedResultsVal);
-        for (auto [tag, val] : resultsContents) {
-            auto [tagCopy, valCopy] = copyValue(tag, val);
-            sortedResultsView->push_back(tagCopy, valCopy);
-        }
-
-        assertValuesEqual(sortedResultsTag, sortedResultsVal, expectedTag, expectedVal);
-    }
+    // No Collator groups the values as: ["a", "a"], ["A"], ["B"], ["b"], ["c"].
+    auto nonCollatorExpectedOutputArr = BSON_ARRAY(2 << 1 << 1 << 1 << 1);
+    performHashAggWithSpillChecking(inputArr, nonCollatorExpectedOutputArr);
 }
 
 TEST_F(HashAggStageTest, HashAggSeekKeysTest) {
@@ -325,7 +350,7 @@ TEST_F(HashAggStageTest, HashAggSeekKeysTest) {
     // Let's start with '5' as our seek value.
     seekAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int>(5));
 
-    // Prepare the tree and get the `SlotAccessor` for the output slot.
+    // Prepare the tree and get the 'SlotAccessor' for the output slot.
     auto resultAccessor = prepareTree(ctx.get(), stage.get(), outputSlot);
     ctx->popCorrelated();
 
@@ -354,6 +379,45 @@ TEST_F(HashAggStageTest, HashAggSeekKeysTest) {
     ASSERT_TRUE(stage->getNext() == PlanState::IS_EOF);
 
     stage->close();
+}
+
+TEST_F(HashAggStageTest, HashAggMemUsageTest) {
+    // Changing the query knobs to always re-estimate the hash table size in HashAgg and spill when
+    // estimated size is >= 128 * 5.
+    auto defaultInternalQuerySBEAggApproxMemoryUseInBytesBeforeSpill =
+        internalQuerySBEAggApproxMemoryUseInBytesBeforeSpill.load();
+    internalQuerySBEAggApproxMemoryUseInBytesBeforeSpill.store(128 * 5);
+    ON_BLOCK_EXIT([&] {
+        internalQuerySBEAggApproxMemoryUseInBytesBeforeSpill.store(
+            defaultInternalQuerySBEAggApproxMemoryUseInBytesBeforeSpill);
+    });
+    auto defaultInternalQuerySBEAggMemoryUseSampleRate =
+        internalQuerySBEAggMemoryUseSampleRate.load();
+    internalQuerySBEAggMemoryUseSampleRate.store(1.0);
+    ON_BLOCK_EXIT([&] {
+        internalQuerySBEAggMemoryUseSampleRate.store(defaultInternalQuerySBEAggMemoryUseSampleRate);
+    });
+
+    auto createInputArray = [](int numberOfBytesPerEntry) {
+        auto arr = BSON_ARRAY(
+            std::string(numberOfBytesPerEntry, 'A')
+            << std::string(numberOfBytesPerEntry, 'a') << std::string(numberOfBytesPerEntry, 'b')
+            << std::string(numberOfBytesPerEntry, 'c') << std::string(numberOfBytesPerEntry, 'B')
+            << std::string(numberOfBytesPerEntry, 'a'));
+        return arr;
+    };
+
+    auto nonSpillInputArr = createInputArray(64);
+    auto spillInputArr = createInputArray(256);
+
+    // Groups the values as: ["a", "a"], ["A"], ["B"], ["b"], ["c"].
+    auto expectedOutputArr = BSON_ARRAY(2 << 1 << 1 << 1 << 1);
+    // Should NOT spill to disk because internalQuerySlotBasedExecutionHashAggMemoryUsageThreshold
+    // is set to 128 * 5. (64 + padding) * 5 < 128 * 5
+    performHashAggWithSpillChecking(nonSpillInputArr, expectedOutputArr);
+    // Should spill to disk because internalQuerySlotBasedExecutionHashAggMemoryUsageThreshold is
+    // set to 128 * 5. (256 + padding) * 5 > 128 * 5
+    performHashAggWithSpillChecking(spillInputArr, expectedOutputArr, true);
 }
 
 }  // namespace mongo::sbe

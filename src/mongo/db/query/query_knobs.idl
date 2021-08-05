@@ -476,6 +476,30 @@ server_parameters:
         gt: 0
         lte: { expr: BSONObjMaxInternalSize }
 
+  internalQuerySlotBasedExecutionHashAggMemoryUseSampleRate:
+    description: "The percent chance that the size of the hash table in a HashAgg stage is re-estimated
+    when an entry is updated. The estimated size of the hash table is used to determine if we should
+    spill to disk. [see internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill]"
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQuerySBEAggMemoryUseSampleRate"
+    cpp_vartype: AtomicDouble
+    default:
+      expr: 0.5
+    validator:
+        gt: 0.0
+        lte: 1.0
+
+  internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill:
+    description: "The max size in bytes that the hash table in a HashAgg stage can be
+    estimated to be before we spill to disk."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQuerySBEAggApproxMemoryUseInBytesBeforeSpill"
+    cpp_vartype: AtomicWord<long long>
+    default:
+      expr: 1024 * 1024
+    validator:
+        gt: 0
+
   internalQueryEnableSlotBasedExecutionEngine:
     description: "If true, the system will use the SBE execution engine for eligible queries,
     otherwise all queries will execute using the classic execution engine."

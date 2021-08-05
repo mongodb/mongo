@@ -177,6 +177,18 @@ void HashAggStage::open(bool reOpen) {
                 auto [owned, tag, val] = _bytecode.run(_aggCodes[idx].get());
                 _outAggAccessors[idx]->reset(owned, tag, val);
             }
+
+            // Track memory usage.
+            auto shouldCalculateEstimatedSize =
+                _pseudoRandom.nextCanonicalDouble() < _memoryUseSampleRate;
+            if (shouldCalculateEstimatedSize) {
+                long estimatedSizeForOneRow =
+                    it->first.memUsageForSorter() + it->second.memUsageForSorter();
+                long long estimatedTotalSize = _ht->size() * estimatedSizeForOneRow;
+                uassert(5859000,
+                        "Need to spill to disk",
+                        estimatedTotalSize < _approxMemoryUseInBytesBeforeSpill);
+            }
         }
 
         if (_optimizedClose) {
