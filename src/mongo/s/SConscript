@@ -149,6 +149,7 @@ env.Library(
         'database_version.cpp',
         'database_version.idl',
         'internal_transactions_feature_flag.idl',
+        'load_balancer_feature_flag.idl',
         'mongod_and_mongos_server_parameters.idl',
         'request_types/abort_reshard_collection.idl',
         'request_types/add_shard_request_type.cpp',
