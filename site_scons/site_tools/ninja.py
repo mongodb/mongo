@@ -266,6 +266,7 @@ class SConsToNinjaTranslator:
             return None
 
         build = {}
+        env = node.env if node.env else self.env
 
         # Ideally this should never happen, and we do try to filter
         # Ninja builders out of being sources of ninja builders but I
@@ -277,17 +278,22 @@ class SConsToNinjaTranslator:
             build = self.handle_func_action(node, action)
         elif isinstance(action, SCons.Action.LazyAction):
             # pylint: disable=protected-access
-            action = action._generate_cache(node.env if node.env else self.env)
+            action = action._generate_cache(env)
             build = self.action_to_ninja_build(node, action=action)
         elif isinstance(action, SCons.Action.ListAction):
             build = self.handle_list_action(node, action)
         elif isinstance(action, COMMAND_TYPES):
-            build = get_command(node.env if node.env else self.env, node, action)
+            build = get_command(env, node, action)
         else:
             raise Exception("Got an unbuildable ListAction for: {}".format(str(node)))
 
         if build is not None:
             build["order_only"] = get_order_only(node)
+
+        if 'conftest' not in str(node):
+            node_callback = getattr(node.attributes, "ninja_build_callback", None)
+            if callable(node_callback):
+                node_callback(env, node, build)
 
         return build
 
@@ -1088,9 +1094,18 @@ def get_command(env, node, action):  # pylint: disable=too-many-branches
             implicit.append(provider_dep)
             continue
 
+        # in some case the tool could be in the local directory and be suppled without the ext
+        # such as in windows, so append the executable suffix and check.
+        prog_suffix = sub_env.get('PROGSUFFIX', '')
+        provider_dep_ext = provider_dep if provider_dep.endswith(prog_suffix) else provider_dep + prog_suffix
+        if os.path.exists(provider_dep_ext):
+            implicit.append(provider_dep_ext)
+            continue
+
         # Many commands will assume the binary is in the path, so
         # we accept this as a possible input from a given command.
-        provider_dep_abspath = sub_env.WhereIs(provider_dep)
+
+        provider_dep_abspath = sub_env.WhereIs(provider_dep) or sub_env.WhereIs(provider_dep, path=os.environ["PATH"])
         if provider_dep_abspath:
             implicit.append(provider_dep_abspath)
             continue
@@ -1167,7 +1182,7 @@ def register_custom_rule_mapping(env, pre_subst_string, rule):
     __NINJA_RULE_MAPPING[pre_subst_string] = rule
 
 
-def register_custom_rule(env, rule, command, description="", deps=None, pool=None, use_depfile=False):
+def register_custom_rule(env, rule, command, description="", deps=None, pool=None, use_depfile=False, use_response_file=False, response_file_content="$rspc"):
     """Allows specification of Ninja rules from inside SCons files."""
     rule_obj = {
         "command": command,
@@ -1183,6 +1198,10 @@ def register_custom_rule(env, rule, command, description="", deps=None, pool=Non
     if pool is not None:
         rule_obj["pool"] = pool
 
+    if use_response_file:
+        rule_obj["rspfile"] = "$out.rsp"
+        rule_obj["rspfile_content"] = response_file_content
+
     env[NINJA_RULES][rule] = rule_obj
 
 
@@ -1190,6 +1209,9 @@ def register_custom_pool(env, pool, size):
     """Allows the creation of custom Ninja pools"""
     env[NINJA_POOLS][pool] = size
 
+def set_build_node_callback(env, node, callback):
+    if 'conftest' not in str(node):
+        setattr(node.attributes, "ninja_build_callback", callback)
 
 def ninja_csig(original):
     """Return a dummy csig"""
@@ -1371,7 +1393,9 @@ def generate(env):
     # Provide a way for custom rule authors to easily access command
     # generation.
     env.AddMethod(get_generic_shell_command, "NinjaGetGenericShellCommand")
+    env.AddMethod(get_command, "NinjaGetCommand")
     env.AddMethod(gen_get_response_file_command, "NinjaGenResponseFileProvider")
+    env.AddMethod(set_build_node_callback, "NinjaSetBuildNodeCallback")
 
     # Provides a way for users to handle custom FunctionActions they
     # want to translate to Ninja.
