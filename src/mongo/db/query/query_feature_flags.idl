@@ -51,6 +51,11 @@ feature_flags:
       cpp_varname: gFeatureFlagShardedTimeSeries
       default: false
 
+    featureFlagShardedTimeSeriesUpdateDelete:
+      description: "Feature flag for allowing update and delete operations on a sharded Time Series collection"
+      cpp_varname: gFeatureFlagShardedTimeSeriesUpdateDelete
+      default: false
+
     featureFlagSBEGroupAndLookup:
       description: "Feature flag for allowing SBE $group and $lookup"
       cpp_varname: gFeatureFlagSBEGroupAndLookup
