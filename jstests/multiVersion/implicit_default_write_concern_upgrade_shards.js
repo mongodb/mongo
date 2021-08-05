@@ -50,18 +50,19 @@ function testSharding(CWWCSet, isPSASet) {
     jsTestLog("Attempting to upgrade sharded cluster.");
     if (!CWWCSet && isPSASet) {
         // Fassert should be raised.
-        assert.soon(
-            function() {
-                try {
-                    st.upgradeCluster("latest");
-                    return false;
-                } catch (ex) {
-                    return rawMongoProgramOutput().search(/Fatal assertion.*5684400/) >= 0;
-                }
-            },
-            "Node should have fasserted when upgrading to 5.0 when implicitDefaultWC = 1 and no" +
-                "CWWC is set.",
-            ReplSetTest.kDefaultTimeoutMS);
+        assert(function() {
+            try {
+                st.upgradeCluster("latest");
+                return false;
+            } catch (ex) {
+                assert.soon(
+                    () => rawMongoProgramOutput().search(/Fatal assertion.*5684400/) >= 0,
+                    "Node should have fasserted when upgrading to 5.0 when implicitDefaultWC = 1 and no" +
+                        "CWWC is set.",
+                    ReplSetTest.kDefaultTimeoutMS);
+                return true;
+            }
+        });
 
         st.stop({skipValidatingExitCode: true, skipValidation: true});
         return;
