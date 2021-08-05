@@ -9,7 +9,7 @@
 load('jstests/libs/analyze_plan.js');              // For getPlanStage().
 load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
 
-const coll = assertDropAndRecreateCollection(db, "plan_cache_replanning");
+let coll = assertDropAndRecreateCollection(db, "plan_cache_replanning");
 
 function getPlansForCacheEntry(match) {
     const matchingCacheEntries = coll.getPlanCache().list([{$match: match}]);
@@ -123,4 +123,107 @@ assert.eq(planHasIxScanStageForKey(getCachedPlan(entry.cachedPlan), {b: 1}), tru
 
 // The works value should have doubled.
 assert.eq(entry.works, entryWorks * 2);
+
+// Drop and recreate the collection. Now we test that the query system does not replan in cases
+// where the plan is performing only slightly less efficiently than the cached plan.
+coll = assertDropAndRecreateCollection(db, "plan_cache_replanning");
+
+{
+    assert.commandWorked(coll.createIndex({selectiveKey: 1, tiebreak: 1}));
+    assert.commandWorked(coll.createIndex({notSelectiveKey: 1, tiebreak: 1}));
+
+    // These are the possible values used for the 'tiebreak' field. The 'tiebreak' field is included
+    // to guarantee that certain documents are inspected before others to ensure that the plan
+    // may see documents which don't match the filter and "waste" work reading these documents.
+    const kTieBreakLow = 0;
+    const kTieBreakHigh = 1;
+
+    // Special value of 'selectiveKey' for which the plan using {selectiveKey:1, tiebreak:1} is
+    // *slightly* less efficient, but still far better than the plan using {nonSelectiveKey:1,
+    // tiebreak:1}.
+    const kSpecialSelectiveKey = 2;
+
+    // The query using 'filterOnSelectiveKey' should require slightly fewer reads than
+    // 'filterOnSelectiveKeySpecialValue'. We will check that running
+    // 'filterOnSelectiveKeySpecialValue' when there is a cache entry generated from
+    // 'filterOnSelectiveKey' does *not* cause replanning.
+    const filterOnSelectiveKey = {notSelectiveKey: {$lt: 50}, selectiveKey: 3};
+    const filterOnSelectiveKeySpecialValue = {
+        notSelectiveKey: {$lt: 50},
+        selectiveKey: kSpecialSelectiveKey
+    };
+
+    // Insert 110 documents for each value of selectiveKey from 1-10. We use the number 110 docs
+    // because it is greater than the because it is greater than the predefined doc limit of 101
+    // for cached planning and multi-planning.
+    for (let i = 0; i < 10; ++i) {
+        for (let j = 0; j < 110; ++j) {
+            assert.commandWorked(
+                coll.insert({notSelectiveKey: 10, selectiveKey: i, tiebreak: kTieBreakHigh}));
+        }
+    }
+
+    // Now add one extra document so the plan requires a few more reads/works when the value of
+    // 'selectiveKey' is 'kSpecialSelectiveKey'. We use a low value of 'tiebreak' to ensure that
+    // this special, non-matching document is inspected before the documents which do match the
+    // filter.
+    assert.commandWorked(coll.insert(
+        {notSelectiveKey: 55, selectiveKey: kSpecialSelectiveKey, tiebreak: kTieBreakLow}));
+
+    // Now we run a query using the special value of 'selectiveKey' until the plan gets cached. We
+    // run it twice to make the cache entry active.
+    for (let i = 0; i < 2; ++i) {
+        assert.eq(110, coll.find(filterOnSelectiveKeySpecialValue).itcount());
+    }
+
+    // Now look at the cache entry and store the values for works, keysExamined.
+    entry = getPlansForCacheEntry({"createdFromQuery.query": filterOnSelectiveKeySpecialValue});
+    const specialValueCacheEntryWorks = entry.works;
+    const specialValueCacheEntryKeysExamined = entry.creationExecStats[0].totalKeysExamined;
+
+    assert.eq(entry.isActive, true, entry);
+    assert.eq(
+        planHasIxScanStageForKey(getCachedPlan(entry.cachedPlan), {selectiveKey: 1, tiebreak: 1}),
+        true,
+        entry);
+
+    // Clear the plan cache for the collection.
+    coll.getPlanCache().clear();
+
+    // Now run the query on the non-special value of 'selectiveKey' until it gets cached.
+    for (let i = 0; i < 2; ++i) {
+        assert.eq(110, coll.find(filterOnSelectiveKey).itcount());
+    }
+
+    entry = getPlansForCacheEntry({"createdFromQuery.query": filterOnSelectiveKey});
+    assert.eq(entry.isActive, true, entry);
+    assert.eq(
+        planHasIxScanStageForKey(getCachedPlan(entry.cachedPlan), {selectiveKey: 1, tiebreak: 1}),
+        true,
+        entry);
+
+    // The new cache entry's plan should have used fewer works (and examined fewer keys) compared
+    // to the old cache entry's, since the query on the special value is slightly less efficient.
+    assert.lt(entry.works, specialValueCacheEntryWorks, entry);
+    assert.lt(
+        entry.creationExecStats[0].totalKeysExamined, specialValueCacheEntryKeysExamined, entry);
+
+    // Now run the query on the "special" value again and check that replanning does not happen
+    // even though the plan is slightly less efficient than the one in the cache.
+    assert.eq(110, coll.find(filterOnSelectiveKeySpecialValue).itcount());
+
+    // Check that the cache entry hasn't changed.
+    const entryAfterRunningSpecialQuery =
+        getPlansForCacheEntry({"createdFromQuery.query": filterOnSelectiveKey});
+    assert.eq(entryAfterRunningSpecialQuery.isActive, true);
+    assert.eq(planHasIxScanStageForKey(getCachedPlan(entryAfterRunningSpecialQuery.cachedPlan),
+                                       {selectiveKey: 1, tiebreak: 1}),
+              true,
+              entry);
+
+    assert.eq(entry.works, entryAfterRunningSpecialQuery.works, entryAfterRunningSpecialQuery);
+    assert.eq(entryAfterRunningSpecialQuery.creationExecStats[0].totalKeysExamined,
+              entry.creationExecStats[0].totalKeysExamined,
+              entryAfterRunningSpecialQuery);
+}
 })();

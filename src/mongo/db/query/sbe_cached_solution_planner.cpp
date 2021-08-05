@@ -47,13 +47,13 @@ CandidatePlans CachedSolutionPlanner::plan(
     invariant(solutions.size() == 1);
     invariant(solutions.size() == roots.size());
 
+    const double evictionRatio = internalQueryCacheEvictionRatio;
+    const size_t maxReadsBeforeReplan = evictionRatio * _decisionReads;
     auto candidate = [&]() {
         // In cached solution planning we collect execution stats with an upper bound on reads
         // allowed per trial run computed based on previous decision reads.
-        auto candidates = collectExecutionStats(
-            std::move(solutions),
-            std::move(roots),
-            static_cast<size_t>(internalQueryCacheEvictionRatio * _decisionReads));
+        auto candidates =
+            collectExecutionStats(std::move(solutions), std::move(roots), maxReadsBeforeReplan);
         invariant(candidates.size() == 1);
         return std::move(candidates[0]);
     }();
@@ -73,9 +73,10 @@ CandidatePlans CachedSolutionPlanner::plan(
 
     auto stats{candidate.root->getStats(false /* includeDebugInfo  */)};
     auto numReads{calculateNumberOfReads(stats.get())};
+
     // If the cached plan hit EOF quickly enough, or still as efficient as before, then no need to
     // replan. Finalize the cached plan and return it.
-    if (stats->common.isEOF || numReads <= _decisionReads) {
+    if (stats->common.isEOF || numReads <= maxReadsBeforeReplan) {
         return {makeVector(finalizeExecutionPlan(std::move(stats), std::move(candidate))), 0};
     }
 
@@ -86,7 +87,7 @@ CandidatePlans CachedSolutionPlanner::plan(
         1,
         "Evicting cache entry for a query and replanning it since the number of required reads "
         "mismatch the number of cached reads",
-        "maxReadsBeforeReplan"_attr = numReads,
+        "maxReadsBeforeReplan"_attr = maxReadsBeforeReplan,
         "decisionReads"_attr = _decisionReads,
         "query"_attr = redact(_cq.toStringShort()),
         "planSummary"_attr = explainer->getPlanSummary());
