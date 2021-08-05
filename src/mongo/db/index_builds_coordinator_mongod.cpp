@@ -189,6 +189,7 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
             uassertStatusOK(tenant_migration_access_blocker::checkIfCanBuildIndex(opCtx, dbName));
 
             stdx::unique_lock<Latch> lk(_throttlingMutex);
+            bool messageLogged = false;
             opCtx->waitForConditionOrInterrupt(_indexBuildFinished, lk, [&] {
                 const int maxActiveBuilds = maxNumActiveUserIndexBuilds.load();
                 if (_numActiveIndexBuilds < maxActiveBuilds) {
@@ -196,14 +197,18 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
                     return true;
                 }
 
-                LOGV2(4715500,
-                      "Too many index builds running simultaneously, waiting until the number of "
-                      "active index builds is below the threshold",
-                      "numActiveIndexBuilds"_attr = _numActiveIndexBuilds,
-                      "maxNumActiveUserIndexBuilds"_attr = maxActiveBuilds,
-                      "indexSpecs"_attr = specs,
-                      "buildUUID"_attr = buildUUID,
-                      "collectionUUID"_attr = collectionUUID);
+                if (!messageLogged) {
+                    LOGV2(
+                        4715500,
+                        "Too many index builds running simultaneously, waiting until the number of "
+                        "active index builds is below the threshold",
+                        "numActiveIndexBuilds"_attr = _numActiveIndexBuilds,
+                        "maxNumActiveUserIndexBuilds"_attr = maxActiveBuilds,
+                        "indexSpecs"_attr = specs,
+                        "buildUUID"_attr = buildUUID,
+                        "collectionUUID"_attr = collectionUUID);
+                    messageLogged = true;
+                }
                 return false;
             });
         } else {
