@@ -2292,13 +2292,6 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
             // interruption (e.g. by shutDown/stepDown or by recipientForgetMigration command).
             Status status = applierStatus.getStatus();
 
-            // TODO (SERVER-54735): Remove this once AsyncTry can no longer set its result with
-            // BrokenPromise error.
-            if (status == ErrorCodes::BrokenPromise) {
-                status = Status{ErrorCodes::InterruptedDueToReplStateChange,
-                                "operation was interrupted"};
-            }
-
             // If we were interrupted during oplog application, replace oplog application
             // status with error state.
             // Network and cancellation errors can be caused due to interrupt() (which shuts

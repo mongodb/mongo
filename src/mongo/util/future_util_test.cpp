@@ -109,6 +109,40 @@ TEST_F(AsyncTryUntilTest, LoopDoesNotExecuteIfExecutorAlreadyShutdown) {
     ASSERT_EQ(i, 0);
 }
 
+TEST_F(AsyncTryUntilTest, LoopDoesNotReturnBrokenPromiseIfExecutorShutdownWhileLoopBodyExecutes) {
+    unittest::Barrier barrierBeforeShutdown(2);
+    unittest::Barrier barrierAfterShutdown(2);
+    auto resultFut = AsyncTry([&] {
+                         barrierBeforeShutdown.countDownAndWait();
+                         barrierAfterShutdown.countDownAndWait();
+                     })
+                         .until([](Status) { return false; })
+                         .on(executor(), CancellationToken::uncancelable());
+    barrierBeforeShutdown.countDownAndWait();
+    executor()->shutdown();
+    barrierAfterShutdown.countDownAndWait();
+
+    ASSERT_THROWS_CODE(resultFut.get(), DBException, ErrorCodes::ShutdownInProgress);
+}
+
+TEST_F(AsyncTryUntilTest,
+       LoopWithDelayDoesNotReturnBrokenPromiseIfExecutorShutdownWhileLoopBodyExecutes) {
+    unittest::Barrier barrierBeforeShutdown(2);
+    unittest::Barrier barrierAfterShutdown(2);
+    auto resultFut = AsyncTry([&] {
+                         barrierBeforeShutdown.countDownAndWait();
+                         barrierAfterShutdown.countDownAndWait();
+                     })
+                         .until([](Status) { return false; })
+                         .withDelayBetweenIterations(Milliseconds(10))
+                         .on(executor(), CancellationToken::uncancelable());
+    barrierBeforeShutdown.countDownAndWait();
+    executor()->shutdown();
+    barrierAfterShutdown.countDownAndWait();
+
+    ASSERT_THROWS_CODE(resultFut.get(), DBException, ErrorCodes::ShutdownInProgress);
+}
+
 TEST_F(AsyncTryUntilTest, LoopWithDelayDoesNotExecuteIfExecutorAlreadyShutdown) {
     executor()->shutdown();
 
