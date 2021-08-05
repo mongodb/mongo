@@ -229,6 +229,14 @@ TimeseriesTest.run((insert) => {
         1,
         {[metaFieldName + '.loc']: '2dsphere'},
         "GEO_NEAR_2DSPHERE");
+    testAggregationUsesIndex(
+        [
+            {$geoNear: {near: [40.4, -70.4], distanceField: "dist", key: metaFieldName + '.loc'}},
+            {$limit: 1}
+        ],
+        1,
+        {[metaFieldName + '.loc']: '2d'},
+        "GEO_NEAR_2D");
 
     /*********************************** Tests array meta values **********************************/
     resetCollections();

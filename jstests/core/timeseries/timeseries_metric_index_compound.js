@@ -39,7 +39,7 @@ TimeseriesTest.run((insert) => {
         {
             _id: 1,
             [timeFieldName]: ISODate(),
-            [metaFieldName]: {tag: "b", r: {s: true}, loc: [3, 3]},
+            [metaFieldName]: {tag: "b", r: {s: true}, loc2: [3, 3]},
             x: 2,
             z: false
         },
@@ -53,7 +53,7 @@ TimeseriesTest.run((insert) => {
         {
             _id: 3,
             [timeFieldName]: ISODate(),
-            [metaFieldName]: {tag: "d", r: "val", loc: [1, 0]},
+            [metaFieldName]: {tag: "d", r: "val", loc2: [1, 0]},
             x: {y: 4},
             z: false
         }
@@ -75,13 +75,13 @@ TimeseriesTest.run((insert) => {
                              "failed to create index: " + tojson(keysForCreate));
     };
 
-    const testHint = function(indexName) {
+    const testHint = function(indexName, count) {
         const coll = db.getCollection(collName);
         const bucketsColl = db.getCollection("system.buckets." + collName);
 
         // Tests hint() using the index name.
-        assert.eq(docs.length, bucketsColl.find().hint(indexName).toArray().length);
-        assert.eq(docs.length, coll.find().hint(indexName).toArray().length);
+        assert.eq(count, bucketsColl.find().hint(indexName).toArray().length);
+        assert.eq(count, coll.find().hint(indexName).toArray().length);
 
         // Tests that hint() cannot be used when the index is hidden.
         assert.commandWorked(coll.hideIndex(indexName));
@@ -92,7 +92,11 @@ TimeseriesTest.run((insert) => {
         assert.commandWorked(coll.unhideIndex(indexName));
     };
 
-    const testIndex = function(viewDefinition, bucketsDefinition) {
+    const testIndex = function(viewDefinition, bucketsDefinition, count) {
+        if (count === undefined) {
+            count = docs.length;
+        }
+
         const coll = db.getCollection(collName);
         const bucketsColl = db.getCollection("system.buckets." + collName);
 
@@ -108,7 +112,7 @@ TimeseriesTest.run((insert) => {
         assert.eq(1, bucketIndexes.length);
         assert.eq(bucketsDefinition, bucketIndexes[0].key);
 
-        testHint(bucketIndexes[0].name);
+        testHint(bucketIndexes[0].name, count);
 
         // Drop index by key pattern.
         assert.commandWorked(coll.dropIndex(viewDefinition));
@@ -120,9 +124,11 @@ TimeseriesTest.run((insert) => {
     testIndex({[`${metaFieldName}.tag`]: 1, [`${metaFieldName}.r`]: 1},
               {"meta.tag": 1, "meta.r": 1});
     testIndex({[`${metaFieldName}.tag`]: 1, [`${metaFieldName}.loc`]: "2dsphere"},
-              {"meta.tag": 1, "meta.loc": "2dsphere"});
+              {"meta.tag": 1, "meta.loc": "2dsphere"},
+              2);
     testIndex({[`${metaFieldName}.loc`]: "2dsphere", [`${metaFieldName}.tag`]: 1},
-              {"meta.loc": "2dsphere", "meta.tag": 1});
+              {"meta.loc": "2dsphere", "meta.tag": 1},
+              2);
 
     // Test measurement-only indexes.
     testIndex({x: 1, z: 1},
@@ -143,13 +149,24 @@ TimeseriesTest.run((insert) => {
               {"control.max.x": 1, "control.min.x": 1, "meta.r.s": 1});
     testIndex({x: -1, [`${metaFieldName}.r.s`]: 1},
               {"control.min.x": -1, "control.max.x": -1, "meta.r.s": 1});
-    testIndex({x: 1, [`${metaFieldName}.loc`]: "2dsphere", z: -1}, {
-        "control.max.x": 1,
-        "control.min.x": 1,
-        "meta.loc": "2dsphere",
-        "control.min.z": -1,
-        "control.max.z": -1
-    });
+    testIndex({x: 1, [`${metaFieldName}.loc`]: "2dsphere", z: -1},
+              {
+                  "control.max.x": 1,
+                  "control.min.x": 1,
+                  "meta.loc": "2dsphere",
+                  "control.min.z": -1,
+                  "control.max.z": -1
+              },
+              2);
+    testIndex({[`${metaFieldName}.loc2`]: "2d", x: 1, z: -1},
+              {
+                  "meta.loc2": "2d",
+                  "control.max.x": 1,
+                  "control.min.x": 1,
+                  "control.min.z": -1,
+                  "control.max.z": -1
+              },
+              2);
 
     // Test bad input.
     const testBadIndex = function(keysForCreate) {

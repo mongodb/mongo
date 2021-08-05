@@ -205,8 +205,32 @@ TimeseriesTest.run((insert) => {
               bucketscoll.find({'meta': {$near: [0, 0]}}).toArray().length,
               "Failed to use index: " + tojson(twoDBucketsIndexSpec));
 
-    // TODO (SERVER-55240): do the above on the timeseriescoll, which doesn't currently work.
-    // "errmsg" : "$geoNear, $near, and $nearSphere are not allowed in this context"
+    assert.eq(1,
+              bucketscoll
+                  .aggregate([
+                      {$geoNear: {near: [40.4, -70.4], distanceField: "dist", spherical: true}},
+                      {$limit: 1}
+                  ])
+                  .toArray()
+                  .length,
+              "Failed to use 2d index: " + tojson(twoDBucketsIndexSpec));
+
+    assert.eq(1,
+              timeseriescoll
+                  .aggregate([
+                      {
+                          $geoNear: {
+                              near: [40.4, -70.4],
+                              key: metaFieldName,
+                              distanceField: "dist",
+                              spherical: true
+                          }
+                      },
+                      {$limit: 1}
+                  ])
+                  .toArray()
+                  .length,
+              "Failed to use 2d index: " + tojson(twoDBucketsIndexSpec));
 
     hideUnhideListIndexes(twoDTimeseriesIndexSpec, twoDBucketsIndexSpec);
 
