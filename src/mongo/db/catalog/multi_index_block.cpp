@@ -596,7 +596,19 @@ void MultiIndexBlock::_doCollectionScan(OperationContext* opCtx,
 
         // The external sorter is not part of the storage engine and therefore does not need
         // a WriteUnitOfWork to write keys.
-        uassertStatusOK(_insert(opCtx, collection, objToIndex, loc));
+        //
+        // However, if a key constraint violation is found, it will be written to the constraint
+        // violations side table. The plan executor must be passed down to save and restore the
+        // cursor around the side table write in case any write conflict exception occurs that would
+        // otherwise reposition the cursor unexpectedly. All WUOW and write conflict exception
+        // handling for the side table write is handled internally.
+        uassertStatusOK(
+            _insert(opCtx,
+                    collection,
+                    objToIndex,
+                    loc,
+                    /*saveCursorBeforeWrite*/ [&exec] { exec->saveState(); },
+                    /*restoreCursorAfterWrite*/ [&] { exec->restoreState(&collection); }));
 
         _failPointHangDuringBuild(opCtx,
                                   &hangIndexBuildDuringCollectionScanPhaseAfterInsertion,
@@ -614,14 +626,18 @@ Status MultiIndexBlock::insertSingleDocumentForInitialSyncOrRecovery(
     OperationContext* opCtx,
     const CollectionPtr& collection,
     const BSONObj& doc,
-    const RecordId& loc) {
-    return _insert(opCtx, collection, doc, loc);
+    const RecordId& loc,
+    const std::function<void()>& saveCursorBeforeWrite,
+    const std::function<void()>& restoreCursorAfterWrite) {
+    return _insert(opCtx, collection, doc, loc, saveCursorBeforeWrite, restoreCursorAfterWrite);
 }
 
 Status MultiIndexBlock::_insert(OperationContext* opCtx,
                                 const CollectionPtr& collection,
                                 const BSONObj& doc,
-                                const RecordId& loc) {
+                                const RecordId& loc,
+                                const std::function<void()>& saveCursorBeforeWrite,
+                                const std::function<void()>& restoreCursorAfterWrite) {
     invariant(!_buildIsCleanedUp);
     for (size_t i = 0; i < _indexes.size(); i++) {
         if (_indexes[i].filterExpression && !_indexes[i].filterExpression->matchesBSON(doc)) {
@@ -633,7 +649,13 @@ Status MultiIndexBlock::_insert(OperationContext* opCtx,
         // When calling insert, BulkBuilderImpl's Sorter performs file I/O that may result in an
         // exception.
         try {
-            idxStatus = _indexes[i].bulk->insert(opCtx, collection, doc, loc, _indexes[i].options);
+            idxStatus = _indexes[i].bulk->insert(opCtx,
+                                                 collection,
+                                                 doc,
+                                                 loc,
+                                                 _indexes[i].options,
+                                                 saveCursorBeforeWrite,
+                                                 restoreCursorAfterWrite);
         } catch (...) {
             return exceptionToStatus();
         }

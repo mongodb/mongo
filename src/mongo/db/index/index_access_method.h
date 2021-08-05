@@ -242,12 +242,22 @@ public:
 
         /**
          * Insert into the BulkBuilder as-if inserting into an IndexAccessMethod.
+         *
+         * 'saveCursorBeforeWrite' and 'restoreCursorAfterWrite' will be used to save and restore
+         * the cursor around any constraint violation side table write that may occur, in case a WCE
+         * occurs internally that would otherwise unposition the cursor.
+         *
+         * Note: we pass the cursor down into this insert function so we can limit cursor
+         * save/restore to around constraints violation side table writes only. Otherwise, we would
+         * have to save/restore around each insert() call just in case there is a side table write.
          */
         virtual Status insert(OperationContext* opCtx,
                               const CollectionPtr& collection,
                               const BSONObj& obj,
                               const RecordId& loc,
-                              const InsertDeleteOptions& options) = 0;
+                              const InsertDeleteOptions& options,
+                              const std::function<void()>& saveCursorBeforeWrite,
+                              const std::function<void()>& restoreCursorAfterWrite) = 0;
 
         virtual const MultikeyPaths& getMultikeyPaths() const = 0;
 

@@ -120,8 +120,13 @@ TEST_F(MultiIndexBlockTest, CommitAfterInsertingSingleDocument) {
         operationContext(), coll, std::vector<BSONObj>(), MultiIndexBlock::kNoopOnInitFn));
     ASSERT_EQUALS(0U, specs.size());
 
-    ASSERT_OK(indexer->insertSingleDocumentForInitialSyncOrRecovery(
-        operationContext(), coll.get(), {}, {}));
+    ASSERT_OK(
+        indexer->insertSingleDocumentForInitialSyncOrRecovery(operationContext(),
+                                                              coll.get(),
+                                                              {},
+                                                              {},
+                                                              /*saveCursorBeforeWrite*/ []() {},
+                                                              /*restoreCursorAfterWrite*/ []() {}));
     ASSERT_OK(indexer->dumpInsertsFromBulk(operationContext(), coll.get()));
     ASSERT_OK(indexer->checkConstraints(operationContext(), coll.get()));
 
@@ -147,8 +152,13 @@ TEST_F(MultiIndexBlockTest, AbortWithoutCleanupAfterInsertingSingleDocument) {
     auto specs = unittest::assertGet(indexer->init(
         operationContext(), coll, std::vector<BSONObj>(), MultiIndexBlock::kNoopOnInitFn));
     ASSERT_EQUALS(0U, specs.size());
-    ASSERT_OK(indexer->insertSingleDocumentForInitialSyncOrRecovery(
-        operationContext(), coll.get(), {}, {}));
+    ASSERT_OK(
+        indexer->insertSingleDocumentForInitialSyncOrRecovery(operationContext(),
+                                                              coll.get(),
+                                                              {},
+                                                              {},
+                                                              /*saveCursorBeforeWrite*/ []() {},
+                                                              /*restoreCursorAfterWrite*/ []() {}));
     auto isResumable = false;
     indexer->abortWithoutCleanup(operationContext(), coll.get(), isResumable);
 }

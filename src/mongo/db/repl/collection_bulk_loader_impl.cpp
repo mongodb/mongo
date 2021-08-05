@@ -378,7 +378,13 @@ Status CollectionBulkLoaderImpl::_addDocumentToIndexBlocks(const BSONObj& doc,
                                                            const RecordId& loc) {
     if (_idIndexBlock) {
         auto status = _idIndexBlock->insertSingleDocumentForInitialSyncOrRecovery(
-            _opCtx.get(), _collection->getCollection(), doc, loc);
+            _opCtx.get(),
+            _collection->getCollection(),
+            doc,
+            loc,
+            // This caller / code path does not have cursors to save/restore.
+            /*saveCursorBeforeWrite*/ []() {},
+            /*restoreCursorAfterWrite*/ []() {});
         if (!status.isOK()) {
             return status.withContext("failed to add document to _id index");
         }
@@ -386,7 +392,13 @@ Status CollectionBulkLoaderImpl::_addDocumentToIndexBlocks(const BSONObj& doc,
 
     if (_secondaryIndexesBlock) {
         auto status = _secondaryIndexesBlock->insertSingleDocumentForInitialSyncOrRecovery(
-            _opCtx.get(), _collection->getCollection(), doc, loc);
+            _opCtx.get(),
+            _collection->getCollection(),
+            doc,
+            loc,
+            // This caller / code path does not have cursors to save/restore.
+            /*saveCursorBeforeWrite*/ []() {},
+            /*restoreCursorAfterWrite*/ []() {});
         if (!status.isOK()) {
             return status.withContext("failed to add document to secondary indexes");
         }

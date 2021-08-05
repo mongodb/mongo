@@ -164,11 +164,20 @@ public:
      * Do not call if you called insertAllDocumentsInCollection();
      *
      * Should be called inside of a WriteUnitOfWork.
+     *
+     * 'saveCursorBeforeWrite' and 'restoreCursorAfterWrite' will only be called if an index
+     * constraint violation is found and written out to the constraint violation side table. Any
+     * open cursors held by the caller should be saved in 'saveCursorBeforeWrite' and restored in
+     * 'saveCursorBeforeWrite'. Otherwise, the cursors may get reset unexpectedly because of an
+     * internally handled WCE.
      */
-    Status insertSingleDocumentForInitialSyncOrRecovery(OperationContext* opCtx,
-                                                        const CollectionPtr& collection,
-                                                        const BSONObj& wholeDocument,
-                                                        const RecordId& loc);
+    Status insertSingleDocumentForInitialSyncOrRecovery(
+        OperationContext* opCtx,
+        const CollectionPtr& collection,
+        const BSONObj& wholeDocument,
+        const RecordId& loc,
+        const std::function<void()>& saveCursorBeforeWrite,
+        const std::function<void()>& restoreCursorAfterWrite);
 
     /**
      * Call this after the last insertSingleDocumentForInitialSyncOrRecovery(). This gives the index
@@ -315,7 +324,9 @@ private:
     Status _insert(OperationContext* opCtx,
                    const CollectionPtr& collection,
                    const BSONObj& wholeDocument,
-                   const RecordId& loc);
+                   const RecordId& loc,
+                   const std::function<void()>& saveCursorBeforeWrite,
+                   const std::function<void()>& restoreCursorAfterWrite);
 
     /**
      * Performs a collection scan on the given collection and inserts the relevant index keys into
