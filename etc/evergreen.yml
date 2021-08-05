@@ -519,15 +519,6 @@ functions:
       bucket: mciuploads
       local_file: src/mongo-binaries.tgz
 
-  "fetch dist debugsymbols": &fetch_dist_debugsymbols
-    command: s3.get
-    params:
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      remote_file: ${project}/${build_variant}/${revision}/dist/mongo-${build_id}-debugsymbols.${ext|tgz}
-      bucket: mciuploads
-      local_file: src/mongo-debugsymbols.tgz
-
   "fetch binaries": &fetch_binaries
     command: s3.get
     params:
@@ -709,15 +700,6 @@ functions:
       permissions: public-read
       content_type: ${content_type|application/gzip}
 
-  "fetch debugsymbols archive": &fetch_debugsymbols_archive
-    command: s3.get
-    params:
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      remote_file: ${mongo_debugsymbols}
-      bucket: mciuploads
-      local_file: src/mongo-debugsymbols.tgz
-
   "use WiredTiger develop":
     - *f_expansions_write
     - command: subprocess.exec
@@ -867,7 +849,6 @@ functions:
   - *kill_processes
   - *cleanup_environment
   - *fetch_binaries
-  - *fetch_debugsymbols_archive
   - *set_up_venv
   - *upload_pip_requirements
   - *extract_binaries
@@ -1140,6 +1121,7 @@ functions:
   - *determine_resmoke_jobs
   - *update_resmoke_jobs_expansions
   - *f_expansions_write
+  - *configure_evergreen_api_credentials
   - command: subprocess.exec
     params:
       binary: bash
@@ -1934,7 +1916,6 @@ tasks:
           install-dist-test
           ${additional_compile_targets|}
         task_compile_flags: >-
-          --separate-debug
           PREFIX=dist-test
 
 - name: determine_patch_tests
@@ -1958,7 +1939,6 @@ tasks:
         targets: >-
           archive-dist-test
         task_compile_flags: >-
-          --separate-debug
           PREFIX=dist-test
 
     - command: s3.put
@@ -2035,6 +2015,11 @@ tasks:
         files:
           - src/artifacts.json
 
+# Dummy task to activate `archive_dist_test_debug` since it can't be activated directly (not a generated task).
+- name: activate_archive_dist_test_debug
+  tags: []
+  depends_on:
+    - name: archive_dist_test_debug
 
 - name: archive_dist_test_debug
   tags: []
@@ -2046,7 +2031,6 @@ tasks:
         targets: >-
           archive-dist-test-debug
         task_compile_flags: >-
-          --separate-debug
           PREFIX=dist-test
 
     - func: "upload debugsymbols"
@@ -2156,8 +2140,6 @@ tasks:
       vars:
         targets: install-all-meta
         compiling_for_test: true
-        task_compile_flags: >-
-          --separate-debug
 
 ## clang_tidy - run clang_tidy
 - name: clang_tidy
@@ -2186,8 +2168,6 @@ tasks:
     - func: "scons compile"
       vars:
         targets: install-unittests install-unittests-debug
-        task_compile_flags: >-
-          --separate-debug
         compiling_for_test: true
 
 ## A copy of the compile_unittests task for the recorded unittest taskgroup ##
@@ -2299,8 +2279,6 @@ tasks:
     - func: "scons compile"
       vars:
         targets: install-dbtest install-dbtest-debug
-        task_compile_flags: >-
-          --separate-debug
         compiling_for_test: true
 
 ## run_dbtest ##
@@ -2327,8 +2305,6 @@ tasks:
     - func: "scons compile"
       vars:
         targets: archive-dbtest archive-dbtest-debug
-        task_compile_flags: >-
-          --separate-debug
         compiling_for_test: true
 
 - name: compile_visibility_test
@@ -2341,7 +2317,6 @@ tasks:
           --ssl
           --dbg=on
           --opt=on
-          --separate-debug
           --link-model=dynamic
           --visibility-support=on
 
@@ -2384,7 +2359,6 @@ tasks:
           --enable-http-client=off
           --js-engine=none
           --opt=size
-          --separate-debug
           --ssl=off
           --use-system-mongo-c=on
           DESTDIR='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION'
@@ -2531,7 +2505,6 @@ tasks:
           --ssl=off
           --enable-http-client=off
           --modules=
-          --separate-debug
           DESTDIR='$BUILD_ROOT/stitch-support-lib-$MONGO_VERSION'
     - *f_expansions_write
     - command: subprocess.exec
@@ -2565,7 +2538,6 @@ tasks:
           --ssl=off
           --enable-http-client=off
           --modules=
-          --separate-debug
           DESTDIR='$BUILD_ROOT/stitch-support-lib-$MONGO_VERSION'
 
 - name: stitch_support_run_tests
@@ -2754,7 +2726,7 @@ tasks:
 - name: test_api_version_compatibility
   tags: []
   depends_on:
-    - name: archive_dist_test_debug
+    - name: archive_dist_test
   commands:
     - command: manifest.load
     - func: "git get project and add git tag"
@@ -3930,7 +3902,7 @@ tasks:
 - name: burn_in_tags_gen
   tags: []
   depends_on:
-    - name: archive_dist_test_debug
+    - name: archive_dist_test
   commands:
   - command: manifest.load
   - func: "git get project and add git tag"
@@ -6041,7 +6013,7 @@ tasks:
 - name: idl_tests
   tags: []
   depends_on:
-  - name: archive_dist_test_debug
+  - name: archive_dist_test
   commands:
   - command: manifest.load
   - func: "git get project and add git tag"
@@ -6153,7 +6125,6 @@ tasks:
           archive-shell-debug
           ${additional_package_targets|}
         task_compile_flags: >-
-          --separate-debug
           --legacy-tarball
     - func: "f_expansions_write"
     - command: subprocess.exec
@@ -6372,7 +6343,6 @@ tasks:
         build_variants: [rhel70, windows]
     - func: "generate compile expansions"
     - func: "apply compile expansions"
-    - func: "fetch dist debugsymbols"
     - func: "set up remote credentials"
       vars:
         aws_key_remote: ${repo_aws_key}
@@ -10919,6 +10889,7 @@ buildvariants:
     hang_analyzer_dump_core: false
     scons_cache_scope: shared
     exec_timeout_secs: 14400 # 3 hour timeout
+    separate_debug: off
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: compile_benchmarks
@@ -10996,6 +10967,7 @@ buildvariants:
     # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
     test_flags: >-
         --runAllFeatureFlagTests
+    separate_debug: off
   tasks:
   - name: compile_and_archive_dist_test_then_package_TG
   - name: compile_benchmarks
@@ -11067,6 +11039,7 @@ buildvariants:
     hang_analyzer_dump_core: false
     scons_cache_scope: shared
     exec_timeout_secs: 14400 # 3 hour timeout
+    separate_debug: off
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: compile_benchmarks
@@ -11130,6 +11103,7 @@ buildvariants:
     hang_analyzer_dump_core: false
     scons_cache_scope: shared
     test_flags: --excludeWithAnyTags=requires_fast_memory,requires_ocsp_stapling
+    separate_debug: off
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: build_variant_gen
@@ -11157,6 +11131,7 @@ buildvariants:
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under UBSAN build.
     scons_cache_scope: shared
+    separate_debug: off
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: compile_benchmarks
@@ -11229,6 +11204,7 @@ buildvariants:
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under UBSAN build.
     scons_cache_scope: shared
+    separate_debug: off
   tasks:
   - name: compile_and_archive_dist_test_then_package_TG
   - name: compile_benchmarks
@@ -11296,6 +11272,7 @@ buildvariants:
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under UBSAN build.
     scons_cache_scope: shared
+    separate_debug: off
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: compile_benchmarks
@@ -11363,6 +11340,7 @@ buildvariants:
     scons_cache_mode: all
     max_sub_suites: 3
     num_scons_link_jobs_available: 0.99
+    separate_debug: off
   tasks:
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:
@@ -11400,6 +11378,7 @@ buildvariants:
     scons_cache_mode: all
     max_sub_suites: 3
     num_scons_link_jobs_available: 0.99
+    separate_debug: off
   tasks:
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:
@@ -11434,6 +11413,7 @@ buildvariants:
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
     hang_analyzer_dump_core: false
     scons_cache_scope: shared
+    separate_debug: off
   display_tasks:
   - *libfuzzertests
   tasks:
@@ -11468,6 +11448,7 @@ buildvariants:
     # Avoid starting too many mongod's under TSAN build.
     resmoke_jobs_factor: 0.3
     scons_cache_scope: shared
+    separate_debug: off
   tasks:
     - name: compile_test_and_package_serial_TG
     - name: jsCore

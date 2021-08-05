@@ -21,12 +21,6 @@ should_shuffle: "true"
 continue_on_failure: "true"
 install_dir: dist-test/bin
 is_patch: "false"
-install_directory: /data/mongo-install-directory
-task_install_action: hardlink
-num_scons_link_jobs_available: "0.25"
-show_scons_timings: "true"
-compiling_for_test: "false"
-scons_cache_mode: nolinked
 is_commit_queue: "false"
 use_scons_cache: "false"
 npm_command: jstestfuzz
@@ -36,3 +30,12 @@ content_type: application/x-gzip
 jstestfuzz_concurrent_num_files: "10"
 curator_release: "latest"
 ext: tgz
+
+# SCons compile expansions.
+compiling_for_test: "false"
+install_directory: /data/mongo-install-directory
+num_scons_link_jobs_available: "0.25"
+scons_cache_mode: nolinked
+show_scons_timings: "true"
+task_install_action: hardlink
+separate_debug: "on"

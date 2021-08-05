@@ -21,19 +21,19 @@ import getpass
 import psutil
 import distro
 
-from buildscripts.resmokelib import config as resmoke_core_config
-
-from buildscripts.resmokelib.hang_analyzer import extractor
+from buildscripts.resmokelib import config as resmoke_config
 from buildscripts.resmokelib.hang_analyzer import dumper
 from buildscripts.resmokelib.hang_analyzer import process
 from buildscripts.resmokelib.hang_analyzer import process_list
+from buildscripts.resmokelib.hang_analyzer.extractor import download_debug_symbols
 from buildscripts.resmokelib.plugin import PluginInterface, Subcommand
+from buildscripts.resmokelib.symbolizer import Symbolizer
 
 
 class HangAnalyzer(Subcommand):
     """Main class for the hang analyzer subcommand."""
 
-    def __init__(self, options, logger=None, **kwargs):  # pylint: disable=unused-argument
+    def __init__(self, options, task_id=None, logger=None, **_kwargs):  # pylint: disable=unused-argument
         """
         Configure processe lists based on options.
 
@@ -54,9 +54,19 @@ class HangAnalyzer(Subcommand):
         self.go_processes = []
         self.process_ids = []
 
+        def configure_task_id():
+            run_tid = resmoke_config.EVERGREEN_TASK_ID
+            hang_analyzer_tid = task_id
+            if run_tid and hang_analyzer_tid and run_tid != hang_analyzer_tid:
+                raise ValueError(
+                    "The Evergreen Task ID (tid) should be either passed in through `resmoke.py run` "
+                    "or through `resmoke.py hang-analyzer` but not both. run tid: %s, hang-analyzer tid: %s"
+                    % (run_tid, hang_analyzer_tid))
+            return run_tid or hang_analyzer_tid
+
+        self.task_id = configure_task_id()
         self._configure_processes()
         self._setup_logging(logger)
-        self.debug_symbols_url = self._configure_debug_symbols_download()
 
     def execute(self):  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
         """
@@ -68,7 +78,6 @@ class HangAnalyzer(Subcommand):
 
         self._log_system_info()
 
-        extractor.extract_debug_symbols(self.root_logger, self.debug_symbols_url)
         dumpers = dumper.get_dumpers(self.root_logger, self.options.debugger_output)
 
         processes = process_list.get_processes(self.process_ids, self.interesting_processes,
@@ -85,6 +94,13 @@ class HangAnalyzer(Subcommand):
         for pinfo in [pinfo for pinfo in processes if not is_python_process(pinfo.name)]:
             for pid in pinfo.pidv:
                 process.pause_process(self.root_logger, pinfo.name, pid)
+
+        # Download symbols after pausing if the task ID is not None and not running with sanitizers.
+        # Sanitizer builds are not stripped and don't require debug symbols.
+        san_options = os.environ.get("san_options", None)
+        if self.task_id is not None and san_options is None:
+            my_symbolizer = Symbolizer(self.task_id, download_symbols_only=True)
+            download_debug_symbols(self.root_logger, my_symbolizer)
 
         # Dump python processes by signalling them. The resmoke.py process will generate
         # the report.json, when signalled, so we do this before attaching to other processes.
@@ -159,17 +175,6 @@ class HangAnalyzer(Subcommand):
             raise RuntimeError(
                 "Exceptions were thrown while dumping. There may still be some valid dumps.")
 
-    def _configure_debug_symbols_download(self):
-        resmoke_constructed_url = resmoke_core_config.DEBUG_SYMBOLS_URL
-        user_configured_url = self.options.debug_symbols_url
-        if resmoke_constructed_url and user_configured_url:
-            raise ValueError("The debug symbols URL has to be either generated, "
-                             "or passed in through the command line, but not both. "
-                             "resmoke_constructed_url: %s, user_configured_url: %s" %
-                             (resmoke_constructed_url, user_configured_url))
-
-        return resmoke_constructed_url or user_configured_url
-
     def _configure_processes(self):
         if self.options.debugger_output is None:
             self.options.debugger_output = ['stdout']
@@ -229,7 +234,7 @@ class HangAnalyzerPlugin(PluginInterface):
     def parse(self, subcommand, parser, parsed_args, **kwargs):
         """Parse command-line options."""
         if subcommand == 'hang-analyzer':
-            return HangAnalyzer(parsed_args, **kwargs)
+            return HangAnalyzer(parsed_args, task_id=parsed_args.task_id, **kwargs)
         return None
 
     def add_subcommand(self, subparsers):
@@ -268,5 +273,5 @@ class HangAnalyzerPlugin(PluginInterface):
         parser.add_argument('-k', '--kill-processes', dest='kill_processes', action="store_true",
                             default=False,
                             help="Kills the analyzed processes after analysis completes.")
-        parser.add_argument('-ds', '--debug-symbols-url', dest='debug_symbols_url', metavar="URL",
-                            type=str, default=None)
+        parser.add_argument("--task-id", '-t', action="store", type=str, default=None,
+                            help="Fetch corresponding symbols given an Evergreen task ID")

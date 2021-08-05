@@ -1,70 +1,52 @@
-"""Extracts `mongo-debugsymbols.tgz`."""
-
+"""Extracts `mongo-debugsymbols.tgz` in an idempotent manner for performance."""
 import glob
 import os
-import platform
-import shutil
 import tarfile
 import time
 
-from buildscripts.resmokelib import config
+from buildscripts.resmokelib.setup_multiversion.download import DownloadError
 from buildscripts.resmokelib.run import compare_start_time
-from buildscripts.resmokelib.setup_multiversion.setup_multiversion import SetupMultiversion
-from buildscripts.resmokelib.utils import is_windows
 from buildscripts.resmokelib.utils.filesystem import build_hygienic_bin_path
 
 _DEBUG_FILE_BASE_NAMES = ['mongo', 'mongod', 'mongos']
 
 
-def extract_debug_symbols(root_logger, download_url=None):
+def download_debug_symbols(root_logger, symbolizer):
     """
     Extract debug symbols. Idempotent.
 
     :param root_logger: logger to use
-    :param download_url: optional url to download the debug symbols. We conditionally download
-                         the symbols for performance reasons.
+    :param symbolizer: pre-configured instance of symbolizer for downloading symbols.
     :return: None
     """
-    sym_files = []
-    try:
-        sym_files = _extract_tar(root_logger)
-        # Try to copy the files without downloading first in case they already exist
-        # pylint: disable=broad-except
-    except Exception:
-        pass
+    retry_secs = 10
 
-    if len(sym_files) < len(_DEBUG_FILE_BASE_NAMES):
-        if download_url is not None:
-            download_debug_symbols(root_logger, download_url)
-        else:
-            root_logger.info("Skipping downloading debug symbols")
+    # Check if the files are already there. They would be on *SAN builds.
+    sym_files = _get_symbol_files()
 
+    if len(sym_files) >= len(_DEBUG_FILE_BASE_NAMES):
+        root_logger.info(
+            "Skipping downloading debug symbols as there are already symbol files present")
+        return
+
+    while True:
         try:
-            _extract_tar(root_logger)
-        # We never want this to cause the whole task to fail.
-        # The rest of the hang analyzer will continue to work without the
-        # symbols it just won't be quite as helpful.
-        # pylint: disable=broad-except
-        except Exception as exception:
-            root_logger.warning('Error extracting debug symbols: %s', exception)
+            symbolizer.execute()
+            break
+        except (tarfile.ReadError, DownloadError):
+            root_logger.info("Debug symbols unavailable after %s secs, retrying in %s secs",
+                             compare_start_time(time.time()), retry_secs)
+        time.sleep(retry_secs)
+
+        ten_min = 10 * 60
+        if compare_start_time(time.time()) > ten_min:
+            root_logger.info(
+                'Debug-symbols archive-file does not exist after %s secs; '
+                'Hang-Analyzer may not complete successfully.', ten_min)
+            break
 
 
-def _extract_tar(root_logger):
-    sym_files = []
-    for (src, dest) in _extracted_files_to_copy():
-        sym_files.append(dest)
-        if os.path.exists(dest):
-            root_logger.debug('Debug symbol %s already exists, not copying from %s.', dest, src)
-            continue
-        if os.path.isdir(src):
-            shutil.copytree(src, dest)
-        else:
-            shutil.copy(src, dest)
-        root_logger.debug('Copied debug symbol %s.', dest)
-    return sym_files
-
-
-def _extracted_files_to_copy():
+def _get_symbol_files():
     out = []
     for ext in ['debug', 'dSYM', 'pdb']:
         for file in _DEBUG_FILE_BASE_NAMES:
@@ -72,28 +54,3 @@ def _extracted_files_to_copy():
             for needle in glob.glob(haystack):
                 out.append((needle, os.path.join(os.getcwd(), os.path.basename(needle))))
     return out
-
-
-def download_debug_symbols(root_logger, download_url):
-    """Download debug symbols."""
-    retry_secs = 10
-
-    while True:
-        try:
-            install_dir_list = []
-            SetupMultiversion.setup_mongodb(artifacts_url=None, binaries_url=None,
-                                            symbols_url=download_url, install_dir=os.getcwd(),
-                                            install_dir_list=install_dir_list)
-            break
-        except tarfile.ReadError:
-            root_logger.info("Debug symbols unavailable after %s secs, retrying in %s secs",
-                             compare_start_time(time.time()), retry_secs)
-            time.sleep(retry_secs)
-
-        ten_min = 10 * 60
-        if compare_start_time(time.time()) > ten_min:
-            root_logger.info(
-                'Debug-symbols archive-file does not exist after %s secs; '
-                'Hang-Analyzer may not complete successfully. Download URL: %s', ten_min,
-                download_url)
-            break

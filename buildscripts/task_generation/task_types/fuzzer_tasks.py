@@ -3,6 +3,7 @@ from typing import NamedTuple, Set, Optional, Dict, List
 
 from shrub.v2 import Task, FunctionCall, TaskDependency
 
+from buildscripts.task_generation.constants import ARCHIVE_DIST_TEST_TASK
 from buildscripts.util import taskname
 
 
@@ -151,4 +152,4 @@ class FuzzerGenTaskService:
         ]
         commands = [command for command in commands if command is not None]
 
-        return Task(sub_task_name, commands, {TaskDependency("archive_dist_test_debug")})
+        return Task(sub_task_name, commands, {TaskDependency(ARCHIVE_DIST_TEST_TASK)})

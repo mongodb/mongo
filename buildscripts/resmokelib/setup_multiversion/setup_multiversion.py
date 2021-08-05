@@ -131,6 +131,16 @@ class SetupMultiversion(Subcommand):
             if not download_symbols_url:
                 download_symbols_url = urls.get(" mongo-debugsymbols.zip", None)
 
+        if self.download_symbols and not download_symbols_url:
+            raise download.DownloadError("Symbols download requested but not URL available")
+
+        if self.download_artifacts and not artifacts_url:
+            raise download.DownloadError(
+                "Evergreen artifacts download requested but not URL available")
+
+        if self.download_binaries and not binaries_url:
+            raise download.DownloadError("Binaries download requested but not URL available")
+
         self.setup_mongodb(artifacts_url, binaries_url, download_symbols_url, install_dir,
                            bin_suffix, link_dir=self.link_dir,
                            install_dir_list=self._windows_bin_install_dirs)

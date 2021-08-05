@@ -16,8 +16,8 @@ from evergreen.api import EvergreenApi, RetryingEvergreenApi
 from buildscripts.burn_in_tests import EVERGREEN_FILE, \
     DEFAULT_REPO_LOCATIONS, create_tests_by_task, TaskInfo
 from buildscripts.ciconfig.evergreen import parse_evergreen_file, EvergreenProjectConfig
-from buildscripts.evergreen_burn_in_tests import GenerateConfig, DEFAULT_PROJECT, CONFIG_FILE, \
-    EvergreenFileChangeDetector
+from buildscripts.evergreen_burn_in_tests import GenerateConfig, DEFAULT_PROJECT, EvergreenFileChangeDetector
+from buildscripts.task_generation.constants import CONFIG_FILE
 from buildscripts.resmokelib.suitesconfig import get_named_suites_with_root_level_key
 from buildscripts.task_generation.evg_config_builder import EvgConfigBuilder
 from buildscripts.task_generation.gen_config import GenerationConfiguration

@@ -6,6 +6,7 @@ import inject
 from shrub.v2 import ShrubProject, BuildVariant, ExistingTask, Task
 
 from buildscripts.patch_builds.task_generation import validate_task_generation_limit
+from buildscripts.task_generation.constants import ACTIVATE_ARCHIVE_DIST_TEST_DEBUG_TASK
 from buildscripts.task_generation.gen_task_service import GenTaskService, \
     GenTaskOptions, ResmokeGenTaskParams, FuzzerGenTaskParams
 from buildscripts.task_generation.generated_config import GeneratedFile, GeneratedConfiguration
@@ -138,6 +139,16 @@ class EvgConfigBuilder:
         with self.lock:
             build_variant = self.get_build_variant(build_variant)
             build_variant.display_task(display_task_name, execution_existing_tasks=execution_tasks)
+
+    def generate_archive_dist_test_debug_activator_task(self, variant: str):
+        """
+        Generate dummy task to activate the task that archives debug symbols.
+
+        We can't activate it directly as it's not generated.
+        """
+        with self.lock:
+            build_variant = self.get_build_variant(variant)
+            build_variant.add_existing_task(ExistingTask(ACTIVATE_ARCHIVE_DIST_TEST_DEBUG_TASK))
 
     def build(self, config_file_name: str) -> GeneratedConfiguration:
         """

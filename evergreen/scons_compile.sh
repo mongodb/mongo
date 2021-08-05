@@ -24,7 +24,7 @@ extra_args="--install-action=${task_install_action}"
 # links we are likely to OOM or thrash the machine. Dynamic
 # builds, where htis is not a concern, override this value.
 echo "Changing SCons to run with --jlink=${num_scons_link_jobs_available}"
-extra_args="$extra_args --jlink=${num_scons_link_jobs_available}"
+extra_args="$extra_args --jlink=${num_scons_link_jobs_available} --separate-debug=${separate_debug}"
 
 if [ "${scons_cache_scope}" = "shared" ]; then
   extra_args="$extra_args --cache-debug=scons_cache.log"

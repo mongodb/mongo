@@ -8,6 +8,7 @@ import structlog
 from shrub.v2 import Task, TaskDependency
 
 from buildscripts.patch_builds.task_generation import resmoke_commands
+from buildscripts.task_generation.constants import ARCHIVE_DIST_TEST_TASK
 from buildscripts.task_generation.suite_split import GeneratedSuite, SubSuite
 from buildscripts.task_generation.task_types.gentask_options import GenTaskOptions
 from buildscripts.task_generation.timeout import TimeoutEstimate
@@ -173,5 +174,5 @@ class ResmokeGenTaskService:
     @staticmethod
     def _get_dependencies() -> Set[TaskDependency]:
         """Get the set of dependency tasks for these suites."""
-        dependencies = {TaskDependency("archive_dist_test_debug")}
+        dependencies = {TaskDependency(ARCHIVE_DIST_TEST_TASK)}
         return dependencies

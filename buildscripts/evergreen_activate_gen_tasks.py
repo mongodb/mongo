@@ -9,6 +9,9 @@ from pydantic.main import BaseModel
 from evergreen.api import RetryingEvergreenApi, EvergreenApi
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
+from buildscripts.task_generation.constants import ARCHIVE_DIST_TEST_TASK, ARCHIVE_DIST_TEST_DEBUG_TASK, \
+    ACTIVATE_ARCHIVE_DIST_TEST_DEBUG_TASK
+
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -59,6 +62,21 @@ def activate_task(build_id: str, task_name: str, evg_api: EvergreenApi) -> None:
         if task.display_name == task_name:
             LOGGER.info("Activating task", task_id=task.task_id, task_name=task.display_name)
             evg_api.configure_task(task.task_id, activated=True)
+
+            if any(ARCHIVE_DIST_TEST_TASK in dependency["id"] for dependency in task.depends_on):
+                _activate_archive_debug_symbols(evg_api, task_list)
+
+
+def _activate_archive_debug_symbols(evg_api: EvergreenApi, task_list):
+    debug_iter = filter(lambda tsk: tsk.display_name == ACTIVATE_ARCHIVE_DIST_TEST_DEBUG_TASK,
+                        task_list)
+    activate_symbol_tasks = list(debug_iter)
+
+    if len(activate_symbol_tasks) == 1:
+        activated_symbol_task = activate_symbol_tasks[0]
+        if not activated_symbol_task.activated:
+            LOGGER.info("Activating debug symbols archival", task_id=activated_symbol_task.task_id)
+            evg_api.configure_task(activated_symbol_task.task_id, activated=True)
 
 
 @click.command()

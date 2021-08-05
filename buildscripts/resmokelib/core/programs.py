@@ -148,9 +148,6 @@ def mongo_shell_program(  # pylint: disable=too-many-arguments,too-many-branches
         "wiredTigerCollectionConfigString": (config.WT_COLL_CONFIG, ""),
         "wiredTigerEngineConfigString": (config.WT_ENGINE_CONFIG, ""),
         "wiredTigerIndexConfigString": (config.WT_INDEX_CONFIG, ""),
-
-        # Evergreen variables.
-        "evergreenDebugSymbolsUrl": (config.DEBUG_SYMBOLS_URL, ""),
     }
 
     test_data = global_vars.get("TestData", {}).copy()
@@ -166,6 +163,7 @@ def mongo_shell_program(  # pylint: disable=too-many-arguments,too-many-branches
 
     if config.EVERGREEN_TASK_ID is not None:
         test_data["inEvergreen"] = True
+        test_data["evergreenTaskId"] = config.EVERGREEN_TASK_ID
 
     # Initialize setParameters for mongod and mongos, to be passed to the shell via TestData. Since
     # they are dictionaries, they will be converted to JavaScript objects when passed to the shell

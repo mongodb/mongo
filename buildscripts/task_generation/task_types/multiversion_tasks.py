@@ -5,6 +5,7 @@ import inject
 from shrub.v2 import Task, FunctionCall, TaskDependency
 
 from buildscripts.resmokelib.multiversionconstants import REQUIRES_FCV_TAG
+from buildscripts.task_generation.constants import ARCHIVE_DIST_TEST_TASK
 from buildscripts.task_generation.suite_split import GeneratedSuite
 from buildscripts.task_generation.task_types.gentask_options import GenTaskOptions
 
@@ -116,7 +117,7 @@ class MultiversionGenTaskService:
             FunctionCall("run generated tests", run_tests_vars),
         ]
 
-        return Task(sub_task_name, commands, {TaskDependency("archive_dist_test_debug")})
+        return Task(sub_task_name, commands, {TaskDependency(ARCHIVE_DIST_TEST_TASK)})
 
     def _build_resmoke_args(self, suite_file: str, mixed_version_config: str,
                             params: MultiversionGenTaskParams) -> str:

@@ -368,7 +368,7 @@ jsTestOptions = function() {
             undoRecorderPath: TestData.undoRecorderPath,
             backupOnRestartDir: TestData.backupOnRestartDir || false,
 
-            evergreenDebugSymbolsUrl: TestData.evergreenDebugSymbolsUrl || null,
+            evergreenTaskId: TestData.evergreenTaskId || null,
         });
     }
     return _jsTestOptions;

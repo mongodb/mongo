@@ -21,17 +21,15 @@ from buildscripts.patch_builds.change_data import RevisionMap
 from buildscripts.patch_builds.evg_change_data import generate_revision_map_from_manifest
 from buildscripts.patch_builds.task_generation import TimeoutInfo, resmoke_commands, \
     validate_task_generation_limit
+from buildscripts.task_generation.constants import CONFIG_FILE, EVERGREEN_FILE, ARCHIVE_DIST_TEST_TASK
 from buildscripts.util.fileops import write_file
 from buildscripts.util.taskname import name_generated_task
 from buildscripts.util.teststats import TestRuntime, HistoricTaskData
 
-CONFIG_FILE = ".evergreen.yml"
 DEFAULT_PROJECT = "mongodb-mongo-master"
 DEFAULT_VARIANT = "enterprise-rhel-80-64-bit-dynamic-required"
-EVERGREEN_FILE = "etc/evergreen.yml"
 BURN_IN_TESTS_GEN_TASK = "burn_in_tests_gen"
 BURN_IN_TESTS_TASK = "burn_in_tests"
-TASK_WITH_ARTIFACTS = "archive_dist_test_debug"
 AVG_TEST_RUNTIME_ANALYSIS_DAYS = 14
 AVG_TEST_SETUP_SEC = 4 * 60
 AVG_TEST_TIME_MULTIPLIER = 3
@@ -241,7 +239,7 @@ class TaskGenerator:
         timeout = self.generate_timeouts(test_name)
         commands = resmoke_commands("run tests", run_tests_vars, timeout,
                                     self.task_info.require_multiversion)
-        dependencies = {TaskDependency(TASK_WITH_ARTIFACTS)}
+        dependencies = {TaskDependency(ARCHIVE_DIST_TEST_TASK)}
 
         return Task(sub_task_name, commands, dependencies)
 

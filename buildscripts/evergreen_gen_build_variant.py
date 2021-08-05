@@ -16,6 +16,7 @@ from evergreen import Task as EvgTask
 
 from buildscripts.ciconfig.evergreen import EvergreenProjectConfig, parse_evergreen_file, Task, \
     Variant
+from buildscripts.task_generation.constants import ACTIVATE_ARCHIVE_DIST_TEST_DEBUG_TASK
 from buildscripts.task_generation.evg_config_builder import EvgConfigBuilder
 from buildscripts.task_generation.gen_config import GenerationConfiguration
 from buildscripts.task_generation.gen_task_validation import GenTaskValidationService
@@ -368,6 +369,10 @@ class GenerateBuildVariantOrchestrator:
                                 exe.submit(builder.generate_suite, split_params, gen_params))
 
             [j.result() for j in jobs]  # pylint: disable=expression-not-assigned
+
+            builder.generate_archive_dist_test_debug_activator_task(build_variant_name)
+            # TODO: SERVER-59102 Check if this still causes a circular dependency on generator_tasks.
+            # tasks_to_hide.add(ACTIVATE_ARCHIVE_DIST_TEST_DEBUG_TASK)
 
         end_time = perf_counter()
         duration = end_time - start_time
