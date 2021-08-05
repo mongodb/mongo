@@ -198,7 +198,11 @@ bool ReshardingOplogFetcher::iterate(Client* client, CancelableOperationContextF
     try {
         return consume(client, factory, targetShard.get());
     } catch (const ExceptionForCat<ErrorCategory::Interruption>&) {
-        return false;
+        // Defer to the cancellation token for whether the Interruption exception should be retried
+        // upon or not. It is possible the error came as the response from the remote donor shard.
+        // It is also possible that the error is from a stray killOp command being run on this
+        // recipient shard.
+        return true;
     } catch (const ExceptionFor<ErrorCodes::OplogQueryMinTsMissing>&) {
         LOGV2_ERROR(
             5192103, "Fatal resharding error while fetching.", "error"_attr = exceptionToStatus());
