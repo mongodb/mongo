@@ -9,27 +9,31 @@
 //     requires_scripting
 // ]
 
-t = db.jstests_countc;
+(function() {
+'use strict';
+const collNamePrefix = 'jstests_countc_';
+let collCount = 0;
+let t = db.getCollection(collNamePrefix + collCount++);
 t.drop();
 
 // Match a subset of inserted values within a $in operator.
-t.drop();
 t.createIndex({a: 1});
 // Save 'a' values 0, 0.5, 1.5, 2.5 ... 97.5, 98.5, 99.
 t.save({a: 0});
 t.save({a: 99});
-for (i = 0; i < 99; ++i) {
+for (let i = 0; i < 99; ++i) {
     t.save({a: (i + 0.5)});
 }
 // Query 'a' values $in 0, 1, 2, ..., 99.
-vals = [];
-for (i = 0; i < 100; ++i) {
+let vals = [];
+for (let i = 0; i < 100; ++i) {
     vals.push(i);
 }
 // Only values 0 and 99 of the $in set are present in the collection, so the expected count is 2.
 assert.eq(2, t.count({a: {$in: vals}}));
 
 // Match 'a' values within upper and lower limits.
+t = db.getCollection(collNamePrefix + collCount++);
 t.drop();
 t.createIndex({a: 1});
 t.save({a: [1, 2]});  // Will match because 'a' is in range.
@@ -38,6 +42,7 @@ t.save({a: 9});       // Will not match because 'a' is not in range.
 assert.eq(1, t.count({a: {$gt: 0, $lt: 5}}));
 
 // Match two nested fields within an array.
+t = db.getCollection(collNamePrefix + collCount++);
 t.drop();
 t.createIndex({'a.b': 1, 'a.c': 1});
 t.save({a: [{b: 2, c: 3}, {}]});
@@ -45,6 +50,7 @@ t.save({a: [{b: 2, c: 3}, {}]});
 assert.eq(0, t.count({'a.b': 2, 'a.c': 2}));
 
 // $gt:string only matches strings.
+t = db.getCollection(collNamePrefix + collCount++);
 t.drop();
 t.createIndex({a: 1});
 t.save({a: 'a'});  // Will match.
@@ -53,6 +59,7 @@ t.save({a: {}});   // Will not match because {} is not a string.
 assert.eq(1, t.count({a: {$gte: ''}}));
 
 // $lte:date only matches dates.
+t = db.getCollection(collNamePrefix + collCount++);
 t.drop();
 t.createIndex({a: 1});
 t.save({a: new Date(1)});  // Will match.
@@ -61,6 +68,7 @@ t.save({a: true});         // Will not match because 'true' is not a date.
 assert.eq(1, t.count({a: {$lte: new Date(1)}}));
 
 // Querying for 'undefined' triggers an error.
+t = db.getCollection(collNamePrefix + collCount++);
 t.drop();
 t.createIndex({a: 1});
 assert.throws(function() {
@@ -68,6 +76,7 @@ assert.throws(function() {
 });
 
 // Count using a descending order index.
+t = db.getCollection(collNamePrefix + collCount++);
 t.drop();
 t.createIndex({a: -1});
 t.save({a: 1});
@@ -79,6 +88,7 @@ assert.eq(2, t.count({a: {$lte: 2}}));
 assert.eq(2, t.count({a: {$lt: 3}}));
 
 // Count using a compound index.
+t = db.getCollection(collNamePrefix + collCount++);
 t.drop();
 t.createIndex({a: 1, b: 1});
 t.save({a: 1, b: 2});
@@ -94,6 +104,7 @@ assert.eq(1, t.count({a: 2, b: {$lt: 3}}));
 assert.eq(1, t.count({a: 1, b: {$lt: 3}}));
 
 // Count using a compound descending order index.
+t = db.getCollection(collNamePrefix + collCount++);
 t.drop();
 t.createIndex({a: 1, b: -1});
 t.save({a: 1, b: 2});
@@ -107,14 +118,17 @@ assert.eq(1, t.count({a: 2, b: {$lt: 3}}));
 assert.eq(1, t.count({a: 1, b: {$lt: 3}}));
 
 // Count with a multikey value.
+t = db.getCollection(collNamePrefix + collCount++);
 t.drop();
 t.createIndex({a: 1});
 t.save({a: [1, 2]});
 assert.eq(1, t.count({a: {$gt: 0, $lte: 2}}));
 
 // Count with a match constraint on an unindexed field.
+t = db.getCollection(collNamePrefix + collCount++);
 t.drop();
 t.createIndex({a: 1});
 t.save({a: 1, b: 1});
 t.save({a: 1, b: 2});
 assert.eq(1, t.count({a: 1, $where: 'this.b == 1'}));
+})();
