@@ -870,7 +870,9 @@ auto NetworkInterfaceTL::ExhaustCommandState::make(NetworkInterfaceTL* interface
 }
 
 Future<RemoteCommandResponse> NetworkInterfaceTL::ExhaustCommandState::sendRequest(
-    std::shared_ptr<RequestState> requestState) {
+    std::shared_ptr<RequestState> requestState) try {
+    auto [promise, future] = makePromiseFuture<RemoteCommandResponse>();
+    finalResponsePromise = std::move(promise);
 
     setTimer();
     requestState->getClient(requestState->conn)
@@ -880,23 +882,21 @@ Future<RemoteCommandResponse> NetworkInterfaceTL::ExhaustCommandState::sendReque
             continueExhaustRequest(std::move(requestState), swResponse);
         });
 
-    auto [promise, future] = makePromiseFuture<RemoteCommandResponse>();
-    finalResponsePromise = std::move(promise);
     return std::move(future).then([this](const auto& finalResponse) { return finalResponse; });
+} catch (const DBException& ex) {
+    return ex.toStatus();
 }
 
 void NetworkInterfaceTL::ExhaustCommandState::fulfillFinalPromise(
-    StatusWith<RemoteCommandOnAnyResponse> response) {
-    auto status = !response.getStatus().isOK()
-        ? response.getStatus()
-        : getStatusFromCommandResult(response.getValue().data);
-
-    if (!status.isOK()) {
-        promise.setError(status);
-        return;
-    }
-
-    promise.emplaceValue();
+    StatusWith<RemoteCommandOnAnyResponse> swr) {
+    promise.setFrom([&] {
+        if (!swr.isOK())
+            return swr.getStatus();
+        auto response = swr.getValue();
+        if (!response.isOK())
+            return response.status;
+        return getStatusFromCommandResult(response.data);
+    }());
 }
 
 void NetworkInterfaceTL::ExhaustCommandState::continueExhaustRequest(
