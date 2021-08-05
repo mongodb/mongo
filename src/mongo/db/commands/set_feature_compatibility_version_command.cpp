@@ -189,49 +189,6 @@ void uassertStatusOKIgnoreNSNotFound(Status status) {
 }
 
 /**
- * Drops all collections used by resharding on the config.
- *
- * TODO SERVER-55912: This method can be removed once 5.0 becomes last-lts.
- */
-void dropReshardingCollectionsOnConfig(OperationContext* opCtx) {
-    DropReply unusedReply;
-    uassertStatusOKIgnoreNSNotFound(
-        dropCollection(opCtx,
-                       NamespaceString::kConfigReshardingOperationsNamespace,
-                       &unusedReply,
-                       DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops));
-}
-
-/**
- * Drops all collections used by resharding on a shard.
- *
- * TODO SERVER-55912: This method can be removed once 5.0 becomes last-lts.
- */
-void dropReshardingCollectionsOnShard(OperationContext* opCtx) {
-    DropReply unusedReply;
-    uassertStatusOKIgnoreNSNotFound(
-        dropCollection(opCtx,
-                       NamespaceString::kDonorReshardingOperationsNamespace,
-                       &unusedReply,
-                       DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops));
-    uassertStatusOKIgnoreNSNotFound(
-        dropCollection(opCtx,
-                       NamespaceString::kRecipientReshardingOperationsNamespace,
-                       &unusedReply,
-                       DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops));
-    uassertStatusOKIgnoreNSNotFound(
-        dropCollection(opCtx,
-                       NamespaceString::kReshardingApplierProgressNamespace,
-                       &unusedReply,
-                       DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops));
-    uassertStatusOKIgnoreNSNotFound(
-        dropCollection(opCtx,
-                       NamespaceString::kReshardingTxnClonerProgressNamespace,
-                       &unusedReply,
-                       DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops));
-}
-
-/**
  * Sets the minimum allowed feature compatibility version for the cluster. The cluster should not
  * use any new features introduced in binary versions that are newer than the feature compatibility
  * version set.
@@ -592,11 +549,6 @@ private:
             uassertStatusOK(
                 ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
                     opCtx, CommandHelpers::appendMajorityWriteConcern(requestPhase2.toBSON({}))));
-        } else if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
-            // TODO: SERVER-55912 remove after 5.0 becomes last-lts.
-            if (requestedVersion < FeatureCompatibility::Version::kFullyDowngradedTo50) {
-                dropReshardingCollectionsOnShard(opCtx);
-            }
         }
 
         hangWhileDowngrading.pauseWhileSet(opCtx);

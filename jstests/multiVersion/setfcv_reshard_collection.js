@@ -1,10 +1,3 @@
-/**
- * TODO SERVER-55912: Remove this tag to re-enable test
- * @tags: [
- *   disabled_due_to_server_58295
- * ]
- */
-
 (function() {
 "use strict";
 
@@ -67,8 +60,8 @@ function runTest(forcePooledConnectionsDropped) {
 
             let codeToRunInParallelShell =
                 `{
-                    assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
-                }`;
+                assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+            }`;
 
             let awaitShell = startParallelShell(codeToRunInParallelShell, mongos.port);
 
@@ -102,23 +95,26 @@ function runTest(forcePooledConnectionsDropped) {
             expectedErrorCode: [
                 ErrorCodes.ReshardCollectionAborted,
                 ErrorCodes.Interrupted,
-                // TODO: SERVER-55912 this is only for downgrade to < v4.7, which makes namespaces
-                // used by resharding invalid.
-                ErrorCodes.InvalidNamespace,
             ]
         });
 
-    // TODO SERVER-55912: replace with test case that run resharding in background and setFCV to
-    // latestFCV.
-    reshardingTest.withReshardingInBackground({
-        newShardKeyPattern: {newKey: 1},
-        newChunks: [
-            {min: {newKey: MinKey}, max: {newKey: 0}, shard: recipientShardNames[0]},
-            {min: {newKey: 0}, max: {newKey: MaxKey}, shard: recipientShardNames[1]},
-        ],
-    },
-                                              () => {},
-                                              {expectedErrorCode: ErrorCodes.CommandNotSupported});
+    reshardingTest.withReshardingInBackground(
+        {
+            newShardKeyPattern: {newKey: 1},
+            newChunks: [
+                {min: {newKey: MinKey}, max: {newKey: 0}, shard: recipientShardNames[0]},
+                {min: {newKey: 0}, max: {newKey: MaxKey}, shard: recipientShardNames[1]},
+            ],
+        },
+        () => {
+            assert.commandWorked(mongos.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
+        },
+        {
+            expectedErrorCode: [
+                ErrorCodes.ReshardCollectionAborted,
+                ErrorCodes.Interrupted,
+            ]
+        });
 
     reshardingTest.teardown();
 }
