@@ -51,8 +51,7 @@ rectangle "**WiredTiger Engine**                                                
   rectangle "[[arch-transaction.html Transactions]]" as txn
   rectangle "[[arch-metadata.html Metadata]]" as meta
   rectangle "[[arch-dhandle.html dhandle/\nBtree]]" as btree
-  rectangle "[[arch-row.html Row\nStorage]]" as row
-  rectangle "[[arch-column.html Column\nStorage]]" as column
+  rectangle "[[arch-row-column.html Row/Column\nStorage]]" as row
   rectangle "[[arch-hs.html History\nStore]]" as history
   rectangle "[[arch-snapshot.html Snapshots]]" as snapshot
   rectangle "[[arch-cache.html Cache]]" as cache
@@ -140,10 +139,6 @@ make up in-memory Btrees and subordinate data structures.
 
 A checkpoint is created by WiredTiger to serve as a point from which it can recover.
 
-@subpage arch-column
-
-Column Stores are Btrees that have as their key a record id.
-
 @subpage arch-cursor
 
 Cursors are used to get and modify data.
@@ -188,9 +183,10 @@ Metadata is stored as <code>uri, config</code> K/V pairs in a designated table.
 
 WiredTiger has a Python API that is useful for scripting and experimentation.
 
-@subpage arch-row
+@subpage arch-row-column
 
-Row Stores are Btrees that have a variable size key and data.
+Row stores and column store are B-Trees. Row stores have a variable size key and data while column
+stores have as their key a record id.
 
 @subpage arch-rts
 

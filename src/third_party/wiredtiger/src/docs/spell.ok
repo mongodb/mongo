@@ -111,6 +111,7 @@ README
 RedHat
 RepMgr
 Riak
+RLE
 RocksDB
 Roelofs
 RrVv
@@ -316,6 +317,7 @@ fillfactor
 firstname
 flamegraph
 flamegraphs
+flcs
 fnv
 forw
 fprofile
@@ -642,6 +644,7 @@ valuev
 vec
 versa
 viewable
+vlcs
 vm
 vpmsum
 warmup
