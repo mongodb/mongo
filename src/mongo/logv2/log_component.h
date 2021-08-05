@@ -51,6 +51,7 @@ namespace mongo::logv2 {
 /*   (id, val                  , shortName               , logName   , parent) */ \
     X(kDefault, = 0            , "default"               , "-"       , kNumLogComponents) \
     X(kAccessControl,          , "accessControl"         , "ACCESS"  , kDefault) \
+    X(kAssert,                 , "assert"                , "ASSERT"  , kDefault) \
     X(kCommand,                , "command"               , "COMMAND" , kDefault) \
     X(kControl,                , "control"               , "CONTROL" , kDefault) \
     X(kExecutor,               , "executor"              , "EXECUTOR", kDefault) \
