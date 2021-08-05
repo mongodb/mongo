@@ -132,6 +132,7 @@ env.Library(
         'drop_connections_command.cpp',
         'rotate_certificates_command.cpp',
         'generic_servers.cpp',
+        'generic_servers.idl',
         'isself.cpp',
         'logical_session_server_status_section.cpp',
         'mr_common.cpp',

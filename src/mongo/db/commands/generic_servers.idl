@@ -1,0 +1,153 @@
+# Copyright (C) 2021-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+global:
+    cpp_namespace: "mongo"
+
+imports:
+    - "mongo/idl/basic_types.idl"
+
+structs:
+    featuresReplyJS:
+        description: "JS information for features command reply"
+        fields:
+            utf8:
+                # In practice this is always true and exists for BC.
+                description: "Scripting engine supports utf8"
+                type: bool
+
+    featuresReply:
+        description: "Reply to the features command"
+        fields:
+            js:
+                description: "Status of the scription engine"
+                type: featuresReplyJS
+                optional: true
+            oidMachineOld:
+                description: "The previous per-machine nonce, before applying oidReset"
+                type: long
+                optional: true
+            oidMachine:
+                description: "The per-machine nonce used in generating ObjectId values"
+                type: long
+
+    hostInfoSystemReply:
+        description: "hostInfo.system reply fields"
+        fields:
+            currentTime: date
+            hostname: string
+            cpuAddrSize: int
+            memSizeMB: long
+            memLimitMB: long
+            numCores: int
+            cpuArch: string
+            numaEnabled: bool
+
+    hostInfoOsReply:
+        description: "hostInfo.os reply fields"
+        fields:
+            type: string
+            name: string
+            version: string
+
+    hostInfoReply:
+        description: "Reply to hostInfo command"
+        fields:
+            system: hostInfoSystemReply
+            os: hostInfoOsReply
+
+            # extra is operating system specific
+            extra:
+                description: "Extra system information from ProcessInfo"
+                type: object
+
+    getCmdLineOptsReply:
+        description: "Command line options as passed to the server executable on startup"
+        fields:
+            argv: array
+            parsed: object
+
+commands:
+    features:
+        description: "Returns build level feature settings"
+        api_version: ""
+        command_name: features
+        namespace: ignored
+        cpp_name: FeaturesCommand
+        reply_type: featuresReply
+        fields:
+            oidReset:
+                description: "Regenerate the per-machine nonce used in generating ObjectId values"
+                type: safeBool
+                optional: true
+
+    hostInfo:
+        description: "Returns information about the server's host"
+        api_version: ""
+        command_name: hostInfo
+        namespace: ignored
+        cpp_name: HostInfoCommand
+        reply_type: hostInfoReply
+
+    getCmdLineOpts:
+        description: "Return the command line options used to launch the server"
+        api_version: ""
+        command_name: getCmdLineOpts
+        namespace: ignored
+        cpp_name: GetCmdLineOptsCommand
+        reply_type: getCmdLineOptsReply
+
+    logRotate:
+        description: "Rotate log file(s)"
+        api_version: ""
+        command_name: logRotate
+        namespace: type
+        type:
+            # Strictly speaking, this should be `string or ignored`,
+            # but since we must have a type, we'll assume a non-string value
+            # will be of the basic form {logRotate: 1}.
+            variant: [safeBool, string]
+        cpp_name: LogRotateCommand
+        reply_type: OkReply
+
+    getLog:
+        description: "Returns most recent log lines from log spooler"
+        api_version: ""
+        command_name: getLog
+        namespace: type
+        type: string
+        cpp_name: GetLogCommand
+
+    clearLog:
+        # Test Only
+        description: "Clear the log contents"
+        api_version: ""
+        command_name: clearLog
+        namespace: type
+        type: string
+        cpp_name: ClearLogCommand
+        reply_type: OkReply

@@ -25,6 +25,7 @@ if (hostinfo.os.type == "Windows") {
     assert.neq(hostinfo.os.version, "" || null, "Missing FreeBSD version");
 }
 
+jsTest.log(hostinfo);
 // comment out this block for systems which have not implemented hostinfo.
 if (hostinfo.os.type != "") {
     assert.neq(hostinfo.system.hostname, "" || null, "Missing Hostname");
