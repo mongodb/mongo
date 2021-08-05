@@ -13,7 +13,7 @@
 
 load("jstests/core/timeseries/libs/timeseries.js");
 
-const collName = 'system.buckets.test';
+const collName = 'system.buckets.clustered_index_types';
 const coll = db[collName];
 coll.drop();
 
