@@ -8831,6 +8831,7 @@ buildvariants:
     test_flags: >-
       --additionalFeatureFlags=featureFlagTimeseriesUpdatesAndDeletes
       --additionalFeatureFlags=featureFlagShardedTimeSeries
+      --additionalFeatureFlags=featureFlagLoadBalancer
   tasks:
     - name: compile_test_and_package_parallel_core_stream_TG
       distros:
