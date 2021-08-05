@@ -1,4 +1,4 @@
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
 . "$DIR/../prelude.sh"
 
 cd src
@@ -17,6 +17,6 @@ if [ -f $report_file ] && grep -Eq "\"failures\": [1-9]" $report_file; then
     --silent \
     --show-error \
     --config - \
-    https://bfsuggestion.corp.mongodb.com/tasks <<<$user_option
+    https://bfsuggestion.corp.mongodb.com/tasks <<< $user_option
   echo "Request to BF Suggestion service status: $?"
 fi

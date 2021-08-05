@@ -1,4 +1,4 @@
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
 . "$DIR/../prelude.sh"
 
 proc_list="(java|lein|mongo|python|_test$|_test\.exe$)"
@@ -11,7 +11,7 @@ if [ "Windows_NT" = "$OS" ]; then
   }
   get_process_info() {
     proc_name=""
-    proc_info=$(wmic process where "ProcessId=\"$1\"" get "Name,ProcessId,ThreadCount" /format:csv 2>/dev/null | grep $1)
+    proc_info=$(wmic process where "ProcessId=\"$1\"" get "Name,ProcessId,ThreadCount" /format:csv 2> /dev/null | grep $1)
     if [ ! -z $proc_info ]; then
       proc_name=$(echo $proc_info | cut -f2 -d ',')
       proc_threads=$(echo $proc_info | cut -f4 -d ',')

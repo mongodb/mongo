@@ -5,7 +5,7 @@ fi
 set -o errexit
 
 # path the directory that contains this script.
-evergreen_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+evergreen_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
 
 . "$evergreen_dir/prelude_workdir.sh"
 . "$evergreen_dir/prelude_python.sh"
@@ -20,7 +20,7 @@ if [ "Windows_NT" = "$OS" ]; then
   script=$(cygpath -w "$script")
 fi
 
-eval $(activate_venv >/dev/null && $python "$script" "$expansions_yaml" "$expansions_default_yaml")
+eval $(activate_venv > /dev/null && $python "$script" "$expansions_yaml" "$expansions_default_yaml")
 if [ -n "$___expansions_error" ]; then
   echo $___expansions_error
   exit 1
@@ -54,7 +54,7 @@ function posix_workdir {
 }
 
 function set_sudo {
-  set -o >/tmp/settings.log
+  set -o > /tmp/settings.log
   set +o errexit
   grep errexit /tmp/settings.log | grep on
   errexit_on=$?
@@ -62,7 +62,7 @@ function set_sudo {
   set +o errexit
   sudo=
   # Use sudo, if it is supported.
-  sudo date >/dev/null 2>&1
+  sudo date > /dev/null 2>&1
   if [ $? -eq 0 ]; then
     sudo=sudo
   fi

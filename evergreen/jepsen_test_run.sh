@@ -1,4 +1,4 @@
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
 . "$DIR/prelude.sh"
 
 cd src/jepsen-mongodb
@@ -53,10 +53,10 @@ else
     final_exit_code=1
   else
     # If the failure is due to setup, then this is considered a system failure.
-    echo $grep_exit_code >jepsen_system_failure_${task_name}_${execution}
+    echo $grep_exit_code > jepsen_system_failure_${task_name}_${execution}
     exit 0
   fi
 fi
 # Create report.json
-echo "{\"failures\": $failures, \"results\": [{\"status\": $status, \"exit_code\": $final_exit_code, \"test_file\": \"${task_name}\", \"start\": $start_time, \"end\": $end_time, \"elapsed\": $elapsed_secs}]}" >../report.json
+echo "{\"failures\": $failures, \"results\": [{\"status\": $status, \"exit_code\": $final_exit_code, \"test_file\": \"${task_name}\", \"start\": $start_time, \"end\": $end_time, \"elapsed\": $elapsed_secs}]}" > ../report.json
 exit $final_exit_code

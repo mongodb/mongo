@@ -1,4 +1,4 @@
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
 . "$DIR/../prelude.sh"
 
 cd src
@@ -31,7 +31,7 @@ if [ ! -z ${scons_cache_scope} ]; then
     if [ "Windows_NT" = "$OS" ]; then
       ./win_mount.sh
     else
-      mount | grep "\/efs" >/dev/null
+      mount | grep "\/efs" > /dev/null
       if [ $? -eq 0 ]; then
         echo "Shared cache is already mounted"
       else
