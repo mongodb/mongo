@@ -764,6 +764,12 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx) {
 
     coll.setKeyPattern(_shardKeyPattern->getKeyPattern());
 
+    const auto& currentFCV = serverGlobalParams.featureCompatibility;
+    if (currentFCV.isGreaterThanOrEqualTo(
+            ServerGlobalParams::FeatureCompatibility::Version::kVersion51)) {
+        coll.setSupportingLongName(SupportingLongNameStatusEnum::kImplicitlyEnabled);
+    }
+
     if (_doc.getCreateCollectionRequest().getTimeseries()) {
         TypeCollectionTimeseriesFields timeseriesFields;
         timeseriesFields.setTimeseriesOptions(*_doc.getCreateCollectionRequest().getTimeseries());
