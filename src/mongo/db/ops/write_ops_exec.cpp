@@ -879,7 +879,9 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
     auto& curOp = *CurOp::get(opCtx);
     if (source != OperationSource::kTimeseriesInsert) {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        curOp.setNS_inlock(ns.ns());
+        curOp.setNS_inlock(source == OperationSource::kTimeseriesUpdate
+                               ? ns.getTimeseriesViewNamespace().ns()
+                               : ns.ns());
         curOp.setNetworkOp_inlock(dbUpdate);
         curOp.setLogicalOp_inlock(LogicalOp::opUpdate);
         curOp.setOpDescription_inlock(op.toBSON());

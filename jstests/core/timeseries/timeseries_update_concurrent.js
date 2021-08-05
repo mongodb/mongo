@@ -7,6 +7,8 @@
  *   does_not_support_transactions,
  *   requires_fcv_51,
  *   requires_getmore,
+ *   # $currentOp can't run with a readConcern other than 'local'.
+ *   assumes_read_concern_unchanged,
  *   # This test only synchronizes updates on the primary.
  *   assumes_read_preference_unchanged,
  *   # Fail points in this test do not exist on mongos.
@@ -19,7 +21,7 @@
 "use strict";
 
 load("jstests/core/timeseries/libs/timeseries.js");
-load("jstests/libs/fail_point_util.js");
+load("jstests/libs/curop_helpers.js");
 load("jstests/libs/parallel_shell_helpers.js");
 
 if (!TimeseriesTest.timeseriesUpdatesAndDeletesEnabled(db.getMongo())) {
@@ -44,7 +46,6 @@ const validateUpdateIndex = (initialDocList,
                              failCode,
                              newMetaField = null) => {
     const testDB = db.getSiblingDB(dbName);
-    const fp = configureFailPoint(db.getMongo(), "hangDuringBatchUpdate");
     const awaitTestUpdate = startParallelShell(funWithArgs(
         function(
             dbName, collName, timeFieldName, metaFieldName, initialDocList, updateList, failCode) {
@@ -56,6 +57,9 @@ const validateUpdateIndex = (initialDocList,
                 {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
 
             assert.commandWorked(coll.insert(initialDocList));
+
+            assert.commandWorked(testDB.adminCommand(
+                {configureFailPoint: "hangDuringBatchUpdate", mode: "alwaysOn"}));
 
             assert.commandFailedWithCode(
                 testDB.runCommand({update: coll.getName(), updates: updateList}), failCode);
@@ -70,8 +74,8 @@ const validateUpdateIndex = (initialDocList,
         updateList,
         failCode));
 
-    fp.wait();
     const coll = testDB.getCollection(collName);
+    const childOp = waitForCurOpByFailPoint(testDB, coll.getFullName(), "hangDuringBatchUpdate")[0];
 
     // Drop the collection in all test cases.
     assert(coll.drop());
@@ -84,7 +88,9 @@ const validateUpdateIndex = (initialDocList,
                 coll.getName(), {timeseries: {timeField: timeFieldName, metaField: newMetaField}}));
             break;
     }
-    fp.off();
+
+    assert.commandWorked(
+        testDB.adminCommand({configureFailPoint: "hangDuringBatchUpdate", mode: "off"}));
 
     // Wait for testUpdate to finish.
     awaitTestUpdate();
