@@ -36,12 +36,16 @@
 
 namespace mongo {
 namespace change_stream_rewrite {
-using ChangeStreamRewriteFunction = std::function<std::unique_ptr<MatchExpression>(
-    const boost::intrusive_ptr<ExpressionContext>&, const PathMatchExpression*)>;
+using ChangeStreamRewriteFunction =
+    std::function<std::unique_ptr<MatchExpression>(const boost::intrusive_ptr<ExpressionContext>&,
+                                                   const PathMatchExpression*,
+                                                   bool /* allowInexact */)>;
 
 namespace {
 std::unique_ptr<MatchExpression> rewriteOperationType(
-    const boost::intrusive_ptr<ExpressionContext>&, const PathMatchExpression* predicate) {
+    const boost::intrusive_ptr<ExpressionContext>&,
+    const PathMatchExpression* predicate,
+    bool allowInexact) {
     // Callers of this function will always supply a 'predicate' whose path begins with the
     // "operationType" field. If the path is not an exact match, then it must represent a sub-field
     // of the "operationType" component. Any such path is trivially non-matching, because
@@ -179,7 +183,7 @@ std::unique_ptr<MatchExpression> rewriteMatchExpressionTree(
                 tassert(5687202,
                         str::stream() << "No rewrite function found for " << pathME->path(),
                         rewriteRegistry.contains(firstPath));
-                return rewriteRegistry[firstPath](expCtx, pathME);
+                return rewriteRegistry[firstPath](expCtx, pathME, allowInexact);
             }
             // We don't recognize this predicate, so we do not attempt a rewrite.
             return nullptr;
