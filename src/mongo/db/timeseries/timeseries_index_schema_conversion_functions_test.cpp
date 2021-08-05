@@ -322,29 +322,29 @@ TEST(TimeseriesIndexSchemaConversionTest, 2dsphereMetadataIndexSpecConversion) {
     testBothWaysIndexSpecConversion(timeseriesOptions, timeseriesIndexSpec, bucketsIndexSpec);
 }
 
-// {a: 1} <=> {control.max.a: 1, control.min.a: 1}
+// {a: 1} <=> {control.min.a: 1, control.max.a: 1}
 TEST(TimeseriesIndexSchemaConversionTest, AscendingMeasurementIndexSpecConversion) {
     RAIIServerParameterControllerForTest controller("featureFlagTimeseriesMetricIndexes", true);
     TimeseriesOptions timeseriesOptions = makeTimeseriesOptions();
     BSONObj timeseriesIndexSpec = BSON("a" << 1);
-    BSONObj bucketsIndexSpec = BSON("control.max.a" << 1 << "control.min.a" << 1);
+    BSONObj bucketsIndexSpec = BSON("control.min.a" << 1 << "control.max.a" << 1);
 
     testBothWaysIndexSpecConversion(timeseriesOptions, timeseriesIndexSpec, bucketsIndexSpec);
 }
 
-// {a: -1} <=> {control.min.a: -1, control.max.a: -1}
+// {a: -1} <=> {control.max.a: -1, control.min.a: -1}
 TEST(TimeseriesIndexSchemaConversionTest, DescendingMeasurementIndexSpecConversion) {
     RAIIServerParameterControllerForTest controller("featureFlagTimeseriesMetricIndexes", true);
     TimeseriesOptions timeseriesOptions = makeTimeseriesOptions();
     BSONObj timeseriesIndexSpec = BSON("a" << -1);
-    BSONObj bucketsIndexSpec = BSON("control.min.a" << -1 << "control.max.a" << -1);
+    BSONObj bucketsIndexSpec = BSON("control.max.a" << -1 << "control.min.a" << -1);
 
     testBothWaysIndexSpecConversion(timeseriesOptions, timeseriesIndexSpec, bucketsIndexSpec);
 }
 
-// {a: 1, b: -1, c: 1, d: "2dsphere"} <=> {control.max.a: 1, control.min.a: 1,
-//                                         control.min.b: -1, control.max.b: -1,
-//                                         control.max.c: 1, control.min.c: 1,
+// {a: 1, b: -1, c: 1, d: "2dsphere"} <=> {control.min.a: 1, control.max.a: 1,
+//                                         control.max.b: -1, control.min.b: -1,
+//                                         control.min.c: 1, control.max.c: 1,
 //                                         data.d: "2dsphere_bucket"}
 TEST(TimeseriesIndexSchemaConversionTest, MixedCompoundMeasurementIndexSpecConversion) {
     RAIIServerParameterControllerForTest controller("featureFlagTimeseriesMetricIndexes", true);
@@ -352,8 +352,8 @@ TEST(TimeseriesIndexSchemaConversionTest, MixedCompoundMeasurementIndexSpecConve
     BSONObj timeseriesIndexSpec = BSON("a" << 1 << "b" << -1 << "c" << 1 << "d"
                                            << "2dsphere");
     BSONObj bucketsIndexSpec = BSON(
-        "control.max.a" << 1 << "control.min.a" << 1 << "control.min.b" << -1 << "control.max.b"
-                        << -1 << "control.max.c" << 1 << "control.min.c" << 1 << "data.d"
+        "control.min.a" << 1 << "control.max.a" << 1 << "control.max.b" << -1 << "control.min.b"
+                        << -1 << "control.min.c" << 1 << "control.max.c" << 1 << "data.d"
                         << "2dsphere_bucket");
 
     testBothWaysIndexSpecConversion(timeseriesOptions, timeseriesIndexSpec, bucketsIndexSpec);

@@ -106,23 +106,23 @@ TimeseriesTest.run((insert) => {
     testIndex({[`${metaFieldName}.abc`]: 1}, {"meta.abc": 1}, 0);
 
     // Test measurement-only indexes.
-    testIndex({x: 1}, {"control.max.x": 1, "control.min.x": 1}, 2);
-    testIndex({x: -1}, {"control.min.x": -1, "control.max.x": -1}, 2);
-    testIndex({y: 1}, {"control.max.y": 1, "control.min.y": 1}, 2);
-    testIndex({y: -1}, {"control.min.y": -1, "control.max.y": -1}, 2);
+    testIndex({x: 1}, {"control.min.x": 1, "control.max.x": 1}, 2);
+    testIndex({x: -1}, {"control.max.x": -1, "control.min.x": -1}, 2);
+    testIndex({y: 1}, {"control.min.y": 1, "control.max.y": 1}, 2);
+    testIndex({y: -1}, {"control.max.y": -1, "control.min.y": -1}, 2);
     testIndex({x: 1, y: 1},
-              {"control.max.x": 1, "control.min.x": 1, "control.max.y": 1, "control.min.y": 1},
+              {"control.min.x": 1, "control.max.x": 1, "control.min.y": 1, "control.max.y": 1},
               3);
     testIndex({y: -1, x: 1},
-              {"control.min.y": -1, "control.max.y": -1, "control.max.x": 1, "control.min.x": 1},
+              {"control.max.y": -1, "control.min.y": -1, "control.min.x": 1, "control.max.x": 1},
               3);
-    testIndex({z: 1}, {"control.max.z": 1, "control.min.z": 1}, 0);
+    testIndex({z: 1}, {"control.min.z": 1, "control.max.z": 1}, 0);
 
     // Test mixed metadata and measurement indexes.
     testIndex({x: 1, [`${metaFieldName}.loc`]: "2dsphere"},
               {
-                  "control.max.x": 1,
                   "control.min.x": 1,
+                  "control.max.x": 1,
                   "meta.loc": "2dsphere",
               },
               1);

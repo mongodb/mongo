@@ -132,39 +132,39 @@ TimeseriesTest.run((insert) => {
 
     // Test measurement-only indexes.
     testIndex({x: 1, z: 1},
-              {"control.max.x": 1, "control.min.x": 1, "control.max.z": 1, "control.min.z": 1});
+              {"control.min.x": 1, "control.max.x": 1, "control.min.z": 1, "control.max.z": 1});
     testIndex({x: -1, z: -1},
-              {"control.min.x": -1, "control.max.x": -1, "control.min.z": -1, "control.max.z": -1});
+              {"control.max.x": -1, "control.min.x": -1, "control.max.z": -1, "control.min.z": -1});
     testIndex({x: 1, z: -1},
-              {"control.max.x": 1, "control.min.x": 1, "control.min.z": -1, "control.max.z": -1});
+              {"control.min.x": 1, "control.max.x": 1, "control.max.z": -1, "control.min.z": -1});
     testIndex({x: -1, z: 1},
-              {"control.min.x": -1, "control.max.x": -1, "control.max.z": 1, "control.min.z": 1});
+              {"control.max.x": -1, "control.min.x": -1, "control.min.z": 1, "control.max.z": 1});
 
     // Test mixed metadata and measurement indexes.
     testIndex({[`${metaFieldName}.r.s`]: 1, x: 1},
-              {"meta.r.s": 1, "control.max.x": 1, "control.min.x": 1});
+              {"meta.r.s": 1, "control.min.x": 1, "control.max.x": 1});
     testIndex({[`${metaFieldName}.r.s`]: 1, x: -1},
-              {"meta.r.s": 1, "control.min.x": -1, "control.max.x": -1});
+              {"meta.r.s": 1, "control.max.x": -1, "control.min.x": -1});
     testIndex({x: 1, [`${metaFieldName}.r.s`]: 1},
-              {"control.max.x": 1, "control.min.x": 1, "meta.r.s": 1});
+              {"control.min.x": 1, "control.max.x": 1, "meta.r.s": 1});
     testIndex({x: -1, [`${metaFieldName}.r.s`]: 1},
-              {"control.min.x": -1, "control.max.x": -1, "meta.r.s": 1});
+              {"control.max.x": -1, "control.min.x": -1, "meta.r.s": 1});
     testIndex({x: 1, [`${metaFieldName}.loc`]: "2dsphere", z: -1},
               {
-                  "control.max.x": 1,
                   "control.min.x": 1,
+                  "control.max.x": 1,
                   "meta.loc": "2dsphere",
-                  "control.min.z": -1,
-                  "control.max.z": -1
+                  "control.max.z": -1,
+                  "control.min.z": -1
               },
               2);
     testIndex({[`${metaFieldName}.loc2`]: "2d", x: 1, z: -1},
               {
                   "meta.loc2": "2d",
-                  "control.max.x": 1,
                   "control.min.x": 1,
-                  "control.min.z": -1,
-                  "control.max.z": -1
+                  "control.max.x": 1,
+                  "control.max.z": -1,
+                  "control.min.z": -1
               },
               2);
 

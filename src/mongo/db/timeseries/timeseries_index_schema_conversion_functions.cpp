@@ -165,19 +165,19 @@ StatusWith<BSONObj> createBucketsSpecFromTimeseriesSpec(const TimeseriesOptions&
         }
 
         if (elem.number() >= 0) {
-            // For ascending key patterns, the { control.max.elem: 1, control.min.elem: 1 }
+            // For ascending key patterns, the { control.min.elem: 1, control.max.elem: 1 }
             // compound index is created.
             builder.appendAs(
-                elem, str::stream() << timeseries::kControlMaxFieldNamePrefix << elem.fieldName());
-            builder.appendAs(
                 elem, str::stream() << timeseries::kControlMinFieldNamePrefix << elem.fieldName());
+            builder.appendAs(
+                elem, str::stream() << timeseries::kControlMaxFieldNamePrefix << elem.fieldName());
         } else if (elem.number() < 0) {
-            // For descending key patterns, the { control.min.elem: -1, control.max.elem: -1 }
+            // For descending key patterns, the { control.max.elem: -1, control.min.elem: -1 }
             // compound index is created.
             builder.appendAs(
-                elem, str::stream() << timeseries::kControlMinFieldNamePrefix << elem.fieldName());
-            builder.appendAs(
                 elem, str::stream() << timeseries::kControlMaxFieldNamePrefix << elem.fieldName());
+            builder.appendAs(
+                elem, str::stream() << timeseries::kControlMinFieldNamePrefix << elem.fieldName());
         }
     }
 
@@ -307,14 +307,14 @@ boost::optional<BSONObj> createTimeseriesIndexSpecFromBucketsIndexSpec(
             return {};
         }
 
-        if (firstControlFieldPrefix == timeseries::kControlMaxFieldNamePrefix &&
-            secondControlFieldPrefix == timeseries::kControlMinFieldNamePrefix &&
+        if (firstControlFieldPrefix == timeseries::kControlMinFieldNamePrefix &&
+            secondControlFieldPrefix == timeseries::kControlMaxFieldNamePrefix &&
             firstControlFieldKey == secondControlFieldKey && firstOrdering >= 0) {
             // Ascending index.
             builder.appendAs(nextElem, firstControlFieldKey);
             continue;
-        } else if (firstControlFieldPrefix == timeseries::kControlMinFieldNamePrefix &&
-                   secondControlFieldPrefix == timeseries::kControlMaxFieldNamePrefix &&
+        } else if (firstControlFieldPrefix == timeseries::kControlMaxFieldNamePrefix &&
+                   secondControlFieldPrefix == timeseries::kControlMinFieldNamePrefix &&
                    firstControlFieldKey == secondControlFieldKey && firstOrdering < 0) {
             // Descending index.
             builder.appendAs(nextElem, firstControlFieldKey);

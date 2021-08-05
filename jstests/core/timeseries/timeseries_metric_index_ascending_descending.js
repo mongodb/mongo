@@ -81,7 +81,7 @@ TimeseriesTest.run((insert) => {
 
     let bucketIndexes = bucketsColl.getIndexes();
     assert.eq(1, bucketIndexes.length);
-    assert.eq({"control.max.x": 1, "control.min.x": 1}, bucketIndexes[0].key);
+    assert.eq({"control.min.x": 1, "control.max.x": 1}, bucketIndexes[0].key);
 
     testHint(bucketIndexes[0].name);
 
@@ -98,7 +98,7 @@ TimeseriesTest.run((insert) => {
 
     bucketIndexes = bucketsColl.getIndexes();
     assert.eq(1, bucketIndexes.length);
-    assert.eq({"control.min.x": -1, "control.max.x": -1}, bucketIndexes[0].key);
+    assert.eq({"control.max.x": -1, "control.min.x": -1}, bucketIndexes[0].key);
 
     testHint(bucketIndexes[0].name);
 
@@ -115,7 +115,7 @@ TimeseriesTest.run((insert) => {
 
     bucketIndexes = bucketsColl.getIndexes();
     assert.eq(1, bucketIndexes.length);
-    assert.eq({"control.max.x.y": 1, "control.min.x.y": 1}, bucketIndexes[0].key);
+    assert.eq({"control.min.x.y": 1, "control.max.x.y": 1}, bucketIndexes[0].key);
     testHint(bucketIndexes[0].name);
 
     assert.commandWorked(coll.dropIndex(bucketIndexes[0].name));
@@ -133,9 +133,9 @@ TimeseriesTest.run((insert) => {
     assert.commandWorked(bucketsColl.createIndex({"control.min.x.y": 1, "control.min.y.x": 1}));
     assert.commandWorked(bucketsColl.createIndex({"control.max.x.y": 1}));
     assert.commandWorked(bucketsColl.createIndex({"control.max.x.y": 1, "control.max.y.x": 1}));
-    assert.commandWorked(bucketsColl.createIndex({"control.min.x.y": 1, "control.max.x.y": 1}));
+    assert.commandWorked(bucketsColl.createIndex({"control.max.x.y": 1, "control.min.x.y": 1}));
     assert.commandWorked(bucketsColl.createIndex({"control.min.x.y": -1, "control.max.x.y": 1}));
-    assert.commandWorked(bucketsColl.createIndex({"control.max.x.y": -1, "control.min.x.y": -1}));
+    assert.commandWorked(bucketsColl.createIndex({"control.min.x.y": -1, "control.max.x.y": -1}));
     assert.commandWorked(bucketsColl.createIndex({"control.max.x.y": 1, "control.min.x.y": -1}));
 
     assert.commandWorked(bucketsColl.createIndex({"data.x": 1}));
@@ -144,9 +144,9 @@ TimeseriesTest.run((insert) => {
 
     // The first two-thirds of the below compound indexes represent {"x.y" : 1} and {"x.y" : -1}.
     assert.commandWorked(
-        bucketsColl.createIndex({"control.max.x.y": 1, "control.min.x.y": 1, "data.x": 1}));
+        bucketsColl.createIndex({"control.min.x.y": 1, "control.max.x.y": 1, "data.x": 1}));
     assert.commandWorked(
-        bucketsColl.createIndex({"control.min.x.y": -1, "control.max.x.y": -1, "data.x": 1}));
+        bucketsColl.createIndex({"control.max.x.y": -1, "control.min.x.y": -1, "data.x": 1}));
 
     userIndexes = coll.getIndexes();
     assert.eq(0, userIndexes.length);

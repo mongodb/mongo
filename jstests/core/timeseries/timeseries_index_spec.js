@@ -62,7 +62,7 @@ TimeseriesTest.run(() => {
         }
 
         if (spec.name == "x") {
-            assert.eq(spec.key, {"control.max.x": 1, "control.min.x": 1});
+            assert.eq(spec.key, {"control.min.x": 1, "control.max.x": 1});
         }
     };
 
@@ -81,7 +81,7 @@ TimeseriesTest.run(() => {
     // mechanism.
     if (TimeseriesTest.timeseriesMetricIndexesEnabled(db.getMongo())) {
         assert.commandWorked(
-            bucketsColl.createIndex({"control.max.y": 1, "control.min.y": 1}, {name: "y"}));
+            bucketsColl.createIndex({"control.min.y": 1, "control.max.y": 1}, {name: "y"}));
 
         let foundIndex = false;
         bucketIndexes = bucketsColl.getIndexes();
