@@ -180,16 +180,15 @@ void removeIndexBuildEntryAfterCommitOrAbort(OperationContext* opCtx,
 
     auto status = indexbuildentryhelpers::removeIndexBuildEntry(
         opCtx, indexBuildEntryCollection, replState.buildUUID);
-
-    // If we fail to remove the document from config.system.indexBuilds, it is because the document
-    // or collection is missing. In any case, we do not need to fail the commit or abort operation.
-    // TODO(SERVER-47323): Do not ignore removeIndexBuildEntry() errors. Convert to fatal assertion.
     if (!status.isOK()) {
-        LOGV2(4763501,
-              "Unable to remove index build from system collection. Ignoring error",
-              "buildUUID"_attr = replState.buildUUID,
-              "collectionUUID"_attr = replState.collectionUUID,
-              "error"_attr = status);
+        LOGV2_FATAL_NOTRACE(4763501,
+                            "Failed to remove index build from system collection",
+                            "buildUUID"_attr = replState.buildUUID,
+                            "collectionUUID"_attr = replState.collectionUUID,
+                            "db"_attr = replState.dbName,
+                            "indexNames"_attr = replState.indexNames,
+                            "indexSpecs"_attr = replState.indexSpecs,
+                            "error"_attr = status);
     }
 }
 
