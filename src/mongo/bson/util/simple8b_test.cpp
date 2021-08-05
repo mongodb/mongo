@@ -440,6 +440,49 @@ TEST(Simple8b, WordOfSkips) {
     testSimple8b(expectedInts, expectedBinary);
 }
 
+TEST(Simple8b, LargeSkipsFirst) {
+    std::vector<boost::optional<uint64_t>> expectedInts;
+
+    for (uint32_t i = 0; i < 10; ++i) {
+        expectedInts.push_back(boost::none);
+        expectedInts.push_back(64);
+    }
+
+    std::vector<uint8_t> expectedChar{
+        // The selector is 7 and the extension value is 1, so the values alternate
+        // between 0b111111 (skip) and 0b010110 (64).
+        0x17,
+        0xBF,
+        0xF5,
+        0x5B,
+        0xBF,
+        0xF5,
+        0x5B,
+        0x3F,  // 1st word.
+        // The selector is 7 and the extension value is 1, so the values alternate
+        // between 0b111111 (skip) and 0b010110 (64).
+        0x17,
+        0xD6,
+        0x6F,
+        0xFD,
+        0xD6,
+        0x6F,
+        0xFD,
+        0x16,  // 2nd word.
+        // The selector is 13 and there are 2 buckets with one skip and then 0b010000 (64).
+        0xFD,
+        0xFF,
+        0xFF,
+        0xFF,
+        0x03,
+        0x01,
+        0x0,
+        0x0,  // 3rd word.
+    };
+
+    testSimple8b(expectedInts, expectedChar);
+}
+
 TEST(Simple8b, MultipleFlushes) {
     BufBuilder buffer;
     Simple8bBuilder<uint64_t> s8b([&buffer](uint64_t simple8bBlock) {
