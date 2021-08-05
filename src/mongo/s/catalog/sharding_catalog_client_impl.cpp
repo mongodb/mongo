@@ -50,6 +50,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -624,9 +625,17 @@ std::pair<CollectionType, std::vector<ChunkType>> ShardingCatalogClientImpl::get
     aggRequest.setReadConcern(readConcern.toBSONInner());
     aggRequest.setWriteConcern(WriteConcernOptions());
 
-    const auto readPref = (serverGlobalParams.clusterRole == ClusterRole::ConfigServer)
-        ? ReadPreferenceSetting()
-        : Grid::get(opCtx)->readPreferenceWithConfigTime(kConfigReadSelector);
+    const auto readPref = [&]() -> ReadPreferenceSetting {
+        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+            return {};
+        }
+
+        const auto vcTime = VectorClock::get(opCtx)->getTime();
+        ReadPreferenceSetting readPref{kConfigReadSelector};
+        readPref.minClusterTime = vcTime.configTime().asTimestamp();
+        return readPref;
+    }();
+
     aggRequest.setUnwrappedReadPref(readPref.toContainingBSON());
 
     // Run the aggregation

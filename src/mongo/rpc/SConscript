@@ -113,7 +113,6 @@ env.Library(
     target='metadata',
     source=[
         'metadata.cpp',
-        'metadata/config_server_metadata.cpp',
         'metadata/egress_metadata_hook_list.cpp',
         'metadata/sharding_metadata.cpp',
         'metadata/repl_set_metadata.cpp',
@@ -179,7 +178,6 @@ if wiredtiger:
             'get_status_from_command_result_test.cpp',
             'legacy_request_test.cpp',
             'metadata/client_metadata_test.cpp',
-            'metadata/config_server_metadata_test.cpp',
             'metadata/egress_metadata_hook_list_test.cpp',
             'metadata/oplog_query_metadata_test.cpp',
             'metadata/repl_set_metadata_test.cpp',

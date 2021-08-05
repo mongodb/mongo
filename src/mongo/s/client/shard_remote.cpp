@@ -29,8 +29,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/s/client/shard_remote.h"
 
 #include <algorithm>
@@ -42,10 +40,10 @@
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -355,18 +353,29 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
     const BSONObj& sort,
     boost::optional<long long> limit,
     const boost::optional<BSONObj>& hint) {
-    invariant(isConfig());
-    auto const grid = Grid::get(opCtx);
 
-    BSONObj readConcernObj;
-    {
+    invariant(isConfig());
+
+    const auto configTime = [&] {
+        const auto currentTime = VectorClock::get(opCtx)->getTime();
+        return currentTime.configTime();
+    }();
+
+    const auto readPrefWithConfigTime = [&] {
+        ReadPreferenceSetting readPrefToReturn{readPref};
+        readPrefToReturn.minClusterTime = configTime.asTimestamp();
+        return readPrefToReturn;
+    }();
+
+    BSONObj readConcernObj = [&] {
         invariant(readConcernLevel == repl::ReadConcernLevel::kMajorityReadConcern);
-        const auto readConcern = grid->readConcernWithConfigTime(readConcernLevel);
+        repl::OpTime configOpTime{configTime.asTimestamp(),
+                                  mongo::repl::OpTime::kUninitializedTerm};
+        repl::ReadConcernArgs readConcern{configOpTime, readConcernLevel};
         BSONObjBuilder bob;
         readConcern.appendInfo(&bob);
-        readConcernObj =
-            bob.done().getObjectField(repl::ReadConcernArgs::kReadConcernFieldName).getOwned();
-    }
+        return bob.done().getObjectField(repl::ReadConcernArgs::kReadConcernFieldName).getOwned();
+    }();
 
     const Milliseconds maxTimeMS =
         std::min(opCtx->getRemainingMaxTimeMillis(),
@@ -393,11 +402,8 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
         findCommand.serialize(BSONObj(), &findCmdBuilder);
     }
 
-    return _runExhaustiveCursorCommand(opCtx,
-                                       grid->readPreferenceWithConfigTime(readPref),
-                                       nss.db().toString(),
-                                       maxTimeMS,
-                                       findCmdBuilder.done());
+    return _runExhaustiveCursorCommand(
+        opCtx, readPrefWithConfigTime, nss.db().toString(), maxTimeMS, findCmdBuilder.done());
 }
 
 Status ShardRemote::createIndexOnConfig(OperationContext* opCtx,
@@ -522,10 +528,13 @@ StatusWith<ShardRemote::AsyncCmdHandle> ShardRemote::_scheduleCommand(
     Milliseconds maxTimeMSOverride,
     const BSONObj& cmdObj,
     const TaskExecutor::RemoteCommandCallbackFn& cb) {
+
     const auto readPrefWithConfigTime = [&]() -> ReadPreferenceSetting {
         if (isConfig()) {
-            auto const grid = Grid::get(opCtx);
-            return grid->readPreferenceWithConfigTime(readPref);
+            const auto vcTime = VectorClock::get(opCtx)->getTime();
+            ReadPreferenceSetting readPrefToReturn{readPref};
+            readPrefToReturn.minClusterTime = vcTime.configTime().asTimestamp();
+            return readPrefToReturn;
         } else {
             return {readPref};
         }

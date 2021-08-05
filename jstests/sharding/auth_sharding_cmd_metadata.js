@@ -28,24 +28,20 @@ st.adminCommand({shardCollection: 'test.user', key: {x: 1}});
 const shardAdminDB = st.rs0.getPrimary().getDB('admin');
 const shardTestDB = st.rs0.getPrimary().getDB('test');
 
-// ConfigOpTime can't be advanced without the correct permissions
+// ConfigOpTime can't be advanced from external clients
 shardAdminDB.createUser({user: 'user', pwd: 'pwd', roles: jsTest.adminUserRoles});
 shardAdminDB.auth('user', 'pwd');
 const newTimestamp = Timestamp(getConfigOpTime().getTime() + 1000, 0);
 const metadata = {
-    $configServerState: {opTime: {ts: newTimestamp, t: -1}}
+    $configTime: newTimestamp
 };
-var res = shardTestDB.runCommandWithMetadata({ping: 1}, metadata);
-assert.commandFailedWithCode(res.commandReply, ErrorCodes.Unauthorized);
+assert.commandWorked(shardTestDB.runCommandWithMetadata({ping: 1}, metadata).commandReply);
 assert(timestampCmp(getConfigOpTime(), newTimestamp) < 0, "Unexpected ConfigOpTime advancement");
 
-// Advance configOpTime
 shardAdminDB.createUser({user: 'internal', pwd: 'pwd', roles: ['__system']});
 shardAdminDB.auth('internal', 'pwd');
-res = shardTestDB.runCommandWithMetadata({ping: 1}, metadata);
-assert.commandWorked(res.commandReply);
-assert(timestampCmp(getConfigOpTime(), newTimestamp) >= 0,
-       "ConfigOpTime did not advanced as expected");
+assert.commandWorked(shardTestDB.runCommandWithMetadata({ping: 1}, metadata).commandReply);
+assert(timestampCmp(getConfigOpTime(), newTimestamp) < 0, "Unexpected ConfigOpTime advancement");
 
 mongosAdminDB.logout();
 shardAdminDB.logout();

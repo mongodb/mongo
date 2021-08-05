@@ -31,7 +31,7 @@
 
 #include "mongo/client/connpool.h"
 #include "mongo/rpc/metadata.h"
-#include "mongo/s/sharding_egress_metadata_hook.h"
+#include "mongo/rpc/metadata/metadata_hook.h"
 
 namespace mongo {
 

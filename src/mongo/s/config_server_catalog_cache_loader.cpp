@@ -38,6 +38,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/grid.h"
@@ -57,14 +58,24 @@ CollectionAndChangedChunks getChangedChunks(OperationContext* opCtx,
                                             bool avoidSnapshotForRefresh) {
     const auto catalogClient = Grid::get(opCtx)->catalogClient();
 
+    // TODO SERVER-54394 always use snapshot read concern once ephemeral storage engine supports it
     const auto readConcernLevel = !avoidSnapshotForRefresh
         ? repl::ReadConcernLevel::kSnapshotReadConcern
         : repl::ReadConcernLevel::kLocalReadConcern;
-    const auto afterClusterTime = (serverGlobalParams.clusterRole == ClusterRole::ConfigServer)
-        ? repl::ReplicationCoordinator::get(opCtx)->getMyLastAppliedOpTime()
-        : Grid::get(opCtx)->configOpTime();
-    const auto readConcern =
-        repl::ReadConcernArgs(LogicalTime(afterClusterTime.getTimestamp()), readConcernLevel);
+
+    const auto afterClusterTime = [&] {
+        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+            return repl::ReplicationCoordinator::get(opCtx)
+                ->getMyLastAppliedOpTime()
+                .getTimestamp();
+
+        } else {
+            const auto vcTime = VectorClock::get(opCtx)->getTime();
+            return vcTime.configTime().asTimestamp();
+        }
+    }();
+
+    const auto readConcern = repl::ReadConcernArgs(LogicalTime(afterClusterTime), readConcernLevel);
 
     auto collAndChunks =
         catalogClient->getCollectionAndChunks(opCtx, nss, sinceVersion, readConcern);

@@ -29,18 +29,10 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/s/grid.h"
 
 #include "mongo/db/operation_context.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/vector_clock.h"
-#include "mongo/executor/task_executor.h"
-#include "mongo/executor/task_executor_pool.h"
-#include "mongo/logv2/log.h"
 #include "mongo/s/balancer_configuration.h"
-#include "mongo/s/client/shard_factory.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
 
 namespace mongo {
@@ -104,33 +96,6 @@ void Grid::setCustomConnectionPoolStatsFn(CustomConnectionPoolStatsFn statsFn) {
     stdx::lock_guard<Latch> lk(_mutex);
     invariant(!_customConnectionPoolStatsFn || !statsFn);
     _customConnectionPoolStatsFn = std::move(statsFn);
-}
-
-repl::ReadConcernArgs Grid::readConcernWithConfigTime(
-    repl::ReadConcernLevel readConcernLevel) const {
-    return ReadConcernArgs(configOpTime(), readConcernLevel);
-}
-
-ReadPreferenceSetting Grid::readPreferenceWithConfigTime(
-    const ReadPreferenceSetting& readPreference) const {
-    ReadPreferenceSetting readPrefToReturn(readPreference);
-    readPrefToReturn.minClusterTime = configOpTime().getTimestamp();
-    return readPrefToReturn;
-}
-
-repl::OpTime Grid::configOpTime() const {
-    invariant(serverGlobalParams.clusterRole != ClusterRole::ConfigServer);
-    const auto currentTime = VectorClock::get(grid.owner(this))->getTime();
-    const auto vcConfigTimeTs = currentTime.configTime().asTimestamp();
-    return mongo::repl::OpTime(vcConfigTimeTs, mongo::repl::OpTime::kUninitializedTerm);
-}
-
-void Grid::advanceConfigOpTime(OperationContext* opCtx, repl::OpTime opTime) {
-    auto vectorClock = VectorClock::get(grid.owner(this));
-    if (!vectorClock->isEnabled()) {
-        return;
-    }
-    vectorClock->gossipInConfigOpTime(opTime);
 }
 
 void Grid::clearForUnitTests() {

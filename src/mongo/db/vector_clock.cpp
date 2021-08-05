@@ -154,35 +154,6 @@ public:
     }
 };
 
-template <class ActualFormat>
-class VectorClock::OnlyOutOnNewFCVComponentFormat : public ActualFormat {
-public:
-    using ActualFormat::ActualFormat;
-    virtual ~OnlyOutOnNewFCVComponentFormat() = default;
-
-    bool out(ServiceContext* service,
-             OperationContext* opCtx,
-             bool permitRefresh,
-             BSONObjBuilder* out,
-             LogicalTime time,
-             Component component) const override {
-        if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-            serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
-                ServerGlobalParams::FeatureCompatibility::Version::kUpgradingFrom44To47)) {
-            return ActualFormat::out(service, opCtx, permitRefresh, out, time, component);
-        }
-        return false;
-    }
-
-    LogicalTime in(ServiceContext* service,
-                   OperationContext* opCtx,
-                   const BSONObj& in,
-                   bool couldBeUnauthenticated,
-                   Component component) const override {
-        return ActualFormat::in(service, opCtx, in, couldBeUnauthenticated, component);
-    }
-};
-
 class VectorClock::SignedComponentFormat : public VectorClock::ComponentFormat {
 public:
     using ComponentFormat::ComponentFormat;
@@ -318,12 +289,8 @@ private:
 const VectorClock::ComponentArray<std::unique_ptr<VectorClock::ComponentFormat>>
     VectorClock::_gossipFormatters{
         std::make_unique<VectorClock::SignedComponentFormat>(VectorClock::kClusterTimeFieldName),
-        std::make_unique<
-            VectorClock::OnlyOutOnNewFCVComponentFormat<VectorClock::PlainComponentFormat>>(
-            VectorClock::kConfigTimeFieldName),
-        std::make_unique<
-            VectorClock::OnlyOutOnNewFCVComponentFormat<VectorClock::PlainComponentFormat>>(
-            VectorClock::kTopologyTimeFieldName)};
+        std::make_unique<VectorClock::PlainComponentFormat>(VectorClock::kConfigTimeFieldName),
+        std::make_unique<VectorClock::PlainComponentFormat>(VectorClock::kTopologyTimeFieldName)};
 
 bool VectorClock::gossipOut(OperationContext* opCtx,
                             BSONObjBuilder* outMessage,
@@ -411,13 +378,6 @@ bool VectorClock::isEnabled() const {
 void VectorClock::_disable() {
     stdx::lock_guard<Latch> lock(_mutex);
     _isEnabled = false;
-}
-
-void VectorClock::gossipInConfigOpTime(const repl::OpTime& configOpTime) {
-    LogicalTimeArray newTimeArray;
-    newTimeArray[Component::ClusterTime] = LogicalTime(configOpTime.getTimestamp());
-    newTimeArray[Component::ConfigTime] = LogicalTime(configOpTime.getTimestamp());
-    _advanceTime(std::move(newTimeArray));
 }
 
 void VectorClock::resetVectorClock_forTest() {

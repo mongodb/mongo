@@ -159,14 +159,6 @@ public:
      */
     bool isEnabled() const;
 
-    /**
-     * Advances, if necessary, the clusterTime and configTime components of the vector clock up to
-     * the configOpTime received from another node. Necessary to ensure that the Grid's configOpTime
-     * won't be greater than the VectorClock's clusterTime.
-     * TODO SERVER-54252: Remove this after 5.0 has branched out.
-     */
-    void gossipInConfigOpTime(const repl::OpTime& configOpTime);
-
     ///////////////////////////////////////////////////////////////////////////////////////////////
     // The group of methods below is only used for unit-testing
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -307,8 +299,6 @@ protected:
 private:
     class PlainComponentFormat;
     class SignedComponentFormat;
-    template <class ActualFormat>
-    class OnlyOutOnNewFCVComponentFormat;
 
     /**
      * Called to determine if the cluster time component should be gossiped in and out to external

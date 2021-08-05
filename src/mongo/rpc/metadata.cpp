@@ -39,7 +39,6 @@
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/rpc/metadata/client_metadata.h"
-#include "mongo/rpc/metadata/config_server_metadata.h"
 #include "mongo/rpc/metadata/impersonated_user_metadata.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/util/string_map.h"
@@ -54,7 +53,6 @@ BSONObj makeEmptyMetadata() {
 
 void readRequestMetadata(OperationContext* opCtx, const OpMsg& opMsg, bool cmdRequiresAuth) {
     BSONElement readPreferenceElem;
-    BSONElement configSvrElem;
     BSONElement trackingElem;
     BSONElement clientElem;
     BSONElement helloClientElem;
@@ -65,8 +63,6 @@ void readRequestMetadata(OperationContext* opCtx, const OpMsg& opMsg, bool cmdRe
         auto fieldName = metadataElem.fieldNameStringData();
         if (fieldName == "$readPreference") {
             readPreferenceElem = metadataElem;
-        } else if (fieldName == ConfigServerMetadata::fieldName()) {
-            configSvrElem = metadataElem;
         } else if (fieldName == ClientMetadata::fieldName()) {
             clientElem = metadataElem;
         } else if (fieldName == TrackingMetadata::fieldName()) {
@@ -103,9 +99,6 @@ void readRequestMetadata(OperationContext* opCtx, const OpMsg& opMsg, bool cmdRe
         // its own requests. This may or may not be relevant for SERVER-50804.
         ClientMetadata::setFromMetadataForOperation(opCtx, clientElem);
     }
-
-    ConfigServerMetadata::get(opCtx) =
-        uassertStatusOK(ConfigServerMetadata::readFromMetadata(configSvrElem));
 
     TrackingMetadata::get(opCtx) =
         uassertStatusOK(TrackingMetadata::readFromMetadata(trackingElem));

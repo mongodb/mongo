@@ -236,7 +236,6 @@ env.Library(
         'catalog/sharding_catalog_client_impl',
         'committed_optime_metadata_hook',
         'coreshard',
-        'sharding_egress_metadata_hook_for_mongos',
         'sharding_task_executor',
         'sharding_test_fixture_common',
     ],
@@ -286,7 +285,6 @@ env.Library(
         'config_server_catalog_cache_loader.cpp',
         'config_server_client.cpp',
         'shard_util.cpp',
-        'sharding_egress_metadata_hook.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/client_metadata_propagation_egress_hook',
@@ -314,17 +312,6 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
     ],
-)
-
-env.Library(
-    target='sharding_egress_metadata_hook_for_mongos',
-    source=[
-        'sharding_egress_metadata_hook_for_mongos.cpp'
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/rpc/metadata',
-        'coreshard',
-    ]
 )
 
 env.Library(
@@ -458,7 +445,6 @@ env.Library(
         'mongos_server_parameters',
         'mongos_topology_coordinator',
         'query/cluster_cursor_cleanup_job',
-        'sharding_egress_metadata_hook_for_mongos',
         'sharding_initialization',
         'sharding_router_api',
     ],
@@ -512,7 +498,6 @@ env.Library(
         'mongos_topology_coordinator',
         'query/cluster_cursor_cleanup_job',
         'sessions_collection_sharded',
-        'sharding_egress_metadata_hook_for_mongos',
         'sharding_initialization',
         'sharding_router_api',
     ],

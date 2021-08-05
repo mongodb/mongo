@@ -48,11 +48,11 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/vector_clock_mutable.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/grid.h"
 
 namespace mongo {
 namespace {
@@ -147,8 +147,13 @@ Status modifyRecoveryDocument(OperationContext* opCtx,
         boost::optional<AutoGetDb> autoGetDb;
         autoGetDb.emplace(opCtx, NamespaceString::kServerConfigurationNamespace.db(), MODE_X);
 
-        auto const grid = Grid::get(opCtx);
-        BSONObj updateObj = RecoveryDocument::createChangeObj(grid->configOpTime(), change);
+        const auto configOpTime = [&]() {
+            const auto vcTime = VectorClock::get(opCtx)->getTime();
+            const auto vcConfigTimeTs = vcTime.configTime().asTimestamp();
+            return mongo::repl::OpTime(vcConfigTimeTs, mongo::repl::OpTime::kUninitializedTerm);
+        }();
+
+        BSONObj updateObj = RecoveryDocument::createChangeObj(configOpTime, change);
 
         LOGV2_DEBUG(22083,
                     1,
@@ -209,7 +214,6 @@ void ShardingStateRecovery::endMetadataOp(OperationContext* opCtx) {
 }
 
 Status ShardingStateRecovery::recover(OperationContext* opCtx) {
-    Grid* const grid = Grid::get(opCtx);
     ShardingState* const shardingState = ShardingState::get(opCtx);
     invariant(shardingState->enabled());
 
@@ -237,7 +241,9 @@ Status ShardingStateRecovery::recover(OperationContext* opCtx) {
           "recoveryDoc"_attr = redact(recoveryDoc.toBSON()));
 
     if (!recoveryDoc.getMinOpTimeUpdaters()) {
-        grid->advanceConfigOpTime(opCtx, recoveryDoc.getMinOpTime());
+        LogicalTime minOpTime{recoveryDoc.getMinOpTime().getTimestamp()};
+        VectorClockMutable::get(opCtx)->tickClusterTimeTo(minOpTime);
+        VectorClockMutable::get(opCtx)->tickConfigTimeTo(minOpTime);
         return Status::OK();
     }
 
@@ -260,10 +266,7 @@ Status ShardingStateRecovery::recover(OperationContext* opCtx) {
     if (!status.isOK())
         return status;
 
-    LOGV2(22087,
-          "Sharding state recovered. New config server opTime is {newConfigServerOpTime}",
-          "Sharding state recovered",
-          "newConfigServerOpTime"_attr = grid->configOpTime());
+    LOGV2(22087, "Sharding state recovered");
 
     // Finally, clear the recovery document so next time we don't need to recover
     status = modifyRecoveryDocument(opCtx, RecoveryDocument::Clear, kLocalWriteConcern);

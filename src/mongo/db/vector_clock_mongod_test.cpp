@@ -127,11 +127,12 @@ DEATH_TEST_F(VectorClockMongoDTest, CannotTickConfigTime, "Hit a MONGO_UNREACHAB
     vc->tickConfigTime(1);
 }
 
-DEATH_TEST_F(VectorClockMongoDTest, CannotTickToConfigTime, "Hit a MONGO_UNREACHABLE") {
-    auto sc = getServiceContext();
-    auto vc = VectorClockMutable::get(sc);
-    vc->tickConfigTimeTo(LogicalTime());
-}
+// TODO SERVER-55032 re-enable the following test
+// DEATH_TEST_F(VectorClockMongoDTest, CannotTickToConfigTime, "Hit a MONGO_UNREACHABLE") {
+//    auto sc = getServiceContext();
+//    auto vc = VectorClockMutable::get(sc);
+//    vc->tickConfigTimeTo(LogicalTime());
+//}
 
 DEATH_TEST_F(VectorClockMongoDTest, CannotTickTopologyTime, "Hit a MONGO_UNREACHABLE") {
     auto sc = getServiceContext();

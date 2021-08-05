@@ -1514,8 +1514,6 @@ void ExecCommandDatabase::_initiateCommand() {
         if (OperationShardingState::isOperationVersioned(opCtx) || oss.hasDbVersion()) {
             uassertStatusOK(shardingState->canAcceptShardedCommands());
         }
-
-        _execContext->behaviors->advanceConfigOpTimeFromRequestMetadata(opCtx);
     }
 
     _scoped = _execContext->behaviors->scopedOperationCompletionShardingActions(opCtx);

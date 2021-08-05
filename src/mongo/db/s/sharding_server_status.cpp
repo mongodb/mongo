@@ -36,6 +36,7 @@
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_statistics.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
@@ -71,7 +72,13 @@ public:
         result.append("configsvrConnectionString",
                       shardRegistry->getConfigServerConnectionString().toString());
 
-        grid->configOpTime().append(&result, "lastSeenConfigServerOpTime");
+        const auto configOpTime = [&]() {
+            const auto vcTime = VectorClock::get(opCtx)->getTime();
+            const auto vcConfigTimeTs = vcTime.configTime().asTimestamp();
+            return mongo::repl::OpTime(vcConfigTimeTs, mongo::repl::OpTime::kUninitializedTerm);
+        }();
+
+        configOpTime.append(&result, "lastSeenConfigServerOpTime");
 
         const long long maxChunkSizeInBytes =
             grid->getBalancerConfiguration()->getMaxChunkSizeBytes();

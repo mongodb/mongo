@@ -139,8 +139,6 @@ public:
 
     void resetLockerState(OperationContext* opCtx) const noexcept override {}
 
-    void advanceConfigOpTimeFromRequestMetadata(OperationContext* opCtx) const override {}
-
     std::unique_ptr<PolymorphicScoped> scopedOperationCompletionShardingActions(
         OperationContext* opCtx) const override {
         return nullptr;
