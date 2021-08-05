@@ -525,5 +525,45 @@ TEST_F(ReshardingOplogFetcherTest, TestAwaitInsert) {
     ASSERT_FALSE(fetcher.awaitInsert({dataWriteTimestamp, dataWriteTimestamp}).isReady());
 }
 
+TEST_F(ReshardingOplogFetcherTest, RetriesOnRemoteInterruptionError) {
+    const NamespaceString outputCollectionNss("dbtests.outputCollection");
+    const NamespaceString dataCollectionNss("dbtests.runFetchIteration");
+
+    create(outputCollectionNss);
+    create(dataCollectionNss);
+    _fetchTimestamp = repl::StorageInterface::get(_svcCtx)->getLatestOplogTimestamp(_opCtx);
+
+    const auto& collectionUUID = [&] {
+        AutoGetCollection dataColl(_opCtx, dataCollectionNss, LockMode::MODE_IX);
+        return dataColl->uuid();
+    }();
+
+    auto fetcherJob = launchAsync([&, this] {
+        ThreadClient tc("RunnerForFetcher", _svcCtx, nullptr);
+
+        ReshardingDonorOplogId startAt{_fetchTimestamp, _fetchTimestamp};
+        ReshardingOplogFetcher fetcher(makeFetcherEnv(),
+                                       _reshardingUUID,
+                                       collectionUUID,
+                                       startAt,
+                                       _donorShard,
+                                       _destinationShard,
+                                       outputCollectionNss);
+        fetcher.useReadConcernForTest(false);
+        fetcher.setInitialBatchSizeForTest(2);
+
+        auto factory = makeCancelableOpCtx();
+        return fetcher.iterate(&cc(), factory);
+    });
+
+    onCommand([&](const executor::RemoteCommandRequest& request) -> StatusWith<BSONObj> {
+        // Simulate the remote donor shard stepping down or transitioning into rollback.
+        return {ErrorCodes::InterruptedDueToReplStateChange, "operation was interrupted"};
+    });
+
+    auto moreToCome = fetcherJob.timed_get(Seconds(5));
+    ASSERT_TRUE(moreToCome);
+}
+
 }  // namespace
 }  // namespace mongo
