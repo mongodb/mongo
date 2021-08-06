@@ -126,6 +126,7 @@ Status persistCollectionAndChangedChunks(OperationContext* opCtx,
     update.setMaxChunkSizeBytes(collAndChunks.maxChunkSizeBytes);
     update.setAllowAutoSplit(collAndChunks.allowAutoSplit);
     update.setAllowMigrations(collAndChunks.allowMigrations);
+    update.setSupportingLongName(collAndChunks.supportingLongName);
 
     // Mark the chunk metadata as refreshing, so that secondaries are aware of refresh.
     update.setRefreshing(true);
@@ -290,6 +291,7 @@ CollectionAndChangedChunks getPersistedMetadataSinceVersion(OperationContext* op
                                       shardCollectionEntry.getMaxChunkSizeBytes(),
                                       shardCollectionEntry.getAllowAutoSplit(),
                                       shardCollectionEntry.getAllowMigrations(),
+                                      shardCollectionEntry.getSupportingLongName(),
                                       std::move(changedChunks)};
 }
 
@@ -1036,6 +1038,7 @@ StatusWith<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_getLoader
         persisted.maxChunkSizeBytes = enqueued.maxChunkSizeBytes;
         persisted.allowAutoSplit = enqueued.allowAutoSplit;
         persisted.allowMigrations = enqueued.allowMigrations;
+        persisted.supportingLongName = enqueued.supportingLongName;
 
         return persisted;
     }
@@ -1615,6 +1618,7 @@ ShardServerCatalogCacheLoader::CollAndChunkTaskList::getEnqueuedMetadataForTerm(
 
             // Keep the most recent version of these fields
             collAndChunks.allowMigrations = task.collectionAndChangedChunks->allowMigrations;
+            collAndChunks.supportingLongName = task.collectionAndChangedChunks->supportingLongName;
             collAndChunks.maxChunkSizeBytes = task.collectionAndChangedChunks->maxChunkSizeBytes;
             collAndChunks.allowAutoSplit = task.collectionAndChangedChunks->allowAutoSplit;
             collAndChunks.reshardingFields = task.collectionAndChangedChunks->reshardingFields;

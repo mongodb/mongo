@@ -502,5 +502,20 @@ TEST_F(ShardServerCatalogCacheLoaderTest, CollAndChunkTasksConsistency) {
     _shardLoader->getChunksSince(kNss, ChunkVersion::UNSHARDED()).get();
 }
 
+TEST_F(ShardServerCatalogCacheLoaderTest, SupportingLongNameFieldsAreProperlyPropagatedOnSSCCL) {
+    ChunkVersion collectionVersion(1, 0, OID::gen(), boost::none /* timestamp */);
+
+    CollectionType collectionType = makeCollectionType(collectionVersion);
+    collectionType.setSupportingLongName(SupportingLongNameStatusEnum::kExplicitlyEnabled);
+
+    vector<ChunkType> chunks = makeFiveChunks(collectionVersion);
+
+    _remoteLoaderMock->setCollectionRefreshReturnValue(collectionType);
+    _remoteLoaderMock->setChunkRefreshReturnValue(chunks);
+
+    auto collAndChunksRes = _shardLoader->getChunksSince(kNss, ChunkVersion::UNSHARDED()).get();
+    ASSERT(collAndChunksRes.supportingLongName == SupportingLongNameStatusEnum::kExplicitlyEnabled);
+}
+
 }  // namespace
 }  // namespace mongo

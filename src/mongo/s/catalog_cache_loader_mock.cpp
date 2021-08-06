@@ -100,6 +100,7 @@ CollectionAndChangedChunks getCollectionRefresh(
                                       swCollectionReturnValue.getValue().getMaxChunkSizeBytes(),
                                       swCollectionReturnValue.getValue().getAllowAutoSplit(),
                                       swCollectionReturnValue.getValue().getAllowMigrations(),
+                                      swCollectionReturnValue.getValue().getSupportingLongName(),
                                       std::move(chunks)};
 }
 

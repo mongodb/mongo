@@ -91,6 +91,7 @@ CollectionAndChangedChunks getChangedChunks(OperationContext* opCtx,
                                       coll.getMaxChunkSizeBytes(),
                                       coll.getAllowAutoSplit(),
                                       coll.getAllowMigrations(),
+                                      coll.getSupportingLongName(),
                                       std::move(collAndChunks.second)};
 }
 
