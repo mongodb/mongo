@@ -448,6 +448,8 @@ error_codes:
 
     - {code: 353, name: NonRetryableTenantMigrationConflict, extra: NonRetryableTenantMigrationConflictInfo, categories: [TenantMigrationError, TenantMigrationConflictError]}
 
+    - {code: 354, name: LoadBalancerSupportMismatch, categories: [CloseConnectionError]}
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)
