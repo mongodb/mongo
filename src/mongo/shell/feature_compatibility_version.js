@@ -37,19 +37,23 @@ function binVersionToFCV(binVersion) {
  * previousVersion: <optional>}, ok: 1}.
  */
 function checkFCV(adminDB, version, targetVersion) {
-    let res = adminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
-    assert.commandWorked(res);
-    assert.eq(res.featureCompatibilityVersion.version, version, tojson(res));
-    assert.eq(res.featureCompatibilityVersion.targetVersion, targetVersion, tojson(res));
     // When both version and targetVersion are equal to lastContinuousFCV or lastLTSFCV, downgrade
     // is in progress. This tests that previousVersion is always equal to latestFCV in downgrading
     // states or undefined otherwise.
     const isDowngrading = (version === lastLTSFCV && targetVersion === lastLTSFCV) ||
         (version === lastContinuousFCV && targetVersion === lastContinuousFCV);
-    if (isDowngrading) {
-        assert.eq(res.featureCompatibilityVersion.previousVersion, latestFCV, tojson(res));
-    } else {
-        assert.eq(res.featureCompatibilityVersion.previousVersion, undefined, tojson(res));
+
+    const isMongod = !adminDB.getMongo().isMongos();
+    if (isMongod) {
+        let res = adminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
+        assert.commandWorked(res);
+        assert.eq(res.featureCompatibilityVersion.version, version, tojson(res));
+        assert.eq(res.featureCompatibilityVersion.targetVersion, targetVersion, tojson(res));
+        if (isDowngrading) {
+            assert.eq(res.featureCompatibilityVersion.previousVersion, latestFCV, tojson(res));
+        } else {
+            assert.eq(res.featureCompatibilityVersion.previousVersion, undefined, tojson(res));
+        }
     }
 
     // This query specifies an explicit readConcern because some FCV tests pass a connection that
