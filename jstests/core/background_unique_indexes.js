@@ -9,6 +9,8 @@
  * @tags: [
  *   # Sharding suites that use a hashed shard key on _id cannot create a unique index on {x: 1}.
  *   cannot_create_unique_index_when_using_hashed_shard_key,
+ *   # Large update operations may be interrupted by stepdowns.
+ *   operations_longer_than_stepdown_interval,
  *   requires_background_index
  *   ]
  */
