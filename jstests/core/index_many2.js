@@ -3,31 +3,44 @@
 // @tags: [assumes_no_implicit_index_creation]
 
 (function() {
+'use strict';
+
 const t = db.index_many2;
 t.drop();
 
-t.save({x: 1});
+assert.commandWorked(t.insert({_id: 1, x: 1}));
 
 assert.eq(1, t.getIndexKeys().length, "Expected a single default index.");
 
 function make(n) {
-    var x = {};
+    let x = {};
     x["x" + n] = 1;
     return x;
 }
 
-jsTestLog("Creating 1000 indexes.");
+// This should match the constant in IndexCatalogImpl::kMaxNumIndexesAllowed.
+const maxNumIndexesAllowed = 64;
 
-// Try to create 1000 indexes. Only 63 will succeed because 64 is the maximum number of indexes
-// allowed on a collection.
-for (let i = 1; i < 1000; i++) {
-    // Cannot assert success because only 63 additional indexes will succeed.
-    t.createIndex(make(i));
-}
+jsTestLog("Creating " + (maxNumIndexesAllowed - 1) + " indexes.");
+
+// Only 63 will succeed because 64 is the maximum number of indexes allowed on a collection.
+let i = 1;
+assert.soon(() => {
+    const key = make(i++);
+    // May fail due to stepdowns and shutdowns. Keep trying until we reach the
+    // server limit for indexes in a collection.
+    const res = t.createIndex(key);
+    const num = t.getIndexKeys().length;
+    jsTestLog('createIndex: ' + tojson(key) + ': ' +
+              ' (num indexes: ' + num + '): ' + tojson(res));
+    return num === maxNumIndexesAllowed;
+});
 
 const indexKeys = t.getIndexKeys();
 const num = indexKeys.length;
-assert.eq(64, num, "Expected 64 keys, found: " + num);
+assert.eq(maxNumIndexesAllowed, num, "Expected 64 keys, found: " + num);
+
+assert.commandFailedWithCode(t.createIndex({y: 1}), ErrorCodes.CannotCreateIndex);
 
 // Drop one of the indexes.
 const indexToDrop = indexKeys.filter(key => key._id !== 1)[num - 2];
