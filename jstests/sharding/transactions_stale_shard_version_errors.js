@@ -205,7 +205,8 @@ assert.commandWorked(sessionDB.runCommand({insert: collName, documents: [{_id: 6
 assert.commandWorked(session.commitTransaction_forTesting());
 
 //
-// Cannot retry a stale write past the first statement.
+// Can retry a stale write past the first statement if the write has been sent to only new
+// participant shard(s).
 //
 // TODO SERVER-37207: Change batch writes to retry only the failed writes in a batch, to allow
 // retrying writes beyond the first overall statement.
@@ -221,24 +222,9 @@ session.startTransaction();
 assert.commandWorked(sessionDB.runCommand({insert: collName, documents: [{_id: -4}]}));
 
 // Targets Shard2, which is stale.
-let shard2Version = st.shard2.getBinVersion();
-jsTest.log("Binary version of shard2: " + MongoRunner.getBinVersionFor(shard2Version));
-if (MongoRunner.compareBinVersions(shard2Version, "4.9") < 0) {
-    // TODO SERVER-52782 remove this if branch when 5.0 becomes last-lts
-    res = assert.commandFailedWithCode(
-        sessionDB.runCommand({insert: collName, documents: [{_id: 7}]}), ErrorCodes.StaleConfig);
-    assert.eq(res.errorLabels, ["TransientTransactionError"]);
+assert.commandWorked(sessionDB.runCommand({insert: collName, documents: [{_id: 7}]}));
 
-    // The transaction should have been implicitly aborted on all shards.
-    assertNoSuchTransactionOnAllShards(
-        st, session.getSessionId(), session.getTxnNumber_forTesting());
-    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
-                                 ErrorCodes.NoSuchTransaction);
-} else {
-    assert.commandWorked(sessionDB.runCommand({insert: collName, documents: [{_id: 7}]}));
-
-    assert.commandWorked(session.abortTransaction_forTesting());
-}
+assert.commandWorked(session.commitTransaction_forTesting());
 
 //
 // The final StaleConfig error should be returned if the router exhausts its retries.
