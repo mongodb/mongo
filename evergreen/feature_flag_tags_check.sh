@@ -8,31 +8,31 @@ activate_venv
 set -o verbose
 set -o errexit
 
+enterprise_path="src/mongo/db/modules/enterprise"
+diff_file_name="with_base_upstream.diff"
+
 # get the list of feature flags from the patched version
-$python buildscripts/idl/gen_all_feature_flag_list.py --import-dir src --import-dir src/mongo/db/modules/enterprise/src
+$python buildscripts/idl/gen_all_feature_flag_list.py --import-dir src --import-dir "$enterprise_path"/src
 mv all_feature_flags.txt patch_all_feature_flags.txt
 
 # get the list of feature flags from the base commit
-git stash
-if [ -d src/mongo/db/modules/enterprise ]; then
-  pushd src/mongo/db/modules/enterprise
-  git stash
-  popd
+git --no-pager diff "$(git merge-base origin/${branch_name} HEAD)" --output="$diff_file_name"
+if [ -s "$diff_file_name" ]; then
+  git apply -R "$diff_file_name"
 fi
 
-$python buildscripts/idl/gen_all_feature_flag_list.py --import-dir src --import-dir src/mongo/db/modules/enterprise/src
+# This script has to be run on an Evergreen variant or local repo with the enterprise module.
+pushd "$enterprise_path"
+git --no-pager diff "$(git merge-base origin/${branch_name} HEAD)" --output="$diff_file_name"
+if [ -s "$diff_file_name" ]; then
+  git apply -R "$diff_file_name"
+fi
+popd
+
+$python buildscripts/idl/gen_all_feature_flag_list.py --import-dir src --import-dir "$enterprise_path"/src
 mv all_feature_flags.txt base_all_feature_flags.txt
-
-set +o errexit
-git stash pop
-if [ -d src/mongo/db/modules/enterprise ]; then
-  pushd src/mongo/db/modules/enterprise
-  git stash pop
-  popd
-fi
-set -o errexit
 
 # print out the list of tests that previously had feature flag tag, that was
 # enabled by default in the current patch, and currently don't have requires
 # latests FCV tag
-$python buildscripts/feature_flag_tags_check.py
+$python buildscripts/feature_flag_tags_check.py --diff-file-name="$diff_file_name" --enterprise-path="$enterprise_path"

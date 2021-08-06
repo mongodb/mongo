@@ -11707,8 +11707,6 @@ buildvariants:
   batchtime: 10080 # 7 days
   stepback: false
   tasks:
-  - name: validate_commit_message
-  - name: check_for_todos
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:
       - rhel80-xlarge-commitqueue
@@ -11725,6 +11723,7 @@ buildvariants:
   - name: test_api_version_compatibility
   - name: validate_commit_message
   - name: check_for_todos
+  - name: check_feature_flag_tags
 
 - name: live-record
   display_name: "~ RHEL 8.0 Shared Library (with UndoDB live-record)"
