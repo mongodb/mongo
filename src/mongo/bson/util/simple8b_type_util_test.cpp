@@ -46,6 +46,14 @@ uint8_t scaleIndexForMultiplier(double multiplier) {
     return 0;
 }
 
+void assertDecimal128Equal(Decimal128 val) {
+    int128_t encodeResult = Simple8bTypeUtil::encodeDecimal128(val);
+    ASSERT_EQUALS(absl::Int128High64(encodeResult), val.getValue().high64);
+    ASSERT_EQUALS(absl::Int128Low64(encodeResult), val.getValue().low64);
+    Decimal128 decodeResult = Simple8bTypeUtil::decodeDecimal128(encodeResult);
+    ASSERT_TRUE(decodeResult == val);
+}
+
 TEST(Simple8bTypeUtil, EncodeAndDecodePositiveSignedInt) {
     int64_t signedVal = 1;
     uint64_t unsignedVal = Simple8bTypeUtil::encodeInt64(signedVal);
@@ -110,7 +118,7 @@ TEST(Simple8bTypeUtil, EncodeAndDecodeNegativeInt) {
     ASSERT_EQUALS(decodedSignedVal, signedVal);
 }
 
-TEST(Simple8b, DecimalPositiveValue) {
+TEST(Simple8bTypeUtil, DecimalPositiveValue) {
     double val = 1.0;
     boost::optional<uint8_t> scalar = Simple8bTypeUtil::calculateDecimalShiftMultiplier(val);
     ASSERT_TRUE(scalar);
@@ -122,7 +130,7 @@ TEST(Simple8b, DecimalPositiveValue) {
     ASSERT_EQUALS(val, decodeResult);
 }
 
-TEST(Simple8b, EightDigitDecimalValue) {
+TEST(Simple8bTypeUtil, EightDigitDecimalValue) {
     double val = 1.12345678;
     boost::optional<uint8_t> scalar = Simple8bTypeUtil::calculateDecimalShiftMultiplier(val);
     ASSERT_TRUE(scalar);
@@ -134,7 +142,7 @@ TEST(Simple8b, EightDigitDecimalValue) {
     ASSERT_EQUALS(val, decodeResult);
 }
 
-TEST(Simple8b, TwoDigitDecimalValue) {
+TEST(Simple8bTypeUtil, TwoDigitDecimalValue) {
     double val = 1.12;
     boost::optional<uint8_t> scalar = Simple8bTypeUtil::calculateDecimalShiftMultiplier(val);
     ASSERT_TRUE(scalar);
@@ -146,13 +154,13 @@ TEST(Simple8b, TwoDigitDecimalValue) {
     ASSERT_EQUALS(val, decodeResult);
 }
 
-TEST(Simple8b, FloatExceedDigitsValue) {
+TEST(Simple8bTypeUtil, FloatExceedDigitsValue) {
     double val = 1.123456789;
     boost::optional<uint8_t> scalar = Simple8bTypeUtil::calculateDecimalShiftMultiplier(val);
     ASSERT_FALSE(scalar);
 }
 
-TEST(Simple8b, SparseDecimalValue) {
+TEST(Simple8bTypeUtil, SparseDecimalValue) {
     double val = 1.00000001;
     boost::optional<uint8_t> scalar = Simple8bTypeUtil::calculateDecimalShiftMultiplier(val);
     ASSERT_TRUE(scalar);
@@ -164,7 +172,7 @@ TEST(Simple8b, SparseDecimalValue) {
     ASSERT_EQUALS(val, decodeResult);
 }
 
-TEST(Simple8b, RoundingDecimalValue) {
+TEST(Simple8bTypeUtil, RoundingDecimalValue) {
     double val = 1.455454;
     boost::optional<uint8_t> scalar = Simple8bTypeUtil::calculateDecimalShiftMultiplier(val);
     ASSERT_TRUE(scalar);
@@ -176,7 +184,7 @@ TEST(Simple8b, RoundingDecimalValue) {
     ASSERT_EQUALS(val, decodeResult);
 }
 
-TEST(Simple8b, AllNines) {
+TEST(Simple8bTypeUtil, AllNines) {
     double val = 1.99999999;
     boost::optional<uint8_t> scalar = Simple8bTypeUtil::calculateDecimalShiftMultiplier(val);
     ASSERT_TRUE(scalar);
@@ -188,7 +196,7 @@ TEST(Simple8b, AllNines) {
     ASSERT_EQUALS(val, decodeResult);
 }
 
-TEST(Simple8b, 3DigitValue) {
+TEST(Simple8bTypeUtil, 3DigitValue) {
     double val = 123.123;
     boost::optional<uint8_t> scalar = Simple8bTypeUtil::calculateDecimalShiftMultiplier(val);
     ASSERT_TRUE(scalar);
@@ -200,14 +208,14 @@ TEST(Simple8b, 3DigitValue) {
     ASSERT_EQUALS(val, decodeResult);
 }
 
-TEST(Simple8b, RoundingTooShortShouldFail) {
+TEST(Simple8bTypeUtil, RoundingTooShortShouldFail) {
     double val = 1.9876543;
     boost::optional<int64_t> encodeResult =
         Simple8bTypeUtil::encodeDouble(val, scaleIndexForMultiplier(10000));
     ASSERT_FALSE(encodeResult);
 }
 
-TEST(Simple8b, TestNaNAndInfinity) {
+TEST(Simple8bTypeUtil, TestNaNAndInfinity) {
     double val = std::numeric_limits<double>::quiet_NaN();
     boost::optional<uint8_t> scalar = Simple8bTypeUtil::calculateDecimalShiftMultiplier(val);
     ASSERT_FALSE(scalar);
@@ -221,7 +229,7 @@ TEST(Simple8b, TestNaNAndInfinity) {
     ASSERT_FALSE(result.has_value());
 }
 
-TEST(Simple8b, TestMaxDoubleShouldFail) {
+TEST(Simple8bTypeUtil, TestMaxDoubleShouldFail) {
     double val = std::numeric_limits<double>::max();
     boost::optional<uint8_t> scalar = Simple8bTypeUtil::calculateDecimalShiftMultiplier(val);
     ASSERT_FALSE(scalar);
@@ -230,7 +238,7 @@ TEST(Simple8b, TestMaxDoubleShouldFail) {
     ASSERT_FALSE(result.has_value());
 }
 
-TEST(Simple8b, TestMinDoubleShouldFail) {
+TEST(Simple8bTypeUtil, TestMinDoubleShouldFail) {
     double val = std::numeric_limits<double>::lowest();
     boost::optional<uint8_t> scalar = Simple8bTypeUtil::calculateDecimalShiftMultiplier(val);
     ASSERT_FALSE(scalar);
@@ -239,7 +247,7 @@ TEST(Simple8b, TestMinDoubleShouldFail) {
     ASSERT_FALSE(result.has_value());
 }
 
-TEST(Simple8b, InterpretAsMemory) {
+TEST(Simple8bTypeUtil, InterpretAsMemory) {
     std::vector<double> vals = {0.0,
                                 1.12345678,
                                 std::numeric_limits<double>::max(),
@@ -263,7 +271,7 @@ TEST(Simple8b, InterpretAsMemory) {
     }
 }
 
-TEST(Simple8b, TestMaxInt) {
+TEST(Simple8bTypeUtil, TestMaxInt) {
     // max int that can be stored as a double without losing precision
     double val = std::pow(2, 53);
     boost::optional<uint8_t> scalar = Simple8bTypeUtil::calculateDecimalShiftMultiplier(val);
@@ -277,7 +285,7 @@ TEST(Simple8b, TestMaxInt) {
     ASSERT_EQUALS(val, decodeResult);
 }
 
-TEST(Simple8b, NegativeValue) {
+TEST(Simple8bTypeUtil, NegativeValue) {
     double val = -123.123;
     boost::optional<uint8_t> scalar = Simple8bTypeUtil::calculateDecimalShiftMultiplier(val);
     ASSERT_TRUE(scalar);
@@ -290,7 +298,7 @@ TEST(Simple8b, NegativeValue) {
     ASSERT_EQUALS(val, decodeResult);
 }
 
-TEST(Simple8b, NegativeSixDecimalValue) {
+TEST(Simple8bTypeUtil, NegativeSixDecimalValue) {
     double val = -123.123456;
     boost::optional<uint8_t> scalar = Simple8bTypeUtil::calculateDecimalShiftMultiplier(val);
     ASSERT_TRUE(scalar);
@@ -303,7 +311,7 @@ TEST(Simple8b, NegativeSixDecimalValue) {
     ASSERT_EQUALS(val, decodeResult);
 }
 
-TEST(Simple8b, TestMinInt) {
+TEST(Simple8bTypeUtil, TestMinInt) {
     // min int that can be stored as a double without losing precision
     double val = -std::pow(2, 53);
     boost::optional<std::uint8_t> scalar = Simple8bTypeUtil::calculateDecimalShiftMultiplier(val);
@@ -317,7 +325,7 @@ TEST(Simple8b, TestMinInt) {
     ASSERT_EQUALS(val, decodeResult);
 }
 
-TEST(Simple8b, TestObjectId) {
+TEST(Simple8bTypeUtil, TestObjectId) {
     OID objId("112233445566778899AABBCC");
     int64_t encodedObjId = Simple8bTypeUtil::encodeObjectId(objId);
 
@@ -360,4 +368,24 @@ TEST(Simple8bTypeUtil, EncodeAndDecodeMaxNegativeSignedInt128) {
     ASSERT_EQUALS(unsignedVal, expectedVal);
     int128_t decodedSignedVal = Simple8bTypeUtil::decodeInt128(unsignedVal);
     ASSERT_EQUALS(decodedSignedVal, signedVal);
+}
+
+TEST(Simple8bTypeUtil, Decimal128Base) {
+    assertDecimal128Equal(Decimal128(1.0));
+}
+
+TEST(Simple8bTypeUtil, Decimal128Negative) {
+    assertDecimal128Equal(Decimal128(-1.0));
+}
+
+TEST(Simple8bTypeUtil, Decimal128Max) {
+    assertDecimal128Equal(Decimal128(std::numeric_limits<Decimal128>::max()));
+}
+
+TEST(Simple8bTypeUtil, Decimal128Min) {
+    assertDecimal128Equal(Decimal128(std::numeric_limits<Decimal128>::min()));
+}
+
+TEST(Simple8bTypeUtil, Decimal128Lowest) {
+    assertDecimal128Equal(Decimal128(std::numeric_limits<Decimal128>::lowest()));
 }

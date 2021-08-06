@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/simple8b.h"
+#include "mongo/platform/int128.h"
 
 #include <memory>
 
@@ -101,7 +102,8 @@ private:
     int64_t _prevDelta = 0;
 
     // Simple-8b builder for storing compressed deltas
-    Simple8bBuilder<uint64_t> _simple8bBuilder;
+    Simple8bBuilder<uint64_t> _simple8bBuilder64;
+    Simple8bBuilder<uint128_t> _simple8bBuilder128;
 
     // Offset to last Simple-8b control byte
     std::ptrdiff_t _controlByteOffset = 0;
@@ -116,6 +118,9 @@ private:
 
     // Field name
     std::string _fieldName;
+
+    // Chose whether to use 128 or 64 Simple-8b builder
+    bool _storeWith128 = false;
 };
 
 }  // namespace mongo

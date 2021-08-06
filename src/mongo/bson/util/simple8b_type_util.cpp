@@ -166,4 +166,17 @@ double Simple8bTypeUtil::decodeDouble(int64_t val, uint8_t scaleIndex) {
     return val / kScaleMultiplier[scaleIndex];
 }
 
+int128_t Simple8bTypeUtil::encodeDecimal128(Decimal128 val) {
+    Decimal128::Value underlyingData = val.getValue();
+    return absl::MakeInt128(underlyingData.high64, underlyingData.low64);
+}
+
+Decimal128 Simple8bTypeUtil::decodeDecimal128(int128_t val) {
+    Decimal128::Value constructFromValue;
+    constructFromValue.high64 = absl::Uint128High64(val);
+    constructFromValue.low64 = absl::Uint128Low64(val);
+    Decimal128 res(constructFromValue);
+    return res;
+}
+
 }  // namespace mongo

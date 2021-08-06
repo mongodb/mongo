@@ -28,6 +28,7 @@
  */
 
 #include "mongo/bson/oid.h"
+#include "mongo/platform/decimal128.h"
 #include "mongo/platform/int128.h"
 
 #include <array>
@@ -71,6 +72,11 @@ public:
     static boost::optional<uint8_t> calculateDecimalShiftMultiplier(double val);
     static boost::optional<int64_t> encodeDouble(double val, uint8_t scaleIndex);
     static double decodeDouble(int64_t val, uint8_t scaleIndex);
+
+    // These methods allow encoding decimal 128 with simple8b. We do not do any transformation to
+    // the bits themselves and this can be thought of as a reinterpret cast.
+    static int128_t encodeDecimal128(Decimal128 val);
+    static Decimal128 decodeDecimal128(int128_t val);
 
     // Array is a double as it will always be multiplied by a double and we don't want to do an
     // extra cast for
