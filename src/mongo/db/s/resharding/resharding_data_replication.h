@@ -149,9 +149,9 @@ public:
     // entry point for constructing instances of ReshardingDataReplication.
     ReshardingDataReplication(std::unique_ptr<ReshardingCollectionCloner> collectionCloner,
                               std::vector<std::unique_ptr<ReshardingTxnCloner>> txnCloners,
-                              std::vector<std::unique_ptr<ReshardingOplogApplier>> oplogAppliers,
                               std::vector<std::unique_ptr<ReshardingOplogFetcher>> oplogFetchers,
                               std::shared_ptr<executor::TaskExecutor> oplogFetcherExecutor,
+                              std::vector<std::unique_ptr<ReshardingOplogApplier>> oplogAppliers,
                               TrustedInitTag);
 
     SemiFuture<void> runUntilStrictlyConsistent(
@@ -245,12 +245,10 @@ private:
     // _txnCloners is left as an empty vector when make() is called with cloningDone=true.
     const std::vector<std::unique_ptr<ReshardingTxnCloner>> _txnCloners;
 
-    const std::vector<std::unique_ptr<ReshardingOplogApplier>> _oplogAppliers;
-
-    // The ReshardingOplogFetcher must be destructed before the corresponding ReshardingOplogApplier
-    // to ensure the future returned by awaitInsert() is always eventually readied.
     const std::vector<std::unique_ptr<ReshardingOplogFetcher>> _oplogFetchers;
     const std::shared_ptr<executor::TaskExecutor> _oplogFetcherExecutor;
+
+    const std::vector<std::unique_ptr<ReshardingOplogApplier>> _oplogAppliers;
 
     // Promise fulfilled by startOplogApplication() to signal that oplog application can begin.
     SharedPromise<void> _startOplogApplication;
