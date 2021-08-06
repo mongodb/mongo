@@ -296,11 +296,7 @@ var authCommandsLib = {
           testcases: [
               {
                 runOnDb: adminDbName,
-                roles: {
-                    dbAdminAnyDatabase: 1,
-                    root: 1,
-                    __system: 1
-                },
+                roles: {dbAdminAnyDatabase: 1, root: 1, __system: 1},
                 privileges: [
                     {resource: {db: firstDbName, collection: "x"}, actions: ["createCollection"]},
                     {resource: {cluster: true}, actions: ["applyOps"]},
@@ -385,11 +381,7 @@ var authCommandsLib = {
           testcases: [
               {
                 runOnDb: adminDbName,
-                roles: {
-                    dbAdminAnyDatabase: 1,
-                    root: 1,
-                    __system: 1
-                },
+                roles: {dbAdminAnyDatabase: 1, root: 1, __system: 1},
                 privileges: [
                     {resource: {db: firstDbName, collection: "x"}, actions: ["dropCollection"]},
                     {resource: {cluster: true}, actions: ["applyOps"]},
