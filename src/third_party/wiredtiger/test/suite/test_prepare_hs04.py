@@ -47,10 +47,18 @@ class test_prepare_hs04(wttest.WiredTigerTestCase):
     nkeys = 40
     nrows = 100
 
-    scenarios = make_scenarios([
+    commit_values = [
         ('commit_transaction', dict(commit=True)),
         ('rollback_transaction', dict(commit=False))
-    ])
+    ]
+
+    key_format_values = [
+        # Note: commit_key must exceed nrows to give behavior comparable to the row case.
+        ('column', dict(key_format='r', commit_key=1000)),
+        ('string-row', dict(key_format='S', commit_key='C')),
+    ]
+
+    scenarios = make_scenarios(commit_values, key_format_values)
 
     def get_stat(self, stat):
         stat_cursor = self.session.open_cursor('statistics:')
@@ -61,7 +69,7 @@ class test_prepare_hs04(wttest.WiredTigerTestCase):
     def search_keys_timestamp_and_ignore(self, ds, txn_config, expected_value, conflict=False):
         cursor = self.session.open_cursor(self.uri)
 
-        commit_key = "C"
+        commit_key = self.commit_key
         self.session.begin_transaction(txn_config)
         for i in range(1, self.nsessions * self.nkeys):
             key = commit_key + ds.key(self.nrows + i)
@@ -84,7 +92,7 @@ class test_prepare_hs04(wttest.WiredTigerTestCase):
 
         # Commit some updates to get eviction and history store fired up.
         # Insert a key at timestamp 1.
-        commit_key = "C"
+        commit_key = self.commit_key
         commit_value = b"bbbbb" * 100
         cursor = self.session.open_cursor(self.uri)
         for i in range(1, self.nsessions * self.nkeys):
@@ -208,7 +216,7 @@ class test_prepare_hs04(wttest.WiredTigerTestCase):
 
     def test_prepare_hs(self):
 
-        ds = SimpleDataSet(self, self.uri, self.nrows, key_format="S", value_format='u')
+        ds = SimpleDataSet(self, self.uri, self.nrows, key_format=self.key_format, value_format='u')
         ds.populate()
         bigvalue = b"aaaaa" * 100
 

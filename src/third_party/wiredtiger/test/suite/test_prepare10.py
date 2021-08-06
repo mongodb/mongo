@@ -30,6 +30,7 @@ import fnmatch, os, shutil, time
 from helper import copy_wiredtiger_home
 import wiredtiger, wttest
 from wtdataset import SimpleDataSet
+from wtscenario import make_scenarios
 
 # test_prepare10.py
 # Test to ensure prepared tombstones are properly aborted even when they are written
@@ -38,6 +39,13 @@ class test_prepare10(wttest.WiredTigerTestCase):
     # Force a small cache.
     conn_config = 'cache_size=10MB,eviction_dirty_trigger=80,eviction_updates_trigger=80'
     session_config = 'isolation=snapshot'
+
+    key_format_values = [
+        ('column', dict(key_format='r')),
+        ('string-row', dict(key_format='S')),
+    ]
+
+    scenarios = make_scenarios(key_format_values)
 
     def updates(self, ds, uri, nrows, value, ts):
         cursor = self.session.open_cursor(uri)
@@ -81,7 +89,7 @@ class test_prepare10(wttest.WiredTigerTestCase):
         # Create a small table.
         uri = "table:test_prepare10"
         nrows = 1000
-        ds = SimpleDataSet(self, uri, 0, key_format="S", value_format='u')
+        ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format='u')
         ds.populate()
 
         value_a = b"aaaaa" * 100

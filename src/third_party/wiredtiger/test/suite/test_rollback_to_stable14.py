@@ -64,10 +64,6 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
     def test_rollback_to_stable(self):
         nrows = 1500
 
-        # Prepare transactions for column store table is not yet supported.
-        if self.prepare and self.key_format == 'r':
-            self.skipTest('Prepare transactions for column store table is not yet supported')
-
         # Create a table without logging.
         self.pr("create/populate table")
         uri = "table:rollback_to_stable14"
@@ -169,10 +165,6 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
     def test_rollback_to_stable_same_ts(self):
         nrows = 1500
 
-        # Prepare transactions for column store table is not yet supported.
-        if self.prepare and self.key_format == 'r':
-            self.skipTest('Prepare transactions for column store table is not yet supported')
-
         # Create a table without logging.
         self.pr("create/populate table")
         uri = "table:rollback_to_stable14"
@@ -271,10 +263,6 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
 
     def test_rollback_to_stable_same_ts_append(self):
         nrows = 1500
-
-        # Prepare transactions for column store table is not yet supported.
-        if self.prepare and self.key_format == 'r':
-            self.skipTest('Prepare transactions for column store table is not yet supported')
 
         # Create a table without logging.
         self.pr("create/populate table")

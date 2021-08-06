@@ -61,10 +61,6 @@ class test_prepare15(wttest.WiredTigerTestCase):
         return config
 
     def test_prepare_restore_hs_update(self):
-        # Prepare transactions for column store table is not yet supported.
-        if self.key_format == 'r':
-            self.skipTest('Prepare transactions for column store table is not yet supported')
-
         # Create a table without logging.
         uri = "table:prepare15"
         create_config = 'allocation_size=512,key_format=S,value_format=S'
@@ -138,10 +134,6 @@ class test_prepare15(wttest.WiredTigerTestCase):
         self.session.commit_transaction()
 
     def test_prepare_not_found(self):
-        # Prepare transactions for column store table is not yet supported.
-        if self.key_format == 'r':
-            self.skipTest('Prepare transactions for column store table is not yet supported')
-
         # Create a table without logging.
         uri = "table:prepare15"
         create_config = 'allocation_size=512,key_format=S,value_format=S'

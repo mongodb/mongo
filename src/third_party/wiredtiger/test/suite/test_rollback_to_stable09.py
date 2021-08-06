@@ -38,6 +38,11 @@ from test_rollback_to_stable01 import test_rollback_to_stable_base
 class test_rollback_to_stable09(test_rollback_to_stable_base):
     session_config = 'isolation=snapshot'
 
+    colstore_values = [
+        ('column', dict(use_columns=True)),
+        ('row', dict(use_columns=False)),
+    ]
+
     in_memory_values = [
         ('no_inmem', dict(in_memory=False)),
         ('inmem', dict(in_memory=True))
@@ -52,7 +57,7 @@ class test_rollback_to_stable09(test_rollback_to_stable_base):
     uri = "table:" + tablename
     index_uri = "index:test_rollback_stable09:country"
 
-    scenarios = make_scenarios(in_memory_values, prepare_values)
+    scenarios = make_scenarios(colstore_values, in_memory_values, prepare_values)
 
     def conn_config(self):
         config = 'cache_size=250MB'
@@ -66,7 +71,11 @@ class test_rollback_to_stable09(test_rollback_to_stable_base):
         self.pr('create table')
         session = self.session
         session.begin_transaction()
-        session.create(self.uri, 'key_format=5s,value_format=HQ,columns=(country,year,population)')
+        if self.use_columns:
+                config = 'key_format=r,value_format=5sHQ,columns=(id,country,year,population)'
+        else:
+                config = 'key_format=5s,value_format=HQ,columns=(country,year,population)'
+        session.create(self.uri, config)
         if commit_ts == 0:
                 session.commit_transaction()
         elif self.prepare:

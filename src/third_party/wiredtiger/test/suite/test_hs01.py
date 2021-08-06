@@ -158,11 +158,6 @@ class test_hs01(wttest.WiredTigerTestCase):
         session2.rollback_transaction()
         session2.close()
 
-        # FIXME-WT-7120: Rollback to stable support for column store is not implemented, and it
-        # fails only when it is used with timestamps.
-        if self.key_format == 'r':
-            return
-
         # Scenario: 3
         # Check to see if the history store is working with the old timestamp.
         bigvalue4 = b"ddddd" * 100

@@ -32,22 +32,29 @@
 
 import wiredtiger, wttest
 from wtdataset import SimpleDataSet
+from wtscenario import make_scenarios
 
 class test_txn23(wttest.WiredTigerTestCase):
     session_config = 'isolation=snapshot'
     conn_config = 'cache_size=5MB'
 
+    key_format_values = [
+        ('integer-row', dict(key_format='i')),
+        ('column', dict(key_format='r')),
+    ]
+    scenarios = make_scenarios(key_format_values)
+
     def large_updates(self, uri, value, ds, nrows, commit_ts):
         # Update a large number of records.
         cursor = self.session.open_cursor(uri)
-        for i in range(0, nrows):
+        for i in range(1, nrows + 1):
             self.session.begin_transaction()
             cursor[ds.key(i)] = value
             self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(commit_ts))
         cursor.close()
 
     def check(self, check_value, uri, ds, nrows, read_ts):
-        for i in range(0, nrows):
+        for i in range(1, nrows + 1):
             self.session.begin_transaction('read_timestamp=' + self.timestamp_str(read_ts))
             cursor = self.session.open_cursor(uri)
             self.assertEqual(cursor[ds.key(i)], check_value)
@@ -60,13 +67,13 @@ class test_txn23(wttest.WiredTigerTestCase):
         # Create a table.
         uri_1 = "table:txn23_1"
         ds_1 = SimpleDataSet(
-            self, uri_1, 0, key_format="i", value_format="S")
+            self, uri_1, 0, key_format=self.key_format, value_format="S")
         ds_1.populate()
 
         # Create another table.
         uri_2 = "table:txn23_2"
         ds_2 = SimpleDataSet(
-            self, uri_2, 0, key_format="i", value_format="S")
+            self, uri_2, 0, key_format=self.key_format, value_format="S")
         ds_2.populate()
 
         # Pin oldest and stable to timestamp 10.

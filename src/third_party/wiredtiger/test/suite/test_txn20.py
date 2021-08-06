@@ -36,18 +36,21 @@ from wtscenario import make_scenarios
 class test_txn20(wttest.WiredTigerTestCase):
 
     uri = 'table:test_txn'
+    key_format_values = [
+        ('string-row', dict(key_format='S', key='key')),
+        ('column', dict(key_format='r', key=12)),
+    ]
     iso_types = [
         ('isolation_read_uncommitted', dict(isolation='read-uncommitted')),
         ('isolation_read_committed', dict(isolation='read-committed')),
         ('isolation_snapshot', dict(isolation='snapshot'))
     ]
-    scenarios = make_scenarios(iso_types)
-    key = 'key'
+    scenarios = make_scenarios(key_format_values, iso_types)
     old_value = 'value: old'
     new_value = 'value: new'
 
     def test_isolation_level(self):
-        self.session.create(self.uri, 'key_format=S,value_format=S')
+        self.session.create(self.uri, 'key_format={},value_format=S'.format(self.key_format))
         cursor = self.session.open_cursor(self.uri, None)
         cursor[self.key] = self.old_value
 

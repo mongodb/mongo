@@ -32,9 +32,16 @@
 
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
+from wtscenario import make_scenarios
 
 class test_assert02(wttest.WiredTigerTestCase, suite_subprocess):
     session_config = 'isolation=snapshot'
+
+    key_format_values = [
+        ('column', dict(key_format='r', usestrings=False)),
+        ('string-row', dict(key_format='S', usestrings=True))
+    ]
+    scenarios = make_scenarios(key_format_values)
 
     def test_read_timestamp(self):
         #if not wiredtiger.diagnostic_build():
@@ -47,17 +54,20 @@ class test_assert02(wttest.WiredTigerTestCase, suite_subprocess):
         uri_never = base_uri + '.never.wt'
         uri_none = base_uri + '.none.wt'
 
-        cfg = 'key_format=S,value_format=S'
+        cfg = 'key_format={},value_format=S'.format(self.key_format)
         cfg_always = cfg + ',write_timestamp_usage=always,assert=(read_timestamp=always)'
         cfg_def = cfg
         cfg_never = cfg + ',assert=(read_timestamp=never)'
         cfg_none = cfg + ',assert=(read_timestamp=none)'
 
-        # Create a data item at a timestamp
+        # Create a data item at a timestamp.
         self.session.create(uri_always, cfg_always)
         self.session.create(uri_def, cfg_def)
         self.session.create(uri_never, cfg_never)
         self.session.create(uri_none, cfg_none)
+
+        # Make a key.
+        key1 = 'key1' if self.usestrings else 1
 
         # Insert a data item at timestamp 1.  This should work for all.
         c_always = self.session.open_cursor(uri_always)
@@ -66,10 +76,10 @@ class test_assert02(wttest.WiredTigerTestCase, suite_subprocess):
         c_none = self.session.open_cursor(uri_none)
         self.session.begin_transaction()
         self.session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(1))
-        c_always['key1'] = 'value1'
-        c_def['key1'] = 'value1'
-        c_never['key1'] = 'value1'
-        c_none['key1'] = 'value1'
+        c_always[key1] = 'value1'
+        c_def[key1] = 'value1'
+        c_never[key1] = 'value1'
+        c_none[key1] = 'value1'
         self.session.commit_transaction()
         c_always.close()
         c_def.close()
@@ -83,10 +93,10 @@ class test_assert02(wttest.WiredTigerTestCase, suite_subprocess):
         c_never = self.session.open_cursor(uri_never)
         c_none = self.session.open_cursor(uri_none)
 
-        c_always.set_key('key1')
-        c_def.set_key('key1')
-        c_never.set_key('key1')
-        c_none.set_key('key1')
+        c_always.set_key(key1)
+        c_def.set_key(key1)
+        c_never.set_key(key1)
+        c_none.set_key(key1)
 
         self.session.begin_transaction('read_timestamp=' + self.timestamp_str(1))
         c_always.search()
@@ -111,10 +121,10 @@ class test_assert02(wttest.WiredTigerTestCase, suite_subprocess):
         c_never = self.session.open_cursor(uri_never)
         c_none = self.session.open_cursor(uri_none)
 
-        c_always.set_key('key1')
-        c_def.set_key('key1')
-        c_never.set_key('key1')
-        c_none.set_key('key1')
+        c_always.set_key(key1)
+        c_def.set_key(key1)
+        c_never.set_key(key1)
+        c_none.set_key(key1)
 
         self.session.begin_transaction()
         c_never.search()

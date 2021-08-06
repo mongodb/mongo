@@ -34,11 +34,18 @@ import fnmatch, os, shutil, run, time
 from suite_subprocess import suite_subprocess
 from wiredtiger import stat
 import wttest
+from wtscenario import make_scenarios
 
 class test_txn08(wttest.WiredTigerTestCase, suite_subprocess):
     logmax = "100K"
     tablename = 'test_txn08'
     uri = 'table:' + tablename
+
+    key_format_values = [
+        ('col', dict(key_format='r')),
+        ('row', dict(key_format='i'))
+    ]
+    scenarios = make_scenarios(key_format_values)
 
     # Turn on logging for this test.
     def conn_config(self):
@@ -46,8 +53,8 @@ class test_txn08(wttest.WiredTigerTestCase, suite_subprocess):
             'transaction_sync="(method=dsync,enabled)"'
 
     def test_printlog_unicode(self):
-        # print "Creating %s with config '%s'" % (self.uri, self.create_params)
-        create_params = 'key_format=i,value_format=S'
+        create_params = 'key_format={},value_format=S'.format(self.key_format)
+        # print "Creating %s with config '%s'" % (self.uri, create_params)
         self.session.create(self.uri, create_params)
         c = self.session.open_cursor(self.uri, None)
 
@@ -56,7 +63,7 @@ class test_txn08(wttest.WiredTigerTestCase, suite_subprocess):
         value = u'\u0001\u0002abcd\u0003\u0004'
 
         self.session.begin_transaction()
-        for k in range(5):
+        for k in range(1, 6):
             c[k] = value
 
         self.session.commit_transaction()

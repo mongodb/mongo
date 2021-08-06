@@ -31,7 +31,7 @@ __wt_col_modify(WT_CURSOR_BTREE *cbt, uint64_t recno, const WT_ITEM *value, WT_U
     WT_PAGE *page;
     WT_PAGE_MODIFY *mod;
     WT_SESSION_IMPL *session;
-    WT_UPDATE *old_upd, *upd;
+    WT_UPDATE *last_upd, *old_upd, *upd;
     wt_timestamp_t prev_upd_ts;
     size_t ins_size, upd_size;
     u_int i, skipdepth;
@@ -141,19 +141,33 @@ __wt_col_modify(WT_CURSOR_BTREE *cbt, uint64_t recno, const WT_ITEM *value, WT_U
 #endif
             WT_ERR(__wt_txn_modify(session, upd));
             logged = true;
+
+            /* Avoid a data copy in WT_CURSOR.update. */
+            __wt_upd_value_assign(cbt->modify_update, upd);
         } else {
-            upd = upd_arg;
-            upd_size = WT_UPDATE_MEMSIZE(upd);
+            upd_size = __wt_update_list_memsize(upd);
+
+            /* If there are existing updates, append them after the new updates. */
+            for (last_upd = upd; last_upd->next != NULL; last_upd = last_upd->next)
+                ;
+            last_upd->next = old_upd;
+
+            /*
+             * If we restore an update chain in update restore eviction, there should be no update
+             * on the existing update chain.
+             */
+            WT_ASSERT(session, !restore || old_upd == NULL);
+
+            /*
+             * We can either put multiple new updates or a single update on the update chain.
+             *
+             * Set the "old" entry to the second update in the list so that the serialization
+             * function succeeds in swapping the first update into place.
+             */
+            if (upd->next != NULL)
+                cbt->ins->upd = upd->next;
+            old_upd = cbt->ins->upd;
         }
-
-        /* Avoid a data copy in WT_CURSOR.update. */
-        __wt_upd_value_assign(cbt->modify_update, upd);
-
-        /*
-         * If we restore an update chain in update restore eviction, there should be no update on
-         * the existing update chain.
-         */
-        WT_ASSERT(session, !restore || old_upd == NULL);
 
         /*
          * Point the new WT_UPDATE item to the next element in the list. If we get it right, the

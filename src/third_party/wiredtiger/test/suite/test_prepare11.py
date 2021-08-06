@@ -35,25 +35,30 @@ class test_prepare11(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=2MB'
     session_config = 'isolation=snapshot'
 
+    key_format_values = [
+        ('column', dict(key_format='r', key1=17)),
+        ('string-row', dict(key_format='S', key1='key1')),
+    ]
+
     commit_values = [
         ('commit', dict(commit=True)),
         ('rollback', dict(commit=False)),
     ]
 
-    scenarios = make_scenarios(commit_values)
+    scenarios = make_scenarios(key_format_values, commit_values)
 
     def test_prepare_update_rollback(self):
         uri = "table:test_prepare11"
-        self.session.create(uri, 'key_format=S,value_format=S')
+        self.session.create(uri, 'key_format={},value_format=S'.format(self.key_format))
         self.session.begin_transaction("isolation=snapshot")
 
         # In the scenario where we have a reserved update in between two updates, the key repeated
         # flag won't get set and we'll call resolve prepared op on both prepared updates.
         c = self.session.open_cursor(uri, None)
-        c['key1'] = 'xxxx'
-        c.set_key('key1')
+        c[self.key1] = 'xxxx'
+        c.set_key(self.key1)
         c.reserve()
-        c['key1'] = 'yyyy'
+        c[self.key1] = 'yyyy'
         self.session.prepare_transaction('prepare_timestamp=10')
         if self.commit:
             self.session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(20))

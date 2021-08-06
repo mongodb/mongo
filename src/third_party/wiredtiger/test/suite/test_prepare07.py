@@ -30,6 +30,7 @@ import fnmatch, os, shutil, time
 from helper import copy_wiredtiger_home
 import wiredtiger, wttest
 from wtdataset import SimpleDataSet
+from wtscenario import make_scenarios
 
 # test_prepare07.py
 # Test to ensure prepared updates older than oldest timestamp are not visible.
@@ -39,6 +40,13 @@ from wtdataset import SimpleDataSet
 class test_prepare07(wttest.WiredTigerTestCase):
     # Force a small cache.
     conn_config = 'cache_size=50MB'
+
+    key_format_values = [
+        ('column', dict(key_format='r')),
+        ('string-row', dict(key_format='S')),
+    ]
+
+    scenarios = make_scenarios(key_format_values)
 
     def older_prepare_updates(self, uri, ds, nrows, value_a):
         # Commit some updates along with a prepared update, which is not resolved.
@@ -140,7 +148,7 @@ class test_prepare07(wttest.WiredTigerTestCase):
         # Create a small table.
         uri = "table:test"
         nrows = 100
-        ds = SimpleDataSet(self, uri, nrows, key_format="S", value_format='u')
+        ds = SimpleDataSet(self, uri, nrows, key_format=self.key_format, value_format='u')
         ds.populate()
         value_a = b"aaaaa" * 100
 

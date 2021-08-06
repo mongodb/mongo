@@ -32,12 +32,21 @@
 
 import wiredtiger, wttest
 from wtdataset import simple_key, simple_value
+from wtscenario import make_scenarios
 
 class test_prepare_conflict(wttest.WiredTigerTestCase):
+    key_format_values = [
+        ('column', dict(key_format='r')),
+        ('integer_row', dict(key_format='i')),
+    ]
+
+    scenarios = make_scenarios(key_format_values)
+
     def test_prepare(self):
         # Create a large table with lots of pages.
         uri = "table:test_prepare_conflict"
-        config = 'allocation_size=512,leaf_page_max=512,key_format=S,value_format=S'
+        key_format = 'key_format=' + self.key_format
+        config = 'allocation_size=512,leaf_page_max=512,{},value_format=S'.format(key_format)
         self.session.create(uri, config)
         cursor = self.session.open_cursor(uri)
         for i in range(1, 80000):

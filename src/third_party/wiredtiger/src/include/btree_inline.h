@@ -724,6 +724,13 @@ static inline void
 __wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
     /*
+     * Prepared records in the datastore require page updates, even for read-only handles, don't
+     * mark the tree or page dirty.
+     */
+    if (F_ISSET(S2BT(session), WT_BTREE_READONLY))
+        return;
+
+    /*
      * Mark the tree dirty (even if the page is already marked dirty), newly created pages to
      * support "empty" files are dirty, but the file isn't marked dirty until there's a real change
      * needing to be written.
@@ -1992,68 +1999,54 @@ __wt_page_swap_func(WT_SESSION_IMPL *session, WT_REF *held, WT_REF *want, uint32
 }
 
 /*
- * __wt_bt_col_var_cursor_walk_txn_read --
- *     Set the value for variable-length column-store cursor walk.
- */
-static inline int
-__wt_bt_col_var_cursor_walk_txn_read(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_PAGE *page,
-  WT_CELL_UNPACK_KV *unpack, WT_COL *cip)
-{
-    WT_UPDATE *upd;
-
-    upd = NULL;
-
-    if (cbt->ins)
-        upd = cbt->ins->upd;
-
-    cbt->slot = WT_COL_SLOT(page, cip);
-    WT_RET(__wt_txn_read(session, cbt, NULL, cbt->recno, upd, unpack));
-    if (cbt->upd_value->type == WT_UPDATE_INVALID || cbt->upd_value->type == WT_UPDATE_TOMBSTONE)
-        return (0);
-
-    WT_RET(__wt_value_return(cbt, cbt->upd_value));
-
-    cbt->tmp->data = cbt->iface.value.data;
-    cbt->tmp->size = cbt->iface.value.size;
-    cbt->cip_saved = cip;
-    return (0);
-}
-
-/*
  * __wt_btcur_skip_page --
  *     Return if the cursor is pointing to a page with deleted records and can be skipped for cursor
  *     traversal.
  */
-static inline int
-__wt_btcur_skip_page(WT_SESSION_IMPL *session, WT_REF *ref, void *context, bool *skipp)
+static inline bool
+__wt_btcur_skip_page(WT_CURSOR_BTREE *cbt)
 {
     WT_ADDR_COPY addr;
+    WT_PAGE *page;
+    WT_REF *ref;
+    WT_SESSION_IMPL *session;
     uint8_t previous_state;
+    bool can_skip;
 
-    WT_UNUSED(context);
+    session = CUR2S(cbt);
+    ref = cbt->ref;
+    page = cbt->ref == NULL ? NULL : cbt->ref->page;
 
-    *skipp = false; /* Default to reading */
+    if (page == NULL)
+        return false;
+
+    previous_state = ref->state;
+    can_skip = false;
 
     /*
      * Determine if all records on the page have been deleted and all the tombstones are visible to
      * our transaction. If so, we can avoid reading the records on the page and move to the next
      * page. We base this decision on the aggregate stop point added to the page during the last
-     * reconciliation. We can skip this test if the page has been modified since it was reconciled.
+     * reconciliation. We can skip this test if the page has been modified since it was reconciled
+     * or the underlying cursor is configured to ignore tombstones.
      *
      * We are making these decisions while holding a lock for the page as checkpoint or eviction can
-     * make changes to the data structures (i.e., aggregate timestamps) we are reading. It is okay
-     * if the page is not in memory, or gets evicted before we lock it. In such a case, we can forgo
-     * checking if the page has been modified. So, only do a page modified check if the page was in
-     * memory before locking.
+     * make changes to the data structures (i.e., aggregate timestamps) we are reading.
      */
-    WT_REF_LOCK(session, ref, &previous_state);
-    if ((previous_state == WT_REF_DISK || previous_state == WT_REF_DELETED ||
-          (previous_state == WT_REF_MEM && !__wt_page_is_modified(ref->page))) &&
-      __wt_ref_addr_copy(session, ref, &addr) &&
-      __wt_txn_visible(session, addr.ta.newest_stop_txn, addr.ta.newest_stop_ts) &&
-      __wt_txn_visible(session, addr.ta.newest_stop_txn, addr.ta.newest_stop_durable_ts))
-        *skipp = true;
-    WT_REF_UNLOCK(ref, previous_state);
+    if (session->txn->isolation == WT_ISO_SNAPSHOT && !__wt_page_is_modified(page) &&
+      !F_ISSET(&cbt->iface, WT_CURSTD_IGNORE_TOMBSTONE) && previous_state == WT_REF_MEM) {
 
-    return (0);
+        /* We only try to lock the page once. */
+        if (!WT_REF_CAS_STATE(session, ref, previous_state, WT_REF_LOCKED))
+            return false;
+
+        if (__wt_ref_addr_copy(session, ref, &addr) &&
+          __wt_txn_visible(session, addr.ta.newest_stop_txn, addr.ta.newest_stop_ts) &&
+          __wt_txn_visible(session, addr.ta.newest_stop_txn, addr.ta.newest_stop_durable_ts))
+            can_skip = true;
+
+        WT_REF_SET_STATE(ref, previous_state);
+    }
+
+    return (can_skip);
 }

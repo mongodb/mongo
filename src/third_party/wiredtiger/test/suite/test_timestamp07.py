@@ -41,6 +41,11 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
     tablename2 = 'ts07_nots_logged'
     tablename3 = 'ts07_ts_logged'
 
+    key_format_values = [
+        ('integer-row', dict(key_format='i')),
+        ('column', dict(key_format='r')),
+    ]
+
     types = [
         ('file', dict(uri='file:', use_cg=False, use_index=False)),
         ('table-cg', dict(uri='table:', use_cg=True, use_index=False)),
@@ -58,7 +63,7 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
         ('1000keys', dict(nkeys=1000)),
     ]
 
-    scenarios = make_scenarios(types, conncfg, nkeys)
+    scenarios = make_scenarios(key_format_values, types, conncfg, nkeys)
 
     # Binary values.
     value = u'\u0001\u0002abcd\u0007\u0004'
@@ -180,11 +185,11 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
         # 2. Table is logged and does not use timestamps.
         # 3. Table is logged and uses timestamps.
         #
-        self.session.create(uri, 'key_format=i,value_format=S,log=(enabled=false)')
+        self.session.create(uri, 'key_format={},value_format=S,log=(enabled=false)'.format(self.key_format))
         c = self.session.open_cursor(uri)
-        self.session.create(uri2, 'key_format=i,value_format=S')
+        self.session.create(uri2, 'key_format={},value_format=S'.format(self.key_format))
         c2 = self.session.open_cursor(uri2)
-        self.session.create(uri3, 'key_format=i,value_format=S')
+        self.session.create(uri3, 'key_format={},value_format=S'.format(self.key_format))
         c3 = self.session.open_cursor(uri3)
         # print "tables created"
 

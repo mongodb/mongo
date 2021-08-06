@@ -36,9 +36,16 @@ class test_prepare_hs05(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=50MB'
     session_config = 'isolation=snapshot'
 
+    key_format_values = [
+        ('column', dict(key_format='r', key=1)),
+        ('string-row', dict(key_format='S', key=str(1))),
+    ]
+
+    scenarios = make_scenarios(key_format_values)
+
     def test_check_prepare_abort_hs_restore(self):
         uri = 'table:test_prepare_hs05'
-        create_params = 'key_format=S,value_format=S'
+        create_params = 'key_format={},value_format=S'.format(self.key_format)
         self.session.create(uri, create_params)
 
         value1 = 'a' * 5
@@ -48,23 +55,23 @@ class test_prepare_hs05(wttest.WiredTigerTestCase):
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
         cursor = self.session.open_cursor(uri)
 
-        key = 1
+        key = self.key
 
         self.session.begin_transaction()
-        cursor[str(key)] = value1
-        cursor.set_key(str(key))
+        cursor[key] = value1
+        cursor.set_key(key)
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
 
         # Commit update and remove operation in the same transaction.
         self.session.begin_transaction()
-        cursor[str(key)] = value2
-        cursor.set_key(str(key))
+        cursor[key] = value2
+        cursor.set_key(key)
         cursor.remove()
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(3))
 
         # Add a prepared update for the key.
         self.session.begin_transaction()
-        cursor[str(key)] = value3
+        cursor[key] = value3
         self.session.prepare_transaction('prepare_timestamp='+ self.timestamp_str(4))
 
         # Try to evict the page with prepared update. This will ensure that prepared update is
@@ -72,7 +79,7 @@ class test_prepare_hs05(wttest.WiredTigerTestCase):
         session2 = self.conn.open_session()
         session2.begin_transaction('ignore_prepare=true')
         cursor2 = session2.open_cursor(uri, None, "debug=(release_evict=true)")
-        cursor2.set_key(str(key))
+        cursor2.set_key(key)
         self.assertEquals(cursor2.search(), WT_NOTFOUND)
         cursor2.reset()
 
@@ -83,13 +90,13 @@ class test_prepare_hs05(wttest.WiredTigerTestCase):
 
         # We should be able to read the older version of the key from the history store.
         self.session.begin_transaction('read_timestamp='+self.timestamp_str(2))
-        cursor.set_key(str(key))
+        cursor.set_key(key)
         self.assertEqual(cursor.search(), 0)
         self.assertEqual(cursor.get_value(), value1)
         self.session.rollback_transaction()
 
         # The latest version should be marked deleted.
         self.session.begin_transaction()
-        cursor.set_key(str(key))
+        cursor.set_key(key)
         self.assertEqual(cursor.search(), WT_NOTFOUND)
         self.session.rollback_transaction()

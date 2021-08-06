@@ -113,6 +113,11 @@ class test_txn19(wttest.WiredTigerTestCase, suite_subprocess):
     nrecords = [('nrecords=10', dict(nrecords=10)),
                 ('nrecords=11', dict(nrecords=11))]
 
+    key_format_values = [
+        ('integer-row', dict(key_format='i')),
+        ('column', dict(key_format='r')),
+    ]
+
     # This function prunes out unnecessary or problematic test cases
     # from the list of scenarios.
     def includeFunc(name, dictarg):
@@ -131,11 +136,10 @@ class test_txn19(wttest.WiredTigerTestCase, suite_subprocess):
         return True
 
     scenarios = make_scenarios(
-        corruption_type, corruption_pos, nrecords,
+        key_format_values, corruption_type, corruption_pos, nrecords,
         include=includeFunc, prune=20, prunelong=1000)
 
     uri = 'table:test_txn19'
-    create_params = 'key_format=i,value_format=S'
 
     # Return the log file number that contains the given record
     # number.  In this test, two records fit into each log file, and
@@ -282,7 +286,8 @@ class test_txn19(wttest.WiredTigerTestCase, suite_subprocess):
         # Then does a restart with recovery, then starts again with salvage,
         # and finally starts again with recovery (adding new records).
 
-        self.session.create(self.uri, self.create_params)
+        create_params = 'key_format=i,value_format=S'.format(self.key_format)
+        self.session.create(self.uri, create_params)
         self.inserts([x for x in range(0, self.nrecords)])
         newdir = "RESTART"
         copy_for_crash_restart(self.home, newdir)
@@ -385,6 +390,11 @@ class test_txn19_meta(wttest.WiredTigerTestCase, suite_subprocess):
         ('WiredTiger.wt', dict(filename='WiredTiger.wt')),
         ('WiredTigerHS.wt', dict(filename='WiredTigerHS.wt')),
     ]
+    # Configure the database type.
+    key_format_values = [
+        ('integer-row', dict(key_format='i')),
+        ('column', dict(key_format='r')),
+    ]
 
     # In many cases, wiredtiger_open without any salvage options will
     # just work.  We list those cases here.
@@ -433,10 +443,9 @@ class test_txn19_meta(wttest.WiredTigerTestCase, suite_subprocess):
         "garbage-end:WiredTiger.basecfg",
     ]
 
-    scenarios = make_scenarios(corruption_scenarios, filename_scenarios)
+    scenarios = make_scenarios(key_format_values, corruption_scenarios, filename_scenarios)
     uri = 'table:test_txn19_meta_'
     ntables = 5
-    create_params = 'key_format=i,value_format=S'
     nrecords = 1000                                  # records per table.
     suffixes = [ str(x) for x in range(0, ntables)]  # [ '0', '1', ... ]
 
@@ -507,11 +516,12 @@ class test_txn19_meta(wttest.WiredTigerTestCase, suite_subprocess):
     def test_corrupt_meta(self):
         newdir = "RESTART"
         newdir2 = "RESTART2"
-        expect = list(range(0, self.nrecords))
+        expect = list(range(1, self.nrecords + 1))
         salvage_config = self.base_config + ',salvage=true'
 
+        create_params = 'key_format={},value_format=S'.format(self.key_format)
         for suffix in self.suffixes:
-            self.session.create(self.uri + suffix, self.create_params)
+            self.session.create(self.uri + suffix, create_params)
         self.inserts(expect)
 
         # Simulate a crash by copying the contents of the directory

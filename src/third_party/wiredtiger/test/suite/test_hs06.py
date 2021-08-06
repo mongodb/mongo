@@ -45,10 +45,11 @@ class test_hs06(wttest.WiredTigerTestCase):
     session_config = 'isolation=snapshot'
     key_format_values = [
         ('column', dict(key_format='r')),
-        ('integer', dict(key_format='i')),
-        ('string', dict(key_format='S'))
+        ('integer-row', dict(key_format='i')),
+        ('string-row', dict(key_format='S'))
     ]
     scenarios = make_scenarios(key_format_values)
+    nrows = 2000
 
     def get_stat(self, stat):
         stat_cursor = self.session.open_cursor('statistics:')
@@ -77,13 +78,13 @@ class test_hs06(wttest.WiredTigerTestCase):
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
         cursor = self.session.open_cursor(uri)
         self.session.begin_transaction()
-        for i in range(1, 2000):
+        for i in range(1, self.nrows):
             cursor[self.create_key(i)] = value1
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
 
         # Load another 1Mb of data with a later timestamp.
         self.session.begin_transaction()
-        for i in range(1, 2000):
+        for i in range(1, self.nrows):
             cursor[self.create_key(i)] = value2
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(3))
 
@@ -111,7 +112,7 @@ class test_hs06(wttest.WiredTigerTestCase):
         # be reading it straight from the history store without initialising a full
         # update chain of every version of the data.
         self.session.begin_transaction('read_timestamp=' + self.timestamp_str(2))
-        for i in range(1, 2000):
+        for i in range(1, self.nrows):
             self.assertEqual(cursor[self.create_key(i)], value1)
         self.session.rollback_transaction()
 
@@ -143,13 +144,13 @@ class test_hs06(wttest.WiredTigerTestCase):
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
         cursor = self.session.open_cursor(uri)
         self.session.begin_transaction()
-        for i in range(1, 2000):
+        for i in range(1, self.nrows):
             cursor[self.create_key(i)] = value1
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
 
         # Load a slight modification with a later timestamp.
         self.session.begin_transaction()
-        for i in range(1, 2000):
+        for i in range(1, self.nrows):
             cursor.set_key(self.create_key(i))
             mods = [wiredtiger.Modify('B', 100, 1)]
             self.assertEqual(cursor.modify(mods), 0)
@@ -157,7 +158,7 @@ class test_hs06(wttest.WiredTigerTestCase):
 
         # And another.
         self.session.begin_transaction()
-        for i in range(1, 2000):
+        for i in range(1, self.nrows):
             cursor.set_key(self.create_key(i))
             mods = [wiredtiger.Modify('C', 200, 1)]
             self.assertEqual(cursor.modify(mods), 0)
@@ -165,7 +166,7 @@ class test_hs06(wttest.WiredTigerTestCase):
 
         # Now write something completely different.
         self.session.begin_transaction()
-        for i in range(1, 2000):
+        for i in range(1, self.nrows):
             cursor[self.create_key(i)] = value2
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(5))
 
@@ -185,7 +186,7 @@ class test_hs06(wttest.WiredTigerTestCase):
         # t3: (reverse delta in las) <= We're querying for t4 so we begin here.
         # t2: value2 (full update in las)
         self.session.begin_transaction('read_timestamp=' + self.timestamp_str(3))
-        for i in range(1, 2000):
+        for i in range(1, self.nrows):
             self.assertEqual(cursor[self.create_key(i)], expected)
         self.session.rollback_transaction()
 
@@ -201,16 +202,11 @@ class test_hs06(wttest.WiredTigerTestCase):
         # t3: (reverse delta in las)
         # t2: value2 (full update in las)
         self.session.begin_transaction('read_timestamp=' + self.timestamp_str(4))
-        for i in range(1, 2000):
+        for i in range(1, self.nrows):
             self.assertEqual(cursor[self.create_key(i)], expected)
         self.session.rollback_transaction()
 
     def test_hs_prepare_reads(self):
-        # FIXME-WT-6061: Prepare reads currently not supported with columnar store.
-        # Remove this once prepare reads is supported.
-        if self.key_format == 'r':
-            return
-
         # Create a small table.
         uri = "table:test_hs06"
         create_params = 'key_format={},value_format=S'.format(self.key_format)
@@ -221,7 +217,7 @@ class test_hs06(wttest.WiredTigerTestCase):
 
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
         cursor = self.session.open_cursor(uri)
-        for i in range(1, 2000):
+        for i in range(1, self.nrows):
             self.session.begin_transaction()
             cursor[self.create_key(i)] = value1
             self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
@@ -236,7 +232,7 @@ class test_hs06(wttest.WiredTigerTestCase):
             'prepare_timestamp=' + self.timestamp_str(3))
 
         # Write some more to cause eviction of the prepared data.
-        for i in range(11, 2000):
+        for i in range(11, self.nrows):
             self.session.begin_transaction()
             cursor[self.create_key(i)] = value2
             self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(4))
@@ -277,7 +273,7 @@ class test_hs06(wttest.WiredTigerTestCase):
         # Load 1Mb of data.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
         cursor = self.session.open_cursor(uri)
-        for i in range(1, 2000):
+        for i in range(1, self.nrows):
             self.session.begin_transaction()
             cursor[self.create_key(i)] = value1
             self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
@@ -291,7 +287,7 @@ class test_hs06(wttest.WiredTigerTestCase):
             self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(3))
 
         # Write a newer value on top.
-        for i in range(1, 2000):
+        for i in range(1, self.nrows):
             self.session.begin_transaction()
             cursor[self.create_key(i)] = value4
             self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(4))
@@ -314,7 +310,7 @@ class test_hs06(wttest.WiredTigerTestCase):
         # Load 1Mb of data.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
         cursor = self.session.open_cursor(uri)
-        for i in range(1, 2000):
+        for i in range(1, self.nrows):
             self.session.begin_transaction()
             cursor[self.create_key(i)] = value1
             self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
@@ -336,7 +332,7 @@ class test_hs06(wttest.WiredTigerTestCase):
         expected = str().join(expected)
 
         # Write a newer value on top.
-        for i in range(1, 2000):
+        for i in range(1, self.nrows):
             self.session.begin_transaction()
             cursor[self.create_key(i)] = value2
             self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(4))

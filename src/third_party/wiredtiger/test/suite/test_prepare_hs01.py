@@ -29,12 +29,20 @@
 from helper import copy_wiredtiger_home
 import wiredtiger, wttest
 from wtdataset import SimpleDataSet
+from wtscenario import make_scenarios
 
 # test_prepare_hs01.py
 # test to ensure history store eviction is working for prepared transactions.
 class test_prepare_hs01(wttest.WiredTigerTestCase):
     # Force a small cache.
     conn_config = 'cache_size=50MB,eviction_updates_trigger=95,eviction_updates_target=80'
+
+    key_format_values = [
+        ('column', dict(key_format='r')),
+        ('string-row', dict(key_format='S')),
+    ]
+
+    scenarios = make_scenarios(key_format_values)
 
     def check(self, uri, ds, nrows, nsessions, nkeys, read_ts, expected_value, not_expected_value):
         cursor = self.session.open_cursor(uri)
@@ -113,7 +121,7 @@ class test_prepare_hs01(wttest.WiredTigerTestCase):
         # Create a small table.
         uri = "table:test_prepare_hs01"
         nrows = 100
-        ds = SimpleDataSet(self, uri, nrows, key_format="S", value_format='u')
+        ds = SimpleDataSet(self, uri, nrows, key_format=self.key_format, value_format='u')
         ds.populate()
         bigvalue = b"aaaaa" * 100
 

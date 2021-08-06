@@ -36,7 +36,7 @@ class test_hs18(wttest.WiredTigerTestCase):
     session_config = 'isolation=snapshot'
     key_format_values = [
         ('column', dict(key_format='r')),
-        ('string', dict(key_format='S'))
+        ('string-row', dict(key_format='S'))
     ]
     scenarios = make_scenarios(key_format_values)
 
@@ -119,11 +119,6 @@ class test_hs18(wttest.WiredTigerTestCase):
 
     # Test that we don't get the wrong value if we read with a timestamp originally.
     def test_read_timestamp_weirdness(self):
-        # FIXME-WT-7136: Mixed mode transactions not supported for column store scenario.
-        # Re-enable once complete.
-        if self.key_format == 'r':
-            return
-
         uri = 'table:test_hs18'
         self.session.create(uri, 'key_format={},value_format=S'.format(self.key_format))
         cursor = self.session.open_cursor(uri)
@@ -248,11 +243,6 @@ class test_hs18(wttest.WiredTigerTestCase):
 
     # Test older readers for each of the updates moved to the history store.
     def test_multiple_older_readers(self):
-        # FIXME-WT-7136: Mixed mode transactions not supported for column store scenario.
-        # Re-enable once complete.
-        if self.key_format == 'r':
-            return
-
         uri = 'table:test_multiple_older_readers'
         self.session.create(uri, 'key_format={},value_format=S'.format(self.key_format))
         cursor = self.session.open_cursor(uri)
@@ -325,11 +315,6 @@ class test_hs18(wttest.WiredTigerTestCase):
             cursors[i].reset()
 
     def test_multiple_older_readers_with_multiple_mixed_mode(self):
-        # FIXME-WT-7136: Mixed mode transactions not supported for column store scenario.
-        # Re-enable once complete.
-        if self.key_format == 'r':
-            return
-
         uri = 'table:test_multiple_older_readers'
         self.session.create(uri, 'key_format={},value_format=S'.format(self.key_format))
         cursor = self.session.open_cursor(uri)
@@ -447,11 +432,6 @@ class test_hs18(wttest.WiredTigerTestCase):
             cursors[i].reset()
 
     def test_modifies(self):
-        # FIXME-WT-7136: Modify not supported for column store scenario.
-        # Re-enable once complete.
-        if self.key_format == 'r':
-            return
-
         uri = 'table:test_modifies'
         self.session.create(uri, 'key_format={},value_format=S'.format(self.key_format))
         cursor = self.session.open_cursor(uri)

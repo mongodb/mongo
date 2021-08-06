@@ -30,6 +30,7 @@ import time, re
 import wiredtiger, wttest
 from wtdataset import SimpleDataSet
 from wiredtiger import stat
+from wtscenario import make_scenarios
 
 # test_hs21.py
 # Test we don't lose any data when idle files with an active history are closed/sweeped.
@@ -45,6 +46,13 @@ class test_hs21(wttest.WiredTigerTestCase):
     file_name = 'test_hs21'
     numfiles = 10
     nrows = 1000
+
+    key_format_values = [
+        ('column', dict(key_format='r', key1=1, key2=2)),
+        ('string-row', dict(key_format='S', key1=str(0), key2=str(1))),
+    ]
+
+    scenarios = make_scenarios(key_format_values)
 
     def large_updates(self, uri, value, ds, nrows, commit_ts):
         # Update a large number of records, we'll hang if the history store table isn't working.
@@ -67,6 +75,12 @@ class test_hs21(wttest.WiredTigerTestCase):
             count += 1
         if read_ts != -1:
             session.rollback_transaction()
+        if count != nrows:
+            self.prout("Oops")
+            self.prout("value: " + str(check_value))
+            self.prout("count: " + str(count))
+            self.prout("nrows: " + str(nrows))
+            self.prout("read_ts: " + str(read_ts))
         self.assertEqual(count, nrows)
         cursor.close()
 
@@ -98,7 +112,7 @@ class test_hs21(wttest.WiredTigerTestCase):
             file_uri = 'file:%s.%d.wt' % (self.file_name, f)
             # Create a small table.
             ds = SimpleDataSet(
-                self, table_uri, 0, key_format='S', value_format='S', config='log=(enabled=false)')
+                self, table_uri, 0, key_format=self.key_format, value_format='S', config='log=(enabled=false)')
             ds.populate()
             # Checkpoint to ensure we write the files metadata checkpoint value.
             self.session.checkpoint()

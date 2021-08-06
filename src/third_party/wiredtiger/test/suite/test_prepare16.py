@@ -62,10 +62,6 @@ class test_prepare16(wttest.WiredTigerTestCase):
     def test_prepare(self):
         nrows = 1000
 
-        # Prepare transactions for column store table is not yet supported.
-        if self.key_format == 'r':
-            self.skipTest('Prepare transactions for column store table is not yet supported')
-
         # Create a table without logging.
         uri = "table:prepare16"
         create_config = 'allocation_size=512,key_format=S,value_format=S,leaf_page_max=512,leaf_value_max=64MB'

@@ -39,9 +39,8 @@ class test_hs02(wttest.WiredTigerTestCase):
     session_config = 'isolation=snapshot'
 
     key_format_values = [
-        ('string', dict(key_format='S')),
-        # FIXME-WT-7120: Uncomment the column store scenario when rollback to stable support is complete.
-        # ('column', dict(key_format='r'))
+        ('string-row', dict(key_format='S')),
+        ('column', dict(key_format='r'))
     ]
     scenarios = make_scenarios(key_format_values)
 

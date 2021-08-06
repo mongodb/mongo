@@ -32,6 +32,7 @@
 from suite_subprocess import suite_subprocess
 from wtdataset import SimpleDataSet
 import wiredtiger, wttest
+from wtscenario import make_scenarios
 
 class test_txn06(wttest.WiredTigerTestCase, suite_subprocess):
     conn_config = 'verbose=[transaction]'
@@ -40,13 +41,23 @@ class test_txn06(wttest.WiredTigerTestCase, suite_subprocess):
     source_uri = 'table:' + tablename + "_src"
     nrows = 100000
 
+    format_values = [
+        ('row', dict(key_format = 'S', value_format='S')),
+        ('var', dict(key_format = 'r', value_format='S')),
+        ('fix', dict(key_format = 'r', value_format='8t')),
+    ]
+    scenarios = make_scenarios(format_values)
+
     def test_long_running(self):
         # Populate a table
-        SimpleDataSet(self, self.source_uri, self.nrows).populate()
+        ds = SimpleDataSet(self, self.source_uri, self.nrows,
+            key_format=self.key_format, value_format=self.value_format)
+        ds.populate()
 
         # Now scan the table and copy the rows into a new table. The cursor will keep the snapshot
         # in self.session pinned while the inserts cause new IDs to be allocated.
-        c_src = self.session.create(self.uri, "key_format=S,value_format=S")
+        format = "key_format={},value_format={}".format(self.key_format, self.value_format)
+        c_src = self.session.create(self.uri, format)
         c_src = self.session.open_cursor(self.source_uri)
         insert_session = self.conn.open_session()
         c = insert_session.open_cursor(self.uri)

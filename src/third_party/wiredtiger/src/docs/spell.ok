@@ -206,6 +206,7 @@ clickable
 cmake
 colgroup
 colgroups
+colspan
 combinatorial
 command's
 comparator
@@ -229,6 +230,7 @@ cryptographically
 csuite
 ctest
 curfile
+curhs
 cursortype
 curtable
 customerABC
@@ -517,6 +519,7 @@ putKey
 putKeyString
 putValue
 putValueString
+px
 py
 qnx
 qqq

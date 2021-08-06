@@ -43,11 +43,13 @@ class test_timestamp03(wttest.WiredTigerTestCase, suite_subprocess):
     table_nots_nolog = 'ts03_nots_nologged'
 
     types = [
-        ('file', dict(uri='file:', use_cg=False, use_index=False)),
-        ('lsm', dict(uri='lsm:', use_cg=False, use_index=False)),
-        ('table-cg', dict(uri='table:', use_cg=True, use_index=False)),
-        ('table-index', dict(uri='table:', use_cg=False, use_index=True)),
-        ('table-simple', dict(uri='table:', use_cg=False, use_index=False)),
+        ('file-row', dict(uri='file:', key_format='i', use_cg=False, use_index=False)),
+        ('file-col', dict(uri='file:', key_format='r', use_cg=False, use_index=False)),
+        ('lsm', dict(uri='lsm:', key_format='i', use_cg=False, use_index=False)),
+        ('table-row', dict(uri='table:', key_format='i', use_cg=False, use_index=False)),
+        ('table-row-index', dict(uri='table:', key_format='i', use_cg=False, use_index=True)),
+        ('table-col', dict(uri='table:', key_format='r', use_cg=False, use_index=False)),
+        ('table-col-cg', dict(uri='table:', key_format='r', use_cg=True, use_index=False)),
     ]
 
     ckpt = [
@@ -163,13 +165,14 @@ class test_timestamp03(wttest.WiredTigerTestCase, suite_subprocess):
         # 3. Table is logged and does not use timestamps.
         # 4. Table is not logged and does not use timestamps.
         #
-        self.session.create(uri_ts_log, 'key_format=i,value_format=S')
+        format = 'key_format={},value_format=S'.format(self.key_format)
+        self.session.create(uri_ts_log, format)
         cur_ts_log = self.session.open_cursor(uri_ts_log)
-        self.session.create(uri_ts_nolog, 'key_format=i,value_format=S,log=(enabled=false)')
+        self.session.create(uri_ts_nolog, format + ',log=(enabled=false)')
         cur_ts_nolog = self.session.open_cursor(uri_ts_nolog)
-        self.session.create(uri_nots_log, 'key_format=i,value_format=S')
+        self.session.create(uri_nots_log, format)
         cur_nots_log = self.session.open_cursor(uri_nots_log)
-        self.session.create(uri_nots_nolog, 'key_format=i,value_format=S, log=(enabled=false)')
+        self.session.create(uri_nots_nolog, format + ',log=(enabled=false)')
         cur_nots_nolog = self.session.open_cursor(uri_nots_nolog)
 
         # Insert keys 1..100 each with timestamp=key, in some order

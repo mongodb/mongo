@@ -32,6 +32,7 @@
 
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
+from wtscenario import make_scenarios
 
 class test_assert05(wttest.WiredTigerTestCase, suite_subprocess):
     base = 'assert05'
@@ -41,11 +42,16 @@ class test_assert05(wttest.WiredTigerTestCase, suite_subprocess):
     uri_def = base_uri + '.def.wt'
     uri_never = base_uri + '.never.wt'
     uri_none = base_uri + '.none.wt'
-    cfg = 'key_format=S,value_format=S,'
     cfg_always = 'verbose=(write_timestamp=true),write_timestamp_usage=always,assert=(write_timestamp=on)'
     cfg_def = ''
     cfg_never = 'write_timestamp_usage=never,assert=(write_timestamp=on)'
     cfg_none = 'assert=(write_timestamp=off)'
+
+    key_format_values = [
+        ('column', dict(key_format='r', usestrings=False)),
+        ('string-row', dict(key_format='S', usestrings=True))
+    ]
+    scenarios = make_scenarios(key_format_values)
 
     count = 1
     #
@@ -54,7 +60,7 @@ class test_assert05(wttest.WiredTigerTestCase, suite_subprocess):
     #
     def insert_check(self, uri, use_ts):
         c = self.session.open_cursor(uri)
-        key = 'key' + str(self.count)
+        key = 'key' + str(self.count) if self.usestrings else self.count
         val = 'value' + str(self.count)
 
         # Commit with a timestamp
@@ -83,7 +89,7 @@ class test_assert05(wttest.WiredTigerTestCase, suite_subprocess):
         self.count += 1
 
         # Commit without a timestamp
-        key = 'key' + str(self.count)
+        key = 'key' + str(self.count) if self.usestrings else self.count
         val = 'value' + str(self.count)
         c = self.session.open_cursor(uri)
         self.session.begin_transaction()
@@ -111,11 +117,13 @@ class test_assert05(wttest.WiredTigerTestCase, suite_subprocess):
         c.close()
 
     def test_durable_timestamp(self):
+        cfg = 'key_format={},value_format=S,'.format(self.key_format)
+
         # Create a data item at a timestamp
-        self.session.create(self.uri_always, self.cfg + self.cfg_always)
-        self.session.create(self.uri_def, self.cfg + self.cfg_def)
-        self.session.create(self.uri_never, self.cfg + self.cfg_never)
-        self.session.create(self.uri_none, self.cfg + self.cfg_none)
+        self.session.create(self.uri_always, cfg + self.cfg_always)
+        self.session.create(self.uri_def, cfg + self.cfg_def)
+        self.session.create(self.uri_never, cfg + self.cfg_never)
+        self.session.create(self.uri_none, cfg + self.cfg_none)
 
         # Check inserting into each table
         self.insert_check(self.uri_always, 'always')

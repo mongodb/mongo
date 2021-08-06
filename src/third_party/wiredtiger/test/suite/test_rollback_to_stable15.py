@@ -40,7 +40,7 @@ class test_rollback_to_stable15(wttest.WiredTigerTestCase):
     session_config = 'isolation=snapshot'
     key_format_values = [
         ('column', dict(key_format='r')),
-        ('integer', dict(key_format='i')),
+        ('integer-row', dict(key_format='i')),
     ]
     value_format_values = [
         # Fixed length

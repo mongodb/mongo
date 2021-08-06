@@ -39,6 +39,12 @@ class test_timestamp05(wttest.WiredTigerTestCase, suite_subprocess):
     uri = 'table:ts05'
     session_config = 'isolation=snapshot'
 
+    key_format_values = [
+        ('integer-row', dict(key_format='i')),
+        ('column', dict(key_format='r')),
+    ]
+    scenarios = make_scenarios(key_format_values)
+
     def test_create(self):
         s = self.session
         conn = self.conn
@@ -48,7 +54,7 @@ class test_timestamp05(wttest.WiredTigerTestCase, suite_subprocess):
 
         # Commit at 100
         s.begin_transaction()
-        s.create(self.uri, 'key_format=i,value_format=S')
+        s.create(self.uri, 'key_format={},value_format=S'.format(self.key_format))
         s.commit_transaction('commit_timestamp=' + self.timestamp_str(100))
 
         # Make sure the tree is dirty
@@ -62,7 +68,7 @@ class test_timestamp05(wttest.WiredTigerTestCase, suite_subprocess):
         s = self.session
         conn = self.conn
 
-        s.create(self.uri, 'key_format=i,value_format=S')
+        s.create(self.uri, 'key_format={},value_format=S'.format(self.key_format))
         c = s.open_cursor(self.uri, None, 'bulk')
 
         # Insert keys 1..100 each with timestamp=key, in some order

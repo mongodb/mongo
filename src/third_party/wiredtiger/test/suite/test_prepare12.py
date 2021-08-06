@@ -31,6 +31,7 @@
 # [END_TAGS]
 
 import wiredtiger, wttest
+from wtscenario import make_scenarios
 
 # test_prepare12.py
 # Test update restore of a page with prepared update.
@@ -38,26 +39,33 @@ class test_prepare12(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=2MB'
     session_config = 'isolation=snapshot'
 
+    key_format_values = [
+        ('column', dict(key_format='r')),
+        ('integer_row', dict(key_format='i')),
+    ]
+
+    scenarios = make_scenarios(key_format_values)
+
     def test_prepare_update_restore(self):
         uri = "table:test_prepare12"
-        self.session.create(uri, 'key_format=i,value_format=S')
+        self.session.create(uri, 'key_format={},value_format=S'.format(self.key_format))
 
         # Prepare a transaction
         cursor = self.session.open_cursor(uri, None)
         self.session.begin_transaction()
-        cursor[0] = 'a'
+        cursor[1] = 'a'
         self.session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(1))
 
         # Insert an uncommitted key
         session2 = self.conn.open_session(None)
         cursor2 = session2.open_cursor(uri, None)
         session2.begin_transaction()
-        cursor2[1] = 'b'
+        cursor2[2] = 'b'
 
         # Insert a bunch of other content to fill the database to trigger eviction.
         session3 = self.conn.open_session(None)
         cursor3 = session3.open_cursor(uri, None)
-        for i in range(2, 100):
+        for i in range(3, 101):
             session3.begin_transaction()
             cursor3[i] = 'a' * 500
             session3.commit_transaction()
@@ -67,4 +75,4 @@ class test_prepare12(wttest.WiredTigerTestCase):
 
         # Read the prepared update
         self.session.begin_transaction('read_timestamp=' + self.timestamp_str(2))
-        self.assertEqual(cursor[0], 'a')
+        self.assertEqual(cursor[1], 'a')

@@ -37,7 +37,7 @@ class test_hs10(wttest.WiredTigerTestCase):
     session_config = 'isolation=snapshot'
     key_format_values = (
         ('column', dict(key_format='r')),
-        ('int', dict(key_format='i'))
+        ('integer-row', dict(key_format='i'))
     )
     scenarios = make_scenarios(key_format_values)
 

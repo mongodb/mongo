@@ -48,10 +48,17 @@ class test_prepare_hs03(wttest.WiredTigerTestCase):
     # Create a small table.
     uri = "table:test_prepare_hs03"
 
-    scenarios = make_scenarios([
+    corrupt_values = [
         ('corrupt_table', dict(corrupt=True)),
         ('dont_corrupt_table', dict(corrupt=False))
-    ])
+    ]
+
+    key_format_values = [
+        ('column', dict(key_format='r')),
+        ('string-row', dict(key_format='S')),
+    ]
+
+    scenarios = make_scenarios(corrupt_values, key_format_values)
 
     def corrupt_table(self):
         tablename="test_prepare_hs03.wt"
@@ -192,7 +199,7 @@ class test_prepare_hs03(wttest.WiredTigerTestCase):
 
     def test_prepare_hs(self):
         nrows = 100
-        ds = SimpleDataSet(self, self.uri, nrows, key_format="S", value_format='u')
+        ds = SimpleDataSet(self, self.uri, nrows, key_format=self.key_format, value_format='u')
         ds.populate()
         bigvalue = b"aaaaa" * 100
 

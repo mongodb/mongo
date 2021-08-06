@@ -52,7 +52,9 @@ Btree
 Buf
 Bxxx
 Bzip
+CACHEABLE
 CAS
+CBT
 CCCCCCCCCCCCCCCCCC
 CELL's
 CELLs
@@ -573,6 +575,7 @@ bzDecompressInit
 bzalloc
 bzfree
 bzip
+cacheable
 calc
 call's
 calloc
@@ -1417,6 +1420,7 @@ uint
 uintmax
 unbare
 unbuffered
+uncacheable
 uncompressed
 uncompressing
 uncustomized

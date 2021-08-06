@@ -44,8 +44,8 @@ class test_hs05(wttest.WiredTigerTestCase):
     stable = 1
     key_format_values = [
         ('column', dict(key_format='r')),
-        ('integer', dict(key_format='i')),
-        ('string', dict(key_format='S'))
+        ('integer-row', dict(key_format='i')),
+        ('string-row', dict(key_format='S'))
     ]
     scenarios = make_scenarios(key_format_values)
 

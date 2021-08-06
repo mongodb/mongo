@@ -41,7 +41,8 @@ class test_timestamp06(wttest.WiredTigerTestCase, suite_subprocess):
     table_ts_nolog   = 'table:ts06_ts_nologged'
 
     types = [
-        ('col_fix', dict(empty=1, extra_config=',key_format=r,value_format=8t')),
+        # FLCS does not yet work in a timestamp world.
+        #('col_fix', dict(empty=1, extra_config=',key_format=r,value_format=8t')),
         ('col_var', dict(empty=0, extra_config=',key_format=r')),
         ('lsm', dict(empty=0, extra_config=',type=lsm')),
         ('row', dict(empty=0, extra_config='',)),
@@ -122,9 +123,9 @@ class test_timestamp06(wttest.WiredTigerTestCase, suite_subprocess):
         # Open two timestamp tables:
         # 1. Table is logged and uses timestamps.
         # 2. Table is not logged and uses timestamps.
-        self.session.create(self.table_ts_log, 'key_format=i,value_format=i')
+        self.session.create(self.table_ts_log, 'key_format=i,value_format=i' + self.extra_config)
         cur_ts_log = self.session.open_cursor(self.table_ts_log)
-        self.session.create(self.table_ts_nolog, 'key_format=i,value_format=i,log=(enabled=false)')
+        self.session.create(self.table_ts_nolog, 'key_format=i,value_format=i,log=(enabled=false)' + self.extra_config)
         cur_ts_nolog = self.session.open_cursor(self.table_ts_nolog)
 
         # Insert keys 1..100

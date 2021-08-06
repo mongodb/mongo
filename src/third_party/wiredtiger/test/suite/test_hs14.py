@@ -37,7 +37,7 @@ class test_hs14(wttest.WiredTigerTestCase):
     session_config = 'isolation=snapshot'
     key_format_values = [
         ('column', dict(key_format='r')),
-        ('string', dict(key_format='S'))
+        ('string-row', dict(key_format='S'))
     ]
     scenarios = make_scenarios(key_format_values)
 
@@ -52,13 +52,15 @@ class test_hs14(wttest.WiredTigerTestCase):
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
         cursor = self.session.open_cursor(uri)
 
+        nrows = 10000
+
         value1 = 'a' * 500
         value2 = 'b' * 500
         value3 = 'c' * 500
         value4 = 'd' * 500
         value5 = 'e' * 500
 
-        for i in range(1, 10000):
+        for i in range(1, nrows):
             self.session.begin_transaction()
             cursor[self.create_key(i)] = value1
             self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
@@ -77,7 +79,7 @@ class test_hs14(wttest.WiredTigerTestCase):
 
         start = time.time()
         self.session.begin_transaction('read_timestamp=' + self.timestamp_str(3))
-        for i in range(1, 10000):
+        for i in range(1, nrows):
             self.assertEqual(cursor[self.create_key(i)], value3)
         self.session.rollback_transaction()
         end = time.time()
@@ -85,7 +87,7 @@ class test_hs14(wttest.WiredTigerTestCase):
         # The time spent when all history store keys are visible to us.
         visible_hs_latency = (end - start)
 
-        for i in range(1, 10000):
+        for i in range(1, nrows):
             self.session.begin_transaction()
             cursor.set_key(self.create_key(i))
             cursor.remove()
@@ -99,7 +101,7 @@ class test_hs14(wttest.WiredTigerTestCase):
 
         start = time.time()
         self.session.begin_transaction('read_timestamp=' + self.timestamp_str(9))
-        for i in range(1, 10000):
+        for i in range(1, nrows):
             cursor.set_key(self.create_key(i))
             self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
         self.session.rollback_transaction()

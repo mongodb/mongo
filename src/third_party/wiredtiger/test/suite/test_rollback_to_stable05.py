@@ -67,10 +67,6 @@ class test_rollback_to_stable05(test_rollback_to_stable_base):
     def test_rollback_to_stable(self):
         nrows = 1000
 
-        # Prepare transactions for column store table is not yet supported.
-        if self.prepare and self.key_format == 'r':
-            self.skipTest('Prepare transactions for column store table is not yet supported')
-
         # Create two tables without logging.
         uri_1 = "table:rollback_to_stable05_1"
         ds_1 = SimpleDataSet(

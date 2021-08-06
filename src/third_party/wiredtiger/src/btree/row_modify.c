@@ -206,7 +206,7 @@ __wt_row_modify(WT_CURSOR_BTREE *cbt, const WT_ITEM *key, const WT_ITEM *value, 
             WT_ERR(__wt_txn_modify(session, upd));
             logged = true;
 
-            /* Avoid WT_CURSOR.update data copy. */
+            /* Avoid a data copy in WT_CURSOR.update. */
             __wt_upd_value_assign(cbt->modify_update, upd);
         } else {
             /*

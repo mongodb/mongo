@@ -392,14 +392,14 @@ __rollback_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE *page
     } else {
         /* Unpack a column cell. */
         WT_ERR(__wt_scr_alloc(session, WT_INTPACK64_MAXSIZE, &key));
+        memp = key->mem;
+        WT_ERR(__wt_vpack_uint(&memp, 0, recno));
+        key->size = WT_PTRDIFF(memp, key->data);
 
         /* Get the full update value from the data store. */
         unpack = &_unpack;
         kcell = WT_COL_PTR(page, cip);
         __wt_cell_unpack_kv(session, page->dsk, kcell, unpack);
-        memp = key->mem;
-        WT_ERR(__wt_vpack_uint(&memp, 0, recno));
-        key->size = WT_PTRDIFF(memp, key->data);
     }
 
     WT_ERR(__wt_page_cell_data_ref(session, page, unpack, &full_value));

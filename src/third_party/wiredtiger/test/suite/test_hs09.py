@@ -44,10 +44,11 @@ class test_hs09(wttest.WiredTigerTestCase):
     uri = "table:test_hs09"
     key_format_values = [
         ('column', dict(key_format='r')),
-        ('integer', dict(key_format='i')),
-        ('string', dict(key_format='S')),
+        ('integer-row', dict(key_format='i')),
+        ('string-row', dict(key_format='S')),
     ]
     scenarios = make_scenarios(key_format_values)
+    nrows = 1000
 
     def create_key(self, i):
         if self.key_format == 'S':
@@ -101,13 +102,13 @@ class test_hs09(wttest.WiredTigerTestCase):
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
         cursor = self.session.open_cursor(self.uri)
         self.session.begin_transaction()
-        for i in range(1, 1000):
+        for i in range(1, self.nrows):
             cursor[self.create_key(i)] = value1
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
 
         # Load another 500KB of data with a later timestamp.
         self.session.begin_transaction()
-        for i in range(1, 1000):
+        for i in range(1, self.nrows):
             cursor[self.create_key(i)] = value2
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(3))
 
@@ -119,11 +120,6 @@ class test_hs09(wttest.WiredTigerTestCase):
         self.check_ckpt_hs(value2, value1, 2, 3)
 
     def test_prepared_updates_not_written_to_hs(self):
-        # FIXME-WT-6061: Prepare reads currently not supported with columnar store.
-        # Remove this once prepare reads is supported.
-        if self.key_format == 'r':
-            return
-
         # Create a small table.
         create_params = 'key_format={},value_format=S'.format(self.key_format)
         self.session.create(self.uri, create_params)
@@ -170,13 +166,13 @@ class test_hs09(wttest.WiredTigerTestCase):
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
         cursor = self.session.open_cursor(self.uri)
         self.session.begin_transaction()
-        for i in range(1, 1000):
+        for i in range(1, self.nrows):
             cursor[self.create_key(i)] = value1
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
 
         # Load another 500KB of data with a later timestamp.
         self.session.begin_transaction()
-        for i in range(1, 1000):
+        for i in range(1, self.nrows):
             cursor[self.create_key(i)] = value2
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(3))
 
@@ -194,19 +190,19 @@ class test_hs09(wttest.WiredTigerTestCase):
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
         cursor = self.session.open_cursor(self.uri)
         self.session.begin_transaction()
-        for i in range(1, 1000):
+        for i in range(1, self.nrows):
             cursor[self.create_key(i)] = value1
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
 
         # Load another 500KB of data with a later timestamp.
         self.session.begin_transaction()
-        for i in range(1, 1000):
+        for i in range(1, self.nrows):
             cursor[self.create_key(i)] = value2
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(3))
 
         # Delete records.
         self.session.begin_transaction()
-        for i in range(1, 1000):
+        for i in range(1, self.nrows):
             cursor = self.session.open_cursor(self.uri)
             cursor.set_key(self.create_key(i))
             self.assertEqual(cursor.remove(), 0)
