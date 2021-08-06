@@ -627,6 +627,115 @@ TEST(SSLManager, TransientSSLParams) {
     ASSERT_NOT_OK(tla.rotateCertificates(swContext.getValue()->manager, true));
 }
 
+#if OPENSSL_VERSION_NUMBER >= 0x100010fFL
+
+TEST(SSLManager, TransientSSLParamsStressTestWithTransport) {
+    static constexpr int kMaxContexts = 100;
+    static constexpr int kThreads = 10;
+    SSLParams params;
+    params.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+    params.sslCAFile = "jstests/libs/ca.pem";
+
+    ServiceEntryPointUtil sepu;
+
+    auto options = [] {
+        ServerGlobalParams params;
+        params.noUnixSocket = true;
+        transport::TransportLayerASIO::Options opts(&params);
+        return opts;
+    }();
+    transport::TransportLayerASIO tla(options, &sepu);
+
+    TransientSSLParams transientSSLParams;
+    transientSSLParams.sslClusterPEMPayload = loadFile("jstests/libs/client.pem");
+    transientSSLParams.targetedClusterConnectionString = ConnectionString::forLocal();
+
+    Mutex mutex = MONGO_MAKE_LATCH("::test_mutex");
+    std::deque<std::shared_ptr<const transport::SSLConnectionContext>> contexts;
+    std::vector<stdx::thread> threads;
+    Counter64 iterations;
+
+    for (int t = 0; t < kThreads; ++t) {
+        stdx::thread thread([&]() {
+            Timer timer;
+            while (timer.elapsed() < Seconds(2)) {
+                auto swContext = tla.createTransientSSLContext(transientSSLParams);
+                invariant(swContext.getStatus().isOK());
+                std::shared_ptr<const transport::SSLConnectionContext> ctxToDelete;
+                {
+                    auto lk = stdx::lock_guard(mutex);
+                    contexts.push_back(std::move(swContext.getValue()));
+                    if (contexts.size() > kMaxContexts) {
+                        ctxToDelete = contexts.front();
+                        contexts.pop_front();
+                    }
+                }
+                iterations.increment();
+            }
+        });
+        threads.push_back(std::move(thread));
+    }
+    for (auto& t : threads) {
+        t.join();
+    }
+
+    contexts.clear();
+    LOGV2(5906701, "Stress test completed", "iterations"_attr = iterations);
+}
+
+TEST(SSLManager, TransientSSLParamsStressTestWithManager) {
+    static constexpr int kMaxManagers = 100;
+    static constexpr int kThreads = 10;
+    SSLParams params;
+    params.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+    params.sslPEMKeyFile = "jstests/libs/server.pem";
+    params.sslCAFile = "jstests/libs/ca.pem";
+
+    TransientSSLParams transientParams;
+    transientParams.sslClusterPEMPayload = loadFile("jstests/libs/client.pem");
+
+    Mutex mutex = MONGO_MAKE_LATCH("::test_mutex");
+    std::deque<std::shared_ptr<SSLManagerInterface>> managers;
+    std::vector<stdx::thread> threads;
+    int iterations = 0;
+
+    for (int t = 0; t < kThreads; ++t) {
+        stdx::thread thread([&]() {
+            Timer timer;
+            while (timer.elapsed() < Seconds(3)) {
+                std::shared_ptr<SSLManagerInterface> manager =
+                    SSLManagerInterface::create(params, transientParams, true /* isSSLServer */);
+
+                auto egress = std::make_unique<asio::ssl::context>(asio::ssl::context::sslv23);
+                invariant(manager
+                              ->initSSLContext(egress->native_handle(),
+                                               params,
+                                               SSLManagerInterface::ConnectionDirection::kOutgoing)
+                              .isOK());
+                std::shared_ptr<SSLManagerInterface> managerToDelete;
+                {
+                    auto lk = stdx::lock_guard(mutex);
+                    managers.push_back(std::move(manager));
+                    if (managers.size() > kMaxManagers) {
+                        managerToDelete = managers.front();
+                        managers.pop_front();
+                    }
+                }
+                ++iterations;
+            }
+        });
+        threads.push_back(std::move(thread));
+    }
+    for (auto& t : threads) {
+        t.join();
+    }
+
+    managers.clear();
+    LOGV2(5906702, "Stress test completed", "iterations"_attr = iterations);
+}
+
+#endif  // OPENSSL_VERSION_NUMBER >= 0x100010fFL
+
 #endif  // MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
 
 static bool isSanWarningWritten(const std::vector<std::string>& logLines) {

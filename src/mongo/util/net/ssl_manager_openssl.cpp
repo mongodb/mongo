@@ -2686,7 +2686,7 @@ bool SSLManagerOpenSSL::_readCertificateChainFromMemory(
 #if OPENSSL_VERSION_NUMBER >= 0x100010fFL
         if (1 != SSL_CTX_add1_chain_cert(context, ca.get())) {
 #else
-        if (1 != SSL_CTX_add_extra_chain_cert(context, ca.release())) {
+        if (1 != SSL_CTX_add_extra_chain_cert(context, ca.get())) {
 #endif
             CaptureSSLErrorInAttrs capture(errorAttrs);
             LOGV2_ERROR(
@@ -2695,6 +2695,10 @@ bool SSLManagerOpenSSL::_readCertificateChainFromMemory(
         }
         _getX509CertInfo(ca, &debugInfo, std::nullopt, targetClusterURI);
         logCert(debugInfo, "", 5159902);
+#if OPENSSL_VERSION_NUMBER < 0x100010fFL
+        ca.release();  // Older version add_extra_chain_cert takes over the pointer without
+                       // incrementing refcount. Avoid double free.
+#endif
     }
     // When the while loop ends, it's usually just EOF.
     auto err = ERR_peek_last_error();
@@ -3462,6 +3466,10 @@ void SSLManagerOpenSSL::_getX509CertInfo(UniqueX509& x509,
                                          CertInformationToLog* info,
                                          std::optional<StringData> keyFile,
                                          std::optional<StringData> targetClusterURI) {
+    if (!x509) {
+        return;
+    }
+
     info->subject = getCertificateSubjectX509Name(x509.get());
     info->issuer = convertX509ToSSLX509Name(X509_get_issuer_name(x509.get()));
 
