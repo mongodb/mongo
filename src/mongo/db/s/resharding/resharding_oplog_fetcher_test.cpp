@@ -262,41 +262,44 @@ public:
         create(dataCollectionNss);
         _fetchTimestamp = repl::StorageInterface::get(_svcCtx)->getLatestOplogTimestamp(_opCtx);
 
-        AutoGetCollection dataColl(_opCtx, dataCollectionNss, LockMode::MODE_IX);
-
-        // Set a failpoint to tack a `destinedRecipient` onto oplog entries.
-        setGlobalFailPoint("addDestinedRecipient",
-                           BSON("mode"
-                                << "alwaysOn"
-                                << "data"
-                                << BSON("destinedRecipient" << destinedRecipient.toString())));
-
-        // Insert five documents. Advance the majority point.
-        const std::int32_t docsToInsert = 5;
         {
-            for (std::int32_t num = 0; num < docsToInsert; ++num) {
+            AutoGetCollection dataColl(_opCtx, dataCollectionNss, LockMode::MODE_IX);
+
+            // Set a failpoint to tack a `destinedRecipient` onto oplog entries.
+            setGlobalFailPoint("addDestinedRecipient",
+                               BSON("mode"
+                                    << "alwaysOn"
+                                    << "data"
+                                    << BSON("destinedRecipient" << destinedRecipient.toString())));
+
+            // Insert five documents. Advance the majority point.
+            const std::int32_t docsToInsert = 5;
+            {
+                for (std::int32_t num = 0; num < docsToInsert; ++num) {
+                    WriteUnitOfWork wuow(_opCtx);
+                    insertDocument(dataColl.getCollection(),
+                                   InsertStatement(BSON("_id" << num << "a" << num)));
+                    wuow.commit();
+                }
+            }
+
+            // Write an entry saying that fetching is complete.
+            {
                 WriteUnitOfWork wuow(_opCtx);
-                insertDocument(dataColl.getCollection(),
-                               InsertStatement(BSON("_id" << num << "a" << num)));
+                _opCtx->getServiceContext()->getOpObserver()->onInternalOpMessage(
+                    _opCtx,
+                    dataColl.getCollection()->ns(),
+                    dataColl.getCollection()->uuid(),
+                    BSON(
+                        "msg" << fmt::format("Writes to {} are temporarily blocked for resharding.",
+                                             dataColl.getCollection()->ns().toString())),
+                    BSON("type" << kReshardFinalOpLogType << "reshardingUUID" << _reshardingUUID),
+                    boost::none,
+                    boost::none,
+                    boost::none,
+                    boost::none);
                 wuow.commit();
             }
-        }
-
-        // Write an entry saying that fetching is complete.
-        {
-            WriteUnitOfWork wuow(_opCtx);
-            _opCtx->getServiceContext()->getOpObserver()->onInternalOpMessage(
-                _opCtx,
-                dataColl.getCollection()->ns(),
-                dataColl.getCollection()->uuid(),
-                BSON("msg" << fmt::format("Writes to {} are temporarily blocked for resharding.",
-                                          dataColl.getCollection()->ns().toString())),
-                BSON("type" << kReshardFinalOpLogType << "reshardingUUID" << _reshardingUUID),
-                boost::none,
-                boost::none,
-                boost::none,
-                boost::none);
-            wuow.commit();
         }
 
         repl::StorageInterface::get(_opCtx)->waitForAllEarlierOplogWritesToBeVisible(_opCtx);
@@ -497,10 +500,12 @@ TEST_F(ReshardingOplogFetcherTest, TestAwaitInsert) {
         FailPointEnableBlock fp("addDestinedRecipient",
                                 BSON("destinedRecipient" << _destinationShard.toString()));
 
-        AutoGetCollection dataColl(_opCtx, dataCollectionNss, LockMode::MODE_IX);
-        WriteUnitOfWork wuow(_opCtx);
-        insertDocument(dataColl.getCollection(), InsertStatement(BSON("_id" << 1 << "a" << 1)));
-        wuow.commit();
+        {
+            AutoGetCollection dataColl(_opCtx, dataCollectionNss, LockMode::MODE_IX);
+            WriteUnitOfWork wuow(_opCtx);
+            insertDocument(dataColl.getCollection(), InsertStatement(BSON("_id" << 1 << "a" << 1)));
+            wuow.commit();
+        }
 
         repl::StorageInterface::get(_opCtx)->waitForAllEarlierOplogWritesToBeVisible(_opCtx);
         return repl::StorageInterface::get(_svcCtx)->getLatestOplogTimestamp(_opCtx);
@@ -554,10 +559,12 @@ TEST_F(ReshardingOplogFetcherTest, TestStartAtUpdatedWithProgressMarkOplogTs) {
         FailPointEnableBlock fp("addDestinedRecipient",
                                 BSON("destinedRecipient" << _destinationShard.toString()));
 
-        AutoGetCollection dataColl(_opCtx, dataCollectionNss, LockMode::MODE_IX);
-        WriteUnitOfWork wuow(_opCtx);
-        insertDocument(dataColl.getCollection(), InsertStatement(BSON("_id" << 1 << "a" << 1)));
-        wuow.commit();
+        {
+            AutoGetCollection dataColl(_opCtx, dataCollectionNss, LockMode::MODE_IX);
+            WriteUnitOfWork wuow(_opCtx);
+            insertDocument(dataColl.getCollection(), InsertStatement(BSON("_id" << 1 << "a" << 1)));
+            wuow.commit();
+        }
 
         repl::StorageInterface::get(_opCtx)->waitForAllEarlierOplogWritesToBeVisible(_opCtx);
         return repl::StorageInterface::get(_svcCtx)->getLatestOplogTimestamp(_opCtx);
@@ -579,10 +586,12 @@ TEST_F(ReshardingOplogFetcherTest, TestStartAtUpdatedWithProgressMarkOplogTs) {
 
     // Now, insert a document into a different collection that is not involved in resharding.
     auto writeToOtherCollectionTs = [&] {
-        AutoGetCollection dataColl(_opCtx, otherCollection, LockMode::MODE_IX);
-        WriteUnitOfWork wuow(_opCtx);
-        insertDocument(dataColl.getCollection(), InsertStatement(BSON("_id" << 1 << "a" << 1)));
-        wuow.commit();
+        {
+            AutoGetCollection dataColl(_opCtx, otherCollection, LockMode::MODE_IX);
+            WriteUnitOfWork wuow(_opCtx);
+            insertDocument(dataColl.getCollection(), InsertStatement(BSON("_id" << 1 << "a" << 1)));
+            wuow.commit();
+        }
 
         repl::StorageInterface::get(_opCtx)->waitForAllEarlierOplogWritesToBeVisible(_opCtx);
         return repl::StorageInterface::get(_svcCtx)->getLatestOplogTimestamp(_opCtx);

@@ -1217,6 +1217,31 @@ TEST_F(LockerImplTest, ConvertLockPendingUnlockAndUnlock) {
     locker.unlockGlobal();
 }
 
+TEST_F(LockerImplTest, SkipTicketAcquisitionForLockRAIIType) {
+    auto opCtx = makeOperationContext();
+
+    // By default, ticket acquisition is required.
+    ASSERT_TRUE(opCtx->lockState()->shouldAcquireTicket());
+
+    {
+        SkipTicketAcquisitionForLock skipTicketAcquisition(opCtx.get());
+        ASSERT_FALSE(opCtx->lockState()->shouldAcquireTicket());
+    }
+
+    ASSERT_TRUE(opCtx->lockState()->shouldAcquireTicket());
+
+    // If ticket acquisitions are disabled on the lock state, the RAII type has no effect.
+    opCtx->lockState()->skipAcquireTicket();
+    ASSERT_FALSE(opCtx->lockState()->shouldAcquireTicket());
+
+    {
+        SkipTicketAcquisitionForLock skipTicketAcquisition(opCtx.get());
+        ASSERT_FALSE(opCtx->lockState()->shouldAcquireTicket());
+    }
+
+    ASSERT_FALSE(opCtx->lockState()->shouldAcquireTicket());
+}
+
 // This test exercises the lock dumping code in ~LockerImpl in case locks are held on destruction.
 DEATH_TEST_F(LockerImplTest,
              LocksHeldOnDestructionCausesALocksDump,

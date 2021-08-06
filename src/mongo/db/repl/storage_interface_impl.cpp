@@ -52,6 +52,7 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
@@ -1443,6 +1444,10 @@ Status StorageInterfaceImpl::isAdminDbValid(OperationContext* opCtx) {
 
 void StorageInterfaceImpl::waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx,
                                                                    bool primaryOnly) {
+    // Waiting for oplog writes to be visible in the oplog does not use any storage engine resources
+    // and must skip ticket acquisition to avoid deadlocks with updating oplog visibility.
+    SkipTicketAcquisitionForLock skipTicketAcquisition(opCtx);
+
     AutoGetOplog oplogRead(opCtx, OplogAccessMode::kRead);
     if (primaryOnly &&
         !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(opCtx, "admin"))
@@ -1455,6 +1460,10 @@ void StorageInterfaceImpl::waitForAllEarlierOplogWritesToBeVisible(OperationCont
 void StorageInterfaceImpl::oplogDiskLocRegister(OperationContext* opCtx,
                                                 const Timestamp& ts,
                                                 bool orderedCommit) {
+    // Setting the oplog visibility does not use any storage engine resources and must skip ticket
+    // acquisition to avoid deadlocks with updating oplog visibility.
+    SkipTicketAcquisitionForLock skipTicketAcquisition(opCtx);
+
     AutoGetOplog oplogRead(opCtx, OplogAccessMode::kRead);
     fassert(28557,
             oplogRead.getCollection()->getRecordStore()->oplogDiskLocRegister(
