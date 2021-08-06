@@ -654,7 +654,6 @@ icuEnv.CppUnitTest(
         'icu_test.cpp',
         'static_immortal_test.cpp',
         'invalidating_lru_cache_test.cpp',
-        'interruptible_test.cpp',
         'itoa_test.cpp',
         'latch_analyzer_test.cpp' if get_option('use-diagnostic-latches') == 'on' else [],
         'lockable_adapter_test.cpp',
