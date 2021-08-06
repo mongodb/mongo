@@ -444,6 +444,8 @@ error_codes:
 
     - {code: 349, name: KeyPatternShorterThanBound}
 
+    - {code: 354, name: LoadBalancerSupportMismatch, categories: [CloseConnectionError]}
+
     - {code: 357, name: InvalidBSONType}
 
     # Error codes 4000-8999 are reserved.
