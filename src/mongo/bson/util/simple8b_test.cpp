@@ -979,7 +979,7 @@ TEST(Simple8b, EightSelectorLargeBase) {
     // second value of 20 is the nibble shift of 4*20. The first value is 0111 because we store at
     // least 4 values. This should be encoded as [(0111) (10100)] x6 [1000] [1000] = //
     // 81E8F47A3D1E8F48
-    uint128_t val("8462480737302404222943232");
+    uint128_t val = absl::MakeUint128(0x70000, 0x0);
     std::vector<boost::optional<uint128_t>> expectedInts = {val, val, val, val, val, val};
     std::vector<uint8_t> expectedBinary = {0x88, 0xF4, 0xE8, 0xD1, 0xA3, 0x47, 0x8F, 0x1E};
     testSimple8b(expectedInts, expectedBinary);
@@ -990,7 +990,7 @@ TEST(Simple8b, Selector8LargeBaseTestAndSkip) {
     // second value of 20 is the nibble shift of 4*20. The first value is 0111 because we store at
     // least 4 values. With skip this should be encoded as:
     // [(1111) (11111) (0111) (10100)] x3 [1000] = 83FEF4FFBD3FEF48
-    uint128_t val("8462480737302404222943232");
+    uint128_t val = absl::MakeUint128(0x70000, 0x0);
     std::vector<boost::optional<uint128_t>> expectedInts;
     for (uint32_t i = 0; i < 3; i++) {
         expectedInts.push_back(val);
@@ -1005,7 +1005,7 @@ TEST(Simple8b, Selector8LargeSkipEncoding) {
     // that.
     // This should be encoded as
     // [(001111 11111) x 5] [1001] [1000] = 1FF3FE7FCFF9FF98
-    uint128_t val("319014718988379809496913694467282698240");
+    uint128_t val = absl::MakeUint128(0xF000000000000000, 0x0);
     std::vector<boost::optional<uint128_t>> expectedInts = {val, val, val, val, val};
     std::vector<uint8_t> expectedBinary = {0x98, 0xFF, 0xF9, 0xCF, 0x7F, 0xFE, 0xF3, 0x1F};
     testSimple8b(expectedInts, expectedBinary);
@@ -1015,7 +1015,7 @@ TEST(Simple8b, Selector8LargeNibbleShift) {
     // 170141183460469231731687303715884105728= 1 + 127 zeros. This is a value that should have 3
     // trailing zeros due to nibble. So we should encode as:
     // [(1000) (11111)] x6 [1000] [1000] = 23F1F8FC7E3F1F88
-    uint128_t val("170141183460469231731687303715884105728");
+    uint128_t val = absl::MakeUint128(0x8000000000000000, 0x0);
     std::vector<boost::optional<uint128_t>> expectedInts = {val, val, val, val, val, val};
     std::vector<uint8_t> expectedBinary = {0x88, 0x1F, 0x3F, 0x7E, 0xFC, 0xF8, 0xF1, 0x23};
     testSimple8b(expectedInts, expectedBinary);
@@ -1074,7 +1074,7 @@ TEST(Simple8b, RleEightSelectorLarge) {
     // 8462480737302404222943232= 111 + 80 zeros
     // This should be encoded as
     // [(0111) (10000)] x6 [1000] [1000] = 1E8F47A3D1E8F488 + 0xF (rle) + repeat eight selector
-    uint128_t val("8462480737302404222943232");
+    uint128_t val = absl::MakeUint128(0x70000, 0x0);
     std::vector<boost::optional<uint128_t>> expectedInts(132, val);
     std::vector<uint8_t> expectedBinary = {0x88, 0xF4, 0xE8, 0xD1, 0xA3, 0x47, 0x8F, 0x1E,
                                            0x0F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,

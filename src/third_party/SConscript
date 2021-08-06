@@ -372,6 +372,7 @@ if use_system_version_of_library("abseil-cpp"):
         SYSLIBDEPS=[
             env['LIBDEPS_ABSL_CONTAINER_SYSLIBDEP'],
             env['LIBDEPS_ABSL_HASH_SYSLIBDEP'],
+            env['LIBDEPS_ABSL_NUMERIC_SYSLIBDEP'],
         ])
 else:
     abseilDirectory = 'abseil-cpp-master'
@@ -382,6 +383,7 @@ else:
         LIBDEPS_INTERFACE=[
             abseilDirectory + '/absl_container',
             abseilDirectory + '/absl_hash',
+            abseilDirectory + '/absl_numeric', 
         ])
 
 abseilEnv.ShimLibrary(name="abseil")

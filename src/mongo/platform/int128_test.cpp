@@ -27,9 +27,33 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/int128.h"
+#include "mongo/unittest/unittest.h"
 
-#include <absl/numeric/int128.h>
+using namespace mongo;
 
-using uint128_t = absl::uint128;
-using int128_t = absl::int128;
+// Asserts that we can cast to uint128_t and cast back as well that the expected high and low bits
+// after cast are following 2's complement.
+void assertCastIsValid(int128_t val, uint64_t expectedHi, uint64_t expectedLo) {
+    uint128_t castedInt = static_cast<uint128_t>(val);
+    ASSERT_EQUALS(absl::Uint128High64(castedInt), expectedHi);
+    ASSERT_EQUALS(absl::Uint128Low64(castedInt), expectedLo);
+    int128_t backToSigned = static_cast<int128_t>(castedInt);
+    ASSERT_EQUALS(val, backToSigned);
+}
+
+TEST(Int128, TestCastingPositive) {
+    assertCastIsValid(12345, 0, 12345);
+}
+
+TEST(Int128, TestCastingNegative) {
+    assertCastIsValid(-12345, 0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFCFC7);
+}
+
+TEST(Int128, MaxPositiveInt) {
+    assertCastIsValid(std::numeric_limits<int128_t>::max(), 0x7FFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF);
+}
+
+TEST(Int128, MaxNegativeInt) {
+    assertCastIsValid(std::numeric_limits<int128_t>::min(), 0x8000000000000000, 0);
+}

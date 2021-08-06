@@ -37,7 +37,7 @@
 namespace mongo {
 
 uint64_t Simple8bTypeUtil::encodeInt64(int64_t val) {
-    return (uint64_t(val) << 1) ^ (val >> 63);
+    return (static_cast<uint64_t>(val) << 1) ^ (val >> 63);
 }
 
 int64_t Simple8bTypeUtil::decodeInt64(uint64_t val) {
