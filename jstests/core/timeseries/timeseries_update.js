@@ -53,9 +53,15 @@ TimeseriesTest.run((insert) => {
 
         assert.eq(nModifiedBuckets, res.n);
         assert.eq(initialDocList.length, resultDocList.length);
-        for (let i = 0; i < resultDocList.length; ++i) {
-            assert.docEq(coll.findOne(resultDocList[i]), resultDocList[i]);
-        }
+
+        resultDocList.forEach(resultDoc => {
+            const actualDoc = coll.findOne(resultDoc);
+            assert(actualDoc,
+                   "Document " + tojson(resultDoc) +
+                       " is not found in the result collection as expected");
+            assert.docEq(resultDoc, actualDoc);
+        });
+
         assert(coll.drop());
     }
 
@@ -696,6 +702,46 @@ TimeseriesTest.run((insert) => {
         nModifiedBuckets: 0,
         failCode: ErrorCodes.InvalidOptions,
         hasMetaField: false,
+    });
+
+    /************************ Tests updating a collection using collation. ************************/
+    const doc1Collation = {_id: 1, [timeFieldName]: dateTime, [metaFieldName]: "café"};
+    const doc2Collation = {_id: 2, [timeFieldName]: dateTime, [metaFieldName]: "cafe"};
+    const doc3Collation = {_id: 3, [timeFieldName]: dateTime, [metaFieldName]: "cafE"};
+
+    // Query on the metaField and modify the metaField using collation with strength level 1.
+    testUpdate({
+        initialDocList: [doc1Collation, doc2Collation, doc3Collation],
+        updateList: [{
+            q: {[metaFieldName]: "cafe"},
+            u: {$set: {[metaFieldName]: "Updated"}},
+            multi: true,
+            collation: {locale: "fr", strength: 1},
+        }],
+        resultDocList: [
+            {_id: 1, [timeFieldName]: dateTime, [metaFieldName]: "Updated"},
+            {_id: 2, [timeFieldName]: dateTime, [metaFieldName]: "Updated"},
+            {_id: 3, [timeFieldName]: dateTime, [metaFieldName]: "Updated"}
+        ],
+        nModifiedBuckets: 3,
+    });
+
+    // Query on the metafield and modify the metaField using collation with the default strength
+    // (level 3).
+    testUpdate({
+        initialDocList: [doc1Collation, doc2Collation, doc3Collation],
+        updateList: [{
+            q: {[metaFieldName]: "cafe"},
+            u: {$set: {[metaFieldName]: "Updated"}},
+            multi: true,
+            collation: {locale: "fr"},
+        }],
+        resultDocList: [
+            doc1Collation,
+            {_id: 2, [timeFieldName]: dateTime, [metaFieldName]: "Updated"},
+            doc3Collation,
+        ],
+        nModifiedBuckets: 1,
     });
 });
 }());
