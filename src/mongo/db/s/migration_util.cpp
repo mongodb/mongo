@@ -239,6 +239,28 @@ void retryIdempotentWorkAsPrimaryUntilSuccessOrStepdown(
     }
 }
 
+void refreshFilteringMetadataUntilSuccess(OperationContext* opCtx, const NamespaceString& nss) {
+    retryIdempotentWorkAsPrimaryUntilSuccessOrStepdown(
+        opCtx, "refreshFilteringMetadataUntilSuccess", [&nss](OperationContext* newOpCtx) {
+            hangInRefreshFilteringMetadataUntilSuccessInterruptible.pauseWhileSet(newOpCtx);
+
+            try {
+                onShardVersionMismatch(newOpCtx, nss, boost::none);
+            } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                // Can throw NamespaceNotFound if the collection/database was dropped
+            }
+
+            if (hangInRefreshFilteringMetadataUntilSuccessThenSimulateErrorUninterruptible
+                    .shouldFail()) {
+                hangInRefreshFilteringMetadataUntilSuccessThenSimulateErrorUninterruptible
+                    .pauseWhileSet();
+                uasserted(ErrorCodes::InternalError,
+                          "simulate an error response for onShardVersionMismatch");
+            }
+        });
+}
+
+
 }  // namespace
 
 std::shared_ptr<executor::ThreadPoolTaskExecutor> getMigrationUtilExecutor(
@@ -393,48 +415,34 @@ ExecutorFuture<void> submitRangeDeletionTask(OperationContext* opCtx,
                     << " because the disableResumableRangeDeleter server parameter is set to true",
                 !disableResumableRangeDeleter.load());
 
-            // Make sure the collection metadata is up-to-date.
-            while (true) {
-                {
-                    AutoGetCollection autoColl(opCtx, deletionTask.getNss(), MODE_IS);
-                    auto csr = CollectionShardingRuntime::get(opCtx, deletionTask.getNss());
-                    auto optCollDescr = csr->getCurrentMetadataIfKnown();
-
-                    if (deletionTaskUuidMatchesFilteringMetadataUuid(
-                            opCtx, optCollDescr, deletionTask)) {
-                        break;
-                    }
-
-                    // If the collection's filtering metadata is not known, is unsharded, or its
-                    // UUID does not match the UUID of the deletion task, force a filtering metadata
-                    // refresh, because this node may have just stepped up and therefore may have a
-                    // stale cache.
-                    LOGV2(22024,
-                          "Filtering metadata for this range deletion task may be outdated; "
-                          "forcing refresh",
-                          "deletionTask"_attr = redact(deletionTask.toBSON()),
-                          "error"_attr =
-                              (optCollDescr ? (optCollDescr->isSharded()
-                                                   ? "Collection has UUID that does not match "
-                                                     "UUID of the deletion task"
-                                                   : "Collection is unsharded")
-                                            : "Collection's sharding state is not known"),
-                          "namespace"_attr = deletionTask.getNss(),
-                          "migrationId"_attr = deletionTask.getId());
-                }
-
-                try {
-                    onShardVersionMismatch(opCtx, deletionTask.getNss(), boost::none);
-                } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-                    // If the database has been dropped, don't retry to get the shard version
-                    break;
-                }
-
+            // Make sure the collection metadata is up-to-date before submitting.
+            boost::optional<CollectionMetadata> optCollDescr;
+            {
                 AutoGetCollection autoColl(opCtx, deletionTask.getNss(), MODE_IS);
                 auto csr = CollectionShardingRuntime::get(opCtx, deletionTask.getNss());
-                if (csr->getCurrentMetadataIfKnown()) {
-                    break;
-                }
+                optCollDescr = csr->getCurrentMetadataIfKnown();
+            }
+
+            if (!deletionTaskUuidMatchesFilteringMetadataUuid(opCtx, optCollDescr, deletionTask)) {
+
+                // If the collection's filtering metadata is not known, is unsharded, or its
+                // UUID does not match the UUID of the deletion task, force a filtering metadata
+                // refresh, because this node may have just stepped up and therefore may have a
+                // stale cache.
+                LOGV2(22024,
+                      "Filtering metadata for this range deletion task may be outdated; "
+                      "forcing refresh",
+                      "deletionTask"_attr = redact(deletionTask.toBSON()),
+                      "error"_attr =
+                          (optCollDescr ? (optCollDescr->isSharded()
+                                               ? "Collection has UUID that does not match "
+                                                 "UUID of the deletion task"
+                                               : "Collection is unsharded")
+                                        : "Collection's sharding state is not known"),
+                      "namespace"_attr = deletionTask.getNss(),
+                      "migrationId"_attr = deletionTask.getId());
+
+                refreshFilteringMetadataUntilSuccess(opCtx, deletionTask.getNss());
             }
 
             return AsyncTry([=]() {

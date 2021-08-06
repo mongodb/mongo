@@ -214,12 +214,6 @@ void ensureChunkVersionIsGreaterThan(OperationContext* opCtx,
                                      const ChunkVersion& preMigrationChunkVersion);
 
 /**
- * Forces a filtering metadata refresh of the namespace until the refresh succeeds or the node
- * steps down or shuts down.
- */
-void refreshFilteringMetadataUntilSuccess(OperationContext* opCtx, const NamespaceString& nss);
-
-/**
  * Submits an asynchronous task to scan config.migrationCoordinators and drive each unfinished
  * migration coordination to completion.
  */
