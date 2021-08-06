@@ -514,6 +514,59 @@ public:
         return visitor->visit(this);
     }
 };
+template <typename AccumulatorN>
+class ExpressionFromAccumulatorN : public Expression {
+public:
+    explicit ExpressionFromAccumulatorN(ExpressionContext* const expCtx,
+                                        boost::intrusive_ptr<Expression> n,
+                                        boost::intrusive_ptr<Expression> output)
+        : Expression(expCtx, {n, output}), _n(n), _output(output) {
+        expCtx->sbeCompatible = false;
+    }
+
+    const char* getOpName() const {
+        return AccumulatorN::kName.rawData();
+    }
+
+    Value serialize(bool explain) const {
+        MutableDocument md;
+        AccumulatorN::serializeHelper(_n, _output, explain, md);
+        return Value(DOC(getOpName() << md.freeze()));
+    }
+
+    Value evaluate(const Document& root, Variables* variables) const {
+        AccumulatorN accum(this->getExpressionContext());
+
+        // Evaluate and initialize 'n'.
+        accum.startNewGroup(_n->evaluate(root, variables));
+
+        // Verify that '_output' produces an array and pass each element to 'process'.
+        auto output = _output->evaluate(root, variables);
+        uassert(5788200, "Input must be an array", output.isArray());
+        for (auto item : output.getArray()) {
+            accum.process(item, false);
+        }
+        return accum.getValue(false);
+    }
+
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
+        return visitor->visit(this);
+    }
+
+protected:
+    void _doAddDependencies(DepsTracker* deps) const {
+        _n->addDependencies(deps);
+        _output->addDependencies(deps);
+    }
+
+private:
+    boost::intrusive_ptr<Expression> _n;
+    boost::intrusive_ptr<Expression> _output;
+};
 
 /**
  * Inherit from this class if your expression takes exactly one numeric argument.

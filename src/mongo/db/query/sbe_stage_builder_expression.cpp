@@ -45,6 +45,7 @@
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/accumulator.h"
+#include "mongo/db/pipeline/accumulator_multi.h"
 #include "mongo/db/pipeline/expression_visitor.h"
 #include "mongo/db/pipeline/expression_walker.h"
 #include "mongo/db/query/projection_parser.h"
@@ -439,6 +440,8 @@ public:
     void visit(const ExpressionFromAccumulator<AccumulatorAvg>* expr) final {}
     void visit(const ExpressionFromAccumulator<AccumulatorMax>* expr) final {}
     void visit(const ExpressionFromAccumulator<AccumulatorMin>* expr) final {}
+    void visit(const ExpressionFromAccumulatorN<AccumulatorMaxN>* expr) final {}
+    void visit(const ExpressionFromAccumulatorN<AccumulatorMinN>* expr) final {}
     void visit(const ExpressionFromAccumulator<AccumulatorStdDevPop>* expr) final {}
     void visit(const ExpressionFromAccumulator<AccumulatorStdDevSamp>* expr) final {}
     void visit(const ExpressionFromAccumulator<AccumulatorSum>* expr) final {}
@@ -642,6 +645,8 @@ public:
     void visit(const ExpressionFromAccumulator<AccumulatorAvg>* expr) final {}
     void visit(const ExpressionFromAccumulator<AccumulatorMax>* expr) final {}
     void visit(const ExpressionFromAccumulator<AccumulatorMin>* expr) final {}
+    void visit(const ExpressionFromAccumulatorN<AccumulatorMaxN>* expr) final {}
+    void visit(const ExpressionFromAccumulatorN<AccumulatorMinN>* expr) final {}
     void visit(const ExpressionFromAccumulator<AccumulatorStdDevPop>* expr) final {}
     void visit(const ExpressionFromAccumulator<AccumulatorStdDevSamp>* expr) final {}
     void visit(const ExpressionFromAccumulator<AccumulatorSum>* expr) final {}
@@ -2672,6 +2677,12 @@ public:
         unsupportedExpression(expr->getOpName());
     }
     void visit(const ExpressionFromAccumulator<AccumulatorMin>* expr) final {
+        unsupportedExpression(expr->getOpName());
+    }
+    void visit(const ExpressionFromAccumulatorN<AccumulatorMaxN>* expr) final {
+        unsupportedExpression(expr->getOpName());
+    }
+    void visit(const ExpressionFromAccumulatorN<AccumulatorMinN>* expr) final {
         unsupportedExpression(expr->getOpName());
     }
     void visit(const ExpressionFromAccumulator<AccumulatorStdDevPop>* expr) final {

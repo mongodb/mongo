@@ -44,21 +44,24 @@ using Sense = AccumulatorMinMax::Sense;
 class AccumulatorN : public AccumulatorState {
 public:
     AccumulatorN(ExpressionContext* expCtx);
-
-protected:
-    // Initialize 'n' with 'input'. In particular, verifies that 'input' is a positive integer.
+    /**
+     * Initialize 'n' with 'input'. In particular, verifies that 'input' is a positive integer.
+     */
     void startNewGroup(const Value& input) final;
 
-    // Parses 'args' for the 'n' and 'output' arguments that are common to the 'N' family of
-    // accumulators.
-    static std::tuple<boost::intrusive_ptr<Expression>, boost::intrusive_ptr<Expression>> parseArgs(
-        ExpressionContext* expCtx, const BSONObj& args, VariablesParseState vps);
-
-    // Helper which appends the 'n' and 'output' fields to 'md'.
+    /**
+     * Helper which appends the 'n' and 'output' fields to 'md'.
+     */
     static void serializeHelper(const boost::intrusive_ptr<Expression>& initializer,
                                 const boost::intrusive_ptr<Expression>& argument,
                                 bool explain,
                                 MutableDocument& md);
+
+protected:
+    // Parses 'args' for the 'n' and 'output' arguments that are common to the 'N' family of
+    // accumulators.
+    static std::tuple<boost::intrusive_ptr<Expression>, boost::intrusive_ptr<Expression>> parseArgs(
+        ExpressionContext* expCtx, const BSONObj& args, VariablesParseState vps);
 
     // Stores the limit of how many values we will return. This value is initialized to
     // 'boost::none' on construction and is only set during 'startNewGroup'.
@@ -82,6 +85,14 @@ public:
     static AccumulationExpression parseMinMaxN(ExpressionContext* expCtx,
                                                BSONElement elem,
                                                VariablesParseState vps);
+
+    /**
+     * Constructs an Expression representing $minN or $maxN depending on 's'.
+     */
+    template <Sense s>
+    static boost::intrusive_ptr<Expression> parseExpression(ExpressionContext* expCtx,
+                                                            BSONElement exprElement,
+                                                            const VariablesParseState& vps);
 
     void processInternal(const Value& input, bool merging) final;
 

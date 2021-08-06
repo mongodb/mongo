@@ -165,6 +165,8 @@ class ExpressionSetField;
 class AccumulatorAvg;
 class AccumulatorMax;
 class AccumulatorMin;
+class AccumulatorMaxN;
+class AccumulatorMinN;
 class AccumulatorStdDevPop;
 class AccumulatorStdDevSamp;
 class AccumulatorSum;
@@ -175,6 +177,8 @@ class ExpressionTsIncrement;
 
 template <typename AccumulatorState>
 class ExpressionFromAccumulator;
+template <typename AccumulatorN>
+class ExpressionFromAccumulatorN;
 
 /**
  * This is a base class to allow for traversal of an aggregation expression tree. It implements the
@@ -316,6 +320,10 @@ public:
         expression_walker::MaybeConstPtr<IsConst, ExpressionFromAccumulator<AccumulatorMax>>) = 0;
     virtual void visit(
         expression_walker::MaybeConstPtr<IsConst, ExpressionFromAccumulator<AccumulatorMin>>) = 0;
+    virtual void visit(
+        expression_walker::MaybeConstPtr<IsConst, ExpressionFromAccumulatorN<AccumulatorMaxN>>) = 0;
+    virtual void visit(
+        expression_walker::MaybeConstPtr<IsConst, ExpressionFromAccumulatorN<AccumulatorMinN>>) = 0;
     virtual void visit(
         expression_walker::MaybeConstPtr<IsConst,
                                          ExpressionFromAccumulator<AccumulatorStdDevPop>>) = 0;

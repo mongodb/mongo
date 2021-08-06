@@ -30,10 +30,24 @@
 #include "mongo/db/pipeline/accumulator_multi.h"
 
 namespace mongo {
-// TODO SERVER-58379 Update these macros once FCV constants are upgraded.
-REGISTER_ACCUMULATOR(maxN, AccumulatorMinMaxN::parseMinMaxN<Sense::kMax>);
-REGISTER_ACCUMULATOR(minN, AccumulatorMinMaxN::parseMinMaxN<Sense::kMin>);
-// TODO SERVER-57882 Add $minN/$maxN as expressions.
+REGISTER_ACCUMULATOR_WITH_MIN_VERSION(
+    maxN,
+    AccumulatorMinMaxN::parseMinMaxN<Sense::kMax>,
+    ServerGlobalParams::FeatureCompatibility::Version::kVersion51);
+REGISTER_ACCUMULATOR_WITH_MIN_VERSION(
+    minN,
+    AccumulatorMinMaxN::parseMinMaxN<Sense::kMin>,
+    ServerGlobalParams::FeatureCompatibility::Version::kVersion51);
+REGISTER_EXPRESSION_WITH_MIN_VERSION(maxN,
+                                     AccumulatorMinMaxN::parseExpression<Sense::kMax>,
+                                     AllowedWithApiStrict::kNeverInVersion1,
+                                     AllowedWithClientType::kAny,
+                                     ServerGlobalParams::FeatureCompatibility::Version::kVersion51);
+REGISTER_EXPRESSION_WITH_MIN_VERSION(minN,
+                                     AccumulatorMinMaxN::parseExpression<Sense::kMin>,
+                                     AllowedWithApiStrict::kNeverInVersion1,
+                                     AllowedWithClientType::kAny,
+                                     ServerGlobalParams::FeatureCompatibility::Version::kVersion51);
 // TODO SERVER-57885 Add $minN/$maxN as window functions.
 
 AccumulatorN::AccumulatorN(ExpressionContext* const expCtx)
@@ -77,6 +91,19 @@ Document AccumulatorMinMaxN::serialize(boost::intrusive_ptr<Expression> initiali
     return DOC(getOpName() << args.freeze());
 }
 
+template <Sense s>
+boost::intrusive_ptr<Expression> AccumulatorMinMaxN::parseExpression(
+    ExpressionContext* const expCtx, BSONElement exprElement, const VariablesParseState& vps) {
+    auto accExpr = AccumulatorMinMaxN::parseMinMaxN<s>(expCtx, exprElement, vps);
+    if constexpr (s == Sense::kMin) {
+        return make_intrusive<ExpressionFromAccumulatorN<AccumulatorMinN>>(
+            expCtx, std::move(accExpr.initializer), std::move(accExpr.argument));
+    } else {
+        return make_intrusive<ExpressionFromAccumulatorN<AccumulatorMaxN>>(
+            expCtx, std::move(accExpr.initializer), std::move(accExpr.argument));
+    }
+}
+
 std::tuple<boost::intrusive_ptr<Expression>, boost::intrusive_ptr<Expression>>
 AccumulatorN::parseArgs(ExpressionContext* const expCtx,
                         const BSONObj& args,
@@ -93,8 +120,8 @@ AccumulatorN::parseArgs(ExpressionContext* const expCtx,
             uasserted(5787901, str::stream() << "Unknown argument to minN/maxN: " << fieldName);
         }
     }
-    uassert(5787906, "Missing value for 'n'", n);
-    uassert(5787907, "Missing value for 'output'", output);
+    uassert(5787906, str::stream() << "Missing value for " << kFieldNameN << "'", n);
+    uassert(5787907, str::stream() << "Missing value for " << kFieldNameOutput << "'", output);
     return std::make_tuple(n, output);
 }
 

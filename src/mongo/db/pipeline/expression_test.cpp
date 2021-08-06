@@ -44,6 +44,7 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
 
@@ -739,6 +740,39 @@ TEST(ExpressionFromAccumulators, Min) {
                            {{Value(0LL), Value(20.0), Value(10)}, Value(0LL)},
                            // $min returns null when no arguments are provided.
                            {{}, Value(BSONNULL)}});
+}
+
+TEST(ExpressionFromAccumulators, MinNMaxN) {
+    auto assertEq = [](const BSONObj& spec, const BSONArray& expected) {
+        auto expCtx = ExpressionContextForTest{};
+        VariablesParseState vps = expCtx.variablesParseState;
+        auto expression = Expression::parseExpression(&expCtx, spec, vps);
+        auto result = expression->evaluate({}, &expCtx.variables);
+        ASSERT_EQ(result.getType(), BSONType::Array);
+        ASSERT_VALUE_EQ(result, Value(expected));
+    };
+
+    RAIIServerParameterControllerForTest controller("featureFlagExactTopNAccumulator", true);
+
+    // $maxN
+    assertEq(fromjson("{$maxN: {n: 3, output: [19, 7, 28, 3, 5]}}"),
+             BSONArray(fromjson("[28, 19, 7]")));
+    assertEq(fromjson("{$maxN: {n: 6, output: [19, 7, 28, 3, 5]}}"),
+             BSONArray(fromjson("[28, 19, 7, 5, 3]")));
+    assertEq(fromjson("{$maxN: {n: 3, output: [1,2,3]}}"), BSONArray(fromjson("[3,2,1]")));
+    assertEq(fromjson("{$maxN: {n: 3, output: [1,2,null]}}"), BSONArray(fromjson("[2,1]")));
+    assertEq(fromjson("{$maxN: {n: 3, output: [1.1, 2.713, 3]}}"),
+             BSONArray(fromjson("[3, 2.713, 1.1]")));
+
+    // $minN
+    assertEq(fromjson("{$minN: {n: 3, output: [19, 7, 28, 3, 5]}}"),
+             BSONArray(fromjson("[3,5,7]")));
+    assertEq(fromjson("{$minN: {n: 6, output: [19, 7, 28, 3, 5]}}"),
+             BSONArray(fromjson("[3,5,7,19,28]")));
+    assertEq(fromjson("{$minN: {n: 3, output: [3,2,1]}}"), BSONArray(fromjson("[1,2,3]")));
+    assertEq(fromjson("{$minN: {n: 3, output: [1,2,null]}}"), BSONArray(fromjson("[1,2]")));
+    assertEq(fromjson("{$minN: {n: 3, output: [3, 2.713, 1.1]}}"),
+             BSONArray(fromjson("[1.1, 2.713, 3]")));
 }
 
 TEST(ExpressionFromAccumulators, Sum) {
