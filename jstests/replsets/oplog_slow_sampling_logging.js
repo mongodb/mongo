@@ -32,7 +32,8 @@ const replSet = new ReplSetTest({
             "maxOplogTruncationPointsDuringStartup": 10,
             "oplogSamplingLogIntervalSeconds": kLoggingIntervalSeconds,
             "failpoint.slowOplogSamplingReads":
-                tojson({mode: "alwaysOn", data: {"delay": kOplogSampleReadDelay}})
+                tojson({mode: "alwaysOn", data: {"delay": kOplogSampleReadDelay}}),
+            logComponentVerbosity: tojson({storage: {verbosity: 2}}),
         }
     }
 });
