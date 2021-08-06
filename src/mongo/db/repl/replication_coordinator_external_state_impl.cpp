@@ -462,14 +462,13 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
                                const auto msgObj = BSON("msg" << kInitiatingSetMsg);
                                _service->getOpObserver()->onOpMessage(opCtx, msgObj);
                                wuow.commit();
-                               // ReplSetTest assumes that immediately after the replSetInitiate
-                               // command returns, it can allow other nodes to initial sync with
-                               // no retries and they will succeed.  Unfortunately, initial sync
-                               // will fail if it finds its sync source has an empty oplog.
-                               // Thus, we need to wait here until the seed document is visible
-                               // in our oplog.
-                               _storageInterface->waitForAllEarlierOplogWritesToBeVisible(opCtx);
                            });
+
+        // ReplSetTest assumes that immediately after the replSetInitiate command returns, it can
+        // allow other nodes to initial sync with no retries and they will succeed. Unfortunately,
+        // initial sync will fail if it finds its sync source has an empty oplog. Thus, we need to
+        // wait here until the seed document is visible in our oplog.
+        _storageInterface->waitForAllEarlierOplogWritesToBeVisible(opCtx);
 
         // Take an unstable checkpoint to ensure that the FCV document is persisted to disk.
         opCtx->recoveryUnit()->waitUntilUnjournaledWritesDurable(opCtx,
