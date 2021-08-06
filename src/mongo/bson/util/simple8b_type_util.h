@@ -28,6 +28,7 @@
  */
 
 #include "mongo/bson/oid.h"
+#include "mongo/platform/int128.h"
 
 #include <array>
 #include <boost/optional.hpp>
@@ -49,6 +50,8 @@ public:
     // unsigned integer.
     static uint64_t encodeInt64(int64_t val);
     static int64_t decodeInt64(uint64_t val);
+    static uint128_t encodeInt128(int128_t val);
+    static int128_t decodeInt128(uint128_t val);
 
     // These methods are for encoding OID with simple8b. The unique identifier is not part of
     // the encoded integer and must thus be provided when decoding.
