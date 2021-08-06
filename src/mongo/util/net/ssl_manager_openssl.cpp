@@ -851,7 +851,7 @@ StatusWith<std::pair<OCSPCertIDSet, boost::optional<Date_t>>> iterateResponse(
  * earliest expiration date on the OCSPResponse.
  */
 StatusWith<std::pair<OCSPCertIDSet, boost::optional<Date_t>>> parseAndValidateOCSPResponse(
-    SSL_CTX* context, OCSP_RESPONSE* response, STACK_OF(X509) * intermediateCerts) {
+    SSL_CTX* context, X509_STORE* ca, OCSP_RESPONSE* response, STACK_OF(X509) * intermediateCerts) {
     // Read the overall status of the OCSP response
     int responseStatus = OCSP_response_status(response);
     switch (responseStatus) {
@@ -878,7 +878,7 @@ StatusWith<std::pair<OCSPCertIDSet, boost::optional<Date_t>>> parseAndValidateOC
         return getSSLFailure("incomplete OCSP response.");
     }
 
-    X509_STORE* store = SSL_CTX_get_cert_store(context);
+    X509_STORE* store = ca == nullptr ? SSL_CTX_get_cert_store(context) : ca;
 
     // OCSP_basic_verify takes in the Response from the responder and verifies
     // that the signer of the OCSP response is in intermediateCerts. Then it tries
@@ -890,10 +890,11 @@ StatusWith<std::pair<OCSPCertIDSet, boost::optional<Date_t>>> parseAndValidateOC
     return iterateResponse(basicResponse.get(), intermediateCerts);
 }
 
-Future<OCSPFetchResponse> dispatchRequests(SSL_CTX* context,
-                                           std::shared_ptr<STACK_OF(X509)> intermediateCerts,
-                                           OCSPValidationContext& ocspContext,
-                                           OCSPPurpose purpose) {
+Future<OCSPFetchResponse> dispatchOCSPRequests(SSL_CTX* context,
+                                               std::shared_ptr<X509_STORE> ca,
+                                               std::shared_ptr<STACK_OF(X509)> intermediateCerts,
+                                               OCSPValidationContext& ocspContext,
+                                               OCSPPurpose purpose) {
     auto& [ocspRequestMap, _, leafResponders] = ocspContext;
 
     struct OCSPCompletionState {
@@ -925,7 +926,7 @@ Future<OCSPFetchResponse> dispatchRequests(SSL_CTX* context,
     for (size_t i = 0; i < futureResponses.size(); i++) {
         auto futureResponse = std::move(futureResponses[i]);
         std::move(futureResponse)
-            .getAsync([context, state](StatusWith<UniqueOCSPResponse> swResponse) mutable {
+            .getAsync([context, ca, state](StatusWith<UniqueOCSPResponse> swResponse) mutable {
                 if (!swResponse.isOK()) {
                     if (state->finishLine.arriveWeakly()) {
                         state->promise.setError(
@@ -936,7 +937,7 @@ Future<OCSPFetchResponse> dispatchRequests(SSL_CTX* context,
                 }
 
                 auto swCertIDSetAndDuration = parseAndValidateOCSPResponse(
-                    context, swResponse.getValue().get(), state->intermediateCerts.get());
+                    context, ca.get(), swResponse.getValue().get(), state->intermediateCerts.get());
 
                 if (swCertIDSetAndDuration.isOK() ||
                     swCertIDSetAndDuration.getStatus() ==
@@ -1035,10 +1036,12 @@ private:
 
         auto ocspContext = std::move(swOCSPContext.getValue());
 
-        auto swResponse =
-            dispatchRequests(
-                key.context, key.intermediateCerts, ocspContext, OCSPPurpose::kClientVerify)
-                .getNoThrow();
+        auto swResponse = dispatchOCSPRequests(key.context,
+                                               nullptr,
+                                               key.intermediateCerts,
+                                               ocspContext,
+                                               OCSPPurpose::kClientVerify)
+                              .getNoThrow();
         if (!swResponse.isOK()) {
             return LookupResult(boost::none);
         }
@@ -1121,6 +1124,7 @@ private:
     UniqueSSL _ssl{nullptr};
     SSL_CTX* _context{nullptr};
     X509* _cert{nullptr};
+    std::shared_ptr<X509_STORE> _ca;
 
     // Note: A ref is kept by all futures and the periodic job on the SSLManagerOpenSSL ensure this
     // object is alive.
@@ -1157,6 +1161,10 @@ public:
 
     std::weak_ptr<const SSLConnectionContext> getSSLContextOwner() {
         return *_ownedByContext;
+    }
+
+    std::shared_ptr<X509_STORE> getOCSPCertStore() {
+        return _ocspCertStore;
     }
 
     SSLConnectionInterface* connect(Socket* socket) final;
@@ -1210,8 +1218,9 @@ private:
     const int _rolesNid = OBJ_create(mongodbRolesOID.identifier.c_str(),
                                      mongodbRolesOID.shortDescription.c_str(),
                                      mongodbRolesOID.longDescription.c_str());
-    UniqueSSLContext _serverContext;  // SSL context for incoming connections
-    UniqueSSLContext _clientContext;  // SSL context for outgoing connections
+    UniqueSSLContext _serverContext;             // SSL context for incoming connections
+    UniqueSSLContext _clientContext;             // SSL context for outgoing connections
+    std::shared_ptr<X509_STORE> _ocspCertStore;  // X509 Store specifically for OCSP stapling
 
     bool _weakValidation;
     bool _allowInvalidCertificates;
@@ -1581,6 +1590,7 @@ SSLManagerOpenSSL::SSLManagerOpenSSL(const SSLParams& params,
                                      bool isServer)
     : _serverContext(nullptr),
       _clientContext(nullptr),
+      _ocspCertStore(nullptr),
       _weakValidation(params.sslWeakCertificateValidation),
       _allowInvalidCertificates(params.sslAllowInvalidCertificates),
       _allowInvalidHostnames(params.sslAllowInvalidHostnames),
@@ -1644,6 +1654,24 @@ SSLManagerOpenSSL::SSLManagerOpenSSL(const SSLParams& params,
 
         CertificateExpirationMonitor::get()->updateExpirationDeadline(
             _sslConfiguration.serverCertificateExpirationDate);
+
+        if (tlsOCSPEnabled) {
+            OpenSSLDeleter<decltype(::X509_STORE_free), ::X509_STORE_free> deleter;
+            _ocspCertStore = std::shared_ptr<X509_STORE>(X509_STORE_new(), deleter);
+            if (!_ocspCertStore) {
+                uasserted(5771600, "failed to allocate X509 store for OCSP fetcher");
+            }
+
+            LOGV2_DEBUG(5771602, 1, "Loading ocsp store", "cafile"_attr = params.sslCAFile);
+            int result = params.sslCAFile.empty()
+                ? X509_STORE_set_default_paths(_ocspCertStore.get())
+                : X509_STORE_load_locations(
+                      _ocspCertStore.get(), params.sslCAFile.c_str(), nullptr);
+
+            if (result == 0) {
+                uasserted(5771601, "failed to load certificates into OCSP X509 store");
+            }
+        }
     }
 }
 
@@ -1758,13 +1786,14 @@ StatusWith<bool> verifyStapledResponse(SSL* conn, X509* peerCert, OCSP_RESPONSE*
     auto intermediateCerts = SSLgetVerifiedChain(conn);
     OCSPCertIDSet emptyCertIDSet{};
 
-    auto swCertId = getCertIdForCert(SSL_get_SSL_CTX(conn), peerCert, intermediateCerts.get());
+    auto context = SSL_get_SSL_CTX(conn);
+    auto swCertId = getCertIdForCert(context, peerCert, intermediateCerts.get());
     if (!swCertId.isOK()) {
         return swCertId.getStatus();
     }
 
     auto swCertIDSetAndDuration =
-        parseAndValidateOCSPResponse(SSL_get_SSL_CTX(conn), response, intermediateCerts.get());
+        parseAndValidateOCSPResponse(context, nullptr, response, intermediateCerts.get());
 
     if (swCertIDSetAndDuration.getStatus() == ErrorCodes::OCSPCertificateStatusRevoked) {
         return swCertIDSetAndDuration.getStatus();
@@ -1992,6 +2021,10 @@ Status SSLManagerOpenSSL::stapleOCSPResponse(SSL_CTX* context, bool asyncOCSPSta
         return Status::OK();
     }
 
+    if (!isSSLServer || isTransient()) {
+        return Status::OK();
+    }
+
     return _fetcher.start(context, asyncOCSPStaple);
 }
 #else
@@ -2004,6 +2037,8 @@ Status OCSPFetcher::start(SSL_CTX* context, bool asyncOCSPStaple) {
     // Increment the ref count on SSL_CTX by creating a SSL object so that our context lives with
     // the OCSPFetcher
     _ssl = UniqueSSL(SSL_new(context));
+    _ca = _manager->getOCSPCertStore();
+    invariant(_ca);
     _context = context;
     _ownedByContext = _manager->getSSLContextOwner();
     // Verify the consistent link between manager and the context that owns it.
@@ -2140,13 +2175,17 @@ void sslContextGetOtherCerts(SSL_CTX* ctx, STACK_OF(X509) * *sk) {
 #endif
 
 Future<Milliseconds> OCSPFetcher::fetchAndStaple(Promise<void>* promise) {
+
+    LOGV2_INFO(577164, "OCSP fetch/staple started");
+
     // Generate a new verified X509StoreContext to get our own certificate chain
     UniqueX509StoreCtx storeCtx(X509_STORE_CTX_new());
     if (!storeCtx) {
         return getSSLFailure("Could not create X509 store.");
     }
 
-    if (X509_STORE_CTX_init(storeCtx.get(), SSL_CTX_get_cert_store(_context), NULL, NULL) == 0) {
+    X509_STORE* store = _ca ? _ca.get() : SSL_CTX_get_cert_store(_context);
+    if (X509_STORE_CTX_init(storeCtx.get(), store, NULL, NULL) == 0) {
         return getSSLFailure("Could not initialize the X509 Store Context.");
     }
 
@@ -2172,10 +2211,11 @@ Future<Milliseconds> OCSPFetcher::fetchAndStaple(Promise<void>* promise) {
 
     auto ocspContext = std::move(swOCSPContext.getValue());
 
-    return dispatchRequests(
-               _context, std::move(intermediateCerts), ocspContext, OCSPPurpose::kStaple)
+    return dispatchOCSPRequests(
+               _context, _ca, std::move(intermediateCerts), ocspContext, OCSPPurpose::kStaple)
         .onCompletion(
             [this, promise](StatusWith<OCSPFetchResponse> swResponse) mutable -> Milliseconds {
+                LOGV2_INFO(577165, "OCSP fetch/staple completion");
                 stdx::lock_guard<Latch> lock(this->_staplingMutex);
 
                 if (_isShutdownConditionLocked(lock)) {
@@ -2191,6 +2231,7 @@ Future<Milliseconds> OCSPFetcher::fetchAndStaple(Promise<void>* promise) {
                     });
                 }
 
+                LOGV2_INFO(577163, "OCSP response", "status"_attr = swResponse.getStatus());
                 return _manager->updateOcspStaplingContextWithResponse(std::move(swResponse));
             });
 }
