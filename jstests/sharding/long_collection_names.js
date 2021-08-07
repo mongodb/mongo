@@ -1,3 +1,10 @@
+/**
+ * Tests long collection name support in sharded collections.
+ *
+ * @tags: [
+ *   requires_fcv_51,
+ * ]
+ */
 (function() {
 "use strict";
 
@@ -34,7 +41,7 @@ function testImplicitlyEnabledLongNameSupport() {
 
     // Verify that long name support is implicitly enabled with FCV 5.1
     const collConfigDoc = configDB.collections.findOne({_id: collNs});
-    assert.eq(collConfigDoc.supportingLongName, "implicitly");
+    assert.eq(collConfigDoc.supportingLongName, "implicitly_enabled");
 }
 
 testDisabledLongNameSupport();
