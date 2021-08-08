@@ -38,7 +38,9 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/split_chunk.h"
@@ -94,6 +96,29 @@ public:
         uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
 
         const NamespaceString nss = NamespaceString(parseNs(dbname, cmdObj));
+
+        // throw if the provided shard version is too old
+        {
+            AutoGetCollection autoColl(opCtx, nss, MODE_IS);
+            auto csr = CollectionShardingRuntime::get(opCtx, nss);
+
+            // pre 5.1 client  will send the collection version, which will make
+            // checkShardVersionOrThrow fail. TODO remove try-catch in 6.1
+            try {
+                csr->checkShardVersionOrThrow(opCtx);
+            } catch (const ExceptionFor<ErrorCodes::StaleConfig>& e) {
+                do {
+                    if (auto staleInfo = e.extraInfo<StaleConfigInfo>()) {
+                        if (staleInfo->getVersionWanted() &&
+                            staleInfo->getVersionWanted()->isOlderThan(
+                                staleInfo->getVersionReceived())) {
+                            break;
+                        }
+                    }
+                    throw;  // cause a refresh
+                } while (false);
+            }
+        }
 
         // Check whether parameters passed to splitChunk are sound
         BSONObj keyPatternObj;

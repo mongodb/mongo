@@ -57,12 +57,14 @@ BSONObj selectMedianKey(OperationContext* opCtx,
                         const ShardId& shardId,
                         const NamespaceString& nss,
                         const ShardKeyPattern& shardKeyPattern,
+                        const ChunkVersion& chunkVersion,
                         const ChunkRange& chunkRange) {
     BSONObjBuilder cmd;
     cmd.append("splitVector", nss.ns());
     cmd.append("keyPattern", shardKeyPattern.toBSON());
     chunkRange.append(&cmd);
     cmd.appendBool("force", true);
+    chunkVersion.appendToCommand(&cmd);
 
     auto shard = uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId));
 
@@ -251,6 +253,7 @@ public:
                               chunk->getShardId(),
                               nss,
                               cm.getShardKeyPattern(),
+                              cm.getVersion(chunk->getShardId()),
                               ChunkRange(chunk->getMin(), chunk->getMax()));
 
         LOGV2(22758,
@@ -261,14 +264,15 @@ public:
               "namespace"_attr = nss.ns(),
               "shardId"_attr = chunk->getShardId());
 
-        uassertStatusOK(
-            shardutil::splitChunkAtMultiplePoints(opCtx,
-                                                  chunk->getShardId(),
-                                                  nss,
-                                                  cm.getShardKeyPattern(),
-                                                  cm.getVersion(),
-                                                  ChunkRange(chunk->getMin(), chunk->getMax()),
-                                                  {splitPoint}));
+        uassertStatusOK(shardutil::splitChunkAtMultiplePoints(
+            opCtx,
+            chunk->getShardId(),
+            nss,
+            cm.getShardKeyPattern(),
+            cm.getVersion().epoch(),
+            cm.getVersion(chunk->getShardId()) /* shardVersion */,
+            ChunkRange(chunk->getMin(), chunk->getMax()),
+            {splitPoint}));
 
         Grid::get(opCtx)
             ->catalogCache()

@@ -44,6 +44,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
@@ -77,6 +78,8 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
 
     {
         AutoGetCollection collection(opCtx, nss, MODE_IS);
+
+        CollectionShardingState::get(opCtx, nss)->checkShardVersionOrThrow(opCtx);
 
         uassert(ErrorCodes::NamespaceNotFound, "ns not found", collection);
 

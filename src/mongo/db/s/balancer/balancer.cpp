@@ -641,7 +641,8 @@ Status Balancer::_splitChunksIfNeeded(OperationContext* opCtx) {
                                                   splitInfo.shardId,
                                                   splitInfo.nss,
                                                   cm.getShardKeyPattern(),
-                                                  splitInfo.collectionVersion,
+                                                  splitInfo.collectionVersion.epoch(),
+                                                  ChunkVersion::IGNORED() /*shardVersion*/,
                                                   ChunkRange(splitInfo.minKey, splitInfo.maxKey),
                                                   splitInfo.splitKeys);
         if (!splitStatus.isOK()) {

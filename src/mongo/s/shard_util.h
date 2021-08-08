@@ -97,7 +97,8 @@ StatusWith<boost::optional<ChunkRange>> splitChunkAtMultiplePoints(
     const ShardId& shardId,
     const NamespaceString& nss,
     const ShardKeyPattern& shardKeyPattern,
-    ChunkVersion collectionVersion,
+    const OID& epoch,
+    ChunkVersion shardVersion,
     const ChunkRange& chunkRange,
     const std::vector<BSONObj>& splitPoints);
 

@@ -139,7 +139,8 @@ StatusWith<boost::optional<ChunkRange>> splitChunkAtMultiplePoints(
     const ShardId& shardId,
     const NamespaceString& nss,
     const ShardKeyPattern& shardKeyPattern,
-    ChunkVersion collectionVersion,
+    const OID& epoch,
+    ChunkVersion shardVersion,
     const ChunkRange& chunkRange,
     const std::vector<BSONObj>& splitPoints) {
     invariant(!splitPoints.empty());
@@ -173,9 +174,9 @@ StatusWith<boost::optional<ChunkRange>> splitChunkAtMultiplePoints(
     cmd.append("splitChunk", nss.ns());
     cmd.append("from", shardId.toString());
     cmd.append("keyPattern", shardKeyPattern.toBSON());
-    cmd.append("epoch", collectionVersion.epoch());
-    collectionVersion.appendWithField(
-        &cmd, ChunkVersion::kShardVersionField);  // backwards compatibility with v3.4
+    cmd.append("epoch", epoch);
+    shardVersion.appendToCommand(&cmd);
+
     chunkRange.append(&cmd);
     cmd.append("splitKeys", splitPoints);
 

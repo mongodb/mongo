@@ -1725,7 +1725,8 @@ void ShardingCatalogManager::splitOrMarkJumbo(OperationContext* opCtx,
                                                   chunk.getShardId(),
                                                   nss,
                                                   cm.getShardKeyPattern(),
-                                                  cm.getVersion(),
+                                                  cm.getVersion().epoch(),
+                                                  ChunkVersion::IGNORED() /*shardVersion*/,
                                                   ChunkRange(chunk.getMin(), chunk.getMax()),
                                                   splitPoints));
     } catch (const DBException&) {
