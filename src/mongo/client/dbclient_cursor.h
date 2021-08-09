@@ -162,7 +162,8 @@ public:
                    int nToReturn,
                    int options,
                    std::vector<BSONObj> initialBatch = {},
-                   boost::optional<Timestamp> operationTime = boost::none);
+                   boost::optional<Timestamp> operationTime = boost::none,
+                   boost::optional<BSONObj> postBatchResumeToken = boost::none);
 
     static StatusWith<std::unique_ptr<DBClientCursor>> fromAggregationRequest(
         DBClientBase* client,
@@ -291,7 +292,8 @@ private:
                    int bs,
                    std::vector<BSONObj> initialBatch,
                    boost::optional<BSONObj> readConcernObj,
-                   boost::optional<Timestamp> operationTime);
+                   boost::optional<Timestamp> operationTime,
+                   boost::optional<BSONObj> postBatchResumeToken = boost::none);
 
     int nextBatchSize();
 
@@ -323,9 +325,9 @@ private:
     Milliseconds _awaitDataTimeout = Milliseconds{0};
     boost::optional<long long> _term;
     boost::optional<repl::OpTime> _lastKnownCommittedOpTime;
-    boost::optional<BSONObj> _postBatchResumeToken;
     boost::optional<BSONObj> _readConcernObj;
     boost::optional<Timestamp> _operationTime;
+    boost::optional<BSONObj> _postBatchResumeToken;
 
     void dataReceived(const Message& reply) {
         bool retry;

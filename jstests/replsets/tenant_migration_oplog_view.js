@@ -31,6 +31,7 @@ const donorRst = new ReplSetTest({
             // up the test.
             tenantMigrationGarbageCollectionDelayMS: kGarbageCollectionDelayMS,
             ttlMonitorSleepSecs: 1,
+            storeFindAndModifyImagesInSideCollection: false,
         }
     }
 });

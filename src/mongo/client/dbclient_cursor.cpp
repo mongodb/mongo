@@ -550,7 +550,8 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
                                int nToReturn,
                                int queryOptions,
                                std::vector<BSONObj> initialBatch,
-                               boost::optional<Timestamp> operationTime)
+                               boost::optional<Timestamp> operationTime,
+                               boost::optional<BSONObj> postBatchResumeToken)
     : DBClientCursor(client,
                      nsOrUuid,
                      BSONObj(),  // query
@@ -562,7 +563,8 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
                      0,
                      std::move(initialBatch),  // batchSize
                      boost::none,
-                     operationTime) {}
+                     operationTime,
+                     postBatchResumeToken) {}
 
 DBClientCursor::DBClientCursor(DBClientBase* client,
                                const NamespaceStringOrUUID& nsOrUuid,
@@ -575,7 +577,8 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
                                int batchSize,
                                std::vector<BSONObj> initialBatch,
                                boost::optional<BSONObj> readConcernObj,
-                               boost::optional<Timestamp> operationTime)
+                               boost::optional<Timestamp> operationTime,
+                               boost::optional<BSONObj> postBatchResumeToken)
     : batch{std::move(initialBatch)},
       _client(client),
       _originalHost(_client->getServerAddress()),
@@ -594,7 +597,8 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
       _ownCursor(true),
       wasError(false),
       _readConcernObj(readConcernObj),
-      _operationTime(operationTime) {
+      _operationTime(operationTime),
+      _postBatchResumeToken(postBatchResumeToken) {
     if (queryOptions & QueryOptionLocal_forceOpQuery) {
         // Legacy OP_QUERY does not support UUIDs.
         invariant(!_nsOrUuid.uuid());
@@ -621,6 +625,14 @@ StatusWith<std::unique_ptr<DBClientCursor>> DBClientCursor::fromAggregationReque
     for (BSONElement elem : ret["cursor"].Obj()["firstBatch"].Array()) {
         firstBatch.emplace_back(elem.Obj().getOwned());
     }
+    boost::optional<BSONObj> postBatchResumeToken;
+    if (auto postBatchResumeTokenElem = ret["cursor"].Obj()["postBatchResumeToken"];
+        postBatchResumeTokenElem.type() == BSONType::Object) {
+        postBatchResumeToken = postBatchResumeTokenElem.Obj().getOwned();
+    } else if (ret["cursor"].Obj().hasField("postBatchResumeToken")) {
+        return Status(ErrorCodes::Error(5761702),
+                      "Expected field 'postbatchResumeToken' to be of object type");
+    }
 
     boost::optional<Timestamp> operationTime = boost::none;
     if (ret.hasField(LogicalTime::kOperationTimeFieldName)) {
@@ -633,7 +645,8 @@ StatusWith<std::unique_ptr<DBClientCursor>> DBClientCursor::fromAggregationReque
                                              0,
                                              useExhaust ? QueryOption_Exhaust : 0,
                                              firstBatch,
-                                             operationTime)};
+                                             operationTime,
+                                             postBatchResumeToken)};
 }
 
 DBClientCursor::~DBClientCursor() {
