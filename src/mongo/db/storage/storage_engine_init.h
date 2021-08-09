@@ -44,6 +44,7 @@ namespace mongo {
 enum class StorageEngineInitFlags {
     kAllowNoLockFile = 1 << 0,
     kSkipMetadataFile = 1 << 1,
+    kForRestart = 1 << 2,  // Used by reinitialzeStorageEngine only.
 };
 
 constexpr StorageEngineInitFlags operator&(StorageEngineInitFlags a,
@@ -66,6 +67,14 @@ StorageEngine::LastShutdownState initializeStorageEngine(OperationContext* opCtx
  * Shuts down storage engine cleanly and releases any locks on mongod.lock.
  */
 void shutdownGlobalStorageEngineCleanly(ServiceContext* service);
+
+/**
+ * Changes the storage engine for the given service by shutting down the old one and starting
+ * up a new one.  Kills all opCtxs on the service context which have a storage recovery unit,
+ * except the one passed in which has its recovery unit replaced.
+ */
+StorageEngine::LastShutdownState reinitializeStorageEngine(OperationContext* opCtx,
+                                                           StorageEngineInitFlags initFlags);
 
 /**
  * Registers a storage engine onto the given "service".

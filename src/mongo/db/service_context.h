@@ -384,7 +384,9 @@ public:
     //
 
     /**
-     * Sets the storage engine for this instance. May be called up to once per instance.
+     * Sets the storage engine for this instance. May be called up to once per instance, unless
+     * clearStorageEngine() is called in which it may be called once after each call to
+     * clearStorageEngine().
      */
     void setStorageEngine(std::unique_ptr<StorageEngine> engine);
 
@@ -393,6 +395,17 @@ public:
      */
     StorageEngine* getStorageEngine() {
         return _storageEngine.get();
+    }
+
+    /**
+     * Clear the current storage engine so we can set a new one.  This is safe to call only if
+     * the caller has arranged for no opCtxs to be accessing the existing storage engine,
+     * and that no new opCtxs can be created which will access storage until this call returns.
+     *
+     * See StorageEngineChangeContext for one way this may be done.
+     */
+    void clearStorageEngine() {
+        _storageEngine = nullptr;
     }
 
     //

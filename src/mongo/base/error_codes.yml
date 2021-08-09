@@ -443,12 +443,13 @@ error_codes:
     - {code: 350, name: ReshardCollectionTruncatedError}
 
     - {code: 351, name: ChangeStreamStartAfterInvalidate, extra: ChangeStreamStartAfterInvalidateInfo}
-    
     - {code: 352, name: UnsupportedOpQueryCommand}
 
     - {code: 353, name: NonRetryableTenantMigrationConflict, extra: NonRetryableTenantMigrationConflictInfo, categories: [TenantMigrationError, TenantMigrationConflictError]}
 
     - {code: 354, name: LoadBalancerSupportMismatch, categories: [CloseConnectionError]}
+
+    - {code: 355, name: InterruptedDueToStorageChange,categories: [Interruption,CancellationError]}
 
     # Error codes 4000-8999 are reserved.
 

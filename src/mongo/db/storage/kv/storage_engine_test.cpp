@@ -42,6 +42,8 @@
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/startup_recovery.h"
+#include "mongo/db/storage/control/storage_control.h"
 #include "mongo/db/storage/devnull/devnull_kv_engine.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/storage_engine_impl.h"
@@ -609,6 +611,44 @@ TEST_F(TimestampKVEngineTest, TimestampAdvancesOnNotification) {
     }
 
     _storageEngine->getTimestampMonitor()->removeListener(&listener);
+}
+
+TEST_F(StorageEngineDurableTest, UseAlternateStorageLocation) {
+    auto opCtx = cc().makeOperationContext();
+
+    const NamespaceString coll1Ns("db.coll1");
+    const NamespaceString coll2Ns("db.coll2");
+    auto swCollInfo = createCollection(opCtx.get(), coll1Ns);
+    ASSERT_OK(swCollInfo.getStatus());
+    ASSERT(collectionExists(opCtx.get(), coll1Ns));
+    ASSERT_FALSE(collectionExists(opCtx.get(), coll2Ns));
+
+    LOGV2(5781102, "Starting up storage engine in alternate location");
+    const auto oldPath = storageGlobalParams.dbpath;
+    storageGlobalParams.dbpath = boost::filesystem::path(oldPath).append(".alternate").string();
+    boost::filesystem::create_directory(storageGlobalParams.dbpath);
+    auto lastShutdownState = reinitializeStorageEngine(opCtx.get(), StorageEngineInitFlags{});
+    getGlobalServiceContext()->getStorageEngine()->notifyStartupComplete();
+    LOGV2(5781103, "Started up storage engine in alternate location");
+    ASSERT(StorageEngine::LastShutdownState::kClean == lastShutdownState);
+    StorageEngineTest::_storageEngine = getServiceContext()->getStorageEngine();
+    // Alternate storage location should have no collections.
+    ASSERT_FALSE(collectionExists(opCtx.get(), coll1Ns));
+    ASSERT_FALSE(collectionExists(opCtx.get(), coll2Ns));
+
+    swCollInfo = createCollection(opCtx.get(), coll2Ns);
+    ASSERT_OK(swCollInfo.getStatus());
+    ASSERT_FALSE(collectionExists(opCtx.get(), coll1Ns));
+    ASSERT_TRUE(collectionExists(opCtx.get(), coll2Ns));
+
+    LOGV2(5781104, "Starting up storage engine in original location");
+    storageGlobalParams.dbpath = oldPath;
+    lastShutdownState = reinitializeStorageEngine(opCtx.get(), StorageEngineInitFlags{});
+    getGlobalServiceContext()->getStorageEngine()->notifyStartupComplete();
+    ASSERT(StorageEngine::LastShutdownState::kClean == lastShutdownState);
+    StorageEngineTest::_storageEngine = getServiceContext()->getStorageEngine();
+    ASSERT_TRUE(collectionExists(opCtx.get(), coll1Ns));
+    ASSERT_FALSE(collectionExists(opCtx.get(), coll2Ns));
 }
 
 }  // namespace

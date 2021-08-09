@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/unittest/temp_dir.h"
 
 namespace mongo {
@@ -38,6 +39,10 @@ namespace mongo {
  * Test fixture class for tests that use the "ephemeralForTest" storage engine.
  */
 class ServiceContextMongoDTest : public virtual ServiceContextTest {
+public:
+    constexpr static StorageEngineInitFlags kDefaultStorageEngineInitFlags =
+        StorageEngineInitFlags::kAllowNoLockFile | StorageEngineInitFlags::kSkipMetadataFile;
+
 protected:
     enum class RepairAction { kNoRepair, kRepair };
 
@@ -47,7 +52,9 @@ protected:
      * Build a ServiceContextMongoDTest, using the named storage engine.
      */
     explicit ServiceContextMongoDTest(std::string engine);
-    ServiceContextMongoDTest(std::string engine, RepairAction repair);
+    ServiceContextMongoDTest(std::string engine,
+                             RepairAction repair,
+                             StorageEngineInitFlags initFlags = kDefaultStorageEngineInitFlags);
     virtual ~ServiceContextMongoDTest();
 
     void tearDown() override;

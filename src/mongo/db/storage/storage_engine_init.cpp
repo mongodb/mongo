@@ -41,6 +41,8 @@
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/control/storage_control.h"
+#include "mongo/db/storage/recovery_unit_noop.h"
+#include "mongo/db/storage/storage_engine_change_context.h"
 #include "mongo/db/storage/storage_engine_lock_file.h"
 #include "mongo/db/storage/storage_engine_metadata.h"
 #include "mongo/db/storage/storage_options.h"
@@ -64,7 +66,8 @@ StorageEngine::LastShutdownState initializeStorageEngine(OperationContext* opCtx
     ServiceContext* service = opCtx->getServiceContext();
 
     // This should be set once.
-    invariant(!service->getStorageEngine());
+    if ((initFlags & StorageEngineInitFlags::kForRestart) == StorageEngineInitFlags{})
+        invariant(!service->getStorageEngine());
 
     if ((initFlags & StorageEngineInitFlags::kAllowNoLockFile) == StorageEngineInitFlags{}) {
         createLockFile(service);
@@ -154,8 +157,18 @@ StorageEngine::LastShutdownState initializeStorageEngine(OperationContext* opCtx
     });
 
     auto& lockFile = StorageEngineLockFile::get(service);
-    service->setStorageEngine(std::unique_ptr<StorageEngine>(
-        factory->create(opCtx, storageGlobalParams, lockFile ? &*lockFile : nullptr)));
+    if ((initFlags & StorageEngineInitFlags::kForRestart) == StorageEngineInitFlags{}) {
+        auto storageEngine = std::unique_ptr<StorageEngine>(
+            factory->create(opCtx, storageGlobalParams, lockFile ? &*lockFile : nullptr));
+        service->setStorageEngine(std::move(storageEngine));
+    } else {
+        auto storageEngineChangeContext = StorageEngineChangeContext::get(service);
+        auto token = storageEngineChangeContext->killOpsForStorageEngineChange(service);
+        auto storageEngine = std::unique_ptr<StorageEngine>(
+            factory->create(opCtx, storageGlobalParams, lockFile ? &*lockFile : nullptr));
+        storageEngineChangeContext->changeStorageEngine(
+            service, std::move(token), std::move(storageEngine));
+    }
     service->getStorageEngine()->finishInit();
 
     if (lockFile) {
@@ -181,18 +194,41 @@ StorageEngine::LastShutdownState initializeStorageEngine(OperationContext* opCtx
     }
 }
 
-void shutdownGlobalStorageEngineCleanly(ServiceContext* service) {
+namespace {
+void shutdownGlobalStorageEngineCleanly(ServiceContext* service, Status errorToReport) {
     auto storageEngine = service->getStorageEngine();
     invariant(storageEngine);
-    StorageControl::stopStorageControls(
-        service,
-        {ErrorCodes::ShutdownInProgress, "The storage catalog is being closed."},
-        /*forRestart=*/false);
+    // We always use 'forRestart' = false here because 'forRestart' = true is only appropriate if
+    // we're going to restart controls on the same storage engine, which we are not here because
+    // we are shutting the storage engine down.
+    StorageControl::stopStorageControls(service, errorToReport, /*forRestart=*/false);
     storageEngine->cleanShutdown();
     auto& lockFile = StorageEngineLockFile::get(service);
     if (lockFile) {
         lockFile->clearPidAndUnlock();
+        lockFile = boost::none;
     }
+}
+} /* namespace */
+
+void shutdownGlobalStorageEngineCleanly(ServiceContext* service) {
+    shutdownGlobalStorageEngineCleanly(
+        service, {ErrorCodes::ShutdownInProgress, "The storage catalog is being closed."});
+}
+
+StorageEngine::LastShutdownState reinitializeStorageEngine(OperationContext* opCtx,
+                                                           StorageEngineInitFlags initFlags) {
+    auto service = opCtx->getServiceContext();
+    opCtx->recoveryUnit()->abandonSnapshot();
+    shutdownGlobalStorageEngineCleanly(
+        service,
+        {ErrorCodes::InterruptedDueToStorageChange, "The storage engine is being reinitialized."});
+    opCtx->setRecoveryUnit(std::make_unique<RecoveryUnitNoop>(),
+                           WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+    auto lastShutdownState =
+        initializeStorageEngine(opCtx, initFlags | StorageEngineInitFlags::kForRestart);
+    StorageControl::startStorageControls(service);
+    return lastShutdownState;
 }
 
 namespace {
@@ -318,6 +354,11 @@ public:
         // Use a fully fledged lock manager even when the storage engine is not set.
         opCtx->setLockState(std::make_unique<LockerImpl>());
 
+        auto service = opCtx->getServiceContext();
+        // We must prevent storage engine changes while setting the recovery unit on the opCtx.
+        auto sharedStorageChangeToken =
+            StorageEngineChangeContext::get(service)->acquireSharedStorageChangeToken();
+
         // There are a few cases where we don't have a storage engine available yet when creating an
         // operation context.
         // 1. During startup, we create an operation context to allow the storage engine
@@ -326,7 +367,6 @@ public:
         //    engine.
         // 3. Unit tests that use an operation context but don't require a storage engine for their
         //    testing purpose.
-        auto service = opCtx->getServiceContext();
         auto storageEngine = service->getStorageEngine();
         if (!storageEngine) {
             return;
@@ -334,7 +374,10 @@ public:
         opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(storageEngine->newRecoveryUnit()),
                                WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
     }
-    void onDestroyOperationContext(OperationContext* opCtx) {}
+    void onDestroyOperationContext(OperationContext* opCtx) {
+        StorageEngineChangeContext::get(opCtx->getServiceContext())
+            ->onDestroyOperationContext(opCtx);
+    }
 };
 
 ServiceContext::ConstructorActionRegisterer registerStorageClientObserverConstructor{

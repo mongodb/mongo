@@ -47,15 +47,22 @@ namespace mongo {
 
 class StorageEngineTest : public ServiceContextMongoDTest {
 public:
-    StorageEngineTest(RepairAction repair)
-        : ServiceContextMongoDTest("ephemeralForTest", repair),
+    StorageEngineTest(RepairAction repair,
+                      const std::string& storageEngine,
+                      StorageEngineInitFlags initFlags)
+        : ServiceContextMongoDTest(storageEngine, repair, initFlags),
           _storageEngine(getServiceContext()->getStorageEngine()) {}
 
-    StorageEngineTest() : StorageEngineTest(RepairAction::kNoRepair) {
+    StorageEngineTest(const std::string& storageEngine, StorageEngineInitFlags initFlags)
+        : StorageEngineTest(RepairAction::kNoRepair, storageEngine, initFlags) {
         auto serviceCtx = getServiceContext();
         repl::ReplicationCoordinator::set(
             serviceCtx, std::make_unique<repl::ReplicationCoordinatorMock>(serviceCtx));
     }
+
+    StorageEngineTest()
+        : StorageEngineTest("ephemeralForTest",
+                            ServiceContextMongoDTest::kDefaultStorageEngineInitFlags) {}
 
     StatusWith<DurableCatalog::Entry> createCollection(OperationContext* opCtx,
                                                        NamespaceString ns) {
@@ -195,7 +202,10 @@ public:
 
 class StorageEngineRepairTest : public StorageEngineTest {
 public:
-    StorageEngineRepairTest() : StorageEngineTest(RepairAction::kRepair) {}
+    StorageEngineRepairTest()
+        : StorageEngineTest(RepairAction::kRepair,
+                            "ephemeralForTest",
+                            ServiceContextMongoDTest::kDefaultStorageEngineInitFlags) {}
 
     void tearDown() {
         auto repairObserver = StorageRepairObserver::get(getGlobalServiceContext());
@@ -212,4 +222,10 @@ public:
                                 boost::make_transform_iterator(modifications.end(), asString)));
     }
 };
+
+class StorageEngineDurableTest : public StorageEngineTest {
+public:
+    StorageEngineDurableTest() : StorageEngineTest("wiredTiger", StorageEngineInitFlags()) {}
+};
+
 }  // namespace mongo

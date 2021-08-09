@@ -61,7 +61,9 @@ ServiceContextMongoDTest::ServiceContextMongoDTest()
 ServiceContextMongoDTest::ServiceContextMongoDTest(std::string engine)
     : ServiceContextMongoDTest(engine, RepairAction::kNoRepair) {}
 
-ServiceContextMongoDTest::ServiceContextMongoDTest(std::string engine, RepairAction repair)
+ServiceContextMongoDTest::ServiceContextMongoDTest(std::string engine,
+                                                   RepairAction repair,
+                                                   StorageEngineInitFlags initFlags)
     : _tempDir("service_context_d_test_fixture") {
 
     _stashedStorageParams.engine = std::exchange(storageGlobalParams.engine, std::move(engine));
@@ -89,12 +91,10 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(std::string engine, RepairAct
 
     storageGlobalParams.dbpath = _tempDir.path();
 
-    // Since unit tests start in their own directories, skip lock file and metadata file for faster
-    // startup.
+    // Since unit tests start in their own directories, by default skip lock file and metadata file
+    // for faster startup.
     auto opCtx = serviceContext->makeOperationContext(getClient());
-    initializeStorageEngine(opCtx.get(),
-                            StorageEngineInitFlags::kAllowNoLockFile |
-                                StorageEngineInitFlags::kSkipMetadataFile);
+    initializeStorageEngine(opCtx.get(), initFlags);
     StorageControl::startStorageControls(serviceContext, true /*forTestOnly*/);
 
     DatabaseHolder::set(serviceContext, std::make_unique<DatabaseHolderImpl>());
