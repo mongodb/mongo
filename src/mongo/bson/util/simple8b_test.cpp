@@ -483,6 +483,45 @@ TEST(Simple8b, LargeSkipsFirst) {
     testSimple8b(expectedInts, expectedChar);
 }
 
+TEST(Simple8b, RleZeroThenRleAnotherValue) {
+    std::vector<boost::optional<uint64_t>> expectedInts(1920, 0);
+
+    expectedInts.insert(expectedInts.end(), 270, 1);
+
+    std::vector<uint8_t> expectedChar{
+        // The selector is 15 and the word is a RLE encoding with count = 16.
+        // The default RLE value is 0 if it is the first number.
+        0xFF,
+        0x0,
+        0x0,
+        0x0,
+        0x0,
+        0x0,
+        0x0,
+        0x0,  // 1st word.
+        // The selector is 2 and there are 30 bucket with the same value 0b01. 0x55 = 0b01010101.
+        0x52,
+        0x55,
+        0x55,
+        0x55,
+        0x55,
+        0x55,
+        0x55,
+        0x55,  // 2nd word.
+        // The selector is 15 and the word is a RLE encoding with count = 2.
+        0x1F,
+        0x0,
+        0x0,
+        0x0,
+        0x0,
+        0x0,
+        0x0,
+        0x0,  // 3rd word.
+    };
+
+    testSimple8b(expectedInts, expectedChar);
+}
+
 TEST(Simple8b, MultipleFlushes) {
     BufBuilder buffer;
     Simple8bBuilder<uint64_t> s8b([&buffer](uint64_t simple8bBlock) {
