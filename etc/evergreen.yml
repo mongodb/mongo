@@ -11722,7 +11722,6 @@ buildvariants:
   - name: .lint
   - name: test_api_version_compatibility
   - name: validate_commit_message
-  - name: check_for_todos
   - name: check_feature_flag_tags
 
 - name: live-record
