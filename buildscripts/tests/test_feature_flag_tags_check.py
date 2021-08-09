@@ -10,12 +10,12 @@ class TestFindTestsInGitDiff(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.requires_fcv_tag = "requires_fcv_51"
-        cls.original_requires_fcv_tag = feature_flag_tags_check.REQUIRES_FCV_TAG
-        feature_flag_tags_check.REQUIRES_FCV_TAG = cls.requires_fcv_tag
+        cls.original_requires_fcv_tag = feature_flag_tags_check.REQUIRES_FCV_TAG_LATEST
+        feature_flag_tags_check.REQUIRES_FCV_TAG_LATEST = cls.requires_fcv_tag
 
     @classmethod
     def tearDownClass(cls):
-        feature_flag_tags_check.REQUIRES_FCV_TAG = cls.original_requires_fcv_tag
+        feature_flag_tags_check.REQUIRES_FCV_TAG_LATEST = cls.original_requires_fcv_tag
 
     def test_get_tests_missing_fcv_tag_no_tag(self):
         tests = ["dummy_jstest_file.js"]
