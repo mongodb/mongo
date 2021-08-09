@@ -54,7 +54,6 @@ def generate_independent_parameters(rng):
     if rng.choice(3 * [True] + [False]):
         # The old retryable writes format is used by other variants. Weight towards turning on the
         # new retryable writes format on in this one.
-        ret["featureFlagRetryableFindAndModify"] = True
         ret["storeFindAndModifyImagesInSideCollection"] = True
 
     return ret

@@ -15,15 +15,7 @@ load('jstests/replsets/rslib.js');
 TestData.skipCheckDBHashes = true;
 
 // Start a single node replica set.
-const rst = new ReplSetTest({
-    nodes: 1,
-    nodeOptions: {
-        setParameter: {
-            featureFlagRetryableFindAndModify: true,
-            storeFindAndModifyImagesInSideCollection: true
-        }
-    }
-});
+const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiateWithHighElectionTimeout();
 

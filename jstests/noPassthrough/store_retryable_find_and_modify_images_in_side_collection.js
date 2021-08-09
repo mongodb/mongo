@@ -287,28 +287,15 @@ function runTests(lsid, mainConn, primary, secondary, storeImagesInSideCollectio
 }
 
 const lsid = UUID();
-const rst = new ReplSetTest({
-    nodes: numNodes,
-    nodeOptions: {setParameter: {storeFindAndModifyImagesInSideCollection: true}}
-});
-rst.startSet({setParameter: {featureFlagRetryableFindAndModify: true}});
+const rst = new ReplSetTest({nodes: numNodes});
+rst.startSet();
 rst.initiate();
 runTests(lsid, rst.getPrimary(), rst.getPrimary(), rst.getSecondary(), true, 40);
 runTests(lsid, rst.getPrimary(), rst.getPrimary(), rst.getSecondary(), false, 50);
 rst.stopSet();
 // Test that retryable findAndModifys will store pre- and post- images in the
 // 'config.image_collection' table.
-const st = new ShardingTest({
-    shards: {
-        rs0: {
-            nodes: numNodes,
-            setParameter: {
-                featureFlagRetryableFindAndModify: true,
-                storeFindAndModifyImagesInSideCollection: true
-            }
-        }
-    }
-});
+const st = new ShardingTest({shards: {rs0: {nodes: numNodes}}});
 runTests(lsid, st.s, st.rs0.getPrimary(), st.rs0.getSecondary(), true, 60);
 runTests(lsid, st.s, st.rs0.getPrimary(), st.rs0.getSecondary(), true, 70);
 st.stop();

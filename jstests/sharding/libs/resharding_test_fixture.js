@@ -93,7 +93,9 @@ var ReshardingTest = class {
     setup() {
         const mongosOptions = {setParameter: {}};
         const configOptions = {setParameter: {}};
-        const rsOptions = {setParameter: {}};
+        // TODO SERVER-56813: Exercise resharding with `storeFindAndModifyImagesInSideCollection`
+        // enabled.
+        const rsOptions = {setParameter: {storeFindAndModifyImagesInSideCollection: false}};
         const configReplSetTestOptions = {};
 
         let nodesPerShard = 2;

@@ -1454,21 +1454,10 @@ class OpObserverRetryableFindAndModifyTest : public OpObserverTxnParticipantTest
 public:
     void setUp() override {
         OpObserverTxnParticipantTest::setUp();
-        // Set parameter to indicate that pre- and post- images should be stored in a side
-        // collection rather than the oplog.
-        std::ignore = ServerParameterSet::getGlobal()
-                          ->getMap()
-                          .find("storeFindAndModifyImagesInSideCollection")
-                          ->second->setFromString("true");
         txnParticipant().beginOrContinue(opCtx(), txnNum(), boost::none, boost::none);
     }
 
     void tearDown() override {
-        // Ensure the server parameter is set back to the default if we fail the test midway.
-        std::ignore = ServerParameterSet::getGlobal()
-                          ->getMap()
-                          .find("storeFindAndModifyImagesInSideCollection")
-                          ->second->setFromString("false");
         OpObserverTxnParticipantTest::tearDown();
     }
 };

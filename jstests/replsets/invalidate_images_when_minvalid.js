@@ -27,13 +27,7 @@ TestData.skipCheckDBHashes = true;
 
 let replTest = new ReplSetTest({name: "invalidate_images_when_minvalid", nodes: 1});
 
-let nodes = replTest.startSet({
-    setParameter: {
-        featureFlagRetryableFindAndModify: true,
-        storeFindAndModifyImagesInSideCollection: true,
-        replBatchLimitOperations: 1
-    }
-});
+let nodes = replTest.startSet({setParameter: {replBatchLimitOperations: 1}});
 replTest.initiate();
 let primary = replTest.getPrimary();
 let coll = primary.getDB("test")["invalidating"];

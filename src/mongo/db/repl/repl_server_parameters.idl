@@ -374,9 +374,9 @@ server_parameters:
 
     enableOverrideClusterChainingSetting:
         description: >-
-            When enabled, allows a node to override the cluster-wide chainingAllowed setting. 
+            When enabled, allows a node to override the cluster-wide chainingAllowed setting.
             If chaining is disabled in the replica set, enabling this parameter allows the node
-            to chain regardless. 
+            to chain regardless.
         set_at: [ startup ]
         cpp_vartype: AtomicWord<bool>
         cpp_varname: enableOverrideClusterChainingSetting
@@ -514,7 +514,7 @@ server_parameters:
         set_at: [ startup, runtime ]
         cpp_vartype: AtomicWord<bool>
         cpp_varname: gStoreFindAndModifyImagesInSideCollection
-        default: false
+        default: true
 
     enableReconfigRollbackCommittedWritesCheck:
         description: >-
@@ -564,7 +564,8 @@ feature_flags:
             When enabled, storeFindAndModifyImagesInOplog=false will change the location of any
             document images for retryable find and modifies.
         cpp_varname: feature_flags::gFeatureFlagRetryableFindAndModify
-        default: false
+        default: true
+        version: 5.1
 
     featureFlagDefaultReadConcernLocal:
         description: >-
