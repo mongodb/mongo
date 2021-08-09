@@ -45,6 +45,7 @@
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -94,9 +95,10 @@ OptionsAndIndexes getCollectionOptionsAndIndexes(OperationContext* opCtx,
  * to ensure they are a legal combination.
  */
 void validateShardKeyAgainstExistingZones(OperationContext* opCtx,
+                                          const NamespaceString& nss,
                                           const BSONObj& proposedKey,
-                                          const ShardKeyPattern& shardKeyPattern,
                                           const std::vector<TagsType>& tags) {
+    const AutoGetCollection coll(opCtx, nss, MODE_IS);
     for (const auto& tag : tags) {
         BSONObjIterator tagMinFields(tag.getMinKey());
         BSONObjIterator tagMaxFields(tag.getMaxKey());
@@ -132,20 +134,37 @@ void validateShardKeyAgainstExistingZones(OperationContext* opCtx,
                 !ShardKeyPattern::isHashedPatternEl(proposedKeyElement) ||
                     (ShardKeyPattern::isValidHashedValue(tagMinKeyElement) &&
                      ShardKeyPattern::isValidHashedValue(tagMaxKeyElement)));
+
+            if (coll && coll->getTimeseriesOptions()) {
+                const std::string controlTimeField =
+                    timeseries::kControlMinFieldNamePrefix.toString() +
+                    coll->getTimeseriesOptions()->getTimeField();
+                if (tagMinKeyElement.fieldNameStringData() == controlTimeField) {
+                    uassert(ErrorCodes::InvalidOptions,
+                            str::stream() << "time field cannot be specified in the zone range for "
+                                             "time-series collections",
+                            tagMinKeyElement.type() == MinKey);
+                }
+                if (tagMaxKeyElement.fieldNameStringData() == controlTimeField) {
+                    uassert(ErrorCodes::InvalidOptions,
+                            str::stream() << "time field cannot be specified in the zone range for "
+                                             "time-series collections",
+                            tagMaxKeyElement.type() == MinKey);
+                }
+            }
         }
     }
 }
 
 std::vector<TagsType> getTagsAndValidate(OperationContext* opCtx,
                                          const NamespaceString& nss,
-                                         const BSONObj& proposedKey,
-                                         const ShardKeyPattern& shardKeyPattern) {
+                                         const BSONObj& proposedKey) {
     // Read zone info
     const auto catalogClient = Grid::get(opCtx)->catalogClient();
     auto tags = uassertStatusOK(catalogClient->getTagsForCollection(opCtx, nss));
 
     if (!tags.empty()) {
-        validateShardKeyAgainstExistingZones(opCtx, proposedKey, shardKeyPattern, tags);
+        validateShardKeyAgainstExistingZones(opCtx, nss, proposedKey, tags);
     }
 
     return tags;
@@ -667,7 +686,7 @@ void CreateCollectionCoordinator::_createPolicyAndChunks(OperationContext* opCtx
         _doc.getNumInitialChunks() ? *_doc.getNumInitialChunks() : 0,
         _doc.getPresplitHashedZones() ? *_doc.getPresplitHashedZones() : false,
         _doc.getInitialSplitPoints(),
-        getTagsAndValidate(opCtx, nss(), _shardKeyPattern->toBSON(), *_shardKeyPattern),
+        getTagsAndValidate(opCtx, nss(), _shardKeyPattern->toBSON()),
         getNumShards(opCtx),
         *_collectionEmpty);
 

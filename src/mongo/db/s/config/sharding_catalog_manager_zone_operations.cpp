@@ -38,6 +38,7 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/balancer/balancer_policy.h"
+#include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_collection.h"
@@ -179,6 +180,32 @@ Status checkHashedShardKeyRange(const ChunkRange& range, const KeyPattern& shard
     return Status::OK();
 }
 
+/**
+ * Checks whether the time field of a time-series collection has the range MinKey -> MinKey.
+ * Returns ErrorCodes::InvalidOptions if the time field range is of a different pattern.
+ *
+ * This is the only allowed range on time field, because time-series collections are bucketed and
+ * sharded on the min time of the bucket, which means the bucket might contain time point outside
+ * any designated time range.
+ */
+Status checkForTimeseriesTimeFieldKeyRange(const ChunkRange& range, StringData timeField) {
+    const std::string controlTimeField =
+        timeseries::kControlMinFieldNamePrefix.toString() + timeField;
+    if (range.getMin().getField(controlTimeField).type() != MinKey) {
+        return {
+            ErrorCodes::InvalidOptions,
+            str::stream()
+                << "time field cannot be specified in the zone range for time-series collections"};
+    }
+    if (range.getMax().getField(controlTimeField).type() != MinKey) {
+        return {
+            ErrorCodes::InvalidOptions,
+            str::stream()
+                << "time field cannot be specified in the zone range for time-series collections"};
+    }
+    return Status::OK();
+}
+
 }  // namespace
 
 Status ShardingCatalogManager::addShardToZone(OperationContext* opCtx,
@@ -314,6 +341,16 @@ void ShardingCatalogManager::assignKeyRangeToZone(OperationContext* opCtx,
     uassertStatusOK(checkHashedShardKeyRange(actualRange, keyPattern));
     uassertStatusOK(checkForOverlappingZonedKeyRange(
         opCtx, configServer.get(), nss, actualRange, zoneName, keyPattern));
+    try {
+        const auto& coll = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss);
+        const auto& timeseriesField = coll.getTimeseriesFields();
+        if (timeseriesField) {
+            uassertStatusOK(
+                checkForTimeseriesTimeFieldKeyRange(actualRange, timeseriesField->getTimeField()));
+        }
+    } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+        // collection doesn't exist or not sharded, skip range check for time-series collection.
+    }
 
     BSONObjBuilder updateBuilder;
     updateBuilder.append(TagsType::ns(), nss.ns());

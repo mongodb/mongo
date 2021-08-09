@@ -34,6 +34,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_shard.h"
@@ -361,6 +362,61 @@ TEST_F(AssignKeyRangeToZoneTestFixture, PrefixIsNotAllowedOnUnshardedColl) {
         DBException,
         ErrorCodes::ShardKeyNotFound);
     assertNoZoneDoc();
+}
+
+TEST_F(AssignKeyRangeToZoneTestFixture, TimeseriesCollMustHaveTimeKeyRangeMinKey) {
+    const NamespaceString ns("test.system.buckets.timeseries");
+    const StringData metaField = "meta"_sd;
+    const StringData timeField = "time"_sd;
+    const std::string controlTimeField =
+        timeseries::kControlMinFieldNamePrefix.toString() + timeField;
+    const TimeseriesOptions timeseriesOptions(timeField.toString());
+    CollectionType shardedCollection(ns, OID::gen(), Date_t::now(), UUID::gen());
+    TypeCollectionTimeseriesFields timeseriesFields;
+    timeseriesFields.setTimeseriesOptions(timeseriesOptions);
+    shardedCollection.setTimeseriesFields(timeseriesFields);
+    shardedCollection.setKeyPattern(BSON(metaField << 1 << controlTimeField << 1));
+
+    ASSERT_OK(insertToConfigCollection(
+        operationContext(), CollectionType::ConfigNS, shardedCollection.toBSON()));
+
+    const ChunkRange newRange1(BSON(metaField << 1 << controlTimeField << 1),
+                               BSON(metaField << 10 << controlTimeField << 10));
+    ASSERT_THROWS_CODE(ShardingCatalogManager::get(operationContext())
+                           ->assignKeyRangeToZone(operationContext(), ns, newRange1, zoneName()),
+                       DBException,
+                       ErrorCodes::InvalidOptions);
+    assertNoZoneDoc();
+
+    const ChunkRange newRange2(BSON(metaField << 1 << controlTimeField << 1),
+                               BSON(metaField << 10 << controlTimeField << MAXKEY));
+    ASSERT_THROWS_CODE(ShardingCatalogManager::get(operationContext())
+                           ->assignKeyRangeToZone(operationContext(), ns, newRange2, zoneName()),
+                       DBException,
+                       ErrorCodes::InvalidOptions);
+    assertNoZoneDoc();
+
+    const ChunkRange newRange3(BSON(metaField << 1 << controlTimeField << MINKEY),
+                               BSON(metaField << 10 << controlTimeField << 10));
+    ASSERT_THROWS_CODE(ShardingCatalogManager::get(operationContext())
+                           ->assignKeyRangeToZone(operationContext(), ns, newRange3, zoneName()),
+                       DBException,
+                       ErrorCodes::InvalidOptions);
+    assertNoZoneDoc();
+
+    const ChunkRange newRange4(BSON(metaField << 1 << controlTimeField << MINKEY),
+                               BSON(metaField << 10 << controlTimeField << MAXKEY));
+    ASSERT_THROWS_CODE(ShardingCatalogManager::get(operationContext())
+                           ->assignKeyRangeToZone(operationContext(), ns, newRange4, zoneName()),
+                       DBException,
+                       ErrorCodes::InvalidOptions);
+    assertNoZoneDoc();
+
+    const ChunkRange newRange5(BSON(metaField << 1 << controlTimeField << MINKEY),
+                               BSON(metaField << 10 << controlTimeField << MINKEY));
+    ShardingCatalogManager::get(operationContext())
+        ->assignKeyRangeToZone(operationContext(), ns, newRange5, zoneName());
+    assertOnlyZone(ns, newRange5, zoneName());
 }
 
 /**
