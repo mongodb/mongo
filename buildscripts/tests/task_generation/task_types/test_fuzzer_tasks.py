@@ -99,7 +99,7 @@ class TestBuildFuzzerSubTask(unittest.TestCase):
         sub_task = fuzzer_service.build_fuzzer_sub_task(3, mock_params, "")
 
         self.assertEqual(sub_task.name, f"{mock_params.task_name}_3_{mock_params.variant}")
-        self.assertEqual(len(sub_task.commands), 4)
+        self.assertEqual(len(sub_task.commands), 5)
 
     def test_sub_task_multi_version_tasks_should_be_built_correct(self):
         mock_params = build_mock_fuzzer_params(multi_version="multiversion value")
@@ -108,4 +108,15 @@ class TestBuildFuzzerSubTask(unittest.TestCase):
         sub_task = fuzzer_service.build_fuzzer_sub_task(3, mock_params, "")
 
         self.assertEqual(sub_task.name, f"{mock_params.task_name}_3_{mock_params.variant}")
-        self.assertEqual(len(sub_task.commands), 7)
+        self.assertEqual(len(sub_task.commands), 8)
+
+    def test_sub_task_should_include_timeout_info(self):
+        mock_params = build_mock_fuzzer_params(multi_version="multiversion value")
+        fuzzer_service = under_test.FuzzerGenTaskService()
+
+        sub_task = fuzzer_service.build_fuzzer_sub_task(3, mock_params, "")
+
+        cmd = sub_task.commands[1].as_dict()
+
+        self.assertEqual(cmd["command"], "timeout.update")
+        self.assertEqual(cmd["params"]["exec_timeout_secs"], mock_params.timeout_secs)

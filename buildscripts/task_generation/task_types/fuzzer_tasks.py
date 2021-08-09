@@ -3,6 +3,7 @@ from typing import NamedTuple, Set, Optional, Dict, List
 
 from shrub.v2 import Task, FunctionCall, TaskDependency
 
+from buildscripts.patch_builds.task_generation import TimeoutInfo
 from buildscripts.task_generation.constants import ARCHIVE_DIST_TEST_TASK
 from buildscripts.util import taskname
 
@@ -136,12 +137,15 @@ class FuzzerGenTaskService:
             "gen_task_config_location": params.config_location,
         }  # yapf: disable
 
+        timeout_info = TimeoutInfo.overridden(exec_timeout=params.timeout_secs)
+
         commands = []
 
         if params.require_multiversion:
             commands += [FunctionCall("git get project no modules")]
 
         commands += [
+            timeout_info.cmd,
             FunctionCall("do setup"),
             FunctionCall("configure evergreen api credentials")
             if params.require_multiversion else None,
