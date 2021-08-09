@@ -4650,7 +4650,10 @@ boost::optional<OpTimeAndWallTime> ReplicationCoordinatorImpl::_chooseStableOpTi
     // There is a valid stable optime.
     else {
         auto stableOpTime = *std::prev(upperBoundIter);
-        invariant(stableOpTime.opTime.getTimestamp() <= maximumStableTimestamp);
+        invariant(stableOpTime.opTime.getTimestamp() <= maximumStableTimestamp,
+                  str::stream() << "stableOpTime: " << stableOpTime.opTime.toString()
+                                << " maximumStableTimestamp: "
+                                << maximumStableTimestamp.toString());
         return stableOpTime;
     }
 }
@@ -4693,8 +4696,12 @@ boost::optional<OpTimeAndWallTime> ReplicationCoordinatorImpl::_recalculateStabl
     auto commitPoint = _topCoord->getLastCommittedOpTimeAndWallTime();
     if (_currentCommittedSnapshot) {
         auto snapshotOpTime = _currentCommittedSnapshot->opTime;
-        invariant(snapshotOpTime.getTimestamp() <= commitPoint.opTime.getTimestamp());
-        invariant(snapshotOpTime <= commitPoint.opTime);
+        invariant(snapshotOpTime.getTimestamp() <= commitPoint.opTime.getTimestamp(),
+                  str::stream() << "snapshotOpTime: " << snapshotOpTime.toString()
+                                << " commitPoint: " << commitPoint.opTime.toString());
+        invariant(snapshotOpTime <= commitPoint.opTime,
+                  str::stream() << "snapshotOpTime: " << snapshotOpTime.toString()
+                                << " commitPoint: " << commitPoint.opTime.toString());
     }
 
     // When majority read concern is disabled, the stable opTime is set to the lastApplied, rather
@@ -4708,9 +4715,14 @@ boost::optional<OpTimeAndWallTime> ReplicationCoordinatorImpl::_recalculateStabl
         _chooseStableOpTimeFromCandidates(lk, _stableOpTimeCandidates, maximumStableOpTime);
     if (stableOpTime) {
         // Check that the selected stable optime does not exceed our maximum.
-        invariant(stableOpTime.get().opTime.getTimestamp() <=
-                  maximumStableOpTime.opTime.getTimestamp());
-        invariant(stableOpTime.get().opTime <= maximumStableOpTime.opTime);
+        invariant(
+            stableOpTime.get().opTime.getTimestamp() <= maximumStableOpTime.opTime.getTimestamp(),
+            str::stream() << "stableOpTime: " << stableOpTime.get().opTime.toString()
+                          << " maximumStableOpTime: " << maximumStableOpTime.opTime.toString());
+        invariant(stableOpTime.get().opTime <= maximumStableOpTime.opTime,
+                  str::stream() << "stableOpTime: " << stableOpTime.get().opTime.toString()
+                                << " maximumStableOpTime: "
+                                << maximumStableOpTime.opTime.toString());
     }
 
     return stableOpTime;
