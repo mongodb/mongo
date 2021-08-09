@@ -84,9 +84,11 @@ StatusWith<ChunkVersion> ChunkVersion::fromBSON(const BSONObj& obj) {
     // bit complex because this function relies on the order of the fields, but since both of them
     // are optional they might/might not be present.
     BSONElement nextElem = it.next();
+    //
+    // TODO SERVER-59105: remove once 6.0 is last-lts. For backward compatibility reasons 5.0
+    // routers sends canThrowSSVOnIgnored even though it is not used, so we attempt to parse and
+    // ignore it.
     if (!nextElem.eoo() && nextElem.type() == BSONType::Bool) {
-        const BSONElement& canThrowSSVOnIgnoredPart = nextElem;
-        version._canThrowSSVOnIgnored = canThrowSSVOnIgnoredPart && canThrowSSVOnIgnoredPart.Bool();
         nextElem = it.next();
     }
 
@@ -153,9 +155,6 @@ void ChunkVersion::appendWithField(BSONObjBuilder* out, StringData field) const 
     BSONArrayBuilder arr(out->subarrayStart(field));
     arr.appendTimestamp(_combined);
     arr.append(_epoch);
-    if (_canThrowSSVOnIgnored) {
-        arr.append(_canThrowSSVOnIgnored);
-    }
     if (_timestamp) {
         arr.append(*_timestamp);
     }
@@ -173,9 +172,6 @@ BSONObj ChunkVersion::toBSON() const {
     BSONArrayBuilder b;
     b.appendTimestamp(_combined);
     b.append(_epoch);
-    if (_canThrowSSVOnIgnored) {
-        b.append(_canThrowSSVOnIgnored);
-    }
     if (_timestamp) {
         b.append(*_timestamp);
     }
@@ -188,8 +184,7 @@ void ChunkVersion::legacyToBSON(StringData field, BSONObjBuilder* out) const {
 
 std::string ChunkVersion::toString() const {
     return str::stream() << majorVersion() << "|" << minorVersion() << "||" << _epoch
-                         << (_timestamp ? "||" + _timestamp->toString() : "")
-                         << (_canThrowSSVOnIgnored ? "|||canThrowSSVOnIgnored" : "");
+                         << (_timestamp ? "||" + _timestamp->toString() : "");
 }
 
 }  // namespace mongo

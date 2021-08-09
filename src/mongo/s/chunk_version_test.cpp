@@ -65,7 +65,7 @@ TEST(ChunkVersionParsing, ToFromBSONLegacyRoundtrip) {
     ASSERT_EQ(version, roundTripVersion);
 }
 
-TEST(ChunkVersionParsing, FromBSONMissingCanThrowaAndTimestamp) {
+TEST(ChunkVersionParsing, FromBSONMissingTimestamp) {
     const OID oid = OID::gen();
     ChunkVersion chunkVersionComplete = assertGet(ChunkVersion::parseWithField(
         BSON("testVersionField" << BSON_ARRAY(Timestamp(Seconds(2), 3) << oid)),
@@ -77,41 +77,11 @@ TEST(ChunkVersionParsing, FromBSONMissingCanThrowaAndTimestamp) {
     ASSERT_EQ(3u, chunkVersionComplete.minorVersion());
 }
 
-TEST(ChunkVersionParsing, FromBSONMissingTimestamp) {
-    const OID oid = OID::gen();
-    const bool canThrowSSVOnIgnored = true;
-    ChunkVersion chunkVersionComplete = assertGet(ChunkVersion::parseWithField(
-        BSON("testVersionField" << BSON_ARRAY(Timestamp(Seconds(2), 3)
-                                              << oid << canThrowSSVOnIgnored)),
-        "testVersionField"));
-
-    ASSERT(chunkVersionComplete.epoch().isSet());
-    ASSERT_EQ(oid, chunkVersionComplete.epoch());
-    ASSERT_EQ(2u, chunkVersionComplete.majorVersion());
-    ASSERT_EQ(3u, chunkVersionComplete.minorVersion());
-}
-
-TEST(ChunkVersionParsing, FromBSONMissingCanThrow) {
+TEST(ChunkVersionParsing, FromBSON) {
     const OID oid = OID::gen();
     const Timestamp timestamp(42);
     ChunkVersion chunkVersionComplete = assertGet(ChunkVersion::parseWithField(
         BSON("testVersionField" << BSON_ARRAY(Timestamp(Seconds(2), 3) << oid << timestamp)),
-        "testVersionField"));
-
-    ASSERT(chunkVersionComplete.epoch().isSet());
-    ASSERT_EQ(oid, chunkVersionComplete.epoch());
-    ASSERT_EQ(2u, chunkVersionComplete.majorVersion());
-    ASSERT_EQ(3u, chunkVersionComplete.minorVersion());
-    ASSERT_EQ(timestamp, *chunkVersionComplete.getTimestamp());
-}
-
-TEST(ChunkVersionParsing, FromBSON) {
-    const OID oid = OID::gen();
-    const bool canThrowSSVOnIgnored = true;
-    const Timestamp timestamp(42);
-    ChunkVersion chunkVersionComplete = assertGet(ChunkVersion::parseWithField(
-        BSON("testVersionField" << BSON_ARRAY(Timestamp(Seconds(2), 3)
-                                              << oid << canThrowSSVOnIgnored << timestamp)),
         "testVersionField"));
 
     ASSERT(chunkVersionComplete.epoch().isSet());

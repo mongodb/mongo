@@ -127,7 +127,6 @@ public:
     static ChunkVersion IGNORED() {
         ChunkVersion version;
         version._epoch.init(Date_t(), true);  // ignored OID is zero time, max machineId/inc
-        version._canThrowSSVOnIgnored = true;
         return version;
     }
 
@@ -253,11 +252,6 @@ public:
 private:
     uint64_t _combined;
     OID _epoch;
-    // Temporary flag to indicate shards that a router is able to process and retry multi-write
-    // operations
-    //
-    // TODO (SERVER-53099): Once 5.0 is last stable, get rid of this field
-    bool _canThrowSSVOnIgnored{false};
 
     boost::optional<Timestamp> _timestamp;
 };
