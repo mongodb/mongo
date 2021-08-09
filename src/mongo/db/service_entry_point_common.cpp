@@ -1576,7 +1576,7 @@ Future<void> ExecCommandDatabase::_commandExec() {
                 !_refreshedDatabase) {
                 auto sce = s.extraInfo<StaleDbRoutingVersion>();
                 invariant(sce);
-                // TODO SERVER-52784 refresh only if wantedVersion is empty or less then
+                // TODO SERVER-59177 refresh only if wantedVersion is empty or less then
                 // received
                 const auto refreshed = _execContext->behaviors->refreshDatabase(opCtx, *sce);
                 if (refreshed) {
@@ -1597,8 +1597,13 @@ Future<void> ExecCommandDatabase::_commandExec() {
                 serverGlobalParams.clusterRole != ClusterRole::ConfigServer &&
                 !_refreshedCollection) {
                 if (auto sce = s.extraInfo<StaleConfigInfo>()) {
-                    // TODO SERVER-52784 refresh only if wantedVersion is empty or less then
-                    // received
+                    if (sce->getVersionWanted() &&
+                        sce->getVersionReceived().isOlderThan(sce->getVersionWanted().get())) {
+                        // If the local shard version is newer than the received one return the
+                        // error to the router without retrying locally.
+                        return s;
+                    }
+
                     const auto refreshed = _execContext->behaviors->refreshCollection(opCtx, *sce);
                     if (refreshed) {
                         _refreshedCollection = true;
