@@ -146,6 +146,10 @@ const assertTransactionEntries = (donorTxnEntries, recipientTxnEntries) => {
     const donorTxnEntries = runTransaction(donorPrimary, tenantDB, collName2);
     assert.eq(2, donorTxnEntries.length);
 
+    // Remove wait to recreate aggregation cursors to eliminate race conditions when waiting for
+    // the recipient to retry.
+    configureFailPoint(recipientPrimary, "skipWaitingToRecreateCursor");
+
     // Hang the recipient after it updates the first transaction entry.
     const hangAfterUpdatingTransactionEntry =
         configureFailPoint(recipientPrimary, "hangAfterUpdatingTransactionEntry");
@@ -214,6 +218,10 @@ const assertTransactionEntries = (donorTxnEntries, recipientTxnEntries) => {
     const session = donorPrimary.startSession({causalConsistency: false});
     const initialDonorTxnEntries = runTransaction(donorPrimary, tenantDB, collName2, session);
     assert.eq(2, initialDonorTxnEntries.length);
+
+    // Remove wait to recreate aggregation cursors to eliminate race conditions when waiting for
+    // the recipient to retry.
+    configureFailPoint(recipientPrimary, "skipWaitingToRecreateCursor");
 
     // Hang the recipient after it updates the first transaction entry.
     const hangAfterUpdatingTransactionEntry =

@@ -288,8 +288,9 @@ TEST_F(FindAndModifyImageLookupTest, ShouldForgeImageEntryWhenMatchingImageDocIs
             : repl::OplogEntry::kPostImageOpTimeFieldName;
         expectedDownConvertedDoc.setField(
             expectedImageOpTimeFieldName,
-            Value{Document{{repl::OpTime::kTimestampFieldName.toString(), opTime.getTimestamp()},
-                           {repl::OpTime::kTermFieldName.toString(), opTime.getTerm()}}});
+            Value{Document{
+                {repl::OpTime::kTimestampFieldName.toString(), forgedImageEntry.getTimestamp()},
+                {repl::OpTime::kTermFieldName.toString(), opTime.getTerm()}}});
         ASSERT_DOCUMENT_EQ(next.releaseDocument(), expectedDownConvertedDoc.freeze());
 
         ASSERT_TRUE(imageLookup->getNext().isEOF());

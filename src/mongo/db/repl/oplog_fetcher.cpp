@@ -32,9 +32,12 @@
 #include "mongo/db/repl/oplog_fetcher.h"
 
 #include "mongo/base/counter.h"
+#include "mongo/bson/mutable/document.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/matcher.h"
+#include "mongo/db/pipeline/document_source_find_and_modify_image_lookup.h"
+#include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replication_auth.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -57,6 +60,7 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeStartingOplogFetcher);
 MONGO_FAIL_POINT_DEFINE(hangBeforeOplogFetcherRetries);
 MONGO_FAIL_POINT_DEFINE(hangBeforeProcessingSuccessfulBatch);
 MONGO_FAIL_POINT_DEFINE(hangOplogFetcherBeforeAdvancingLastFetched);
+MONGO_FAIL_POINT_DEFINE(skipWaitingToRecreateCursor);
 
 namespace {
 class OplogBatchStats {
@@ -229,6 +233,7 @@ void OplogFetcher::_doShutdown_inlock() noexcept {
     if (_conn) {
         _conn->shutdownAndDisallowReconnect();
     }
+    _shutdownCondVar.notify_all();
 }
 
 Mutex* OplogFetcher::_getMutex() noexcept {
@@ -363,8 +368,14 @@ void OplogFetcher::_runQuery(const executor::TaskExecutor::CallbackArgs& callbac
     }
 
     _setMetadataWriterAndReader();
-    _createNewCursor(true /* initialFind */);
-
+    auto cursorStatus = _createNewCursor(true /* initialFind */);
+    if (!cursorStatus.isOK()) {
+        invariant(_config.forTenantMigration);
+        // If we are a TenantOplogFetcher, we never retry as we will always restart the entire
+        // TenantMigrationRecipient state machine on failure. So instead, we just fail and exit.
+        _finishCallback(cursorStatus);
+        return;
+    }
     while (true) {
         Status status{Status::OK()};
         {
@@ -388,9 +399,12 @@ void OplogFetcher::_runQuery(const executor::TaskExecutor::CallbackArgs& callbac
             auto brStatus = batchResult.getStatus();
 
             // Recreate a cursor if we have enough retries left.
-            if (_oplogFetcherRestartDecision->shouldContinue(this, brStatus)) {
+            // If we are a TenantOplogFetcher, we never retry as we will always restart the
+            // TenantMigrationRecipient state machine on failure. So instead, we just fail and exit.
+            if (_oplogFetcherRestartDecision->shouldContinue(this, brStatus) &&
+                !_config.forTenantMigration) {
                 hangBeforeOplogFetcherRetries.pauseWhileSet();
-                _createNewCursor(false /* initialFind */);
+                _cursor.reset();
                 continue;
             } else {
                 _finishCallback(brStatus);
@@ -413,11 +427,34 @@ void OplogFetcher::_runQuery(const executor::TaskExecutor::CallbackArgs& callbac
         }
 
         if (_cursor->isDead()) {
-            // This means the sync source closes the tailable cursor with a returned cursorId of 0.
-            // Any users of the oplog fetcher should create a new oplog fetcher if they see a
-            // successful status and would like to continue fetching more oplog entries.
-            _finishCallback(Status::OK());
-            return;
+            if (!_cursor->tailable()) {
+                try {
+                    if (!MONGO_unlikely(skipWaitingToRecreateCursor.shouldFail())) {
+                        stdx::unique_lock<Latch> lk(_mutex);
+                        auto opCtx = cc().makeOperationContext();
+                        // Wait a little before re-running the aggregation command on the donor's
+                        // oplog. We are not actually intending to wait for shutdown here, we use
+                        // this as a way to wait while still being able to be interrupted outside of
+                        // primary-only service shutdown.
+                        opCtx->waitForConditionOrInterruptFor(
+                            _shutdownCondVar, lk, _awaitDataTimeout, [&] {
+                                return _isShuttingDown_inlock();
+                            });
+                    }
+                    _cursor.reset();
+                    continue;
+                } catch (const DBException& e) {
+                    _finishCallback(e.toStatus().withContext(
+                        "Interrupted while waiting to create a new aggregation cursor"));
+                    return;
+                }
+            } else {
+                // This means the sync source closes the tailable cursor with a returned cursorId of
+                // 0. Any users of the oplog fetcher should create a new oplog fetcher if they see a
+                // successful status and would like to continue fetching more oplog entries.
+                _finishCallback(Status::OK());
+                return;
+            }
         }
     }
 }
@@ -470,8 +507,8 @@ void OplogFetcher::_setMetadataWriterAndReader() {
         *metadataBob << rpc::kOplogQueryMetadataFieldName << 1;
         metadataBob->appendElements(ReadPreferenceSetting::secondaryPreferredMetadata());
 
-        // Run VectorClockMetadataHook on request metadata so this matches the behavior of the
-        // connections in the replication coordinator thread pool.
+        // Run VectorClockMetadataHook on request metadata so this matches the behavior of
+        // the connections in the replication coordinator thread pool.
         return _vectorClockMetadataHook->writeRequestMetadata(opCtx, metadataBob);
     });
 
@@ -483,6 +520,56 @@ void OplogFetcher::_setMetadataWriterAndReader() {
             // connections in the replication coordinator thread pool.
             return _vectorClockMetadataHook->readReplyMetadata(opCtx, source, _metadataObj);
         });
+}
+
+
+AggregateCommandRequest OplogFetcher::_makeAggregateCommandRequest(long long maxTimeMs,
+                                                                   Timestamp startTs) const {
+    auto opCtx = cc().makeOperationContext();
+    StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
+    boost::intrusive_ptr<ExpressionContext> expCtx =
+        make_intrusive<ExpressionContext>(opCtx.get(),
+                                          boost::none, /* explain */
+                                          false,       /* fromMongos */
+                                          false,       /* needsMerge */
+                                          true,        /* allowDiskUse */
+                                          true,        /* bypassDocumentValidation */
+                                          false,       /* isMapReduceCommand */
+                                          _nss,
+                                          boost::none, /* runtimeConstants */
+                                          nullptr,     /* collator */
+                                          MongoProcessInterface::create(opCtx.get()),
+                                          std::move(resolvedNamespaces),
+                                          boost::none); /* collUUID */
+    Pipeline::SourceContainer stages;
+    // Match oplog entries greater than or equal to the last fetched timestamp.
+    BSONObjBuilder builder(BSON("$or" << BSON_ARRAY(_config.queryFilter << BSON("ts" << startTs))));
+    builder.append("ts", BSON("$gte" << startTs));
+    stages.emplace_back(DocumentSourceMatch::createFromBson(
+        Document{{"$match", Document{builder.obj()}}}.toBson().firstElement(), expCtx));
+    stages.emplace_back(DocumentSourceFindAndModifyImageLookup::create(expCtx));
+    // Do another filter on the timestamp as the 'FindAndModifyImageLookup' stage can forge
+    // synthetic no-op entries if the oplog corresponding to the 'startTs' is a retryable
+    // 'findAndModify' entry.
+    BSONObjBuilder secondMatchBuilder(BSON("ts" << BSON("$gte" << startTs)));
+    stages.emplace_back(DocumentSourceMatch::createFromBson(
+        Document{{"$match", Document{secondMatchBuilder.obj()}}}.toBson().firstElement(), expCtx));
+    const auto serializedPipeline = Pipeline::create(std::move(stages), expCtx)->serializeToBson();
+
+    AggregateCommandRequest aggRequest(_nss, std::move(serializedPipeline));
+    aggRequest.setReadConcern(_config.queryReadConcern.toBSONInner());
+    aggRequest.setMaxTimeMS(maxTimeMs);
+    if (_config.requestResumeToken) {
+        aggRequest.setHint(BSON("$natural" << 1));
+        aggRequest.setRequestReshardingResumeToken(true);
+    }
+    if (_config.batchSize) {
+        SimpleCursorOptions cursor;
+        cursor.setBatchSize(_config.batchSize);
+        aggRequest.setCursor(cursor);
+    }
+    aggRequest.setWriteConcern(WriteConcernOptions());
+    return aggRequest;
 }
 
 BSONObj OplogFetcher::_makeFindQuery(long long findTimeout) const {
@@ -527,49 +614,80 @@ BSONObj OplogFetcher::_makeFindQuery(long long findTimeout) const {
     return queryBob.obj();
 }
 
-void OplogFetcher::_createNewCursor(bool initialFind) {
+Status OplogFetcher::_createNewCursor(bool initialFind) {
     invariant(_conn);
 
     // Set the socket timeout to the 'find' timeout plus a network buffer.
-    auto findTimeout = durationCount<Milliseconds>(initialFind ? _getInitialFindMaxTime()
-                                                               : _getRetriedFindMaxTime());
-    _setSocketTimeout(findTimeout);
+    auto maxTimeMs = durationCount<Milliseconds>(initialFind ? _getInitialFindMaxTime()
+                                                             : _getRetriedFindMaxTime());
+    _setSocketTimeout(maxTimeMs);
 
-    _cursor =
-        std::make_unique<DBClientCursor>(_conn.get(),
-                                         _nss,
-                                         _makeFindQuery(findTimeout),
-                                         0 /* limit */,
-                                         0 /* nToSkip */,
-                                         nullptr /* fieldsToReturn */,
-                                         QueryOption_CursorTailable | QueryOption_AwaitData |
-                                             (oplogFetcherUsesExhaust ? QueryOption_Exhaust : 0),
-                                         _config.batchSize);
+    if (_config.forTenantMigration) {
+        // We set 'secondaryOk'=false here to avoid duplicating OP_MSG fields since we already
+        // set the request metadata readPreference to `secondaryPreferred`.
+        auto ret = DBClientCursor::fromAggregationRequest(
+            _conn.get(),
+            _makeAggregateCommandRequest(maxTimeMs, _getLastOpTimeFetched().getTimestamp()),
+            false /* secondaryOk */,
+            oplogFetcherUsesExhaust);
+        if (!ret.isOK()) {
+            LOGV2_DEBUG(5761701,
+                        2,
+                        "Failed to create aggregation cursor in TenantOplogFetcher",
+                        "status"_attr = ret.getStatus());
+            return ret.getStatus();
+        }
+        _cursor = std::move(ret.getValue());
+    } else {
+        _cursor = std::make_unique<DBClientCursor>(
+            _conn.get(),
+            _nss,
+            _makeFindQuery(maxTimeMs),
+            0 /* nToReturn */,
+            0 /* nToSkip */,
+            nullptr /* fieldsToReturn */,
+            QueryOption_CursorTailable | QueryOption_AwaitData |
+                (oplogFetcherUsesExhaust ? QueryOption_Exhaust : 0),
+            _config.batchSize);
+    }
 
     _firstBatch = true;
 
     readersCreatedStats.increment();
+    return Status::OK();
 }
 
 StatusWith<OplogFetcher::Documents> OplogFetcher::_getNextBatch() {
     Documents batch;
     try {
         Timer timer;
+        if (!_cursor) {
+            // An error occurred and we should recreate the cursor.
+            auto status = _createNewCursor(false /* initialFind */);
+            if (!status.isOK()) {
+                return status;
+            }
+        }
         // If it is the first batch, we should initialize the cursor, which will run the find query.
         // Otherwise we should call more() to get the next batch.
         if (_firstBatch) {
             // Network errors manifest as exceptions that are handled in the catch block. If init
             // returns false it means that the sync source responded with nothing, which could
             // indicate a problem with the sync source.
-            if (!_cursor->init()) {
+            // We can't call `init()` when using an aggregate command because
+            // `DBClientCursor::fromAggregationRequest` will already have processed the `cursorId`.
+            if (!_config.forTenantMigration && !_cursor->init()) {
                 _cursor.reset();
                 return {ErrorCodes::InvalidSyncSource,
                         str::stream() << "Oplog fetcher could not create cursor on source: "
                                       << _config.source};
             }
 
-            // This will also set maxTimeMS on the generated getMore command.
-            _cursor->setAwaitDataTimeoutMS(_awaitDataTimeout);
+            // Aggregate commands do not support tailable cursors outside of change streams.
+            if (!_config.forTenantMigration) {
+                // This will also set maxTimeMS on the generated getMore command.
+                _cursor->setAwaitDataTimeoutMS(_awaitDataTimeout);
+            }
 
             // The 'find' command has already been executed, so reset the socket timeout to reflect
             // the awaitData timeout with a network buffer.
@@ -591,7 +709,6 @@ StatusWith<OplogFetcher::Documents> OplogFetcher::_getNextBatch() {
             }
             _cursor->more();
         }
-
         while (_cursor->moreInCurrentBatch()) {
             batch.emplace_back(_cursor->nextSafe());
         }

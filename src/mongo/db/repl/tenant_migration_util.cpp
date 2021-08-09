@@ -40,6 +40,7 @@
 #include "mongo/db/ops/update.h"
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/pipeline/document_source_add_fields.h"
+#include "mongo/db/pipeline/document_source_find_and_modify_image_lookup.h"
 #include "mongo/db/pipeline/document_source_graph_lookup.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/pipeline/document_source_match.h"
@@ -312,14 +313,15 @@ createRetryableWritesOplogFetchingPipelineForTenantMigrations(
         expCtx));
 
     // 10. Filter out all oplog entries from the `history` array that occur after
-    //    `startFetchingTimestamp`. Since the oplog fetching and application stages will already
-    //    capture entries after `startFetchingTimestamp`, we only need the earlier part of the oplog
-    //    chain. We do not need to sort the history after this since we will put the fetched entries
-    //    into the oplog buffer collection, where entries are read in timestamp order.
+    //    `startFetchingTimestamp`. We keep the entry at the `startFetchingTimestamp` here so that
+    //    we can capture any synthetic oplog entries that need to be created in the
+    //    `FindAndModifyImageLookup` stage later. We do not need to sort the history after this
+    //    since we will put the fetched entries into the oplog buffer collection, where entries are
+    //    read in timestamp order.
     stages.emplace_back(DocumentSourceAddFields::create(fromjson("{\
                     history: {$filter: {\
                         input: '$history',\
-                        cond: {$lt: ['$$this.ts', " + startFetchingTimestamp.toString() +
+                        cond: {$lte: ['$$this.ts', " + startFetchingTimestamp.toString() +
                                                                  "]}}}}"),
                                                         expCtx));
 
@@ -360,6 +362,16 @@ createRetryableWritesOplogFetchingPipelineForTenantMigrations(
     // 16. Replace root.
     stages.emplace_back(DocumentSourceReplaceRoot::createFromBson(
         fromjson("{$replaceRoot: {newRoot: '$completeOplogEntry'}}").firstElement(), expCtx));
+
+    // 17. Downconvert any 'findAndModify' oplog entries to store pre- and post-images in the
+    //     oplog rather than in a side collection.
+    stages.emplace_back(DocumentSourceFindAndModifyImageLookup::create(expCtx));
+
+    // 18. Since the oplog fetching and application stages will already capture entries after
+    //    `startFetchingTimestamp`, we only need the earlier part of the oplog chain.
+    stages.emplace_back(DocumentSourceMatch::createFromBson(
+        BSON("$match" << BSON("ts" << BSON("$lt" << startFetchingTimestamp))).firstElement(),
+        expCtx));
 
     return Pipeline::create(std::move(stages), expCtx);
 }

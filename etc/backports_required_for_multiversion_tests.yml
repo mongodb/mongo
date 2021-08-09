@@ -70,6 +70,18 @@ last-continuous:
       test_file: jstests/sharding/query/pipeline_length_limit.js
     - ticket: SERVER-56887
       test_file: jstests/sharding/database_versioning_all_commands.js
+    - ticket: SERVER-57617
+      test_file: jstests/replsets/tenant_migration_recipient_fetches_retryable_writes_oplog_entries.js
+    - ticket: SERVER-57617
+      test_file: jstests/replsets/tenant_migration_recipient_fetches_synthetic_find_and_modify_oplog_entries.js
+    - ticket: SERVER-57617
+      test_file: jstests/replsets/tenant_migration_fetch_committed_transactions_retry.js
+    - ticket: SERVER-57617
+      test_file: jstests/replsets/tenant_migration_retryable_write_retry.js
+    - ticket: SERVER-57617
+      test_file: jstests/replsets/tenant_migration_retryable_write_retry_on_recipient.js
+    - ticket: SERVER-57617
+      test_file: jstests/replsets/tenant_migration_find_and_modify_retry.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -302,6 +314,18 @@ last-lts:
       test_file: jstests/replsets/sessions_collection_reaping.js
     - ticket: SERVER-58203
       test_file: jstests/sharding/query/pipeline_length_limit.js
+    - ticket: SERVER-57617
+      test_file: jstests/replsets/tenant_migration_recipient_fetches_retryable_writes_oplog_entries.js
+    - ticket: SERVER-57617
+      test_file: jstests/replsets/tenant_migration_recipient_fetches_synthetic_find_and_modify_oplog_entries.js
+    - ticket: SERVER-57617
+      test_file: jstests/replsets/tenant_migration_fetch_committed_transactions_retry.js
+    - ticket: SERVER-57617
+      test_file: jstests/replsets/tenant_migration_retryable_write_retry.js
+    - ticket: SERVER-57617
+      test_file: jstests/replsets/tenant_migration_retryable_write_retry_on_recipient.js
+    - ticket: SERVER-57617
+      test_file: jstests/replsets/tenant_migration_find_and_modify_retry.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:

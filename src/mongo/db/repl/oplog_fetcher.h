@@ -37,6 +37,7 @@
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/repl/abstract_async_component.h"
 #include "mongo/db/repl/data_replicator_external_state.h"
 #include "mongo/db/repl/repl_set_config.h"
@@ -176,13 +177,15 @@ public:
                int requiredRBIDIn,
                int batchSizeIn,
                RequireFresherSyncSource requireFresherSyncSourceIn =
-                   RequireFresherSyncSource::kRequireFresherSyncSource)
+                   RequireFresherSyncSource::kRequireFresherSyncSource,
+               bool forTenantMigrationIn = false)
             : initialLastFetched(initialLastFetchedIn),
               source(sourceIn),
               replSetConfig(replSetConfigIn),
               requiredRBID(requiredRBIDIn),
               batchSize(batchSizeIn),
-              requireFresherSyncSource(requireFresherSyncSourceIn) {}
+              requireFresherSyncSource(requireFresherSyncSourceIn),
+              forTenantMigration(forTenantMigrationIn) {}
         // The OpTime, last oplog entry fetched in a previous run, or the optime to start fetching
         // from, depending on the startingPoint (below.).  If the startingPoint is kSkipFirstDoc,
         // this entry will be verified to exist, then discarded. If it is kEnqueueFirstDoc, it will
@@ -221,6 +224,10 @@ public:
         bool requestResumeToken = false;
 
         std::string name = "oplog fetcher";
+
+        // If true, the oplog fetcher will use an aggregation request with '$match' rather than
+        // a 'find' query.
+        bool forTenantMigration;
     };
 
     /**
@@ -358,14 +365,24 @@ private:
     void _setMetadataWriterAndReader();
 
     /**
-     * Executes a `find` query on the sync source's oplog and establishes a tailable, awaitData,
+     * Does one of:
+     * 1. Executes a `find` query on the sync source's oplog and establishes a tailable, awaitData,
      * exhaust cursor.
+     * 2. Executes a 'aggregate' query on the sync source's oplog. This is currently used in
+     * tenant migrations.
      *
      * Before running the query, it will set a RequestMetadataWriter to modify the request to
      * include $oplogQueryData and $replData. If will also set a ReplyMetadataReader to parse the
      * response for the metadata field.
      */
-    void _createNewCursor(bool initialFind);
+    Status _createNewCursor(bool initialFind);
+
+    /**
+     * This function will create an `AggregateCommandRequest` object that will do a `$match` to find
+     * all entries greater than the last fetched timestamp.
+     */
+    AggregateCommandRequest _makeAggregateCommandRequest(long long maxTimeMs,
+                                                         Timestamp startTs) const;
 
     /**
      * This function will create the `find` query to issue to the sync source. It is provided with
@@ -488,6 +505,9 @@ private:
     executor::TaskExecutor::CallbackHandle _runQueryHandle;
 
     int _lastBatchElapsedMS = 0;
+
+    // Condition to be notified on shutdown.
+    stdx::condition_variable _shutdownCondVar;
 };
 
 class OplogFetcherFactory {

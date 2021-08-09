@@ -1330,7 +1330,8 @@ void TenantMigrationRecipientService::Instance::_startOplogFetcher() {
         // We do not need to check the rollback ID.
         ReplicationProcess::kUninitializedRollbackId,
         tenantMigrationOplogFetcherBatchSize,
-        OplogFetcher::RequireFresherSyncSource::kDontRequireFresherSyncSource);
+        OplogFetcher::RequireFresherSyncSource::kDontRequireFresherSyncSource,
+        true /* forTenantMigration */);
     oplogFetcherConfig.queryFilter = _getOplogFetcherFilter();
     oplogFetcherConfig.queryReadConcern =
         ReadConcernArgs(repl::ReadConcernLevel::kMajorityReadConcern);
