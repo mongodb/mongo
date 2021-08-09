@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/catalog/list_indexes.h"
@@ -41,6 +43,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/uuid.h"
 
 // Failpoint which causes to hang "listIndexes" cmd after acquiring the DB lock.
@@ -66,8 +69,6 @@ std::list<BSONObj> listIndexesInLock(OperationContext* opCtx,
                                      const CollectionPtr& collection,
                                      const NamespaceString& nss,
                                      boost::optional<bool> includeBuildUUIDs) {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IS));
-
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &hangBeforeListIndexes, opCtx, "hangBeforeListIndexes", []() {}, nss);
 

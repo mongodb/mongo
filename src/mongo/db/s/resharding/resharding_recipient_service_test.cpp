@@ -322,12 +322,6 @@ private:
 };
 
 TEST_F(ReshardingRecipientServiceTest, CanTransitionThroughEachStateToCompletion) {
-    // TODO (SERVER-57194): enable lock-free reads.
-    bool disableLockFreeReadsOriginalValue = storageGlobalParams.disableLockFreeReads;
-    storageGlobalParams.disableLockFreeReads = true;
-    ON_BLOCK_EXIT(
-        [&] { storageGlobalParams.disableLockFreeReads = disableLockFreeReadsOriginalValue; });
-
     for (bool isAlsoDonor : {false, true}) {
         LOGV2(5551105,
               "Running case",
@@ -352,12 +346,6 @@ TEST_F(ReshardingRecipientServiceTest, StepDownStepUpEachTransition) {
                                                           RecipientStateEnum::kApplying,
                                                           RecipientStateEnum::kStrictConsistency,
                                                           RecipientStateEnum::kDone};
-    // TODO (SERVER-57194): enable lock-free reads.
-    bool disableLockFreeReadsOriginalValue = storageGlobalParams.disableLockFreeReads;
-    storageGlobalParams.disableLockFreeReads = true;
-    ON_BLOCK_EXIT(
-        [&] { storageGlobalParams.disableLockFreeReads = disableLockFreeReadsOriginalValue; });
-
     for (bool isAlsoDonor : {false, true}) {
         LOGV2(5551106,
               "Running case",
@@ -444,12 +432,6 @@ TEST_F(ReshardingRecipientServiceTest, StepDownStepUpEachTransition) {
 }
 
 DEATH_TEST_REGEX_F(ReshardingRecipientServiceTest, CommitFn, "4457001.*tripwire") {
-    // TODO (SERVER-57194): enable lock-free reads.
-    bool disableLockFreeReadsOriginalValue = storageGlobalParams.disableLockFreeReads;
-    storageGlobalParams.disableLockFreeReads = true;
-    ON_BLOCK_EXIT(
-        [&] { storageGlobalParams.disableLockFreeReads = disableLockFreeReadsOriginalValue; });
-
     auto doc = makeStateDocument(false /* isAlsoDonor */);
     auto opCtx = makeOperationContext();
     RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
@@ -465,12 +447,6 @@ DEATH_TEST_REGEX_F(ReshardingRecipientServiceTest, CommitFn, "4457001.*tripwire"
 }
 
 TEST_F(ReshardingRecipientServiceTest, DropsTemporaryReshardingCollectionOnAbort) {
-    // TODO (SERVER-57194): enable lock-free reads.
-    bool disableLockFreeReadsOriginalValue = storageGlobalParams.disableLockFreeReads;
-    storageGlobalParams.disableLockFreeReads = true;
-    ON_BLOCK_EXIT(
-        [&] { storageGlobalParams.disableLockFreeReads = disableLockFreeReadsOriginalValue; });
-
     auto metrics = ReshardingRecipientServiceTest::metrics();
     for (bool isAlsoDonor : {false, true}) {
         LOGV2(5551107,
@@ -539,12 +515,6 @@ TEST_F(ReshardingRecipientServiceTest, DropsTemporaryReshardingCollectionOnAbort
 }
 
 TEST_F(ReshardingRecipientServiceTest, RenamesTemporaryReshardingCollectionWhenDone) {
-    // TODO (SERVER-57194): enable lock-free reads.
-    bool disableLockFreeReadsOriginalValue = storageGlobalParams.disableLockFreeReads;
-    storageGlobalParams.disableLockFreeReads = true;
-    ON_BLOCK_EXIT(
-        [&] { storageGlobalParams.disableLockFreeReads = disableLockFreeReadsOriginalValue; });
-
     // The temporary collection is renamed by the donor service when the shard is also a donor. Only
     // on non-donor shards will the recipient service rename the temporary collection.
     bool isAlsoDonor = false;
@@ -582,12 +552,6 @@ TEST_F(ReshardingRecipientServiceTest, RenamesTemporaryReshardingCollectionWhenD
 }
 
 TEST_F(ReshardingRecipientServiceTest, WritesNoopOplogEntryOnReshardDoneCatchUp) {
-    // TODO (SERVER-57194): enable lock-free reads.
-    bool disableLockFreeReadsOriginalValue = storageGlobalParams.disableLockFreeReads;
-    storageGlobalParams.disableLockFreeReads = true;
-    ON_BLOCK_EXIT(
-        [&] { storageGlobalParams.disableLockFreeReads = disableLockFreeReadsOriginalValue; });
-
     boost::optional<PauseDuringStateTransitions> doneTransitionGuard;
     doneTransitionGuard.emplace(controller(), RecipientStateEnum::kDone);
 
@@ -633,12 +597,7 @@ TEST_F(ReshardingRecipientServiceTest, WritesNoopOplogEntryOnReshardDoneCatchUp)
 }
 
 TEST_F(ReshardingRecipientServiceTest, TruncatesXLErrorOnRecipientDocument) {
-    // TODO (SERVER-57194): enable lock-free reads.
     auto metrics = ReshardingRecipientServiceTest::metrics();
-    bool disableLockFreeReadsOriginalValue = storageGlobalParams.disableLockFreeReads;
-    storageGlobalParams.disableLockFreeReads = true;
-    ON_BLOCK_EXIT(
-        [&] { storageGlobalParams.disableLockFreeReads = disableLockFreeReadsOriginalValue; });
 
     for (bool isAlsoDonor : {false, true}) {
         LOGV2(5568600,
@@ -699,14 +658,7 @@ TEST_F(ReshardingRecipientServiceTest, TruncatesXLErrorOnRecipientDocument) {
 }
 
 TEST_F(ReshardingRecipientServiceTest, MetricsSuccessfullyShutDownOnUserCancelation) {
-    // TODO (SERVER-57194): enable lock-free reads.
     auto metrics = ReshardingRecipientServiceTest::metrics();
-    bool disableLockFreeReadsOriginalValue = storageGlobalParams.disableLockFreeReads;
-    storageGlobalParams.disableLockFreeReads = true;
-    ON_BLOCK_EXIT(
-        [&] { storageGlobalParams.disableLockFreeReads = disableLockFreeReadsOriginalValue; });
-
-
     auto doc = makeStateDocument(false);
     auto opCtx = makeOperationContext();
     RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
@@ -732,12 +684,6 @@ TEST_F(ReshardingRecipientServiceTest, RestoreMetricsAfterStepUp) {
                                                           RecipientStateEnum::kApplying,
                                                           RecipientStateEnum::kStrictConsistency,
                                                           RecipientStateEnum::kDone};
-    // TODO (SERVER-57194): enable lock-free reads.
-    bool disableLockFreeReadsOriginalValue = storageGlobalParams.disableLockFreeReads;
-    storageGlobalParams.disableLockFreeReads = true;
-    ON_BLOCK_EXIT(
-        [&] { storageGlobalParams.disableLockFreeReads = disableLockFreeReadsOriginalValue; });
-
     PauseDuringStateTransitions stateTransitionsGuard{controller(), recipientStates};
     auto doc = makeStateDocument(false);
     auto instanceId =

@@ -664,12 +664,6 @@ TEST_F(ReshardingDonorServiceTest, RetainsSourceCollectionOnAbort) {
 }
 
 TEST_F(ReshardingDonorServiceTest, TruncatesXLErrorOnDonorDocument) {
-    // TODO (SERVER-57194): enable lock-free reads.
-    bool disableLockFreeReadsOriginalValue = storageGlobalParams.disableLockFreeReads;
-    storageGlobalParams.disableLockFreeReads = true;
-    ON_BLOCK_EXIT(
-        [&] { storageGlobalParams.disableLockFreeReads = disableLockFreeReadsOriginalValue; });
-
     for (bool isAlsoRecipient : {false, true}) {
         LOGV2(5568601,
               "Running case",

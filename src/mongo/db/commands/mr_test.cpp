@@ -26,6 +26,9 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
+
 #include <functional>
 #include <memory>
 #include <string>
@@ -48,6 +51,7 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/logv2/log.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/scripting/dbdirectclient_factory.h"
@@ -521,12 +525,6 @@ TEST_F(MapReduceCommandTest, PrimaryStepDownPreventsTemporaryCollectionDrops) {
 }
 
 TEST_F(MapReduceCommandTest, ReplacingExistingOutputCollectionPreservesIndexes) {
-    // TODO (SERVER-57194): enable lock-free reads.
-    bool disableLockFreeReadsOriginalValue = storageGlobalParams.disableLockFreeReads;
-    storageGlobalParams.disableLockFreeReads = true;
-    ON_BLOCK_EXIT(
-        [&] { storageGlobalParams.disableLockFreeReads = disableLockFreeReadsOriginalValue; });
-
     CollectionOptions options;
     options.uuid = UUID::gen();
     ASSERT_OK(_storage.createCollection(_opCtx.get(), outputNss, options));

@@ -248,12 +248,6 @@ TEST_F(ShardLocalTest, FindNoMatchingDocumentsEmpty) {
 }
 
 TEST_F(ShardLocalTest, CreateIndex) {
-    // TODO (SERVER-57194): enable lock-free reads.
-    bool disableLockFreeReadsOriginalValue = storageGlobalParams.disableLockFreeReads;
-    storageGlobalParams.disableLockFreeReads = true;
-    ON_BLOCK_EXIT(
-        [&] { storageGlobalParams.disableLockFreeReads = disableLockFreeReadsOriginalValue; });
-
     NamespaceString nss("config.foo");
 
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, getIndexes(nss).getStatus());
@@ -282,12 +276,6 @@ TEST_F(ShardLocalTest, CreateIndex) {
 }
 
 TEST_F(ShardLocalTest, CreateIndexNonEmptyCollection) {
-    // TODO (SERVER-57194): enable lock-free reads.
-    bool disableLockFreeReadsOriginalValue = storageGlobalParams.disableLockFreeReads;
-    storageGlobalParams.disableLockFreeReads = true;
-    ON_BLOCK_EXIT(
-        [&] { storageGlobalParams.disableLockFreeReads = disableLockFreeReadsOriginalValue; });
-
     NamespaceString nss("config.foo");
 
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, getIndexes(nss).getStatus());
