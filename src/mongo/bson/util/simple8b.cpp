@@ -313,19 +313,14 @@ uint8_t _countBitsWithoutLeadingZeros(uint128_t value) {
 
 /*
  * This method takes a number of intsNeeded and an extensionType and returns the selector index for
- * that type. This method should never fail as it is called when we are encoding a largest value and
- * as such, we provide an invariant.
+ * that type. This method should never fail as it is called when we are encoding a largest value.
  */
 uint8_t _getSelectorIndex(uint8_t intsNeeded, uint8_t extensionType) {
     auto iteratorIdx = std::find_if(
         kIntsStoreForSelector[extensionType].begin() + kMinSelector[extensionType],
         kIntsStoreForSelector[extensionType].begin() + kMaxSelector[extensionType],
         [intsNeeded](uint8_t intsPerSelectorIdx) { return intsNeeded >= intsPerSelectorIdx; });
-    uint8_t potentialSelectorIdx = iteratorIdx - kIntsStoreForSelector[extensionType].begin();
-    // Ensure that our selector is valid
-    invariant(potentialSelectorIdx <= kMaxSelector[extensionType] &&
-              potentialSelectorIdx >= kMinSelector[extensionType]);
-    return potentialSelectorIdx;
+    return iteratorIdx - kIntsStoreForSelector[extensionType].begin();
 }
 
 }  // namespace
@@ -346,9 +341,6 @@ Simple8bBuilder<T>::~Simple8bBuilder() = default;
 
 template <typename T>
 bool Simple8bBuilder<T>::append(T value) {
-    // TODO (SERVER-58520): Remove invariants before release.
-    // There should be no values in _pendingValues if RLE is happening and vice versa.
-    invariant(_rleCount == 0 || _pendingValues.empty());
     if (_rlePossible()) {
         if (_lastValueInPrevWord.value() == value) {
             ++_rleCount;
@@ -362,9 +354,6 @@ bool Simple8bBuilder<T>::append(T value) {
 
 template <typename T>
 void Simple8bBuilder<T>::skip() {
-    // TODO (SERVER-58520): Remove invariants before release.
-    // There should be no values in _pendingValues if RLE is happening and vice versa.
-    invariant(_rleCount == 0 || _pendingValues.empty());
     if (_rlePossible() && _lastValueInPrevWord.isSkip()) {
         ++_rleCount;
         return;
@@ -376,10 +365,6 @@ void Simple8bBuilder<T>::skip() {
 
 template <typename T>
 void Simple8bBuilder<T>::flush() {
-    // TODO (SERVER-58520): Remove invariants before release.
-    // There should be no values in _pendingValues if RLE is happening and vice versa.
-    invariant(_rleCount == 0 || _pendingValues.empty());
-
     // Flush repeating integers that have been kept for RLE.
     _handleRleTermination();
     // Flush buffered values in _pendingValues.
@@ -636,10 +621,6 @@ int64_t Simple8bBuilder<T>::_encodeLargestPossibleWord(uint8_t extensionType) {
 template <typename T>
 template <typename Func>
 uint64_t Simple8bBuilder<T>::_encode(Func func, uint8_t selectorIdx, uint8_t extensionType) {
-    // TODO (SERVER-58520) : Remove invariants before release.
-    invariant(
-        !(selectorIdx > kMaxSelector[extensionType] || selectorIdx < kMinSelector[extensionType]));
-
     uint8_t baseSelector = kExtensionToBaseSelector[extensionType][selectorIdx];
     uint8_t bitShiftExtension = kBaseSelectorToShiftSize[baseSelector];
     uint64_t encodedWord = baseSelector;
