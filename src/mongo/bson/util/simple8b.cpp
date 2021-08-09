@@ -231,7 +231,7 @@ constexpr std::array<std::array<uint8_t, 16>, 4> kIntsStoreForSelector = {
 template <typename T>
 struct BaseSelectorEncodeFunctor {
     uint64_t operator()(const typename Simple8bBuilder<T>::PendingValue& value) {
-        return static_cast<uint64_t>(value.val);
+        return static_cast<uint64_t>(value.value());
     };
 };
 
@@ -245,7 +245,7 @@ struct SevenSelectorEncodeFunctor {
         uint64_t currWord = trailingZeros;
         // We do two shifts here to account for the case where trailingZeros is > kTrailingZero bit
         // size. If we subtracted this could lead to shift by a negative value which is undefined.
-        currWord |= static_cast<uint64_t>((value.val >> trailingZeros)
+        currWord |= static_cast<uint64_t>((value.value() >> trailingZeros)
                                           << kTrailingZeroBitSize[kSevenSelector]);
         return currWord;
     };
@@ -262,7 +262,7 @@ struct EightSelectorEncodeFunctor {
         uint64_t currWord = trailingZeros;
         // Shift to remove trailing zeros * 4 and then shift over for the 4 bits to hold
         // the trailingZerosCount
-        currWord |= static_cast<uint64_t>((value.val >> (trailingZeros * kNibbleShiftSize))
+        currWord |= static_cast<uint64_t>((value.value() >> (trailingZeros * kNibbleShiftSize))
                                           << kTrailingZeroBitSize[ExtensionType]);
         return currWord;
     }
@@ -333,11 +333,10 @@ uint8_t _getSelectorIndex(uint8_t intsNeeded, uint8_t extensionType) {
 // Base Constructor for PendingValue
 template <typename T>
 Simple8bBuilder<T>::PendingValue::PendingValue(
-    T val,
+    boost::optional<T> val,
     std::array<uint8_t, kNumOfSelectorTypes> bitCount,
-    std::array<uint8_t, kNumOfSelectorTypes> trailingZerosCount,
-    bool skip)
-    : val(val), bitCount(bitCount), trailingZerosCount(trailingZerosCount), skip(skip){};
+    std::array<uint8_t, kNumOfSelectorTypes> trailingZerosCount)
+    : val(val), bitCount(bitCount), trailingZerosCount(trailingZerosCount){};
 
 template <typename T>
 Simple8bBuilder<T>::Simple8bBuilder(WriteFn writeFunc) : _writeFn(std::move(writeFunc)) {}
@@ -351,7 +350,7 @@ bool Simple8bBuilder<T>::append(T value) {
     // There should be no values in _pendingValues if RLE is happening and vice versa.
     invariant(_rleCount == 0 || _pendingValues.empty());
     if (_rlePossible()) {
-        if (_lastValueInPrevWord.val == value) {
+        if (_lastValueInPrevWord.value() == value) {
             ++_rleCount;
             return true;
         }
@@ -366,7 +365,7 @@ void Simple8bBuilder<T>::skip() {
     // TODO (SERVER-58520): Remove invariants before release.
     // There should be no values in _pendingValues if RLE is happening and vice versa.
     invariant(_rleCount == 0 || _pendingValues.empty());
-    if (_rlePossible() && _lastValueInPrevWord.skip) {
+    if (_rlePossible() && _lastValueInPrevWord.isSkip()) {
         ++_rleCount;
         return;
     }
@@ -461,8 +460,7 @@ bool Simple8bBuilder<T>::_appendValue(T value, bool tryRle) {
                                meaningfulValueBitsStoredWithSeven,
                                meaningfulValueBitsStoredWithEightSmall,
                                meaningfulValueBitsStoredWithEightLarge},
-                              zeroCount,
-                              false);
+                              zeroCount);
     // Check if we have a valid selector for the current word. This method update the global
     // isSelectorValid to avoid redundant computation.
     if (_doesIntegerFitInCurrentWord(pendingValue)) {
@@ -498,19 +496,11 @@ bool Simple8bBuilder<T>::_appendValue(T value, bool tryRle) {
 template <typename T>
 void Simple8bBuilder<T>::_appendSkip() {
     if (!_pendingValues.empty()) {
-        bool isLastValueSkip = _pendingValues.back().skip;
+        bool isLastValueSkip = _pendingValues.back().isSkip();
 
         // There is never a case where we need to write more than one Simple8b wrod
         // because we only need 1 bit for skip
-        if (!_doesIntegerFitInCurrentWord({1,
-                                           {
-                                               1,
-                                               1,
-                                               4,
-                                               4,
-                                           },
-                                           {0, 0, 0, 0},
-                                           true})) {
+        if (!_doesIntegerFitInCurrentWord({boost::none, kMinDataBits, {0, 0, 0, 0}})) {
             // Form simple8b word if skip can not fit with last selector
             uint64_t simple8bWord = _encodeLargestPossibleWord(_lastValidExtensionType);
             _writeFn(simple8bWord);
@@ -521,13 +511,13 @@ void Simple8bBuilder<T>::_appendSkip() {
         if (_pendingValues.empty() && isLastValueSkip) {
             // It is possible to start rle
             _rleCount = 1;
-            _lastValueInPrevWord = {0, {0, 0, 0, 0}, {0, 0, 0, 0}, true};
+            _lastValueInPrevWord = {boost::none, {0, 0, 0, 0}, {0, 0, 0, 0}};
             return;
         }
     }
     // Push true into skip and the dummy value, 0, into currNum. We use the dummy value, 0 because
     // it takes 1 bit and it will not affect our global curr bit length calculations.
-    _pendingValues.push_back({0, {0, 0, 0, 0}, {0, 0, 0, 0}, true});
+    _pendingValues.push_back({boost::none, {0, 0, 0, 0}, {0, 0, 0, 0}});
 }
 
 template <typename T>
@@ -539,10 +529,10 @@ void Simple8bBuilder<T>::_handleRleTermination() {
     _appendRleEncoding();
     // Add any values that could not be encoded in RLE.
     while (_rleCount > 0) {
-        if (_lastValueInPrevWord.skip) {
+        if (_lastValueInPrevWord.isSkip()) {
             _appendSkip();
         } else {
-            _appendValue(_lastValueInPrevWord.val, false);
+            _appendValue(_lastValueInPrevWord.value(), false);
         }
         --_rleCount;
     }
@@ -661,7 +651,7 @@ uint64_t Simple8bBuilder<T>::_encode(Func func, uint8_t selectorIdx, uint8_t ext
         uint8_t shiftSize =
             (bitsPerInteger + bitsForTrailingZeros) * i + kSelectorBits + bitShiftExtension;
         uint64_t currEncodedWord;
-        if (_pendingValues[i].skip) {
+        if (_pendingValues[i].isSkip()) {
             currEncodedWord = unshiftedMask;
         } else {
             currEncodedWord = func(_pendingValues[i]);
