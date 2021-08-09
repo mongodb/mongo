@@ -157,6 +157,7 @@ selector:
   - jstests/core/indexes_multiple_commands.js
   - jstests/core/js2.js
   - jstests/core/json_schema/json_schema.js
+  - jstests/core/max_doc_size.js
   - jstests/core/mr_bigobject.js
   - jstests/core/not2.js
   - jstests/core/null_query_semantics.js
