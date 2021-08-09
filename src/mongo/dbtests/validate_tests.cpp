@@ -71,11 +71,8 @@ public:
 
         _supportsBackgroundValidation = storageGlobalParams.engine != "ephemeralForTest";
 
-        _supportsClusteredIdIndex =
-            _opCtx.getServiceContext()->getStorageEngine()->supportsClusteredIdIndex();
-
         CollectionOptions options;
-        if (clustered && _supportsClusteredIdIndex) {
+        if (clustered) {
             options.clusteredIndex = true;
         }
 
@@ -193,7 +190,6 @@ protected:
     unique_ptr<AutoGetDb> _autoDb;
     Database* _db;
     bool _supportsBackgroundValidation;
-    bool _supportsClusteredIdIndex;
 };
 
 template <bool full, bool background>
@@ -3461,10 +3457,6 @@ public:
         : ValidateBase(/*full=*/false, background, /*clustered=*/true) {}
 
     void run() {
-        if (!_supportsClusteredIdIndex) {
-            return;
-        }
-
         if (_background && !_supportsBackgroundValidation) {
             return;
         }
@@ -3527,10 +3519,6 @@ public:
         : ValidateBase(/*full=*/false, background, /*clustered=*/true) {}
 
     void run() {
-        if (!_supportsClusteredIdIndex) {
-            return;
-        }
-
         if (_background && !_supportsBackgroundValidation) {
             return;
         }
@@ -3628,10 +3616,6 @@ public:
         : ValidateBase(/*full=*/false, /*background=*/false, /*clustered=*/true) {}
 
     void run() {
-        if (!_supportsClusteredIdIndex) {
-            return;
-        }
-
         if (_background && !_supportsBackgroundValidation) {
             return;
         }

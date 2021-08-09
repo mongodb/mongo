@@ -251,10 +251,6 @@ public:
 
     Timestamp getAllDurableTimestamp() const override;
 
-    bool supportsClusteredIdIndex() const final override {
-        return true;
-    }
-
     bool supportsReadConcernSnapshot() const final override;
 
     bool supportsOplogStones() const final override;

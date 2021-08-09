@@ -151,8 +151,6 @@ public:
 
     boost::optional<Timestamp> getOplogNeededForCrashRecovery() const final;
 
-    bool supportsClusteredIdIndex() const final;
-
     bool supportsReadConcernSnapshot() const final;
 
     bool supportsReadConcernMajority() const final;

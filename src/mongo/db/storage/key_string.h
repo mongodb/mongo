@@ -335,7 +335,7 @@ public:
     int compareWithTypeBits(const Value& other) const;
 
     template <class T>
-    int compareWithoutRecordId(const T& other) const;
+    int compareWithoutRecordIdLong(const T& other) const;
 
     // Returns the size of the stored KeyString.
     size_t getSize() const {
@@ -381,7 +381,7 @@ public:
      * information. The serialized format takes the following form:
      *   [keystring size][keystring encoding][typebits encoding]
      */
-    void serializeWithoutRecordId(BufBuilder& buf) const;
+    void serializeWithoutRecordIdLong(BufBuilder& buf) const;
 
     // Deserialize the Value from a serialized format.
     static Value deserialize(BufReader& buf, KeyString::Version version) {
@@ -605,7 +605,7 @@ public:
     int compare(const T& other) const;
 
     template <class T>
-    int compareWithoutRecordId(const T& other) const;
+    int compareWithoutRecordIdLong(const T& other) const;
 
     /**
      * @return a hex encoding of this key
@@ -919,7 +919,7 @@ inline typename std::enable_if<isKeyString<T>::value, std::ostream&>::type opera
 
 /**
  * Given a KeyString which may or may not have a RecordId, returns the length of the section without
- * the RecordId. More expensive than sizeWithoutRecordIdAtEnd
+ * the RecordId. More expensive than sizeWithoutRecordId(Long|Str)AtEnd
  */
 size_t getKeySize(const char* buffer, size_t len, Ordering ord, const TypeBits& typeBits);
 
@@ -957,9 +957,16 @@ RecordId decodeRecordIdLongAtEnd(const void* buf, size_t size);
 RecordId decodeRecordIdStrAtEnd(const void* buf, size_t size);
 
 /**
- * Given a KeyString with a RecordId, returns the length of the section without the RecordId.
+ * Given a KeyString with a RecordId in the long format, returns the length of the section without
+ * the RecordId.
  */
-size_t sizeWithoutRecordIdAtEnd(const void* bufferRaw, size_t bufSize);
+size_t sizeWithoutRecordIdLongAtEnd(const void* bufferRaw, size_t bufSize);
+
+/**
+ * Given a KeyString with a RecordId in the string format, returns the length of the section without
+ * the RecordId.
+ */
+size_t sizeWithoutRecordIdStrAtEnd(const void* bufferRaw, size_t bufSize);
 
 /**
  * Decodes a RecordId, consuming all bytes needed from reader.
@@ -998,12 +1005,12 @@ int BuilderBase<BufferT>::compare(const T& other) const {
 
 template <class BufferT>
 template <class T>
-int BuilderBase<BufferT>::compareWithoutRecordId(const T& other) const {
+int BuilderBase<BufferT>::compareWithoutRecordIdLong(const T& other) const {
     return KeyString::compare(
         getBuffer(),
         other.getBuffer(),
-        !isEmpty() ? sizeWithoutRecordIdAtEnd(getBuffer(), getSize()) : 0,
-        !other.isEmpty() ? sizeWithoutRecordIdAtEnd(other.getBuffer(), other.getSize()) : 0);
+        !isEmpty() ? sizeWithoutRecordIdLongAtEnd(getBuffer(), getSize()) : 0,
+        !other.isEmpty() ? sizeWithoutRecordIdLongAtEnd(other.getBuffer(), other.getSize()) : 0);
 }
 
 template <class T>
@@ -1012,12 +1019,12 @@ int Value::compare(const T& other) const {
 }
 
 template <class T>
-int Value::compareWithoutRecordId(const T& other) const {
+int Value::compareWithoutRecordIdLong(const T& other) const {
     return KeyString::compare(
         getBuffer(),
         other.getBuffer(),
-        !isEmpty() ? sizeWithoutRecordIdAtEnd(getBuffer(), getSize()) : 0,
-        !other.isEmpty() ? sizeWithoutRecordIdAtEnd(other.getBuffer(), other.getSize()) : 0);
+        !isEmpty() ? sizeWithoutRecordIdLongAtEnd(getBuffer(), getSize()) : 0,
+        !other.isEmpty() ? sizeWithoutRecordIdLongAtEnd(other.getBuffer(), other.getSize()) : 0);
 }
 
 }  // namespace KeyString

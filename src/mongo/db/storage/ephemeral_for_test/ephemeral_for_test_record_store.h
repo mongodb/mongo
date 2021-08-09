@@ -50,6 +50,7 @@ class RecordStore final : public ::mongo::RecordStore {
 public:
     explicit RecordStore(StringData ns,
                          StringData ident,
+                         KeyFormat keyFormat,
                          bool isCapped = false,
                          CappedCallback* cappedCallback = nullptr,
                          VisibilityManager* visibilityManager = nullptr);
@@ -57,7 +58,7 @@ public:
 
     virtual const char* name() const;
     virtual KeyFormat keyFormat() const {
-        return KeyFormat::Long;
+        return _keyFormat;
     }
     virtual long long dataSize(OperationContext* opCtx) const;
     virtual long long numRecords(OperationContext* opCtx) const;
@@ -119,6 +120,7 @@ private:
      */
     int64_t _nextRecordId(OperationContext* opCtx);
 
+    const KeyFormat _keyFormat;
     const bool _isCapped;
 
     StringData _ident;

@@ -728,7 +728,7 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
         // builds since this check can be expensive.
         int cmpData;
         if (_descriptor->unique()) {
-            cmpData = data.first.compareWithoutRecordId(previousKey);
+            cmpData = data.first.compareWithoutRecordIdLong(previousKey);
         }
 
         if (kDebugBuild && data.first.compare(previousKey) < 0) {

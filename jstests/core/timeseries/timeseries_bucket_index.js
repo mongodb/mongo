@@ -43,11 +43,7 @@ TimeseriesTest.run((insert) => {
 
     assert.docEq(buckets, bucketsColl.find({_id: bucketId}).toArray());
     let explain = bucketsColl.find({_id: bucketId}).explain();
-    assert(planHasStage(
-               db,
-               explain,
-               TimeseriesTest.supportsClusteredIndexes(db.getMongo()) ? "COLLSCAN" : "IDHACK"),
-           explain);
+    assert(planHasStage(db, explain, "COLLSCAN"), explain);
 
     assert.docEq(buckets, bucketsColl.find({"control.max.time": maxTime}).toArray());
     explain = bucketsColl.find({"control.max.time": minTime}).explain();

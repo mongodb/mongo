@@ -43,10 +43,6 @@ TEST(SortedDataInterface, KeyFormatStringInsertDuplicates) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(
         /*unique=*/false, /*partial=*/false, KeyFormat::String));
-    if (!sorted) {
-        // Not supported by this storage engine.
-        return;
-    }
     const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
     ASSERT(sorted->isEmpty(opCtx.get()));
 
@@ -118,10 +114,6 @@ TEST(SortedDataInterface, KeyFormatStringSetEndPosition) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(
         /*unique=*/false, /*partial=*/false, KeyFormat::String));
-    if (!sorted) {
-        // Not supported by this storage engine.
-        return;
-    }
     const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
     ASSERT(sorted->isEmpty(opCtx.get()));
 
@@ -191,10 +183,6 @@ TEST(SortedDataInterface, KeyFormatStringUnindex) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(
         /*unique=*/false, /*partial=*/false, KeyFormat::String));
-    if (!sorted) {
-        // Not supported by this storage engine.
-        return;
-    }
     const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
     ASSERT(sorted->isEmpty(opCtx.get()));
 
@@ -244,10 +232,6 @@ TEST(SortedDataInterface, InsertReservedRecordIdStr) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(
         /*unique=*/false, /*partial=*/false, KeyFormat::String));
-    if (!sorted) {
-        // Not supported by this storage engine.
-        return;
-    }
     const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
     ASSERT(sorted->isEmpty(opCtx.get()));
     WriteUnitOfWork uow(opCtx.get());
@@ -265,10 +249,6 @@ TEST(SortedDataInterface, BuilderAddKeyWithReservedRecordIdStr) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(
         /*unique=*/false, /*partial=*/false, KeyFormat::String));
-    if (!sorted) {
-        // Not supported by this storage engine.
-        return;
-    }
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT(sorted->isEmpty(opCtx.get()));
