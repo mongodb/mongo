@@ -622,6 +622,7 @@ clsm
 cmd
 cmp
 cnt
+cntvct
 colcheck
 colgroup
 colgroups
@@ -1073,6 +1074,7 @@ mmap
 mmrand
 mnt
 movemask
+mrs
 msecs
 msg
 msvc

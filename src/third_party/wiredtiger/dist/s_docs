@@ -1,7 +1,8 @@
 #! /bin/bash
 
 t=__wt.$$
-trap 'rm -f $t' 0 1 2 3 13 15
+t2=__wt.$$.2
+trap 'rm -f $t $t2' 0 1 2 3 13 15
 
 # Skip this when building release packages: docs are built separately
 test -n "$WT_RELEASE_BUILD" && exit 0
@@ -51,6 +52,18 @@ wtperf_config()
 	 echo '.'
 	 echo 'w'
 	 echo 'q') | ed ../src/docs/wtperf.dox 1>/dev/null 2>/dev/null
+}
+
+glossarychk()
+{
+	(cd ../src/docs && grep '^<tr><td>' arch-glossary.dox | cut -d'>' -f3 | sed -e 's/<.*//') > $t
+	sort --ignore-case $t > $t2
+	if ! diff $t $t2; then
+		echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+		echo "arch-glossary.dox entries out of order"
+		echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+		e=1
+	fi
 }
 
 structurechk()
@@ -116,7 +129,7 @@ spellchk()
 
 	(cd ../src/docs &&
 	# Separate quoted newlines "line\nline" so "nline" is not reported.
-        sed -e 's/\("[^"]*\)\\n\([^"]*"\)/\1 \2/' *.dox | \
+	sed -e 's/\("[^"]*\)\\n\([^"]*"\)/\1 \2/' -e 's/[@\\]sic  *\([^ ]*\) //g' *.dox | \
 	aspell --encoding=iso-8859-1 --lang=en_US --personal=./spell.ok list) |
 	sort -u > $t
 	test -s $t && {
@@ -176,6 +189,9 @@ EOF
 		cat $t
 		e=1
 	}
+
+	# Copy any needed javascript
+	cp ../src/docs/js/* ../docs/
 
 	# Fix up bad links doxygen generates in navtree.js
 	(cd ../docs &&
@@ -243,6 +259,7 @@ wtperf_config
 asciichk
 spellchk
 structurechk
+glossarychk
 
 # Check the docs data input file.
 check_docs_data

@@ -33,7 +33,7 @@ from wtbackup import backup_base
 class test_backup15(backup_base):
     bkp_home = "WT_BLOCK"
     bkup_id=0
-    conn_config='cache_size=1G,log=(enabled,file_max=100K),verbose=[backup]'
+    conn_config='cache_size=1G,log=(enabled,file_max=100K)'
     logmax="100K"
     max_iteration=5
     mult=0
@@ -113,4 +113,3 @@ class test_backup15(backup_base):
                 self.take_full_backup(self.home_full)
             self.compare_backups(self.uri, self.home_full, self.home_incr, str(self.bkup_id))
             self.setup_directories(self.home_incr, self.home_full)
-        self.ignoreStdoutPatternIfExists("")

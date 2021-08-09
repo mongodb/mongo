@@ -29,6 +29,13 @@ __wt_rdtsc(void)
         __asm__ volatile("rdtsc" : "=a"(a), "=d"(d));
         return ((d << 32) | a);
     }
+#elif defined(__aarch64__)
+    {
+        uint64_t t;
+
+        __asm__ volatile("mrs %0,  cntvct_el0" : "=r"(t));
+        return (t);
+    }
 #else
     return (0);
 #endif

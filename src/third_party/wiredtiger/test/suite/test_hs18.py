@@ -438,6 +438,8 @@ class test_hs18(wttest.WiredTigerTestCase):
         session_ts_reader = self.setUpSessionOpen(self.conn)
         cursor_ts_reader = session_ts_reader.open_cursor(uri)
 
+        self.skipTest('Skip this part of test_hs18 until WT-7931 is resolved')
+
         # The ID of the session corresponds the value it should see.
         sessions = []
         cursors = []
