@@ -241,6 +241,7 @@ MongoRunner.logicalOptions = {
     waitForConnect: true,
     bridgeOptions: true,
     skipValidation: true,
+    allowedExitCode: true,
 };
 
 MongoRunner.toRealPath = function(path, pathOpts) {

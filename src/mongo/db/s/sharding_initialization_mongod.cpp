@@ -38,6 +38,7 @@
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/client/remote_command_targeter_factory_impl.h"
 #include "mongo/client/replica_set_monitor.h"
+#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/dbhelpers.h"
@@ -55,6 +56,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
+#include "mongo/s/catalog/type_lockpings.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/shard_factory.h"
@@ -137,6 +139,35 @@ public:
 private:
     ServiceContext* _serviceContext;
 };
+
+// In v2.4, an index on {ping: 1} with index name  "ping_" was created on the config.lockpings
+// collection due to a bug. The existence of "ping_" clashes with an identical index with a
+// different name, "ping_1", that is created internally when a secondary steps up to primary.
+//
+// If the "ping_" index exists, fatally prevent nodes from upgrading until the index is dropped.
+void assertLegacyPingIndexDoesNotExist(OperationContext* opCtx) {
+    if (!serverGlobalParams.featureCompatibility.isVersionInitialized() ||
+        serverGlobalParams.featureCompatibility.getVersion() !=
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo40) {
+        // The server is not upgrading to 4.2, bypass the check.
+        return;
+    }
+
+    AutoGetDb autoDb(opCtx, LockpingsType::ConfigNS.db(), MODE_IS);
+    Collection* collection = autoDb.getDb()->getCollection(opCtx, LockpingsType::ConfigNS);
+    if (collection) {
+        IndexCatalog* indexCatalog = collection->getIndexCatalog();
+        invariant(indexCatalog);
+
+        auto desc = indexCatalog->findIndexByName(opCtx, "ping_");
+        if (desc) {
+            auto status = Status(ErrorCodes::IndexOptionsConflict,
+                                 "Must drop index 'ping_' on config.lockpings and await "
+                                 "replication before upgrading");
+            fassertFailedWithStatus(5272800, status);
+        }
+    }
+}
 
 }  // namespace
 
@@ -279,6 +310,10 @@ bool ShardingInitializationMongoD::initializeShardingAwarenessIfNeeded(Operation
 
         return true;
     } else {
+        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+            assertLegacyPingIndexDoesNotExist(opCtx);
+        }
+
         // Warn if a shardIdentity document is found on disk but *not* started with --shardsvr.
         if (!shardIdentityBSON.isEmpty()) {
             warning() << "Not started with --shardsvr, but a shardIdentity document was found "
