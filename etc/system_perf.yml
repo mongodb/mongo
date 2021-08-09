@@ -69,54 +69,54 @@ modules:
   # etc/perf.yml in mongodb/mongo
   - name: dsi
     repo: git@github.com:10gen/dsi.git
-    prefix: ../../src
+    prefix: ${workdir}/src
     branch: master
   - name: genny
     repo: git@github.com:10gen/genny.git
-    prefix: ../../src
+    prefix: ${workdir}/src
     branch: master
   - name: signal-processing
     repo: git@github.com:10gen/signal-processing.git
-    prefix: ../../src
+    prefix: ${workdir}/src
     branch: master
   - name: workloads
     repo: git@github.com:10gen/workloads.git
-    prefix: ../../src
+    prefix: ${workdir}/src
     branch: master
   - name: linkbench
     repo: git@github.com:10gen/linkbench.git
-    prefix: ../../src
+    prefix: ${workdir}/src
     branch: master
   - name: linkbench2
     repo: git@github.com:10gen/linkbench2.git
-    prefix: ../../src
+    prefix: ${workdir}/src
     branch: master
   - name: tsbs
     repo: git@github.com:gregorynoma/tsbs.git
-    prefix: ../../src
+    prefix: ${workdir}/src
     branch: master
     ref: 225e713010463582712dca30ffcfc70c7d661663
   - name: mongo-perf
     repo: git@github.com:mongodb/mongo-perf.git
-    prefix: ../../src
+    prefix: ${workdir}/src
     branch: master
   - name: YCSB
     repo: git@github.com:mongodb-labs/YCSB.git
-    prefix: ../../src
+    prefix: ${workdir}/src
     branch: master
     ref: 03515f78fc460836886604ff8fbee89e5853fbbc
   - name: benchmarks
     repo: git@github.com:mongodb-labs/benchmarks.git
-    prefix: ../../src
+    prefix: ${workdir}/src
     branch: master
   - name: py-tpcc
     repo: git@github.com:mongodb-labs/py-tpcc.git
-    prefix: ../../src
+    prefix: ${workdir}/src
     branch: master
     ref: 46f8f42a71626fc2057d2604ab9359ccf0395ba0
 #  - name: mongo
 #    repo: git@github.com:mongodb/mongo.git
-#    prefix: ../../src
+#    prefix: ${workdir}/src
 #    branch: master
   ###
   - name: enterprise
