@@ -32,7 +32,7 @@ var replTest = new ReplSetTest({
     name: name,
     nodes: 5,
     nodeOptions: {
-        setParameter: {logComponentVerbosity: tojson({replication: 2})},
+        setParameter: {logComponentVerbosity: tojson({replication: 2}), numInitialSyncAttempts: 25},
     }
 });
 var nodes = replTest.nodeList();

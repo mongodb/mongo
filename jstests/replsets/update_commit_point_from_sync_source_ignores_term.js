@@ -12,8 +12,11 @@ const dbName = "test";
 const collName = "coll";
 
 // Set up a ReplSetTest where nodes only sync one oplog entry at a time.
-const rst = new ReplSetTest(
-    {nodes: 5, useBridge: true, nodeOptions: {setParameter: "bgSyncOplogFetcherBatchSize=1"}});
+const rst = new ReplSetTest({
+    nodes: 5,
+    useBridge: true,
+    nodeOptions: {setParameter: {bgSyncOplogFetcherBatchSize: 1, numInitialSyncAttempts: 25}}
+});
 rst.startSet();
 const config = rst.getReplSetConfig();
 // Ban chaining and prevent elections.
