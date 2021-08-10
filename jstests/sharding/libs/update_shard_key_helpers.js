@@ -4,8 +4,7 @@ function shardCollectionMoveChunks(
     st, kDbName, ns, shardKey, docsToInsert, splitDoc, moveChunkDoc) {
     assert.commandWorked(st.s.getDB(kDbName).foo.createIndex(shardKey));
 
-    // TODO SERVER-51881: Remove the checking for 'dropped: {$ne: true}' after 5.0 is released
-    assert.eq(st.s.getDB('config').collections.count({_id: ns, dropped: {$ne: true}}), 0);
+    assert.eq(st.s.getDB('config').collections.countDocuments({_id: ns}), 0);
 
     for (let i = 0; i < docsToInsert.length; i++) {
         assert.commandWorked(st.s.getDB(kDbName).foo.insert(docsToInsert[i]));

@@ -68,9 +68,7 @@ CollectionType::CollectionType(const BSONObj& obj) {
     if (!getPre22CompatibleEpoch()) {
         setPre22CompatibleEpoch(OID());
     }
-    uassert(ErrorCodes::NoSuchKey,
-            "Shard key is missing",
-            getPre50CompatibleKeyPattern() || getDropped());
+    uassert(ErrorCodes::NoSuchKey, "Shard key is missing", getPre50CompatibleKeyPattern());
 }
 
 std::string CollectionType::toString() const {

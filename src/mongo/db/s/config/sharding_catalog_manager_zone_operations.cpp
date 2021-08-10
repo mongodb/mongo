@@ -132,10 +132,6 @@ ChunkRange includeFullShardKey(OperationContext* opCtx,
             !findCollResult.empty());
 
     CollectionType coll(findCollResult.front());
-    uassert(ErrorCodes::NamespaceNotSharded,
-            str::stream() << nss.ns() << " is not sharded",
-            !coll.getDropped());
-
     const auto& shardKeyPattern = coll.getKeyPattern();
     const auto& shardKeyBSON = shardKeyPattern.toBSON();
     *shardKeyPatternOut = shardKeyPattern;

@@ -44,14 +44,8 @@ function assertDatabaseDropped(dbName) {
     // No more tags for this database
     assert.eq(0, configDB.tags.countDocuments({ns: getDbPrefixRegExp(dbName)}));
 
-    // Check dropped collections (they either do not exist or all have the dropped field set)
-    //
-    // TODO (SERVER-51881): Remove this check after 5.0 is released
-    const droppedCollEntries =
-        configDB.collections.countDocuments({_id: getDbPrefixRegExp(dbName)});
-    if (droppedCollEntries > 0) {
-        droppedCollEntries.forEach((collEntry) => assert.eq(true, collEntry.dropped));
-    }
+    // Check dropped collections.
+    assert.eq(0, configDB.collections.countDocuments({_id: getDbPrefixRegExp(dbName)}));
 }
 
 jsTest.log("Test that dropping admin/config DB is illegal");

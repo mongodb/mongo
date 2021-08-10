@@ -24,8 +24,7 @@ var CheckOrphansAreDeletedHelpers = (function() {
             5 * 60 * 1000,
             1000);
 
-        // TODO SERVER-51881: Remove the checking for 'dropped: {$ne: true}' after 5.0 is released
-        mongosConn.getDB('config').collections.find({dropped: {$ne: true}}).forEach(collDoc => {
+        mongosConn.getDB('config').collections.find().forEach(collDoc => {
             const ns = collDoc._id;
             const tempNsArray = ns.split('.');
             const dbName = tempNsArray.shift();

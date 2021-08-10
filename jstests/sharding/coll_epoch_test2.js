@@ -73,16 +73,6 @@ jsTest.log("Rebuilding sharded collection with different split...");
 
 coll.drop();
 
-// TODO (SERVER-51881): Remove this check after 5.0 is released
-var droppedCollDoc = config.collections.findOne({_id: coll.getFullName()});
-if (droppedCollDoc) {
-    assert(droppedCollDoc != null);
-    assert.eq(true, droppedCollDoc.dropped);
-    assert(droppedCollDoc.lastmodEpoch != null);
-    assert(droppedCollDoc.lastmodEpoch.equals(new ObjectId("000000000000000000000000")),
-           "epoch not zero: " + droppedCollDoc.lastmodEpoch);
-}
-
 assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + ""}));
 st.ensurePrimaryShard(coll.getDB().getName(), st.shard1.shardName);
 assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}));

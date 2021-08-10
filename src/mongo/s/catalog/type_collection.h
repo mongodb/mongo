@@ -45,7 +45,6 @@ using ReshardingFields = TypeCollectionReshardingFields;
  *      "_id" : "foo.bar",
  *      "lastmodEpoch" : ObjectId("58b6fd76132358839e409e47"),
  *      "lastmod" : ISODate("1970-02-19T17:02:47.296Z"),
- *      "dropped" : false,
  *      "key" : {
  *          "_id" : 1
  *      },
@@ -136,10 +135,6 @@ public:
         return *getPre50CompatibleUuid();
     }
     void setUuid(UUID uuid);
-
-    bool getDropped() const {
-        return getPre50CompatibleDropped().get_value_or(false);
-    }
 
     const KeyPattern& getKeyPattern() const {
         return *getPre50CompatibleKeyPattern();

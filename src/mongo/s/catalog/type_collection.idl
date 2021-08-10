@@ -60,8 +60,7 @@ structs:
             lastmod:
                 cpp_name: updatedAt
                 type: date
-                description: "Contains the time of when the collection was either created, or if
-                              dropped = true, when it was dropped."
+                description: "Contains the time of when the collection was either created."
                 optional: false
             timestamp:
                 type: timestamp
@@ -86,12 +85,6 @@ structs:
                               prior to 5.0, this value would be missing for entries where 'dropped'
                               is set to true, because dropped collections' entries were being
                               written as dropped with certain fields missing instead of deleted."
-                optional: true
-            dropped:      # TODO (SERVER-51881): Remove this field after 5.0 is released
-                cpp_name: pre50CompatibleDropped
-                type: bool
-                description: "Legacy (pre 5.0 only) field, which indicates that the collection is
-                              dropped"
                 optional: true
             key:
                 cpp_name: pre50CompatibleKeyPattern

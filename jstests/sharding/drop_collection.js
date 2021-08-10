@@ -42,24 +42,7 @@ function assertCollectionDropped(ns, uuid = null) {
 
     // No more coll entry
     assert.eq(null, st.s.getCollection(ns).exists());
-
-    // Check for the collection with majority RC to verify that the write to remove the collection
-    // document from the catalog has propagated to the majority snapshot. Note that here we
-    // explicitly use a command instead of going through the driver's 'find' helper, in order to be
-    // able to specify a 'majority' read concern.
-    //
-    // assert.eq(0, configDB.chunks.countDocuments({_id: ns{));
-    //
-    // TODO (SERVER-51881): Remove this check after 5.0 is released
-    var collEntry =
-        assert
-            .commandWorked(configDB.runCommand(
-                {find: 'collections', filter: {_id: ns}, readConcern: {'level': 'majority'}}))
-            .cursor.firstBatch;
-    if (collEntry.length > 0) {
-        assert.eq(1, collEntry.length);
-        assert.eq(true, collEntry[0].dropped);
-    }
+    assert.eq(0, configDB.collections.countDocuments({_id: ns}));
 }
 
 jsTest.log("Drop unsharded collection.");

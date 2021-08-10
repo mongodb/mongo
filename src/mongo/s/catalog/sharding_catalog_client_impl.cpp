@@ -430,9 +430,6 @@ CollectionType ShardingCatalogClientImpl::getCollection(OperationContext* opCtx,
             !collDoc.empty());
 
     CollectionType coll(collDoc[0]);
-    uassert(ErrorCodes::NamespaceNotFound,
-            stream() << "collection " << nss.ns() << " was dropped",
-            !coll.getDropped());
     return coll;
 }
 
@@ -467,10 +464,6 @@ std::vector<NamespaceString> ShardingCatalogClientImpl::getAllShardedCollections
     std::vector<NamespaceString> collectionsToReturn;
     collectionsToReturn.reserve(collectionsOnConfig.size());
     for (const auto& coll : collectionsOnConfig) {
-        if (coll.getDropped()) {
-            continue;
-        }
-
         collectionsToReturn.push_back(coll.getNss());
     }
 
@@ -678,10 +671,6 @@ std::pair<CollectionType, std::vector<ChunkType>> ShardingCatalogClientImpl::get
             }
         }
         uassert(5520101, "'collections' document not found in aggregation response", coll);
-
-        uassert(ErrorCodes::NamespaceNotFound,
-                str::stream() << "Collection " << nss.ns() << " is dropped.",
-                !coll->getDropped());
     }
 
     // 2nd: Traverse all the elements and build the chunks.

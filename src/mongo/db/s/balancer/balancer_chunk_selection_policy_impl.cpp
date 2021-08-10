@@ -294,10 +294,6 @@ StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToSpli
     std::shuffle(collections.begin(), collections.end(), _random);
 
     for (const auto& coll : collections) {
-        if (coll.getDropped()) {
-            continue;
-        }
-
         const NamespaceString& nss(coll.getNss());
 
         if (coll.getTimeseriesFields()) {
@@ -377,10 +373,6 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
     std::shuffle(collections.begin(), collections.end(), _random);
 
     for (const auto& coll : collections) {
-        if (coll.getDropped()) {
-            continue;
-        }
-
         const NamespaceString& nss(coll.getNss());
 
         if (!coll.getAllowBalance() || !coll.getAllowMigrations() || coll.getTimeseriesFields()) {
@@ -426,11 +418,9 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
 
     const auto& shardStats = shardStatsStatus.getValue();
 
-    auto collection = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss);
-    if (collection.getDropped()) {
-        return Status(ErrorCodes::NamespaceNotFound,
-                      str::stream() << "collection " << nss.ns() << " not found");
-    }
+    // Used to check locally if the collection exists, it should trow NamespaceNotFound if it
+    // doesn't.
+    Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss);
 
     std::set<ShardId> usedShards;
 

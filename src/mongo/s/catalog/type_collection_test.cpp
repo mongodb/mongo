@@ -63,7 +63,6 @@ TEST(CollectionType, Basic) {
                            << "fr_CA"));
     ASSERT_EQUALS(coll.getUnique(), true);
     ASSERT_EQUALS(coll.getAllowBalance(), true);
-    ASSERT_EQUALS(coll.getDropped(), false);
 }
 
 TEST(CollectionType, AllFieldsPresent) {
@@ -96,7 +95,6 @@ TEST(CollectionType, AllFieldsPresent) {
                            << "fr_CA"));
     ASSERT_EQUALS(coll.getUnique(), true);
     ASSERT_EQUALS(coll.getAllowBalance(), true);
-    ASSERT_EQUALS(coll.getDropped(), false);
     ASSERT_EQUALS(coll.getUuid(), uuid);
     ASSERT(coll.getReshardingFields()->getState() == CoordinatorStateEnum::kUnused);
     ASSERT(coll.getReshardingFields()->getReshardingUUID() == reshardingUuid);
@@ -142,7 +140,6 @@ TEST(CollectionType, Pre22Format) {
     ASSERT_BSONOBJ_EQ(coll.getKeyPattern().toBSON(), BSON("a" << 1));
     ASSERT_EQUALS(coll.getUnique(), false);
     ASSERT_EQUALS(coll.getAllowBalance(), true);
-    ASSERT_EQUALS(coll.getDropped(), false);
 }
 
 TEST(CollectionType, InvalidNamespace) {
