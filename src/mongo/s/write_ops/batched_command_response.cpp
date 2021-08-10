@@ -131,17 +131,21 @@ BSONObj BatchedCommandResponse::toBSON() const {
             BSONObjBuilder errDetailsDocument(errDetailsBuilder.subobjStart());
 
             if (writeError->isIndexSet())
-                builder.append(WriteErrorDetail::index(), writeError->getIndex());
+                errDetailsDocument.append(WriteErrorDetail::index(), writeError->getIndex());
 
             auto status = writeError->toStatus();
-            builder.append(WriteErrorDetail::errCode(), status.code());
-            builder.append(WriteErrorDetail::errCodeName(), status.codeString());
-            builder.append(WriteErrorDetail::errMessage(), errorMessage(status.reason()));
+            errDetailsDocument.append(WriteErrorDetail::errCode(), status.code());
+            errDetailsDocument.append(WriteErrorDetail::errCodeName(), status.codeString());
+            errDetailsDocument.append(WriteErrorDetail::errMessage(),
+                                      errorMessage(status.reason()));
             if (auto extra = status.extraInfo())
-                extra->serialize(&builder);  // TODO consider extra info size for truncation.
+                extra->serialize(
+                    &errDetailsDocument);  // TODO consider extra info size for truncation.
 
-            if (writeError->isErrInfoSet())
-                builder.append(WriteErrorDetail::errInfo(), writeError->getErrInfo());
+            // Only set 'errInfo' if it hasn't been added by serializing 'extra'.
+            if (writeError->isErrInfoSet() &&
+                !errDetailsDocument.hasField(WriteErrorDetail::errInfo()))
+                errDetailsDocument.append(WriteErrorDetail::errInfo(), writeError->getErrInfo());
         }
         errDetailsBuilder.done();
     }
