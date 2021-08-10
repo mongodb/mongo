@@ -146,6 +146,13 @@ createRandomCursorExecutor(const CollectionPtr& coll,
         std::make_unique<MultiIteratorStage>(expCtx.get(), ws.get(), coll);
     static_cast<MultiIteratorStage*>(root.get())->addIterator(std::move(rsRandCursor));
 
+    // If the incoming operation is sharded, use the CSS to infer the filtering metadata for the
+    // collection, otherwise treat it as unsharded
+    auto collectionFilter =
+        CollectionShardingState::get(opCtx, coll->ns())
+            ->getOwnershipFilter(
+                opCtx, CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup);
+
     TrialStage* trialStage = nullptr;
 
     // Because 'numRecords' includes orphan documents, our initial decision to optimize the $sample
@@ -153,9 +160,7 @@ createRandomCursorExecutor(const CollectionPtr& coll,
     // to a collection scan if the ratio of orphaned to owned documents encountered over the first
     // 100 works() is such that we would have chosen not to optimize.
     static const size_t kMaxPresampleSize = 100;
-    if (auto css = CollectionShardingState::get(opCtx, coll->ns());
-        css->getCollectionDescription(opCtx).isSharded() &&
-        !expCtx->ns.isTimeseriesBucketsCollection()) {
+    if (collectionFilter.isSharded() && !expCtx->ns.isTimeseriesBucketsCollection()) {
         // The ratio of owned to orphaned documents must be at least equal to the ratio between the
         // requested sampleSize and the maximum permitted sampleSize for the original constraints to
         // be satisfied. For instance, if there are 200 documents and the sampleSize is 5, then at
@@ -163,11 +168,6 @@ createRandomCursorExecutor(const CollectionPtr& coll,
         // of the documents in the collection are owned, we default to the backup plan.
         const auto minAdvancedToWorkRatio = std::max(
             sampleSize / (numRecords * kMaxSampleRatioForRandCursor), kMaxSampleRatioForRandCursor);
-        // Since the incoming operation is sharded, use the CSS to infer the filtering metadata for
-        // the collection. We get the shard ownership filter after checking to see if the collection
-        // is sharded to avoid an invariant from being fired in this call.
-        auto collectionFilter = css->getOwnershipFilter(
-            opCtx, CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup);
         // The trial plan is SHARDING_FILTER-MULTI_ITERATOR.
         auto randomCursorPlan = std::make_unique<ShardFilterStage>(
             expCtx.get(), collectionFilter, ws.get(), std::move(root));
