@@ -48,7 +48,8 @@ class DocumentSourceUnwind::Unwinder {
 public:
     Unwinder(const FieldPath& unwindPath,
              bool preserveNullAndEmptyArrays,
-             const boost::optional<FieldPath>& indexPath);
+             const boost::optional<FieldPath>& indexPath,
+             bool strict);
     /** Reset the unwinder to unwind a new document. */
     void resetDocument(const Document& document);
 
@@ -75,6 +76,8 @@ private:
     // If set, the $unwind stage will include the array index in the specified path, overwriting any
     // existing value, setting to null when the value was a non-array or empty array.
     const boost::optional<FieldPath> _indexPath;
+    // Specifies if input to $unwind is required to be an array.
+    const bool _strict;
 
     Value _inputArray;
 
@@ -89,10 +92,12 @@ private:
 
 DocumentSourceUnwind::Unwinder::Unwinder(const FieldPath& unwindPath,
                                          bool preserveNullAndEmptyArrays,
-                                         const boost::optional<FieldPath>& indexPath)
+                                         const boost::optional<FieldPath>& indexPath,
+                                         bool strict)
     : _unwindPath(unwindPath),
       _preserveNullAndEmptyArrays(preserveNullAndEmptyArrays),
-      _indexPath(indexPath) {}
+      _indexPath(indexPath),
+      _strict(strict) {}
 
 void DocumentSourceUnwind::Unwinder::resetDocument(const Document& document) {
     // Reset document specific attributes.
@@ -114,6 +119,8 @@ DocumentSource::GetNextResult DocumentSourceUnwind::Unwinder::getNext() {
     // this index in the output document, or null if the value didn't come from an array.
     boost::optional<long long> indexForOutput;
 
+    uassert(
+        5858203, "an array is expected", (_strict && _inputArray.getType() == Array) || !_strict);
     if (_inputArray.getType() == Array) {
         const size_t length = _inputArray.getArrayLength();
         invariant(_index == 0 || _index < length);
@@ -159,12 +166,13 @@ DocumentSource::GetNextResult DocumentSourceUnwind::Unwinder::getNext() {
 DocumentSourceUnwind::DocumentSourceUnwind(const intrusive_ptr<ExpressionContext>& pExpCtx,
                                            const FieldPath& fieldPath,
                                            bool preserveNullAndEmptyArrays,
-                                           const boost::optional<FieldPath>& indexPath)
+                                           const boost::optional<FieldPath>& indexPath,
+                                           bool strict)
     : DocumentSource(kStageName, pExpCtx),
       _unwindPath(fieldPath),
       _preserveNullAndEmptyArrays(preserveNullAndEmptyArrays),
       _indexPath(indexPath),
-      _unwinder(new Unwinder(fieldPath, preserveNullAndEmptyArrays, indexPath)) {}
+      _unwinder(new Unwinder(fieldPath, preserveNullAndEmptyArrays, indexPath, strict)) {}
 
 REGISTER_DOCUMENT_SOURCE(unwind,
                          LiteParsedDocumentSourceDefault::parse,
@@ -179,12 +187,14 @@ intrusive_ptr<DocumentSourceUnwind> DocumentSourceUnwind::create(
     const intrusive_ptr<ExpressionContext>& expCtx,
     const string& unwindPath,
     bool preserveNullAndEmptyArrays,
-    const boost::optional<string>& indexPath) {
+    const boost::optional<string>& indexPath,
+    bool strict) {
     intrusive_ptr<DocumentSourceUnwind> source(
         new DocumentSourceUnwind(expCtx,
                                  FieldPath(unwindPath),
                                  preserveNullAndEmptyArrays,
-                                 indexPath ? FieldPath(*indexPath) : boost::optional<FieldPath>()));
+                                 indexPath ? FieldPath(*indexPath) : boost::optional<FieldPath>(),
+                                 strict));
     return source;
 }
 
