@@ -8,6 +8,7 @@
  *   incompatible_with_windows_tls,
  *   requires_majority_read_concern,
  *   requires_persistence,
+ *   multiversion_incompatible,
  * ]
  */
 
@@ -102,6 +103,8 @@ if (!tenantMigrationTest.isFeatureFlagEnabled()) {
         }));
         // The failpoints in this test run hang the TenantMigrationDonorService during service
         // rebuild, so we need to skip waiting on PrimaryOnlyServices.
+        // This is also a problem when setting the server featureCompatibilityVersion, as this
+        // waits for a rebuild, which is why this test is tagged as 'multiversion_incompatible'.
         tenantMigrationTest.getDonorRst().initiate(
             null, null, {doNotWaitForPrimaryOnlyServices: true});
         TenantMigrationUtil.createTenantMigrationRecipientRoleIfNotExist(
