@@ -141,14 +141,20 @@ int removeSessionsTransactionRecords(OperationContext* opCtx,
     if (expiredSessionIds.empty())
         return 0;
 
-    // Remove the session ids from the on-disk catalog
-    write_ops::DeleteCommandRequest deleteOp(NamespaceString::kSessionTransactionsTableNamespace);
-    deleteOp.setWriteCommandRequestBase([] {
+    // Remove findAndModify images that map to deleted sessions. We first delete any images
+    // belonging to sessions about to be reaped, followed by the sessions. This way if there's a
+    // failure, we'll only be left with sessions that have a dangling reference to an image. Session
+    // reaping will rediscover the sessions to delete and try again.
+    //
+    // We opt for this rather than performing the two sets of deletes in a single transaction simply
+    // to reduce code complexity.
+    write_ops::DeleteCommandRequest imageDeleteOp(NamespaceString::kConfigImagesNamespace);
+    imageDeleteOp.setWriteCommandRequestBase([] {
         write_ops::WriteCommandRequestBase base;
         base.setOrdered(false);
         return base;
     }());
-    deleteOp.setDeletes([&] {
+    imageDeleteOp.setDeletes([&] {
         std::vector<write_ops::DeleteOpEntry> entries;
         for (const auto& lsid : expiredSessionIds) {
             entries.emplace_back(BSON(LogicalSessionRecord::kIdFieldName << lsid.toBSON()),
@@ -157,20 +163,45 @@ int removeSessionsTransactionRecords(OperationContext* opCtx,
         return entries;
     }());
 
+    BatchedCommandResponse response;
+    std::string errmsg;
     BSONObj result;
 
     DBDirectClient client(opCtx);
-    client.runCommand(NamespaceString::kSessionTransactionsTableNamespace.db().toString(),
-                      deleteOp.toBSON({}),
-                      result);
+    client.runCommand(
+        NamespaceString::kConfigImagesNamespace.db().toString(), imageDeleteOp.toBSON({}), result);
 
-    BatchedCommandResponse response;
-    std::string errmsg;
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "Failed to parse response " << result,
             response.parseBSON(result, &errmsg));
     uassertStatusOK(response.getTopLevelStatus());
 
+    // Remove the session ids from the on-disk catalog
+    write_ops::DeleteCommandRequest sessionDeleteOp(
+        NamespaceString::kSessionTransactionsTableNamespace);
+    sessionDeleteOp.setWriteCommandRequestBase([] {
+        write_ops::WriteCommandRequestBase base;
+        base.setOrdered(false);
+        return base;
+    }());
+    sessionDeleteOp.setDeletes([&] {
+        std::vector<write_ops::DeleteOpEntry> entries;
+        for (const auto& lsid : expiredSessionIds) {
+            entries.emplace_back(BSON(LogicalSessionRecord::kIdFieldName << lsid.toBSON()),
+                                 false /* multi = false */);
+        }
+        return entries;
+    }());
+
+
+    client.runCommand(NamespaceString::kSessionTransactionsTableNamespace.db().toString(),
+                      sessionDeleteOp.toBSON({}),
+                      result);
+
+    uassert(ErrorCodes::FailedToParse,
+            str::stream() << "Failed to parse response " << result,
+            response.parseBSON(result, &errmsg));
+    uassertStatusOK(response.getTopLevelStatus());
     return response.getN();
 }
 

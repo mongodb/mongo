@@ -26,6 +26,8 @@ last-continuous:
       test_file: jstests/replsets/catchup_takeover_with_higher_config.js
     - ticket: SERVER-58898
       test_file: jstests/replsets/write_concern_write_to_local.js
+    - ticket: SERVER-59197
+      test_file: jstests/replsets/sessions_collection_reaping.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -200,6 +202,8 @@ last-lts:
       test_file: jstests/replsets/catchup_takeover_with_higher_config.js
     - ticket: SERVER-58898
       test_file: jstests/replsets/write_concern_write_to_local.js
+    - ticket: SERVER-59197
+      test_file: jstests/replsets/sessions_collection_reaping.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
