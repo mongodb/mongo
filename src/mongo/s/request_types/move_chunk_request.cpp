@@ -40,8 +40,6 @@ namespace {
 
 const char kMoveChunk[] = "moveChunk";
 const char kEpoch[] = "epoch";
-const char kChunkVersion[] = "chunkVersion";
-const char kConfigServerConnectionString[] = "configdb";
 const char kFromShardId[] = "fromShard";
 const char kToShardId[] = "toShard";
 const char kMaxChunkSizeBytes[] = "maxChunkSizeBytes";
@@ -177,7 +175,6 @@ StatusWith<MoveChunkRequest> MoveChunkRequest::createFromCommand(NamespaceString
 void MoveChunkRequest::appendAsCommand(BSONObjBuilder* builder,
                                        const NamespaceString& nss,
                                        ChunkVersion chunkVersion,
-                                       const ConnectionString& configServerConnectionString,
                                        const ShardId& fromShardId,
                                        const ShardId& toShardId,
                                        const ChunkRange& range,
@@ -189,10 +186,7 @@ void MoveChunkRequest::appendAsCommand(BSONObjBuilder* builder,
     invariant(nss.isValid());
 
     builder->append(kMoveChunk, nss.ns());
-    chunkVersion.appendToCommand(builder);  // 3.4 shard compatibility
     builder->append(kEpoch, chunkVersion.epoch());
-    // config connection string is included for 3.4 shard compatibility
-    builder->append(kConfigServerConnectionString, configServerConnectionString.toString());
     builder->append(kFromShardId, fromShardId.toString());
     builder->append(kToShardId, toShardId.toString());
     range.append(builder);
@@ -200,6 +194,13 @@ void MoveChunkRequest::appendAsCommand(BSONObjBuilder* builder,
     secondaryThrottle.append(builder);
     builder->append(kWaitForDelete, waitForDelete);
     builder->append(kForceJumbo, forceJumbo);
+    // Commands sent to shards that accept writeConcern, must always have writeConcern. So if the
+    // MoveChunkRequest didn't add writeConcern (from secondaryThrottle), then we add the implicit
+    // server default writeConcern.
+    if (!builder->hasField(WriteConcernOptions::kWriteConcernField)) {
+        builder->append(WriteConcernOptions::kWriteConcernField,
+                        WriteConcernOptions::kInternalWriteDefault);
+    }
 }
 
 bool MoveChunkRequest::operator==(const MoveChunkRequest& other) const {

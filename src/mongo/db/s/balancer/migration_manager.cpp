@@ -467,26 +467,16 @@ std::shared_ptr<Notification<RemoteCommandResponse>> MigrationManager::_schedule
     }
 
     BSONObjBuilder builder;
-    MoveChunkRequest::appendAsCommand(
-        &builder,
-        nss,
-        migrateInfo.version,
-        repl::ReplicationCoordinator::get(opCtx)->getConfigConnectionString(),
-        migrateInfo.from,
-        migrateInfo.to,
-        ChunkRange(migrateInfo.minKey, migrateInfo.maxKey),
-        maxChunkSizeBytes,
-        secondaryThrottle,
-        waitForDelete,
-        migrateInfo.forceJumbo);
-
-    // Commands sent to shards that accept writeConcern, must always have writeConcern. So if the
-    // MoveChunkRequest didn't add writeConcern (from secondaryThrottle), then we add the implicit
-    // server default writeConcern.
-    if (!builder.hasField(WriteConcernOptions::kWriteConcernField)) {
-        builder.append(WriteConcernOptions::kWriteConcernField,
-                       WriteConcernOptions::kInternalWriteDefault);
-    }
+    MoveChunkRequest::appendAsCommand(&builder,
+                                      nss,
+                                      migrateInfo.version,
+                                      migrateInfo.from,
+                                      migrateInfo.to,
+                                      ChunkRange(migrateInfo.minKey, migrateInfo.maxKey),
+                                      maxChunkSizeBytes,
+                                      secondaryThrottle,
+                                      waitForDelete,
+                                      migrateInfo.forceJumbo);
 
     stdx::lock_guard<Latch> lock(_mutex);
 

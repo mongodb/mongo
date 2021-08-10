@@ -66,7 +66,6 @@ MoveChunkRequest createMoveChunkRequest(const NamespaceString& nss) {
         &builder,
         nss,
         chunkVersion,
-        assertGet(ConnectionString::parse("TestConfigRS/CS1:12345,CS2:12345,CS3:12345")),
         ShardId("shard0001"),
         ShardId("shard0002"),
         ChunkRange(BSON("Key" << -100), BSON("Key" << 100)),

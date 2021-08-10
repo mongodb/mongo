@@ -82,7 +82,6 @@ public:
     static void appendAsCommand(BSONObjBuilder* builder,
                                 const NamespaceString& nss,
                                 ChunkVersion chunkVersion,
-                                const ConnectionString& configServerConnectionString,
                                 const ShardId& fromShardId,
                                 const ShardId& toShardId,
                                 const ChunkRange& range,

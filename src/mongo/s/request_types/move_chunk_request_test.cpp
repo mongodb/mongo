@@ -40,8 +40,6 @@ using unittest::assertGet;
 
 namespace {
 
-const ConnectionString kTestConfigServerConnectionString =
-    assertGet(ConnectionString::parse("TestConfigRS/CS1:12345,CS2:12345,CS3:12345"));
 const NamespaceString kNs("TestDB.TestColl");
 const BSONObj kMin = BSON("Key" << -100);
 const BSONObj kMax = BSON("Key" << 100);
@@ -58,7 +56,6 @@ TEST(MoveChunkRequest, Roundtrip) {
         &builder,
         kNs,
         chunkVersion,
-        kTestConfigServerConnectionString,
         kFromShard,
         kToShard,
         ChunkRange(kMin, kMax),
@@ -68,8 +65,6 @@ TEST(MoveChunkRequest, Roundtrip) {
         MoveChunkRequest::ForceJumbo::kDoNotForce);
 
     BSONObj cmdObj = builder.obj();
-
-    ASSERT_TRUE(cmdObj.hasField("shardVersion"));
 
     auto request = assertGet(
         MoveChunkRequest::createFromCommand(NamespaceString(cmdObj["moveChunk"].String()), cmdObj));
@@ -93,7 +88,6 @@ TEST(MoveChunkRequest, EqualityOperatorSameValue) {
         &builder,
         kNs,
         chunkVersion,
-        kTestConfigServerConnectionString,
         kFromShard,
         kToShard,
         ChunkRange(kMin, kMax),
@@ -119,7 +113,6 @@ TEST(MoveChunkRequest, EqualityOperatorDifferentValues) {
         &builder1,
         kNs,
         chunkVersion,
-        kTestConfigServerConnectionString,
         kFromShard,
         kToShard,
         ChunkRange(kMin, kMax),
@@ -135,7 +128,6 @@ TEST(MoveChunkRequest, EqualityOperatorDifferentValues) {
         &builder2,
         kNs,
         chunkVersion,
-        kTestConfigServerConnectionString,
         kFromShard,
         kToShard,
         ChunkRange(BSON("Key" << 100), BSON("Key" << 200)),  // Different key ranges

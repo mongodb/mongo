@@ -54,11 +54,6 @@ using unittest::assertGet;
 const NamespaceString kNss("TestDB", "TestColl");
 const std::string kShardKey = "X";
 const BSONObj kShardKeyPattern{BSON(kShardKey << 1)};
-const ConnectionString kConfigConnStr =
-    ConnectionString::forReplicaSet("Donor",
-                                    {HostAndPort("DonorHost1:1234"),
-                                     HostAndPort{"DonorHost2:1234"},
-                                     HostAndPort{"DonorHost3:1234"}});
 const ConnectionString kDonorConnStr =
     ConnectionString::forReplicaSet("Donor",
                                     {HostAndPort("DonorHost1:1234"),
@@ -212,7 +207,6 @@ protected:
             &cmdBuilder,
             kNss,
             ChunkVersion(1, 0, OID::gen(), boost::none /* timestamp */),
-            kConfigConnStr,
             kDonorConnStr.getSetName(),
             kRecipientConnStr.getSetName(),
             chunkRange,
