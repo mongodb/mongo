@@ -48,6 +48,7 @@ class ShardCollectionType;
 class ShardDatabaseType;
 template <typename T>
 class StatusWith;
+enum class SupportingLongNameStatusEnum : std::int32_t;
 
 /**
  * Function helpers to locally, using a DBDirectClient, read and write sharding metadata on a shard.
@@ -165,13 +166,11 @@ Status updateShardDatabasesEntry(OperationContext* opCtx,
  * 'query', returning at most 'limit' chunks in 'sort' order. 'epoch' populates the returned chunks'
  * version fields, because we do not yet have UUIDs to replace epochs nor UUIDs associated with
  * namespaces.
- *
- * Starting with FCV 5.0, the collection UUID is used to read chunk metadata. Instead, the
- * collection namespace is used with previous FCV.
  */
 StatusWith<std::vector<ChunkType>> readShardChunks(OperationContext* opCtx,
                                                    const NamespaceString& nss,
-                                                   const boost::optional<UUID>& uuid,
+                                                   const UUID& uuid,
+                                                   SupportingLongNameStatusEnum supportingLongName,
                                                    const BSONObj& query,
                                                    const BSONObj& sort,
                                                    boost::optional<long long> limit,
@@ -184,13 +183,12 @@ StatusWith<std::vector<ChunkType>> readShardChunks(OperationContext* opCtx,
  * as the updated chunk document is inserted. If the epoch of a chunk in 'chunks' does not match
  * 'currEpoch', a ConflictingOperationInProgress error is returned and no more updates are applied.
  *
- * Starting with FCV 5.0, the collection UUID is used to update chunk metadata. Insteed, the
- * collection namespace is used with previous FCV.
- *
  * Note: two threads running this function in parallel for the same collection can corrupt the
  * collection data!
  *
  * nss - the collection namespace for which chunk metadata is being updated.
+ * supportingLongName - when enabled, chunk metadata is accessed by collection 'uuid' rather than
+ *                      'nss'.
  * uuid - the collection UUID for which chunk metadata is being updated.
  * chunks - chunks retrieved from the config server, sorted in ascending chunk version order.
  * currEpoch - what this shard server expects the collection epoch to be.
@@ -202,7 +200,8 @@ StatusWith<std::vector<ChunkType>> readShardChunks(OperationContext* opCtx,
  */
 Status updateShardChunks(OperationContext* opCtx,
                          const NamespaceString& nss,
-                         const boost::optional<UUID>& uuid,
+                         const UUID& uuid,
+                         SupportingLongNameStatusEnum supportingLongName,
                          const std::vector<ChunkType>& chunks,
                          const OID& currEpoch);
 
@@ -229,7 +228,8 @@ Status dropChunksAndDeleteCollectionsEntry(OperationContext* opCtx, const Namesp
  */
 void dropChunks(OperationContext* opCtx,
                 const NamespaceString& nss,
-                const boost::optional<UUID>& uuid);
+                const UUID& uuid,
+                SupportingLongNameStatusEnum supportingLongName);
 
 /**
  * Deletes locally persisted database metadata associated with 'dbName': removes the databases

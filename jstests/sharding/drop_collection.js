@@ -5,7 +5,7 @@
 (function() {
 "use strict";
 
-load("jstests/libs/uuid_util.js");
+load("jstests/sharding/libs/catalog_cache_loader_helpers.js");
 load("jstests/sharding/libs/find_chunks_util.js");
 
 var st = new ShardingTest({shards: 2});
@@ -328,7 +328,7 @@ jsTest.log("Test that dropping a sharded collection, the cached metadata on shar
 
     // Get the chunks cache collection name
     const configCollDoc = st.s0.getDB('config').collections.findOne({_id: coll.getFullName()});
-    const chunksCollName = 'cache.chunks.' + coll.getFullName();
+    const chunksCollName = getCachedChunksCollectionName(configCollDoc);
 
     // Drop the collection
     assert.commandWorked(db.runCommand({drop: coll.getName()}));
