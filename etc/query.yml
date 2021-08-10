@@ -1030,6 +1030,7 @@ functions:
         binary: bash
         args:
           - "./src/evergreen/generate_build_variant.sh"
+          - "--evg-project-config etc/query.yml"
     - command: archive.targz_pack
       params:
         target: generate_tasks_config.tgz
