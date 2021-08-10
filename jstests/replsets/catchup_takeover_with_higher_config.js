@@ -30,18 +30,17 @@ const getNodeConfigAndCompare = function(node, config, cmp) {
     }
 };
 
-// Wait for all nodes to acknowledge that the node at nodeIndex is in PRIMARY state.
-// A node may see multiple nodes claiming primary, but only checks the provided one.
-const waitForPrimaryState = function(nodes, nodeIndex, timeout) {
+// Wait for all nodes to acknowledge that the node at nodeIndex is in the specified state.
+const waitForNodeState = function(nodes, nodeIndex, state, timeout) {
     assert.soon(() => {
         for (const node of nodes) {
             const status = assert.commandWorked(node.adminCommand({replSetGetStatus: 1}));
-            if (status.members[nodeIndex].state !== ReplSetTest.State.PRIMARY) {
+            if (status.members[nodeIndex].state !== state) {
                 return false;
             }
         }
         return true;
-    }, `Failed to wait for primary state for node ${nodes[nodeIndex].host}`, timeout);
+    }, `Failed to agree on node ${nodes[nodeIndex].host} in state ${state}`, timeout);
 };
 
 const replSet = new ReplSetTest({name: jsTestName(), nodes: 3});
@@ -79,7 +78,7 @@ hangBeforeTermBumpFpNode2.wait();
 // awaitNodesAgreeOnPrimary() or getPrimary() here which do not allow a node to
 // see multiple primaries.
 jsTestLog(`Waiting for all nodes to agree on ${nodes[2].host} being primary`);
-waitForPrimaryState(nodes, 2, 30 * 1000);
+waitForNodeState(nodes, 2, ReplSetTest.State.PRIMARY, 30 * 1000);
 
 // Wait for node0 to change its sync source to node2. Later when the failpoint on node 1
 // is lifted, it will do a no-op write and finish the stepup process, so its lastApplied
@@ -96,6 +95,9 @@ const statusBeforeTakeover = assert.commandWorked(nodes[1].adminCommand({serverS
 // Lift the failpoint on node1 to let it finish reconfig and bump the config term.
 hangBeforeTermBumpFpNode1.off();
 
+jsTestLog(`Waiting for ${nodes[1].host} to step down before doing catchup takeover.`);
+waitForNodeState(nodes, 1, ReplSetTest.State.SECONDARY, 30 * 1000);
+
 jsTestLog(
     `Waiting for ${nodes[1].host} to finish config term bump and propagate to ${nodes[0].host}`);
 assert.soon(() => getNodeConfigAndCompare(nodes[0], initialConfig, '>'));
@@ -105,7 +107,7 @@ assert(getNodeConfigAndCompare(nodes[2], initialConfig, '='));
 
 // Wait for node1 to catchup takeover node2 after the default catchup takeover delay.
 jsTestLog(`Waiting for ${nodes[1].host} to catchup takeover ${nodes[2].host}`);
-waitForPrimaryState(nodes, 1, 60 * 1000);
+waitForNodeState(nodes, 1, ReplSetTest.State.PRIMARY, 60 * 1000);
 
 // Check again that node2 is still in catchup mode and has not installed a new config.
 assert(getNodeConfigAndCompare(nodes[2], initialConfig, '='));
