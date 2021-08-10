@@ -34,9 +34,6 @@ from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 from wtthread import checkpoint_thread, op_thread
 
-def timestamp_str(t):
-    return '%x' % t
-
 # test_rollback_to_stable10.py
 # Test the rollback to stable operation performs sweeping history store.
 class test_rollback_to_stable10(test_rollback_to_stable_base):
@@ -61,10 +58,6 @@ class test_rollback_to_stable10(test_rollback_to_stable_base):
     def test_rollback_to_stable(self):
         nrows = 1000
 
-        # Prepare transactions for column store table is not yet supported.
-        if self.prepare and self.key_format == 'r':
-            self.skipTest('Prepare transactions for column store table is not yet supported')
-
         # Create a table without logging.
         self.pr("create/populate tables")
         uri_1 = "table:rollback_to_stable10_1"
@@ -79,8 +72,8 @@ class test_rollback_to_stable10(test_rollback_to_stable_base):
         ds_2.populate()
 
         # Pin oldest and stable to timestamp 10.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(10) +
-            ',stable_timestamp=' + timestamp_str(10))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
+            ',stable_timestamp=' + self.timestamp_str(10))
 
         value_a = "aaaaa" * 100
         value_b = "bbbbb" * 100
@@ -114,9 +107,9 @@ class test_rollback_to_stable10(test_rollback_to_stable_base):
 
         # Pin stable to timestamp 60 if prepare otherwise 50.
         if self.prepare:
-            self.conn.set_timestamp('stable_timestamp=' + timestamp_str(60))
+            self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(60))
         else:
-            self.conn.set_timestamp('stable_timestamp=' + timestamp_str(50))
+            self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(50))
 
         # Create a checkpoint thread
         done = threading.Event()
@@ -180,10 +173,6 @@ class test_rollback_to_stable10(test_rollback_to_stable_base):
     def test_rollback_to_stable_prepare(self):
         nrows = 1000
 
-        # Prepare transactions for column store table is not yet supported.
-        if self.prepare and self.key_format == 'r':
-            self.skipTest('Prepare transactions for column store table is not yet supported')
-
         # Create a table without logging.
         self.pr("create/populate tables")
         uri_1 = "table:rollback_to_stable10_1"
@@ -198,8 +187,8 @@ class test_rollback_to_stable10(test_rollback_to_stable_base):
         ds_2.populate()
 
         # Pin oldest and stable to timestamp 10.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(10) +
-            ',stable_timestamp=' + timestamp_str(10))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
+            ',stable_timestamp=' + self.timestamp_str(10))
 
         value_a = "aaaaa" * 100
         value_b = "bbbbb" * 100
@@ -235,9 +224,9 @@ class test_rollback_to_stable10(test_rollback_to_stable_base):
 
         # Pin stable to timestamp 60 if prepare otherwise 50.
         if self.prepare:
-            self.conn.set_timestamp('stable_timestamp=' + timestamp_str(60))
+            self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(60))
         else:
-            self.conn.set_timestamp('stable_timestamp=' + timestamp_str(50))
+            self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(50))
 
         # Here's the update operations we'll perform, encapsulated so we can easily retry
         # it if we get a rollback. Rollbacks may occur when checkpoint is running.
@@ -265,7 +254,7 @@ class test_rollback_to_stable10(test_rollback_to_stable_base):
             self.retry_rollback('update ds1', session_p1,
                            lambda: prepare_range_updates(
                                session_p1, cursor_p1, ds_1, value_e, nrows,
-                               'prepare_timestamp=' + timestamp_str(69)))
+                               'prepare_timestamp=' + self.timestamp_str(69)))
 
             # Perform several updates in parallel with checkpoint.
             session_p2 = self.conn.open_session()
@@ -274,7 +263,7 @@ class test_rollback_to_stable10(test_rollback_to_stable_base):
             self.retry_rollback('update ds2', session_p2,
                            lambda: prepare_range_updates(
                                session_p2, cursor_p2, ds_2, value_e, nrows,
-                               'prepare_timestamp=' + timestamp_str(69)))
+                               'prepare_timestamp=' + self.timestamp_str(69)))
         finally:
             done.set()
             ckpt.join()
@@ -290,8 +279,8 @@ class test_rollback_to_stable10(test_rollback_to_stable_base):
         copy_wiredtiger_home(self, ".", "RESTART")
 
         # Commit the prepared transaction.
-        session_p1.commit_transaction('commit_timestamp=' + timestamp_str(70) + ',durable_timestamp=' + timestamp_str(71))
-        session_p2.commit_transaction('commit_timestamp=' + timestamp_str(70) + ',durable_timestamp=' + timestamp_str(71))
+        session_p1.commit_transaction('commit_timestamp=' + self.timestamp_str(70) + ',durable_timestamp=' + self.timestamp_str(71))
+        session_p2.commit_transaction('commit_timestamp=' + self.timestamp_str(70) + ',durable_timestamp=' + self.timestamp_str(71))
         session_p1.close()
         session_p2.close()
 

@@ -30,9 +30,7 @@ import time, re
 import wiredtiger, wttest
 from wtdataset import SimpleDataSet
 from wiredtiger import stat
-
-def timestamp_str(t):
-    return '%x' % t
+from wtscenario import make_scenarios
 
 # test_hs21.py
 # Test we don't lose any data when idle files with an active history are closed/sweeped.
@@ -49,6 +47,13 @@ class test_hs21(wttest.WiredTigerTestCase):
     numfiles = 10
     nrows = 1000
 
+    key_format_values = [
+        ('column', dict(key_format='r', key1=1, key2=2)),
+        ('string-row', dict(key_format='S', key1=str(0), key2=str(1))),
+    ]
+
+    scenarios = make_scenarios(key_format_values)
+
     def large_updates(self, uri, value, ds, nrows, commit_ts):
         # Update a large number of records, we'll hang if the history store table isn't working.
         session = self.session
@@ -56,13 +61,13 @@ class test_hs21(wttest.WiredTigerTestCase):
         session.begin_transaction()
         for i in range(1, nrows + 1):
             cursor[ds.key(i)] = value
-        session.commit_transaction('commit_timestamp=' + timestamp_str(commit_ts))
+        session.commit_transaction('commit_timestamp=' + self.timestamp_str(commit_ts))
         cursor.close()
 
     def check(self, session, check_value, uri, nrows, read_ts=-1):
         # Validate we read an expected value (optionally at a given read timestamp).
         if read_ts != -1:
-            session.begin_transaction('read_timestamp=' + timestamp_str(read_ts))
+            session.begin_transaction('read_timestamp=' + self.timestamp_str(read_ts))
         cursor = session.open_cursor(uri)
         count = 0
         for k, v in cursor:
@@ -70,6 +75,12 @@ class test_hs21(wttest.WiredTigerTestCase):
             count += 1
         if read_ts != -1:
             session.rollback_transaction()
+        if count != nrows:
+            self.prout("Oops")
+            self.prout("value: " + str(check_value))
+            self.prout("count: " + str(count))
+            self.prout("nrows: " + str(nrows))
+            self.prout("read_ts: " + str(read_ts))
         self.assertEqual(count, nrows)
         cursor.close()
 
@@ -101,7 +112,7 @@ class test_hs21(wttest.WiredTigerTestCase):
             file_uri = 'file:%s.%d.wt' % (self.file_name, f)
             # Create a small table.
             ds = SimpleDataSet(
-                self, table_uri, 0, key_format='S', value_format='S', config='log=(enabled=false)')
+                self, table_uri, 0, key_format=self.key_format, value_format='S', config='log=(enabled=false)')
             ds.populate()
             # Checkpoint to ensure we write the files metadata checkpoint value.
             self.session.checkpoint()
@@ -110,8 +121,8 @@ class test_hs21(wttest.WiredTigerTestCase):
             active_files.append((base_write_gen, ds))
 
         # Pin oldest and stable to timestamp 1.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(1) +
-            ',stable_timestamp=' + timestamp_str(1))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +
+            ',stable_timestamp=' + self.timestamp_str(1))
 
         # Perform a series of updates over our files at timestamp 2. This being data we can later assert
         # to ensure the history store is working as intended.
@@ -122,7 +133,7 @@ class test_hs21(wttest.WiredTigerTestCase):
         # We want to create a long running read transaction in a seperate session which we will persist over the closing and
         # re-opening of handles. We want to ensure the correct data gets read throughout this time period.
         session_read = self.conn.open_session()
-        session_read.begin_transaction('read_timestamp=' + timestamp_str(2))
+        session_read.begin_transaction('read_timestamp=' + self.timestamp_str(2))
         # Check our inital set of updates are seen at the read timestamp.
         for (_, ds) in active_files:
             # Check that all updates at timestamp 2 are seen.

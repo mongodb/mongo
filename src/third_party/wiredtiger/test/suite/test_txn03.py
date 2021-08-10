@@ -37,13 +37,18 @@ class test_txn03(wttest.WiredTigerTestCase):
     tablename = 'test_txn03'
     uri1 = 'table:' + tablename + "_1"
     uri2 = 'table:' + tablename + "_2"
-    key_str = "TEST_KEY1"
-    data_str1 = "VAL"
-    data_str2 = "TEST_VAL1"
+    key = "TEST_KEY1"
+    data1 = "VAL"
+    data2 = "TEST_VAL1"
 
     nentries = 1000
     scenarios = make_scenarios([
-        ('var', dict(create_params = "key_format=S,value_format=S")),
+        ('row', dict(create_params = "key_format=S,value_format=S",
+                key = "TEST_KEY1", data1 = "VAL", data2 = "TEST_VAL1")),
+        ('var', dict(create_params = "key_format=r,value_format=S",
+                key = 123, data1 = "VAL", data2 = "TEST_VAL1")),
+        ('fix', dict(create_params = "key_format=r,value_format=8t",
+                key = 123, data1 = 0x17, data2 = 0xaa)),
     ])
 
     def test_ops(self):
@@ -52,17 +57,17 @@ class test_txn03(wttest.WiredTigerTestCase):
         # Set up the table with entries for 1 and 10
         # We use the overwrite config so insert can update as needed.
         c = self.session.open_cursor(self.uri1, None, 'overwrite')
-        c[self.key_str] = self.data_str1
+        c[self.key] = self.data1
         c.close()
         c = self.session.open_cursor(self.uri2, None, 'overwrite')
-        c[self.key_str] = self.data_str1
+        c[self.key] = self.data1
         c.close()
 
         # Update the first table - this update should be visible in the
         # new session.
         self.session.begin_transaction()
         c = self.session.open_cursor(self.uri1, None, 'overwrite')
-        c[self.key_str] = self.data_str2
+        c[self.key] = self.data2
         self.session.commit_transaction()
         c.close()
 
@@ -75,16 +80,16 @@ class test_txn03(wttest.WiredTigerTestCase):
         # Make an update in the first session.
         self.session.begin_transaction()
         c = self.session.open_cursor(self.uri2, None, 'overwrite')
-        c[self.key_str] = self.data_str2
+        c[self.key] = self.data2
         self.session.commit_transaction()
         c.close()
 
-        t1c.set_key(self.key_str)
+        t1c.set_key(self.key)
         t1c.search()
-        t2c.set_key(self.key_str)
+        t2c.set_key(self.key)
         t2c.search()
-        self.assertEqual(t1c.get_value(), self.data_str2)
-        self.assertEqual(t2c.get_value(), self.data_str1)
+        self.assertEqual(t1c.get_value(), self.data2)
+        self.assertEqual(t2c.get_value(), self.data1)
 
         # Clean up
         t1c.close()

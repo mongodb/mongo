@@ -1,6 +1,6 @@
 /*! @arch_page arch-data-file Data File Format
 
-@section Database Files
+@section data_file_database_files Database Files
 
 WiredTiger stores databases in a durable format through writing data to files
 it has created in the database directory. These include data files representing
@@ -12,7 +12,7 @@ Data files are denoted by the .wt suffix. The history store file
 (WiredTigerHS.wt) and the metadata file (WiredTiger.wt) are special WiredTiger
 files, but have the same underlying structure as normal data files.
 
-@section Format & Layout of Data Files
+@section data_file_format Data File Format and Layout
 
 In memory, a database table is represented by a B-Tree data structure, which is
 made up of nodes that are page structures. The root and internal pages will only
@@ -30,7 +30,7 @@ contents. This information is used to verify that the file is a legitimate
 WiredTiger data file with a compatible WiredTiger version, and that its
 contents are not corrupted.
 
-@section Format & Layout of On-Disk Pages
+@section data_file_on_disk_page_format On-Disk Page Format and Layout
 
 Pages consist of a header (\c WT_PAGE_HEADER and \c WT_BLOCK_HEADER) followed
 by a variable number of cells, which encode keys, values or addresses (see
@@ -56,7 +56,7 @@ described here. The encoding strikes a balance between data that can be
 compacted efficiently in time and space, extensibility, and compatibility
 with previous versions.
 
-@section Page Types
+@section data_file_page_types Page Types
 
 Different types of pages are made up of different types of cells.
 
@@ -94,7 +94,7 @@ is used (the identical key prefix is stored only once per page to reduce
 size). In addition, each block written may be compressed and/or encrypted.
 The header portion of each block remains uncompressed and unencrypted.
 
-@section Data File Functions
+@section data_file_functions Data File Functions
 
 When data needs to be read from a data file, it is unpacked into in-memory
 structures, and vice versa, we pack the contents when we want to write a

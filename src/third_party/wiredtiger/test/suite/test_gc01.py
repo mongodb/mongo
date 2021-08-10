@@ -36,11 +36,7 @@ import wiredtiger, wttest
 from wtdataset import SimpleDataSet
 from wiredtiger import stat
 
-def timestamp_str(t):
-    return '%x' % t
-
 # test_gc01.py
-
 # Shared base class used by gc tests.
 class test_gc_base(wttest.WiredTigerTestCase):
 
@@ -51,7 +47,7 @@ class test_gc_base(wttest.WiredTigerTestCase):
         for i in range(0, nrows):
             session.begin_transaction()
             cursor[ds.key(i)] = value
-            session.commit_transaction('commit_timestamp=' + timestamp_str(commit_ts))
+            session.commit_transaction('commit_timestamp=' + self.timestamp_str(commit_ts))
         cursor.close()
 
     def large_modifies(self, uri, value, ds, location, nbytes, nrows, commit_ts):
@@ -63,12 +59,12 @@ class test_gc_base(wttest.WiredTigerTestCase):
             cursor.set_key(i)
             mods = [wiredtiger.Modify(value, location, nbytes)]
             self.assertEqual(cursor.modify(mods), 0)
-        session.commit_transaction('commit_timestamp=' + timestamp_str(commit_ts))
+        session.commit_transaction('commit_timestamp=' + self.timestamp_str(commit_ts))
         cursor.close()
 
     def check(self, check_value, uri, nrows, read_ts):
         session = self.session
-        session.begin_transaction('read_timestamp=' + timestamp_str(read_ts))
+        session.begin_transaction('read_timestamp=' + self.timestamp_str(read_ts))
         cursor = session.open_cursor(uri)
         count = 0
         for k, v in cursor:
@@ -100,8 +96,8 @@ class test_gc01(test_gc_base):
         ds.populate()
 
         # Pin oldest and stable to timestamp 1.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(1) +
-            ',stable_timestamp=' + timestamp_str(1))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +
+            ',stable_timestamp=' + self.timestamp_str(1))
 
         bigvalue = "aaaaa" * 100
         bigvalue2 = "ddddd" * 100
@@ -119,8 +115,8 @@ class test_gc01(test_gc_base):
         self.check(bigvalue, uri, nrows, 10)
 
         # Pin oldest and stable to timestamp 100.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(100) +
-            ',stable_timestamp=' + timestamp_str(100))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(100) +
+            ',stable_timestamp=' + self.timestamp_str(100))
 
         # Checkpoint to ensure that the history store is cleaned.
         self.session.checkpoint()
@@ -152,8 +148,8 @@ class test_gc01(test_gc_base):
         self.check(bigvalue2, uri, nrows, 100)
 
         # Pin oldest and stable to timestamp 200.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(200) +
-            ',stable_timestamp=' + timestamp_str(200))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(200) +
+            ',stable_timestamp=' + self.timestamp_str(200))
 
         # Checkpoint to ensure that the history store is cleaned.
         self.session.checkpoint()
@@ -185,8 +181,8 @@ class test_gc01(test_gc_base):
         self.check(bigvalue, uri, nrows, 200)
 
         # Pin oldest and stable to timestamp 300.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(300) +
-            ',stable_timestamp=' + timestamp_str(300))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(300) +
+            ',stable_timestamp=' + self.timestamp_str(300))
 
         # Checkpoint to ensure that the history store is cleaned.
         self.session.checkpoint()

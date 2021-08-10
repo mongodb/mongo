@@ -116,7 +116,7 @@ new_page:
     __wt_upd_value_clear(cbt->upd_value);
     if (cbt->ins != NULL)
 restart_read:
-        WT_RET(__wt_txn_read(session, cbt, NULL, cbt->recno, cbt->ins->upd, NULL));
+        WT_RET(__wt_txn_read(session, cbt, NULL, cbt->recno, cbt->ins->upd));
     if (cbt->upd_value->type == WT_UPDATE_INVALID) {
         cbt->v = __bit_getv_recno(cbt->ref, cbt->recno, btree->bitcnt);
         cbt->iface.value.data = &cbt->v;
@@ -211,6 +211,7 @@ __cursor_var_next(WT_CURSOR_BTREE *cbt, bool newpage, bool restart, size_t *skip
             return (WT_NOTFOUND);
         __cursor_set_recno(cbt, cbt->ref->ref_recno);
         cbt->cip_saved = NULL;
+        F_CLR(cbt, WT_CBT_CACHEABLE_RLE_CELL);
         goto new_page;
     }
 
@@ -245,56 +246,84 @@ restart_read:
         }
 
         /*
-         * If we're at the same slot as the last reference and there's no matching insert list item,
-         * re-use the return information (so encoded items with large repeat counts aren't
-         * repeatedly decoded). Otherwise, unpack the cell and build the return information.
+         * There's no matching insert list item. If we're on the same slot as the last reference,
+         * and the cell is cacheable (it might not be if it's not globally visible), reuse the
+         * previous return data to avoid repeatedly decoding items.
          */
-        if (cbt->cip_saved != cip) {
-            cell = WT_COL_PTR(page, cip);
-            __wt_cell_unpack_kv(session, page->dsk, cell, &unpack);
-            if (unpack.type == WT_CELL_DEL) {
-                if ((rle = __wt_cell_rle(&unpack)) == 1) {
-                    ++*skippedp;
-                    continue;
-                }
-
-                /*
-                 * There can be huge gaps in the variable-length column-store name space appearing
-                 * as deleted records. If more than one deleted record, do the work of finding the
-                 * next record to return instead of looping through the records.
-                 *
-                 * First, find the smallest record in the update list that's larger than the current
-                 * record.
-                 */
-                ins = __col_insert_search_gt(cbt->ins_head, cbt->recno);
-
-                /*
-                 * Second, for records with RLEs greater than 1, the above call to __col_var_search
-                 * located this record in the page's list of repeating records, and returned the
-                 * starting record. The starting record plus the RLE is the record to which we could
-                 * skip, if there was no smaller record in the update list.
-                 */
-                cbt->recno = rle_start + rle;
-                if (ins != NULL && WT_INSERT_RECNO(ins) < cbt->recno)
-                    cbt->recno = WT_INSERT_RECNO(ins);
-
-                /* Adjust for the outer loop increment. */
-                --cbt->recno;
-                ++*skippedp;
-                continue;
-            }
-
-            WT_RET(__wt_bt_col_var_cursor_walk_txn_read(session, cbt, page, &unpack, cip));
-            if (cbt->upd_value->type == WT_UPDATE_INVALID ||
-              cbt->upd_value->type == WT_UPDATE_TOMBSTONE) {
-                ++*skippedp;
-                continue;
-            }
-
+        if (cbt->cip_saved == cip && F_ISSET(cbt, WT_CBT_CACHEABLE_RLE_CELL)) {
+            F_CLR(&cbt->iface, WT_CURSTD_VALUE_EXT);
+            F_SET(&cbt->iface, WT_CURSTD_VALUE_INT);
+            cbt->iface.value.data = cbt->tmp->data;
+            cbt->iface.value.size = cbt->tmp->size;
             return (0);
         }
-        cbt->iface.value.data = cbt->tmp->data;
-        cbt->iface.value.size = cbt->tmp->size;
+
+        /* Unpack the cell and build the return information. */
+        cell = WT_COL_PTR(page, cip);
+        __wt_cell_unpack_kv(session, page->dsk, cell, &unpack);
+        rle = __wt_cell_rle(&unpack);
+        if (unpack.type == WT_CELL_DEL) {
+            if (rle == 1) {
+                ++*skippedp;
+                continue;
+            }
+
+            /*
+             * There can be huge gaps in the variable-length column-store name space appearing as
+             * deleted records. If more than one deleted record, do the work of finding the next
+             * record to return instead of looping through the records.
+             *
+             * First, find the smallest record in the update list that's larger than the current
+             * record.
+             */
+            ins = __col_insert_search_gt(cbt->ins_head, cbt->recno);
+
+            /*
+             * Second, for records with RLEs greater than 1, the above call to __col_var_search
+             * located this record in the page's list of repeating records, and returned the
+             * starting record. The starting record plus the RLE is the record to which we could
+             * skip, if there was no smaller record in the update list.
+             */
+            cbt->recno = rle_start + rle;
+            if (ins != NULL && WT_INSERT_RECNO(ins) < cbt->recno)
+                cbt->recno = WT_INSERT_RECNO(ins);
+
+            /* Adjust for the outer loop increment. */
+            --cbt->recno;
+            ++*skippedp;
+            continue;
+        }
+
+        WT_RET(__wt_txn_read(session, cbt, NULL, cbt->recno, cbt->ins ? cbt->ins->upd : NULL));
+        if (cbt->upd_value->type == WT_UPDATE_INVALID ||
+          cbt->upd_value->type == WT_UPDATE_TOMBSTONE) {
+            ++*skippedp;
+            continue;
+        }
+        WT_RET(__wt_value_return(cbt, cbt->upd_value));
+
+        /*
+         * It is only safe to cache the value for other keys in the same RLE cell if it is globally
+         * visible. Otherwise, there might be some older timestamp where the value isn't uniform
+         * across the cell. Always set cip_saved so it's easy to tell when we change cells.
+         */
+        cbt->cip_saved = cip;
+        if (rle > 1 &&
+          __wt_txn_visible_all(session, unpack.tw.start_txn, unpack.tw.durable_start_ts)) {
+            /*
+             * Copy the value into cbt->tmp to cache it. This is perhaps unfortunate, because
+             * copying isn't free, but it's currently necessary. The memory we're copying might be
+             * on the disk page (which is safe because the page is pinned as long as the cursor is
+             * sitting on it) but if not it belongs to cbt->upd_value, and that (though it belongs
+             * to the cursor and won't disappear arbitrarily) might be invalidated or changed by
+             * other paths through this function on a subsequent call but before we are done with
+             * this RLE cell. In principle those paths could clear WT_CBT_CACHEABLE_RLE_CELL, but
+             * the code is currently structured in a way that makes that difficult.
+             */
+            WT_RET(__wt_buf_set(session, cbt->tmp, cbt->iface.value.data, cbt->iface.value.size));
+            F_SET(cbt, WT_CBT_CACHEABLE_RLE_CELL);
+        } else
+            F_CLR(cbt, WT_CBT_CACHEABLE_RLE_CELL);
         return (0);
     }
     /* NOTREACHED */
@@ -413,8 +442,8 @@ restart_read_page:
             WT_STAT_CONN_DATA_INCR(session, cursor_search_near_prefix_fast_paths);
             return (WT_NOTFOUND);
         }
-        WT_RET(__wt_txn_read(
-          session, cbt, &cbt->iface.key, WT_RECNO_OOB, WT_ROW_UPDATE(page, rip), NULL));
+        WT_RET(
+          __wt_txn_read(session, cbt, &cbt->iface.key, WT_RECNO_OOB, WT_ROW_UPDATE(page, rip)));
         if (cbt->upd_value->type == WT_UPDATE_INVALID) {
             ++*skippedp;
             continue;
@@ -590,6 +619,7 @@ __wt_btcur_iterate_setup(WT_CURSOR_BTREE *cbt)
     /* Clear saved iteration cursor position information. */
     cbt->cip_saved = NULL;
     cbt->rip_saved = NULL;
+    F_CLR(cbt, WT_CBT_CACHEABLE_RLE_CELL);
 
     /*
      * If we don't have a search page, then we're done, we're starting at the beginning or end of

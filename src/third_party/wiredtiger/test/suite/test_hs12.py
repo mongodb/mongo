@@ -29,19 +29,14 @@
 import wiredtiger, wttest, time
 from wtscenario import make_scenarios
 
-def timestamp_str(t):
-    return '%x' % t
-
 # test_hs12.py
 # Verify we can correctly append modifies to the end of string values
 class test_hs12(wttest.WiredTigerTestCase):
-    conn_config = 'cache_size=2MB,statistics=(all),eviction=(threads_max=1)'
+    conn_config = 'cache_size=2MB,eviction=(threads_max=1)'
     session_config = 'isolation=snapshot'
     key_format_values = [
-        # FIXME-WT-7120: The commented columnar tests needs to be enabled once columnar
-        # modify type update is fixed.
-        # ('column', dict(key_format='r')),
-        ('integer', dict(key_format='i')),
+        ('column', dict(key_format='r')),
+        ('integer-row', dict(key_format='i')),
     ]
     scenarios = make_scenarios(key_format_values)
 
@@ -94,12 +89,12 @@ class test_hs12(wttest.WiredTigerTestCase):
         cursor[1] = value2
         self.session.commit_transaction()
 
-        # Insert a whole bunch of data into the table to force wiredtiger to evict data
-        # from the previous table.
-        self.session.begin_transaction()
-        for i in range(2, 10000):
-            cursor[i] = valuebig
-        self.session.commit_transaction()
+        # Configure debug behavior on a cursor to evict the positioned page on cursor reset
+        # and evict the page.
+        evict_cursor = self.session.open_cursor(uri, None, "debug=(release_evict)")
+        evict_cursor.set_key(1)
+        self.assertEquals(evict_cursor.search(), 0)
+        evict_cursor.reset()
 
         # Try to find the value we saw earlier
         cursor2.set_key(1)

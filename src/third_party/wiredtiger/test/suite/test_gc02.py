@@ -30,9 +30,6 @@ from test_gc01 import test_gc_base
 from wiredtiger import stat
 from wtdataset import SimpleDataSet
 
-def timestamp_str(t):
-    return '%x' % t
-
 # test_gc02.py
 # Test that checkpoint cleans the obsolete history store internal pages.
 class test_gc02(test_gc_base):
@@ -49,8 +46,8 @@ class test_gc02(test_gc_base):
         ds.populate()
 
         # Pin oldest and stable to timestamp 1.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(1) +
-            ',stable_timestamp=' + timestamp_str(1))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +
+            ',stable_timestamp=' + self.timestamp_str(1))
 
         bigvalue = "aaaaa" * 100
         bigvalue2 = "ddddd" * 100
@@ -76,8 +73,8 @@ class test_gc02(test_gc_base):
         c.close()
 
         # Pin oldest and stable to timestamp 100.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(100) +
-            ',stable_timestamp=' + timestamp_str(100))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(100) +
+            ',stable_timestamp=' + self.timestamp_str(100))
 
         # Check that the new updates are only seen after the update timestamp.
         self.check(bigvalue2, uri, nrows, 100)
@@ -114,8 +111,8 @@ class test_gc02(test_gc_base):
         self.check(bigvalue, uri, nrows, 200)
 
         # Pin oldest and stable to timestamp 200.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(200) +
-            ',stable_timestamp=' + timestamp_str(200))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(200) +
+            ',stable_timestamp=' + self.timestamp_str(200))
 
         # Checkpoint to ensure that the history store is cleaned.
         self.session.checkpoint()

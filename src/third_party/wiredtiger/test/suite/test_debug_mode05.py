@@ -28,9 +28,6 @@
 
 import wiredtiger, wttest
 
-def timestamp_str(t):
-    return '%x' %t
-
 # test_debug_mode05.py
 #     As per WT-5046, the debug table logging settings prevent rollback to
 #     stable in the presence of prepared transactions.
@@ -44,7 +41,7 @@ class test_debug_mode05(wttest.WiredTigerTestCase):
     def test_table_logging_rollback_to_stable(self):
         self.session.create(self.uri, 'key_format=i,value_format=u,log=(enabled=false)')
 
-        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(100))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(100))
         self.session.checkpoint()
 
         # Try doing a normal prepared txn and then rollback to stable.
@@ -53,11 +50,11 @@ class test_debug_mode05(wttest.WiredTigerTestCase):
         for i in range(1, 50):
             cursor[i] = b'a' * 100
         self.session.prepare_transaction(
-            'prepare_timestamp=' + timestamp_str(150))
+            'prepare_timestamp=' + self.timestamp_str(150))
         self.session.timestamp_transaction(
-            'commit_timestamp=' + timestamp_str(200))
+            'commit_timestamp=' + self.timestamp_str(200))
         self.session.timestamp_transaction(
-            'durable_timestamp=' + timestamp_str(250))
+            'durable_timestamp=' + self.timestamp_str(250))
         self.session.commit_transaction()
         cursor.close()
 
@@ -70,11 +67,11 @@ class test_debug_mode05(wttest.WiredTigerTestCase):
         # Therefore, we're specifically not doing any operations here.
         self.session.begin_transaction()
         self.session.prepare_transaction(
-            'prepare_timestamp=' + timestamp_str(300))
+            'prepare_timestamp=' + self.timestamp_str(300))
         self.session.timestamp_transaction(
-            'commit_timestamp=' + timestamp_str(350))
+            'commit_timestamp=' + self.timestamp_str(350))
         self.session.timestamp_transaction(
-            'durable_timestamp=' + timestamp_str(400))
+            'durable_timestamp=' + self.timestamp_str(400))
         self.session.commit_transaction()
 
         # The aforementioned bug resulted in a failure in rollback to stable.
@@ -88,7 +85,7 @@ class test_debug_mode05(wttest.WiredTigerTestCase):
         for i in range(1, 50):
             cursor[i] = b'b' * 100
         self.session.commit_transaction(
-            'commit_timestamp=' + timestamp_str(450))
+            'commit_timestamp=' + self.timestamp_str(450))
         cursor.close()
 
         self.conn.rollback_to_stable()

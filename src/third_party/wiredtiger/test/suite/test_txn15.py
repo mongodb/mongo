@@ -38,7 +38,6 @@ import wttest
 
 class test_txn15(wttest.WiredTigerTestCase, suite_subprocess):
     uri = 'table:test_txn15_1'
-    create_params = 'key_format=i,value_format=i'
     entries = 100
     # Turn on logging for this test.
     def conn_config(self):
@@ -48,6 +47,10 @@ class test_txn15(wttest.WiredTigerTestCase, suite_subprocess):
             'transaction_sync=(enabled=%s),' % self.conn_enable + \
             'transaction_sync=(method=%s),' % self.conn_method
 
+    key_format_values = [
+        ('integer-row', dict(key_format='i')),
+        ('column', dict(key_format='r')),
+    ]
     conn_sync_enabled = [
         ('en_off', dict(conn_enable='false')),
         ('en_on', dict(conn_enable='true')),
@@ -71,7 +74,7 @@ class test_txn15(wttest.WiredTigerTestCase, suite_subprocess):
         ('c_none', dict(commit_sync=None)),
         ('c_off', dict(commit_sync='sync=off')),
     ]
-    scenarios = make_scenarios(conn_sync_enabled, conn_sync_method,
+    scenarios = make_scenarios(key_format_values, conn_sync_enabled, conn_sync_method,
         begin_sync, commit_sync)
 
     # Given the different configuration settings determine if this group
@@ -111,7 +114,8 @@ class test_txn15(wttest.WiredTigerTestCase, suite_subprocess):
         if self.begin_sync != None and self.commit_sync != None:
             return
 
-        self.session.create(self.uri, self.create_params)
+        create_params = 'key_format={},value_format=i'.format(self.key_format)
+        self.session.create(self.uri, create_params)
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         #
@@ -126,7 +130,7 @@ class test_txn15(wttest.WiredTigerTestCase, suite_subprocess):
 
         c = self.session.open_cursor(self.uri, None, None)
         self.session.begin_transaction(self.begin_sync)
-        for i in range(self.entries):
+        for i in range(1, self.entries + 1):
             c[i] = i + 1
         self.session.commit_transaction(self.commit_sync)
         c.close()

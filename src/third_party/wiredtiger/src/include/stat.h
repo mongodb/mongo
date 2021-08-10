@@ -717,7 +717,6 @@ struct __wt_connection_stats {
     int64_t conn_close_blocked_lsm;
     int64_t dhandle_lock_blocked;
     int64_t page_index_slot_ref_blocked;
-    int64_t log_server_sync_blocked;
     int64_t prepared_transition_blocked_page;
     int64_t page_busy_blocked;
     int64_t page_forcible_evict_blocked;
@@ -792,7 +791,6 @@ struct __wt_connection_stats {
     int64_t txn_pinned_timestamp_oldest;
     int64_t txn_timestamp_oldest_active_read;
     int64_t txn_rollback_to_stable_running;
-    int64_t txn_sync;
     int64_t txn_walk_sessions;
     int64_t txn_commit;
     int64_t txn_rollback;

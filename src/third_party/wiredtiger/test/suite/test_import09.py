@@ -100,7 +100,7 @@ class test_import09(test_import_base):
         extlist.extension('encryptors', self.encryptor)
 
     def conn_config(self):
-        return 'cache_size=50MB,log=(enabled),statistics=(all),encryption=(name={})'.format(
+        return 'cache_size=50MB,log=(enabled),encryption=(name={})'.format(
             self.encryptor + self.encryptor_args)
 
     def test_import_table_repair(self):

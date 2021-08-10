@@ -49,13 +49,9 @@ class test_txn07(wttest.WiredTigerTestCase, suite_subprocess):
     ]
 
     types = [
-        ('row', dict(tabletype='row',
-                    create_params = 'key_format=i,value_format=S')),
-    # The commented columnar tests needs to be enabled once rollback to stable for columnar is fixed in (WT-5548).
-    #    ('var', dict(tabletype='var',
-    #                create_params = 'key_format=r,value_format=S')),
-    #    ('fix', dict(tabletype='fix',
-    #                create_params = 'key_format=r,value_format=8t')),
+        ('row', dict(tabletype='row', create_params = 'key_format=i,value_format=S')),
+        ('var', dict(tabletype='var', create_params = 'key_format=r,value_format=S')),
+        ('fix', dict(tabletype='fix', create_params = 'key_format=r,value_format=8t')),
     ]
     op1s = [
         ('trunc-all', dict(op1=('all', 0))),

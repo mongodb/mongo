@@ -33,9 +33,6 @@ from wiredtiger import stat
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-def timestamp_str(t):
-    return '%x' % t
-
 # test_rollback_to_stable11.py
 # Test the rollback to stable is retrieving the proper history store update.
 class test_rollback_to_stable11(test_rollback_to_stable_base):
@@ -60,10 +57,6 @@ class test_rollback_to_stable11(test_rollback_to_stable_base):
     def test_rollback_to_stable(self):
         nrows = 1
 
-        # Prepare transactions for column store table is not yet supported.
-        if self.prepare and self.key_format == 'r':
-            self.skipTest('Prepare transactions for column store table is not yet supported')
-
         # Create a table without logging.
         uri = "table:rollback_to_stable11"
         ds = SimpleDataSet(
@@ -71,8 +64,8 @@ class test_rollback_to_stable11(test_rollback_to_stable_base):
         ds.populate()
 
         # Pin oldest and stable to timestamp 10.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(10) +
-            ',stable_timestamp=' + timestamp_str(10))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
+            ',stable_timestamp=' + self.timestamp_str(10))
 
         value_a = "aaaaa" * 100
         value_b = "bbbbb" * 100
@@ -90,9 +83,9 @@ class test_rollback_to_stable11(test_rollback_to_stable_base):
 
         # Pin stable to timestamp 30 if prepare otherwise 20.
         if self.prepare:
-            self.conn.set_timestamp('stable_timestamp=' + timestamp_str(30))
+            self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(30))
         else:
-            self.conn.set_timestamp('stable_timestamp=' + timestamp_str(20))
+            self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(20))
 
         # Checkpoint to ensure that all the updates are flushed to disk.
         self.session.checkpoint()

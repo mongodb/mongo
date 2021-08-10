@@ -42,7 +42,7 @@ from wiredtiger import stat
 #
 
 class test_checkpoint_snapshot01(wttest.WiredTigerTestCase):
-    conn_config = 'cache_size=50MB,statistics=(fast)'
+    conn_config = 'cache_size=50MB'
 
     # Create a table.
     uri = "table:test_checkpoint_snapshot01"

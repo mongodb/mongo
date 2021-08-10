@@ -29,9 +29,6 @@
 from test_gc01 import test_gc_base
 from wtdataset import SimpleDataSet
 
-def timestamp_str(t):
-    return '%x' % t
-
 # test_gc05.py
 # Verify a locked checkpoint is not removed during garbage collection.
 class test_gc05(test_gc_base):
@@ -52,8 +49,8 @@ class test_gc05(test_gc_base):
         ds.populate()
 
         # Set the oldest and stable timestamps to 10.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(10) +
-            ',stable_timestamp=' + timestamp_str(10))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
+            ',stable_timestamp=' + self.timestamp_str(10))
 
         # Insert values with varying timestamps.
         self.large_updates(uri, value_x, ds, nrows, 20)
@@ -70,8 +67,8 @@ class test_gc05(test_gc_base):
         ckpt_cursor = self.session.open_cursor(uri, None, "checkpoint=checkpoint_one")
 
         # Move the oldest and stable timestamps to 40.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(40) +
-            ',stable_timestamp=' + timestamp_str(40))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(40) +
+            ',stable_timestamp=' + self.timestamp_str(40))
 
         # Insert values with varying timestamps.
         self.large_updates(uri, value_z, ds, nrows, 50)
@@ -79,8 +76,8 @@ class test_gc05(test_gc_base):
         self.large_updates(uri, value_x, ds, nrows, 70)
 
         # Move the oldest and stable timestamps to 70.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(70) +
-            ',stable_timestamp=' + timestamp_str(70))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(70) +
+            ',stable_timestamp=' + self.timestamp_str(70))
 
         # Perform a checkpoint.
         self.session.checkpoint()

@@ -28,9 +28,6 @@
 
 import wiredtiger, wttest
 
-def timestamp_str(t):
-    return '%x' % t
-
 # test_truncate05.py
 # Test various fast truncate visibility scenarios
 class test_truncate05(wttest.WiredTigerTestCase):
@@ -49,7 +46,7 @@ class test_truncate05(wttest.WiredTigerTestCase):
         for i in range(1, 1000):
             self.session.begin_transaction()
             cursor[i] = value1
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(2))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
 
         # Reopen the connection to force all content to disk.
         self.reopen_conn()
@@ -59,17 +56,17 @@ class test_truncate05(wttest.WiredTigerTestCase):
         # Insert a single update at a later timestamp.
         self.session.begin_transaction()
         cursor[500] = value2
-        self.assertEqual(self.session.commit_transaction('commit_timestamp=' + timestamp_str(3)), 0)
+        self.assertEqual(self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(3)), 0)
 
         # Insert a bunch of other content to fill the database and evict the committed update.
         for i in range(1000, 20000):
             self.session.begin_transaction()
             cursor[i] = value1
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(4))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(4))
 
         # Start a transaction with an earlier read timestamp than the commit timestamp of the
         # previous update.
-        self.session.begin_transaction('read_timestamp=' + timestamp_str(2))
+        self.session.begin_transaction('read_timestamp=' + self.timestamp_str(2))
 
         # Truncate from key 1 to 1000.
         start = self.session.open_cursor(uri, None)

@@ -203,8 +203,6 @@ __session_clear(WT_SESSION_IMPL *session)
      */
     memset(session, 0, WT_SESSION_CLEAR_SIZE);
 
-    WT_INIT_LSN(&session->bg_sync_lsn);
-
     session->hazard_inuse = 0;
     session->nhazard = 0;
 }
@@ -808,9 +806,7 @@ __session_log_flush(WT_SESSION *wt_session, const char *config)
         WT_ERR_MSG(session, EINVAL, "logging not enabled");
 
     WT_ERR(__wt_config_gets_def(session, cfg, "sync", 0, &cval));
-    if (WT_STRING_MATCH("background", cval.str, cval.len))
-        flags = WT_LOG_BACKGROUND;
-    else if (WT_STRING_MATCH("off", cval.str, cval.len))
+    if (WT_STRING_MATCH("off", cval.str, cval.len))
         flags = WT_LOG_FLUSH;
     else if (WT_STRING_MATCH("on", cval.str, cval.len))
         flags = WT_LOG_FSYNC;
@@ -1783,114 +1779,6 @@ err:
 }
 
 /*
- * __transaction_sync_run_chk --
- *     Check to decide if the transaction sync call should continue running.
- */
-static bool
-__transaction_sync_run_chk(WT_SESSION_IMPL *session)
-{
-    WT_CONNECTION_IMPL *conn;
-
-    conn = S2C(session);
-
-    return (FLD_ISSET(conn->server_flags, WT_CONN_SERVER_LOG));
-}
-
-/*
- * __session_transaction_sync --
- *     WT_SESSION->transaction_sync method.
- */
-static int
-__session_transaction_sync(WT_SESSION *wt_session, const char *config)
-{
-    WT_CONFIG_ITEM cval;
-    WT_CONNECTION_IMPL *conn;
-    WT_DECL_RET;
-    WT_LOG *log;
-    WT_SESSION_IMPL *session;
-    uint64_t remaining_usec, timeout_ms, waited_ms;
-    uint64_t time_start, time_stop;
-
-    session = (WT_SESSION_IMPL *)wt_session;
-    SESSION_API_CALL_PREPARE_NOT_ALLOWED(session, transaction_sync, config, cfg);
-    WT_STAT_CONN_INCR(session, txn_sync);
-
-    conn = S2C(session);
-    WT_ERR(__wt_txn_context_check(session, false));
-
-    /*
-     * If logging is not enabled there is nothing to do.
-     */
-    if (!FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))
-        WT_ERR_MSG(session, EINVAL, "logging not enabled");
-
-    log = conn->log;
-
-    /*
-     * If there is no background sync LSN in this session, there is nothing to do.
-     */
-    if (WT_IS_INIT_LSN(&session->bg_sync_lsn))
-        goto err;
-
-    /*
-     * If our LSN is smaller than the current sync LSN then our transaction is stable. We're done.
-     */
-    if (__wt_log_cmp(&session->bg_sync_lsn, &log->sync_lsn) <= 0)
-        goto err;
-
-    /*
-     * Our LSN is not yet stable. Wait and check again depending on the timeout.
-     */
-    WT_ERR(__wt_config_gets_def(session, cfg, "timeout_ms", (int)WT_SESSION_BG_SYNC_MSEC, &cval));
-    timeout_ms = (uint64_t)cval.val;
-
-    if (timeout_ms == 0)
-        WT_ERR(ETIMEDOUT);
-
-    /*
-     * Keep checking the LSNs until we find it is stable or we reach our timeout, or there's some
-     * other reason to quit.
-     */
-    time_start = __wt_clock(session);
-    while (__wt_log_cmp(&session->bg_sync_lsn, &log->sync_lsn) > 0) {
-        if (!__transaction_sync_run_chk(session))
-            WT_ERR(ETIMEDOUT);
-
-        __wt_cond_signal(session, conn->log_file_cond);
-        time_stop = __wt_clock(session);
-        waited_ms = WT_CLOCKDIFF_MS(time_stop, time_start);
-        if (waited_ms < timeout_ms) {
-            remaining_usec = (timeout_ms - waited_ms) * WT_THOUSAND;
-            __wt_cond_wait(session, log->log_sync_cond, remaining_usec, __transaction_sync_run_chk);
-        } else
-            WT_ERR(ETIMEDOUT);
-    }
-
-err:
-    API_END_RET(session, ret);
-}
-
-/*
- * __session_transaction_sync_readonly --
- *     WT_SESSION->transaction_sync method; readonly version.
- */
-static int
-__session_transaction_sync_readonly(WT_SESSION *wt_session, const char *config)
-{
-    WT_DECL_RET;
-    WT_SESSION_IMPL *session;
-
-    WT_UNUSED(config);
-
-    session = (WT_SESSION_IMPL *)wt_session;
-    SESSION_API_CALL_NOCONF(session, transaction_sync);
-
-    ret = __wt_session_notsup(session);
-err:
-    API_END_RET(session, ret);
-}
-
-/*
  * __session_checkpoint --
  *     WT_SESSION->checkpoint method.
  */
@@ -2009,8 +1897,7 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
         __session_truncate, __session_upgrade, __session_verify, __session_begin_transaction,
         __session_commit_transaction, __session_prepare_transaction, __session_reset_snapshot,
         __session_rollback_transaction, __session_timestamp_transaction, __session_query_timestamp,
-        __session_checkpoint, __session_transaction_pinned_range, __session_transaction_sync,
-        __wt_session_breakpoint},
+        __session_checkpoint, __session_transaction_pinned_range, __wt_session_breakpoint},
       stds_readonly = {NULL, NULL, __session_close, __session_reconfigure, __session_flush_tier,
         __wt_session_strerror, __session_open_cursor, __session_alter_readonly,
         __session_create_readonly, __wt_session_compact_readonly, __session_drop_readonly,
@@ -2020,8 +1907,7 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
         __session_begin_transaction, __session_commit_transaction,
         __session_prepare_transaction_readonly, __session_reset_snapshot,
         __session_rollback_transaction, __session_timestamp_transaction, __session_query_timestamp,
-        __session_checkpoint_readonly, __session_transaction_pinned_range,
-        __session_transaction_sync_readonly, __wt_session_breakpoint};
+        __session_checkpoint_readonly, __session_transaction_pinned_range, __wt_session_breakpoint};
     WT_DECL_RET;
     WT_SESSION_IMPL *session, *session_ret;
     uint32_t i;

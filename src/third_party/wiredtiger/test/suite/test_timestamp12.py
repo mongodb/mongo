@@ -33,9 +33,6 @@
 import shutil, os, wiredtiger, wttest
 from wtscenario import make_scenarios
 
-def timestamp_str(t):
-    return '%x' % t
-
 class test_timestamp12(wttest.WiredTigerTestCase):
     conn_config = 'config_base=false,create,log=(enabled)'
     session_config = 'isolation=snapshot'
@@ -85,10 +82,10 @@ class test_timestamp12(wttest.WiredTigerTestCase):
             c_op[i] = 1
             c_coll[i] = 1
             self.session.commit_transaction(
-              'commit_timestamp=' + timestamp_str(i))
+              'commit_timestamp=' + self.timestamp_str(i))
         # Set the oldest and stable timestamp to the end.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(nentries-1) +
-        ',stable_timestamp=' + timestamp_str(nentries-1))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(nentries-1) +
+        ',stable_timestamp=' + self.timestamp_str(nentries-1))
 
         # Add more data but don't advance the stable timestamp.
         for i in second_range:
@@ -97,7 +94,7 @@ class test_timestamp12(wttest.WiredTigerTestCase):
             c_coll[i] = 1
             self.pr("i: " + str(i))
             self.session.commit_transaction(
-              'commit_timestamp=' + timestamp_str(i))
+              'commit_timestamp=' + self.timestamp_str(i))
 
         # Close and reopen the connection. We cannot use reopen_conn because
         # we want to test the specific close configuration string.

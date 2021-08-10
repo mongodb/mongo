@@ -30,9 +30,6 @@
 import time, wiredtiger, wttest, unittest
 from wiredtiger import stat
 
-def timestamp_str(t):
-    return '%x' % t
-
 # test_search_near01.py
 # Test various prefix search near scenarios.
 class test_search_near01(wttest.WiredTigerTestCase):

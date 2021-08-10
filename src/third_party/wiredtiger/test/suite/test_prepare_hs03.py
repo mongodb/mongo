@@ -38,9 +38,6 @@ import os, shutil
 from wtscenario import make_scenarios
 from wiredtiger import stat
 
-def timestamp_str(t):
-    return '%x' % t
-
 # test_prepare_hs03.py
 # test to ensure salvage, verify & simulating crash are working for prepared transactions.
 class test_prepare_hs03(wttest.WiredTigerTestCase):
@@ -51,10 +48,17 @@ class test_prepare_hs03(wttest.WiredTigerTestCase):
     # Create a small table.
     uri = "table:test_prepare_hs03"
 
-    scenarios = make_scenarios([
+    corrupt_values = [
         ('corrupt_table', dict(corrupt=True)),
         ('dont_corrupt_table', dict(corrupt=False))
-    ])
+    ]
+
+    key_format_values = [
+        ('column', dict(key_format='r')),
+        ('string-row', dict(key_format='S')),
+    ]
+
+    scenarios = make_scenarios(corrupt_values, key_format_values)
 
     def corrupt_table(self):
         tablename="test_prepare_hs03.wt"
@@ -96,12 +100,12 @@ class test_prepare_hs03(wttest.WiredTigerTestCase):
             cursor.set_key(ds.key(nrows + i))
             cursor.set_value(commit_value)
             self.assertEquals(cursor.insert(), 0)
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(1))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
         cursor.close()
 
         # Set the stable/oldest timstamps.
-        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(1))
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(1))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(1))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
 
         # Corrupt the table, call salvage to recover data from the corrupted table and call verify
         self.corrupt_salvage_verify()
@@ -124,7 +128,7 @@ class test_prepare_hs03(wttest.WiredTigerTestCase):
                 cursors[j].set_key(ds.key(nrows + i))
                 cursors[j].set_value(prepare_value)
                 self.assertEquals(cursors[j].insert(), 0)
-            sessions[j].prepare_transaction('prepare_timestamp=' + timestamp_str(4))
+            sessions[j].prepare_transaction('prepare_timestamp=' + self.timestamp_str(4))
 
         hs_writes = self.get_stat(stat.conn.cache_write_hs) - hs_writes_start
 
@@ -133,7 +137,7 @@ class test_prepare_hs03(wttest.WiredTigerTestCase):
 
         # Test if we can read prepared updates from the history store.
         cursor = self.session.open_cursor(self.uri)
-        self.session.begin_transaction('read_timestamp=' + timestamp_str(3))
+        self.session.begin_transaction('read_timestamp=' + self.timestamp_str(3))
         for i in range(1, nsessions * nkeys):
             cursor.set_key(ds.key(nrows + i))
             # The search should pass.
@@ -156,7 +160,7 @@ class test_prepare_hs03(wttest.WiredTigerTestCase):
         # Finally, search for the keys inserted with commit timestamp
         cursor = self.session.open_cursor(self.uri)
         self.pr('Read Keys')
-        self.session.begin_transaction('read_timestamp=' + timestamp_str(4))
+        self.session.begin_transaction('read_timestamp=' + self.timestamp_str(4))
         for i in range(1, nkeys):
             cursor.set_key(ds.key(nrows + i))
             # The search should pass
@@ -177,7 +181,7 @@ class test_prepare_hs03(wttest.WiredTigerTestCase):
         cursor = self.session.open_cursor(self.uri)
 
         # Search the keys inserted with commit timestamp after crash
-        self.session.begin_transaction('read_timestamp=' + timestamp_str(4))
+        self.session.begin_transaction('read_timestamp=' + self.timestamp_str(4))
         for i in range(1, nkeys):
             cursor.set_key(ds.key(nrows + i))
             # The search should pass
@@ -195,7 +199,7 @@ class test_prepare_hs03(wttest.WiredTigerTestCase):
 
     def test_prepare_hs(self):
         nrows = 100
-        ds = SimpleDataSet(self, self.uri, nrows, key_format="S", value_format='u')
+        ds = SimpleDataSet(self, self.uri, nrows, key_format=self.key_format, value_format='u')
         ds.populate()
         bigvalue = b"aaaaa" * 100
 

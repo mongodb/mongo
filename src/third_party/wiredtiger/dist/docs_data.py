@@ -11,6 +11,9 @@ class ArchDocPage:
 # List of all architecture subsections
 ##########################################
 arch_doc_pages = [
+    ArchDocPage('arch-backup',
+        ['WT_CURSOR_BACKUP'],
+        ['src/cursor/cur_backup.c', 'src/cursor/cur_backup_incr.c']),
     ArchDocPage('arch-block',
         ['WT_BLOCK', 'WT_BLOCK_CKPT', 'WT_BLOCK_DESC', 'WT_BLOCK_HEADER',
          'WT_BM', 'WT_EXTLIST'],
@@ -24,9 +27,6 @@ arch_doc_pages = [
         ['src/block/block_ckpt.c', 'src/block/block_ckpt_scan.c',
          'src/conn/conn_ckpt.c', 'src/meta/meta_ckpt.c',
          'src/txn/txn_ckpt.c']),
-    ArchDocPage('arch-column',
-        ['WT_BTREE'],
-        ['src/include/btree.h']),
     ArchDocPage('arch-cursor',
         ['WT_CURSOR', 'WT_CURSOR_BACKUP', 'WT_CURSOR_BTREE', 'WT_CURSOR_BULK',
          'WT_CURSOR_DATA_SOURCE', 'WT_CURSOR_DUMP', 'WT_CURSOR_INDEX',
@@ -67,7 +67,7 @@ arch_doc_pages = [
     ArchDocPage('arch-python',
         [],
         ['lang/python/']),
-    ArchDocPage('arch-row',
+    ArchDocPage('arch-row-column',
         ['WT_BTREE'],
         ['src/include/btree.h']),
     ArchDocPage('arch-rts',

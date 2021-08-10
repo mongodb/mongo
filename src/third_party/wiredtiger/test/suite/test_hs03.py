@@ -32,9 +32,6 @@ from wiredtiger import stat
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-def timestamp_str(t):
-    return '%x' % t
-
 # test_hs03.py
 # Ensure checkpoints don't read too unnecessary history store entries.
 class test_hs03(wttest.WiredTigerTestCase):
@@ -43,8 +40,8 @@ class test_hs03(wttest.WiredTigerTestCase):
     session_config = 'isolation=snapshot'
     key_format_values = [
         ('column', dict(key_format='r')),
-        ('integer', dict(key_format='i')),
-        ('string', dict(key_format='S'))
+        ('integer-row', dict(key_format='i')),
+        ('string-row', dict(key_format='S'))
     ]
     scenarios = make_scenarios(key_format_values)
 
@@ -61,7 +58,7 @@ class test_hs03(wttest.WiredTigerTestCase):
         for i in range(nrows + 1, nrows + nops + 1):
             session.begin_transaction()
             cursor[ds.key(i)] = value
-            session.commit_transaction('commit_timestamp=' + timestamp_str(i))
+            session.commit_transaction('commit_timestamp=' + self.timestamp_str(i))
         cursor.close()
 
     def test_checkpoint_hs_reads(self):
@@ -81,7 +78,7 @@ class test_hs03(wttest.WiredTigerTestCase):
 
         # Check to see the history store working with old timestamp.
         bigvalue2 = b"ddddd" * 100
-        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(1))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(1))
         hs_writes_start = self.get_stat(stat.conn.cache_write_hs)
         self.large_updates(self.session, uri, bigvalue2, ds, nrows, 10000)
 
@@ -91,7 +88,7 @@ class test_hs03(wttest.WiredTigerTestCase):
         self.assertGreaterEqual(hs_writes, 0)
 
         for ts in range(2, 4):
-            self.conn.set_timestamp('stable_timestamp=' + timestamp_str(ts))
+            self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(ts))
 
             # Now just update one record and checkpoint again.
             self.large_updates(self.session, uri, bigvalue2, ds, nrows, 1)

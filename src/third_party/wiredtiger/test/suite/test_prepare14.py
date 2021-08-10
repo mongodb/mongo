@@ -28,10 +28,8 @@
 
 import wttest
 from wiredtiger import WT_NOTFOUND
+from wtdataset import simple_key
 from wtscenario import make_scenarios
-
-def timestamp_str(t):
-    return '%x' % t
 
 # test_prepare14.py
 # Test that the transaction visibility of an on-disk update
@@ -61,37 +59,34 @@ class test_prepare14(wttest.WiredTigerTestCase):
         return config
 
     def test_prepare14(self):
-        # Prepare transactions for column store table is not yet supported.
-        if self.key_format == 'r':
-            self.skipTest('Prepare transactions for column store table is not yet supported')
-
         # Create a table without logging.
         uri = "table:prepare14"
-        create_config = 'allocation_size=512,key_format=S,value_format=S'
+        create_config = 'allocation_size=512,key_format={},value_format=S'.format(self.key_format)
         self.session.create(uri, create_config)
 
         # Pin oldest and stable timestamps to 10.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(10) +
-            ',stable_timestamp=' + timestamp_str(10))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
+            ',stable_timestamp=' + self.timestamp_str(10))
 
         value = 'a'
 
-        # Perform several updates and removes.
+        # Perform an update and a remove.
         s = self.conn.open_session()
         cursor = s.open_cursor(uri)
         s.begin_transaction()
-        cursor[str(0)] = value
-        cursor.set_key(str(0))
+        key = simple_key(cursor, 1)
+        cursor[key] = value
+        cursor.set_key(key)
         cursor.remove()
         cursor.close()
-        s.prepare_transaction('prepare_timestamp=' + timestamp_str(20))
+        s.prepare_transaction('prepare_timestamp=' + self.timestamp_str(20))
 
         # Configure debug behavior on a cursor to evict the page positioned on when the reset API is used.
         evict_cursor = self.session.open_cursor(uri, None, "debug=(release_evict)")
 
         # Search for the key so we position our cursor on the page that we want to evict.
         self.session.begin_transaction("ignore_prepare = true")
-        evict_cursor.set_key(str(0))
+        evict_cursor.set_key(key)
         self.assertEquals(evict_cursor.search(), WT_NOTFOUND)
         evict_cursor.reset()
         evict_cursor.close()
@@ -99,6 +94,6 @@ class test_prepare14(wttest.WiredTigerTestCase):
 
         self.session.begin_transaction("ignore_prepare = true")
         cursor2 = self.session.open_cursor(uri)
-        cursor2.set_key(str(0))
+        cursor2.set_key(key)
         self.assertEquals(cursor2.search(), WT_NOTFOUND)
         self.session.commit_transaction()

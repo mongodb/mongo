@@ -30,9 +30,6 @@ import string, os, sys, random
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
 
-def timestamp_str(t):
-    return '%x' % t
-
 # test_util01.py
 #    Utilities: wt dump, as well as the dump cursor
 class test_util01(wttest.WiredTigerTestCase, suite_subprocess):
@@ -164,7 +161,7 @@ class test_util01(wttest.WiredTigerTestCase, suite_subprocess):
                 expectout.write(self.dumpstr(key, hexoutput))
                 expectout.write(self.dumpstr(value, hexoutput))
         if commit_timestamp is not None:
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(commit_timestamp))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(commit_timestamp))
 
     def dump(self, usingapi, hexoutput, commit_timestamp, read_timestamp):
         params = self.table_config()

@@ -29,9 +29,6 @@
 import time, wiredtiger, wttest, unittest
 from wtscenario import make_scenarios
 
-def timestamp_str(t):
-    return '%x' % t
-
 # test_hs18.py
 # Test various older reader scenarios
 class test_hs18(wttest.WiredTigerTestCase):
@@ -39,7 +36,7 @@ class test_hs18(wttest.WiredTigerTestCase):
     session_config = 'isolation=snapshot'
     key_format_values = [
         ('column', dict(key_format='r')),
-        ('string', dict(key_format='S'))
+        ('string-row', dict(key_format='S'))
     ]
     scenarios = make_scenarios(key_format_values)
 
@@ -76,7 +73,7 @@ class test_hs18(wttest.WiredTigerTestCase):
         # Insert an update at timestamp 3
         self.session.begin_transaction()
         cursor[self.create_key(1)] = value0
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(3))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(3))
 
         # Start a long running transaction which could see update 0.
         session2.begin_transaction()
@@ -85,12 +82,12 @@ class test_hs18(wttest.WiredTigerTestCase):
         # Insert an update at timestamp 5
         self.session.begin_transaction()
         cursor[self.create_key(1)] = value1
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(5))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(5))
 
         # Insert another update at timestamp 10
         self.session.begin_transaction()
         cursor[self.create_key(1)] = value2
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(10))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(10))
 
         # Insert a bunch of contents to fill the cache
         for i in range(2000, 10000):
@@ -106,7 +103,7 @@ class test_hs18(wttest.WiredTigerTestCase):
         # Commit an update with timestamp 15
         self.session.begin_transaction()
         cursor[self.create_key(1)] = value5
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(15))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(15))
 
         # Check our value is still correct.
         self.check_value(cursor2, value0)
@@ -122,11 +119,6 @@ class test_hs18(wttest.WiredTigerTestCase):
 
     # Test that we don't get the wrong value if we read with a timestamp originally.
     def test_read_timestamp_weirdness(self):
-        # FIXME-WT-7136: Mixed mode transactions not supported for column store scenario.
-        # Re-enable once complete.
-        if self.key_format == 'r':
-            return
-
         uri = 'table:test_hs18'
         self.session.create(uri, 'key_format={},value_format=S'.format(self.key_format))
         cursor = self.session.open_cursor(uri)
@@ -144,20 +136,20 @@ class test_hs18(wttest.WiredTigerTestCase):
         # Insert an update at timestamp 3
         self.session.begin_transaction()
         cursor[self.create_key(1)] = value1
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(3))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(3))
 
         # Start a long running transaction which could see update 0.
-        session2.begin_transaction('read_timestamp=' + timestamp_str(5))
+        session2.begin_transaction('read_timestamp=' + self.timestamp_str(5))
         # Check our value is still correct.
         self.check_value(cursor2, value1)
 
         # Insert another update at timestamp 10
         self.session.begin_transaction()
         cursor[self.create_key(1)] = value2
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(10))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(10))
 
         # Start a long running transaction which could see update 0.
-        session3.begin_transaction('read_timestamp=' + timestamp_str(5))
+        session3.begin_transaction('read_timestamp=' + self.timestamp_str(5))
         # Check our value is still correct.
         self.check_value(cursor3, value1)
 
@@ -175,7 +167,7 @@ class test_hs18(wttest.WiredTigerTestCase):
         # Commit an update with timestamp 15
         self.session.begin_transaction()
         cursor[self.create_key(1)] = value5
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(15))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(15))
 
         # Check our value is still correct.
         self.check_value(cursor2, value1)
@@ -219,12 +211,12 @@ class test_hs18(wttest.WiredTigerTestCase):
         # Insert an update at timestamp 5
         self.session.begin_transaction()
         cursor[self.create_key(1)] = value1
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(5))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(5))
 
         # Insert another update at timestamp 10
         self.session.begin_transaction()
         cursor[self.create_key(1)] = value2
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(10))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(10))
 
         # Insert a bunch of other contents to trigger eviction
         for i in range(2, 10000):
@@ -251,11 +243,6 @@ class test_hs18(wttest.WiredTigerTestCase):
 
     # Test older readers for each of the updates moved to the history store.
     def test_multiple_older_readers(self):
-        # FIXME-WT-7136: Mixed mode transactions not supported for column store scenario.
-        # Re-enable once complete.
-        if self.key_format == 'r':
-            return
-
         uri = 'table:test_multiple_older_readers'
         self.session.create(uri, 'key_format={},value_format=S'.format(self.key_format))
         cursor = self.session.open_cursor(uri)
@@ -274,7 +261,7 @@ class test_hs18(wttest.WiredTigerTestCase):
         # Insert an update at timestamp 3
         self.session.begin_transaction()
         cursor[self.create_key(1)] = values[0]
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(3))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(3))
 
         # Start a transaction that will see update 0.
         self.start_txn(sessions, cursors, values, 0)
@@ -282,7 +269,7 @@ class test_hs18(wttest.WiredTigerTestCase):
         # Insert an update at timestamp 5
         self.session.begin_transaction()
         cursor[self.create_key(1)] = values[1]
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(5))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(5))
 
         # Start a transaction that will see update 1.
         self.start_txn(sessions, cursors, values, 1)
@@ -290,7 +277,7 @@ class test_hs18(wttest.WiredTigerTestCase):
         # Insert another update at timestamp 10
         self.session.begin_transaction()
         cursor[self.create_key(1)] = values[2]
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(10))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(10))
 
         # Start a transaction that will see update 2.
         self.start_txn(sessions, cursors, values, 2)
@@ -312,7 +299,7 @@ class test_hs18(wttest.WiredTigerTestCase):
         # Commit an update with timestamp 15
         self.session.begin_transaction()
         cursor[self.create_key(1)] = values[4]
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(15))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(15))
 
         # Insert a bunch of other contents to trigger eviction
         for i in range(10001, 20000):
@@ -328,11 +315,6 @@ class test_hs18(wttest.WiredTigerTestCase):
             cursors[i].reset()
 
     def test_multiple_older_readers_with_multiple_mixed_mode(self):
-        # FIXME-WT-7136: Mixed mode transactions not supported for column store scenario.
-        # Re-enable once complete.
-        if self.key_format == 'r':
-            return
-
         uri = 'table:test_multiple_older_readers'
         self.session.create(uri, 'key_format={},value_format=S'.format(self.key_format))
         cursor = self.session.open_cursor(uri)
@@ -351,7 +333,7 @@ class test_hs18(wttest.WiredTigerTestCase):
         # Insert an update at timestamp 3
         self.session.begin_transaction()
         cursor[self.create_key(1)] = values[0]
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(3))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(3))
 
         # Start a transaction that will see update 0.
         self.start_txn(sessions, cursors, values, 0)
@@ -359,7 +341,7 @@ class test_hs18(wttest.WiredTigerTestCase):
         # Insert an update at timestamp 5
         self.session.begin_transaction()
         cursor[self.create_key(1)] = values[1]
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(5))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(5))
 
         # Start a transaction that will see update 1.
         self.start_txn(sessions, cursors, values, 1)
@@ -367,7 +349,7 @@ class test_hs18(wttest.WiredTigerTestCase):
         # Insert another update at timestamp 10
         self.session.begin_transaction()
         cursor[self.create_key(1)] = values[2]
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(10))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(10))
 
         # Start a transaction that will see update 2.
         self.start_txn(sessions, cursors, values, 2)
@@ -389,7 +371,7 @@ class test_hs18(wttest.WiredTigerTestCase):
         # Commit an update with timestamp 5
         self.session.begin_transaction()
         cursor[self.create_key(1)] = values[4]
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(5))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(5))
 
         # Start a transaction that will see update 4.
         self.start_txn(sessions, cursors, values, 4)
@@ -397,7 +379,7 @@ class test_hs18(wttest.WiredTigerTestCase):
         # Commit an update with timestamp 10
         self.session.begin_transaction()
         cursor[self.create_key(1)] = values[5]
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(10))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(10))
 
         # Start a transaction that will see update 5.
         self.start_txn(sessions, cursors, values, 5)
@@ -405,7 +387,7 @@ class test_hs18(wttest.WiredTigerTestCase):
         # Commit an update with timestamp 15
         self.session.begin_transaction()
         cursor[self.create_key(1)] = values[6]
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(15))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(15))
 
         # Start a transaction that will see update 6.
         self.start_txn(sessions, cursors, values, 6)
@@ -434,7 +416,7 @@ class test_hs18(wttest.WiredTigerTestCase):
         # Commit an update with timestamp 5
         self.session.begin_transaction()
         cursor[self.create_key(1)] = values[8]
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(5))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(5))
 
         # Insert a bunch of other contents to trigger eviction
         for i in range(10001, 20000):
@@ -450,16 +432,13 @@ class test_hs18(wttest.WiredTigerTestCase):
             cursors[i].reset()
 
     def test_modifies(self):
-        # FIXME-WT-7136: Modify not supported for column store scenario.
-        # Re-enable once complete.
-        if self.key_format == 'r':
-            return
-
         uri = 'table:test_modifies'
         self.session.create(uri, 'key_format={},value_format=S'.format(self.key_format))
         cursor = self.session.open_cursor(uri)
         session_ts_reader = self.setUpSessionOpen(self.conn)
         cursor_ts_reader = session_ts_reader.open_cursor(uri)
+
+        self.skipTest('Skip this part of test_hs18 until WT-7931 is resolved')
 
         # The ID of the session corresponds the value it should see.
         sessions = []
@@ -480,7 +459,7 @@ class test_hs18(wttest.WiredTigerTestCase):
         # Insert an update at timestamp 3
         self.session.begin_transaction()
         cursor[self.create_key(1)] = values[0]
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(3))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(3))
 
         # Start a long running transaction which could see update 0.
         self.start_txn(sessions, cursors, values, 0)
@@ -489,7 +468,7 @@ class test_hs18(wttest.WiredTigerTestCase):
         self.session.begin_transaction()
         cursor.set_key(self.create_key(1))
         cursor.modify([wiredtiger.Modify('a', 0, 0)])
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(5))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(5))
 
         session_ts_reader.begin_transaction('read_timestamp=3')
         self.check_value(cursor_ts_reader, values[0])
@@ -501,7 +480,7 @@ class test_hs18(wttest.WiredTigerTestCase):
         self.session.begin_transaction()
         cursor.set_key(self.create_key(1))
         cursor.modify([wiredtiger.Modify('b', 0, 0)])
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(10))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(10))
 
         # Start a long running transaction which could see modify 1.
         self.start_txn(sessions, cursors, values, 2)
@@ -524,7 +503,7 @@ class test_hs18(wttest.WiredTigerTestCase):
         self.session.begin_transaction()
         cursor.set_key(self.create_key(1))
         cursor.modify([wiredtiger.Modify('e', 0, 0)])
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(15))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(15))
 
         # Start a long running transaction which could see modify 2.
         sessions[4].begin_transaction()

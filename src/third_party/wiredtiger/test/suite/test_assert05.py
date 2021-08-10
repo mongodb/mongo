@@ -32,9 +32,7 @@
 
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
-
-def timestamp_str(t):
-    return '%x' % t
+from wtscenario import make_scenarios
 
 class test_assert05(wttest.WiredTigerTestCase, suite_subprocess):
     base = 'assert05'
@@ -44,11 +42,16 @@ class test_assert05(wttest.WiredTigerTestCase, suite_subprocess):
     uri_def = base_uri + '.def.wt'
     uri_never = base_uri + '.never.wt'
     uri_none = base_uri + '.none.wt'
-    cfg = 'key_format=S,value_format=S,'
     cfg_always = 'verbose=(write_timestamp=true),write_timestamp_usage=always,assert=(write_timestamp=on)'
     cfg_def = ''
     cfg_never = 'write_timestamp_usage=never,assert=(write_timestamp=on)'
     cfg_none = 'assert=(write_timestamp=off)'
+
+    key_format_values = [
+        ('column', dict(key_format='r', usestrings=False)),
+        ('string-row', dict(key_format='S', usestrings=True))
+    ]
+    scenarios = make_scenarios(key_format_values)
 
     count = 1
     #
@@ -57,18 +60,18 @@ class test_assert05(wttest.WiredTigerTestCase, suite_subprocess):
     #
     def insert_check(self, uri, use_ts):
         c = self.session.open_cursor(uri)
-        key = 'key' + str(self.count)
+        key = 'key' + str(self.count) if self.usestrings else self.count
         val = 'value' + str(self.count)
 
         # Commit with a timestamp
         self.session.begin_transaction()
         c[key] = val
         self.session.prepare_transaction(
-            'prepare_timestamp=' + timestamp_str(self.count))
+            'prepare_timestamp=' + self.timestamp_str(self.count))
         self.session.timestamp_transaction(
-            'commit_timestamp=' + timestamp_str(self.count))
+            'commit_timestamp=' + self.timestamp_str(self.count))
         self.session.timestamp_transaction(
-            'durable_timestamp=' + timestamp_str(self.count))
+            'durable_timestamp=' + self.timestamp_str(self.count))
         # All settings other than never should commit successfully
         if (use_ts != 'never'):
             self.session.commit_transaction()
@@ -86,17 +89,17 @@ class test_assert05(wttest.WiredTigerTestCase, suite_subprocess):
         self.count += 1
 
         # Commit without a timestamp
-        key = 'key' + str(self.count)
+        key = 'key' + str(self.count) if self.usestrings else self.count
         val = 'value' + str(self.count)
         c = self.session.open_cursor(uri)
         self.session.begin_transaction()
         c[key] = val
         if (use_ts == 'always'):
             self.session.prepare_transaction(
-                'prepare_timestamp=' + timestamp_str(self.count))
+                'prepare_timestamp=' + self.timestamp_str(self.count))
 
         self.session.timestamp_transaction(
-            'commit_timestamp=' + timestamp_str(self.count))
+            'commit_timestamp=' + self.timestamp_str(self.count))
         # All settings other than always should commit successfully
         if (use_ts != 'always' and use_ts != 'never'):
             self.session.commit_transaction()
@@ -114,11 +117,13 @@ class test_assert05(wttest.WiredTigerTestCase, suite_subprocess):
         c.close()
 
     def test_durable_timestamp(self):
+        cfg = 'key_format={},value_format=S,'.format(self.key_format)
+
         # Create a data item at a timestamp
-        self.session.create(self.uri_always, self.cfg + self.cfg_always)
-        self.session.create(self.uri_def, self.cfg + self.cfg_def)
-        self.session.create(self.uri_never, self.cfg + self.cfg_never)
-        self.session.create(self.uri_none, self.cfg + self.cfg_none)
+        self.session.create(self.uri_always, cfg + self.cfg_always)
+        self.session.create(self.uri_def, cfg + self.cfg_def)
+        self.session.create(self.uri_never, cfg + self.cfg_never)
+        self.session.create(self.uri_none, cfg + self.cfg_none)
 
         # Check inserting into each table
         self.insert_check(self.uri_always, 'always')

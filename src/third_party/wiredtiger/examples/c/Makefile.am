@@ -25,7 +25,6 @@ noinst_PROGRAMS = \
 	ex_schema \
 	ex_smoke \
 	ex_stat \
-	ex_sync \
 	ex_thread
 
 ex_encrypt_LDFLAGS = -rdynamic

@@ -84,11 +84,10 @@ class test_encrypt08(wttest.WiredTigerTestCase):
     def test_encrypt(self):
         sysconfig = 'encryption=(name=sodium,{0}),'.format(self.sys_encrypt)
 
-        with self.expectedStdoutPattern('Failed wiredtiger_open'):
-            self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-                    lambda:
-                       self.reopen_conn(config = sysconfig),
-                 self.msg)
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+                lambda:
+                   self.reopen_conn(config = sysconfig),
+             self.msg)
 
 if __name__ == '__main__':
     wttest.run()

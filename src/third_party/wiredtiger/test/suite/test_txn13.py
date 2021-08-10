@@ -43,14 +43,20 @@ class test_txn13(wttest.WiredTigerTestCase, suite_subprocess):
     # We use 8 ops here to get around the 10 operation check done by WiredTiger to determine if
     # a transaction is blocking or not.
     nops = 8
-    create_params = 'key_format=i,value_format=S'
+
+    key_format_values = [
+        ('integer-row', dict(key_format='i')),
+        ('column', dict(key_format='r')),
+    ]
 
     # The 1gb, 2gb and 4gb scenario names refer to the valuesize * nops.
-    scenarios = make_scenarios([
+    size_values = [
         ('1gb', dict(expect_err=False, valuesize=134217728)),
         ('2gb', dict(expect_err=False, valuesize=268435456)),
         ('4gb', dict(expect_err=True, valuesize=536870912))
-    ])
+    ]
+
+    scenarios = make_scenarios(key_format_values, size_values)
 
     # Turn on logging for this test.
     def conn_config(self):
@@ -59,9 +65,11 @@ class test_txn13(wttest.WiredTigerTestCase, suite_subprocess):
 
     @wttest.longtest('txn tests with huge values')
     def test_large_values(self):
-        # print "Creating %s with config '%s'" % (self.uri, self.create_params)
+        create_params = 'key_format={},value_format=S'.format(self.key_format)
+
+        # print "Creating %s with config '%s'" % (self.uri, create_params)
         # print "Running with %d" % (self.valuesize)
-        self.session.create(self.uri, self.create_params)
+        self.session.create(self.uri, create_params)
         c = self.session.open_cursor(self.uri, None)
 
         # We want to test very large values.  Generate 'nops' records within
@@ -70,7 +78,7 @@ class test_txn13(wttest.WiredTigerTestCase, suite_subprocess):
 
         gotException = False
         self.session.begin_transaction()
-        for k in range(self.nops):
+        for k in range(1, self.nops + 1):
             value = valuepfx + str(k)
             c[k] = value
 

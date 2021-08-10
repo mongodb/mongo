@@ -1385,12 +1385,10 @@ methods = {
 'WT_SESSION.log_flush' : Method([
     Config('sync', 'on', r'''
         forcibly flush the log and wait for it to achieve the synchronization
-        level specified.  The \c background setting initiates a background
-        synchronization intended to be used with a later call to
-        WT_SESSION::transaction_sync.  The \c off setting forces any
+        level specified.  The \c off setting forces any
         buffered log records to be written to the file system.  The
         \c on setting forces log records to be written to the storage device''',
-        choices=['background', 'off', 'on']),
+        choices=['off', 'on']),
 ]),
 
 'WT_SESSION.log_printf' : Method([]),
@@ -1581,14 +1579,6 @@ methods = {
 ]),
 
 'WT_SESSION.strerror' : Method([]),
-'WT_SESSION.transaction_sync' : Method([
-    Config('timeout_ms', '1200000', # !!! Must match WT_SESSION_BG_SYNC_MSEC
-        r'''
-        maximum amount of time to wait for background sync to complete in
-        milliseconds.  A value of zero disables the timeout and returns
-        immediately''',
-        type='int'),
-]),
 
 'WT_SESSION.truncate' : Method([]),
 'WT_SESSION.upgrade' : Method([]),
@@ -1706,13 +1696,10 @@ methods = {
         min=1),
     Config('sync', '', r'''
         override whether to sync log records when the transaction commits,
-        inherited from ::wiredtiger_open \c transaction_sync.
-        The \c background setting initiates a background
-        synchronization intended to be used with a later call to
-        WT_SESSION::transaction_sync.  The \c off setting does not
+        inherited from ::wiredtiger_open \c transaction_sync.  The \c off setting does not
         wait for record to be written or synchronized.  The
         \c on setting forces log records to be written to the storage device''',
-        choices=['background', 'off', 'on']),
+        choices=['off', 'on']),
 ]),
 
 'WT_SESSION.prepare_transaction' : Method([

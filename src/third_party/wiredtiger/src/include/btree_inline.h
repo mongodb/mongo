@@ -724,6 +724,13 @@ static inline void
 __wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
     /*
+     * Prepared records in the datastore require page updates, even for read-only handles, don't
+     * mark the tree or page dirty.
+     */
+    if (F_ISSET(S2BT(session), WT_BTREE_READONLY))
+        return;
+
+    /*
      * Mark the tree dirty (even if the page is already marked dirty), newly created pages to
      * support "empty" files are dirty, but the file isn't marked dirty until there's a real change
      * needing to be written.
@@ -1989,34 +1996,6 @@ __wt_page_swap_func(WT_SESSION_IMPL *session, WT_REF *held, WT_REF *want, uint32
         WT_RET_MSG(session, EINVAL, "page-release WT_RESTART error mapped to EINVAL");
 
     return (ret);
-}
-
-/*
- * __wt_bt_col_var_cursor_walk_txn_read --
- *     Set the value for variable-length column-store cursor walk.
- */
-static inline int
-__wt_bt_col_var_cursor_walk_txn_read(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_PAGE *page,
-  WT_CELL_UNPACK_KV *unpack, WT_COL *cip)
-{
-    WT_UPDATE *upd;
-
-    upd = NULL;
-
-    if (cbt->ins)
-        upd = cbt->ins->upd;
-
-    cbt->slot = WT_COL_SLOT(page, cip);
-    WT_RET(__wt_txn_read(session, cbt, NULL, cbt->recno, upd, unpack));
-    if (cbt->upd_value->type == WT_UPDATE_INVALID || cbt->upd_value->type == WT_UPDATE_TOMBSTONE)
-        return (0);
-
-    WT_RET(__wt_value_return(cbt, cbt->upd_value));
-
-    cbt->tmp->data = cbt->iface.value.data;
-    cbt->tmp->size = cbt->iface.value.size;
-    cbt->cip_saved = cip;
-    return (0);
 }
 
 /*
