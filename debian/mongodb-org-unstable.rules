@@ -15,11 +15,11 @@ configure-stamp:
 
 build: build-stamp
 
-build-stamp: configure-stamp  
+build-stamp: configure-stamp
 	dh_testdir
 
-	# THE FOLLOWING LINE IS INTENTIONALLY COMMENTED. 
-	# scons 
+	# THE FOLLOWING LINE IS INTENTIONALLY COMMENTED.
+	# scons
 	#docbook-to-man debian/mongodb.sgml > mongodb.1
 
 	echo -n > debian/mongodb-org-unstable-database-tools-extra.manpages
@@ -34,7 +34,7 @@ build-stamp: configure-stamp
 
 	touch $@
 
-clean: 
+clean:
 	dh_testdir
 	dh_testroot
 	rm -f build-stamp configure-stamp
@@ -60,7 +60,7 @@ clean:
 	rm -rf tools/*.o
 	rm -rf shell/*.o
 	rm -rf .sconf_temp
-	rm -f buildscripts/*.pyc 
+	rm -f buildscripts/*.pyc
 	rm -f *.pyc
 	rm -f buildinfo.cpp
 	dh_clean debian/files
@@ -88,7 +88,7 @@ install: build
 	done
 
 	mkdir -p $(CURDIR)/debian/mongodb-org-unstable-server/etc
-	cp $(CURDIR)/debian/mongod.conf $(CURDIR)/debian/mongodb-org-unstable-server/etc/mongod.conf 
+	cp $(CURDIR)/debian/mongod.conf $(CURDIR)/debian/mongodb-org-unstable-server/etc/mongod.conf
 
 	mkdir -p $(CURDIR)/debian/mongodb-org-unstable-shell/usr/share/lintian/overrides/
 	mkdir -p $(CURDIR)/debian/mongodb-org-unstable-server/usr/share/lintian/overrides/
@@ -98,11 +98,11 @@ install: build
 	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-org-unstable-server/usr/share/lintian/overrides/mongodb-org-unstable-server
 	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-org-unstable-mongos/usr/share/lintian/overrides/mongodb-org-unstable-mongos
 	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-org-unstable-database-tools-extra/usr/share/lintian/overrides/mongodb-org-unstable-database-tools-extra
-    install -m 644 $(CURDIR)/debian/substvars               $(CURDIR)/debian/mongodb-org-unstable-database.substvars
-    install -m 644 $(CURDIR)/debian/substvars               $(CURDIR)/debian/mongodb-org-unstable-shell.substvars
-    install -m 644 $(CURDIR)/debian/substvars               $(CURDIR)/debian/mongodb-org-unstable-server.substvars
-    install -m 644 $(CURDIR)/debian/substvars               $(CURDIR)/debian/mongodb-org-unstable-mongos.substvars
-    install -m 644 $(CURDIR)/debian/substvars               $(CURDIR)/debian/mongodb-org-unstable-database-tools-extra.substvars
+	install -m 644 $(CURDIR)/debian/substvars				$(CURDIR)/debian/mongodb-org-unstable-database.substvars
+	install -m 644 $(CURDIR)/debian/substvars				$(CURDIR)/debian/mongodb-org-unstable-shell.substvars
+	install -m 644 $(CURDIR)/debian/substvars				$(CURDIR)/debian/mongodb-org-unstable-server.substvars
+	install -m 644 $(CURDIR)/debian/substvars				$(CURDIR)/debian/mongodb-org-unstable-mongos.substvars
+	install -m 644 $(CURDIR)/debian/substvars				$(CURDIR)/debian/mongodb-org-unstable-database-tools-extra.substvars
 
 # Build architecture-independent files here.
 binary-indep: build install
@@ -112,12 +112,12 @@ binary-indep: build install
 binary-arch: build install
 	dh_testdir
 	dh_testroot
-	dh_installchangelogs 
+	dh_installchangelogs
 	dh_installdocs
 	dh_installexamples
 #	dh_install
 #	dh_installmenu
-#	dh_installdebconf	
+#	dh_installdebconf
 #	dh_installlogrotate
 #	dh_installemacsen
 #	dh_installpam
