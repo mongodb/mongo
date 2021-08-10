@@ -2335,8 +2335,9 @@ TEST_F(ChangeStreamStageWithDualFeatureFlagValueTest, DSCSOplogMatchStageSeriali
 TEST_F(ChangeStreamStageWithDualFeatureFlagValueTest, DSCSUnwindTransactionStageSerialization) {
     auto expCtx = getExpCtx();
 
-    std::string nsRegex = "*.ns";
-    DocumentSourceChangeStreamUnwindTransactionSpec spec(nsRegex);
+    auto filter = BSON("ns" << BSON("$regex"
+                                    << "^db\\.coll$"));
+    DocumentSourceChangeStreamUnwindTransactionSpec spec(filter);
     auto stageSpecAsBSON = BSON("" << spec.toBSON());
 
     validateDocumentSourceStageSerialization<DocumentSourceChangeStreamUnwindTransaction>(

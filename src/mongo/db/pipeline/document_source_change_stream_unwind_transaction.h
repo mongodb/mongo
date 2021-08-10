@@ -82,7 +82,7 @@ protected:
 
 private:
     DocumentSourceChangeStreamUnwindTransaction(
-        std::string nsRegex, const boost::intrusive_ptr<ExpressionContext>& expCtx);
+        BSONObj filter, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     /**
      * Validates if the supplied document contains transaction details.
@@ -115,7 +115,7 @@ private:
         TransactionOpIterator(OperationContext* opCtx,
                               std::shared_ptr<MongoProcessInterface> mongoProcessInterface,
                               const Document& input,
-                              const pcrecpp::RE& nsRegex);
+                              const MatchExpression* expression);
 
         /**
          * Returns the index for the last operation returned by getNextTransactionOp(). It is
@@ -200,14 +200,18 @@ private:
         // Used for traversing the oplog with TransactionHistoryInterface.
         std::shared_ptr<MongoProcessInterface> _mongoProcessInterface;
 
-        // An operation is relevant to a change stream iff its namespace matches this regex.
-        const pcrecpp::RE& _nsRegex;
+        // Only return entries matching this expression.
+        const MatchExpression* _expression;
     };
 
-    // Regex for matching the "ns" field in applyOps sub-entries. Only used when we have a
-    // change stream on the entire DB. When watching just a single collection, this field is
-    // boost::none, and an exact string equality check is used instead.
-    boost::optional<pcrecpp::RE> _nsRegex;
+    // All transaction entries are filtered through this expression. This extra filtering step is
+    // necessary because a transaction can contain a mix of operations from different namespaces. A
+    // change stream needs to filter by namespace to ensure it does not return operations outside
+    // the namespace it watches. As an optimization, this filter can also have predicates from
+    // user-specified $match stages, allowing for early filtering of events that we know would be
+    // filtered later in the pipeline.
+    BSONObj _filter;
+    std::unique_ptr<MatchExpression> _expression;
 
     // Represents the current transaction we're unwinding, if any.
     boost::optional<TransactionOpIterator> _txnIterator;

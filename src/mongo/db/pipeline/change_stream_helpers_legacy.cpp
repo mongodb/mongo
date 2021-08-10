@@ -158,8 +158,11 @@ Value DocumentSourceChangeStreamCheckResumability::serializeLegacy(
 Value DocumentSourceChangeStreamUnwindTransaction::serializeLegacy(
     boost::optional<ExplainOptions::Verbosity> explain) const {
     if (explain) {
-        tassert(5543800, "nsRegex has not been initialized", _nsRegex != boost::none);
-        return Value(Document{{kStageName, Value(Document{{"nsRegex", _nsRegex->pattern()}})}});
+        return Value(
+            Document{{kStageName,
+                      Value(Document{
+                          {"nsRegex",
+                           DocumentSourceChangeStream::getNsRegexForChangeStream(pExpCtx->ns)}})}});
     }
 
     return Value();

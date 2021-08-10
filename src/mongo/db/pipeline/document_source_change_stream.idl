@@ -176,7 +176,7 @@ structs:
         description: A document used to specify the $_internalChangeStreamUnwindTransaction stage of
                      an aggregation pipeline.
         fields:
-            nsRegex: string
+            filter: object_owned
 
     DocumentSourceChangeStreamCheckInvalidateSpec:
         strict: true

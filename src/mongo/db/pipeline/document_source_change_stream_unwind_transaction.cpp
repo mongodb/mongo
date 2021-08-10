@@ -48,8 +48,9 @@ REGISTER_INTERNAL_DOCUMENT_SOURCE(
 boost::intrusive_ptr<DocumentSourceChangeStreamUnwindTransaction>
 DocumentSourceChangeStreamUnwindTransaction::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    return new DocumentSourceChangeStreamUnwindTransaction(
-        DocumentSourceChangeStream::getNsRegexForChangeStream(expCtx->ns), expCtx);
+    auto filter =
+        BSON("ns" << BSONRegEx(DocumentSourceChangeStream::getNsRegexForChangeStream(expCtx->ns)));
+    return new DocumentSourceChangeStreamUnwindTransaction(std::move(filter), expCtx);
 }
 
 boost::intrusive_ptr<DocumentSourceChangeStreamUnwindTransaction>
@@ -60,13 +61,14 @@ DocumentSourceChangeStreamUnwindTransaction::createFromBson(
             elem.type() == BSONType::Object);
     auto parsedSpec = DocumentSourceChangeStreamUnwindTransactionSpec::parse(
         IDLParserErrorContext("DocumentSourceChangeStreamUnwindTransactionSpec"), elem.Obj());
-    return new DocumentSourceChangeStreamUnwindTransaction(parsedSpec.getNsRegex().toString(),
-                                                           expCtx);
+    return new DocumentSourceChangeStreamUnwindTransaction(parsedSpec.getFilter(), expCtx);
 }
 
 DocumentSourceChangeStreamUnwindTransaction::DocumentSourceChangeStreamUnwindTransaction(
-    std::string nsRegex, const boost::intrusive_ptr<ExpressionContext>& expCtx)
-    : DocumentSource(kStageName, expCtx), _nsRegex(std::move(nsRegex)) {}
+    BSONObj filter, const boost::intrusive_ptr<ExpressionContext>& expCtx)
+    : DocumentSource(kStageName, expCtx),
+      _filter(filter),
+      _expression(MatchExpressionParser::parseAndNormalize(filter, expCtx)) {}
 
 StageConstraints DocumentSourceChangeStreamUnwindTransaction::constraints(
     Pipeline::SplitState pipeState) const {
@@ -83,16 +85,16 @@ StageConstraints DocumentSourceChangeStreamUnwindTransaction::constraints(
 
 Value DocumentSourceChangeStreamUnwindTransaction::serializeLatest(
     boost::optional<ExplainOptions::Verbosity> explain) const {
-    tassert(5467604, "nsRegex has not been initialized", _nsRegex != boost::none);
+    tassert(5467604, "expression has not been initialized", _expression);
 
     if (explain) {
-        return Value(DOC(DocumentSourceChangeStream::kStageName
-                         << DOC("stage"
-                                << "internalUnwindTransaction"_sd
-                                << "nsRegex" << _nsRegex->pattern())));
+        return Value(
+            DOC(DocumentSourceChangeStream::kStageName << DOC("stage"
+                                                              << "internalUnwindTransaction"_sd
+                                                              << "filter" << _filter)));
     }
 
-    DocumentSourceChangeStreamUnwindTransactionSpec spec(_nsRegex->pattern());
+    DocumentSourceChangeStreamUnwindTransactionSpec spec(_filter);
     return Value(Document{{kStageName, Value(spec.toBSON())}});
 }
 
@@ -154,7 +156,8 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamUnwindTransaction::doGet
         // call 'getNextTransactionOp' on it. Note that is possible for the transaction iterator
         // to be empty of any relevant operations, meaning that this loop may need to execute
         // multiple times before it encounters a relevant change to return.
-        _txnIterator.emplace(pExpCtx->opCtx, pExpCtx->mongoProcessInterface, doc, *_nsRegex);
+        _txnIterator.emplace(
+            pExpCtx->opCtx, pExpCtx->mongoProcessInterface, doc, _expression.get());
     }
 }
 
@@ -180,8 +183,8 @@ DocumentSourceChangeStreamUnwindTransaction::TransactionOpIterator::TransactionO
     OperationContext* opCtx,
     std::shared_ptr<MongoProcessInterface> mongoProcessInterface,
     const Document& input,
-    const pcrecpp::RE& nsRegex)
-    : _mongoProcessInterface(mongoProcessInterface), _nsRegex(nsRegex) {
+    const MatchExpression* expression)
+    : _mongoProcessInterface(mongoProcessInterface), _expression(expression) {
     Value lsidValue = input["lsid"];
     DocumentSourceChangeStream::checkValueType(lsidValue, "lsid", BSONType::Object);
     _lsid = lsidValue.getDocument();
@@ -309,10 +312,7 @@ bool DocumentSourceChangeStreamUnwindTransaction::TransactionOpIterator::_isDocu
             "Unexpected noop entry within a transaction",
             ValueComparator::kInstance.evaluate(d["op"] != Value("n"_sd)));
 
-    Value nsField = d["ns"];
-    tassert(5543810, "'ns' field is missing within the transaction op", !nsField.missing());
-
-    return _nsRegex.PartialMatch(nsField.getString());
+    return _expression->matchesBSON(d.toBson());
 }
 
 Document
