@@ -129,12 +129,123 @@ std::unique_ptr<MatchExpression> rewriteOperationType(
     return nullptr;
 }
 
+/**
+ * Rewrites filters on 'documentKey' in a format that can be applied directly to the oplog. Returns
+ * nullptr if the predicate cannot be rewritten.
+ */
+std::unique_ptr<MatchExpression> matchRewriteDocumentKey(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const PathMatchExpression* predicate,
+    bool allowInexact) {
+    tassert(5554600, "Unexpected empty predicate path", predicate->fieldRef()->numParts() > 0);
+    tassert(5554601,
+            str::stream() << "Unexpected predicate path: " << predicate->path(),
+            predicate->fieldRef()->getPart(0) == DocumentSourceChangeStream::kDocumentKeyField);
+
+    // Check if the predicate's path starts with "documentKey._id". If so, then we can always
+    // perform an exact rewrite. If not, because of the complexities of the 'op' == 'i' case, it's
+    // impractical to try to generate a rewritten predicate that matches exactly.
+    bool pathStartsWithDKId =
+        (predicate->fieldRef()->numParts() >= 2 &&
+         predicate->fieldRef()->getPart(1) == DocumentSourceChangeStream::kIdField);
+    if (!pathStartsWithDKId && !allowInexact) {
+        return nullptr;
+    }
+
+    // Helper to generate a filter on the 'op' field for the specified type. This filter will also
+    // include a copy of 'predicate' with the path renamed to apply to the oplog.
+    auto generateFilterForOp = [&](StringData op, const StringMap<std::string>& renameList) {
+        auto renamedPredicate = predicate->shallowClone();
+        static_cast<PathMatchExpression*>(renamedPredicate.get())->applyRename(renameList);
+
+        auto andExpr = std::make_unique<AndMatchExpression>();
+        andExpr->add(std::make_unique<EqualityMatchExpression>("op"_sd, Value(op)));
+        andExpr->add(std::move(renamedPredicate));
+        return andExpr;
+    };
+
+    // The MatchExpression which will contain the final rewritten predicate.
+    auto rewrittenPredicate = std::make_unique<OrMatchExpression>();
+
+    // Handle update, replace and delete. The predicate path can simply be renamed.
+    rewrittenPredicate->add(generateFilterForOp("u"_sd, {{"documentKey", "o2"}}));
+    rewrittenPredicate->add(generateFilterForOp("d"_sd, {{"documentKey", "o"}}));
+
+    // If the path is a subfield of 'documentKey', inserts can also be handled by renaming.
+    if (predicate->fieldRef()->numParts() > 1) {
+        rewrittenPredicate->add(generateFilterForOp("i"_sd, {{"documentKey", "o"}}));
+        return rewrittenPredicate;
+    }
+
+    // Otherwise, we must handle the {op: "i"} case where the predicate is on the full documentKey
+    // field. Create an $and filter for the insert case, and seed it with {op: "i"}. If we are
+    // unable to rewrite the predicate below, this filter will simply return all insert events.
+    auto insertCase = std::make_unique<AndMatchExpression>();
+    insertCase->add(std::make_unique<EqualityMatchExpression>("op"_sd, Value("i"_sd)));
+
+    // Helper to convert an equality match against 'documentKey' into a match against each subfield.
+    auto makeInsertDocKeyFilterForOperand =
+        [&](BSONElement rhs) -> std::unique_ptr<MatchExpression> {
+        // We're comparing against the full 'documentKey' field, which is an object that has an
+        // '_id' subfield and possibly other subfields. If 'rhs' is not an object or if 'rhs'
+        // doesn't have an '_id' subfield, it will never match.
+        if (rhs.type() != BSONType::Object ||
+            !rhs.embeddedObject()[DocumentSourceChangeStream::kIdField]) {
+            return std::make_unique<AlwaysFalseMatchExpression>();
+        }
+        // Iterate over 'rhs' and add an equality match on each subfield into the $and. Each
+        // fieldname is prefixed with "o." so that it applies to the document embedded in the oplog.
+        auto andExpr = std::make_unique<AndMatchExpression>();
+        for (auto&& subfield : rhs.embeddedObject()) {
+            andExpr->add(MatchExpressionParser::parseAndNormalize(
+                BSON((str::stream() << "o." << subfield.fieldNameStringData()) << subfield),
+                expCtx));
+        }
+        return andExpr;
+    };
+
+    // There are only a limited set of predicates that we can feasibly rewrite here.
+    switch (predicate->matchType()) {
+        case MatchExpression::INTERNAL_EXPR_EQ:
+        case MatchExpression::EQ: {
+            auto cme = static_cast<const ComparisonMatchExpressionBase*>(predicate);
+            insertCase->add(makeInsertDocKeyFilterForOperand(cme->getData()));
+            break;
+        }
+        case MatchExpression::MATCH_IN: {
+            // Convert the $in into an $or with one branch for each operand. We don't need to
+            // account for regex operands, since these will never match.
+            auto ime = static_cast<const InMatchExpression*>(predicate);
+            auto orExpr = std::make_unique<OrMatchExpression>();
+            for (auto& equality : ime->getEqualities()) {
+                orExpr->add(makeInsertDocKeyFilterForOperand(equality));
+            }
+            insertCase->add(std::move(orExpr));
+            break;
+        }
+        case MatchExpression::EXISTS:
+            // An $exists predicate will match every insert, since every insert has a documentKey.
+            // Leave the filter as {op: "i"} and fall through to the default 'break' case.
+        default:
+            // For all other predicates, we give up and just allow all insert oplog entries to pass
+            // through.
+            break;
+    }
+
+    // Regardless of whether we were able to fully rewrite the {op: "i"} case or not, add the
+    // 'insertCase' to produce the final rewritten documentKey predicate.
+    rewrittenPredicate->add(std::move(insertCase));
+
+    return rewrittenPredicate;
+}
+
 // Map of fields names for which a simple rename is sufficient when rewriting.
 StringMap<std::string> renameRegistry = {
     {"clusterTime", "ts"}, {"lsid", "lsid"}, {"txnNumber", "txnNumber"}};
 
 // Map of field names to corresponding rewrite functions.
-StringMap<ChangeStreamRewriteFunction> rewriteRegistry = {{"operationType", rewriteOperationType}};
+StringMap<ChangeStreamRewriteFunction> rewriteRegistry = {{"operationType", rewriteOperationType},
+                                                          {"documentKey", matchRewriteDocumentKey}};
 
 // Traverse the MatchExpression tree and rewrite as many predicates as possible. When 'allowInexact'
 // is true, the traversal produces a "best effort" rewrite, which rejects a subset of the oplog
