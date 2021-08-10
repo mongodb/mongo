@@ -528,10 +528,6 @@ bool ReplicationCoordinatorNoOp::setContainsArbiter() const {
     MONGO_UNREACHABLE;
 }
 
-bool ReplicationCoordinatorNoOp::replSetContainsNewlyAddedMembers() const {
-    MONGO_UNREACHABLE;
-}
-
 void ReplicationCoordinatorNoOp::attemptToAdvanceStableTimestamp() {
     MONGO_UNREACHABLE;
 }

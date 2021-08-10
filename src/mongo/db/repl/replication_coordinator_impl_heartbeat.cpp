@@ -329,16 +329,6 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
             remoteState == MemberState::RS_ROLLBACK) {
             const auto mem = _rsConfig.findMemberByHostAndPort(target);
             if (mem && mem->isNewlyAdded()) {
-                // 'NewlyAdded' field can only exist if automatic reconfig is supported, with the
-                // exception of upgrading/downgrading fcv document. And, it's safe to have that
-                // exception because a node can't downgrade the binary version until its FCV
-                // document is fully downgraded. So, its impossible for a node with downgraded
-                // binaries to have on-disk repl config with 'newlyAdded' fields.
-                invariant(
-                    _supportsAutomaticReconfig() ||
-                    serverGlobalParams.featureCompatibility.isGreaterThan(
-                        ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo44));
-
                 const auto memId = mem->getId();
                 auto status = _replExecutor->scheduleWork(
                     [=](const executor::TaskExecutor::CallbackArgs& cbData) {

@@ -696,15 +696,6 @@ bool ReplSetConfig::containsArbiter() const {
     return false;
 }
 
-bool ReplSetConfig::containsNewlyAddedMembers() const {
-    for (MemberIterator mem = membersBegin(); mem != membersEnd(); mem++) {
-        if (mem->isNewlyAdded()) {
-            return true;
-        }
-    }
-    return false;
-}
-
 MutableReplSetConfig ReplSetConfig::getMutable() const {
     return *static_cast<const MutableReplSetConfig*>(this);
 }

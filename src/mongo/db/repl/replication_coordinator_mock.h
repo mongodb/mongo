@@ -353,8 +353,6 @@ public:
 
     virtual bool setContainsArbiter() const override;
 
-    virtual bool replSetContainsNewlyAddedMembers() const override;
-
     virtual void attemptToAdvanceStableTimestamp() override;
 
     virtual void finishRecoveryIfEligible(OperationContext* opCtx) override;

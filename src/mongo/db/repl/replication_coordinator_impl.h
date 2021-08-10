@@ -374,8 +374,6 @@ public:
 
     virtual bool setContainsArbiter() const override;
 
-    virtual bool replSetContainsNewlyAddedMembers() const override;
-
     virtual void attemptToAdvanceStableTimestamp() override;
 
     virtual void finishRecoveryIfEligible(OperationContext* opCtx) override;
@@ -1501,11 +1499,6 @@ private:
      * Sets the implicit default write concern on startup.
      */
     void _setImplicitDefaultWriteConcern(OperationContext* opCtx, WithLock lk);
-
-    /**
-     * Checks whether replication coordinator supports automatic reconfig.
-     */
-    bool _supportsAutomaticReconfig() const;
 
     /*
      * Calculates and returns the read preference for the node.

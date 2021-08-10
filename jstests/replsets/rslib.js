@@ -19,7 +19,6 @@ var isConfigCommitted;
 var assertSameConfigContent;
 var getConfigWithNewlyAdded;
 var isMemberNewlyAdded;
-var replConfigHasNewlyAddedMembers;
 var waitForNewlyAddedRemovalForNodeToBeCommitted;
 var assertVoteCount;
 var disconnectSecondaries;
@@ -791,11 +790,6 @@ isMemberNewlyAdded = function(node, memberIndex) {
     }
 
     return hasNewlyAdded(memberIndex);
-};
-
-// Returns true if at least one member in the repl set config contains "newlyAdded" field.
-replConfigHasNewlyAddedMembers = function(conn) {
-    return isMemberNewlyAdded(conn);
 };
 
 waitForNewlyAddedRemovalForNodeToBeCommitted = function(node, memberIndex, force = false) {

@@ -112,33 +112,6 @@ void deletePersistedDefaultRWConcernDocument(OperationContext* opCtx) {
     uassertStatusOK(getStatusFromWriteCommandReply(commandResponse->getCommandReply()));
 }
 
-void checkInitialSyncFinished(OperationContext* opCtx) {
-    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    const bool isReplSet =
-        replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
-
-    uassert(ErrorCodes::ConflictingOperationInProgress,
-            str::stream() << "Cannot upgrade/downgrade the cluster when the replica set config "
-                          << "contains 'newlyAdded' members; wait for those members to "
-                          << "finish its initial sync procedure",
-            !(isReplSet && replCoord->replSetContainsNewlyAddedMembers()));
-
-
-    // We should make sure the current config w/o 'newlyAdded' members got replicated
-    // to all nodes.
-    LOGV2(4637904, "Waiting for the current replica set config to propagate to all nodes.");
-    // If a write concern is given, we'll use its wTimeout. It's kNoTimeout by default.
-    WriteConcernOptions writeConcern(repl::ReplSetConfig::kConfigAllWriteConcernName,
-                                     WriteConcernOptions::SyncMode::NONE,
-                                     opCtx->getWriteConcern().wTimeout);
-    writeConcern.checkCondition = WriteConcernOptions::CheckCondition::Config;
-    repl::OpTime fakeOpTime(Timestamp(1, 1), replCoord->getTerm());
-    uassertStatusOKWithContext(
-        replCoord->awaitReplication(opCtx, fakeOpTime, writeConcern).status,
-        "Failed to wait for the current replica set config to propagate to all nodes");
-    LOGV2(4637905, "The current replica set config has been propagated to all nodes.");
-}
-
 void waitForCurrentConfigCommitment(OperationContext* opCtx) {
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
 
@@ -345,8 +318,6 @@ public:
                 // 'kUpgrading' or 'kDowngrading' state, respectively.
                 const auto fcvChangeRegion(
                     FeatureCompatibilityVersion::enterFCVChangeRegion(opCtx));
-
-                checkInitialSyncFinished(opCtx);
 
                 FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
                     opCtx,

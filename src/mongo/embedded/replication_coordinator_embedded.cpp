@@ -554,10 +554,6 @@ bool ReplicationCoordinatorEmbedded::setContainsArbiter() const {
     UASSERT_NOT_IMPLEMENTED;
 }
 
-bool ReplicationCoordinatorEmbedded::replSetContainsNewlyAddedMembers() const {
-    UASSERT_NOT_IMPLEMENTED;
-}
-
 void ReplicationCoordinatorEmbedded::attemptToAdvanceStableTimestamp() {
     UASSERT_NOT_IMPLEMENTED;
 }

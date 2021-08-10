@@ -3280,12 +3280,6 @@ Status ReplicationCoordinatorImpl::processReplSetFreeze(int secs, BSONObjBuilder
     return Status::OK();
 }
 
-bool ReplicationCoordinatorImpl::_supportsAutomaticReconfig() const {
-    // TODO SERVER-48545: Remove this when 5.0 becomes last-lts.
-    return serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
-        ServerGlobalParams::FeatureCompatibility::Version::kVersion47);
-}
-
 Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCtx,
                                                           const ReplSetReconfigArgs& args,
                                                           BSONObjBuilder* resultObj) {
@@ -3356,9 +3350,8 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
                 return Status(ErrorCodes::InvalidReplicaSetConfig, errmsg);
             }
 
-            // We should never set the 'newlyAdded' field for arbiters, or when automatic reconfig
-            // is disabled, or during force reconfigs.
-            if (newMem.isArbiter() || !_supportsAutomaticReconfig() || args.force) {
+            // We should never set the 'newlyAdded' field for arbiters or during force reconfigs.
+            if (newMem.isArbiter() || args.force) {
                 continue;
             }
 
@@ -3505,19 +3498,6 @@ Status ReplicationCoordinatorImpl::_doReplSetReconfig(OperationContext* opCtx,
     int myIndex = _selfIndex;
     lk.unlock();
 
-    // TODO SERVER-48545: Remove this when 5.0 becomes last-lts.
-    // Automatic reconfig ("newlyAdded" field in repl config) is supported only from FCV4.7+.
-    // So, acquire FCV mutex lock in shared mode to block writers from modifying the fcv document
-    // to make sure fcv is not changed between getNewConfig() and storing the new config
-    // document locally.
-    // Since 'skipSafetyChecks' is only true when this reconfig is invoked as part of
-    // 'signalDrainComplete', we can skip taking the FCV lock here because:
-    // 1. 'signalDrainComplete' acquires the RSTL in X mode prior to this reconfig, which will block
-    //    all external writers. This is also important because we must not acquire the FCV lock
-    //    while holding the RSTL to avoid deadlocking.
-    // 2. We are not able to accept replicated writes as primary until we fully exit drain mode.
-    auto fixedFcvRegion = skipSafetyChecks ? nullptr : std::make_unique<FixedFCVRegion>(opCtx);
-
     // Call the callback to get the new config given the old one.
     auto newConfigStatus = getNewConfig(oldConfig, topCoordTerm);
     Status status = newConfigStatus.getStatus();
@@ -3609,40 +3589,6 @@ Status ReplicationCoordinatorImpl::_doReplSetReconfig(OperationContext* opCtx,
                     "newConfig"_attr = newConfigObj,
                     "oldConfig"_attr = oldConfigObj);
         return Status(ErrorCodes::NewReplicaSetConfigurationIncompatible, validateStatus.reason());
-    }
-
-    // Since at this point, we have validated the new config, we are assuming the new config follows
-    // the safe reconfig rules.
-    auto needsFcvLock = [&]() -> bool {
-        int oldVoters = 0, newVoters = 0;
-        bool oldHasNewlyAdded = false, newHasNewlyAdded = false;
-
-        std::for_each(oldConfig.membersBegin(), oldConfig.membersEnd(), [&](const MemberConfig& m) {
-            if (m.isVoter())
-                oldVoters++;
-            oldHasNewlyAdded = oldHasNewlyAdded || m.isNewlyAdded();
-        });
-        std::for_each(newConfig.membersBegin(), newConfig.membersEnd(), [&](const MemberConfig& m) {
-            if (m.isVoter())
-                newVoters++;
-            newHasNewlyAdded = newHasNewlyAdded || m.isNewlyAdded();
-        });
-
-        // It's illegal for the new config to contain "newlyAdded" field when automatic reconfig is
-        // disabled. If the primary receives a new config with 'newlyAdded' field via
-        // replSetReconfig command, then the primary should have already uasserted earlier in
-        // getNewConfig().
-        invariant(_supportsAutomaticReconfig() || !newHasNewlyAdded);
-
-        return (!oldHasNewlyAdded && newHasNewlyAdded) || (newVoters > oldVoters);
-    };
-
-    // We need to take fcv lock only for 2 cases:
-    // 1) For fcv 4.4, addition of new voter nodes.
-    // 2) For fcv 4.7+, only if the current config doesn't contain the 'newlyAdded' field but the
-    // new config got mutated to append 'newlyAdded' field.
-    if (fixedFcvRegion && (force || !needsFcvLock())) {
-        fixedFcvRegion.reset();
     }
 
     if (MONGO_unlikely(ReconfigHangBeforeConfigValidationCheck.shouldFail())) {
@@ -5825,11 +5771,6 @@ int64_t ReplicationCoordinatorImpl::_nextRandomInt64_inlock(int64_t limit) {
 bool ReplicationCoordinatorImpl::setContainsArbiter() const {
     stdx::lock_guard<Latch> lock(_mutex);
     return _rsConfig.containsArbiter();
-}
-
-bool ReplicationCoordinatorImpl::replSetContainsNewlyAddedMembers() const {
-    stdx::lock_guard<Latch> lock(_mutex);
-    return _rsConfig.containsNewlyAddedMembers();
 }
 
 void ReplicationCoordinatorImpl::ReadWriteAbility::setCanAcceptNonLocalWrites(

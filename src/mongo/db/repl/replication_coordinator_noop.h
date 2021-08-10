@@ -288,8 +288,6 @@ public:
 
     bool setContainsArbiter() const final;
 
-    bool replSetContainsNewlyAddedMembers() const final;
-
     void attemptToAdvanceStableTimestamp() final;
 
     void finishRecoveryIfEligible(OperationContext* opCtx) final;
