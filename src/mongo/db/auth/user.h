@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -265,6 +267,36 @@ private:
 
     // Indicates whether the user has been marked as invalid by the AuthorizationManager.
     AtomicWord<bool> _isValid{true};
+};
+
+/**
+ * Represents the properties required to request a UserHandle.
+ * This type is hashable and may be used as a key describing requests
+ */
+struct UserRequest {
+    UserRequest(const UserName& name, boost::optional<std::set<RoleName>> roles)
+        : name(name), roles(std::move(roles)) {}
+
+    template <typename H>
+    friend H AbslHashValue(H h, const UserRequest& key) {
+        auto state = H::combine(std::move(h), key.name);
+        if (key.roles) {
+            for (const auto& role : *key.roles) {
+                state = H::combine(std::move(state), role);
+            }
+        }
+        return state;
+    }
+
+    bool operator==(const UserRequest& key) const {
+        return name == key.name && roles == key.roles;
+    }
+
+    // The name of the requested user
+    UserName name;
+
+    // Any authorization grants which should override and be used in favor of roles acquisition.
+    boost::optional<std::set<RoleName>> roles;
 };
 
 using UserHandle = std::shared_ptr<User>;

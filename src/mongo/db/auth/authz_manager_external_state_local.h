@@ -60,7 +60,7 @@ public:
 
     Status getStoredAuthorizationVersion(OperationContext* opCtx, int* outVersion) override;
     Status getUserDescription(OperationContext* opCtx,
-                              const UserName& userName,
+                              const UserRequest& userRequest,
                               BSONObj* result) override;
     Status getRoleDescription(OperationContext* opCtx,
                               const RoleName& roleName,

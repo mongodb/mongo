@@ -42,9 +42,11 @@
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/element.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/config.h"
 #include "mongo/crypto/mechanism_scram.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/address_restriction.h"
+#include "mongo/db/auth/authorization_manager_global_parameters_gen.h"
 #include "mongo/db/auth/authorization_manager_impl_parameters_gen.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/authorization_session_impl.h"
@@ -67,6 +69,7 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
+#include "mongo/util/net/ssl_types.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -204,6 +207,24 @@ private:
     mutable Mutex _mutex = MONGO_MAKE_LATCH("PinnedUserSetParameter::_mutex");
     std::vector<UserName> _pinnedUsersList;
 } authorizationManagerPinnedUsers;
+
+bool shouldUseRolesFromConnection(OperationContext* opCtx, const UserName& userName) {
+#ifdef MONGO_CONFIG_SSL
+    if (!opCtx || !opCtx->getClient() || !opCtx->getClient()->session()) {
+        return false;
+    }
+
+    if (!allowRolesFromX509Certificates) {
+        return false;
+    }
+
+    auto& sslPeerInfo = SSLPeerInfo::forSession(opCtx->getClient()->session());
+    return sslPeerInfo.subjectName.toString() == userName.getUser() &&
+        userName.getDB() == "$external" && !sslPeerInfo.roles.empty();
+#else
+    return false;
+#endif
+}
 
 }  // namespace
 
@@ -464,7 +485,7 @@ Status AuthorizationManagerImpl::_initializeUserFromPrivilegeDocument(User* user
 Status AuthorizationManagerImpl::getUserDescription(OperationContext* opCtx,
                                                     const UserName& userName,
                                                     BSONObj* result) {
-    return _externalState->getUserDescription(opCtx, userName, result);
+    return _externalState->getUserDescription(opCtx, UserRequest(userName, boost::none), result);
 }
 
 Status AuthorizationManagerImpl::getRoleDescription(OperationContext* opCtx,
@@ -506,7 +527,22 @@ StatusWith<UserHandle> AuthorizationManagerImpl::acquireUser(OperationContext* o
         return internalSecurity.user;
     }
 
-    boost::optional<UserHandle> cachedUser = _userCache.get(userName);
+    UserRequest request(userName, boost::none);
+
+    // Clients connected via TLS may present an X.509 certificate which contains an authorization
+    // grant. If this is the case, the roles must be provided to the external state, for expansion
+    // into privileges.
+    if (shouldUseRolesFromConnection(opCtx, userName)) {
+        auto& sslPeerInfo = SSLPeerInfo::forSession(opCtx->getClient()->session());
+        request.roles = std::set<RoleName>();
+
+        // In order to be hashable, the role names must be converted from unordered_set to a set.
+        std::copy(sslPeerInfo.roles.begin(),
+                  sslPeerInfo.roles.end(),
+                  std::inserter(*request.roles, request.roles->begin()));
+    }
+
+    boost::optional<UserHandle> cachedUser = _userCache.get(request);
     auto returnUser = [&](boost::optional<UserHandle> cachedUser) {
         auto ret = *cachedUser;
         fassert(16914, ret.get());
@@ -525,7 +561,7 @@ StatusWith<UserHandle> AuthorizationManagerImpl::acquireUser(OperationContext* o
     // thread is fetching into the cache
     CacheGuard guard(opCtx, this);
 
-    while ((boost::none == (cachedUser = _userCache.get(userName))) &&
+    while ((boost::none == (cachedUser = _userCache.get(request))) &&
            guard.otherUpdateInFetchPhase()) {
         guard.wait();
     }
@@ -563,7 +599,7 @@ StatusWith<UserHandle> AuthorizationManagerImpl::acquireUser(OperationContext* o
             case schemaVersion28SCRAM:
             case schemaVersion26Final:
             case schemaVersion26Upgrade:
-                status = _fetchUserV2(opCtx, userName, &user);
+                status = _fetchUserV2(opCtx, request, &user);
                 break;
             case schemaVersion24:
                 status =
@@ -589,9 +625,11 @@ StatusWith<UserHandle> AuthorizationManagerImpl::acquireUser(OperationContext* o
 
     UserHandle ret;
     if (guard.isSameCacheGeneration()) {
-        if (_version == schemaVersionInvalid)
+        if (_version == schemaVersionInvalid) {
             _version = authzVersion;
-        ret = _userCache.insertOrAssignAndGet(userName, std::move(user));
+        }
+
+        ret = _userCache.insertOrAssignAndGet(request, std::move(user));
     } else {
         // If the cache generation changed while this thread was in fetch mode, the data
         // associated with the user may now be invalid, so we must mark it as such.  The caller
@@ -621,15 +659,15 @@ StatusWith<UserHandle> AuthorizationManagerImpl::acquireUserForSessionRefresh(
 }
 
 Status AuthorizationManagerImpl::_fetchUserV2(OperationContext* opCtx,
-                                              const UserName& userName,
+                                              const UserRequest& userRequest,
                                               std::unique_ptr<User>* out) {
     BSONObj userObj;
-    Status status = getUserDescription(opCtx, userName, &userObj);
+    Status status = _externalState->getUserDescription(opCtx, userRequest, &userObj);
     if (!status.isOK()) {
         return status;
     }
 
-    auto user = std::make_unique<User>(userName);
+    auto user = std::make_unique<User>(userRequest.name);
 
     status = _initializeUserFromPrivilegeDocument(user.get(), userObj);
     if (!status.isOK()) {
@@ -735,7 +773,9 @@ void AuthorizationManagerImpl::invalidateUserByName(OperationContext* opCtx,
     CacheGuard guard(opCtx, this);
     _updateCacheGeneration_inlock(guard);
     LOG(2) << "Invalidating user " << userName;
-    _userCache.invalidate(userName);
+    // Invalidate the named User, assuming no externally provided roles. When roles are defined
+    // externally, there exists no user document which may become invalid.
+    _userCache.invalidate(UserRequest(userName, boost::none));
 }
 
 void AuthorizationManagerImpl::invalidateUsersFromDB(OperationContext* opCtx, StringData dbname) {
@@ -743,7 +783,7 @@ void AuthorizationManagerImpl::invalidateUsersFromDB(OperationContext* opCtx, St
     _updateCacheGeneration_inlock(guard);
     LOG(2) << "Invalidating all users from database " << dbname;
     _userCache.invalidateIf(
-        [&](const UserName& user, const User*) { return user.getDB() == dbname; });
+        [&](const UserRequest& request, const User*) { return request.name.getDB() == dbname; });
 }
 
 void AuthorizationManagerImpl::invalidateUserCache(OperationContext* opCtx) {
@@ -754,7 +794,7 @@ void AuthorizationManagerImpl::invalidateUserCache(OperationContext* opCtx) {
 
 void AuthorizationManagerImpl::_invalidateUserCache_inlock(const CacheGuard& guard) {
     _updateCacheGeneration_inlock(guard);
-    _userCache.invalidateIf([](const UserName& a, const User*) { return true; });
+    _userCache.invalidateIf([](const UserRequest&, const User*) { return true; });
 
     // Reread the schema version before acquiring the next user.
     _version = schemaVersionInvalid;
@@ -851,7 +891,7 @@ std::vector<AuthorizationManager::CachedUserInfo> AuthorizationManagerImpl::getU
     ret.reserve(cacheData.size());
     std::transform(
         cacheData.begin(), cacheData.end(), std::back_inserter(ret), [](const auto& info) {
-            return AuthorizationManager::CachedUserInfo{info.key, info.active};
+            return AuthorizationManager::CachedUserInfo{info.key.name, info.active};
         });
 
     return ret;

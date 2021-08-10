@@ -120,9 +120,10 @@ Status AuthzManagerExternalStateMongos::getStoredAuthorizationVersion(OperationC
 }
 
 Status AuthzManagerExternalStateMongos::getUserDescription(OperationContext* opCtx,
-                                                           const UserName& userName,
+                                                           const UserRequest& userRequest,
                                                            BSONObj* result) {
-    if (!shouldUseRolesFromConnection(opCtx, userName)) {
+    const auto userName = userRequest.name;
+    if (userRequest.roles == boost::none) {
         BSONObj usersInfoCmd =
             BSON("usersInfo" << BSON_ARRAY(BSON(AuthorizationManager::USER_NAME_FIELD_NAME
                                                 << userName.getUser()
@@ -156,8 +157,7 @@ Status AuthzManagerExternalStateMongos::getUserDescription(OperationContext* opC
         // Obtain privilege information from the config servers for all roles acquired from the X509
         // certificate.
         BSONArrayBuilder userRolesBuilder;
-        auto& sslPeerInfo = SSLPeerInfo::forSession(opCtx->getClient()->session());
-        for (const RoleName& role : sslPeerInfo.roles) {
+        for (const auto& role : userRequest.roles.get()) {
             userRolesBuilder.append(BSON(
                 AuthorizationManager::ROLE_NAME_FIELD_NAME
                 << role.getRole() << AuthorizationManager::ROLE_DB_FIELD_NAME << role.getDB()));

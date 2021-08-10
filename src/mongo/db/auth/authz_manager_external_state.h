@@ -95,7 +95,7 @@ public:
      * If the user does not exist, returns ErrorCodes::UserNotFound.
      */
     virtual Status getUserDescription(OperationContext* opCtx,
-                                      const UserName& userName,
+                                      const UserRequest& userRequest,
                                       BSONObj* result) = 0;
 
     /**
@@ -172,12 +172,6 @@ public:
 
 protected:
     AuthzManagerExternalState();  // This class should never be instantiated directly.
-
-    /**
-     * Returns true if roles for this user were provided by the client, and can be obtained from
-     * the connection.
-     */
-    bool shouldUseRolesFromConnection(OperationContext* opCtx, const UserName& username);
 };
 
 }  // namespace mongo

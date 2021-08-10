@@ -184,7 +184,7 @@ private:
      * and stores a pointer to a new user object into *acquiredUser on success.
      */
     Status _fetchUserV2(OperationContext* opCtx,
-                        const UserName& userName,
+                        const UserRequest& userRequest,
                         std::unique_ptr<User>* acquiredUser);
 
     /**
@@ -230,7 +230,7 @@ private:
         void operator()(User* user);
     };
 
-    InvalidatingLRUCache<UserName, User, UserCacheInvalidator> _userCache;
+    InvalidatingLRUCache<UserRequest, User, UserCacheInvalidator> _userCache;
 
     Mutex _pinnedUsersMutex = MONGO_MAKE_LATCH("AuthorizationManagerImpl::_pinnedUsersMutex");
     stdx::condition_variable _pinnedUsersCond;
