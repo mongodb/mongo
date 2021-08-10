@@ -362,7 +362,7 @@ createRetryableWritesOplogFetchingPipelineForTenantMigrations(
         fromjson("{$replaceRoot: {newRoot: '$completeOplogEntry'}}").firstElement(), expCtx));
 
     return Pipeline::create(std::move(stages), expCtx);
-}  // namespace tenant_migration_util
+}
 
 bool shouldStopUpdatingExternalKeys(Status status, const CancellationToken& token) {
     return status.isOK() || token.isCanceled();
