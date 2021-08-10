@@ -169,8 +169,6 @@ function runTest(getShardKey, insert) {
     // During chunk migration, we have moved 2 buckets into the other shard. These migrated buckets
     // cannot be modified, so after insertion of second and third batches, two more buckets are
     // created.
-    // TODO SERVER-58334: Once we are able to insert documents into the migrated buckets, this
-    // check should be modified to expect only 2 buckets on the 'otherShard'.
     verifyBucketsOnShard(otherShard, otherBuckets.concat(otherBuckets));
 
     // Check that both old documents and newly inserted documents are available.
