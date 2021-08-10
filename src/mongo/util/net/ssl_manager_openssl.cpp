@@ -1215,9 +1215,6 @@ public:
     Milliseconds updateOcspStaplingContextWithResponse(StatusWith<OCSPFetchResponse> swResponse);
 
 private:
-    const int _rolesNid = OBJ_create(mongodbRolesOID.identifier.c_str(),
-                                     mongodbRolesOID.shortDescription.c_str(),
-                                     mongodbRolesOID.longDescription.c_str());
     UniqueSSLContext _serverContext;             // SSL context for incoming connections
     UniqueSSLContext _clientContext;             // SSL context for outgoing connections
     std::shared_ptr<X509_STORE> _ocspCertStore;  // X509 Store specifically for OCSP stapling
@@ -1380,6 +1377,10 @@ private:
 
     StatusWith<stdx::unordered_set<RoleName>> _parsePeerRoles(X509* peerCert) const;
 
+    // Fetches NID for mongodbRolesOID constant. Initializes once, safe to invoke
+    // multiple times.
+    static int _getMongoDbRolesOID();
+
     StatusWith<boost::optional<std::vector<DERInteger>>> _parseTLSFeature(X509* peerCert) const;
 
     /** @return true if was successful, otherwise false */
@@ -1477,11 +1478,17 @@ bool isSSLServer = false;
 
 extern SSLManagerCoordinator* theSSLManagerCoordinator;
 
+static int sMongoDbRolesOID;
+
 MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManager, ("SetupOpenSSL", "EndStartupOptionHandling"))
 (InitializerContext*) {
     if (!isSSLServer || (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled)) {
         theSSLManagerCoordinator = new SSLManagerCoordinator();
     }
+
+    sMongoDbRolesOID = OBJ_create(mongodbRolesOID.identifier.c_str(),
+                                  mongodbRolesOID.shortDescription.c_str(),
+                                  mongodbRolesOID.longDescription.c_str());
 }
 
 std::shared_ptr<SSLManagerInterface> SSLManagerInterface::create(
@@ -3335,7 +3342,7 @@ StatusWith<stdx::unordered_set<RoleName>> SSLManagerOpenSSL::_parsePeerRoles(X50
         extCount = sk_X509_EXTENSION_num(exts);
     }
 
-    ASN1_OBJECT* rolesObj = OBJ_nid2obj(_rolesNid);
+    ASN1_OBJECT* rolesObj = OBJ_nid2obj(_getMongoDbRolesOID());
 
     // Search all certificate extensions for our own
     stdx::unordered_set<RoleName> roles;
@@ -3354,6 +3361,10 @@ StatusWith<stdx::unordered_set<RoleName>> SSLManagerOpenSSL::_parsePeerRoles(X50
     }
 
     return roles;
+}
+
+int SSLManagerOpenSSL::_getMongoDbRolesOID() {
+    return sMongoDbRolesOID;
 }
 
 StatusWith<boost::optional<std::vector<DERInteger>>> SSLManagerOpenSSL::_parseTLSFeature(

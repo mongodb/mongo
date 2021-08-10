@@ -627,8 +627,6 @@ TEST(SSLManager, TransientSSLParams) {
     ASSERT_NOT_OK(tla.rotateCertificates(swContext.getValue()->manager, true));
 }
 
-#if OPENSSL_VERSION_NUMBER >= 0x100010fFL
-
 TEST(SSLManager, TransientSSLParamsStressTestWithTransport) {
     static constexpr int kMaxContexts = 100;
     static constexpr int kThreads = 10;
@@ -733,8 +731,6 @@ TEST(SSLManager, TransientSSLParamsStressTestWithManager) {
     managers.clear();
     LOGV2(5906702, "Stress test completed", "iterations"_attr = iterations);
 }
-
-#endif  // OPENSSL_VERSION_NUMBER >= 0x100010fFL
 
 #endif  // MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
 
