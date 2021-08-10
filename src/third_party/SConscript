@@ -240,9 +240,19 @@ empty_object = env.LibraryObject(
 )
 
 def shim_library(env, name, **kwargs):
+    # Add the 'virtual-libdep' tag, which will prevent shim libraries
+    # from actually being linked to. They don't provide any symbols,
+    # so there is no need to do so. Instead, they just act as a node
+    # in the library dependency graph to reach other libraries.
+    libdeps_tags = kwargs.get('LIBDEPS_TAGS', env.get('LIBDEPS_TAGS', [])).copy()
+    libdeps_tags.append('virtual-libdep')
+    kwargs['LIBDEPS_TAGS'] = libdeps_tags
     return env.Library(
-        target=f"shim_{name}",
+        target=f'shim_{name}',
         source=empty_object[0],
+        # Since nothing will link to this library per the
+        # `virtual-libdep` tag above, we can also skip installing it.
+        AIB_IGNORE=True,
         **kwargs,
     )
 env.AddMethod(shim_library, 'ShimLibrary')

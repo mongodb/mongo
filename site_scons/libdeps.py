@@ -730,7 +730,13 @@ def _libdeps_visit(n, tsorted, marked, walking, debug=False):
                 _libdeps_visit_private(child, marked, walking, debug)
 
         marked[n.target_node] = LibdepsVisitationMark.MARKED_PUBLIC
-        tsorted.append(n.target_node)
+
+        # If the node has been marked as a virtual libdep in the tags,
+        # we don't add it to tsorted because it isn't a real
+        # dependency, just a node that adds further transitive
+        # dependencies.
+        if not 'virtual-libdep' in n.target_node.get_env().get('LIBDEPS_TAGS', []):
+            tsorted.append(n.target_node)
 
     except DependencyCycleError as e:
         if len(e.cycle_nodes) == 1 or e.cycle_nodes[0] != e.cycle_nodes[-1]:
