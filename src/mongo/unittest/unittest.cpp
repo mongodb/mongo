@@ -253,12 +253,12 @@ void CaptureLogs::startCapturingLogMessages() {
     _capturedBSONLogMessages.clear();
 
     if (!_captureSink) {
-        _captureSink = logv2::LogCaptureBackend::create(_capturedLogMessages);
+        _captureSink = logv2::LogCaptureBackend::create(_capturedLogMessages, true);
         _captureSink->set_filter(
             logv2::AllLogsFilter(logv2::LogManager::global().getGlobalDomain()));
         _captureSink->set_formatter(logv2::PlainFormatter());
 
-        _captureBSONSink = logv2::LogCaptureBackend::create(_capturedBSONLogMessages);
+        _captureBSONSink = logv2::LogCaptureBackend::create(_capturedBSONLogMessages, false);
 
         _captureBSONSink->set_filter(
             logv2::AllLogsFilter(logv2::LogManager::global().getGlobalDomain()));

@@ -171,6 +171,7 @@ void PlainFormatter::operator()(boost::log::record_view const& rec,
     fmt::memory_buffer buffer;
     operator()(rec, buffer);
     strm.write(buffer.data(), buffer.size());
+    strm.put(boost::log::formatting_ostream::char_type('\n'));
 }
 
 }  // namespace mongo::logv2

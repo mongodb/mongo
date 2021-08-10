@@ -189,7 +189,7 @@ void applyDefaultFilterToSink(SinkPtr&& sink) {
 class LogDuringInitShutdownTester {
 public:
     LogDuringInitShutdownTester() {
-        auto sink = LogCaptureBackend::create(lines);
+        auto sink = LogCaptureBackend::create(lines, true);
         applyDefaultFilterToSink(sink);
         // We have to leave this sink installed as it is not allowed to install sinks during
         // shutdown. Add a filter so it is only used during this test.
@@ -217,9 +217,10 @@ class LogV2Test : public unittest::Test {
 public:
     class LineCapture {
     public:
-        LineCapture()
+        LineCapture() = delete;
+        LineCapture(bool stripEol)
             : _lines{std::make_unique<std::vector<std::string>>()},
-              _sink{LogCaptureBackend::create(*_lines)} {}
+              _sink{LogCaptureBackend::create(*_lines, stripEol)} {}
         auto& lines() {
             return *_lines;
         }
@@ -280,8 +281,8 @@ public:
     }
 
     template <typename Fmt>
-    LineCapture makeLineCapture(Fmt&& formatter) {
-        LineCapture ret;
+    LineCapture makeLineCapture(Fmt&& formatter, bool stripEol = true) {
+        LineCapture ret(stripEol);
         auto& s = ret.sink();
         applyDefaultFilterToSink(s);
         s->set_formatter(std::forward<Fmt>(formatter));
@@ -1518,13 +1519,18 @@ TEST_F(LogV2Test, Ramlog) {
     sink->set_formatter(PlainFormatter());
     attachSink(sink);
 
-    auto lines = makeLineCapture(PlainFormatter());
+    auto lines = makeLineCapture(PlainFormatter(), false);
 
     auto verifyRamLog = [&] {
         RamLog::LineIterator iter(ramlog);
-        for (const auto& s : lines.lines())
-            if (s != iter.next())
+        for (const auto& s : lines.lines()) {
+            const auto next = iter.next();
+            if (s != next) {
+                std::cout << "\n\n\n********************** s='" << s << "', next='" << next
+                          << "'\n";
                 return false;
+            }
+        }
         return true;
     };
 
@@ -1641,7 +1647,7 @@ TEST_F(LogV2Test, MultipleDomains) {
     };
     LogDomain other_domain(std::make_unique<OtherDomain>());
     std::vector<std::string> other_lines;
-    auto other_sink = LogCaptureBackend::create(other_lines);
+    auto other_sink = LogCaptureBackend::create(other_lines, true);
     other_sink->set_filter(ComponentSettingsFilter(other_domain, mgr().getGlobalSettings()));
     other_sink->set_formatter(PlainFormatter());
     attachSink(other_sink);
@@ -1708,7 +1714,7 @@ TEST_F(LogV2Test, FileLogging) {
 TEST_F(LogV2Test, UserAssert) {
     std::vector<std::string> lines;
     auto sink = wrapInSynchronousSink(wrapInCompositeBackend(
-        boost::make_shared<LogCaptureBackend>(lines), boost::make_shared<UserAssertSink>()));
+        boost::make_shared<LogCaptureBackend>(lines, true), boost::make_shared<UserAssertSink>()));
     applyDefaultFilterToSink(sink);
     sink->set_formatter(PlainFormatter());
     attachSink(sink);

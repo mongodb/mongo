@@ -42,19 +42,26 @@ class LogCaptureBackend
     : public boost::log::sinks::
           basic_formatted_sink_backend<char, boost::log::sinks::synchronized_feeding> {
 public:
-    LogCaptureBackend(std::vector<std::string>& lines) : _logLines(lines) {}
+    LogCaptureBackend(std::vector<std::string>& lines, bool stripEol)
+        : _stripEol(stripEol), _logLines(lines) {}
 
     static boost::shared_ptr<boost::log::sinks::synchronous_sink<LogCaptureBackend>> create(
-        std::vector<std::string>& lines) {
+        std::vector<std::string>& lines, bool stripEol) {
         return boost::make_shared<boost::log::sinks::synchronous_sink<LogCaptureBackend>>(
-            boost::make_shared<LogCaptureBackend>(lines));
+            boost::make_shared<LogCaptureBackend>(lines, stripEol));
     }
 
     void consume(boost::log::record_view const& rec, string_type const& formatted_string) {
-        _logLines.push_back(formatted_string);
+        if (_stripEol && !formatted_string.empty() &&
+            formatted_string[formatted_string.size() - 1] == '\n') {
+            _logLines.push_back(formatted_string.substr(0, formatted_string.size() - 1));
+        } else {
+            _logLines.push_back(formatted_string);
+        }
     }
 
 private:
+    bool _stripEol;
     std::vector<std::string>& _logLines;
 };
 }  // namespace mongo::logv2
