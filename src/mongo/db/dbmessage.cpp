@@ -138,21 +138,6 @@ T DbMessage::readAndAdvance() {
     return t;
 }
 
-namespace {
-template <typename Func>
-Message makeMessage(NetworkOp op, Func&& bodyBuilder) {
-    BufBuilder b;
-    b.skip(sizeof(MSGHEADER::Layout));
-
-    bodyBuilder(b);
-
-    const int size = b.len();
-    auto out = Message(b.release());
-    out.header().setOperation(op);
-    out.header().setLen(size);
-    return out;
-}
-}  // namespace
 
 Message makeDeprecatedQueryMessage(StringData ns,
                                    BSONObj query,
@@ -183,46 +168,6 @@ Message makeDeprecatedInsertMessage(StringData ns, const BSONObj* objs, size_t c
         for (size_t i = 0; i < count; i++) {
             objs[i].appendSelfToBufBuilder(b);
         }
-    });
-}
-
-Message makeDeprecatedUpdateMessage(StringData ns, BSONObj query, BSONObj update, int flags) {
-    return makeMessage(dbUpdate, [&](BufBuilder& b) {
-        const int reservedFlags = 0;
-        b.appendNum(reservedFlags);
-        b.appendStr(ns);
-        b.appendNum(flags);
-
-        query.appendSelfToBufBuilder(b);
-        update.appendSelfToBufBuilder(b);
-    });
-}
-
-Message makeDeprecatedRemoveMessage(StringData ns, BSONObj query, int flags) {
-    return makeMessage(dbDelete, [&](BufBuilder& b) {
-        const int reservedFlags = 0;
-        b.appendNum(reservedFlags);
-        b.appendStr(ns);
-        b.appendNum(flags);
-
-        query.appendSelfToBufBuilder(b);
-    });
-}
-
-Message makeDeprecatedKillCursorsMessage(long long cursorId) {
-    return makeMessage(dbKillCursors, [&](BufBuilder& b) {
-        b.appendNum((int)0);  // reserved
-        b.appendNum((int)1);  // number
-        b.appendNum(cursorId);
-    });
-}
-
-Message makeDeprecatedGetMoreMessage(StringData ns, long long cursorId, int nToReturn, int flags) {
-    return makeMessage(dbGetMore, [&](BufBuilder& b) {
-        b.appendNum(flags);
-        b.appendStr(ns);
-        b.appendNum(nToReturn);
-        b.appendNum(cursorId);
     });
 }
 

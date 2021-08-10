@@ -182,37 +182,6 @@ write_ops::UpdateCommandRequest UpdateOp::parse(const OpMsgRequest& request) {
     return updateOp;
 }
 
-write_ops::UpdateCommandRequest UpdateOp::parseLegacy(const Message& msgRaw) {
-    DbMessage msg(msgRaw);
-
-    UpdateCommandRequest op(NamespaceString(msg.getns()));
-
-    {
-        write_ops::WriteCommandRequestBase writeCommandBase;
-        writeCommandBase.setBypassDocumentValidation(false);
-        writeCommandBase.setOrdered(true);
-        op.setWriteCommandRequestBase(std::move(writeCommandBase));
-    }
-
-    op.setUpdates([&] {
-        std::vector<write_ops::UpdateOpEntry> updates;
-        updates.emplace_back();
-
-        // Legacy updates only allowed one update per operation. Layout is flags, query, update.
-        auto& singleUpdate = updates.back();
-        const int flags = msg.pullInt();
-        singleUpdate.setUpsert(flags & UpdateOption_Upsert);
-        singleUpdate.setMulti(flags & UpdateOption_Multi);
-        singleUpdate.setQ(msg.nextJsObj());
-        singleUpdate.setU(
-            write_ops::UpdateModification::parseLegacyOpUpdateFromBSON(msg.nextJsObj()));
-
-        return updates;
-    }());
-
-    return op;
-}
-
 write_ops::UpdateCommandReply UpdateOp::parseResponse(const BSONObj& obj) {
     uassertStatusOK(getStatusFromCommandResult(obj));
 
@@ -235,34 +204,6 @@ write_ops::DeleteCommandRequest DeleteOp::parse(const OpMsgRequest& request) {
 
     checkOpCountForCommand(deleteOp, deleteOp.getDeletes().size());
     return deleteOp;
-}
-
-write_ops::DeleteCommandRequest DeleteOp::parseLegacy(const Message& msgRaw) {
-    DbMessage msg(msgRaw);
-
-    DeleteCommandRequest op(NamespaceString(msg.getns()));
-
-    {
-        write_ops::WriteCommandRequestBase writeCommandBase;
-        writeCommandBase.setBypassDocumentValidation(false);
-        writeCommandBase.setOrdered(true);
-        op.setWriteCommandRequestBase(std::move(writeCommandBase));
-    }
-
-    op.setDeletes([&] {
-        std::vector<write_ops::DeleteOpEntry> deletes;
-        deletes.emplace_back();
-
-        // Legacy deletes only allowed one delete per operation. Layout is flags, query.
-        auto& singleDelete = deletes.back();
-        const int flags = msg.pullInt();
-        singleDelete.setMulti(!(flags & RemoveOption_JustOne));
-        singleDelete.setQ(msg.nextJsObj());
-
-        return deletes;
-    }());
-
-    return op;
 }
 
 void DeleteOp::validate(const DeleteCommandRequest& deleteOp) {
@@ -342,11 +283,6 @@ write_ops::UpdateModification::UpdateModification(std::vector<BSONObj> pipeline)
  */
 write_ops::UpdateModification write_ops::UpdateModification::parseFromBSON(BSONElement elem) {
     return UpdateModification(elem);
-}
-
-write_ops::UpdateModification write_ops::UpdateModification::parseLegacyOpUpdateFromBSON(
-    const BSONObj& obj) {
-    return UpdateModification(obj, ClassicTag{});
 }
 
 int write_ops::UpdateModification::objsize() const {

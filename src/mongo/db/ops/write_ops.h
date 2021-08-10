@@ -38,6 +38,11 @@ namespace mongo {
 class InsertOp {
 public:
     static write_ops::InsertCommandRequest parse(const OpMsgRequest& request);
+    /**
+     * This is to parse OP_INSERT legacy request and deprecated and used only to parse legacy insert
+     * request to know how many documents need to be inserted for the purpose of monitoring. Do not
+     * call this method any more.
+     */
     static write_ops::InsertCommandRequest parseLegacy(const Message& msg);
     static void validate(const write_ops::InsertCommandRequest& insertOp);
 };
@@ -45,7 +50,6 @@ public:
 class UpdateOp {
 public:
     static write_ops::UpdateCommandRequest parse(const OpMsgRequest& request);
-    static write_ops::UpdateCommandRequest parseLegacy(const Message& msg);
     static write_ops::UpdateCommandReply parseResponse(const BSONObj& obj);
     static void validate(const write_ops::UpdateCommandRequest& updateOp);
 };
@@ -53,7 +57,6 @@ public:
 class DeleteOp {
 public:
     static write_ops::DeleteCommandRequest parse(const OpMsgRequest& request);
-    static write_ops::DeleteCommandRequest parseLegacy(const Message& msg);
     static void validate(const write_ops::DeleteCommandRequest& deleteOp);
 };
 

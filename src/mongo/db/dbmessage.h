@@ -384,6 +384,20 @@ public:
     }
 };
 
+template <typename Func>
+Message makeMessage(NetworkOp op, Func&& bodyBuilder) {
+    BufBuilder b;
+    b.skip(sizeof(MSGHEADER::Layout));
+
+    bodyBuilder(b);
+
+    const int size = b.len();
+    auto out = Message(b.release());
+    out.header().setOperation(op);
+    out.header().setLen(size);
+    return out;
+}
+
 /**
  * Builds a legacy OP_QUERY message.
  */
@@ -419,11 +433,6 @@ enum UpdateOptions {
     UpdateOption_Broadcast = 1 << 2
 };
 
-/**
- * Builds a legacy OP_UPDATE message.
- */
-Message makeDeprecatedUpdateMessage(StringData ns, BSONObj query, BSONObj update, int flags = 0);
-
 enum RemoveOptions {
     /** only delete one option */
     RemoveOption_JustOne = 1 << 0,
@@ -431,24 +440,6 @@ enum RemoveOptions {
     /** flag from mongo saying this update went everywhere */
     RemoveOption_Broadcast = 1 << 1
 };
-
-/**
- * Builds a legacy OP_REMOVE message.
- */
-Message makeDeprecatedRemoveMessage(StringData ns, BSONObj query, int flags = 0);
-
-/**
- * Builds a legacy OP_KILLCURSORS message.
- */
-Message makeDeprecatedKillCursorsMessage(long long cursorId);
-
-/**
- * Builds a legacy OP_GET_MORE message.
- */
-Message makeDeprecatedGetMoreMessage(StringData ns,
-                                     long long cursorId,
-                                     int nToReturn,
-                                     int flags = 0);
 
 /**
  * A response to a DbMessage.

@@ -122,15 +122,6 @@ public:
      */
     void serializeToBSON(StringData fieldName, BSONObjBuilder* bob) const;
 
-    // When parsing from legacy OP_UPDATE messages, we receive the "u" field as an object. When an
-    // array is parsed, we receive it as an object with numeric fields names and can't differentiate
-    // between a user constructed object and an array. For that reason, we don't support pipeline
-    // style update via OP_UPDATE and 'obj' is assumed to be a classic update.
-    //
-    // If a user did send a pipeline-style update via OP_UPDATE, it would fail parsing a field
-    // representing an aggregation stage, due to the leading '$'' character.
-    static UpdateModification parseLegacyOpUpdateFromBSON(const BSONObj& obj);
-
     int objsize() const;
 
     Type type() const;

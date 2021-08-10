@@ -54,6 +54,46 @@ long getDeprecatedOpCount(BSONObj serverStatus, const char* opName) {
     return deprecatedOpcounters ? deprecatedOpcounters[opName].Long() : 0;
 }
 
+Message makeDeprecatedUpdateMessage(StringData ns, BSONObj query, BSONObj update, int flags) {
+    return makeMessage(dbUpdate, [&](BufBuilder& b) {
+        const int reservedFlags = 0;
+        b.appendNum(reservedFlags);
+        b.appendStr(ns);
+        b.appendNum(flags);
+
+        query.appendSelfToBufBuilder(b);
+        update.appendSelfToBufBuilder(b);
+    });
+}
+
+Message makeDeprecatedRemoveMessage(StringData ns, BSONObj query, int flags) {
+    return makeMessage(dbDelete, [&](BufBuilder& b) {
+        const int reservedFlags = 0;
+        b.appendNum(reservedFlags);
+        b.appendStr(ns);
+        b.appendNum(flags);
+
+        query.appendSelfToBufBuilder(b);
+    });
+}
+
+Message makeDeprecatedKillCursorsMessage(long long cursorId) {
+    return makeMessage(dbKillCursors, [&](BufBuilder& b) {
+        b.appendNum((int)0);  // reserved
+        b.appendNum((int)1);  // number
+        b.appendNum(cursorId);
+    });
+}
+
+Message makeDeprecatedGetMoreMessage(StringData ns, long long cursorId, int nToReturn, int flags) {
+    return makeMessage(dbGetMore, [&](BufBuilder& b) {
+        b.appendNum(flags);
+        b.appendStr(ns);
+        b.appendNum(nToReturn);
+        b.appendNum(cursorId);
+    });
+}
+
 // Issue a find command request so we can use cursor id from it to test the deprecated getMore
 // and killCursors ops.
 int64_t getValidCursorIdFromFindCmd(DBClientBase* conn, const char* collName) {

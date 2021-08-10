@@ -75,11 +75,10 @@ void doFuzzing(ConstDataRangeCursor fuzzedData) try {
         msg = uassertStatusOK(compression.manager.decompressMessage(msg));
     }
 
-    DbMessage dbMsgObj(msg);
 
     switch (msg.operation()) {
         case dbMsg: {
-            auto request = rpc::opMsgRequestFromAnyProtocol(msg);
+            auto request = OpMsgRequest::parseOwned(msg);
             validateBSON(request.body);
             for (const auto& docSeq : request.sequences) {
                 for (const auto& doc : docSeq.objs) {
@@ -87,22 +86,18 @@ void doFuzzing(ConstDataRangeCursor fuzzedData) try {
                 }
             }
         } break;
-        case dbUpdate: {
-            auto op = UpdateOp::parseLegacy(msg);
-        } break;
         case dbInsert: {
             auto op = InsertOp::parseLegacy(msg);
         } break;
-        case dbDelete: {
-            auto op = DeleteOp::parseLegacy(msg);
-        }
         case dbQuery: {
+            DbMessage dbMsgObj(msg);
             QueryMessage q(dbMsgObj);
         } break;
-        // TODO these message types don't have discrete parsers. We should move their parsing out
-        // of the ServiceEntryPointCommon so we can actually
+        // These message types don't have parsers because they are no longer supported.
         case dbGetMore:
         case dbKillCursors:
+        case dbDelete:
+        case dbUpdate:
             break;
         default:
             invariant(!isSupportedRequestNetworkOp(msg.operation()));
