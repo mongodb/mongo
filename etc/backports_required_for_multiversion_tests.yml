@@ -24,6 +24,8 @@ last-continuous:
   all:
     - ticket: SERVER-57262
       test_file: jstests/replsets/catchup_takeover_with_higher_config.js
+    - ticket: SERVER-58353
+      test_file: jstests/replsets/tenant_migration_aborted_buildindex.js
     - ticket: SERVER-58898
       test_file: jstests/replsets/write_concern_write_to_local.js
     - ticket: SERVER-59197
@@ -52,6 +54,8 @@ last-lts:
   all:
     - ticket: SERVER-49471
       test_file: jstests/replsets/apply_prepare_txn_write_conflict_robustness.js
+    - ticket: SERVER-58353
+      test_file: jstests/replsets/tenant_migration_aborted_buildindex.js
     - ticket: SERVER-47645
       test_file: jstests/replsets/invalidate_sessions_on_stepdown.js
     - ticket: SERVER-47773

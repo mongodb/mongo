@@ -53,6 +53,9 @@ namespace mongo {
 // Failpoint that will cause recoverTenantMigrationAccessBlockers to return early.
 MONGO_FAIL_POINT_DEFINE(skipRecoverTenantMigrationAccessBlockers);
 
+// Signals that we have checked that we can build an index.
+MONGO_FAIL_POINT_DEFINE(haveCheckedIfIndexBuildableDuringTenantMigration);
+
 namespace tenant_migration_access_blocker {
 
 namespace {
@@ -265,11 +268,14 @@ Status checkIfCanBuildIndex(OperationContext* opCtx, StringData dbName) {
         // This log is included for synchronization of the tenant migration buildindex jstests.
         auto status = mtab->checkIfCanBuildIndex();
         mtab->recordTenantMigrationError(status);
-        LOGV2_DEBUG(4886202,
-                    1,
-                    "Checked if tenant migration on database prevents index builds",
-                    "db"_attr = dbName,
-                    "error"_attr = status);
+
+        if (MONGO_unlikely(haveCheckedIfIndexBuildableDuringTenantMigration.shouldFail())) {
+            LOGV2(5835300,
+                  "haveCheckedIfIndexBuildableDuringTenantMigration failpoint enabled",
+                  "db"_attr = dbName,
+                  "status"_attr = status);
+        }
+
         return status;
     }
     return Status::OK();
