@@ -97,18 +97,6 @@ ReplSetConfig ReplSetConfig::parseForInitiate(const BSONObj& cfg, OID newReplica
     return result;
 }
 
-void ReplSetConfig::setDefaultDelayFieldForMember(MemberConfig mem) {
-    // We should only be setting the default values if the config has neither delay field set.
-    if (!mem.hasSecondaryDelaySecs() && !mem.hasSlaveDelay()) {
-        if (feature_flags::gUseSecondaryDelaySecs.isEnabled(
-                serverGlobalParams.featureCompatibility)) {
-            useSecondaryDelaySecsFieldName(mem.getId());
-        } else {
-            useSlaveDelayFieldName(mem.getId());
-        }
-    }
-}
-
 void ReplSetConfig::_setRequiredFields() {
     // The three required fields need to be set to something valid to avoid a potential
     // invariant if the uninitialized object is ever used with toBSON().
@@ -157,7 +145,7 @@ Status ReplSetConfig::_initialize(bool forInitiate,
         // arrays.
         const_cast<MemberConfig&>(member).addTagInfo(&_tagConfig);
 
-        setDefaultDelayFieldForMember(member);
+        setSecondaryDelaySecsFieldDefault(member.getId());
     }
 
     //
@@ -272,12 +260,6 @@ Status ReplSetConfig::_validate(bool allowSplitHorizonIP) const {
             for (const auto& mapping : memberI.getHorizonMappings()) {
                 ++horizonHostNameCounts[mapping.second];
             }
-        }
-
-        if (memberI.hasSlaveDelay() && memberI.hasSecondaryDelaySecs()) {
-            return Status(ErrorCodes::BadValue,
-                          "Cannot specify both secondaryDelaySecs and slaveDelay as fields in "
-                          "member configuration.");
         }
 
         if (memberI.getHostAndPort().isLocalHost()) {
@@ -733,22 +715,12 @@ void MutableReplSetConfig::removeNewlyAddedFieldForMember(MemberId memberId) {
     _findMemberByID(memberId)->setNewlyAdded(boost::none);
 }
 
-void MutableReplSetConfig::useSecondaryDelaySecsFieldName(MemberId memberId) {
+void MutableReplSetConfig::setSecondaryDelaySecsFieldDefault(MemberId memberId) {
     auto mem = _findMemberByID(memberId);
     if (mem->hasSecondaryDelaySecs()) {
         return;
     }
-    mem->setSecondaryDelaySecs(mem->hasSlaveDelay() ? mem->getSlaveDelaySecs() : 0LL);
-    mem->setSlaveDelaySecs(boost::none);
-}
-
-void MutableReplSetConfig::useSlaveDelayFieldName(MemberId memberId) {
-    auto mem = _findMemberByID(memberId);
-    if (mem->hasSlaveDelay()) {
-        return;
-    }
-    mem->setSlaveDelaySecs(mem->hasSecondaryDelaySecs() ? mem->getSecondaryDelaySecs() : 0LL);
-    mem->setSecondaryDelaySecs(boost::none);
+    mem->setSecondaryDelaySecs(0LL);
 }
 
 }  // namespace repl

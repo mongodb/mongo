@@ -20,13 +20,9 @@ var conf = rst.getReplSetConfig();
 conf.members[1].votes = 0;
 conf.members[1].priority = 0;
 conf.members[1].hidden = true;
+conf.members[1].secondaryDelaySecs = 0;  // Set later.
 
 rst.startSet();
-// If featureFlagUseSecondaryDelaySecs is enabled, we must use the 'secondaryDelaySecs' field
-// name in our config. Otherwise, we use 'slaveDelay'.
-const delayFieldName = selectDelayFieldName(rst);
-conf.members[1][delayFieldName] = 0;  // Set later.
-
 rst.initiate(conf);
 
 var primary = rst.getPrimary();  // Waits for PRIMARY state.
@@ -37,9 +33,9 @@ assert.commandWorked(primary.getCollection(ns).insert([{}, {}, {}], {writeConcer
 // Set the delay field and wait for secondary to receive the change.
 conf = rst.getReplSetConfigFromNode();
 conf.version++;
-conf.members[1][delayFieldName] = 24 * 60 * 60;
+conf.members[1].secondaryDelaySecs = 24 * 60 * 60;
 reconfig(rst, conf);
-assert.soon(() => rst.getReplSetConfigFromNode(1).members[1][delayFieldName] > 0,
+assert.soon(() => rst.getReplSetConfigFromNode(1).members[1].secondaryDelaySecs > 0,
             () => rst.getReplSetConfigFromNode(1));
 
 // The secondary apply loop only checks for the delay field changes once per second.

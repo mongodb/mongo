@@ -834,23 +834,6 @@ TEST(ReplSetConfig, ValidateFailsWithDuplicateMemberId) {
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
-TEST(ReplSetConfig, ValidateFailsWithBothDelaySecsFieldNames) {
-    ReplSetConfig config(ReplSetConfig::parse(
-        BSON("_id"
-             << "rs0"
-             << "protocolVersion" << 1 << "version" << 1 << "configsvr" << true << "members"
-             << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                      << "localhost:12345")
-                           << BSON("_id" << 1 << "host"
-                                         << "localhost:54321"
-                                         << "priority" << 0 << "secondaryDelaySecs" << 10
-                                         << "slaveDelay" << 10)))));
-    Status status = config.validate();
-    ASSERT_EQUALS(ErrorCodes::BadValue, status);
-    ASSERT_STRING_CONTAINS(status.reason(),
-                           "Cannot specify both secondaryDelaySecs and slaveDelay");
-}
-
 TEST(ReplSetConfig, InitializeFailsWithInvalidMember) {
     ReplSetConfig config;
     ASSERT_THROWS(ReplSetConfig::parse(BSON("_id"

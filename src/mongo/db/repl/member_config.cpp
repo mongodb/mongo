@@ -214,9 +214,6 @@ BSONObj MemberConfig::toBSON(bool omitNewlyAddedField) const {
     if (getSecondaryDelaySecs()) {
         configBuilder.append(kSecondaryDelaySecsFieldName, getSecondaryDelaySecs().get());
     }
-    if (getSlaveDelaySecs()) {
-        configBuilder.append(kSlaveDelaySecsFieldName, getSlaveDelaySecs().get());
-    }
 
     configBuilder.append(kVotesFieldName, MemberConfigBase::getVotes() ? 1 : 0);
     return configBuilder.obj();

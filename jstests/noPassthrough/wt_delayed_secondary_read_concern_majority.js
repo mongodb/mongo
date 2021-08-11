@@ -48,12 +48,7 @@ if (storageEngine !== "wiredTiger") {
     conf.members[1].priority = 0;
 
     rst.startSet();
-
-    // If featureFlagUseSecondaryDelaySecs is enabled, we must use the 'secondaryDelaySecs' field
-    // name in our config. Otherwise, we use 'slaveDelay'.
-    const delayFieldName = selectDelayFieldName(rst);
-
-    conf.members[1][delayFieldName] = 24 * 60 * 60;
+    conf.members[1].secondaryDelaySecs = 24 * 60 * 60;
 
     // We cannot wait for a stable recovery timestamp, oplog replication, or config replication due
     // to the secondary delay.

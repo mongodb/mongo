@@ -132,18 +132,9 @@ public:
     void removeNewlyAddedFieldForMember(MemberId memberId);
 
     /**
-     * Sets the member config's 'secondaryDelaySecs' to the value of 'slaveDelay' and removes the
-     * 'slaveDelay' field entirely. If 'slaveDelay' is not set, then sets 'secondaryDelaySecs' to
-     * the default value.
+     * Sets the member config's 'secondaryDelaySecs' field to the default value of 0.
      */
-    void useSecondaryDelaySecsFieldName(MemberId memberId);
-
-    /**
-     * Sets the member config's 'slaveDelay' to the value of 'secondaryDelaySecs' and removes the
-     * 'secondaryDelaySecs' field entirely. If 'secondaryDelaySecs' is not set, then sets
-     * 'slaveDelay' to the default value.
-     */
-    void useSlaveDelayFieldName(MemberId memberId);
+    void setSecondaryDelaySecsFieldDefault(MemberId memberId);
 
 protected:
     MutableReplSetConfig() = default;
@@ -230,13 +221,6 @@ public:
      * Sets replicaSetId to "newReplicaSetId", which must be set.
      */
     static ReplSetConfig parseForInitiate(const BSONObj& cfg, OID newReplicaSetId);
-
-    /**
-     * Sets the default delay field name for a member config based on feature compatibility version,
-     * but only if the member config has neither 'secondaryDelaySecs' nor 'slaveDelay' already set.
-     * This function is used when constructing 'ReplSetConfigs' for initiate and reconfig.
-     */
-    void setDefaultDelayFieldForMember(MemberConfig mem);
 
     /**
      * Returns true if this object has been successfully initialized or copied from

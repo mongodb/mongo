@@ -64,7 +64,6 @@ public:
     using MemberConfigBase::kNewlyAddedFieldName;
     using MemberConfigBase::kPriorityFieldName;
     using MemberConfigBase::kSecondaryDelaySecsFieldName;
-    using MemberConfigBase::kSlaveDelaySecsFieldName;
     using MemberConfigBase::kTagsFieldName;
     using MemberConfigBase::kVotesFieldName;
 
@@ -143,13 +142,7 @@ public:
      * remain.  Zero seconds means stay as caught up as possible.
      */
     Seconds getSecondaryDelay() const {
-        if (getSecondaryDelaySecs()) {
-            return Seconds(getSecondaryDelaySecs().get());
-        }
-        if (getSlaveDelaySecs()) {
-            return Seconds(getSlaveDelaySecs().get());
-        }
-        return Seconds(0);
+        return getSecondaryDelaySecs() ? Seconds(getSecondaryDelaySecs().get()) : Seconds(0);
     }
 
     /**
@@ -185,7 +178,7 @@ public:
      * Returns true if this member has the field 'slaveDelay'.
      */
     bool hasSlaveDelay() const {
-        return getSlaveDelaySecs().has_value();
+        return false;
     }
 
     /**

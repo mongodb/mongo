@@ -56,7 +56,6 @@
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/tenant_migration_donor_service.h"
@@ -369,7 +368,6 @@ private:
     void _runUpgrade(OperationContext* opCtx,
                      const SetFeatureCompatibilityVersion& request,
                      boost::optional<Timestamp> changeTimestamp) {
-        const auto requestedVersion = request.getCommandParameter();
 
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             // Tell the shards to enter phase-1 of setFCV
@@ -383,34 +381,6 @@ private:
         }
 
         _cancelTenantMigrations(opCtx);
-
-        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-        const bool isReplSet =
-            replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
-
-        // If the 'useSecondaryDelaySecs' feature flag is enabled in the upgraded FCV, issue a
-        // reconfig to change the 'slaveDelay' field to 'secondaryDelaySecs'.
-        if (repl::feature_flags::gUseSecondaryDelaySecs.isEnabledAndIgnoreFCV() && isReplSet &&
-            requestedVersion >= repl::feature_flags::gUseSecondaryDelaySecs.getVersion()) {
-            // Wait for the current config to be committed before starting a new reconfig.
-            waitForCurrentConfigCommitment(opCtx);
-
-            auto getNewConfig = [&](const repl::ReplSetConfig& oldConfig, long long term) {
-                auto newConfig = oldConfig.getMutable();
-                newConfig.setConfigVersion(newConfig.getConfigVersion() + 1);
-                for (auto mem = oldConfig.membersBegin(); mem != oldConfig.membersEnd(); mem++) {
-                    newConfig.useSecondaryDelaySecsFieldName(mem->getId());
-                }
-                return repl::ReplSetConfig(std::move(newConfig));
-            };
-            auto status = replCoord->doReplSetReconfig(opCtx, getNewConfig, false /* force */);
-            uassertStatusOKWithContext(status, "Failed to upgrade the replica set config");
-
-            uassertStatusOKWithContext(
-                replCoord->awaitConfigCommitment(opCtx, true /* waitForOplogCommitment */),
-                "The upgraded replica set config failed to propagate to a majority");
-            LOGV2(5042302, "The upgraded replica set config has been propagated to a majority");
-        }
 
         {
             // Take the global lock in S mode to create a barrier for operations taking the global
@@ -464,10 +434,6 @@ private:
 
         _cancelTenantMigrations(opCtx);
 
-        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-        const bool isReplSet =
-            replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
-
         // Secondary indexes on time-series measurements are only supported in 5.1 and up. If the
         // user tries to downgrade the cluster to an earlier version, they must first remove all
         // incompatible secondary indexes on time-series measurements.
@@ -507,32 +473,6 @@ private:
                         return collection->getTimeseriesOptions() != boost::none;
                     });
             }
-        }
-
-        // If the 'useSecondaryDelaySecs' feature flag is disabled in the downgraded FCV, issue a
-        // reconfig to change the 'secondaryDelaySecs' field to 'slaveDelay'.
-        if (isReplSet && repl::feature_flags::gUseSecondaryDelaySecs.isEnabledAndIgnoreFCV() &&
-            requestedVersion < repl::feature_flags::gUseSecondaryDelaySecs.getVersion()) {
-            // Wait for the current config to be committed before starting a new reconfig.
-            waitForCurrentConfigCommitment(opCtx);
-
-            auto getNewConfig = [&](const repl::ReplSetConfig& oldConfig, long long term) {
-                auto newConfig = oldConfig.getMutable();
-                newConfig.setConfigVersion(newConfig.getConfigVersion() + 1);
-                for (auto mem = oldConfig.membersBegin(); mem != oldConfig.membersEnd(); mem++) {
-                    newConfig.useSlaveDelayFieldName(mem->getId());
-                }
-
-                return repl::ReplSetConfig(std::move(newConfig));
-            };
-
-            auto status = replCoord->doReplSetReconfig(opCtx, getNewConfig, false /* force */);
-            uassertStatusOKWithContext(status, "Failed to downgrade the replica set config");
-
-            uassertStatusOKWithContext(
-                replCoord->awaitConfigCommitment(opCtx, true /* waitForOplogCommitment */),
-                "The downgraded replica set config failed to propagate to a majority");
-            LOGV2(5042304, "The downgraded replica set config has been propagated to a majority");
         }
 
         {

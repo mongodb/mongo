@@ -43,7 +43,7 @@ let makeTenantId = function() {
 
     let config = recipientRst.getReplSetConfig();
     config.members[2].priority = 0;
-    config.members[2][selectDelayFieldName(recipientRst)] = 5;
+    config.members[2].secondaryDelaySecs = 5;
     recipientRst.initiate(config);
 
     const normalSecondary = recipientRst.getSecondaries()[0];

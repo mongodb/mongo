@@ -668,53 +668,6 @@ TEST(MemberConfig, ParsePriority) {
     }
 }
 
-TEST(MemberConfig, ParseSlaveDelay) {
-    ReplSetTagConfig tagConfig;
-    {
-        MemberConfig mc(BSON("_id" << 0 << "host"
-                                   << "h"
-                                   << "priority" << 0 << "slaveDelay" << 100),
-                        &tagConfig);
-        ASSERT_EQUALS(Seconds(100), mc.getSecondaryDelay());
-    }
-    {
-        ASSERT_THROWS(MemberConfig(BSON("_id" << 0 << "host"
-                                              << "h"
-                                              << "slaveDelay" << 100),
-                                   &tagConfig),
-                      ExceptionFor<ErrorCodes::BadValue>);
-    }
-    {
-        MemberConfig mc(BSON("_id" << 0 << "host"
-                                   << "h"
-                                   << "priority" << 0 << "slaveDelay" << 0),
-                        &tagConfig);
-    }
-    {
-        MemberConfig mc(BSON("_id" << 0 << "host"
-                                   << "h"
-                                   << "priority" << 0 << "slaveDelay" << 3600 * 10),
-                        &tagConfig);
-    }
-    {
-        ASSERT_THROWS_CODE(MemberConfig(BSON("_id" << 0 << "host"
-                                                   << "h"
-                                                   << "priority" << 0 << "slaveDelay" << -1),
-                                        &tagConfig),
-                           AssertionException,
-                           51024);
-    }
-    {
-        ASSERT_THROWS_CODE(
-            MemberConfig(BSON("_id" << 0 << "host"
-                                    << "h"
-                                    << "priority" << 0 << "slaveDelay" << 3600 * 24 * 400),
-                         &tagConfig),
-            AssertionException,
-            51024);
-    }
-}
-
 TEST(MemberConfig, ParseSecondaryDelay) {
     ReplSetTagConfig tagConfig;
     {
@@ -760,60 +713,6 @@ TEST(MemberConfig, ParseSecondaryDelay) {
                          &tagConfig),
             AssertionException,
             51024);
-    }
-}
-
-TEST(MemberConfig, ParseAcceptsAnyNumberSlaveDelay) {
-    ReplSetTagConfig tagConfig;
-    {
-        MemberConfig mc(BSON("_id" << 1 << "host"
-                                   << "h"
-                                   << "priority" << 0 << "slaveDelay" << 0),
-                        &tagConfig);
-        ASSERT_EQUALS(mc.getSecondaryDelay(), Seconds(0));
-    }
-    {
-        MemberConfig mc(BSON("_id" << 1 << "host"
-                                   << "h"
-                                   << "priority" << 0 << "slaveDelay" << 0.5),
-                        &tagConfig);
-        ASSERT_EQUALS(mc.getSecondaryDelay(), Seconds(0));
-    }
-    {
-        MemberConfig mc(BSON("_id" << 1 << "host"
-                                   << "h"
-                                   << "priority" << 0 << "slaveDelay" << -0.5),
-                        &tagConfig);
-        ASSERT_EQUALS(mc.getSecondaryDelay(), Seconds(0));
-    }
-    {
-        MemberConfig mc(BSON("_id" << 1 << "host"
-                                   << "h"
-                                   << "priority" << 0 << "slaveDelay" << 1),
-                        &tagConfig);
-        ASSERT_EQUALS(mc.getSecondaryDelay(), Seconds(1));
-    }
-    {
-        ASSERT_THROWS_CODE(MemberConfig(BSON("_id" << 1 << "host"
-                                                   << "h"
-                                                   << "priority" << 0 << "slaveDelay" << -1.5),
-                                        &tagConfig),
-                           AssertionException,
-                           51024);
-    }
-    {
-        MemberConfig mc(BSON("_id" << 0 << "host"
-                                   << "h"
-                                   << "priority" << 0 << "slaveDelay" << 1.6),
-                        &tagConfig);
-        ASSERT_EQUALS(mc.getSecondaryDelay(), Seconds(1));
-    }
-    {
-        MemberConfig mc(BSON("_id" << 1 << "host"
-                                   << "h"
-                                   << "priority" << 0 << "slaveDelay" << 4),
-                        &tagConfig);
-        ASSERT_EQUALS(mc.getSecondaryDelay(), Seconds(4));
     }
 }
 
@@ -1082,15 +981,6 @@ TEST(MemberConfig, HorizonFieldWithEmptyStringIsRejected) {
         ASSERT_NOT_EQUALS(ex.toStatus().reason().find("Horizons cannot have empty names"),
                           std::string::npos);
     }
-}
-
-TEST(MemberConfig, ValidatePriorityAndSlaveDelayRelationship) {
-    ReplSetTagConfig tagConfig;
-    ASSERT_THROWS(MemberConfig(BSON("_id" << 0 << "host"
-                                          << "h"
-                                          << "priority" << 1 << "slaveDelay" << 60),
-                               &tagConfig),
-                  ExceptionFor<ErrorCodes::BadValue>);
 }
 
 TEST(MemberConfig, ValidatePriorityAndSecondaryDelayRelationship) {

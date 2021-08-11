@@ -92,22 +92,14 @@ structs:
                              not include the member in the output of db.hello() or hello. This
                              prevents read operations (i.e. queries) from ever reaching this host by
                              way of secondary read preference"
-            slaveDelay:
-                cpp_name: slaveDelaySecs
-                type: safeInt64
-                optional: true
-                validator: { gte: 0, lte: 31622400 }
-                description: "The number of seconds 'behind' the primary that this replica set
-                              member should 'lag'. This is a legacy field kept for backwards
-                              compatibility, and 5.0+ nodes should use secondaryDelaySecs"
+
             secondaryDelaySecs:
                 cpp_name: secondaryDelaySecs
                 type: safeInt64
                 optional: true
                 validator: { gte: 0, lte: 31622400 }
                 description: "The number of seconds 'behind' the primary that this replica set
-                              member should 'lag'. Only 5.0+ nodes will use this field,
-                              and older nodes will use slaveDelay"
+                              member should 'lag'."
             arbiterOnly:
                 type: safeBool
                 default: false

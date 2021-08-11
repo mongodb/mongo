@@ -23,7 +23,6 @@ var waitForNewlyAddedRemovalForNodeToBeCommitted;
 var assertVoteCount;
 var disconnectSecondaries;
 var reconnectSecondaries;
-var selectDelayFieldName;
 var isDefaultReadConcernLocalFlagEnabled;
 
 (function() {
@@ -832,19 +831,6 @@ reconnectSecondaries = function(rst) {
             }
         }
     }
-};
-
-/**
- * If featureFlagUseSecondaryDelaySecs is enabled, we must use the 'secondaryDelaySecs' field name
- * in our config. Otherwise, we use 'slaveDelay'. This helper implements the logic to determine
- * which field to use.
- */
-selectDelayFieldName = function(rst) {
-    const useSecondaryDelaySecs =
-        rst.nodes[0]
-            .adminCommand({getParameter: 1, featureFlagUseSecondaryDelaySecs: 1})
-            .featureFlagUseSecondaryDelaySecs.value;
-    return useSecondaryDelaySecs ? "secondaryDelaySecs" : "slaveDelay";
 };
 
 /**
