@@ -165,6 +165,8 @@ all:
     test_file: jstests/core/txns/timestamped_reads_wait_for_prepare_oplog_visibility.js
   - ticket: SERVER-59197
     test_file: jstests/replsets/sessions_collection_reaping.js
+  - ticket: SERVER-57262
+    test_file: jstests/replsets/catchup_takeover_with_higher_config.js
 
 suites:
 

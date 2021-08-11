@@ -126,7 +126,9 @@ MONGO_FAIL_POINT_DEFINE(hangWhileWaitingForHelloResponse);
 MONGO_FAIL_POINT_DEFINE(skipDurableTimestampUpdates);
 // Will cause a reconfig to hang after completing the config quorum check.
 MONGO_FAIL_POINT_DEFINE(omitConfigQuorumCheck);
-// Will cause signal drain complete to hang after reconfig
+// Will cause signal drain complete to hang before reconfig.
+MONGO_FAIL_POINT_DEFINE(hangBeforeReconfigOnDrainComplete);
+// Will cause signal drain complete to hang after reconfig.
 MONGO_FAIL_POINT_DEFINE(hangAfterReconfigOnDrainComplete);
 
 // Number of times we tried to go live as a secondary.
@@ -1135,6 +1137,10 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* opCtx,
         lk.unlock();
 
         if (needBumpConfigTerm) {
+            if (MONGO_unlikely(hangBeforeReconfigOnDrainComplete.shouldFail())) {
+                LOGV2(5726200, "Hanging due to hangBeforeReconfigOnDrainComplete failpoint");
+                hangBeforeReconfigOnDrainComplete.pauseWhileSet(opCtx);
+            }
             // We re-write the term but keep version the same. This conceptually a no-op
             // in the config consensus group, analogous to writing a new oplog entry
             // in Raft log state machine on step up.
