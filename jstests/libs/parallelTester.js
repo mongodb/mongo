@@ -231,7 +231,8 @@ if (typeof _threadInject != "undefined") {
             // This test causes delete commands to hang, which may affect other tests running
             // concurrently.
             "timeseries/timeseries_delete_hint.js",
-            "timeseries/timeseries_delete_concurrent.js"
+            "timeseries/timeseries_delete_concurrent.js",
+            "timeseries/timeseries_update_concurrent.js"
         ]);
 
         // Get files, including files in subdirectories.
