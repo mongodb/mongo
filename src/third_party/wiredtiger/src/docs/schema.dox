@@ -67,7 +67,7 @@ struct module to describe the types of columns in a table:
 
 <table>
 @hrow{Format, C Type, Python type, Notes}
-@row{\c x, N/A, N/A, N/A, pad byte\, no associated value}
+@row{\c x, N/A, N/A, pad byte\, no associated value}
 @row{\c b, \c int8_t, \c int, signed byte}
 @row{\c B, \c uint8_t, \c int, unsigned byte}
 @row{\c h, \c int16_t, \c int, signed 16-bit}
