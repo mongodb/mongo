@@ -789,7 +789,12 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
                 str::stream() << "Cannot perform an update on a time-series collection "
                                  "when querying on a field that is not the metaField "
                               << *metaField << ": " << ns,
-                timeseries::queryOnlyDependsOnMetaField(opCtx, ns, updateQuery, *metaField));
+                timeseries::queryOnlyDependsOnMetaField(opCtx,
+                                                        ns,
+                                                        updateQuery,
+                                                        *metaField,
+                                                        *updateRequest->getLegacyRuntimeConstants(),
+                                                        updateRequest->getLetParameters()));
 
         // Get the original set of modifications to apply and check that they only
         // modify the metaField.

@@ -34,6 +34,7 @@ TimeseriesTest.run((insert) => {
         updateList,
         resultDocList,
         nModifiedBuckets,
+        letDoc = {},
         failCode = null,
         hasMetaField = true,
         ordered = true
@@ -46,7 +47,8 @@ TimeseriesTest.run((insert) => {
 
         assert.commandWorked(insert(coll, initialDocList));
 
-        const updateCommand = {update: coll.getName(), updates: updateList, ordered: ordered};
+        const updateCommand =
+            {update: coll.getName(), updates: updateList, ordered: ordered, let : letDoc};
         const res = failCode
             ? assert.commandFailedWithCode(testDB.runCommand(updateCommand), failCode)
             : assert.commandWorked(testDB.runCommand(updateCommand));
@@ -831,6 +833,62 @@ TimeseriesTest.run((insert) => {
         resultDocList: [doc1, doc4, doc5],
         nModifiedBuckets: 0,
         failCode: ErrorCodes.InvalidOptions,
+    });
+
+    // Use a variable defined in the let option in the query to modify the metaField.
+    testUpdate({
+        initialDocList: [doc1, doc4, doc5],
+        updateList: [{
+            q: {$expr: {$eq: ["$" + metaFieldName + ".a", "$$oldVal"]}},
+            u: {$set: {[metaFieldName]: "aaa"}},
+            multi: true,
+        }],
+        letDoc: {oldVal: "A"},
+        resultDocList: [
+            {_id: 1, [timeFieldName]: dateTime, [metaFieldName]: "aaa"},
+            {_id: 4, [timeFieldName]: dateTime, [metaFieldName]: "aaa", f: "F"},
+            {_id: 5, [timeFieldName]: dateTime, [metaFieldName]: "aaa"}
+        ],
+        nModifiedBuckets: 2,
+    });
+
+    // Variables defined in the let option can only be used in the update if the update is an
+    // pipeline update. Since this update is an update document, the literal name of the variable
+    // will be used in the update instead of the variable's value.
+    testUpdate({
+        initialDocList: [doc1],
+        updateList: [{
+            q: {[metaFieldName + ".a"]: "A"},
+            u: {$set: {[metaFieldName]: "$$myVar"}},
+            multi: true,
+        }],
+        letDoc: {myVar: "aaa"},
+        resultDocList: [{_id: 1, [timeFieldName]: dateTime, [metaFieldName]: "$$myVar"}],
+        nModifiedBuckets: 1,
+    });
+
+    // Use variables defined in the let option in the query to modify the metaField multiple times.
+    testUpdate({
+        initialDocList: [doc1, doc4, doc5],
+        updateList: [
+            {
+                q: {$expr: {$eq: ["$" + metaFieldName + ".a", "$$val1"]}},
+                u: {$set: {[metaFieldName]: "aaa"}},
+                multi: true,
+            },
+            {
+                q: {$expr: {$eq: ["$" + metaFieldName, "$$val2"]}},
+                u: {$set: {[metaFieldName]: "bbb"}},
+                multi: true,
+            }
+        ],
+        letDoc: {val1: "A", val2: "aaa"},
+        resultDocList: [
+            {_id: 1, [timeFieldName]: dateTime, [metaFieldName]: "bbb"},
+            {_id: 4, [timeFieldName]: dateTime, [metaFieldName]: "bbb", f: "F"},
+            {_id: 5, [timeFieldName]: dateTime, [metaFieldName]: "bbb"}
+        ],
+        nModifiedBuckets: 4,
     });
 
     /************************** Tests updating with an update pipeline **************************/
