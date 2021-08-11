@@ -166,6 +166,10 @@ private:
 
     void recordPlanSummaryStats(const Pipeline& pipeline);
 
+    void logStartingSubPipeline(const std::vector<BSONObj>& serializedPipeline);
+    void logShardedViewFound(
+        const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e);
+
     std::unique_ptr<Pipeline, PipelineDeleter> _pipeline;
     Pipeline::SourceContainer _cachedPipeline;
     ExecutionProgress _executionState = ExecutionProgress::kIteratingSource;

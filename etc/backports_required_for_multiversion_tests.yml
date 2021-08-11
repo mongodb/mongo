@@ -66,6 +66,8 @@ last-continuous:
       test_file: jstests/sharding/implicit_default_write_concern_add_shard.js
     - ticket: SERVER-59197
       test_file: jstests/replsets/sessions_collection_reaping.js
+    - ticket: SERVER-58203
+      test_file: jstests/sharding/query/pipeline_length_limit.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -296,6 +298,8 @@ last-lts:
       test_file: jstests/sharding/implicit_default_write_concern_add_shard.js
     - ticket: SERVER-59197
       test_file: jstests/replsets/sessions_collection_reaping.js
+    - ticket: SERVER-58203
+      test_file: jstests/sharding/query/pipeline_length_limit.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:

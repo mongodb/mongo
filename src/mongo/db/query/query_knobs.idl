@@ -148,7 +148,8 @@ server_parameters:
     set_at: [ startup ]
     cpp_varname: "internalPipelineLengthLimit"
     cpp_vartype: int
-    default: 1000
+    default:
+      expr: 'kDebugBuild ? 200 : 1000'
     validator:
       gt: 0
 

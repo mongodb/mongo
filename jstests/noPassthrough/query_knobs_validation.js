@@ -38,7 +38,6 @@ const expectedParamDefaults = {
     internalLookupStageIntermediateDocumentMaxSizeBytes: 100 * 1024 * 1024,
     internalDocumentSourceGroupMaxMemoryBytes: 100 * 1024 * 1024,
     internalDocumentSourceSetWindowFieldsMaxMemoryBytes: 100 * 1024 * 1024,
-    internalPipelineLengthLimit: 1000,
     internalQueryMaxJsEmitBytes: 100 * 1024 * 1024,
     internalQueryMaxPushBytes: 100 * 1024 * 1024,
     internalQueryMaxAddToSetBytes: 100 * 1024 * 1024,
@@ -73,6 +72,13 @@ function assertSetParameterFails(paramName, value) {
     assert.commandFailedWithCode(testDB.adminCommand({setParameter: 1, [paramName]: value}),
                                  ErrorCodes.BadValue);
 }
+
+// InternalPipelineLengthLimit is different is lowered in a debug build so its expected value
+// depends on that
+const getParamRes =
+    assert.commandWorked(testDB.adminCommand({getParameter: 1, internalPipelineLengthLimit: 1}));
+assert.eq(getParamRes["internalPipelineLengthLimit"],
+          testDB.adminCommand("buildInfo").debug ? 200 : 1000);
 
 // Verify that the default values are set as expected when the server starts up.
 assertDefaultParameterValues();
