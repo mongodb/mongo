@@ -322,6 +322,9 @@ void FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
     boost::optional<Timestamp> changeTimestamp,
     bool setTargetVersion) {
 
+    // We may have just stepped down, in which case we should not proceed.
+    opCtx->checkForInterrupt();
+
     // Only transition to fully upgraded or downgraded states when we
     // have completed all required upgrade/downgrade behavior.
     auto transitioningVersion = setTargetVersion &&

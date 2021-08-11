@@ -89,6 +89,7 @@ MONGO_FAIL_POINT_DEFINE(hangWhileUpgrading);
 MONGO_FAIL_POINT_DEFINE(hangAfterStartingFCVTransition);
 MONGO_FAIL_POINT_DEFINE(failDowngrading);
 MONGO_FAIL_POINT_DEFINE(hangWhileDowngrading);
+MONGO_FAIL_POINT_DEFINE(hangBeforeUpdatingFcvDoc);
 
 /**
  * Ensures that only one instance of setFeatureCompatibilityVersion can run at a given time.
@@ -351,6 +352,8 @@ public:
             // Complete transition by updating the local FCV document to the fully upgraded or
             // downgraded requestedVersion.
             const auto fcvChangeRegion(FeatureCompatibilityVersion::enterFCVChangeRegion(opCtx));
+
+            hangBeforeUpdatingFcvDoc.pauseWhileSet();
 
             FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
                 opCtx,
