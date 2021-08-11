@@ -109,6 +109,14 @@ public:
         MatchExpressionParser::AllowedFeatures::kGeoNear;
 
     /**
+     * The match expression features allowed when running .find() on a view.
+     *
+     * The result can depend on feature flags or FCV.
+     * If FCV is not known yet, we err on the side of disallowing newer features.
+     */
+    static MatchExpressionParser::AllowedFeatureSet viewFindMatcherFeatures();
+
+    /**
      * Parses a Pipeline from a vector of BSONObjs then invokes the optional 'validator' callback
      * with a reference to the newly created Pipeline. If no validator callback is given, this
      * method assumes that we're parsing a top-level pipeline. Throws an exception if it failed to

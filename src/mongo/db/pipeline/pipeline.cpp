@@ -45,6 +45,7 @@
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
 
@@ -133,6 +134,17 @@ using StreamType = StageConstraints::StreamType;
 
 constexpr MatchExpressionParser::AllowedFeatureSet Pipeline::kAllowedMatcherFeatures;
 constexpr MatchExpressionParser::AllowedFeatureSet Pipeline::kGeoNearMatcherFeatures;
+
+MatchExpressionParser::AllowedFeatureSet Pipeline::viewFindMatcherFeatures() {
+    if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+        feature_flags::gTimeseriesMetricIndexes.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        return Pipeline::kGeoNearMatcherFeatures;
+    }
+
+    return Pipeline::kAllowedMatcherFeatures;
+}
+
 
 Pipeline::Pipeline(const intrusive_ptr<ExpressionContext>& pTheCtx) : pCtx(pTheCtx) {}
 

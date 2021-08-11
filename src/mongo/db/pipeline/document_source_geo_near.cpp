@@ -38,6 +38,8 @@
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/logv2/log.h"
 
+#include "mongo/db/storage/storage_parameters_gen.h"
+
 namespace mongo {
 
 using boost::intrusive_ptr;
@@ -62,7 +64,9 @@ Value DocumentSourceGeoNear::serialize(boost::optional<ExplainOptions::Verbosity
         result.setField("near", Value(coords));
     }
 
-    result.setField("distanceField", Value(distanceField->fullPath()));
+    if (distanceField) {
+        result.setField("distanceField", Value(distanceField->fullPath()));
+    }
 
     if (maxDistance) {
         result.setField("maxDistance", Value(*maxDistance));
@@ -120,17 +124,26 @@ void DocumentSourceGeoNear::parseOptions(BSONObj options) {
             !options["num"]);
     uassert(50856, "$geoNear no longer supports the 'start' argument.", !options["start"]);
 
-    // The "near" and "distanceField" parameters are required.
+    // The "near" parameter is required.
     uassert(16605,
             "$geoNear requires a 'near' option as an Array",
             options["near"].isABSONObj());  // Array or Object (Object is deprecated)
     coordsIsArray = options["near"].type() == Array;
     coords = options["near"].embeddedObject().getOwned();
 
-    uassert(16606,
-            "$geoNear requires a 'distanceField' option as a String",
-            options["distanceField"].type() == String);
-    distanceField.reset(new FieldPath(options["distanceField"].str()));
+    // "distanceField" is optional.
+    auto distElem = options["distanceField"];
+    if (!feature_flags::gTimeseriesMetricIndexes.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        // Except without this feature flag, "distanceField" is required.
+        uassert(16606,
+                "$geoNear requires a 'distanceField' option, as a String",
+                distElem.type() == String);
+    }
+    if (distElem) {
+        uassert(5844304, "$geoNear 'distanceField' must be a String", distElem.type() == String);
+        distanceField = FieldPath(distElem.str());
+    }
 
     // The remaining fields are optional.
     if (auto maxDistElem = options["maxDistance"]) {
@@ -226,10 +239,10 @@ bool DocumentSourceGeoNear::needsGeoNearPoint() const {
 }
 
 DepsTracker::State DocumentSourceGeoNear::getDependencies(DepsTracker* deps) const {
-    // TODO (SERVER-35424): Implement better dependency tracking. For example, 'distanceField' is
-    // produced by this stage, and we could inform the query system that it need not include it in
-    // its response. For now, assume that we require the entire document as well as the appropriate
-    // geoNear metadata.
+    // TODO (SERVER-35424): Implement better dependency tracking. For example, 'distanceField' (if
+    // specified) is produced by this stage, and we could inform the query system that it need not
+    // include it in its response. For now, assume that we require the entire document as well as
+    // the appropriate geoNear metadata.
     deps->setNeedsMetadata(DocumentMetadataFields::kGeoNearDist, true);
     deps->setNeedsMetadata(DocumentMetadataFields::kGeoNearPoint, needsGeoNearPoint());
 
@@ -243,7 +256,14 @@ DocumentSourceGeoNear::DocumentSourceGeoNear(const intrusive_ptr<ExpressionConte
 boost::optional<DocumentSource::DistributedPlanLogic>
 DocumentSourceGeoNear::distributedPlanLogic() {
     // {shardsStage, mergingStage, sortPattern}
-    return DistributedPlanLogic{this, nullptr, BSON(distanceField->fullPath() << 1)};
+    return DistributedPlanLogic{
+        this,
+        nullptr,
+        // The field name here apparently doesn't matter, because we always look
+        // in {$meta: sortKey}, which is implicitly set from {$meta: geoNearDistance}
+        // when available.
+        BSON("field_name_does_not_matter" << 1),
+    };
 }
 
 }  // namespace mongo

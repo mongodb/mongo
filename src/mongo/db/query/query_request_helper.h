@@ -41,6 +41,7 @@
 namespace mongo {
 
 class QueryMessage;
+class CanonicalQuery;
 class Status;
 template <typename T>
 class StatusWith;
@@ -91,13 +92,6 @@ std::unique_ptr<FindCommandRequest> makeFromFindCommandForTests(
  * If _uuid exists for this FindCommandRequest, update the value of _nss.
  */
 void refreshNSS(const NamespaceString& nss, FindCommandRequest* findCommand);
-
-/**
- * Converts this FindCommandRequest into an aggregation using $match. If this FindCommandRequest has
- * options that cannot be satisfied by aggregation, a non-OK status is returned and 'cmdBuilder' is
- * not modified.
- */
-StatusWith<BSONObj> asAggregationCommand(const FindCommandRequest& findCommand);
 
 /**
  * Helper function to identify text search sort key

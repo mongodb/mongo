@@ -446,6 +446,7 @@ GeoNearMatchExpression::GeoNearMatchExpression(StringData path,
 
 bool GeoNearMatchExpression::matchesSingleElement(const BSONElement& e,
                                                   MatchDetails* details) const {
+    tasserted(5844303, "GeoNearMatchExpression::matchesSingleElement() should never be called");
     return true;
 }
 

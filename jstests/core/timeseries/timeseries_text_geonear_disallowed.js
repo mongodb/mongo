@@ -23,7 +23,7 @@ if (!TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo())) {
 
 const timeFieldName = "time";
 const metaFieldName = "tags";
-const testDB = db.getSiblingDB(jsTestName());
+const testDB = db.getSiblingDB('timeseries_text_geonear_disallowed' /*jsTestName()*/);
 assert.commandWorked(testDB.dropDatabase());
 
 const tsColl = testDB.getCollection("ts_point_data");
@@ -42,29 +42,39 @@ for (let i = 0; i < nMeasurements; i++) {
     assert.commandWorked(tsColl.insert(docToInsert));
 }
 
-// Test that $geoNear fails cleanly because it cannot be issued against a time-series collection.
-assert.commandFailedWithCode(
-    assert.throws(() => tsColl.find({"tags.distance": {$geoNear: [0, 0]}}).itcount()), 5626500);
+// Test that geo operators fail cleanly.
+if (!TimeseriesTest.timeseriesMetricIndexesEnabled(db.getMongo())) {
+    // $geoNear (alias for $near)
+    assert.commandFailedWithCode(
+        assert.throws(() => tsColl.find({"tags.distance": {$geoNear: [0, 0]}}).itcount()),
+                     // "$geoNear, $near, and $nearSphere are not allowed in this context"
+                     5626500);
+
+    // $near
+    assert.commandFailedWithCode(
+        assert.throws(() => tsColl.find({"tags.distance": {$near: [0, 0]}}).itcount()),
+                     // "$geoNear, $near, and $nearSphere are not allowed in this context"
+                     5626500);
+
+    // $nearSphere
+    assert.commandFailedWithCode(
+        assert.throws(() => tsColl
+                                .find({
+                                    "tags.distance": {
+                                        $nearSphere: {
+                                            $geometry:
+                                                {type: "Point", coordinates: [-73.9667, 40.78]},
+                                            $minDistance: 10,
+                                            $maxDistance: 20
+                                        }
+                                    }
+                                })
+                                .itcount()),
+                     // "$geoNear, $near, and $nearSphere are not allowed in this context"
+                     5626500);
+}
 
 // Test that unimplemented match exprs on time-series collections fail cleanly.
-// $near
-assert.commandFailedWithCode(
-    assert.throws(() => tsColl.find({"tags.distance": {$near: [0, 0]}}).itcount()), 5626500);
-
-// $nearSphere
-assert.commandFailedWithCode(
-    assert.throws(() => tsColl
-                            .find({
-                                "tags.distance": {
-                                    $nearSphere: {
-                                        $geometry: {type: "Point", coordinates: [-73.9667, 40.78]},
-                                        $minDistance: 10,
-                                        $maxDistance: 20
-                                    }
-                                }
-                            })
-                            .itcount()),
-                 5626500);
 
 // $text
 // Text indices are disallowed on collections clustered by _id.

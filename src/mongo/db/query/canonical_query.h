@@ -45,6 +45,7 @@
 namespace mongo {
 
 class OperationContext;
+class GeoNearMatchExpression;
 
 class CanonicalQuery {
 public:
@@ -130,8 +131,30 @@ public:
     const BSONObj& getQueryObj() const {
         return _findCommand->getFilter();
     }
+
+    /**
+     * Returns the query with any $near or $nearSphere removed.
+     * Returns $alwaysTrue if the query contains nothing besides $near or $nearSphere.
+     */
+    MatchExpression* rootWithoutGeoNear() const {
+        if (_splitGeoNear) {
+            return _splitGeoNear->nonGeoNear.get();
+        } else {
+            return _root.get();
+        }
+    }
+
+    /**
+     * Returns the $near or $nearSphere expression, if the query has one.
+     */
+    boost::optional<GeoNearMatchExpression*> geoNear() const;
+
     const FindCommandRequest& getFindCommandRequest() const {
         return *_findCommand;
+    }
+
+    std::unique_ptr<FindCommandRequest> releaseFindCommandRequest() && {
+        return std::move(_findCommand);
     }
 
     /**
@@ -256,6 +279,16 @@ private:
 
     std::unique_ptr<MatchExpression> _root;
 
+    // If _root contains a GEO_NEAR, then we split it into a geo part and a non-geo part.
+    // GEO_NEAR is special because it also sorts, so it can't be represented as a $match;
+    // we split it so we can create a separate $geoNear stage instead.
+    // This is only supported if gTimeseriesMetricIndexes is enabled.
+    struct SplitGeoNear {
+        std::unique_ptr<MatchExpression> nonGeoNear;
+        std::unique_ptr<MatchExpression> geoNear;
+    };
+    boost::optional<SplitGeoNear> _splitGeoNear;
+
     boost::optional<projection_ast::Projection> _proj;
 
     boost::optional<SortPattern> _sortPattern;
@@ -272,5 +305,12 @@ private:
     // Determines whether the SBE engine is enabled.
     bool _enableSlotBasedExecutionEngine = false;
 };
+
+/**
+ * Converts this CanonicalQuery into an aggregation using $match. If this CanonicalQuery has
+ * options that cannot be satisfied by aggregation, a non-OK status is returned and 'cmdBuilder' is
+ * not modified.
+ */
+StatusWith<BSONObj> asAggregationCommand(const CanonicalQuery& cq);
 
 }  // namespace mongo

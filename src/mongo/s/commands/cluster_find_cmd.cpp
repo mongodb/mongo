@@ -38,6 +38,7 @@
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog_cache.h"
@@ -197,8 +198,14 @@ public:
                 auto bodyBuilder = result->getBodyBuilder();
                 bodyBuilder.resetToEmpty();
 
-                auto aggCmdOnView =
-                    uassertStatusOK(query_request_helper::asAggregationCommand(*findCommand));
+                auto cq = uassertStatusOK(
+                    CanonicalQuery::canonicalize(opCtx,
+                                                 std::move(findCommand),
+                                                 false /*isExplain*/,
+                                                 nullptr /*expCtx*/,
+                                                 ExtensionsCallbackNoop(),
+                                                 Pipeline::viewFindMatcherFeatures()));
+                auto aggCmdOnView = uassertStatusOK(asAggregationCommand(*cq));
                 auto viewAggregationCommand =
                     OpMsgRequest::fromDBAndBody(_dbName, aggCmdOnView).body;
 
@@ -264,8 +271,16 @@ public:
             } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
                 result->reset();
 
-                auto aggCmdOnView = uassertStatusOK(
-                    query_request_helper::asAggregationCommand(cq->getFindCommandRequest()));
+                // 'cq' was constructed with kAllowAllSpecialFeatures, but now we want to convert it
+                // to an aggregation, which implies a stricter set of allowed features.
+                cq = uassertStatusOK(
+                    CanonicalQuery::canonicalize(opCtx,
+                                                 std::move(*cq).releaseFindCommandRequest(),
+                                                 false, /* isExplain */
+                                                 expCtx,
+                                                 ExtensionsCallbackNoop(),
+                                                 Pipeline::viewFindMatcherFeatures()));
+                auto aggCmdOnView = uassertStatusOK(asAggregationCommand(*cq));
                 auto viewAggregationCommand =
                     OpMsgRequest::fromDBAndBody(_dbName, aggCmdOnView).body;
 
