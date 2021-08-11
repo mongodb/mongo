@@ -7,8 +7,6 @@
 (function() {
 "use strict";
 
-load("jstests/libs/write_concern_util.js");  // For isDefaultWriteConcernMajorityFlagEnabled.
-
 // Verifies that the server status response has the fields that we expect.
 function verifyServerStatusFields(serverStatusResponse) {
     assert(serverStatusResponse.hasOwnProperty("opWriteConcernCounters"),
@@ -111,7 +109,6 @@ function resetCollection(setupCommand) {
 
 function testWriteConcernMetrics(cmd, opName, inc, isPSASet, setupCommand) {
     initializeReplicaSet(isPSASet);
-    const isDefaultWCMajorityFlagEnabled = isDefaultWriteConcernMajorityFlagEnabled(primary);
 
     // Run command with no writeConcern and no CWWC set.
     resetCollection(setupCommand);
@@ -119,17 +116,15 @@ function testWriteConcernMetrics(cmd, opName, inc, isPSASet, setupCommand) {
     verifyServerStatusFields(serverStatus);
     assert.commandWorked(testDB.runCommand(cmd));
     let newStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
-    verifyServerStatusChange(
-        serverStatus.opWriteConcernCounters,
-        newStatus.opWriteConcernCounters,
-        [
-            opName +
-                (isDefaultWCMajorityFlagEnabled ? (isPSASet ? ".noneInfo.implicitDefault.wnum.1"
-                                                            : ".noneInfo.implicitDefault.wmajority")
-                                                : ".noneInfo.implicitDefault.wnum.1"),
-            opName + ".none"
-        ],
-        inc);
+    verifyServerStatusChange(serverStatus.opWriteConcernCounters,
+                             newStatus.opWriteConcernCounters,
+                             [
+                                 opName +
+                                     (isPSASet ? ".noneInfo.implicitDefault.wnum.1"
+                                               : ".noneInfo.implicitDefault.wmajority"),
+                                 opName + ".none"
+                             ],
+                             inc);
 
     // Run command with no writeConcern with CWWC set to majority.
     resetCollection(setupCommand);

@@ -6,7 +6,6 @@
  */
 (function() {
 'use strict';
-load("jstests/libs/write_concern_util.js");  // For isDefaultWriteConcernMajorityFlagEnabled.
 
 jsTestLog("Test PSS configuration will set defaultWC to majority.");
 let replTest = new ReplSetTest({name: 'default_wc_majority', nodes: 3});
@@ -15,12 +14,8 @@ replTest.initiate();
 let primary = replTest.getPrimary();
 
 let res = assert.commandWorked(primary.adminCommand({getDefaultRWConcern: 1}));
-if (isDefaultWriteConcernMajorityFlagEnabled(primary)) {
-    assert(res.hasOwnProperty("defaultWriteConcern"));
-    assert.eq({w: "majority", wtimeout: 0}, res.defaultWriteConcern, tojson(res));
-} else {
-    assert(!res.hasOwnProperty("defaultWriteConcern"));
-}
+assert(res.hasOwnProperty("defaultWriteConcern"));
+assert.eq({w: "majority", wtimeout: 0}, res.defaultWriteConcern, tojson(res));
 
 replTest.stopSet();
 

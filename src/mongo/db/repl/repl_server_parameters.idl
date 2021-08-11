@@ -551,14 +551,6 @@ feature_flags:
         default: true
         version: 4.9
 
-    featureFlagDefaultWriteConcernMajority:
-        description: >-
-            When enabled, default write concern might be set to majority following the default write
-            concern formula if there is no cluster wide write concern (CWWC).
-        cpp_varname: feature_flags::gDefaultWCMajority
-        default: true
-        version: 5.0
-
     featureFlagRetryableFindAndModify:
         description: >-
             When enabled, storeFindAndModifyImagesInOplog=false will change the location of any

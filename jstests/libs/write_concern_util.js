@@ -155,16 +155,3 @@ function runWriteConcernRetryabilityTest(priConn, secConn, cmd, kNodes, dbName, 
 
     restartServerReplication(secConn);
 }
-
-// Check if featureFlagDefaultWriteConcernMajority is enabled.
-function isDefaultWriteConcernMajorityFlagEnabled(conn) {
-    let res = conn.adminCommand({getParameter: 1, featureFlagDefaultWriteConcernMajority: 1});
-    if (!res.ok) {
-        // Running with old version which doesn't have the flag.
-        if (res.errmsg == "no option found to get")
-            return false;
-        assert(false);
-    }
-
-    return res.featureFlagDefaultWriteConcernMajority.value;
-}

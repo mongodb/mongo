@@ -116,15 +116,10 @@ StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
                     ReadWriteConcernDefaults::get(opCtx->getServiceContext()).getDefault(opCtx);
                 auto wcDefault = rwcDefaults.getDefaultWriteConcern();
                 if (wcDefault) {
-                    if (repl::feature_flags::gDefaultWCMajority.isEnabled(
-                            serverGlobalParams.featureCompatibility)) {
-                        const auto defaultWriteConcernSource =
-                            rwcDefaults.getDefaultWriteConcernSource();
-                        customDefaultWasApplied = defaultWriteConcernSource &&
-                            defaultWriteConcernSource == DefaultWriteConcernSourceEnum::kGlobal;
-                    } else {
-                        customDefaultWasApplied = true;
-                    }
+                    const auto defaultWriteConcernSource =
+                        rwcDefaults.getDefaultWriteConcernSource();
+                    customDefaultWasApplied = defaultWriteConcernSource &&
+                        defaultWriteConcernSource == DefaultWriteConcernSourceEnum::kGlobal;
 
                     LOGV2_DEBUG(22548,
                                 2,

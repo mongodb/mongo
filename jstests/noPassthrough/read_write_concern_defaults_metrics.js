@@ -8,8 +8,7 @@
 "use strict";
 
 load("jstests/libs/ftdc.js");
-load("jstests/libs/write_concern_util.js");  // For isDefaultWriteConcernMajorityFlagEnabled.
-load('jstests/replsets/rslib.js');           // For isDefaultReadConcernLocalFlagEnabled.
+load('jstests/replsets/rslib.js');  // For isDefaultReadConcernLocalFlagEnabled.
 
 // Verifies the transaction server status response has the fields that we expect.
 function verifyServerStatus(conn,
@@ -42,18 +41,14 @@ function verifyServerStatus(conn,
         assert.eq(undefined, defaultsRes.defaultReadConcern, tojson(defaultsRes));
     }
 
-    if (isDefaultWriteConcernMajorityFlagEnabled(conn)) {
-        assert.hasFields(defaultsRes, ["defaultWriteConcernSource"]);
-        if (!expectedWC) {
-            assert.eq("implicit", defaultsRes.defaultWriteConcernSource, tojson(defaultsRes));
-            if (isImplicitDefaultWCMajority) {
-                expectedWC = {w: "majority", wtimeout: 0};
-            }
-        } else {
-            assert.eq("global", defaultsRes.defaultWriteConcernSource, tojson(defaultsRes));
+    assert.hasFields(defaultsRes, ["defaultWriteConcernSource"]);
+    if (!expectedWC) {
+        assert.eq("implicit", defaultsRes.defaultWriteConcernSource, tojson(defaultsRes));
+        if (isImplicitDefaultWCMajority) {
+            expectedWC = {w: "majority", wtimeout: 0};
         }
     } else {
-        assert.eq(undefined, defaultsRes.defaultWriteConcernSource);
+        assert.eq("global", defaultsRes.defaultWriteConcernSource, tojson(defaultsRes));
     }
 
     if (expectedWC) {

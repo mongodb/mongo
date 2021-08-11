@@ -3515,9 +3515,7 @@ Status ReplicationCoordinatorImpl::_doReplSetReconfig(OperationContext* opCtx,
         // reconfig command. This includes force reconfigs.
         // The user should set a cluster-wide write concern and attempt the reconfig command again.
         if (serverGlobalParams.clusterRole != ClusterRole::ShardServer) {
-            if (repl::feature_flags::gDefaultWCMajority.isEnabled(
-                    serverGlobalParams.featureCompatibility) &&
-                !repl::enableDefaultWriteConcernUpdatesForInitiate.load() && currIDWC != newIDWC &&
+            if (!repl::enableDefaultWriteConcernUpdatesForInitiate.load() && currIDWC != newIDWC &&
                 !ReadWriteConcernDefaults::get(opCtx).isCWWCSet(opCtx)) {
                 return Status(
                     ErrorCodes::NewReplicaSetConfigurationIncompatible,

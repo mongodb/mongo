@@ -676,15 +676,9 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
                 ReadWriteConcernDefaults::get(opCtx->getServiceContext()).getDefault(opCtx);
             if (const auto wcDefault = rwcDefaults.getDefaultWriteConcern()) {
                 _parc->_wc = *wcDefault;
-                if (repl::feature_flags::gDefaultWCMajority.isEnabled(
-                        serverGlobalParams.featureCompatibility)) {
-                    const auto defaultWriteConcernSource =
-                        rwcDefaults.getDefaultWriteConcernSource();
-                    customDefaultWriteConcernWasApplied = defaultWriteConcernSource &&
-                        defaultWriteConcernSource == DefaultWriteConcernSourceEnum::kGlobal;
-                } else {
-                    customDefaultWriteConcernWasApplied = true;
-                }
+                const auto defaultWriteConcernSource = rwcDefaults.getDefaultWriteConcernSource();
+                customDefaultWriteConcernWasApplied = defaultWriteConcernSource &&
+                    defaultWriteConcernSource == DefaultWriteConcernSourceEnum::kGlobal;
                 LOGV2_DEBUG(22766,
                             2,
                             "Applying default writeConcern on {command} of {writeConcern}",

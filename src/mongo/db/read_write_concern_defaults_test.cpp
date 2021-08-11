@@ -60,10 +60,6 @@ protected:
 
     ReadWriteConcernDefaultsLookupMock _lookupMock;
 
-    bool _isDefaultWCMajorityEnabled{
-        serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        repl::feature_flags::gDefaultWCMajority.isEnabled(serverGlobalParams.featureCompatibility)};
-
     bool _isDefaultRCLocalEnabled{
         serverGlobalParams.featureCompatibility.isVersionInitialized() &&
         repl::feature_flags::gDefaultRCLocal.isEnabled(serverGlobalParams.featureCompatibility)};
@@ -94,16 +90,10 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithAbsentCWRWCWithImplicitWC
     ASSERT(!defaults.getUpdateOpTime());
     ASSERT(!defaults.getUpdateWallClockTime());
     ASSERT_EQ(Date_t(), defaults.localUpdateWallClockTime());
-    if (_isDefaultWCMajorityEnabled) {
-        ASSERT(defaults.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kImplicit);
-    }
+    ASSERT(defaults.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kImplicit);
 }
 
 TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithAbsentCWRWCWithImplicitWCMajority) {
-    if (!_isDefaultWCMajorityEnabled) {
-        return;
-    }
-
     createDefaults(true /* isImplicitWCMajority */);
 
     // By not calling _lookupMock.setLookupCallReturnValue(), tests _defaults.lookup() returning
@@ -152,16 +142,10 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithCWRWCNeverSetWithImplicit
     ASSERT(!defaults.getUpdateOpTime());
     ASSERT(!defaults.getUpdateWallClockTime());
     ASSERT_GT(defaults.localUpdateWallClockTime(), Date_t());
-    if (_isDefaultWCMajorityEnabled) {
-        ASSERT(defaults.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kImplicit);
-    }
+    ASSERT(defaults.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kImplicit);
 }
 
 TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithCWRWCNeverSetWithImplicitWCMajority) {
-    if (!_isDefaultWCMajorityEnabled) {
-        return;
-    }
-
     createDefaults(true /* isImplicitWCMajority */);
 
     // _defaults.lookup() returning default constructed RWConcern not boost::none.
@@ -212,16 +196,10 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithUnsetCWRWCWithImplicitWCW
     ASSERT_EQ(Timestamp(1, 2), *defaults.getUpdateOpTime());
     ASSERT_EQ(1234, defaults.getUpdateWallClockTime()->toMillisSinceEpoch());
     ASSERT_GT(defaults.localUpdateWallClockTime(), Date_t());
-    if (_isDefaultWCMajorityEnabled) {
-        ASSERT(defaults.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kImplicit);
-    }
+    ASSERT(defaults.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kImplicit);
 }
 
 TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithUnsetCWRWCWithImplicitWCMajority) {
-    if (!_isDefaultWCMajorityEnabled) {
-        return;
-    }
-
     createDefaults(true /* isImplicitWCMajority */);
 
     RWConcernDefault newDefaults;
@@ -270,10 +248,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithCWRWCNotSetThenSetWithImp
     ASSERT(!oldDefaults.getUpdateOpTime());
     ASSERT(!oldDefaults.getUpdateWallClockTime());
     ASSERT_GT(oldDefaults.localUpdateWallClockTime(), Date_t());
-    if (_isDefaultWCMajorityEnabled) {
-        ASSERT(oldDefaults.getDefaultWriteConcernSource() ==
-               DefaultWriteConcernSourceEnum::kImplicit);
-    }
+    ASSERT(oldDefaults.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kImplicit);
 
     RWConcernDefault newDefaults;
     newDefaults.setDefaultReadConcern(
@@ -288,9 +263,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithCWRWCNotSetThenSetWithImp
     _lookupMock.setLookupCallReturnValue(std::move(newDefaults));
 
     ReadWriteConcernDefaults::get(getServiceContext()).invalidate();
-    if (_isDefaultWCMajorityEnabled) {
-        ASSERT(isCWWCSet());
-    }
+    ASSERT(isCWWCSet());
     auto defaults = getDefault();
     ASSERT(defaults.getDefaultReadConcern()->getLevel() ==
            repl::ReadConcernLevel::kLocalReadConcern);
@@ -304,17 +277,11 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithCWRWCNotSetThenSetWithImp
     ASSERT_EQ(Timestamp(1, 2), *defaults.getUpdateOpTime());
     ASSERT_EQ(1234, defaults.getUpdateWallClockTime()->toMillisSinceEpoch());
     ASSERT_GT(defaults.localUpdateWallClockTime(), Date_t());
-    if (_isDefaultWCMajorityEnabled) {
-        ASSERT(defaults.getDefaultWriteConcernSource());
-        ASSERT(defaults.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kGlobal);
-    }
+    ASSERT(defaults.getDefaultWriteConcernSource());
+    ASSERT(defaults.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kGlobal);
 }
 
 TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithCWRWCNotSetThenSetWithImplicitWCMajority) {
-    if (!_isDefaultWCMajorityEnabled) {
-        return;
-    }
-
     createDefaults(true /* isImplicitWCMajority */);
 
     // _defaults.lookup() returning default constructed RWConcern not boost::none.
@@ -383,10 +350,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithSetCWRWCWithImplicitWCW1)
     newDefaults.setUpdateOpTime(Timestamp(1, 2));
     newDefaults.setUpdateWallClockTime(Date_t::fromMillisSinceEpoch(1234));
     _lookupMock.setLookupCallReturnValue(std::move(newDefaults));
-
-    if (_isDefaultWCMajorityEnabled) {
-        ASSERT(isCWWCSet());
-    }
+    ASSERT(isCWWCSet());
     auto defaults = getDefault();
     ASSERT(defaults.getDefaultReadConcern()->getLevel() ==
            repl::ReadConcernLevel::kLocalReadConcern);
@@ -400,16 +364,10 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithSetCWRWCWithImplicitWCW1)
     ASSERT_EQ(Timestamp(1, 2), *defaults.getUpdateOpTime());
     ASSERT_EQ(1234, defaults.getUpdateWallClockTime()->toMillisSinceEpoch());
     ASSERT_GT(defaults.localUpdateWallClockTime(), Date_t());
-    if (_isDefaultWCMajorityEnabled) {
-        ASSERT(defaults.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kGlobal);
-    }
+    ASSERT(defaults.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kGlobal);
 }
 
 TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithSetCWRWCWithImplicitWCMajority) {
-    if (!_isDefaultWCMajorityEnabled) {
-        return;
-    }
-
     createDefaults(true /* isImplicitWCMajority */);
 
     RWConcernDefault newDefaults;
@@ -441,10 +399,6 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithSetCWRWCWithImplicitWCMaj
 }
 
 TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWriteConcernSourceImplicitWithUsedDefaultWC) {
-    if (!_isDefaultWCMajorityEnabled) {
-        return;
-    }
-
     createDefaults(true /* isImplicitWCMajority */);
 
     RWConcernDefault newDefaults;
@@ -500,9 +454,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithSetAndUnSetCWRCWithImplic
     ASSERT_EQ(Timestamp(1, 2), *defaults.getUpdateOpTime());
     ASSERT_EQ(1234, defaults.getUpdateWallClockTime()->toMillisSinceEpoch());
     ASSERT_GT(defaults.localUpdateWallClockTime(), Date_t());
-    if (_isDefaultWCMajorityEnabled) {
-        ASSERT(defaults.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kImplicit);
-    }
+    ASSERT(defaults.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kImplicit);
 
     // unsetting default read concern.
     RWConcernDefault newDefaults2;
@@ -529,16 +481,10 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithSetAndUnSetCWRCWithImplic
     ASSERT_EQ(Timestamp(1, 3), *defaults.getUpdateOpTime());
     ASSERT_EQ(1234, defaults.getUpdateWallClockTime()->toMillisSinceEpoch());
     ASSERT_GT(defaults.localUpdateWallClockTime(), Date_t());
-    if (_isDefaultWCMajorityEnabled) {
-        ASSERT(defaults.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kImplicit);
-    }
+    ASSERT(defaults.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kImplicit);
 }
 
 TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithSetAndUnSetCWRCWithImplicitWCMajority) {
-    if (!_isDefaultWCMajorityEnabled) {
-        return;
-    }
-
     createDefaults(true /* isImplicitWCMajority */);
 
     // Setting only default read concern.
@@ -624,9 +570,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithoutInvalidateDoesNotCallL
     ASSERT_EQ(Timestamp(1, 2), *defaults.getUpdateOpTime());
     ASSERT_EQ(1234, defaults.getUpdateWallClockTime()->toMillisSinceEpoch());
     ASSERT_GT(defaults.localUpdateWallClockTime(), Date_t());
-    if (_isDefaultWCMajorityEnabled) {
-        ASSERT(defaults.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kImplicit);
-    }
+    ASSERT(defaults.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kImplicit);
 
     RWConcernDefault newDefaults2;
     newDefaults2.setDefaultReadConcern(
@@ -638,9 +582,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithoutInvalidateDoesNotCallL
     newDefaults2.setDefaultWriteConcern(wc);
     newDefaults2.setUpdateOpTime(Timestamp(3, 4));
     newDefaults2.setUpdateWallClockTime(Date_t::fromMillisSinceEpoch(5678));
-    if (_isDefaultWCMajorityEnabled) {
-        newDefaults2.setDefaultWriteConcernSource(DefaultWriteConcernSourceEnum::kGlobal);
-    }
+    newDefaults2.setDefaultWriteConcernSource(DefaultWriteConcernSourceEnum::kGlobal);
     _lookupMock.setLookupCallReturnValue(std::move(newDefaults2));
 
     ASSERT(!isCWWCSet());
@@ -659,10 +601,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithoutInvalidateDoesNotCallL
     ASSERT_EQ(Timestamp(1, 2), *defaults2.getUpdateOpTime());
     ASSERT_EQ(1234, defaults2.getUpdateWallClockTime()->toMillisSinceEpoch());
     ASSERT_GT(defaults2.localUpdateWallClockTime(), Date_t());
-    if (_isDefaultWCMajorityEnabled) {
-        ASSERT(defaults2.getDefaultWriteConcernSource() ==
-               DefaultWriteConcernSourceEnum::kImplicit);
-    }
+    ASSERT(defaults2.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kImplicit);
 }
 
 TEST_F(ReadWriteConcernDefaultsTest, TestInvalidate) {
@@ -689,9 +628,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestInvalidate) {
     ASSERT_EQ(Timestamp(1, 2), *defaults.getUpdateOpTime());
     ASSERT_EQ(1234, defaults.getUpdateWallClockTime()->toMillisSinceEpoch());
     ASSERT_GT(defaults.localUpdateWallClockTime(), Date_t());
-    if (_isDefaultWCMajorityEnabled) {
-        ASSERT(defaults.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kImplicit);
-    }
+    ASSERT(defaults.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kImplicit);
 
     RWConcernDefault newDefaults2;
     newDefaults2.setDefaultReadConcern(
@@ -706,9 +643,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestInvalidate) {
     _lookupMock.setLookupCallReturnValue(std::move(newDefaults2));
 
     ReadWriteConcernDefaults::get(getServiceContext()).invalidate();
-    if (_isDefaultWCMajorityEnabled) {
-        ASSERT(isCWWCSet());
-    }
+    ASSERT(isCWWCSet());
     auto defaults2 = getDefault();
     ASSERT(defaults2.getDefaultReadConcern()->getLevel() ==
            repl::ReadConcernLevel::kAvailableReadConcern);
@@ -720,9 +655,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestInvalidate) {
     ASSERT_EQ(Timestamp(3, 4), *defaults2.getUpdateOpTime());
     ASSERT_EQ(5678, defaults2.getUpdateWallClockTime()->toMillisSinceEpoch());
     ASSERT_GT(defaults2.localUpdateWallClockTime(), Date_t());
-    if (_isDefaultWCMajorityEnabled) {
-        ASSERT(defaults2.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kGlobal);
-    }
+    ASSERT(defaults2.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kGlobal);
 }
 
 TEST_F(ReadWriteConcernDefaultsTest, TestRefreshDefaultsWithEmptyCacheAndAbsentDefaults) {
@@ -746,9 +679,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestRefreshDefaultsWithEmptyCacheAndAbsentD
     ASSERT(!defaults.getUpdateOpTime());
     ASSERT(!defaults.getUpdateWallClockTime());
     ASSERT_EQ(Date_t(), defaults.localUpdateWallClockTime());
-    if (_isDefaultWCMajorityEnabled) {
-        ASSERT(defaults.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kImplicit);
-    }
+    ASSERT(defaults.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kImplicit);
 }
 
 TEST_F(ReadWriteConcernDefaultsTest, TestRefreshDefaultsWithEmptyCacheAndSetDefaults) {
@@ -766,9 +697,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestRefreshDefaultsWithEmptyCacheAndSetDefa
     ASSERT_EQ(Timestamp(1, 2), *defaults.getUpdateOpTime());
     ASSERT_EQ(1234, defaults.getUpdateWallClockTime()->toMillisSinceEpoch());
     ASSERT_GT(defaults.localUpdateWallClockTime(), Date_t());
-    if (_isDefaultWCMajorityEnabled) {
-        ASSERT(defaults.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kImplicit);
-    }
+    ASSERT(defaults.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kImplicit);
 }
 
 TEST_F(ReadWriteConcernDefaultsTest, TestRefreshDefaultsWithHigherEpoch) {
@@ -783,9 +712,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestRefreshDefaultsWithHigherEpoch) {
     auto defaults = getDefault();
     ASSERT_EQ(Timestamp(1, 2), *defaults.getUpdateOpTime());
     ASSERT_EQ(1234, defaults.getUpdateWallClockTime()->toMillisSinceEpoch());
-    if (_isDefaultWCMajorityEnabled) {
-        ASSERT(defaults.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kImplicit);
-    }
+    ASSERT(defaults.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kImplicit);
 
     RWConcernDefault newDefaults2;
     newDefaults2.setUpdateOpTime(Timestamp(3, 4));
@@ -798,9 +725,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestRefreshDefaultsWithHigherEpoch) {
     auto defaults2 = getDefault();
     ASSERT_EQ(Timestamp(3, 4), *defaults2.getUpdateOpTime());
     ASSERT_EQ(5678, defaults2.getUpdateWallClockTime()->toMillisSinceEpoch());
-    if (_isDefaultWCMajorityEnabled) {
-        ASSERT(defaults.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kImplicit);
-    }
+    ASSERT(defaults.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kImplicit);
 }
 
 TEST_F(ReadWriteConcernDefaultsTest, TestRefreshDefaultsWithLowerEpoch) {
@@ -814,9 +739,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestRefreshDefaultsWithLowerEpoch) {
     auto defaults = getDefault();
     ASSERT(defaults.getUpdateOpTime());
     ASSERT(defaults.getUpdateWallClockTime());
-    if (_isDefaultWCMajorityEnabled) {
-        ASSERT(defaults.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kImplicit);
-    }
+    ASSERT(defaults.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kImplicit);
 
     RWConcernDefault newDefaults2;
     newDefaults2.setUpdateOpTime(Timestamp(5, 6));
@@ -828,9 +751,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestRefreshDefaultsWithLowerEpoch) {
     auto defaults2 = getDefault();
     ASSERT_EQ(Timestamp(10, 20), *defaults2.getUpdateOpTime());
     ASSERT_EQ(1234, defaults2.getUpdateWallClockTime()->toMillisSinceEpoch());
-    if (_isDefaultWCMajorityEnabled) {
-        ASSERT(defaults.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kImplicit);
-    }
+    ASSERT(defaults.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kImplicit);
 }
 
 /**
@@ -879,10 +800,6 @@ protected:
         ReadWriteConcernDefaults::create(getServiceContext(), _lookupMock.getFetchDefaultsFn());
         return ReadWriteConcernDefaults::get(getServiceContext());
     }()};
-
-    bool _isDefaultWCMajorityEnabled{
-        serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        repl::feature_flags::gDefaultWCMajority.isEnabled(serverGlobalParams.featureCompatibility)};
 
     bool _isDefaultRCLocalEnabled{
         serverGlobalParams.featureCompatibility.isVersionInitialized() &&
@@ -975,11 +892,8 @@ TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
     _rwcd.refreshIfNecessary(operationContext());
     auto newDefaults = _rwcd.getDefault(operationContext());
     ASSERT_LT(oldDefaults.localUpdateWallClockTime(), newDefaults.localUpdateWallClockTime());
-    if (_isDefaultWCMajorityEnabled) {
-        // Default write concern source is calculated through 'getDefault'.
-        ASSERT(newDefaults.getDefaultWriteConcernSource() ==
-               DefaultWriteConcernSourceEnum::kGlobal);
-    }
+    // Default write concern source is calculated through 'getDefault'.
+    ASSERT(newDefaults.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kGlobal);
 }
 
 TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
@@ -1004,11 +918,8 @@ TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
     _rwcd.refreshIfNecessary(operationContext());
     auto newDefaults = _rwcd.getDefault(operationContext());
     ASSERT_LT(oldDefaults.localUpdateWallClockTime(), newDefaults.localUpdateWallClockTime());
-    if (_isDefaultWCMajorityEnabled) {
-        // Default write concern source is calculated through 'getDefault'.
-        ASSERT(newDefaults.getDefaultWriteConcernSource() ==
-               DefaultWriteConcernSourceEnum::kGlobal);
-    }
+    // Default write concern source is calculated through 'getDefault'.
+    ASSERT(newDefaults.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kGlobal);
 }
 
 TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
@@ -1026,11 +937,8 @@ TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
     _lookupMock.setLookupCallReturnValue(std::move(defaults));
     _rwcd.refreshIfNecessary(operationContext());
     auto newDefaults = _rwcd.getDefault(operationContext());
-    if (_isDefaultWCMajorityEnabled) {
-        // Default write concern source is calculated through 'getDefault'.
-        ASSERT(newDefaults.getDefaultWriteConcernSource() ==
-               DefaultWriteConcernSourceEnum::kImplicit);
-    }
+    // Default write concern source is calculated through 'getDefault'.
+    ASSERT(newDefaults.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kImplicit);
 }
 
 TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
@@ -1054,11 +962,8 @@ TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
     _rwcd.refreshIfNecessary(operationContext());
     auto newDefaults = _rwcd.getDefault(operationContext());
     ASSERT_LT(oldDefaults.localUpdateWallClockTime(), newDefaults.localUpdateWallClockTime());
-    if (_isDefaultWCMajorityEnabled) {
-        // Default write concern source is calculated through 'getDefault'.
-        ASSERT(newDefaults.getDefaultWriteConcernSource() ==
-               DefaultWriteConcernSourceEnum::kGlobal);
-    }
+    // Default write concern source is calculated through 'getDefault'.
+    ASSERT(newDefaults.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kGlobal);
 }
 
 TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
@@ -1076,11 +981,8 @@ TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
     _lookupMock.setLookupCallReturnValue(std::move(oldDefaults));
     _rwcd.refreshIfNecessary(operationContext());
     auto newDefaults = _rwcd.getDefault(operationContext());
-    if (_isDefaultWCMajorityEnabled) {
-        // Default write concern source is calculated through 'getDefault'.
-        ASSERT(newDefaults.getDefaultWriteConcernSource() ==
-               DefaultWriteConcernSourceEnum::kImplicit);
-    }
+    // Default write concern source is calculated through 'getDefault'.
+    ASSERT(newDefaults.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kImplicit);
 
     VectorClockMutable::get(getServiceContext())->tickClusterTime(1);
     getMockClockSource()->advance(Milliseconds(1));
@@ -1100,11 +1002,8 @@ TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
     newDefaults = _rwcd.getDefault(operationContext());
     ASSERT(newDefaults.getDefaultWriteConcern());
     ASSERT_EQ(5, newDefaults.getDefaultWriteConcern()->wNumNodes);
-    if (_isDefaultWCMajorityEnabled) {
-        // Default write concern source is calculated through 'getDefault'.
-        ASSERT(newDefaults.getDefaultWriteConcernSource() ==
-               DefaultWriteConcernSourceEnum::kGlobal);
-    }
+    // Default write concern source is calculated through 'getDefault'.
+    ASSERT(newDefaults.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kGlobal);
 }
 
 TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
@@ -1128,11 +1027,8 @@ TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
     _rwcd.refreshIfNecessary(operationContext());
     auto newDefaults = _rwcd.getDefault(operationContext());
     ASSERT_LT(oldDefaults.localUpdateWallClockTime(), newDefaults.localUpdateWallClockTime());
-    if (_isDefaultWCMajorityEnabled) {
-        // Default write concern source is calculated through 'getDefault'.
-        ASSERT(newDefaults.getDefaultWriteConcernSource() ==
-               DefaultWriteConcernSourceEnum::kGlobal);
-    }
+    // Default write concern source is calculated through 'getDefault'.
+    ASSERT(newDefaults.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kGlobal);
 
     // Test that the implicit default read concern is still used after read concern is unset.
     if (_isDefaultRCLocalEnabled) {
@@ -1150,29 +1046,11 @@ TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
 
 TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
        TestGenerateNewCWRWCToBeSavedOnDiskInvalidUnsetWriteConcern) {
-    auto oldDefaults = setupOldDefaults();
-    if (repl::feature_flags::gDefaultWCMajority.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        ASSERT_THROWS_CODE(_rwcd.generateNewCWRWCToBeSavedOnDisk(
-                               operationContext(), boost::none, WriteConcernOptions()),
-                           AssertionException,
-                           ErrorCodes::IllegalOperation);
-    } else {
-        auto defaults = _rwcd.generateNewCWRWCToBeSavedOnDisk(
-            operationContext(), boost::none, WriteConcernOptions());
-        ASSERT(defaults.getDefaultReadConcern());
-        ASSERT(oldDefaults.getDefaultReadConcern()->getLevel() ==
-               defaults.getDefaultReadConcern()->getLevel());
-        ASSERT(!defaults.getDefaultReadConcernSource());
-        ASSERT(!defaults.getDefaultWriteConcern());
-        ASSERT_LT(*oldDefaults.getUpdateOpTime(), *defaults.getUpdateOpTime());
-        ASSERT_LT(*oldDefaults.getUpdateWallClockTime(), *defaults.getUpdateWallClockTime());
-
-        _lookupMock.setLookupCallReturnValue(std::move(defaults));
-        _rwcd.refreshIfNecessary(operationContext());
-        auto newDefaults = _rwcd.getDefault(operationContext());
-        ASSERT_LT(oldDefaults.localUpdateWallClockTime(), newDefaults.localUpdateWallClockTime());
-    }
+    setupOldDefaults();
+    ASSERT_THROWS_CODE(_rwcd.generateNewCWRWCToBeSavedOnDisk(
+                           operationContext(), boost::none, WriteConcernOptions()),
+                       AssertionException,
+                       ErrorCodes::IllegalOperation);
 }
 
 TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
@@ -1187,50 +1065,17 @@ TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
     _lookupMock.setLookupCallReturnValue(std::move(defaults));
     _rwcd.refreshIfNecessary(operationContext());
     auto newDefaults = _rwcd.getDefault(operationContext());
-    if (_isDefaultWCMajorityEnabled) {
-        // Default write concern source is calculated through 'getDefault'.
-        ASSERT(newDefaults.getDefaultWriteConcernSource() ==
-               DefaultWriteConcernSourceEnum::kImplicit);
-    }
+    // Default write concern source is calculated through 'getDefault'.
+    ASSERT(newDefaults.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kImplicit);
 }
 
 TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
        TestGenerateNewCWRWCToBeSavedOnDiskInvalidUnsetReadWriteConcern) {
-    auto oldDefaults = setupOldDefaults();
-    if (repl::feature_flags::gDefaultWCMajority.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        ASSERT_THROWS_CODE(_rwcd.generateNewCWRWCToBeSavedOnDisk(
-                               operationContext(), repl::ReadConcernArgs(), WriteConcernOptions()),
-                           AssertionException,
-                           ErrorCodes::IllegalOperation);
-    } else {
-        auto defaults = _rwcd.generateNewCWRWCToBeSavedOnDisk(
-            operationContext(), repl::ReadConcernArgs(), WriteConcernOptions());
-        // Assert that the on disk version does not have a read/write concern set.
-        ASSERT(!defaults.getDefaultReadConcern());
-        ASSERT(!defaults.getDefaultReadConcernSource());
-
-        ASSERT(!defaults.getDefaultWriteConcern());
-        ASSERT_LT(*oldDefaults.getUpdateOpTime(), *defaults.getUpdateOpTime());
-        ASSERT_LT(*oldDefaults.getUpdateWallClockTime(), *defaults.getUpdateWallClockTime());
-
-        _lookupMock.setLookupCallReturnValue(std::move(defaults));
-        _rwcd.refreshIfNecessary(operationContext());
-        auto newDefaults = _rwcd.getDefault(operationContext());
-        ASSERT_LT(oldDefaults.localUpdateWallClockTime(), newDefaults.localUpdateWallClockTime());
-
-        if (_isDefaultRCLocalEnabled) {
-            ASSERT(newDefaults.getDefaultReadConcern());
-            ASSERT(newDefaults.getDefaultReadConcern()->getLevel() ==
-                   repl::ReadConcernLevel::kLocalReadConcern);
-            ASSERT(newDefaults.getDefaultReadConcernSource());
-            ASSERT(newDefaults.getDefaultReadConcernSource() ==
-                   DefaultReadConcernSourceEnum::kImplicit);
-        } else {
-            ASSERT(!newDefaults.getDefaultReadConcern());
-            ASSERT(!newDefaults.getDefaultReadConcernSource());
-        }
-    }
+    setupOldDefaults();
+    ASSERT_THROWS_CODE(_rwcd.generateNewCWRWCToBeSavedOnDisk(
+                           operationContext(), repl::ReadConcernArgs(), WriteConcernOptions()),
+                       AssertionException,
+                       ErrorCodes::IllegalOperation);
 }
 
 TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
@@ -1255,11 +1100,8 @@ TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
     _rwcd.refreshIfNecessary(operationContext());
     auto newDefaults = _rwcd.getDefault(operationContext());
     ASSERT_LT(oldDefaults.localUpdateWallClockTime(), newDefaults.localUpdateWallClockTime());
-    if (_isDefaultWCMajorityEnabled) {
-        // Default write concern source is calculated through 'getDefault'.
-        ASSERT(newDefaults.getDefaultWriteConcernSource() ==
-               DefaultWriteConcernSourceEnum::kGlobal);
-    }
+    // Default write concern source is calculated through 'getDefault'.
+    ASSERT(newDefaults.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kGlobal);
 }
 
 TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
@@ -1284,11 +1126,8 @@ TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
     _rwcd.refreshIfNecessary(operationContext());
     auto newDefaults = _rwcd.getDefault(operationContext());
     ASSERT_LT(oldDefaults.localUpdateWallClockTime(), newDefaults.localUpdateWallClockTime());
-    if (_isDefaultWCMajorityEnabled) {
-        // Default write concern source is calculated through 'getDefault'.
-        ASSERT(newDefaults.getDefaultWriteConcernSource() ==
-               DefaultWriteConcernSourceEnum::kGlobal);
-    }
+    // Default write concern source is calculated through 'getDefault'.
+    ASSERT(newDefaults.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kGlobal);
 }
 
 TEST_F(ReadWriteConcernDefaultsTestWithClusterTime, TestRefreshDefaultsWithDeletedDefaults) {
@@ -1300,10 +1139,8 @@ TEST_F(ReadWriteConcernDefaultsTestWithClusterTime, TestRefreshDefaultsWithDelet
     auto origCachedDefaults = _rwcd.getDefault(operationContext());
     ASSERT_EQ(Timestamp(10, 20), *origCachedDefaults.getUpdateOpTime());
     ASSERT_EQ(Date_t::fromMillisSinceEpoch(1234), *origCachedDefaults.getUpdateWallClockTime());
-    if (_isDefaultWCMajorityEnabled) {
-        ASSERT(origCachedDefaults.getDefaultWriteConcernSource() ==
-               DefaultWriteConcernSourceEnum::kImplicit);
-    }
+    ASSERT(origCachedDefaults.getDefaultWriteConcernSource() ==
+           DefaultWriteConcernSourceEnum::kImplicit);
 
     VectorClockMutable::get(getServiceContext())->tickClusterTime(1);
     getMockClockSource()->advance(Milliseconds(1));
@@ -1318,10 +1155,8 @@ TEST_F(ReadWriteConcernDefaultsTestWithClusterTime, TestRefreshDefaultsWithDelet
     ASSERT(!newCachedDefaults.getUpdateWallClockTime());
     ASSERT_LT(origCachedDefaults.localUpdateWallClockTime(),
               newCachedDefaults.localUpdateWallClockTime());
-    if (_isDefaultWCMajorityEnabled) {
-        ASSERT(newCachedDefaults.getDefaultWriteConcernSource() ==
-               DefaultWriteConcernSourceEnum::kImplicit);
-    }
+    ASSERT(newCachedDefaults.getDefaultWriteConcernSource() ==
+           DefaultWriteConcernSourceEnum::kImplicit);
 }
 
 }  // namespace
