@@ -280,15 +280,7 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
             quiesceTime = Milliseconds(mongosShutdownTimeoutMillisForSignaledShutdown.load());
         }
 
-        // Enter quiesce mode so that existing and new short operations are allowed to finish.
-        // At this point, we will start responding to any hello request with ShutdownInProgress
-        // so that clients can re-route their operations.
-        //
-        // TODO SERVER-49138: Remove this FCV check when 5.0 becomes last-lts.
-        if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-                serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
-                    ServerGlobalParams::FeatureCompatibility::Version::kVersion47);
-            auto mongosTopCoord = MongosTopologyCoordinator::get(opCtx)) {
+        if (auto mongosTopCoord = MongosTopologyCoordinator::get(opCtx)) {
             mongosTopCoord->enterQuiesceModeAndWait(opCtx, quiesceTime);
         }
 
