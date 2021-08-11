@@ -46,7 +46,7 @@ if [ "$(uname -m)" = "arm64" ] && [ "$(uname)" == "Darwin" ]; then
   export GRPC_PYTHON_BUILD_SYSTEM_ZLIB=1
 fi
 
-python -m pip --disable-pip-version-check install "pip==21.0.1" || exit 1
+python -m pip --disable-pip-version-check install "pip==21.0.1" "wheel==0.37.0" || exit 1
 python -m pip --disable-pip-version-check install -r "$toolchain_txt" -q --log install.log
 if [ $? != 0 ]; then
   echo "Pip install error"
