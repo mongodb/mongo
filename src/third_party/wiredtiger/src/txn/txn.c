@@ -1127,7 +1127,9 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
     if (upd == NULL || upd->prepare_state != WT_PREPARE_INPROGRESS)
         goto prepare_verify;
 
-    WT_ERR(__txn_commit_timestamps_usage_check(session, op, upd));
+    /* A prepared operation that is rolled back will not have a timestamp worth asserting on. */
+    if (commit)
+        WT_ERR(__txn_commit_timestamps_usage_check(session, op, upd));
 
     for (first_committed_upd = upd; first_committed_upd != NULL &&
          (first_committed_upd->txnid == WT_TXN_ABORTED ||
