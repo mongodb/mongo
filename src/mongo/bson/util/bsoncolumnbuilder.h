@@ -80,7 +80,6 @@ private:
     void _storePrevious(BSONElement elem);
     void _writeLiteralFromPrevious();
     void _incrementSimple8bCount();
-    bool _usesDeltaOfDelta(BSONType type);
     bool _objectIdDeltaPossible(BSONElement elem, BSONElement prev);
 
     // Helper to append doubles to this Column builder. Returns true if append was successful and

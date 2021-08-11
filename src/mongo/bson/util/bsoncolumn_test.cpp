@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/bson/util/bsoncolumn.h"
 #include "mongo/bson/util/bsoncolumnbuilder.h"
 #include "mongo/bson/util/simple8b_type_util.h"
 
@@ -39,6 +40,13 @@ namespace {
 
 class BSONColumnTest : public unittest::Test {
 public:
+    BSONElement createBSONColumn(const char* buffer, int size) {
+        BSONObjBuilder ob;
+        ob.appendBinData(""_sd, size, BinDataType::Column, buffer);
+        _elementMemory.emplace_front(ob.obj());
+        return _elementMemory.front().firstElement();
+    }
+
     template <typename T>
     BSONElement _createElement(T val) {
         BSONObjBuilder ob;
@@ -137,13 +145,21 @@ public:
         return _elementMemory.front().firstElement();
     }
 
-    static uint128_t deltaBinData(BSONElement val, BSONElement prev) {
+    static boost::optional<uint128_t> deltaBinData(BSONElement val, BSONElement prev) {
         if (val.binaryEqualValues(prev)) {
-            return 0;
+            return uint128_t(0);
         }
-        return Simple8bTypeUtil::encodeInt128(
-            Simple8bTypeUtil::encodeBinary(val.valuestr(), val.valuestrsize()) -
-            Simple8bTypeUtil::encodeBinary(prev.valuestr(), prev.valuestrsize()));
+
+        int valSize;
+        int prevSize;
+        const char* valBinary = val.binData(valSize);
+        const char* prevBinary = prev.binData(prevSize);
+        if (valSize != prevSize || valSize > 16) {
+            return boost::none;
+        }
+
+        return Simple8bTypeUtil::encodeInt128(Simple8bTypeUtil::encodeBinary(valBinary, valSize) -
+                                              Simple8bTypeUtil::encodeBinary(prevBinary, prevSize));
     }
 
     static uint64_t deltaInt32(BSONElement val, BSONElement prev) {
@@ -318,6 +334,85 @@ public:
         ASSERT_EQ(memcmp(columnBinary.data, buf, columnBinary.length), 0);
     }
 
+    static void verifyDecompression(BSONBinData columnBinary,
+                                    const std::vector<BSONElement>& expected) {
+        BSONObjBuilder obj;
+        obj.append(""_sd, columnBinary);
+        BSONElement columnElement = obj.done().firstElement();
+
+        // Verify that we can traverse BSONColumn twice and extract values on the second pass
+        {
+            BSONColumn col(columnElement);
+            ASSERT_EQ(col.size(), expected.size());
+            ASSERT_EQ(std::distance(col.begin(), col.end()), expected.size());
+            ASSERT_EQ(col.size(), expected.size());
+
+            auto it = col.begin();
+            for (auto elem : expected) {
+                BSONElement other = *(it++);
+                ASSERT(elem.binaryEqualValues(other));
+            }
+        }
+
+        // Verify that we can traverse BSONColumn and extract values on the first pass
+        {
+            BSONColumn col(columnElement);
+
+            auto it = col.begin();
+            for (auto elem : expected) {
+                BSONElement other = *(it++);
+                ASSERT(elem.binaryEqualValues(other));
+            }
+        }
+
+        // Verify operator[] when accessing in order
+        {
+            BSONColumn col(columnElement);
+
+            for (size_t i = 0; i < expected.size(); ++i) {
+                ASSERT(expected[i].binaryEqualValues(col[i]));
+            }
+        }
+
+        // Verify operator[] when accessing in reverse order
+        {
+            BSONColumn col(columnElement);
+
+            for (int i = (int)expected.size() - 1; i >= 0; --i) {
+                ASSERT(expected[i].binaryEqualValues(col[i]));
+            }
+        }
+
+        // Verify that we can continue traverse with new iterators when we stop before end
+        {
+            BSONColumn col(columnElement);
+
+            for (size_t e = 0; e < expected.size(); ++e) {
+                auto it = col.begin();
+                for (size_t i = 0; i < e; ++i, ++it) {
+                    ASSERT(expected[i].binaryEqualValues(*it));
+                }
+                ASSERT_EQ(col.size(), expected.size());
+            }
+        }
+
+        // Verify that we can have multiple iterators on the same thread
+        {
+            BSONColumn col(columnElement);
+
+            auto it1 = col.begin();
+            auto it2 = col.begin();
+            auto itEnd = col.end();
+
+            for (; it1 != itEnd && it2 != itEnd; ++it1, ++it2) {
+                ASSERT(it1->binaryEqualValues(*it2));
+                ASSERT_EQ(&*it1, &*it2);  // Iterators should point to same reference
+            }
+
+            ASSERT(it1 == it2);
+        }
+    }
+
     const boost::optional<uint64_t> kDeltaForBinaryEqualValues = Simple8bTypeUtil::encodeInt64(0);
 
 private:
@@ -337,7 +432,9 @@ TEST_F(BSONColumnTest, BasicValue) {
     appendSimple8bBlock64(expected, 0);
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {elem, elem});
 }
 
 TEST_F(BSONColumnTest, BasicSkip) {
@@ -353,7 +450,9 @@ TEST_F(BSONColumnTest, BasicSkip) {
     appendSimple8bBlock64(expected, boost::none);
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {elem, BSONElement()});
 }
 
 TEST_F(BSONColumnTest, OnlySkip) {
@@ -366,7 +465,9 @@ TEST_F(BSONColumnTest, OnlySkip) {
     appendSimple8bBlock64(expected, boost::none);
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {BSONElement()});
 }
 
 TEST_F(BSONColumnTest, ValueAfterSkip) {
@@ -382,7 +483,9 @@ TEST_F(BSONColumnTest, ValueAfterSkip) {
     appendLiteral(expected, elem);
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {BSONElement(), elem});
 }
 
 
@@ -400,7 +503,9 @@ TEST_F(BSONColumnTest, LargeDeltaIsLiteral) {
     appendLiteral(expected, second);
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {first, second});
 }
 
 TEST_F(BSONColumnTest, LargeDeltaIsLiteralAfterSimple8b) {
@@ -423,7 +528,9 @@ TEST_F(BSONColumnTest, LargeDeltaIsLiteralAfterSimple8b) {
     appendSimple8bBlock64(expected, deltaInt64(large, large));
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {zero, zero, large, large});
 }
 
 TEST_F(BSONColumnTest, OverBlockCount) {
@@ -454,7 +561,9 @@ TEST_F(BSONColumnTest, OverBlockCount) {
 
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
 }
 
 TEST_F(BSONColumnTest, TypeChangeAfterLiteral) {
@@ -471,7 +580,9 @@ TEST_F(BSONColumnTest, TypeChangeAfterLiteral) {
     appendLiteral(expected, elemInt64);
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {elemInt32, elemInt64});
 }
 
 TEST_F(BSONColumnTest, TypeChangeAfterSimple8b) {
@@ -491,7 +602,9 @@ TEST_F(BSONColumnTest, TypeChangeAfterSimple8b) {
     appendLiteral(expected, elemInt64);
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {elemInt32, elemInt32, elemInt64});
 }
 
 TEST_F(BSONColumnTest, Simple8bAfterTypeChange) {
@@ -511,38 +624,9 @@ TEST_F(BSONColumnTest, Simple8bAfterTypeChange) {
     appendSimple8bBlock64(expected, 0);
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
-}
-
-TEST_F(BSONColumnTest, Decimal128Base) {
-    BSONColumnBuilder cb("test"_sd);
-
-    auto elemDec128 = createElementDecimal128(Decimal128());
-
-    cb.append(elemDec128);
-
-    BufBuilder expected;
-    appendLiteral(expected, elemDec128);
-    appendEOO(expected);
-
-    verifyBinary(cb.finalize(), expected);
-}
-
-TEST_F(BSONColumnTest, Decimal128Delta) {
-    BSONColumnBuilder cb("test"_sd);
-
-    auto elemDec128 = createElementDecimal128(Decimal128(1));
-
-    cb.append(elemDec128);
-    cb.append(elemDec128);
-
-    BufBuilder expected;
-    appendLiteral(expected, elemDec128);
-    appendSimple8bControl(expected, 0b1000, 0b0000);
-    appendSimple8bBlock128(expected, deltaDecimal128(elemDec128, elemDec128));
-    appendEOO(expected);
-
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {elemInt32, elemInt64, elemInt64});
 }
 
 TEST_F(BSONColumnTest, BasicDouble) {
@@ -559,7 +643,9 @@ TEST_F(BSONColumnTest, BasicDouble) {
     appendSimple8bBlock64(expected, deltaDouble(d2, d1, 1));
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {d1, d2});
 }
 
 TEST_F(BSONColumnTest, DoubleSameScale) {
@@ -581,7 +667,9 @@ TEST_F(BSONColumnTest, DoubleSameScale) {
         expected, deltaDouble(elems.begin() + 1, elems.end(), elems.front(), 1), 1);
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
 }
 
 TEST_F(BSONColumnTest, DoubleIncreaseScaleFromLiteral) {
@@ -598,7 +686,9 @@ TEST_F(BSONColumnTest, DoubleIncreaseScaleFromLiteral) {
     appendSimple8bBlock64(expected, deltaDouble(d2, d1, 10));
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {d1, d2});
 }
 
 TEST_F(BSONColumnTest, DoubleLiteralAndScaleAfterSkip) {
@@ -618,7 +708,9 @@ TEST_F(BSONColumnTest, DoubleLiteralAndScaleAfterSkip) {
     appendSimple8bBlock64(expected, deltaDouble(d2, d1, 10));
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {BSONElement(), d1, d2});
 }
 
 TEST_F(BSONColumnTest, DoubleIncreaseScaleFromLiteralAfterSkip) {
@@ -640,7 +732,9 @@ TEST_F(BSONColumnTest, DoubleIncreaseScaleFromLiteralAfterSkip) {
     appendSimple8bBlocks64(expected, expectedVals, 1);
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {d1, BSONElement(), BSONElement(), d2});
 }
 
 TEST_F(BSONColumnTest, DoubleIncreaseScaleFromDeltaWithRescale) {
@@ -663,7 +757,9 @@ TEST_F(BSONColumnTest, DoubleIncreaseScaleFromDeltaWithRescale) {
         expected, deltaDouble(elems.begin() + 1, elems.end(), elems.front(), 10), 1);
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
 }
 
 TEST_F(BSONColumnTest, DoubleIncreaseScaleFromDeltaNoRescale) {
@@ -693,7 +789,9 @@ TEST_F(BSONColumnTest, DoubleIncreaseScaleFromDeltaNoRescale) {
         expected, deltaDouble(deltaEnd, elems.end(), *(deltaEnd - 1), 100000000), 1);
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
 }
 
 TEST_F(BSONColumnTest, DoubleDecreaseScaleAfterBlock) {
@@ -722,7 +820,9 @@ TEST_F(BSONColumnTest, DoubleDecreaseScaleAfterBlock) {
     appendSimple8bBlocks64(expected, deltaDouble(deltaEnd, elems.end(), *(deltaEnd - 1), 1), 1);
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
 }
 
 TEST_F(BSONColumnTest, DoubleDecreaseScaleAfterBlockUsingSkip) {
@@ -756,7 +856,9 @@ TEST_F(BSONColumnTest, DoubleDecreaseScaleAfterBlockUsingSkip) {
     appendSimple8bBlocks64(expected, deltaDouble(deltaEnd, elems.end(), *deltaBegin, 1), 1);
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
 }
 
 TEST_F(BSONColumnTest, DoubleDecreaseScaleAfterBlockThenScaleBackUp) {
@@ -780,7 +882,9 @@ TEST_F(BSONColumnTest, DoubleDecreaseScaleAfterBlockThenScaleBackUp) {
         expected, deltaDouble(elems.begin() + 1, elems.end(), elems.front(), 100000000), 2);
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
 }
 
 TEST_F(BSONColumnTest, DoubleDecreaseScaleAfterBlockUsingSkipThenScaleBackUp) {
@@ -808,7 +912,9 @@ TEST_F(BSONColumnTest, DoubleDecreaseScaleAfterBlockUsingSkipThenScaleBackUp) {
         expected, deltaDouble(elems.begin() + 1, elems.end(), elems.front(), 100000000), 2);
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
 }
 
 TEST_F(BSONColumnTest, DoubleUnscalable) {
@@ -833,7 +939,9 @@ TEST_F(BSONColumnTest, DoubleUnscalable) {
     appendSimple8bBlocks64(expected, expectedVals, 1);
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
 }
 
 TEST_F(BSONColumnTest, DoubleSignalingNaN) {
@@ -857,7 +965,9 @@ TEST_F(BSONColumnTest, DoubleSignalingNaN) {
 
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {elem, nan});
 }
 
 TEST_F(BSONColumnTest, DoubleQuietNaN) {
@@ -879,7 +989,9 @@ TEST_F(BSONColumnTest, DoubleQuietNaN) {
     }
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {elem, nan});
 }
 
 TEST_F(BSONColumnTest, DoubleInfinity) {
@@ -901,7 +1013,9 @@ TEST_F(BSONColumnTest, DoubleInfinity) {
     }
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {elem, inf});
 }
 
 TEST_F(BSONColumnTest, DoubleDenorm) {
@@ -923,7 +1037,9 @@ TEST_F(BSONColumnTest, DoubleDenorm) {
     }
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {elem, denorm});
 }
 
 TEST_F(BSONColumnTest, DoubleIntegerOverflow) {
@@ -944,6 +1060,45 @@ TEST_F(BSONColumnTest, DoubleIntegerOverflow) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlock64(expected, deltaDoubleMemory(e2, e1));
     appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {e1, e2});
+}
+
+TEST_F(BSONColumnTest, Decimal128Base) {
+    BSONColumnBuilder cb("test"_sd);
+
+    auto elemDec128 = createElementDecimal128(Decimal128());
+
+    cb.append(elemDec128);
+
+    BufBuilder expected;
+    appendLiteral(expected, elemDec128);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {elemDec128});
+}
+
+TEST_F(BSONColumnTest, Decimal128Delta) {
+    BSONColumnBuilder cb("test"_sd);
+
+    auto elemDec128 = createElementDecimal128(Decimal128(1));
+
+    cb.append(elemDec128);
+    cb.append(elemDec128);
+
+    BufBuilder expected;
+    appendLiteral(expected, elemDec128);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlock128(expected, deltaDecimal128(elemDec128, elemDec128));
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {elemDec128, elemDec128});
 }
 
 TEST_F(BSONColumnTest, DecimalNonZeroDelta) {
@@ -959,7 +1114,10 @@ TEST_F(BSONColumnTest, DecimalNonZeroDelta) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlock128(expected, deltaDecimal128(elemDec128Max, elemDec128Zero));
     appendEOO(expected);
-    verifyBinary(cb.finalize(), expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {elemDec128Zero, elemDec128Max});
 }
 
 TEST_F(BSONColumnTest, DecimalMaxMin) {
@@ -975,7 +1133,10 @@ TEST_F(BSONColumnTest, DecimalMaxMin) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlock128(expected, deltaDecimal128(elemDec128Max, elemDec128Zero));
     appendEOO(expected);
-    verifyBinary(cb.finalize(), expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {elemDec128Zero, elemDec128Max});
 }
 
 TEST_F(BSONColumnTest, DecimalMultiElement) {
@@ -999,7 +1160,11 @@ TEST_F(BSONColumnTest, DecimalMultiElement) {
         deltaDecimal128(elemDec128One, elemDec128Zero)};
     appendSimple8bBlocks128(expected, valuesToAppend, 1);
     appendEOO(expected);
-    verifyBinary(cb.finalize(), expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(
+        binData, {elemDec128Zero, elemDec128Max, elemDec128Zero, elemDec128Zero, elemDec128One});
 }
 
 TEST_F(BSONColumnTest, DecimalMultiElementSkips) {
@@ -1027,7 +1192,17 @@ TEST_F(BSONColumnTest, DecimalMultiElementSkips) {
         deltaDecimal128(elemDec128One, elemDec128Zero)};
     appendSimple8bBlocks128(expected, valuesToAppend, 1);
     appendEOO(expected);
-    verifyBinary(cb.finalize(), expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData,
+                        {elemDec128Zero,
+                         elemDec128Max,
+                         BSONElement(),
+                         BSONElement(),
+                         elemDec128Zero,
+                         elemDec128Zero,
+                         elemDec128One});
 }
 
 TEST_F(BSONColumnTest, BasicObjectId) {
@@ -1051,7 +1226,9 @@ TEST_F(BSONColumnTest, BasicObjectId) {
     appendSimple8bBlocks64(expected, expectedDeltas, 1);
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {first, second, second, third});
 }
 
 TEST_F(BSONColumnTest, ObjectIdDifferentProcessUnique) {
@@ -1068,7 +1245,9 @@ TEST_F(BSONColumnTest, ObjectIdDifferentProcessUnique) {
     appendLiteral(expected, second);
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {first, second});
 }
 
 TEST_F(BSONColumnTest, ObjectIdAfterChangeBack) {
@@ -1099,7 +1278,9 @@ TEST_F(BSONColumnTest, ObjectIdAfterChangeBack) {
 
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {first, second, elemInt32, first, second});
 }
 
 TEST_F(BSONColumnTest, Simple8bTimestamp) {
@@ -1120,7 +1301,9 @@ TEST_F(BSONColumnTest, Simple8bTimestamp) {
     appendSimple8bBlocks64(expected, expectedDeltaOfDeltas, 1);
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {first, second, second});
 }
 
 TEST_F(BSONColumnTest, Simple8bTimestampNegativeDeltaOfDelta) {
@@ -1142,7 +1325,9 @@ TEST_F(BSONColumnTest, Simple8bTimestampNegativeDeltaOfDelta) {
     appendSimple8bBlocks64(expected, expectedDeltaOfDeltas, 1);
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {first, second, third});
 }
 
 TEST_F(BSONColumnTest, Simple8bTimestampAfterChangeBack) {
@@ -1172,7 +1357,9 @@ TEST_F(BSONColumnTest, Simple8bTimestampAfterChangeBack) {
 
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {first, second, elemInt32, first, second});
 }
 
 TEST_F(BSONColumnTest, LargeDeltaOfDeltaTimestamp) {
@@ -1189,7 +1376,9 @@ TEST_F(BSONColumnTest, LargeDeltaOfDeltaTimestamp) {
     appendLiteral(expected, second);
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {first, second});
 }
 
 TEST_F(BSONColumnTest, LargeDeltaOfDeltaIsLiteralAfterSimple8bTimestamp) {
@@ -1218,7 +1407,9 @@ TEST_F(BSONColumnTest, LargeDeltaOfDeltaIsLiteralAfterSimple8bTimestamp) {
     appendSimple8bBlocks64(expected, expectedDeltaOfDeltas, 1);
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {zero, zero, large, large, semiLarge});
 }
 
 TEST_F(BSONColumnTest, DateBasic) {
@@ -1238,7 +1429,9 @@ TEST_F(BSONColumnTest, DateBasic) {
     _appendSimple8bBlocks(expected, expectedDeltaOfDeltas, 1);
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {first, second, second});
 }
 
 TEST_F(BSONColumnTest, DateAfterChangeBack) {
@@ -1259,7 +1452,9 @@ TEST_F(BSONColumnTest, DateAfterChangeBack) {
 
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {elemInt32, date, date});
 }
 
 TEST_F(BSONColumnTest, DateLargeDelta) {
@@ -1276,7 +1471,9 @@ TEST_F(BSONColumnTest, DateLargeDelta) {
     appendLiteral(expected, second);
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {first, second});
 }
 
 TEST_F(BSONColumnTest, BoolBasic) {
@@ -1298,7 +1495,9 @@ TEST_F(BSONColumnTest, BoolBasic) {
     _appendSimple8bBlocks(expected, expectedDeltaOfDeltas, 1);
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {trueBson, trueBson, falseBson, trueBson});
 }
 
 TEST_F(BSONColumnTest, BoolAfterChangeBack) {
@@ -1319,7 +1518,9 @@ TEST_F(BSONColumnTest, BoolAfterChangeBack) {
 
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {elemInt32, trueBson, trueBson});
 }
 
 TEST_F(BSONColumnTest, UndefinedBasic) {
@@ -1335,7 +1536,9 @@ TEST_F(BSONColumnTest, UndefinedBasic) {
     appendSimple8bBlock64(expected, kDeltaForBinaryEqualValues);
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {first, first});
 }
 
 TEST_F(BSONColumnTest, UndefinedAfterChangeBack) {
@@ -1356,7 +1559,9 @@ TEST_F(BSONColumnTest, UndefinedAfterChangeBack) {
 
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {elemInt32, undefined, undefined});
 }
 
 TEST_F(BSONColumnTest, NullBasic) {
@@ -1372,7 +1577,9 @@ TEST_F(BSONColumnTest, NullBasic) {
     appendSimple8bBlock64(expected, kDeltaForBinaryEqualValues);
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {first, first});
 }
 
 TEST_F(BSONColumnTest, NullAfterChangeBack) {
@@ -1393,7 +1600,9 @@ TEST_F(BSONColumnTest, NullAfterChangeBack) {
 
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {elemInt32, null, null});
 }
 
 TEST_F(BSONColumnTest, RegexBasic) {
@@ -1412,7 +1621,9 @@ TEST_F(BSONColumnTest, RegexBasic) {
     appendSimple8bBlock64(expected, kDeltaForBinaryEqualValues);
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {first, second, second});
 }
 
 TEST_F(BSONColumnTest, RegexAfterChangeBack) {
@@ -1433,7 +1644,9 @@ TEST_F(BSONColumnTest, RegexAfterChangeBack) {
 
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {elemInt32, regex, regex});
 }
 
 TEST_F(BSONColumnTest, DBRefBasic) {
@@ -1453,7 +1666,9 @@ TEST_F(BSONColumnTest, DBRefBasic) {
     appendSimple8bBlock64(expected, kDeltaForBinaryEqualValues);
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {first, second, second});
 }
 
 TEST_F(BSONColumnTest, DBRefAfterChangeBack) {
@@ -1475,7 +1690,9 @@ TEST_F(BSONColumnTest, DBRefAfterChangeBack) {
 
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {elemInt32, dbRef, dbRef});
 }
 
 TEST_F(BSONColumnTest, CodeWScopeBasic) {
@@ -1494,7 +1711,9 @@ TEST_F(BSONColumnTest, CodeWScopeBasic) {
     appendSimple8bBlock64(expected, kDeltaForBinaryEqualValues);
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {first, second, second});
 }
 
 TEST_F(BSONColumnTest, CodeWScopeAfterChangeBack) {
@@ -1515,7 +1734,9 @@ TEST_F(BSONColumnTest, CodeWScopeAfterChangeBack) {
 
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {elemInt32, codeWScope, codeWScope});
 }
 
 TEST_F(BSONColumnTest, SymbolBasic) {
@@ -1534,7 +1755,9 @@ TEST_F(BSONColumnTest, SymbolBasic) {
     appendSimple8bBlock64(expected, kDeltaForBinaryEqualValues);
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {first, second, second});
 }
 
 TEST_F(BSONColumnTest, SymbolAfterChangeBack) {
@@ -1555,7 +1778,9 @@ TEST_F(BSONColumnTest, SymbolAfterChangeBack) {
 
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {elemInt32, symbol, symbol});
 }
 
 TEST_F(BSONColumnTest, BinDataBase) {
@@ -1569,7 +1794,9 @@ TEST_F(BSONColumnTest, BinDataBase) {
     appendLiteral(expected, elemBinData);
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {elemBinData});
 }
 
 TEST_F(BSONColumnTest, BinDataOdd) {
@@ -1583,7 +1810,9 @@ TEST_F(BSONColumnTest, BinDataOdd) {
     appendLiteral(expected, elemBinData);
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {elemBinData});
 }
 
 TEST_F(BSONColumnTest, BinDataDelta) {
@@ -1600,7 +1829,9 @@ TEST_F(BSONColumnTest, BinDataDelta) {
     appendSimple8bBlock128(expected, deltaBinData(elemBinData, elemBinData));
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {elemBinData, elemBinData});
 }
 
 TEST_F(BSONColumnTest, BinDataDeltaShouldFail) {
@@ -1619,7 +1850,9 @@ TEST_F(BSONColumnTest, BinDataDeltaShouldFail) {
     appendLiteral(expected, elemBinDataLong);
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {elemBinData, elemBinDataLong});
 }
 
 TEST_F(BSONColumnTest, BinDataDeltaCheckSkips) {
@@ -1637,15 +1870,17 @@ TEST_F(BSONColumnTest, BinDataDeltaCheckSkips) {
 
     BufBuilder expected;
     appendLiteral(expected, elemBinData);
-    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bControl(expected, 0b1000, 0b0001);
     std::vector<boost::optional<uint128_t>> expectedValues = {
         deltaBinData(elemBinDataLong, elemBinData),
         boost::none,
         deltaBinData(elemBinData, elemBinDataLong)};
-    appendSimple8bBlocks128(expected, expectedValues, 1);
+    appendSimple8bBlocks128(expected, expectedValues, 2);
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {elemBinData, elemBinDataLong, BSONElement(), elemBinData});
 }
 
 TEST_F(BSONColumnTest, BinDataLargerThan16) {
@@ -1666,7 +1901,9 @@ TEST_F(BSONColumnTest, BinDataLargerThan16) {
     appendLiteral(expected, elemBinDataLong);
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {elemBinData, elemBinDataLong});
 }
 
 TEST_F(BSONColumnTest, BinDataEqualTo16) {
@@ -1688,7 +1925,9 @@ TEST_F(BSONColumnTest, BinDataEqualTo16) {
     appendSimple8bBlock128(expected, deltaBinData(elemBinDataLong, elemBinData));
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {elemBinData, elemBinDataLong});
 }
 
 TEST_F(BSONColumnTest, BinDataLargerThan16SameValue) {
@@ -1706,8 +1945,135 @@ TEST_F(BSONColumnTest, BinDataLargerThan16SameValue) {
     appendSimple8bBlock128(expected, deltaBinData(elemBinData, elemBinData));
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {elemBinData, elemBinData});
 }
+
+TEST_F(BSONColumnTest, InvalidControlByte) {
+    auto elem = createElementInt32(0);
+
+    BufBuilder expected;
+    appendLiteral(expected, elem);
+    appendSimple8bControl(expected, 0b0010, 0b0000);
+    appendSimple8bBlock64(expected, deltaInt32(elem, elem));
+    appendEOO(expected);
+
+    try {
+        BSONColumn col(createBSONColumn(expected.buf(), expected.len()));
+        for (auto it = col.begin(), e = col.end(); it != e; ++it) {
+        }
+        ASSERT(false);
+
+    } catch (DBException&) {
+    }
+}
+
+TEST_F(BSONColumnTest, InvalidSize) {
+    auto elem = createElementInt32(0);
+
+    BufBuilder expected;
+    appendLiteral(expected, elem);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlock64(expected, deltaInt32(elem, elem));
+    appendEOO(expected);
+
+    try {
+        BSONColumn col(createBSONColumn(expected.buf(), expected.len() - 2));
+        for (auto it = col.begin(), e = col.end(); it != e; ++it) {
+        }
+        ASSERT(false);
+
+    } catch (DBException&) {
+    }
+}
+
+TEST_F(BSONColumnTest, InvalidDoubleScale) {
+    auto d1 = createElementDouble(1.11);
+    auto d2 = createElementDouble(1.12);
+
+    BufBuilder expected;
+    appendLiteral(expected, d1);
+    appendSimple8bControl(expected, 0b1001, 0b0000);
+    appendSimple8bBlock64(expected, deltaDouble(d2, d1, 100));
+    appendEOO(expected);
+
+    try {
+        BSONColumn col(createBSONColumn(expected.buf(), expected.len()));
+        for (auto it = col.begin(), e = col.end(); it != e; ++it) {
+        }
+        ASSERT(false);
+
+    } catch (DBException&) {
+    }
+}
+
+TEST_F(BSONColumnTest, MissingEOO) {
+    auto elem = createElementInt32(0);
+
+    BufBuilder expected;
+    appendLiteral(expected, elem);
+
+    try {
+        BSONColumn col(createBSONColumn(expected.buf(), expected.len()));
+        for (auto it = col.begin(), e = col.end(); it != e; ++it) {
+        }
+        ASSERT(false);
+
+    } catch (DBException&) {
+    }
+}
+
+TEST_F(BSONColumnTest, EmptyBuffer) {
+    BufBuilder expected;
+
+    try {
+        BSONColumn col(createBSONColumn(expected.buf(), expected.len()));
+        for (auto it = col.begin(), e = col.end(); it != e; ++it) {
+        }
+        ASSERT(false);
+
+    } catch (DBException&) {
+    }
+}
+
+TEST_F(BSONColumnTest, InvalidSimple8b) {
+    // A Simple8b block with an invalid selector doesn't throw an error, but make sure we can handle
+    // it gracefully. Check so we don't read out of bounds and can iterate.
+
+    auto elem = createElementInt32(0);
+
+    BufBuilder expected;
+    appendLiteral(expected, elem);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    uint64_t invalidSimple8b = 0;
+    expected.appendNum(invalidSimple8b);
+    appendEOO(expected);
+
+    BSONColumn col(createBSONColumn(expected.buf(), expected.len()));
+    for (auto it = col.begin(), e = col.end(); it != e; ++it) {
+    }
+}
+
+TEST_F(BSONColumnTest, NoLiteralStart) {
+    // Starting the stream with a delta block doesn't throw an error. Make sure we handle it
+    // gracefully even if the values we extracted may not be meaningful. Check so we don't read out
+    // of bounds and can iterate.
+
+    auto elem = createElementInt32(0);
+
+    BufBuilder expected;
+    appendLiteral(expected, elem);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    uint64_t invalidSimple8b = 0;
+    expected.appendNum(invalidSimple8b);
+    appendEOO(expected);
+
+    BSONColumn col(createBSONColumn(expected.buf(), expected.len()));
+    for (auto it = col.begin(), e = col.end(); it != e; ++it) {
+    }
+}
+
 
 }  // namespace
 }  // namespace mongo

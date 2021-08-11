@@ -57,12 +57,14 @@ void assertDecimal128Equal(Decimal128 val) {
 void assertBinaryEqual(char* val, size_t size, int128_t expected) {
     int128_t encodeResult = Simple8bTypeUtil::encodeBinary(val, size);
     ASSERT_EQUALS(encodeResult, expected);
-    char charPtr[16] = {1};
+
+    // Initialize to something non zero so we can verify that we did not write out of bounds
+    char charPtr[17];
+    char unused = 'x';
+    memset(charPtr, unused, sizeof(charPtr));
     Simple8bTypeUtil::decodeBinary(encodeResult, charPtr, size);
     ASSERT_EQUALS(std::memcmp(charPtr, val, size), 0);
-    if (size <= 16) {
-        ASSERT_EQUALS(charPtr[size], 1);
-    }
+    ASSERT_EQUALS(charPtr[size], unused);
 }
 
 TEST(Simple8bTypeUtil, EncodeAndDecodePositiveSignedInt) {

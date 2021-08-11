@@ -82,26 +82,30 @@ int64_t Simple8bTypeUtil::encodeObjectId(const OID& oid) {
     return LittleEndian<uint64_t>::load(encoded);
 }
 
-OID Simple8bTypeUtil::decodeObjectId(int64_t val, OID::InstanceUnique processUnique) {
-    unsigned char objId[OID::kOIDSize];
-
+void Simple8bTypeUtil::decodeObjectIdInto(char* buffer,
+                                          int64_t val,
+                                          OID::InstanceUnique processUnique) {
     val = LittleEndian<uint64_t>::store(val);
     uint8_t* encodedBytes = reinterpret_cast<uint8_t*>(&val);
 
     // Set Timestamp and Counter variables together.
-    objId[0] = encodedBytes[6];   // Timestamp index 0.
-    objId[1] = encodedBytes[4];   // Timestamp index 1.
-    objId[2] = encodedBytes[2];   // Timestamp index 2.
-    objId[3] = encodedBytes[0];   // Timestamp index 3.
-    objId[9] = encodedBytes[5];   // Counter index 0;
-    objId[10] = encodedBytes[3];  // Counter index 1.
-    objId[11] = encodedBytes[1];  // Counter index 2.
+    buffer[0] = encodedBytes[6];   // Timestamp index 0.
+    buffer[1] = encodedBytes[4];   // Timestamp index 1.
+    buffer[2] = encodedBytes[2];   // Timestamp index 2.
+    buffer[3] = encodedBytes[0];   // Timestamp index 3.
+    buffer[9] = encodedBytes[5];   // Counter index 0;
+    buffer[10] = encodedBytes[3];  // Counter index 1.
+    buffer[11] = encodedBytes[1];  // Counter index 2.
 
     // Finally set Process Unique.
     std::copy(processUnique.bytes,
               processUnique.bytes + OID::kInstanceUniqueSize,
-              objId + OID::kTimestampSize);
+              buffer + OID::kTimestampSize);
+}
 
+OID Simple8bTypeUtil::decodeObjectId(int64_t val, OID::InstanceUnique processUnique) {
+    unsigned char objId[OID::kOIDSize];
+    decodeObjectIdInto(reinterpret_cast<char*>(objId), val, processUnique);
     return OID(objId);
 }
 
@@ -186,8 +190,9 @@ Decimal128 Simple8bTypeUtil::decodeDecimal128(int128_t val) {
 }
 
 int128_t Simple8bTypeUtil::encodeBinary(const char* val, size_t size) {
-    char arr[16] = {};
+    char arr[16];
     memcpy(arr, val, size);
+    memset(arr + size, 0, sizeof(arr) - size);
     uint64_t low = ConstDataView(arr).read<LittleEndian<uint64_t>>();
     uint64_t high = ConstDataView(arr + 8).read<LittleEndian<uint64_t>>();
     return absl::MakeInt128(high, low);
@@ -201,10 +206,6 @@ void Simple8bTypeUtil::decodeBinary(int128_t val, char* result, size_t size) {
         memcpy(result + 8, &high, size - 8);
     } else {
         memcpy(result, &low, size);
-    }
-    if (size < 16) {
-        // Set the position at end of binary to be always one.
-        result[size] = 1;
     }
 }
 

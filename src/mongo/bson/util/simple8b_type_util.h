@@ -61,7 +61,9 @@ public:
     // then rearrange the bytes to:
     // | Byte Usage | TS3 | C2 | TS2 | C1 | TS1 | C0 | TS0 |
     // | Byte Index |  0  |  1 |  2  | 3  |  4  | 5  |  6  |
+    // The buffer passed to decodeObjectIdInto() must have at least OID::kOIDSize size.
     static int64_t encodeObjectId(const OID& oid);
+    static void decodeObjectIdInto(char* buffer, int64_t val, OID::InstanceUnique processUnique);
     static OID decodeObjectId(int64_t val, OID::InstanceUnique processUnique);
 
     // These methods add floating point support for encoding and decoding with simple8b up to 8

@@ -212,11 +212,12 @@ constexpr std::array<std::array<uint64_t, 16>, 4> kDecodeMask = {
         0}};
 
 // The number of meaningful bits for each selector. This does not include any trailing zero bits.
+// We use 64 bits for all invalid selectors, this is to make sure iteration does not get stuck.
 constexpr std::array<std::array<uint8_t, 16>, 4> kBitsPerIntForSelector = {
-    std::array<uint8_t, 16>{0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 15, 20, 30, 60, 0},
-    std::array<uint8_t, 16>{0, 2, 3, 4, 5, 7, 10, 14, 24, 52, 0, 0, 0, 0, 0, 0},
-    std::array<uint8_t, 16>{0, 4, 5, 7, 10, 14, 24, 52, 0, 0, 0, 0, 0, 0, 0, 0},
-    std::array<uint8_t, 16>{0, 0, 0, 0, 0, 0, 0, 0, 4, 6, 9, 13, 23, 51, 0, 0}};
+    std::array<uint8_t, 16>{64, 1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 15, 20, 30, 60, 64},
+    std::array<uint8_t, 16>{64, 2, 3, 4, 5, 7, 10, 14, 24, 52, 64, 64, 64, 64, 64, 64},
+    std::array<uint8_t, 16>{64, 4, 5, 7, 10, 14, 24, 52, 0, 0, 64, 64, 64, 64, 64, 64},
+    std::array<uint8_t, 16>{64, 0, 0, 0, 0, 0, 0, 0, 4, 6, 9, 13, 23, 51, 64, 64}};
 
 // The number of integers coded for each selector.
 constexpr std::array<std::array<uint8_t, 16>, 4> kIntsStoreForSelector = {
@@ -723,7 +724,7 @@ void Simple8bBuilder<T>::setWriteCallback(Simple8bWriteFn writer) {
 }
 
 template <typename T>
-Simple8b<T>::Iterator::Iterator(const uint64_t* pos, const uint64_t* end)
+Simple8b<T>::Iterator::Iterator(const char* pos, const char* end)
     : _pos(pos), _end(end), _value(0), _rleRemaining(0), _shift(0) {
     if (pos != end) {
         _loadBlock();
@@ -732,7 +733,7 @@ Simple8b<T>::Iterator::Iterator(const uint64_t* pos, const uint64_t* end)
 
 template <typename T>
 void Simple8b<T>::Iterator::_loadBlock() {
-    _current = LittleEndian<uint64_t>::load(*_pos);
+    _current = ConstDataView(_pos).read<LittleEndian<uint64_t>>();
 
     _selector = _current & kBaseSelectorMask;
     uint8_t selectorExtension = ((_current >> kSelectorBits) & kBaseSelectorMask);
@@ -823,7 +824,7 @@ typename Simple8b<T>::Iterator& Simple8b<T>::Iterator::operator++() {
 
 template <typename T>
 typename Simple8b<T>::Iterator& Simple8b<T>::Iterator::advanceBlock() {
-    ++_pos;
+    _pos += sizeof(uint64_t);
     if (_pos == _end) {
         _rleRemaining = 0;
         _shift = 0;
@@ -845,18 +846,18 @@ bool Simple8b<T>::Iterator::operator!=(const Simple8b::Iterator& rhs) const {
 }
 
 template <typename T>
-Simple8b<T>::Simple8b(const char* buffer, int size) : _buffer(buffer), _size(size) {}
+Simple8b<T>::Simple8b(const char* buffer, int size) : _buffer(buffer), _size(size) {
+    invariant(size % sizeof(uint64_t) == 0);
+}
 
 template <typename T>
 typename Simple8b<T>::Iterator Simple8b<T>::begin() const {
-    return {reinterpret_cast<const uint64_t*>(_buffer),
-            reinterpret_cast<const uint64_t*>(_buffer + _size)};
+    return {_buffer, _buffer + _size};
 }
 
 template <typename T>
 typename Simple8b<T>::Iterator Simple8b<T>::end() const {
-    return {reinterpret_cast<const uint64_t*>(_buffer + _size),
-            reinterpret_cast<const uint64_t*>(_buffer + _size)};
+    return {_buffer + _size, _buffer + _size};
 }
 
 template class Simple8b<uint64_t>;

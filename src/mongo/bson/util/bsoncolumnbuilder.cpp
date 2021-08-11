@@ -28,12 +28,15 @@
  */
 
 #include "mongo/bson/util/bsoncolumnbuilder.h"
+#include "mongo/bson/util/bsoncolumn_util.h"
 
 #include "mongo/bson/util/simple8b_type_util.h"
 
 #include <memory>
 
 namespace mongo {
+using namespace bsoncolumn;
+
 namespace {
 static constexpr uint8_t kMaxCount = 16;
 static constexpr uint8_t kCountMask = 0x0F;
@@ -41,18 +44,6 @@ static constexpr uint8_t kControlMask = 0xF0;
 
 static constexpr std::array<uint8_t, Simple8bTypeUtil::kMemoryAsInteger + 1>
     kControlByteForScaleIndex = {0x90, 0xA0, 0xB0, 0xC0, 0xD0, 0x80};
-
-int64_t calcDelta(int64_t val, int64_t prev) {
-    // Do the subtraction as unsigned and cast back to signed to get overflow defined to wrapped
-    // around instead of undefined behavior.
-    return static_cast<int64_t>(static_cast<uint64_t>(val) - static_cast<uint64_t>(prev));
-}
-
-int64_t expandDelta(int64_t prev, int64_t delta) {
-    // Do the addition as unsigned and cast back to signed to get overflow defined to wrapped around
-    // instead of undefined behavior.
-    return static_cast<int64_t>(static_cast<uint64_t>(prev) + static_cast<uint64_t>(delta));
-}
 
 // Encodes the double with the lowest possible scale index. In worst case we will interpret the
 // memory as integer which is guaranteed to succeed.
@@ -91,13 +82,13 @@ BSONColumnBuilder& BSONColumnBuilder::append(BSONElement elem) {
         _storePrevious(elem);
         _simple8bBuilder128.flush();
         _simple8bBuilder64.flush();
-        _storeWith128 = elem.type() == NumberDecimal || elem.type() == BinData;
+        _storeWith128 = uses128bit(type);
         _writeLiteralFromPrevious();
         return *this;
     }
 
     // Store delta in Simple-8b if types match
-    bool compressed = !_usesDeltaOfDelta(type) && elem.binaryEqualValues(previous);
+    bool compressed = !usesDeltaOfDelta(type) && elem.binaryEqualValues(previous);
     if (compressed) {
         if (_storeWith128) {
             _simple8bBuilder128.append(0);
@@ -112,18 +103,19 @@ BSONColumnBuilder& BSONColumnBuilder::append(BSONElement elem) {
             int128_t delta = 0;
             switch (type) {
                 case BinData: {
-                    encodingPossible =
-                        elem.valuestrsize() == previous.valuestrsize() && elem.valuestrsize() <= 16;
+                    int size;
+                    const char* binary = elem.binData(size);
+                    encodingPossible = size == previous.valuestrsize() && elem.valuestrsize() <= 16;
                     if (!encodingPossible)
                         break;
-                    int128_t curEncoded =
-                        Simple8bTypeUtil::encodeBinary(elem.valuestr(), elem.valuestrsize());
-                    delta = curEncoded - _prevEncoded128;
+
+                    int128_t curEncoded = Simple8bTypeUtil::encodeBinary(binary, size);
+                    delta = calcDelta(curEncoded, _prevEncoded128);
                     _prevEncoded128 = curEncoded;
                 } break;
                 case NumberDecimal: {
                     int128_t curEncoded = Simple8bTypeUtil::encodeDecimal128(elem._numberDecimal());
-                    delta = curEncoded - _prevEncoded128;
+                    delta = calcDelta(curEncoded, _prevEncoded128);
                     _prevEncoded128 = curEncoded;
                 } break;
                 default:
@@ -144,12 +136,16 @@ BSONColumnBuilder& BSONColumnBuilder::append(BSONElement elem) {
                 case NumberLong:
                     value = calcDelta(elem._numberLong(), previous._numberLong());
                     break;
-                case jstOID:
+                case jstOID: {
                     encodingPossible = _objectIdDeltaPossible(elem, previous);
-                    if (encodingPossible)
-                        value = calcDelta(Simple8bTypeUtil::encodeObjectId(elem.OID()),
-                                          Simple8bTypeUtil::encodeObjectId(previous.OID()));
+                    if (!encodingPossible)
+                        break;
+
+                    int64_t curEncoded = Simple8bTypeUtil::encodeObjectId(elem.OID());
+                    value = calcDelta(curEncoded, _prevEncoded64);
+                    _prevEncoded64 = curEncoded;
                     break;
+                }
                 case bsonTimestamp: {
                     int64_t currTimestampDelta =
                         calcDelta(elem.timestamp().asULL(), previous.timestamp().asULL());
@@ -158,10 +154,11 @@ BSONColumnBuilder& BSONColumnBuilder::append(BSONElement elem) {
                     break;
                 }
                 case Date:
-                    value = elem.date().toMillisSinceEpoch() - previous.date().toMillisSinceEpoch();
+                    value = calcDelta(elem.date().toMillisSinceEpoch(),
+                                      previous.date().toMillisSinceEpoch());
                     break;
                 case Bool:
-                    value = elem.boolean() - previous.boolean();
+                    value = calcDelta(elem.boolean(), previous.boolean());
                     break;
                 case Undefined:
                 case jstNULL:
@@ -374,28 +371,33 @@ void BSONColumnBuilder::_writeLiteralFromPrevious() {
     // appending next value.
     auto prevElem = _previous();
     _bufBuilder.appendBuf(_prev.get(), _prevSize);
+
+    // Reset state
     _controlByteOffset = 0;
-    // There is no previous timestamp delta. Set to default.
+    _scaleIndex = Simple8bTypeUtil::kMemoryAsInteger;
     _prevDelta = 0;
+
+    // Initialize previous encoded when needed
     switch (prevElem.type()) {
-        case BinData:
-            if (prevElem.valuestrsize() <= 16)
-                _prevEncoded128 =
-                    Simple8bTypeUtil::encodeBinary(prevElem.valuestr(), prevElem.valuestrsize());
+        case NumberDouble:
+            _lastValueInPrevBlock = prevElem._numberDouble();
+            std::tie(_prevEncoded64, _scaleIndex) = scaleAndEncodeDouble(_lastValueInPrevBlock, 0);
             break;
+        case BinData: {
+            int size;
+            const char* binary = prevElem.binData(size);
+            if (size <= 16)
+                _prevEncoded128 = Simple8bTypeUtil::encodeBinary(binary, size);
+            break;
+        }
         case NumberDecimal:
             _prevEncoded128 = Simple8bTypeUtil::encodeDecimal128(prevElem._numberDecimal());
             break;
+        case jstOID:
+            _prevEncoded64 = Simple8bTypeUtil::encodeObjectId(prevElem.__oid());
+            break;
         default:
             break;
-    }
-
-    // Set scale factor for this literal and values needed to append values
-    if (_prev[0] == NumberDouble) {
-        _lastValueInPrevBlock = prevElem._numberDouble();
-        std::tie(_prevEncoded64, _scaleIndex) = scaleAndEncodeDouble(_lastValueInPrevBlock, 0);
-    } else {
-        _scaleIndex = Simple8bTypeUtil::kMemoryAsInteger;
     }
 }
 
@@ -446,10 +448,6 @@ Simple8bWriteFn BSONColumnBuilder::_createBufferWriter() {
 
         return true;
     };
-}
-
-bool BSONColumnBuilder::_usesDeltaOfDelta(BSONType type) {
-    return type == bsonTimestamp;
 }
 
 bool BSONColumnBuilder::_objectIdDeltaPossible(BSONElement elem, BSONElement prev) {

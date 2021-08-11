@@ -322,7 +322,7 @@ public:
         bool operator!=(const Iterator& rhs) const;
 
     private:
-        Iterator(const uint64_t* pos, const uint64_t* end);
+        Iterator(const char* pos, const char* end);
 
         /**
          * Loads the current Simple8b block into the iterator
@@ -335,8 +335,8 @@ public:
          */
         uint16_t _rleCountInCurrent(uint8_t selectorExtension) const;
 
-        const uint64_t* _pos;
-        const uint64_t* _end;
+        const char* _pos;
+        const char* _end;
 
         // Current Simple8b block in native endian
         uint64_t _current;
