@@ -2262,14 +2262,10 @@ var ReplSetTest = function(opts) {
         return sessions.map(session => {
             const commandObj = {dbHash: 1};
             const db = session.getDatabase(dbName);
-            // If eMRC=false or we are in binary version 4.4, we use the old behavior using
-            // $_internalReadAtClusterTime. Otherwise, we use snapshot read concern for dbhash.
+            // If eMRC=false, we use the old behavior using $_internalReadAtClusterTime.
+            // Otherwise, we use snapshot read concern for dbhash.
             if (readAtClusterTime !== undefined) {
-                // TODO (SERVER-48959): Remove 4.4 version check to see which point-in-time read
-                // behavior to use.
-                const version = assert.commandWorked(db.runCommand({buildinfo: 1})).versionArray;
-                if (jsTest.options().enableMajorityReadConcern !== false &&
-                    ((version[0] > 4) || ((version[0] == 4) && (version[1] > 4)))) {
+                if (jsTest.options().enableMajorityReadConcern !== false) {
                     commandObj.readConcern = {level: "snapshot", atClusterTime: readAtClusterTime};
                 } else {
                     commandObj.$_internalReadAtClusterTime = readAtClusterTime;
