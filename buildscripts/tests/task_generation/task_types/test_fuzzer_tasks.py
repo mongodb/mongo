@@ -119,4 +119,4 @@ class TestBuildFuzzerSubTask(unittest.TestCase):
         cmd = sub_task.commands[1].as_dict()
 
         self.assertEqual(cmd["command"], "timeout.update")
-        self.assertEqual(cmd["params"]["exec_timeout_secs"], mock_params.timeout_secs)
+        self.assertEqual(cmd["params"]["timeout_secs"], mock_params.timeout_secs)

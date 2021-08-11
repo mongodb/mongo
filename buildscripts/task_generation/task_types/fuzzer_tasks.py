@@ -137,7 +137,7 @@ class FuzzerGenTaskService:
             "gen_task_config_location": params.config_location,
         }  # yapf: disable
 
-        timeout_info = TimeoutInfo.overridden(exec_timeout=params.timeout_secs)
+        timeout_info = TimeoutInfo.overridden(timeout=params.timeout_secs)
 
         commands = []
 
