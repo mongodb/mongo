@@ -64,6 +64,7 @@ BSONColumnBuilder& BSONColumnBuilder::append(BSONElement elem) {
 
     // Depending on the type, delta or delta-of-delta is stored in Simple-8b.
     int64_t value = 0;
+    bool deltaPossible = true;
     if (_usesDeltaOfDelta(type) || !elem.binaryEqualValues(previous)) {
         switch (type) {
             case NumberInt:
@@ -71,6 +72,12 @@ BSONColumnBuilder& BSONColumnBuilder::append(BSONElement elem) {
                 break;
             case NumberLong:
                 value = elem._numberLong() - previous._numberLong();
+                break;
+            case jstOID:
+                deltaPossible = _objectIdDeltaPossible(elem, previous);
+                if (deltaPossible)
+                    value = Simple8bTypeUtil::encodeObjectId(elem.OID()) -
+                        Simple8bTypeUtil::encodeObjectId(previous.OID());
                 break;
             case bsonTimestamp: {
                 int64_t currTimestampDelta =
@@ -85,7 +92,9 @@ BSONColumnBuilder& BSONColumnBuilder::append(BSONElement elem) {
         };
     }
 
-    bool result = _simple8bBuilder.append(Simple8bTypeUtil::encodeInt64(value));
+    bool result = false;
+    if (deltaPossible)
+        result = _simple8bBuilder.append(Simple8bTypeUtil::encodeInt64(value));
     _storePrevious(elem);
 
     // Store uncompressed literal if value is outside of range of encodable values.
@@ -178,5 +187,12 @@ Simple8bBuilder<uint64_t> BSONColumnBuilder::_createSimple8bBuilder() {
 bool BSONColumnBuilder::_usesDeltaOfDelta(BSONType type) {
     return type == bsonTimestamp;
 }
+
+bool BSONColumnBuilder::_objectIdDeltaPossible(BSONElement elem, BSONElement prev) {
+    return !memcmp(prev.OID().getInstanceUnique().bytes,
+                   elem.OID().getInstanceUnique().bytes,
+                   OID::kInstanceUniqueSize);
+}
+
 
 }  // namespace mongo

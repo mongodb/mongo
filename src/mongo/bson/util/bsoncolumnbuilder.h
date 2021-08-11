@@ -80,6 +80,7 @@ private:
     void _writeLiteralFromPrevious();
     void _incrementSimple8bCount();
     bool _usesDeltaOfDelta(BSONType type);
+    bool _objectIdDeltaPossible(BSONElement elem, BSONElement prev);
 
     Simple8bBuilder<uint64_t> _createSimple8bBuilder();
 

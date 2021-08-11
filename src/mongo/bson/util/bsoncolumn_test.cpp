@@ -53,6 +53,13 @@ public:
         return _elementMemory.front().firstElement();
     }
 
+    BSONElement createObjectId(OID val) {
+        BSONObjBuilder ob;
+        ob.append("0"_sd, val);
+        _elementMemory.emplace_front(ob.obj());
+        return _elementMemory.front().firstElement();
+    }
+
     BSONElement createTimestamp(Timestamp val) {
         BSONObjBuilder ob;
         ob.append("0"_sd, val);
@@ -66,6 +73,11 @@ public:
 
     static uint64_t deltaInt64(BSONElement val, BSONElement prev) {
         return Simple8bTypeUtil::encodeInt64(val.Long() - prev.Long());
+    }
+
+    static uint64_t deltaObjectId(BSONElement val, BSONElement prev) {
+        return Simple8bTypeUtil::encodeInt64(Simple8bTypeUtil::encodeObjectId(val.OID()) -
+                                             Simple8bTypeUtil::encodeObjectId(prev.OID()));
     }
 
     uint64_t deltaOfDeltaTimestamp(BSONElement val, BSONElement prev) {
@@ -333,6 +345,78 @@ TEST_F(BSONColumnTest, Simple8bAfterTypeChange) {
     appendLiteral(expected, elemInt64);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlock(expected, 0);
+    appendEOO(expected);
+
+    verifyBinary(cb.finalize(), expected);
+}
+
+TEST_F(BSONColumnTest, BasicObjectId) {
+    BSONColumnBuilder cb("test"_sd);
+
+    auto first = createObjectId(OID("112233445566778899AABBCC"));
+    // Increment the lower byte for timestamp and counter.
+    auto second = createObjectId(OID("112234445566778899AABBEE"));
+    auto third = createObjectId(OID("112234445566778899AABBFF"));
+
+    cb.append(first);
+    cb.append(second);
+    cb.append(second);
+    cb.append(third);
+
+    BufBuilder expected;
+    appendLiteral(expected, first);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    std::vector<uint64_t> expectedDeltas{
+        deltaObjectId(second, first), deltaObjectId(second, second), deltaObjectId(third, second)};
+    appendSimple8bBlocks(expected, expectedDeltas, 1);
+    appendEOO(expected);
+
+    verifyBinary(cb.finalize(), expected);
+}
+
+TEST_F(BSONColumnTest, ObjectIdDifferentProcessUnique) {
+    BSONColumnBuilder cb("test"_sd);
+
+    auto first = createObjectId(OID("112233445566778899AABBCC"));
+    auto second = createObjectId(OID("112233445566FF8899AABBCC"));
+
+    cb.append(first);
+    cb.append(second);
+
+    BufBuilder expected;
+    appendLiteral(expected, first);
+    appendLiteral(expected, second);
+    appendEOO(expected);
+
+    verifyBinary(cb.finalize(), expected);
+}
+
+TEST_F(BSONColumnTest, ObjectIdAfterChangeBack) {
+    BSONColumnBuilder cb("test"_sd);
+
+    auto first = createObjectId(OID("112233445566778899AABBCC"));
+    // Increment the lower byte for timestamp and counter.
+    auto second = createObjectId(OID("1122FF445566778899AABBEE"));
+    auto elemInt32 = createElementInt32(0);
+
+    cb.append(first);
+    cb.append(second);
+    cb.append(elemInt32);
+    cb.append(first);
+    cb.append(second);
+
+    BufBuilder expected;
+
+    appendLiteral(expected, first);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlock(expected, deltaObjectId(second, first));
+
+    appendLiteral(expected, elemInt32);
+
+    appendLiteral(expected, first);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlock(expected, deltaObjectId(second, first));
+
     appendEOO(expected);
 
     verifyBinary(cb.finalize(), expected);
