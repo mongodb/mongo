@@ -6,7 +6,7 @@
 #  See the file LICENSE for redistribution information
 #
 
-include(build_cmake/helpers.cmake)
+include(cmake/helpers.cmake)
 
 ### Auto configure options and checks that we can infer from our toolchain environment.
 

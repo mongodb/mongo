@@ -6,7 +6,7 @@
 #  See the file LICENSE for redistribution information
 #
 
-include(build_cmake/helpers.cmake)
+include(cmake/helpers.cmake)
 
 # WiredTiger-related configuration options.
 

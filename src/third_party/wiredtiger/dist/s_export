@@ -51,7 +51,7 @@ check()
 #    ../build_posix/.libs/libwiredtiger.$ext    (autotools build)
 #    ../.libs/libwiredtiger.$ext                (autotools build at top level)
 #    ../build/libwiredtiger.$ext                (cmake build)
-#    ../build_cmake/libwiredtiger.$ext          (cmake build)
+#    ../cmake_build/libwiredtiger.$ext          (cmake build)
 
 found=0
 for f in $(find .. -name "libwiredtiger.*" -print); do
