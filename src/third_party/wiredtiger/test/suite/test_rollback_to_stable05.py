@@ -34,9 +34,6 @@ from wiredtiger import stat
 from wtscenario import make_scenarios
 from test_rollback_to_stable01 import test_rollback_to_stable_base
 
-def timestamp_str(t):
-    return '%x' % t
-
 # test_rollback_to_stable05.py
 # Test that rollback to stable cleans history store for non-timestamp tables.
 class test_rollback_to_stable05(test_rollback_to_stable_base):
@@ -69,10 +66,6 @@ class test_rollback_to_stable05(test_rollback_to_stable_base):
 
     def test_rollback_to_stable(self):
         nrows = 1000
-
-        # Prepare transactions for column store table is not yet supported.
-        if self.prepare and self.key_format == 'r':
-            self.skipTest('Prepare transactions for column store table is not yet supported')
 
         # Create two tables without logging.
         uri_1 = "table:rollback_to_stable05_1"

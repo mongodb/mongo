@@ -1,6 +1,16 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
 </dl><hr>
+@section version_1001 Upgrading to Version 10.0.1
+<dl>
+
+<dt>Background sync APIs</dt>
+<dd>
+The WT_SESSION::transaction_sync API and the sync=background configuration option to
+WT_SESSION::log_flush and WT_SESSION::commit_transaction have all been removed from WiredTiger.
+</dd>
+
+</dl><hr>
 @section version_1000 Upgrading to Version 10.0.0
 <dl>
 

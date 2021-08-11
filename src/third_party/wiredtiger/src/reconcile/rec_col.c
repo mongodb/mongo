@@ -573,17 +573,20 @@ __wt_rec_col_var(
     WT_CELL *cell;
     WT_CELL_UNPACK_KV *vpack, _vpack;
     WT_COL *cip;
+    WT_CURSOR *hs_cursor;
     WT_CURSOR_BTREE *cbt;
     WT_DECL_ITEM(orig);
     WT_DECL_RET;
     WT_INSERT *ins;
+    WT_ITEM hs_recno_key;
     WT_PAGE *page;
     WT_TIME_WINDOW clear_tw, *twp;
     WT_UPDATE *upd;
     WT_UPDATE_SELECT upd_select;
     uint64_t n, nrepeat, repeat_count, rle, skip, src_recno;
     uint32_t i, size;
-    bool deleted, orig_deleted, update_no_copy;
+    uint8_t *p, hs_recno_key_buf[WT_INTPACK64_MAXSIZE];
+    bool deleted, hs_clear, orig_deleted, update_no_copy;
     const void *data;
 
     btree = S2BT(session);
@@ -602,6 +605,23 @@ __wt_rec_col_var(
     last.value = r->last;
     WT_TIME_WINDOW_INIT(&last.tw);
     last.deleted = false;
+
+    /*
+     * When removing a key due to a tombstone with a durable timestamp of "none", also remove the
+     * history store contents associated with that key. It's safe to do even if we fail
+     * reconciliation after the removal, the history store content must be obsolete in order for us
+     * to consider removing the key.
+     *
+     * Ignore if this is metadata, as metadata doesn't have any history.
+     *
+     * Some code paths, such as schema removal, involve deleting keys in metadata and assert that
+     * they shouldn't open new dhandles. In those cases we won't ever need to blow away history
+     * store content, so we can skip this.
+     */
+    hs_cursor = NULL;
+    hs_clear = F_ISSET(S2C(session), WT_CONN_HS_OPEN) &&
+      !F_ISSET(session, WT_SESSION_NO_DATA_HANDLES) && !WT_IS_HS(btree->dhandle) &&
+      !WT_IS_METADATA(btree->dhandle);
 
     WT_RET(__wt_rec_split_init(session, r, page, pageref->ref_recno, btree->maxleafpage_precomp));
 
@@ -789,8 +809,30 @@ record_loop:
                     size = upd->size;
                     break;
                 case WT_UPDATE_TOMBSTONE:
-                    twp = &clear_tw;
+                    /*
+                     * When removing a key due to a tombstone with a durable timestamp of "none",
+                     * also remove the history store contents associated with that key.
+                     */
+                    if (twp->durable_stop_ts == WT_TS_NONE && hs_clear) {
+                        p = hs_recno_key_buf;
+                        WT_ERR(__wt_vpack_uint(&p, 0, src_recno));
+                        hs_recno_key.data = hs_recno_key_buf;
+                        hs_recno_key.size = WT_PTRDIFF(p, hs_recno_key_buf);
+
+                        /* Open a history store cursor if we don't yet have one. */
+                        if (hs_cursor == NULL)
+                            WT_ERR(__wt_curhs_open(session, NULL, &hs_cursor));
+
+                        /* From WT_TS_NONE to delete all the history store content of the key. */
+                        WT_ERR(__wt_hs_delete_key_from_ts(session, hs_cursor, btree->id,
+                          &hs_recno_key, WT_TS_NONE, false, F_ISSET(r, WT_REC_CHECKPOINT_RUNNING)));
+
+                        WT_STAT_CONN_INCR(session, cache_hs_key_truncate_onpage_removal);
+                        WT_STAT_DATA_INCR(session, cache_hs_key_truncate_onpage_removal);
+                    }
+
                     deleted = true;
+                    twp = &clear_tw;
                     break;
                 default:
                     WT_ERR(__wt_illegal_value(session, upd->type));
@@ -799,19 +841,21 @@ record_loop:
 
 compare:
             /*
-             * If we have a record against which to compare, and the records compare equal,
-             * increment the rle counter and continue. If the records don't compare equal, output
-             * the last record and swap the last and current buffers: do NOT update the starting
-             * record number, we've been doing that all along.
+             * If we have a record against which to compare and the records compare equal, increment
+             * the RLE and continue. If the records don't compare equal, output the last record and
+             * swap the last and current buffers: do NOT update the starting record number, we've
+             * been doing that all along.
              */
             if (rle != 0) {
-                if (WT_TIME_WINDOWS_EQUAL(twp, &last.tw) &&
+                if (WT_TIME_WINDOWS_EQUAL(&last.tw, twp) &&
                   ((deleted && last.deleted) ||
                     (!deleted && !last.deleted && last.value->size == size &&
-                      memcmp(last.value->data, data, size) == 0))) {
+                      (size == 0 || memcmp(last.value->data, data, size) == 0)))) {
+
                     /* The time window for deleted keys must be empty. */
                     WT_ASSERT(
                       session, (!deleted && !last.deleted) || WT_TIME_WINDOW_IS_EMPTY(&last.tw));
+
                     rle += repeat_count;
                     continue;
                 }
@@ -951,13 +995,13 @@ compare:
             if (rle != 0) {
                 if (WT_TIME_WINDOWS_EQUAL(&last.tw, twp) &&
                   ((deleted && last.deleted) ||
-                    (!deleted && !last.deleted && size != 0 && last.value->size == size &&
-                      memcmp(last.value->data, data, size) == 0))) {
-                    /*
-                     * The time window for deleted keys must be empty.
-                     */
+                    (!deleted && !last.deleted && last.value->size == size &&
+                      (size == 0 || memcmp(last.value->data, data, size) == 0)))) {
+
+                    /* The time window for deleted keys must be empty. */
                     WT_ASSERT(
                       session, (!deleted && !last.deleted) || WT_TIME_WINDOW_IS_EMPTY(&last.tw));
+
                     ++rle;
                     goto next;
                 }
@@ -1012,6 +1056,8 @@ next:
     ret = __wt_rec_split_finish(session, r);
 
 err:
+    if (hs_cursor != NULL)
+        WT_TRET(hs_cursor->close(hs_cursor));
     __wt_scr_free(session, &orig);
     return (ret);
 }

@@ -29,9 +29,6 @@
 import time
 import wiredtiger, wttest
 
-def timestamp_str(t):
-    return '%x' % t
-
 # test_checkpoint06.py
 # Verify that we rollback the truncation that is committed after stable
 # timestamp in the checkpoint.
@@ -44,14 +41,14 @@ class test_checkpoint06(wttest.WiredTigerTestCase):
         self.session.create(self.uri, 'key_format=i,value_format=S')
 
         value = "abcdefghijklmnopqrstuvwxyz" * 3
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(1))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
         cursor = self.session.open_cursor(self.uri)
         self.session.begin_transaction()
         # Setup: Insert some data
         for i in range(10000):
             cursor[i] = value
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(2))
-        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(2))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(2))
 
         # Flush everything to disk
         self.reopen_conn()
@@ -63,7 +60,7 @@ class test_checkpoint06(wttest.WiredTigerTestCase):
         end = self.session.open_cursor(self.uri)
         end.set_key(9995)
         self.session.truncate(None, start, None, None)
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(3))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(3))
 
         # Do a checkpoint
         self.session.checkpoint()

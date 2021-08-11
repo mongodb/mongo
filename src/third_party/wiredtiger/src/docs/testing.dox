@@ -37,7 +37,7 @@ into the WiredTiger GitHub source tree.
 @subsection test_csuite CSuite
 @subsection test_cppsuite CPPSuite
 @subsection test_format Format
-@subsection test_perf WT Perf
+@subsection test_perf WiredTiger Perf
 @subsection test_workgen Workgen
 
 @section testing_compatibility Compatibility Testing

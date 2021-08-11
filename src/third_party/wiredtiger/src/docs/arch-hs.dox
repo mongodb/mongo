@@ -1,8 +1,272 @@
 /*! @arch_page arch-hs History Store
 
-The History Store in WiredTiger tracks old (all but the latest committed)
-versions of records.  By having these records in storage separate from
-the current version, they can be used to service long running transactions,
+The history store in WiredTiger tracks historical versions of records required to
+service older readers. By having these records in storage separate from
+the current version, they can be used to service long running transactions
 and be evicted as necessary, without interfering with activity that uses
-the most recent committed versions.
+the most recent committed versions. With the introduction of history store, only the
+newest update to a key is written to the user table while the older updates
+for the key are written to the history store. All user tables in the database are
+backed by a single history store table. The history store has no outward
+visibility to the application code and only WiredTiger's internal modules can
+perform operations on the history store table using a predefined cursor API.
+
+@section arch_hs_table History store table structure
+WiredTiger writes the history store on the disk as a standard row-store table. The key for
+the history store table is a combination of:
+- btree ID of user table this update belongs to
+- record key (byte-string for row-store, record number for column-store)
+- start timestamp for the update
+- counter value
+
+This key format allows us to search efficiently for a given record key and read
+timestamp combination. The last part of the key is a monotonically increasing counter
+to keep the key unique in scenarios where a key has multiple updates with the same commit timestamp.
+As the key for the history store table is different for row- and column-store,
+we store both key types in a byte string otherwise we'd need two history store files with
+different key formats.
+
+The corresponding value for each key is stored as a combination of:
+- stop timestamp
+- durable timestamp
+- update type
+- value
+
+@subsection arch_hs_table_tombstone Tombstones in the history store table
+The stop timestamp refers to the point in time after which the update is no longer visible. This can
+either be a result of deletion or of a new update being committed. An update with a valid stop time
+is also called a \c tombstone. Every update in the history store has a valid stop timestamp and
+transaction id associated with it, except for cases where the update preceded a prepared update.
+The stop timestamp of the update immediately before the prepared update is set to the maximum
+possible timestamp (\c WT_TS_MAX). The stop timestamp of the latest update in the history store is
+updated once the prepared update is resolved. A tombstone becomes globally visible if the stop
+timestamp is less than the oldest timestamp and the stop transaction id is visible to all concurrent
+transactions in the system. A checkpoint can delete history store pages that only contain globally
+visible tombstones. The garbage collection process is discussed in @ref arch-checkpoint.
+
+@section arch_hs_initialize History store initialization
+WiredTiger checks for an existing history store table at startup and creates a new table if it is
+not able to find one. The history store table is usually created when WiredTiger creates a
+new database, with one exception where WiredTiger is opening an existing database created by an
+older version of WiredTiger that doesn't support the history store. WiredTiger uses
+\c WiredTigerHS.wt as the filename for the history store table.
+
+@section arch_hs_cursor History store cursor interface
+WiredTiger uses a cursor interface for history store table to make it easier for different modules
+to perform data operations on the history store table. A new cursor can be opened by calling
+\c __wt_curhs_open(). History store cursor implementation supports most of the standard \c WT_CURSOR
+methods except for \c WT_CURSOR::search() method. Recall that the key contains a
+counter and timestamp value and it is expected that the caller can not possibly know the exact
+values for both fields beforehand. Therefore, \c WT_CURSOR::search_near() is used for all search
+operations. Two helper functions, \c __wt_curhs_search_near_before() and
+\c __wt_curhs_search_near_after(),
+have been provided to facilitate searching for the required record in the history store table.
+
+@section arch_hs_cursor_visibility History store cursor interface and visibility rules
+When using the history store cursor interface, the user can configure the type of visibility checks
+that are performed on the records. The behavior is controlled by a set of cursor flags:
+
+- By default, snapshot based visibility checks are performed on all records returned to the API
+user.
+
+- When the flag \c WT_CURSTD_HS_READ_ALL is set on the cursor, no visibility checks are performed
+on the records returned to the API user. This means that cursor interface can even return a record
+with a globally visible tombstone. When this flag is set, it suppresses the effect of other
+visibility flags.
+
+- When the flag \c WT_CURSTD_HS_READ_COMMITTED is set, the cursor interface can return any record
+except for globally deleted records. This flag has no effect when the flag
+\c WT_CURSTD_HS_READ_ALL is set.
+
+History store cursor users must use one of the flags if the caller thread is running in a lower
+isolation level and doesn't hold a valid snapshot.
+
+@section arch_hs_reconciliation History store and reconciliation
+When a dirty page is reconciled on a user file btree, the update chain is examined and the latest
+committed update is chosen as the on-disk value. All older updates are added to the history store
+table assuming they are not yet obsolete. Additionally any out of order timestamps will
+be corrected.
+
+Consider the following update chain for a user table with btree id 1000 and data store key "AAA":
+
+@plantuml_start{hs_update_chain.png}
+@startuml{hs_update_chain.png}
+
+together {
+rectangle "     U1 \n @ts 70" as U1
+rectangle "     U2 \n @ts 80" as U2
+rectangle "     U3 \n @ts 90" as U3
+rectangle "     U4 \n @ts 100" as U4
+
+U2-right->U1
+U3-right->U2
+U4-right->U3
+
+}
+@enduml
+@plantuml_end
+
+Assuming all updates are committed, updates \c U1, \c U2 and \c U3 will be added to the history
+store table as shown in the table below.
+
+<table style="height: 195px; width: 811px; border-color: Black;" border="4">
+  <tr style="height: 32px;">
+    <td style="width: 353.391px; height: 32px; text-align: center;" colspan="4">
+      <strong>KEY</strong>
+    </td>
+    <td style="width: 456.609px; height: 32px; text-align: center;" colspan="4">
+      <strong>VALUE</strong>
+    </td>
+  </tr>
+  <tr style="height: 32px;">
+    <td style="width: 72.5156px; height: 32px; text-align: center;">
+      <strong>Btree ID</strong>
+    </td>
+    <td style="width: 89.875px; height: 32px; text-align: center;">
+      <strong>User Key</strong>
+    </td>
+    <td style="width: 97.0312px; height: 32px; text-align: center;">
+      <strong>Start ts</strong>
+    </td>
+    <td style="width: 93.9688px; height: 32px; text-align: center;">
+      <strong>Counter</strong>
+    </td>
+    <td style="width: 92.4375px; height: 32px; text-align: center;">
+      <strong>Stop ts</strong>
+    </td>
+    <td style="width: 105.719px; height: 32px; text-align: center;">
+      <strong>Durable ts</strong>
+    </td>
+    <td style="width: 110.312px; height: 32px; text-align: center;">
+      <strong>Type</strong>
+    </td>
+    <td style="width: 148.141px; height: 32px; text-align: center;">
+      <strong>Value</strong>
+    </td>
+  </tr>
+  <tr style="height: 32.5625px;">
+    <td style="width: 72.5156px; height: 32.5625px; text-align: center;">
+      <strong>...</strong>
+    </td>
+    <td style="width: 89.875px; height: 32.5625px; text-align: center;">
+      <strong>...</strong>
+    </td>
+    <td style="width: 97.0312px; height: 32.5625px; text-align: center;">
+      <strong>...</strong>
+    </td>
+    <td style="width: 93.9688px; height: 32.5625px; text-align: center;">
+      <strong>...</strong>
+    </td>
+    <td style="width: 92.4375px; height: 32.5625px; text-align: center;">
+      <strong>...</strong>
+    </td>
+    <td style="width: 105.719px; height: 32.5625px; text-align: center;">
+      <strong>...</strong>
+    </td>
+    <td style="width: 110.312px; height: 32.5625px; text-align: center;">
+      <strong>...</strong>
+    </td>
+    <td style="width: 148.141px; height: 32.5625px; text-align: center;">
+      <strong>...</strong>
+    </td>
+  </tr>
+  <tr style="height: 32px;">
+    <td style="width: 72.5156px; height: 32px; text-align: center;">1000</td>
+    <td style="width: 89.875px; height: 32px; text-align: center;">"AAA"</td>
+    <td style="width: 97.0312px; height: 32px; text-align: center;">70</td>
+    <td style="width: 93.9688px; height: 32px; text-align: center;">0</td>
+    <td style="width: 92.4375px; height: 32px; text-align: center;">80</td>
+    <td style="width: 105.719px; height: 32px; text-align: center;">70</td>
+    <td style="width: 110.312px; height: 32px; text-align: center;">STANDARD</td>
+    <td style="width: 148.141px; height: 32px; text-align: center;">Value from U1</td>
+  </tr>
+  <tr style="height: 32px;">
+    <td style="width: 72.5156px; height: 32px; text-align: center;">1000</td>
+    <td style="width: 89.875px; height: 32px; text-align: center;">"AAA"</td>
+    <td style="width: 97.0312px; height: 32px; text-align: center;">80</td>
+    <td style="width: 93.9688px; height: 32px; text-align: center;">0</td>
+    <td style="width: 92.4375px; height: 32px; text-align: center;">90</td>
+    <td style="width: 105.719px; height: 32px; text-align: center;">80</td>
+    <td style="width: 110.312px; height: 32px; text-align: center;">STANDARD</td>
+    <td style="width: 148.141px; height: 32px; text-align: center;">Value from U2</td>
+  </tr>
+  <tr style="height: 32px;">
+    <td style="width: 72.5156px; height: 32px; text-align: center;">1000</td>
+    <td style="width: 89.875px; height: 32px; text-align: center;">"AAA"</td>
+    <td style="width: 97.0312px; height: 32px; text-align: center;">90</td>
+    <td style="width: 93.9688px; height: 32px; text-align: center;">0</td>
+    <td style="width: 92.4375px; height: 32px; text-align: center;">100</td>
+    <td style="width: 105.719px; height: 32px; text-align: center;">90</td>
+    <td style="width: 110.312px; height: 32px; text-align: center;">STANDARD</td>
+    <td style="width: 148.141px; height: 32px; text-align: center;">Value from U3</td>
+  </tr>
+  <tr style="height: 32px;">
+    <td style="width: 72.5156px; height: 32px; text-align: center;">
+      <strong>...</strong>
+    </td>
+    <td style="width: 89.875px; height: 32px; text-align: center;">
+      <strong>...</strong>
+    </td>
+    <td style="width: 97.0312px; height: 32px; text-align: center;">
+      <strong>...</strong>
+    </td>
+    <td style="width: 93.9688px; height: 32px; text-align: center;">
+      <strong>...</strong>
+    </td>
+    <td style="width: 92.4375px; height: 32px; text-align: center;">
+      <strong>...</strong>
+    </td>
+    <td style="width: 105.719px; height: 32px; text-align: center;">
+      <strong>...</strong>
+    </td>
+    <td style="width: 110.312px; height: 32px; text-align: center;">
+      <strong>...</strong>
+    </td>
+    <td style="width: 148.141px; height: 32px; text-align: center;">
+      <strong>...</strong>
+    </td>
+  </tr>
+</table>
+
+For the history store table entry corresponding to the update \c U1, the start timestamp in the key
+is the start timestamp for the update \c U1 and the stop timestamp in the value is the start
+timestamp for the update \c U2.
+
+When a modified history store table page is processed by reconciliation, a new page image is
+created without records which have globally visible tombstones. This ensures that WiredTiger is
+only keeping the relevant historical data required to serve the oldest reader in the system or
+as dictated by the oldest timestamp set by the application. Once all records on a page are obsolete,
+the page itself can be removed to reduce the size of the history store table
+(see @ref arch-transaction for more details about oldest timestamp).
+
+@section arch_hs_read Searching for older versions of a key in History Store
+When looking for an update visible to the current transaction, WiredTiger first searches the update
+chain for any visible updates. If there is no visible update in the chain, WiredTiger then
+inspects the on-disk version of the key. If that version is not visible to the transaction,
+WiredTiger searches the history store table for a visible update for the key. When
+searching for an update that satisfies the read timestamp constraint, WiredTiger starts
+with the newest update of the key in the history store table and then iterates through the older
+updates until there are no updates left to process. Note that although there can be multiple updates
+in the history store for a key and read timestamp combination, each update would have different
+visibility based on transaction and timestamp based visibility rules. In case there are no records
+visible in the history store table, \c WT_NOTFOUND error is returned to the reader.
+
+@section arch_hs_rts History store and rollback-to-stable
+Rollback-to-stable searches the history store table for valid updates that are stable according to
+the supplied stable timestamp and replaces the on-disk version with an update from the history store
+table that fulfills the criteria. Rollback-to-stable also removes updates from the
+history store table that are not stable according to the stable timestamp and transaction snapshot
+being used for rollback-to-stable operation. More details about the rollback-to-stable operation
+can be found in the @ref arch-rts page.
+
+@section arch_hs_prepared History store and prepared transactions
+When there is a prepared update for a key and the page is evicted, the prepared update is written
+to the on-disk page and any older updates are written to the history store table. There can be
+no update from a different transaction that is newer than the prepared update for the key and
+therefore the history store should never contain a prepared update. When a prepared update is
+committed, the stop timestamp of the newest update in the history store table is updated from
+\c WT_TS_MAX to the commit timestamp of the prepared update. When a prepared update is rolled back,
+the newest update from the history store table is restored as the on-disk version and then removed
+from the history store table.
+
 */

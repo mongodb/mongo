@@ -53,44 +53,134 @@ build_branch()
 }
 
 #############################################################
+# get_config_file_name:
+#       arg1: branch name
+#############################################################
+get_config_file_name()
+{
+    local file_name=""
+    branch_name=$1
+    if [ "${wt_standalone}" = true ] || [ $older = true ] ; then
+        file_name="${branch_name}/test/format/CONFIG_default"
+        echo $file_name
+        return
+    fi
+    file_name="CONFIG_${branch_name}"
+
+    echo $file_name
+}
+
+#############################################################
+# create_configs:
+#       arg1: branch name
+#############################################################
+create_configs()
+{
+    branch_name=$1
+
+    file_name=$(get_config_file_name $branch_name)
+
+    if [ -f $file_name ] ; then
+        echo " WARNING - ${file_name} already exists, overwriting it."
+    fi
+
+    echo "##################################################" > $file_name
+    echo "runs.type=row" >> $file_name              # WT-7379 - Temporarily disable column store tests
+    echo "btree.prefix=0" >> $file_name             # WT-7579 - Prefix testing isn't portable between releases
+    echo "cache=80" >> $file_name                   # Medium cache so there's eviction
+    echo "checksum=on" >> $file_name                # WT-7851 Fix illegal checksum configuration
+    echo "checkpoints=1"  >> $file_name             # Force periodic writes
+    echo "compression=snappy"  >> $file_name        # We only built with snappy, force the choice
+    echo "data_source=table" >> $file_name
+    echo "huffman_key=0" >> $file_name              # WT-6893 - Not supoprted by newer releases 
+    echo "in_memory=0" >> $file_name                # Interested in the on-disk format
+    echo "leak_memory=1" >> $file_name              # Faster runs
+    echo "logging=1" >> $file_name                  # Test log compatibility
+    echo "logging_compression=snappy" >> $file_name # We only built with snappy, force the choice
+    echo "rows=1000000" >> $file_name
+    echo "salvage=0" >> $file_name                  # Faster runs
+    echo "timer=4" >> $file_name
+    echo "verify=1" >> $file_name                   # Faster runs
+
+    # Append older release configs for newer compatibility release test
+    if [ $newer = true ]; then
+        for i in "${compatible_upgrade_downgrade_release_branches[@]}"
+        do
+            if [ "$i" == "$branch_name" ] ; then
+                echo "transaction.isolation=snapshot" >> $file_name # WT-7545 - Older releases can't do lower isolation levels
+                echo "transaction.timestamps=1" >> $file_name       # WT-7545 - Older releases can't do non-timestamp transactions
+                break
+            fi
+        done
+    fi
+    echo "##################################################" >> $file_name
+}
+
+#############################################################
+# create_default_configs:
+# This function will create the default configs for older and standalone
+# release branches.
+#############################################################
+create_default_configs()
+{
+    # Iterate over the release branches and create configuration files
+    for b in `ls`; do
+        if [ -d "$b" ]; then
+            (create_configs $b)
+        fi
+    done
+}
+
+#############################################################
+# create_configs_for_newer_release_branches:
+#############################################################
+create_configs_for_newer_release_branches()
+{
+    # Create configs for all the newer releases
+    for b in ${newer_release_branches[@]}; do
+        (create_configs $b)
+    done
+
+    # Copy per-release configs in the newer release branches
+    for b in ${newer_release_branches[@]}; do
+        cp -rf CONFIG* $b/test/format/
+    done
+
+    # Delete configs from the top folder
+    rm -rf CONFIG*
+}
+
+#############################################################
 # run_format:
 #       arg1: branch name
 #       arg2: access methods list
 #############################################################
 run_format()
 {
+        branch_name=$1
         echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
-        echo "Running format in branch: \"$1\""
+        echo "Running format in branch: \"$branch_name\""
         echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
 
-        cd "$1/test/format"
+        cd "$branch_name/test/format"
+        flags="-1q $(bflag $branch_name)"
 
-        flags="-1q $(bflag $1)"
+        config_file=""
 
-        args=""
-        args+="btree.prefix=0 "                 # Prefix testing isn't portable between releases
-        args+="cache=80 "                       # Medium cache so there's eviction
-        args+="checkpoints=1 "                  # Force periodic writes
-        args+="checksum=on "                    # Force checksums.
-        args+="compression=snappy "             # We only built with snappy, force the choice
-        args+="data_source=table "
-        args+="huffman_key=0 "                  # Not supoprted by newer releases
-        args+="in_memory=0 "                    # Interested in the on-disk format
-        args+="leak_memory=1 "                  # Faster runs
-        args+="logging=1 "                      # Test log compatibility
-        args+="logging_compression=snappy "     # We only built with snappy, force the choice
-        args+="rows=1000000 "
-        args+="runs.type=row "                  # Temporarily disable column store tests
-        args+="salvage=0 "                      # Faster runs
-        args+="timer=4 "
-        args+="transaction.isolation=snapshot " # Older releases can't do lower isolation levels
-        args+="transaction.timestamps=1 "       # Older releases can't do non-timestamp transactions
-        args+="verify=0 "                       # Faster runs
+        # Compatibility test for newer releases will have CONFIG file for each release
+        # branches for the upgrade/downgrade testing.
+        #
+        # Compatibility test for older and standalone releases will have the default config.
+        if [ "$newer" = true ]; then
+            config_file="-c CONFIG_${branch_name}"
+        else
+            config_file="-c CONFIG_default"
+        fi
 
         for am in $2; do
             dir="RUNDIR.$am"
             echo "./t running $am access method..."
-            ./t $flags -h $dir "file_type=$am" $args
+            ./t $flags ${config_file} -h $dir "file_type=$am"
 
             # Remove the version string from the base configuration file. (MongoDB does not create
             # a base configuration file, but format does, so we need to remove its version string
@@ -145,6 +235,9 @@ upgrade_downgrade()
         echo "Upgrade/downgrade testing with \"$1\" and \"$2\""
         echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
 
+        cfg_file_branch1=$(get_config_file_name $1)
+        cfg_file_branch2=$(get_config_file_name $2)
+
         # Alternate running each branch format test program on the second branch's build.
         # Loop twice, that is, run format twice using each branch.
         top="$PWD"
@@ -152,13 +245,13 @@ upgrade_downgrade()
             for reps in {1..2}; do
                 echo "$1 format running on $2 access method $am..."
                 cd "$top/$1/test/format"
-                flags="-1qR $(bflag $1)"
-                ./t $flags -h "$top/$2/test/format/RUNDIR.$am" timer=2
+                flags="-1Rq $(bflag $1)"
+                ./t $flags -c "$top/$2/test/format/${cfg_file_branch1}" -h "$top/$2/test/format/RUNDIR.$am" timer=2
 
                 echo "$2 format running on $2 access method $am..."
                 cd "$top/$2/test/format"
-                flags="-1qR $(bflag $2)"
-                ./t $flags -h "RUNDIR.$am" timer=2
+                flags="-1Rq $(bflag $2)"
+                ./t $flags -c $cfg_file_branch2 -h "RUNDIR.$am" timer=2
             done
         done
 }
@@ -177,6 +270,11 @@ wt_standalone=false
 # or older branches are EOL.
 newer_release_branches=(develop mongodb-5.0 mongodb-4.4 mongodb-4.2)
 older_release_branches=(mongodb-4.2 mongodb-4.0 mongodb-3.6)
+
+# This array is used to generate compatible configuration files between releases, because
+# upgrade/downgrade test runs each build's format test program on the second build's
+# configuration file. 
+compatible_upgrade_downgrade_release_branches=(mongodb-4.4 mongodb-4.2)
 
 declare -A scopes
 scopes[newer]="newer stable release branches"
@@ -229,6 +327,7 @@ top="test-compatibility-run"
 rm -rf "$top" && mkdir "$top"
 cd "$top"
 
+
 # Build the branches.
 if [ "$newer" = true ]; then
     for b in ${newer_release_branches[@]}; do
@@ -253,6 +352,13 @@ if [ "${wt_standalone}" = true ]; then
     (build_branch "$wt2")
 fi
 
+if [ "$newer" = true ]; then
+    create_configs_for_newer_release_branches
+else
+    create_default_configs
+fi
+
+
 # Run format in each branch for supported access methods.
 if [ "$newer" = true ]; then
     for b in ${newer_release_branches[@]}; do
@@ -267,8 +373,8 @@ if [ "$older" = true ]; then
 fi
 
 if [ "${wt_standalone}" = true ]; then
-    (run_format "$wt1" "fix row var")
-    (run_format "$wt2" "fix row var")
+    (run_format "$wt1" "row")
+    (run_format "$wt2" "row")
 fi
 
 # Verify backward compatibility for supported access methods.

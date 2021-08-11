@@ -128,7 +128,6 @@ __wt_verbose_dump_log(WT_SESSION_IMPL *session)
     WT_RET(__wt_msg(session, "Current log file number: %" PRIu32, log->fileid));
     WT_RET(__wt_msg(session, "Current log version number: %" PRIu16, log->log_version));
     WT_RET(WT_LSN_MSG(&log->alloc_lsn, "Next allocation"));
-    WT_RET(WT_LSN_MSG(&log->bg_sync_lsn, "Last background sync"));
     WT_RET(WT_LSN_MSG(&log->ckpt_lsn, "Last checkpoint"));
     WT_RET(WT_LSN_MSG(&log->sync_dir_lsn, "Last directory sync"));
     WT_RET(WT_LSN_MSG(&log->sync_lsn, "Last sync"));

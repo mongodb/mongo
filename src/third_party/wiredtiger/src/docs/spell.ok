@@ -1,5 +1,6 @@
 personal_ws-1.1 en 200
 ACM
+ADDR
 APIs
 ASAN
 ActiveState
@@ -7,6 +8,7 @@ Adler's
 Atomicity
 BLOBs
 BLRrVv
+CAS
 CFLAGS
 CMake
 COV
@@ -107,9 +109,11 @@ PPC
 PRELOAD
 PROFDATA
 README
+RLE
 RedHat
 RepMgr
 Riak
+RLE
 RocksDB
 Roelofs
 RrVv
@@ -149,6 +153,7 @@ aR
 abc
 abstime
 ack'ed
+addr
 ajn
 alloc
 allocator
@@ -179,6 +184,7 @@ br
 btmem
 btree
 btrees
+btree's
 bufs
 builtin
 builtins
@@ -193,6 +199,7 @@ cdb
 cds
 changelog
 checkpointed
+checkpointing
 checksum
 checksums
 ckp
@@ -201,6 +208,7 @@ clickable
 cmake
 colgroup
 colgroups
+colspan
 combinatorial
 command's
 comparator
@@ -224,6 +232,7 @@ cryptographically
 csuite
 ctest
 curfile
+curhs
 cursortype
 curtable
 customerABC
@@ -263,6 +272,7 @@ dl
 dll
 dlp
 dontlock
+doxtable
 dp
 ds
 dsrc
@@ -312,6 +322,7 @@ fillfactor
 firstname
 flamegraph
 flamegraphs
+flcs
 fnv
 forw
 fprofile
@@ -358,6 +369,7 @@ insn
 intl
 intpack
 inuse
+invariants
 io
 ip
 je
@@ -374,6 +386,7 @@ keyfmt
 keyid
 keyname
 keyvalue
+kv
 kvs
 lang
 lastname
@@ -510,6 +523,7 @@ putKey
 putKeyString
 putValue
 putValueString
+px
 py
 qnx
 qqq
@@ -560,6 +574,7 @@ sess
 sid
 skinparam
 skiplist
+sortable
 spinlock
 spinlocks
 sql
@@ -637,6 +652,7 @@ valuev
 vec
 versa
 viewable
+vlcs
 vm
 vpmsum
 warmup

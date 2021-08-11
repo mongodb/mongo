@@ -38,9 +38,6 @@ from wiredtiger import stat
 #   This test is to run checkpoint and eviction in parallel with timing
 #   stress for checkpoint and let eviction write more data than checkpoint.
 #
-
-def timestamp_str(t):
-    return '%x' % t
 class test_checkpoint_snapshot02(wttest.WiredTigerTestCase):
 
     # Create a table.
@@ -68,7 +65,7 @@ class test_checkpoint_snapshot02(wttest.WiredTigerTestCase):
             if commit_ts == 0:
                 session.commit_transaction()
             else:
-                session.commit_transaction('commit_timestamp=' + timestamp_str(commit_ts))
+                session.commit_transaction('commit_timestamp=' + self.timestamp_str(commit_ts))
         cursor.close()
 
     def check(self, check_value, uri, nrows, read_ts):
@@ -76,7 +73,7 @@ class test_checkpoint_snapshot02(wttest.WiredTigerTestCase):
         if read_ts == 0:
             session.begin_transaction()
         else:
-            session.begin_transaction('read_timestamp=' + timestamp_str(read_ts))
+            session.begin_transaction('read_timestamp=' + self.timestamp_str(read_ts))
         cursor = session.open_cursor(uri)
         count = 0
         for k, v in cursor:
@@ -137,8 +134,8 @@ class test_checkpoint_snapshot02(wttest.WiredTigerTestCase):
         valuea = "aaaaa" * 100
 
         # Pin oldest and stable timestamps to 10.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(10) +
-            ',stable_timestamp=' + timestamp_str(10))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
+            ',stable_timestamp=' + self.timestamp_str(10))
 
         self.large_updates(self.uri, valuea, ds, self.nrows, 20)
         self.check(valuea, self.uri, self.nrows, 20)
@@ -151,10 +148,10 @@ class test_checkpoint_snapshot02(wttest.WiredTigerTestCase):
             cursor1.set_key(ds.key(i))
             cursor1.set_value(valuea)
             self.assertEqual(cursor1.insert(), 0)
-        session1.timestamp_transaction('commit_timestamp=' + timestamp_str(30))
+        session1.timestamp_transaction('commit_timestamp=' + self.timestamp_str(30))
 
         # Set stable timestamp to 40
-        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(40))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(40))
 
         # Create a checkpoint thread
         done = threading.Event()
@@ -191,8 +188,8 @@ class test_checkpoint_snapshot02(wttest.WiredTigerTestCase):
         valueb = "bbbbb" * 100
 
         # Pin oldest and stable timestamps to 10.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(10) +
-            ',stable_timestamp=' + timestamp_str(10))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
+            ',stable_timestamp=' + self.timestamp_str(10))
 
         session1 = self.conn.open_session()
         session1.begin_transaction()
@@ -208,10 +205,10 @@ class test_checkpoint_snapshot02(wttest.WiredTigerTestCase):
             cursor2.set_key(ds.key(i))
             cursor2.set_value(valuea)
             self.assertEqual(cursor2.insert(), 0)
-        session1.timestamp_transaction('commit_timestamp=' + timestamp_str(30))
+        session1.timestamp_transaction('commit_timestamp=' + self.timestamp_str(30))
 
         # Set stable timestamp to 40
-        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(40))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(40))
 
         # Create a checkpoint thread
         done = threading.Event()

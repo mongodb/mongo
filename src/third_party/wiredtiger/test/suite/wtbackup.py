@@ -202,16 +202,21 @@ class backup_base(wttest.WiredTigerTestCase, suite_subprocess):
     #
     # Perform a block range copy for a given offset and file.
     #
-    def range_copy(self, filename, offset, size, backup_incr_dir):
+    def range_copy(self, filename, offset, size, backup_incr_dir, consolidate):
         read_from = filename
         write_to = backup_incr_dir  + '/' + filename
         rfp = open(read_from, "rb")
         rfp.seek(offset, 0)
         buf = rfp.read(size)
         # Perform between previous incremental directory, to check that
-        # the old file and the new file is different.
+        # the old file and the new file is different. We can only ensure
+        # the data are different if running in consolidate mode. It's
+        # possible that we change multiple blocks in a single write and
+        # some of the blocks are the same as before. If we are not running
+        # in consolidate mode, these blocks which are copied separately one
+        # by one will trigger this assert.
         old_to = self.home_tmp + '/' + filename
-        if os.path.exists(old_to):
+        if os.path.exists(old_to) and consolidate:
             self.pr('RANGE CHECK file ' + old_to + ' offset ' + str(offset) + ' len ' + str(size))
             old_rfp = open(old_to, "rb")
             old_rfp.seek(offset, 0)
@@ -238,7 +243,7 @@ class backup_base(wttest.WiredTigerTestCase, suite_subprocess):
     #
     # Note: we return the sizes of WT_BACKUP_RANGE type files for tests that check for consolidate config.
     #
-    def take_incr_backup_block(self, bkup_c, newfile, backup_incr_dir):
+    def take_incr_backup_block(self, bkup_c, newfile, backup_incr_dir, consolidate):
         config = 'incremental=(file=' + newfile + ')'
         self.pr('Open incremental cursor with ' + config)
         # For each file listed, open a duplicate backup cursor and copy the blocks.
@@ -262,7 +267,7 @@ class backup_base(wttest.WiredTigerTestCase, suite_subprocess):
             else:
                 # Copy the block range.
                 self.pr('Range copy file ' + newfile + ' offset ' + str(offset) + ' len ' + str(size))
-                self.range_copy(newfile, offset, size, backup_incr_dir)
+                self.range_copy(newfile, offset, size, backup_incr_dir, consolidate)
                 lens.append(size)
         incr_c.close()
         return lens
@@ -319,7 +324,7 @@ class backup_base(wttest.WiredTigerTestCase, suite_subprocess):
         # If that changes then this, and the use of the duplicate below can change.
         while bkup_c.next() == 0:
             newfile = bkup_c.get_key()
-            file_sizes += self.take_incr_backup_block(bkup_c, newfile, backup_incr_dir)
+            file_sizes += self.take_incr_backup_block(bkup_c, newfile, backup_incr_dir, consolidate)
             file_names.append(newfile)
             # Copy into temp directory for tests that require further iterations of incremental backups.
             self.copy_file(newfile, self.home_tmp)

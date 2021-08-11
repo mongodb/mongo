@@ -34,9 +34,6 @@ from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 from wtthread import checkpoint_thread, op_thread
 
-def timestamp_str(t):
-    return '%x' % t
-
 def mod_val(value, char, location, nbytes=1):
     return value[0:location] + char + value[location+nbytes:]
 
@@ -67,10 +64,6 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
     def test_rollback_to_stable(self):
         nrows = 1500
 
-        # Prepare transactions for column store table is not yet supported.
-        if self.prepare and self.key_format == 'r':
-            self.skipTest('Prepare transactions for column store table is not yet supported')
-
         # Create a table without logging.
         self.pr("create/populate table")
         uri = "table:rollback_to_stable14"
@@ -79,8 +72,8 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
         ds.populate()
 
         # Pin oldest and stable to timestamp 10.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(10) +
-            ',stable_timestamp=' + timestamp_str(10))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
+            ',stable_timestamp=' + self.timestamp_str(10))
 
         value_a = "aaaaa" * 100
 
@@ -106,9 +99,9 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
 
         # Pin stable to timestamp 60 if prepare otherwise 50.
         if self.prepare:
-            self.conn.set_timestamp('stable_timestamp=' + timestamp_str(60))
+            self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(60))
         else:
-            self.conn.set_timestamp('stable_timestamp=' + timestamp_str(50))
+            self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(50))
 
         # Create a checkpoint thread
         done = threading.Event()
@@ -172,10 +165,6 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
     def test_rollback_to_stable_same_ts(self):
         nrows = 1500
 
-        # Prepare transactions for column store table is not yet supported.
-        if self.prepare and self.key_format == 'r':
-            self.skipTest('Prepare transactions for column store table is not yet supported')
-
         # Create a table without logging.
         self.pr("create/populate table")
         uri = "table:rollback_to_stable14"
@@ -184,8 +173,8 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
         ds.populate()
 
         # Pin oldest and stable to timestamp 10.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(10) +
-            ',stable_timestamp=' + timestamp_str(10))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
+            ',stable_timestamp=' + self.timestamp_str(10))
 
         value_a = "aaaaa" * 100
 
@@ -213,7 +202,7 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
         self.check(value_modQ, uri, nrows, 30)
         self.check(value_modT, uri, nrows, 60)
 
-        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(50))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(50))
 
         # Create a checkpoint thread
         done = threading.Event()
@@ -275,10 +264,6 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
     def test_rollback_to_stable_same_ts_append(self):
         nrows = 1500
 
-        # Prepare transactions for column store table is not yet supported.
-        if self.prepare and self.key_format == 'r':
-            self.skipTest('Prepare transactions for column store table is not yet supported')
-
         # Create a table without logging.
         self.pr("create/populate table")
         uri = "table:rollback_to_stable14"
@@ -287,8 +272,8 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
         ds.populate()
 
         # Pin oldest and stable to timestamp 10.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(10) +
-            ',stable_timestamp=' + timestamp_str(10))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
+            ',stable_timestamp=' + self.timestamp_str(10))
 
         value_a = "aaaaa" * 100
 
@@ -316,7 +301,7 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
         self.check(value_modQ, uri, nrows, 30)
         self.check(value_modT, uri, nrows, 60)
 
-        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(50))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(50))
 
         # Create a checkpoint thread
         done = threading.Event()

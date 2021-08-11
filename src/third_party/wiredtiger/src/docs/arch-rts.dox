@@ -16,8 +16,8 @@ updates are aborted and the on-disk version updates are replaced with an update
 from history store otherwise the data store version is removed.
 
 Rollback to stable is performed in three phases
-1. WT startup
-2. WT shutdown
+1. WiredTiger startup
+2. WiredTiger shutdown
 3. Application initiated
 
 To improve the performance of rollback to stable operation, rollback to stable

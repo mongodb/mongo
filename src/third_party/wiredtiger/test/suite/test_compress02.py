@@ -39,11 +39,7 @@ from wiredtiger import stat
 #   we are using zstd as the block compressor. Tables created before reconfiguration
 #   will still use the previous compression level.
 #
-
-def timestamp_str(t):
-    return '%x' % t
 class test_compress02(wttest.WiredTigerTestCase):
-
     # Create a table.
     uri = "table:test_compress02"
     nrows = 1000

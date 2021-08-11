@@ -39,9 +39,6 @@ import wiredtiger, wttest
 from wiredtiger import stat
 from wtscenario import make_scenarios
 
-def timestamp_str(t):
-    return '%x' % t
-
 class test_checkpoint03(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = 'test_checkpoint03'
     conn_config = 'statistics=(all)'

@@ -50,7 +50,7 @@ class test_checkpoint_snapshot04(backup_base):
     scenarios = make_scenarios(target_backup)
 
     def conn_config(self):
-        config = 'cache_size=25MB'
+        config = 'cache_size=200MB'
         return config
 
     def large_updates(self, uri, value, ds, nrows):

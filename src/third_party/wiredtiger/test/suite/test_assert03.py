@@ -32,24 +32,36 @@
 
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
+from wtscenario import make_scenarios
 
 class test_assert03(wttest.WiredTigerTestCase, suite_subprocess):
     conn_config = 'log=(enabled)'
     base_uri = 'file:assert03.wt'
-    cfg = 'key_format=S,value_format=S'
     always = 'write_timestamp_usage=always,assert=(write_timestamp=on)'
     never = 'write_timestamp_usage=never,assert=(write_timestamp=on)'
     none = 'assert=(write_timestamp=off)'
+
+    key_format_values = [
+        ('column', dict(key_format='r', usestrings=False)),
+        ('string-row', dict(key_format='S', usestrings=True))
+    ]
+    scenarios = make_scenarios(key_format_values)
 
     def test_assert03(self):
         #if not wiredtiger.diagnostic_build():
         #    self.skipTest('requires a diagnostic build')
 
+        cfg = 'key_format={},value_format=S'.format(self.key_format)
+        key0 = 'key0' if self.usestrings else 17
+        key1 = 'key1' if self.usestrings else 18
+        key2 = 'key2' if self.usestrings else 19
+        key3 = 'key3' if self.usestrings else 20
+
         # Create a data item at the default setting
-        self.session.create(self.base_uri, self.cfg)
+        self.session.create(self.base_uri, cfg)
         c = self.session.open_cursor(self.base_uri)
         self.session.begin_transaction()
-        c['key0'] = 'value0'
+        c[key0] = 'value0'
         self.session.commit_transaction()
         c.close()
 
@@ -58,7 +70,7 @@ class test_assert03(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.alter(self.base_uri, self.always)
         c = self.session.open_cursor(self.base_uri)
         self.session.begin_transaction()
-        c['key1'] = 'value1'
+        c[key1] = 'value1'
         msg = "/none set on this transaction/"
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda:self.assertEquals(self.session.commit_transaction(), 0), msg)
@@ -68,14 +80,14 @@ class test_assert03(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.alter(self.base_uri, self.never)
         c = self.session.open_cursor(self.base_uri)
         self.session.begin_transaction()
-        c['key2'] = 'value2'
+        c[key2] = 'value2'
         self.session.commit_transaction()
         c.close()
 
         self.session.alter(self.base_uri, self.none)
         c = self.session.open_cursor(self.base_uri)
         self.session.begin_transaction()
-        c['key3'] = 'value3'
+        c[key3] = 'value3'
         self.session.commit_transaction()
         c.close()
 

@@ -37,9 +37,6 @@ from helper import simulate_crash_restart
 from wtdataset import SimpleDataSet
 from test_rollback_to_stable01 import test_rollback_to_stable_base
 
-def timestamp_str(t):
-    return '%x' % t
-
 # test_rollback_to_stable21.py
 # Test rollback to stable when an out of order prepared transaction is written to disk
 class test_rollback_to_stable21(test_rollback_to_stable_base):
@@ -57,10 +54,6 @@ class test_rollback_to_stable21(test_rollback_to_stable_base):
     def test_rollback_to_stable(self):
         nrows = 1000
 
-        # Prepare transactions for column store table is not yet supported.
-        if self.key_format == 'r':
-            self.skipTest('Prepare transactions for column store table is not yet supported')
-
         # Create a table without logging.
         uri = "table:rollback_to_stable21"
         ds = SimpleDataSet(
@@ -68,8 +61,8 @@ class test_rollback_to_stable21(test_rollback_to_stable_base):
         ds.populate()
 
         # Pin oldest and stable timestamps to 10.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(10) +
-            ',stable_timestamp=' + timestamp_str(10))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
+            ',stable_timestamp=' + self.timestamp_str(10))
 
         valuea = 'a' * 400
         valueb = 'b' * 400
@@ -79,7 +72,7 @@ class test_rollback_to_stable21(test_rollback_to_stable_base):
         for i in range(1, nrows + 1):
             cursor[i] = valuea
 
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(30))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(30))
 
         self.session.begin_transaction()
         for i in range(1, nrows + 1):
@@ -87,7 +80,7 @@ class test_rollback_to_stable21(test_rollback_to_stable_base):
 
         cursor.reset()
         cursor.close()
-        self.session.prepare_transaction('prepare_timestamp=' + timestamp_str(20))
+        self.session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(20))
 
         s = self.conn.open_session()
         s.begin_transaction('ignore_prepare = true')
@@ -101,7 +94,7 @@ class test_rollback_to_stable21(test_rollback_to_stable_base):
             evict_cursor.reset()
 
         s.rollback_transaction()
-        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(40))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(40))
         s.checkpoint()
 
         # Rollback the prepared transaction
@@ -123,10 +116,6 @@ class test_rollback_to_stable21(test_rollback_to_stable_base):
     def test_rollback_to_stable_with_different_tombstone(self):
         nrows = 1000
 
-        # Prepare transactions for column store table is not yet supported.
-        if self.key_format == 'r':
-            self.skipTest('Prepare transactions for column store table is not yet supported')
-
         # Create a table without logging.
         uri = "table:rollback_to_stable21"
         ds = SimpleDataSet(
@@ -134,8 +123,8 @@ class test_rollback_to_stable21(test_rollback_to_stable_base):
         ds.populate()
 
         # Pin oldest and stable timestamps to 10.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(10) +
-            ',stable_timestamp=' + timestamp_str(10))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
+            ',stable_timestamp=' + self.timestamp_str(10))
 
         valuea = 'a' * 400
         valueb = 'b' * 400
@@ -144,13 +133,13 @@ class test_rollback_to_stable21(test_rollback_to_stable_base):
         self.session.begin_transaction()
         for i in range(1, nrows + 1):
             cursor[i] = valuea
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(30))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(30))
 
         self.session.begin_transaction()
         for i in range(1, nrows + 1):
             cursor.set_key(i)
             cursor.remove()
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(40))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(40))
 
         self.session.begin_transaction()
         for i in range(1, nrows + 1):
@@ -158,10 +147,10 @@ class test_rollback_to_stable21(test_rollback_to_stable_base):
 
         cursor.reset()
         cursor.close()
-        self.session.prepare_transaction('prepare_timestamp=' + timestamp_str(20))
+        self.session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(20))
 
         s = self.conn.open_session()
-        s.begin_transaction('ignore_prepare = true, read_timestamp = ' + timestamp_str(30))
+        s.begin_transaction('ignore_prepare = true, read_timestamp = ' + self.timestamp_str(30))
         # Configure debug behavior on a cursor to evict the page positioned on when the reset API is used.
         evict_cursor = s.open_cursor(uri, None, "debug=(release_evict)")
 
@@ -172,7 +161,7 @@ class test_rollback_to_stable21(test_rollback_to_stable_base):
             evict_cursor.reset()
 
         s.rollback_transaction()
-        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(40))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(40))
         s.checkpoint()
 
         # Rollback the prepared transaction
@@ -197,10 +186,6 @@ class test_rollback_to_stable21(test_rollback_to_stable_base):
     def test_rollback_to_stable_with_same_tombstone(self):
         nrows = 1000
 
-        # Prepare transactions for column store table is not yet supported.
-        if self.key_format == 'r':
-            self.skipTest('Prepare transactions for column store table is not yet supported')
-
         # Create a table without logging.
         uri = "table:rollback_to_stable21"
         ds = SimpleDataSet(
@@ -208,8 +193,8 @@ class test_rollback_to_stable21(test_rollback_to_stable_base):
         ds.populate()
 
         # Pin oldest and stable timestamps to 10.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(10) +
-            ',stable_timestamp=' + timestamp_str(10))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
+            ',stable_timestamp=' + self.timestamp_str(10))
 
         valuea = 'a' * 400
         valueb = 'b' * 400
@@ -221,7 +206,7 @@ class test_rollback_to_stable21(test_rollback_to_stable_base):
             cursor.set_key(i)
             cursor.remove()
 
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(30))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(30))
 
         self.session.begin_transaction()
         for i in range(1, nrows + 1):
@@ -229,7 +214,7 @@ class test_rollback_to_stable21(test_rollback_to_stable_base):
 
         cursor.reset()
         cursor.close()
-        self.session.prepare_transaction('prepare_timestamp=' + timestamp_str(20))
+        self.session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(20))
 
         s = self.conn.open_session()
         s.begin_transaction('ignore_prepare = true')
@@ -242,7 +227,7 @@ class test_rollback_to_stable21(test_rollback_to_stable_base):
             evict_cursor.reset()
 
         s.rollback_transaction()
-        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(40))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(40))
         s.checkpoint()
 
         # Rollback the prepared transaction

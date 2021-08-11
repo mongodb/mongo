@@ -213,6 +213,7 @@ conn_stats = [
     CacheStat('cache_eviction_fail_in_reconciliation', 'pages selected for eviction unable to be evicted because of failure in reconciliation'),
     CacheStat('cache_eviction_fail_parent_has_overflow_items', 'pages selected for eviction unable to be evicted as the parent page has overflow items'),
     CacheStat('cache_eviction_force', 'forced eviction - pages selected count'),
+    CacheStat('cache_eviction_force_long_update_list', 'forced eviction - pages selected because of a large number of updates to a single item'),
     CacheStat('cache_eviction_force_clean', 'forced eviction - pages evicted that were clean count'),
     CacheStat('cache_eviction_force_clean_time', 'forced eviction - pages evicted that were clean time (usecs)'),
     CacheStat('cache_eviction_force_delete', 'forced eviction - pages selected because of too many deleted items count'),
@@ -572,7 +573,6 @@ conn_stats = [
     TxnStat('txn_set_ts_oldest_upd', 'set timestamp oldest updates'),
     TxnStat('txn_set_ts_stable', 'set timestamp stable calls'),
     TxnStat('txn_set_ts_stable_upd', 'set timestamp stable updates'),
-    TxnStat('txn_sync', 'transaction sync calls'),
     TxnStat('txn_timestamp_oldest_active_read', 'transaction read timestamp of the oldest active reader', 'no_clear,no_scale'),
     TxnStat('txn_walk_sessions', 'transaction walk of concurrent sessions'),
 
@@ -584,7 +584,6 @@ conn_stats = [
     YieldStat('child_modify_blocked_page', 'page reconciliation yielded due to child modification'),
     YieldStat('conn_close_blocked_lsm', 'connection close yielded for lsm manager shutdown'),
     YieldStat('dhandle_lock_blocked', 'data handle lock yielded'),
-    YieldStat('log_server_sync_blocked', 'log server sync yielded for log write'),
     YieldStat('page_busy_blocked', 'page acquire busy blocked'),
     YieldStat('page_del_rollback_blocked', 'page delete rollback time sleeping for state change (usecs)'),
     YieldStat('page_forcible_evict_blocked', 'page acquire eviction blocked'),

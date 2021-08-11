@@ -138,11 +138,11 @@ __wt_block_compact_page_skip(
     wt_off_t limit, offset;
     uint32_t checksum, objectid, size;
 
-    WT_UNUSED(addr_size);
     *skipp = true; /* Return a default skip. */
 
     /* Crack the cookie. */
-    WT_RET(__wt_block_buffer_to_addr(block, addr, &objectid, &offset, &size, &checksum));
+    WT_RET(__wt_block_addr_unpack(
+      session, block, addr, addr_size, &objectid, &offset, &size, &checksum));
 
     /*
      * If this block is in the chosen percentage of the file and there's a block on the available

@@ -34,11 +34,9 @@
 # "python setup_pip.py sdist", this creates a tar.gz file under ./dist .
 from __future__ import print_function
 import os, os.path, re, shutil, site, sys
-from setuptools import setup, Distribution
-from distutils.extension import Extension
+from setuptools import setup, Distribution, Extension
 import distutils.sysconfig
 import distutils.ccompiler
-from distutils.errors import CompileError, LinkError
 import subprocess
 from subprocess import call
 import setuptools.command.install
@@ -75,12 +73,12 @@ def check_needed_dependencies(builtins, inc_paths, lib_paths):
     distutils.sysconfig.customize_compiler(compiler)
     compiler.set_library_dirs(library_dirs)
     missing = []
-    for name, libname, instructions in builtins:
+    for _, libname, instructions in builtins:
         found = compiler.find_library_file(library_dirs, libname)
         if found is None:
             msg(libname + ": missing")
             msg(instructions)
-            msg("after installing it, set LD_LIBRARY_PATH or DYLD_LIBRARY_PATH")
+            msg("after installing it, set CMAKE_LIBRARY_PATH")
             missing.append(libname)
         else:
             package_top = os.path.dirname(os.path.dirname(found))
@@ -94,41 +92,12 @@ def check_needed_dependencies(builtins, inc_paths, lib_paths):
     #if len(missing) > 0:
     #    die("install packages for: " + str(missing))
 
-# find_executable --
-#   Locate an executable in the PATH.
-def find_executable(exename, path):
-    p = subprocess.Popen(['which', exename ], stdout=subprocess.PIPE,
-                         stderr=subprocess.PIPE, universal_newlines=True)
-    out, err = p.communicate('')
-    out = str(out)  # needed for Python3
-    if out == '':
-        if err != '':
-            err = ': "' + err + '"'
-        die('"' + exename + '": not found in path' + err)
-    dirname = os.path.dirname(out)
-    if not dirname in path:
-        path.append(dirname)
-
-# get_build_path --
-#   Create a PATH that can be used for installation.  Apparently,
-# installation commands are run with a restricted PATH, and
-# autoreconf/aclocal will not normally be found.
-def get_build_path():
-    build_paths = []
-    find_executable('autoreconf', build_paths)
-    find_executable('aclocal', build_paths)
-    build_path = os.environ['PATH'] + ':' + ':'.join(build_paths)
-    return build_path
-
 # get_compile_flags --
 #   Get system specific compile flags.  Return a triple: C preprocessor
 # flags, C compilation flags and linker flags.
 def get_compile_flags(inc_paths, lib_paths):
     # Suppress warnings building SWIG generated code
-    if sys.platform == 'win32' and cc == 'msvc':
-        cflags = ['/arch:SSE2', '/EHsc']
-        cppflags = []
-        ldflags = []
+    if sys.platform == 'win32':
         # Windows untested and incomplete, don't claim that it works.
         die('Windows is not supported by this setup script')
     else:
@@ -181,43 +150,11 @@ def get_library_dirs():
     dirs.append("/opt/local/lib")
     dirs.append("/usr/lib")
     dirs.append("/usr/lib64")
-    for path in ['LD_LIBRARY_PATH', 'DYLD_LIBRARY_PATH', 'LIBRARY_PATH']:
+    for path in ['CMAKE_LIBRARY_PATH', 'LIBRARY_PATH']:
         if path in os.environ:
             dirs.extend(os.environ[path].split(':'))
     dirs = list(set(filter(os.path.isdir, dirs)))
     return dirs
-
-# source_filter
-#   Make any needed changes to the original sources list and return a manifest,
-# a list of source file names relative to the new staging root.  Any entry
-# that needs to be renamed returned in a dictionary where the entry's key
-# is the new name and the value is the old source name.
-def source_filter(sources):
-    result = []
-    movers = dict()
-    py_dir = os.path.join('lang', 'python')
-    pywt_dir = os.path.join(py_dir, 'wiredtiger')
-    pywt_build_dir = os.path.join('build_posix', py_dir, 'wiredtiger')
-    pywt_prefix = pywt_dir + os.path.sep
-    for f in sources:
-        if not re.match(source_regex, f):
-            continue
-        src = f
-        dest = f
-        # move all lang/python files to the top level.
-        if dest.startswith(pywt_prefix):
-            dest = os.path.basename(dest)
-            if dest == 'init.py':
-                dest = '__init__.py'
-        if dest != src:
-            movers[dest] = src
-        result.append(dest)
-    # Add SWIG generated files
-    result.append(os.path.join(py_dir, 'wiredtiger_wrap.c'))
-    wiredtiger_py = 'swig_wiredtiger.py'
-    result.append('swig_wiredtiger.py')
-    movers['swig_wiredtiger.py'] = os.path.join(py_dir, 'wiredtiger.py')
-    return result, movers
 
 ################################################################
 # Do some initial setup and checks.
@@ -243,10 +180,10 @@ if sys.maxsize < 2**32:
     die('need to be running on a 64 bit system, and have a 64 bit Python')
 
 python_rel_dir = os.path.join('lang', 'python')
-build_dir = os.path.join(wt_dir, 'build_posix')
-makefile = os.path.join(build_dir, 'Makefile')
+build_dir = os.path.join(wt_dir, 'cmake_pip_build')
+makefile = os.path.join(build_dir, 'build.ninja')
 built_sentinal = os.path.join(build_dir, 'built.txt')
-conf_make_dir = 'build_posix'
+conf_make_dir = 'cmake_pip_build'
 wt_swig_lib_name = os.path.join(python_rel_dir, '_wiredtiger.so')
 
 ################################################################
@@ -257,11 +194,6 @@ long_description = 'WiredTiger is a ' + short_description + '.\n\n' + \
     open(os.path.join(wt_dir, 'README')).read()
 
 wt_ver, wt_full_ver = get_wiredtiger_versions(wt_dir)
-build_path = get_build_path()
-
-# We only need a small set of directories to build a WT library,
-# we also include any files at the top level.
-source_regex = r'^(?:(?:api|build_posix|ext|lang/python|src|dist)/|[^/]*$)'
 
 # The builtins that we include in this distribution.
 builtins = [
@@ -277,7 +209,7 @@ builtins = [
       'It can be installed via: apt-get install zlib1g' ],
     [ 'zstd', 'zstd',
       'Need to install zstd\n' + \
-      'It can be installed via: apt-get install zstd' ]
+      'It can be installed via: apt-get install libzstd-dev' ]
 ]
 builtin_names = [b[0] for b in builtins]
 builtin_libraries = [b[1] for b in builtins]
@@ -285,22 +217,19 @@ builtin_libraries = [b[1] for b in builtins]
 # Here's the configure/make operations we perform before the python extension
 # is linked.
 configure_cmds = [
-    './makemake --clean-and-make',
-    './reconf',
-    # force building a position independent library; it will be linked
-    # into a single shared library with the SWIG interface code.
-    'CFLAGS="${CFLAGS:-} -fPIC -DPIC" ' + \
-    '../configure --enable-python --with-builtins=' + ','.join(builtin_names)
+    'cmake -B cmake_pip_build -G Ninja -DENABLE_STATIC=1 -DCMAKE_C_FLAGS="${CFLAGS:-}" -DENABLE_PYTHON=1 ' + \
+    ' '.join(map(lambda name: '-DHAVE_BUILTIN_EXTENSION_' + name.upper() + '=1', builtin_names)),
 ]
 
 # build all the builtins, at the moment they are all compressors.
 make_cmds = []
 for name in builtin_names:
-    make_cmds.append('(cd ext/compressors/' + name + '/; make)')
-make_cmds.append('make libwiredtiger.la')
+    make_cmds.append('ninja -C ' + build_dir  +  ' ext/compressors/' + name + '/all')
+make_cmds.append('ninja -C ' + build_dir + ' libwiredtiger.a')
+make_cmds.append('ninja -C ' + build_dir + ' lang/python/all')
 
-inc_paths = [ os.path.join(build_dir, 'src', 'include'), build_dir, '.' ]
-lib_paths = [ '.' ]   # wiredtiger.so is moved into the top level directory
+inc_paths = [ os.path.join(build_dir, 'include'), os.path.join(build_dir, 'config'), build_dir, '.' ]
+lib_paths = [ '.' ]
 
 check_needed_dependencies(builtins, inc_paths, lib_paths)
 
@@ -320,7 +249,7 @@ if pip_command == 'sdist':
     if python2:
         die('Python3 should be used to create a source distribution')
 
-    sources, movers = source_filter(get_sources_curdir())
+    sources = get_sources_curdir()
     stage_dir = os.path.join(python_rel_dir, 'stage')
     shutil.rmtree(stage_dir, True)
     os.makedirs(stage_dir)
@@ -329,23 +258,34 @@ if pip_command == 'sdist':
         d = os.path.join(stage_dir, os.path.dirname(f))
         if not os.path.isdir(d):
             os.makedirs(d)
-        if f in movers:
-            src = movers[f]
-        else:
-            src = f
         # Symlinks are not followed in setup, we need to use real files.
-        shutil.copy2(src, os.path.join(stage_dir, f))
+        shutil.copy2(f, os.path.join(stage_dir, f))
+    # Copy files in lang/python/wiredtiger to the root folder.
+    pywt_path = os.path.join(stage_dir, "lang", "python", "wiredtiger")
+    pywt_files = os.listdir(pywt_path)
+    for f in pywt_files:
+        basename = os.path.basename(f)
+        src = os.path.join(pywt_path, f)
+        if basename == 'init.py':
+            shutil.copy2(src, os.path.join(stage_dir, '__init__.py'))
+        else:
+            shutil.copy2(src, os.path.join(stage_dir, basename))
     os.chdir(stage_dir)
     sys.argv.append('--dist-dir=' + os.path.join('..', 'dist'))
 else:
-    sources = [ os.path.join(python_rel_dir, 'wiredtiger_wrap.c') ]
+    sources = [ os.path.join(conf_make_dir, python_rel_dir, 'CMakeFiles', '__wiredtiger.dir', 'wiredtigerPYTHON_wrap.c') ]
 
 wt_ext = Extension('_wiredtiger',
     sources = sources,
     extra_compile_args = cflags + cppflags,
     extra_link_args = ldflags,
     libraries = builtin_libraries,
-    extra_objects = [ os.path.join(build_dir, '.libs', 'libwiredtiger.a') ],
+    # FIXME-WT-7905: Remove manual linking of static extension libraries.
+    # Unfortunately CMake's use of the builtin doesn't currently support linking in the extension
+    # objects into a static libwiredtiger archive. As a workaround, we need to manually link
+    # the ext/compressor libraries.
+    extra_objects = [ os.path.join(build_dir, 'libwiredtiger.a') ] + \
+        list(map(lambda name: os.path.join(build_dir, 'ext', 'compressors', name) + '/libwiredtiger_' + name + '.a', builtin_names)),
     include_dirs = inc_paths,
     library_dirs = lib_paths,
 )
@@ -353,7 +293,8 @@ extensions = [ wt_ext ]
 env = { "CFLAGS" : ' '.join(cflags),
         "CPPFLAGS" : ' '.join(cppflags),
         "LDFLAGS" : ' '.join(ldflags),
-        "PATH" : build_path }
+        "CMAKE_LIBRARY_PATH" : os.getenv("CMAKE_LIBRARY_PATH", default=""),
+        "PATH" : os.getenv("PATH", default="") }
 
 class BinaryDistribution(Distribution):
     def is_pure(self):
@@ -362,6 +303,10 @@ class BinaryDistribution(Distribution):
 class WTInstall(setuptools.command.install.install):
     def run(self):
         self.run_command("build_ext")
+        # Copy the SWIG generated python module to our build directory. This will
+        # then subsequently be installed by pip into the package directory.
+        shutil.move(os.path.join(conf_make_dir, python_rel_dir, 'wiredtiger.py'),
+            os.path.join(self.build_lib, 'wiredtiger','swig_wiredtiger.py'))
         return setuptools.command.install.install.run(self)
 
 class WTBuildExt(setuptools.command.build_ext.build_ext):
@@ -376,12 +321,12 @@ class WTBuildExt(setuptools.command.build_ext.build_ext):
             except OSError:
                 pass
             self.execute(
-                lambda: build_commands(configure_cmds, conf_make_dir, env), [],
+                lambda: build_commands(configure_cmds, wt_dir, env), [],
                 'wiredtiger configure')
             if not os.path.isfile(makefile):
                 die('configure failed, file does not exist: ' + makefile)
             self.execute(
-                lambda: build_commands(make_cmds, conf_make_dir, env), [],
+                lambda: build_commands(make_cmds, wt_dir, env), [],
                 'wiredtiger make')
             open(built_sentinal, 'a').close()
         return setuptools.command.build_ext.build_ext.run(self)
@@ -404,7 +349,7 @@ setup(
     package_dir = { 'wiredtiger' : '.' },
     cmdclass = { 'install': WTInstall, 'build_ext': WTBuildExt },
     package_data = {
-        'wiredtiger' : [ wt_swig_lib_name, '*.py' ]
+        'wiredtiger' : [ '*.py']
     },
     classifiers=[
         'Intended Audience :: Developers',
@@ -417,6 +362,10 @@ setup(
         'Operating System :: POSIX :: BSD',
         'Operating System :: POSIX :: Linux',
         'Operating System :: POSIX :: SunOS/Solaris',
+    ],
+    install_requires=[
+        'cmake',
+        'ninja',
     ]
 )
 

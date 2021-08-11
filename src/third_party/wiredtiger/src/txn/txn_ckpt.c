@@ -1991,9 +1991,6 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
       !WT_IS_METADATA(session->dhandle) ||
         FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_METADATA));
 
-    /* Discard the cached checkpoint list when checkpointing a single file by itself. */
-    __wt_meta_saved_ckptlist_free(session);
-
     WT_RET(__wt_config_gets_def(session, cfg, "force", 0, &cval));
     force = cval.val != 0;
     WT_SAVE_DHANDLE(session, ret = __checkpoint_lock_dirty_tree(session, true, force, true, cfg));
@@ -2066,9 +2063,6 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session, bool final)
         (!F_ISSET(S2C(session), WT_CONN_FILE_CLOSE_SYNC) && !metadata)))
         return (__wt_set_return(session, EBUSY));
 
-    /* Discard the cached checkpoint list when checkpointing a single file by itself. */
-    __wt_meta_saved_ckptlist_free(session);
-
     /*
      * Make sure there isn't a potential race between backup copying the metadata and a checkpoint
      * changing the metadata. Backup holds both the checkpoint and schema locks. Checkpoint should
@@ -2096,7 +2090,7 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session, bool final)
     if (ret == 0 && !F_ISSET(btree, WT_BTREE_SKIP_CKPT))
         ret = __checkpoint_tree(session, false, NULL);
 
-    /* Do not store the cached checkpoint list when checkpointing a single file alone. */
+    /* Do not store the cached checkpoint list when closing the handle. */
     __wt_meta_saved_ckptlist_free(session);
 
     if (need_tracking)

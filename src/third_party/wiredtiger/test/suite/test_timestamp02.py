@@ -35,9 +35,6 @@ from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
 from wtscenario import make_scenarios
 
-def timestamp_str(t):
-    return '%x' % t
-
 class test_timestamp02(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = 'test_timestamp02'
     uri = 'table:' + tablename
@@ -79,58 +76,58 @@ class test_timestamp02(wttest.WiredTigerTestCase, suite_subprocess):
         for k in keys:
             self.session.begin_transaction()
             c[k] = 1
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(k))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(k))
 
         # Don't set a stable timestamp yet.  Make sure we can read with
         # a timestamp before the stable timestamp has been set.
         # Now check that we see the expected state when reading at each
         # timestamp
         for i, t in enumerate(orig_keys):
-            self.check(self.session, 'read_timestamp=' + timestamp_str(t),
+            self.check(self.session, 'read_timestamp=' + self.timestamp_str(t),
                 dict((k, 1) for k in orig_keys[:i+1]))
 
         # Everything up to and including timestamp 100 has been committed.
-        self.assertTimestampsEqual(self.conn.query_timestamp(), timestamp_str(100))
+        self.assertTimestampsEqual(self.conn.query_timestamp(), self.timestamp_str(100))
 
         # Bump the oldest timestamp, we're not going back...
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(100))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(100))
 
         # Update them and retry.
         random.shuffle(keys)
         for k in keys:
             self.session.begin_transaction()
             c[k] = 2
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(k + 100))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(k + 100))
 
         # Everything up to and including timestamp 200 has been committed.
-        self.assertTimestampsEqual(self.conn.query_timestamp(), timestamp_str(200))
+        self.assertTimestampsEqual(self.conn.query_timestamp(), self.timestamp_str(200))
 
         # Test that we can manually move the commit timestamp back
-        self.conn.set_timestamp('commit_timestamp=' + timestamp_str(150))
-        self.assertTimestampsEqual(self.conn.query_timestamp(), timestamp_str(150))
-        self.conn.set_timestamp('commit_timestamp=' + timestamp_str(200))
+        self.conn.set_timestamp('commit_timestamp=' + self.timestamp_str(150))
+        self.assertTimestampsEqual(self.conn.query_timestamp(), self.timestamp_str(150))
+        self.conn.set_timestamp('commit_timestamp=' + self.timestamp_str(200))
 
         # Now the stable timestamp before we read.
-        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(200))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(200))
 
         for i, t in enumerate(orig_keys):
-            self.check(self.session, 'read_timestamp=' + timestamp_str(t + 100),
+            self.check(self.session, 'read_timestamp=' + self.timestamp_str(t + 100),
                 dict((k, (2 if j <= i else 1)) for j, k in enumerate(orig_keys)))
 
         # Bump the oldest timestamp, we're not going back...
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(200))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(200))
 
         # Remove them and retry
         random.shuffle(keys)
         for k in keys:
             self.session.begin_transaction()
             del c[k]
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(k + 200))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(k + 200))
 
         # We have to continue to advance the stable timestamp before reading.
-        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(300))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(300))
         for i, t in enumerate(orig_keys):
-            self.check(self.session, 'read_timestamp=' + timestamp_str(t + 200),
+            self.check(self.session, 'read_timestamp=' + self.timestamp_str(t + 200),
                 dict((k, 2) for k in orig_keys[i+1:]))
 
     def test_read_your_writes(self):

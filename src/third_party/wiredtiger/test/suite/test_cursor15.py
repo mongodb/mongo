@@ -37,7 +37,7 @@ class test_cursor15(wttest.WiredTigerTestCase):
     tablename = 'test_read_once'
     uri = 'table:' + tablename
 
-    conn_config = 'cache_size=1M,statistics=(all)'
+    conn_config = 'cache_size=1M'
 
     def test_cursor15(self):
         # This test is configured to use 1MB of cache. It will insert 20
@@ -51,7 +51,7 @@ class test_cursor15(wttest.WiredTigerTestCase):
             cursor[key] = '1' * (100 * 1024)
         cursor.close()
 
-        # Restart the database to clear the cache and reset statistics.
+        # Restart the database to clear the cache.
         self.reopen_conn()
 
         # We don't restart the database between runs to exercise that read_once

@@ -30,9 +30,7 @@ import fnmatch, os, shutil, time
 from helper import copy_wiredtiger_home
 import wiredtiger, wttest
 from wtdataset import SimpleDataSet
-
-def timestamp_str(t):
-    return '%x' % t
+from wtscenario import make_scenarios
 
 # test_prepare10.py
 # Test to ensure prepared tombstones are properly aborted even when they are written
@@ -42,6 +40,13 @@ class test_prepare10(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=10MB,eviction_dirty_trigger=80,eviction_updates_trigger=80'
     session_config = 'isolation=snapshot'
 
+    key_format_values = [
+        ('column', dict(key_format='r')),
+        ('string-row', dict(key_format='S')),
+    ]
+
+    scenarios = make_scenarios(key_format_values)
+
     def updates(self, ds, uri, nrows, value, ts):
         cursor = self.session.open_cursor(uri)
         self.session.begin_transaction()
@@ -49,7 +54,7 @@ class test_prepare10(wttest.WiredTigerTestCase):
             cursor.set_key(ds.key(i))
             cursor.set_value(value)
             self.assertEquals(cursor.insert(), 0)
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(ts))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(ts))
         cursor.close()
 
     def removes(self, ds, uri, nrows, ts):
@@ -58,12 +63,12 @@ class test_prepare10(wttest.WiredTigerTestCase):
         for i in range(1, nrows):
             cursor.set_key(ds.key(i))
             self.assertEquals(cursor.remove(), 0)
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(ts))
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(ts))
         cursor.close()
 
     def check(self, ds, uri, nrows, value, ts):
         cursor = self.session.open_cursor(uri)
-        self.session.begin_transaction('ignore_prepare=true,read_timestamp=' + timestamp_str(ts))
+        self.session.begin_transaction('ignore_prepare=true,read_timestamp=' + self.timestamp_str(ts))
         for i in range(1, nrows):
             cursor.set_key(ds.key(i))
             self.assertEquals(cursor.search(), 0)
@@ -73,7 +78,7 @@ class test_prepare10(wttest.WiredTigerTestCase):
 
     def check_not_found(self, ds, uri, nrows, ts):
         cursor = self.session.open_cursor(uri)
-        self.session.begin_transaction('ignore_prepare=true,read_timestamp=' + timestamp_str(ts))
+        self.session.begin_transaction('ignore_prepare=true,read_timestamp=' + self.timestamp_str(ts))
         for i in range(1, nrows):
             cursor.set_key(ds.key(i))
             self.assertEquals(cursor.search(), wiredtiger.WT_NOTFOUND)
@@ -84,7 +89,7 @@ class test_prepare10(wttest.WiredTigerTestCase):
         # Create a small table.
         uri = "table:test_prepare10"
         nrows = 1000
-        ds = SimpleDataSet(self, uri, 0, key_format="S", value_format='u')
+        ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format='u')
         ds.populate()
 
         value_a = b"aaaaa" * 100
@@ -92,8 +97,8 @@ class test_prepare10(wttest.WiredTigerTestCase):
         value_c = b"ccccc" * 100
 
         # Commit some updates along with a prepared update, which is not resolved.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(10))
-        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(10))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(10))
 
         # Initially load huge data
         self.updates(ds, uri, nrows, value_a, 20)
@@ -141,7 +146,7 @@ class test_prepare10(wttest.WiredTigerTestCase):
             cursor_p.set_key(ds.key(i))
             cursor_p.set_value(value_c)
             self.assertEquals(cursor_p.insert(), 0)
-        session_p.prepare_transaction('prepare_timestamp=' + timestamp_str(50))
+        session_p.prepare_transaction('prepare_timestamp=' + self.timestamp_str(50))
 
         self.check(ds, uri, nrows, value_a, 20)
         self.check(ds, uri, nrows, value_b, 35)

@@ -33,9 +33,6 @@ import wiredtiger, wttest
 from wiredtiger import stat
 from wtdataset import SimpleDataSet
 
-def timestamp_str(t):
-    return '%x' % t
-
 class test_checkpoint07(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=50MB,log=(enabled),statistics=(all)'
     session_config = 'isolation=snapshot'

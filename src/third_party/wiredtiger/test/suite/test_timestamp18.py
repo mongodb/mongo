@@ -38,9 +38,6 @@
 import wiredtiger, wttest
 from wtscenario import make_scenarios
 
-def timestamp_str(t):
-    return '%x' % t
-
 class test_timestamp18(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=50MB'
     session_config = 'isolation=snapshot'
@@ -53,7 +50,7 @@ class test_timestamp18(wttest.WiredTigerTestCase):
     def test_ts_writes_with_non_ts_write(self):
         uri = 'table:test_timestamp18'
         self.session.create(uri, 'key_format=S,value_format=S')
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(1))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
         cursor = self.session.open_cursor(uri)
 
         value1 = 'a' * 500
@@ -65,17 +62,17 @@ class test_timestamp18(wttest.WiredTigerTestCase):
         for i in range(1, 10000):
             self.session.begin_transaction()
             cursor[str(i)] = value1
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(2))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
 
         for i in range(1, 10000):
             self.session.begin_transaction()
             cursor[str(i)] = value2
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(3))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(3))
 
         for i in range(1, 10000):
             self.session.begin_transaction()
             cursor[str(i)] = value3
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(4))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(4))
 
         # Add a non-timestamped delete.
         # Let's do every second key to ensure that we get the truncation right and don't
@@ -91,7 +88,7 @@ class test_timestamp18(wttest.WiredTigerTestCase):
         self.session.checkpoint()
 
         for ts in range(2, 4):
-            self.session.begin_transaction('read_timestamp=' + timestamp_str(ts))
+            self.session.begin_transaction('read_timestamp=' + self.timestamp_str(ts))
             for i in range(1, 10000):
                 # The non-timestamped delete should cover all the previous writes and make them effectively
                 # invisible.

@@ -33,9 +33,6 @@ from wiredtiger import stat, WT_NOTFOUND
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-def timestamp_str(t):
-    return '%x' % t
-
 # test_rollback_to_stable19.py
 # Test that rollback to stable aborts both insert and remove updates from a single prepared transaction
 class test_rollback_to_stable19(test_rollback_to_stable_base):
@@ -52,8 +49,8 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
     ]
 
     restart_options = [
-        ('shutdown', dict(crash='false')),
-        ('crash', dict(crash='true')),
+        ('shutdown', dict(crash=False)),
+        ('crash', dict(crash=True)),
     ]
 
     scenarios = make_scenarios(in_memory_values, key_format_values, restart_options)
@@ -69,10 +66,6 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
     def test_rollback_to_stable_no_history(self):
         nrows = 1000
 
-        # Prepare transactions for column store table is not yet supported.
-        if self.key_format == 'r':
-            self.skipTest('Prepare transactions for column store table is not yet supported')
-
         # Create a table without logging.
         uri = "table:rollback_to_stable19"
         ds = SimpleDataSet(
@@ -80,8 +73,8 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
         ds.populate()
 
         # Pin oldest and stable timestamps to 10.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(10) +
-            ',stable_timestamp=' + timestamp_str(10))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
+            ',stable_timestamp=' + self.timestamp_str(10))
 
         valuea = "aaaaa" * 100
 
@@ -94,7 +87,7 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
             cursor.set_key(i)
             cursor.remove()
         cursor.close()
-        s.prepare_transaction('prepare_timestamp=' + timestamp_str(20))
+        s.prepare_transaction('prepare_timestamp=' + self.timestamp_str(20))
 
         # Configure debug behavior on a cursor to evict the page positioned on when the reset API is used.
         evict_cursor = self.session.open_cursor(uri, None, "debug=(release_evict)")
@@ -116,7 +109,7 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
         cursor2.close()
 
         # Pin stable timestamp to 20.
-        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(20))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(20))
         if not self.in_memory:
             self.session.checkpoint()
 
@@ -137,16 +130,21 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         upd_aborted = stat_cursor[stat.conn.txn_rts_upd_aborted][2]
         keys_removed = stat_cursor[stat.conn.txn_rts_keys_removed][2]
-        self.assertGreater(upd_aborted, 0)
-        self.assertGreater(keys_removed, 0)
+
+        # After restart (not crash) the stats for the aborted updates will be 0, as the updates
+        # will be aborted during shutdown, and on startup there will be no updates to be aborted.
+        # This is similar case with keys removed.
+        if not self.in_memory and not self.crash:
+            self.assertEqual(upd_aborted, 0)
+            self.assertEqual(keys_removed, 0)
+        else:
+            self.assertGreater(upd_aborted, 0)
+            self.assertGreater(keys_removed, 0)
+
         stat_cursor.close()
 
     def test_rollback_to_stable_with_history(self):
         nrows = 1000
-
-        # Prepare transactions for column store table is not yet supported.
-        if self.key_format == 'r':
-            self.skipTest('Prepare transactions for column store table is not yet supported')
 
         # Create a table without logging.
         uri = "table:rollback_to_stable19"
@@ -155,8 +153,8 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
         ds.populate()
 
         # Pin oldest and stable timestamps to 10.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(10) +
-            ',stable_timestamp=' + timestamp_str(10))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
+            ',stable_timestamp=' + self.timestamp_str(10))
 
         valuea = "aaaaa" * 100
         valueb = "bbbbb" * 100
@@ -176,7 +174,7 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
             cursor.set_key(i)
             cursor.remove()
         cursor.close()
-        s.prepare_transaction('prepare_timestamp=' + timestamp_str(40))
+        s.prepare_transaction('prepare_timestamp=' + self.timestamp_str(40))
 
         # Configure debug behavior on a cursor to evict the page positioned on when the reset API is used.
         evict_cursor = self.session.open_cursor(uri, None, "debug=(release_evict)")
@@ -198,7 +196,7 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
         cursor2.close()
 
         # Pin stable timestamp to 40.
-        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(40))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(40))
         if not self.in_memory:
             self.session.checkpoint()
 
@@ -220,6 +218,15 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         upd_aborted = stat_cursor[stat.conn.txn_rts_upd_aborted][2]
         hs_removed = stat_cursor[stat.conn.txn_rts_hs_removed][2]
-        self.assertGreater(upd_aborted, 0)
+
+        # After restart (not crash) the stats for the aborted updates and history store removed will be 0,
+        # as the updates aborted and history store removed will occur during shutdown, and on startup there
+        # will be no updates to be removed.
         if not self.in_memory:
-            self.assertGreater(hs_removed, 0)
+            if self.crash:
+                self.assertGreater(hs_removed, 0)
+            else:
+                self.assertEqual(hs_removed, 0)
+                self.assertEqual(upd_aborted, 0)
+        else:
+            self.assertGreater(upd_aborted, 0)

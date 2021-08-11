@@ -700,10 +700,6 @@ session_ops(WT_SESSION *session)
         error_check(session->truncate(session, "table:mytable", NULL, NULL, NULL));
         /*! [Truncate a table] */
 
-        /*! [Transaction sync] */
-        error_check(session->transaction_sync(session, NULL));
-        /*! [Transaction sync] */
-
         /*! [Reset the session] */
         error_check(session->reset(session));
         /*! [Reset the session] */

@@ -297,6 +297,7 @@ ALIASES                = "arch_page_table{2}=<div class= arch_head><table><tr><t
                          "row{7}=<tr><td>\1</td><td>\2</td><td>\3</td><td>\4</td><td>\5</td><td>\6</td><td>\7</td></tr>" \
                          "row{8}=<tr><td>\1</td><td>\2</td><td>\3</td><td>\4</td><td>\5</td><td>\6</td><td>\7</td><td>\8</td></tr>" \
                          "row{9}=<tr><td>\1</td><td>\2</td><td>\3</td><td>\4</td><td>\5</td><td>\6</td><td>\7</td><td>\8</td><td>\9</td></tr>" \
+                         "sic=" \
                          "subpage_single=@subpage"
 
 # Set the OPTIMIZE_OUTPUT_FOR_C tag to YES if your project consists of C sources

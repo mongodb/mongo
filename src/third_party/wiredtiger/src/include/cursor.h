@@ -154,7 +154,10 @@ struct __wt_cursor_btree {
      * Variable-length column-store values are run-length encoded and may be overflow values or
      * Huffman encoded. To avoid repeatedly reading overflow values or decompressing encoded values,
      * process it once and store the result in a temporary buffer. The cip_saved field is used to
-     * determine if we've switched columns since our last cursor call.
+     * determine if we've switched columns since our last cursor call. Note however that this result
+     * caching is not necessarily safe for all RLE cells. The flag WT_CBT_CACHEABLE_RLE_CELL
+     * indicates that the value is uniform across the whole cell. If it is not set (e.g. if the cell
+     * is not globally visible yet), the cached values should not be used.
      */
     WT_COL *cip_saved; /* Last iteration reference */
 
@@ -214,16 +217,17 @@ struct __wt_cursor_btree {
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_CBT_ACTIVE 0x001u             /* Active in the tree */
-#define WT_CBT_ITERATE_APPEND 0x002u     /* Col-store: iterating append list */
-#define WT_CBT_ITERATE_NEXT 0x004u       /* Next iteration configuration */
-#define WT_CBT_ITERATE_PREV 0x008u       /* Prev iteration configuration */
-#define WT_CBT_ITERATE_RETRY_NEXT 0x010u /* Prepare conflict by next. */
-#define WT_CBT_ITERATE_RETRY_PREV 0x020u /* Prepare conflict by prev. */
-#define WT_CBT_NO_TRACKING 0x040u        /* Non tracking cursor. */
-#define WT_CBT_NO_TXN 0x080u             /* Non-txn cursor (e.g. a checkpoint) */
-#define WT_CBT_READ_ONCE 0x100u          /* Page in with WT_READ_WONT_NEED */
-#define WT_CBT_SEARCH_SMALLEST 0x200u    /* Row-store: small-key insert list */
-#define WT_CBT_VAR_ONPAGE_MATCH 0x400u   /* Var-store: on-page recno match */
+#define WT_CBT_CACHEABLE_RLE_CELL 0x002u /* Col-store: value in RLE cell valid for all its keys */
+#define WT_CBT_ITERATE_APPEND 0x004u     /* Col-store: iterating append list */
+#define WT_CBT_ITERATE_NEXT 0x008u       /* Next iteration configuration */
+#define WT_CBT_ITERATE_PREV 0x010u       /* Prev iteration configuration */
+#define WT_CBT_ITERATE_RETRY_NEXT 0x020u /* Prepare conflict by next. */
+#define WT_CBT_ITERATE_RETRY_PREV 0x040u /* Prepare conflict by prev. */
+#define WT_CBT_NO_TRACKING 0x080u        /* Non tracking cursor. */
+#define WT_CBT_NO_TXN 0x100u             /* Non-txn cursor (e.g. a checkpoint) */
+#define WT_CBT_READ_ONCE 0x200u          /* Page in with WT_READ_WONT_NEED */
+#define WT_CBT_SEARCH_SMALLEST 0x400u    /* Row-store: small-key insert list */
+#define WT_CBT_VAR_ONPAGE_MATCH 0x800u   /* Var-store: on-page recno match */
     /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
 
 #define WT_CBT_POSITION_MASK /* Flags associated with position */                      \

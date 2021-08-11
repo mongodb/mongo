@@ -30,16 +30,21 @@ import time
 from helper import copy_wiredtiger_home
 import wiredtiger, wttest
 from wtdataset import SimpleDataSet
+from wtscenario import make_scenarios
 from wiredtiger import stat
 from helper import simulate_crash_restart
 from test_rollback_to_stable01 import test_rollback_to_stable_base
 
-def timestamp_str(t):
-    return '%x' % t
-
 # Test that rollback to stable does not open any dhandles that don't have unstable updates.
 class test_rollback_to_stable20(test_rollback_to_stable_base):
     session_config = 'isolation=snapshot'
+
+    key_format_values = [
+        ('column', dict(key_format='r')),
+        ('integer_row', dict(key_format='i')),
+    ]
+
+    scenarios = make_scenarios(key_format_values)
 
     def conn_config(self):
         config = 'cache_size=50MB,statistics=(all)'
@@ -51,12 +56,12 @@ class test_rollback_to_stable20(test_rollback_to_stable_base):
         create_params = 'key_format=i,value_format=S'
         uri = "table:rollback_to_stable20"
         ds = SimpleDataSet(
-            self, uri, 0, key_format="i", value_format="S", config='log=(enabled=false)')
+            self, uri, 0, key_format=self.key_format, value_format="S", config='log=(enabled=false)')
         ds.populate()
 
         # Pin oldest and stable timestamp to 1.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(1) +
-            ',stable_timestamp=' + timestamp_str(1))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +
+            ',stable_timestamp=' + self.timestamp_str(1))
 
         valuea = "aaaaa" * 100
 
@@ -65,7 +70,7 @@ class test_rollback_to_stable20(test_rollback_to_stable_base):
             self.session.create(uri, create_params)
             self.large_updates(uri, valuea, ds, nrows, 0, 10)
 
-        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(10))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(10))
 
         self.session.checkpoint()
 

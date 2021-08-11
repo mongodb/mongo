@@ -32,9 +32,11 @@ FileSystem = wiredtiger.FileSystem  # easy access to constants
 # test_tiered06.py
 #    Test the local storage source.
 class test_tiered06(wttest.WiredTigerTestCase):
-    # Load the local store extension, but skip the test if it is missing.
+    # Load the local store extension.
     def conn_extensions(self, extlist):
-        extlist.skip_if_missing = True
+        # Windows doesn't support dynamically loaded extension libraries.
+        if os.name == 'nt':
+            extlist.skip_if_missing = True
         #extlist.extension('storage_sources',
         #  'local_store=(config=\"(verbose=1,delay_ms=200,force_delay=3)\")')
         extlist.extension('storage_sources', 'local_store')

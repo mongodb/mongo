@@ -52,7 +52,9 @@ Btree
 Buf
 Bxxx
 Bzip
+CACHEABLE
 CAS
+CBT
 CCCCCCCCCCCCCCCCCC
 CELL's
 CELLs
@@ -573,6 +575,7 @@ bzDecompressInit
 bzalloc
 bzfree
 bzip
+cacheable
 calc
 call's
 calloc
@@ -619,6 +622,7 @@ clsm
 cmd
 cmp
 cnt
+cntvct
 colcheck
 colgroup
 colgroups
@@ -1062,6 +1066,7 @@ metadata
 metadata's
 metafile
 mfence
+minSnapshotHistoryWindowInSeconds
 minorp
 mips
 mkdir
@@ -1069,6 +1074,7 @@ mmap
 mmrand
 mnt
 movemask
+mrs
 msecs
 msg
 msvc
@@ -1416,6 +1422,7 @@ uint
 uintmax
 unbare
 unbuffered
+uncacheable
 uncompressed
 uncompressing
 uncustomized

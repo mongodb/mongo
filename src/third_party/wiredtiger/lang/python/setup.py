@@ -27,8 +27,8 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 
-import re, os, sys
-from distutils.core import setup, Extension
+import re, os
+from setuptools import setup, Extension
 
 # OS X hack: turn off the Universal binary support that is built into the
 # Python build machinery, just build for the default CPU architecture.

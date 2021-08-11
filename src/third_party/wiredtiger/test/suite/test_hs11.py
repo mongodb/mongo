@@ -30,23 +30,22 @@ import wiredtiger, wttest
 from wtscenario import make_scenarios
 from wiredtiger import stat
 
-def timestamp_str(t):
-    return '%x' % t
-
 # test_hs11.py
 # Ensure that updates without timestamps clear the history store records.
 class test_hs11(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=50MB,statistics=(all)'
     session_config = 'isolation=snapshot'
-    key_format_values = (
-        ('int', dict(key_format='i')),
-        ('string', dict(key_format='S')),
-        ('column', dict(key_format='r'))
-    )
-    scenarios = make_scenarios([
+    key_format_values = [
+        ('column', dict(key_format='r')),
+        ('integer-row', dict(key_format='i')),
+        ('string-row', dict(key_format='S'))
+    ]
+    update_type_values = [
         ('deletion', dict(update_type='deletion')),
-        ('update', dict(update_type='update')),
-    ], key_format_values)
+        ('update', dict(update_type='update'))
+    ]
+    scenarios = make_scenarios(key_format_values, update_type_values)
+    nrows = 10000
 
     def create_key(self, i):
         if self.key_format == 'S':
@@ -68,19 +67,19 @@ class test_hs11(wttest.WiredTigerTestCase):
         value2 = 'b' * 500
 
         # Apply a series of updates from timestamps 1-4.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(1))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
         cursor = self.session.open_cursor(uri)
         for ts in range(1, 5):
-            for i in range(1, 10000):
+            for i in range(1, self.nrows):
                 self.session.begin_transaction()
                 cursor[self.create_key(i)] = value1
-                self.session.commit_transaction('commit_timestamp=' + timestamp_str(ts))
+                self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(ts))
 
         # Reconcile and flush versions 1-3 to the history store.
         self.session.checkpoint()
 
         # Apply an update without timestamp.
-        for i in range(1, 10000):
+        for i in range(1, self.nrows):
             if i % 2 == 0:
                 if self.update_type == 'deletion':
                     cursor.set_key(self.create_key(i))
@@ -92,20 +91,15 @@ class test_hs11(wttest.WiredTigerTestCase):
         self.session.checkpoint()
 
         # Now apply an update at timestamp 10.
-        for i in range(1, 10000):
+        for i in range(1, self.nrows):
             self.session.begin_transaction()
             cursor[self.create_key(i)] = value2
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(10))
-
-        # FIXME-WT-7120: Remove for column store until rollback to stable is implemented for column
-        # store.
-        if self.key_format == 'r':
-            return
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(10))
 
         # Ensure that we blew away history store content.
         for ts in range(1, 5):
-            self.session.begin_transaction('read_timestamp=' + timestamp_str(ts))
-            for i in range(1, 10000):
+            self.session.begin_transaction('read_timestamp=' + self.timestamp_str(ts))
+            for i in range(1, self.nrows):
                 if i % 2 == 0:
                     if self.update_type == 'deletion':
                         cursor.set_key(self.create_key(i))
@@ -129,38 +123,38 @@ class test_hs11(wttest.WiredTigerTestCase):
         value2 = 'b' * 500
 
         # Apply a series of updates from timestamps 1-4.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(1))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
         cursor = self.session.open_cursor(uri)
         for ts in range(1, 5):
-            for i in range(1, 10000):
+            for i in range(1, self.nrows):
                 self.session.begin_transaction()
                 cursor[self.create_key(i)] = value1
-                self.session.commit_transaction('commit_timestamp=' + timestamp_str(ts))
+                self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(ts))
 
         # Reconcile and flush versions 1-3 to the history store.
         self.session.checkpoint()
 
         # Remove the key with timestamp 10.
-        for i in range(1, 10000):
+        for i in range(1, self.nrows):
             if i % 2 == 0:
                 self.session.begin_transaction()
                 cursor.set_key(self.create_key(i))
                 cursor.remove()
-                self.session.commit_transaction('commit_timestamp=' + timestamp_str(10))
+                self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(10))
 
         # Reconcile and remove the obsolete entries.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(10))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10))
         self.session.checkpoint()
 
         # Now apply an update at timestamp 20.
-        for i in range(1, 10000):
+        for i in range(1, self.nrows):
             self.session.begin_transaction()
             cursor[self.create_key(i)] = value2
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(20))
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(20))
 
         # Ensure that we didn't select old history store content even if it is not blew away.
-        self.session.begin_transaction('read_timestamp=' + timestamp_str(10))
-        for i in range(1, 10000):
+        self.session.begin_transaction('read_timestamp=' + self.timestamp_str(10))
+        for i in range(1, self.nrows):
             if i % 2 == 0:
                 cursor.set_key(self.create_key(i))
                 self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)

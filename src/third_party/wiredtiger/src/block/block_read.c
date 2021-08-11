@@ -29,7 +29,8 @@ __wt_bm_preload(WT_BM *bm, WT_SESSION_IMPL *session, const uint8_t *addr, size_t
     WT_STAT_CONN_INCR(session, block_preload);
 
     /* Crack the cookie. */
-    WT_RET(__wt_block_buffer_to_addr(block, addr, &objectid, &offset, &size, &checksum));
+    WT_RET(__wt_block_addr_unpack(
+      session, block, addr, addr_size, &objectid, &offset, &size, &checksum));
 
     WT_RET(__wt_block_fh(session, block, objectid, &fh));
     handle = fh->handle;
@@ -67,11 +68,11 @@ __wt_bm_read(
     uint32_t checksum, objectid, size;
     bool mapped;
 
-    WT_UNUSED(addr_size);
     block = bm->block;
 
     /* Crack the cookie. */
-    WT_RET(__wt_block_buffer_to_addr(block, addr, &objectid, &offset, &size, &checksum));
+    WT_RET(__wt_block_addr_unpack(
+      session, block, addr, addr_size, &objectid, &offset, &size, &checksum));
 
     /*
      * Map the block if it's possible.
@@ -165,7 +166,8 @@ __wt_bm_corrupt(WT_BM *bm, WT_SESSION_IMPL *session, const uint8_t *addr, size_t
     WT_ERR(__wt_bm_read(bm, session, tmp, addr, addr_size));
 
     /* Crack the cookie, dump the block. */
-    WT_ERR(__wt_block_buffer_to_addr(bm->block, addr, &objectid, &offset, &size, &checksum));
+    WT_ERR(__wt_block_addr_unpack(
+      session, bm->block, addr, addr_size, &objectid, &offset, &size, &checksum));
     WT_ERR(__wt_bm_corrupt_dump(session, tmp, objectid, offset, size, checksum));
 
 err:
@@ -205,21 +207,6 @@ err:
     return (ret);
 }
 #endif
-
-/*
- * __wt_block_fh --
- *     Get a block file handle.
- */
-int
-__wt_block_fh(WT_SESSION_IMPL *session, WT_BLOCK *block, uint32_t objectid, WT_FH **fhp)
-{
-    if (!block->has_objects)
-        *fhp = block->fh;
-    else
-        WT_RET(__wt_block_tiered_fh(session, block, objectid, fhp));
-
-    return (0);
-}
 
 /*
  * __wt_block_read_off --

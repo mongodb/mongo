@@ -229,6 +229,7 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_PAGE *page
     upd = *updp;
     *updp = NULL;
     prev_upd_ts = WT_TS_NONE;
+
 #ifdef HAVE_DIAGNOSTIC
     prev_upd_ts = upd->prev_durable_ts;
 #endif
@@ -296,7 +297,7 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_PAGE *page
     if (WT_PAGE_TRYLOCK(session, page) != 0)
         return (0);
 
-    obsolete = __wt_update_obsolete_check(session, page, upd->next, true);
+    obsolete = __wt_update_obsolete_check(session, cbt, upd->next, true);
 
     WT_PAGE_UNLOCK(session, page);
 

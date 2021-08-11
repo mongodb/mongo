@@ -31,9 +31,6 @@ from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 from test_rollback_to_stable01 import test_rollback_to_stable_base
 
-def timestamp_str(t):
-    return '%x' % t
-
 # test_rollback_to_stable08.py
 # Test that rollback to stable does not abort updates when the stable timestamp is
 # set to the latest commit.
@@ -68,10 +65,6 @@ class test_rollback_to_stable08(test_rollback_to_stable_base):
     def test_rollback_to_stable(self):
         nrows = 10000
 
-        # Prepare transactions for column store table is not yet supported.
-        if self.prepare and self.key_format == 'r':
-            self.skipTest('Prepare transactions for column store table is not yet supported')
-
         # Create a table without logging.
         uri = "table:rollback_to_stable08"
         ds = SimpleDataSet(
@@ -79,8 +72,8 @@ class test_rollback_to_stable08(test_rollback_to_stable_base):
         ds.populate()
 
         # Pin oldest and stable to timestamp 10.
-        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(10) +
-            ',stable_timestamp=' + timestamp_str(10))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
+            ',stable_timestamp=' + self.timestamp_str(10))
 
         value_a = "aaaaa" * 100
         value_b = "bbbbb" * 100
@@ -101,9 +94,9 @@ class test_rollback_to_stable08(test_rollback_to_stable_base):
 
         # Pin stable to timestamp 60 if prepare otherwise 50.
         if self.prepare:
-            self.conn.set_timestamp('stable_timestamp=' + timestamp_str(60))
+            self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(60))
         else:
-            self.conn.set_timestamp('stable_timestamp=' + timestamp_str(50))
+            self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(50))
 
         # Checkpoint to ensure the data is flushed, then rollback to the stable timestamp.
         if not self.in_memory:

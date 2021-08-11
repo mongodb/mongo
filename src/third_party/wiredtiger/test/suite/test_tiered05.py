@@ -42,13 +42,14 @@ class test_tiered05(wttest.WiredTigerTestCase):
     wait = 2
 
     def conn_extensions(self, extlist):
-        extlist.skip_if_missing = True
+        # Windows doesn't support dynamically loaded extension libraries.
+        if os.name == 'nt':
+            extlist.skip_if_missing = True
         extlist.extension('storage_sources', self.extension_name)
 
     def conn_config(self):
         os.mkdir(self.bucket)
         return \
-          'statistics=(fast),' + \
           'tiered_manager=(wait=%d),' % self.wait + \
           'tiered_storage=(auth_token=%s,' % self.auth_token + \
           'bucket=%s,' % self.bucket + \
