@@ -98,6 +98,34 @@ void testBothWaysIndexSpecConversion(const TimeseriesOptions& timeseriesOptions,
     }
 }
 
+TEST(TimeseriesIndexSchemaConversionTest, OriginalSpecFieldName) {
+    TimeseriesOptions timeseriesOptions = makeTimeseriesOptions();
+
+    BSONObj bucketsIndexSpec =
+        BSON(timeseries::kKeyFieldName << BSON("control.min.a" << 1 << "control.max.a" << 1)
+                                       << timeseries::kOriginalSpecFieldName << BSON("abc" << 123));
+
+    {
+        // The "originalSpec" field is used when the time-series metric indexes feature flag is
+        // enabled.
+        RAIIServerParameterControllerForTest controller("featureFlagTimeseriesMetricIndexes", true);
+        auto timeseriesIndexSpecResult =
+            timeseries::createTimeseriesIndexFromBucketsIndex(timeseriesOptions, bucketsIndexSpec);
+        ASSERT(timeseriesIndexSpecResult);
+        ASSERT_BSONOBJ_EQ(*timeseriesIndexSpecResult, BSON("abc" << 123));
+    }
+
+    {
+        // The "originalSpec" field is not used when the time-series metric indexes feature flag is
+        // disabled.
+        RAIIServerParameterControllerForTest controller("featureFlagTimeseriesMetricIndexes",
+                                                        false);
+        auto timeseriesIndexSpecResult =
+            timeseries::createTimeseriesIndexFromBucketsIndex(timeseriesOptions, bucketsIndexSpec);
+        ASSERT(!timeseriesIndexSpecResult);
+    }
+}
+
 // {} <=> {}
 TEST(TimeseriesIndexSchemaConversionTest, EmptyTimeseriesIndexSpecDoesNothing) {
     TimeseriesOptions timeseriesOptions = makeTimeseriesOptions();

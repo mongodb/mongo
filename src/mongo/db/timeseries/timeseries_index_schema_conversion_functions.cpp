@@ -344,18 +344,24 @@ StatusWith<BSONObj> createBucketsShardKeySpecFromTimeseriesShardKeySpec(
 
 boost::optional<BSONObj> createTimeseriesIndexFromBucketsIndex(
     const TimeseriesOptions& timeseriesOptions, const BSONObj& bucketsIndex) {
-    if (bucketsIndex.hasField(kOriginalSpecFieldName)) {
-        // This buckets index has the original user index definition available, return it.
+    if (bucketsIndex.hasField(kOriginalSpecFieldName) &&
+        feature_flags::gTimeseriesMetricIndexes.isEnabledAndIgnoreFCV()) {
+        // This buckets index has the original user index definition available, return it if the
+        // time-series metric indexes feature flag is enabled. If the feature flag isn't enabled,
+        // the reverse mapping mechanism will be used. This is necessary to skip returning any
+        // incompatible indexes created when the feature flag was enabled.
         return bucketsIndex.getObjectField(kOriginalSpecFieldName);
     }
     if (bucketsIndex.hasField(kKeyFieldName)) {
         auto timeseriesKeyValue = createTimeseriesIndexSpecFromBucketsIndexSpec(
             timeseriesOptions, bucketsIndex.getField(kKeyFieldName).Obj());
         if (timeseriesKeyValue) {
-            // This creates a bsonobj copy with a modified kKeyFieldName field set to
-            // timeseriesKeyValue.
-            return bucketsIndex.addFields(BSON(kKeyFieldName << timeseriesKeyValue.get()),
-                                          StringDataSet{kKeyFieldName});
+            // This creates a BSONObj copy with the kOriginalSpecFieldName field removed, if it
+            // exists, and modifies the kKeyFieldName field to timeseriesKeyValue.
+            BSONObj intermediateObj =
+                bucketsIndex.removeFields(StringDataSet{kOriginalSpecFieldName});
+            return intermediateObj.addFields(BSON(kKeyFieldName << timeseriesKeyValue.get()),
+                                             StringDataSet{kKeyFieldName});
         }
     }
     return boost::none;
