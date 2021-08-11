@@ -53,19 +53,23 @@ protected:
 
 TEST_F(TimeseriesUpdateDeleteUtilTest, QueryOnlyDependsOnMetaFieldNoMetaField) {
     // Empty query.
-    ASSERT_TRUE(timeseries::queryOnlyDependsOnMetaField(_opCtx.get(), _ns, BSONObj(), boost::none));
+    ASSERT_TRUE(timeseries::queryOnlyDependsOnMetaField(
+        _opCtx.get(), _ns, BSONObj(), boost::none, LegacyRuntimeConstants(), boost::none));
 
     // Query on the "meta" field.
     ASSERT_FALSE(timeseries::queryOnlyDependsOnMetaField(_opCtx.get(),
                                                          _ns,
                                                          BSON("meta"
                                                               << "A"),
+                                                         boost::none,
+                                                         LegacyRuntimeConstants(),
                                                          boost::none));
 }
 
 TEST_F(TimeseriesUpdateDeleteUtilTest, QueryOnlyDependsOnMetaField) {
     // Empty query.
-    ASSERT_TRUE(timeseries::queryOnlyDependsOnMetaField(_opCtx.get(), _ns, BSONObj(), _metaField));
+    ASSERT_TRUE(timeseries::queryOnlyDependsOnMetaField(
+        _opCtx.get(), _ns, BSONObj(), _metaField, LegacyRuntimeConstants(), boost::none));
 
     // Query on the metaField using dot notation.
     ASSERT_TRUE(
@@ -75,7 +79,9 @@ TEST_F(TimeseriesUpdateDeleteUtilTest, QueryOnlyDependsOnMetaField) {
                                                                                << "A")
                                                                           << BSON(_metaField + ".b"
                                                                                   << "B"))),
-                                                _metaField));
+                                                _metaField,
+                                                LegacyRuntimeConstants(),
+                                                boost::none));
 
     // Query on a nested field of the metaField.
     ASSERT_TRUE(timeseries::queryOnlyDependsOnMetaField(
@@ -85,7 +91,9 @@ TEST_F(TimeseriesUpdateDeleteUtilTest, QueryOnlyDependsOnMetaField) {
                                                           << "A"))
                                   << BSON(_metaField << BSON("b"
                                                              << "B")))),
-        _metaField));
+        _metaField,
+        LegacyRuntimeConstants(),
+        boost::none));
 
 
     // Query on a field that is a prefix of the metaField.
@@ -93,28 +101,36 @@ TEST_F(TimeseriesUpdateDeleteUtilTest, QueryOnlyDependsOnMetaField) {
                                                          _ns,
                                                          BSON(_metaField + "a"
                                                               << "A"),
-                                                         _metaField));
+                                                         _metaField,
+                                                         LegacyRuntimeConstants(),
+                                                         boost::none));
 
     // Query using $jsonSchema with the metaField required.
     ASSERT_TRUE(timeseries::queryOnlyDependsOnMetaField(
         _opCtx.get(),
         _ns,
         BSON("$jsonSchema" << BSON("required" << BSON_ARRAY(_metaField))),
-        _metaField));
+        _metaField,
+        LegacyRuntimeConstants(),
+        boost::none));
 
     // Query using $jsonSchema with a field that is not the metaField required.
     ASSERT_FALSE(timeseries::queryOnlyDependsOnMetaField(
         _opCtx.get(),
         _ns,
         BSON("$jsonSchema" << BSON("required" << BSON_ARRAY("measurement"))),
-        _metaField));
+        _metaField,
+        LegacyRuntimeConstants(),
+        boost::none));
 
     // Query using $jsonSchema with a field that is the metaField in dot notation required.
     ASSERT_TRUE(timeseries::queryOnlyDependsOnMetaField(
         _opCtx.get(),
         _ns,
         BSON("$jsonSchema" << BSON("required" << BSON_ARRAY(_metaField + ".a"))),
-        _metaField));
+        _metaField,
+        LegacyRuntimeConstants(),
+        boost::none));
 
     // Query using $jsonSchema with the metaField required and an optional field that is not the
     // metaField.
@@ -125,7 +141,9 @@ TEST_F(TimeseriesUpdateDeleteUtilTest, QueryOnlyDependsOnMetaField) {
                                    << BSON_ARRAY(_metaField) << "properties"
                                    << BSON("measurement" << BSON("description"
                                                                  << "can be any value")))),
-        _metaField));
+        _metaField,
+        LegacyRuntimeConstants(),
+        boost::none));
 
     // Query using $jsonSchema with the metaField required and the metaField as a property.
     ASSERT_TRUE(timeseries::queryOnlyDependsOnMetaField(
@@ -134,7 +152,9 @@ TEST_F(TimeseriesUpdateDeleteUtilTest, QueryOnlyDependsOnMetaField) {
         BSON("$jsonSchema" << BSON("required" << BSON_ARRAY(_metaField) << "properties"
                                               << BSON(_metaField << BSON("bsonType"
                                                                          << "string")))),
-        _metaField));
+        _metaField,
+        LegacyRuntimeConstants(),
+        boost::none));
 
     // Query using $jsonSchema with a field that is not the metaField as a property of the
     // metaField.
@@ -145,7 +165,9 @@ TEST_F(TimeseriesUpdateDeleteUtilTest, QueryOnlyDependsOnMetaField) {
                  "properties" << BSON(_metaField
                                       << BSON("properties" << BSON("a" << BSON("bsonType"
                                                                                << "string")))))),
-        _metaField));
+        _metaField,
+        LegacyRuntimeConstants(),
+        boost::none));
 }
 
 TEST_F(TimeseriesUpdateDeleteUtilTest, QueryOnlyDependsOnMetaFieldLet) {
