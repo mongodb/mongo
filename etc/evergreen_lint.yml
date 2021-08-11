@@ -16,3 +16,6 @@ rules:
     - rule: "invalid-build-parameter"
     - rule: "required-expansions-write"
       regex: .*\/evergreen\/.*\.sh
+    - rule: "dependency-for-func"
+      dependencies:
+        generate resmoke tasks: ["build_variant_gen", "archive_dist_test"]
