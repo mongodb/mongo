@@ -807,6 +807,32 @@ TimeseriesTest.run((insert) => {
         nModifiedBuckets: 1
     });
 
+    // Updates where upsert:false should not insert a new document when no match is found.
+    testUpdate({
+        initialDocList: [doc1, doc4, doc5],
+        updateList: [{
+            q: {[metaFieldName]: "Z"},
+            u: {$set: {[metaFieldName]: 5}},
+            multi: true,
+        }],
+        resultDocList: [doc1, doc4, doc5],
+        nModifiedBuckets: 0,
+    });
+
+    // Do the same test case as above but with upsert:true, which should fail.
+    testUpdate({
+        initialDocList: [doc1, doc4, doc5],
+        updateList: [{
+            q: {[metaFieldName]: "Z"},
+            u: {$set: {[metaFieldName]: 5}},
+            multi: true,
+            upsert: true,
+        }],
+        resultDocList: [doc1, doc4, doc5],
+        nModifiedBuckets: 0,
+        failCode: ErrorCodes.InvalidOptions,
+    });
+
     /************************** Tests updating with an update pipeline **************************/
     // Modify the metaField, which should fail since update pipelines are not supported.
     testUpdate({

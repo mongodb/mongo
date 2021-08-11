@@ -777,6 +777,12 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
                           << ns,
             updateRequest->isMulti());
 
+        uassert(
+            ErrorCodes::InvalidOptions,
+            str::stream() << "upsert:true updates are not supported for time-series collections: "
+                          << ns,
+            !updateRequest->isUpsert());
+
         // Get the original update query and check that it only depends on the metaField.
         const auto& updateQuery = updateRequest->getQuery();
         uassert(ErrorCodes::InvalidOptions,
