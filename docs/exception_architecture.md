@@ -50,14 +50,24 @@ a test suite to fail, without resorting to different behavior during testing, an
 user operations to potentially disrupt production deployments by terminating the server.
 
 Both `massert` and `uassert` take error codes, so that all assertions have codes associated with
-them. Currently, programmers are free to provide the error code by either using a unique location
-number or choose from existing `ErrorCodes`. Unique location numbers are assigned incrementally and
-have no meaning other than a way to associate a log message with a line of code.
+them. Currently, programmers are free to provide the error code by either [using a unique location
+number](#choosing-a-unique-location-number) or choosing a named code from `ErrorCodes`. Unique location 
+numbers have no meaning other than a way to associate a log message with a line of code.
 
 `iassert` provides similar functionality to `uassert`, but it logs at a higher level and
 does not increment user assertion counters. We should always choose `iassert` over `uassert`
 when we expect a failure, a failure might be recoverable, or failure accounting is not interesting.
 
+### Choosing a unique location number
+
+The current convention for choosing a unique location number is to use the 5 digit SERVER ticket number 
+for the ticket being addressed when the assertion is added, followed by a two digit counter to distinguish 
+between codes added as part of the same ticket. For example, if you're working on SERVER-12345, the first 
+error code would be 1234500, the second would be 1234501, etc. This convention can also be used for LOGV2 
+logging id numbers.
+
+The only real constraint for unique location numbers is that they must be unique across the codebase. This is 
+verified at compile time with a [python script][errorcodes_py].
 
 ## Exception
 
@@ -133,3 +143,4 @@ Gotchas to watch out for:
 [status_with_h]: ../src/mongo/base/status_with.h
 [idlc_py]: ../buildscripts/idl/idlc.py
 [status_with_test_cpp]: ../src/mongo/base/status_with_test.cpp
+[errorcodes_py]: ../buildscripts/errorcodes.py
