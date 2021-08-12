@@ -214,8 +214,8 @@ std::unique_ptr<PlanCacheEntry> PlanCacheEntry::create(
         }
 
         CreatedFromQuery createdFromQuery{
-            findCommand.getFilter(),
-            findCommand.getSort(),
+            findCommand.getFilter().getOwned(),
+            findCommand.getSort().getOwned(),
             projBuilder.obj(),
             query.getCollator() ? query.getCollator()->getSpec().toBSON() : BSONObj()};
         debugInfo.emplace(std::move(createdFromQuery), std::move(decision));
