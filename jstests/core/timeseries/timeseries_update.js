@@ -697,6 +697,94 @@ TimeseriesTest.run((insert) => {
         failCode: ErrorCodes.InvalidOptions
     });
 
+    const arrayDoc1 = {_id: 1, [timeFieldName]: dateTime, [metaFieldName]: [1, 4, 7, 11, 13]};
+    const arrayDoc2 = {_id: 2, [timeFieldName]: dateTime, [metaFieldName]: [2, 5, 9, 12]};
+    const arrayDoc3 = {_id: 3, [timeFieldName]: dateTime, [metaFieldName]: [3, 6, 10]};
+
+    // Multiple updates, unordered: Modify the metaField of all documents using arrayFilters.
+    testUpdate({
+        initialDocList: [arrayDoc1, arrayDoc2, arrayDoc3],
+        updateList: [{
+            q: {},
+            u: {$set: {[metaFieldName + ".$[i]"]: 100}},
+            multi: true,
+            arrayFilters: [{"i": {$gte: 7}}],
+        }],
+        resultDocList: [
+            {_id: 1, [timeFieldName]: dateTime, [metaFieldName]: [1, 4, 100, 100, 100]},
+            {_id: 2, [timeFieldName]: dateTime, [metaFieldName]: [2, 5, 100, 100]},
+            {_id: 3, [timeFieldName]: dateTime, [metaFieldName]: [3, 6, 100]}
+        ],
+        nModifiedBuckets: 3,
+    });
+
+    // Multiple updates, unordered: Modify the metaField of multiple documents using arrayFilters.
+    testUpdate({
+        initialDocList: [arrayDoc1, arrayDoc2, arrayDoc3],
+        updateList: [{
+            q: {[metaFieldName]: {$lt: 3}},
+            u: {$inc: {[metaFieldName + ".$[i]"]: 2000}},
+            multi: true,
+            arrayFilters: [{$and: [{"i": {$gt: 6}}, {"i": {$lt: 15}}]}],
+        }],
+        resultDocList: [
+            {_id: 1, [timeFieldName]: dateTime, [metaFieldName]: [1, 4, 2007, 2011, 2013]},
+            {_id: 2, [timeFieldName]: dateTime, [metaFieldName]: [2, 5, 2009, 2012]},
+            arrayDoc3
+        ],
+        nModifiedBuckets: 2,
+    });
+
+    testUpdate({
+        initialDocList: [arrayDoc1, arrayDoc2, arrayDoc3],
+        updateList: [{
+            q: {[metaFieldName]: {$lt: 2}},
+            u: {$unset: {[metaFieldName + ".$[i]"]: ""}},
+            multi: true,
+            arrayFilters: [{$or: [{"i": {$lt: 5}}, {"i": {$gt: 10}}]}],
+        }],
+        resultDocList: [
+            {_id: 1, [timeFieldName]: dateTime, [metaFieldName]: [null, null, 7, null, null]},
+            arrayDoc2,
+            arrayDoc3
+        ],
+        nModifiedBuckets: 1,
+    });
+
+    testUpdate({
+        initialDocList: [
+            {
+                _id: 1,
+                [timeFieldName]: dateTime,
+                [metaFieldName]: [{a: 0, b: 2, c: 4}, {a: 6, b: 8, c: 10}]
+            },
+            {
+                _id: 2,
+                [timeFieldName]: dateTime,
+                [metaFieldName]: [{a: 1, b: 3, c: 5}, {a: 7, b: 9, c: 11}, {a: 3, b: 6, c: 9}]
+            }
+        ],
+        updateList: [{
+            q: {},
+            u: {$set: {[metaFieldName + ".$[i].c"]: 0}},
+            multi: true,
+            arrayFilters: [{"i.a": {$gt: 5}}],
+        }],
+        resultDocList: [
+            {
+                _id: 1,
+                [timeFieldName]: dateTime,
+                [metaFieldName]: [{a: 0, b: 2, c: 4}, {a: 6, b: 8, c: 0}]
+            },
+            {
+                _id: 2,
+                [timeFieldName]: dateTime,
+                [metaFieldName]: [{a: 1, b: 3, c: 5}, {a: 7, b: 9, c: 0}, {a: 3, b: 6, c: 9}]
+            }
+        ],
+        nModifiedBuckets: 2,
+    });
+
     /************************** Tests updating with an update pipeline **************************/
     // Modify the metaField, which should fail since update pipelines are not supported.
     testUpdate({
@@ -787,13 +875,13 @@ TimeseriesTest.run((insert) => {
     });
 
     /************************ Tests updating a collection using collation. ************************/
-    const doc1Collation = {_id: 1, [timeFieldName]: dateTime, [metaFieldName]: "café"};
-    const doc2Collation = {_id: 2, [timeFieldName]: dateTime, [metaFieldName]: "cafe"};
-    const doc3Collation = {_id: 3, [timeFieldName]: dateTime, [metaFieldName]: "cafE"};
+    const collationDoc1 = {_id: 1, [timeFieldName]: dateTime, [metaFieldName]: "café"};
+    const collationDoc2 = {_id: 2, [timeFieldName]: dateTime, [metaFieldName]: "cafe"};
+    const collationDoc3 = {_id: 3, [timeFieldName]: dateTime, [metaFieldName]: "cafE"};
 
     // Query on the metaField and modify the metaField using collation with strength level 1.
     testUpdate({
-        initialDocList: [doc1Collation, doc2Collation, doc3Collation],
+        initialDocList: [collationDoc1, collationDoc2, collationDoc3],
         updateList: [{
             q: {[metaFieldName]: "cafe"},
             u: {$set: {[metaFieldName]: "Updated"}},
@@ -811,7 +899,7 @@ TimeseriesTest.run((insert) => {
     // Query on the metafield and modify the metaField using collation with the default strength
     // (level 3).
     testUpdate({
-        initialDocList: [doc1Collation, doc2Collation, doc3Collation],
+        initialDocList: [collationDoc1, collationDoc2, collationDoc3],
         updateList: [{
             q: {[metaFieldName]: "cafe"},
             u: {$set: {[metaFieldName]: "Updated"}},
@@ -819,9 +907,9 @@ TimeseriesTest.run((insert) => {
             collation: {locale: "fr"},
         }],
         resultDocList: [
-            doc1Collation,
+            collationDoc1,
             {_id: 2, [timeFieldName]: dateTime, [metaFieldName]: "Updated"},
-            doc3Collation,
+            collationDoc3,
         ],
         nModifiedBuckets: 1,
     });
