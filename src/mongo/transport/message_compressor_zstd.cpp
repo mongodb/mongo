@@ -75,6 +75,11 @@ StatusWith<std::size_t> ZstdMessageCompressor::decompressData(ConstDataRange inp
     return {ret};
 }
 
+std::size_t ZstdMessageCompressor::getMaxDecompressedSize(const void* src, size_t srcSize) {
+    auto maxDecompressedSize = ZSTD_getFrameContentSize(src, srcSize);
+    return static_cast<size_t>(maxDecompressedSize);
+}
+
 
 MONGO_INITIALIZER_GENERAL(ZstdMessageCompressorInit,
                           ("EndStartupOptionHandling"),
