@@ -89,7 +89,7 @@ private:
     vector<Position> _unwindPathFieldIndexes;
 
     // Index into the _inputArray to return next.
-    size_t _index;
+    size_t _index = 0;
 };
 
 DocumentSourceUnwind::Unwinder::Unwinder(const FieldPath& unwindPath,
