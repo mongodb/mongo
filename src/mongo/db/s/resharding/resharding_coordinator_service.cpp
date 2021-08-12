@@ -1436,9 +1436,12 @@ void ReshardingCoordinatorService::ReshardingCoordinator::onOkayToEnterCritical(
 
 void ReshardingCoordinatorService::ReshardingCoordinator::_insertCoordDocAndChangeOrigCollEntry() {
     if (_coordinatorDoc.getState() > CoordinatorStateEnum::kUnused) {
-        _coordinatorDocWrittenPromise.emplaceValue();
-        ReshardingMetrics::get(cc().getServiceContext())
-            ->onStepUp(ReshardingMetrics::Role::kCoordinator);
+        if (!_coordinatorDocWrittenPromise.getFuture().isReady()) {
+            _coordinatorDocWrittenPromise.emplaceValue();
+            ReshardingMetrics::get(cc().getServiceContext())
+                ->onStepUp(ReshardingMetrics::Role::kCoordinator);
+        }
+
         return;
     }
 
@@ -1448,11 +1451,15 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_insertCoordDocAndChan
     resharding::insertCoordDocAndChangeOrigCollEntry(opCtx.get(), updatedCoordinatorDoc);
     installCoordinatorDoc(opCtx.get(), updatedCoordinatorDoc);
 
-    _coordinatorDocWrittenPromise.emplaceValue();
+    {
+        // Note: don't put blocking or interruptible code in this block.
+        _coordinatorDocWrittenPromise.emplaceValue();
 
-    // TODO SERVER-53914 to accommodate loading metrics for the coordinator.
-    ReshardingMetrics::get(cc().getServiceContext())
-        ->onStart(ReshardingMetrics::Role::kCoordinator, getCurrentTime());
+        // TODO SERVER-53914 to accommodate loading metrics for the coordinator.
+        ReshardingMetrics::get(cc().getServiceContext())
+            ->onStart(ReshardingMetrics::Role::kCoordinator, getCurrentTime());
+    }
+
     pauseBeforeInsertCoordinatorDoc.pauseWhileSet();
 }
 

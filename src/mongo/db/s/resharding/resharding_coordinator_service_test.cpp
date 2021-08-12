@@ -184,6 +184,8 @@ public:
     }
 
     void tearDown() override {
+        globalFailPointRegistry().disableAllFailpoints();
+
         TransactionCoordinatorService::get(operationContext())->onStepDown();
         WaitForMajorityService::get(getServiceContext()).shutDown();
         ConfigServerTestFixture::tearDown();
@@ -484,6 +486,24 @@ public:
         }
     }
 
+    void killAllReshardingCoordinatorOps() {
+        for (ServiceContext::LockedClientsCursor cursor(getServiceContext());
+             Client* client = cursor.next();) {
+            invariant(client);
+
+            stdx::lock_guard<Client> lk(*client);
+            if (auto opCtx = client->getOperationContext()) {
+                StringData desc(client->desc());
+
+                // Resharding coordinator doc changes are run under WithTransaction, which uses
+                // AlternativeSessionRegion.
+                if (desc.find("alternative-session-region") != std::string::npos) {
+                    getServiceContext()->killOperation(lk, opCtx);
+                }
+            }
+        }
+    }
+
     repl::PrimaryOnlyService* _service = nullptr;
 
     std::shared_ptr<CoordinatorStateTransitionController> _controller;
@@ -563,6 +583,68 @@ TEST_F(ReshardingCoordinatorServiceTest, ReshardingCoordinatorSuccessfullyTransi
 
     coordinator->onOkayToEnterCritical();
     stateTransitionsGuard.wait(CoordinatorStateEnum::kBlockingWrites);
+    stateTransitionsGuard.unset(CoordinatorStateEnum::kBlockingWrites);
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kBlockingWrites);
+
+    makeRecipientsBeInStrictConsistency(opCtx);
+
+    stateTransitionsGuard.wait(CoordinatorStateEnum::kCommitting);
+    stateTransitionsGuard.unset(CoordinatorStateEnum::kCommitting);
+
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kCommitting);
+
+    makeDonorsProceedToDone(opCtx);
+    makeRecipientsProceedToDone(opCtx);
+
+    coordinator->getCompletionFuture().get(opCtx);
+}
+
+TEST_F(ReshardingCoordinatorServiceTest, ReshardingCoordinatorTransitionsTokDoneWithInterrupt) {
+    const std::vector<CoordinatorStateEnum> coordinatorStates{
+        CoordinatorStateEnum::kPreparingToDonate,
+        CoordinatorStateEnum::kCloning,
+        CoordinatorStateEnum::kApplying,
+        CoordinatorStateEnum::kBlockingWrites,
+        CoordinatorStateEnum::kCommitting};
+    PauseDuringStateTransitions stateTransitionsGuard{controller(), coordinatorStates};
+
+    auto doc = insertStateAndCatalogEntries(CoordinatorStateEnum::kUnused, _originalEpoch);
+    auto opCtx = operationContext();
+    auto donorChunk = makeAndInsertChunksForDonorShard(
+        _originalUUID, _originalEpoch, _oldShardKey, std::vector{OID::gen(), OID::gen()});
+
+    auto initialChunks =
+        makeChunks(_reshardingUUID, _tempEpoch, _newShardKey, std::vector{OID::gen(), OID::gen()});
+
+    std::vector<ReshardedChunk> presetReshardedChunks;
+    for (const auto& chunk : initialChunks) {
+        presetReshardedChunks.emplace_back(chunk.getShard(), chunk.getMin(), chunk.getMax());
+    }
+
+    doc.setPresetReshardedChunks(presetReshardedChunks);
+
+    auto coordinator = ReshardingCoordinator::getOrCreate(opCtx, _service, doc.toBSON());
+
+    stateTransitionsGuard.wait(CoordinatorStateEnum::kPreparingToDonate);
+    killAllReshardingCoordinatorOps();
+    stateTransitionsGuard.unset(CoordinatorStateEnum::kPreparingToDonate);
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kPreparingToDonate);
+    makeDonorsReadyToDonate(opCtx);
+
+    stateTransitionsGuard.wait(CoordinatorStateEnum::kCloning);
+    killAllReshardingCoordinatorOps();
+    stateTransitionsGuard.unset(CoordinatorStateEnum::kCloning);
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kCloning);
+
+    makeRecipientsFinishedCloning(opCtx);
+    stateTransitionsGuard.wait(CoordinatorStateEnum::kApplying);
+    killAllReshardingCoordinatorOps();
+    stateTransitionsGuard.unset(CoordinatorStateEnum::kApplying);
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kApplying);
+
+    coordinator->onOkayToEnterCritical();
+    stateTransitionsGuard.wait(CoordinatorStateEnum::kBlockingWrites);
+    killAllReshardingCoordinatorOps();
     stateTransitionsGuard.unset(CoordinatorStateEnum::kBlockingWrites);
     waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kBlockingWrites);
 
