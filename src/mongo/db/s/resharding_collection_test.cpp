@@ -36,6 +36,7 @@
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/write_concern.h"
+#include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/unittest/unittest.h"
 
@@ -87,6 +88,41 @@ TEST_F(ReshardingCollectionTest, TestWritesToTempReshardingCollection) {
     auto chunksNss = NamespaceString{
         "config.cache.chunks.{}.system.resharding.{}"_format("test", uuid.toString())};
     ASSERT_OK(client.insert(chunksNss, BSON("X" << 5)));
+}
+
+// TODO(SERVER-59325): Remove stress test when no longer needed.
+TEST_F(ReshardingCollectionTest, TestWritesToTempReshardingCollectionStressTest) {
+    static constexpr int kThreads = 10;
+    std::vector<stdx::thread> threads;
+    Counter64 iterations;
+
+    for (int t = 0; t < kThreads; ++t) {
+        stdx::thread thread([&]() {
+            Timer timer;
+            while (timer.elapsed() < Seconds(2)) {
+                ThreadClient threadClient(getGlobalServiceContext());
+                auto opCtx = Client::getCurrent()->makeOperationContext();
+                invariant(opCtx);
+                SimpleClient client(opCtx.get());
+                auto uuid = UUID::gen();
+
+                auto tempNss =
+                    NamespaceString{"{}.system.resharding.{}"_format("test", uuid.toString())};
+                ASSERT_OK(client.insert(tempNss, BSON("x" << 5)));
+
+                auto chunksNss = NamespaceString{
+                    "config.cache.chunks.{}.system.resharding.{}"_format("test", uuid.toString())};
+                ASSERT_OK(client.insert(chunksNss, BSON("X" << 5)));
+                iterations.increment();
+            }
+        });
+        threads.push_back(std::move(thread));
+    }
+    for (auto& t : threads) {
+        t.join();
+    }
+
+    LOGV2(5930701, "Stress test completed", "iterations"_attr = iterations);
 }
 
 }  // namespace
