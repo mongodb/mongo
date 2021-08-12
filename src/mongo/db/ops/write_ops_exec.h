@@ -77,13 +77,13 @@ struct WriteResult {
  */
 WriteResult performInserts(OperationContext* opCtx,
                            const write_ops::InsertCommandRequest& op,
-                           const OperationSource& source = OperationSource::kStandard);
+                           OperationSource source = OperationSource::kStandard);
 WriteResult performUpdates(OperationContext* opCtx,
                            const write_ops::UpdateCommandRequest& op,
-                           const OperationSource& source = OperationSource::kStandard);
+                           OperationSource source = OperationSource::kStandard);
 WriteResult performDeletes(OperationContext* opCtx,
                            const write_ops::DeleteCommandRequest& op,
-                           const OperationSource& source = OperationSource::kStandard);
+                           OperationSource source = OperationSource::kStandard);
 
 Status performAtomicTimeseriesWrites(OperationContext* opCtx,
                                      const std::vector<write_ops::InsertCommandRequest>& insertOps,

@@ -583,7 +583,7 @@ SingleWriteResult makeWriteResultForInsertOrDeleteRetry() {
 
 WriteResult performInserts(OperationContext* opCtx,
                            const write_ops::InsertCommandRequest& wholeOp,
-                           const OperationSource& source) {
+                           OperationSource source) {
     // Insert performs its own retries, so we should only be within a WriteUnitOfWork when run in a
     // transaction.
     auto txnParticipant = TransactionParticipant::get(opCtx);
@@ -947,7 +947,7 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
 
 WriteResult performUpdates(OperationContext* opCtx,
                            const write_ops::UpdateCommandRequest& wholeOp,
-                           const OperationSource& source) {
+                           OperationSource source) {
     // Update performs its own retries, so we should not be in a WriteUnitOfWork unless run in a
     // transaction.
     auto txnParticipant = TransactionParticipant::get(opCtx);
@@ -1166,7 +1166,7 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
 
 WriteResult performDeletes(OperationContext* opCtx,
                            const write_ops::DeleteCommandRequest& wholeOp,
-                           const OperationSource& source) {
+                           OperationSource source) {
     // Delete performs its own retries, so we should not be in a WriteUnitOfWork unless we are in a
     // transaction.
     auto txnParticipant = TransactionParticipant::get(opCtx);
