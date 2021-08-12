@@ -42,29 +42,86 @@ using ChangeStreamRewriteFunction =
                                                    bool /* allowInexact */)>;
 
 namespace {
+/**
+ * Rewrites filters on 'operationType' in a format that can be applied directly to the oplog.
+ * Returns nullptr if the predicate cannot be rewritten.
+ *
+ * Examples,
+ *   '{operationType: "insert"}' gets rewritten to '{op: {$eq: "i"}}'
+ *   '{operationType: "drop"}' gets rewritten to
+ *     '{$and: [{op: {$eq: "c"}}, {o.drop: {exists: true}}]}'
+ */
 std::unique_ptr<MatchExpression> rewriteOperationType(
-    const boost::intrusive_ptr<ExpressionContext>&,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const PathMatchExpression* predicate,
     bool allowInexact) {
-    // Callers of this function will always supply a 'predicate' whose path begins with the
-    // "operationType" field. If the path is not an exact match, then it must represent a sub-field
-    // of the "operationType" component. Any such path is trivially non-matching, because
-    // "operationType" is never a sub-document.
-    if (predicate->path() != DocumentSourceChangeStream::kOperationTypeField) {
+    // We should only ever see predicates on the 'operationType' field.
+    tassert(5554200, "Unexpected empty path", !predicate->path().empty());
+    tassert(5554201,
+            str::stream() << "Unexpected predicate on " << predicate->path(),
+            predicate->fieldRef()->getPart(0) == DocumentSourceChangeStream::kOperationTypeField);
+
+    // If the query is on a subfield of operationType, it will never match.
+    if (predicate->fieldRef()->numParts() > 1) {
         return std::make_unique<AlwaysFalseMatchExpression>();
     }
-    // Map of change stream to oplog. This rewrite still needs to account for other types.
-    static const std::map<std::string, std::string> opTypeMap = {
-        {"insert", "i"}, {"update", "u"}, {"replace", "u"}, {"delete", "d"}};
+
+    static const auto kExistsTrue = Document{{"$exists", true}};
+    static const auto kExistsFalse = Document{{"$exists", false}};
+
+    // Maps the operation type to the corresponding rewritten document in the oplog format.
+    static const StringMap<Document> kOpTypeRewriteMap = {
+        {"insert", {{"op", "i"_sd}}},
+        {"delete", {{"op", "d"_sd}}},
+        {"update", {{"op", "u"_sd}, {"o._id"_sd, kExistsFalse}}},
+        {"replace", {{"op", "u"_sd}, {"o._id"_sd, kExistsTrue}}},
+        {"drop", {{"op", "c"_sd}, {"o.drop"_sd, kExistsTrue}}},
+        {"rename", {{"op", "c"_sd}, {"o.renameCollection"_sd, kExistsTrue}}},
+        {"dropDatabase", {{"op", "c"_sd}, {"o.dropDatabase"_sd, kExistsTrue}}}};
+
+    // Helper to convert a BSONElement opType into a rewritten MatchExpression.
+    auto getRewrittenOpType = [&](auto& opType) -> std::unique_ptr<MatchExpression> {
+        if (BSONType::String != opType.type()) {
+            return std::make_unique<AlwaysFalseMatchExpression>();
+        } else if (kOpTypeRewriteMap.count(opType.str())) {
+            return MatchExpressionParser::parseAndNormalize(
+                kOpTypeRewriteMap.at(opType.str()).toBson(), expCtx);
+        }
+        return nullptr;
+    };
+
     switch (predicate->matchType()) {
         case MatchExpression::EQ:
         case MatchExpression::INTERNAL_EXPR_EQ: {
             auto eqME = static_cast<const ComparisonMatchExpressionBase*>(predicate);
-            auto rhs = eqME->getData();
-            if (rhs.type() != BSONType::String || !opTypeMap.count(rhs.str())) {
+            return getRewrittenOpType(eqME->getData());
+        }
+        case MatchExpression::MATCH_IN: {
+            auto inME = static_cast<const InMatchExpression*>(predicate);
+
+            // Regex predicates cannot be written, and rewriting only part of an '$in' would produce
+            // a more restrictive filter than the original, therefore return nullptr immediately.
+            if (!inME->getRegexes().empty()) {
                 return nullptr;
             }
-            return std::make_unique<EqualityMatchExpression>("op", Value(opTypeMap.at(rhs.str())));
+
+            // An empty '$in' should not match with anything, return '$alwaysFalse'.
+            if (inME->getEqualities().empty()) {
+                return std::make_unique<AlwaysFalseMatchExpression>();
+            }
+
+            auto rewrittenOr = std::make_unique<OrMatchExpression>();
+
+            // Add the rewritten sub-expression to the '$or' expression. Abandon the entire rewrite,
+            // if any of the rewrite fails.
+            for (const auto& elem : inME->getEqualities()) {
+                if (auto rewrittenExpr = getRewrittenOpType(elem)) {
+                    rewrittenOr->add(std::move(rewrittenExpr));
+                    continue;
+                }
+                return nullptr;
+            }
+            return rewrittenOr;
         }
         default:
             break;

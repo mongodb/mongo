@@ -33,9 +33,6 @@
 
 namespace mongo {
 
-// $or helper: BSON(OR(BSON("x" << GT << 7), BSON("y" << LT << 6)));
-// becomes   : {$or: [{x: {$gt: 7}}, {y: {$lt: 6}}]}
-
 inline void addToArray(BSONArrayBuilder& builder) {}
 
 template <typename T, typename... Rest>
@@ -44,11 +41,36 @@ void addToArray(BSONArrayBuilder& builder, const T& a, Rest... rest) {
     addToArray(builder, rest...);
 }
 
+/** $or helper: BSON(OR(BSON("x" << GT << 7), BSON("y" << LT << 6)));
+ * becomes   : {$or: [{x: {$gt: 7}}, {y: {$lt: 6}}]}
+ */
 template <typename... Args>
 inline BSONFieldValue<BSONArray> OR(Args... args) {
     BSONArrayBuilder builder;
     addToArray(builder, args...);
     return {"$or", builder.arr()};
+}
+
+/**
+ * $and helper: BSON(AND(BSON("x" << GT << 7), BSON("y" << LT << 6)));
+ * becomes   : {$and: [{x: {$gt: 7}}, {y: {$lt: 6}}]}
+ */
+template <typename... Args>
+inline BSONFieldValue<BSONArray> AND(Args... args) {
+    BSONArrayBuilder builder;
+    addToArray(builder, args...);
+    return {"$and", builder.arr()};
+}
+
+/**
+ * $nor helper: BSON(NOR(BSON("x" << GT << 7), BSON("y" << LT << 6)));
+ * becomes   : {$nor: [{x: {$gt: 7}}, {y: {$lt: 6}}]}
+ */
+template <typename... Args>
+inline BSONFieldValue<BSONArray> NOR(Args... args) {
+    BSONArrayBuilder builder;
+    addToArray(builder, args...);
+    return {"$nor", builder.arr()};
 }
 
 }  // namespace mongo
