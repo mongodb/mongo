@@ -263,6 +263,10 @@ public:
 
     size_t getNumConnectionsPerHost(const HostAndPort& hostAndPort) const;
 
+    std::string getName() const {
+        return _name;
+    }
+
 private:
     std::string _name;
 
@@ -409,7 +413,7 @@ protected:
      * Sets up the connection. This should include connection + auth + any
      * other associated hooks.
      */
-    virtual void setup(Milliseconds timeout, SetupCallback cb) = 0;
+    virtual void setup(Milliseconds timeout, SetupCallback cb, std::string instanceName) = 0;
 
     /**
      * Resets the connection's state to kConnectionStateUnknown for the next user.

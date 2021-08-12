@@ -113,7 +113,7 @@ public:
     Date_t now() override;
 
 private:
-    void setup(Milliseconds timeout, SetupCallback cb) override;
+    void setup(Milliseconds timeout, SetupCallback cb, std::string) override;
 
     void refresh(Milliseconds timeout, RefreshCallback cb) override;
 

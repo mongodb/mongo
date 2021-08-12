@@ -179,7 +179,7 @@ public:
 private:
     void setTimeout(Milliseconds timeout, TimeoutCallback cb) override;
     void cancelTimeout() override;
-    void setup(Milliseconds timeout, SetupCallback cb) override;
+    void setup(Milliseconds timeout, SetupCallback cb, std::string instanceName) override;
     void refresh(Milliseconds timeout, RefreshCallback cb) override;
     void cancelAsync();
 

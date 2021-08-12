@@ -419,7 +419,7 @@ public:
     }
 
 private:
-    void setup(Milliseconds timeout, SetupCallback cb) final;
+    void setup(Milliseconds timeout, SetupCallback cb, std::string) final;
 
     void refresh(Milliseconds timeout, RefreshCallback cb) final;
 
@@ -433,7 +433,7 @@ private:
     CurlEasyHandle _handle;
 };
 
-void PooledCurlHandle::setup(Milliseconds timeout, SetupCallback cb) {
+void PooledCurlHandle::setup(Milliseconds timeout, SetupCallback cb, std::string) {
     auto anchor = shared_from_this();
     _executor->schedule([this, anchor, cb = std::move(cb)](auto execStatus) {
         if (!execStatus.isOK()) {

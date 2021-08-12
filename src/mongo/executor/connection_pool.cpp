@@ -1060,7 +1060,8 @@ void ConnectionPool::SpecificPool::spawnConnections() {
         handle->setup(_parent->_controller->pendingTimeout(),
                       guardCallback([this](auto conn, auto status) {
                           finishRefresh(std::move(conn), std::move(status));
-                      }));
+                      }),
+                      _parent->getName());
     }
 }
 

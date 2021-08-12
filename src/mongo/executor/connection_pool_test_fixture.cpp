@@ -181,7 +181,7 @@ void ConnectionImpl::cancelTimeout() {
     _timer.cancelTimeout();
 }
 
-void ConnectionImpl::setup(Milliseconds timeout, SetupCallback cb) {
+void ConnectionImpl::setup(Milliseconds timeout, SetupCallback cb, std::string) {
     _setupCallback = std::move(cb);
 
     _timer.setTimeout(timeout, [this] {

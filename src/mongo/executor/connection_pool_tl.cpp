@@ -292,7 +292,7 @@ private:
 
 }  // namespace
 
-void TLConnection::setup(Milliseconds timeout, SetupCallback cb) {
+void TLConnection::setup(Milliseconds timeout, SetupCallback cb, std::string instanceName) {
     auto anchor = shared_from_this();
 
     auto pf = makePromiseFuture<void>();
@@ -333,9 +333,10 @@ void TLConnection::setup(Milliseconds timeout, SetupCallback cb) {
         .onError([](StatusWith<AsyncDBClient::Handle> swc) -> StatusWith<AsyncDBClient::Handle> {
             return Status(ErrorCodes::HostUnreachable, swc.getStatus().reason());
         })
-        .then([this, isMasterHook](AsyncDBClient::Handle client) {
+        .then([this, isMasterHook, instanceName = std::move(instanceName)](
+                  AsyncDBClient::Handle client) {
             _client = std::move(client);
-            return _client->initWireVersion("NetworkInterfaceTL", isMasterHook.get());
+            return _client->initWireVersion(instanceName, isMasterHook.get());
         })
         .then([this, isMasterHook]() -> Future<bool> {
             if (_skipAuth) {
