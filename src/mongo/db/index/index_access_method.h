@@ -632,7 +632,9 @@ private:
                                const KeyString::Value& dataKey,
                                const RecordIdHandlerFn& onDuplicateRecord);
 
-    void _yieldBulkLoad(OperationContext* opCtx, const Yieldable* yieldable) const;
+    void _yieldBulkLoad(OperationContext* opCtx,
+                        const Yieldable* yieldable,
+                        const NamespaceString& ns) const;
 
     const std::unique_ptr<SortedDataInterface> _newInterface;
 };

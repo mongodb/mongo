@@ -706,7 +706,8 @@ AbstractIndexAccessMethod::BulkBuilderImpl::_makeSorter(
 }
 
 void AbstractIndexAccessMethod::_yieldBulkLoad(OperationContext* opCtx,
-                                               const Yieldable* yieldable) const {
+                                               const Yieldable* yieldable,
+                                               const NamespaceString& ns) const {
     // Releasing locks means a new snapshot should be acquired when restored.
     opCtx->recoveryUnit()->abandonSnapshot();
     yieldable->yield();
@@ -718,15 +719,14 @@ void AbstractIndexAccessMethod::_yieldBulkLoad(OperationContext* opCtx,
         // Track the number of yields in CurOp.
         CurOp::get(opCtx)->yielded();
 
-        auto failPointHang = [opCtx, indexCatalogEntry = _indexCatalogEntry](FailPoint* fp) {
+        auto failPointHang = [opCtx, &ns](FailPoint* fp) {
             fp->executeIf(
                 [fp](auto&&) {
                     LOGV2(5180600, "Hanging index build during bulk load yield");
                     fp->pauseWhileSet();
                 },
-                [opCtx, indexCatalogEntry](auto&& config) {
-                    return config.getStringField("namespace") ==
-                        indexCatalogEntry->getNSSFromCatalog(opCtx).ns();
+                [opCtx, &ns](auto&& config) {
+                    return config.getStringField("namespace") == ns.ns();
                 });
         };
         failPointHang(&hangDuringIndexBuildBulkLoadYield);
@@ -844,7 +844,7 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
 
         // Starts yielding locks after the first non-zero 'yieldIterations' inserts.
         if (yieldIterations && (i + 1) % yieldIterations == 0) {
-            _yieldBulkLoad(opCtx, &collection);
+            _yieldBulkLoad(opCtx, &collection, ns);
         }
 
         // If we're here either it's a dup and we're cool with it or the addKey went just fine.
