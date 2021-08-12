@@ -57,7 +57,7 @@ wtperf_config()
 glossarychk()
 {
 	(cd ../src/docs && grep '^<tr><td>' arch-glossary.dox | cut -d'>' -f3 | sed -e 's/<.*//') > $t
-	sort --ignore-case $t > $t2
+	sort -f $t > $t2
 	if ! diff $t $t2; then
 		echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
 		echo "arch-glossary.dox entries out of order"
