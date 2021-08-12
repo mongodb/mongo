@@ -142,5 +142,49 @@ TEST(BatchedCommandResponse, TooManyBigErrors) {
     }
 }
 
+TEST(BatchedCommandResponse, NoDuplicateErrInfo) {
+    auto verifySingleErrInfo = [](const BSONObj& obj) {
+        size_t errInfo = 0;
+        for (auto elem : obj) {
+            if (elem.fieldNameStringData() == WriteErrorDetail::errInfo()) {
+                ++errInfo;
+            }
+        }
+        ASSERT_EQ(errInfo, 1) << "serialized obj with duplicate errInfo " << obj.toString();
+    };
+
+    // Construct a WriteErrorDetail.
+    Status s(ErrorCodes::DocumentValidationFailure,
+             "Document failed validation",
+             BSON("errInfo" << BSON("detailed"
+                                    << "error message")));
+    BSONObjBuilder b;
+    s.serialize(&b);
+    WriteErrorDetail wed;
+    wed.setIndex(0);
+
+    // Verify it produces a single errInfo.
+    wed.parseBSON(b.obj(), nullptr);
+    BSONObj bsonWed = wed.toBSON();
+    verifySingleErrInfo(bsonWed);
+
+    BSONObjBuilder bcrBuilder;
+    bcrBuilder.append("ok", 1);
+    bcrBuilder.append("writeErrors", BSON_ARRAY(bsonWed));
+
+    // Construct a 'BatchedCommandResponse' using the above 'bsonWed'.
+    BatchedCommandResponse bcr;
+    bcr.parseBSON(bcrBuilder.obj(), nullptr);
+    BSONObj bsonBcr = bcr.toBSON();
+    auto writeErrors = bsonBcr[BatchedCommandResponse::writeErrors()];
+    ASSERT(!writeErrors.eoo());
+    ASSERT_EQ(writeErrors.type(), BSONType::Array);
+
+    // Verify that the entry in the 'writeErrors' array produces one 'errInfo' field.
+    for (auto&& elem : writeErrors.Array()) {
+        ASSERT_EQ(elem.type(), BSONType::Object);
+        verifySingleErrInfo(elem.embeddedObject());
+    }
+}
 }  // namespace
 }  // namespace mongo

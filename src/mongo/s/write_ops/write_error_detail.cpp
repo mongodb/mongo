@@ -82,7 +82,8 @@ BSONObj WriteErrorDetail::toBSON() const {
     if (auto extra = _status.extraInfo())
         extra->serialize(&builder);
 
-    if (_isErrInfoSet)
+    // Only set 'errInfo' if it hasn't been added by serializing 'extra'.
+    if (_isErrInfoSet && !builder.hasField(errInfo()))
         builder.append(errInfo(), _errInfo);
 
     return builder.obj();
