@@ -114,7 +114,7 @@ public:
                    BSONObjBuilder& output) override {
         int scale = 1;
         if (cmdObj["scale"].isNumber()) {
-            scale = cmdObj["scale"].numberInt();
+            scale = cmdObj["scale"].safeNumberInt();
             if (scale <= 0) {
                 errmsg = "scale has to be > 0";
                 return false;
