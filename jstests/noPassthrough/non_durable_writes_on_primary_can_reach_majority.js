@@ -122,12 +122,18 @@ try {
     checkTimestamps("eq", primaryPostFsyncMajorityTs, primaryPostWritesMajorityTs);
 
     // Check that the secondary's durable timestamp has moved forward, but the majority has not.
-    const secondaryStatus = assert.commandWorked(runningSecondary.adminCommand("replSetGetStatus"));
-    const secondaryDurableTs = secondaryStatus.optimes.durableOpTime.ts;
-    const secondaryMajorityTs = secondaryStatus.optimes.readConcernMajorityOpTime.ts;
-    jsTestLog("Secondary's optimes (when 2 nodes): " + tojson(secondaryStatus.optimes));
-    checkTimestamps("gt", secondaryDurableTs, primaryPostFsyncMajorityTs);
-    checkTimestamps("eq", secondaryMajorityTs, primaryPostFsyncMajorityTs);
+    // Durable timestamp is advanced by the journal flusher, not the fsync command. Keep retrying
+    // until the secondary's durable timestamp has advanced past the majority timestamp.
+    assert.soonNoExcept(() => {
+        const secondaryStatus =
+            assert.commandWorked(runningSecondary.adminCommand("replSetGetStatus"));
+        const secondaryDurableTs = secondaryStatus.optimes.durableOpTime.ts;
+        const secondaryMajorityTs = secondaryStatus.optimes.readConcernMajorityOpTime.ts;
+        jsTestLog("Secondary's optimes (when 2 nodes): " + tojson(secondaryStatus.optimes));
+        checkTimestamps("gt", secondaryDurableTs, primaryPostFsyncMajorityTs);
+        checkTimestamps("eq", secondaryMajorityTs, primaryPostFsyncMajorityTs);
+        return true;
+    }, "Secondary durable timestamp has not advanced past majority", 30000, 1000);
 } finally {
     // Turn off the failpoint before allowing the test to end, so nothing hangs while the server
     // shuts down or in post-test hooks.
