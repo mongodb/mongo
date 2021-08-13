@@ -37,6 +37,7 @@ server_parameters:
     cpp_vartype: bool
     cpp_varname: "enableIndexBuildCommitQuorum"
     default: true
+    test_only: true
 
   maxNumActiveUserIndexBuilds:
     description: >
