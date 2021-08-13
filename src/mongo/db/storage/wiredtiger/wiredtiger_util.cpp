@@ -426,8 +426,11 @@ StatusWith<int64_t> WiredTigerUtil::getStatisticsValue(WT_SESSION* session,
     const char* cursorConfig = config.empty() ? nullptr : config.c_str();
     int ret = session->open_cursor(session, uri.c_str(), nullptr, cursorConfig, &cursor);
     if (ret != 0) {
+        // The numerical 'statisticsKey' can be located in the WT_STATS_* preprocessor macros in
+        // wiredtiger.h.
         return StatusWith<int64_t>(ErrorCodes::CursorNotFound,
                                    str::stream() << "unable to open cursor at URI " << uri
+                                                 << " for statistic: " << statisticsKey
                                                  << ". reason: " << wiredtiger_strerror(ret));
     }
     invariant(cursor);
