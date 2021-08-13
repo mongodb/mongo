@@ -72,10 +72,12 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/projection_ast',
         '$BUILD_DIR/mongo/db/query/sort_pattern',
         '$BUILD_DIR/mongo/db/record_id_helpers',
-        '$BUILD_DIR/mongo/db/timeseries/timeseries_dotted_path_support',
         '$BUILD_DIR/third_party/s2/s2',
         'expression_params',
         'index_descriptor',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/timeseries/timeseries_dotted_path_support',
     ],
 )
 
