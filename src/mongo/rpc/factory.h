@@ -52,16 +52,6 @@ class ReplyInterface;
 std::unique_ptr<ReplyInterface> makeReply(const Message* unownedMessage);
 
 /**
- * Serializes an OpMsgRequest for a server that speaks the requested protocol.
- */
-Message messageFromOpMsgRequest(Protocol proto, const OpMsgRequest&);
-inline Message messageFromOpMsgRequest(ProtocolSet clientProtos,
-                                       ProtocolSet serverProtos,
-                                       const OpMsgRequest& request) {
-    return messageFromOpMsgRequest(uassertStatusOK(negotiate(clientProtos, serverProtos)), request);
-}
-
-/**
  * Parses the message (from any protocol) into an OpMsgRequest.
  */
 OpMsgRequest opMsgRequestFromAnyProtocol(const Message& unownedMessage);

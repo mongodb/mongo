@@ -58,8 +58,6 @@ typedef std::shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorPtr;
 class DBClientReplicaSet : public DBClientBase {
 public:
     using DBClientBase::query;
-    using DBClientBase::remove;
-    using DBClientBase::update;
 
     /** Call connect() after constructing. autoReconnect is always on for DBClientReplicaSet
      * connections. */
@@ -94,7 +92,7 @@ public:
     std::unique_ptr<DBClientCursor> query(
         const NamespaceStringOrUUID& nsOrUuid,
         Query query,
-        int nToReturn = 0,
+        int limit = 0,
         int nToSkip = 0,
         const BSONObj* fieldsToReturn = nullptr,
         int queryOptions = 0,
@@ -110,25 +108,19 @@ public:
 
     void insert(const std::string& ns,
                 BSONObj obj,
-                int flags = 0,
+                bool ordered = true,
                 boost::optional<BSONObj> writeConcernObj = boost::none) override;
 
     /** insert multiple objects.  Note that single object insert is asynchronous, so this version
         is only nominally faster and not worth a special effort to try to use.  */
     void insert(const std::string& ns,
                 const std::vector<BSONObj>& v,
-                int flags = 0,
+                bool ordered = true,
                 boost::optional<BSONObj> writeConcernObj = boost::none) override;
 
     void remove(const std::string& ns,
                 Query obj,
-                int flags,
-                boost::optional<BSONObj> writeConcernObj = boost::none) override;
-
-    void update(const std::string& ns,
-                Query query,
-                BSONObj obj,
-                int flags,
+                bool removeMany = true,
                 boost::optional<BSONObj> writeConcernObj = boost::none) override;
 
     void killCursor(const NamespaceString& ns, long long cursorID) override;
@@ -156,10 +148,6 @@ public:
 
     void say(Message& toSend, bool isRetry = false, std::string* actualServer = nullptr) override;
     Status recv(Message& toRecv, int lastRequestId) override;
-    void checkResponse(const std::vector<BSONObj>& batch,
-                       bool networkError,
-                       bool* retry = nullptr,
-                       std::string* targetHost = nullptr) override;
 
     /* this is the callback from our underlying connections to notify us that we got a "not primary"
      * error.
@@ -204,9 +192,6 @@ public:
 
     ConnectionString::ConnectionType type() const override {
         return ConnectionString::ConnectionType::kReplicaSet;
-    }
-    bool lazySupported() const override {
-        return true;
     }
 
     using DBClientBase::runCommandWithTarget;
@@ -365,17 +350,6 @@ private:
     MongoURI _uri;
 
 protected:
-    /**
-     * for storing (non-threadsafe) information between lazy calls
-     */
-    class LazyState {
-    public:
-        LazyState() : _lastClient(nullptr), _lastOp(-1), _secondaryQueryOk(false), _retries(0) {}
-        DBClientConnection* _lastClient;
-        int _lastOp;
-        bool _secondaryQueryOk;
-        int _retries;
-
-    } _lazyState;
+    DBClientConnection* _lastClient = nullptr;
 };
 }  // namespace mongo

@@ -54,7 +54,7 @@ public:
 
     using DBClientBase::query;
 
-    virtual std::unique_ptr<DBClientCursor> query(
+    std::unique_ptr<DBClientCursor> query(
         const NamespaceStringOrUUID& nsOrUuid,
         Query query,
         int limit = 0,
@@ -62,40 +62,38 @@ public:
         const BSONObj* fieldsToReturn = nullptr,
         int queryOptions = 0,
         int batchSize = 0,
-        boost::optional<BSONObj> readConcernObj = boost::none);
+        boost::optional<BSONObj> readConcernObj = boost::none) override;
 
     write_ops::FindAndModifyCommandReply findAndModify(
         const write_ops::FindAndModifyCommandRequest& findAndModify);
 
-    virtual bool isFailed() const;
+    bool isFailed() const override;
 
-    virtual bool isStillConnected();
+    bool isStillConnected() override;
 
-    virtual std::string toString() const;
+    std::string toString() const override;
 
-    virtual std::string getServerAddress() const;
+    std::string getServerAddress() const override;
 
-    virtual bool call(Message& toSend,
-                      Message& response,
-                      bool assertOk = true,
-                      std::string* actualServer = nullptr);
+    bool call(Message& toSend,
+              Message& response,
+              bool assertOk = true,
+              std::string* actualServer = nullptr) override;
 
-    virtual void say(Message& toSend, bool isRetry = false, std::string* actualServer = nullptr);
+    void say(Message& toSend, bool isRetry = false, std::string* actualServer = nullptr) override;
 
-    virtual long long count(NamespaceStringOrUUID nsOrUuid,
-                            const BSONObj& query = BSONObj(),
-                            int options = 0,
-                            int limit = 0,
-                            int skip = 0,
-                            boost::optional<BSONObj> readConcernObj = boost::none);
+    long long count(NamespaceStringOrUUID nsOrUuid,
+                    const BSONObj& query = BSONObj(),
+                    int options = 0,
+                    int limit = 0,
+                    int skip = 0,
+                    boost::optional<BSONObj> readConcernObj = boost::none) override;
 
-    virtual ConnectionString::ConnectionType type() const;
+    ConnectionString::ConnectionType type() const override;
 
-    double getSoTimeout() const;
+    double getSoTimeout() const override;
 
-    virtual bool lazySupported() const;
-
-    virtual QueryOptions _lookupAvailableOptions();
+    QueryOptions _lookupAvailableOptions() override;
 
     int getMinWireVersion() final;
     int getMaxWireVersion() final;

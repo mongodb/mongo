@@ -89,7 +89,7 @@ public:
     }
 
     void update(BSONObj& query, BSONObj& updateSpec) {
-        _client.update(nss.ns(), query, updateSpec, false, false);
+        _client.update(nss.ns(), query, updateSpec);
     }
 
     /**

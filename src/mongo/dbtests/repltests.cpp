@@ -857,7 +857,7 @@ protected:
 
 class RemoveOne : public Remove {
     void doIt() const {
-        _client.remove(ns(), q_, true);
+        _client.remove(ns(), q_, false /*removeMany*/);
     }
     void check() const {
         ASSERT_EQUALS(1, count());

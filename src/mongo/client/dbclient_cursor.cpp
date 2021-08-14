@@ -81,8 +81,10 @@ Message assembleCommandRequest(DBClientBase* cli,
         request.body = bodyBob.obj();
     }
 
-    return rpc::messageFromOpMsgRequest(
-        cli->getClientRPCProtocols(), cli->getServerRPCProtocols(), std::move(request));
+    rpc::Protocol protocol =
+        uassertStatusOK(rpc::negotiate(cli->getClientRPCProtocols(), cli->getServerRPCProtocols()));
+    invariant(protocol == rpc::Protocol::kOpMsg);
+    return request.serialize();
 }
 
 }  // namespace
@@ -186,42 +188,6 @@ bool DBClientCursor::init() {
     }
     dataReceived(reply);
     return true;
-}
-
-void DBClientCursor::initLazy(bool isRetry) {
-    massert(15875,
-            "DBClientCursor::initLazy called on a client that doesn't support lazy",
-            _client->lazySupported());
-    Message toSend = _assembleInit();
-    _client->say(toSend, isRetry, &_originalHost);
-    _lastRequestId = toSend.header().getId();
-    _connectionHasPendingReplies = true;
-}
-
-bool DBClientCursor::initLazyFinish(bool& retry) {
-    invariant(_connectionHasPendingReplies);
-    Message reply;
-    Status recvStatus = _client->recv(reply, _lastRequestId);
-    _connectionHasPendingReplies = false;
-
-    // If we get a bad response, return false
-    if (!recvStatus.isOK() || reply.empty()) {
-        if (!recvStatus.isOK())
-            LOGV2(20129,
-                  "DBClientCursor::init lazy say() failed: {error}",
-                  "DBClientCursor::init lazy say() failed",
-                  "error"_attr = redact(recvStatus));
-        if (reply.empty())
-            LOGV2(20130, "DBClientCursor::init message from say() was empty");
-
-        _client->checkResponse({}, true, &retry, &_lazyHost);
-
-        return false;
-    }
-
-    dataReceived(reply, retry, _lazyHost);
-
-    return !retry;
 }
 
 void DBClientCursor::requestMore() {
@@ -395,21 +361,16 @@ void DBClientCursor::attach(AScopedConnection* conn) {
     verify(conn->get());
 
     if (conn->get()->type() == ConnectionString::ConnectionType::kReplicaSet) {
-        if (_lazyHost.size() > 0)
-            _scopedHost = _lazyHost;
-        else if (_client)
+        if (_client)
             _scopedHost = _client->getServerAddress();
         else
-            massert(14821,
-                    "No client or lazy client specified, cannot store multi-host connection.",
-                    false);
+            massert(14821, "No client specified, cannot store multi-host connection.", false);
     } else {
         _scopedHost = conn->getHost();
     }
 
     conn->done();
     _client = nullptr;
-    _lazyHost = "";
 }
 
 DBClientCursor::DBClientCursor(DBClientBase* client,
@@ -477,7 +438,6 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
       fieldsToReturn(fieldsToReturn),
       opts(queryOptions),
       batchSize(batchSize == 1 ? 2 : batchSize),
-      resultFlags(0),
       cursorId(cursorId),
       _ownCursor(true),
       wasError(false),

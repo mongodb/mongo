@@ -241,10 +241,7 @@ public:
 
     void say(Message& toSend, bool isRetry = false, std::string* actualServer = nullptr) override;
     Status recv(Message& m, int lastRequestId) override;
-    void checkResponse(const std::vector<BSONObj>& batch,
-                       bool networkError,
-                       bool* retry = nullptr,
-                       std::string* host = nullptr) override;
+
     bool call(Message& toSend,
               Message& response,
               bool assertOk,
@@ -259,10 +256,6 @@ public:
 
     void setHandshakeValidationHook(const HandshakeValidationHook& hook) {
         _hook = hook;
-    }
-
-    bool lazySupported() const override {
-        return true;
     }
 
     static int getNumConnections() {

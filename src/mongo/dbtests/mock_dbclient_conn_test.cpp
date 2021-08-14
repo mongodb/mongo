@@ -258,7 +258,7 @@ TEST(MockDBClientConnTest, SimpleRemove) {
 
     {
         MockDBClientConnection conn(&server);
-        conn.remove(ns, Query(), false);
+        conn.remove(ns, Query());
     }
 
     {
@@ -303,7 +303,7 @@ TEST(MockDBClientConnTest, MultiNSRemove) {
 
     {
         MockDBClientConnection conn(&server);
-        conn.remove(ns2, Query(), false);
+        conn.remove(ns2, Query());
 
         std::unique_ptr<mongo::DBClientCursor> cursor = conn.query(NamespaceString(ns2));
         ASSERT(!cursor->more());
@@ -351,7 +351,7 @@ TEST(MockDBClientConnTest, InsertAfterRemove) {
 
     {
         MockDBClientConnection conn(&server);
-        conn.remove(ns, Query(), false);
+        conn.remove(ns, Query());
     }
 
     {
@@ -617,7 +617,7 @@ TEST(MockDBClientConnTest, SimulateCallAndRecvResponses) {
 
     mongo::DBClientCursor cursor(&conn,
                                  mongo::NamespaceStringOrUUID(nss),
-                                 Query().obj,
+                                 BSONObj{},
                                  0,
                                  0,
                                  nullptr,
@@ -688,7 +688,7 @@ TEST(MockDBClientConnTest, SimulateCallErrors) {
     MockDBClientConnection conn(&server);
 
     mongo::DBClientCursor cursor(
-        &conn, mongo::NamespaceStringOrUUID(nss), Query().obj, 0, 0, nullptr, 0, 0);
+        &conn, mongo::NamespaceStringOrUUID(nss), BSONObj{}, 0, 0, nullptr, 0, 0);
 
     // Test network exception and error response for the initial find.
     MockDBClientConnection::Responses callResponses = {
@@ -737,7 +737,7 @@ TEST(MockDBClientConnTest, SimulateRecvErrors) {
 
     mongo::DBClientCursor cursor(&conn,
                                  mongo::NamespaceStringOrUUID(nss),
-                                 Query().obj,
+                                 BSONObj{},
                                  0,
                                  0,
                                  nullptr,
@@ -785,7 +785,7 @@ TEST(MockDBClientConnTest, BlockingNetwork) {
 
     mongo::DBClientCursor cursor(&conn,
                                  mongo::NamespaceStringOrUUID(nss),
-                                 Query().obj,
+                                 BSONObj{},
                                  0,
                                  0,
                                  nullptr,
@@ -846,7 +846,7 @@ TEST(MockDBClientConnTest, ShutdownServerBeforeCall) {
         conn.connect(mongo::HostAndPort("localhost", 12345), mongo::StringData(), boost::none));
     mongo::DBClientCursor cursor(&conn,
                                  mongo::NamespaceStringOrUUID(nss),
-                                 Query().obj,
+                                 BSONObj{},
                                  0,
                                  0,
                                  nullptr,
@@ -871,7 +871,7 @@ TEST(MockDBClientConnTest, ShutdownServerAfterCall) {
 
     mongo::DBClientCursor cursor(&conn,
                                  mongo::NamespaceStringOrUUID(nss),
-                                 Query().obj,
+                                 BSONObj{},
                                  0,
                                  0,
                                  nullptr,
@@ -902,7 +902,7 @@ TEST(MockDBClientConnTest, ConnectionAutoReconnect) {
         conn.connect(mongo::HostAndPort("localhost", 12345), mongo::StringData(), boost::none));
     mongo::DBClientCursor cursor(&conn,
                                  mongo::NamespaceStringOrUUID(nss),
-                                 Query().obj,
+                                 BSONObj{},
                                  0,
                                  0,
                                  nullptr,
@@ -934,7 +934,7 @@ TEST(MockDBClientConnTest, ShutdownServerBeforeRecv) {
 
     mongo::DBClientCursor cursor(&conn,
                                  mongo::NamespaceStringOrUUID(nss),
-                                 Query().obj,
+                                 BSONObj{},
                                  0,
                                  0,
                                  nullptr,
@@ -959,7 +959,7 @@ TEST(MockDBClientConnTest, ShutdownServerAfterRecv) {
 
     mongo::DBClientCursor cursor(&conn,
                                  mongo::NamespaceStringOrUUID(nss),
-                                 Query().obj,
+                                 BSONObj{},
                                  0,
                                  0,
                                  nullptr,

@@ -57,7 +57,6 @@ env.Library(
         'legacy_reply.cpp',
         'legacy_reply_builder.cpp',
         'legacy_request.cpp',
-        'legacy_request_builder.cpp',
         'object_check.cpp',
         'object_check.idl',
         'reply_builder_interface.cpp',
@@ -176,7 +175,6 @@ if wiredtiger:
         target='rpc_test',
         source=[
             'get_status_from_command_result_test.cpp',
-            'legacy_request_test.cpp',
             'metadata/client_metadata_test.cpp',
             'metadata/egress_metadata_hook_list_test.cpp',
             'metadata/oplog_query_metadata_test.cpp',

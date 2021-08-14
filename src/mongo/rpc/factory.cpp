@@ -36,7 +36,6 @@
 #include "mongo/rpc/legacy_reply.h"
 #include "mongo/rpc/legacy_reply_builder.h"
 #include "mongo/rpc/legacy_request.h"
-#include "mongo/rpc/legacy_request_builder.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/rpc/protocol.h"
@@ -45,16 +44,6 @@
 
 namespace mongo {
 namespace rpc {
-
-Message messageFromOpMsgRequest(Protocol proto, const OpMsgRequest& request) {
-    switch (proto) {
-        case Protocol::kOpMsg:
-            return request.serialize();
-        case Protocol::kOpQuery:
-            return legacyRequestFromOpMsgRequest(request);
-    }
-    MONGO_UNREACHABLE;
-}
 
 std::unique_ptr<ReplyInterface> makeReply(const Message* unownedMessage) {
     switch (unownedMessage->operation()) {

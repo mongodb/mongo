@@ -115,7 +115,6 @@ private:
     transport::SessionHandle _session;
     ServiceContext* const _svcCtx;
     MessageCompressorManager _compressorManager;
-    boost::optional<rpc::Protocol> _negotiatedProtocol;
 };
 
 }  // namespace mongo

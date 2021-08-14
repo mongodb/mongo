@@ -80,6 +80,8 @@ constexpr std::array<StringData, 11> kEncryptedCommands = {"aggregate"_sd,
 
 class EncryptedDBClientBase : public DBClientBase, public mozjs::EncryptionCallbacks {
 public:
+    using DBClientBase::query;
+
     EncryptedDBClientBase(std::unique_ptr<DBClientBase> conn,
                           ClientSideFLEOptions encryptionOptions,
                           JS::HandleValue collection,
@@ -91,8 +93,6 @@ public:
     bool call(Message& toSend, Message& response, bool assertOk, std::string* actualServer) final;
 
     void say(Message& toSend, bool isRetry, std::string* actualServer) final;
-
-    bool lazySupported() const final;
 
     using DBClientBase::runCommandWithTarget;
     virtual std::pair<rpc::UniqueReply, DBClientBase*> runCommandWithTarget(
@@ -118,11 +118,10 @@ public:
     using EncryptionCallbacks::trace;
     void trace(JSTracer* trc) final;
 
-    using DBClientBase::query;
     std::unique_ptr<DBClientCursor> query(
         const NamespaceStringOrUUID& nsOrUuid,
         Query query,
-        int nToReturn,
+        int limit,
         int nToSkip,
         const BSONObj* fieldsToReturn,
         int queryOptions,

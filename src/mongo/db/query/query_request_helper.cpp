@@ -191,7 +191,6 @@ Status initFindCommandRequest(int ntoskip,
                               int queryOptions,
                               const BSONObj& queryObj,
                               const BSONObj& proj,
-                              bool fromQueryMessage,
                               FindCommandRequest* findCommand) {
     if (!proj.isEmpty()) {
         findCommand->setProjection(proj.getOwned());
@@ -203,28 +202,23 @@ Status initFindCommandRequest(int ntoskip,
     // Initialize flags passed as 'queryOptions' bit vector.
     initFromInt(queryOptions, findCommand);
 
-    if (fromQueryMessage) {
-        BSONElement queryField = queryObj["query"];
-        if (!queryField.isABSONObj()) {
-            queryField = queryObj["$query"];
+    BSONElement queryField = queryObj["query"];
+    if (!queryField.isABSONObj()) {
+        queryField = queryObj["$query"];
+    }
+    if (queryField.isABSONObj()) {
+        findCommand->setFilter(queryField.embeddedObject().getOwned());
+        Status status = initFullQuery(queryObj, findCommand);
+        if (!status.isOK()) {
+            return status;
         }
-        if (queryField.isABSONObj()) {
-            findCommand->setFilter(queryField.embeddedObject().getOwned());
-            Status status = initFullQuery(queryObj, findCommand);
-            if (!status.isOK()) {
-                return status;
-            }
-        } else {
-            findCommand->setFilter(queryObj.getOwned());
-        }
-        // It's not possible to specify readConcern in a legacy query message, so initialize it to
-        // an empty readConcern object, ie. equivalent to `readConcern: {}`.  This ensures that
-        // mongos passes this empty readConcern to shards.
-        findCommand->setReadConcern(BSONObj());
     } else {
-        // This is the debugging code path.
         findCommand->setFilter(queryObj.getOwned());
     }
+    // It's not possible to specify readConcern in a legacy query message, so initialize it to
+    // an empty readConcern object, ie. equivalent to `readConcern: {}`.  This ensures that
+    // mongos passes this empty readConcern to shards.
+    findCommand->setReadConcern(BSONObj());
 
     return validateFindCommandRequest(*findCommand);
 }
@@ -408,7 +402,7 @@ StatusWith<std::unique_ptr<FindCommandRequest>> fromLegacyQuery(NamespaceStringO
     auto findCommand = std::make_unique<FindCommandRequest>(std::move(nssOrUuid));
 
     Status status =
-        initFindCommandRequest(ntoskip, queryOptions, queryObj, proj, true, findCommand.get());
+        initFindCommandRequest(ntoskip, queryOptions, queryObj, proj, findCommand.get());
     if (!status.isOK()) {
         return status;
     }

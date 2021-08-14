@@ -58,7 +58,7 @@ public:
         auto conn = makeConn(kAppName + "-cleanup");
 
         BSONObj currOp;
-        if (!conn->simpleCommand("admin", &currOp, "currentOp"))
+        if (!conn->runCommand("admin", BSON("currentOp" << 1), currOp))
             uassertStatusOK(getStatusFromCommandResult(currOp));
 
         for (auto&& op : currOp["inprog"].Obj()) {

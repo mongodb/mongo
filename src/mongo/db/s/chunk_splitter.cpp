@@ -173,7 +173,7 @@ BSONObj findExtremeKeyForShard(OperationContext* opCtx,
         // make the lower half of the split end up with a single document.
         std::unique_ptr<DBClientCursor> cursor = client.query(nss,
                                                               q,
-                                                              1, /* nToReturn */
+                                                              1, /* limit */
                                                               1 /* nToSkip */);
 
         uassert(40618,

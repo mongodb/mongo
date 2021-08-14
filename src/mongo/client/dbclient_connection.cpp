@@ -47,7 +47,6 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/authenticate.h"
-#include "mongo/client/constants.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/sasl_client_authenticate.h"
@@ -785,22 +784,6 @@ bool DBClientConnection::call(Message& toSend,
 
     killSessionOnError.dismiss();
     return true;
-}
-
-void DBClientConnection::checkResponse(const std::vector<BSONObj>& batch,
-                                       bool networkError,
-                                       bool* retry,
-                                       string* host) {
-    /* check for errors.  the only one we really care about at
-     * this stage is "not master"
-     */
-
-    *retry = false;
-    *host = _serverAddress.toString();
-
-    if (!_parentReplSetName.empty() && !batch.empty()) {
-        handleNotPrimaryResponse(batch[0], "$err");
-    }
 }
 
 void DBClientConnection::setParentReplSetName(const string& replSetName) {

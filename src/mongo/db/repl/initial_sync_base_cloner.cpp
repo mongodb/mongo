@@ -155,7 +155,7 @@ Status InitialSyncBaseCloner::checkInitialSyncIdIsUnchanged() {
 Status InitialSyncBaseCloner::checkRollBackIdIsUnchanged() {
     BSONObj info;
     try {
-        getClient()->simpleCommand("admin", &info, "replSetGetRBID");
+        getClient()->runCommand("admin", BSON("replSetGetRBID" << 1), info);
     } catch (DBException& e) {
         if (ErrorCodes::isRetriableError(e)) {
             static constexpr char errorMsg[] =

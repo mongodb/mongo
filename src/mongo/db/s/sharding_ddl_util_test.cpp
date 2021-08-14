@@ -80,6 +80,28 @@ protected:
 
 const NamespaceString kToNss("test.to");
 
+// Query 'limit' objects from the database into an array.
+void findN(DBClientBase& client,
+           const std::string& ns,
+           Query query,
+           int limit,
+           std::vector<BSONObj>& out) {
+    out.reserve(limit);
+    std::unique_ptr<DBClientCursor> c = client.query(NamespaceString(ns),
+                                                     std::move(query),
+                                                     limit,
+                                                     0 /*nToSkip*/,
+                                                     nullptr /*fieldsToReturn*/,
+                                                     0 /*queryOptions*/,
+                                                     0 /* batchSize */,
+                                                     boost::none);
+    ASSERT(c.get());
+
+    while (c->more()) {
+        out.push_back(c->nextSafe());
+    }
+}
+
 // Test that config.collection document and config.chunks documents are properly updated from source
 // to destination collection metadata
 TEST_F(ShardingDDLUtilTest, ShardedRenameMetadata) {
@@ -137,7 +159,7 @@ TEST_F(ShardingDDLUtilTest, ShardedRenameMetadata) {
     auto fromChunksQuery =
         Query(BSON(ChunkType::collectionUUID << collUUID)).sort(BSON("_id" << 1));
     std::vector<BSONObj> fromChunks;
-    client.findN(fromChunks, ChunkType::ConfigNS.ns(), fromChunksQuery, nChunks);
+    findN(client, ChunkType::ConfigNS.ns(), fromChunksQuery, nChunks, fromChunks);
 
     auto fromCollType = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, fromNss);
     // Perform the metadata rename
@@ -153,7 +175,7 @@ TEST_F(ShardingDDLUtilTest, ShardedRenameMetadata) {
         Query(BSON(ChunkType::collectionUUID << collUUID)).sort(BSON("_id" << 1));
     CollectionType toCollection(toDoc);
     std::vector<BSONObj> toChunks;
-    client.findN(toChunks, ChunkType::ConfigNS.ns(), toChunksQuery, nChunks);
+    findN(client, ChunkType::ConfigNS.ns(), toChunksQuery, nChunks, toChunks);
 
     // Check that original epoch/timestamp are changed in config.collections entry
     ASSERT(fromCollection.getEpoch() != toCollection.getEpoch());

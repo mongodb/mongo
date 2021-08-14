@@ -574,7 +574,7 @@ void ConnectionRegistry::killOperationsOnAllConnections(bool withPrompt) const {
         const std::set<std::string>& uris = connection.second;
 
         BSONObj currentOpRes;
-        conn->runPseudoCommand("admin", "currentOp", "$cmd.sys.inprog", {}, currentOpRes);
+        conn->runCommand("admin", BSON("currentOp" << 1), currentOpRes);
         if (!currentOpRes["inprog"].isABSONObj()) {
             // We don't have permissions (or the call didn't succeed) - go to the next connection.
             continue;
@@ -609,11 +609,8 @@ void ConnectionRegistry::killOperationsOnAllConnections(bool withPrompt) const {
             }
             if (uris.count(client)) {
                 if (!withPrompt || prompter.confirm()) {
-                    BSONObjBuilder cmdBob;
                     BSONObj info;
-                    cmdBob.appendAs(op["opid"], "op");
-                    auto cmdArgs = cmdBob.done();
-                    conn->runPseudoCommand("admin", "killOp", "$cmd.sys.killop", cmdArgs, info);
+                    conn->runCommand("admin", BSON("killOp" << 1 << "op" << op["opid"]), info);
                 } else {
                     return;
                 }

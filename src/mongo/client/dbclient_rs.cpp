@@ -532,36 +532,28 @@ void DBClientReplicaSet::logout(const string& dbname, BSONObj& info) {
 
 void DBClientReplicaSet::insert(const string& ns,
                                 BSONObj obj,
-                                int flags,
+                                bool ordered,
                                 boost::optional<BSONObj> writeConcernObj) {
-    checkPrimary()->insert(ns, obj, flags, writeConcernObj);
+    checkPrimary()->insert(ns, obj, ordered, writeConcernObj);
 }
 
 void DBClientReplicaSet::insert(const string& ns,
                                 const vector<BSONObj>& v,
-                                int flags,
+                                bool ordered,
                                 boost::optional<BSONObj> writeConcernObj) {
-    checkPrimary()->insert(ns, v, flags, writeConcernObj);
+    checkPrimary()->insert(ns, v, ordered, writeConcernObj);
 }
 
 void DBClientReplicaSet::remove(const string& ns,
                                 Query obj,
-                                int flags,
+                                bool removeMany,
                                 boost::optional<BSONObj> writeConcernObj) {
-    checkPrimary()->remove(ns, obj, flags, writeConcernObj);
-}
-
-void DBClientReplicaSet::update(const string& ns,
-                                Query query,
-                                BSONObj obj,
-                                int flags,
-                                boost::optional<BSONObj> writeConcernObj) {
-    return checkPrimary()->update(ns, query, obj, flags, writeConcernObj);
+    checkPrimary()->remove(ns, obj, removeMany, writeConcernObj);
 }
 
 unique_ptr<DBClientCursor> DBClientReplicaSet::query(const NamespaceStringOrUUID& nsOrUuid,
                                                      Query query,
-                                                     int nToReturn,
+                                                     int limit,
                                                      int nToSkip,
                                                      const BSONObj* fieldsToReturn,
                                                      int queryOptions,
@@ -597,7 +589,7 @@ unique_ptr<DBClientCursor> DBClientReplicaSet::query(const NamespaceStringOrUUID
 
                 unique_ptr<DBClientCursor> cursor = conn->query(nsOrUuid,
                                                                 query,
-                                                                nToReturn,
+                                                                limit,
                                                                 nToSkip,
                                                                 fieldsToReturn,
                                                                 queryOptions,
@@ -628,14 +620,8 @@ unique_ptr<DBClientCursor> DBClientReplicaSet::query(const NamespaceStringOrUUID
                 "dbclient_rs query to primary node",
                 "replicaSet"_attr = _getMonitor()->getName());
 
-    return checkPrimary()->query(nsOrUuid,
-                                 query,
-                                 nToReturn,
-                                 nToSkip,
-                                 fieldsToReturn,
-                                 queryOptions,
-                                 batchSize,
-                                 readConcernObj);
+    return checkPrimary()->query(
+        nsOrUuid, query, limit, nToSkip, fieldsToReturn, queryOptions, batchSize, readConcernObj);
 }
 
 BSONObj DBClientReplicaSet::findOne(const string& ns,
@@ -838,7 +824,7 @@ DBClientConnection* DBClientReplicaSet::selectNodeUsingTags(
 
 void DBClientReplicaSet::say(Message& toSend, bool isRetry, string* actualServer) {
     if (!isRetry)
-        _lazyState = LazyState();
+        _lastClient = nullptr;
 
     const int lastOp = toSend.operation();
 
@@ -866,7 +852,6 @@ void DBClientReplicaSet::say(Message& toSend, bool isRetry, string* actualServer
             string lastNodeErrMsg;
 
             for (size_t retry = 0; retry < MAX_RETRY; retry++) {
-                _lazyState._retries = retry;
                 try {
                     DBClientConnection* conn = selectNodeUsingTags(readPref);
 
@@ -880,9 +865,7 @@ void DBClientReplicaSet::say(Message& toSend, bool isRetry, string* actualServer
 
                     conn->say(toSend);
 
-                    _lazyState._lastOp = lastOp;
-                    _lazyState._secondaryQueryOk = true;
-                    _lazyState._lastClient = conn;
+                    _lastClient = conn;
                 } catch (const DBException& ex) {
                     const Status status =
                         ex.toStatus(str::stream() << "can't callLazy replica set node "
@@ -916,104 +899,24 @@ void DBClientReplicaSet::say(Message& toSend, bool isRetry, string* actualServer
     if (actualServer)
         *actualServer = primary->getServerAddress();
 
-    _lazyState._lastOp = lastOp;
-    _lazyState._secondaryQueryOk = false;
-    // Don't retry requests to primary since there is only one host to try
-    _lazyState._retries = MAX_RETRY;
-    _lazyState._lastClient = primary;
+    _lastClient = primary;
 
     primary->say(toSend);
     return;
 }
 
 Status DBClientReplicaSet::recv(Message& m, int lastRequestId) {
-    verify(_lazyState._lastClient);
+    verify(_lastClient);
 
     try {
-        return _lazyState._lastClient->recv(m, lastRequestId);
+        return _lastClient->recv(m, lastRequestId);
     } catch (DBException& e) {
         LOGV2(20143,
               "Could not receive data from {connString}: {error}",
               "Could not receive data",
-              "connString"_attr = _lazyState._lastClient->toString(),
+              "connString"_attr = _lastClient->toString(),
               "error"_attr = redact(e));
         return e.toStatus();
-    }
-}
-
-void DBClientReplicaSet::checkResponse(const std::vector<BSONObj>& batch,
-                                       bool networkError,
-                                       bool* retry,
-                                       string* targetHost) {
-    // For now, do exactly as we did before, so as not to break things.  In general though, we
-    // should fix this so checkResponse has a more consistent contract.
-    if (!retry) {
-        if (_lazyState._lastClient)
-            return _lazyState._lastClient->checkResponse(batch, networkError);
-        else
-            return checkPrimary()->checkResponse(batch, networkError);
-    }
-
-    *retry = false;
-    if (targetHost && _lazyState._lastClient)
-        *targetHost = _lazyState._lastClient->getServerAddress();
-    else if (targetHost)
-        *targetHost = "";
-
-    if (!_lazyState._lastClient)
-        return;
-
-    // nReturned == 1 means that we got one result back, which might be an error
-    // networkError is a sentinel value for "no data returned" aka (usually) network problem
-    // If neither, this must be a query result so our response is ok wrt the replica set
-    if (batch.size() != 1 && !networkError)
-        return;
-
-    BSONObj dataObj;
-    if (batch.size() == 1)
-        dataObj = batch[0];
-
-    // Check if we should retry here
-    if (_lazyState._lastOp == dbQuery && _lazyState._secondaryQueryOk) {
-        // query could potentially go to a secondary, so see if this is an error (or empty) and
-        // retry if we're not past our retry limit.
-
-        if (networkError ||
-            (hasErrField(dataObj) && !dataObj["code"].eoo() &&
-             dataObj["code"].Int() == ErrorCodes::NotPrimaryOrSecondary)) {
-            if (_lazyState._lastClient == _lastSecondaryOkConn.get()) {
-                isntSecondary();
-            } else if (_lazyState._lastClient == _primary.get()) {
-                isNotPrimary();
-            } else {
-                LOGV2_WARNING(20151,
-                              "Data {dataObj} is invalid because last rs client {connString} is "
-                              "not primary or secondary",
-                              "Data is invalid because last rs client is not primary or secondary",
-                              "dataObj"_attr = redact(dataObj),
-                              "connString"_attr = _lazyState._lastClient->toString());
-            }
-
-            if (_lazyState._retries < static_cast<int>(MAX_RETRY)) {
-                _lazyState._retries++;
-                *retry = true;
-            } else {
-                LOGV2(20144,
-                      "Too many retries ({numRetries}), could not get data from replica set",
-                      "Too many retries, could not get data from replica set",
-                      "numRetries"_attr = _lazyState._retries);
-            }
-        }
-    } else if (_lazyState._lastOp == dbQuery) {
-        // if query could not potentially go to a secondary, just mark the primary as bad
-
-        if (networkError ||
-            (hasErrField(dataObj) && !dataObj["code"].eoo() &&
-             dataObj["code"].Int() == ErrorCodes::NotPrimaryNoSecondaryOk)) {
-            if (_lazyState._lastClient == _primary.get()) {
-                isNotPrimary();
-            }
-        }
     }
 }
 
@@ -1180,7 +1083,7 @@ void DBClientReplicaSet::_invalidateLastSecondaryOkCache(const Status& status) {
 
 void DBClientReplicaSet::reset() {
     resetSecondaryOkConn();
-    _lazyState._lastClient = nullptr;
+    _lastClient = nullptr;
     _lastReadPref.reset();
 }
 

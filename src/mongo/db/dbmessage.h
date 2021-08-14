@@ -95,7 +95,8 @@ class OperationContext;
 
 namespace QueryResult {
 #pragma pack(1)
-/* see http://dochub.mongodb.org/core/mongowireprotocol
+/**
+ * See http://dochub.mongodb.org/core/mongowireprotocol.
  */
 struct Layout {
     MsgData::Layout msgdata;
@@ -205,25 +206,31 @@ public:
 
 }  // namespace QueryResult
 
-/* For the database/server protocol, these objects and functions encapsulate
-   the various messages transmitted over the connection.
-
-   See http://dochub.mongodb.org/core/mongowireprotocol
-*/
+/**
+ * For the database/server protocol, these objects and functions encapsulate the various messages
+ * transmitted over the connection.
+ *
+ * See http://dochub.mongodb.org/core/mongowireprotocol.
+ */
 class DbMessage {
     // Assume sizeof(int) == 4 bytes
     MONGO_STATIC_ASSERT(sizeof(int) == 4);
 
 public:
-    // Note: DbMessage constructor reads the first 4 bytes and stores it in reserved
+    /**
+     * Note: DbMessage constructor reads the first 4 bytes and stores it in reserved
+     */
     DbMessage(const Message& msg);
 
-    // Indicates whether this message is expected to have a ns
+    /**
+     * Indicates whether this message is expected to have a ns.
+     */
     bool messageShouldHaveNs() const {
         return (_msg.operation() >= dbUpdate) & (_msg.operation() <= dbDelete);
     }
 
-    /** the 32 bit field before the ns
+    /**
+     * Returns the 32 bit field before the ns.
      * track all bit usage here as its cross op
      * 0: InsertOption_ContinueOnError
      * 1: fromWriteback
@@ -239,7 +246,9 @@ public:
     long long pullInt64();
     const char* getArray(size_t count) const;
 
-    /* for insert and update msgs */
+    /**
+     * Used by insert and update msgs
+     */
     bool moreJSObjs() const {
         return _nextjsobj != nullptr && _nextjsobj != _theEnd;
     }
@@ -285,58 +294,64 @@ private:
     unsigned int _nsLen;
 };
 
-/** the query field 'options' can have these bits set: */
+/**
+ * The query field 'options' can have these bits set:
+ */
 enum QueryOptions {
-    /** Tailable means cursor is not closed when the last data is retrieved.  rather, the cursor
-     * marks the final object's position.  you can resume using the cursor later, from where it was
-       located, if more data were received.  Set on dbQuery and dbGetMore.
-
-       like any "latent cursor", the cursor may become invalid at some point -- for example if that
-       final object it references were deleted.  Thus, you should be prepared to requery if you get
-       back ResultFlag_CursorNotFound.
-    */
+    /**
+     * Tailable means cursor is not closed when the last data is retrieved. Rather, the cursor
+     * marks the final object's position. You can resume using the cursor later, from where it was
+     * located, if more data were received. Set on dbQuery and dbGetMore.
+     *
+     *  like any "latent cursor", the cursor may become invalid at some point -- for example if that
+     *  final object it references were deleted.
+     */
     QueryOption_CursorTailable = 1 << 1,
 
-    /** allow query of replica secondary.  normally these return an error except for namespace
+    /**
+     * Allow query of replica secondary. Normally these return an error except for namespace
      * "local".
      */
     QueryOption_SecondaryOk = 1 << 2,
 
-    // In previous versions of the server, clients were required to set this option in order to
-    // enable an optimized oplog scan. As of 4.4, the server will apply the optimization for
-    // eligible queries regardless of whether this flag is set.
-    //
-    // This bit is reserved for compatibility with old clients, but it should not be set by modern
-    // clients.
-    //
-    // New server code should not use this flag.
+    /**
+     * In previous versions of the server, clients were required to set this option in order to
+     * enable an optimized oplog scan. As of 4.4, the server will apply the optimization for
+     * eligible queries regardless of whether this flag is set.
+     *
+     * This bit is reserved for compatibility with old clients, but it should not be set by modern
+     * clients.
+     *
+     * New server code should not use this flag.
+     */
     QueryOption_OplogReplay_DEPRECATED = 1 << 3,
 
-    /** The server normally times out idle cursors after an inactivity period to prevent excess
-     * memory uses
-        Set this option to prevent that.
-    */
+    /**
+     * The server normally times out idle cursors after an inactivity period to prevent excess
+     * memory uses. Set this option to prevent that.
+     */
     QueryOption_NoCursorTimeout = 1 << 4,
 
-    /** Use with QueryOption_CursorTailable.  If we are at the end of the data, block for a while
+    /**
+     * Use with QueryOption_CursorTailable.  If we are at the end of the data, block for a while
      * rather than returning no data. After a timeout period, we do return as normal.
      */
     QueryOption_AwaitData = 1 << 5,
 
-    /** Stream the data down full blast in multiple "more" packages, on the assumption that the
+    /**
+     * Stream the data down full blast in multiple "more" packages, on the assumption that the
      * client will fully read all data queried.  Faster when you are pulling a lot of data and know
      * you want to pull it all down.  Note: it is not allowed to not read all the data unless you
      * close the connection.
-
-        Use the query( std::function<void(const BSONObj&)> f, ... ) version of the connection's
-        query()
-        method, and it will take care of all the details for you.
-    */
+     *
+     * Use the query( std::function<void(const BSONObj&)> f, ... ) version of the connection's
+     * query() method, and it will take care of all the details for you.
+     */
     QueryOption_Exhaust = 1 << 6,
 
-    /** When sharded, this means its ok to return partial results
-        Usually we will fail a query if all required shards aren't up
-        If this is set, it'll be a partial result set
+    /**
+     * When sharded, this means its ok to return partial results. Usually we will fail a query if
+     * all required shards aren't up. If this is set, it'll be a partial result set.
      */
     QueryOption_PartialResults = 1 << 7,
 
@@ -350,7 +365,9 @@ enum QueryOptions {
         QueryOption_NoCursorTimeout | QueryOption_AwaitData | QueryOption_PartialResults,
 };
 
-/* a request to run a query, received from the database */
+/**
+ * A request to run a query, received from the database.
+ */
 class QueryMessage {
 public:
     const char* ns;
@@ -361,7 +378,7 @@ public:
     BSONObj fields;
 
     /**
-     * parses the message into the above fields
+     * Parses the message into the above fields.
      * Warning: constructor mutates DbMessage.
      */
     explicit QueryMessage(DbMessage& d) {
@@ -376,7 +393,7 @@ public:
     }
 
     /**
-     * A non-muting constructor from the whole message.
+     * A non-mutating constructor from the whole message.
      */
     explicit QueryMessage(const Message& message) {
         DbMessage dbm(message);
@@ -409,7 +426,9 @@ Message makeDeprecatedQueryMessage(StringData ns,
                                    int queryOptions);
 
 enum InsertOptions {
-    /** With muli-insert keep processing inserts if one fails */
+    /**
+     * With muli-insert keep processing inserts if one fails.
+     */
     InsertOption_ContinueOnError = 1 << 0
 };
 
@@ -420,26 +439,6 @@ Message makeDeprecatedInsertMessage(StringData ns,
                                     const BSONObj* objs,
                                     size_t count,
                                     int flags = 0);
-
-enum UpdateOptions {
-    /** Upsert - that is, insert the item if no matching item is found. */
-    UpdateOption_Upsert = 1 << 0,
-
-    /** Update multiple documents (if multiple documents match query expression).
-       (Default is update a single document and stop.) */
-    UpdateOption_Multi = 1 << 1,
-
-    /** flag from mongo saying this update went everywhere */
-    UpdateOption_Broadcast = 1 << 2
-};
-
-enum RemoveOptions {
-    /** only delete one option */
-    RemoveOption_JustOne = 1 << 0,
-
-    /** flag from mongo saying this update went everywhere */
-    RemoveOption_Broadcast = 1 << 1
-};
 
 /**
  * A response to a DbMessage.

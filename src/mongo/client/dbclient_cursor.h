@@ -130,14 +130,6 @@ public:
         return tailable() && (opts & QueryOption_AwaitData);
     }
 
-    /** see ResultFlagType (constants.h) for flag values
-        mostly these flags are for internal purposes -
-        ResultFlag_ErrSet is the possible exception to that
-    */
-    bool hasResultFlag(int flag) {
-        return (resultFlags & flag) != 0;
-    }
-
     /// Change batchSize after construction. Can change after requesting first batch.
     void setBatchSize(int newBatchSize) {
         batchSize = newBatchSize;
@@ -198,9 +190,6 @@ public:
      */
     bool init();
 
-    void initLazy(bool isRetry = false);
-    bool initLazyFinish(bool& retry);
-
     /**
      * For exhaust. Used in DBClientConnection.
      */
@@ -224,8 +213,7 @@ public:
      * If true, you should not try to use the connection for any other purpose or return it to a
      * pool.
      *
-     * This can happen if either initLazy() was called without initLazyFinish() or an exhaust query
-     * was started but not completed.
+     * This can happen if an exhaust query was started but not completed.
      */
     bool connectionHasPendingReplies() const {
         return _connectionHasPendingReplies;
@@ -304,11 +292,9 @@ private:
     int opts;
     int batchSize;
     std::stack<BSONObj> _putBack;
-    int resultFlags;
     long long cursorId;
     bool _ownCursor;  // see decouple()
     std::string _scopedHost;
-    std::string _lazyHost;
     bool wasError;
     bool _connectionHasPendingReplies = false;
     int _lastRequestId = 0;

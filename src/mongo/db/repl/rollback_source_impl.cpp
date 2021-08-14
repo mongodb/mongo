@@ -61,7 +61,7 @@ const HostAndPort& RollbackSourceImpl::getSource() const {
 
 int RollbackSourceImpl::getRollbackId() const {
     bo info;
-    _getConnection()->simpleCommand("admin", &info, "replSetGetRBID");
+    _getConnection()->runCommand("admin", BSON("replSetGetRBID" << 1), info);
     return info["rbid"].numberInt();
 }
 

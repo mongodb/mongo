@@ -41,13 +41,13 @@
 #include "mongo/config.h"
 #include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/db/dbmessage.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/egress_tag_closer_manager.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/rpc/legacy_request_builder.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/reply_interface.h"
 #include "mongo/util/fail_point.h"
@@ -142,8 +142,9 @@ void AsyncDBClient::_parseIsMasterResponse(BSONObj request,
 
     auto clientProtocols = rpc::computeProtocolSet(wireSpec->outgoing);
     invariant(clientProtocols != rpc::supports::kNone);
-    // Set the operation protocol
-    _negotiatedProtocol = uassertStatusOK(rpc::negotiate(protocolSet.protocolSet, clientProtocols));
+    boost::optional<rpc::Protocol> protocol =
+        uassertStatusOK(rpc::negotiate(protocolSet.protocolSet, clientProtocols));
+    invariant(protocol && *protocol == rpc::Protocol::kOpMsg);
 
     _compressorManager.clientFinish(responseBody);
 }
@@ -238,8 +239,12 @@ Future<void> AsyncDBClient::initWireVersion(const std::string& appName,
     auto requestObj = _buildIsMasterRequest(appName, hook);
     // We use a legacy request to create our ismaster request because we may
     // have to communicate with servers that do not support other protocols.
-    auto requestMsg =
-        rpc::legacyRequestFromOpMsgRequest(OpMsgRequest::fromDBAndBody("admin", requestObj));
+    auto requestMsg = makeDeprecatedQueryMessage("admin.$cmd",
+                                                 requestObj,
+                                                 1 /*nToReturn*/,
+                                                 0 /*nToSkip*/,
+                                                 nullptr /*fieldsToReturn*/,
+                                                 0 /*queryOptions*/);
     auto msgId = nextMessageId();
     return _call(requestMsg, msgId)
         .then([msgId, this]() { return _waitForResponse(msgId); })
@@ -291,8 +296,7 @@ Future<Message> AsyncDBClient::_waitForResponse(boost::optional<int32_t> msgId,
 Future<rpc::UniqueReply> AsyncDBClient::runCommand(OpMsgRequest request,
                                                    const BatonHandle& baton,
                                                    bool fireAndForget) {
-    invariant(_negotiatedProtocol);
-    auto requestMsg = rpc::messageFromOpMsgRequest(*_negotiatedProtocol, std::move(request));
+    auto requestMsg = request.serialize();
     if (fireAndForget) {
         OpMsg::setFlag(&requestMsg, OpMsg::kMoreToCome);
     }
@@ -351,8 +355,7 @@ Future<executor::RemoteCommandResponse> AsyncDBClient::awaitExhaustCommand(
 
 Future<executor::RemoteCommandResponse> AsyncDBClient::runExhaustCommand(OpMsgRequest request,
                                                                          const BatonHandle& baton) {
-    invariant(_negotiatedProtocol);
-    auto requestMsg = rpc::messageFromOpMsgRequest(*_negotiatedProtocol, std::move(request));
+    auto requestMsg = request.serialize();
     OpMsg::setFlag(&requestMsg, OpMsg::kExhaustSupported);
 
     auto msgId = nextMessageId();

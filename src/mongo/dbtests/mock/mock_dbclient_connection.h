@@ -134,17 +134,17 @@ public:
 
     void insert(const std::string& ns,
                 BSONObj obj,
-                int flags = 0,
+                bool ordered = true,
                 boost::optional<BSONObj> writeConcernObj = boost::none) override;
 
     void insert(const std::string& ns,
                 const std::vector<BSONObj>& objList,
-                int flags = 0,
+                bool ordered = true,
                 boost::optional<BSONObj> writeConcernObj = boost::none) override;
 
     void remove(const std::string& ns,
                 Query query,
-                int flags = 0,
+                bool removeMany = true,
                 boost::optional<BSONObj> writeConcernObj = boost::none) override;
 
     bool call(mongo::Message& toSend,
@@ -197,7 +197,6 @@ public:
     void say(mongo::Message& toSend,
              bool isRetry = false,
              std::string* actualServer = nullptr) override;
-    bool lazySupported() const override;
 
 private:
     void checkConnection() override;

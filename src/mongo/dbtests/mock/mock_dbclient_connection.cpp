@@ -194,25 +194,25 @@ uint64_t MockDBClientConnection::getSockCreationMicroSec() const {
 
 void MockDBClientConnection::insert(const string& ns,
                                     BSONObj obj,
-                                    int flags,
+                                    bool ordered,
                                     boost::optional<BSONObj> writeConcernObj) {
-    _remoteServer->insert(ns, obj, flags);
+    _remoteServer->insert(ns, obj);
 }
 
 void MockDBClientConnection::insert(const string& ns,
                                     const vector<BSONObj>& objList,
-                                    int flags,
+                                    bool ordered,
                                     boost::optional<BSONObj> writeConcernObj) {
     for (vector<BSONObj>::const_iterator iter = objList.begin(); iter != objList.end(); ++iter) {
-        insert(ns, *iter, flags);
+        insert(ns, *iter, ordered);
     }
 }
 
 void MockDBClientConnection::remove(const string& ns,
                                     Query query,
-                                    int flags,
+                                    bool removeMany,
                                     boost::optional<BSONObj> writeConcernObj) {
-    _remoteServer->remove(ns, query, flags);
+    _remoteServer->remove(ns, std::move(query));
 }
 
 void MockDBClientConnection::killCursor(const NamespaceString& ns, long long cursorID) {
@@ -330,11 +330,6 @@ void MockDBClientConnection::setRecvResponses(Responses responses) {
 
 void MockDBClientConnection::say(mongo::Message& toSend, bool isRetry, string* actualServer) {
     invariant(false);  // unimplemented
-}
-
-bool MockDBClientConnection::lazySupported() const {
-    invariant(false);  // unimplemented
-    return false;
 }
 
 void MockDBClientConnection::checkConnection() {

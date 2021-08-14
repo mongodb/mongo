@@ -111,10 +111,6 @@ void EncryptedDBClientBase::say(Message& toSend, bool isRetry, std::string* actu
     MONGO_UNREACHABLE;
 }
 
-bool EncryptedDBClientBase::lazySupported() const {
-    return _conn->lazySupported();
-}
-
 BSONObj EncryptedDBClientBase::encryptDecryptCommand(const BSONObj& object,
                                                      bool encrypt,
                                                      const StringData databaseName) {
@@ -513,20 +509,14 @@ JS::Value EncryptedDBClientBase::getCollection() const {
 std::unique_ptr<DBClientCursor> EncryptedDBClientBase::query(
     const NamespaceStringOrUUID& nsOrUuid,
     Query query,
-    int nToReturn,
+    int limit,
     int nToSkip,
     const BSONObj* fieldsToReturn,
     int queryOptions,
     int batchSize,
     boost::optional<BSONObj> readConcernObj) {
-    return _conn->query(nsOrUuid,
-                        query,
-                        nToReturn,
-                        nToSkip,
-                        fieldsToReturn,
-                        queryOptions,
-                        batchSize,
-                        readConcernObj);
+    return _conn->query(
+        nsOrUuid, query, limit, nToSkip, fieldsToReturn, queryOptions, batchSize, readConcernObj);
 }
 
 bool EncryptedDBClientBase::isFailed() const {

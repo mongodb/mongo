@@ -153,7 +153,7 @@ TEST_F(DBClientCursorTest, DBClientCursorCallsMetaDataReaderOncePerBatch) {
     // Set up the DBClientCursor and a mock client connection.
     DBClientConnectionForTest conn;
     const NamespaceString nss("test", "coll");
-    DBClientCursor cursor(&conn, NamespaceStringOrUUID(nss), Query().obj, 0, 0, nullptr, 0, 0);
+    DBClientCursor cursor(&conn, NamespaceStringOrUUID(nss), fromjson("{}"), 0, 0, nullptr, 0, 0);
     cursor.setBatchSize(2);
 
     // Set up mock 'find' response.
@@ -200,7 +200,7 @@ TEST_F(DBClientCursorTest, DBClientCursorHandlesOpMsgExhaustCorrectly) {
     DBClientConnectionForTest conn;
     const NamespaceString nss("test", "coll");
     DBClientCursor cursor(
-        &conn, NamespaceStringOrUUID(nss), Query().obj, 0, 0, nullptr, QueryOption_Exhaust, 0);
+        &conn, NamespaceStringOrUUID(nss), fromjson("{}"), 0, 0, nullptr, QueryOption_Exhaust, 0);
     cursor.setBatchSize(0);
 
     // Set up mock 'find' response.
@@ -264,7 +264,7 @@ TEST_F(DBClientCursorTest, DBClientCursorResendsGetMoreIfMoreToComeFlagIsOmitted
     DBClientConnectionForTest conn;
     const NamespaceString nss("test", "coll");
     DBClientCursor cursor(
-        &conn, NamespaceStringOrUUID(nss), Query().obj, 0, 0, nullptr, QueryOption_Exhaust, 0);
+        &conn, NamespaceStringOrUUID(nss), fromjson("{}"), 0, 0, nullptr, QueryOption_Exhaust, 0);
     cursor.setBatchSize(0);
 
     // Set up mock 'find' response.
@@ -349,7 +349,7 @@ TEST_F(DBClientCursorTest, DBClientCursorMoreThrowsExceptionOnNonOKResponse) {
     DBClientConnectionForTest conn;
     const NamespaceString nss("test", "coll");
     DBClientCursor cursor(
-        &conn, NamespaceStringOrUUID(nss), Query().obj, 0, 0, nullptr, QueryOption_Exhaust, 0);
+        &conn, NamespaceStringOrUUID(nss), fromjson("{}"), 0, 0, nullptr, QueryOption_Exhaust, 0);
     cursor.setBatchSize(0);
 
     // Set up mock 'find' response.
@@ -381,7 +381,7 @@ TEST_F(DBClientCursorTest, DBClientCursorMoreThrowsExceptionWhenMoreToComeFlagSe
     DBClientConnectionForTest conn;
     const NamespaceString nss("test", "coll");
     DBClientCursor cursor(
-        &conn, NamespaceStringOrUUID(nss), Query().obj, 0, 0, nullptr, QueryOption_Exhaust, 0);
+        &conn, NamespaceStringOrUUID(nss), fromjson("{}"), 0, 0, nullptr, QueryOption_Exhaust, 0);
     cursor.setBatchSize(0);
 
     // Set up mock 'find' response.
@@ -490,7 +490,7 @@ TEST_F(DBClientCursorTest, DBClientCursorTailable) {
     const NamespaceString nss("test", "coll");
     DBClientCursor cursor(&conn,
                           NamespaceStringOrUUID(nss),
-                          Query().obj,
+                          fromjson("{}"),
                           0,
                           0,
                           nullptr,
@@ -589,7 +589,7 @@ TEST_F(DBClientCursorTest, DBClientCursorTailableAwaitData) {
     const NamespaceString nss("test", "coll");
     DBClientCursor cursor(&conn,
                           NamespaceStringOrUUID(nss),
-                          Query().obj,
+                          fromjson("{}"),
                           0,
                           0,
                           nullptr,
@@ -655,7 +655,7 @@ TEST_F(DBClientCursorTest, DBClientCursorTailableAwaitDataExhaust) {
     const NamespaceString nss("test", "coll");
     DBClientCursor cursor(&conn,
                           NamespaceStringOrUUID(nss),
-                          Query().obj,
+                          fromjson("{}"),
                           0,
                           0,
                           nullptr,

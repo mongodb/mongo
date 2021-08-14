@@ -121,10 +121,6 @@ double DBDirectClient::getSoTimeout() const {
     return 0;
 }
 
-bool DBDirectClient::lazySupported() const {
-    return false;
-}
-
 QueryOptions DBDirectClient::_lookupAvailableOptions() {
     // Exhaust mode is not available in DBDirectClient.
     return QueryOptions(DBClientBase::_lookupAvailableOptions() & ~QueryOption_Exhaust);

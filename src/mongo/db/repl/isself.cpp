@@ -255,7 +255,7 @@ bool isSelf(const HostAndPort& hostAndPort, ServiceContext* const ctx) {
             }
         }
         BSONObj out;
-        bool ok = conn.simpleCommand("admin", &out, "_isSelf");
+        bool ok = conn.runCommand("admin", BSON("_isSelf" << 1), out);
         bool me = ok && out["id"].type() == jstOID && instanceId == out["id"].OID();
 
         return me;
