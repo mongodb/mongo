@@ -465,7 +465,7 @@ long long WiredTigerIndex::getSpaceUsedBytes(OperationContext* opCtx) const {
 long long WiredTigerIndex::getFreeStorageBytes(OperationContext* opCtx) const {
     dassert(opCtx->lockState()->isReadLocked());
     auto ru = WiredTigerRecoveryUnit::get(opCtx);
-    WiredTigerSession* session = ru->getSession();
+    WiredTigerSession* session = ru->getSessionNoTxn();
 
     return static_cast<long long>(WiredTigerUtil::getIdentReuseSize(session->getSession(), _uri));
 }
