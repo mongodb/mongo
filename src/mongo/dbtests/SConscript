@@ -147,6 +147,7 @@ env.Program(
         "$BUILD_DIR/mongo/db/exec/document_value/document_value_test_util",
         "$BUILD_DIR/mongo/db/index/index_access_methods",
         "$BUILD_DIR/mongo/db/index/index_build_interceptor",
+        "$BUILD_DIR/mongo/db/index/skipped_record_tracker",
         "$BUILD_DIR/mongo/db/logical_time_metadata_hook",
         "$BUILD_DIR/mongo/db/mongohasher",
         "$BUILD_DIR/mongo/db/op_observer_impl",
