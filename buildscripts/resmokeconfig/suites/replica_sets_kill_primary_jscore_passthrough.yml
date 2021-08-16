@@ -131,7 +131,6 @@ executor:
         load("jstests/libs/override_methods/fail_unclean_shutdown_start_parallel_shell.js");
       global_vars:
         TestData:
-          allowUncleanShutdowns: true
           alwaysInjectTransactionNumber: true
           defaultReadConcernLevel: "majority"
           logRetryAttempts: true

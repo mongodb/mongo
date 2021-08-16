@@ -320,7 +320,6 @@ executor:
         load('jstests/libs/override_methods/txn_passthrough_cmd_massage.js');
       global_vars:
         TestData:
-          allowUncleanShutdowns: true
           logRetryAttempts: true
           networkErrorAndTxnOverrideConfig:
             retryOnNetworkErrors: true

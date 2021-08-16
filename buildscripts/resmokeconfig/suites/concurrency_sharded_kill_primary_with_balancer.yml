@@ -194,7 +194,6 @@ executor:
     shell_options:
       global_vars:
         TestData:
-          allowUncleanShutdowns: true
           runningWithConfigStepdowns: true
           runningWithShardStepdowns: true
           useStepdownPermittedFile: true
