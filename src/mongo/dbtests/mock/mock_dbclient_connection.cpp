@@ -100,7 +100,8 @@ std::pair<rpc::UniqueReply, DBClientBase*> MockDBClientConnection::runCommandWit
 
 std::unique_ptr<mongo::DBClientCursor> MockDBClientConnection::query(
     const NamespaceStringOrUUID& nsOrUuid,
-    mongo::Query query,
+    const BSONObj& filter,
+    const Query& querySettings,
     int limit,
     int nToSkip,
     const BSONObj* fieldsToReturn,
@@ -112,7 +113,8 @@ std::unique_ptr<mongo::DBClientCursor> MockDBClientConnection::query(
     try {
         mongo::BSONArray result(_remoteServer->query(_remoteServerInstanceID,
                                                      nsOrUuid,
-                                                     query,
+                                                     filter,
+                                                     querySettings,
                                                      limit,
                                                      nToSkip,
                                                      fieldsToReturn,
@@ -125,15 +127,15 @@ std::unique_ptr<mongo::DBClientCursor> MockDBClientConnection::query(
         // A simple mock implementation of a resumable query, where we skip the first 'n' fields
         // where 'n' is given by the mock resume token.
         auto nToSkip = 0;
-        auto queryBson = fromjson(query.toString());
-        if (queryBson.hasField("$_resumeAfter")) {
-            if (queryBson["$_resumeAfter"].Obj().hasField("n")) {
-                nToSkip = queryBson["$_resumeAfter"]["n"].numberInt();
+        BSONObj querySettingsAsBSON = querySettings.getFullSettingsDeprecated();
+        if (querySettingsAsBSON.hasField("$_resumeAfter")) {
+            if (querySettingsAsBSON["$_resumeAfter"].Obj().hasField("n")) {
+                nToSkip = querySettingsAsBSON["$_resumeAfter"]["n"].numberInt();
             }
         }
 
         bool provideResumeToken = false;
-        if (queryBson.hasField("$_requestResumeToken")) {
+        if (querySettingsAsBSON.hasField("$_requestResumeToken")) {
             provideResumeToken = true;
         }
 
@@ -179,13 +181,20 @@ mongo::ConnectionString::ConnectionType MockDBClientConnection::type() const {
 unsigned long long MockDBClientConnection::query(
     std::function<void(mongo::DBClientCursorBatchIterator&)> f,
     const NamespaceStringOrUUID& nsOrUuid,
-    mongo::Query query,
+    const BSONObj& filter,
+    const Query& querySettings,
     const mongo::BSONObj* fieldsToReturn,
     int queryOptions,
     int batchSize,
     boost::optional<BSONObj> readConcernObj) {
-    return DBClientBase::query(
-        f, nsOrUuid, query, fieldsToReturn, queryOptions, batchSize, readConcernObj);
+    return DBClientBase::query(f,
+                               nsOrUuid,
+                               filter,
+                               querySettings,
+                               fieldsToReturn,
+                               queryOptions,
+                               batchSize,
+                               readConcernObj);
 }
 
 uint64_t MockDBClientConnection::getSockCreationMicroSec() const {
@@ -209,10 +218,10 @@ void MockDBClientConnection::insert(const string& ns,
 }
 
 void MockDBClientConnection::remove(const string& ns,
-                                    Query query,
+                                    const BSONObj& filter,
                                     bool removeMany,
                                     boost::optional<BSONObj> writeConcernObj) {
-    _remoteServer->remove(ns, std::move(query));
+    _remoteServer->remove(ns, filter);
 }
 
 void MockDBClientConnection::killCursor(const NamespaceString& ns, long long cursorID) {

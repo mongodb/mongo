@@ -110,7 +110,7 @@ PersistentTaskQueue<T>::PersistentTaskQueue(OperationContext* opCtx, NamespaceSt
     DBDirectClient client(opCtx);
 
     auto projection = BSON("_id" << 1);
-    auto cursor = client.query(_storageNss, Query(), 0, 0, &projection);
+    auto cursor = client.query(_storageNss, BSONObj{}, Query(), 0, 0, &projection);
     _count = cursor->itcount();
 
     if (_count > 0)
@@ -203,15 +203,15 @@ bool PersistentTaskQueue<T>::empty(OperationContext* opCtx) const {
 template <typename T>
 TaskId PersistentTaskQueue<T>::_loadLastId(DBDirectClient& client) {
     auto fieldsToReturn = BSON("_id" << 1);
-    auto maxId =
-        client.findOne(_storageNss.toString(), Query().sort(BSON("_id" << -1)), &fieldsToReturn);
+    auto maxId = client.findOne(
+        _storageNss.toString(), BSONObj{}, Query().sort(BSON("_id" << -1)), &fieldsToReturn);
     return maxId.getField("_id").Long();
 }
 
 template <typename T>
 typename boost::optional<typename BlockingTaskQueue<T>::Record>
 PersistentTaskQueue<T>::_loadNextRecord(DBDirectClient& client) {
-    auto bson = client.findOne(_storageNss.toString(), Query().sort("_id"));
+    auto bson = client.findOne(_storageNss.toString(), BSONObj{}, Query().sort("_id"));
 
     boost::optional<typename PersistentTaskQueue<T>::Record> result;
 

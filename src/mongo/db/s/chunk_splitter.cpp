@@ -172,6 +172,7 @@ BSONObj findExtremeKeyForShard(OperationContext* opCtx,
         // upper bound. Chunk range upper bounds are exclusive so skip a document to
         // make the lower half of the split end up with a single document.
         std::unique_ptr<DBClientCursor> cursor = client.query(nss,
+                                                              BSONObj{},
                                                               q,
                                                               1, /* limit */
                                                               1 /* nToSkip */);
@@ -185,7 +186,7 @@ BSONObj findExtremeKeyForShard(OperationContext* opCtx,
             end = cursor->next().getOwned();
         }
     } else {
-        end = client.findOne(nss.ns(), q);
+        end = client.findOne(nss.ns(), BSONObj{}, q);
     }
 
     if (end.isEmpty()) {

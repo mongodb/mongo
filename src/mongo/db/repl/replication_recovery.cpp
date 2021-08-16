@@ -144,7 +144,8 @@ public:
             ? BSON("$gte" << _oplogApplicationStartPoint << "$lte" << *_oplogApplicationEndPoint)
             : BSON("$gte" << _oplogApplicationStartPoint);
         _cursor = _client->query(NamespaceString::kRsOplogNamespace,
-                                 QUERY("ts" << predicate),
+                                 BSON("ts" << predicate),
+                                 /*querySettings*/ Query(),
                                  /*limit*/ 0,
                                  /*skip*/ 0,
                                  /*projection*/ nullptr,

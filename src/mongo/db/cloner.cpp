@@ -226,21 +226,20 @@ struct Cloner::Fun {
     time_t saveLast;
 };
 
-/* copy the specified collection
+/**
+ * Copy the specified collection.
  */
 void Cloner::_copy(OperationContext* opCtx,
                    const std::string& toDBName,
                    const NamespaceString& nss,
                    const BSONObj& from_opts,
                    const BSONObj& from_id_index,
-                   Query query,
                    DBClientBase* conn) {
     LOGV2_DEBUG(20414,
                 2,
-                "\t\tcloning collection with filter",
+                "\t\tcloning collection",
                 "ns"_attr = nss,
-                "conn_getServerAddress"_attr = conn->getServerAddress(),
-                "query"_attr = redact(query.toString()));
+                "conn_getServerAddress"_attr = conn->getServerAddress());
 
     Fun f(opCtx, toDBName);
     f.numSeen = 0;
@@ -254,7 +253,8 @@ void Cloner::_copy(OperationContext* opCtx,
         Lock::TempRelease tempRelease(opCtx->lockState());
         conn->query(std::function<void(DBClientCursorBatchIterator&)>(f),
                     nss,
-                    query,
+                    BSONObj{} /* filter */,
+                    Query() /* querySettings */,
                     nullptr,
                     options,
                     0 /* batchSize */,
@@ -262,8 +262,7 @@ void Cloner::_copy(OperationContext* opCtx,
     }
 
     uassert(ErrorCodes::PrimarySteppedDown,
-            str::stream() << "Not primary while cloning collection " << nss.ns() << " with filter "
-                          << query.toString(),
+            str::stream() << "Not primary while cloning collection " << nss.ns(),
             !opCtx->writesAreReplicated() ||
                 repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss));
 }
@@ -582,7 +581,6 @@ Status Cloner::copyDb(OperationContext* opCtx,
               nss,
               params.collectionInfo["options"].Obj(),
               params.idIndexSpec,
-              Query(),
               conn.get());
     }
 

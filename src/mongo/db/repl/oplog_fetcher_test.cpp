@@ -793,12 +793,14 @@ TEST_F(OplogFetcherTest,
     // Test that the correct maxTimeMS is set if this is the initial 'find' query.
     auto oplogFetcher = makeOplogFetcher();
     auto findTimeout = durationCount<Milliseconds>(oplogFetcher->getInitialFindMaxTime_forTest());
-    auto queryObj = oplogFetcher->getFindQuery_forTest(findTimeout);
+
+    auto filter = oplogFetcher->getFindQueryFilter_forTest();
+    ASSERT_BSONOBJ_EQ(BSON("ts" << BSON("$gte" << lastFetched.getTimestamp())), filter);
+
+    auto queryObj =
+        (oplogFetcher->getFindQuerySettings_forTest(findTimeout)).getFullSettingsDeprecated();
     ASSERT_EQUALS(60000, queryObj.getIntField("$maxTimeMS"));
 
-    ASSERT_EQUALS(mongo::BSONType::Object, queryObj["query"].type());
-    ASSERT_BSONOBJ_EQ(BSON("ts" << BSON("$gte" << lastFetched.getTimestamp())),
-                      queryObj["query"].Obj());
     ASSERT_EQUALS(mongo::BSONType::Object, queryObj["readConcern"].type());
     ASSERT_BSONOBJ_EQ(BSON("level"
                            << "local"
@@ -812,14 +814,15 @@ TEST_F(OplogFetcherTest,
     dataReplicatorExternalState->currentTerm = OpTime::kUninitializedTerm;
     auto oplogFetcher = makeOplogFetcher();
 
+    auto filter = oplogFetcher->getFindQueryFilter_forTest();
+    ASSERT_BSONOBJ_EQ(BSON("ts" << BSON("$gte" << lastFetched.getTimestamp())), filter);
+
     // Test that the correct maxTimeMS is set if we are retrying the 'find' query.
     auto findTimeout = durationCount<Milliseconds>(oplogFetcher->getRetriedFindMaxTime_forTest());
-    auto queryObj = oplogFetcher->getFindQuery_forTest(findTimeout);
+    auto queryObj =
+        (oplogFetcher->getFindQuerySettings_forTest(findTimeout)).getFullSettingsDeprecated();
     ASSERT_EQUALS(2000, queryObj.getIntField("$maxTimeMS"));
 
-    ASSERT_EQUALS(mongo::BSONType::Object, queryObj["query"].type());
-    ASSERT_BSONOBJ_EQ(BSON("ts" << BSON("$gte" << lastFetched.getTimestamp())),
-                      queryObj["query"].Obj());
     ASSERT_EQUALS(mongo::BSONType::Object, queryObj["readConcern"].type());
     ASSERT_BSONOBJ_EQ(BSON("level"
                            << "local"

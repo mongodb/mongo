@@ -95,51 +95,54 @@ Message DBClientCursor::_assembleInit() {
     }
 
     // If we haven't gotten a cursorId yet, we need to issue a new query or command.
-    // The caller supplies a 'query' object which may have $-prefixed directives in the format
-    // expected for a legacy OP_QUERY. Therefore, we use the legacy parsing code supplied by
-    // query_request_helper. When actually issuing the request to the remote node, we will
-    // assemble a find command.
-    auto findCommand = query_request_helper::fromLegacyQuery(
-        _nsOrUuid, query, fieldsToReturn ? *fieldsToReturn : BSONObj(), nToSkip, opts);
+    // The caller supplies a filter and a query settings object which may have $-prefixed directives
+    // in the format previously expected for a legacy OP_QUERY. Therefore, we use the legacy parsing
+    // code supplied by query_request_helper. When actually issuing the request to the remote node,
+    // we will assemble a find command.
+    auto findCommand =
+        query_request_helper::fromLegacyQuery(_nsOrUuid,
+                                              _filter,
+                                              _querySettings,
+                                              fieldsToReturn ? *fieldsToReturn : BSONObj(),
+                                              nToSkip,
+                                              opts);
     // If there was a problem building the query request, report that.
     uassertStatusOK(findCommand.getStatus());
 
-    // Despite the request being generated using the legacy OP_QUERY format above, we will never set
-    // the 'ntoreturn' parameter on the find command request, since this is an OP_QUERY-specific
-    // concept. Instead, we always use 'batchSize' and 'limit', which are provided separately to us
-    // by the client.
     if (limit) {
         findCommand.getValue()->setLimit(limit);
     }
     if (batchSize) {
         findCommand.getValue()->setBatchSize(batchSize);
     }
-    if (query.getBoolField("$readOnce")) {
+
+    const BSONObj querySettings = _querySettings.getFullSettingsDeprecated();
+    if (querySettings.getBoolField("$readOnce")) {
         // Legacy queries don't handle readOnce.
         findCommand.getValue()->setReadOnce(true);
     }
-    if (query.getBoolField(FindCommandRequest::kRequestResumeTokenFieldName)) {
+    if (querySettings.getBoolField(FindCommandRequest::kRequestResumeTokenFieldName)) {
         // Legacy queries don't handle requestResumeToken.
         findCommand.getValue()->setRequestResumeToken(true);
     }
-    if (query.hasField(FindCommandRequest::kResumeAfterFieldName)) {
+    if (querySettings.hasField(FindCommandRequest::kResumeAfterFieldName)) {
         // Legacy queries don't handle resumeAfter.
         findCommand.getValue()->setResumeAfter(
-            query.getObjectField(FindCommandRequest::kResumeAfterFieldName));
+            querySettings.getObjectField(FindCommandRequest::kResumeAfterFieldName));
     }
-    if (auto replTerm = query[FindCommandRequest::kTermFieldName]) {
+    if (auto replTerm = querySettings[FindCommandRequest::kTermFieldName]) {
         // Legacy queries don't handle term.
         findCommand.getValue()->setTerm(replTerm.numberLong());
     }
     // Legacy queries don't handle readConcern.
     // We prioritize the readConcern parsed from the query object over '_readConcernObj'.
-    if (auto readConcern = query[repl::ReadConcernArgs::kReadConcernFieldName]) {
+    if (auto readConcern = querySettings[repl::ReadConcernArgs::kReadConcernFieldName]) {
         findCommand.getValue()->setReadConcern(readConcern.Obj());
     } else if (_readConcernObj) {
         findCommand.getValue()->setReadConcern(_readConcernObj);
     }
     BSONObj cmd = findCommand.getValue()->toBSON(BSONObj());
-    if (auto readPref = query["$readPreference"]) {
+    if (auto readPref = querySettings["$readPreference"]) {
         // FindCommandRequest doesn't handle $readPreference.
         cmd = BSONObjBuilder(std::move(cmd)).append(readPref).obj();
     }
@@ -375,7 +378,8 @@ void DBClientCursor::attach(AScopedConnection* conn) {
 
 DBClientCursor::DBClientCursor(DBClientBase* client,
                                const NamespaceStringOrUUID& nsOrUuid,
-                               const BSONObj& query,
+                               const BSONObj& filter,
+                               const Query& querySettings,
                                int limit,
                                int nToSkip,
                                const BSONObj* fieldsToReturn,
@@ -384,7 +388,8 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
                                boost::optional<BSONObj> readConcernObj)
     : DBClientCursor(client,
                      nsOrUuid,
-                     query,
+                     filter,
+                     querySettings,
                      0,  // cursorId
                      limit,
                      nToSkip,
@@ -405,7 +410,8 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
                                boost::optional<BSONObj> postBatchResumeToken)
     : DBClientCursor(client,
                      nsOrUuid,
-                     BSONObj(),  // query
+                     BSONObj(),  // filter
+                     Query(),    // querySettings
                      cursorId,
                      limit,
                      0,        // nToSkip
@@ -419,7 +425,8 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
 
 DBClientCursor::DBClientCursor(DBClientBase* client,
                                const NamespaceStringOrUUID& nsOrUuid,
-                               const BSONObj& query,
+                               const BSONObj& filter,
+                               const Query& querySettings,
                                long long cursorId,
                                int limit,
                                int nToSkip,
@@ -435,7 +442,8 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
       _originalHost(_client->getServerAddress()),
       _nsOrUuid(nsOrUuid),
       ns(nsOrUuid.nss() ? *nsOrUuid.nss() : NamespaceString(nsOrUuid.dbname())),
-      query(query),
+      _filter(filter),
+      _querySettings(querySettings),
       limit(limit),
       nToSkip(nToSkip),
       fieldsToReturn(fieldsToReturn),

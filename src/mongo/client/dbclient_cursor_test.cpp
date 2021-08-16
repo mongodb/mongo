@@ -153,7 +153,8 @@ TEST_F(DBClientCursorTest, DBClientCursorCallsMetaDataReaderOncePerBatch) {
     // Set up the DBClientCursor and a mock client connection.
     DBClientConnectionForTest conn;
     const NamespaceString nss("test", "coll");
-    DBClientCursor cursor(&conn, NamespaceStringOrUUID(nss), fromjson("{}"), 0, 0, nullptr, 0, 0);
+    DBClientCursor cursor(
+        &conn, NamespaceStringOrUUID(nss), BSONObj{}, Query(), 0, 0, nullptr, 0, 0);
     cursor.setBatchSize(2);
 
     // Set up mock 'find' response.
@@ -199,8 +200,15 @@ TEST_F(DBClientCursorTest, DBClientCursorHandlesOpMsgExhaustCorrectly) {
     // Set up the DBClientCursor and a mock client connection.
     DBClientConnectionForTest conn;
     const NamespaceString nss("test", "coll");
-    DBClientCursor cursor(
-        &conn, NamespaceStringOrUUID(nss), fromjson("{}"), 0, 0, nullptr, QueryOption_Exhaust, 0);
+    DBClientCursor cursor(&conn,
+                          NamespaceStringOrUUID(nss),
+                          BSONObj{},
+                          Query(),
+                          0,
+                          0,
+                          nullptr,
+                          QueryOption_Exhaust,
+                          0);
     cursor.setBatchSize(0);
 
     // Set up mock 'find' response.
@@ -263,8 +271,15 @@ TEST_F(DBClientCursorTest, DBClientCursorResendsGetMoreIfMoreToComeFlagIsOmitted
     // Set up the DBClientCursor and a mock client connection.
     DBClientConnectionForTest conn;
     const NamespaceString nss("test", "coll");
-    DBClientCursor cursor(
-        &conn, NamespaceStringOrUUID(nss), fromjson("{}"), 0, 0, nullptr, QueryOption_Exhaust, 0);
+    DBClientCursor cursor(&conn,
+                          NamespaceStringOrUUID(nss),
+                          BSONObj{},
+                          Query(),
+                          0,
+                          0,
+                          nullptr,
+                          QueryOption_Exhaust,
+                          0);
     cursor.setBatchSize(0);
 
     // Set up mock 'find' response.
@@ -348,8 +363,15 @@ TEST_F(DBClientCursorTest, DBClientCursorMoreThrowsExceptionOnNonOKResponse) {
     // Set up the DBClientCursor and a mock client connection.
     DBClientConnectionForTest conn;
     const NamespaceString nss("test", "coll");
-    DBClientCursor cursor(
-        &conn, NamespaceStringOrUUID(nss), fromjson("{}"), 0, 0, nullptr, QueryOption_Exhaust, 0);
+    DBClientCursor cursor(&conn,
+                          NamespaceStringOrUUID(nss),
+                          BSONObj{},
+                          Query(),
+                          0,
+                          0,
+                          nullptr,
+                          QueryOption_Exhaust,
+                          0);
     cursor.setBatchSize(0);
 
     // Set up mock 'find' response.
@@ -380,8 +402,15 @@ TEST_F(DBClientCursorTest, DBClientCursorMoreThrowsExceptionWhenMoreToComeFlagSe
     // Set up the DBClientCursor and a mock client connection.
     DBClientConnectionForTest conn;
     const NamespaceString nss("test", "coll");
-    DBClientCursor cursor(
-        &conn, NamespaceStringOrUUID(nss), fromjson("{}"), 0, 0, nullptr, QueryOption_Exhaust, 0);
+    DBClientCursor cursor(&conn,
+                          NamespaceStringOrUUID(nss),
+                          BSONObj{},
+                          Query(),
+                          0,
+                          0,
+                          nullptr,
+                          QueryOption_Exhaust,
+                          0);
     cursor.setBatchSize(0);
 
     // Set up mock 'find' response.
@@ -416,7 +445,8 @@ TEST_F(DBClientCursorTest, DBClientCursorPassesReadOnceFlag) {
     const NamespaceString nss("test", "coll");
     DBClientCursor cursor(&conn,
                           NamespaceStringOrUUID(nss),
-                          QUERY("query" << BSONObj() << "$readOnce" << true).obj,
+                          BSONObj{},
+                          Query().readOnce(true),
                           0,
                           0,
                           nullptr,
@@ -448,9 +478,8 @@ TEST_F(DBClientCursorTest, DBClientCursorPassesResumeFields) {
     const NamespaceString nss("test", "coll");
     DBClientCursor cursor(&conn,
                           NamespaceStringOrUUID(nss),
-                          QUERY("query" << BSONObj() << "$_requestResumeToken" << true
-                                        << "$_resumeAfter" << BSON("$recordId" << 5LL))
-                              .obj,
+                          BSONObj{},
+                          Query().requestResumeToken(true).resumeAfter(BSON("$recordId" << 5LL)),
                           0,
                           0,
                           nullptr,
@@ -490,7 +519,8 @@ TEST_F(DBClientCursorTest, DBClientCursorTailable) {
     const NamespaceString nss("test", "coll");
     DBClientCursor cursor(&conn,
                           NamespaceStringOrUUID(nss),
-                          fromjson("{}"),
+                          BSONObj{},
+                          Query(),
                           0,
                           0,
                           nullptr,
@@ -589,7 +619,8 @@ TEST_F(DBClientCursorTest, DBClientCursorTailableAwaitData) {
     const NamespaceString nss("test", "coll");
     DBClientCursor cursor(&conn,
                           NamespaceStringOrUUID(nss),
-                          fromjson("{}"),
+                          BSONObj{},
+                          Query(),
                           0,
                           0,
                           nullptr,
@@ -655,7 +686,8 @@ TEST_F(DBClientCursorTest, DBClientCursorTailableAwaitDataExhaust) {
     const NamespaceString nss("test", "coll");
     DBClientCursor cursor(&conn,
                           NamespaceStringOrUUID(nss),
-                          fromjson("{}"),
+                          BSONObj{},
+                          Query(),
                           0,
                           0,
                           nullptr,
@@ -805,12 +837,11 @@ TEST_F(DBClientCursorTest, DBClientCursorOplogQuery) {
     const BSONObj readConcernObj = BSON("afterClusterTime" << Timestamp(0, 1));
     const long long maxTimeMS = 5000LL;
     const long long term = 5;
-    const auto oplogQuery = QUERY("query" << filterObj << "readConcern" << readConcernObj
-                                          << "$maxTimeMS" << maxTimeMS << "term" << term);
 
     DBClientCursor cursor(&conn,
                           NamespaceStringOrUUID(nss),
-                          oplogQuery.obj,
+                          filterObj,
+                          Query().readConcern(readConcernObj).maxTimeMS(maxTimeMS).term(term),
                           0,
                           0,
                           nullptr,

@@ -183,13 +183,6 @@ protected:
     void checkOne(const BSONObj& o) const {
         check(o, one(o));
     }
-    void checkAll(const BSONObj& o) const {
-        unique_ptr<DBClientCursor> c = _client.query(NamespaceString(ns()), o);
-        verify(c->more());
-        while (c->more()) {
-            check(o, c->next());
-        }
-    }
     void check(const BSONObj& expected, const BSONObj& got) const {
         if (expected.woCompare(got)) {
             LOGV2(22500,
@@ -219,14 +212,14 @@ protected:
         return count;
     }
     int opCount() {
-        return DBDirectClient(&_opCtx).query(NamespaceString(cllNS()), BSONObj())->itcount();
+        return DBDirectClient(&_opCtx).query(NamespaceString(cllNS()), BSONObj{})->itcount();
     }
     void applyAllOperations() {
         Lock::GlobalWrite lk(&_opCtx);
         vector<BSONObj> ops;
         {
             DBDirectClient db(&_opCtx);
-            auto cursor = db.query(NamespaceString(cllNS()), BSONObj());
+            auto cursor = db.query(NamespaceString(cllNS()), BSONObj{});
             while (cursor->more()) {
                 ops.push_back(cursor->nextSafe());
             }
@@ -381,10 +374,10 @@ public:
         b.append("a", 1);
         b.appendTimestamp("t");
         _client.insert(ns(), b.done());
-        date_ = _client.findOne(ns(), QUERY("a" << 1)).getField("t").date();
+        date_ = _client.findOne(ns(), BSON("a" << 1)).getField("t").date();
     }
     void check() const {
-        BSONObj o = _client.findOne(ns(), QUERY("a" << 1));
+        BSONObj o = _client.findOne(ns(), BSON("a" << 1));
         ASSERT(Date_t{} != o.getField("t").date());
         ASSERT_EQUALS(date_, o.getField("t").date());
     }
@@ -472,10 +465,10 @@ public:
         b.append("_id", 1);
         b.appendTimestamp("t");
         _client.update(ns(), BSON("_id" << 1), b.done());
-        date_ = _client.findOne(ns(), QUERY("_id" << 1)).getField("t").date();
+        date_ = _client.findOne(ns(), BSON("_id" << 1)).getField("t").date();
     }
     void check() const {
-        BSONObj o = _client.findOne(ns(), QUERY("_id" << 1));
+        BSONObj o = _client.findOne(ns(), BSON("_id" << 1));
         ASSERT(Date_t{} != o.getField("t").date());
         ASSERT_EQUALS(date_, o.getField("t").date());
     }
@@ -772,7 +765,7 @@ public:
     string s() const {
         StringBuilder ss;
         unique_ptr<DBClientCursor> cc =
-            _client.query(NamespaceString(ns()), Query().sort(BSON("_id" << 1)));
+            _client.query(NamespaceString(ns()), BSONObj{}, Query().sort(BSON("_id" << 1)));
         bool first = true;
         while (cc->more()) {
             if (first)

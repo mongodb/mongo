@@ -163,7 +163,7 @@ repl::OpTime persistParticipantListBlocking(OperationContext* opCtx,
         // changed since the update above ran.
         const auto doc = client.findOne(
             NamespaceString::kTransactionCoordinatorsNamespace.toString(),
-            QUERY(TransactionCoordinatorDocument::kIdFieldName << sessionInfo.toBSON()));
+            BSON(TransactionCoordinatorDocument::kIdFieldName << sessionInfo.toBSON()));
         uasserted(51025,
                   str::stream() << "While attempting to write participant list "
                                 << buildParticipantListString(participantList) << " for "
@@ -375,7 +375,7 @@ repl::OpTime persistDecisionBlocking(OperationContext* opCtx,
         // changed since the update above ran.
         const auto doc = client.findOne(
             NamespaceString::kTransactionCoordinatorsNamespace.ns(),
-            QUERY(TransactionCoordinatorDocument::kIdFieldName << sessionInfo.toBSON()));
+            BSON(TransactionCoordinatorDocument::kIdFieldName << sessionInfo.toBSON()));
         uasserted(51026,
                   str::stream() << "While attempting to write decision "
                                 << (isCommit ? "'commit'" : "'abort'") << " for" << lsid.getId()
@@ -542,7 +542,7 @@ void deleteCoordinatorDocBlocking(OperationContext* opCtx,
         // changed since the update above ran.
         const auto doc = client.findOne(
             NamespaceString::kTransactionCoordinatorsNamespace.toString(),
-            QUERY(TransactionCoordinatorDocument::kIdFieldName << sessionInfo.toBSON()));
+            BSON(TransactionCoordinatorDocument::kIdFieldName << sessionInfo.toBSON()));
         uasserted(51027,
                   str::stream() << "While attempting to delete document for " << lsid.getId() << ':'
                                 << txnNumber
@@ -591,7 +591,7 @@ std::vector<TransactionCoordinatorDocument> readAllCoordinatorDocs(OperationCont
 
     DBDirectClient client(opCtx);
     auto coordinatorDocsCursor =
-        client.query(NamespaceString::kTransactionCoordinatorsNamespace, Query{});
+        client.query(NamespaceString::kTransactionCoordinatorsNamespace, BSONObj{});
 
     while (coordinatorDocsCursor->more()) {
         // TODO (SERVER-38307): Try/catch around parsing the document and skip the document if it

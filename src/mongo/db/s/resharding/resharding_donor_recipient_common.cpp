@@ -312,7 +312,7 @@ void clearFilteringMetadata(OperationContext* opCtx, bool scheduleAsyncRefresh) 
           NamespaceString::kRecipientReshardingOperationsNamespace}) {
         PersistentTaskStore<CommonReshardingMetadata> store(homeToReshardingDocs);
 
-        store.forEach(opCtx, Query(), [&](CommonReshardingMetadata reshardingDoc) -> bool {
+        store.forEach(opCtx, BSONObj{}, [&](CommonReshardingMetadata reshardingDoc) -> bool {
             namespacesToRefresh.insert(reshardingDoc.getSourceNss());
             namespacesToRefresh.insert(reshardingDoc.getTempReshardingNss());
 

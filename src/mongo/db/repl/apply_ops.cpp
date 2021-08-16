@@ -314,7 +314,9 @@ Status _checkPrecondition(OperationContext* opCtx,
         }
 
         DBDirectClient db(opCtx);
-        BSONObj realres = db.findOne(nss.ns(), preCondition["q"].Obj());
+        // The preconditions come in "q: {{query: {...}, orderby: ..., etc.}}" format.
+        auto preconditionQuery = Query::fromBSONDeprecated(preCondition["q"].Obj());
+        BSONObj realres = db.findOne(nss.ns(), preconditionQuery.getFilter(), preconditionQuery);
 
         // Get collection default collation.
         auto databaseHolder = DatabaseHolder::get(opCtx);

@@ -352,7 +352,7 @@ protected:
                          const std::string& nss,
                          const std::vector<HostAndPort>& hosts) {
         for (const auto& host : hosts) {
-            replSet->getNode(host.toString())->remove(nss, Query());
+            replSet->getNode(host.toString())->remove(nss, BSONObj{} /*filter*/);
         }
     }
 

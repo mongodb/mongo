@@ -56,7 +56,8 @@ public:
 
     std::unique_ptr<DBClientCursor> query(
         const NamespaceStringOrUUID& nsOrUuid,
-        Query query,
+        const BSONObj& filter,
+        const Query& querySettings = Query(),
         int limit = 0,
         int nToSkip = 0,
         const BSONObj* fieldsToReturn = nullptr,

@@ -258,7 +258,7 @@ protected:
 
         DBDirectClient client(opCtx());
         auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace,
-                                   {BSON("_id" << session->getSessionId().toBSON())});
+                                   BSON("_id" << session->getSessionId().toBSON()));
         ASSERT(cursor);
         ASSERT(cursor->more());
 
@@ -296,7 +296,7 @@ TEST_F(TransactionParticipantRetryableWritesTest, SessionEntryNotWrittenOnBegin)
 
     DBDirectClient client(opCtx());
     auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace,
-                               {BSON("_id" << sessionId.toBSON())});
+                               BSON("_id" << sessionId.toBSON()));
     ASSERT(cursor);
     ASSERT(!cursor->more());
 }
@@ -313,7 +313,7 @@ TEST_F(TransactionParticipantRetryableWritesTest, SessionEntryWrittenAtFirstWrit
 
     DBDirectClient client(opCtx());
     auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace,
-                               {BSON("_id" << sessionId.toBSON())});
+                               BSON("_id" << sessionId.toBSON()));
     ASSERT(cursor);
     ASSERT(cursor->more());
 
@@ -339,7 +339,7 @@ TEST_F(TransactionParticipantRetryableWritesTest,
 
     DBDirectClient client(opCtx());
     auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace,
-                               {BSON("_id" << sessionId.toBSON())});
+                               BSON("_id" << sessionId.toBSON()));
     ASSERT(cursor);
     ASSERT(cursor->more());
 

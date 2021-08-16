@@ -206,27 +206,26 @@ public:
         std::vector<SlimApplyOpsInfo> result;
 
         PersistentTaskStore<repl::OplogEntryBase> store(NamespaceString::kRsOplogNamespace);
-        store.forEach(
-            opCtx,
-            QUERY("op"
-                  << "c"
-                  << "o.applyOps" << BSON("$exists" << true) << "ts" << BSON("$gt" << ts)),
-            [&](const auto& oplogEntry) {
-                auto applyOpsCmd = oplogEntry.getObject().getOwned();
-                auto applyOpsInfo = repl::ApplyOpsCommandInfo::parse(applyOpsCmd);
+        store.forEach(opCtx,
+                      BSON("op"
+                           << "c"
+                           << "o.applyOps" << BSON("$exists" << true) << "ts" << BSON("$gt" << ts)),
+                      [&](const auto& oplogEntry) {
+                          auto applyOpsCmd = oplogEntry.getObject().getOwned();
+                          auto applyOpsInfo = repl::ApplyOpsCommandInfo::parse(applyOpsCmd);
 
-                std::vector<repl::DurableReplOperation> operations;
-                operations.reserve(applyOpsInfo.getOperations().size());
+                          std::vector<repl::DurableReplOperation> operations;
+                          operations.reserve(applyOpsInfo.getOperations().size());
 
-                for (const auto& innerOp : applyOpsInfo.getOperations()) {
-                    operations.emplace_back(
-                        repl::DurableReplOperation::parse({"findApplyOpsNewerThan"}, innerOp));
-                }
+                          for (const auto& innerOp : applyOpsInfo.getOperations()) {
+                              operations.emplace_back(repl::DurableReplOperation::parse(
+                                  {"findApplyOpsNewerThan"}, innerOp));
+                          }
 
-                result.emplace_back(
-                    SlimApplyOpsInfo{std::move(applyOpsCmd), std::move(operations)});
-                return true;
-            });
+                          result.emplace_back(
+                              SlimApplyOpsInfo{std::move(applyOpsCmd), std::move(operations)});
+                          return true;
+                      });
 
         return result;
     }

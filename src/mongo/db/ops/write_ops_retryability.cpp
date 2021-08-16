@@ -118,8 +118,8 @@ BSONObj extractPreOrPostImage(OperationContext* opCtx, const repl::OplogEntry& o
         LogicalSessionId sessionId = oplog.getSessionId().get();
         TxnNumber txnNumber = oplog.getTxnNumber().get();
         Timestamp ts = oplog.getTimestamp();
-        const auto query = BSON("_id" << sessionId.toBSON());
-        BSONObj imageDoc = client.findOne(NamespaceString::kConfigImagesNamespace.ns(), query);
+        BSONObj imageDoc = client.findOne(NamespaceString::kConfigImagesNamespace.ns(),
+                                          BSON("_id" << sessionId.toBSON()) /*filter*/);
         if (imageDoc.isEmpty()) {
             LOGV2_WARNING(5676402,
                           "Image lookup for a retryable findAndModify was not found",
@@ -170,9 +170,8 @@ BSONObj extractPreOrPostImage(OperationContext* opCtx, const repl::OplogEntry& o
 
     auto opTime = oplog.getPreImageOpTime() ? oplog.getPreImageOpTime().value()
                                             : oplog.getPostImageOpTime().value();
-
     auto oplogDoc =
-        client.findOne(NamespaceString::kRsOplogNamespace.ns(), opTime.asQuery(), nullptr);
+        client.findOne(NamespaceString::kRsOplogNamespace.ns(), opTime.asQuery(), Query(), nullptr);
 
     uassert(40613,
             str::stream() << "oplog no longer contains the complete write history of this "

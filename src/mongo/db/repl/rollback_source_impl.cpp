@@ -66,9 +66,9 @@ int RollbackSourceImpl::getRollbackId() const {
 }
 
 BSONObj RollbackSourceImpl::getLastOperation() const {
-    const Query query = Query().sort(BSON("$natural" << -1));
     return _getConnection()->findOne(_collectionName,
-                                     query,
+                                     BSONObj{},
+                                     Query().sort(BSON("$natural" << -1)),
                                      nullptr,
                                      QueryOption_SecondaryOk,
                                      ReadConcernArgs::kImplicitDefault);
@@ -78,6 +78,7 @@ BSONObj RollbackSourceImpl::findOne(const NamespaceString& nss, const BSONObj& f
     return _getConnection()
         ->findOne(nss.toString(),
                   filter,
+                  Query(),
                   nullptr,
                   QueryOption_SecondaryOk,
                   ReadConcernArgs::kImplicitDefault)

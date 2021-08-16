@@ -1967,8 +1967,11 @@ void setNewTimestamp(ServiceContext* service, const Timestamp& newTime) {
 void initTimestampFromOplog(OperationContext* opCtx, const NamespaceString& oplogNss) {
     DBDirectClient c(opCtx);
     static const BSONObj reverseNaturalObj = BSON("$natural" << -1);
-    BSONObj lastOp =
-        c.findOne(oplogNss.ns(), Query().sort(reverseNaturalObj), nullptr, QueryOption_SecondaryOk);
+    BSONObj lastOp = c.findOne(oplogNss.ns(),
+                               BSONObj{},
+                               Query().sort(reverseNaturalObj),
+                               nullptr,
+                               QueryOption_SecondaryOk);
 
     if (!lastOp.isEmpty()) {
         LOGV2_DEBUG(21256, 1, "replSet setting last Timestamp");

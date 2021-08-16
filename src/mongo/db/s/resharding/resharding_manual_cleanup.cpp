@@ -132,7 +132,7 @@ ReshardingCleaner<Service, StateMachine, ReshardingDocument>::_fetchReshardingDo
     OperationContext* opCtx) {
     boost::optional<ReshardingDocument> docOptional;
     _store.forEach(opCtx,
-                   QUERY(ReshardingDocument::kReshardingUUIDFieldName << _reshardingUUID),
+                   BSON(ReshardingDocument::kReshardingUUIDFieldName << _reshardingUUID),
                    [&](const ReshardingDocument& doc) {
                        docOptional.emplace(doc);
                        return false;

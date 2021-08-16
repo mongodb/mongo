@@ -1165,8 +1165,8 @@ TEST(OpMsg, ExhaustWithDBClientCursorBehavesCorrectly) {
 
     // Open an exhaust cursor.
     int batchSize = 2;
-    auto cursor =
-        conn->query(nss, Query().sort("_id", 1), 0, 0, nullptr, QueryOption_Exhaust, batchSize);
+    auto cursor = conn->query(
+        nss, BSONObj{}, Query().sort("_id", 1), 0, 0, nullptr, QueryOption_Exhaust, batchSize);
 
     // Verify that the documents are returned properly. Exhaust cursors should still receive results
     // in batches, so we check that these batches correspond to the given specified batch size.

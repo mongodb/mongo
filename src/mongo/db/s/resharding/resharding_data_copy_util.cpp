@@ -105,8 +105,8 @@ void ensureOplogCollectionsDropped(OperationContext* opCtx,
             NamespaceString::kReshardingApplierProgressNamespace);
         oplogApplierProgressStore.remove(
             opCtx,
-            QUERY(ReshardingOplogApplierProgress::kOplogSourceIdFieldName
-                  << reshardingSourceId.toBSON()),
+            BSON(ReshardingOplogApplierProgress::kOplogSourceIdFieldName
+                 << reshardingSourceId.toBSON()),
             WriteConcernOptions());
 
         // Remove the txn cloner progress doc for this donor.
@@ -114,7 +114,7 @@ void ensureOplogCollectionsDropped(OperationContext* opCtx,
             NamespaceString::kReshardingTxnClonerProgressNamespace);
         txnClonerProgressStore.remove(
             opCtx,
-            QUERY(ReshardingTxnClonerProgress::kSourceIdFieldName << reshardingSourceId.toBSON()),
+            BSON(ReshardingTxnClonerProgress::kSourceIdFieldName << reshardingSourceId.toBSON()),
             WriteConcernOptions());
 
         // Drop the conflict stash collection for this donor.

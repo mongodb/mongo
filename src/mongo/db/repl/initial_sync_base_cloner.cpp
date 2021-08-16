@@ -128,7 +128,8 @@ Status InitialSyncBaseCloner::checkInitialSyncIdIsUnchanged() {
     BSONObj initialSyncId;
     try {
         initialSyncId = getClient()->findOne(
-            ReplicationConsistencyMarkersImpl::kDefaultInitialSyncIdNamespace.toString(), Query());
+            ReplicationConsistencyMarkersImpl::kDefaultInitialSyncIdNamespace.toString(),
+            BSONObj{});
     } catch (DBException& e) {
         if (ErrorCodes::isRetriableError(e)) {
             auto status = e.toStatus().withContext(

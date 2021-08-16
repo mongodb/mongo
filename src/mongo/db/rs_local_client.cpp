@@ -124,18 +124,18 @@ StatusWith<Shard::QueryResponse> RSLocalClient::queryOnce(
     }
 
     DBDirectClient client(opCtx);
-    Query fullQuery(query);
+    Query querySettings;
     if (!sort.isEmpty()) {
-        fullQuery.sort(sort);
+        querySettings.sort(sort);
     }
     if (hint) {
-        fullQuery.hint(*hint);
+        querySettings.hint(*hint);
     }
-    fullQuery.readPref(readPref.pref, BSONArray());
+    querySettings.readPref(readPref.pref, BSONArray());
 
     try {
         std::unique_ptr<DBClientCursor> cursor =
-            client.query(nss, fullQuery, limit.get_value_or(0));
+            client.query(nss, query, querySettings, limit.get_value_or(0));
 
         if (!cursor) {
             return {ErrorCodes::OperationFailed,

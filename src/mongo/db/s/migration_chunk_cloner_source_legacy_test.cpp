@@ -137,8 +137,8 @@ protected:
         ASSERT_GT(response["n"].Int(), 0);
     }
 
-    void updateDocsInShardedCollection(BSONObj query, BSONObj updated) {
-        auto response = client()->updateAcknowledged(kNss.ns(), query, updated);
+    void updateDocsInShardedCollection(BSONObj filter, BSONObj updated) {
+        auto response = client()->updateAcknowledged(kNss.ns(), filter, updated);
         ASSERT_OK(getStatusFromWriteCommandReply(response));
         ASSERT_GT(response["n"].Int(), 0);
     }

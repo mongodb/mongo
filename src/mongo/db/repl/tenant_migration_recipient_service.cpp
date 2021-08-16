@@ -573,6 +573,7 @@ OpTime TenantMigrationRecipientService::Instance::_getDonorMajorityOpTime(
         BSON(OplogEntry::kTimestampFieldName << 1 << OplogEntry::kTermFieldName << 1);
     auto majorityOpTimeBson =
         client->findOne(NamespaceString::kRsOplogNamespace.ns(),
+                        BSONObj{},
                         Query().sort("$natural", -1),
                         &oplogOpTimeFields,
                         QueryOption_SecondaryOk,
@@ -867,8 +868,8 @@ void TenantMigrationRecipientService::Instance::_getStartOpTimesFromDonor(WithLo
     auto transactionTableOpTimeFields = BSON(SessionTxnRecord::kStartOpTimeFieldName << 1);
     auto earliestOpenTransactionBson = _client->findOne(
         NamespaceString::kSessionTransactionsTableNamespace.ns(),
-        QUERY("state" << BSON("$in" << BSON_ARRAY(preparedState << inProgressState)))
-            .sort(SessionTxnRecord::kStartOpTimeFieldName.toString(), 1),
+        BSON("state" << BSON("$in" << BSON_ARRAY(preparedState << inProgressState))),
+        Query().sort(SessionTxnRecord::kStartOpTimeFieldName.toString(), 1),
         &transactionTableOpTimeFields,
         QueryOption_SecondaryOk,
         ReadConcernArgs(ReadConcernLevel::kMajorityReadConcern).toBSONInner());
@@ -1875,6 +1876,7 @@ void TenantMigrationRecipientService::Instance::_fetchAndStoreDonorClusterTimeKe
     std::vector<ExternalKeysCollectionDocument> keyDocs;
     auto cursor =
         _client->query(NamespaceString::kKeysCollectionNamespace,
+                       BSONObj{},
                        Query().readPref(_readPreference.pref, _readPreference.tags.getTagBSON()));
     while (cursor->more()) {
         const auto doc = cursor->nextSafe().getOwned();
@@ -1892,7 +1894,8 @@ void TenantMigrationRecipientService::Instance::_compareRecipientAndDonorFCV() c
 
     auto donorFCVbson =
         _client->findOne(NamespaceString::kServerConfigurationNamespace.ns(),
-                         QUERY("_id" << FeatureCompatibilityVersionParser::kParameterName),
+                         BSON("_id" << FeatureCompatibilityVersionParser::kParameterName),
+                         Query(),
                          nullptr,
                          QueryOption_SecondaryOk,
                          ReadConcernArgs(ReadConcernLevel::kMajorityReadConcern).toBSONInner());

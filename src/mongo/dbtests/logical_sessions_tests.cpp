@@ -57,14 +57,13 @@ Status insertRecord(OperationContext* opCtx, LogicalSessionRecord record) {
     return getStatusFromWriteCommandReply(response);
 }
 
-BSONObj lsidQuery(const LogicalSessionId& lsid) {
-    return BSON(LogicalSessionRecord::kIdFieldName << lsid.toBSON());
-}
-
 StatusWith<LogicalSessionRecord> fetchRecord(OperationContext* opCtx,
                                              const LogicalSessionId& lsid) {
     DBDirectClient client(opCtx);
-    auto cursor = client.query(NamespaceString(kTestNS), lsidQuery(lsid), 1);
+    auto cursor = client.query(NamespaceString(kTestNS),
+                               BSON(LogicalSessionRecord::kIdFieldName << lsid.toBSON()),
+                               Query(),
+                               1);
     if (!cursor->more()) {
         return {ErrorCodes::NoSuchSession, "No matching record in the sessions collection"};
     }

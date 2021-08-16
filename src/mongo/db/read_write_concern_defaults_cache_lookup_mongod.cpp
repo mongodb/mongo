@@ -50,7 +50,7 @@ BSONObj getPersistedDefaultRWConcernDocument(OperationContext* opCtx) {
 
     DBDirectClient client(opCtx);
     return client.findOne(NamespaceString::kConfigSettingsNamespace.toString(),
-                          QUERY("_id" << ReadWriteConcernDefaults::kPersistedDocumentId));
+                          BSON("_id" << ReadWriteConcernDefaults::kPersistedDocumentId));
 }
 
 }  // namespace

@@ -163,7 +163,7 @@ DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
                              (std::string) "^" + pcrecpp::RE::QuoteMeta(dbName.toString()) + "$",
                              "i");
 
-    auto dbDoc = client.findOne(DatabaseType::ConfigNS.ns(), {queryBuilder.obj()});
+    auto dbDoc = client.findOne(DatabaseType::ConfigNS.ns(), queryBuilder.obj());
     auto const [primaryShardPtr, database] = [&] {
         if (!dbDoc.isEmpty()) {
             auto actualDb = uassertStatusOK(DatabaseType::fromBSON(dbDoc));

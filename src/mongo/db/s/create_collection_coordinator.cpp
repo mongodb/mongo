@@ -156,7 +156,7 @@ bool checkIfCollectionIsEmpty(OperationContext* opCtx, const NamespaceString& ns
     // command doesn't just consult the cached metadata, which may not always be
     // correct
     DBDirectClient localClient(opCtx);
-    return localClient.findOne(nss.ns(), Query()).isEmpty();
+    return localClient.findOne(nss.ns(), BSONObj{}).isEmpty();
 }
 
 int getNumShards(OperationContext* opCtx) {

@@ -270,9 +270,9 @@ void ensureRangeDeletionTaskStillExists(OperationContext* opCtx, const UUID& mig
     // for deleting the range deletion task document.
     PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
     auto count = store.count(opCtx,
-                             QUERY(RangeDeletionTask::kIdFieldName
-                                   << migrationId << RangeDeletionTask::kPendingFieldName
-                                   << BSON("$exists" << false)));
+                             BSON(RangeDeletionTask::kIdFieldName
+                                  << migrationId << RangeDeletionTask::kPendingFieldName
+                                  << BSON("$exists" << false)));
     invariant(count == 0 || count == 1, "found duplicate range deletion tasks");
     uassert(ErrorCodes::RangeDeletionAbandonedBecauseTaskDocumentDoesNotExist,
             "Range deletion task no longer exists",
@@ -380,7 +380,7 @@ void removePersistentRangeDeletionTask(const NamespaceString& nss, UUID migratio
     withTemporaryOperationContext([&](OperationContext* opCtx) {
         PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
 
-        store.remove(opCtx, QUERY(RangeDeletionTask::kIdFieldName << migrationId));
+        store.remove(opCtx, BSON(RangeDeletionTask::kIdFieldName << migrationId));
     });
 }
 
@@ -413,7 +413,7 @@ std::vector<RangeDeletionTask> getPersistentRangeDeletionTasks(OperationContext*
     std::vector<RangeDeletionTask> tasks;
 
     PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
-    auto query = QUERY(RangeDeletionTask::kNssFieldName << nss.ns());
+    auto query = BSON(RangeDeletionTask::kNssFieldName << nss.ns());
 
     store.forEach(opCtx, query, [&](const RangeDeletionTask& deletionTask) {
         tasks.push_back(std::move(deletionTask));
@@ -431,7 +431,7 @@ void snapshotRangeDeletionsForRename(OperationContext* opCtx,
     // Clear out eventual snapshots associated with the target collection: always restart from a
     // clean state in case of stepdown or primary killed.
     PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionForRenameNamespace);
-    store.remove(opCtx, QUERY(RangeDeletionTask::kNssFieldName << toNss.ns()));
+    store.remove(opCtx, BSON(RangeDeletionTask::kNssFieldName << toNss.ns()));
 
     auto rangeDeletionTasks = getPersistentRangeDeletionTasks(opCtx, fromNss);
     for (auto& task : rangeDeletionTasks) {
@@ -449,7 +449,7 @@ void restoreRangeDeletionTasksForRename(OperationContext* opCtx, const Namespace
     PersistentTaskStore<RangeDeletionTask> rangeDeletionsStore(
         NamespaceString::kRangeDeletionNamespace);
 
-    const auto query = QUERY(RangeDeletionTask::kNssFieldName << nss.ns());
+    const auto query = BSON(RangeDeletionTask::kNssFieldName << nss.ns());
 
     rangeDeletionsForRenameStore.forEach(opCtx, query, [&](const RangeDeletionTask& deletionTask) {
         try {
@@ -467,13 +467,13 @@ void deleteRangeDeletionTasksForRename(OperationContext* opCtx,
     // Delete range deletion tasks associated to the source collection
     PersistentTaskStore<RangeDeletionTask> rangeDeletionsStore(
         NamespaceString::kRangeDeletionNamespace);
-    rangeDeletionsStore.remove(opCtx, QUERY(RangeDeletionTask::kNssFieldName << fromNss.ns()));
+    rangeDeletionsStore.remove(opCtx, BSON(RangeDeletionTask::kNssFieldName << fromNss.ns()));
 
     // Delete already restored snapshots associated to the target collection
     PersistentTaskStore<RangeDeletionTask> rangeDeletionsForRenameStore(
         NamespaceString::kRangeDeletionForRenameNamespace);
     rangeDeletionsForRenameStore.remove(opCtx,
-                                        QUERY(RangeDeletionTask::kNssFieldName << toNss.ns()));
+                                        BSON(RangeDeletionTask::kNssFieldName << toNss.ns()));
 }
 
 

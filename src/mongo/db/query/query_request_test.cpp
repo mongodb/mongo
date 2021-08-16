@@ -1551,24 +1551,20 @@ TEST(QueryRequestTest, ConvertToFindWithAllowDiskUseFalseSucceeds) {
 TEST(QueryRequestTest, ParseFromLegacyQuery) {
     const auto kSkip = 1;
     const NamespaceString nss("test.testns");
-    BSONObj queryObj = fromjson(R"({
-            query: {query: 1},
-            orderby: {sort: 1},
-            $hint: {hint: 1},
-            $min: {x: 'min'},
-            $max: {x: 'max'}
-         })");
 
     unique_ptr<FindCommandRequest> findCommand(assertGet(query_request_helper::fromLegacyQuery(
-        nss, queryObj, BSON("proj" << 1), kSkip, QueryOption_Exhaust)));
+        nss,
+        fromjson("{query: 1}") /*filter*/,
+        Query().sort(BSON("sort" << 1)).hint(BSON("hint" << 1)),
+        BSON("proj" << 1),
+        kSkip,
+        QueryOption_Exhaust)));
 
     ASSERT_EQ(*findCommand->getNamespaceOrUUID().nss(), nss);
     ASSERT_BSONOBJ_EQ(findCommand->getFilter(), fromjson("{query: 1}"));
     ASSERT_BSONOBJ_EQ(findCommand->getProjection(), fromjson("{proj: 1}"));
     ASSERT_BSONOBJ_EQ(findCommand->getSort(), fromjson("{sort: 1}"));
     ASSERT_BSONOBJ_EQ(findCommand->getHint(), fromjson("{hint: 1}"));
-    ASSERT_BSONOBJ_EQ(findCommand->getMin(), fromjson("{x: 'min'}"));
-    ASSERT_BSONOBJ_EQ(findCommand->getMax(), fromjson("{x: 'max'}"));
     ASSERT_EQ(findCommand->getSkip(), boost::optional<int64_t>(kSkip));
     ASSERT_FALSE(findCommand->getNtoreturn());
     ASSERT_EQ(findCommand->getSingleBatch(), false);
@@ -1579,15 +1575,14 @@ TEST(QueryRequestTest, ParseFromLegacyQuery) {
 
 TEST(QueryRequestTest, ParseFromLegacyQueryOplogReplayFlagAllowed) {
     const NamespaceString nss("test.testns");
-    auto queryObj = fromjson("{query: {query: 1}, orderby: {sort: 1}}");
     const BSONObj projectionObj{};
     const auto nToSkip = 0;
 
     // Test that parsing succeeds even if the oplog replay bit is set in the OP_QUERY message. This
     // flag may be set by old clients.
     auto options = QueryOption_OplogReplay_DEPRECATED;
-    unique_ptr<FindCommandRequest> findCommand(assertGet(
-        query_request_helper::fromLegacyQuery(nss, queryObj, projectionObj, nToSkip, options)));
+    unique_ptr<FindCommandRequest> findCommand(assertGet(query_request_helper::fromLegacyQuery(
+        nss, fromjson("{query: 1}"), Query().sort("sort", 1), projectionObj, nToSkip, options)));
 
     // Verify that if we reserialize the find command, the 'oplogReplay' field
     // does not appear.
@@ -1603,12 +1598,9 @@ TEST(QueryRequestTest, ParseFromLegacyQueryOplogReplayFlagAllowed) {
 }
 
 TEST(QueryRequestTest, ParseFromLegacyQueryUnwrapped) {
-    BSONObj queryObj = fromjson(R"({
-            foo: 1
-         })");
     const NamespaceString nss("test.testns");
-    unique_ptr<FindCommandRequest> findCommand(assertGet(
-        query_request_helper::fromLegacyQuery(nss, queryObj, BSONObj(), 0, QueryOption_Exhaust)));
+    unique_ptr<FindCommandRequest> findCommand(assertGet(query_request_helper::fromLegacyQuery(
+        nss, fromjson("{foo: 1}"), Query(), BSONObj(), 0, QueryOption_Exhaust)));
 
     ASSERT_EQ(*findCommand->getNamespaceOrUUID().nss(), nss);
     ASSERT_BSONOBJ_EQ(findCommand->getFilter(), fromjson("{foo: 1}"));
@@ -1626,20 +1618,6 @@ TEST(QueryRequestHelperTest, ValidateResponseWrongDataType) {
     ASSERT_THROWS_CODE(query_request_helper::validateCursorResponse(builder.asTempObj()),
                        DBException,
                        ErrorCodes::TypeMismatch);
-}
-
-TEST(QueryRequestTest, ParseFromLegacyQueryExplainError) {
-    BSONObj queryObj = fromjson(R"({
-            query: {query: 1},
-            $explain: false
-         })");
-
-    const NamespaceString nss("test.testns");
-    ASSERT_EQUALS(
-        query_request_helper::fromLegacyQuery(nss, queryObj, BSONObj(), 0, QueryOption_Exhaust)
-            .getStatus()
-            .code(),
-        static_cast<ErrorCodes::Error>(5856600));
 }
 
 class QueryRequestTest : public ServiceContextTest {};

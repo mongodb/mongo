@@ -93,7 +93,7 @@ public:
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient client(&opCtx);
 
-        ASSERT_THROWS_CODE(client.query(NamespaceString(), Query(), 1)->nextSafe(),
+        ASSERT_THROWS_CODE(client.query(NamespaceString(), BSONObj{}, Query(), 1)->nextSafe(),
                            AssertionException,
                            ErrorCodes::InvalidNamespace);
     }
@@ -130,7 +130,8 @@ public:
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient client(&opCtx);
 
-        auto response = client.updateAcknowledged("", Query(), BSON("$set" << BSON("x" << 1)));
+        auto response =
+            client.updateAcknowledged("", BSONObj{} /*filter*/, BSON("$set" << BSON("x" << 1)));
         ASSERT_EQ(ErrorCodes::InvalidNamespace, getStatusFromCommandResult(response));
     }
 };
@@ -142,7 +143,7 @@ public:
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient client(&opCtx);
 
-        auto response = client.removeAcknowledged("", Query());
+        auto response = client.removeAcknowledged("", BSONObj{} /*filter*/);
         ASSERT_EQ(ErrorCodes::InvalidNamespace, getStatusFromCommandResult(response));
     }
 };

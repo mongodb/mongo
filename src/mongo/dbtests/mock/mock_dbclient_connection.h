@@ -122,7 +122,8 @@ public:
 
     std::unique_ptr<mongo::DBClientCursor> query(
         const NamespaceStringOrUUID& nsOrUuid,
-        mongo::Query query = mongo::Query(),
+        const BSONObj& filter = BSONObj{},
+        const Query& querySettings = Query(),
         int limit = 0,
         int nToSkip = 0,
         const mongo::BSONObj* fieldsToReturn = nullptr,
@@ -143,7 +144,7 @@ public:
                 boost::optional<BSONObj> writeConcernObj = boost::none) override;
 
     void remove(const std::string& ns,
-                Query query,
+                const BSONObj& filter,
                 bool removeMany = true,
                 boost::optional<BSONObj> writeConcernObj = boost::none) override;
 
@@ -183,7 +184,8 @@ public:
 
     unsigned long long query(std::function<void(mongo::DBClientCursorBatchIterator&)> f,
                              const NamespaceStringOrUUID& nsOrUuid,
-                             mongo::Query query,
+                             const BSONObj& filter,
+                             const Query& querySettings,
                              const mongo::BSONObj* fieldsToReturn = nullptr,
                              int queryOptions = 0,
                              int batchSize = 0,

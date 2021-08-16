@@ -131,7 +131,7 @@ void MockRemoteDBServer::insert(const string& ns, BSONObj obj) {
     mockCollection.push_back(obj.copy());
 }
 
-void MockRemoteDBServer::remove(const string& ns, Query) {
+void MockRemoteDBServer::remove(const string& ns, const BSONObj&) {
     scoped_spinlock sLock(_lock);
     if (_dataMgr.count(ns) == 0) {
         return;
@@ -197,7 +197,8 @@ BSONObj MockRemoteDBServer::project(projection_executor::ProjectionExecutor* pro
 
 mongo::BSONArray MockRemoteDBServer::query(MockRemoteDBServer::InstanceID id,
                                            const NamespaceStringOrUUID& nsOrUuid,
-                                           mongo::Query query,
+                                           const BSONObj& filter,
+                                           const Query& querySettings,
                                            int limit,
                                            int nToSkip,
                                            const BSONObj* fieldsToReturn,

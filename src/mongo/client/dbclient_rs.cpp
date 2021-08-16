@@ -105,14 +105,15 @@ const size_t MAX_RETRY = 3;
  *
  * @throws AssertionException if the read preference object is malformed
  */
-std::unique_ptr<ReadPreferenceSetting> _extractReadPref(const BSONObj& query, int queryOptions) {
+std::unique_ptr<ReadPreferenceSetting> _extractReadPref(const Query& querySettings,
+                                                        int queryOptions) {
     // Default read pref is primary only or secondary preferred with secondaryOK
     const auto defaultReadPref = queryOptions & QueryOption_SecondaryOk
         ? ReadPreference::SecondaryPreferred
         : ReadPreference::PrimaryOnly;
 
-    auto readPrefContainingObj = query;
-    if (auto elem = query["$queryOptions"]) {
+    BSONObj readPrefContainingObj = querySettings.getFullSettingsDeprecated();
+    if (auto elem = readPrefContainingObj["$queryOptions"]) {
         // The readPreference is embedded in the $queryOptions field.
         readPrefContainingObj = elem.Obj();
     }
@@ -248,7 +249,7 @@ bool _isSecondaryCommand(StringData commandName, const BSONObj& commandArgs) {
 
 // Internal implementation of isSecondaryQuery, takes previously-parsed read preference
 bool _isSecondaryQuery(const string& ns,
-                       const BSONObj& queryObj,
+                       const BSONObj& filter,
                        const ReadPreferenceSetting& readPref) {
     // If the read pref is primary only, this is not a secondary query
     if (readPref.pref == ReadPreference::PrimaryOnly)
@@ -261,28 +262,11 @@ bool _isSecondaryQuery(const string& ns,
     // This is a command with secondary-possible read pref
     // Only certain commands are supported for secondary operation.
 
-    BSONObj actualQueryObj;
-    if (strcmp(queryObj.firstElement().fieldName(), "$query") == 0) {
-        actualQueryObj = queryObj["$query"].embeddedObject();
-    } else if (strcmp(queryObj.firstElement().fieldName(), "query") == 0) {
-        actualQueryObj = queryObj["query"].embeddedObject();
-    } else {
-        actualQueryObj = queryObj;
-    }
-
-    StringData commandName = actualQueryObj.firstElementFieldName();
-    return _isSecondaryCommand(commandName, actualQueryObj);
+    StringData commandName = filter.firstElementFieldName();
+    return _isSecondaryCommand(commandName, filter);
 }
 
 }  // namespace
-
-
-bool DBClientReplicaSet::isSecondaryQuery(const string& ns,
-                                          const BSONObj& queryObj,
-                                          int queryOptions) {
-    unique_ptr<ReadPreferenceSetting> readPref(_extractReadPref(queryObj, queryOptions));
-    return _isSecondaryQuery(ns, queryObj, *readPref);
-}
 
 DBClientConnection* DBClientReplicaSet::checkPrimary() {
     ReplicaSetMonitorPtr monitor = _getMonitor();
@@ -545,24 +529,25 @@ void DBClientReplicaSet::insert(const string& ns,
 }
 
 void DBClientReplicaSet::remove(const string& ns,
-                                Query obj,
+                                const BSONObj& filter,
                                 bool removeMany,
                                 boost::optional<BSONObj> writeConcernObj) {
-    checkPrimary()->remove(ns, obj, removeMany, writeConcernObj);
+    checkPrimary()->remove(ns, filter, removeMany, writeConcernObj);
 }
 
 unique_ptr<DBClientCursor> DBClientReplicaSet::query(const NamespaceStringOrUUID& nsOrUuid,
-                                                     Query query,
+                                                     const BSONObj& filter,
+                                                     const Query& querySettings,
                                                      int limit,
                                                      int nToSkip,
                                                      const BSONObj* fieldsToReturn,
                                                      int queryOptions,
                                                      int batchSize,
                                                      boost::optional<BSONObj> readConcernObj) {
-    shared_ptr<ReadPreferenceSetting> readPref(_extractReadPref(query.obj, queryOptions));
+    shared_ptr<ReadPreferenceSetting> readPref(_extractReadPref(querySettings, queryOptions));
     invariant(nsOrUuid.nss());
     const string ns = nsOrUuid.nss()->ns();
-    if (_isSecondaryQuery(ns, query.obj, *readPref)) {
+    if (_isSecondaryQuery(ns, filter, *readPref)) {
         LOGV2_DEBUG(20133,
                     3,
                     "dbclient_rs query using secondary or tagged node selection in {replicaSet}, "
@@ -588,7 +573,8 @@ unique_ptr<DBClientCursor> DBClientReplicaSet::query(const NamespaceStringOrUUID
                 }
 
                 unique_ptr<DBClientCursor> cursor = conn->query(nsOrUuid,
-                                                                query,
+                                                                filter,
+                                                                querySettings,
                                                                 limit,
                                                                 nToSkip,
                                                                 fieldsToReturn,
@@ -620,17 +606,25 @@ unique_ptr<DBClientCursor> DBClientReplicaSet::query(const NamespaceStringOrUUID
                 "dbclient_rs query to primary node",
                 "replicaSet"_attr = _getMonitor()->getName());
 
-    return checkPrimary()->query(
-        nsOrUuid, query, limit, nToSkip, fieldsToReturn, queryOptions, batchSize, readConcernObj);
+    return checkPrimary()->query(nsOrUuid,
+                                 filter,
+                                 querySettings,
+                                 limit,
+                                 nToSkip,
+                                 fieldsToReturn,
+                                 queryOptions,
+                                 batchSize,
+                                 readConcernObj);
 }
 
 BSONObj DBClientReplicaSet::findOne(const string& ns,
-                                    const Query& query,
+                                    const BSONObj& filter,
+                                    const Query& querySettings,
                                     const BSONObj* fieldsToReturn,
                                     int queryOptions,
                                     boost::optional<BSONObj> readConcernObj) {
-    shared_ptr<ReadPreferenceSetting> readPref(_extractReadPref(query.obj, queryOptions));
-    if (_isSecondaryQuery(ns, query.obj, *readPref)) {
+    shared_ptr<ReadPreferenceSetting> readPref(_extractReadPref(querySettings, queryOptions));
+    if (_isSecondaryQuery(ns, filter, *readPref)) {
         LOGV2_DEBUG(20135,
                     3,
                     "dbclient_rs findOne using secondary or tagged node selection in {replicaSet}, "
@@ -655,7 +649,8 @@ BSONObj DBClientReplicaSet::findOne(const string& ns,
                     break;
                 }
 
-                return conn->findOne(ns, query, fieldsToReturn, queryOptions, readConcernObj);
+                return conn->findOne(
+                    ns, filter, querySettings, fieldsToReturn, queryOptions, readConcernObj);
             } catch (const DBException& ex) {
                 const Status status = ex.toStatus(str::stream() << "can't findone replica set node "
                                                                 << _lastSecondaryOkHost.toString());
@@ -679,7 +674,8 @@ BSONObj DBClientReplicaSet::findOne(const string& ns,
                 "dbclient_rs findOne to primary node",
                 "replicaSet"_attr = _getMonitor()->getName());
 
-    return checkPrimary()->findOne(ns, query, fieldsToReturn, queryOptions, readConcernObj);
+    return checkPrimary()->findOne(
+        ns, filter, querySettings, fieldsToReturn, queryOptions, readConcernObj);
 }
 
 void DBClientReplicaSet::killCursor(const NamespaceString& ns, long long cursorID) {
@@ -833,7 +829,8 @@ void DBClientReplicaSet::say(Message& toSend, bool isRetry, string* actualServer
         DbMessage dm(toSend);
         QueryMessage qm(dm);
 
-        shared_ptr<ReadPreferenceSetting> readPref(_extractReadPref(qm.query, qm.queryOptions));
+        shared_ptr<ReadPreferenceSetting> readPref(
+            _extractReadPref(Query::fromBSONDeprecated(qm.query), qm.queryOptions));
         if (_isSecondaryQuery(qm.ns, qm.query, *readPref)) {
             LOGV2_DEBUG(20141,
                         3,
@@ -998,7 +995,8 @@ bool DBClientReplicaSet::call(Message& toSend,
         QueryMessage qm(dm);
         ns = qm.ns;
 
-        shared_ptr<ReadPreferenceSetting> readPref(_extractReadPref(qm.query, qm.queryOptions));
+        shared_ptr<ReadPreferenceSetting> readPref(
+            _extractReadPref(Query::fromBSONDeprecated(qm.query), qm.queryOptions));
         if (_isSecondaryQuery(ns, qm.query, *readPref)) {
             LOGV2_DEBUG(
                 20145,

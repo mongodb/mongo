@@ -1994,7 +1994,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, MigratingKnownStmtWhileOplogTrunc
     {
         // Confirm that oplog is indeed empty.
         DBDirectClient client(opCtx);
-        auto result = client.findOne(NamespaceString::kRsOplogNamespace.ns(), {});
+        auto result = client.findOne(NamespaceString::kRsOplogNamespace.ns(), BSONObj{});
         ASSERT_TRUE(result.isEmpty());
     }
 

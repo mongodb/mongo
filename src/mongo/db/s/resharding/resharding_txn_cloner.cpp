@@ -111,7 +111,7 @@ boost::optional<LogicalSessionId> ReshardingTxnCloner::_fetchProgressLsid(Operat
 
     boost::optional<LogicalSessionId> progressLsid;
     store.forEach(opCtx,
-                  QUERY(ReshardingTxnClonerProgress::kSourceIdFieldName << _sourceId.toBSON()),
+                  BSON(ReshardingTxnClonerProgress::kSourceIdFieldName << _sourceId.toBSON()),
                   [&](const auto& doc) {
                       progressLsid = doc.getProgress();
                       return false;
@@ -184,7 +184,7 @@ void ReshardingTxnCloner::_updateProgressDocument(OperationContext* opCtx,
 
     store.upsert(
         opCtx,
-        QUERY(ReshardingTxnClonerProgress::kSourceIdFieldName << _sourceId.toBSON()),
+        BSON(ReshardingTxnClonerProgress::kSourceIdFieldName << _sourceId.toBSON()),
         BSON("$set" << BSON(ReshardingTxnClonerProgress::kProgressFieldName << progress.toBSON())),
         {1, WriteConcernOptions::SyncMode::UNSET, Seconds(0)});
 }

@@ -391,7 +391,7 @@ TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnMultiUpdates)
     OperationShardingState::get(opCtx).initializeClientRoutingVersions(
         kNss, ChunkVersion::IGNORED(), env.dbVersion);
     client.update(kNss.ns(),
-                  Query{BSON("x" << 0)},
+                  BSON("x" << 0),
                   BSON("$set" << BSON("z" << 5)),
                   false /*upsert*/,
                   true /*multi*/);

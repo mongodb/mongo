@@ -239,9 +239,9 @@ void createRetryableFindAndModifyTable(OperationContext* opCtx) {
 
 void abortInProgressTransactions(OperationContext* opCtx) {
     DBDirectClient client(opCtx);
-    Query query(BSON(SessionTxnRecord::kStateFieldName
-                     << DurableTxnState_serializer(DurableTxnStateEnum::kInProgress)));
-    auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace, query);
+    auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace,
+                               BSON(SessionTxnRecord::kStateFieldName << DurableTxnState_serializer(
+                                        DurableTxnStateEnum::kInProgress)));
     if (cursor->more()) {
         LOGV2_DEBUG(21977, 3, "Aborting in-progress transactions on stepup.");
     }
@@ -428,12 +428,12 @@ int MongoDSessionCatalog::reapSessionsOlderThan(OperationContext* opCtx,
 
     // Scan for records older than the minimum lifetime and uses a sort to walk the '_id' index
     DBDirectClient client(opCtx);
-    auto cursor =
-        client.query(NamespaceString::kSessionTransactionsTableNamespace,
-                     Query(BSON(kLastWriteDateFieldName << LT << possiblyExpired)).sort(kSortById),
-                     0,
-                     0,
-                     &kIdProjection);
+    auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace,
+                               BSON(kLastWriteDateFieldName << LT << possiblyExpired),
+                               Query().sort(kSortById),
+                               0,
+                               0,
+                               &kIdProjection);
 
     // The max batch size is chosen so that a single batch won't exceed the 16MB BSON object size
     // limit

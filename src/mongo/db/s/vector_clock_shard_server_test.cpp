@@ -292,8 +292,8 @@ protected:
     }
 };
 
-const Query kVectorClockQuery = QUERY("_id"
-                                      << "vectorClockState");
+const BSONObj kVectorClockQuery = BSON("_id"
+                                       << "vectorClockState");
 
 TEST_F(VectorClockPersistenceTest, PrimaryPersistVectorClockDocument) {
     auto sc = getServiceContext();

@@ -174,7 +174,7 @@ public:
         std::vector<repl::DurableOplogEntry> result;
 
         PersistentTaskStore<repl::OplogEntryBase> store(NamespaceString::kRsOplogNamespace);
-        store.forEach(opCtx, QUERY("ts" << BSON("$gt" << ts)), [&](const auto& oplogEntry) {
+        store.forEach(opCtx, BSON("ts" << BSON("$gt" << ts)), [&](const auto& oplogEntry) {
             result.emplace_back(
                 unittest::assertGet(repl::DurableOplogEntry::parse(oplogEntry.toBSON())));
             return true;
@@ -190,7 +190,7 @@ public:
         PersistentTaskStore<SessionTxnRecord> store(
             NamespaceString::kSessionTransactionsTableNamespace);
         store.forEach(opCtx,
-                      QUERY(SessionTxnRecord::kSessionIdFieldName << lsid.toBSON()),
+                      BSON(SessionTxnRecord::kSessionIdFieldName << lsid.toBSON()),
                       [&](const auto& sessionTxnRecord) {
                           result.emplace(sessionTxnRecord);
                           return false;

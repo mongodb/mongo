@@ -145,9 +145,9 @@ public:
      * Removes documents from this server.
      *
      * @param ns the namespace to remove documents from.
-     * @param query ignored.
+     * @param filter ignored.
      */
-    void remove(const std::string& ns, Query query);
+    void remove(const std::string& ns, const BSONObj& filter);
 
     /**
      * Assign a UUID to a collection
@@ -164,7 +164,8 @@ public:
 
     mongo::BSONArray query(InstanceID id,
                            const NamespaceStringOrUUID& nsOrUuid,
-                           mongo::Query query = mongo::Query(),
+                           const BSONObj& filter,
+                           const Query& querySettings,
                            int limit = 0,
                            int nToSkip = 0,
                            const mongo::BSONObj* fieldsToReturn = nullptr,

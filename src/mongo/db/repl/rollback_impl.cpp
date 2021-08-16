@@ -477,10 +477,10 @@ void RollbackImpl::_restoreTxnsTableEntryFromRetryableWrites(OperationContext* o
                                           << "fromMigrate" << true);
     auto cursor = client->query(
         NamespaceString::kRsOplogNamespace,
-        QUERY("ts" << BSON("$gt" << stableTimestamp) << "txnNumber" << BSON("$exists" << true)
-                   << "stmtId" << BSON("$exists" << true) << "prevOpTime.ts"
-                   << BSON("$gte" << Timestamp(1, 0) << "$lte" << stableTimestamp) << "$or"
-                   << BSON_ARRAY(filter << filterFromMigration)));
+        BSON("ts" << BSON("$gt" << stableTimestamp) << "txnNumber" << BSON("$exists" << true)
+                  << "stmtId" << BSON("$exists" << true) << "prevOpTime.ts"
+                  << BSON("$gte" << Timestamp(1, 0) << "$lte" << stableTimestamp) << "$or"
+                  << BSON_ARRAY(filter << filterFromMigration)));
     while (cursor->more()) {
         auto doc = cursor->next();
         auto swEntry = OplogEntry::parse(doc);

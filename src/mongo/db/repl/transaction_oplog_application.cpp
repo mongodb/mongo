@@ -556,8 +556,8 @@ void reconstructPreparedTransactions(OperationContext* opCtx, repl::OplogApplica
 
     DBDirectClient client(opCtx);
     const auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace,
-                                     {BSON("state"
-                                           << "prepared")});
+                                     BSON("state"
+                                          << "prepared"));
 
     // Iterate over each entry in the transactions table that has a prepared transaction.
     while (cursor->more()) {

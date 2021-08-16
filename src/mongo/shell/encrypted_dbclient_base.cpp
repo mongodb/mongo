@@ -508,15 +508,23 @@ JS::Value EncryptedDBClientBase::getCollection() const {
 
 std::unique_ptr<DBClientCursor> EncryptedDBClientBase::query(
     const NamespaceStringOrUUID& nsOrUuid,
-    Query query,
+    const BSONObj& filter,
+    const Query& querySettings,
     int limit,
     int nToSkip,
     const BSONObj* fieldsToReturn,
     int queryOptions,
     int batchSize,
     boost::optional<BSONObj> readConcernObj) {
-    return _conn->query(
-        nsOrUuid, query, limit, nToSkip, fieldsToReturn, queryOptions, batchSize, readConcernObj);
+    return _conn->query(nsOrUuid,
+                        filter,
+                        querySettings,
+                        limit,
+                        nToSkip,
+                        fieldsToReturn,
+                        queryOptions,
+                        batchSize,
+                        readConcernObj);
 }
 
 bool EncryptedDBClientBase::isFailed() const {
@@ -616,8 +624,12 @@ std::shared_ptr<SymmetricKey> EncryptedDBClientBase::getDataKey(const UUID& uuid
 
 std::shared_ptr<SymmetricKey> EncryptedDBClientBase::getDataKeyFromDisk(const UUID& uuid) {
     NamespaceString fullNameNS = getCollectionNS();
-    BSONObj dataKeyObj = _conn->findOne(
-        fullNameNS.ns(), QUERY("_id" << uuid), nullptr, 0, repl::ReadConcernArgs::kImplicitDefault);
+    BSONObj dataKeyObj = _conn->findOne(fullNameNS.ns(),
+                                        BSON("_id" << uuid),
+                                        Query(),
+                                        nullptr,
+                                        0,
+                                        repl::ReadConcernArgs::kImplicitDefault);
     if (dataKeyObj.isEmpty()) {
         uasserted(ErrorCodes::BadValue, "Invalid keyID.");
     }

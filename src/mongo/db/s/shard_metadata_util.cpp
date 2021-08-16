@@ -137,12 +137,13 @@ StatusWith<RefreshState> getPersistedRefreshFlags(OperationContext* opCtx,
 StatusWith<ShardCollectionType> readShardCollectionsEntry(OperationContext* opCtx,
                                                           const NamespaceString& nss) {
 
-    Query fullQuery(BSON(ShardCollectionType::kNssFieldName << nss.ns()));
-
     try {
         DBDirectClient client(opCtx);
         std::unique_ptr<DBClientCursor> cursor =
-            client.query(NamespaceString::kShardConfigCollectionsNamespace, fullQuery, 1);
+            client.query(NamespaceString::kShardConfigCollectionsNamespace,
+                         BSON(ShardCollectionType::kNssFieldName << nss.ns()),
+                         Query(),
+                         1);
         if (!cursor) {
             return Status(ErrorCodes::OperationFailed,
                           str::stream() << "Failed to establish a cursor for reading "
@@ -165,12 +166,13 @@ StatusWith<ShardCollectionType> readShardCollectionsEntry(OperationContext* opCt
 }
 
 StatusWith<ShardDatabaseType> readShardDatabasesEntry(OperationContext* opCtx, StringData dbName) {
-    Query fullQuery(BSON(ShardDatabaseType::name() << dbName.toString()));
-
     try {
         DBDirectClient client(opCtx);
         std::unique_ptr<DBClientCursor> cursor =
-            client.query(NamespaceString::kShardConfigDatabasesNamespace, fullQuery, 1);
+            client.query(NamespaceString::kShardConfigDatabasesNamespace,
+                         BSON(ShardDatabaseType::name() << dbName.toString()),
+                         Query(),
+                         1);
         if (!cursor) {
             return Status(ErrorCodes::OperationFailed,
                           str::stream() << "Failed to establish a cursor for reading "
@@ -292,11 +294,8 @@ StatusWith<std::vector<ChunkType>> readShardChunks(OperationContext* opCtx,
     try {
         DBDirectClient client(opCtx);
 
-        Query fullQuery(query);
-        fullQuery.sort(sort);
-
         std::unique_ptr<DBClientCursor> cursor =
-            client.query(chunksNss, fullQuery, limit.get_value_or(0));
+            client.query(chunksNss, query, Query().sort(sort), limit.get_value_or(0));
         uassert(ErrorCodes::OperationFailed,
                 str::stream() << "Failed to establish a cursor for reading " << chunksNss.ns()
                               << " from local storage",

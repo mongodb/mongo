@@ -627,8 +627,8 @@ TEST_F(ReshardingRecipientServiceTest, TruncatesXLErrorOnRecipientDocument) {
             PersistentTaskStore<ReshardingRecipientDocument> store(
                 NamespaceString::kRecipientReshardingOperationsNamespace);
             store.forEach(opCtx.get(),
-                          QUERY(ReshardingRecipientDocument::kReshardingUUIDFieldName
-                                << doc.getReshardingUUID()),
+                          BSON(ReshardingRecipientDocument::kReshardingUUIDFieldName
+                               << doc.getReshardingUUID()),
                           [&](const auto& recipientDocument) {
                               persistedRecipientDocument.emplace(recipientDocument);
                               return false;

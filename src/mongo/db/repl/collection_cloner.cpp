@@ -308,12 +308,11 @@ void CollectionCloner::runQuery() {
         if (_resumeToken) {
             // Resume the query from where we left off.
             LOGV2_DEBUG(21133, 1, "Collection cloner will resume the last successful query");
-            query = QUERY("query" << BSONObj() << "$_requestResumeToken" << true << "$_resumeAfter"
-                                  << _resumeToken.get());
+            query.requestResumeToken(true).resumeAfter(_resumeToken.get());
         } else {
             // New attempt at a resumable query.
             LOGV2_DEBUG(21134, 1, "Collection cloner will run a new query");
-            query = QUERY("query" << BSONObj() << "$_requestResumeToken" << true);
+            query.requestResumeToken(true);
         }
         query.hint(BSON("$natural" << 1));
     }
@@ -326,6 +325,7 @@ void CollectionCloner::runQuery() {
     try {
         getClient()->query([this](DBClientCursorBatchIterator& iter) { handleNextBatch(iter); },
                            _sourceDbAndUuid,
+                           BSONObj{},
                            query,
                            nullptr /* fieldsToReturn */,
                            QueryOption_NoCursorTimeout | QueryOption_SecondaryOk |

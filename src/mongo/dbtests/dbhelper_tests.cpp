@@ -84,7 +84,7 @@ private:
     BSONArray docs(OperationContext* opCtx) const {
         DBDirectClient client(opCtx);
         unique_ptr<DBClientCursor> cursor =
-            client.query(NamespaceString(ns), Query().hint(BSON("_id" << 1)));
+            client.query(NamespaceString(ns), BSONObj{}, Query().hint(BSON("_id" << 1)));
         BSONArrayBuilder bab;
         while (cursor->more()) {
             bab << cursor->next();

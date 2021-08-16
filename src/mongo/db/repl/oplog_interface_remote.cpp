@@ -85,6 +85,7 @@ std::unique_ptr<OplogInterface::Iterator> OplogInterfaceRemote::makeIterator() c
     const BSONObj fields = BSON("ts" << 1 << "t" << 1LL);
     return std::unique_ptr<OplogInterface::Iterator>(
         new OplogIteratorRemote(_getConnection()->query(NamespaceString(_collectionName),
+                                                        BSONObj{},
                                                         query,
                                                         0,
                                                         0,

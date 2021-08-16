@@ -91,7 +91,8 @@ public:
     /** throws userassertion "no primary found" */
     std::unique_ptr<DBClientCursor> query(
         const NamespaceStringOrUUID& nsOrUuid,
-        Query query,
+        const BSONObj& filter,
+        const Query& querySettings,
         int limit = 0,
         int nToSkip = 0,
         const BSONObj* fieldsToReturn = nullptr,
@@ -101,7 +102,8 @@ public:
 
     /** throws userassertion "no primary found" */
     BSONObj findOne(const std::string& ns,
-                    const Query& query,
+                    const BSONObj& filter,
+                    const Query& querySettings,
                     const BSONObj* fieldsToReturn = nullptr,
                     int queryOptions = 0,
                     boost::optional<BSONObj> readConcernObj = boost::none) override;
@@ -119,7 +121,7 @@ public:
                 boost::optional<BSONObj> writeConcernObj = boost::none) override;
 
     void remove(const std::string& ns,
-                Query obj,
+                const BSONObj& filter,
                 bool removeMany = true,
                 boost::optional<BSONObj> writeConcernObj = boost::none) override;
 
@@ -212,18 +214,6 @@ public:
               Message& response,
               bool assertOk,
               std::string* actualServer) override;
-
-    /**
-     * Returns whether a query or command can be sent to secondaries based on the query object
-     * and options.
-     *
-     * @param ns the namespace of the query.
-     * @param queryObj the query object to check.
-     * @param queryOptions the query options
-     *
-     * @return true if the query/cmd could potentially be sent to a secondary, false otherwise
-     */
-    static bool isSecondaryQuery(const std::string& ns, const BSONObj& queryObj, int queryOptions);
 
     /**
      * Performs a "soft reset" by clearing all states relating to secondary nodes and

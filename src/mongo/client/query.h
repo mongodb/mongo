@@ -33,27 +33,30 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/rpc/message.h"
 
-
 namespace mongo {
 
-/** Represents a Mongo query expression.  Typically one uses the QUERY(...) macro to construct a
- * Query object.
-    Examples:
-       QUERY( "age" << 33 << "school" << "UCLA" ).sort("name")
-       QUERY( "age" << GT << 30 << LT << 50 )
-*/
-
+/**
+ * Represents a subset query settings, such as sort, hint, etc. and might also contain a query
+ * filter. The class is being evolved into statically checkable QueryOptions type that won't include
+ * the filter and will encompass all relevant query settings.
+ */
 class Query {
 public:
     static const BSONField<BSONObj> ReadPrefField;
     static const BSONField<std::string> ReadPrefModeField;
     static const BSONField<BSONArray> ReadPrefTagsField;
 
-    BSONObj obj;
+    /**
+     * Creating a Query object from raw BSON is on its way out. Please don't add new callers under
+     * any circumstances.
+     */
+    static Query fromBSONDeprecated(const BSONObj& b) {
+        Query q;
+        q.obj = b;
+        return q;
+    }
+
     Query() : obj(BSONObj()) {}
-    Query(const BSONObj& b) : obj(b) {}
-    Query(const std::string& json);
-    Query(const char* json);
 
     /** Add a sort (ORDER BY) criteria to the query expression.
         @param sortPattern the sort order template.  For example to order by name ascending, time
@@ -82,37 +85,6 @@ public:
           hint("{ts:1}")
     */
     Query& hint(BSONObj keyPattern);
-    Query& hint(const std::string& jsonKeyPatt);
-
-    /** Provide min and/or max index limits for the query.
-        min <= x < max
-     */
-    Query& minKey(const BSONObj& val);
-    /**
-       max is exclusive
-     */
-    Query& maxKey(const BSONObj& val);
-
-    /** Queries to the Mongo database support a $where parameter option which contains
-        a javascript function that is evaluated to see whether objects being queried match
-        its criteria.  Use this helper to append such a function to a query object.
-        Your query may also contain other traditional Mongo query terms.
-
-        @param jscode The javascript function to evaluate against each potential object
-               match.  The function must return true for matched objects.  Use the this
-               variable to inspect the current object.
-        @param scope SavedContext for the javascript object.  List in a BSON object any
-               variables you would like defined when the jscode executes.  One can think
-               of these as "bind variables".
-
-        Examples:
-          conn.findOne("test.coll", Query("{a:3}").where("this.b == 2 || this.c == 3"));
-          Query badBalance = Query().where("this.debits - this.credits < 0");
-    */
-    Query& where(const std::string& jscode, BSONObj scope);
-    Query& where(const std::string& jscode) {
-        return where(jscode, BSONObj());
-    }
 
     /**
      * Sets the read preference for this query.
@@ -122,27 +94,39 @@ public:
      */
     Query& readPref(ReadPreference pref, const BSONArray& tags);
 
+    BSONObj getFilter() const;
+
+    /**
+     * A temporary accessor that returns a reference to the internal BSON object. No new callers
+     * should be introduced!
+     * NB: must be implemented in the header because db/query/query_request cannot link against
+     * client/client_query.
+     */
+    const BSONObj& getFullSettingsDeprecated() const {
+        return obj;
+    }
+
+    /**
+     * The setters below were added to make the contents of the Query's settings internal BSON
+     * explicit. They will be reviewed and deprecated/removed as appropriate.
+     */
+    Query& appendElements(BSONObj elements);
+    Query& requestResumeToken(bool enable);
+    Query& resumeAfter(BSONObj point);
+    Query& maxTimeMS(long long timeout);
+    Query& term(long long value);
+    Query& readConcern(BSONObj rc);
+    Query& readOnce(bool enable);
+
+private:
+    BSONObj obj;
+
     /**
      * @return true if this query has an orderby, hint, or some other field
      */
     bool isComplex(bool* hasDollar = nullptr) const;
     static bool isComplex(const BSONObj& obj, bool* hasDollar = nullptr);
 
-    BSONObj getFilter() const;
-    BSONObj getSort() const;
-    BSONObj getHint() const;
-
-    /**
-     * @return true if the query object contains a read preference specification object.
-     */
-    static bool hasReadPreference(const BSONObj& queryObj);
-
-    std::string toString() const;
-    operator std::string() const {
-        return toString();
-    }
-
-private:
     void makeComplex();
     template <class T>
     void appendComplex(const char* fieldName, const T& val) {
@@ -154,12 +138,7 @@ private:
 };
 
 inline std::ostream& operator<<(std::ostream& s, const Query& q) {
-    return s << q.toString();
+    return s << q.getFullSettingsDeprecated().toString();
 }
-
-/** Typically one uses the QUERY(...) macro to construct a Query object.
-Example: QUERY( "age" << 33 << "school" << "UCLA" )
-*/
-#define QUERY(x) ::mongo::Query(BSON(x))
 
 }  // namespace mongo

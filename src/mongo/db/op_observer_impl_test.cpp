@@ -785,7 +785,7 @@ protected:
                          boost::optional<DurableTxnStateEnum> txnState) {
         DBDirectClient client(opCtx());
         auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace,
-                                   {BSON("_id" << session()->getSessionId().toBSON())});
+                                   BSON("_id" << session()->getSessionId().toBSON()));
         ASSERT(cursor);
         ASSERT(cursor->more());
 
@@ -811,7 +811,7 @@ protected:
     void assertNoTxnRecord() {
         DBDirectClient client(opCtx());
         auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace,
-                                   {BSON("_id" << session()->getSessionId().toBSON())});
+                                   BSON("_id" << session()->getSessionId().toBSON()));
         ASSERT(cursor);
         ASSERT(!cursor->more());
     }
@@ -819,7 +819,7 @@ protected:
     void assertTxnRecordStartOpTime(boost::optional<repl::OpTime> startOpTime) {
         DBDirectClient client(opCtx());
         auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace,
-                                   {BSON("_id" << session()->getSessionId().toBSON())});
+                                   BSON("_id" << session()->getSessionId().toBSON()));
         ASSERT(cursor);
         ASSERT(cursor->more());
 

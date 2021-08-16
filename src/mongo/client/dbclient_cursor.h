@@ -31,6 +31,7 @@
 
 #include <stack>
 
+#include "mongo/client/query.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
@@ -137,7 +138,8 @@ public:
 
     DBClientCursor(DBClientBase* client,
                    const NamespaceStringOrUUID& nsOrUuid,
-                   const BSONObj& query,
+                   const BSONObj& filter,
+                   const Query& querySettings,
                    int limit,
                    int nToSkip,
                    const BSONObj* fieldsToReturn,
@@ -268,7 +270,8 @@ protected:
 private:
     DBClientCursor(DBClientBase* client,
                    const NamespaceStringOrUUID& nsOrUuid,
-                   const BSONObj& query,
+                   const BSONObj& filter,
+                   const Query& querySettings,
                    long long cursorId,
                    int limit,
                    int nToSkip,
@@ -287,7 +290,8 @@ private:
     // After a successful 'find' command, 'ns' is updated to contain the namespace returned by that
     // command.
     NamespaceString ns;
-    BSONObj query;
+    BSONObj _filter;
+    Query _querySettings;
     int limit;
     int nToSkip;
     const BSONObj* fieldsToReturn;

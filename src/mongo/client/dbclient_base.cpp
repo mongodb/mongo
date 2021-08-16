@@ -603,12 +603,14 @@ bool DBClientBase::exists(const string& ns) {
 }
 
 BSONObj DBClientBase::findOne(const string& ns,
-                              const Query& query,
+                              const BSONObj& filter,
+                              const Query& querySettings,
                               const BSONObj* fieldsToReturn,
                               int queryOptions,
                               boost::optional<BSONObj> readConcernObj) {
     unique_ptr<DBClientCursor> c = this->query(NamespaceString(ns),
-                                               query,
+                                               filter,
+                                               querySettings,
                                                1 /*limit*/,
                                                0 /*nToSkip*/,
                                                fieldsToReturn,
@@ -619,7 +621,8 @@ BSONObj DBClientBase::findOne(const string& ns,
     // query() throws on network error so OK to uassert with numeric code here.
     uassert(10276,
             str::stream() << "DBClientBase::findN: transport error: " << getServerAddress()
-                          << " ns: " << ns << " query: " << query.toString(),
+                          << " ns: " << ns << " filter: " << filter.toString()
+                          << " query settings: " << querySettings.getFullSettingsDeprecated(),
             c.get());
 
     return c->more() ? c->nextSafe() : BSONObj();
@@ -668,7 +671,8 @@ std::pair<BSONObj, NamespaceString> DBClientBase::findOneByUUID(
 const uint64_t DBClientBase::INVALID_SOCK_CREATION_TIME = std::numeric_limits<uint64_t>::max();
 
 unique_ptr<DBClientCursor> DBClientBase::query(const NamespaceStringOrUUID& nsOrUuid,
-                                               Query query,
+                                               const BSONObj& filter,
+                                               const Query& querySettings,
                                                int limit,
                                                int nToSkip,
                                                const BSONObj* fieldsToReturn,
@@ -677,7 +681,8 @@ unique_ptr<DBClientCursor> DBClientBase::query(const NamespaceStringOrUUID& nsOr
                                                boost::optional<BSONObj> readConcernObj) {
     unique_ptr<DBClientCursor> c(new DBClientCursor(this,
                                                     nsOrUuid,
-                                                    query.obj,
+                                                    filter,
+                                                    querySettings,
                                                     limit,
                                                     nToSkip,
                                                     fieldsToReturn,
@@ -708,7 +713,8 @@ struct DBClientFunConvertor {
 
 unsigned long long DBClientBase::query(std::function<void(const BSONObj&)> f,
                                        const NamespaceStringOrUUID& nsOrUuid,
-                                       Query query,
+                                       const BSONObj& filter,
+                                       const Query& querySettings,
                                        const BSONObj* fieldsToReturn,
                                        int queryOptions,
                                        int batchSize,
@@ -716,13 +722,20 @@ unsigned long long DBClientBase::query(std::function<void(const BSONObj&)> f,
     DBClientFunConvertor fun;
     fun._f = f;
     std::function<void(DBClientCursorBatchIterator&)> ptr(fun);
-    return this->query(
-        ptr, nsOrUuid, std::move(query), fieldsToReturn, queryOptions, batchSize, readConcernObj);
+    return this->query(ptr,
+                       nsOrUuid,
+                       filter,
+                       querySettings,
+                       fieldsToReturn,
+                       queryOptions,
+                       batchSize,
+                       readConcernObj);
 }
 
 unsigned long long DBClientBase::query(std::function<void(DBClientCursorBatchIterator&)> f,
                                        const NamespaceStringOrUUID& nsOrUuid,
-                                       Query query,
+                                       const BSONObj& filter,
+                                       const Query& querySettings,
                                        const BSONObj* fieldsToReturn,
                                        int queryOptions,
                                        int batchSize,
@@ -730,8 +743,15 @@ unsigned long long DBClientBase::query(std::function<void(DBClientCursorBatchIte
     // mask options
     queryOptions &= (int)(QueryOption_NoCursorTimeout | QueryOption_SecondaryOk);
 
-    unique_ptr<DBClientCursor> c(this->query(
-        nsOrUuid, query, 0, 0, fieldsToReturn, queryOptions, batchSize, readConcernObj));
+    unique_ptr<DBClientCursor> c(this->query(nsOrUuid,
+                                             filter,
+                                             querySettings,
+                                             0,
+                                             0,
+                                             fieldsToReturn,
+                                             queryOptions,
+                                             batchSize,
+                                             readConcernObj));
     // query() throws on network error so OK to uassert with numeric code here.
     uassert(16090, "socket error for mapping query", c.get());
 
@@ -764,8 +784,8 @@ OpMsgRequest createInsertRequest(const string& ns,
 }
 
 OpMsgRequest createUpdateRequest(const string& ns,
-                                 Query query,
-                                 BSONObj obj,
+                                 const BSONObj& filter,
+                                 BSONObj updateSpec,
                                  bool upsert,
                                  bool multi,
                                  boost::optional<BSONObj> writeConcernObj) {
@@ -779,13 +799,13 @@ OpMsgRequest createUpdateRequest(const string& ns,
     auto request = OpMsgRequest::fromDBAndBody(nss.db(), cmdBuilder.obj());
     request.sequences.push_back(
         {"updates",
-         {BSON("q" << query.obj << "u" << obj << "upsert" << upsert << "multi" << multi)}});
+         {BSON("q" << filter << "u" << updateSpec << "upsert" << upsert << "multi" << multi)}});
 
     return request;
 }
 
 OpMsgRequest createRemoveRequest(const string& ns,
-                                 Query obj,
+                                 const BSONObj& filter,
                                  bool removeMany,
                                  boost::optional<BSONObj> writeConcernObj) {
     const int limit = removeMany ? 0 : 1;
@@ -797,7 +817,7 @@ OpMsgRequest createRemoveRequest(const string& ns,
         cmdBuilder.append(WriteConcernOptions::kWriteConcernField, *writeConcernObj);
     }
     auto request = OpMsgRequest::fromDBAndBody(nss.db(), cmdBuilder.obj());
-    request.sequences.push_back({"deletes", {BSON("q" << obj.obj << "limit" << limit)}});
+    request.sequences.push_back({"deletes", {BSON("q" << filter << "limit" << limit)}});
 
     return request;
 }
@@ -828,40 +848,40 @@ void DBClientBase::insert(const string& ns,
 }
 
 BSONObj DBClientBase::removeAcknowledged(const string& ns,
-                                         Query obj,
+                                         const BSONObj& filter,
                                          bool removeMany,
                                          boost::optional<BSONObj> writeConcernObj) {
-    OpMsgRequest request = createRemoveRequest(ns, obj, removeMany, writeConcernObj);
+    OpMsgRequest request = createRemoveRequest(ns, filter, removeMany, writeConcernObj);
     rpc::UniqueReply reply = runCommand(std::move(request));
     return reply->getCommandReply();
 }
 
 void DBClientBase::remove(const string& ns,
-                          Query obj,
+                          const BSONObj& filter,
                           bool removeMany,
                           boost::optional<BSONObj> writeConcernObj) {
-    auto request = createRemoveRequest(ns, obj, removeMany, writeConcernObj);
+    auto request = createRemoveRequest(ns, filter, removeMany, writeConcernObj);
     runFireAndForgetCommand(std::move(request));
 }
 
 BSONObj DBClientBase::updateAcknowledged(const string& ns,
-                                         Query query,
-                                         BSONObj obj,
+                                         const BSONObj& filter,
+                                         BSONObj updateSpec,
                                          bool upsert,
                                          bool multi,
                                          boost::optional<BSONObj> writeConcernObj) {
-    auto request = createUpdateRequest(ns, query, obj, upsert, multi, writeConcernObj);
+    auto request = createUpdateRequest(ns, filter, updateSpec, upsert, multi, writeConcernObj);
     rpc::UniqueReply reply = runCommand(std::move(request));
     return reply->getCommandReply();
 }
 
 void DBClientBase::update(const string& ns,
-                          Query query,
-                          BSONObj obj,
+                          const BSONObj& filter,
+                          BSONObj updateSpec,
                           bool upsert,
                           bool multi,
                           boost::optional<BSONObj> writeConcernObj) {
-    auto request = createUpdateRequest(ns, query, obj, upsert, multi, writeConcernObj);
+    auto request = createUpdateRequest(ns, filter, updateSpec, upsert, multi, writeConcernObj);
     runFireAndForgetCommand(std::move(request));
 }
 

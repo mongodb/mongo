@@ -212,7 +212,8 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::checkIfDonorCollectionIsE
     auto fieldsToReturn = BSON("_id" << 1);
     auto cursor =
         getClient()->query(_sourceDbAndUuid,
-                           {} /* Query */,
+                           BSONObj{} /* filter */,
+                           Query() /* querySettings */,
                            1 /* limit */,
                            0 /* skip */,
                            &fieldsToReturn,
@@ -348,8 +349,8 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::createCollectionStage() {
         ON_BLOCK_EXIT([&opCtx] { tenantMigrationRecipientInfo(opCtx.get()) = boost::none; });
 
         auto fieldsToReturn = BSON("_id" << 1);
-        _lastDocId =
-            client.findOne(_existingNss->ns(), Query().sort(BSON("_id" << -1)), &fieldsToReturn);
+        _lastDocId = client.findOne(
+            _existingNss->ns(), BSONObj{}, Query().sort(BSON("_id" << -1)), &fieldsToReturn);
         if (!_lastDocId.isEmpty()) {
             // The collection is not empty. Skip creating indexes and resume cloning from the last
             // document.
@@ -462,21 +463,21 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::queryStage() {
 }
 
 void TenantCollectionCloner::runQuery() {
-    auto query = _lastDocId.isEmpty()
-        ? QUERY("query" << BSONObj())
-        // Use $expr and the aggregation version of $gt to avoid type bracketing.
-        : QUERY("$expr" << BSON("$gt" << BSON_ARRAY("$_id" << _lastDocId["_id"])));
-    if (_collectionOptions.clusteredIndex) {
+    const BSONObj& filter = _lastDocId.isEmpty()
+        ? BSONObj{}  // Use $expr and the aggregation version of $gt to avoid type bracketing.
+        : BSON("$expr" << BSON("$gt" << BSON_ARRAY("$_id" << _lastDocId["_id"])));
+
+    auto query = _collectionOptions.clusteredIndex
         // RecordIds are _id values and has no separate _id index
-        query.hint(BSON("$natural" << 1));
-    } else {
-        query.hint(BSON("_id" << 1));
-    }
+        ? Query().hint(BSON("$natural" << 1))
+        : Query().hint(BSON("_id" << 1));
+
 
     // Any errors that are thrown here (including NamespaceNotFound) will be handled on the stage
     // level.
     getClient()->query([this](DBClientCursorBatchIterator& iter) { handleNextBatch(iter); },
                        _sourceDbAndUuid,
+                       filter,
                        query,
                        nullptr /* fieldsToReturn */,
                        QueryOption_NoCursorTimeout | QueryOption_SecondaryOk |

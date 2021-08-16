@@ -42,6 +42,7 @@ namespace mongo {
 
 class QueryMessage;
 class Status;
+class Query;
 template <typename T>
 class StatusWith;
 
@@ -151,7 +152,8 @@ void validateCursorResponse(const BSONObj& outputAsBson);
  * Parse the provided legacy query object and parameters to construct a FindCommandRequest.
  */
 StatusWith<std::unique_ptr<FindCommandRequest>> fromLegacyQuery(NamespaceStringOrUUID nsOrUuid,
-                                                                const BSONObj& queryObj,
+                                                                const BSONObj& filter,
+                                                                const Query& querySettings,
                                                                 const BSONObj& proj,
                                                                 int ntoskip,
                                                                 int queryOptions);

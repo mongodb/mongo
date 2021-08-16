@@ -62,7 +62,7 @@ public:
                 const BSONObj& query) final;
     Status query(OperationContext* opCtx,
                  const NamespaceString& collectionName,
-                 const BSONObj& query,
+                 const BSONObj& filter,
                  const BSONObj& projection,
                  const std::function<void(const BSONObj&)>& resultProcessor) final;
 };

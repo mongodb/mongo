@@ -63,6 +63,7 @@ boost::optional<repl::OplogEntry> forgeNoopEntryFromImageCollection(
     BSONObj imageObj =
         client.findOne(NamespaceString::kConfigImagesNamespace.ns(),
                        BSON("_id" << retryableFindAndModifyOplogEntry.getSessionId()->toBSON()),
+                       Query(),
                        nullptr);
     if (imageObj.isEmpty()) {
         return boost::none;
@@ -124,7 +125,7 @@ boost::optional<repl::OplogEntry> fetchPrePostImageOplog(OperationContext* opCtx
     auto opTime = opTimeToFetch.value();
     DBDirectClient client(opCtx);
     auto oplogBSON =
-        client.findOne(NamespaceString::kRsOplogNamespace.ns(), opTime.asQuery(), nullptr);
+        client.findOne(NamespaceString::kRsOplogNamespace.ns(), opTime.asQuery(), Query(), nullptr);
 
     return uassertStatusOK(repl::OplogEntry::parse(oplogBSON));
 }
@@ -192,13 +193,12 @@ SessionCatalogMigrationSource::SessionCatalogMigrationSource(OperationContext* o
       _rollbackIdAtInit(repl::ReplicationProcess::get(opCtx)->getRollbackID()),
       _chunkRange(std::move(chunk)),
       _keyPattern(shardKey) {
-    Query query;
     // Sort is not needed for correctness. This is just for making it easier to write deterministic
     // tests.
-    query.sort(BSON("_id" << 1));
-
     DBDirectClient client(opCtx);
-    auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace, query);
+    auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace,
+                               BSONObj{},
+                               Query().sort(BSON("_id" << 1)));
 
     while (cursor->more()) {
         auto nextSession = SessionTxnRecord::parse(
@@ -422,7 +422,7 @@ bool SessionCatalogMigrationSource::_fetchNextNewWriteOplog(OperationContext* op
 
     DBDirectClient client(opCtx);
     const auto& newWriteOplogDoc = client.findOne(
-        NamespaceString::kRsOplogNamespace.ns(), nextOpTimeToFetch.asQuery(), nullptr);
+        NamespaceString::kRsOplogNamespace.ns(), nextOpTimeToFetch.asQuery(), Query(), nullptr);
 
     uassert(40620,
             str::stream() << "Unable to fetch oplog entry with opTime: "

@@ -330,7 +330,7 @@ Future<void> VectorClockMongoD::_doWhileQueueNotEmptyOrError(ServiceContext* ser
                     NamespaceString::kVectorClockNamespace);
                 store.forEach(
                     opCtx,
-                    QUERY(VectorClockDocument::k_idFieldName << durableVectorClock.get_id()),
+                    BSON(VectorClockDocument::k_idFieldName << durableVectorClock.get_id()),
                     [&, numDocsFound = 0](const auto& doc) mutable {
                         invariant(++numDocsFound == 1);
                         durableVectorClock = doc;
@@ -348,7 +348,7 @@ Future<void> VectorClockMongoD::_doWhileQueueNotEmptyOrError(ServiceContext* ser
 
             PersistentTaskStore<VectorClockDocument> store(NamespaceString::kVectorClockNamespace);
             store.upsert(opCtx,
-                         QUERY(VectorClockDocument::k_idFieldName << vcd.get_id()),
+                         BSON(VectorClockDocument::k_idFieldName << vcd.get_id()),
                          vcd.toBSON(),
                          WriteConcerns::kMajorityWriteConcern);
             return vectorTime;

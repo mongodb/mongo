@@ -85,7 +85,7 @@ std::shared_ptr<executor::ThreadPoolTaskExecutor> getMigrationUtilExecutor(
  * Creates a query object that can used to find overlapping ranges in the pending range deletions
  * collection.
  */
-Query overlappingRangeQuery(const ChunkRange& range, const UUID& uuid);
+BSONObj overlappingRangeQuery(const ChunkRange& range, const UUID& uuid);
 
 /**
  * Checks the pending range deletions collection to see if there are any pending ranges that

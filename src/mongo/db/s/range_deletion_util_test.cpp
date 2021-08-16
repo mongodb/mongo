@@ -189,7 +189,7 @@ RangeDeletionTask insertRangeDeletionTask(OperationContext* opCtx, UUID uuid, Ch
     // Document should be in the store.
     ASSERT_EQUALS(countDocsInConfigRangeDeletions(store, opCtx), 1);
 
-    auto query = QUERY(RangeDeletionTask::kIdFieldName << migrationId);
+    auto query = BSON(RangeDeletionTask::kIdFieldName << migrationId);
     t.setPending(boost::none);
     auto update = t.toBSON();
     store.update(opCtx, query, update);

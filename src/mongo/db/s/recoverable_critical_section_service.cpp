@@ -359,7 +359,7 @@ void RecoverableCriticalSectionService::recoverRecoverableCriticalSections(
     // Map the critical sections that are on disk to memory
     PersistentTaskStore<CollectionCriticalSectionDocument> store(
         NamespaceString::kCollectionCriticalSectionsNamespace);
-    store.forEach(opCtx, Query{}, [&opCtx](const CollectionCriticalSectionDocument& doc) {
+    store.forEach(opCtx, BSONObj{}, [&opCtx](const CollectionCriticalSectionDocument& doc) {
         const auto& nss = doc.getNss();
         {
             AutoGetCollection collLock(opCtx, nss, MODE_X);

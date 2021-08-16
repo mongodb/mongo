@@ -384,7 +384,8 @@ TEST_F(AllDatabaseClonerTest, RetriesListDatabasesButInitialSyncIdChanges) {
 
     // Clear and change the initial sync ID
     _mockServer->remove(
-        ReplicationConsistencyMarkersImpl::kDefaultInitialSyncIdNamespace.toString(), Query());
+        ReplicationConsistencyMarkersImpl::kDefaultInitialSyncIdNamespace.toString(),
+        BSONObj{} /*filter*/);
     _mockServer->insert(
         ReplicationConsistencyMarkersImpl::kDefaultInitialSyncIdNamespace.toString(),
         BSON("_id" << UUID::gen()));

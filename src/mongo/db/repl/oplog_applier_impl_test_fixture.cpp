@@ -350,7 +350,7 @@ void checkTxnTable(OperationContext* opCtx,
                    boost::optional<DurableTxnStateEnum> expectedState) {
     DBDirectClient client(opCtx);
     auto result = client.findOne(NamespaceString::kSessionTransactionsTableNamespace.ns(),
-                                 {BSON(SessionTxnRecord::kSessionIdFieldName << lsid.toBSON())});
+                                 BSON(SessionTxnRecord::kSessionIdFieldName << lsid.toBSON()));
     ASSERT_FALSE(result.isEmpty());
 
     auto txnRecord =
@@ -393,7 +393,7 @@ StatusWith<BSONObj> CollectionReader::next() {
 
 bool docExists(OperationContext* opCtx, const NamespaceString& nss, const BSONObj& doc) {
     DBDirectClient client(opCtx);
-    auto result = client.findOne(nss.ns(), {doc});
+    auto result = client.findOne(nss.ns(), doc);
     return !result.isEmpty();
 }
 

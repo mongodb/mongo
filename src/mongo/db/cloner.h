@@ -95,7 +95,6 @@ private:
                const NamespaceString& nss,
                const BSONObj& from_opts,
                const BSONObj& from_id_index,
-               Query q,
                DBClientBase* conn);
 
     void _copyIndexes(OperationContext* opCtx,

@@ -237,7 +237,7 @@ protected:
         OperationContext* opCtx, ReshardingCoordinatorDocument expectedCoordinatorDoc) {
         DBDirectClient client(opCtx);
         auto doc = client.findOne(NamespaceString::kConfigReshardingOperationsNamespace.ns(),
-                                  Query(BSON("ns" << expectedCoordinatorDoc.getSourceNss().ns())));
+                                  BSON("ns" << expectedCoordinatorDoc.getSourceNss().ns()));
 
         auto coordinatorDoc = ReshardingCoordinatorDocument::parse(
             IDLParserErrorContext("ReshardingCoordinatorTest"), doc);
@@ -319,7 +319,7 @@ protected:
         const ReshardingCoordinatorDocument& expectedCoordinatorDoc) {
         DBDirectClient client(opCtx);
         CollectionType onDiskEntry(
-            client.findOne(CollectionType::ConfigNS.ns(), Query(BSON("_id" << _originalNss.ns()))));
+            client.findOne(CollectionType::ConfigNS.ns(), BSON("_id" << _originalNss.ns())));
 
         ASSERT_EQUALS(onDiskEntry.getAllowMigrations(), expectedCollType.getAllowMigrations());
 
@@ -378,8 +378,7 @@ protected:
     void assertTemporaryCollectionCatalogEntryMatchesExpected(
         OperationContext* opCtx, boost::optional<CollectionType> expectedCollType) {
         DBDirectClient client(opCtx);
-        auto doc =
-            client.findOne(CollectionType::ConfigNS.ns(), Query(BSON("_id" << _tempNss.ns())));
+        auto doc = client.findOne(CollectionType::ConfigNS.ns(), BSON("_id" << _tempNss.ns()));
         if (!expectedCollType) {
             ASSERT(doc.isEmpty());
             return;
@@ -423,7 +422,7 @@ protected:
                                                        const Timestamp& collTimestamp) {
         DBDirectClient client(opCtx);
         std::vector<ChunkType> foundChunks;
-        auto cursor = client.query(ChunkType::ConfigNS, Query(BSON("uuid" << uuid)));
+        auto cursor = client.query(ChunkType::ConfigNS, BSON("uuid" << uuid));
         while (cursor->more()) {
             auto d = uassertStatusOK(
                 ChunkType::fromConfigBSON(cursor->nextSafe().getOwned(), collEpoch, collTimestamp));
@@ -449,7 +448,7 @@ protected:
 
         DBDirectClient client(opCtx);
         std::vector<TagsType> foundZones;
-        auto cursor = client.query(TagsType::ConfigNS, Query(BSON("ns" << nss.ns())));
+        auto cursor = client.query(TagsType::ConfigNS, BSON("ns" << nss.ns()));
         while (cursor->more()) {
             foundZones.push_back(
                 uassertStatusOK(TagsType::fromBSON(cursor->nextSafe().getOwned())));
@@ -618,11 +617,10 @@ protected:
 
         // Check that chunks and tags under the temp namespace have been removed
         DBDirectClient client(opCtx);
-        auto chunkDoc =
-            client.findOne(ChunkType::ConfigNS.ns(), Query(BSON("ns" << _tempNss.ns())));
+        auto chunkDoc = client.findOne(ChunkType::ConfigNS.ns(), BSON("ns" << _tempNss.ns()));
         ASSERT(chunkDoc.isEmpty());
 
-        auto tagDoc = client.findOne(TagsType::ConfigNS.ns(), Query(BSON("ns" << _tempNss.ns())));
+        auto tagDoc = client.findOne(TagsType::ConfigNS.ns(), BSON("ns" << _tempNss.ns()));
         ASSERT(tagDoc.isEmpty());
 
         // Check that chunks and tags entries previously under the temporary namespace have been
@@ -642,7 +640,7 @@ protected:
         // Check that the entry is removed from config.reshardingOperations
         DBDirectClient client(opCtx);
         auto doc = client.findOne(NamespaceString::kConfigReshardingOperationsNamespace.ns(),
-                                  Query(BSON("ns" << expectedCoordinatorDoc.getSourceNss().ns())));
+                                  BSON("ns" << expectedCoordinatorDoc.getSourceNss().ns()));
         ASSERT(doc.isEmpty());
 
         // Check that the resharding fields are removed from the config.collections entry and

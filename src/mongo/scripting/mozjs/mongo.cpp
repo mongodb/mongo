@@ -367,8 +367,10 @@ void MongoBase::Functions::find::call(JSContext* cx, JS::CallArgs args) {
     int batchSize = ValueWriter(cx, args.get(5)).toInt32();
     int options = ValueWriter(cx, args.get(6)).toInt32();
 
+    const Query query = Query::fromBSONDeprecated(q);
     std::unique_ptr<DBClientCursor> cursor(conn->query(NamespaceString(ns),
-                                                       q,
+                                                       query.getFilter(),
+                                                       query,
                                                        limit,
                                                        nToSkip,
                                                        haveFields ? &fields : nullptr,

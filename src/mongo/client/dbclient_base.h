@@ -519,9 +519,16 @@ public:
     /**
      *  Returns a single object that matches the query. if none do, then the object is empty.
      *  Throws AssertionException.
+     *
+     * The 'querySettings' argument might contain a subset of query settings, such as sort, hint,
+     * etc. If the passed in 'querySettings' object also includes a filter (in its 'query'/'$query'
+     * field), the filter will be ignored. Pass in the desired filter's BSON as 'filter' instead.
+     * The other options parameters exist for historic reasons and will be eventually combined with
+     * 'querySettings' into a single 'QueryOptions' parameter.
      */
     virtual BSONObj findOne(const std::string& ns,
-                            const Query& query,
+                            const BSONObj& filter,
+                            const Query& querySettings = Query(),
                             const BSONObj* fieldsToReturn = nullptr,
                             int queryOptions = 0,
                             boost::optional<BSONObj> readConcernObj = boost::none);
@@ -544,19 +551,28 @@ public:
      * Sends a query to the database.
      *
      *  'ns': Namespace to query, format is <dbname>.<collectname>[.<collectname>]*
-     *  'query': Query to perform on the collection.
+     *  'filter': Query to perform on the collection.
+     *  'querySettings': sort, hint, readPref, etc.
      *  'limit': The maximum number of documents that the cursor should return. 0 = unlimited.
      *  'nToSkip': Start with the nth item.
      *  'fieldsToReturn': Optional template of which fields to select. If unspecified, returns all
      *                    fields.
      *  'queryOptions': See options enum at top of this file.
      *
+     * Notes:
+     * The 'querySettings' argument might contain a subset of query settings, such as sort, hint,
+     * etc. If the passed in 'querySettings' object also includes a filter (in its 'query'/'$query'
+     * field), the filter will be ignored. Pass in the desired filter's BSON as 'filter' instead.
+     * The other options parameters exist for historic reasons and will be eventually combined with
+     * 'querySettings' into a single 'QueryOptions' parameter.
+     *
      * Returns nullptr if error (connection failure).
      * Throws AssertionException.
      */
     virtual std::unique_ptr<DBClientCursor> query(
         const NamespaceStringOrUUID& nsOrUuid,
-        Query query,
+        const BSONObj& filter,
+        const Query& querySettings = Query(),
         int limit = 0,
         int nToSkip = 0,
         const BSONObj* fieldsToReturn = nullptr,
@@ -575,13 +591,20 @@ public:
      * Use the DBClientCursorBatchIterator version, below, if you want to do items in large
      * blocks, perhaps to avoid granular locking and such.
      *
-     * Note:
+     * Notes:
      * The version that takes a BSONObj cannot return the namespace queried when the query is done
      * by UUID. If this is required, use the DBClientBatchIterator version.
+     *
+     * The 'querySettings' argument might contain a subset of query settings, such as sort, hint,
+     * etc. If the passed in 'querySettings' object also includes a filter (in its 'query'/'$query'
+     * field), the filter will be ignored. Pass in the desired filter's BSON as 'filter' instead.
+     * The other options parameters exist for historic reasons and will be eventually combined with
+     * 'querySettings' into a single 'QueryOptions' parameter.
      */
     unsigned long long query(std::function<void(const BSONObj&)> f,
                              const NamespaceStringOrUUID& nsOrUuid,
-                             Query query,
+                             const BSONObj& filter,
+                             const Query& querySettings = Query(),
                              const BSONObj* fieldsToReturn = nullptr,
                              int queryOptions = QueryOption_Exhaust,
                              int batchSize = 0,
@@ -589,7 +612,8 @@ public:
 
     virtual unsigned long long query(std::function<void(DBClientCursorBatchIterator&)> f,
                                      const NamespaceStringOrUUID& nsOrUuid,
-                                     Query query,
+                                     const BSONObj& filter,
+                                     const Query& querySettings = Query(),
                                      const BSONObj* fieldsToReturn = nullptr,
                                      int queryOptions = QueryOption_Exhaust,
                                      int batchSize = 0,
@@ -642,8 +666,8 @@ public:
      * Executes an acknowledged command to update the objects that match the query.
      */
     virtual BSONObj updateAcknowledged(const std::string& ns,
-                                       Query query,
-                                       BSONObj obj,
+                                       const BSONObj& filter,
+                                       BSONObj updateSpec,
                                        bool upsert = false,
                                        bool multi = false,
                                        boost::optional<BSONObj> writeConcernObj = boost::none);
@@ -652,8 +676,8 @@ public:
      * Executes a fire-and-forget command to update the objects that match the query.
      */
     virtual void update(const std::string& ns,
-                        Query query,
-                        BSONObj obj,
+                        const BSONObj& filter,
+                        BSONObj updateSpec,
                         bool upsert = false,
                         bool multi = false,
                         boost::optional<BSONObj> writeConcernObj = boost::none);
@@ -662,7 +686,7 @@ public:
      * Executes an acknowledged command to remove the objects that match the query.
      */
     virtual BSONObj removeAcknowledged(const std::string& ns,
-                                       Query query,
+                                       const BSONObj& filter,
                                        bool removeMany = true,
                                        boost::optional<BSONObj> writeConcernObj = boost::none);
 
@@ -670,7 +694,7 @@ public:
      * Executes a fire-and-forget command to remove the objects that match the query.
      */
     virtual void remove(const std::string& ns,
-                        Query query,
+                        const BSONObj& filter,
                         bool removeMany = true,
                         boost::optional<BSONObj> writeConcernObj = boost::none);
 

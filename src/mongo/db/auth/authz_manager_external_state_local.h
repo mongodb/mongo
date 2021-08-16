@@ -101,12 +101,12 @@ public:
                         const BSONObj& query) = 0;
 
     /**
-     * Finds all documents matching "query" in "collectionName".  For each document returned,
+     * Finds all documents matching "filter" in "collectionName".  For each document returned,
      * calls the function resultProcessor on it.
      */
     virtual Status query(OperationContext* opCtx,
                          const NamespaceString& collectionName,
-                         const BSONObj& query,
+                         const BSONObj& filter,
                          const BSONObj& projection,
                          const std::function<void(const BSONObj&)>& resultProcessor) = 0;
 

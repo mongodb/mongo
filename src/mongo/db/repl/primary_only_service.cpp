@@ -657,7 +657,7 @@ void PrimaryOnlyService::_rebuildInstances(long long term) noexcept {
                     Status(ErrorCodes::InternalError, "Querying state documents failed"));
             }
 
-            auto cursor = client.query(ns, Query());
+            auto cursor = client.query(ns, BSONObj{});
             while (cursor->more()) {
                 stateDocuments.push_back(cursor->nextSafe().getOwned());
             }

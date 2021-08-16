@@ -36,6 +36,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/client/query.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/dbmessage.h"
 
@@ -139,10 +140,7 @@ Status initFullQuery(const BSONObj& top, FindCommandRequest* findCommand) {
             }
         } else if (name.startsWith("$")) {
             name = name.substr(1);  // chop first char
-            if (name == "explain") {
-                return Status(ErrorCodes::Error(5856600),
-                              "the $explain OP_QUERY flag is no longer supported");
-            } else if (name == "min") {
+            if (name == "min") {
                 if (!e.isABSONObj()) {
                     return Status(ErrorCodes::BadValue, "$min must be a BSONObj");
                 }
@@ -187,7 +185,8 @@ Status initFullQuery(const BSONObj& top, FindCommandRequest* findCommand) {
 
 Status initFindCommandRequest(int ntoskip,
                               int queryOptions,
-                              const BSONObj& queryObj,
+                              const BSONObj& filter,
+                              const Query& querySettings,
                               const BSONObj& proj,
                               FindCommandRequest* findCommand) {
     if (!proj.isEmpty()) {
@@ -200,19 +199,12 @@ Status initFindCommandRequest(int ntoskip,
     // Initialize flags passed as 'queryOptions' bit vector.
     initFromInt(queryOptions, findCommand);
 
-    BSONElement queryField = queryObj["query"];
-    if (!queryField.isABSONObj()) {
-        queryField = queryObj["$query"];
+    findCommand->setFilter(filter.getOwned());
+    Status status = initFullQuery(querySettings.getFullSettingsDeprecated(), findCommand);
+    if (!status.isOK()) {
+        return status;
     }
-    if (queryField.isABSONObj()) {
-        findCommand->setFilter(queryField.embeddedObject().getOwned());
-        Status status = initFullQuery(queryObj, findCommand);
-        if (!status.isOK()) {
-            return status;
-        }
-    } else {
-        findCommand->setFilter(queryObj.getOwned());
-    }
+
     // It's not possible to specify readConcern in a legacy query message, so initialize it to
     // an empty readConcern object, ie. equivalent to `readConcern: {}`.  This ensures that
     // mongos passes this empty readConcern to shards.
@@ -393,14 +385,15 @@ void validateCursorResponse(const BSONObj& outputAsBson) {
 //
 
 StatusWith<std::unique_ptr<FindCommandRequest>> fromLegacyQuery(NamespaceStringOrUUID nssOrUuid,
-                                                                const BSONObj& queryObj,
+                                                                const BSONObj& filter,
+                                                                const Query& querySettings,
                                                                 const BSONObj& proj,
                                                                 int ntoskip,
                                                                 int queryOptions) {
     auto findCommand = std::make_unique<FindCommandRequest>(std::move(nssOrUuid));
 
-    Status status =
-        initFindCommandRequest(ntoskip, queryOptions, queryObj, proj, findCommand.get());
+    Status status = initFindCommandRequest(
+        ntoskip, queryOptions, filter, querySettings, proj, findCommand.get());
     if (!status.isOK()) {
         return status;
     }

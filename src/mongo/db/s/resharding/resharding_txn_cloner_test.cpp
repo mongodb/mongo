@@ -253,9 +253,10 @@ protected:
         DBDirectClient client(operationContext());
         // The same logical session entry may be inserted more than once by a test case, so use a
         // $natural sort to find the most recently inserted entry.
-        Query oplogQuery(BSON(repl::OplogEntryBase::kSessionIdFieldName << sessionId.toBSON()));
-        auto bsonOplog = client.findOne(NamespaceString::kRsOplogNamespace.ns(),
-                                        oplogQuery.sort(BSON("$natural" << -1)));
+        auto bsonOplog =
+            client.findOne(NamespaceString::kRsOplogNamespace.ns(),
+                           BSON(repl::OplogEntryBase::kSessionIdFieldName << sessionId.toBSON()),
+                           Query().sort(BSON("$natural" << -1)));
         ASSERT(!bsonOplog.isEmpty());
         auto oplogEntry = repl::MutableOplogEntry::parse(bsonOplog).getValue();
         ASSERT_EQ(oplogEntry.getTxnNumber().get(), txnNum);
@@ -265,7 +266,7 @@ protected:
 
         auto bsonTxn =
             client.findOne(NamespaceString::kSessionTransactionsTableNamespace.ns(),
-                           {BSON(SessionTxnRecord::kSessionIdFieldName << sessionId.toBSON())});
+                           BSON(SessionTxnRecord::kSessionIdFieldName << sessionId.toBSON()));
         ASSERT(!bsonTxn.isEmpty());
         auto txn = SessionTxnRecord::parse(
             IDLParserErrorContext("resharding config transactions cloning test"), bsonTxn);
@@ -422,7 +423,7 @@ protected:
         std::vector<repl::DurableOplogEntry> result;
 
         PersistentTaskStore<repl::OplogEntryBase> store(NamespaceString::kRsOplogNamespace);
-        store.forEach(opCtx, QUERY("ts" << BSON("$gt" << ts)), [&](const auto& oplogEntry) {
+        store.forEach(opCtx, BSON("ts" << BSON("$gt" << ts)), [&](const auto& oplogEntry) {
             result.emplace_back(
                 unittest::assertGet(repl::DurableOplogEntry::parse(oplogEntry.toBSON())));
             return true;
@@ -438,7 +439,7 @@ protected:
         PersistentTaskStore<SessionTxnRecord> store(
             NamespaceString::kSessionTransactionsTableNamespace);
         store.forEach(opCtx,
-                      QUERY(SessionTxnRecord::kSessionIdFieldName << lsid.toBSON()),
+                      BSON(SessionTxnRecord::kSessionIdFieldName << lsid.toBSON()),
                       [&](const auto& sessionTxnRecord) {
                           result.emplace(sessionTxnRecord);
                           return false;

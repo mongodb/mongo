@@ -43,24 +43,6 @@ const BSONField<BSONObj> Query::ReadPrefField("$readPreference");
 const BSONField<string> Query::ReadPrefModeField("mode");
 const BSONField<BSONArray> Query::ReadPrefTagsField("tags");
 
-
-Query::Query(const string& json) : obj(fromjson(json)) {}
-
-Query::Query(const char* json) : obj(fromjson(json)) {}
-
-Query& Query::hint(const string& jsonKeyPatt) {
-    return hint(fromjson(jsonKeyPatt));
-}
-
-Query& Query::where(const string& jscode, BSONObj scope) {
-    /* use where() before sort() and hint() and explain(), else this will assert. */
-    verify(!isComplex());
-    BSONObjBuilder b(std::move(obj));
-    b.appendWhere(jscode, scope);
-    obj = b.obj();
-    return *this;
-}
-
 void Query::makeComplex() {
     if (isComplex())
         return;
@@ -76,16 +58,6 @@ Query& Query::sort(const BSONObj& s) {
 
 Query& Query::hint(BSONObj keyPattern) {
     appendComplex("$hint", keyPattern);
-    return *this;
-}
-
-Query& Query::minKey(const BSONObj& val) {
-    appendComplex("$min", val);
-    return *this;
-}
-
-Query& Query::maxKey(const BSONObj& val) {
-    appendComplex("$max", val);
     return *this;
 }
 
@@ -105,6 +77,14 @@ bool Query::isComplex(const BSONObj& obj, bool* hasDollar) {
     return false;
 }
 
+BSONObj Query::getFilter() const {
+    bool hasDollar;
+    if (!isComplex(&hasDollar))
+        return obj;
+
+    return obj.getObjectField(hasDollar ? "$query" : "query");
+}
+
 Query& Query::readPref(ReadPreference pref, const BSONArray& tags) {
     appendComplex(ReadPrefField.name().c_str(),
                   ReadPreferenceSetting(pref, TagSet(tags)).toInnerBSON());
@@ -115,40 +95,41 @@ bool Query::isComplex(bool* hasDollar) const {
     return isComplex(obj, hasDollar);
 }
 
-bool Query::hasReadPreference(const BSONObj& queryObj) {
-    const bool hasReadPrefOption = queryObj["$queryOptions"].isABSONObj() &&
-        queryObj["$queryOptions"].Obj().hasField(ReadPrefField.name());
-
-    bool canHaveReadPrefField = Query::isComplex(queryObj) ||
-        // The find command has a '$readPreference' option.
-        queryObj.firstElementFieldName() == StringData("find");
-
-    return (canHaveReadPrefField && queryObj.hasField(ReadPrefField.name())) || hasReadPrefOption;
+Query& Query::appendElements(BSONObj elements) {
+    makeComplex();
+    BSONObjBuilder b(std::move(obj));
+    b.appendElements(elements);
+    obj = b.obj();
+    return *this;
 }
 
-BSONObj Query::getFilter() const {
-    bool hasDollar;
-    if (!isComplex(&hasDollar))
-        return obj;
-
-    return obj.getObjectField(hasDollar ? "$query" : "query");
-}
-BSONObj Query::getSort() const {
-    if (!isComplex())
-        return BSONObj();
-    BSONObj ret = obj.getObjectField("orderby");
-    if (ret.isEmpty())
-        ret = obj.getObjectField("$orderby");
-    return ret;
-}
-BSONObj Query::getHint() const {
-    if (!isComplex())
-        return BSONObj();
-    return obj.getObjectField("$hint");
+Query& Query::requestResumeToken(bool enable) {
+    appendComplex("$_requestResumeToken", enable);
+    return *this;
 }
 
-string Query::toString() const {
-    return obj.toString();
+Query& Query::resumeAfter(BSONObj point) {
+    appendComplex("$_resumeAfter", point);
+    return *this;
 }
 
+Query& Query::maxTimeMS(long long timeout) {
+    appendComplex("$maxTimeMS", timeout);
+    return *this;
+}
+
+Query& Query::term(long long value) {
+    appendComplex("term", value);
+    return *this;
+}
+
+Query& Query::readConcern(BSONObj rc) {
+    appendComplex("readConcern", rc);
+    return *this;
+}
+
+Query& Query::readOnce(bool enable) {
+    appendComplex("$readOnce", enable);
+    return *this;
+}
 }  // namespace mongo

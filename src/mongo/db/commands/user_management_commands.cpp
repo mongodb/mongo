@@ -220,7 +220,7 @@ Status queryAuthzDocument(OperationContext* opCtx,
                           const std::function<void(const BSONObj&)>& resultProcessor) {
     try {
         DBDirectClient client(opCtx);
-        client.query(resultProcessor, collectionName, query, &projection);
+        client.query(resultProcessor, collectionName, query, Query(), &projection);
         return Status::OK();
     } catch (const DBException& e) {
         return e.toStatus();

@@ -60,12 +60,12 @@ AuthzManagerExternalStateMongod::makeAuthzSessionExternalState(AuthorizationMana
 Status AuthzManagerExternalStateMongod::query(
     OperationContext* opCtx,
     const NamespaceString& collectionName,
-    const BSONObj& query,
+    const BSONObj& filter,
     const BSONObj& projection,
     const std::function<void(const BSONObj&)>& resultProcessor) {
     try {
         DBDirectClient client(opCtx);
-        client.query(resultProcessor, collectionName, query, &projection);
+        client.query(resultProcessor, collectionName, filter, Query(), &projection);
         return Status::OK();
     } catch (const DBException& e) {
         return e.toStatus();

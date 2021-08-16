@@ -83,10 +83,10 @@ public:
      * multiple documents match, at most one document will be updated.
      */
     void update(OperationContext* opCtx,
-                Query query,
+                const BSONObj& filter,
                 const BSONObj& update,
                 const WriteConcernOptions& writeConcern = WriteConcerns::kMajorityWriteConcern) {
-        _update(opCtx, std::move(query), update, /* upsert */ false, writeConcern);
+        _update(opCtx, filter, update, /* upsert */ false, writeConcern);
     }
 
     /**
@@ -94,17 +94,17 @@ public:
      * multiple documents match, at most one document will be updated.
      */
     void upsert(OperationContext* opCtx,
-                Query query,
+                const BSONObj& filter,
                 const BSONObj& update,
                 const WriteConcernOptions& writeConcern = WriteConcerns::kMajorityWriteConcern) {
-        _update(opCtx, std::move(query), update, /* upsert */ true, writeConcern);
+        _update(opCtx, filter, update, /* upsert */ true, writeConcern);
     }
 
     /**
      * Removes all documents which match the given query.
      */
     void remove(OperationContext* opCtx,
-                Query query,
+                const BSONObj& filter,
                 const WriteConcernOptions& writeConcern = WriteConcerns::kMajorityWriteConcern) {
         DBDirectClient dbClient(opCtx);
 
@@ -114,7 +114,7 @@ public:
             deleteOp.setDeletes({[&] {
                 write_ops::DeleteOpEntry entry;
 
-                entry.setQ(query.obj);
+                entry.setQ(filter);
                 entry.setMulti(true);
 
                 return entry;
@@ -136,10 +136,12 @@ public:
      * Iteration can be stopped early if the callback returns false indicating that it doesn't want
      * to continue.
      */
-    void forEach(OperationContext* opCtx, Query query, std::function<bool(const T&)> handler) {
+    void forEach(OperationContext* opCtx,
+                 const BSONObj& filter,
+                 std::function<bool(const T&)> handler) {
         DBDirectClient dbClient(opCtx);
 
-        auto cursor = dbClient.query(_storageNss, query);
+        auto cursor = dbClient.query(_storageNss, filter);
 
         while (cursor->more()) {
             auto bson = cursor->next();
@@ -154,18 +156,18 @@ public:
     /**
      * Returns the number of documents in the store matching the given query.
      */
-    size_t count(OperationContext* opCtx, Query query = Query()) {
+    size_t count(OperationContext* opCtx, const BSONObj& filter = BSONObj{}) {
         DBDirectClient client(opCtx);
 
         auto projection = BSON("_id" << 1);
-        auto cursor = client.query(_storageNss, query, 0, 0, &projection);
+        auto cursor = client.query(_storageNss, filter, Query(), 0, 0, &projection);
 
         return cursor->itcount();
     }
 
 private:
     void _update(OperationContext* opCtx,
-                 Query query,
+                 const BSONObj& filter,
                  const BSONObj& update,
                  bool upsert,
                  const WriteConcernOptions& writeConcern = WriteConcerns::kMajorityWriteConcern) {
@@ -174,7 +176,7 @@ private:
         auto commandResponse = dbClient.runCommand([&] {
             write_ops::UpdateCommandRequest updateOp(_storageNss);
             auto updateModification = write_ops::UpdateModification::parseFromClassicUpdate(update);
-            write_ops::UpdateOpEntry updateEntry(query.obj, updateModification);
+            write_ops::UpdateOpEntry updateEntry(filter, updateModification);
             updateEntry.setMulti(false);
             updateEntry.setUpsert(upsert);
             updateOp.setUpdates({updateEntry});
@@ -187,7 +189,7 @@ private:
 
         uassert(ErrorCodes::NoMatchingDocument,
                 "No matching document found for query {} on namespace {}"_format(
-                    query.toString(), _storageNss.toString()),
+                    filter.toString(), _storageNss.toString()),
                 upsert || commandReply.getIntField("n") > 0);
 
         WriteConcernResult ignoreResult;

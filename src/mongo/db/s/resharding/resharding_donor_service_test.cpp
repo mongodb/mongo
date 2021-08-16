@@ -693,7 +693,7 @@ TEST_F(ReshardingDonorServiceTest, TruncatesXLErrorOnDonorDocument) {
                 NamespaceString::kDonorReshardingOperationsNamespace);
             store.forEach(
                 opCtx.get(),
-                QUERY(ReshardingDonorDocument::kReshardingUUIDFieldName << doc.getReshardingUUID()),
+                BSON(ReshardingDonorDocument::kReshardingUUIDFieldName << doc.getReshardingUUID()),
                 [&](const auto& donorDocument) {
                     persistedDonorDocument.emplace(donorDocument);
                     return false;

@@ -137,7 +137,7 @@ protected:
 
     void waitUntilCoordinatorDocIsPresent() {
         DBDirectClient dbClient(operationContext());
-        while (dbClient.findOne(NamespaceString::kTransactionCoordinatorsNamespace.ns(), Query())
+        while (dbClient.findOne(NamespaceString::kTransactionCoordinatorsNamespace.ns(), BSONObj{})
                    .isEmpty())
             ;
     }
@@ -151,13 +151,14 @@ protected:
         do {
             doc = TransactionCoordinatorDocument::parse(
                 IDLParserErrorContext("dummy"),
-                dbClient.findOne(NamespaceString::kTransactionCoordinatorsNamespace.ns(), Query()));
+                dbClient.findOne(NamespaceString::kTransactionCoordinatorsNamespace.ns(),
+                                 BSONObj{}));
         } while (!doc.getDecision());
     }
 
     void waitUntilNoCoordinatorDocIsPresent() {
         DBDirectClient dbClient(operationContext());
-        while (!dbClient.findOne(NamespaceString::kTransactionCoordinatorsNamespace.ns(), Query())
+        while (!dbClient.findOne(NamespaceString::kTransactionCoordinatorsNamespace.ns(), BSONObj{})
                     .isEmpty())
             ;
     }

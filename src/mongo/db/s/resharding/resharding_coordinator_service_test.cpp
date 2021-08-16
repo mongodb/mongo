@@ -228,7 +228,8 @@ public:
     ReshardingCoordinatorDocument getCoordinatorDoc(OperationContext* opCtx) {
         DBDirectClient client(opCtx);
 
-        auto doc = client.findOne(NamespaceString::kConfigReshardingOperationsNamespace.ns(), {});
+        auto doc =
+            client.findOne(NamespaceString::kConfigReshardingOperationsNamespace.ns(), BSONObj{});
         IDLParserErrorContext errCtx("reshardingCoordFromTest");
         return ReshardingCoordinatorDocument::parse(errCtx, doc);
     }
