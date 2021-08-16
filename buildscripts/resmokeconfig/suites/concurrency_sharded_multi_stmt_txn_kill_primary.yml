@@ -229,6 +229,7 @@ executor:
     shell_options:
       global_vars:
         TestData:
+          allowUncleanShutdowns: true
           runInsideTransaction: true
           runningWithAutoSplit: false
           runningWithBalancer: false

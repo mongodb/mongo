@@ -238,6 +238,7 @@ executor:
       global_vars:
         TestData: &TestData
           tenantId: "tenantMigrationTenantId"
+          allowUncleanShutdowns: true
           auth: true
           authMechanism: SCRAM-SHA-1
           keyFile: *keyFile
