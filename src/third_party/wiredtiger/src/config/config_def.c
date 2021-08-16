@@ -359,7 +359,10 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_open_cursor[] = {
   {"checkpoint", "string", NULL, NULL, NULL, 0},
   {"checkpoint_wait", "boolean", NULL, NULL, NULL, 0},
   {"debug", "category", NULL, NULL, confchk_WT_SESSION_open_cursor_debug_subconfigs, 1},
-  {"dump", "string", NULL, "choices=[\"hex\",\"json\",\"pretty\",\"print\"]", NULL, 0},
+  {"dump", "string", NULL,
+    "choices=[\"hex\",\"json\",\"pretty\",\"pretty_hex\","
+    "\"print\"]",
+    NULL, 0},
   {"incremental", "category", NULL, NULL, confchk_WT_SESSION_open_cursor_incremental_subconfigs, 7},
   {"next_random", "boolean", NULL, NULL, NULL, 0},
   {"next_random_sample_size", "string", NULL, NULL, NULL, 0},

@@ -902,10 +902,12 @@ struct __wt_session {
 	 * @config{dump, configure the cursor for dump format inputs and outputs: "hex" selects a
 	 * simple hexadecimal format\, "json" selects a JSON format with each record formatted as
 	 * fields named by column names if available\, "pretty" selects a human-readable format
-	 * (making it incompatible with the "load") and "print" selects a format where only
-	 * non-printing characters are hexadecimal encoded.  These formats are compatible with the
-	 * @ref util_dump and @ref util_load commands., a string\, chosen from the following
-	 * options: \c "hex"\, \c "json"\, \c "pretty"\, \c "print"; default empty.}
+	 * (making it incompatible with the "load")\, "pretty_hex" is similar to "pretty" (also
+	 * incompatible with "load") except raw byte data elements will be printed like "hex"
+	 * format\, and "print" selects a format where only non-printing characters are hexadecimal
+	 * encoded.  These formats are compatible with the @ref util_dump and @ref util_load
+	 * commands., a string\, chosen from the following options: \c "hex"\, \c "json"\, \c
+	 * "pretty"\, \c "pretty_hex"\, \c "print"; default empty.}
 	 * @config{incremental = (, configure the cursor for block incremental backup usage.  These
 	 * formats are only compatible with the backup data source; see @ref backup., a set of
 	 * related configuration options defined below.}

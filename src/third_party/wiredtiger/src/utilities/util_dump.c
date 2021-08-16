@@ -13,12 +13,13 @@
 #define STRING_MATCH_CONFIG(s, item) \
     (strncmp(s, (item).str, (item).len) == 0 && (s)[(item).len] == '\0')
 
-static int dump_config(WT_SESSION *, const char *, WT_CURSOR *, bool, bool);
+static int dump_config(WT_SESSION *, const char *, WT_CURSOR *, bool, bool, bool);
 static int dump_json_begin(WT_SESSION *);
 static int dump_json_end(WT_SESSION *);
 static int dump_json_separator(WT_SESSION *);
 static int dump_json_table_end(WT_SESSION *);
-static int dump_prefix(WT_SESSION *, bool, bool);
+static const char *get_dump_type(bool, bool, bool);
+static int dump_prefix(WT_SESSION *, bool, bool, bool);
 static int dump_record(WT_CURSOR *, bool, bool);
 static int dump_suffix(WT_SESSION *, bool);
 static int dump_table_config(WT_SESSION *, WT_CURSOR *, WT_CURSOR *, const char *, bool);
@@ -33,12 +34,16 @@ usage(void)
     static const char *options[] = {"-c checkpoint",
       "dump as of the named checkpoint (the default is the most recent version of the data)",
       "-f output", "dump to the specified file (the default is stdout)", "-j",
-      "dump in JSON format", "-p", "dump in human readable format (pretty-print)", "-r",
-      "dump in reverse order", "-t timestamp",
+      "dump in JSON format", "-p",
+      "dump in human readable format (pretty-print). The -p flag can be combined with -x. In this "
+      "case, raw data elements will be formatted like -x with hexadecimal encoding.",
+      "-r", "dump in reverse order", "-t timestamp",
       "dump as of the specified timestamp (the default is the most recent version of the data)",
       "-x",
       "dump all characters in a hexadecimal encoding (by default printable characters are not "
-      "encoded)",
+      "encoded). The -x flag can be combined with -p. In this case, the dump will be formatted "
+      "similar to -p except for raw data elements, which will look like -x with hexadecimal "
+      "encoding.",
       NULL, NULL};
 
     util_usage(
@@ -108,8 +113,13 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
         ++format_specifiers;
     if (hex)
         ++format_specifiers;
-    if (format_specifiers > 1) {
-        fprintf(stderr, "%s: the -j, -p and -x dump options are incompatible\n", progname);
+
+    /* Supported options are -j, -p, -x and a combination of -p and -x. */
+    if (format_specifiers > 1 && !(pretty && hex)) {
+        fprintf(stderr,
+          "%s: the only possible options are -j, -p, -x and a combination of -p and -x. Other "
+          "options are incompatible\n",
+          progname);
         return (usage());
     }
 
@@ -119,7 +129,7 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
     else if ((fp = fopen(ofile, "w")) == NULL)
         return (util_err(session, errno, "%s: open", ofile));
 
-    if (json && (dump_json_begin(session) != 0 || dump_prefix(session, hex, json) != 0))
+    if (json && (dump_json_begin(session) != 0 || dump_prefix(session, pretty, hex, json) != 0))
         goto err;
 
     WT_RET(__wt_scr_alloc(session_impl, 0, &tmp));
@@ -147,8 +157,7 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
         WT_ERR(__wt_buf_set(session_impl, tmp, "", 0));
         if (checkpoint != NULL)
             WT_ERR(__wt_buf_catfmt(session_impl, tmp, "checkpoint=%s,", checkpoint));
-        WT_ERR(__wt_buf_catfmt(session_impl, tmp, "dump=%s",
-          json ? "json" : (hex ? "hex" : (pretty ? "pretty" : "print"))));
+        WT_ERR(__wt_buf_catfmt(session_impl, tmp, "dump=%s", get_dump_type(pretty, hex, json)));
         if ((ret = session->open_cursor(session, uri, NULL, (char *)tmp->data, &cursor)) != 0) {
             fprintf(stderr, "%s: cursor open(%s) failed: %s\n", progname, uri,
               session->strerror(session, ret));
@@ -172,7 +181,7 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
             /* Set the "ignore tombstone" flag on the underlying cursor. */
             F_SET(hs_dump_cursor->child, WT_CURSTD_IGNORE_TOMBSTONE);
         }
-        if (dump_config(session, simpleuri, cursor, hex, json) != 0)
+        if (dump_config(session, simpleuri, cursor, pretty, hex, json) != 0)
             goto err;
 
         if (dump_record(cursor, reverse, json) != 0)
@@ -241,7 +250,8 @@ time_pair_to_timestamp(WT_SESSION_IMPL *session_impl, char *ts_string, WT_ITEM *
  *     Dump the config for the uri.
  */
 static int
-dump_config(WT_SESSION *session, const char *uri, WT_CURSOR *cursor, bool hex, bool json)
+dump_config(
+  WT_SESSION *session, const char *uri, WT_CURSOR *cursor, bool pretty, bool hex, bool json)
 {
     WT_CURSOR *mcursor;
     WT_DECL_RET;
@@ -260,7 +270,7 @@ dump_config(WT_SESSION *session, const char *uri, WT_CURSOR *cursor, bool hex, b
      */
     mcursor->set_key(mcursor, uri);
     if ((ret = mcursor->search(mcursor)) == 0) {
-        if ((!json && dump_prefix(session, hex, json) != 0) ||
+        if ((!json && dump_prefix(session, pretty, hex, json) != 0) ||
           dump_table_config(session, mcursor, cursor, uri, json) != 0 ||
           dump_suffix(session, json) != 0)
             ret = 1;
@@ -560,11 +570,35 @@ match:
 }
 
 /*
+ * Returns dump type string based on the passed format flags
+ */
+static const char *
+get_dump_type(bool pretty, bool hex, bool json)
+{
+    const char *result;
+
+    result = NULL;
+
+    if (json)
+        result = "json";
+    else if (hex && pretty)
+        result = "pretty_hex";
+    else if (hex)
+        result = "hex";
+    else if (pretty)
+        result = "pretty";
+    else
+        result = "print";
+
+    return result;
+}
+
+/*
  * dump_prefix --
  *     Output the dump file header prefix.
  */
 static int
-dump_prefix(WT_SESSION *session, bool hex, bool json)
+dump_prefix(WT_SESSION *session, bool pretty, bool hex, bool json)
 {
     int vmajor, vminor, vpatch;
 
@@ -577,7 +611,8 @@ dump_prefix(WT_SESSION *session, bool hex, bool json)
 
     if (!json &&
       (fprintf(fp, "WiredTiger Dump (WiredTiger Version %d.%d.%d)\n", vmajor, vminor, vpatch) < 0 ||
-        fprintf(fp, "Format=%s\n", hex ? "hex" : "print") < 0 || fprintf(fp, "Header\n") < 0))
+        fprintf(fp, "Format=%s\n", (pretty && hex) ? "print hex" : hex ? "hex" : "print") < 0 ||
+        fprintf(fp, "Header\n") < 0))
         return (util_err(session, EIO, NULL));
 
     return (0);

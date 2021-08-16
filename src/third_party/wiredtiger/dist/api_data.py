@@ -1432,10 +1432,11 @@ methods = {
         selects a simple hexadecimal format, "json" selects a JSON format
         with each record formatted as fields named by column names if
         available, "pretty" selects a human-readable format (making it
-        incompatible with the "load") and "print" selects a format where only
-        non-printing characters are hexadecimal encoded.  These formats are
-        compatible with the @ref util_dump and @ref util_load commands''',
-        choices=['hex', 'json', 'pretty', 'print']),
+        incompatible with the "load"), "pretty_hex" is similar to "pretty" (also incompatible with
+        "load") except raw byte data elements will be printed like "hex" format, and
+        "print" selects a format where only non-printing characters are hexadecimal encoded. These
+        formats are compatible with the @ref util_dump and @ref util_load commands''',
+        choices=['hex', 'json', 'pretty', 'pretty_hex', 'print']),
     Config('incremental', '', r'''
         configure the cursor for block incremental backup usage. These formats
         are only compatible with the backup data source; see @ref backup''',

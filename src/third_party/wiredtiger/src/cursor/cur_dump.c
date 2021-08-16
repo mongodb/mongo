@@ -91,8 +91,8 @@ __curdump_get_key(WT_CURSOR *cursor, ...)
             WT_ERR(child->get_key(child, &item));
 
             if (F_ISSET(cursor, WT_CURSTD_DUMP_PRETTY)) {
-                WT_IGNORE_RET_PTR(__wt_buf_set_printable_format(
-                  session, item.data, item.size, cursor->key_format, &cursor->key));
+                WT_IGNORE_RET_PTR(__wt_buf_set_printable_format(session, item.data, item.size,
+                  cursor->key_format, F_ISSET(cursor, WT_CURSTD_DUMP_HEX), &cursor->key));
             } else
                 WT_ERR(
                   __raw_to_dump(session, &item, &cursor->key, F_ISSET(cursor, WT_CURSTD_DUMP_HEX)));
@@ -241,8 +241,8 @@ __curdump_get_value(WT_CURSOR *cursor, ...)
         WT_ERR(child->get_value(child, &item));
 
         if (F_ISSET(cursor, WT_CURSTD_DUMP_PRETTY))
-            WT_IGNORE_RET_PTR(__wt_buf_set_printable_format(
-              session, item.data, item.size, cursor->value_format, &cursor->value));
+            WT_IGNORE_RET_PTR(__wt_buf_set_printable_format(session, item.data, item.size,
+              cursor->value_format, F_ISSET(cursor, WT_CURSTD_DUMP_HEX), &cursor->value));
         else
             WT_ERR(
               __raw_to_dump(session, &item, &cursor->value, F_ISSET(cursor, WT_CURSTD_DUMP_HEX)));

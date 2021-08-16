@@ -646,10 +646,11 @@ __slvg_trk_leaf(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, uint8_t *ad
 
         __wt_verbose(session, WT_VERB_SALVAGE, "%s start key %s",
           __wt_addr_string(session, trk->trk_addr, trk->trk_addr_size, ss->tmp1),
-          __wt_buf_set_printable(session, trk->row_start.data, trk->row_start.size, ss->tmp2));
+          __wt_buf_set_printable(
+            session, trk->row_start.data, trk->row_start.size, false, ss->tmp2));
         __wt_verbose(session, WT_VERB_SALVAGE, "%s stop key %s",
           __wt_addr_string(session, trk->trk_addr, trk->trk_addr_size, ss->tmp1),
-          __wt_buf_set_printable(session, trk->row_stop.data, trk->row_stop.size, ss->tmp2));
+          __wt_buf_set_printable(session, trk->row_stop.data, trk->row_stop.size, false, ss->tmp2));
 
         /* Row-store pages can contain overflow items. */
         WT_ERR(__slvg_trk_leaf_ovfl(session, dsk, trk));
@@ -1879,7 +1880,7 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk, WT_REF *ref, WT_S
                 break;
             __wt_verbose(session, WT_VERB_SALVAGE, "%s merge discarding leading key %s",
               __wt_addr_string(session, trk->trk_addr, trk->trk_addr_size, ss->tmp1),
-              __wt_buf_set_printable(session, key->data, key->size, ss->tmp2));
+              __wt_buf_set_printable(session, key->data, key->size, false, ss->tmp2));
             ++skip_start;
         }
     if (F_ISSET(trk, WT_TRACK_CHECK_STOP))
@@ -1894,7 +1895,7 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk, WT_REF *ref, WT_S
                 break;
             __wt_verbose(session, WT_VERB_SALVAGE, "%s merge discarding trailing key %s",
               __wt_addr_string(session, trk->trk_addr, trk->trk_addr_size, ss->tmp1),
-              __wt_buf_set_printable(session, key->data, key->size, ss->tmp2));
+              __wt_buf_set_printable(session, key->data, key->size, false, ss->tmp2));
             ++skip_stop;
         }
 
