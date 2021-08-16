@@ -206,6 +206,10 @@ executor:
     kill: true
   - class: CheckReplDBHash
   - class: ValidateCollections
+    shell_options:
+      global_vars:
+        TestData:
+          skipEnforceFastCountOnValidate: true
   - class: CheckOrphansDeleted
   - class: CleanupConcurrencyWorkloads
   fixture:

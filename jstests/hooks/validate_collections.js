@@ -111,7 +111,13 @@ function CollectionValidator() {
 
             const dbNames = conn.getDBNames();
             for (let dbName of dbNames) {
-                const validateRes = validatorFunc(conn.getDB(dbName), {full: true});
+                const validateRes = validatorFunc(conn.getDB(dbName), {
+                    full: true,
+                    // TODO (SERVER-24266): Always enforce fast counts, once they are always
+                    // accurate.
+                    enforceFastCount:
+                        !TestData.skipEnforceFastCountOnValidate && !TestData.allowUncleanShutdowns,
+                });
                 if (validateRes.ok !== 1) {
                     return {ok: 0, host: host, validateRes: validateRes};
                 }

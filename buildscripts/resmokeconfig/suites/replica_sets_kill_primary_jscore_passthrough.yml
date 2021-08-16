@@ -156,6 +156,10 @@ executor:
   - class: CheckReplOplogs
   - class: CheckReplDBHash
   - class: ValidateCollections
+    shell_options:
+      global_vars:
+        TestData:
+          skipEnforceFastCountOnValidate: true
   - class: CleanEveryN
     n: 20
   fixture:

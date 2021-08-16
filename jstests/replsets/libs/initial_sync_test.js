@@ -126,17 +126,13 @@ function InitialSyncTest(
         return isNodeInState(secondary, ReplSetTest.State.SECONDARY);
     }
 
-    function checkDataConsistency() {
-        const name = replSet.name;
-
-        // Make sure there are no open transactions.
-        let status = assert.commandWorked(primary.adminCommand('serverStatus'));
+    /**
+     * Asserts that there are no open transactions.
+     */
+    function assertNoOpenTxns() {
+        const status = assert.commandWorked(primary.adminCommand('serverStatus'));
         assert(typeof status.transactions === "object", status);
         assert.eq(0, status.transactions.currentOpen, status.transactions);
-
-        // We must check counts before validate is called during stopSet since validate fixes
-        // counts.
-        replSet.checkCollectionCounts(name);
     }
 
     /**
@@ -287,7 +283,7 @@ function InitialSyncTest(
      */
     this.stop = function() {
         transitionIfAllowed(State.kStopped);
-        checkDataConsistency();
+        assertNoOpenTxns();
         return replSet.stopSet();
     };
 }

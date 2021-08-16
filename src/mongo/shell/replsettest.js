@@ -2666,65 +2666,6 @@ var ReplSetTest = function(opts) {
     }
 
     /**
-     * Checks that 'fastCount' matches an iterative count for all collections.
-     */
-    this.checkCollectionCounts = function(msgPrefix = 'checkCollectionCounts') {
-        let success = true;
-        const errPrefix = `${msgPrefix}, counts did not match for collection`;
-
-        function checkCollectionCount(coll) {
-            const itCount = coll.find().itcount();
-            const fastCount = coll.count();
-            if (itCount !== fastCount) {
-                print(`${errPrefix} ${coll.getFullName()} on ${coll.getMongo().host}.` +
-                      ` itcount: ${itCount}, fast count: ${fastCount}`);
-                print("Collection info: " +
-                      tojson(coll.getDB().getCollectionInfos({name: coll.getName()})));
-                print("Collection stats: " + tojson(coll.stats()));
-                print("First 10 documents in collection: " +
-                      tojson(coll.find().limit(10).toArray()));
-
-                if (coll.getFullName() == "config.transactions") {
-                    print(`Ignoring fastcount error for ${coll.getFullName()} on ` +
-                          `${coll.getMongo().host}. itcount: ${itCount}, fast count: ${fastCount}`);
-                    return;
-                }
-                success = false;
-            }
-        }
-
-        function checkCollectionCountsForDB(_db) {
-            const res = assert.commandWorked(
-                _db.runCommand({listCollections: 1, includePendingDrops: true}));
-            const collNames = new DBCommandCursor(_db, res).toArray();
-            collNames.forEach(c => checkCollectionCount(_db.getCollection(c.name)));
-        }
-
-        function checkCollectionCountsForNode(node) {
-            const dbNames = node.getDBNames();
-            dbNames.forEach(dbName => checkCollectionCountsForDB(node.getDB(dbName)));
-        }
-
-        function checkCollectionCountsForReplSet(rst) {
-            print("checkCollectionCountsForReplSet waiting for secondaries to be ready: " +
-                  tojson(rst.nodes));
-            this.awaitSecondaryNodes();
-
-            rst.nodes.forEach(node => {
-                // Arbiters have no replicated collections.
-                if (isNodeArbiter(node)) {
-                    print("checkCollectionCounts skipping counts for arbiter: " + node.host);
-                    return;
-                }
-                checkCollectionCountsForNode(node);
-            });
-            assert(success, `Collection counts did not match. search for '${errPrefix}' in logs.`);
-        }
-
-        this.checkReplicaSet(checkCollectionCountsForReplSet, _determineLiveSecondaries(), this);
-    };
-
-    /**
      * Waits for an initial connection to a given node. Should only be called after the node's
      * process has already been started. Updates the corresponding entry in 'this.nodes' with the
      * newly established connection object.
