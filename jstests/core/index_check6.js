@@ -3,19 +3,23 @@
 // @tags: [
 //   assumes_unsharded_collection,
 // ]
-t = db.index_check6;
+(function() {
+'use strict';
+const collNamePrefix = 'jstests_index_check6_';
+let collCount = 0;
+let t = db.getCollection(collNamePrefix + collCount++);
 t.drop();
 
 function keysExamined(query, hint) {
-    var explain = t.find(query).hint(hint).explain("executionStats");
+    let explain = t.find(query).hint(hint).explain("executionStats");
     return explain.executionStats.totalKeysExamined;
 }
 
-t.createIndex({age: 1, rating: 1});
+assert.commandWorked(t.createIndex({age: 1, rating: 1}));
 
-for (var age = 10; age < 50; age++) {
-    for (var rating = 0; rating < 10; rating++) {
-        t.save({age: age, rating: rating});
+for (let age = 10; age < 50; age++) {
+    for (let rating = 0; rating < 10; rating++) {
+        assert.commandWorked(t.insert({age: age, rating: rating}));
     }
 }
 
@@ -39,24 +43,24 @@ assert.eq(
     keysExamined({age: {$gte: 29, $lte: 30}, rating: {$gte: 4, $lte: 5}}, {age: 1, rating: 1}),
     "D");  // SERVER-371
 
-assert.eq.automsg("2",
-                  "t.find( { age:30, rating:{ $gte:4, $lte:5} } )" +
-                      ".explain('executionStats')" +
-                      ".executionStats.totalKeysExamined");
+assert.eq(2,
+          t.find({age: 30, rating: {$gte: 4, $lte: 5}})
+              .explain('executionStats')
+              .executionStats.totalKeysExamined);
 
-t.drop();
-
-for (var a = 1; a < 10; a++) {
-    for (var b = 0; b < 10; b++) {
-        for (var c = 0; c < 10; c++) {
-            t.save({a: a, b: b, c: c});
+function doPopulateData() {
+    for (let a = 1; a < 10; a++) {
+        for (let b = 0; b < 10; b++) {
+            for (let c = 0; c < 10; c++) {
+                assert.commandWorked(t.insert({a: a, b: b, c: c}));
+            }
         }
     }
 }
 
 function doQuery(count, query, sort, index) {
-    var explain = t.find(query).hint(index).sort(sort).explain("executionStats");
-    var nscanned = explain.executionStats.totalKeysExamined;
+    let explain = t.find(query).hint(index).sort(sort).explain("executionStats");
+    let nscanned = explain.executionStats.totalKeysExamined;
     assert(Math.abs(count - nscanned) <= 2);
 }
 
@@ -92,14 +96,19 @@ function doTest(sort, index) {
     doQuery(15, {a: {$gte: 5, $lte: 6}, b: {$gte: 5, $lte: 6}, c: {$gte: 5, $lte: 6}}, sort, index);
 }
 
-for (var a = -1; a <= 1; a += 2) {
-    for (var b = -1; b <= 1; b += 2) {
-        for (var c = -1; c <= 1; c += 2) {
-            t.dropIndexes();
-            var spec = {a: a, b: b, c: c};
+for (let a = -1; a <= 1; a += 2) {
+    for (let b = -1; b <= 1; b += 2) {
+        for (let c = -1; c <= 1; c += 2) {
+            // Retain collection from previous iteration for validation purposes
+            // and to be consistent with other jsCore tests.
+            t = db.getCollection(collNamePrefix + collCount++);
+            t.drop();
+            doPopulateData();
+            let spec = {a: a, b: b, c: c};
             t.createIndex(spec);
             doTest(spec, spec);
             doTest({a: -a, b: -b, c: -c}, spec);
         }
     }
 }
+})();
