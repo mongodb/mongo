@@ -169,13 +169,8 @@ Status ViewCatalog::reload(OperationContext* opCtx,
                            const Database* db,
                            ViewCatalogLookupBehavior lookupBehavior) {
     auto catalog = getViewCatalog(db).writer();
-    // TODO SERVER-58219: evaluate whether this is safe or whether acquiring the lock can block.
-    AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
-    Lock::CollectionLock systemViewsLock(
-        opCtx,
-        NamespaceString(catalog->_durable->getName(),
-                        NamespaceString::kSystemDotViewsCollectionName),
-        MODE_IS);
+    invariant(opCtx->lockState()->isCollectionLockedForMode(
+        NamespaceString(db->name(), NamespaceString::kSystemDotViewsCollectionName), MODE_IS));
     auto result =
         catalog.writable()->_reload(opCtx, ViewCatalogLookupBehavior::kValidateDurableViews, true);
     catalog.commit();

@@ -190,6 +190,12 @@ void DatabaseImpl::init(OperationContext* const opCtx) const {
         // initialized, reload the viewCatalog to populate its in-memory state. If there are
         // problems with the catalog contents as might be caused by incorrect mongod versions or
         // similar, they are found right away.
+        //
+        // We take an IS lock here because the ViewCatalog::reload API requires it for other uses.
+        // Realistically no one else can be accessing the collection, and there's no chance of this
+        // blocking.
+        Lock::CollectionLock systemViewsLock(
+            opCtx, NamespaceString(_name, NamespaceString::kSystemDotViewsCollectionName), MODE_IS);
         Status reloadStatus =
             ViewCatalog::reload(opCtx, this, ViewCatalogLookupBehavior::kValidateDurableViews);
         if (!reloadStatus.isOK()) {
