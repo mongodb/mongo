@@ -104,6 +104,7 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeChildRemoveOpIsPopped);
 MONGO_FAIL_POINT_DEFINE(hangAfterAllChildRemoveOpsArePopped);
 MONGO_FAIL_POINT_DEFINE(hangDuringBatchInsert);
 MONGO_FAIL_POINT_DEFINE(hangDuringBatchUpdate);
+MONGO_FAIL_POINT_DEFINE(hangAfterBatchUpdate);
 MONGO_FAIL_POINT_DEFINE(hangDuringBatchRemove);
 MONGO_FAIL_POINT_DEFINE(hangAndFailAfterDocumentInsertsReserveOpTimes);
 // The withLock fail points are for testing interruptability of these operations, so they will not
@@ -805,6 +806,15 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
                               << *metaField << ": " << ns,
                 timeseries::updateOnlyModifiesMetaField(opCtx, ns, updateMod, *metaField));
 
+        // Only translate the hint (if there is one) if it is specified with an index specification
+        // document.
+        if (!updateRequest->getHint().isEmpty() &&
+            updateRequest->getHint().firstElement().fieldNameStringData() != "$hint"_sd) {
+            updateRequest->setHint(
+                uassertStatusOK(timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(
+                    *timeseriesOptions, updateRequest->getHint())));
+        }
+
         updateRequest->setQuery(timeseries::translateQuery(updateQuery, *metaField));
         updateRequest->setUpdateModification(timeseries::translateUpdate(updateMod, *metaField));
     }
@@ -866,6 +876,9 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
     result.setN(nMatchedOrInserted);
     result.setNModified(updateResult.numDocsModified);
     result.setUpsertedId(updateResult.upsertedId);
+
+    CurOpFailpointHelpers::waitWhileFailPointEnabled(
+        &hangAfterBatchUpdate, opCtx, "hangAfterBatchUpdate");
 
     if (containsDotsAndDollarsField && updateResult.containsDotsAndDollarsField) {
         *containsDotsAndDollarsField = true;
@@ -1107,8 +1120,9 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
                 timeseriesOptions);
 
         // Only translate the hint if it is specified by index spec.
-        if (request.getHint().firstElement().fieldNameStringData() != "$hint"_sd ||
-            request.getHint().firstElement().type() != BSONType::String) {
+        if (!request.getHint().isEmpty() &&
+            (request.getHint().firstElement().fieldNameStringData() != "$hint"_sd ||
+             request.getHint().firstElement().type() != BSONType::String)) {
             request.setHint(
                 uassertStatusOK(timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(
                     *timeseriesOptions, request.getHint())));

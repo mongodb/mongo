@@ -232,6 +232,7 @@ if (typeof _threadInject != "undefined") {
             // These tests cause deletes and updates to hang, which may affect other tests running
             // concurrently.
             "timeseries/timeseries_delete_hint.js",
+            "timeseries/timeseries_update_hint.js",
             "timeseries/timeseries_delete_concurrent.js",
             "timeseries/timeseries_update_concurrent.js"
         ]);
