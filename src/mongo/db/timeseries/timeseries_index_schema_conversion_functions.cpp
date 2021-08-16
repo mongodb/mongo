@@ -206,7 +206,9 @@ StatusWith<BSONObj> createBucketsSpecFromTimeseriesSpec(const TimeseriesOptions&
  * }
  */
 boost::optional<BSONObj> createTimeseriesIndexSpecFromBucketsIndexSpec(
-    const TimeseriesOptions& timeseriesOptions, const BSONObj& bucketsIndexSpecBSON) {
+    const TimeseriesOptions& timeseriesOptions,
+    const BSONObj& bucketsIndexSpecBSON,
+    bool timeseriesMetricIndexesFeatureFlagEnabled) {
     auto timeField = timeseriesOptions.getTimeField();
     auto metaField = timeseriesOptions.getMetaField();
 
@@ -251,7 +253,7 @@ boost::optional<BSONObj> createTimeseriesIndexSpecFromBucketsIndexSpec(
             }
         }
 
-        if (!feature_flags::gTimeseriesMetricIndexes.isEnabledAndIgnoreFCV()) {
+        if (!timeseriesMetricIndexesFeatureFlagEnabled) {
             // 'elem' is an invalid index spec field for this time-series collection. It matches
             // neither the time field nor the metaField field. Therefore, we will not convert the
             // index spec.
@@ -344,8 +346,11 @@ StatusWith<BSONObj> createBucketsShardKeySpecFromTimeseriesShardKeySpec(
 
 boost::optional<BSONObj> createTimeseriesIndexFromBucketsIndex(
     const TimeseriesOptions& timeseriesOptions, const BSONObj& bucketsIndex) {
+    bool timeseriesMetricIndexesFeatureFlagEnabled =
+        feature_flags::gTimeseriesMetricIndexes.isEnabledAndIgnoreFCV();
+
     if (bucketsIndex.hasField(kOriginalSpecFieldName) &&
-        feature_flags::gTimeseriesMetricIndexes.isEnabledAndIgnoreFCV()) {
+        timeseriesMetricIndexesFeatureFlagEnabled) {
         // This buckets index has the original user index definition available, return it if the
         // time-series metric indexes feature flag is enabled. If the feature flag isn't enabled,
         // the reverse mapping mechanism will be used. This is necessary to skip returning any
@@ -354,7 +359,9 @@ boost::optional<BSONObj> createTimeseriesIndexFromBucketsIndex(
     }
     if (bucketsIndex.hasField(kKeyFieldName)) {
         auto timeseriesKeyValue = createTimeseriesIndexSpecFromBucketsIndexSpec(
-            timeseriesOptions, bucketsIndex.getField(kKeyFieldName).Obj());
+            timeseriesOptions,
+            bucketsIndex.getField(kKeyFieldName).Obj(),
+            timeseriesMetricIndexesFeatureFlagEnabled);
         if (timeseriesKeyValue) {
             // This creates a BSONObj copy with the kOriginalSpecFieldName field removed, if it
             // exists, and modifies the kKeyFieldName field to timeseriesKeyValue.
@@ -378,6 +385,18 @@ std::list<BSONObj> createTimeseriesIndexesFromBucketsIndexes(
         }
     }
     return indexSpecs;
+}
+
+bool isBucketsIndexSpecCompatibleForDowngrade(const TimeseriesOptions& timeseriesOptions,
+                                              const BSONObj& bucketsIndex) {
+    if (!bucketsIndex.hasField(kKeyFieldName)) {
+        return false;
+    }
+
+    return createTimeseriesIndexSpecFromBucketsIndexSpec(
+               timeseriesOptions,
+               bucketsIndex.getField(kKeyFieldName).Obj(),
+               /*timeseriesMetricIndexesFeatureFlagEnabled=*/false) != boost::none;
 }
 
 }  // namespace timeseries

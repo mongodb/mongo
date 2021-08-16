@@ -35,6 +35,7 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/coll_mod.h"
+#include "mongo/db/catalog/collection_catalog_helper.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/drop_collection.h"
@@ -65,6 +66,7 @@
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/logv2/log.h"
@@ -465,6 +467,47 @@ private:
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         const bool isReplSet =
             replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
+
+        // Secondary indexes on time-series measurements are only supported in 5.1 and up. If the
+        // user tries to downgrade the cluster to an earlier version, they must first remove all
+        // incompatible secondary indexes on time-series measurements.
+        if (requestedVersion < FeatureCompatibility::Version::kVersion51) {
+            for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
+                Lock::DBLock dbLock(opCtx, dbName, MODE_IS);
+                catalog::forEachCollectionFromDb(
+                    opCtx,
+                    dbName,
+                    MODE_IS,
+                    [&](const CollectionPtr& collection) {
+                        invariant(collection->getTimeseriesOptions());
+
+                        auto indexCatalog = collection->getIndexCatalog();
+                        auto indexIt = indexCatalog->getIndexIterator(
+                            opCtx, /*includeUnfinishedIndexes=*/true);
+
+                        while (indexIt->more()) {
+                            auto indexEntry = indexIt->next();
+                            uassert(ErrorCodes::CannotDowngrade,
+                                    str::stream()
+                                        << "Cannot downgrade the cluster when there are secondary "
+                                           "indexes on time-series measurements present. Drop all "
+                                           "secondary indexes on time-series measurements before "
+                                           "downgrading. First detected incompatible index name: '"
+                                        << indexEntry->descriptor()->indexName()
+                                        << "' on collection: '"
+                                        << collection->ns().getTimeseriesViewNamespace() << "'",
+                                    timeseries::isBucketsIndexSpecCompatibleForDowngrade(
+                                        *collection->getTimeseriesOptions(),
+                                        indexEntry->descriptor()->infoObj()));
+                        }
+
+                        return true;
+                    },
+                    [&](const CollectionPtr& collection) {
+                        return collection->ns().isTimeseriesBucketsCollection();
+                    });
+            }
+        }
 
         // If the 'useSecondaryDelaySecs' feature flag is disabled in the downgraded FCV, issue a
         // reconfig to change the 'secondaryDelaySecs' field to 'slaveDelay'.

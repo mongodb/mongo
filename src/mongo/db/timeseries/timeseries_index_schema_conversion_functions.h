@@ -74,5 +74,11 @@ boost::optional<BSONObj> createTimeseriesIndexFromBucketsIndex(
 std::list<BSONObj> createTimeseriesIndexesFromBucketsIndexes(
     const TimeseriesOptions& timeseriesOptions, const std::list<BSONObj>& bucketsIndexes);
 
+/**
+ * Returns true if the 'bucketsIndex' is compatible for FCV downgrade.
+ */
+bool isBucketsIndexSpecCompatibleForDowngrade(const TimeseriesOptions& timeseriesOptions,
+                                              const BSONObj& bucketsIndex);
+
 }  // namespace timeseries
 }  // namespace mongo
