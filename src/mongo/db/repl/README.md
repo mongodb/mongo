@@ -1820,11 +1820,8 @@ description of the complete voting behavior, see the [Elections](#Elections) sec
 ### Formal Specification
 
 For more details on the safe reconfig protocol and its behaviors, refer to the [TLA+
-specification](https://github.com/mongodb/mongo/tree/r4.4.0-rc6/src/mongo/tla_plus/MongoReplReconfig).
-It defines two main invariants of the protocol,
-[ElectionSafety](https://github.com/mongodb/mongo/blob/r4.4.0-rc6/src/mongo/tla_plus/MongoReplReconfig/MongoReplReconfig.tla#L403-L404)
-and
-[NeverRollbackCommitted](https://github.com/mongodb/mongo/blob/r4.4.0-rc6/src/mongo/tla_plus/MongoReplReconfig/MongoReplReconfig.tla#L413-L420),
+specification](https://github.com/mongodb/mongo/tree/master/src/mongo/tla_plus/MongoReplReconfig).
+It defines two main invariants of the protocol, ElectionSafety and NeverRollbackCommitted,
 which assert, respectively, that no two leaders are elected in the same term and that majority
 committed writes are never rolled back.
 
