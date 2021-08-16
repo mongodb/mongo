@@ -34,6 +34,7 @@ mock_ocsp.stop();
 Object.extend(ocsp_options, {waitForConnect: false});
 ocsp_options.sslPEMKeyFile = OCSP_SERVER_CERT_REVOKED;
 
+print("Restarting MockOCSPServer with FAULT_REVOKED option");
 mock_ocsp = new MockOCSPServer(FAULT_REVOKED, 1);
 mock_ocsp.start();
 
@@ -42,6 +43,7 @@ conn = MongoRunner.runMongod(ocsp_options);
 waitForServer(conn);
 
 assert.throws(() => {
+    print("Following connection should fail");
     new Mongo(conn.host);
 });
 
