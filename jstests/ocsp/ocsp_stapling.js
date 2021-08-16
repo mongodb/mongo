@@ -10,7 +10,14 @@ if (!supportsStapling()) {
     return;
 }
 
-function test(serverCert, caCert, responderCertPair) {
+const CLUSTER_CA = {
+    tlsClusterFile: CLUSTER_KEY,
+    tlsClusterCAFile: CLUSTER_CA_CERT,
+    tlsAllowConnectionsWithoutCertificates: "",
+    tlsAllowInvalidCertificates: "",
+};
+
+function test(serverCert, caCert, responderCertPair, extraOpts) {
     const ocsp_options = {
         sslMode: "requireSSL",
         sslPEMKeyFile: serverCert,
@@ -19,8 +26,12 @@ function test(serverCert, caCert, responderCertPair) {
         setParameter: {
             "ocspStaplingRefreshPeriodSecs": 500,
             "ocspEnabled": "true",
-        },
+        }
     };
+
+    if (extraOpts) {
+        Object.extend(ocsp_options, extraOpts);
+    }
 
     // This is to test what happens when the responder is down,
     // making sure that we soft fail.
@@ -84,9 +95,19 @@ function test(serverCert, caCert, responderCertPair) {
 }
 
 test(OCSP_SERVER_CERT, OCSP_CA_PEM, OCSP_DELEGATE_RESPONDER);
+test(OCSP_SERVER_CERT, OCSP_CA_PEM, OCSP_DELEGATE_RESPONDER, CLUSTER_CA);
 test(OCSP_SERVER_CERT, OCSP_CA_PEM, OCSP_CA_RESPONDER);
+test(OCSP_SERVER_CERT, OCSP_CA_PEM, OCSP_CA_RESPONDER, CLUSTER_CA);
+
+// This test can not be repeated with CLUSTER_CA, because intermediate cert
+// is not part of cluster CA chain
 test(OCSP_SERVER_SIGNED_BY_INTERMEDIATE_CA_PEM,
      OCSP_INTERMEDIATE_CA_WITH_ROOT_PEM,
      OCSP_INTERMEDIATE_RESPONDER);
+
 test(OCSP_SERVER_AND_INTERMEDIATE_APPENDED_PEM, OCSP_CA_PEM, OCSP_INTERMEDIATE_RESPONDER);
+test(OCSP_SERVER_AND_INTERMEDIATE_APPENDED_PEM,
+     OCSP_CA_PEM,
+     OCSP_INTERMEDIATE_RESPONDER,
+     CLUSTER_CA);
 }());
