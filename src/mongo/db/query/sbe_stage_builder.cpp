@@ -363,8 +363,14 @@ std::unique_ptr<sbe::RuntimeEnvironment> makeRuntimeEnvironment(
     }
 
     for (auto&& [id, name] : Variables::kIdToBuiltinVarName) {
-        if (id != Variables::kRootId && id != Variables::kRemoveId &&
-            cq.getExpCtx()->variables.hasValue(id)) {
+        if ((id != Variables::kRootId && id != Variables::kRemoveId &&
+             cq.getExpCtx()->variables.hasValue(id))) {
+            auto [tag, val] = makeValue(cq.getExpCtx()->variables.getValue(id));
+            env->registerSlot(name, tag, val, true, slotIdGenerator);
+        } else if (id == Variables::kSearchMetaId &&
+                   ::mongo::feature_flags::gFeatureFlagSearchMeta.isEnabledAndIgnoreFCV()) {
+            // SEARCH_META never has a value at this point but can be set later and therefore must
+            // have a slot. The find layer is not responsible for setting this value.
             auto [tag, val] = makeValue(cq.getExpCtx()->variables.getValue(id));
             env->registerSlot(name, tag, val, true, slotIdGenerator);
         }

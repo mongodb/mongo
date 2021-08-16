@@ -167,8 +167,7 @@ Value Variables::getValue(Id id, const Document& root) const {
                 uassert(5858105,
                         str::stream() << "Must enable 'featureFlagSearchMeta' to access '$$"
                                       << getBuiltinVariableName(id),
-                        ::mongo::feature_flags::gFeatureFlagSearchMeta.isEnabled(
-                            serverGlobalParams.featureCompatibility));
+                        ::mongo::feature_flags::gFeatureFlagSearchMeta.isEnabledAndIgnoreFCV());
                 auto metaIt = _definitions.find(id);
                 return metaIt == _definitions.end() ? Value() : metaIt->second.value;
             }

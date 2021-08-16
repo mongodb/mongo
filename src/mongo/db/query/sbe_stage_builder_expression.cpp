@@ -1793,6 +1793,12 @@ public:
                         it != Variables::kIdToBuiltinVarName.end());
 
                 auto variableSlot = _context->state.env->getSlotIfExists(it->second);
+                if (expr->getVariableId() == Variables::kSearchMetaId) {
+                    uassert(5916201,
+                            str::stream() << "Must enable 'featureFlagSearchMeta' to access '$$"
+                                          << "SEARCH_META",
+                            ::mongo::feature_flags::gFeatureFlagSearchMeta.isEnabledAndIgnoreFCV());
+                }
                 uassert(5611301,
                         str::stream()
                             << "Builtin variable '$$" << it->second << "' is not available",
