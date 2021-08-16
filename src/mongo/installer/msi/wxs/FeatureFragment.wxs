@@ -110,6 +110,7 @@
                 Level ="1">
           <ComponentRef Id="c_mongocryptd"/>
           <ComponentRef Id="c_mongocryptdPdb"/>
+          <ComponentGroupRef Id="cg_EnterpriseBase" />
         </Feature>
         <?endif ?>
       </Feature>
