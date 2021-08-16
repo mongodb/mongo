@@ -280,11 +280,12 @@ real_worker(void)
                         } else
                             testutil_check(__wt_snprintf(
                               buf, sizeof(buf), "commit_timestamp=%x", g.ts_stable + 1));
-                        __wt_readunlock((WT_SESSION_IMPL *)session, &g.clock_lock);
                         if ((ret = session->commit_transaction(session, buf)) != 0) {
+                            __wt_readunlock((WT_SESSION_IMPL *)session, &g.clock_lock);
                             (void)log_print_err("real_worker:commit_transaction", ret, 1);
                             goto err;
                         }
+                        __wt_readunlock((WT_SESSION_IMPL *)session, &g.clock_lock);
                         start_txn = true;
                         /* Occasionally reopen cursors after committing. */
                         if (next_rnd % 13 == 0) {

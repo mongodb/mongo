@@ -1304,11 +1304,11 @@ __wt_txn_search_check(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_txn_update_check --
- *     Check if the current transaction can update an item.
+ * __wt_txn_modify_check --
+ *     Check if the current transaction can modify an item.
  */
 static inline int
-__wt_txn_update_check(
+__wt_txn_modify_check(
   WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd, wt_timestamp_t *prev_tsp)
 {
     WT_DECL_RET;

@@ -45,6 +45,10 @@ class test_timestamp10(wttest.WiredTigerTestCase, suite_subprocess):
     nentries = 10
     table_cnt = 3
 
+    key_format_values = [
+        ('integer-row', dict(key_format='i')),
+        ('column', dict(key_format='r')),
+    ]
     types = [
         ('all', dict(use_stable='false', run_wt=0)),
         ('all+wt', dict(use_stable='false', run_wt=1)),
@@ -56,7 +60,7 @@ class test_timestamp10(wttest.WiredTigerTestCase, suite_subprocess):
         ('stable+wt', dict(use_stable='true', run_wt=1)),
         ('stable+wt2', dict(use_stable='true', run_wt=2)),
     ]
-    scenarios = make_scenarios(types)
+    scenarios = make_scenarios(key_format_values, types)
 
     def data_and_checkpoint(self):
         #
@@ -64,10 +68,11 @@ class test_timestamp10(wttest.WiredTigerTestCase, suite_subprocess):
         # Add data to each of them separately and checkpoint so that each one
         # has a different stable timestamp.
         #
-        self.session.create(self.oplog_uri, 'key_format=i,value_format=i')
-        self.session.create(self.coll1_uri, 'key_format=i,value_format=i,log=(enabled=false)')
-        self.session.create(self.coll2_uri, 'key_format=i,value_format=i,log=(enabled=false)')
-        self.session.create(self.coll3_uri, 'key_format=i,value_format=i,log=(enabled=false)')
+        basecfg = 'key_format={},value_format=i'.format(self.key_format)
+        self.session.create(self.oplog_uri, basecfg)
+        self.session.create(self.coll1_uri, basecfg + ',log=(enabled=false)')
+        self.session.create(self.coll2_uri, basecfg + ',log=(enabled=false)')
+        self.session.create(self.coll3_uri, basecfg + ',log=(enabled=false)')
         c_op = self.session.open_cursor(self.oplog_uri)
         c = []
         c.append(self.session.open_cursor(self.coll1_uri))

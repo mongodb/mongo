@@ -30,15 +30,22 @@
 # Use the oldest timestamp in the metadata as the oldest timestamp on restart.
 import wiredtiger, wttest
 from wtdataset import SimpleDataSet
+from wtscenario import make_scenarios
 
 class test_timestamp19(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=50MB,log=(enabled)'
     session_config = 'isolation=snapshot'
 
+    key_format_values = [
+        ('integer-row', dict(key_format='i')),
+        ('column', dict(key_format='r')),
+    ]
+    scenarios = make_scenarios(key_format_values)
+
     def updates(self, uri, value, ds, nrows, commit_ts):
         session = self.session
         cursor = session.open_cursor(uri)
-        for i in range(0, nrows):
+        for i in range(1, nrows + 1):
             session.begin_transaction()
             cursor[ds.key(i)] = value
             session.commit_transaction('commit_timestamp=' + self.timestamp_str(commit_ts))
@@ -46,11 +53,11 @@ class test_timestamp19(wttest.WiredTigerTestCase):
 
     def test_timestamp(self):
         uri = "table:test_timestamp19"
-        create_params = 'value_format=S,key_format=i'
+        create_params = 'key_format={},value_format=S'.format(self.key_format)
         self.session.create(uri, create_params)
 
         ds = SimpleDataSet(
-            self, uri, 0, key_format="i", value_format="S", config='log=(enabled=false)')
+            self, uri, 0, key_format=self.key_format, value_format="S", config='log=(enabled=false)')
         ds.populate()
 
         nrows = 1000

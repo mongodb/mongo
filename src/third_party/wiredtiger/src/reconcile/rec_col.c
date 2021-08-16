@@ -327,7 +327,9 @@ __wt_rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *pageref)
     WT_RET(__wt_rec_split_init(session, r, page, pageref->ref_recno, btree->maxleafpage));
 
     /* Copy the original, disk-image bytes into place. */
-    memcpy(r->first_free, page->pg_fix_bitf, __bitstr_size((size_t)page->entries * btree->bitcnt));
+    if (page->entries != 0)
+        memcpy(
+          r->first_free, page->pg_fix_bitf, __bitstr_size((size_t)page->entries * btree->bitcnt));
 
     /* Update any changes to the original on-page data items. */
     WT_SKIP_FOREACH (ins, WT_COL_UPDATE_SINGLE(page)) {
