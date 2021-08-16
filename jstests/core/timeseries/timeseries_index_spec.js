@@ -1,7 +1,8 @@
 /**
  * Tests that the original user index definition is stored on the transformed index definition on
- * the buckets collection. Indexes created directly on the buckets collection do not have an
- * original user index definition and rely on the reverse mapping mechanism.
+ * the buckets collection for newly supported index types. Indexes created directly on the buckets
+ * collection do not have an original user index definition and rely on the reverse mapping
+ * mechanism.
  *
  * @tags: [
  *     assumes_no_implicit_collection_creation_after_drop,
@@ -52,17 +53,15 @@ TimeseriesTest.run(() => {
             return;
         }
 
-        if (TimeseriesTest.timeseriesMetricIndexesEnabled(db.getMongo())) {
+        if (spec.name == "x") {
             assert(spec.hasOwnProperty("originalSpec"));
             assert.eq(spec.v, spec.originalSpec.v);
             assert.eq(spec.name, spec.originalSpec.name);
             assert.neq(spec.key, spec.originalSpec.key);
+
+            assert.eq(spec.key, {"control.min.x": 1, "control.max.x": 1});
         } else {
             assert(!spec.hasOwnProperty("originalSpec"));
-        }
-
-        if (spec.name == "x") {
-            assert.eq(spec.key, {"control.min.x": 1, "control.max.x": 1});
         }
     };
 

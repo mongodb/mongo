@@ -636,6 +636,7 @@ std::unique_ptr<CreateIndexesCommand> makeTimeseriesCreateIndexesCommand(
     std::vector<mongo::BSONObj> indexes;
     for (const auto& origIndex : origIndexes) {
         BSONObjBuilder builder;
+        bool isBucketsIndexSpecCompatibleForDowngrade = false;
         for (const auto& elem : origIndex) {
             if (elem.fieldNameStringData() == NewIndexSpec::kKeyFieldName) {
                 auto pluginName = IndexNames::findPluginName(elem.Obj());
@@ -650,6 +651,11 @@ std::unique_ptr<CreateIndexesCommand> makeTimeseriesCreateIndexesCommand(
                         str::stream() << bucketsIndexSpecWithStatus.getStatus().toString()
                                       << " Command request: " << redact(origCmd.toBSON({})),
                         bucketsIndexSpecWithStatus.isOK());
+
+                isBucketsIndexSpecCompatibleForDowngrade =
+                    timeseries::isBucketsIndexSpecCompatibleForDowngrade(
+                        *timeseriesOptions,
+                        BSON(NewIndexSpec::kKeyFieldName << bucketsIndexSpecWithStatus.getValue()));
 
                 builder.append(NewIndexSpec::kKeyFieldName,
                                std::move(bucketsIndexSpecWithStatus.getValue()));
@@ -667,9 +673,12 @@ std::unique_ptr<CreateIndexesCommand> makeTimeseriesCreateIndexesCommand(
             }
         }
 
-        if (feature_flags::gTimeseriesMetricIndexes.isEnabledAndIgnoreFCV()) {
+        if (feature_flags::gTimeseriesMetricIndexes.isEnabledAndIgnoreFCV() &&
+            !isBucketsIndexSpecCompatibleForDowngrade) {
             // Store the original user index definition on the transformed index definition for the
-            // time-series buckets collection.
+            // time-series buckets collection if this is a newly supported index type on time-series
+            // collections. This is to avoid any additional downgrade steps for index types already
+            // supported in 5.0.
             builder.appendObject(IndexDescriptor::kOriginalSpecFieldName, origIndex.objdata());
         }
 
