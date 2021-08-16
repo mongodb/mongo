@@ -5007,6 +5007,7 @@ tasks:
     vars:
       resmoke_args: "--storageEngine=wiredTiger"
       resmoke_jobs_max: 1
+      use_large_distro: "true"
 
 - <<: *gen_task_template
   name: concurrency_replication_multi_stmt_txn_gen
@@ -10581,7 +10582,7 @@ buildvariants:
     multiversion_platform: rhel80
     multiversion_edition: enterprise
     scons_cache_scope: shared
-    large_distro_name: rhel80-medium
+    large_distro_name: rhel80-large
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
