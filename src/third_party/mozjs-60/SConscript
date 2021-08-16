@@ -68,7 +68,14 @@ if env.TargetOSIs('windows'):
 
             # 'operator': unsafe use of type 'type' in operation
             '/wd4804',
-        ]
+        ],
+        CXXFLAGS=[
+            # TODO(SERVER-59417): Override any potentially applied
+            # C++20 switch to unconditionally build in C++17 mode, at
+            # least until MozJS is upgraded to an ESR that can be
+            # compiled in C++20 mode.
+            '/std:c++17',
+        ],
     )
 else:
     env.Append(
@@ -76,6 +83,11 @@ else:
             '-Wno-non-virtual-dtor',
             '-Wno-invalid-offsetof',
             '-Wno-sign-compare',
+            # TODO(SERVER-59417): Override any potentially applied
+            # C++20 switch to unconditionally build in C++17 mode, at
+            # least until MozJS is upgraded to an ESR that can be
+            # compiled in C++20 mode.
+            '-std=c++17',
         ],
     )
 
