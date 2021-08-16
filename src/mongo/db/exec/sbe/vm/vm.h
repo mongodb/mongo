@@ -201,6 +201,8 @@ struct Instruction {
         pushAccessVal,
         pushMoveVal,
         pushLocalVal,
+        pushMoveLocalVal,
+        pushLocalLambda,
         pop,
         swap,
 
@@ -238,6 +240,11 @@ struct Instruction {
         getField,
         getElement,
         collComparisonKey,
+        getFieldOrElement,
+        traverseP,  // traverse projection paths
+        traverseF,  // traverse filter paths
+        setField,
+        getArraySize,
 
         aggSum,
         aggMin,
@@ -270,6 +277,7 @@ struct Instruction {
         jmp,  // offset is calculated from the end of instruction
         jmpTrue,
         jmpNothing,
+        ret,  // used only by simple local lambdas
 
         fail,
 
@@ -297,6 +305,7 @@ enum class Builtin : uint8_t {
     datePartsWeekYear,
     dropFields,
     newArray,
+    keepFields,
     newArrayFromRange,
     newObj,
     ksToString,  // KeyString to string
@@ -363,6 +372,7 @@ enum class Builtin : uint8_t {
     hasNullBytes,
     getRegexPattern,
     getRegexFlags,
+    hash,
     ftsMatch,
     generateSortKey,
     tsSecond,
@@ -386,11 +396,13 @@ public:
     void removeFixup(FrameId frameId);
 
     void append(std::unique_ptr<CodeFragment> code);
+    void appendNoStack(std::unique_ptr<CodeFragment> code);
     void append(std::unique_ptr<CodeFragment> lhs, std::unique_ptr<CodeFragment> rhs);
     void appendConstVal(value::TypeTags tag, value::Value val);
     void appendAccessVal(value::SlotAccessor* accessor);
     void appendMoveVal(value::SlotAccessor* accessor);
-    void appendLocalVal(FrameId frameId, int stackOffset);
+    void appendLocalVal(FrameId frameId, int stackOffset, bool moveFrom);
+    void appendLocalLambda(int codePosition);
     void appendPop() {
         appendSimpleInstruction(Instruction::pop);
     }
@@ -453,6 +465,18 @@ public:
     void appendGetField();
     void appendGetElement();
     void appendCollComparisonKey();
+    void appendGetFieldOrElement();
+    void appendTraverseP() {
+        appendSimpleInstruction(Instruction::traverseP);
+    }
+    void appendTraverseF() {
+        appendSimpleInstruction(Instruction::traverseF);
+    }
+    void appendSetField() {
+        appendSimpleInstruction(Instruction::setField);
+    }
+    void appendGetArraySize();
+
     void appendSum();
     void appendMin();
     void appendMax();
@@ -485,10 +509,15 @@ public:
     void appendJump(int jumpOffset);
     void appendJumpTrue(int jumpOffset);
     void appendJumpNothing(int jumpOffset);
+    void appendRet() {
+        appendSimpleInstruction(Instruction::ret);
+    }
     void appendFail() {
         appendSimpleInstruction(Instruction::fail);
     }
     void appendNumericConvert(value::TypeTags targetTag);
+
+    void fixup(int offset);
 
 private:
     void appendSimpleInstruction(Instruction::Tags tag);
@@ -499,7 +528,6 @@ private:
     }
 
     void adjustStackSimple(const Instruction& i);
-    void fixup(int offset);
     void copyCodeAndFixup(const CodeFragment& from);
 
     std::vector<uint8_t> _instrs;
@@ -531,6 +559,10 @@ private:
     std::vector<uint8_t> _argStackOwned;
     std::vector<value::TypeTags> _argStackTags;
     std::vector<value::Value> _argStackVals;
+
+    void runInternal(const CodeFragment* code, int64_t position);
+    std::tuple<bool, value::TypeTags, value::Value> runLambdaInternal(const CodeFragment* code,
+                                                                      int64_t position);
 
     std::tuple<bool, value::TypeTags, value::Value> genericAdd(value::TypeTags lhsTag,
                                                                value::Value lhsValue,
@@ -611,6 +643,22 @@ private:
                                                                value::Value objValue,
                                                                value::TypeTags fieldTag,
                                                                value::Value fieldValue);
+    std::tuple<bool, value::TypeTags, value::Value> getFieldOrElement(value::TypeTags objTag,
+                                                                      value::Value objValue,
+                                                                      value::TypeTags fieldTag,
+                                                                      value::Value fieldValue);
+
+    std::tuple<bool, value::TypeTags, value::Value> traverseP(const CodeFragment* code);
+    std::tuple<bool, value::TypeTags, value::Value> traverseP_nested(const CodeFragment* code,
+                                                                     int64_t position,
+                                                                     value::TypeTags tag,
+                                                                     value::Value val);
+
+    std::tuple<bool, value::TypeTags, value::Value> traverseF(const CodeFragment* code);
+    std::tuple<bool, value::TypeTags, value::Value> setField();
+
+    std::tuple<bool, value::TypeTags, value::Value> getArraySize(value::TypeTags tag,
+                                                                 value::Value val);
 
     std::tuple<bool, value::TypeTags, value::Value> aggSum(value::TypeTags accTag,
                                                            value::Value accValue,
@@ -713,6 +761,7 @@ private:
     std::tuple<bool, value::TypeTags, value::Value> builtinDayOfMonth(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinDayOfWeek(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinRegexMatch(ArityType arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinKeepFields(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinReplaceOne(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinDropFields(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinNewArray(ArityType arity);
@@ -782,6 +831,7 @@ private:
     std::tuple<bool, value::TypeTags, value::Value> builtinHasNullBytes(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinGetRegexPattern(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinGetRegexFlags(ArityType arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinHash(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinFtsMatch(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinGenerateSortKey(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinTsSecond(ArityType arity);
@@ -794,6 +844,18 @@ private:
         auto owned = _argStackOwned[backOffset];
         auto tag = _argStackTags[backOffset];
         auto val = _argStackVals[backOffset];
+
+        return {owned, tag, val};
+    }
+
+    std::tuple<bool, value::TypeTags, value::Value> moveFromStack(size_t offset) {
+        auto backOffset = _argStackOwned.size() - 1 - offset;
+        auto owned = _argStackOwned[backOffset];
+        _argStackOwned[backOffset] = false;
+        auto tag = _argStackTags[backOffset];
+        _argStackTags[backOffset] = value::TypeTags::Nothing;
+        auto val = _argStackVals[backOffset];
+        _argStackVals[backOffset] = 0;
 
         return {owned, tag, val};
     }
@@ -822,6 +884,20 @@ private:
         _argStackTags.pop_back();
         _argStackVals.pop_back();
     }
+
+    void popAndReleaseStack() {
+        auto owned = _argStackOwned.back();
+        auto tag = _argStackTags.back();
+        auto val = _argStackVals.back();
+
+        popStack();
+
+        if (owned) {
+            value::releaseValue(tag, val);
+        }
+    }
+
+    void swapStack();
 };
 }  // namespace vm
 }  // namespace sbe

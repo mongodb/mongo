@@ -190,6 +190,7 @@ private:
     void walkPrimaryExpr(AstQuery& ast);
     void walkIfExpr(AstQuery& ast);
     void walkLetExpr(AstQuery& ast);
+    void walkLambdaExpr(AstQuery& ast);
     void walkFrameProjectList(AstQuery& ast);
     void walkFunCall(AstQuery& ast);
     void walkUnionBranch(AstQuery& ast);

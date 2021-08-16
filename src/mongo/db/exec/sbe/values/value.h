@@ -126,6 +126,9 @@ enum class TypeTags : uint8_t {
     bsonDBPointer,
     bsonCodeWScope,
 
+    // Local lambda value
+    LocalLambda,
+
     // KeyString::Value
     ksValue,
 

@@ -365,8 +365,9 @@ private:
  */
 class EVariable final : public EExpression {
 public:
-    EVariable(value::SlotId var) : _var(var), _frameId(boost::none) {}
-    EVariable(FrameId frameId, value::SlotId var) : _var(var), _frameId(frameId) {}
+    EVariable(value::SlotId var) : _var(var), _frameId(boost::none), _moveFrom(false) {}
+    EVariable(FrameId frameId, value::SlotId var, bool moveFrom = false)
+        : _var(var), _frameId(frameId), _moveFrom(moveFrom) {}
 
     std::unique_ptr<EExpression> clone() const override;
 
@@ -377,6 +378,11 @@ public:
 private:
     value::SlotId _var;
     boost::optional<FrameId> _frameId;
+    // If true then accessing this variable will take over the ownership of value. The flag has to
+    // be used carefully only when the variable is used exactly once. When used with slots then the
+    // expression must be guaranteed to be the last use of the slot. Essentially we are simulating
+    // linear type system here.
+    bool _moveFrom{false};
 };
 
 /**
@@ -516,6 +522,26 @@ public:
         : _frameId(frameId) {
         _nodes = std::move(binds);
         _nodes.emplace_back(std::move(in));
+        validateNodes();
+    }
+
+    std::unique_ptr<EExpression> clone() const override;
+
+    std::unique_ptr<vm::CodeFragment> compile(CompileCtx& ctx) const override;
+
+    std::vector<DebugPrinter::Block> debugPrint() const override;
+
+private:
+    FrameId _frameId;
+};
+
+/**
+ * A simple lambda value with no captures.
+ */
+class ELocalLambda final : public EExpression {
+public:
+    ELocalLambda(FrameId frameId, std::unique_ptr<EExpression> body) : _frameId(frameId) {
+        _nodes.emplace_back(std::move(body));
         validateNodes();
     }
 

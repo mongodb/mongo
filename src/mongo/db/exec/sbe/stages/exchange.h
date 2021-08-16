@@ -42,7 +42,7 @@ namespace mongo::sbe {
 class ExchangeConsumer;
 class ExchangeProducer;
 
-enum class ExchangePolicy { broadcast, roundrobin, partition };
+enum class ExchangePolicy { broadcast, roundrobin, hashpartition, rangepartition };
 
 // A unit of exchange between a consumer and a producer
 class ExchangeBuffer {
@@ -215,6 +215,11 @@ public:
     auto& fields() const {
         return _fields;
     }
+
+    auto partitionExpr() const {
+        return _partition.get();
+    }
+
     ExchangePipe* pipe(size_t consumerTid, size_t producerTid);
 
 private:
@@ -330,6 +335,11 @@ private:
     std::shared_ptr<ExchangeState> _state;
     size_t _tid{0};
     size_t _roundRobinCounter{0};
+
+    // A partitiong function (either hash or range) to distribute rows.
+    std::unique_ptr<vm::CodeFragment> _partition;
+
+    vm::ByteCode _bytecode;
 
     std::vector<value::SlotAccessor*> _incoming;
 

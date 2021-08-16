@@ -167,6 +167,12 @@ ExchangeConsumer::ExchangeConsumer(std::unique_ptr<PlanStage> input,
 
     _tid = _state->addConsumer(this);
     _orderPreserving = _state->isOrderPreserving();
+
+    if (policy == ExchangePolicy::hashpartition || policy == ExchangePolicy::rangepartition) {
+        uassert(5922201, "partition expression must be present", _state->partitionExpr());
+    } else {
+        uassert(5922202, "partition expression must not be present", !_state->partitionExpr());
+    }
 }
 ExchangeConsumer::ExchangeConsumer(std::shared_ptr<ExchangeState> state, PlanNodeId planNodeId)
     : PlanStage("exchange"_sd, planNodeId), _state(state) {
@@ -181,9 +187,14 @@ void ExchangeConsumer::prepare(CompileCtx& ctx) {
         _outgoing.emplace_back(ExchangeBuffer::Accessor{});
     }
 
-    for (size_t idx = 0; idx < _state->numOfProducers(); ++idx) {
-        _state->producerCompileCtxs().push_back(ctx.makeCopy(true));
+    if (_tid == 0) {
+        // Only consumer ID 0 prepares (copies) the compilation context. Note that we do not have to
+        // lock the shared state here - it is accessed only by consmer ID 0 again in the future.
+        for (size_t idx = 0; idx < _state->numOfProducers(); ++idx) {
+            _state->producerCompileCtxs().push_back(ctx.makeCopy(true));
+        }
     }
+
     // Compile '<' function once we implement order preserving exchange.
 }
 value::SlotAccessor* ExchangeConsumer::getAccessor(CompileCtx& ctx, value::SlotId slot) {
@@ -396,6 +407,12 @@ std::vector<DebugPrinter::Block> ExchangeConsumer::debugPrint() const {
         case ExchangePolicy::roundrobin:
             DebugPrinter::addKeyword(ret, "round");
             break;
+        case ExchangePolicy::hashpartition:
+            DebugPrinter::addKeyword(ret, "hash");
+            break;
+        case ExchangePolicy::rangepartition:
+            DebugPrinter::addKeyword(ret, "range");
+            break;
         default:
             uasserted(4822835, "policy not yet implemented");
     }
@@ -491,6 +508,10 @@ void ExchangeProducer::prepare(CompileCtx& ctx) {
     for (auto& f : _state->fields()) {
         _incoming.emplace_back(_children[0]->getAccessor(ctx, f));
     }
+
+    if (auto partition = _state->partitionExpr(); partition) {
+        _partition = partition->compile(ctx);
+    }
 }
 value::SlotAccessor* ExchangeProducer::getAccessor(CompileCtx& ctx, value::SlotId slot) {
     return _children[0]->getAccessor(ctx, slot);
@@ -541,8 +562,34 @@ PlanState ExchangeProducer::getNext() {
                 }
                 _roundRobinCounter = (_roundRobinCounter + 1) % _pipes.size();
             } break;
-            case ExchangePolicy::partition: {
-                uasserted(4822840, "policy not yet implemented");
+            case ExchangePolicy::hashpartition: {
+                auto [owned, tag, val] = _bytecode.run(_partition.get());
+                if (owned) {
+                    value::releaseValue(tag, val);
+                }
+
+                uassert(4822840, "wrong partitioning", tag == sbe::value::TypeTags::NumberInt64);
+                size_t idx = sbe::value::bitcastTo<size_t>(val) % _pipes.size();
+
+                // Detect early out in the loop.
+                if (!appendData(idx)) {
+                    return trackPlanState(PlanState::IS_EOF);
+                }
+            } break;
+            case ExchangePolicy::rangepartition: {
+                auto [owned, tag, val] = _bytecode.run(_partition.get());
+                if (owned) {
+                    value::releaseValue(tag, val);
+                }
+
+                uassert(5922203, "wrong partitioning", tag == sbe::value::TypeTags::NumberInt64);
+                size_t idx = sbe::value::bitcastTo<size_t>(val);
+                uassert(5922204, "wrong partitioning", idx < _pipes.size());
+
+                // Detect early out in the loop.
+                if (!appendData(idx)) {
+                    return trackPlanState(PlanState::IS_EOF);
+                }
             } break;
             default:
                 MONGO_UNREACHABLE;

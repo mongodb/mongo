@@ -354,6 +354,9 @@ void writeTagToStream(T& stream, const TypeTags tag) {
         case TypeTags::bsonBinData:
             stream << "bsonBinData";
             break;
+        case TypeTags::LocalLambda:
+            stream << "LocalLambda";
+            break;
         case TypeTags::bsonUndefined:
             stream << "bsonUndefined";
             break;
@@ -601,6 +604,9 @@ void writeValueToStream(T& stream, TypeTags tag, Value val, size_t depth = 1) {
         case TypeTags::bsonUndefined:
             stream << "undefined";
             break;
+        case TypeTags::LocalLambda:
+            stream << "LocalLambda";
+            break;
         case TypeTags::ksValue: {
             auto ks = getKeyStringView(val);
             stream << "KS(" << ks->toString() << ")";
@@ -782,6 +788,7 @@ bool isShallowType(TypeTags tag) noexcept {
         case TypeTags::MinKey:
         case TypeTags::MaxKey:
         case TypeTags::bsonUndefined:
+        case TypeTags::LocalLambda:
             return true;
         case TypeTags::NumberDecimal:
         case TypeTags::StringBig:

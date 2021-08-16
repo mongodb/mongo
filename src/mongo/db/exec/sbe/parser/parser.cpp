@@ -258,7 +258,7 @@ static constexpr auto kSyntax = R"(
                 MUL_EXPR <- PRIMARY_EXPR MUL_TOK MUL_EXPR / PRIMARY_EXPR
                 MUL_TOK <- <'*'> / <'/'>
 
-                PRIMARY_EXPR <- '(' EXPR ')' / CONST_TOK / IF_EXPR / LET_EXPR / FUN_CALL / IDENT / NUMBER / STRING
+                PRIMARY_EXPR <- '(' EXPR ')' / CONST_TOK / IF_EXPR / LET_EXPR / FUN_CALL / LAMBDA_EXPR / IDENT / NUMBER / STRING
                 CONST_TOK <- <'true'> / <'false'> / <'null'> / <'#'> / EMPTY_EXPR_TOK
                 EMPTY_EXPR_TOK <- <'{}'>
 
@@ -266,6 +266,8 @@ static constexpr auto kSyntax = R"(
 
                 LET_EXPR <- 'let' FRAME_PROJECT_LIST EXPR
                 FRAME_PROJECT_LIST <- '[' (ASSIGN (',' ASSIGN)* )?']'
+
+                LAMBDA_EXPR <- '\\' IDENT '.' EXPR
 
                 FUN_CALL <- IDENT # function call identifier
                             '(' (EXPR (',' EXPR)*)? ')' # function call arguments
@@ -567,6 +569,8 @@ void Parser::walkPrimaryExpr(AstQuery& ast) {
         ast.expr = std::move(ast.nodes[0]->expr);
     } else if (ast.nodes[0]->tag == "LET_EXPR"_) {
         ast.expr = std::move(ast.nodes[0]->expr);
+    } else if (ast.nodes[0]->tag == "LAMBDA_EXPR"_) {
+        ast.expr = std::move(ast.nodes[0]->expr);
     } else if (ast.nodes[0]->tag == "FUN_CALL"_) {
         ast.expr = std::move(ast.nodes[0]->expr);
     } else if (ast.nodes[0]->tag == "STRING"_) {
@@ -589,9 +593,23 @@ void Parser::walkLetExpr(AstQuery& ast) {
         invariant(it != plist->projects.end());
         binds[symbol.second] = std::move(it->second);
     }
-    popFrameSymbolTable();
 
     ast.expr = makeE<ELocalBind>(frame->id, std::move(binds), std::move(ast.nodes[1]->expr));
+
+    popFrameSymbolTable();
+}
+
+void Parser::walkLambdaExpr(AstQuery& ast) {
+    auto frame = newFrameSymbolTable();
+
+    walk(*ast.nodes[0]);
+    frame->table[ast.nodes[0]->identifier] = value::SlotId{0};
+
+    walk(*ast.nodes[1]);
+
+    ast.expr = makeE<ELocalLambda>(frame->id, std::move(ast.nodes[1]->expr));
+
+    popFrameSymbolTable();
 }
 
 void Parser::walkFrameProjectList(AstQuery& ast) {
@@ -1792,6 +1810,9 @@ void Parser::walk(AstQuery& ast) {
             break;
         case "LET_EXPR"_:
             walkLetExpr(ast);
+            break;
+        case "LAMBDA_EXPR"_:
+            walkLambdaExpr(ast);
             break;
         case "FRAME_PROJECT_LIST"_:
             walkFrameProjectList(ast);
