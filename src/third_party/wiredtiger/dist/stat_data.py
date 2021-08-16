@@ -876,6 +876,7 @@ conn_dsrc_stats = [
     ##########################################
     TxnStat('txn_checkpoint_obsolete_applied', 'transaction checkpoints due to obsolete pages'),
     TxnStat('txn_read_race_prepare_update', 'race to read prepared update retry'),
+    TxnStat('txn_rts_delete_rle_skipped', 'rollback to stable skipping delete rle'),
     TxnStat('txn_rts_hs_removed', 'rollback to stable updates removed from history store'),
     TxnStat('txn_rts_hs_restore_updates', 'rollback to stable restored updates from history store'),
     TxnStat('txn_rts_hs_restore_tombstones', 'rollback to stable restored tombstones from history store'),
@@ -883,6 +884,7 @@ conn_dsrc_stats = [
     TxnStat('txn_rts_inconsistent_ckpt', 'rollback to stable inconsistent checkpoint'),
     TxnStat('txn_rts_keys_removed', 'rollback to stable keys removed'),
     TxnStat('txn_rts_keys_restored', 'rollback to stable keys restored'),
+    TxnStat('txn_rts_stable_rle_skipped', 'rollback to stable skipping stable rle'),
     TxnStat('txn_rts_sweep_hs_keys', 'rollback to stable sweeping history store keys'),
     TxnStat('txn_update_conflict', 'update conflicts'),
 ]
