@@ -74,6 +74,62 @@ public:
         return _createElement(val);
     }
 
+    BSONElement createDate(Date_t dt) {
+        BSONObjBuilder ob;
+        ob.appendDate("0"_sd, dt);
+        _elementMemory.emplace_front(ob.obj());
+        return _elementMemory.front().firstElement();
+    }
+
+    BSONElement createBool(bool b) {
+        BSONObjBuilder ob;
+        ob.appendBool("0"_sd, b);
+        _elementMemory.emplace_front(ob.obj());
+        return _elementMemory.front().firstElement();
+    }
+
+    BSONElement createNull() {
+        BSONObjBuilder ob;
+        ob.appendNull("0"_sd);
+        _elementMemory.emplace_front(ob.obj());
+        return _elementMemory.front().firstElement();
+    }
+
+    BSONElement createUndefined() {
+        BSONObjBuilder ob;
+        ob.appendUndefined("0"_sd);
+        _elementMemory.emplace_front(ob.obj());
+        return _elementMemory.front().firstElement();
+    }
+
+    BSONElement createRegex(StringData options = "") {
+        BSONObjBuilder ob;
+        ob.appendRegex("0"_sd, options);
+        _elementMemory.emplace_front(ob.obj());
+        return _elementMemory.front().firstElement();
+    }
+
+    BSONElement createDBRef(StringData ns, const OID& oid) {
+        BSONObjBuilder ob;
+        ob.appendDBRef("0"_sd, ns, oid);
+        _elementMemory.emplace_front(ob.obj());
+        return _elementMemory.front().firstElement();
+    }
+
+    BSONElement createCodeWScope(StringData code, const BSONObj& scope) {
+        BSONObjBuilder ob;
+        ob.appendCodeWScope("0"_sd, code, scope);
+        _elementMemory.emplace_front(ob.obj());
+        return _elementMemory.front().firstElement();
+    }
+
+    BSONElement createSymbol(StringData symbol) {
+        BSONObjBuilder ob;
+        ob.appendSymbol("0"_sd, symbol);
+        _elementMemory.emplace_front(ob.obj());
+        return _elementMemory.front().firstElement();
+    }
+
     static uint64_t deltaInt32(BSONElement val, BSONElement prev) {
         return Simple8bTypeUtil::encodeInt64(val.Int() - prev.Int());
     }
@@ -151,6 +207,15 @@ public:
             }
         }
         return deltas;
+    }
+
+    static uint64_t deltaBool(BSONElement val, BSONElement prev) {
+        return Simple8bTypeUtil::encodeInt64(val.Bool() - prev.Bool());
+    }
+
+    static uint64_t deltaDate(BSONElement val, BSONElement prev) {
+        return Simple8bTypeUtil::encodeInt64(val.Date().toMillisSinceEpoch() -
+                                             prev.Date().toMillisSinceEpoch());
     }
 
     static void appendLiteral(BufBuilder& builder, BSONElement elem) {
@@ -236,6 +301,8 @@ public:
         auto buf = expected.buf();
         ASSERT_EQ(memcmp(columnBinary.data, buf, columnBinary.length), 0);
     }
+
+    const boost::optional<uint64_t> kDeltaForBinaryEqualValues = Simple8bTypeUtil::encodeInt64(0);
 
 private:
     std::forward_list<BSONObj> _elementMemory;
@@ -1133,6 +1200,343 @@ TEST_F(BSONColumnTest, LargeDeltaOfDeltaIsLiteralAfterSimple8bTimestamp) {
     std::vector<boost::optional<uint64_t>> expectedDeltaOfDeltas{
         deltaOfDeltaTimestamp(large, large), deltaOfDeltaTimestamp(semiLarge, large, large)};
     appendSimple8bBlocks64(expected, expectedDeltaOfDeltas, 1);
+    appendEOO(expected);
+
+    verifyBinary(cb.finalize(), expected);
+}
+
+TEST_F(BSONColumnTest, DateBasic) {
+    BSONColumnBuilder cb("test"_sd);
+
+    auto first = createDate(Date_t::fromMillisSinceEpoch(1));
+    auto second = createDate(Date_t::fromMillisSinceEpoch(2));
+    cb.append(first);
+    cb.append(second);
+    cb.append(second);
+
+    BufBuilder expected;
+    appendLiteral(expected, first);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    std::vector<boost::optional<uint64_t>> expectedDeltaOfDeltas{deltaDate(second, first),
+                                                                 deltaDate(second, second)};
+    _appendSimple8bBlocks(expected, expectedDeltaOfDeltas, 1);
+    appendEOO(expected);
+
+    verifyBinary(cb.finalize(), expected);
+}
+
+TEST_F(BSONColumnTest, DateAfterChangeBack) {
+    BSONColumnBuilder cb("test"_sd);
+
+    auto date = createDate(Date_t::fromMillisSinceEpoch(1));
+    auto elemInt32 = createElementInt32(0);
+
+    cb.append(elemInt32);
+    cb.append(date);
+    cb.append(date);
+
+    BufBuilder expected;
+    appendLiteral(expected, elemInt32);
+    appendLiteral(expected, date);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlock64(expected, kDeltaForBinaryEqualValues);
+
+    appendEOO(expected);
+
+    verifyBinary(cb.finalize(), expected);
+}
+
+TEST_F(BSONColumnTest, DateLargeDelta) {
+    BSONColumnBuilder cb("test"_sd);
+
+    auto first = createDate(Date_t::fromMillisSinceEpoch(1));
+    cb.append(first);
+
+    auto second = createDate(Date_t::fromMillisSinceEpoch(std::numeric_limits<int64_t>::max()));
+    cb.append(second);
+
+    BufBuilder expected;
+    appendLiteral(expected, first);
+    appendLiteral(expected, second);
+    appendEOO(expected);
+
+    verifyBinary(cb.finalize(), expected);
+}
+
+TEST_F(BSONColumnTest, BoolBasic) {
+    BSONColumnBuilder cb("test"_sd);
+
+    auto trueBson = createBool(true);
+    auto falseBson = createBool(false);
+    cb.append(trueBson);
+    cb.append(trueBson);
+    cb.append(falseBson);
+    cb.append(trueBson);
+
+    BufBuilder expected;
+    appendLiteral(expected, trueBson);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    std::vector<boost::optional<uint64_t>> expectedDeltaOfDeltas{deltaBool(trueBson, trueBson),
+                                                                 deltaBool(falseBson, trueBson),
+                                                                 deltaBool(trueBson, falseBson)};
+    _appendSimple8bBlocks(expected, expectedDeltaOfDeltas, 1);
+    appendEOO(expected);
+
+    verifyBinary(cb.finalize(), expected);
+}
+
+TEST_F(BSONColumnTest, BoolAfterChangeBack) {
+    BSONColumnBuilder cb("test"_sd);
+
+    auto trueBson = createBool(true);
+    auto elemInt32 = createElementInt32(0);
+
+    cb.append(elemInt32);
+    cb.append(trueBson);
+    cb.append(trueBson);
+
+    BufBuilder expected;
+    appendLiteral(expected, elemInt32);
+    appendLiteral(expected, trueBson);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlock64(expected, kDeltaForBinaryEqualValues);
+
+    appendEOO(expected);
+
+    verifyBinary(cb.finalize(), expected);
+}
+
+TEST_F(BSONColumnTest, UndefinedBasic) {
+    BSONColumnBuilder cb("test"_sd);
+
+    auto first = createUndefined();
+    cb.append(first);
+    cb.append(first);
+
+    BufBuilder expected;
+    appendLiteral(expected, first);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlock64(expected, kDeltaForBinaryEqualValues);
+    appendEOO(expected);
+
+    verifyBinary(cb.finalize(), expected);
+}
+
+TEST_F(BSONColumnTest, UndefinedAfterChangeBack) {
+    BSONColumnBuilder cb("test"_sd);
+
+    auto undefined = createUndefined();
+    auto elemInt32 = createElementInt32(0);
+
+    cb.append(elemInt32);
+    cb.append(undefined);
+    cb.append(undefined);
+
+    BufBuilder expected;
+    appendLiteral(expected, elemInt32);
+    appendLiteral(expected, undefined);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlock64(expected, kDeltaForBinaryEqualValues);
+
+    appendEOO(expected);
+
+    verifyBinary(cb.finalize(), expected);
+}
+
+TEST_F(BSONColumnTest, NullBasic) {
+    BSONColumnBuilder cb("test"_sd);
+
+    auto first = createNull();
+    cb.append(first);
+    cb.append(first);
+
+    BufBuilder expected;
+    appendLiteral(expected, first);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlock64(expected, kDeltaForBinaryEqualValues);
+    appendEOO(expected);
+
+    verifyBinary(cb.finalize(), expected);
+}
+
+TEST_F(BSONColumnTest, NullAfterChangeBack) {
+    BSONColumnBuilder cb("test"_sd);
+
+    auto null = createNull();
+    auto elemInt32 = createElementInt32(0);
+
+    cb.append(elemInt32);
+    cb.append(null);
+    cb.append(null);
+
+    BufBuilder expected;
+    appendLiteral(expected, elemInt32);
+    appendLiteral(expected, null);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlock64(expected, kDeltaForBinaryEqualValues);
+
+    appendEOO(expected);
+
+    verifyBinary(cb.finalize(), expected);
+}
+
+TEST_F(BSONColumnTest, RegexBasic) {
+    BSONColumnBuilder cb("test"_sd);
+
+    auto first = createRegex();
+    auto second = createRegex("regex");
+    cb.append(first);
+    cb.append(second);
+    cb.append(second);
+
+    BufBuilder expected;
+    appendLiteral(expected, first);
+    appendLiteral(expected, second);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlock64(expected, kDeltaForBinaryEqualValues);
+    appendEOO(expected);
+
+    verifyBinary(cb.finalize(), expected);
+}
+
+TEST_F(BSONColumnTest, RegexAfterChangeBack) {
+    BSONColumnBuilder cb("test"_sd);
+
+    auto regex = createRegex();
+    auto elemInt32 = createElementInt32(0);
+
+    cb.append(elemInt32);
+    cb.append(regex);
+    cb.append(regex);
+
+    BufBuilder expected;
+    appendLiteral(expected, elemInt32);
+    appendLiteral(expected, regex);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlock64(expected, kDeltaForBinaryEqualValues);
+
+    appendEOO(expected);
+
+    verifyBinary(cb.finalize(), expected);
+}
+
+TEST_F(BSONColumnTest, DBRefBasic) {
+    BSONColumnBuilder cb("test"_sd);
+
+    auto oid = OID("112233445566778899AABBCC");
+    auto first = createDBRef("ns", oid);
+    auto second = createDBRef("diffNs", oid);
+    cb.append(first);
+    cb.append(second);
+    cb.append(second);
+
+    BufBuilder expected;
+    appendLiteral(expected, first);
+    appendLiteral(expected, second);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlock64(expected, kDeltaForBinaryEqualValues);
+    appendEOO(expected);
+
+    verifyBinary(cb.finalize(), expected);
+}
+
+TEST_F(BSONColumnTest, DBRefAfterChangeBack) {
+    BSONColumnBuilder cb("test"_sd);
+
+    auto oid = OID("112233445566778899AABBCC");
+    auto dbRef = createDBRef("ns", oid);
+    auto elemInt32 = createElementInt32(0);
+
+    cb.append(elemInt32);
+    cb.append(dbRef);
+    cb.append(dbRef);
+
+    BufBuilder expected;
+    appendLiteral(expected, elemInt32);
+    appendLiteral(expected, dbRef);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlock64(expected, kDeltaForBinaryEqualValues);
+
+    appendEOO(expected);
+
+    verifyBinary(cb.finalize(), expected);
+}
+
+TEST_F(BSONColumnTest, CodeWScopeBasic) {
+    BSONColumnBuilder cb("test"_sd);
+
+    auto first = createCodeWScope("code", BSONObj());
+    auto second = createCodeWScope("diffCode", BSONObj());
+    cb.append(first);
+    cb.append(second);
+    cb.append(second);
+
+    BufBuilder expected;
+    appendLiteral(expected, first);
+    appendLiteral(expected, second);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlock64(expected, kDeltaForBinaryEqualValues);
+    appendEOO(expected);
+
+    verifyBinary(cb.finalize(), expected);
+}
+
+TEST_F(BSONColumnTest, CodeWScopeAfterChangeBack) {
+    BSONColumnBuilder cb("test"_sd);
+
+    auto codeWScope = createCodeWScope("code", BSONObj());
+    auto elemInt32 = createElementInt32(0);
+
+    cb.append(elemInt32);
+    cb.append(codeWScope);
+    cb.append(codeWScope);
+
+    BufBuilder expected;
+    appendLiteral(expected, elemInt32);
+    appendLiteral(expected, codeWScope);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlock64(expected, kDeltaForBinaryEqualValues);
+
+    appendEOO(expected);
+
+    verifyBinary(cb.finalize(), expected);
+}
+
+TEST_F(BSONColumnTest, SymbolBasic) {
+    BSONColumnBuilder cb("test"_sd);
+
+    auto first = createSymbol("symbol");
+    auto second = createSymbol("diffSymbol");
+    cb.append(first);
+    cb.append(second);
+    cb.append(second);
+
+    BufBuilder expected;
+    appendLiteral(expected, first);
+    appendLiteral(expected, second);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlock64(expected, kDeltaForBinaryEqualValues);
+    appendEOO(expected);
+
+    verifyBinary(cb.finalize(), expected);
+}
+
+TEST_F(BSONColumnTest, SymbolAfterChangeBack) {
+    BSONColumnBuilder cb("test"_sd);
+
+    auto symbol = createSymbol("symbol");
+    auto elemInt32 = createElementInt32(0);
+
+    cb.append(elemInt32);
+    cb.append(symbol);
+    cb.append(symbol);
+
+    BufBuilder expected;
+    appendLiteral(expected, elemInt32);
+    appendLiteral(expected, symbol);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlock64(expected, kDeltaForBinaryEqualValues);
+
     appendEOO(expected);
 
     verifyBinary(cb.finalize(), expected);

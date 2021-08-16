@@ -144,6 +144,22 @@ BSONColumnBuilder& BSONColumnBuilder::append(BSONElement elem) {
                     _prevDelta = currTimestampDelta;
                     break;
                 }
+                case Date:
+                    value = elem.date().toMillisSinceEpoch() - previous.date().toMillisSinceEpoch();
+                    break;
+                case Bool:
+                    value = elem.boolean() - previous.boolean();
+                    break;
+                case Undefined:
+                case jstNULL:
+                    value = 0;
+                    break;
+                case RegEx:
+                case DBRef:
+                case CodeWScope:
+                case Symbol:
+                    encodingPossible = false;
+                    break;
                 default:
                     // Nothing else is implemented yet
                     invariant(false);
