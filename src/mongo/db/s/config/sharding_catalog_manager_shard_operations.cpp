@@ -697,12 +697,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
 
         SetFeatureCompatibilityVersion setFcvCmd(fcvRegion->getVersion());
         setFcvCmd.setDbName(NamespaceString::kAdminDb);
-        // TODO (SERVER-50954): Remove this FCV check once 4.4 is no longer the last LTS version.
-        if (fcvRegion->isGreaterThanOrEqualTo(FeatureCompatibility::Version::kVersion47)) {
-            // fromConfigServer is a new parameter added to 4.8 with intention to be backported
-            // to 4.7.
-            setFcvCmd.setFromConfigServer(true);
-        }
+        setFcvCmd.setFromConfigServer(true);
 
         auto versionResponse =
             _runCommandForAddShard(opCtx,
