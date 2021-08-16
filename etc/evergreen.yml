@@ -7811,6 +7811,40 @@ buildvariants:
     distros:
     - ubuntu2004-test
 
+- &enterprise-ubuntu2104-dynamic-gcc11-debug-experimental-template
+  name: enterprise-ubuntu2104-dynamic-gcc11-debug-experimental
+  display_name: "~ Shared Library Enterprise Ubuntu 21.04 GCC11 DEBUG"
+  batchtime: 1440 # 1 day
+  modules:
+  - enterprise
+  run_on:
+  - ubuntu2104-small
+  expansions: &enterprise-ubuntu2104-dynamic-gcc11-debug-experimental-expansions
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
+    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --link-model=dynamic CC=/usr/bin/gcc-11 CXX=/usr/bin/g++-11 --disable-warnings-as-errors
+    has_packages: false
+    scons_cache_scope: shared
+    scons_cache_mode: all
+    large_distro_name: ubuntu2104-large
+    num_scons_link_jobs_available: 0.99
+  tasks: &enterprise-ubuntu2104-dynamic-gcc11-debug-experimental-tasks
+  - name: compile_test_and_package_parallel_core_stream_TG
+    distros:
+      - ubuntu2104-large
+  - name: compile_test_and_package_parallel_unittest_stream_TG
+    distros:
+      - ubuntu2104-large
+  - name: compile_test_and_package_parallel_dbtest_stream_TG
+    distros:
+      - ubuntu2104-large
+
+- <<: *enterprise-ubuntu2104-dynamic-gcc11-debug-experimental-template
+  name: enterprise-ubuntu2104-dynamic-clang12-debug-experimental
+  display_name: "~ Shared Library Enterprise Ubuntu 21.04 clang12 DEBUG"
+  expansions:
+    <<: *enterprise-ubuntu2104-dynamic-gcc11-debug-experimental-expansions
+    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --link-model=dynamic CC=/usr/bin/clang-12 CXX=/usr/bin/clang++-12 --disable-warnings-as-errors
+
 - name: enterprise-linux-64-amazon-ami
   display_name: "Enterprise Amazon Linux"
   modules:

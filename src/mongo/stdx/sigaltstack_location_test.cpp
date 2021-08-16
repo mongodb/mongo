@@ -31,6 +31,7 @@
 
 #include <condition_variable>
 #include <exception>
+#include <functional>
 #include <iostream>
 #include <mutex>
 #include <setjmp.h>
@@ -182,19 +183,22 @@ int recursionTestImpl(bool useSigAltStack) {
         }
 
         struct MostlyInfiniteRecursion {
-            // Recurse to run out of stack on purpose. There can be no destructors or
-            // AS-unsafe code here, as this function terminates via `siglongjmp`.
+            // Recurse to run out of stack on purpose. There can be no
+            // destructors or AS-unsafe code here, as this function
+            // terminates via `siglongjmp`. Hide the recursion via the
+            // `recur` callback to frustrate ambitious optimizers.
             void run() {
                 if (++depth == std::numeric_limits<size_t>::max())
                     return;  // Avoid the undefined behavior of truly infinite recursion.
                 char localVar;
                 deepestAddress = &localVar;
-                run();
+                recur();
             }
             size_t depth;
             void* deepestAddress;
+            const std::function<void()> recur;
         };
-        MostlyInfiniteRecursion recursion = {0, &recursion};
+        MostlyInfiniteRecursion recursion = {0, &recursion, [&] { recursion.run(); }};
 
         // When the signal handler fires, it will return to this sigsetjmp call, causing
         // it to return a nonzero value. This makes the child thread viable again, and
