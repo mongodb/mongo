@@ -133,7 +133,8 @@ ChunkManager CatalogCacheTestFixture::makeChunkManager(
     ChunkVersion version(1, 0, OID::gen(), boost::none /* timestamp */);
 
     const BSONObj databaseBSON = [&]() {
-        DatabaseType db(nss.db().toString(), {"0"}, true, DatabaseVersion(UUID::gen()));
+        DatabaseType db(
+            nss.db().toString(), {"0"}, true, DatabaseVersion(UUID::gen(), Timestamp()));
         return db.toBSON();
     }();
 
@@ -194,7 +195,8 @@ ChunkManager CatalogCacheTestFixture::makeChunkManager(
 
 void CatalogCacheTestFixture::expectGetDatabase(NamespaceString nss, std::string shardId) {
     expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
-        DatabaseType db(nss.db().toString(), {shardId}, true, DatabaseVersion(UUID::gen()));
+        DatabaseType db(
+            nss.db().toString(), {shardId}, true, DatabaseVersion(UUID::gen(), Timestamp()));
         return std::vector<BSONObj>{db.toBSON()};
     }());
 }

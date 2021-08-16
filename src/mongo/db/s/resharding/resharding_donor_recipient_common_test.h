@@ -51,6 +51,7 @@ using namespace fmt::literals;
 class ReshardingDonorRecipientCommonInternalsTest : public ShardServerTestFixture {
 public:
     const UUID kExistingUUID = UUID::gen();
+    const Timestamp kExistingTimestamp = Timestamp();
     const NamespaceString kOriginalNss = NamespaceString("db", "foo");
 
     const NamespaceString kTemporaryReshardingNss =
@@ -62,6 +63,7 @@ public:
     const OID kOriginalEpoch = OID::gen();
     const OID kReshardingEpoch = OID::gen();
     const UUID kReshardingUUID = UUID::gen();
+    const Timestamp kReshardingTimestamp = Timestamp(kExistingTimestamp.getSecs() + 1, 0);
 
     const DonorShardFetchTimestamp kThisShard =
         makeDonorShardFetchTimestamp(ShardId("shardOne"), Timestamp(10, 0));
@@ -80,6 +82,7 @@ protected:
                                    kOriginalShardKey,
                                    kOriginalShardKeyPattern,
                                    kExistingUUID,
+                                   kExistingTimestamp,
                                    kOriginalEpoch,
                                    shardThatChunkExistsOn);
     }
@@ -91,6 +94,7 @@ protected:
                                    kReshardingKey,
                                    kReshardingKeyPattern,
                                    kReshardingUUID,
+                                   kReshardingTimestamp,
                                    kReshardingEpoch,
                                    shardThatChunkExistsOn);
     }
@@ -100,13 +104,14 @@ protected:
                                            const std::string& shardKey,
                                            const BSONObj& shardKeyPattern,
                                            const UUID& uuid,
+                                           const Timestamp& timestamp,
                                            const OID& epoch,
                                            const ShardId& shardThatChunkExistsOn) {
         auto range = ChunkRange(BSON(shardKey << MINKEY), BSON(shardKey << MAXKEY));
         auto chunk = ChunkType(
             nss, std::move(range), ChunkVersion(1, 0, epoch, boost::none), shardThatChunkExistsOn);
         ChunkManager cm(kThisShard.getShardId(),
-                        DatabaseVersion(uuid),
+                        DatabaseVersion(uuid, timestamp),
                         makeStandaloneRoutingTableHistory(
                             RoutingTableHistory::makeNew(nss,
                                                          uuid,

@@ -92,7 +92,7 @@ public:
                                                chunks);
 
         return ChunkManager(_myDonorId,
-                            DatabaseVersion(UUID::gen()),
+                            DatabaseVersion(UUID::gen(), Timestamp()),
                             makeStandaloneRoutingTableHistory(std::move(rt)),
                             boost::none /* clusterTime */);
     }

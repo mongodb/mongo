@@ -34,13 +34,11 @@
 #include <pcrecpp.h>
 
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/dist_lock_manager.h"
-#include "mongo/db/s/sharding_ddl_50_upgrade_downgrade.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/write_concern.h"
@@ -199,13 +197,8 @@ DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
                 optPrimaryShard ? *optPrimaryShard
                                 : selectShardForNewDatabase(opCtx, shardRegistry)));
 
-            FixedFCVRegion fcvRegion(opCtx);
-
-            boost::optional<Timestamp> clusterTime;
-            if (DatabaseEntryFormat::get(fcvRegion) == DatabaseEntryFormat::kUUIDandTimestamp) {
-                const auto now = VectorClock::get(opCtx)->getTime();
-                clusterTime = now.clusterTime().asTimestamp();
-            }
+            const auto now = VectorClock::get(opCtx)->getTime();
+            const auto clusterTime = now.clusterTime().asTimestamp();
 
             // Pick a primary shard for the new database.
             DatabaseType db(dbName.toString(),

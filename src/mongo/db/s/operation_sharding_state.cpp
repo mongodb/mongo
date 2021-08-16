@@ -102,8 +102,8 @@ void OperationShardingState::initializeClientRoutingVersions(
         }
     }
     if (dbVersion) {
-        invariant(_databaseVersions.find(nss.db()) == _databaseVersions.end());
-        _databaseVersions[nss.db()] = *dbVersion;
+        const auto [_, inserted] = _databaseVersions.emplace(nss.db(), *dbVersion);
+        invariant(inserted);
     }
 }
 

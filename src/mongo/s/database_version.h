@@ -47,8 +47,6 @@ class DatabaseVersion : public DatabaseVersionBase {
 public:
     using DatabaseVersionBase::getTimestamp;
 
-    DatabaseVersion() = default;
-
     explicit DatabaseVersion(const BSONObj& obj) {
         DatabaseVersionBase::parseProtected(IDLParserErrorContext("DatabaseVersion"), obj);
     }
@@ -56,18 +54,11 @@ public:
     explicit DatabaseVersion(const DatabaseVersionBase& dbv) : DatabaseVersionBase(dbv) {}
 
     /**
-     * Constructor of a DatabaseVersion based on epochs
-     */
-    explicit DatabaseVersion(mongo::UUID uuid)
-        : DatabaseVersion(uuid, boost::none /* timestamp */) {}
-
-    /**
      * Constructor of a DatabaseVersion based on epochs and timestamps
      */
-    DatabaseVersion(mongo::UUID uuid, boost::optional<mongo::Timestamp> timestamp)
-        : DatabaseVersionBase(1 /* lastMod */) {
+    DatabaseVersion(mongo::UUID uuid, mongo::Timestamp timestamp)
+        : DatabaseVersionBase(timestamp, 1 /* lastMod */) {
         setUuid(uuid);
-        setTimestamp(timestamp);
     }
 
     // Returns a new hardcoded DatabaseVersion value, which is used to distinguish databases that do

@@ -176,7 +176,11 @@ function testCommandAfterDropRecreateDatabase(testCase, st) {
     // Drop and recreate the database through the second mongos. Insert the entry for the new
     // database explicitly to ensure it is assigned the other shard as the primary shard.
     assert.commandWorked(st.s1.getDB(dbName).dropDatabase());
-    let currDbVersion = {uuid: UUID(), lastMod: NumberInt(1)};
+    let currDbVersion = {
+        uuid: UUID(),
+        timestamp: Timestamp(dbVersionBefore.timestamp.getTime() + 1, 0),
+        lastMod: NumberInt(1)
+    };
     assert.commandWorked(st.s1.getDB("config").getCollection("databases").insert({
         _id: dbName,
         partitioned: false,

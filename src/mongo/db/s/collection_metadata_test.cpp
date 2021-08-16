@@ -52,6 +52,7 @@ CollectionMetadata makeCollectionMetadataImpl(
     const std::vector<std::pair<BSONObj, BSONObj>>& thisShardsChunks,
     bool staleChunkManager,
     UUID uuid = UUID::gen(),
+    Timestamp timestamp = Timestamp(),
     boost::optional<TypeCollectionReshardingFields> reshardingFields = boost::none) {
 
     const OID epoch = OID::gen();
@@ -85,7 +86,7 @@ CollectionMetadata makeCollectionMetadataImpl(
 
     return CollectionMetadata(
         ChunkManager(kThisShard,
-                     DatabaseVersion(uuid),
+                     DatabaseVersion(uuid, timestamp),
                      ShardingTestFixtureCommon::makeStandaloneRoutingTableHistory(
                          RoutingTableHistory::makeNew(kNss,
                                                       uuid,
@@ -134,7 +135,7 @@ protected:
             (state >= CoordinatorStateEnum::kCommitting) ? reshardingUuid : existingUuid;
 
         return makeCollectionMetadataImpl(
-            KeyPattern(BSON("a" << 1)), {}, false, metadataUuid, reshardingFields);
+            KeyPattern(BSON("a" << 1)), {}, false, metadataUuid, Timestamp(), reshardingFields);
     }
 };
 

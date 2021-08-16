@@ -37,9 +37,8 @@ AtomicWord<uint64_t> ComparableDatabaseVersion::_uuidDisambiguatingSequenceNumSo
 AtomicWord<uint64_t> ComparableDatabaseVersion::_forcedRefreshSequenceNumSource{1ULL};
 
 DatabaseVersion DatabaseVersion::makeFixed() {
-    DatabaseVersion dbVersion;
+    DatabaseVersion dbVersion(UUID::gen(), Timestamp());
     dbVersion.setLastMod(0);
-    dbVersion.setUuid(UUID::gen());
     return dbVersion;
 }
 DatabaseVersion DatabaseVersion::makeUpdated() const {
@@ -104,23 +103,17 @@ bool ComparableDatabaseVersion::operator<(const ComparableDatabaseVersion& other
         return false;  // Only default constructed values have _forcedRefreshSequenceNum == 0 and
                        // they are always equal
 
-    // 1. If both versions are valid and have timestamps
-    //    1.1. if their timestamps are the same -> rely on lastMod to define the order
-    //    1.2. Otherwise  -> rely on the timestamps values to define order
-    // 2. If both versions are valid and have the same uuid -> rely on lastMod to define the order
-    // 3. Any other scenario -> rely on disambiguating sequence number
+    // 1. If both versions are valid
+    // 1.1. If both timestamps are the same -> rely on lastMod to define the order
+    // 1.2. Otherwise  -> rely on the timestamps' values to define order
+    // 2. Any other scenario -> rely on disambiguating sequence number
     if (_dbVersion && other._dbVersion) {
         const auto timestamp = _dbVersion->getTimestamp();
         const auto otherTimestamp = other._dbVersion->getTimestamp();
-        if (timestamp && otherTimestamp) {
-            if (*timestamp == *otherTimestamp)
-                return _dbVersion->getLastMod() < other._dbVersion->getLastMod();
-            else
-                return *timestamp < *otherTimestamp;
-
-        } else if (_dbVersion->getUuid() == other._dbVersion->getUuid()) {
+        if (timestamp == otherTimestamp)
             return _dbVersion->getLastMod() < other._dbVersion->getLastMod();
-        }
+        else
+            return timestamp < otherTimestamp;
     }
 
     return _uuidDisambiguatingSequenceNum < other._uuidDisambiguatingSequenceNum;

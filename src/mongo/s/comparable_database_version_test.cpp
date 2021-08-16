@@ -42,7 +42,6 @@ TEST(ComparableDatabaseVersionTest, VersionsEqual) {
         ASSERT(version == version);
     };
 
-    versionsEqual(DatabaseVersion(UUID::gen()));
     versionsEqual(DatabaseVersion(UUID::gen(), Timestamp(1)));
 }
 
@@ -53,18 +52,7 @@ TEST(ComparableDatabaseVersionTest, VersionsEqualAfterCopy) {
         ASSERT(version1 == version2);
     };
 
-    versionsEqualAfterCopy(DatabaseVersion(UUID::gen()));
     versionsEqualAfterCopy(DatabaseVersion(UUID::gen(), Timestamp(1)));
-}
-
-TEST(ComparableDatabaseVersionTest, CompareVersionDifferentUuids) {
-    const auto version1 =
-        ComparableDatabaseVersion::makeComparableDatabaseVersion(DatabaseVersion(UUID::gen()));
-    const auto version2 =
-        ComparableDatabaseVersion::makeComparableDatabaseVersion(DatabaseVersion(UUID::gen()));
-    ASSERT(version2 != version1);
-    ASSERT(version2 > version1);
-    ASSERT_FALSE(version2 < version1);
 }
 
 TEST(ComparableDatabaseVersionTest, CompareVersionDifferentTimestamps) {
@@ -77,57 +65,6 @@ TEST(ComparableDatabaseVersionTest, CompareVersionDifferentTimestamps) {
     ASSERT_FALSE(version2 > version1);
 }
 
-TEST(ComparableDatabaseVersionTest, CompareEpochBasedVersionAgainstEpochAndTimestampBasedVersion) {
-    {
-        auto equalVersions = [](const DatabaseVersion& v1, const DatabaseVersion& v2) {
-            const auto version1 = ComparableDatabaseVersion::makeComparableDatabaseVersion(v1);
-            const auto version2 = ComparableDatabaseVersion::makeComparableDatabaseVersion(v2);
-            ASSERT(version1 == version2);
-            ASSERT_FALSE(version1 < version2);
-            ASSERT_FALSE(version1 > version2);
-        };
-
-        const auto epoch = UUID::gen();
-        const DatabaseVersion v1(epoch);
-        const DatabaseVersion v2(epoch, Timestamp(1));
-        equalVersions(v1, v2);
-        equalVersions(v2, v1);
-    }
-
-    {
-        auto diffVersionsMoreRecentByLastMod = [](const DatabaseVersion& v1,
-                                                  const DatabaseVersion& v2) {
-            const auto version1 = ComparableDatabaseVersion::makeComparableDatabaseVersion(v1);
-            const auto version2 = ComparableDatabaseVersion::makeComparableDatabaseVersion(v2);
-            ASSERT(version1 != version2);
-            ASSERT(version1 > version2);
-            ASSERT_FALSE(version1 < version2);
-        };
-
-        const auto epoch = UUID::gen();
-        const DatabaseVersion v1(epoch);
-        const DatabaseVersion v2(epoch, Timestamp(1));
-        diffVersionsMoreRecentByLastMod(v1.makeUpdated(), v2);
-        diffVersionsMoreRecentByLastMod(v2.makeUpdated(), v1);
-    }
-
-    {
-        auto diffVersionsMoreRecentByDisambigSeqNum = [](const DatabaseVersion& v1,
-                                                         const DatabaseVersion& v2) {
-            const auto version1 = ComparableDatabaseVersion::makeComparableDatabaseVersion(v1);
-            const auto version2 = ComparableDatabaseVersion::makeComparableDatabaseVersion(v2);
-            ASSERT(version1 != version2);
-            ASSERT(version1 < version2);
-            ASSERT_FALSE(version1 > version2);
-        };
-
-        const DatabaseVersion v1(UUID::gen());
-        const DatabaseVersion v2(UUID::gen(), Timestamp(1));
-        diffVersionsMoreRecentByDisambigSeqNum(v1, v2);
-        diffVersionsMoreRecentByDisambigSeqNum(v2, v1);
-    }
-}
-
 TEST(ComparableDatabaseVersionTest, VersionGreaterSameUuidOrTimestamp) {
     auto versionGreaterSameUuidOrTimestamp = [](const DatabaseVersion& v1) {
         const DatabaseVersion v2 = v1.makeUpdated();
@@ -138,8 +75,7 @@ TEST(ComparableDatabaseVersionTest, VersionGreaterSameUuidOrTimestamp) {
         ASSERT_FALSE(version2 < version1);
     };
 
-    versionGreaterSameUuidOrTimestamp(DatabaseVersion(UUID::gen()));
-    versionGreaterSameUuidOrTimestamp(DatabaseVersion(UUID::gen(), Timestamp(1)));
+    versionGreaterSameUuidOrTimestamp(DatabaseVersion(UUID::gen(), Timestamp(0)));
 }
 
 TEST(ComparableDatabaseVersionTest, VersionLessSameUuidOrTimestamp) {
@@ -152,7 +88,6 @@ TEST(ComparableDatabaseVersionTest, VersionLessSameUuidOrTimestamp) {
         ASSERT_FALSE(version1 > version2);
     };
 
-    versionLessSameUuidOrTimestamp(DatabaseVersion(UUID::gen()));
     versionLessSameUuidOrTimestamp(DatabaseVersion(UUID::gen(), Timestamp(1)));
 }
 
@@ -173,8 +108,7 @@ TEST(ComparableDatabaseVersionTest, DefaultConstructedVersionIsAlwaysLess) {
         ASSERT_FALSE(defaultVersion > version1);
     };
 
-    defaultConstructedVersionIsAlwaysLess(DatabaseVersion(UUID::gen()));
-    defaultConstructedVersionIsAlwaysLess(DatabaseVersion(UUID::gen(), Timestamp(1)));
+    defaultConstructedVersionIsAlwaysLess(DatabaseVersion(UUID::gen(), Timestamp()));
 }
 
 TEST(ComparableDatabaseVersionTest, CompareForcedRefreshVersionVersusValidDatabaseVersion) {
@@ -199,9 +133,8 @@ TEST(ComparableDatabaseVersionTest, CompareForcedRefreshVersionVersusValidDataba
         ASSERT(defaultVersionAfterForce < forcedRefreshVersion);
     };
 
-    compareForcedRefreshVersionVersusValidDatabaseVersion(DatabaseVersion(UUID::gen()));
     compareForcedRefreshVersionVersusValidDatabaseVersion(
-        DatabaseVersion(UUID::gen(), Timestamp(1)));
+        DatabaseVersion(UUID::gen(), Timestamp()));
 }
 
 TEST(ComparableDatabaseVersionTest, CompareTwoForcedRefreshVersions) {

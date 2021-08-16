@@ -409,7 +409,7 @@ StatusWith<ChunkVersion> ConfigServerTestFixture::getCollectionVersion(Operation
 void ConfigServerTestFixture::setupDatabase(const std::string& dbName,
                                             const ShardId primaryShard,
                                             const bool sharded) {
-    DatabaseType db(dbName, primaryShard, sharded, DatabaseVersion(UUID::gen()));
+    DatabaseType db(dbName, primaryShard, sharded, DatabaseVersion(UUID::gen(), Timestamp()));
     ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
                                                     DatabaseType::ConfigNS,
                                                     db.toBSON(),

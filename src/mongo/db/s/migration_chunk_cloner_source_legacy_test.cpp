@@ -144,7 +144,7 @@ protected:
     }
 
     /**
-     * Creates a collection, which contains an index corresponding to kShardKeyPattern and insers
+     * Creates a collection, which contains an index corresponding to kShardKeyPattern and inserts
      * the specified initial documents.
      */
     void createShardedCollection(const std::vector<BSONObj>& initialDocs) {
@@ -187,7 +187,7 @@ protected:
                     operationContext(),
                     CollectionMetadata(
                         ChunkManager(ShardId("dummyShardId"),
-                                     DatabaseVersion(UUID::gen()),
+                                     DatabaseVersion(UUID::gen(), Timestamp()),
                                      makeStandaloneRoutingTableHistory(std::move(rt)),
                                      boost::none),
                         ShardId("dummyShardId")));

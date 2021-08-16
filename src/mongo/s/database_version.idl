@@ -48,10 +48,7 @@ structs:
                 optional: true
             timestamp:
                 type: timestamp
-                description: "Uniquely identifies to distinguish different incarnations of this database
-                              It is optional for parsing purposes, because in versions of MongoDB
-                              prior to 5.0, this value wasn't being written."
-                optional: true
+                description: "Uniquely identifies to distinguish different incarnations of this database."
             lastMod:
                 type: int
                 description: "an integer which is bumped whenever the database's primary shard changes"

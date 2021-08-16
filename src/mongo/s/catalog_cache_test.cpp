@@ -181,7 +181,7 @@ protected:
 
 TEST_F(CatalogCacheTest, GetDatabase) {
     const auto dbName = "testDB";
-    const auto dbVersion = DatabaseVersion(UUID::gen());
+    const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp());
     _catalogCacheLoader->setDatabaseRefreshReturnValue(
         DatabaseType(dbName, kShards[0], true, dbVersion));
 
@@ -197,7 +197,7 @@ TEST_F(CatalogCacheTest, GetDatabase) {
 
 TEST_F(CatalogCacheTest, GetCachedDatabase) {
     const auto dbName = "testDB";
-    const auto dbVersion = DatabaseVersion(UUID::gen());
+    const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp());
     loadDatabases({DatabaseType(dbName, kShards[0], true, dbVersion)});
 
     const auto swDatabase = _catalogCache->getDatabase(operationContext(), dbName);
@@ -212,7 +212,7 @@ TEST_F(CatalogCacheTest, GetCachedDatabase) {
 
 TEST_F(CatalogCacheTest, InvalidateSingleDbOnShardRemoval) {
     const auto dbName = "testDB";
-    const auto dbVersion = DatabaseVersion(UUID::gen());
+    const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp());
     loadDatabases({DatabaseType(dbName, kShards[0], true, dbVersion)});
 
     _catalogCache->invalidateEntriesThatReferenceShard(kShards[0]);
@@ -227,7 +227,7 @@ TEST_F(CatalogCacheTest, InvalidateSingleDbOnShardRemoval) {
 
 TEST_F(CatalogCacheTest, OnStaleDatabaseVersionNoVersion) {
     // onStaleDatabaseVesrsion must invalidate the database entry if invoked with no version
-    const auto dbVersion = DatabaseVersion(UUID::gen());
+    const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp());
     loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], true, dbVersion)});
 
     _catalogCache->onStaleDatabaseVersion(kNss.db(), boost::none);
@@ -237,7 +237,7 @@ TEST_F(CatalogCacheTest, OnStaleDatabaseVersionNoVersion) {
 }
 
 TEST_F(CatalogCacheTest, OnStaleShardVersionWithSameVersion) {
-    const auto dbVersion = DatabaseVersion(UUID::gen());
+    const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp());
     const auto cachedCollVersion = ChunkVersion(1, 0, OID::gen(), boost::none /* timestamp */);
 
     loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], true, dbVersion)});
@@ -248,7 +248,7 @@ TEST_F(CatalogCacheTest, OnStaleShardVersionWithSameVersion) {
 }
 
 TEST_F(CatalogCacheTest, OnStaleShardVersionWithNoVersion) {
-    const auto dbVersion = DatabaseVersion(UUID::gen());
+    const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp());
     const auto cachedCollVersion = ChunkVersion(1, 0, OID::gen(), boost::none /* timestamp */);
 
     loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], true, dbVersion)});
@@ -261,7 +261,7 @@ TEST_F(CatalogCacheTest, OnStaleShardVersionWithNoVersion) {
 }
 
 TEST_F(CatalogCacheTest, OnStaleShardVersionWithGraterVersion) {
-    const auto dbVersion = DatabaseVersion(UUID::gen());
+    const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp());
     const auto cachedCollVersion = ChunkVersion(1, 0, OID::gen(), boost::none /* timestamp */);
     const auto wantedCollVersion =
         ChunkVersion(2, 0, cachedCollVersion.epoch(), cachedCollVersion.getTimestamp());
@@ -278,7 +278,7 @@ TEST_F(CatalogCacheTest, OnStaleShardVersionWithGraterVersion) {
 TEST_F(CatalogCacheTest, GetDatabaseWithMetadataFormatChange) {
     const auto dbName = "testDB";
     const auto uuid = UUID::gen();
-    const DatabaseVersion versionWithoutTimestamp(uuid);
+    const DatabaseVersion versionWithoutTimestamp(uuid, Timestamp());
     const DatabaseVersion versionWithTimestamp(uuid, Timestamp(42));
 
     auto getDatabaseWithRefreshAndCheckResults = [&](const DatabaseVersion& version) {
@@ -303,7 +303,7 @@ TEST_F(CatalogCacheTest, GetDatabaseWithMetadataFormatChange) {
 }
 
 TEST_F(CatalogCacheTest, GetCollectionWithMetadataFormatChange) {
-    const auto dbVersion = DatabaseVersion(UUID::gen());
+    const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp());
     const auto epoch = OID::gen();
     const auto collVersionWithoutTimestamp = ChunkVersion(1, 0, epoch, boost::none /* timestamp */);
     const auto collVersionWithTimestamp = ChunkVersion(1, 0, epoch, Timestamp(42));
@@ -342,7 +342,7 @@ TEST_F(CatalogCacheTest, GetCollectionWithMetadataFormatChange) {
 
 TEST_F(CatalogCacheTest,
        GetCollectionWithRefreshDuringUpgradeWithMetadataFormatChangeChunksDontMatchCollection) {
-    const auto dbVersion = DatabaseVersion(UUID::gen());
+    const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp());
     const auto epoch = OID::gen();
     const auto timestamp = Timestamp(42);
 
@@ -372,7 +372,7 @@ TEST_F(CatalogCacheTest,
 
 TEST_F(CatalogCacheTest,
        GetCollectionWithRefreshDuringUpgradeWithMetadataFormatChangeSomeChunksMatchCollection) {
-    const auto dbVersion = DatabaseVersion(UUID::gen());
+    const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp());
     const auto epoch = OID::gen();
     const auto timestamp = Timestamp(42);
 
@@ -409,7 +409,7 @@ TEST_F(CatalogCacheTest,
 }
 
 TEST_F(CatalogCacheTest, GetCollectionWithRefreshDuringDowngradeWithMetadataFormatChange) {
-    const auto dbVersion = DatabaseVersion(UUID::gen());
+    const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp());
     const auto epoch = OID::gen();
     const auto timestamp = Timestamp(42);
 
@@ -438,7 +438,7 @@ TEST_F(CatalogCacheTest, GetCollectionWithRefreshDuringDowngradeWithMetadataForm
 }
 
 TEST_F(CatalogCacheTest, TimeseriesFieldsAreProperlyPropagatedOnCC) {
-    const auto dbVersion = DatabaseVersion(UUID::gen());
+    const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp());
     const auto epoch = OID::gen();
     const auto version = ChunkVersion(1, 0, epoch, Timestamp(42));
 
@@ -461,7 +461,7 @@ TEST_F(CatalogCacheTest, TimeseriesFieldsAreProperlyPropagatedOnCC) {
 }
 
 TEST_F(CatalogCacheTest, LookupCollectionWithInvalidOptions) {
-    const auto dbVersion = DatabaseVersion(UUID::gen());
+    const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp());
     const auto epoch = OID::gen();
     const auto version = ChunkVersion(1, 0, epoch, Timestamp(42));
 

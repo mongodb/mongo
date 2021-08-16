@@ -36,21 +36,6 @@ namespace mongo {
 using FeatureCompatibility = ServerGlobalParams::FeatureCompatibility;
 using FCVersion = FeatureCompatibility::Version;
 
-DatabaseEntryFormat::Format DatabaseEntryFormat::get(const FixedFCVRegion& fcvRegion) {
-    switch (fcvRegion->getVersion()) {
-        case FCVersion::kUpgradingFrom44To50:
-        case FCVersion::kUpgradingFrom49To50:
-        case FCVersion::kUpgradingFrom50To51:
-        case FCVersion::kDowngradingFrom51To50:
-        case FCVersion::kFullyDowngradedTo50:
-        case FCVersion::kVersion51:
-            return Format::kUUIDandTimestamp;
-
-        default:
-            return Format::kUUIDOnly;
-    }
-}
-
 ChunkEntryFormat::Format ChunkEntryFormat::get(const FixedFCVRegion& fcvRegion) {
     return getForVersionCallerGuaranteesFCVStability(fcvRegion->getVersion());
 }

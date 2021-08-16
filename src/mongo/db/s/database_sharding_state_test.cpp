@@ -118,8 +118,7 @@ public:
         return std::make_unique<StaticCatalogClient>(kShardList);
     }
 
-    DatabaseType createDatabase(const UUID& uuid,
-                                boost::optional<Timestamp> timestamp = boost::none) {
+    DatabaseType createDatabase(const UUID& uuid, const Timestamp& timestamp) {
         return DatabaseType(
             kDbName.toString(), kShardList[0].getName(), true, DatabaseVersion(uuid, timestamp));
     }
@@ -129,10 +128,10 @@ protected:
 };
 
 TEST_F(DatabaseShardingStateTestWithMockedLoader, OnDbVersionMismatch) {
-    const auto oldDb = createDatabase(UUID::gen());
-    const auto newDb = createDatabase(UUID::gen());
+    const auto oldDb = createDatabase(UUID::gen(), Timestamp(1));
+    const auto newDb = createDatabase(UUID::gen(), Timestamp(2));
 
-    auto checkOnDbVersionMismatch = [&](const auto& newDb) {
+    auto checkOnDbVersionMismatch = [&](const auto& newDb, bool expectRefresh) {
         const auto newDbVersion = newDb.getVersion();
         auto opCtx = operationContext();
 
@@ -150,56 +149,23 @@ TEST_F(DatabaseShardingStateTestWithMockedLoader, OnDbVersionMismatch) {
 
         activeDbVersion = getActiveDbVersion();
         ASSERT_TRUE(activeDbVersion);
-        ASSERT_EQ(newDbVersion.getTimestamp(), activeDbVersion->getTimestamp());
+        if (expectRefresh) {
+            ASSERT_EQUALS(newDbVersion.getTimestamp(), activeDbVersion->getTimestamp());
+        }
     };
 
-    checkOnDbVersionMismatch(oldDb);
-    checkOnDbVersionMismatch(newDb);
-    checkOnDbVersionMismatch(oldDb);
+    checkOnDbVersionMismatch(oldDb, true);
+    checkOnDbVersionMismatch(newDb, true);
+    checkOnDbVersionMismatch(oldDb, false);
 }
 
-TEST_F(DatabaseShardingStateTestWithMockedLoader, OnDbVersionMismatchWithUpdateMetadataFormat) {
+TEST_F(DatabaseShardingStateTestWithMockedLoader, ForceDatabaseRefresh) {
     const auto uuid = UUID::gen();
-    const Timestamp timestamp(42);
 
-    const auto db = createDatabase(uuid);
-    const auto timestampedDb = createDatabase(uuid, timestamp);
+    const auto oldDb = createDatabase(uuid, Timestamp(1));
+    const auto newDb = createDatabase(uuid, Timestamp(2));
 
-    auto checkOnDbVersionMismatch = [&](const auto& newDb) {
-        auto opCtx = operationContext();
-
-        _mockCatalogCacheLoader->setDatabaseRefreshReturnValue(newDb);
-
-        auto getActiveDbVersion = [&] {
-            AutoGetDb autoDb(opCtx, kDbName, MODE_IS);
-            const auto dss = DatabaseShardingState::get(opCtx, kDbName);
-            auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
-            return dss->getDbVersion(opCtx, dssLock);
-        };
-
-        boost::optional<DatabaseVersion> activeDbVersion = getActiveDbVersion();
-
-        const auto& newDbVersion = newDb.getVersion();
-        ASSERT_OK(onDbVersionMismatchNoExcept(opCtx, kDbName, newDbVersion, activeDbVersion));
-
-        activeDbVersion = getActiveDbVersion();
-        ASSERT_TRUE(activeDbVersion);
-        ASSERT_EQ(newDbVersion.getTimestamp(), activeDbVersion->getTimestamp());
-    };
-
-    checkOnDbVersionMismatch(db);
-    checkOnDbVersionMismatch(timestampedDb);
-    checkOnDbVersionMismatch(db);
-}
-
-TEST_F(DatabaseShardingStateTestWithMockedLoader, ForceDatabaseRefreshWithUpdateMetadataFormat) {
-    const auto uuid = UUID::gen();
-    const Timestamp timestamp(42);
-
-    const auto db = createDatabase(uuid);
-    const auto timestampedDb = createDatabase(uuid, timestamp);
-
-    auto checkForceDatabaseRefresh = [&](const auto& newDb) {
+    auto checkForceDatabaseRefresh = [&](const auto& newDb, bool expectRefresh) {
         const auto newDbVersion = newDb.getVersion();
         auto opCtx = operationContext();
 
@@ -213,12 +179,14 @@ TEST_F(DatabaseShardingStateTestWithMockedLoader, ForceDatabaseRefreshWithUpdate
             return dss->getDbVersion(opCtx, dssLock);
         }();
         ASSERT_TRUE(activeDbVersion);
-        ASSERT_EQ(newDbVersion.getTimestamp(), activeDbVersion->getTimestamp());
+        if (expectRefresh) {
+            ASSERT_EQ(newDbVersion.getTimestamp(), activeDbVersion->getTimestamp());
+        }
     };
 
-    checkForceDatabaseRefresh(db);
-    checkForceDatabaseRefresh(timestampedDb);
-    checkForceDatabaseRefresh(db);
+    checkForceDatabaseRefresh(oldDb, true);
+    checkForceDatabaseRefresh(newDb, true);
+    checkForceDatabaseRefresh(oldDb, false);
 }
 
 }  // namespace

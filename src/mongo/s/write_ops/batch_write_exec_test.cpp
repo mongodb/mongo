@@ -140,7 +140,7 @@ BSONObj expectInsertsReturnStaleDbVersionErrorsBase(const NamespaceString& nss,
         errorBuilder.append("index", i);
         errorBuilder.append("code", int(ErrorCodes::StaleDbVersion));
 
-        auto dbVersion = DatabaseVersion(UUID::gen());
+        auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp());
         errorBuilder.append("db", nss.db());
         errorBuilder.append("vReceived", dbVersion.toBSON());
         errorBuilder.append("vWanted", dbVersion.makeUpdated().toBSON());

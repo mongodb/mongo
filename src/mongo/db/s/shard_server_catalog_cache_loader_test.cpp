@@ -440,7 +440,7 @@ TEST_F(ShardServerCatalogCacheLoaderTest, PrimaryLoadFromShardedAndFindMixedChun
 
 TEST_F(ShardServerCatalogCacheLoaderTest, PrimaryLoadFromShardedAndFindDbMetadataFormatChanged) {
     const std::string dbName("dbName");
-    DatabaseVersion version(UUID::gen());
+    DatabaseVersion version(UUID::gen(), Timestamp());
     DatabaseType dbType(dbName, kShardId, true /* sharded */, version);
 
     _remoteLoaderMock->setDatabaseRefreshReturnValue(dbType);

@@ -47,10 +47,12 @@ TEST(DatabaseType, Empty) {
 
 TEST(DatabaseType, Basic) {
     UUID uuid = UUID::gen();
+    Timestamp timestamp = Timestamp();
     StatusWith<DatabaseType> status = DatabaseType::fromBSON(
         BSON(DatabaseType::name("mydb")
              << DatabaseType::primary("shard") << DatabaseType::sharded(true)
-             << DatabaseType::version(BSON("uuid" << uuid << "lastMod" << 0))));
+             << DatabaseType::version(
+                    BSON("uuid" << uuid << "lastMod" << 0 << "timestamp" << timestamp))));
     ASSERT_TRUE(status.isOK());
 
     DatabaseType db = status.getValue();

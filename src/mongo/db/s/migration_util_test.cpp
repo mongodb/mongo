@@ -350,8 +350,9 @@ public:
     const ShardKeyPattern kShardKeyPattern = ShardKeyPattern(BSON("_id" << 1));
     const UUID kDefaultUUID = UUID::gen();
     const OID kEpoch = OID::gen();
-    const DatabaseType kDefaultDatabaseType =
-        DatabaseType(kNss.db().toString(), ShardId("0"), true, DatabaseVersion(kDefaultUUID));
+    const Timestamp kDefaultTimestamp = Timestamp();
+    const DatabaseType kDefaultDatabaseType = DatabaseType(
+        kNss.db().toString(), ShardId("0"), true, DatabaseVersion(kDefaultUUID, kDefaultTimestamp));
     const std::vector<ShardType> kShardList = {ShardType("0", "Host0:12345"),
                                                ShardType("1", "Host1:12345")};
 

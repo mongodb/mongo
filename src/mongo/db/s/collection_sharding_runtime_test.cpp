@@ -62,7 +62,7 @@ protected:
                                ChunkVersion(1, 0, epoch, boost::none /* timestamp */),
                                ShardId("other"));
         ChunkManager cm(ShardId("0"),
-                        DatabaseVersion(UUID::gen()),
+                        DatabaseVersion(UUID::gen(), Timestamp()),
                         makeStandaloneRoutingTableHistory(
                             RoutingTableHistory::makeNew(kTestNss,
                                                          uuid,
@@ -293,8 +293,10 @@ protected:
 
 TEST_F(CollectionShardingRuntimeTestWithMockedLoader,
        ForceShardFilteringMetadataRefreshWithUpdateMetadataFormat) {
-    const DatabaseType dbType(
-        kNss.db().toString(), kShardList[0].getName(), true, DatabaseVersion(UUID::gen()));
+    const DatabaseType dbType(kNss.db().toString(),
+                              kShardList[0].getName(),
+                              true,
+                              DatabaseVersion(UUID::gen(), Timestamp()));
 
     const auto epoch = OID::gen();
     const Timestamp timestamp(42);
@@ -329,8 +331,10 @@ TEST_F(CollectionShardingRuntimeTestWithMockedLoader,
 
 TEST_F(CollectionShardingRuntimeTestWithMockedLoader,
        OnShardVersionMismatchWithUpdateMetadataFormat) {
-    const DatabaseType dbType(
-        kNss.db().toString(), kShardList[0].getName(), true, DatabaseVersion(UUID::gen()));
+    const DatabaseType dbType(kNss.db().toString(),
+                              kShardList[0].getName(),
+                              true,
+                              DatabaseVersion(UUID::gen(), Timestamp()));
 
     const auto epoch = OID::gen();
     const Timestamp timestamp(42);

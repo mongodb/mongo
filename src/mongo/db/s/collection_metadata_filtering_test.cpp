@@ -110,7 +110,7 @@ protected:
             }());
 
         ChunkManager cm(ShardId("0"),
-                        DatabaseVersion(UUID::gen()),
+                        DatabaseVersion(UUID::gen(), Timestamp()),
                         makeStandaloneRoutingTableHistory(std::move(rt)),
                         boost::none);
         ASSERT_EQ(4, cm.numChunks());

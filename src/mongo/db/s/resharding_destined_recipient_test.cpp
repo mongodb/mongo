@@ -178,7 +178,7 @@ protected:
         UUID sourceUuid;
         ShardId destShard;
         ChunkVersion version;
-        DatabaseVersion dbVersion;
+        DatabaseVersion dbVersion{UUID::gen(), Timestamp()};
     };
 
     ReshardingEnv setupReshardingEnv(OperationContext* opCtx, bool refreshTempNss) {
@@ -196,7 +196,6 @@ protected:
         ReshardingEnv env(CollectionCatalog::get(opCtx)->lookupUUIDByNSS(opCtx, kNss).value());
         env.destShard = kShardList[1].getName();
         env.version = ChunkVersion(1, 0, OID::gen(), boost::none /* timestamp */);
-        env.dbVersion = DatabaseVersion(UUID::gen());
         env.tempNss =
             NamespaceString(kNss.db(),
                             fmt::format("{}{}",

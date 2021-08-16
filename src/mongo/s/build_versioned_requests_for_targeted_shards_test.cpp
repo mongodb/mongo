@@ -73,7 +73,8 @@ protected:
 
     void expectGetDatabaseUnsharded() {
         expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
-            DatabaseType db(kNss.db().toString(), {"0"}, false, DatabaseVersion(UUID::gen()));
+            DatabaseType db(
+                kNss.db().toString(), {"0"}, false, DatabaseVersion(UUID::gen(), Timestamp()));
             return std::vector<BSONObj>{db.toBSON()};
         }());
     }

@@ -33,15 +33,6 @@
 
 namespace mongo {
 
-struct DatabaseEntryFormat {
-    enum Format {
-        kUUIDOnly,
-        kUUIDandTimestamp,
-    };
-
-    static Format get(const FixedFCVRegion& fcvRegion);
-};
-
 struct ChunkEntryFormat {
     enum Format {
         kNamespaceOnlyNoTimestamps,       // Chunks have ns, no timestamps in the version

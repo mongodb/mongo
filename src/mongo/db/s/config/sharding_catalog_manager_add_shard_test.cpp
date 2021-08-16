@@ -380,9 +380,9 @@ TEST_F(AddShardTest, StandaloneBasicSuccess) {
     expectedShard.setState(ShardType::ShardState::kShardAware);
 
     DatabaseType discoveredDB1(
-        "TestDB1", ShardId("StandaloneShard"), false, DatabaseVersion(UUID::gen()));
+        "TestDB1", ShardId("StandaloneShard"), false, DatabaseVersion(UUID::gen(), Timestamp()));
     DatabaseType discoveredDB2(
-        "TestDB2", ShardId("StandaloneShard"), false, DatabaseVersion(UUID::gen()));
+        "TestDB2", ShardId("StandaloneShard"), false, DatabaseVersion(UUID::gen(), Timestamp()));
 
     auto expectWriteConcern = ShardingCatalogClient::kMajorityWriteConcern;
 
@@ -466,9 +466,9 @@ TEST_F(AddShardTest, StandaloneGenerateName) {
     expectedShard.setState(ShardType::ShardState::kShardAware);
 
     DatabaseType discoveredDB1(
-        "TestDB1", ShardId(expectedShardName), false, DatabaseVersion(UUID::gen()));
+        "TestDB1", ShardId(expectedShardName), false, DatabaseVersion(UUID::gen(), Timestamp()));
     DatabaseType discoveredDB2(
-        "TestDB2", ShardId(expectedShardName), false, DatabaseVersion(UUID::gen()));
+        "TestDB2", ShardId(expectedShardName), false, DatabaseVersion(UUID::gen(), Timestamp()));
 
     auto future = launchAsync([this, &expectedShardName, &shardTarget] {
         ThreadClient tc(getServiceContext());
@@ -810,7 +810,7 @@ TEST_F(AddShardTest, ShardContainsExistingDatabase) {
     std::string expectedShardName = "mySet";
 
     DatabaseType existingDB(
-        "existing", ShardId("existingShard"), false, DatabaseVersion(UUID::gen()));
+        "existing", ShardId("existingShard"), false, DatabaseVersion(UUID::gen(), Timestamp()));
 
     // Add a pre-existing database.
     ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
@@ -865,7 +865,7 @@ TEST_F(AddShardTest, SuccessfullyAddReplicaSet) {
     expectedShard.setState(ShardType::ShardState::kShardAware);
 
     DatabaseType discoveredDB(
-        "shardDB", ShardId(expectedShardName), false, DatabaseVersion(UUID::gen()));
+        "shardDB", ShardId(expectedShardName), false, DatabaseVersion(UUID::gen(), Timestamp()));
 
     auto future = launchAsync([this, &expectedShardName, &connString] {
         ThreadClient tc(getServiceContext());
@@ -930,7 +930,7 @@ TEST_F(AddShardTest, ReplicaSetExtraHostsDiscovered) {
     expectedShard.setState(ShardType::ShardState::kShardAware);
 
     DatabaseType discoveredDB(
-        "shardDB", ShardId(expectedShardName), false, DatabaseVersion(UUID::gen()));
+        "shardDB", ShardId(expectedShardName), false, DatabaseVersion(UUID::gen(), Timestamp()));
 
     auto future = launchAsync([this, &expectedShardName, &seedString] {
         ThreadClient tc(getServiceContext());
@@ -996,9 +996,9 @@ TEST_F(AddShardTest, AddShardSucceedsEvenIfAddingDBsFromNewShardFails) {
     expectedShard.setState(ShardType::ShardState::kShardAware);
 
     DatabaseType discoveredDB1(
-        "TestDB1", ShardId("StandaloneShard"), false, DatabaseVersion(UUID::gen()));
+        "TestDB1", ShardId("StandaloneShard"), false, DatabaseVersion(UUID::gen(), Timestamp()));
     DatabaseType discoveredDB2(
-        "TestDB2", ShardId("StandaloneShard"), false, DatabaseVersion(UUID::gen()));
+        "TestDB2", ShardId("StandaloneShard"), false, DatabaseVersion(UUID::gen(), Timestamp()));
 
     // Enable fail point to cause all updates to fail.  Since we add the databases detected from
     // the shard being added with upserts, but we add the shard document itself via insert, this
