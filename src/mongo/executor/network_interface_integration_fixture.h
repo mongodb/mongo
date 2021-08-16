@@ -35,6 +35,7 @@
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/util/future.h"
 
 namespace mongo {
@@ -116,9 +117,22 @@ public:
                           ErrorCodes::Error reason,
                           Milliseconds timeoutMillis = Minutes(5));
 
+    size_t getInProgress() {
+        auto lk = stdx::unique_lock(_mutex);
+        return _workInProgress;
+    }
+
 private:
+    void _onSchedulingCommand();
+    void _onCompletingCommand();
+
     std::unique_ptr<NetworkInterface> _net;
     PseudoRandom* _rng = nullptr;
+
+    size_t _workInProgress = 0;
+    stdx::condition_variable _fixtureIsIdle;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("NetworkInterfaceIntegrationFixture::_mutex");
 };
+
 }  // namespace executor
 }  // namespace mongo

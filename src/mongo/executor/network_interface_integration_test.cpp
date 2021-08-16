@@ -164,7 +164,10 @@ public:
 
     // NetworkInterfaceIntegrationFixture::tearDown() shuts down the NetworkInterface. We always
     // need to do it even if we have additional tearDown tasks.
-    using NetworkInterfaceIntegrationFixture::tearDown;
+    void tearDown() override {
+        NetworkInterfaceIntegrationFixture::tearDown();
+        ASSERT_EQ(getInProgress(), 0);
+    }
 
     RemoteCommandRequest makeTestCommand(
         Milliseconds timeout,
@@ -893,6 +896,44 @@ TEST_F(NetworkInterfaceTest, StartExhaustCommandShouldStopOnFailure) {
         ASSERT_EQ(counters._success, 0);
         ASSERT_EQ(counters._failed, 1);
     }
+}
+
+TEST_F(NetworkInterfaceTest, TearDownWaitsForInProgress) {
+    boost::optional<stdx::thread> tearDownThread;
+    auto tearDownPF = makePromiseFuture<void>();
+
+    auto deferred = [&] {
+        // Enable failpoint to make sure tearDown is blocked
+        FailPointEnableBlock fpb("networkInterfaceFixtureHangOnCompletion");
+
+        auto future = runCommand(makeCallbackHandle(), makeTestCommand(kMaxWait, makeEchoCmdObj()));
+
+        // Wait for the completion of the command
+        fpb->waitForTimesEntered(fpb.initialTimesEntered() + 1);
+
+        tearDownThread.emplace([this, promise = std::move(tearDownPF.promise)]() mutable {
+            tearDown();
+            promise.setWith([] {});
+        });
+
+        // Arbitrary delay between spawning the tearDown thread and checking futures
+        // to increase the chance of failures if tearDown doesn't wait for
+        // in-progress commands.
+        sleepFor(Milliseconds(50));
+
+        ASSERT_EQ(getInProgress(), 1);
+        ASSERT_FALSE(future.isReady()) << "Expected the command to be blocked";
+        ASSERT_FALSE(tearDownPF.future.isReady())
+            << "Expected tearDown to wait for blocked command";
+
+        return future;
+    }();
+
+    tearDownThread->join();
+
+    ASSERT(deferred.isReady());
+    ASSERT(tearDownPF.future.isReady());
+    ASSERT_EQ(getInProgress(), 0);
 }
 
 }  // namespace

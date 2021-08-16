@@ -48,9 +48,10 @@
 namespace mongo {
 namespace executor {
 
+MONGO_FAIL_POINT_DEFINE(networkInterfaceFixtureHangOnCompletion);
+
 void NetworkInterfaceIntegrationFixture::createNet(
     std::unique_ptr<NetworkConnectionHook> connectHook, ConnectionPool::Options options) {
-
     options.minConnections = 0u;
 
 #ifdef _WIN32
@@ -66,7 +67,6 @@ void NetworkInterfaceIntegrationFixture::createNet(
 
 void NetworkInterfaceIntegrationFixture::startNet(
     std::unique_ptr<NetworkConnectionHook> connectHook) {
-
     createNet(std::move(connectHook));
     net().startup();
 }
@@ -74,6 +74,10 @@ void NetworkInterfaceIntegrationFixture::startNet(
 void NetworkInterfaceIntegrationFixture::tearDown() {
     // Network interface will only shutdown once because of an internal shutdown guard
     _net->shutdown();
+
+    auto lk = stdx::unique_lock(_mutex);
+    auto checkIdle = [&]() { return _workInProgress == 0; };
+    _fixtureIsIdle.wait(lk, checkIdle);
 }
 
 NetworkInterface& NetworkInterfaceIntegrationFixture::net() {
@@ -113,35 +117,57 @@ Future<RemoteCommandResponse> NetworkInterfaceIntegrationFixture::runCommand(
     const TaskExecutor::CallbackHandle& cbHandle, RemoteCommandRequest request) {
     RemoteCommandRequestOnAny rcroa{request};
 
-    return net().startCommand(cbHandle, rcroa).then([](TaskExecutor::ResponseOnAnyStatus roa) {
-        auto res = RemoteCommandResponse(roa);
-        if (res.isOK()) {
-            LOGV2(4820500,
-                  "Got command result: {response}",
-                  "Got command result",
-                  "response"_attr = res.toString());
-        } else {
-            LOGV2(4820501, "Command failed: {error}", "Command failed", "error"_attr = res.status);
-        }
-        return res;
-    });
+    _onSchedulingCommand();
+
+    return net()
+        .startCommand(cbHandle, rcroa)
+        .then([](TaskExecutor::ResponseOnAnyStatus roa) {
+            auto res = RemoteCommandResponse(roa);
+            if (res.isOK()) {
+                LOGV2(4820500,
+                      "Got command result: {response}",
+                      "Got command result",
+                      "response"_attr = res.toString());
+            } else {
+                LOGV2(4820501,
+                      "Command failed: {error}",
+                      "Command failed",
+                      "error"_attr = res.status);
+            }
+            return res;
+        })
+        .onCompletion([this](StatusOrStatusWith<RemoteCommandResponse> status) {
+            _onCompletingCommand();
+            return status;
+        });
 }
 
 Future<RemoteCommandOnAnyResponse> NetworkInterfaceIntegrationFixture::runCommandOnAny(
     const TaskExecutor::CallbackHandle& cbHandle, RemoteCommandRequestOnAny request) {
     RemoteCommandRequestOnAny rcroa{request};
 
-    return net().startCommand(cbHandle, rcroa).then([](TaskExecutor::ResponseOnAnyStatus roa) {
-        if (roa.isOK()) {
-            LOGV2(4820502,
-                  "Got command result: {response}",
-                  "Got command result",
-                  "response"_attr = roa.toString());
-        } else {
-            LOGV2(4820503, "Command failed: {error}", "Command failed", "error"_attr = roa.status);
-        }
-        return roa;
-    });
+    _onSchedulingCommand();
+
+    return net()
+        .startCommand(cbHandle, rcroa)
+        .then([](TaskExecutor::ResponseOnAnyStatus roa) {
+            if (roa.isOK()) {
+                LOGV2(4820502,
+                      "Got command result: {response}",
+                      "Got command result",
+                      "response"_attr = roa.toString());
+            } else {
+                LOGV2(4820503,
+                      "Command failed: {error}",
+                      "Command failed",
+                      "error"_attr = roa.status);
+            }
+            return roa;
+        })
+        .onCompletion([this](StatusOrStatusWith<TaskExecutor::ResponseOnAnyStatus> status) {
+            _onCompletingCommand();
+            return status;
+        });
 }
 
 Future<void> NetworkInterfaceIntegrationFixture::startExhaustCommand(
@@ -233,6 +259,19 @@ void NetworkInterfaceIntegrationFixture::assertWriteError(StringData db,
     Status writeErrorStatus(ErrorCodes::Error(firstWriteError.getIntField("code")),
                             firstWriteError.getStringField("errmsg"));
     ASSERT_EQ(reason, writeErrorStatus);
+}
+
+void NetworkInterfaceIntegrationFixture::_onSchedulingCommand() {
+    auto lk = stdx::lock_guard(_mutex);
+    _workInProgress++;
+}
+
+void NetworkInterfaceIntegrationFixture::_onCompletingCommand() {
+    networkInterfaceFixtureHangOnCompletion.pauseWhileSet();
+    auto lk = stdx::lock_guard(_mutex);
+    if (--_workInProgress == 0) {
+        _fixtureIsIdle.notify_all();
+    }
 }
 
 }  // namespace executor
