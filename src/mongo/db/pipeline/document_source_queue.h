@@ -43,23 +43,18 @@ namespace mongo {
  */
 class DocumentSourceQueue : public DocumentSource {
 public:
-    static constexpr StringData kStageName = "queue"_sd;
+    static constexpr StringData kStageName = "$queue"_sd;
 
     static boost::intrusive_ptr<DocumentSourceQueue> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     DocumentSourceQueue(std::deque<GetNextResult> results,
                         const boost::intrusive_ptr<ExpressionContext>& expCtx);
-    virtual ~DocumentSourceQueue() {}
+    ~DocumentSourceQueue() override = default;
 
     const char* getSourceName() const override;
-    Value serialize(
-        boost::optional<ExplainOptions::Verbosity> explain = boost::none) const override {
-        // This stage is not intended to be serialized. Supporting a fully-general serialization is
-        // not trivial since we'd have to invent a serialization format for each of the
-        // GetNextResult states.
-        MONGO_UNREACHABLE;
-    }
+
+    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const override;
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const override {
         StageConstraints constraints(StreamType::kStreaming,
@@ -98,6 +93,9 @@ public:
     void push_back(const GetNextResult& result) {
         _queue.push_back(result);
     }
+
+    static boost::intrusive_ptr<DocumentSource> createFromBson(
+        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
 protected:
     GetNextResult doGetNext() override;

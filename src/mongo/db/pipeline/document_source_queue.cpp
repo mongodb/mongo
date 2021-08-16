@@ -33,6 +33,30 @@
 
 namespace mongo {
 
+REGISTER_DOCUMENT_SOURCE_WITH_MIN_VERSION(
+    queue,
+    LiteParsedDocumentSourceDefault::parse,
+    DocumentSourceQueue::createFromBson,
+    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
+
+boost::intrusive_ptr<DocumentSource> DocumentSourceQueue::createFromBson(
+    BSONElement arrayElem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    uassert(
+        5858205, "Must set 'enableSearchMeta' to true to use '$queue'", enableSearchMeta.load());
+    uassert(5858201,
+            "literal documents specification must be an array",
+            arrayElem.type() == BSONType::Array);
+    auto queue = DocumentSourceQueue::create(expCtx);
+    // arrayElem is an Array and can be iterated through by using .Obj() method
+    for (auto elem : arrayElem.Obj()) {
+        uassert(5858202,
+                "literal documents specification must be an array of objects",
+                elem.type() == BSONType::Object);
+        queue->emplace_back(Document{elem.Obj()});
+    }
+    return queue;
+}
+
 boost::intrusive_ptr<DocumentSourceQueue> DocumentSourceQueue::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     return new DocumentSourceQueue({}, expCtx);
@@ -55,4 +79,13 @@ DocumentSource::GetNextResult DocumentSourceQueue::doGetNext() {
     _queue.pop_front();
     return next;
 }
+
+Value DocumentSourceQueue::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
+    ValueArrayStream vals;
+    for (auto elem : _queue) {
+        vals << elem.getDocument();
+    }
+    return Value(DOC(kStageName << vals.done()));
+}
+
 }  // namespace mongo
