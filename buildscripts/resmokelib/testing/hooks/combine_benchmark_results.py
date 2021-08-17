@@ -51,7 +51,7 @@ class CombineBenchmarkResults(interface.Hook):
         """Set suite start time."""
         self.create_time = datetime.datetime.now()
 
-    def after_suite(self, test_report):
+    def after_suite(self, test_report, teardown_flag=None):
         """Update test report."""
         if self.report_file is None:
             return

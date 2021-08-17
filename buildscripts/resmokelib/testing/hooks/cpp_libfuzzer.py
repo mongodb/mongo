@@ -3,9 +3,6 @@
 import os
 
 from buildscripts.resmokelib import core
-from buildscripts.resmokelib import errors
-from buildscripts.resmokelib import utils
-from buildscripts.resmokelib.testing.fixtures import interface as fixture_interface
 from buildscripts.resmokelib.testing.hooks import interface
 
 
@@ -31,7 +28,7 @@ class LibfuzzerHook(interface.Hook):  # pylint: disable=too-many-instance-attrib
         """Before suite."""
         pass
 
-    def after_suite(self, test_report):
+    def after_suite(self, test_report, teardown_flag=None):
         """After suite."""
         pass
 

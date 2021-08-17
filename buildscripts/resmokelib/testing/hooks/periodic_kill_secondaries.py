@@ -44,7 +44,7 @@ class PeriodicKillSecondaries(interface.Hook):
         self._start_time = None
         self._last_test = None
 
-    def after_suite(self, test_report):
+    def after_suite(self, test_report, teardown_flag=None):
         """Run after suite."""
         if self._start_time is not None:
             # Ensure that we test killing the secondary and having it reach state SECONDARY after

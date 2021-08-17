@@ -3,7 +3,6 @@
 import sys
 
 from buildscripts.resmokelib import errors
-from buildscripts.resmokelib.logging import loggers
 from buildscripts.resmokelib.testing.testcases import interface as testcase
 from buildscripts.resmokelib.utils import registry
 
@@ -43,10 +42,11 @@ class Hook(object, metaclass=registry.make_registry_metaclass(_HOOKS)):  # pylin
         """Test runner calls this exactly once before they start running the suite."""
         pass
 
-    def after_suite(self, test_report):
+    def after_suite(self, test_report, teardown_flag=None):
         """Invoke by test runner calls this exactly once after all tests have finished executing.
 
         Be sure to reset the behavior back to its original state so that it can be run again.
+        Hook failures in this function should set 'teardown_flag' since there is no testcase available.
         """
         pass
 

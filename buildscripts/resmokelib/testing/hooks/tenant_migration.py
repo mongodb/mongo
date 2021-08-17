@@ -11,7 +11,6 @@ import bson
 import pymongo.errors
 
 from buildscripts.resmokelib import errors
-from buildscripts.resmokelib import utils
 from buildscripts.resmokelib.testing.fixtures import interface as fixture_interface
 from buildscripts.resmokelib.testing.fixtures import tenant_migration
 from buildscripts.resmokelib.testing.hooks import dbhash_tenant_migration
@@ -53,7 +52,7 @@ class ContinuousTenantMigration(interface.Hook):  # pylint: disable=too-many-ins
             self.logger, self._tenant_migration_fixture, self._shell_options, test_report)
         self._tenant_migration_thread.start()
 
-    def after_suite(self, test_report):
+    def after_suite(self, test_report, teardown_flag=None):
         """After suite."""
         self.logger.info("Stopping the tenant migration thread.")
         self._tenant_migration_thread.stop()

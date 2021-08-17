@@ -44,7 +44,7 @@ class CheckReplDBHashInBackground(jsfile.JSHook):
         self.logger.info("Starting the background check repl dbhash thread.")
         self._background_job.start()
 
-    def after_suite(self, test_report):
+    def after_suite(self, test_report, teardown_flag=None):
         """Signal the background thread to exit, and wait until it does."""
         if self._background_job is None:
             return

@@ -95,7 +95,7 @@ class ContinuousStepdown(interface.Hook):  # pylint: disable=too-many-instance-a
         self.logger.info("Starting the stepdown thread.")
         self._stepdown_thread.start()
 
-    def after_suite(self, test_report):
+    def after_suite(self, test_report, teardown_flag=None):
         """After suite."""
         self.logger.info("Stopping the stepdown thread.")
         self._stepdown_thread.stop()

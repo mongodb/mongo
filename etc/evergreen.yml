@@ -3972,6 +3972,17 @@ tasks:
       require_multiversion: true
       implicit_multiversion: true
 
+- <<: *gen_task_template
+  name: change_streams_multiversion_downgrade_passthrough_gen
+  tags: ["multiversion_passthrough"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      suite: change_streams_multiversion_downgrade_passthrough
+      resmoke_args: --storageEngine=wiredTiger
+      require_multiversion: true
+      implicit_multiversion: true
+
 - <<: *task_template
   name: change_streams_update_v1_oplog
   tags: ["change_streams"]
