@@ -53,21 +53,20 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
     bool verbose = storageStatsSpec.getVerbose();
     bool waitForLock = storageStatsSpec.getWaitForLock();
 
-    bool isTimeseries = false;
-    if (auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, nss.db())) {
-        if (auto viewDef = viewCatalog->lookupWithoutValidatingDurableViews(opCtx, nss)) {
-            isTimeseries = viewDef->timeseries();
-        }
-    }
+    const auto bucketNss = nss.makeTimeseriesBucketsNamespace();
+    const auto isTimeseries = nss.isTimeseriesBucketsCollection() ||
+        CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForRead(opCtx, bucketNss);
+    const auto collNss =
+        (isTimeseries && !nss.isTimeseriesBucketsCollection()) ? std::move(bucketNss) : nss;
 
     boost::optional<AutoGetCollectionForReadCommand> autoColl;
     try {
         autoColl.emplace(opCtx,
-                         isTimeseries ? nss.makeTimeseriesBucketsNamespace() : nss,
+                         collNss,
                          AutoGetCollectionViewMode::kViewsForbidden,
                          waitForLock ? Date_t::max() : Date_t::now());
     } catch (const ExceptionForCat<ErrorCategory::Interruption>&) {
-        LOGV2_DEBUG(3088801, 2, "Failed to retrieve storage statistics", logAttrs(nss));
+        LOGV2_DEBUG(3088801, 2, "Failed to retrieve storage statistics", logAttrs(collNss));
         return Status::OK();
     }
 
@@ -83,8 +82,8 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
         result->append("indexSizes", BSONObj());
         result->append("scaleFactor", scale);
         std::string errmsg = !autoColl->getDb()
-            ? "Database [" + nss.db().toString() + "] not found."
-            : "Collection [" + nss.toString() + "] not found.";
+            ? "Database [" + collNss.db().toString() + "] not found."
+            : "Collection [" + collNss.toString() + "] not found.";
         return {ErrorCodes::NamespaceNotFound, errmsg};
     }
 
@@ -94,12 +93,12 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
     long long numRecords = collection->numRecords(opCtx);
     if (isTimeseries) {
         BSONObjBuilder bob(result->subobjStart("timeseries"));
-        bob.append("bucketsNs", nss.makeTimeseriesBucketsNamespace().ns());
+        bob.append("bucketsNs", collNss.ns());
         bob.appendNumber("bucketCount", numRecords);
         if (numRecords) {
             bob.append("avgBucketSize", collection->averageObjectSize(opCtx));
         }
-        BucketCatalog::get(opCtx).appendExecutionStats(nss, &bob);
+        BucketCatalog::get(opCtx).appendExecutionStats(collNss.getTimeseriesViewNamespace(), &bob);
     } else {
         result->appendNumber("count", numRecords);
         if (numRecords) {

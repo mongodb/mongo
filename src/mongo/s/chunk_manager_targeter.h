@@ -110,6 +110,10 @@ public:
 
     int getNShardsOwningChunks() const override;
 
+    const ChunkManager& getRoutingInfo() const {
+        return *_cm;
+    }
+
     static BSONObj extractBucketsShardKeyFromTimeseriesDoc(
         const BSONObj& doc,
         const ShardKeyPattern& pattern,
