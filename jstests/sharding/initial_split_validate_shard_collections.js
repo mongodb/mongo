@@ -3,11 +3,11 @@
  * which spreads the collection across all available shards.
  */
 
+load("jstests/libs/uuid_util.js");
+load("jstests/sharding/libs/find_chunks_util.js");
+
 (function() {
 'use strict';
-
-load("jstests/sharding/libs/catalog_cache_loader_helpers.js");
-load("jstests/sharding/libs/find_chunks_util.js");
 
 let st = new ShardingTest({shards: 2});
 let mongos = st.s0;
@@ -61,7 +61,7 @@ assert.commandWorked(
 const chunksOnConfigCount = findChunksUtil.countChunksForNs(st.config, 'test.user');
 assert.eq(2, chunksOnConfigCount);
 
-const chunksCollName = getCachedChunksCollectionName(collEntry);
+const chunksCollName = "cache.chunks.test.user";
 const chunksOnShard0 = st.shard0.getDB("config").getCollection(chunksCollName).find().toArray();
 const chunksOnShard1 = st.shard1.getDB("config").getCollection(chunksCollName).find().toArray();
 assert.eq(chunksOnConfigCount, chunksOnShard0.length);

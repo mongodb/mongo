@@ -276,18 +276,13 @@ Status updateShardDatabasesEntry(OperationContext* opCtx,
 
 StatusWith<std::vector<ChunkType>> readShardChunks(OperationContext* opCtx,
                                                    const NamespaceString& nss,
-                                                   const UUID& uuid,
-                                                   SupportingLongNameStatusEnum supportingLongName,
+                                                   const boost::optional<UUID>& uuid,
                                                    const BSONObj& query,
                                                    const BSONObj& sort,
                                                    boost::optional<long long> limit,
                                                    const OID& epoch,
                                                    const boost::optional<Timestamp>& timestamp) {
-    const auto chunksNsPostfix{supportingLongName == SupportingLongNameStatusEnum::kDisabled ||
-                                       nss.isTemporaryReshardingCollection()
-                                   ? nss.ns()
-                                   : uuid.toString()};
-    const NamespaceString chunksNss{ChunkType::ShardNSPrefix + chunksNsPostfix};
+    const NamespaceString chunksNss{ChunkType::ShardNSPrefix + nss.ns()};
 
     try {
         DBDirectClient client(opCtx);
@@ -322,17 +317,12 @@ StatusWith<std::vector<ChunkType>> readShardChunks(OperationContext* opCtx,
 
 Status updateShardChunks(OperationContext* opCtx,
                          const NamespaceString& nss,
-                         const UUID& uuid,
-                         SupportingLongNameStatusEnum supportingLongName,
+                         const boost::optional<UUID>& uuid,
                          const std::vector<ChunkType>& chunks,
                          const OID& currEpoch) {
     invariant(!chunks.empty());
 
-    const auto chunksNsPostfix{supportingLongName == SupportingLongNameStatusEnum::kDisabled ||
-                                       nss.isTemporaryReshardingCollection()
-                                   ? nss.ns()
-                                   : uuid.toString()};
-    const NamespaceString chunksNss{ChunkType::ShardNSPrefix + chunksNsPostfix};
+    const NamespaceString chunksNss{ChunkType::ShardNSPrefix + nss.ns()};
 
     try {
         DBDirectClient client(opCtx);
@@ -421,17 +411,17 @@ void updateTimestampOnShardCollections(OperationContext* opCtx,
 }
 
 Status dropChunksAndDeleteCollectionsEntry(OperationContext* opCtx, const NamespaceString& nss) {
-    // TODO (SERVER-58361): Reduce the access to local collections.
-    const auto statusWithCollectionEntry = readShardCollectionsEntry(opCtx, nss);
-    if (statusWithCollectionEntry.getStatus() == ErrorCodes::NamespaceNotFound) {
-        return Status::OK();
-    }
-    uassertStatusOKWithContext(statusWithCollectionEntry,
-                               str::stream() << "Failed to read persisted collection entry for '"
-                                             << nss.ns() << "'.");
-    const auto& collectionEntry = statusWithCollectionEntry.getValue();
-
     try {
+        const auto localUuid = [&] {
+            const auto statusWithCollectionEntry = readShardCollectionsEntry(opCtx, nss);
+            if (!statusWithCollectionEntry.isOK()) {
+                return boost::optional<UUID>(boost::none);
+            }
+            const auto collectionEntry = statusWithCollectionEntry.getValue();
+            return collectionEntry.getTimestamp() ? collectionEntry.getUuid()
+                                                  : boost::optional<UUID>(boost::none);
+        }();
+
         DBDirectClient client(opCtx);
         auto deleteCommandResponse = client.runCommand([&] {
             write_ops::DeleteCommandRequest deleteOp(
@@ -447,12 +437,12 @@ Status dropChunksAndDeleteCollectionsEntry(OperationContext* opCtx, const Namesp
         uassertStatusOK(
             getStatusFromWriteCommandResponse(deleteCommandResponse->getCommandReply()));
 
-        dropChunks(opCtx, nss, collectionEntry.getUuid(), collectionEntry.getSupportingLongName());
+        dropChunks(opCtx, nss, localUuid);
 
         LOGV2(3463200,
               "Dropped chunks and collection caches",
               "collectionNamespace"_attr = nss,
-              "collectionUUID"_attr = collectionEntry.getUuid());
+              "collectionUuid"_attr = localUuid);
 
         return Status::OK();
     } catch (const DBException& ex) {
@@ -462,13 +452,8 @@ Status dropChunksAndDeleteCollectionsEntry(OperationContext* opCtx, const Namesp
 
 void dropChunks(OperationContext* opCtx,
                 const NamespaceString& nss,
-                const UUID& uuid,
-                SupportingLongNameStatusEnum supportingLongName) {
-    const auto chunksNsPostfix{supportingLongName == SupportingLongNameStatusEnum::kDisabled ||
-                                       nss.isTemporaryReshardingCollection()
-                                   ? nss.ns()
-                                   : uuid.toString()};
-    const NamespaceString chunksNss{ChunkType::ShardNSPrefix + chunksNsPostfix};
+                const boost::optional<UUID>& uuid) {
+    const NamespaceString chunksNss{ChunkType::ShardNSPrefix + nss.ns()};
 
     DBDirectClient client(opCtx);
     BSONObj result;
@@ -478,6 +463,13 @@ void dropChunks(OperationContext* opCtx,
             uassertStatusOK(status);
         }
     }
+
+    LOGV2_DEBUG(3463201,
+                1,
+                "Dropped chunks cache",
+                "chunksNamespace"_attr = chunksNss,
+                "collectionNamespace"_attr = nss,
+                "error"_attr = getStatusFromCommandResult(result));
 }
 
 Status deleteDatabasesEntry(OperationContext* opCtx, StringData dbName) {

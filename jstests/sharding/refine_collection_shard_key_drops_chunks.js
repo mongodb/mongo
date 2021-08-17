@@ -5,9 +5,8 @@
 
 (function() {
 'use strict';
-
 load('jstests/libs/fail_point_util.js');
-load('jstests/sharding/libs/catalog_cache_loader_helpers.js');
+load('jstests/libs/uuid_util.js');
 
 const st = new ShardingTest({shards: 1});
 const mongos = st.s0;
@@ -42,8 +41,7 @@ assert.commandWorked(mongos.adminCommand({split: kNsName, middle: {a: 5, b: 5}})
 // before refineCollectionShardKey.
 assert.commandWorked(shard.adminCommand({_flushRoutingTableCacheUpdates: kNsName}));
 
-let collEntry = st.config.collections.findOne({_id: kNsName});
-let configCacheChunks = "config." + getCachedChunksCollectionName(collEntry);
+let configCacheChunks = "config.cache.chunks." + kNsName;
 let chunkArr = shard.getCollection(configCacheChunks).find({}).sort({min: 1}).toArray();
 assert.eq(3, chunkArr.length);
 assert.eq({a: MinKey, b: MinKey}, chunkArr[0]._id);

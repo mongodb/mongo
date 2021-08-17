@@ -17,7 +17,8 @@
 load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
 load("jstests/libs/discover_topology.js");    // For findNonConfigNodes.
 load("jstests/libs/profiler.js");             // For profilerHasSingleMatchingEntryOrThrow.
-load("jstests/sharding/libs/catalog_cache_loader_helpers.js");
+load("jstests/libs/uuid_util.js");            // For extractUUIDFromObject.
+// For flushRoutersAndRefreshShardMetadata.
 load('jstests/sharding/libs/sharded_transactions_helpers.js');
 
 const st = new ShardingTest({shards: 2});
@@ -44,7 +45,7 @@ const setUp = () => {
 
     const collNs = dbName + "." + collName;
     const collEntry = st.config.collections.findOne({_id: collNs});
-    chunksCollName = getCachedChunksCollectionName(collEntry);
+    chunksCollName = "cache.chunks." + collNs;
     flushRoutersAndRefreshShardMetadata(st, {collNs});
 };
 
