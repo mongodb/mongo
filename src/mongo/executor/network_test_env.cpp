@@ -40,6 +40,8 @@ namespace mongo {
 
 namespace executor {
 
+constexpr Minutes NetworkTestEnv::kDefaultLaunchAsyncFutureTimeout;
+
 NetworkTestEnv::NetworkTestEnv(TaskExecutor* executor, NetworkInterfaceMock* network)
     : _executor(executor), _mockNetwork(network) {}
 

@@ -67,8 +67,6 @@ using std::string;
 using std::vector;
 using unittest::assertGet;
 
-const Seconds kFutureTimeout{5};
-
 BSONObj getReplSecondaryOkMetadata() {
     BSONObjBuilder o;
     ReadPreferenceSetting(ReadPreference::Nearest).toContainingBSON(&o);

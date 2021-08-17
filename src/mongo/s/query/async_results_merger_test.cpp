@@ -2075,7 +2075,7 @@ TEST_F(AsyncResultsMergerTest, ShouldBeAbleToBlockUntilNextResultIsReady) {
             .toBSON(CursorResponse::ResponseType::SubsequentResponse);
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(AsyncResultsMergerTest, ShouldBeInterruptableDuringBlockingNext) {
@@ -2095,7 +2095,7 @@ TEST_F(AsyncResultsMergerTest, ShouldBeInterruptableDuringBlockingNext) {
         stdx::lock_guard<Client> lk(*operationContext()->getClient());
         operationContext()->markKilled(ErrorCodes::Interrupted);
     }
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
     // Be careful not to use a blocking kill here, since the main thread is in charge of running the
     // callbacks, and we'd block on ourselves.
     auto killEvent = arm->kill(operationContext());

@@ -260,7 +260,7 @@ TEST_F(BatchWriteExecTest, SingleOp) {
 
     expectInsertsReturnSuccess(std::vector<BSONObj>{BSON("x" << 1)});
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(BatchWriteExecTest, MultiOpLarge) {
@@ -299,7 +299,7 @@ TEST_F(BatchWriteExecTest, MultiOpLarge) {
     expectInsertsReturnSuccess(docsToInsert.begin(), docsToInsert.begin() + 66576);
     expectInsertsReturnSuccess(docsToInsert.begin() + 66576, docsToInsert.end());
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(BatchWriteExecTest, SingleOpError) {
@@ -335,7 +335,7 @@ TEST_F(BatchWriteExecTest, SingleOpError) {
 
     expectInsertsReturnError({BSON("x" << 1)}, errResponse);
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 void serializeErrorToBSON(const Status& status, BSONObjBuilder* builder) {
@@ -437,7 +437,7 @@ TEST_F(BatchWriteExecTest, StaleShardVersionReturnedFromBatchWithSingleMultiWrit
         return response.toBSON();
     });
 
-    auto response = future.timed_get(kFutureTimeout);
+    auto response = future.default_timed_get();
 
     ASSERT_OK(response.getTopLevelStatus());
     ASSERT_EQ(3, response.getNModified());
@@ -552,7 +552,7 @@ TEST_F(BatchWriteExecTest,
         return response.toBSON();
     });
 
-    auto response = future.timed_get(kFutureTimeout);
+    auto response = future.default_timed_get();
     ASSERT_OK(response.getTopLevelStatus());
     ASSERT_EQ(3, response.getNModified());
 }
@@ -676,7 +676,7 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromMultiWriteWithShard1FirstOK
         return response.toBSON();
     });
 
-    auto response = future.timed_get(kFutureTimeout);
+    auto response = future.default_timed_get();
     ASSERT_OK(response.getTopLevelStatus());
     ASSERT_EQ(2, response.getNModified());
 }
@@ -800,7 +800,7 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromMultiWriteWithShard1FirstOK
         return response.toBSON();
     });
 
-    auto response = future.timed_get(kFutureTimeout);
+    auto response = future.default_timed_get();
     ASSERT_OK(response.getTopLevelStatus());
     ASSERT_EQ(2, response.getNModified());
 }
@@ -897,7 +897,7 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromWriteWithShard1SSVShard2OK)
         return response.toBSON();
     });
 
-    auto response = future.timed_get(kFutureTimeout);
+    auto response = future.default_timed_get();
     ASSERT_OK(response.getTopLevelStatus());
     ASSERT_EQ(1, response.getNModified());
     ASSERT_EQ(1, response.getN());
@@ -937,7 +937,7 @@ TEST_F(BatchWriteExecTest, StaleOp) {
     expectInsertsReturnStaleVersionErrors(expected);
     expectInsertsReturnSuccess(expected);
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(BatchWriteExecTest, MultiStaleOp) {
@@ -972,7 +972,7 @@ TEST_F(BatchWriteExecTest, MultiStaleOp) {
 
     expectInsertsReturnSuccess(expected);
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(BatchWriteExecTest, TooManyStaleShardOp) {
@@ -1011,7 +1011,7 @@ TEST_F(BatchWriteExecTest, TooManyStaleShardOp) {
         expectInsertsReturnStaleVersionErrors({BSON("x" << 1), BSON("x" << 2)});
     }
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(BatchWriteExecTest, RetryableWritesLargeBatch) {
@@ -1055,7 +1055,7 @@ TEST_F(BatchWriteExecTest, RetryableWritesLargeBatch) {
     expectInsertsReturnSuccess(docsToInsert.begin(), docsToInsert.begin() + 63791);
     expectInsertsReturnSuccess(docsToInsert.begin() + 63791, docsToInsert.end());
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(BatchWriteExecTest, RetryableErrorNoTxnNumber) {
@@ -1094,7 +1094,7 @@ TEST_F(BatchWriteExecTest, RetryableErrorNoTxnNumber) {
 
     expectInsertsReturnError({BSON("x" << 1), BSON("x" << 2)}, retryableErrResponse);
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(BatchWriteExecTest, RetryableErrorTxnNumber) {
@@ -1132,7 +1132,7 @@ TEST_F(BatchWriteExecTest, RetryableErrorTxnNumber) {
     expectInsertsReturnError({BSON("x" << 1), BSON("x" << 2)}, retryableErrResponse);
     expectInsertsReturnSuccess({BSON("x" << 1), BSON("x" << 2)});
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(BatchWriteExecTest, NonRetryableErrorTxnNumber) {
@@ -1174,8 +1174,7 @@ TEST_F(BatchWriteExecTest, NonRetryableErrorTxnNumber) {
 
     expectInsertsReturnError({BSON("x" << 1), BSON("x" << 2)}, nonRetryableErrResponse);
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
-
 }  // namespace
 }  // namespace mongo

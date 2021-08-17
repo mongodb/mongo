@@ -208,7 +208,7 @@ TEST_F(DropColl2ShardTest, Basic) {
     expectSetShardVersionZero(shard2());
     expectUnsetSharding(shard2());
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 
     expectCollectionDocMarkedAsDropped();
     expectNoChunkDocs();
@@ -253,7 +253,7 @@ TEST_F(DropColl2ShardTest, NSNotFound) {
     expectSetShardVersionZero(shard2());
     expectUnsetSharding(shard2());
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 
     expectCollectionDocMarkedAsDropped();
     expectNoChunkDocs();
@@ -272,7 +272,7 @@ TEST_F(DropColl2ShardTest, FirstShardTargeterError) {
         ASSERT_FALSE(status.reason().empty());
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DropColl2ShardTest, FirstShardDropError) {
@@ -287,7 +287,7 @@ TEST_F(DropColl2ShardTest, FirstShardDropError) {
         return BSON("ok" << 1);
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DropColl2ShardTest, FirstShardDropCmdError) {
@@ -304,7 +304,7 @@ TEST_F(DropColl2ShardTest, FirstShardDropCmdError) {
 
     expectDrop(shard2());
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DropColl2ShardTest, SecondShardTargeterError) {
@@ -321,7 +321,7 @@ TEST_F(DropColl2ShardTest, SecondShardTargeterError) {
 
     expectDrop(shard1());
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DropColl2ShardTest, SecondShardDropError) {
@@ -338,7 +338,7 @@ TEST_F(DropColl2ShardTest, SecondShardDropError) {
         return BSON("ok" << 1);
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DropColl2ShardTest, SecondShardDropCmdError) {
@@ -354,7 +354,7 @@ TEST_F(DropColl2ShardTest, SecondShardDropCmdError) {
         return BSON("ok" << 0 << "code" << ErrorCodes::Unauthorized);
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DropColl2ShardTest, CleanupChunkError) {
@@ -372,7 +372,7 @@ TEST_F(DropColl2ShardTest, CleanupChunkError) {
                          << "bad delete");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 
     expectCollectionDocMarkedAsDropped();
     expectNoChunkDocs();
@@ -394,7 +394,7 @@ TEST_F(DropColl2ShardTest, SSVCmdErrorOnShard1) {
                          << "bad");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 
     expectCollectionDocMarkedAsDropped();
     expectNoChunkDocs();
@@ -416,7 +416,7 @@ TEST_F(DropColl2ShardTest, SSVErrorOnShard1) {
         return BSON("ok" << 1);
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 
     expectCollectionDocMarkedAsDropped();
     expectNoChunkDocs();
@@ -440,7 +440,7 @@ TEST_F(DropColl2ShardTest, UnsetCmdErrorOnShard1) {
                          << "bad");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 
     expectCollectionDocMarkedAsDropped();
     expectNoChunkDocs();
@@ -464,7 +464,7 @@ TEST_F(DropColl2ShardTest, UnsetErrorOnShard1) {
         return BSON("ok" << 1);
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 
     expectCollectionDocMarkedAsDropped();
     expectNoChunkDocs();
@@ -489,7 +489,7 @@ TEST_F(DropColl2ShardTest, SSVCmdErrorOnShard2) {
                          << "bad");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 
     expectCollectionDocMarkedAsDropped();
     expectNoChunkDocs();
@@ -514,7 +514,7 @@ TEST_F(DropColl2ShardTest, SSVErrorOnShard2) {
         return BSON("ok" << 1);
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 
     expectCollectionDocMarkedAsDropped();
     expectNoChunkDocs();
@@ -541,7 +541,7 @@ TEST_F(DropColl2ShardTest, UnsetCmdErrorOnShard2) {
                          << "bad");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 
     expectCollectionDocMarkedAsDropped();
     expectNoChunkDocs();
@@ -568,7 +568,7 @@ TEST_F(DropColl2ShardTest, UnsetErrorOnShard2) {
         return BSON("ok" << 1);
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 
     expectCollectionDocMarkedAsDropped();
     expectNoChunkDocs();

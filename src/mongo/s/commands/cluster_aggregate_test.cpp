@@ -146,7 +146,7 @@ protected:
             expectAggReturnsSuccess(i % numShards);
         }
 
-        future.timed_get(kFutureTimeout);
+        future.default_timed_get();
     }
 
     void runAggCommandOneError(BSONObj cmd, ErrorCodes::Error code, bool isTargeted) {
@@ -163,7 +163,7 @@ protected:
             expectAggReturnsSuccess(i % numShards);
         }
 
-        future.timed_get(kFutureTimeout);
+        future.default_timed_get();
     }
 
     void runCommandInspectRequests(BSONObj cmd, InspectionCallback cb, bool isTargeted) {
@@ -174,7 +174,7 @@ protected:
             expectAggInspectRequest(i % numShards, cb);
         }
 
-        future.timed_get(kFutureTimeout);
+        future.default_timed_get();
     }
 
     void runAggCommandMaxErrors(BSONObj cmd, ErrorCodes::Error code, bool isTargeted) {
@@ -186,7 +186,7 @@ protected:
             expectAggReturnsError(code);
         }
 
-        future.timed_get(kFutureTimeout);
+        future.default_timed_get();
     }
 
     /**

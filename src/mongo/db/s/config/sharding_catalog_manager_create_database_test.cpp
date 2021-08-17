@@ -151,7 +151,7 @@ TEST_F(CreateDatabaseTest, createDatabaseSuccessWithoutCustomPrimary) {
         return BSON("ok" << 1 << "totalSize" << 100);
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(CreateDatabaseTest, createDatabaseSuccessWithCustomPrimary) {
@@ -196,7 +196,7 @@ TEST_F(CreateDatabaseTest, createDatabaseSuccessWithCustomPrimary) {
             ->createDatabase(opCtx.get(), dbname, ShardId(primaryShardName));
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 
     auto databaseDoc = assertGet(findOneOnConfigCollection(
         operationContext(), DatabaseType::ConfigNS, BSON("_id" << dbname)));

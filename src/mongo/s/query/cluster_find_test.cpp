@@ -145,7 +145,7 @@ protected:
             expectFindReturnsSuccess(i % numShards);
         }
 
-        future.timed_get(kFutureTimeout);
+        future.default_timed_get();
     }
 
     void runFindCommandOneError(BSONObj cmd, ErrorCodes::Error code, bool isTargeted) {
@@ -162,7 +162,7 @@ protected:
             expectFindReturnsSuccess(i % numShards);
         }
 
-        future.timed_get(kFutureTimeout);
+        future.default_timed_get();
     }
 
     void runFindCommandMaxErrors(BSONObj cmd, ErrorCodes::Error code, bool isTargeted) {
@@ -175,7 +175,7 @@ protected:
             expectFindReturnsError(code);
         }
 
-        future.timed_get(kFutureTimeout);
+        future.default_timed_get();
     }
 
     void runFindCommandInspectRequests(BSONObj cmd, InspectionCallback cb, bool isTargeted) {
@@ -186,7 +186,7 @@ protected:
             expectFindInspectRequest(i % numShards, cb);
         }
 
-        future.timed_get(kFutureTimeout);
+        future.default_timed_get();
     }
 };
 

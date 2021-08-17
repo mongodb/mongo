@@ -49,8 +49,6 @@ class TaskExecutor;
  */
 class ShardingTestFixtureCommon {
 public:
-    static constexpr Seconds kFutureTimeout{5};
-
     ShardingTestFixtureCommon();
     ~ShardingTestFixtureCommon();
 

@@ -55,7 +55,6 @@ using executor::TaskExecutor;
 using stdx::async;
 using unittest::assertGet;
 
-const Seconds kFutureTimeout{5};
 const HostAndPort configHost{"TestHost1"};
 
 class InfoLoggingTest : public ShardingTestFixture {
@@ -86,7 +85,7 @@ protected:
                                      BSON("min" << 3 << "max" << 4));
 
         // Now wait for the logChange call to return
-        future.timed_get(kFutureTimeout);
+        future.default_timed_get();
 
         // Now log another change and confirm that we don't re-attempt to create the collection
         future = launchAsync([this] {
@@ -102,7 +101,7 @@ protected:
                                      BSON("min" << 4 << "max" << 5));
 
         // Now wait for the logChange call to return
-        future.timed_get(kFutureTimeout);
+        future.default_timed_get();
     }
 
     void noRetryCreateIfAlreadyExists() {
@@ -123,7 +122,7 @@ protected:
                                      BSON("min" << 3 << "max" << 4));
 
         // Now wait for the logAction call to return
-        future.timed_get(kFutureTimeout);
+        future.default_timed_get();
 
         // Now log another change and confirm that we don't re-attempt to create the collection
         future = launchAsync([this] {
@@ -139,7 +138,7 @@ protected:
                                      BSON("min" << 4 << "max" << 5));
 
         // Now wait for the logChange call to return
-        future.timed_get(kFutureTimeout);
+        future.default_timed_get();
     }
 
     void createFailure() {
@@ -154,7 +153,7 @@ protected:
             configHost, getConfigCollName(), _cappedSize, createResponseBuilder.obj());
 
         // Now wait for the logAction call to return
-        future.timed_get(kFutureTimeout);
+        future.default_timed_get();
 
         // Now log another change and confirm that we *do* attempt to create the collection
         future = launchAsync([this] {
@@ -171,7 +170,7 @@ protected:
                                      BSON("min" << 4 << "max" << 5));
 
         // Now wait for the logChange call to return
-        future.timed_get(kFutureTimeout);
+        future.default_timed_get();
     }
 
     std::string getConfigCollName() const {
