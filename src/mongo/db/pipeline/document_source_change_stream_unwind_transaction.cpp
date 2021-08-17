@@ -65,10 +65,15 @@ DocumentSourceChangeStreamUnwindTransaction::createFromBson(
 }
 
 DocumentSourceChangeStreamUnwindTransaction::DocumentSourceChangeStreamUnwindTransaction(
-    BSONObj filter, const boost::intrusive_ptr<ExpressionContext>& expCtx)
-    : DocumentSource(kStageName, expCtx),
-      _filter(filter),
-      _expression(MatchExpressionParser::parseAndNormalize(filter, expCtx)) {}
+    const BSONObj& filter, const boost::intrusive_ptr<ExpressionContext>& expCtx)
+    : DocumentSource(kStageName, expCtx) {
+    rebuild(filter);
+}
+
+void DocumentSourceChangeStreamUnwindTransaction::rebuild(BSONObj filter) {
+    _filter = filter.getOwned();
+    _expression = MatchExpressionParser::parseAndNormalize(filter, pExpCtx);
+}
 
 StageConstraints DocumentSourceChangeStreamUnwindTransaction::constraints(
     Pipeline::SplitState pipeState) const {
@@ -382,20 +387,11 @@ namespace change_stream_filter {
  */
 std::unique_ptr<MatchExpression> buildUnwindTransactionFilter(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, const MatchExpression* userMatch) {
-    auto unwoundOplogFilter = std::make_unique<OrMatchExpression>();
-
-    // We do not expect to see any "c" (command) or "n" noop entries within transactions, which
-    // means that they have already been through the earlier DocumentSourceChangeStreamOplogMatch
-    // filter and do not need to be tested again.
-    unwoundOplogFilter->add(std::make_unique<EqualityMatchExpression>("op"_sd, Value("c"_sd)));
-    unwoundOplogFilter->add(std::make_unique<EqualityMatchExpression>("op"_sd, Value("n"_sd)));
-
-    // As an optimization, this filter will cull any operations that could not be filtered during
-    // the oplog scan because they were within a transaction.
-    unwoundOplogFilter->add(buildOperationFilter(expCtx, userMatch));
-
-    // Perform a final optimization pass on the complete filter before returning.
-    return MatchExpression::optimize(std::move(unwoundOplogFilter));
+    // The current implementation of the transaction filter is the same as the "operation filter"
+    // applied to oplog entries that can be filtered early (CRUD operations and non-invalidating
+    // commands). This filter includes a namespace filter, ensuring it will filter out all documents
+    // that would be filtered out by the default 'ns' filter this stage gets initialized with.
+    return change_stream_filter::buildOperationFilter(expCtx, userMatch);
 }
 }  // namespace change_stream_filter
 
@@ -403,18 +399,17 @@ Pipeline::SourceContainer::iterator DocumentSourceChangeStreamUnwindTransaction:
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
     tassert(5687205, "Iterator mismatch during optimization", *itr == this);
 
-    auto unwindStageItr = itr;
     auto nextChangeStreamStageItr = std::next(itr);
 
     if (!feature_flags::gFeatureFlagChangeStreamsRewrite.isEnabledAndIgnoreFCV()) {
         return nextChangeStreamStageItr;
     }
 
-    // If the stage immediately following this one is a $match, then this optimzation was already
-    // applied and should not be applied again.
-    if (std::next(itr) != container->end() && dynamic_cast<DocumentSourceMatch*>(itr->get())) {
-        return nextChangeStreamStageItr;
-    }
+    // We never expect to apply these optimizations more than once. The filter should be in its
+    // default state.
+    tassert(5902200,
+            "Multiple optimizations attempted",
+            _filter.nFields() == 1 && _filter.firstElementFieldNameStringData() == "ns");
 
     // Seek to the stage that immediately follows the change streams stages.
     itr = std::find_if_not(itr, container->end(), [](const auto& stage) {
@@ -431,20 +426,20 @@ Pipeline::SourceContainer::iterator DocumentSourceChangeStreamUnwindTransaction:
         // This function only attempts to optimize a $match that immediately follows expanded
         // $changeStream stages. That does not apply here, and we resume optimization at the last
         // change stream stage, in case a "swap" optimization can apply between it and the stage
-        // that follows it.  For example, $project stages can swap in front of the last change
-        // stream stages.
+        // that follows it. For example, $project stages can swap in front of the last change stream
+        // stages.
         return std::prev(itr);
     }
 
-    // Build a filter which discards unwound transaction operations which would have been
-    // filtered out later in the pipeline by the user's $match filter.
+    // Build a filter which discards unwound transaction operations which would have been filtered
+    // out later in the pipeline by the user's $match filter.
     auto unwindTransactionFilter = change_stream_filter::buildUnwindTransactionFilter(
         pExpCtx, matchStage->getMatchExpression());
 
-    // Create a new $match stage from the filter and add it to the pipeline.
-    auto unwoundTransactionMatch =
-        DocumentSourceMatch::create(unwindTransactionFilter->serialize(), pExpCtx);
-    container->insert(std::next(unwindStageItr), std::move(unwoundTransactionMatch));
+    // Replace the default filter with the new, more restrictive one. Note that the resulting
+    // expression must be serialized then deserialized to ensure it does not retain unsafe
+    // references to strings in the 'matchStage' filter.
+    rebuild(unwindTransactionFilter->serialize());
 
     // Continue optimization at the next change stream stage.
     return nextChangeStreamStageItr;

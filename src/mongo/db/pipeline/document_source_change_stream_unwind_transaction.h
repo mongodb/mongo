@@ -82,7 +82,12 @@ protected:
 
 private:
     DocumentSourceChangeStreamUnwindTransaction(
-        BSONObj filter, const boost::intrusive_ptr<ExpressionContext>& expCtx);
+        const BSONObj& filter, const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+    /**
+     * Resets the transaction entry filter saved in the '_filter' and '_expression' fields.
+     */
+    void rebuild(BSONObj filter);
 
     /**
      * Validates if the supplied document contains transaction details.

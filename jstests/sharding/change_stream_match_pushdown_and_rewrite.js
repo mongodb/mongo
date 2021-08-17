@@ -12,8 +12,9 @@
 
 load("jstests/libs/collection_drop_recreate.js");  // For assertDropAndRecreateCollection.
 
-const dbName = "change_stream_match_pushdown_and_rewrite_and_rewrite";
-const collName = "change_stream_match_pushdown_and_rewrite_and_rewrite";
+const dbName = "change_stream_match_pushdown_and_rewrite";
+const collName = "change_stream_match_pushdown_and_rewrite";
+const collNameAlternate = "change_stream_match_pushdown_and_rewrite_alternate";
 
 const st = new ShardingTest({
     shards: 2,
@@ -66,6 +67,10 @@ const coll = (() => {
                  true);
     return coll;
 })();
+
+// Create a second (unsharded) test collection for validating transactions that insert into multiple
+// collections.
+assert.commandWorked(db.createCollection(collNameAlternate));
 
 // Sets up the 'system.profile' collection for profiling.
 (function setupProfiler() {
@@ -133,15 +138,19 @@ const coll = (() => {
     const execStatsShard1 = getOplogExecutionStatsForShard(stats, st.rs1.name);
     assert.eq(execStatsShard1.nReturned, 1, execStatsShard1);
 
-    // Generate another 6 oplog events, this time within transactions.
+    // Generate another 7 oplog events, this time within a transaction. One of the events is in a
+    // different collection, to validate that events from outside the watched namespace get filtered
+    // out even when within a transaction.
     const session = st.s.startSession({causalConsistency: true});
     const sessionColl = session.getDatabase(dbName)[collName];
+    const sessionCollAlternate = session.getDatabase(dbName)[collNameAlternate];
 
     session.startTransaction({readConcern: {level: "majority"}});
 
     assert.commandWorked(sessionColl.insert({_id: 1}));
     assert.commandWorked(sessionColl.update({_id: 1}, {$set: {foo: "bar"}}));
     assert.commandWorked(sessionColl.remove({_id: 1}));
+    assert.commandWorked(sessionCollAlternate.insert({_id: "alt"}));
     assert.commandWorked(sessionColl.insert({_id: 2}));
     assert.commandWorked(sessionColl.update({_id: 2}, {$set: {foo: "bar"}}));
     assert.commandWorked(sessionColl.remove({_id: 2}));
