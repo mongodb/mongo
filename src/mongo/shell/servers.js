@@ -1249,6 +1249,28 @@ function appendSetParameterArgs(argArray) {
                 }
             }
 
+            function isSetParameterMentioned(setParameters, key) {
+                if (setParameters !== undefined && setParameters[key] !== undefined) {
+                    return true;
+                }
+
+                if (argArrayContainsSetParameterValue(key + '=')) {
+                    return true;
+                }
+
+                return false;
+            }
+
+            // When launching a 5.0 mongod, if we're mentioning the
+            // `storeFindAndModifyImagesInSideCollection` setParameter and the corresponding feature
+            // flag is not set, add it for good measure.
+            if (programMajorMinorVersion === 500 &&
+                isSetParameterMentioned(jsTest.options().setParameters,
+                                        "storeFindAndModifyImagesInSideCollection") &&
+                !argArrayContainsSetParameterValue("featureFlagRetryableFindAndModify=")) {
+                argArray.push(...['--setParameter', "featureFlagRetryableFindAndModify=true"]);
+            }
+
             // New mongod-specific option in 4.9.x.
             if (programMajorMinorVersion >= 490) {
                 const parameters = jsTest.options().setParameters;
