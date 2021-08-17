@@ -48,6 +48,7 @@ import re
 import enum
 import sys
 import textwrap
+import time
 from datetime import datetime, timezone, timedelta
 from typing import Callable, Tuple, Optional
 
@@ -452,7 +453,7 @@ app = Flask(__name__)
 class OCSPResponder:
 
     def __init__(self, issuer_cert: str, responder_cert: str, responder_key: str,
-                       fault: str, next_update_seconds: int):
+            fault: str, next_update_seconds: int, response_delay_seconds: int):
         """
         Create a new OCSPResponder instance.
 
@@ -468,7 +469,7 @@ class OCSPResponder:
             will return the corresponding certificate as a string.
         :param next_update_seconds: The ``nextUpdate`` value that will be written
             into the response. Default: 9 hours.
-
+        :param response_delay_seconds: Delays the HTTP response by this many seconds.
         """
         # Certs and keys
         self._issuer_cert = asymmetric.load_certificate(issuer_cert)
@@ -479,6 +480,8 @@ class OCSPResponder:
         self._next_update_seconds = next_update_seconds
 
         self._fault = fault
+
+        self._response_delay_seconds = response_delay_seconds
 
     def _fail(self, status: ResponseStatus) -> OCSPResponse:
         builder = OCSPResponseBuilder(response_status=status.value)
@@ -572,6 +575,9 @@ class OCSPResponder:
     def build_http_response(self, request_der: bytes) -> Response:
         global app
         response_der = self._build_ocsp_response(request_der).dump()
+        if self._response_delay_seconds > 0:
+           logger.warning("Delaying OCSP response by " + str(self._response_delay_seconds) + " seconds")
+           time.sleep(self._response_delay_seconds)
         resp = app.make_response((response_der, 200))
         resp.headers['content_type'] = 'application/ocsp-response'
         return resp
@@ -579,9 +585,9 @@ class OCSPResponder:
 
 responder = None
 
-def init_responder(issuer_cert: str, responder_cert: str, responder_key: str, fault: str, next_update_seconds: int):
+def init_responder(issuer_cert: str, responder_cert: str, responder_key: str, fault: str, next_update_seconds: int, response_delay_seconds: int):
     global responder
-    responder = OCSPResponder(issuer_cert=issuer_cert, responder_cert=responder_cert, responder_key=responder_key, fault=fault, next_update_seconds=next_update_seconds)
+    responder = OCSPResponder(issuer_cert=issuer_cert, responder_cert=responder_cert, responder_key=responder_key, fault=fault, next_update_seconds=next_update_seconds, response_delay_seconds=response_delay_seconds)
 
 def init(port=8080, debug=False, host=None):
     logger.info('Launching %sserver on port %d', 'debug' if debug else '', port)

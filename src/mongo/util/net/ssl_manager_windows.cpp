@@ -1745,6 +1745,7 @@ Status validatePeerCertificate(const std::string& remoteHost,
 
     certChainPara.dwUrlRetrievalTimeout = gTLSOCSPVerifyTimeoutSecs * 1000;
 
+    auto before = Date_t::now();
     PCCERT_CHAIN_CONTEXT chainContext;
     BOOL ret = CertGetCertificateChain(certChainEngine,
                                        cert,
@@ -1759,6 +1760,12 @@ Status validatePeerCertificate(const std::string& remoteHost,
         return Status(ErrorCodes::InvalidSSLConfiguration,
                       str::stream()
                           << "CertGetCertificateChain failed: " << errnoWithDescription(gle));
+    }
+
+    auto after = Date_t::now();
+    auto elapsed = after - before;
+    if (elapsed > Seconds(gTLSOCSPSlowResponderWarningSecs)) {
+        LOGV2_WARNING(4780400, "OCSP responder was slow to respond", "duration"_attr = elapsed);
     }
 
     UniqueCertChain certChainHolder(chainContext);

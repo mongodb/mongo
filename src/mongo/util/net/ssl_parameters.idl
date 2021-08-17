@@ -102,6 +102,16 @@ server_parameters:
     cpp_varname: "gTLSOCSPStaplingTimeoutSecs"
     validator:
       gte: 1
+  tlsOCSPSlowResponderWarningSecs:
+    description: >-
+       How long to wait for an OCSP response before logging a
+       warning message indicating that the responder is slow.
+    set_at: startup
+    cpp_vartype: int
+    default: 5
+    cpp_varname: "gTLSOCSPSlowResponderWarningSecs"
+    validator:
+      gte: 1
 
   opensslCipherConfig:
     description: "Cipher configuration string for OpenSSL based TLS connections"

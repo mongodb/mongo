@@ -70,6 +70,7 @@ const std::set<std::string> kSetShellParameterAllowlist = {
     "disabledSecureAllocatorDomains",
     "newLineAfterPasswordPromptForTest",
     "skipShellCursorFinalize",
+    "tlsOCSPSlowResponderWarningSecs",
 };
 
 std::string getMongoShellHelp(StringData name, const moe::OptionSection& options) {
