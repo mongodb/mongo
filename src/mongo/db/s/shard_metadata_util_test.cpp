@@ -51,6 +51,8 @@ using std::vector;
 using unittest::assertGet;
 
 const NamespaceString kNss = NamespaceString("test.foo");
+const SupportingLongNameStatusEnum kSupportingLongName =
+    SupportingLongNameStatusEnum::kExplicitlyEnabled;
 const NamespaceString kChunkMetadataNss = NamespaceString("config.cache.chunks.test.foo");
 const ShardId kShardId = ShardId("shard0");
 const bool kUnique = false;
@@ -68,6 +70,7 @@ struct ShardMetadataUtilTest : public ShardServerTestFixture {
                  << ShardCollectionType::kDefaultCollationFieldName << defaultCollation
                  << ShardCollectionType::kUniqueFieldName << kUnique));
         shardCollectionType.setRefreshing(true);
+        shardCollectionType.setSupportingLongName(kSupportingLongName);
 
         ASSERT_OK(updateShardCollectionsEntry(operationContext(),
                                               BSON(ShardCollectionType::kNssFieldName << kNss.ns()),
@@ -81,8 +84,8 @@ struct ShardMetadataUtilTest : public ShardServerTestFixture {
      * Inserts 'chunks' into the shard's chunks collection.
      */
     void setUpChunks(const std::vector<ChunkType> chunks) {
-        ASSERT_OK(
-            updateShardChunks(operationContext(), kNss, uuid, chunks, maxCollVersion.epoch()));
+        ASSERT_OK(updateShardChunks(
+            operationContext(), kNss, uuid, kSupportingLongName, chunks, maxCollVersion.epoch()));
     }
 
     /**
@@ -140,7 +143,7 @@ struct ShardMetadataUtilTest : public ShardServerTestFixture {
                                  << chunk.getMin() << ChunkType::max() << chunk.getMax()));
                 query.readPref(ReadPreference::Nearest, BSONArray());
 
-                NamespaceString chunkMetadataNss{ChunkType::ShardNSPrefix + kNss.ns()};
+                NamespaceString chunkMetadataNss{ChunkType::ShardNSPrefix + uuid.toString()};
                 std::unique_ptr<DBClientCursor> cursor = client.query(chunkMetadataNss, query, 1);
                 ASSERT(cursor);
 
@@ -227,7 +230,8 @@ TEST_F(ShardMetadataUtilTest, PersistedRefreshSignalStartAndFinish) {
 
 TEST_F(ShardMetadataUtilTest, WriteAndReadChunks) {
     std::vector<ChunkType> chunks = makeFourChunks();
-    ASSERT_OK(updateShardChunks(operationContext(), kNss, uuid, chunks, maxCollVersion.epoch()));
+    ASSERT_OK(updateShardChunks(
+        operationContext(), kNss, uuid, kSupportingLongName, chunks, maxCollVersion.epoch()));
     checkChunks(chunks);
 
     // read all the chunks
@@ -236,6 +240,7 @@ TEST_F(ShardMetadataUtilTest, WriteAndReadChunks) {
     std::vector<ChunkType> readChunks = assertGet(readShardChunks(operationContext(),
                                                                   kNss,
                                                                   uuid,
+                                                                  kSupportingLongName,
                                                                   allChunkDiff.query,
                                                                   allChunkDiff.sort,
                                                                   boost::none,
@@ -252,6 +257,7 @@ TEST_F(ShardMetadataUtilTest, WriteAndReadChunks) {
     readChunks = assertGet(readShardChunks(operationContext(),
                                            kNss,
                                            uuid,
+                                           kSupportingLongName,
                                            oneChunkDiff.query,
                                            oneChunkDiff.sort,
                                            boost::none,
@@ -266,7 +272,8 @@ TEST_F(ShardMetadataUtilTest, UpdateWithWriteNewChunks) {
     // Load some chunk metadata.
 
     std::vector<ChunkType> chunks = makeFourChunks();
-    ASSERT_OK(updateShardChunks(operationContext(), kNss, uuid, chunks, maxCollVersion.epoch()));
+    ASSERT_OK(updateShardChunks(
+        operationContext(), kNss, uuid, kSupportingLongName, chunks, maxCollVersion.epoch()));
     checkChunks(chunks);
 
     // Load some changes and make sure it's applied correctly.
@@ -310,7 +317,8 @@ TEST_F(ShardMetadataUtilTest, UpdateWithWriteNewChunks) {
     frontChunkControl.setVersion(collVersion);
     newChunks.push_back(frontChunkControl);
 
-    ASSERT_OK(updateShardChunks(operationContext(), kNss, uuid, newChunks, collVersion.epoch()));
+    ASSERT_OK(updateShardChunks(
+        operationContext(), kNss, uuid, kSupportingLongName, newChunks, collVersion.epoch()));
 
     chunks.push_back(splitChunkOne);
     chunks.push_back(splitChunkTwoMoved);

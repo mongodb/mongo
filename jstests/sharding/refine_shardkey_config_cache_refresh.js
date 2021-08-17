@@ -5,10 +5,10 @@
  * sure that the shard will be able to eventually reach the valid state on config.cache.
  */
 
-load("jstests/libs/uuid_util.js");
-
 (function() {
 'use strict';
+
+load('jstests/sharding/libs/catalog_cache_loader_helpers.js');
 
 let st = new ShardingTest({shards: 1});
 
@@ -30,7 +30,7 @@ assert.commandWorked(
     priConn.adminCommand({_flushRoutingTableCacheUpdates: 'test.user', syncFromConfig: true}));
 
 let collEntry = st.config.collections.findOne({_id: 'test.user'});
-let chunksCollName = "cache.chunks.test.user";
+let chunksCollName = getCachedChunksCollectionName(collEntry);
 let chunkCache = priConn.getDB('config').getCollection(chunksCollName);
 let preRefineChunks = chunkCache.find().toArray();
 assert.eq(3, preRefineChunks.length);

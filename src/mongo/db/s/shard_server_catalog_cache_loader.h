@@ -239,8 +239,14 @@ private:
         ChunkVersion getHighestVersionEnqueued() const;
 
         /**
-         * Iterates over the task list to retrieve the enqueued metadata. Only retrieves collects
-         * data from tasks that have terms matching the specified 'term'.
+         * Gets the last task's supporting long name status -- this is the most up to date
+         * supporting long name status.
+         */
+        SupportingLongNameStatusEnum getLastSupportingLongNameEnqueued() const;
+
+        /**
+         * Iterates over the task list to retrieve the enqueued metadata. Only retrieves
+         * collects data from tasks that have terms matching the specified 'term'.
          */
         EnqueuedMetadataResults getEnqueuedMetadataForTerm(long long term) const;
 
@@ -343,14 +349,13 @@ private:
     typedef std::map<NamespaceString, CollAndChunkTaskList> CollAndChunkTaskLists;
 
     /**
-     * Waits for processing of any pending task on the namespace, then renames the chunks cache
-     * based on the collection namespace with the collection UUID and vice versa. The renaming using
-     * the collection UUID is applied in FCV 5.0, while the collection namespace in lower FCV.
+     * Waits for any pending task on the collection to be processed, then renames the chunks cache
+     * collection using the collection namespace or UUID.
      */
     void _waitForTasksToCompleteAndRenameChunks(OperationContext* opCtx,
                                                 const NamespaceString& nss,
                                                 const UUID& uuid,
-                                                const boost::optional<Timestamp>& timestamp);
+                                                SupportingLongNameStatusEnum supportingLongName);
 
     /**
      * Forces the primary to refresh its metadata for 'nss' and waits until this node's metadata

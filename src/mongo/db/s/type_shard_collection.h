@@ -46,6 +46,7 @@ public:
     using ShardCollectionTypeBase::kNssFieldName;
     using ShardCollectionTypeBase::kRefreshingFieldName;
     using ShardCollectionTypeBase::kReshardingFieldsFieldName;
+    using ShardCollectionTypeBase::kSupportingLongNameFieldName;
     using ShardCollectionTypeBase::kTimeseriesFieldsFieldName;
     using ShardCollectionTypeBase::kUniqueFieldName;
     using ShardCollectionTypeBase::kUuidFieldName;
