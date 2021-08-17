@@ -61,10 +61,6 @@ function(config_string config_name description)
     if (NOT "${CONFIG_STR_UNPARSED_ARGUMENTS}" STREQUAL "")
         message(FATAL_ERROR "Unknown arguments to config_str: ${CONFIG_STR_UNPARSED_ARGUMENTS}")
     endif()
-    # We require a default value (not optional).
-    if ("${CONFIG_STR_DEFAULT}" STREQUAL "")
-        message(FATAL_ERROR "No default value passed")
-    endif()
 
     # Check that the configs dependencies are enabled before setting it to a visible enabled state.
     eval_dependency("${CONFIG_STR_DEPENDS}" enabled)
