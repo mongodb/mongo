@@ -76,12 +76,14 @@ checkLog = (function() {
     };
 
     /*
-     * Acts just like checkContainsOnceJson but introduces the `expectedCount and `isRelaxed params.
-     * `isRelaxed` is used to determine how object attributes are handled for matching purposes. If
-     * `isRelaxed` is true, then only the fields included in the object in attrsDict will be checked
-     * for in the corresponding object in the log. Otherwise, the objects will be checked for
-     * complete equality. In addition, the `expectedCount` param ensures that the log appears
-     * exactly as many times as expected.
+     * Acts just like checkContainsOnceJson but introduces the `expectedCount`, `isRelaxed`,
+     * `comparator`, and `context` params. `isRelaxed` is used to determine how object attributes
+     * are handled for matching purposes. If `isRelaxed` is true, then only the fields included in
+     * the object in attrsDict will be checked for in the corresponding object in the log.
+     * Otherwise, the objects will be checked for complete equality. After counting the total number
+     * of logs that match `id` and `attrsDict` based on `isRelaxed`, the `comparator` function is
+     * applied to appropriately compare the count with `expectedCount`. `context` allows to check
+     * the `ctx` field of the logs.
      */
     const checkContainsWithCountJson = function(conn,
                                                 id,
@@ -172,8 +174,10 @@ checkLog = (function() {
 
     /*
      * Calls checkContainsWithCountJson with the `isRelaxed` parameter set to true at regular
-     * intervals on the provided connection 'conn' until a log with id 'id' and all of the
-     * attributes in 'attrsDict' is found `expectedCount` times or the timeout (in ms) is reached.
+     * intervals on the provided connection 'conn'. It terminates when a log with id 'id', ctx
+     * 'context', and all of the attributes in 'attrsDict' is found at least, at most, or exactly
+     * `expectedCount` times based on the `comparator` function passed in or the timeout (in ms) is
+     * reached.
      */
     let containsRelaxedJson = function(conn,
                                        id,
