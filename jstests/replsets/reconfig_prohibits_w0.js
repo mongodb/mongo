@@ -18,11 +18,7 @@ function testReconfig(gleDefaults) {
     conf.version++;
 
     var response = admin.runCommand({replSetReconfig: conf});
-    // TODO (SERVER-48065): When 5.0 becomes last-lts, remove
-    // ErrorCodes.NewReplicaSetConfigurationIncompatible.
-    assert.commandFailedWithCode(
-        response,
-        [ErrorCodes.InvalidReplicaSetConfig, ErrorCodes.NewReplicaSetConfigurationIncompatible]);
+    assert.commandFailedWithCode(response, ErrorCodes.InvalidReplicaSetConfig);
 }
 
 /*
