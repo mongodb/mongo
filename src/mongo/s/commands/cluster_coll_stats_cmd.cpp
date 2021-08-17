@@ -32,8 +32,10 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/commands.h"
+#include "mongo/db/timeseries/timeseries_commands_conversion_helper.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/chunk_manager_targeter.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 
@@ -76,18 +78,16 @@ BSONObj scaleIndividualShardStatistics(const BSONObj& shardStats, int scale) {
 /**
  * Takes the shard's "shardTimeseriesStats" and adds it to the sum across shards saved in
  * "clusterTimeseriesStats". All of the mongod "timeseries" collStats are numbers except for the
- * "bucketsNs" field, which we specially track in "timeseriesBucketsNs".
+ * "bucketsNs" field, which we specially track in "timeseriesBucketsNs". We also track
+ * "timeseriesTotalBucketSize" specially for calculating "avgBucketSize".
  *
  * Invariants that "shardTimeseriesStats" is non-empty.
  */
 void aggregateTimeseriesStats(const BSONObj& shardTimeseriesStats,
                               std::map<std::string, long long>* clusterTimeseriesStats,
-                              std::string* timeseriesBucketsNs) {
+                              std::string* timeseriesBucketsNs,
+                              long long* timeseriesTotalBucketSize) {
     invariant(!shardTimeseriesStats.isEmpty());
-
-    // It's currently impossible to have multiple shards with timeseries info because sharded
-    // timeseries collections are not yet supported.
-    invariant(clusterTimeseriesStats->empty());
 
     for (const auto& shardTimeseriesStat : shardTimeseriesStats) {
         // "bucketsNs" is the only timeseries stat that is not a number, so it requires special
@@ -109,19 +109,36 @@ void aggregateTimeseriesStats(const BSONObj& shardTimeseriesStats,
                               << *timeseriesBucketsNs
                               << ", current shard's ns: " << shardTimeseriesStat.String());
             }
-            continue;
+        } else if (shardTimeseriesStat.fieldNameStringData() == "avgBucketSize") {
+            // Special logic to handle average aggregation.
+            tassert(5758901,
+                    str::stream()
+                        << "Cannot aggregate avgBucketSize when bucketCount field is not number.",
+                    shardTimeseriesStats.getField("bucketCount").isNumber());
+            *timeseriesTotalBucketSize +=
+                shardTimeseriesStats.getField("bucketCount").numberLong() *
+                shardTimeseriesStat.numberLong();
+        } else {
+            // Simple summation for other types of stats.
+            // Use 'numberLong' to ensure integers are safely converted to long type.
+            tassert(5758902,
+                    str::stream() << "Index stats '" << shardTimeseriesStat.fieldName()
+                                  << "' should be number.",
+                    shardTimeseriesStat.isNumber());
+            (*clusterTimeseriesStats)[shardTimeseriesStat.fieldName()] +=
+                shardTimeseriesStat.numberLong();
         }
-
-        // Use 'numberLong' to ensure integers are safely converted to long type.
-        (*clusterTimeseriesStats)[shardTimeseriesStat.fieldName()] +=
-            shardTimeseriesStat.numberLong();
     }
+    (*clusterTimeseriesStats)["avgBucketSize"] = (*clusterTimeseriesStats)["bucketCount"]
+        ? *timeseriesTotalBucketSize / (*clusterTimeseriesStats)["bucketCount"]
+        : 0;
 }
 
 /**
  * Adds a "timeseries" field to "result" that contains the summed timeseries statistics in
  * "clusterTimeseriesStats". "timeseriesBucketNs" is specially handled and added to the "timeseries"
- * sub-document because it is the only non-number timeseries statistic.
+ * sub-document because it is the only non-number timeseries statistic. "avgBucketSize" is also
+ * calculated specially through the aggregated "timeseriesTotalBucketSize".
  *
  * Invariants that "clusterTimeseriesStats" and "timeseriesBucketNs" are set.
  */
@@ -177,8 +194,8 @@ public:
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs(dbName, cmdObj));
 
-        const auto cm =
-            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+        const auto targeter = ChunkManagerTargeter(opCtx, nss);
+        const auto cm = targeter.getRoutingInfo();
         if (cm.isSharded()) {
             result.appendBool("sharded", true);
         } else {
@@ -195,7 +212,12 @@ public:
         }
 
         // Re-construct the command's BSONObj without any scaling to be applied.
-        BSONObj cmdObjWithoutScale = cmdObj.removeField("scale");
+        BSONObj cmdObjToSend = cmdObj.removeField("scale");
+
+        // Translate command collection namespace for time-series collection.
+        if (cm.isSharded() && cm.getTimeseriesFields()) {
+            cmdObjToSend = timeseries::makeTimeseriesCommand(cmdObjToSend, nss, getName());
+        }
 
         // Unscaled individual shard results. This is required to apply scaling after summing the
         // statistics from individual shards as opposed to adding the summation of the scaled
@@ -203,12 +225,10 @@ public:
         auto unscaledShardResults = scatterGatherVersionedTargetByRoutingTable(
             opCtx,
             nss.db(),
-            nss,
+            targeter.getNS(),
             cm,
             applyReadWriteConcern(
-                opCtx,
-                this,
-                CommandHelpers::filterCommandRequestForPassthrough(cmdObjWithoutScale)),
+                opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObjToSend)),
             ReadPreferenceSetting::get(opCtx),
             Shard::RetryPolicy::kIdempotent,
             {},
@@ -225,6 +245,7 @@ public:
         int nindexes = 0;
         bool warnedAboutIndexes = false;
         std::string timeseriesBucketsNs;
+        long long timeseriesTotalBucketSize = 0;
 
         for (const auto& shardResult : unscaledShardResults) {
             const auto& shardId = shardResult.shardId;
@@ -258,8 +279,10 @@ public:
                     if (!result.hasField(e.fieldName()))
                         result.append(e);
                 } else if (fieldName == "timeseries") {
-                    aggregateTimeseriesStats(
-                        e.Obj(), &clusterTimeseriesStats, &timeseriesBucketsNs);
+                    aggregateTimeseriesStats(e.Obj(),
+                                             &clusterTimeseriesStats,
+                                             &timeseriesBucketsNs,
+                                             &timeseriesTotalBucketSize);
                 } else if (fieldIsAnyOf(
                                fieldName,
                                {"count", "size", "storageSize", "totalIndexSize", "totalSize"})) {
