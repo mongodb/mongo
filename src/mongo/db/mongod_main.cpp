@@ -664,10 +664,6 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
 
         auto replCoord = repl::ReplicationCoordinator::get(startupOpCtx.get());
         invariant(replCoord);
-        if (replCoord->isReplEnabled()) {
-            storageEngine->setOldestActiveTransactionTimestampCallback(
-                TransactionParticipant::getOldestActiveTimestamp);
-        }
 
         if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
             // Note: For replica sets, ShardingStateRecovery happens on transition to primary.
@@ -700,6 +696,17 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         }
 
         replCoord->startup(startupOpCtx.get(), lastShutdownState);
+        // 'getOldestActiveTimestamp', which is called in the background by the checkpoint thread,
+        // requires a read on 'config.transactions' at the stableTimestamp. If this read occurs
+        // while applying prepared transactions at the end of replication recovery, it's possible to
+        // prepare a transaction at timestamp earlier than the stableTimestamp. This will result in
+        // a WiredTiger invariant. Register the callback after the call to 'startup' to ensure we've
+        // finished applying prepared transactions.
+        if (replCoord->isReplEnabled()) {
+            storageEngine->setOldestActiveTransactionTimestampCallback(
+                TransactionParticipant::getOldestActiveTimestamp);
+        }
+
         if (getReplSetMemberInStandaloneMode(serviceContext)) {
             LOGV2_WARNING_OPTIONS(
                 20547,
