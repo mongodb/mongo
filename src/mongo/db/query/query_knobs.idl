@@ -486,3 +486,11 @@ server_parameters:
     cpp_varname: "internalQueryAppendIdToSetWindowFieldsSort"
     cpp_vartype: AtomicWord<bool>
     default: false
+
+  enableSearchMeta:
+    description: "Exists for backwards compatibility in startup parameters,
+      enabling this was required on 4.4 to access SEARCH_META variables. Does not do anything."
+    set_at: [ startup, runtime ]
+    cpp_varname: "enableSearchMeta"
+    cpp_vartype: AtomicWord<bool>
+    default: true
