@@ -22,11 +22,6 @@ load("jstests/replsets/libs/tenant_migration_util.js");
 const tenantMigrationTest = new TenantMigrationTest(
     {name: jsTestName(), sharedOptions: {setParameter: {collectionClonerBatchSize: 10}}});
 
-if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-    jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-    return;
-}
-
 const kMigrationId = UUID();
 const kTenantId = 'testTenantId';
 const kReadPreference = {

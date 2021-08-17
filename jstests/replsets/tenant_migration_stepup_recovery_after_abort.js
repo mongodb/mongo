@@ -35,11 +35,6 @@ donorRst.initiate();
 
 const tenantMigrationTest = new TenantMigrationTest(
     {name: jsTestName(), donorRst, sharedOptions: {setParameter: kGarbageCollectionParams}});
-if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-    jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-    donorRst.stopSet();
-    return;
-}
 
 const tenantId = "testTenantId";
 const migrationId = UUID();

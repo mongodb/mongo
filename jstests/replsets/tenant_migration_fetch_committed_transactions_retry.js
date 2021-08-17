@@ -24,10 +24,6 @@ load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/libs/uuid_util.js");
 
 let tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), sharedOptions: {nodes: 1}});
-if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-    jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-    return;
-}
 
 const tenantId = "testTenantId";
 const collName = "testColl";

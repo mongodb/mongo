@@ -28,10 +28,6 @@ load("jstests/replsets/libs/tenant_migration_util.js");
 load("jstests/replsets/rslib.js");
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
-if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-    jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-    return;
-}
 
 const kCollName = "testColl";
 const kTenantDefinedDbName = "0";

@@ -3,7 +3,6 @@
  * timestamp than the latest optime associated with cloning on the recipient.
  *
  * @tags: [
- *   featureFlagTenantMigrations,
  *   incompatible_with_eft,
  *   incompatible_with_macos,
  *   incompatible_with_windows_tls,

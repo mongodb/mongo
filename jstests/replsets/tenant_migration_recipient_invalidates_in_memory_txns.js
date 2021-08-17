@@ -33,11 +33,6 @@ const setParameterOpts = {
 };
 const tenantMigrationTest =
     new TenantMigrationTest({name: jsTestName(), sharedOptions: {setParameter: setParameterOpts}});
-if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-    jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-    tenantMigrationTest.stop();
-    return;
-}
 
 const tenantId = "testTenantId";
 const tenantDB = tenantMigrationTest.tenantDB(tenantId, "testDB");

@@ -33,11 +33,6 @@ recipientRst.startSet();
 recipientRst.initiate();
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), recipientRst});
-if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-    jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-    recipientRst.stopSet();
-    return;
-}
 
 const kMaxSleepTimeMS = 7500;
 const kTenantId = 'testTenantId';

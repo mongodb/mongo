@@ -36,11 +36,7 @@ const setUpMigrationSyncSourceTest = function() {
     donorRst.initiateWithHighElectionTimeout();
 
     const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), donorRst});
-    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-        donorRst.stopSet();
-        return {};
-    }
+
     const tenantId = "testTenantId";
     const tenantDB = tenantMigrationTest.tenantDB(tenantId, "DB");
     const collName = "testColl";

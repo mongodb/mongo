@@ -42,11 +42,6 @@ const recipientRst = new ReplSetTest({
 });
 recipientRst.startSet();
 recipientRst.initiate();
-if (!TenantMigrationUtil.isFeatureFlagEnabled(recipientRst.getPrimary())) {
-    jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-    recipientRst.stopSet();
-    return;
-}
 
 function makeMigrationOpts(migrationId, tenantId) {
     return {

@@ -26,10 +26,6 @@ function assertNoCertificateOrPrivateKeyLogsForCmd(conn, cmdName) {
 }
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
-if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-    jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-    return;
-}
 
 const donorPrimary = tenantMigrationTest.getDonorPrimary();
 const recipientPrimary = tenantMigrationTest.getRecipientPrimary();

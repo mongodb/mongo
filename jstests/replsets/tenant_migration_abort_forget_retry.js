@@ -30,10 +30,6 @@ function makeTenantId() {
 }
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
-if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-    jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-    return;
-}
 
 (() => {
     const migrationId1 = extractUUIDFromObject(UUID());

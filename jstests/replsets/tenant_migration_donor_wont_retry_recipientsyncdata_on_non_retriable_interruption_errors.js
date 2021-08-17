@@ -20,10 +20,7 @@ const kTenantId = "testTenantId";
 const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
-if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-    jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-    return;
-}
+
 const donorRst = tenantMigrationTest.getDonorRst();
 let recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 

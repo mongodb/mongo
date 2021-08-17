@@ -22,10 +22,6 @@ load("jstests/libs/fail_point_util.js");  // For configureFailPoint().
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 
-if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-    jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-    return;
-}
 const kTenantId = "testTenantId";
 const kDbName = tenantMigrationTest.tenantDB(kTenantId, "testDB");
 const kCollName = "testColl";

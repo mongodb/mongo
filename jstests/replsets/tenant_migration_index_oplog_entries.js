@@ -22,11 +22,6 @@ const kNs = kDbName + "." + kCollName;
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
-if (!TenantMigrationUtil.isFeatureFlagEnabled(rst.getPrimary())) {
-    jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-    rst.stopSet();
-    return;
-}
 
 const primary = rst.getPrimary();
 const testDB = primary.getDB(kDbName);

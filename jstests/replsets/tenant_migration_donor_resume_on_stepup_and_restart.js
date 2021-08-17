@@ -49,11 +49,7 @@ function testDonorStartMigrationInterrupt(interruptFunc, donorRestarted) {
     donorRst.initiate();
 
     const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), donorRst});
-    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-        donorRst.stopSet();
-        return;
-    }
+
     let donorPrimary = tenantMigrationTest.getDonorPrimary();
     const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 
@@ -141,12 +137,7 @@ function testDonorForgetMigrationInterrupt(interruptFunc) {
 
     const tenantMigrationTest =
         new TenantMigrationTest({name: jsTestName(), donorRst, recipientRst});
-    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-        donorRst.stopSet();
-        recipientRst.stopSet();
-        return;
-    }
+
     const donorPrimary = tenantMigrationTest.getDonorPrimary();
 
     const migrationId = UUID();
@@ -221,12 +212,6 @@ function testDonorAbortMigrationInterrupt(interruptFunc, fpName, isShutdown = fa
 
     const tenantMigrationTest =
         new TenantMigrationTest({name: jsTestName(), donorRst, recipientRst});
-    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-        donorRst.stopSet();
-        recipientRst.stopSet();
-        return;
-    }
 
     const migrationId = UUID();
     const migrationOpts = {
@@ -298,11 +283,6 @@ function testStateDocPersistenceOnFailover(interruptFunc, fpName, isShutdown = f
     donorRst.initiate();
 
     const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), donorRst});
-    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-        donorRst.stopSet();
-        return;
-    }
 
     const migrationId = UUID();
     const migrationOpts = {

@@ -343,13 +343,10 @@ void _logOpsInner(OperationContext* opCtx,
     // across databases, but a tenant will never be able to rename into a database with a different
     // prefix, so it is safe to use the fromCollection's db's prefix for this check.
     //
-    // We ignore FCV here when checking the feature flag since the FCV may not have been initialized
-    // yet. This is safe since tenant migrations does not have any upgrade/downgrade behavior.
-    //
     // Skip the check if this is an "abortIndexBuild" oplog entry since it is safe to the abort an
     // index build on the donor after the blockTimestamp, plus if an index build fails to commit due
     // to TenantMigrationConflict, we need to be able to abort the index build and clean up.
-    if (repl::feature_flags::gTenantMigrations.isEnabledAndIgnoreFCV() && !isAbortIndexBuild) {
+    if (!isAbortIndexBuild) {
         tenant_migration_access_blocker::checkIfCanWriteOrThrow(opCtx, nss.db(), timestamps.back());
     }
 

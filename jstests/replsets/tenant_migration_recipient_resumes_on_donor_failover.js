@@ -44,11 +44,7 @@ function runTest(failPoint) {
 
     const tenantMigrationTest =
         new TenantMigrationTest({name: jsTestName(), recipientRst, sharedOptions: {nodes: 3}});
-    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-        recipientRst.stopSet();
-        return false;
-    }
+
     jsTestLog("Running test with failpoint: " + failPoint);
     const tenantId = "testTenantId";
     const tenantDB = tenantMigrationTest.tenantDB(tenantId, "DB");

@@ -21,12 +21,6 @@ var rst =
     new ReplSetTest({nodes: 1, nodeOptions: TenantMigrationUtil.makeX509OptionsForTest().donor});
 rst.startSet();
 rst.initiate();
-if (!TenantMigrationUtil.isFeatureFlagEnabled(rst.getPrimary())) {
-    jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-    rst.stopSet();
-    return;
-}
-
 const primary = rst.getPrimary();
 const configDB = primary.getDB("config");
 const configRecipientsColl = configDB["tenantMigrationRecipients"];

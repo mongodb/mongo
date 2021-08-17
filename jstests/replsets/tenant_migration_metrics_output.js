@@ -45,11 +45,6 @@ donorRst.initiate();
 
 const tenantMigrationTest =
     new TenantMigrationTest({name: jsTestName(), donorRst, enableRecipientTesting: false});
-if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-    jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-    donorRst.stopSet();
-    return;
-}
 
 const tenantId = "testTenantId";
 const migrationId = extractUUIDFromObject(UUID());

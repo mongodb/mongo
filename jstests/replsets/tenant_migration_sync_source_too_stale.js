@@ -41,12 +41,6 @@ const donorRst = new ReplSetTest({
 donorRst.startSet();
 donorRst.initiateWithHighElectionTimeout();
 
-if (!TenantMigrationUtil.isFeatureFlagEnabled(donorRst.getPrimary())) {
-    jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-    donorRst.stopSet();
-    return;
-}
-
 const tenantMigrationTest = new TenantMigrationTest({
     name: jsTestName(),
     donorRst,

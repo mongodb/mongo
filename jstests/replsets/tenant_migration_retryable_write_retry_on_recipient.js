@@ -21,10 +21,6 @@ load("jstests/libs/parallelTester.js");  // for 'Thread'
 load("jstests/libs/uuid_util.js");
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
-if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-    jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-    return;
-}
 
 const kTenantId = "testTenantId";
 const kDbName = tenantMigrationTest.tenantDB(kTenantId, "testDb");

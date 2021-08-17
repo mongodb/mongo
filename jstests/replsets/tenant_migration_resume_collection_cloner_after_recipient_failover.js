@@ -42,13 +42,6 @@ const tenantMigrationFailoverTest = function(isTimeSeries, createCollFn, docs) {
         new TenantMigrationTest({name: jsTestName(), recipientRst: recipientRst});
     const donorPrimary = tenantMigrationTest.getDonorPrimary();
 
-    if (!TenantMigrationUtil.isFeatureFlagEnabled(donorPrimary)) {
-        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-        tenantMigrationTest.stop();
-        recipientRst.stopSet();
-        return;
-    }
-
     if (isTimeSeries && !TimeseriesTest.timeseriesCollectionsEnabled(donorPrimary)) {
         jsTestLog("Skipping test because the time-series collection feature flag is disabled");
         tenantMigrationTest.stop();

@@ -27,11 +27,6 @@ if (!RetryableWritesUtil.storageEngineSupportsRetryableWrites(jsTest.options().s
 const tenantMigrationTest =
     new TenantMigrationTest({name: jsTestName(), sharedOptions: {nodes: 2}});
 
-if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-    jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-    return;
-}
-
 const kMigrationId = UUID();
 const kTenantId = 'testTenantId';
 const kDbName = tenantMigrationTest.tenantDB(kTenantId, "testDb");

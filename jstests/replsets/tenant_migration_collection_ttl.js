@@ -34,10 +34,6 @@ const garbageCollectionOpts = {
 
 const tenantMigrationTest = new TenantMigrationTest(
     {name: jsTestName(), sharedOptions: {setParameter: garbageCollectionOpts}});
-if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-    jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-    return;
-}
 
 const collName = "testColl";
 

@@ -29,10 +29,6 @@ const kGarbageCollectionParams = {
 
 const tenantMigrationTest = new TenantMigrationTest(
     {name: jsTestName(), sharedOptions: {nodes: 1, setParameter: kGarbageCollectionParams}});
-if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-    jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-    return;
-}
 
 const kTenantId = "testTenantId";
 const kDbName = tenantMigrationTest.tenantDB(kTenantId, "testDB");

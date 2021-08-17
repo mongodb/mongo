@@ -59,11 +59,6 @@ function runTest({failPointName, failPointData = {}, batchSize = 10 * 1000}) {
         sharedOptions: {setParameter: {collectionClonerBatchSize: batchSize}}
     });
 
-    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-        return;
-    }
-
     const tenantId = "testTenantId";
     const dbName = tenantMigrationTest.tenantDB(tenantId, "testDB");
     const collName = "testColl";

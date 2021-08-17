@@ -14,10 +14,6 @@ function runTest(downgradeFCV) {
     load("jstests/replsets/libs/tenant_migration_util.js");
 
     const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
-    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-        return;
-    }
 
     const tenantId = "testTenantId";
     const dbName = tenantMigrationTest.tenantDB(tenantId, "testDB");
@@ -60,5 +56,8 @@ function runTest(downgradeFCV) {
     tenantMigrationTest.stop();
 }
 
-runFeatureFlagMultiversionTest('featureFlagTenantMigrations', runTest);
+runTest(lastContinuousFCV);
+if (lastContinuousFCV != lastLTSFCV) {
+    runTest(lastLTSFCV);
+}
 })();

@@ -42,10 +42,6 @@ function bulkWriteDocsUnordered(primaryHost, dbName, collName, numDocs) {
 jsTestLog("Testing that large write errors fit within the BSON size limit.");
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
-if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-    jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-    return;
-}
 
 const tenantId = "bulkUnorderedInserts-committed";
 const migrationOpts = {

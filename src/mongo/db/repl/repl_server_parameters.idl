@@ -536,13 +536,6 @@ server_parameters:
         default: "logical"
 
 feature_flags:
-    featureFlagTenantMigrations:
-        description: >-
-            When enabled, tenant migration commands are supported.
-        cpp_varname: feature_flags::gTenantMigrations
-        default: true
-        version: 4.9
-
     # TODO (SERVER-54730): Remove featureFlagUseSecondaryDelaySecs.
     featureFlagUseSecondaryDelaySecs:
         description: >-

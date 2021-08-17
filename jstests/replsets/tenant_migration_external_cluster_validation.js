@@ -93,12 +93,6 @@ const donorSecondaryTestDB = donorRst.getSecondary().getDB(kDbName);
 const recipientSecondaryTestDB = recipientRst.getSecondary().getDB(kDbName);
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), donorRst, recipientRst});
-if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-    jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-    donorRst.stopSet();
-    recipientRst.stopSet();
-    return;
-}
 
 createUsers(donorRst);
 createUsers(recipientRst);

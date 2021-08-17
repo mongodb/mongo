@@ -24,13 +24,6 @@ recipientRst.initiate();
 const tenantMigrationTest =
     new TenantMigrationTest({name: jsTestName(), donorRst: donorRstShard, recipientRst});
 
-if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-    jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-    st.stop();
-    recipientRst.stopSet();
-    return;
-}
-
 // Run tenant migration commands on shards.
 let donorPrimary = donorRstShard.getPrimary();
 

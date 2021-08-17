@@ -34,10 +34,7 @@ const tenantMigrationTest = new TenantMigrationTest({
             {'failpoint.tenantMigrationDonorAllowsNonTimestampedReads': tojson({mode: 'alwaysOn'})}
     }
 });
-if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-    jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-    return;
-}
+
 const donorRst = tenantMigrationTest.getDonorRst();
 
 const primary = donorRst.getPrimary();

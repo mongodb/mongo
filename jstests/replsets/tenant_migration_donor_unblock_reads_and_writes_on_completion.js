@@ -64,11 +64,6 @@ donorRst.startSet();
 donorRst.initiate();
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), donorRst});
-if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-    jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-    donorRst.stopSet();
-    return;
-}
 
 const donorPrimary = tenantMigrationTest.getDonorPrimary();
 const donorsColl = donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS);

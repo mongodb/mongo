@@ -22,10 +22,6 @@ TestData.logComponentVerbosity = {
     accessControl: {verbosity: 3}
 };
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
-if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-    jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-    return;
-}
 
 const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 

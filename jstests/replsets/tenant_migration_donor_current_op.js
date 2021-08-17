@@ -37,10 +37,6 @@ const kReadPreference = {
 (() => {
     jsTestLog("Testing currentOp output for migration in data sync state");
     const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
-    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-        return;
-    }
 
     const donorPrimary = tenantMigrationTest.getDonorPrimary();
 
@@ -76,10 +72,6 @@ const kReadPreference = {
 (() => {
     jsTestLog("Testing currentOp output for migration in data sync state");
     const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
-    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-        return;
-    }
 
     const donorPrimary = tenantMigrationTest.getDonorPrimary();
 
@@ -115,10 +107,7 @@ const kReadPreference = {
 (() => {
     jsTestLog("Testing currentOp output for migration in blocking state");
     const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
-    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-        return;
-    }
+
     const donorPrimary = tenantMigrationTest.getDonorPrimary();
 
     const migrationId = UUID();
@@ -154,10 +143,7 @@ const kReadPreference = {
 (() => {
     jsTestLog("Testing currentOp output for aborted migration");
     const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
-    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-        return;
-    }
+
     const donorPrimary = tenantMigrationTest.getDonorPrimary();
 
     const migrationId = UUID();
@@ -196,10 +182,7 @@ const kReadPreference = {
 (() => {
     jsTestLog("Testing currentOp output for committed migration");
     const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
-    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-        return;
-    }
+
     const donorPrimary = tenantMigrationTest.getDonorPrimary();
 
     const migrationId = UUID();

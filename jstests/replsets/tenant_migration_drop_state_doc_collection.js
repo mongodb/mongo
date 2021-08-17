@@ -173,11 +173,6 @@ const tenantMigrationTest = new TenantMigrationTest({
     initiateRstWithHighElectionTimeout: false
 });
 
-if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-    jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-    return;
-}
-
 jsTest.log("Test dropping donor and recipient state doc collections during a migration.");
 kMigrationFpNames.forEach(fpName => {
     testDroppingStateDocCollections(

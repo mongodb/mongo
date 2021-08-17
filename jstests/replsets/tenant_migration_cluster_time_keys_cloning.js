@@ -72,11 +72,6 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
     jsTest.log("Test that the donor and recipient correctly copy each other's cluster time keys " +
                "when there is no failover.");
     const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
-    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-        tenantMigrationTest.stop();
-        return;
-    }
 
     const migrationId = UUID();
     const migrationOpts = {
@@ -109,12 +104,6 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
     recipientRst.initiate();
 
     const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), recipientRst});
-    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-        recipientRst.stopSet();
-        tenantMigrationTest.stop();
-        return;
-    }
 
     const migrationId = UUID();
     const migrationOpts = {
@@ -142,12 +131,6 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
     donorRst.initiate();
 
     const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), donorRst});
-    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-        donorRst.stopSet();
-        tenantMigrationTest.stop();
-        return;
-    }
 
     let donorPrimary = donorRst.getPrimary();
     const fp =
@@ -188,12 +171,6 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
     recipientRst.initiate();
 
     const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), recipientRst});
-    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-        recipientRst.stopSet();
-        tenantMigrationTest.stop();
-        return;
-    }
 
     const recipientPrimary = recipientRst.getPrimary();
     const fp = configureFailPoint(recipientPrimary,
@@ -238,12 +215,6 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
     donorRst.initiate();
 
     const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), donorRst});
-    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-        donorRst.stopSet();
-        tenantMigrationTest.stop();
-        return;
-    }
 
     function runTest(tenantId, withFailover) {
         const migrationId = UUID();

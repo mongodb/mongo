@@ -30,10 +30,6 @@ const tenantMigrationTest = new TenantMigrationTest({
     },
     initiateRstWithHighElectionTimeout: false
 });
-if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-    jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-    return;
-}
 
 const kTenantId = "testTenantId";
 

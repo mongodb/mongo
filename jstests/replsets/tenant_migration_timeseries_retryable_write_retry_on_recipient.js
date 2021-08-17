@@ -25,10 +25,6 @@ load("jstests/libs/uuid_util.js");
 
 function testRetryOnRecipient(ordered) {
     const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
-    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-        return;
-    }
 
     const donorPrimary = tenantMigrationTest.getDonorPrimary();
     if (!TimeseriesTest.timeseriesCollectionsEnabled(donorPrimary)) {

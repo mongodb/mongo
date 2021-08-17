@@ -21,11 +21,6 @@ load("jstests/replsets/libs/tenant_migration_util.js");
 const tenantMigrationTest =
     new TenantMigrationTest({name: jsTestName(), enableRecipientTesting: false});
 
-if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-    jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-    return;
-}
-
 const donorPrimary = tenantMigrationTest.getDonorPrimary();
 const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 

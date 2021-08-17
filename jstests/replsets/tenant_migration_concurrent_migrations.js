@@ -46,10 +46,6 @@ const kTenantIdPrefix = "testTenantId";
 // Test concurrent outgoing migrations to different recipients.
 (() => {
     const tenantMigrationTest0 = new TenantMigrationTest({donorRst: rst0, recipientRst: rst1});
-    if (!tenantMigrationTest0.isFeatureFlagEnabled()) {
-        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-        return;
-    }
     const tenantMigrationTest1 = new TenantMigrationTest({donorRst: rst0, recipientRst: rst2});
     const tenantId0 = `${kTenantIdPrefix}-ConcurrentOutgoingMigrationsToDifferentRecipient0`;
     const tenantId1 = `${kTenantIdPrefix}-ConcurrentOutgoingMigrationsToDifferentRecipient1`;
@@ -97,10 +93,6 @@ const kTenantIdPrefix = "testTenantId";
 // Test concurrent incoming migrations from different donors.
 (() => {
     const tenantMigrationTest0 = new TenantMigrationTest({donorRst: rst0, recipientRst: rst2});
-    if (!tenantMigrationTest0.isFeatureFlagEnabled()) {
-        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-        return;
-    }
     const tenantMigrationTest1 = new TenantMigrationTest({donorRst: rst1, recipientRst: rst2});
     const tenantId0 = `${kTenantIdPrefix}-ConcurrentIncomingMigrations0`;
     const tenantId1 = `${kTenantIdPrefix}-ConcurrentIncomingMigrations1`;
@@ -141,10 +133,6 @@ const kTenantIdPrefix = "testTenantId";
 // migration to that recipient completes.
 (() => {
     const tenantMigrationTest0 = new TenantMigrationTest({donorRst: rst0, recipientRst: rst1});
-    if (!tenantMigrationTest0.isFeatureFlagEnabled()) {
-        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-        return;
-    }
     const tenantMigrationTest1 = new TenantMigrationTest({donorRst: rst0, recipientRst: rst1});
 
     const tenantId0 = `${kTenantIdPrefix}-ConcurrentOutgoingMigrationsToSameRecipient0`;

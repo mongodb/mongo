@@ -29,12 +29,6 @@ const recipientRst =
 recipientRst.startSet();
 recipientRst.initiateWithHighElectionTimeout();
 
-if (!TenantMigrationUtil.isFeatureFlagEnabled(recipientRst.getPrimary())) {
-    jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-    recipientRst.stopSet();
-    return;
-}
-
 // This function does the following:
 // 1. Runs the setup function, which typically involves loading the donor RST with some data.
 // 2. Configures the failpoints passed in to pause. These failpoints usually mark the steps right

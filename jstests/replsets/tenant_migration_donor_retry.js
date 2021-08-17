@@ -46,12 +46,6 @@ const tenantMigrationTest = new TenantMigrationTest(
 const donorPrimary = tenantMigrationTest.getDonorPrimary();
 const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 
-if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-    jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-    donorRst.stopSet();
-    return;
-}
-
 function makeTenantId() {
     return kTenantIdPrefix + testNum++;
 }

@@ -44,12 +44,6 @@ donorRst.startSet();
 donorRst.initiate();
 const donorRstArgs = TenantMigrationUtil.createRstArgs(donorRst);
 
-if (!TenantMigrationUtil.isFeatureFlagEnabled(donorRst.getPrimary())) {
-    jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-    donorRst.stopSet();
-    return;
-}
-
 function makeMigrationOpts(tenantMigrationTest, migrationId, tenantId) {
     return {
         migrationIdString: extractUUIDFromObject(migrationId),

@@ -58,11 +58,6 @@ public:
         using InvocationBase::InvocationBase;
 
         Response typedRun(OperationContext* opCtx) {
-            uassert(ErrorCodes::CommandNotSupported,
-                    "recipientSyncData command not enabled",
-                    repl::feature_flags::gTenantMigrations.isEnabled(
-                        serverGlobalParams.featureCompatibility));
-
             uassert(ErrorCodes::IllegalOperation,
                     "tenant migrations are not available in sharded clusters",
                     serverGlobalParams.clusterRole == ClusterRole::None);
@@ -179,11 +174,6 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            uassert(ErrorCodes::CommandNotSupported,
-                    "recipientForgetMigration command not enabled",
-                    repl::feature_flags::gTenantMigrations.isEnabled(
-                        serverGlobalParams.featureCompatibility));
-
             uassert(ErrorCodes::IllegalOperation,
                     "tenant migrations are not available in sharded clusters",
                     serverGlobalParams.clusterRole == ClusterRole::None);

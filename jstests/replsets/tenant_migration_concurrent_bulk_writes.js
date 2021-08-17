@@ -71,12 +71,6 @@ recipientRst.initiate();
 const kRecipientConnString = recipientRst.getURL();
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), donorRst, recipientRst});
-if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-    jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-    donorRst.stopSet();
-    recipientRst.stopSet();
-    return;
-}
 
 function bulkInsertDocsOrdered(primaryHost, dbName, collName, numDocs) {
     const primary = new Mongo(primaryHost);

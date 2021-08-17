@@ -13,15 +13,6 @@ var TenantMigrationUtil = (function() {
     }
 
     /**
-     * Returns whether tenant migration commands are supported.
-     */
-    function isFeatureFlagEnabled(conn) {
-        return assert
-            .commandWorked(conn.adminCommand({getParameter: 1, featureFlagTenantMigrations: 1}))
-            .featureFlagTenantMigrations.value;
-    }
-
-    /**
      * Returns X509 options for ReplSetTest with the given certificate-key file and CA pem file.
      */
     function makeX509Options(certPemFile, caPemFile = "jstests/libs/ca.pem") {
@@ -472,7 +463,6 @@ var TenantMigrationUtil = (function() {
         createRstArgs,
         createRst,
         runTenantMigrationCommand,
-        isFeatureFlagEnabled,
         getCertificateAndPrivateKey,
         makeX509Options,
         makeMigrationCertificatesForTest,

@@ -58,11 +58,6 @@ function insertDocument(primaryHost, dbName, collName) {
         enableRecipientTesting: false,
         sharedOptions: {setParameter: kGarbageCollectionParams}
     });
-    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-        donorRst.stopSet();
-        return;
-    }
 
     const migrationId = UUID();
     const tenantId = "migrationOutcome-committed";
@@ -120,11 +115,6 @@ function insertDocument(primaryHost, dbName, collName) {
 
     const tenantMigrationTest = new TenantMigrationTest(
         {name: jsTestName(), donorRst, sharedOptions: {setParameter: kGarbageCollectionParams}});
-    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-        donorRst.stopSet();
-        return;
-    }
 
     const migrationId = UUID();
     const tenantId = "migrationOutcome-aborted";

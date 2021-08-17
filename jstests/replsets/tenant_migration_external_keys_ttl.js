@@ -99,12 +99,6 @@ function makeTestParams() {
     const tmt = new TenantMigrationTest(
         {name: jsTestName(), sharedOptions: {setParameter: ttlMonitorOptions}});
 
-    if (!tmt.isFeatureFlagEnabled()) {
-        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-        tmt.stop();
-        return;
-    }
-
     // Verify the external keys TTL index is created on both replica sets on stepup.
     waitForExternalKeysTTLIndex(tmt.getDonorPrimary());
     waitForExternalKeysTTLIndex(tmt.getRecipientPrimary());
@@ -222,13 +216,6 @@ function makeTestParams() {
     recipientRst.initiate();
 
     const tmt = new TenantMigrationTest({name: jsTestName(), donorRst, recipientRst});
-    if (!tmt.isFeatureFlagEnabled()) {
-        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-        donorRst.stopSet();
-        recipientRst.stopSet();
-        tmt.stop();
-        return;
-    }
 
     jsTestLog("Donor failover before receiving forgetMigration");
     {

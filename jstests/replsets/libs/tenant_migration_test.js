@@ -94,32 +94,6 @@ function TenantMigrationTest({
     }
 
     /**
-     * Returns whether tenant migration commands are supported.
-     */
-    this.isFeatureFlagEnabled = function() {
-        function supportsTenantMigrations(rst) {
-            const conn = rst.getPrimary();
-            return rst.asCluster(conn, () => {
-                return assert
-                    .commandWorked(
-                        conn.adminCommand({getParameter: 1, featureFlagTenantMigrations: 1}))
-                    .featureFlagTenantMigrations.value;
-            });
-        }
-        const retVal = (supportsTenantMigrations(this.getDonorRst()) &&
-                        supportsTenantMigrations(this.getRecipientRst()));
-        if (!retVal) {
-            jsTestLog("At least one of the donor or recipient replica sets do not support tenant " +
-                      "migration commands. Terminating any replica sets started by the " +
-                      "TenantMigrationTest fixture.");
-            // Stop any replica sets started by the TenantMigrationTest fixture.
-            this.stop();
-        }
-
-        return retVal;
-    };
-
-    /**
      * Runs a tenant migration with the given migration options and waits for the migration to be
      * committed or aborted.
      *

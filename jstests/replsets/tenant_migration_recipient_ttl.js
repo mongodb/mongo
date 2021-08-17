@@ -28,12 +28,6 @@ const kGarbageCollectionParams = {
 const tenantMigrationTest = new TenantMigrationTest(
     {name: jsTestName(), sharedOptions: {setParameter: kGarbageCollectionParams}});
 
-if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-    jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-    tenantMigrationTest.stop();
-    return;
-}
-
 const kRecipientTTLIndexName = "TenantMigrationRecipientTTLIndex";
 
 const kMigrationId = UUID();
