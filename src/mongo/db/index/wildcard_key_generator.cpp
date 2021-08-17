@@ -92,7 +92,7 @@ WildcardProjection WildcardKeyGenerator::createProjectionExecutor(BSONObj keyPat
     // will never be used.
     auto expCtx = make_intrusive<ExpressionContext>(nullptr, nullptr, NamespaceString());
     auto policies = ProjectionPolicies::wildcardIndexSpecProjectionPolicies();
-    auto projection = projection_ast::parse(expCtx, projSpec, policies);
+    auto projection = projection_ast::parseAndAnalyze(expCtx, projSpec, policies);
     return WildcardProjection{projection_executor::buildProjectionExecutor(
         expCtx, &projection, policies, projection_executor::kDefaultBuilderParams)};
 }

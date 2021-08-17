@@ -44,7 +44,7 @@ constexpr auto kProjectionPostImageVarName =
 auto createProjectionExecutor(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                               const BSONObj& projSpec,
                               ProjectionPolicies policies) {
-    auto projection = projection_ast::parse(expCtx, projSpec, policies);
+    auto projection = projection_ast::parseAndAnalyze(expCtx, projSpec, policies);
     auto builderParams = BuilderParamsBitSet{kDefaultBuilderParams};
     builderParams.reset(kAllowFastPath);
     return buildProjectionExecutor(expCtx, &projection, policies, builderParams);

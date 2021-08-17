@@ -189,12 +189,12 @@ struct stitch_support_v1_projection {
             collator ? collator->collator->clone() : nullptr,
             mongo::kDummyNamespaceStr);
         const auto policies = mongo::ProjectionPolicies::findProjectionPolicies();
-        auto proj =
-            mongo::projection_ast::parse(expCtx,
-                                         pattern,
-                                         matcher ? matcher->matcher.getMatchExpression() : nullptr,
-                                         matcher ? *matcher->matcher.getQuery() : mongo::BSONObj(),
-                                         policies);
+        auto proj = mongo::projection_ast::parseAndAnalyze(
+            expCtx,
+            pattern,
+            matcher ? matcher->matcher.getMatchExpression() : nullptr,
+            matcher ? *matcher->matcher.getQuery() : mongo::BSONObj(),
+            policies);
 
         uassert(51051,
                 "$textScore, $sortKey, $recordId and $geoNear are not allowed in this "

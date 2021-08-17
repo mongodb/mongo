@@ -1254,11 +1254,11 @@ StatusWith<std::unique_ptr<projection_ast::Projection>> makeProjection(const BSO
     invariant(!projObj.isEmpty());
 
     projection_ast::Projection proj =
-        projection_ast::parse(cq->getExpCtx(),
-                              projObj.getOwned(),
-                              cq->root(),
-                              cq->getQueryObj(),
-                              ProjectionPolicies::findProjectionPolicies());
+        projection_ast::parseAndAnalyze(cq->getExpCtx(),
+                                        projObj.getOwned(),
+                                        cq->root(),
+                                        cq->getQueryObj(),
+                                        ProjectionPolicies::findProjectionPolicies());
 
     // ProjectionExec requires the MatchDetails from the query expression when the projection
     // uses the positional operator. Since the query may no longer match the newly-updated

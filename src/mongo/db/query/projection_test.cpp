@@ -61,7 +61,7 @@ projection_ast::Projection createProjection(const BSONObj& query,
     ASSERT_OK(statusWithMatcher.getStatus());
     std::unique_ptr<MatchExpression> queryMatchExpr = std::move(statusWithMatcher.getValue());
     projection_ast::Projection res =
-        projection_ast::parse(expCtx, projObj, queryMatchExpr.get(), query, policies);
+        projection_ast::parseAndAnalyze(expCtx, projObj, queryMatchExpr.get(), query, policies);
 
     return res;
 }
@@ -88,13 +88,14 @@ void assertInvalidFindProjection(const char* queryStr, const char* projStr, size
     StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(statusWithMatcher.getStatus());
     std::unique_ptr<MatchExpression> queryMatchExpr = std::move(statusWithMatcher.getValue());
-    ASSERT_THROWS_CODE(projection_ast::parse(expCtx,
-                                             projObj,
-                                             queryMatchExpr.get(),
-                                             query,
-                                             ProjectionPolicies::findProjectionPolicies()),
-                       DBException,
-                       errCode);
+    ASSERT_THROWS_CODE(
+        projection_ast::parseAndAnalyze(expCtx,
+                                        projObj,
+                                        queryMatchExpr.get(),
+                                        query,
+                                        ProjectionPolicies::findProjectionPolicies()),
+        DBException,
+        errCode);
 }
 
 TEST(QueryProjectionTest, MakeEmptyProjection) {
@@ -213,14 +214,14 @@ TEST(QueryProjectionTest, InvalidPositionalProjectionDefaultPathMatchExpression)
     ASSERT_EQ(nullptr, queryMatchExpr->path().rawData());
 
     BSONObj projObj = fromjson("{'a.$': 1}");
-    ASSERT_THROWS(projection_ast::parse(
+    ASSERT_THROWS(projection_ast::parseAndAnalyze(
                       expCtx, projObj, queryMatchExpr.get(), BSONObj(), ProjectionPolicies{}),
                   DBException);
 
     // Projecting onto empty field should fail.
     BSONObj emptyFieldProjObj = fromjson("{'.$': 1}");
     ASSERT_THROWS(
-        projection_ast::parse(
+        projection_ast::parseAndAnalyze(
             expCtx, emptyFieldProjObj, queryMatchExpr.get(), BSONObj(), ProjectionPolicies{}),
         DBException);
 }

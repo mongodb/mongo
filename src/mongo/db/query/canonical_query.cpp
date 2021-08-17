@@ -256,11 +256,12 @@ Status CanonicalQuery::init(OperationContext* opCtx,
     // Validate the projection if there is one.
     if (!_findCommand->getProjection().isEmpty()) {
         try {
-            _proj.emplace(projection_ast::parse(expCtx,
-                                                _findCommand->getProjection(),
-                                                _root.get(),
-                                                _findCommand->getFilter(),
-                                                projectionPolicies));
+            _proj.emplace(projection_ast::parseAndAnalyze(expCtx,
+                                                          _findCommand->getProjection(),
+                                                          _root.get(),
+                                                          _findCommand->getFilter(),
+                                                          projectionPolicies,
+                                                          true /* Should optimize? */));
 
             // Fail if any of the projection's dependencies are unavailable.
             DepsTracker{unavailableMetadata}.requestMetadata(_proj->metadataDeps());

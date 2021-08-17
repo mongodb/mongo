@@ -244,7 +244,7 @@ TEST_F(SbeShardFilterTest, CoveredShardFilterPlan) {
     auto expCtx = make_intrusive<ExpressionContextForTest>(nss);
     auto emptyMatchExpression =
         unittest::assertGet(MatchExpressionParser::parse(BSONObj{}, expCtx));
-    auto projectionAst = projection_ast::parse(expCtx, projection, ProjectionPolicies{});
+    auto projectionAst = projection_ast::parseAndAnalyze(expCtx, projection, ProjectionPolicies{});
 
     // Construct a PROJECTION_COVERED => SHARDING_FILTER => VIRTUAL_SCAN query solution node tree
     // where the virtual scan mocks an index scan with 'indexKeyPattern'.

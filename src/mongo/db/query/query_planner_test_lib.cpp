@@ -874,8 +874,8 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
         // collator. This should be sufficient to parse a projection.
         auto expCtx =
             make_intrusive<ExpressionContext>(nullptr, nullptr, NamespaceString("test.dummy"));
-        auto projection =
-            projection_ast::parse(expCtx, spec.Obj(), ProjectionPolicies::findProjectionPolicies());
+        auto projection = projection_ast::parseAndAnalyze(
+            expCtx, spec.Obj(), ProjectionPolicies::findProjectionPolicies());
         auto specProjObj = projection_ast::astToDebugBSON(projection.root());
         auto solnProjObj = projection_ast::astToDebugBSON(pn->proj.root());
         if (!SimpleBSONObjComparator::kInstance.evaluate(specProjObj == solnProjObj)) {

@@ -93,11 +93,11 @@ protected:
             uassertStatusOK(swMatchExpression.getStatus());
         }
 
-        return projection_ast::parse(getExpCtx(),
-                                     projectionBson,
-                                     swMatchExpression.getValue().get(),
-                                     matchExprBson.get_value_or(BSONObj()),
-                                     policies);
+        return projection_ast::parseAndAnalyze(getExpCtx(),
+                                               projectionBson,
+                                               swMatchExpression.getValue().get(),
+                                               matchExprBson.get_value_or(BSONObj()),
+                                               policies);
     }
 
     auto createProjectionExecutor(const projection_ast::Projection& projection) {

@@ -777,7 +777,7 @@ auto createMatchExprAndProjection(const BSONObj& query, const BSONObj& projObj) 
         opCtx.get(), std::unique_ptr<CollatorInterface>(nullptr), NamespaceString("test.dummy")));
     StatusWithMatchExpression queryMatchExpr = MatchExpressionParser::parse(query, expCtx);
     ASSERT(queryMatchExpr.isOK());
-    projection_ast::Projection res = projection_ast::parse(
+    projection_ast::Projection res = projection_ast::parseAndAnalyze(
         expCtx, projObj, queryMatchExpr.getValue().get(), query, ProjectionPolicies{});
     return std::make_pair(std::move(queryMatchExpr.getValue()), std::move(res));
 }

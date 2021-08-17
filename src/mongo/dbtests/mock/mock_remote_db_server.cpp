@@ -181,7 +181,7 @@ std::unique_ptr<projection_executor::ProjectionExecutor>
 MockRemoteDBServer::createProjectionExecutor(const BSONObj& projectionSpec) {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ProjectionPolicies defaultPolicies;
-    auto projection = projection_ast::parse(expCtx, projectionSpec, defaultPolicies);
+    auto projection = projection_ast::parseAndAnalyze(expCtx, projectionSpec, defaultPolicies);
     return projection_executor::buildProjectionExecutor(
         expCtx, &projection, defaultPolicies, projection_executor::kDefaultBuilderParams);
 }

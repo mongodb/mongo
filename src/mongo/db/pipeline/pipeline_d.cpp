@@ -685,9 +685,10 @@ auto buildProjectionForPushdown(const DepsTracker& deps,
         if (projStage->getType() == TransformerInterface::TransformerType::kInclusionProjection) {
             auto projObj =
                 projStage->getTransformer().serializeTransformation(boost::none).toBson();
-            auto projAst = projection_ast::parse(projStage->getContext(),
-                                                 projObj,
-                                                 ProjectionPolicies::aggregateProjectionPolicies());
+            auto projAst =
+                projection_ast::parseAndAnalyze(projStage->getContext(),
+                                                projObj,
+                                                ProjectionPolicies::aggregateProjectionPolicies());
             if (!projAst.hasExpressions() || allowExpressions) {
                 // If there is an inclusion projection at the front of the pipeline, we have case 1.
                 sources.pop_front();

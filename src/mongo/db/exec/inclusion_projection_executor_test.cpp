@@ -99,11 +99,11 @@ protected:
             if (matchSpec) {
                 auto matchExpr = CopyableMatchExpression{*matchSpec, expCtx};
                 return std::make_pair(
-                    projection_ast::parse(
+                    projection_ast::parseAndAnalyze(
                         expCtx, projSpec, &*matchExpr, matchExpr.inputBSON(), policies),
                     boost::make_optional(matchExpr));
             }
-            return std::make_pair(projection_ast::parse(expCtx, projSpec, policies),
+            return std::make_pair(projection_ast::parseAndAnalyze(expCtx, projSpec, policies),
                                   boost::optional<CopyableMatchExpression>{});
         }();
 

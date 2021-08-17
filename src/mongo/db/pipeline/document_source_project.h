@@ -61,7 +61,7 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         StringData specifiedName) try {
 
-        auto projection = projection_ast::parse(
+        auto projection = projection_ast::parseAndAnalyze(
             expCtx, projectSpec, ProjectionPolicies::aggregateProjectionPolicies());
         return create(projection, expCtx, specifiedName);
     } catch (DBException& ex) {

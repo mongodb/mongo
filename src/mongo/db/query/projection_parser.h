@@ -41,18 +41,20 @@ namespace projection_ast {
  *
  * 'query' and 'queryObj' refer to the associated filter provided in a find() command.
  */
-Projection parse(boost::intrusive_ptr<ExpressionContext> expCtx,
-                 const BSONObj& obj,
-                 const MatchExpression* query,
-                 const BSONObj& queryObj,
-                 ProjectionPolicies policies);
+Projection parseAndAnalyze(boost::intrusive_ptr<ExpressionContext> expCtx,
+                           const BSONObj& obj,
+                           const MatchExpression* query,
+                           const BSONObj& queryObj,
+                           ProjectionPolicies policies,
+                           bool shouldOptimize = false);
 
 /**
  * Overload of parse() to be used when not parsing a projection from a find() command.
  */
-Projection parse(boost::intrusive_ptr<ExpressionContext> expCtx,
-                 const BSONObj& obj,
-                 ProjectionPolicies policies);
+Projection parseAndAnalyze(boost::intrusive_ptr<ExpressionContext> expCtx,
+                           const BSONObj& obj,
+                           ProjectionPolicies policies,
+                           bool shouldOptimize = false);
 
 /**
  * Adds a node to the projection AST rooted at 'root' to the path specified by 'path'.

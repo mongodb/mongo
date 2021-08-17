@@ -56,7 +56,7 @@ BSONObj wrapInLiteral(const T& arg) {
 auto makeProjectionWithDefaultPolicies(BSONObj spec) {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ProjectionPolicies defaultPolicies;
-    auto projection = projection_ast::parse(expCtx, spec, defaultPolicies);
+    auto projection = projection_ast::parseAndAnalyze(expCtx, spec, defaultPolicies);
     return buildProjectionExecutor(expCtx, &projection, defaultPolicies, kDefaultBuilderParams);
 }
 
@@ -67,7 +67,7 @@ auto makeProjectionWithBannedComputedFields(BSONObj spec) {
         ProjectionPolicies::kDefaultIdPolicyDefault,
         ProjectionPolicies::kArrayRecursionPolicyDefault,
         ProjectionPolicies::ComputedFieldsPolicy::kBanComputedFields};
-    auto projection = projection_ast::parse(expCtx, spec, banComputedFields);
+    auto projection = projection_ast::parseAndAnalyze(expCtx, spec, banComputedFields);
     return buildProjectionExecutor(expCtx, &projection, banComputedFields, kDefaultBuilderParams);
 }
 
