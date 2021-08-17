@@ -504,7 +504,7 @@ private:
                         return true;
                     },
                     [&](const CollectionPtr& collection) {
-                        return collection->ns().isTimeseriesBucketsCollection();
+                        return collection->getTimeseriesOptions() != boost::none;
                     });
             }
         }

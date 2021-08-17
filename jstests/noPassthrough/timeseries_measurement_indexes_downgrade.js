@@ -25,6 +25,8 @@ const timeFieldName = "tm";
 const metaFieldName = "mm";
 
 assert.commandWorked(db.createCollection("regular"));
+assert.commandWorked(db.createCollection("system.buckets.abc"));
+
 assert.commandWorked(db.createCollection(
     coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
 
