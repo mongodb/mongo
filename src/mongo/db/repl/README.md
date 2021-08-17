@@ -1607,6 +1607,17 @@ The `initialSyncTransientErrorRetryPeriodSeconds` is also used to control retrie
 fetcher and all network operations in initial sync which take place after the data cloning has
 started.
 
+As of v4.4, initial syncing a node with [two-phase index builds](https://github.com/mongodb/mongo/blob/0a7641e69031fcfdf25a1780a3b62bca5f59d68f/src/mongo/db/catalog/README.md#replica-set-index-builds) 
+will immediately build all ready indexes from the sync source and setup the index builder threads 
+for any unfinished index builds. 
+[See here](https://github.com/mongodb/mongo/blob/85d75907fd12c2360cf16b97f941386f343ca6fc/src/mongo/db/repl/collection_cloner.cpp#L247-L301). 
+
+This is necessary to avoid a scenario where the primary node cannot satisfy the index builds commit 
+quorum if it depends on the initial syncing nodes vote. Prior to this, initial syncing nodes would 
+start the index build when they came across the `commitIndexBuild` oplog entry, which is only 
+observable once the index builds commit quorum has been satisfied. 
+[See this test for an example](https://github.com/mongodb/mongo/blob/f495bdead326a06a76f8a980e44092deb096a21d/jstests/noPassthrough/commit_quorum_does_not_hang_with_initial_sync.js).
+
 ## Oplog application phase
 
 After the cloning phase of initial sync has finished, the oplog application phase begins. The new
