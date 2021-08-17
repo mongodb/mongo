@@ -90,10 +90,8 @@ for (let node of replTest.nodes) {
             local.getCollection("oplog.rs").find({ts: {$gte: oplogStart}}).sort({$natural: 1});
         for (let observedTsIdx = 0; observedTsIdx < timestamps.length; ++observedTsIdx) {
             let observedTs = timestamps[observedTsIdx];
-            assert(cursor.hasNext());
-            let doc = cursor.next();
-            let actualTs = doc["ts"];
-            assert.eq(actualTs, observedTs, function() {
+
+            const makeMissingTsMsgFn = function(actualTs) {
                 let prev = null;
                 let next = null;
                 if (observedTsIdx > 0) {
@@ -105,11 +103,17 @@ for (let node of replTest.nodes) {
 
                 return tojson({
                     "Missing": actualTs,
+                    "ObservedTs": observedTs,
                     "ObservedIdx": observedTsIdx,
                     "PrevObserved": prev,
                     "NextObserved": next
                 });
-            });
+            };
+
+            assert(cursor.hasNext(), makeMissingTsMsgFn('cursor returned no data'));
+            let doc = cursor.next();
+            let actualTs = doc["ts"];
+            assert.eq(actualTs, observedTs, makeMissingTsMsgFn(actualTs));
         }
     };
 
