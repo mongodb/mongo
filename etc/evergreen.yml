@@ -9181,6 +9181,7 @@ buildvariants:
     test_flags: >-
       --runAllFeatureFlagTests
       --mongodSetParameters="{internalQueryEnableSlotBasedExecutionEngine: true}"
+      --additionalFeatureFlags=featureFlagSbePlanCache
   tasks: &enterprise-rhel-80-64-bit-dynamic-all-feature-flags-tasks
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:
@@ -9300,7 +9301,7 @@ buildvariants:
     num_scons_link_jobs_available: 0.99
     test_flags: >-
       --mongodSetParameters="{internalQueryEnableSlotBasedExecutionEngine: true}"
-      --additionalFeatureFlags=featureFlagTimeseriesCollection
+      --additionalFeatureFlags=featureFlagTimeseriesCollection,featureFlagSbePlanCache
   tasks:
   - name: compile_and_archive_dist_test_TG
     distros:
@@ -11038,6 +11039,7 @@ buildvariants:
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=address --ssl --ocsp-stapling=off --enable-free-mon=on -j$(grep -c ^processor /proc/cpuinfo)
     test_flags: >-
       --mongodSetParameters="{internalQueryEnableSlotBasedExecutionEngine: true}"
+      --additionalFeatureFlags=featureFlagSbePlanCache
       --excludeWithAnyTags=requires_fast_memory,requires_ocsp_stapling
     multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
@@ -11273,6 +11275,7 @@ buildvariants:
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --sanitize=undefined --ssl --ocsp-stapling=off --enable-free-mon=on -j$(grep -c ^processor /proc/cpuinfo)
     test_flags: >-
       --mongodSetParameters="{internalQueryEnableSlotBasedExecutionEngine: true}"
+      --additionalFeatureFlags=featureFlagSbePlanCache
       --excludeWithAnyTags=requires_ocsp_stapling
     multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
@@ -11816,7 +11819,7 @@ buildvariants:
     max_sub_suites: 3
     test_flags: >-
       --mongodSetParameters="{internalQueryEnableSlotBasedExecutionEngine: true}"
-      --additionalFeatureFlags=featureFlagTimeseriesCollection
+      --additionalFeatureFlags=featureFlagTimeseriesCollection,featureFlagSbePlanCache
       --excludeWithAnyTags=resource_intensive
 
 # Intentionally derive from SBE to run the SBE tests with all feature flags.

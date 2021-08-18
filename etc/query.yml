@@ -7263,7 +7263,7 @@ buildvariants:
     num_scons_link_jobs_available: 0.99
     test_flags: >-
       --mongodSetParameters="{internalQueryEnableSlotBasedExecutionEngine: true}"
-      --additionalFeatureFlags=featureFlagTimeseriesCollection
+      --additionalFeatureFlags=featureFlagTimeseriesCollection,featureFlagSbePlanCache
   tasks:
     - name: compile_and_archive_dist_test_TG
       distros:
