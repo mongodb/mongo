@@ -2613,14 +2613,14 @@ functions:
             --verbose                                        \
             --userHost $USER@$private_ip_address             \
             --sshConnectionOptions "$ssh_connection_options" \
-            --retries ${ssh_retries|0}                       \
+            --access_retry_count ${ssh_retries|0}            \
             --commands "$cmd"
           $python buildscripts/remote_operations.py          \
             --verbose                                        \
             --userHost $USER@$private_ip_address             \
             --operation "copy_from"                          \
             --sshConnectionOptions "$ssh_connection_options" \
-            --retries ${ssh_retries|0}                       \
+            --access_retry_count ${ssh_retries|0}            \
             --file ec2_monitor_files.tgz
           sleep 30
         done
@@ -2686,7 +2686,7 @@ functions:
             --userHost $USER@${private_ip_address}           \
             --operation "copy_to"                            \
             --sshConnectionOptions "$ssh_connection_options" \
-            --retries ${ssh_retries|0}                       \
+            --access_retry_count ${ssh_retries|0}            \
             --file buildscripts/mount_drives.sh
 
     - command: shell.exec
@@ -2723,7 +2723,7 @@ functions:
             --verbose                                        \
             --userHost $USER@${private_ip_address}           \
             --sshConnectionOptions "$ssh_connection_options" \
-            --retries ${ssh_retries|0}                       \
+            --access_retry_count ${ssh_retries|0}            \
             --commands "$cmds"
 
     - command: shell.exec
@@ -2750,7 +2750,7 @@ functions:
             --verbose                                        \
             --userHost $USER@${private_ip_address}           \
             --sshConnectionOptions "$ssh_connection_options" \
-            --retries ${ssh_retries|0}                       \
+            --access_retry_count ${ssh_retries|0}            \
             --commands "$cmds"
 
     - command: shell.exec
@@ -2773,7 +2773,7 @@ functions:
             --userHost $USER@${private_ip_address}           \
             --operation "copy_to"                            \
             --sshConnectionOptions "$ssh_connection_options" \
-            --retries ${ssh_retries|0}                       \
+            --access_retry_count ${ssh_retries|0}            \
             $file_param                                      \
             --remoteDir ${remote_dir}
 
@@ -2797,7 +2797,7 @@ functions:
             --verbose                                        \
             --userHost $USER@${private_ip_address}           \
             --sshConnectionOptions "$ssh_connection_options" \
-            --retries ${ssh_retries|0}                       \
+            --access_retry_count ${ssh_retries|0}            \
             --commands "$cmds"
 
     - command: shell.exec
@@ -2835,7 +2835,7 @@ functions:
             --verbose                                        \
             --userHost $USER@${private_ip_address}           \
             --sshConnectionOptions "$ssh_connection_options" \
-            --retries ${ssh_retries|0}                       \
+            --access_retry_count ${ssh_retries|0}            \
             --commands "$cmds"
 
     - command: shell.exec
@@ -2860,7 +2860,7 @@ functions:
             --verbose                                        \
             --userHost $USER@${private_ip_address}           \
             --sshConnectionOptions "$ssh_connection_options" \
-            --retries ${ssh_retries|3}                       \
+            --access_retry_count ${ssh_retries|3}            \
             --commands "$cmds"
 
     - command: shell.exec
@@ -2902,7 +2902,8 @@ functions:
             --verbose                                        \
             --userHost $USER@${private_ip_address}           \
             --sshConnectionOptions "$ssh_connection_options" \
-            --retries ${ssh_retries|0}                       \
+            --op_retry_count 2                               \
+            --access_retry_count ${ssh_retries|0}            \
             --commands "$cmds"
 
     - command: shell.exec
@@ -2973,7 +2974,7 @@ functions:
               --verbose                                        \
               --userHost $USER@${private_ip_address}           \
               --sshConnectionOptions "$ssh_connection_options" \
-              --retries ${ssh_retries|0}                       \
+              --access_retry_count ${ssh_retries|0}            \
               --commands "$cmds"
           fi
 
@@ -2996,7 +2997,7 @@ functions:
             --verbose                                        \
             --userHost $USER@${private_ip_address}           \
             --sshConnectionOptions "$ssh_connection_options" \
-            --retries ${ssh_retries|0}                       \
+            --access_retry_count ${ssh_retries|0}            \
             --commands "$cmds"
 
     - *copy_ec2_monitor_files
@@ -3049,7 +3050,7 @@ functions:
           --verbose                                        \
           --userHost $USER@${private_ip_address}           \
           --sshConnectionOptions "$ssh_connection_options" \
-          --retries ${ssh_retries|0}                       \
+          --access_retry_count ${ssh_retries|0}            \
           --commands "$cmd"
 
   "copy EC2 artifacts": &copy_ec2_artifacts
@@ -3069,7 +3070,7 @@ functions:
           --userHost $USER@${private_ip_address}           \
           --operation "copy_from"                          \
           --sshConnectionOptions "$ssh_connection_options" \
-          --retries ${ssh_retries|0}                       \
+          --access_retry_count ${ssh_retries|0}            \
           --file ec2_artifacts.tgz
 
   "cleanup EC2 instance": &cleanup_ec2_instance
@@ -3113,7 +3114,7 @@ functions:
           --verbose                                        \
           --userHost $USER@${private_ip_address}           \
           --sshConnectionOptions "$ssh_connection_options" \
-          --retries ${ssh_retries|0}                       \
+          --access_retry_count ${ssh_retries|0}            \
           --commands "$cmds"
 
   "gather remote mongo coredumps": &gather_remote_mongo_coredumps
@@ -3140,7 +3141,7 @@ functions:
           --verbose                                        \
           --userHost $USER@${private_ip_address}           \
           --sshConnectionOptions "$ssh_connection_options" \
-          --retries ${ssh_retries}                         \
+          --access_retry_count ${ssh_retries}              \
           --commands "$cmds"                               \
           --commandDir $remote_dir
 
@@ -3161,7 +3162,7 @@ functions:
           --userHost $USER@${private_ip_address}           \
           --operation "copy_from"                          \
           --sshConnectionOptions "$ssh_connection_options" \
-          --retries ${ssh_retries}                         \
+          --access_retry_count ${ssh_retries}              \
           --file "$remote_dir/*.core"                      \
           --file "$remote_dir/*.mdmp"
         # Since both type of core files do not exist on the same host, this command
@@ -3629,7 +3630,7 @@ functions:
               --userHost $USER@${private_ip_address}           \
               --operation "copy_to"                            \
               --sshConnectionOptions "$ssh_connection_options" \
-              --retries ${ssh_retries}                         \
+              --access_retry_count ${ssh_retries}              \
               $file_param                                      \
               --remoteDir $remote_dir
           fi
@@ -3647,7 +3648,7 @@ functions:
             --verbose                                        \
             --userHost $USER@${private_ip_address}           \
             --sshConnectionOptions "$ssh_connection_options" \
-            --retries ${ssh_retries}                         \
+            --access_retry_count ${ssh_retries}              \
             --commands "$cmds"
 
           $python buildscripts/remote_operations.py          \
@@ -3655,7 +3656,7 @@ functions:
             --userHost $USER@${private_ip_address}           \
             --operation "copy_from"                          \
             --sshConnectionOptions "$ssh_connection_options" \
-            --retries ${ssh_retries}                         \
+            --access_retry_count ${ssh_retries}              \
             --file "$remote_dir/debugger*.*"                 \
             --file "$remote_dir/*.$core_ext"
         fi
