@@ -44,7 +44,6 @@
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/is_mongos.h"
 #include "mongo/s/mongod_and_mongos_server_parameters_gen.h"
@@ -74,6 +73,8 @@ const OperationContext::Decoration<bool> operationBlockedBehindCatalogCacheRefre
 
 }  // namespace
 
+AtomicWord<uint64_t> ComparableDatabaseVersion::_forcedRefreshSequenceNumSource{1ULL};
+
 CachedDatabaseInfo::CachedDatabaseInfo(DatabaseTypeValueHandle&& dbt) : _dbt(std::move(dbt)){};
 
 DatabaseType CachedDatabaseInfo::getDatabaseType() const {
@@ -90,6 +91,58 @@ bool CachedDatabaseInfo::shardingEnabled() const {
 
 DatabaseVersion CachedDatabaseInfo::databaseVersion() const {
     return _dbt->getVersion();
+}
+
+ComparableDatabaseVersion ComparableDatabaseVersion::makeComparableDatabaseVersion(
+    const boost::optional<DatabaseVersion>& version) {
+    return ComparableDatabaseVersion(version, _forcedRefreshSequenceNumSource.load());
+}
+
+ComparableDatabaseVersion
+ComparableDatabaseVersion::makeComparableDatabaseVersionForForcedRefresh() {
+    return ComparableDatabaseVersion(boost::none /* version */,
+                                     _forcedRefreshSequenceNumSource.addAndFetch(2) - 1);
+}
+
+void ComparableDatabaseVersion::setDatabaseVersion(const DatabaseVersion& version) {
+    _dbVersion = version;
+}
+
+BSONObj ComparableDatabaseVersion::toBSONForLogging() const {
+    BSONObjBuilder builder;
+    if (_dbVersion)
+        builder.append("dbVersion"_sd, _dbVersion->toBSON());
+    else
+        builder.append("dbVersion"_sd, "None");
+
+    builder.append("forcedRefreshSequenceNum"_sd, static_cast<int64_t>(_forcedRefreshSequenceNum));
+
+    return builder.obj();
+}
+
+bool ComparableDatabaseVersion::operator==(const ComparableDatabaseVersion& other) const {
+    if (_forcedRefreshSequenceNum != other._forcedRefreshSequenceNum)
+        return false;  // Values created on two sides of a forced refresh sequence number are always
+                       // considered different
+    if (_forcedRefreshSequenceNum == 0)
+        return true;  // Only default constructed values have _forcedRefreshSequenceNum == 0 and
+                      // they are always equal
+
+    // Relying on the boost::optional<DatabaseVersion>::operator== comparison
+    return _dbVersion == other._dbVersion;
+}
+
+bool ComparableDatabaseVersion::operator<(const ComparableDatabaseVersion& other) const {
+    if (_forcedRefreshSequenceNum < other._forcedRefreshSequenceNum)
+        return true;  // Values created on two sides of a forced refresh sequence number are always
+                      // considered different
+    if (_forcedRefreshSequenceNum > other._forcedRefreshSequenceNum)
+        return false;  // Values created on two sides of a forced refresh sequence number are always
+                       // considered different
+    if (_forcedRefreshSequenceNum == 0)
+        return false;  // Only default constructed values have _forcedRefreshSequenceNum == 0 and
+                       // they are always equal
+    return _dbVersion < other._dbVersion;
 }
 
 CatalogCache::CatalogCache(ServiceContext* const service, CatalogCacheLoader& cacheLoader)

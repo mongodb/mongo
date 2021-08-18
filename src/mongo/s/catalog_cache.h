@@ -43,6 +43,8 @@ namespace mongo {
 
 static constexpr int kMaxNumStaleVersionRetries = 10;
 
+class ComparableDatabaseVersion;
+
 using DatabaseTypeCache = ReadThroughCache<std::string, DatabaseType, ComparableDatabaseVersion>;
 using DatabaseTypeValueHandle = DatabaseTypeCache::ValueHandle;
 
@@ -66,6 +68,77 @@ private:
     CachedDatabaseInfo(DatabaseTypeValueHandle&& dbt);
 
     DatabaseTypeValueHandle _dbt;
+};
+
+/**
+ * This class wrap a DatabaseVersion object augmenting it with a sequence number to allow for forced
+ * catalog cache refreshes.
+ */
+class ComparableDatabaseVersion {
+public:
+    /**
+     * Creates a ComparableDatabaseVersion that wraps the given DatabaseVersion.
+     *
+     * If version is boost::none it creates a ComparableDatabaseVersion that doesn't have a valid
+     * DatabaseVersion. This is useful in some scenarios in which the DatabaseVersion is provided
+     * later through ComparableDatabaseVersion::setVersion.
+     */
+    static ComparableDatabaseVersion makeComparableDatabaseVersion(
+        const boost::optional<DatabaseVersion>& version);
+
+    /**
+     * Creates a new instance which will artificially be greater than any
+     * previously created ComparableDatabaseVersion and smaller than any instance
+     * created afterwards. Used as means to cause the collections cache to
+     * attempt a refresh in situations where causal consistency cannot be
+     * inferred.
+     */
+    static ComparableDatabaseVersion makeComparableDatabaseVersionForForcedRefresh();
+
+    /**
+     * Empty constructor needed by the ReadThroughCache.
+     *
+     * Instances created through this constructor will be always less than the ones created through
+     * the static constructor.
+     */
+    ComparableDatabaseVersion() = default;
+
+    BSONObj toBSONForLogging() const;
+
+    bool operator==(const ComparableDatabaseVersion& other) const;
+
+    bool operator!=(const ComparableDatabaseVersion& other) const {
+        return !(*this == other);
+    }
+
+    bool operator<(const ComparableDatabaseVersion& other) const;
+
+    bool operator>(const ComparableDatabaseVersion& other) const {
+        return other < *this;
+    }
+
+    bool operator<=(const ComparableDatabaseVersion& other) const {
+        return !(*this > other);
+    }
+
+    bool operator>=(const ComparableDatabaseVersion& other) const {
+        return !(*this < other);
+    }
+
+private:
+    friend class CatalogCache;
+
+    static AtomicWord<uint64_t> _forcedRefreshSequenceNumSource;
+
+    ComparableDatabaseVersion(boost::optional<DatabaseVersion> version,
+                              uint64_t forcedRefreshSequenceNum)
+        : _dbVersion(std::move(version)), _forcedRefreshSequenceNum(forcedRefreshSequenceNum) {}
+
+    void setDatabaseVersion(const DatabaseVersion& version);
+
+    boost::optional<DatabaseVersion> _dbVersion;
+
+    uint64_t _forcedRefreshSequenceNum{0};
 };
 
 /**

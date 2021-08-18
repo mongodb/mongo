@@ -67,21 +67,9 @@ void onDbVersionMismatch(OperationContext* opCtx,
 
     invariant(ShardingState::get(opCtx)->canAcceptShardedCommands());
 
-    if (serverDbVersion) {
-        // Do not reorder these two statements! if the comparison is done through epochs, the
-        // construction order matters: we are pessimistically assuming that the client version
-        // is newer when they have different uuids
-        const ComparableDatabaseVersion comparableServerDbVersion =
-            ComparableDatabaseVersion::makeComparableDatabaseVersion(*serverDbVersion);
-        const ComparableDatabaseVersion comparableClientDbVersion =
-            ComparableDatabaseVersion::makeComparableDatabaseVersion(clientDbVersion);
-
-        if (comparableClientDbVersion < comparableServerDbVersion ||
-            (comparableClientDbVersion == comparableServerDbVersion &&
-             clientDbVersion.getTimestamp() == serverDbVersion->getTimestamp())) {
-            // The client was stale; do not trigger server-side refresh.
-            return;
-        }
+    if (clientDbVersion <= serverDbVersion) {
+        // The client was stale; do not trigger server-side refresh.
+        return;
     }
 
     // Ensure any ongoing movePrimary's have completed before trying to do the refresh. This wait is
@@ -553,27 +541,15 @@ void forceDatabaseRefresh(OperationContext* opCtx, const StringData dbName) {
         auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
 
         const auto cachedDbVersion = dss->getDbVersion(opCtx, dssLock);
-        if (cachedDbVersion) {
-            // Do not reorder these two statements! if the comparison is done through epochs, the
-            // construction order matters: we are pessimistically assuming that the refreshed
-            // version is newer when they have different uuids
-            const ComparableDatabaseVersion comparableCachedDbVersion =
-                ComparableDatabaseVersion::makeComparableDatabaseVersion(*cachedDbVersion);
-            const ComparableDatabaseVersion comparableRefreshedDbVersion =
-                ComparableDatabaseVersion::makeComparableDatabaseVersion(refreshedDBVersion);
-
-            if (comparableRefreshedDbVersion < comparableCachedDbVersion ||
-                (comparableRefreshedDbVersion == comparableCachedDbVersion &&
-                 cachedDbVersion->getTimestamp() == refreshedDBVersion.getTimestamp())) {
-                LOGV2_DEBUG(5369130,
-                            2,
-                            "Skipping updating cached database info from refreshed version "
-                            "because the one currently cached is more recent",
-                            "db"_attr = dbName,
-                            "refreshedDbVersion"_attr = refreshedDbInfo.databaseVersion(),
-                            "cachedDbVersion"_attr = cachedDbVersion.get());
-                return;
-            }
+        if (cachedDbVersion >= refreshedDBVersion) {
+            LOGV2_DEBUG(5369130,
+                        2,
+                        "Skipping updating cached database info from refreshed version "
+                        "because the one currently cached is more recent",
+                        "db"_attr = dbName,
+                        "refreshedDbVersion"_attr = refreshedDbInfo.databaseVersion(),
+                        "cachedDbVersion"_attr = cachedDbVersion.get());
+            return;
         }
     }
 

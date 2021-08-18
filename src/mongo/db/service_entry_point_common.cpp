@@ -1576,14 +1576,14 @@ Future<void> ExecCommandDatabase::_commandExec() {
                 !_refreshedDatabase) {
                 auto sce = s.extraInfo<StaleDbRoutingVersion>();
                 invariant(sce);
-                // TODO SERVER-59177 refresh only if wantedVersion is empty or less then
-                // received
-                const auto refreshed = _execContext->behaviors->refreshDatabase(opCtx, *sce);
-                if (refreshed) {
-                    _refreshedDatabase = true;
-                    if (!opCtx->isContinuingMultiDocumentTransaction()) {
-                        _resetLockerStateAfterShardingUpdate(opCtx);
-                        return _commandExec();
+                if (sce->getVersionWanted() < sce->getVersionReceived()) {
+                    const auto refreshed = _execContext->behaviors->refreshDatabase(opCtx, *sce);
+                    if (refreshed) {
+                        _refreshedDatabase = true;
+                        if (!opCtx->isContinuingMultiDocumentTransaction()) {
+                            _resetLockerStateAfterShardingUpdate(opCtx);
+                            return _commandExec();
+                        }
                     }
                 }
             }

@@ -33,9 +33,6 @@
 
 namespace mongo {
 
-AtomicWord<uint64_t> ComparableDatabaseVersion::_uuidDisambiguatingSequenceNumSource{1ULL};
-AtomicWord<uint64_t> ComparableDatabaseVersion::_forcedRefreshSequenceNumSource{1ULL};
-
 DatabaseVersion DatabaseVersion::makeFixed() {
     DatabaseVersion dbVersion(UUID::gen(), Timestamp());
     dbVersion.setLastMod(0);
@@ -47,76 +44,12 @@ DatabaseVersion DatabaseVersion::makeUpdated() const {
     return newVersion;
 }
 
-ComparableDatabaseVersion ComparableDatabaseVersion::makeComparableDatabaseVersion(
-    const boost::optional<DatabaseVersion>& version) {
-    return ComparableDatabaseVersion(version,
-                                     _uuidDisambiguatingSequenceNumSource.fetchAndAdd(1),
-                                     _forcedRefreshSequenceNumSource.load());
-}
-
-ComparableDatabaseVersion
-ComparableDatabaseVersion::makeComparableDatabaseVersionForForcedRefresh() {
-    return ComparableDatabaseVersion(boost::none /* version */,
-                                     _uuidDisambiguatingSequenceNumSource.fetchAndAdd(1),
-                                     _forcedRefreshSequenceNumSource.addAndFetch(2) - 1);
-}
-
-void ComparableDatabaseVersion::setDatabaseVersion(const DatabaseVersion& version) {
-    _dbVersion = version;
-}
-
-BSONObj ComparableDatabaseVersion::toBSONForLogging() const {
-    BSONObjBuilder builder;
-    if (_dbVersion)
-        builder.append("dbVersion"_sd, _dbVersion->toBSON());
-    else
-        builder.append("dbVersion"_sd, "None");
-
-    builder.append("uuidDisambiguatingSequenceNum"_sd,
-                   static_cast<int64_t>(_uuidDisambiguatingSequenceNum));
-
-    builder.append("forcedRefreshSequenceNum"_sd, static_cast<int64_t>(_forcedRefreshSequenceNum));
-
-    return builder.obj();
-}
-
-bool ComparableDatabaseVersion::operator==(const ComparableDatabaseVersion& other) const {
-    if (_forcedRefreshSequenceNum != other._forcedRefreshSequenceNum)
-        return false;  // Values created on two sides of a forced refresh sequence number are always
-                       // considered different
-    if (_forcedRefreshSequenceNum == 0)
-        return true;  // Only default constructed values have _forcedRefreshSequenceNum == 0 and
-                      // they are always equal
-
-    // Relying on the boost::optional<DatabaseVersion>::operator== comparison
-    return _dbVersion == other._dbVersion;
-}
-
-bool ComparableDatabaseVersion::operator<(const ComparableDatabaseVersion& other) const {
-    if (_forcedRefreshSequenceNum < other._forcedRefreshSequenceNum)
-        return true;  // Values created on two sides of a forced refresh sequence number are always
-                      // considered different
-    if (_forcedRefreshSequenceNum > other._forcedRefreshSequenceNum)
-        return false;  // Values created on two sides of a forced refresh sequence number are always
-                       // considered different
-    if (_forcedRefreshSequenceNum == 0)
-        return false;  // Only default constructed values have _forcedRefreshSequenceNum == 0 and
-                       // they are always equal
-
-    // 1. If both versions are valid
-    // 1.1. If both timestamps are the same -> rely on lastMod to define the order
-    // 1.2. Otherwise  -> rely on the timestamps' values to define order
-    // 2. Any other scenario -> rely on disambiguating sequence number
-    if (_dbVersion && other._dbVersion) {
-        const auto timestamp = _dbVersion->getTimestamp();
-        const auto otherTimestamp = other._dbVersion->getTimestamp();
-        if (timestamp == otherTimestamp)
-            return _dbVersion->getLastMod() < other._dbVersion->getLastMod();
-        else
-            return timestamp < otherTimestamp;
+bool DatabaseVersion::operator<(const DatabaseVersion& other) const {
+    if (getTimestamp() == other.getTimestamp()) {
+        return getLastMod() < other.getLastMod();
+    } else {
+        return getTimestamp() < other.getTimestamp();
     }
-
-    return _uuidDisambiguatingSequenceNum < other._uuidDisambiguatingSequenceNum;
 }
 
 }  // namespace mongo
