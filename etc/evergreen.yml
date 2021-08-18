@@ -8370,7 +8370,7 @@ buildvariants:
     distros:
     - rhel62-small
 
-- name: enterprise-rhel-62-64-bit-store_fam_images_in_side_coll
+- name: enterprise-rhel-62-64-bit-store-fam-images-in-side-coll
   display_name: "Enterprise RHEL 6.2 (storeFindAndModifyImagesInSideCollection=True)"
   modules:
   - enterprise
@@ -8404,11 +8404,6 @@ buildvariants:
     distros:
     - rhel62-large
   - name: compile_benchmarks
-    distros:
-    - rhel62-large
-  - name: lint
-  - name: lint_fuzzer_sanity_patch
-  - name: burn_in_tests
     distros:
     - rhel62-large
   - name: rollback_fuzzer_gen
