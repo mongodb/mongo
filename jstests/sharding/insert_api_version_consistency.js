@@ -13,9 +13,9 @@ const DOC = {
     x05: {
         x00: BinData(0, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA"),
         x01: BinData(1, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA"),
-        x02: BinData(2, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA"),
-        x03: BinData(3, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA"),
-        x04: BinData(4, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA"),
+        x02: BinData(2, "KwAAAFRoZSBxdWljayBicm93biBmb3gganVtcHMgb3ZlciB0aGUgbGF6eSBkb2c="),
+        x03: BinData(3, "OEJTfmD8twzaj/LPKLIVkA=="),
+        x04: BinData(4, "OEJTfmD8twzaj/LPKLIVkA=="),
         x05: BinData(5, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA"),
         x06: BinData(6, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA"),
     },
@@ -54,9 +54,10 @@ let test = function(db) {
 
     assert.eq(val.x05.x00, BinData(0, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA"));
     assert.eq(val.x05.x01, BinData(1, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA"));
-    assert.eq(val.x05.x02, BinData(2, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA"));
-    assert.eq(val.x05.x03, BinData(3, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA"));
-    assert.eq(val.x05.x04, BinData(4, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA"));
+    assert.eq(val.x05.x02,
+              BinData(2, "KwAAAFRoZSBxdWljayBicm93biBmb3gganVtcHMgb3ZlciB0aGUgbGF6eSBkb2c="));
+    assert.eq(val.x05.x03, BinData(3, "OEJTfmD8twzaj/LPKLIVkA=="));
+    assert.eq(val.x05.x04, BinData(4, "OEJTfmD8twzaj/LPKLIVkA=="));
     assert.eq(val.x05.x05, BinData(5, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA"));
     assert.eq(val.x05.x06, BinData(6, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA"));
 

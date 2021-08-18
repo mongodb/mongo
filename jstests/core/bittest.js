@@ -195,18 +195,15 @@ assert.commandWorked(coll.insert({a: BinData(0, "JA4A8gAxqTwciCuF5GGzAA==")}));
 assert.commandWorked(coll.insert({a: BinData(1, "JA4A8gAxqTwciCuF5GGzAA==")}));
 assert.commandWorked(
     coll.insert({a: BinData(0, "VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw==")}));
-assert.commandWorked(
-    coll.insert({a: BinData(2, "VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw==")}));
+assert.commandWorked(coll.insert({a: BinData(2, "BAAAADEyMzQ=")}));
 
 assertQueryCorrect({a: {$bitsAllSet: BinData(0, "ZG9n")}}, 1);
 assertQueryCorrect({a: {$bitsAllSet: BinData(0, "JA4A8gAxqTwciCuF5GGzAA==")}}, 2);
-assertQueryCorrect({a: {$bitsAllSet: BinData(2, "JA4A8gAxqTwciCuF5GGzAA==")}}, 2);
+assertQueryCorrect({a: {$bitsAllSet: BinData(2, "BAAAADEyMzQ=")}}, 1);
 assertQueryCorrect(
     {a: {$bitsAllSet: BinData(0, "VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw==")}},
-    2);
-assertQueryCorrect(
-    {a: {$bitsAllSet: BinData(2, "VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw==")}},
-    2);
+    1);
+assertQueryCorrect({a: {$bitsAllSet: BinData(2, "BAAAADEyMzQ=")}}, 1);
 assertQueryCorrect({a: {$bitsAllClear: BinData(0, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA")}}, 5);
 assertQueryCorrect({a: {$bitsAllClear: BinData(0, "JA4A8gAxqTwciCuF5GGzAA==")}}, 0);
 assertQueryCorrect({a: {$bitsAnySet: BinData(0, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA")}}, 0);
@@ -215,7 +212,7 @@ assertQueryCorrect({a: {$bitsAnyClear: BinData(0, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 assertQueryCorrect({
     a: {$bitsAnyClear: BinData(0, "VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw==")}
 },
-                   3);
+                   4);
 
 assert(coll.drop());
 })();

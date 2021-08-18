@@ -21,7 +21,7 @@ const docs = [
     {a: BinData(0, "JA4A8gAxqTwciCuF5GGzAA==")},
     {a: BinData(1, "JA4A8gAxqTwciCuF5GGzAA==")},
     {a: BinData(0, "VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw==")},
-    {a: BinData(2, "VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw==")}
+    {a: BinData(2, "KwAAAFRoZSBxdWljayBicm93biBmb3gganVtcHMgb3ZlciB0aGUgbGF6eSBkb2c=")}
 ];
 assert.commandWorked(coll.insert(docs));
 
@@ -35,23 +35,23 @@ testEqOnlyBinData(0, "ZG9n", 1);
 testEqOnlyBinData(0, "JA4A8gAxqTwciCuF5GGzAA==", 1);
 testEqOnlyBinData(1, "JA4A8gAxqTwciCuF5GGzAA==", 1);
 testEqOnlyBinData(0, "VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw==", 1);
-testEqOnlyBinData(2, "VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw==", 1);
+testEqOnlyBinData(2, "KwAAAFRoZSBxdWljayBicm93biBmb3gganVtcHMgb3ZlciB0aGUgbGF6eSBkb2c=", 1);
 
 // Test BinData records with different subtypes.
 const docs2 = [
     {a: BinData(1, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA")},
-    {a: BinData(2, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA")},
-    {a: BinData(3, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA")},
-    {a: BinData(4, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA")},
+    {a: BinData(2, "KwAAAFRoZSBxdWljayBicm93biBmb3gganVtcHMgb3ZlciB0aGUgbGF6eSBkb2c=")},
+    {a: BinData(3, "OEJTfmD8twzaj/LPKLIVkA==")},
+    {a: BinData(4, "OEJTfmD8twzaj/LPKLIVkA==")},
     {a: BinData(5, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA")},
     {a: BinData(6, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA")},
 ];
 assert.commandWorked(coll.insert(docs2));
 
 testEqOnlyBinData(1, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA", 1);
-testEqOnlyBinData(2, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA", 1);
-testEqOnlyBinData(3, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA", 1);
-testEqOnlyBinData(4, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA", 1);
+testEqOnlyBinData(2, "KwAAAFRoZSBxdWljayBicm93biBmb3gganVtcHMgb3ZlciB0aGUgbGF6eSBkb2c=", 2);
+testEqOnlyBinData(3, "OEJTfmD8twzaj/LPKLIVkA==", 1);
+testEqOnlyBinData(4, "OEJTfmD8twzaj/LPKLIVkA==", 1);
 testEqOnlyBinData(5, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA", 1);
 testEqOnlyBinData(6, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA", 1);
 

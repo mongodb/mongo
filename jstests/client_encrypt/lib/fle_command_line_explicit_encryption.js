@@ -28,7 +28,7 @@ const passTestCases = [
     UUID(),
     ISODate(),
     new Date('December 17, 1995 03:24:00'),
-    BinData(2, '1234'),
+    BinData(0, '1234'),
     new Timestamp(1, 2),
     new ObjectId(),
     new DBPointer("mongo", new ObjectId()),

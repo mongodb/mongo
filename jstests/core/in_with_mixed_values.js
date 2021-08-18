@@ -93,13 +93,13 @@ docs = [
     {x: NaN},
     {x: BinData(0, "AAA=")},
     {x: BinData(1, "AAA=")},
-    {x: BinData(2, "AAA=")},
+    {x: BinData(2, "KwAAAFRoZSBxdWljayBicm93biBmb3gganVtcHMgb3ZlciB0aGUgbGF6eSBkb2c=")},
     {x: BinData(0, "ZAA=")},
     {x: BinData(1, "ZAA=")},
-    {x: BinData(2, "ZAA=")},
+    {x: BinData(2, "KwAAAFRoZSBxdWljayBicm93biBmb3gganVtcHMgb3ZlciB0aGUgbGF6eSBkb2c=")},
     {x: BinData(0, "VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw==")},
     {x: BinData(1, "VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw==")},
-    {x: BinData(2, "VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw==")},
+    {x: BinData(2, "KwAAAFRoZSBxdWljayBicm93biBmb3gganVtcHMgb3ZlciB0aGUgbGF6eSBkb2c=")},
 ];
 assert.commandWorked(coll.insert(docs));
 
