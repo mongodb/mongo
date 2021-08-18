@@ -177,13 +177,7 @@ void ReplSetHeartbeatArgsV1::addToBSON(BSONObjBuilder* builder) const {
     builder->append(kSenderHostFieldName, _hasSender ? _senderHost.toString() : "");
     builder->appendNumber(kSenderIdFieldName, _senderId);
     builder->appendNumber(kTermFieldName, _term);
-
-    // TODO SERVER-49382: Remove this FCV check when 5.0 becomes last-lts.
-    if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
-            ServerGlobalParams::FeatureCompatibility::Version::kVersion47)) {
-        builder->append(kPrimaryIdFieldName, _primaryId);
-    }
+    builder->append(kPrimaryIdFieldName, _primaryId);
 }
 
 }  // namespace repl
