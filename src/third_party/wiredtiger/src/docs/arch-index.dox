@@ -139,6 +139,10 @@ make up in-memory Btrees and subordinate data structures.
 
 A checkpoint is created by WiredTiger to serve as a point from which it can recover.
 
+@subpage arch-connection
+
+A connection is a handle to a WiredTiger database instance.
+
 @subpage arch-cursor
 
 Cursors are used to get and modify data.
