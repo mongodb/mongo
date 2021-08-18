@@ -32,11 +32,12 @@
 #include "mongo/platform/basic.h"
 
 #include <bcrypt.h>
+#include <limits>
 #include <memory>
 #include <vector>
 
-#include "mongo/base/secure_allocator.h"
 #include "mongo/base/status.h"
+#include "mongo/crypto/block_packer.h"
 #include "mongo/crypto/symmetric_crypto.h"
 #include "mongo/crypto/symmetric_key.h"
 #include "mongo/platform/shared_library.h"
@@ -75,6 +76,7 @@ std::string statusWithDescription(NTSTATUS status) {
 struct AlgoInfo {
     BCRYPT_ALG_HANDLE algo;
     DWORD keyBlobSize;
+    DWORD blockLength;
 };
 
 /**
@@ -84,6 +86,7 @@ class BCryptCryptoLoader {
 public:
     BCryptCryptoLoader() {
         loadAlgo(_algoAESCBC, BCRYPT_AES_ALGORITHM, BCRYPT_CHAIN_MODE_CBC);
+        loadAlgo(_algoAESGCM, BCRYPT_AES_ALGORITHM, BCRYPT_CHAIN_MODE_GCM);
 
         auto status =
             ::BCryptOpenAlgorithmProvider(&_random, BCRYPT_RNG_ALGORITHM, MS_PRIMITIVE_PROVIDER, 0);
@@ -92,6 +95,7 @@ public:
 
     ~BCryptCryptoLoader() {
         invariant(BCryptCloseAlgorithmProvider(_algoAESCBC.algo, 0) == STATUS_SUCCESS);
+        invariant(BCryptCloseAlgorithmProvider(_algoAESGCM.algo, 0) == STATUS_SUCCESS);
         invariant(BCryptCloseAlgorithmProvider(_random, 0) == STATUS_SUCCESS);
     }
 
@@ -99,6 +103,8 @@ public:
         switch (mode) {
             case aesMode::cbc:
                 return _algoAESCBC;
+            case aesMode::gcm:
+                return _algoAESGCM;
             default:
                 MONGO_UNREACHABLE;
         }
@@ -128,10 +134,20 @@ private:
                                    &cbOutput,
                                    0);
         invariant(status == STATUS_SUCCESS);
+
+        cbOutput = sizeof(algo.blockLength);
+        status = BCryptGetProperty(algo.algo,
+                                   BCRYPT_BLOCK_LENGTH,
+                                   reinterpret_cast<PUCHAR>(&algo.blockLength),
+                                   cbOutput,
+                                   &cbOutput,
+                                   0);
+        invariant(status == STATUS_SUCCESS);
     }
 
 private:
     AlgoInfo _algoAESCBC;
+    AlgoInfo _algoAESGCM;
     BCRYPT_ALG_HANDLE _random;
 };
 
@@ -150,9 +166,37 @@ public:
         : _keyHandle(INVALID_HANDLE_VALUE), _mode(mode) {
         AlgoInfo& algo = getBCryptCryptoLoader().getAlgo(mode);
 
-
         // Initialize key storage buffers
         _keyObjectBuf->resize(algo.keyBlobSize);
+
+        if (mode == aesMode::cbc) {
+            std::copy(iv, iv + ivLen, std::back_inserter(_iv));
+        } else if (mode == aesMode::gcm) {
+            // In GCM mode, the _iv argument to BCrypt{Encrypt,Decrypt} is used
+            // only for scratch storage. The real IV is loaded into the padding info.
+            // GCM supports multiple valid IV lengths. The padding info must contain
+            // an IV of the length we wish to use. The _iv object must provide enough
+            // storage to contain the largest possible IV. This size can be acquired
+            // from the algorithm's BCRYPT_BLOCK_LENGTH property.
+            _iv = std::vector<unsigned char>(algo.blockLength);
+            std::copy(iv, iv + ivLen, std::back_inserter(_paddingNonce));
+
+            _paddingInfo = std::make_unique<BCRYPT_AUTHENTICATED_CIPHER_MODE_INFO>();
+            BCRYPT_INIT_AUTH_MODE_INFO(*_paddingInfo);
+            _paddingInfo->pbNonce = _paddingNonce.data();
+            _paddingInfo->cbNonce = _paddingNonce.size();
+
+            _paddingInfo->pbAuthData = NULL;
+            _paddingInfo->cbAuthData = 0;
+
+            _paddingInfo->pbTag = _tag.data();
+            _paddingInfo->cbTag = _tag.size();
+            _paddingInfo->pbMacContext = _macContext.data();
+            _paddingInfo->cbMacContext = _macContext.size();
+            _paddingInfo->cbAAD = 0;
+            _paddingInfo->cbData = 0;
+            _paddingInfo->dwFlags = BCRYPT_AUTH_MODE_CHAIN_CALLS_FLAG;
+        }
 
         SecureVector<unsigned char> keyBlob;
         keyBlob->reserve(sizeof(BCRYPT_KEY_DATA_BLOB_HEADER) + key.getKeySize());
@@ -180,8 +224,6 @@ public:
         uassert(ErrorCodes::OperationFailed,
                 str::stream() << "ImportKey failed: " << statusWithDescription(status),
                 status == STATUS_SUCCESS);
-
-        std::copy(iv, iv + ivLen, std::back_inserter(_iv));
     }
 
     ~SymmetricImplWindows() {
@@ -190,21 +232,25 @@ public:
         }
     }
 
-    Status addAuthenticatedData(const uint8_t* in, size_t inLen) final {
-        fassert(51127, inLen == 0);
-        return Status::OK();
-    }
-
 protected:
     const aesMode _mode;
 
     // Buffers for key data
     BCRYPT_KEY_HANDLE _keyHandle;
+    std::unique_ptr<BCRYPT_AUTHENTICATED_CIPHER_MODE_INFO> _paddingInfo;
 
     SecureVector<unsigned char> _keyObjectBuf;
 
-    // Buffer for CBC data
+    // Buffer for CBC IV, also reused for block chaining
     std::vector<unsigned char> _iv;
+
+    // Buffer for GCM
+    std::vector<unsigned char> _paddingNonce;
+    std::array<unsigned char, 12> _tag;
+    std::array<unsigned char, 16> _macContext;
+
+
+    BlockPacker _packer;
 };
 
 /**
@@ -223,113 +269,108 @@ public:
                               aesMode mode,
                               const uint8_t* iv,
                               size_t ivLen)
-        : _blockData(_blockBuffer->data(), _blockBuffer->size()),
-          _blockCursor(_blockData),
-          SymmetricImplWindows<SymmetricEncryptor>(key, mode, iv, ivLen) {}
+        : SymmetricImplWindows<SymmetricEncryptor>(key, mode, iv, ivLen) {}
 
     StatusWith<size_t> update(const uint8_t* in, size_t inLen, uint8_t* out, size_t outLen) final {
-        ULONG blockBufferEncryptLen = 0;
-        ULONG inputEncryptLen = 0;
         ConstDataRange inData(in, inLen);
-        ConstDataRangeCursor inCursor(inData);
+        DataRangeCursor outCursor(out, outLen);
+        return _packer.pack(inData, [this, &outCursor](ConstDataRange inData) {
+            if (inData.length() > std::numeric_limits<ULONG>::max()) {
+                return StatusWith<size_t>{ErrorCodes::Overflow,
+                                          "Too many bytes provided for encryption"};
+            }
 
-        // If we have an incomplete block, we need to fill it before encrypting.
-        // If the total amount of input bytes will not fill the blockBuffer, just add it all to
-        // the buffer.
-        if (inLen < _blockCursor.length()) {
-            _blockCursor.writeAndAdvance(inCursor);
-            return 0;
-        } else if (_blockCursor.length() < _blockData.length() && _blockCursor.length() > 0) {
-            // Entering this code path means that we had data left over from the last time update
-            // was called. What we do below is fill the buffer with new input data until it is full.
-            // We then encrypt that buffer. We skip this step when the buffer is empty.
-            uint8_t bytesToFill = _blockCursor.length();
-            ConstDataRange bytesToFillRange(inCursor.data(), bytesToFill);
-            _blockCursor.writeAndAdvance(bytesToFillRange);
-            inCursor.advance(bytesToFill);
-            // We now encrypt the full buffer.
+            if (_paddingInfo) {
+                _paddingInfo->pbAuthData = NULL;
+                _paddingInfo->cbAuthData = 0;
+            }
+
+            ULONG bytesEncrypted = 0;
             NTSTATUS status = BCryptEncrypt(_keyHandle,
-                                            const_cast<PUCHAR>(_blockBuffer->data()),
-                                            _blockBuffer->size(),
-                                            NULL,
+                                            const_cast<PUCHAR>(inData.data<UCHAR>()),
+                                            inData.length(),
+                                            _paddingInfo.get(),
                                             _iv.data(),
                                             _iv.size(),
-                                            out,
-                                            outLen,
-                                            &blockBufferEncryptLen,
+                                            const_cast<PUCHAR>(outCursor.data<UCHAR>()),
+                                            outCursor.length(),
+                                            &bytesEncrypted,
                                             0);
             if (status != STATUS_SUCCESS) {
-                return Status{ErrorCodes::OperationFailed,
-                              str::stream() << "Encrypt failed: " << statusWithDescription(status)};
+                return StatusWith<size_t>{ErrorCodes::OperationFailed,
+                                          str::stream() << "Encrypt failed: "
+                                                        << statusWithDescription(status)};
             }
-            _blockCursor = DataRangeCursor(_blockData);
-        }
 
-        // we will attempt to encrypt as much of the remaining data as we can (i.e. the largest
-        // available size that is a multiple of the block length)
-        size_t remainingBytes = inCursor.length();
-        ULONG bytesToEncrypt = remainingBytes - (remainingBytes % aesBlockSize);
+            outCursor.advance(bytesEncrypted);
+            return StatusWith<size_t>(bytesEncrypted);
+        });
+    }
 
-        NTSTATUS status = BCryptEncrypt(_keyHandle,
-                                        const_cast<PUCHAR>(inCursor.data<UCHAR>()),
-                                        bytesToEncrypt,
-                                        NULL,
-                                        _iv.data(),
-                                        _iv.size(),
-                                        out + blockBufferEncryptLen,
-                                        outLen - blockBufferEncryptLen,
-                                        &inputEncryptLen,
-                                        0);
+    Status addAuthenticatedData(const uint8_t* in, size_t inLen) final {
+        fassert(5917500, _mode == aesMode::gcm);
+        ULONG len = 0;
+
+        _paddingInfo->pbAuthData = const_cast<uint8_t*>(in);
+        _paddingInfo->cbAuthData = inLen;
+
+        NTSTATUS status = BCryptEncrypt(
+            _keyHandle, NULL, 0, _paddingInfo.get(), _iv.data(), _iv.size(), NULL, 0, &len, 0);
+        invariant(0 == len);
+
+        _paddingInfo->pbAuthData = NULL;
+        _paddingInfo->cbAuthData = 0;
 
         if (status != STATUS_SUCCESS) {
             return Status{ErrorCodes::OperationFailed,
                           str::stream() << "Encrypt failed: " << statusWithDescription(status)};
         }
 
-        inCursor.advance(bytesToEncrypt);
 
-        // we now have to store what is left of the input in the block buffer
-        _blockCursor.writeAndAdvance(inCursor);
-
-        return static_cast<size_t>(blockBufferEncryptLen + inputEncryptLen);
+        return Status::OK();
     }
 
+
     StatusWith<size_t> finalize(uint8_t* out, size_t outLen) final {
+        if (_paddingInfo) {
+            _paddingInfo->dwFlags &= ~BCRYPT_AUTH_MODE_CHAIN_CALLS_FLAG;
+            _paddingInfo->pbAuthData = NULL;
+            _paddingInfo->cbAuthData = 0;
+        }
+
+        auto remainder = _packer.getBlock();
         // if there is any data left over in the block buffer, we will encrypt it with padding
         ULONG len = 0;
         NTSTATUS status = BCryptEncrypt(_keyHandle,
-                                        const_cast<PUCHAR>(_blockBuffer->data()),
-                                        _blockBuffer->size() - _blockCursor.length(),
-                                        NULL,
+                                        const_cast<PUCHAR>(remainder.data<UCHAR>()),
+                                        remainder.length(),
+                                        _paddingInfo.get(),
                                         _iv.data(),
                                         _iv.size(),
                                         out,
                                         outLen,
                                         &len,
-                                        BCRYPT_BLOCK_PADDING);
+                                        _mode == aesMode::cbc ? BCRYPT_BLOCK_PADDING : 0);
 
         if (status != STATUS_SUCCESS) {
             return Status{ErrorCodes::OperationFailed,
                           str::stream() << "Encrypt failed: " << statusWithDescription(status)};
         }
 
-        // we will now start a new block
-        _blockCursor = DataRangeCursor(_blockData);
-
         return static_cast<size_t>(len);
     }
 
     StatusWith<size_t> finalizeTag(uint8_t* out, size_t outLen) final {
-        // Not a tagged cipher mode, write nothing.
-        return 0;
-    }
+        if (_mode == aesMode::cbc) {
+            return 0;
+        }
 
-private:
-    // buffer to store a single block of data, to be encrypted by update when filled, or by finalize
-    // with padding. 16 is the block length for AES.
-    SecureAllocatorDefaultDomain::SecureHandle<std::array<uint8_t, aesBlockSize>> _blockBuffer;
-    DataRange _blockData;
-    DataRangeCursor _blockCursor;
+        ConstDataRange tag(_tag);
+        DataRange outRange(out, outLen);
+        DataRangeCursor outCursor(outRange);
+        outCursor.writeAndAdvance(tag);
+        return tag.length();
+    }
 };
 
 class SymmetricDecryptorWindows : public SymmetricImplWindows<SymmetricDecryptor> {
@@ -337,18 +378,85 @@ public:
     using SymmetricImplWindows::SymmetricImplWindows;
 
     StatusWith<size_t> update(const uint8_t* in, size_t inLen, uint8_t* out, size_t outLen) final {
+        ConstDataRange inData(in, inLen);
+        DataRangeCursor outCursor(out, outLen);
+        return _packer.pack(inData, [this, &outCursor](ConstDataRange inData) {
+            if (inData.length() > std::numeric_limits<ULONG>::max()) {
+                return StatusWith<size_t>{ErrorCodes::Overflow,
+                                          "Too many bytes provided for decryption"};
+            }
+
+            if (_paddingInfo) {
+                _paddingInfo->pbAuthData = NULL;
+                _paddingInfo->cbAuthData = 0;
+            }
+
+            ULONG bytesDecrypted = 0;
+            NTSTATUS status = BCryptDecrypt(_keyHandle,
+                                            const_cast<PUCHAR>(inData.data<UCHAR>()),
+                                            inData.length(),
+                                            _paddingInfo.get(),
+                                            _iv.data(),
+                                            _iv.size(),
+                                            const_cast<PUCHAR>(outCursor.data<UCHAR>()),
+                                            outCursor.length(),
+                                            &bytesDecrypted,
+                                            0);
+            if (status != STATUS_SUCCESS) {
+                return StatusWith<size_t>{ErrorCodes::OperationFailed,
+                                          str::stream() << "Decrypt failed: "
+                                                        << statusWithDescription(status)};
+            }
+
+            outCursor.advance(bytesDecrypted);
+            return StatusWith<size_t>(bytesDecrypted);
+        });
+    }
+
+    Status addAuthenticatedData(const uint8_t* in, size_t inLen) final {
+        fassert(8423310, _mode == aesMode::gcm);
         ULONG len = 0;
 
+        _paddingInfo->pbAuthData = const_cast<uint8_t*>(in);
+        _paddingInfo->cbAuthData = inLen;
+
+        NTSTATUS status = BCryptDecrypt(
+            _keyHandle, NULL, 0, _paddingInfo.get(), _iv.data(), _iv.size(), NULL, 0, &len, 0);
+        invariant(0 == len);
+
+        _paddingInfo->pbAuthData = NULL;
+        _paddingInfo->cbAuthData = 0;
+
+        if (status != STATUS_SUCCESS) {
+            return Status{ErrorCodes::OperationFailed,
+                          str::stream() << "Decrypt2 failed: " << statusWithDescription(status)};
+        }
+
+
+        return Status::OK();
+    }
+
+
+    StatusWith<size_t> finalize(uint8_t* out, size_t outLen) final {
+        ULONG len = 0;
+        if (_paddingInfo) {
+            _paddingInfo->dwFlags &= ~BCRYPT_AUTH_MODE_CHAIN_CALLS_FLAG;
+            _paddingInfo->pbAuthData = NULL;
+            _paddingInfo->cbAuthData = 0;
+        }
+
+        auto remainder = _packer.getBlock();
+
         NTSTATUS status = BCryptDecrypt(_keyHandle,
-                                        const_cast<PUCHAR>(in),
-                                        inLen,
-                                        NULL,
+                                        const_cast<PUCHAR>(remainder.data<UCHAR>()),
+                                        remainder.length(),
+                                        _paddingInfo.get(),
                                         _iv.data(),
                                         _iv.size(),
                                         out,
                                         outLen,
                                         &len,
-                                        BCRYPT_BLOCK_PADDING);
+                                        _mode == aesMode::cbc ? BCRYPT_BLOCK_PADDING : 0);
 
         if (status != STATUS_SUCCESS) {
             return Status{ErrorCodes::OperationFailed,
@@ -358,11 +466,15 @@ public:
         return static_cast<size_t>(len);
     }
 
-    StatusWith<size_t> finalize(uint8_t* out, size_t outLen) final {
-        return 0;
-    }
-
     Status updateTag(const uint8_t* tag, size_t tagLen) final {
+        if (_mode == aesMode::cbc) {
+            return Status::OK();
+        }
+
+        DataRange tagRange(_tag);
+        ConstDataRange providedRange(tag, tagLen);
+        DataRangeCursor tagCursor(tagRange);
+        tagCursor.writeAndAdvance(providedRange);
         return Status::OK();
     }
 };
@@ -370,7 +482,7 @@ public:
 }  // namespace
 
 std::set<std::string> getSupportedSymmetricAlgorithms() {
-    return {aes256CBCName};
+    return {aes256CBCName, aes256GCMName};
 }
 
 Status engineRandBytes(uint8_t* buffer, size_t len) {
@@ -388,11 +500,6 @@ StatusWith<std::unique_ptr<SymmetricEncryptor>> SymmetricEncryptor::create(const
                                                                            aesMode mode,
                                                                            const uint8_t* iv,
                                                                            size_t ivLen) {
-    if (mode != aesMode::cbc) {
-        return Status(ErrorCodes::UnsupportedFormat,
-                      "Native crypto on this platform only supports AES256-CBC");
-    }
-
     try {
         std::unique_ptr<SymmetricEncryptor> encryptor =
             std::make_unique<SymmetricEncryptorWindows>(key, mode, iv, ivLen);
@@ -406,11 +513,6 @@ StatusWith<std::unique_ptr<SymmetricDecryptor>> SymmetricDecryptor::create(const
                                                                            aesMode mode,
                                                                            const uint8_t* iv,
                                                                            size_t ivLen) {
-    if (mode != aesMode::cbc) {
-        return Status(ErrorCodes::UnsupportedFormat,
-                      "Native crypto on this platform only supports AES256-CBC");
-    }
-
     try {
         std::unique_ptr<SymmetricDecryptor> decryptor =
             std::make_unique<SymmetricDecryptorWindows>(key, mode, iv, ivLen);

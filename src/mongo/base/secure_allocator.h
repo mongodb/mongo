@@ -311,6 +311,9 @@ struct SecureAllocatorDomain {
 
     using SecureString =
         SecureHandle<std::basic_string<char, std::char_traits<char>, SecureAllocator<char>>>;
+
+    template <typename T, size_t N>
+    using SecureArray = SecureHandle<std::array<T, N>>;
 };
 
 struct SecureAllocatorDefaultDomainTrait {
@@ -331,5 +334,7 @@ using SecureAllocatorDefaultDomain = SecureAllocatorDomain<SecureAllocatorDefaul
 template <typename T>
 using SecureVector = SecureAllocatorDefaultDomain::SecureVector<T>;
 using SecureString = SecureAllocatorDefaultDomain::SecureString;
+template <typename T, size_t N>
+using SecureArray = SecureAllocatorDefaultDomain::SecureArray<T, N>;
 
 }  // namespace mongo

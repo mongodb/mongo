@@ -69,6 +69,21 @@ TEST(SecureAllocator, SecureString) {
     ASSERT_EQUALS(str2Ptr, &*str3);
 }
 
+TEST(SecureAllocator, SecureArray) {
+    SecureAllocatorDefaultDomain::SecureArray<uint8_t, 100> array1;
+    SecureArray<uint8_t, 100> array2;
+
+    (*array1)[0] = 1;
+    (*array2)[0] = 1;
+
+    ASSERT_EQUALS(100, array1->size());
+    ASSERT_EQUALS(100, array2->size());
+
+    ASSERT_NOT_EQUALS(array1->data(), array2->data());
+
+    ASSERT_EQUALS(*array1->data(), *array2->data());
+}
+
 // Verify that we can make a good number of secure objects.  Under the initial secure allocator
 // design (page per object), you couldn't make more than 8-50 objects before running out of lockable
 // pages.
