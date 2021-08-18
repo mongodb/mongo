@@ -61,6 +61,14 @@ std::unique_ptr<MatchExpression> buildOperationFilter(
 
     auto streamType = DocumentSourceChangeStream::getChangeStreamType(expCtx->ns);
 
+    /**
+     * IMPORTANT: Any new operationType added here must also have a corresponding rewrite in both
+     * the 'exprRewriteOperationType' and 'matchRewriteOperationType' functions, which can be found
+     * in the file change_stream_rewrite_helpers.cpp. Without a corresponding rewrite, the optimizer
+     * will assume that no event can pass a $match filter on the newly added operationType, causing
+     * it to erroneously discard events.
+     */
+
     // The standard event filter, before it is combined with the user filter, is as follows:
     //    {
     //      $or: [
@@ -68,10 +76,10 @@ std::unique_ptr<MatchExpression> buildOperationFilter(
     //        {ns: cmdNsRegex, op: "c", $or: [                // Commands on relevant DB(s)
     //          {"o.drop": collRegex},                        // Drops of relevant collection(s)
     //          {"o.renameCollection": nsRegex},              // Renames of relevant collection(s)
+    //          {"o.renameCollection": {$exists: true},       // Relevant collection was overwritten
+    //              "o.to": nsRegex},
     //          {"o.dropDatabase": {$exists: true}}           // Omitted for single-coll streams
-    //        ]},
-    //        // Renames from any other database or collection onto a relevant collection.
-    //        {op: "c", "o.renameCollection": {$exists: true}, "o.to": nsRegex}
+    //        ]}
     //      ]
     //    }
 

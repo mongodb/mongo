@@ -409,6 +409,108 @@ assert.commandWorked(db.createCollection(collNameAlternate));
                              "change_stream_rewritten_op_type_with_nin_expr_with_number_op_type",
                              ["insert", "update", "replace", "delete"],
                              4 /* expectedOplogCursorReturnedDocs */);
+
+    // Ensure that the '$match' using '$expr' to match only 'insert' operations is rewritten
+    // correctly.
+    verifyNonInvalidatingOps(resumeAfterToken,
+                             {$match: {$expr: {$eq: ["$operationType", "insert"]}}},
+                             "change_stream_rewritten_op_type_eq_insert_in_expr",
+                             ["insert"],
+                             1 /* expectedOplogCursorReturnedDocs */);
+
+    // Ensure that the '$match' using '$expr' to match only 'update' operations is rewritten
+    // correctly.
+    verifyNonInvalidatingOps(resumeAfterToken,
+                             {$match: {$expr: {$eq: ["$operationType", "update"]}}},
+                             "change_stream_rewritten_op_type_eq_update_in_expr",
+                             ["update"],
+                             1 /* expectedOplogCursorReturnedDocs */);
+
+    // Ensure that the '$match' using '$expr' to match only 'replace' operations is rewritten
+    // correctly.
+    verifyNonInvalidatingOps(resumeAfterToken,
+                             {$match: {$expr: {$eq: ["$operationType", "replace"]}}},
+                             "change_stream_rewritten_op_type_eq_replace_in_expr",
+                             ["replace"],
+                             1 /* expectedOplogCursorReturnedDocs */);
+
+    // Ensure that the '$match' using '$expr' to match only 'delete' operations is rewritten
+    // correctly.
+    verifyNonInvalidatingOps(resumeAfterToken,
+                             {$match: {$expr: {$eq: ["$operationType", "delete"]}}},
+                             "change_stream_rewritten_op_type_eq_delete_in_expr",
+                             ["delete"],
+                             1 /* expectedOplogCursorReturnedDocs */);
+
+    // Ensure that the '$match' using '$expr' is rewritten correctly when comparing with 'unknown'
+    // operation type.
+    verifyNonInvalidatingOps(resumeAfterToken,
+                             {$match: {$expr: {$eq: ["$operationType", "unknown"]}}},
+                             "change_stream_rewritten_op_type_eq_unknown_in_expr",
+                             [] /* expectedOps */,
+                             0 /* expectedOplogCursorReturnedDocs */);
+
+    // Ensure that the '$match' using '$expr' is rewritten correctly when '$and' is in the
+    // expression.
+    verifyNonInvalidatingOps(resumeAfterToken,
+                             {
+                                 $match: {
+                                     $expr: {
+                                         $and: [
+                                             {$gte: [{$indexOfCP: ["$operationType", "l"]}, 0]},
+                                             {$gte: [{$indexOfCP: ["$operationType", "te"]}, 0]}
+                                         ]
+                                     }
+                                 }
+                             },
+                             "change_stream_rewritten_op_type_in_expr_with_and",
+                             ["delete"],
+                             1 /* expectedOplogCursorReturnedDocs */);
+
+    // Ensure that the '$match' using '$expr' is rewritten correctly when '$or' is in the
+    // expression.
+    verifyNonInvalidatingOps(resumeAfterToken,
+                             {
+                                 $match: {
+                                     $expr: {
+                                         $or: [
+                                             {$gte: [{$indexOfCP: ["$operationType", "l"]}, 0]},
+                                             {$gte: [{$indexOfCP: ["$operationType", "te"]}, 0]}
+                                         ]
+                                     }
+                                 }
+                             },
+                             "change_stream_rewritten_op_type_in_expr_with_or",
+                             ["update", "replace", "delete"],
+                             3 /* expectedOplogCursorReturnedDocs */);
+
+    // Ensure that the '$match' using '$expr' is rewritten correctly when '$not' is in the
+    // expression.
+    verifyNonInvalidatingOps(
+        resumeAfterToken,
+        {$match: {$expr: {$not: {$regexMatch: {input: "$operationType", regex: /e$/}}}}},
+        "change_stream_rewritten_op_type_in_expr_with_not",
+        ["insert"],
+        1 /* expectedOplogCursorReturnedDocs */);
+
+    // Ensure that the '$match' using '$expr' is rewritten correctly when nor ({$not: {$or: [...]}})
+    // is in the expression.
+    verifyNonInvalidatingOps(resumeAfterToken,
+                             {
+                                 $match: {
+                                     $expr: {
+                                         $not: {
+                                             $or: [
+                                                 {$eq: ["$operationType", "insert"]},
+                                                 {$eq: ["$operationType", "delete"]},
+                                             ]
+                                         }
+                                     }
+                                 }
+                             },
+                             "change_stream_rewritten_op_type_in_expr_with_nor",
+                             ["update", "replace"],
+                             2 /* expectedOplogCursorReturnedDocs */);
 })();
 
 st.stop();
