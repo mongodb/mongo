@@ -5888,8 +5888,8 @@ tasks:
         num_tasks: 20
         exec_timeout_secs: 604800 # 7 days
         timeout_secs: 604800 # 7 days
-        set_up_retry_count: 1000000
-        run_powercycle_args: --sshAccessRetryCount=1000000
+        set_up_retry_count: 450
+        run_powercycle_args: --sshAccessRetryCount=450
 
 - name: powercycle_sentinel
   tags: []
