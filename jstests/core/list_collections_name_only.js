@@ -1,4 +1,11 @@
-// Test nameOnly option of listCollections
+/**
+ * Test nameOnly option of listCollections
+ *
+ * @tags: [
+ *   // We expect the collection to exist when running listCollections
+ *   does_not_support_stepdowns
+ * ]
+ */
 (function() {
 "use strict";
 
