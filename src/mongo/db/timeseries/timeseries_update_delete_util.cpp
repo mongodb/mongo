@@ -167,7 +167,7 @@ bool updateOnlyModifiesMetaField(OperationContext* opCtx,
                                  StringData metaField) {
     invariant(updateMod.type() != write_ops::UpdateModification::Type::kDelta);
     uassert(ErrorCodes::InvalidOptions,
-            str::stream() << "Pipeline upddates are not supported for time-series collections: "
+            str::stream() << "Pipeline updates are not supported for time-series collections: "
                           << ns,
             updateMod.type() != write_ops::UpdateModification::Type::kPipeline);
 

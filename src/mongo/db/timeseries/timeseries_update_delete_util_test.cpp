@@ -28,11 +28,13 @@
  */
 
 
+#include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/pipeline/document_source_merge_gen.h"
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/timeseries/timeseries_update_delete_util.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -44,6 +46,14 @@ protected:
     void setUp() {
         ServiceContextMongoDTest::setUp();
         _opCtx = cc().makeOperationContext();
+    }
+
+    void _testClassicUpdateTranslation(const BSONObj& originalUpdate,
+                                       const BSONObj& expectedTranslatedUpdate) {
+        auto res = timeseries::translateUpdate(
+            write_ops::UpdateModification::parseFromClassicUpdate(originalUpdate), _metaField);
+        ASSERT(res.type() == write_ops::UpdateModification::Type::kClassic);
+        ASSERT_BSONOBJ_EQ(res.getUpdateClassic(), expectedTranslatedUpdate);
     }
 
     ServiceContext::UniqueOperationContext _opCtx;
@@ -329,6 +339,160 @@ TEST_F(TimeseriesUpdateDeleteUtilTest, TranslateQuery) {
                                                                                        << "B"))))
                                   << BSON("meta" << BSON("b"
                                                          << "B")))));
+}
+
+TEST_F(TimeseriesUpdateDeleteUtilTest, UpdateOnlyModifiesMetaField) {
+    // {$set: {tag: "A"}}
+    ASSERT_TRUE(timeseries::updateOnlyModifiesMetaField(
+        _opCtx.get(),
+        _ns,
+        write_ops::UpdateModification::parseFromClassicUpdate(
+            BSON("$set" << BSON(_metaField << "A"))),
+        _metaField));
+
+    // {$set: {nonMetaField: "A"}}
+    ASSERT_FALSE(timeseries::updateOnlyModifiesMetaField(
+        _opCtx.get(),
+        _ns,
+        write_ops::UpdateModification::parseFromClassicUpdate(BSON("$set" << BSON("nonMetaField"
+                                                                                  << "A"))),
+        _metaField));
+
+    // {$set: {tag.a: "A"}}
+    ASSERT_TRUE(timeseries::updateOnlyModifiesMetaField(
+        _opCtx.get(),
+        _ns,
+        write_ops::UpdateModification::parseFromClassicUpdate(BSON("$set" << BSON(_metaField + ".a"
+                                                                                  << "A"))),
+        _metaField));
+
+    // {$unset: {tag.a: ""}}
+    ASSERT_TRUE(timeseries::updateOnlyModifiesMetaField(
+        _opCtx.get(),
+        _ns,
+        write_ops::UpdateModification::parseFromClassicUpdate(
+            BSON("$unset" << BSON(_metaField + ".a"
+                                  << ""))),
+        _metaField));
+
+    // {$unset: {tag.a: ""}, {$inc: {nonMetaField: 10}}}
+    ASSERT_FALSE(timeseries::updateOnlyModifiesMetaField(
+        _opCtx.get(),
+        _ns,
+        write_ops::UpdateModification::parseFromClassicUpdate(
+            BSON("$unset" << BSON(_metaField + ".a"
+                                  << "")
+                          << "inc" << BSON("nonMetaField" << 10))),
+        _metaField));
+
+    // {$unset: {tag.a: ""}, {$inc: {tagggg: 10}}}
+    ASSERT_FALSE(timeseries::updateOnlyModifiesMetaField(
+        _opCtx.get(),
+        _ns,
+        write_ops::UpdateModification::parseFromClassicUpdate(
+            BSON("$unset" << BSON(_metaField + ".a"
+                                  << "")
+                          << "inc" << BSON(_metaField + "ggg" << 10))),
+        _metaField));
+
+    // {$rename: {"tag.a.a": "A", "tag.b": "B"}}
+    ASSERT_TRUE(timeseries::updateOnlyModifiesMetaField(
+        _opCtx.get(),
+        _ns,
+        write_ops::UpdateModification::parseFromClassicUpdate(
+            BSON("$rename" << BSON(_metaField + ".a.a"
+                                   << "A" << _metaField + ".b"
+                                   << "B"))),
+        _metaField));
+
+    // {$rename: {tag.tag.tag: 8}}
+    ASSERT_TRUE(timeseries::updateOnlyModifiesMetaField(
+        _opCtx.get(),
+        _ns,
+        write_ops::UpdateModification::parseFromClassicUpdate(
+            BSON("$rename" << BSON(_metaField + "." + _metaField + "." + _metaField << 8))),
+        _metaField));
+
+    // {$set: {tag.$: 100}}
+    ASSERT_TRUE(timeseries::updateOnlyModifiesMetaField(
+        _opCtx.get(),
+        _ns,
+        write_ops::UpdateModification::parseFromClassicUpdate(BSON("$set" << BSON(_metaField + ".$"
+                                                                                  << ""))),
+        _metaField));
+
+    // {$pull: {tag.arr: {$gte: 80}}}
+    ASSERT_TRUE(timeseries::updateOnlyModifiesMetaField(
+        _opCtx.get(),
+        _ns,
+        write_ops::UpdateModification::parseFromClassicUpdate(
+            BSON("$pull" << BSON(_metaField + ".arr" << BSON("gte" << 80)))),
+        _metaField));
+
+    // Update a collection that does not have a metaField.
+    // {$inc: {nonMetaField: ""}}
+    ASSERT_FALSE(timeseries::updateOnlyModifiesMetaField(
+        _opCtx.get(),
+        _ns,
+        write_ops::UpdateModification::parseFromClassicUpdate(BSON("$inc" << BSON("nonMetaField"
+                                                                                  << ""))),
+        StringData()));
+
+    // Update with an empty document, which is considered a replacement document.
+    ASSERT_THROWS(timeseries::updateOnlyModifiesMetaField(
+                      _opCtx.get(), _ns, write_ops::UpdateModification(), _metaField),
+                  ExceptionFor<ErrorCodes::InvalidOptions>);
+}
+
+TEST_F(TimeseriesUpdateDeleteUtilTest, TranslateUpdate) {
+    // {$set: {nonMetaField: "A"}} => {$set: {nonMetaField: "A"}}
+    _testClassicUpdateTranslation(BSON("$set" << BSON("nonMetaField"
+                                                      << "A")),
+                                  BSON("$set" << BSON("nonMetaField"
+                                                      << "A")));
+
+    // {$set: {tag: "A"}} => {$set: {meta: "A"}}
+    _testClassicUpdateTranslation(BSON("$set" << BSON(_metaField << "A")),
+                                  BSON("$set" << BSON("meta"
+                                                      << "A")));
+
+    // {$unset: {tag.a: ""}, {$inc: {nonMetaField: 10}}} =>
+    // {$unset: {meta.a: ""}, {$inc: {nonMetaField: 10}}}
+    _testClassicUpdateTranslation(BSON("$unset" << BSON(_metaField + ".a"
+                                                        << "")
+                                                << "inc" << BSON("nonMetaField" << 10)),
+                                  BSON("$unset" << BSON("meta.a"
+                                                        << "")
+                                                << "inc" << BSON("nonMetaField" << 10)));
+
+    // {$rename: {"tag.a.a": "A", "tag.b": "B"}}
+    _testClassicUpdateTranslation(BSON("$rename" << BSON(_metaField + ".a.a"
+                                                         << "A" << _metaField + ".b"
+                                                         << "B")),
+                                  BSON("$rename" << BSON("meta.a.a"
+                                                         << "A"
+                                                         << "meta.b"
+                                                         << "B")));
+
+    // {$rename: {tag.tag.tag: 8}}
+    _testClassicUpdateTranslation(
+        BSON("$rename" << BSON(_metaField + "." + _metaField + "." + _metaField << 8)),
+        BSON("$rename" << BSON("meta.tag.tag" << 8)));
+}
+
+// Translate an update with an empty metaField, which violates the translation method's
+// precondition.
+DEATH_TEST_F(TimeseriesUpdateDeleteUtilTest,
+             TranslateUpdateWithEmptyMetaField,
+             "Invariant failure") {
+    timeseries::translateUpdate(write_ops::UpdateModification::parseFromClassicUpdate(
+                                    BSON("$set" << BSON(_metaField << "A"))),
+                                StringData());
+}
+
+// Translate an empty update, which is considered a replacement document.
+DEATH_TEST_F(TimeseriesUpdateDeleteUtilTest, TranslateEmptyUpdate, "Invariant failure") {
+    timeseries::translateUpdate(write_ops::UpdateModification(), _metaField);
 }
 }  // namespace
 }  // namespace mongo
