@@ -44,6 +44,7 @@
 #include "mongo/db/s/resharding/resharding_oplog_applier_progress_gen.h"
 #include "mongo/db/s/resharding_util.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/unittest/unittest.h"
@@ -132,6 +133,49 @@ TEST_F(ReshardingDataReplicationTest, StashCollectionsHaveSameCollationAsReshard
         ASSERT_BSONOBJ_BINARY_EQ(stashColl->getDefaultCollator()->getSpec().toBSON(),
                                  collator.getSpec().toBSON());
     }
+}
+
+// TODO(SERVER-59325): Remove stress test when no longer needed.
+TEST_F(ReshardingDataReplicationTest,
+       StashCollectionsHaveSameCollationAsReshardingCollectionStressTest) {
+    static constexpr int kThreads = 10;
+    std::vector<stdx::thread> threads;
+    Counter64 iterations;
+
+    for (int t = 0; t < kThreads; ++t) {
+        stdx::thread thread([&]() {
+            ThreadClient threadClient(getGlobalServiceContext());
+            Timer timer;
+            while (timer.elapsed() < Seconds(2)) {
+                CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+                auto sourceChunkMgr = makeChunkManagerForSourceCollection(collator.clone());
+
+                auto stashCollections = [&] {
+                    auto opCtx = Client::getCurrent()->makeOperationContext();
+                    return ReshardingDataReplication::ensureStashCollectionsExist(
+                        opCtx.get(),
+                        sourceChunkMgr,
+                        {DonorShardFetchTimestamp{{"shard0"}},
+                         DonorShardFetchTimestamp{{"shard1"}}});
+                }();
+
+                for (const auto& nss : stashCollections) {
+                    auto opCtx = Client::getCurrent()->makeOperationContext();
+                    AutoGetCollection stashColl(opCtx.get(), nss, MODE_IS);
+                    ASSERT_TRUE(bool(stashColl->getDefaultCollator()))
+                        << "Stash collection was created with 'simple' collation";
+                    ASSERT_BSONOBJ_BINARY_EQ(stashColl->getDefaultCollator()->getSpec().toBSON(),
+                                             collator.getSpec().toBSON());
+                }
+            }
+        });
+        threads.push_back(std::move(thread));
+    }
+    for (auto& t : threads) {
+        t.join();
+    }
+
+    LOGV2(5930702, "Stress test completed", "iterations"_attr = iterations);
 }
 
 TEST_F(ReshardingDataReplicationTest, GetOplogFetcherResumeId) {
