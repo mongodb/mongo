@@ -4901,7 +4901,7 @@ tasks:
 
 - <<: *gen_task_template
   name: parallel_gen
-  tags: ["misc_js"]
+  tags: ["misc_js", "parallel"]
   commands:
   - func: "generate resmoke tasks"
     vars:
