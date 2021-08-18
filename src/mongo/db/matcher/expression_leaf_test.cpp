@@ -85,6 +85,73 @@ TEST(ComparisonMatchExpression, StringMatchingRespectsCollation) {
                           nullptr));
 }
 
+TEST(ComparisonMatchExpression, UnequalLengthString) {
+    BSONObj operand = BSON("a"
+                           << "abc");
+    BSONObj match = BSON("a"
+                         << "abcd");
+    EqualityMatchExpression eq("", operand["a"]);
+    ASSERT(!eq.matchesSingleElement(match.firstElement()));
+}
+
+TEST(ComparisonMatchExpression, NaNComparison) {
+    BSONObj match = BSON("a" << 10);
+
+    BSONObj operand = BSON("a" << sqrt(-2));
+    EqualityMatchExpression eq("", operand["a"]);
+    ASSERT(!eq.matchesSingleElement(match.firstElement()));
+    ASSERT(eq.matchesSingleElement(operand.firstElement()));
+
+    BSONObj gteOp = BSON("$gte" << sqrt(-2));
+    GTEMatchExpression gte("", gteOp["$gte"]);
+    ASSERT(!gte.matchesSingleElement(match.firstElement()));
+    ASSERT(gte.matchesSingleElement(operand.firstElement()));
+
+    BSONObj gtOp = BSON("$gt" << sqrt(-2));
+    GTMatchExpression gt("", gtOp["$gt"]);
+    ASSERT(!gt.matchesSingleElement(match.firstElement()));
+    ASSERT(!gt.matchesSingleElement(operand.firstElement()));
+
+    BSONObj lteOp = BSON("$lte" << sqrt(-2));
+    LTEMatchExpression lte("", lteOp["$lte"]);
+    ASSERT(!lte.matchesSingleElement(match.firstElement()));
+    ASSERT(lte.matchesSingleElement(operand.firstElement()));
+
+    BSONObj ltOp = BSON("$lt" << sqrt(-2));
+    LTMatchExpression lt("", ltOp["$lt"]);
+    ASSERT(!lt.matchesSingleElement(match.firstElement()));
+    ASSERT(!lt.matchesSingleElement(operand.firstElement()));
+}
+
+TEST(ComparisonMatchExpression, NaNComparisonDecimal) {
+    BSONObj match = BSON("a" << 10);
+
+    BSONObj operand = BSON("a" << Decimal128::kPositiveNaN);
+    EqualityMatchExpression eq("", operand["a"]);
+    ASSERT(!eq.matchesSingleElement(match.firstElement()));
+    ASSERT(eq.matchesSingleElement(operand.firstElement()));
+
+    BSONObj gteOp = BSON("$gte" << Decimal128::kPositiveNaN);
+    GTEMatchExpression gte("", gteOp["$gte"]);
+    ASSERT(!gte.matchesSingleElement(match.firstElement()));
+    ASSERT(gte.matchesSingleElement(operand.firstElement()));
+
+    BSONObj gtOp = BSON("$gt" << Decimal128::kPositiveNaN);
+    GTMatchExpression gt("", gtOp["$gt"]);
+    ASSERT(!gt.matchesSingleElement(match.firstElement()));
+    ASSERT(!gt.matchesSingleElement(operand.firstElement()));
+
+    BSONObj lteOp = BSON("$lte" << Decimal128::kPositiveNaN);
+    LTEMatchExpression lte("", lteOp["$lte"]);
+    ASSERT(!lte.matchesSingleElement(match.firstElement()));
+    ASSERT(lte.matchesSingleElement(operand.firstElement()));
+
+    BSONObj ltOp = BSON("$lt" << Decimal128::kPositiveNaN);
+    LTMatchExpression lt("", ltOp["$lt"]);
+    ASSERT(!lt.matchesSingleElement(match.firstElement()));
+    ASSERT(!lt.matchesSingleElement(operand.firstElement()));
+}
+
 TEST(EqOp, MatchesElement) {
     BSONObj operand = BSON("a" << 5);
     BSONObj match = BSON("a" << 5.0);

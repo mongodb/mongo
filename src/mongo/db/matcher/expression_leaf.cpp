@@ -60,8 +60,8 @@ ComparisonMatchExpressionBase::ComparisonMatchExpressionBase(
     const CollatorInterface* collator)
     : LeafMatchExpression(type, path, leafArrBehavior, nonLeafArrBehavior, std::move(annotation)),
       _backingBSON(BSON(path << rhs)),
-      _rhs(_backingBSON.firstElement()),
       _collator(collator) {
+    setData(_backingBSON.firstElement());
     invariant(_rhs.type() != BSONType::EOO);
 }
 
@@ -126,58 +126,75 @@ ComparisonMatchExpression::ComparisonMatchExpression(MatchType type,
 
 bool ComparisonMatchExpression::matchesSingleElement(const BSONElement& e,
                                                      MatchDetails* details) const {
-    if (e.canonicalType() != _rhs.canonicalType()) {
-        // We can't call 'compareElements' on elements of different canonical types.  Usually
-        // elements with different canonical types should never match any comparison, but there are
-        // a few exceptions, handled here.
-
-        // jstNULL and undefined are treated the same
-        if (e.canonicalType() + _rhs.canonicalType() == 5) {
-            return matchType() == EQ || matchType() == LTE || matchType() == GTE;
+    if (e.type() != _rhs.type()) {
+        const auto ect = e.canonicalType();
+        const auto rct = _rhs.canonicalType();
+        if (ect != rct) {
+            // We can't call 'compareElements' on elements of different canonical types.  Usually
+            // elements with different canonical types should never match any comparison, but there
+            // are a few exceptions, handled here.
+            // jstNULL and undefined are treated the same
+            if (ect + rct == 5) {
+                return matchType() == EQ || matchType() == LTE || matchType() == GTE;
+            }
+            if (_rhs.type() == MaxKey || _rhs.type() == MinKey) {
+                switch (matchType()) {
+                    // LT and LTE need no distinction here because the two elements that we are
+                    // comparing do not even have the same canonical type and are thus not equal
+                    // (i.e.the case where we compare MinKey against MinKey would not reach this
+                    // switch statement at all).  The same reasoning follows for the lack of
+                    // distinction between GTE and GT.
+                    case LT:
+                    case LTE:
+                        return _rhs.type() == MaxKey;
+                    case EQ:
+                        return false;
+                    case GT:
+                    case GTE:
+                        return _rhs.type() == MinKey;
+                    default:
+                        // This is a comparison match expression, so it must be either
+                        // a $lt, $lte, $gt, $gte, or equality expression.
+                        MONGO_UNREACHABLE;
+                }
+            }
+            return false;
         }
-        if (_rhs.type() == MaxKey || _rhs.type() == MinKey) {
+    }
+
+    if (matchType() == EQ) {
+        if (!_collator && e.type() == String) {
+            // We know from above that _rhs must also be a String (or Symbol which has the same
+            // representation) so if they have different value sizes, they must be different
+            // strings. We can only stop here with the default collator, since other collators may
+            // consider different length strings as equal.
+            if (e.valuesize() != _rhs.valuesize())
+                return false;
+        }
+    } else {
+        // Special case handling for NaN. NaN is equal to NaN but otherwise always compares to
+        // false. This follows the normal comparison rules (where NaN is less than all numbers) for
+        // EQ, so we only need to do this for other comparison types.
+        const bool lhsIsNan =  //
+            (((e.type() == NumberDouble) && (std::isnan(e._numberDouble())))) ||
+            ((e.type() == NumberDecimal) && (e._numberDecimal().isNaN()));
+        const bool rhsIsNan =
+            (((_rhs.type() == NumberDouble) && (std::isnan(_rhs._numberDouble()))) ||
+             ((_rhs.type() == NumberDecimal) && (_rhs._numberDecimal().isNaN())));
+        if (lhsIsNan || rhsIsNan) {
+            bool bothNaN = lhsIsNan && rhsIsNan;
             switch (matchType()) {
-                // LT and LTE need no distinction here because the two elements that we are
-                // comparing do not even have the same canonical type and are thus not equal
-                // (i.e.the case where we compare MinKey against MinKey would not reach this switch
-                // statement at all).  The same reasoning follows for the lack of distinction
-                // between GTE and GT.
                 case LT:
-                case LTE:
-                    return _rhs.type() == MaxKey;
-                case EQ:
-                    return false;
                 case GT:
+                    return false;
+                case LTE:
                 case GTE:
-                    return _rhs.type() == MinKey;
+                    return bothNaN;
                 default:
                     // This is a comparison match expression, so it must be either
                     // a $lt, $lte, $gt, $gte, or equality expression.
-                    MONGO_UNREACHABLE;
+                    fassertFailed(17448);
             }
-        }
-        return false;
-    }
-
-    // Special case handling for NaN. NaN is equal to NaN but
-    // otherwise always compares to false.
-    if (std::isnan(e.numberDouble()) || std::isnan(_rhs.numberDouble())) {
-        bool bothNaN = std::isnan(e.numberDouble()) && std::isnan(_rhs.numberDouble());
-        switch (matchType()) {
-            case LT:
-                return false;
-            case LTE:
-                return bothNaN;
-            case EQ:
-                return bothNaN;
-            case GT:
-                return false;
-            case GTE:
-                return bothNaN;
-            default:
-                // This is a comparison match expression, so it must be either
-                // a $lt, $lte, $gt, $gte, or equality expression.
-                fassertFailed(17448);
         }
     }
 
