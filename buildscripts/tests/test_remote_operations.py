@@ -47,14 +47,14 @@ class RemoteOperationConnection(RemoteOperationsTestCase):
         self.assertIsNotNone(buff)
 
         # Invalid host with retries
-        remote_op = rop.RemoteOperations(user_host="badhost2", retries=3)
+        remote_op = rop.RemoteOperations(user_host="badhost2", access_retry_count=3)
         ret, buff = remote_op.access_info()
         self.assertFalse(remote_op.access_established())
         self.assertNotEqual(0, ret)
         self.assertIsNotNone(buff)
 
         # Invalid host with retries & retry_sleep
-        remote_op = rop.RemoteOperations(user_host="badhost3", retries=3, retry_sleep=1)
+        remote_op = rop.RemoteOperations(user_host="badhost3", access_retry_count=3, retry_sleep=1)
         ret, buff = remote_op.access_info()
         self.assertFalse(remote_op.access_established())
         self.assertNotEqual(0, ret)
