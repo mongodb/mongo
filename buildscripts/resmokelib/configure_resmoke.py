@@ -171,7 +171,7 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
 
         # Specify additional feature flags from the command line.
         # Set running all feature flag tests to True if this options is specified.
-        additional_feature_flags = config.pop("additional_feature_flags")
+        additional_feature_flags = _tags_from_list(config.pop("additional_feature_flags"))
         if additional_feature_flags is not None:
             enabled_feature_flags.extend(additional_feature_flags)
 
