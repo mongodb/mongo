@@ -472,7 +472,8 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
           "namespace"_attr = ns,
           "collectionUUID"_attr = *collectionUUID,
           "indexes"_attr = specs.size(),
-          "firstIndex"_attr = specs[0][IndexDescriptor::kIndexNameFieldName]);
+          "firstIndex"_attr = specs[0][IndexDescriptor::kIndexNameFieldName],
+          "command"_attr = cmd.toBSON({}));
     hangCreateIndexesBeforeStartingIndexBuild.pauseWhileSet(opCtx);
 
     bool shouldContinueInBackground = false;
