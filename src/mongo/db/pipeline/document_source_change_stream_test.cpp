@@ -4667,5 +4667,45 @@ TEST_F(ChangeStreamRewriteTest, CannotExactlyRewritePredicateOnFieldDocumentKeyF
     // documentKey. Therefore, we cannot exactly rewrite a predicate on this field.
     ASSERT(rewrittenMatchExpression == nullptr);
 }
+
+TEST_F(ChangeStreamRewriteTest, CanRewriteArbitraryPredicateOnFieldFullDocumentFoo) {
+    auto spec = fromjson("{'fullDocument.foo': {$lt: 'bar'}}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        getExpCtx(), statusWithMatchExpression.getValue().get(), {"fullDocument"});
+    ASSERT(rewrittenMatchExpression);
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
+                      fromjson("{$or: ["
+                               "  {$and: ["
+                               "    {op: {$eq: 'u'}},"
+                               "    {'o._id': {$not: {$exists: true}}}"
+                               "  ]},"
+                               "  {$and: ["
+                               "    {$or: ["
+                               "      {op: {$eq: 'i'}},"
+                               "      {op: {$eq: 'u'}}"
+                               "    ]},"
+                               "    {'o.foo': {$lt: 'bar'}}"
+                               "  ]}"
+                               "]}"));
+}
+
+TEST_F(ChangeStreamRewriteTest, CannotExactlyRewritePredicateOnFieldFullDocumentFoo) {
+    auto spec = fromjson("{'fullDocument.foo': {$not: {$eq: 'bar'}}}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        getExpCtx(), statusWithMatchExpression.getValue().get(), {"fullDocument"});
+
+    // Because the 'fullDocument' field can be populated later in the pipeline for update events
+    // (via the '{fullDocument: "updateLookup"}' option), it's impractical to try to generate a
+    // rewritten predicate that matches exactly.
+    ASSERT(rewrittenMatchExpression == nullptr);
+}
 }  // namespace
 }  // namespace mongo

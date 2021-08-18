@@ -306,13 +306,86 @@ std::unique_ptr<MatchExpression> matchRewriteDocumentKey(
     return rewrittenPredicate;
 }
 
+const CollatorInterface* getMatchExpressionCollator(const MatchExpression* me) {
+    if (auto cme = dynamic_cast<const ComparisonMatchExpressionBase*>(me); cme != nullptr) {
+        return cme->getCollator();
+    } else if (auto ime = dynamic_cast<const InMatchExpression*>(me); ime != nullptr) {
+        return ime->getCollator();
+    } else {
+        return nullptr;
+    }
+}
+
+/**
+ * Rewrites filters on 'fullDocument' in a format that can be applied directly to the oplog. Returns
+ * nullptr if the predicate cannot be rewritten.
+ */
+std::unique_ptr<MatchExpression> matchRewriteFullDocument(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const PathMatchExpression* predicate,
+    bool allowInexact) {
+    tassert(5851400, "Unexpected empty predicate path", predicate->fieldRef()->numParts() > 0);
+    tassert(5851401,
+            str::stream() << "Unexpected predicate path: " << predicate->path(),
+            predicate->fieldRef()->getPart(0) == DocumentSourceChangeStream::kFullDocumentField);
+
+    // Any rewritten predicate returned from here will get serialized and deserialized later by the
+    // DocumentSourceChangeStreamOplogMatch::doOptimizeAt() method. Unfortunately, the serialization
+    // process doesn't preserve the '_collator' field, so we can't safely rewrite 'predicate' if it
+    // has a collator.
+    if (getMatchExpressionCollator(predicate) != nullptr) {
+        return nullptr;
+    }
+
+    // Because the 'fullDocument' field can be populated later in the pipeline for update events
+    // (via the '{fullDocument: "updateLookup"}' option), it's impractical to try to generate a
+    // rewritten predicate that matches exactly.
+    if (!allowInexact) {
+        return nullptr;
+    }
+
+    // For predicates on the 'fullDocument' field or a subfield thereof, we can generate a rewritten
+    // predicate that matches inexactly like so:
+    //   {$or: [
+    //     {$and: [{op: 'u'}, {'o._id': {$exists: false}}]},
+    //     {$and: [
+    //       {$or: [{op: 'i'}, {op: 'u'}]},
+    //       {o: <predicate>}
+    //     ]},
+    //   ]}
+    auto rewrittenPredicate = std::make_unique<OrMatchExpression>();
+
+    auto updateCase = std::make_unique<AndMatchExpression>();
+    updateCase->add(std::make_unique<EqualityMatchExpression>("op"_sd, Value("u"_sd)));
+    updateCase->add(
+        std::make_unique<NotMatchExpression>(std::make_unique<ExistsMatchExpression>("o._id"_sd)));
+    rewrittenPredicate->add(std::move(updateCase));
+
+    auto insertOrReplaceCase = std::make_unique<AndMatchExpression>();
+
+    auto orExpr = std::make_unique<OrMatchExpression>();
+    orExpr->add(std::make_unique<EqualityMatchExpression>("op"_sd, Value("i"_sd)));
+    orExpr->add(std::make_unique<EqualityMatchExpression>("op"_sd, Value("u"_sd)));
+    insertOrReplaceCase->add(std::move(std::move(orExpr)));
+
+    auto renamedExpr = predicate->shallowClone();
+    static_cast<PathMatchExpression*>(renamedExpr.get())->applyRename({{"fullDocument", "o"}});
+    insertOrReplaceCase->add(std::move(std::move(renamedExpr)));
+
+    rewrittenPredicate->add(std::move(insertOrReplaceCase));
+
+    return rewrittenPredicate;
+}
+
 // Map of fields names for which a simple rename is sufficient when rewriting.
 StringMap<std::string> renameRegistry = {
     {"clusterTime", "ts"}, {"lsid", "lsid"}, {"txnNumber", "txnNumber"}};
 
 // Map of field names to corresponding MatchExpression rewrite functions.
 StringMap<MatchExpressionRewrite> matchRewriteRegistry = {
-    {"operationType", matchRewriteOperationType}, {"documentKey", matchRewriteDocumentKey}};
+    {"operationType", matchRewriteOperationType},
+    {"documentKey", matchRewriteDocumentKey},
+    {"fullDocument", matchRewriteFullDocument}};
 
 // Map of field names to corresponding agg Expression rewrite functions.
 StringMap<AggExpressionRewrite> exprRewriteRegistry = {{"operationType", exprRewriteOperationType}};
