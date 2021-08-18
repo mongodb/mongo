@@ -8023,7 +8023,7 @@ buildvariants:
     has_packages: false
     scons_cache_scope: shared
     scons_cache_mode: all
-    large_distro_name: rhel80-xlarge
+    large_distro_name: rhel80-medium
     num_scons_link_jobs_available: 0.99
   tasks: &enterprise-rhel80-dynamic-v4gcc-debug-experimental-tasks
   - name: compile_test_and_package_parallel_core_stream_TG
@@ -8033,6 +8033,80 @@ buildvariants:
     distros:
       - rhel80-xlarge
   - name: compile_test_and_package_parallel_dbtest_stream_TG
+    distros:
+      - rhel80-xlarge
+  - name: build_variant_gen
+  - name: test_api_version_compatibility
+  - name: .aggfuzzer !.multiversion
+  - name: .aggregation !.multiversion
+  - name: audit
+  - name: .auth !.multiversion
+  - name: .causally_consistent !.sharding
+  - name: .change_streams !.multiversion
+  - name: .change_stream_fuzzer !.multiversion
+  - name: .misc_js !.multiversion
+  - name: .concurrency !.large !.ubsan !.no_txns !.debug_only !.multiversion
+  - name: .concurrency .large !.ubsan !.no_txns !.debug_only !.multiversion
+    distros:
+    - rhel80-xlarge
+  - name: disk_wiredtiger
+  - name: .encrypt !.multiversion
+  - name: idl_tests
+  - name: initial_sync_fuzzer_gen
+  - name: .integration !.multiversion
+    distros:
+    - rhel80-xlarge
+  - name: jsCore
+    distros:
+    - rhel80-xlarge
+  - name: .jscore .common !jsCore !.multiversion
+  - name: jsCore_minimum_batch_size
+  - name: jsCore_txns_large_txns_format
+  - name: jsonSchema
+  - name: .jstestfuzz !.flow_control  !.multiversion # Flow control jstestfuzz take longer.
+  - name: libunwind_tests
+  - name: mqlrun
+  - name: .multi_shard !.multiversion
+  - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
+  - name: .query_fuzzer !.multiversion
+  - name: .read_write_concern .large !.multiversion
+    distros:
+    - rhel80-xlarge
+  - name: .read_write_concern !.large !.multiversion
+  - name: .replica_sets !.encrypt !.auth !.multiversion
+    distros:
+    - rhel80-xlarge
+  - name: replica_sets_api_version_jscore_passthrough_gen
+  - name: replica_sets_reconfig_jscore_passthrough_gen
+  - name: replica_sets_reconfig_jscore_stepdown_passthrough_gen
+    distros:
+    - rhel80-xlarge
+  - name: replica_sets_reconfig_kill_primary_jscore_passthrough_gen
+    distros:
+    - rhel80-xlarge
+  - name: retryable_writes_jscore_passthrough_gen
+  - name: retryable_writes_jscore_stepdown_passthrough_gen
+    distros:
+    - rhel80-xlarge
+  - name: .read_only !.multiversion
+  - name: .rollbackfuzzer !.multiversion
+  - name: sasl
+  - name: search
+  - name: search_auth
+  - name: search_ssl
+  - name: session_jscore_passthrough
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.multiversion
+  - name: sharding_api_version_jscore_passthrough_gen
+  - name: .sharding .txns !.multiversion
+  - name: .sharding .common !.multiversion
+  - name: snmp
+  - name: .stitch
+  - name: secondary_reads_passthrough_gen
+  - name: server_discovery_and_monitoring_json_test_TG
+  - name: .tenant_migration !.multiversion
+    distros:
+      - rhel80-xlarge
+  - name: server_selection_json_test_TG
     distros:
       - rhel80-xlarge
 
