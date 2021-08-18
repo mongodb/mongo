@@ -60,14 +60,16 @@ class RemoteOperations(object):  # pylint: disable=too-many-instance-attributes
 
     def __init__(  # pylint: disable=too-many-arguments
             self, user_host, ssh_connection_options=None, ssh_options=None, scp_options=None,
-            retries=0, retry_sleep=0, debug=False, shell_binary="/bin/bash", use_shell=False):
+            op_retry_count=0, access_retry_count=0, retry_sleep=0, debug=False,
+            shell_binary="/bin/bash", use_shell=False):
         """Initialize RemoteOperations."""
 
         self.user_host = user_host
         self.ssh_connection_options = ssh_connection_options if ssh_connection_options else ""
         self.ssh_options = ssh_options if ssh_options else ""
         self.scp_options = scp_options if scp_options else ""
-        self.retries = retries
+        self.op_retry_count = op_retry_count
+        self.access_retry_count = access_retry_count
         self.retry_sleep = retry_sleep
         self.debug = debug
         self.shell_binary = shell_binary
@@ -87,19 +89,15 @@ class RemoteOperations(object):  # pylint: disable=too-many-instance-attributes
         buff_stdout, _ = process.communicate()
         return process.poll(), buff_stdout
 
-    def _remote_access(self):
-        """Check if a remote session is possible."""
-        cmd = "ssh {} {} {} date".format(self.ssh_connection_options, self.ssh_options,
-                                         self.user_host)
+    def _call_retries(self, cmd, retry_count):
         attempt_num = 0
-        buff = ""
         while True:
             ret, buff = self._call(cmd)
             # Ignore any connection errors before sshd has fully initialized.
             if not ret and not any(ssh_error in buff for ssh_error in _SSH_CONNECTION_ERRORS):
                 return ret, buff
             attempt_num += 1
-            if attempt_num > self.retries:
+            if attempt_num > retry_count:
                 break
             if self.debug:
                 print("Failed remote attempt {}, retrying in {} seconds".format(
@@ -107,7 +105,16 @@ class RemoteOperations(object):  # pylint: disable=too-many-instance-attributes
             time.sleep(self.retry_sleep)
         return ret, buff
 
+    def _remote_access(self):
+        """Check if a remote session is possible."""
+        cmd = "ssh {} {} {} date".format(self.ssh_connection_options, self.ssh_options,
+                                         self.user_host)
+        return self._call_retries(cmd, self.access_retry_count)
+
     def _perform_operation(self, cmd):
+        if self.op_retry_count:
+            return self._call_retries(cmd, self.op_retry_count)
+
         return self._call(cmd)
 
     def access_established(self):
@@ -231,44 +238,55 @@ def main():  # pylint: disable=too-many-branches,too-many-statements
     shell_options = optparse.OptionGroup(parser, "Shell options")
     copy_options = optparse.OptionGroup(parser, "Copy options")
 
-    parser.add_option("--userHost", dest="user_host", default=None,
-                      help=("User and remote host to execute commands on [REQUIRED]."
-                            " Examples, 'user@1.2.3.4' or 'user@myhost.com'."))
+    parser.add_option(
+        "--userHost", dest="user_host", default=None,
+        help=("User and remote host to execute commands on [REQUIRED]."
+              " Examples, 'user@1.2.3.4' or 'user@myhost.com'."))
 
-    parser.add_option("--operation", dest="operation", default="shell", choices=_OPERATIONS,
-                      help=("Remote operation to perform, choose one of '{}',"
-                            " defaults to '%default'.".format(", ".join(_OPERATIONS))))
+    parser.add_option(
+        "--operation", dest="operation", default="shell", choices=_OPERATIONS,
+        help=("Remote operation to perform, choose one of '{}',"
+              " defaults to '%default'.".format(", ".join(_OPERATIONS))))
 
-    control_options.add_option("--sshConnectionOptions", dest="ssh_connection_options",
-                               default=None, action="append",
-                               help=("SSH connection options which are common to ssh and scp."
-                                     " More than one option can be specified either"
-                                     " in one quoted string or by specifying"
-                                     " this option more than once. Example options:"
-                                     " '-i $HOME/.ssh/access.pem -o ConnectTimeout=10"
-                                     " -o ConnectionAttempts=10'"))
+    control_options.add_option(
+        "--sshConnectionOptions", dest="ssh_connection_options", default=None, action="append",
+        help=("SSH connection options which are common to ssh and scp."
+              " More than one option can be specified either"
+              " in one quoted string or by specifying"
+              " this option more than once. Example options:"
+              " '-i $HOME/.ssh/access.pem -o ConnectTimeout=10"
+              " -o ConnectionAttempts=10'"))
 
-    control_options.add_option("--sshOptions", dest="ssh_options", default=None, action="append",
-                               help=("SSH specific options."
-                                     " More than one option can be specified either"
-                                     " in one quoted string or by specifying"
-                                     " this option more than once. Example options:"
-                                     " '-t' or '-T'"))
+    control_options.add_option(
+        "--sshOptions", dest="ssh_options", default=None, action="append",
+        help=("SSH specific options."
+              " More than one option can be specified either"
+              " in one quoted string or by specifying"
+              " this option more than once. Example options:"
+              " '-t' or '-T'"))
 
-    control_options.add_option("--scpOptions", dest="scp_options", default=None, action="append",
-                               help=("SCP specific options."
-                                     " More than one option can be specified either"
-                                     " in one quoted string or by specifying"
-                                     " this option more than once. Example options:"
-                                     " '-l 5000'"))
+    control_options.add_option(
+        "--scpOptions", dest="scp_options", default=None, action="append",
+        help=("SCP specific options."
+              " More than one option can be specified either"
+              " in one quoted string or by specifying"
+              " this option more than once. Example options:"
+              " '-l 5000'"))
 
-    control_options.add_option("--retries", dest="retries", type=int, default=0,
-                               help=("Number of retries to attempt for operation,"
-                                     " defaults to '%default'."))
+    control_options.add_option(
+        "--op_retry_count", dest="op_retry_count", type=int, default=0,
+        help=("Number of retries to attempt for operation,"
+              " defaults to '%default'."))
 
-    control_options.add_option("--retrySleep", dest="retry_sleep", type=int, default=10,
-                               help=("Number of seconds to wait between retries,"
-                                     " defaults to '%default'."))
+    control_options.add_option(
+        "--access_retry_count", dest="access_retry_count", type=int, default=0,
+        help=("Number of retries to attempt remote access,"
+              " defaults to '%default'."))
+
+    control_options.add_option(
+        "--retrySleep", dest="retry_sleep", type=int, default=10,
+        help=("Number of seconds to wait between retries,"
+              " defaults to '%default'."))
 
     control_options.add_option("--debug", dest="debug", action="store_true", default=False,
                                help="Provides debug output.")
@@ -347,8 +365,9 @@ def main():  # pylint: disable=too-many-branches,too-many-statements
 
     remote_op = RemoteOperations(
         user_host=options.user_host, ssh_connection_options=ssh_connection_options,
-        ssh_options=ssh_options, scp_options=scp_options, retries=options.retries,
-        retry_sleep=options.retry_sleep, debug=options.debug)
+        ssh_options=ssh_options, scp_options=scp_options, op_retry_count=options.op_retry_count,
+        access_retry_count=options.access_retry_count, retry_sleep=options.retry_sleep,
+        debug=options.debug)
     ret_code, buff = remote_op.operation(options.operation, operation_param, operation_dir)
     if options.verbose:
         print("Return code: {} for command {}".format(ret_code, sys.argv))
