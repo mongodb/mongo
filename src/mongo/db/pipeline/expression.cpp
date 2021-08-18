@@ -2610,6 +2610,22 @@ void ExpressionFilter::_doAddDependencies(DepsTracker* deps) const {
 
 /* ------------------------- ExpressionFloor -------------------------- */
 
+StatusWith<Value> ExpressionFloor::apply(Value arg) {
+    if (!arg.numeric()) {
+        return Status{ErrorCodes::Error(5733411), "Floor must take a numeric argument"};
+    }
+    switch (arg.getType()) {
+        case NumberDouble:
+            return Value(std::floor(arg.getDouble()));
+        case NumberDecimal:
+            // Round toward the nearest decimal with a zero exponent in the negative direction.
+            return Value(arg.getDecimal().quantize(Decimal128::kNormalizedZero,
+                                                   Decimal128::kRoundTowardNegative));
+        default:
+            return arg;
+    }
+}
+
 Value ExpressionFloor::evaluateNumericArg(const Value& numericArg) const {
     // There's no point in taking the floor of integers or longs, it will have no effect.
     switch (numericArg.getType()) {
@@ -3008,28 +3024,28 @@ void ExpressionMeta::_doAddDependencies(DepsTracker* deps) const {
 
 /* ----------------------- ExpressionMod ---------------------------- */
 
-Value ExpressionMod::evaluate(const Document& root, Variables* variables) const {
-    Value lhs = _children[0]->evaluate(root, variables);
-    Value rhs = _children[1]->evaluate(root, variables);
-
+StatusWith<Value> ExpressionMod::apply(Value lhs, Value rhs) {
     BSONType leftType = lhs.getType();
     BSONType rightType = rhs.getType();
 
     if (lhs.numeric() && rhs.numeric()) {
-        auto assertNonZero = [](bool isZero) { uassert(16610, "can't $mod by zero", !isZero); };
 
         // If either side is decimal, perform the operation in decimal.
         if (leftType == NumberDecimal || rightType == NumberDecimal) {
             Decimal128 left = lhs.coerceToDecimal();
             Decimal128 right = rhs.coerceToDecimal();
-            assertNonZero(right.isZero());
+            if (right.isZero()) {
+                return Status(ErrorCodes::Error(5733415), str::stream() << "can't $mod by zero");
+            }
 
             return Value(left.modulo(right));
         }
 
         // ensure we aren't modding by 0
         double right = rhs.coerceToDouble();
-        assertNonZero(right == 0);
+        if (right == 0) {
+            return Status(ErrorCodes::Error(16610), str::stream() << "can't $mod by zero");
+        };
 
         if (leftType == NumberDouble || (rightType == NumberDouble && !rhs.integral())) {
             // Need to do fmod. Integer-valued double case is handled below.
@@ -3052,10 +3068,16 @@ Value ExpressionMod::evaluate(const Document& root, Variables* variables) const 
     } else if (lhs.nullish() || rhs.nullish()) {
         return Value(BSONNULL);
     } else {
-        uasserted(16611,
-                  str::stream() << "$mod only supports numeric types, not "
-                                << typeName(lhs.getType()) << " and " << typeName(rhs.getType()));
+        return Status(ErrorCodes::Error(16611),
+                      str::stream()
+                          << "$mod only supports numeric types, not " << typeName(lhs.getType())
+                          << " and " << typeName(rhs.getType()));
     }
+}
+Value ExpressionMod::evaluate(const Document& root, Variables* variables) const {
+    Value lhs = _children[0]->evaluate(root, variables);
+    Value rhs = _children[1]->evaluate(root, variables);
+    return uassertStatusOK(apply(lhs, rhs));
 }
 
 REGISTER_STABLE_EXPRESSION(mod, ExpressionMod::parse);

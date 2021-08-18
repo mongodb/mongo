@@ -1,4 +1,4 @@
-# Copyright (C) 2019-present MongoDB, Inc.
+# Copyright (C) 2021-present MongoDB, Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the Server Side Public License, version 1,
@@ -25,26 +25,41 @@
 # exception statement from all source files in the program, then also delete
 # it in the license file.
 #
-
 global:
   cpp_namespace: "mongo"
-  cpp_includes:
-    - "mongo/db/exec/document_value/value.h"
-
-types:
-  Value:
-    bson_serialization_type: any
-    description: A value with any BSON type.
-    cpp_type: Value
-    serializer: Value::serializeForIDL
-    deserializer: Value::deserializeForIDL
-  numeric:
-    bson_serialization_type:
-    - int
-    - decimal
-    - double
-    - long
-    description: A value with any numeric BSON type.
-    cpp_type: Value
-    serializer: Value::serializeForIDL
-    deserializer: Value::deserializeForIDL
+imports:
+  - "mongo/idl/basic_types.idl"
+  - "mongo/db/pipeline/value.idl"
+structs:
+  RangeSpec:
+    description: Specification for a range based densification.
+    strict: true
+    fields:
+      step:
+        description: "Step value. Assumed to be a number unless 'unit' is specified."
+        type: numeric
+        optional: false
+      unit:
+        description: "The time unit to be used for 'step' if densifying over dates."
+        optional: true
+        type: string
+      bounds:
+        description: "The bounds over which to densify. Defaults to 'full'."
+        optional: false
+        type: IDLAnyType
+  DensifySpec:
+    description: Specification for a $densify stage.
+    strict: true
+    fields:
+      field:
+        description: The field on which we are densifying.
+        type: string
+        optional: false
+      partitionByFields:
+        description: The field(s) that will be used as the partition keys.
+        type: array<string>
+        optional: true
+      range:
+        description: Specification for range based densification.
+        type: RangeSpec
+        optional: false

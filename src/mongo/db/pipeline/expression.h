@@ -1891,6 +1891,8 @@ public:
     explicit ExpressionFloor(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionSingleNumericArg<ExpressionFloor>(expCtx, std::move(children)) {}
 
+    static StatusWith<Value> apply(Value lhs);
+
     Value evaluateNumericArg(const Value& numericArg) const final;
     const char* getOpName() const final;
 
@@ -2298,6 +2300,8 @@ public:
         : ExpressionFixedArity<ExpressionMod, 2>(expCtx) {}
     ExpressionMod(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionFixedArity<ExpressionMod, 2>(expCtx, std::move(children)) {}
+
+    static StatusWith<Value> apply(Value lhs, Value rhs);
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;

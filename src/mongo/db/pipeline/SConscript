@@ -391,6 +391,7 @@ env.Library(
     source=[
         'document_source_change_stream.idl',
         'document_source_coll_stats.idl',
+        'document_source_densify.idl',
         'document_source_list_sessions.idl',
         'document_source_merge.idl',
         'document_source_merge_modes.idl',
