@@ -190,6 +190,63 @@ TEST(Accumulators, First) {
          {{Value(), Value(7)}, Value()}});
 }
 
+TEST(Accumulators, FirstN) {
+    RAIIServerParameterControllerForTest controller("featureFlagExactTopNAccumulator", true);
+    auto expCtx = ExpressionContextForTest{};
+    auto n = Value(2);
+
+    assertExpectedResults<AccumulatorFirstN>(
+        &expCtx,
+        {
+            // Basic test involving no values.
+            {{}, Value(std::vector<Value>{})},
+            // Basic test: testing 1 value.
+            {{Value(3)}, Value(std::vector<Value>{Value(3)})},
+            // Basic test involving 2 values.
+            {{Value(3), Value(4)}, Value(std::vector<Value>{Value(3), Value(4)})},
+
+            // Test that processes more than 'n' total values.
+            {{Value(4), Value(5), Value(6), Value(3), Value(2), Value(1)},
+             Value(std::vector<Value>{Value(4), Value(5)})},
+
+            // Null and missing values should NOT be ignored.
+            {{Value(), Value(BSONNULL), Value(4), Value(), Value(BSONNULL), Value(5), Value(6)},
+             Value(std::vector<Value>{Value(), Value(BSONNULL)})},
+
+            // Testing mixed types.
+            {{Value(4), Value("str"_sd), Value(3.2), Value(4.0)},
+             Value(std::vector<Value>{Value(4), Value("str"_sd)})},
+
+            // Testing duplicate values.
+            {{Value("std"_sd), Value("std"_sd), Value("test"_sd)},
+             Value(std::vector<Value>{Value("std"_sd), Value("std"_sd)})},
+
+            {{Value(9.1), Value(4.22), Value(4.22)},
+             Value(std::vector<Value>{Value(9.1), Value(4.22)})},
+        },
+        false, /* skipMerging */
+        n);
+
+    // Additional test partition where N = 1.
+    n = Value(1);
+    assertExpectedResults<AccumulatorFirstN>(
+        &expCtx,
+        {
+            // Basic test involving no values.
+            {{}, Value(std::vector<Value>{})},
+            // Basic test: testing 1 value.
+            {{Value(3)}, Value(std::vector<Value>{Value(3)})},
+            // Basic test involving 2 values.
+            {{Value(3), Value(4)}, Value(std::vector<Value>{Value(3)})},
+
+            // Test that processes more than 'n' total values.
+            {{Value(4), Value(5), Value(6), Value(3), Value(2), Value(1)},
+             Value(std::vector<Value>{Value(4)})},
+        },
+        false, /* skipMerging */
+        n);
+}
+
 TEST(Accumulators, Last) {
     auto expCtx = ExpressionContextForTest{};
     assertExpectedResults<AccumulatorLast>(
@@ -206,6 +263,80 @@ TEST(Accumulators, Last) {
          {{Value(5), Value(7)}, Value(7)},
          // The accumulator evaluates two documents and retains the missing value in the last.
          {{Value(7), Value()}, Value()}});
+}
+
+TEST(Accumulators, LastN) {
+    RAIIServerParameterControllerForTest controller("featureFlagExactTopNAccumulator", true);
+    auto expCtx = ExpressionContextForTest{};
+    auto n = Value(2);
+    assertExpectedResults<AccumulatorLastN>(
+        &expCtx,
+        {
+            // Basic test involving no values.
+            {{}, Value(std::vector<Value>{})},
+            // Basic test: testing 1 value.
+            {{Value(3)}, Value(std::vector<Value>{Value(3)})},
+            // Basic test involving 2 values.
+            {{Value(3), Value(4)}, Value(std::vector<Value>{Value(3), Value(4)})},
+
+            // Test that processes more than 'n' total values.
+            {{Value(4), Value(5), Value(6), Value(3), Value(2), Value(1)},
+             Value(std::vector<Value>{Value(2), Value(1)})},
+
+            // Null and missing values should NOT be ignored.
+            {{Value(), Value(BSONNULL), Value(4), Value(), Value(BSONNULL), Value(5), Value(6)},
+             Value(std::vector<Value>{Value(5), Value(6)})},
+
+            {{Value(),
+              Value(BSONNULL),
+              Value(),
+              Value(),
+              Value(),
+              Value(BSONNULL),
+              Value(BSONNULL)},
+             Value(std::vector<Value>{Value(BSONNULL), Value(BSONNULL)})},
+
+            {{Value(),
+              Value(BSONNULL),
+              Value(BSONNULL),
+              Value(BSONNULL),
+              Value(),
+              Value(),
+              Value()},
+             Value(std::vector<Value>{Value(), Value()})},
+
+            // Testing mixed types.
+            {{Value(4), Value("str"_sd), Value(3.2), Value(4.0)},
+             Value(std::vector<Value>{Value(3.2), Value(4.0)})},
+
+            // Testing duplicate values.
+            {{Value("std"_sd), Value("std"_sd), Value("test"_sd)},
+             Value(std::vector<Value>{Value("std"_sd), Value("test"_sd)})},
+
+            {{Value(9.1), Value(4.22), Value(4.22)},
+             Value(std::vector<Value>{Value(4.22), Value(4.22)})},
+        },
+        false, /* skipMerging */
+        n);
+
+    // Additional test partition where N = 1.
+    n = Value(1);
+    assertExpectedResults<AccumulatorLastN>(
+        &expCtx,
+        {
+            // Basic test involving no values.
+            {{}, Value(std::vector<Value>{})},
+            // Basic test: testing 1 value.
+            {{Value(3)}, Value(std::vector<Value>{Value(3)})},
+            // Basic test involving 2 values.
+            {{Value(3), Value(4)}, Value(std::vector<Value>{Value(4)})},
+
+            // Test that processes more than 'n' total values.
+            {{Value(4), Value(5), Value(6), Value(3), Value(2), Value(1)},
+             Value(std::vector<Value>{Value(1)})},
+        },
+        false, /* skipMerging */
+        n);
 }
 
 TEST(Accumulators, Min) {

@@ -32,6 +32,7 @@
 #include "mongo/base/initializer.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/accumulator_for_window_functions.h"
+#include "mongo/db/pipeline/accumulator_multi.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_set_window_fields_gen.h"
 #include "mongo/db/pipeline/window_function/window_bounds.h"
@@ -657,10 +658,7 @@ public:
 
 class ExpressionFirstLast : public Expression {
 public:
-    enum Sense : int {
-        kFirst,
-        kLast,
-    };
+    using Sense = AccumulatorFirstLastN::Sense;
 
     static boost::intrusive_ptr<Expression> parse(BSONObj obj,
                                                   const boost::optional<SortPattern>& sortBy,

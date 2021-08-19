@@ -29,10 +29,11 @@
 
 #pragma once
 
+#include <deque>
+
 #include "mongo/db/pipeline/accumulation_statement.h"
 
 namespace mongo {
-using Sense = AccumulatorMinMax::Sense;
 
 /**
  * An AccumulatorN picks 'n' of its input values and returns them in an array. Each derived class
@@ -44,9 +45,10 @@ using Sense = AccumulatorMinMax::Sense;
 class AccumulatorN : public AccumulatorState {
 public:
     AccumulatorN(ExpressionContext* expCtx);
-    /**
-     * Initialize 'n' with 'input'. In particular, verifies that 'input' is a positive integer.
-     */
+
+    void processInternal(const Value& input, bool merging) final;
+
+    // Initialize 'n' with 'input'. In particular, verifies that 'input' is a positive integer.
     void startNewGroup(const Value& input) final;
 
     /**
@@ -72,16 +74,20 @@ protected:
 private:
     static constexpr auto kFieldNameN = "n"_sd;
     static constexpr auto kFieldNameOutput = "output"_sd;
+
+    virtual void processValue(const Value& val) = 0;
 };
 class AccumulatorMinMaxN : public AccumulatorN {
 public:
-    AccumulatorMinMaxN(ExpressionContext* expCtx, Sense sense);
+    using MinMaxSense = AccumulatorMinMax::Sense;
+
+    AccumulatorMinMaxN(ExpressionContext* expCtx, MinMaxSense sense);
 
     /**
      * Verifies that 'elem' is an object, delegates argument parsing to 'AccumulatorN::parseArgs',
      * and constructs an AccumulationExpression representing $minN or $maxN depending on 's'.
      */
-    template <Sense s>
+    template <MinMaxSense s>
     static AccumulationExpression parseMinMaxN(ExpressionContext* expCtx,
                                                BSONElement elem,
                                                VariablesParseState vps);
@@ -89,12 +95,10 @@ public:
     /**
      * Constructs an Expression representing $minN or $maxN depending on 's'.
      */
-    template <Sense s>
+    template <MinMaxSense s>
     static boost::intrusive_ptr<Expression> parseExpression(ExpressionContext* expCtx,
                                                             BSONElement exprElement,
                                                             const VariablesParseState& vps);
-
-    void processInternal(const Value& input, bool merging) final;
 
     Value getValue(bool toBeMerged) final;
 
@@ -115,17 +119,17 @@ public:
     }
 
 private:
-    void processValue(const Value& val);
+    void processValue(const Value& val) final;
 
     ValueMultiset _set;
-    Sense _sense;
+    MinMaxSense _sense;
 };
 
 class AccumulatorMinN : public AccumulatorMinMaxN {
 public:
     static constexpr auto kName = "$minN"_sd;
-    explicit AccumulatorMinN(ExpressionContext* const expCtx)
-        : AccumulatorMinMaxN(expCtx, Sense::kMin) {}
+    explicit AccumulatorMinN(ExpressionContext* expCtx)
+        : AccumulatorMinMaxN(expCtx, MinMaxSense::kMin) {}
 
     static const char* getName();
 
@@ -135,8 +139,74 @@ public:
 class AccumulatorMaxN : public AccumulatorMinMaxN {
 public:
     static constexpr auto kName = "$maxN"_sd;
-    explicit AccumulatorMaxN(ExpressionContext* const expCtx)
-        : AccumulatorMinMaxN(expCtx, Sense::kMax) {}
+    explicit AccumulatorMaxN(ExpressionContext* expCtx)
+        : AccumulatorMinMaxN(expCtx, MinMaxSense::kMax) {}
+
+    static const char* getName();
+
+    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx);
+};
+
+class AccumulatorFirstLastN : public AccumulatorN {
+public:
+    enum Sense : int {
+        kFirst = 1,
+        kLast = -1,
+    };
+
+    AccumulatorFirstLastN(ExpressionContext* expCtx, Sense variant);
+
+    /**
+     * Verifies that 'elem' is an object, delegates argument parsing to 'AccumulatorN::parseArgs',
+     * and constructs an AccumulationExpression representing $firstN or $lastN depending on 's'.
+     */
+    template <Sense s>
+    static AccumulationExpression parseFirstLastN(ExpressionContext* expCtx,
+                                                  BSONElement elem,
+                                                  VariablesParseState vps);
+
+    const char* getOpName() const final;
+
+    Document serialize(boost::intrusive_ptr<Expression> initializer,
+                       boost::intrusive_ptr<Expression> argument,
+                       bool explain) const final;
+
+    void reset() final;
+
+    bool isAssociative() const final {
+        return true;
+    }
+
+    bool isCommutative() const final {
+        return true;
+    }
+
+    Value getValue(bool toBeMerged) final;
+
+private:
+    // firstN/lastN do NOT ignore null values.
+    void processValue(const Value& val) final;
+
+    std::deque<Value> _deque;
+    Sense _variant;
+};
+
+class AccumulatorFirstN : public AccumulatorFirstLastN {
+public:
+    static constexpr auto kName = "$firstN"_sd;
+    explicit AccumulatorFirstN(ExpressionContext* expCtx)
+        : AccumulatorFirstLastN(expCtx, Sense::kFirst) {}
+
+    static const char* getName();
+
+    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx);
+};
+
+class AccumulatorLastN : public AccumulatorFirstLastN {
+public:
+    static constexpr auto kName = "$lastN"_sd;
+    explicit AccumulatorLastN(ExpressionContext* expCtx)
+        : AccumulatorFirstLastN(expCtx, Sense::kLast) {}
 
     static const char* getName();
 

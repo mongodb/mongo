@@ -30,25 +30,38 @@
 #include "mongo/db/pipeline/accumulator_multi.h"
 
 namespace mongo {
+using FirstLastSense = AccumulatorFirstLastN::Sense;
+using MinMaxSense = AccumulatorMinMax::Sense;
+
 REGISTER_ACCUMULATOR_WITH_MIN_VERSION(
     maxN,
-    AccumulatorMinMaxN::parseMinMaxN<Sense::kMax>,
+    AccumulatorMinMaxN::parseMinMaxN<MinMaxSense::kMax>,
     ServerGlobalParams::FeatureCompatibility::Version::kVersion51);
 REGISTER_ACCUMULATOR_WITH_MIN_VERSION(
     minN,
-    AccumulatorMinMaxN::parseMinMaxN<Sense::kMin>,
+    AccumulatorMinMaxN::parseMinMaxN<MinMaxSense::kMin>,
     ServerGlobalParams::FeatureCompatibility::Version::kVersion51);
 REGISTER_EXPRESSION_WITH_MIN_VERSION(maxN,
-                                     AccumulatorMinMaxN::parseExpression<Sense::kMax>,
+                                     AccumulatorMinMaxN::parseExpression<MinMaxSense::kMax>,
                                      AllowedWithApiStrict::kNeverInVersion1,
                                      AllowedWithClientType::kAny,
                                      ServerGlobalParams::FeatureCompatibility::Version::kVersion51);
 REGISTER_EXPRESSION_WITH_MIN_VERSION(minN,
-                                     AccumulatorMinMaxN::parseExpression<Sense::kMin>,
+                                     AccumulatorMinMaxN::parseExpression<MinMaxSense::kMin>,
                                      AllowedWithApiStrict::kNeverInVersion1,
                                      AllowedWithClientType::kAny,
                                      ServerGlobalParams::FeatureCompatibility::Version::kVersion51);
+REGISTER_ACCUMULATOR_WITH_MIN_VERSION(
+    firstN,
+    AccumulatorFirstLastN::parseFirstLastN<FirstLastSense::kFirst>,
+    ServerGlobalParams::FeatureCompatibility::Version::kVersion51);
+REGISTER_ACCUMULATOR_WITH_MIN_VERSION(
+    lastN,
+    AccumulatorFirstLastN::parseFirstLastN<FirstLastSense::kLast>,
+    ServerGlobalParams::FeatureCompatibility::Version::kVersion51);
+// TODO SERVER-57881 Add $firstN/$lastN as expressions.
 // TODO SERVER-57885 Add $minN/$maxN as window functions.
+// TODO SERVER-57884 Add $firstN/$lastN as window functions.
 
 AccumulatorN::AccumulatorN(ExpressionContext* const expCtx)
     : AccumulatorState(expCtx), _maxMemUsageBytes(internalQueryMaxNAccumulatorBytes.load()) {}
@@ -68,7 +81,21 @@ void AccumulatorN::startNewGroup(const Value& input) {
     _n = n;
 }
 
-AccumulatorMinMaxN::AccumulatorMinMaxN(ExpressionContext* const expCtx, Sense sense)
+void AccumulatorN::processInternal(const Value& input, bool merging) {
+    tassert(5787802, "'n' must be initialized", _n);
+
+    if (merging) {
+        tassert(5787803, "input must be an array when 'merging' is true", input.isArray());
+        auto array = input.getArray();
+        for (auto&& val : array) {
+            processValue(val);
+        }
+    } else {
+        processValue(input);
+    }
+}
+
+AccumulatorMinMaxN::AccumulatorMinMaxN(ExpressionContext* const expCtx, MinMaxSense sense)
     : AccumulatorN(expCtx),
       _set(expCtx->getValueComparator().makeOrderedValueMultiset()),
       _sense(sense) {
@@ -76,7 +103,7 @@ AccumulatorMinMaxN::AccumulatorMinMaxN(ExpressionContext* const expCtx, Sense se
 }
 
 const char* AccumulatorMinMaxN::getOpName() const {
-    if (_sense == Sense::kMin) {
+    if (_sense == MinMaxSense::kMin) {
         return AccumulatorMinN::getName();
     } else {
         return AccumulatorMaxN::getName();
@@ -91,11 +118,11 @@ Document AccumulatorMinMaxN::serialize(boost::intrusive_ptr<Expression> initiali
     return DOC(getOpName() << args.freeze());
 }
 
-template <Sense s>
+template <MinMaxSense s>
 boost::intrusive_ptr<Expression> AccumulatorMinMaxN::parseExpression(
     ExpressionContext* const expCtx, BSONElement exprElement, const VariablesParseState& vps) {
     auto accExpr = AccumulatorMinMaxN::parseMinMaxN<s>(expCtx, exprElement, vps);
-    if constexpr (s == Sense::kMin) {
+    if constexpr (s == MinMaxSense::kMin) {
         return make_intrusive<ExpressionFromAccumulatorN<AccumulatorMinN>>(
             expCtx, std::move(accExpr.initializer), std::move(accExpr.argument));
     } else {
@@ -117,7 +144,7 @@ AccumulatorN::parseArgs(ExpressionContext* const expCtx,
         } else if (fieldName == kFieldNameN) {
             n = Expression::parseOperand(expCtx, element, vps);
         } else {
-            uasserted(5787901, str::stream() << "Unknown argument to minN/maxN: " << fieldName);
+            uasserted(5787901, str::stream() << "Unknown argument for 'n' operator: " << fieldName);
         }
     }
     uassert(5787906, str::stream() << "Missing value for " << kFieldNameN << "'", n);
@@ -133,12 +160,12 @@ void AccumulatorN::serializeHelper(const boost::intrusive_ptr<Expression>& initi
     md.addField(kFieldNameOutput, Value(argument->serialize(explain)));
 }
 
-template <Sense s>
+template <MinMaxSense s>
 AccumulationExpression AccumulatorMinMaxN::parseMinMaxN(ExpressionContext* const expCtx,
                                                         BSONElement elem,
                                                         VariablesParseState vps) {
     auto name = [] {
-        if constexpr (s == Sense::kMin) {
+        if constexpr (s == MinMaxSense::kMin) {
             return AccumulatorMinN::getName();
         } else {
             return AccumulatorMaxN::getName();
@@ -158,7 +185,7 @@ AccumulationExpression AccumulatorMinMaxN::parseMinMaxN(ExpressionContext* const
     auto [n, output] = AccumulatorN::parseArgs(expCtx, obj, vps);
 
     auto factory = [expCtx] {
-        if constexpr (s == Sense::kMin) {
+        if constexpr (s == MinMaxSense::kMin) {
             return AccumulatorMinN::create(expCtx);
         } else {
             return AccumulatorMaxN::create(expCtx);
@@ -176,7 +203,7 @@ void AccumulatorMinMaxN::processValue(const Value& val) {
     // Only compare if we have 'n' elements.
     if (static_cast<long long>(_set.size()) == *_n) {
         // Get an iterator to the element we want to compare against.
-        auto cmpElem = _sense == Sense::kMin ? std::prev(_set.end()) : _set.begin();
+        auto cmpElem = _sense == MinMaxSense::kMin ? std::prev(_set.end()) : _set.begin();
 
         auto cmp = getExpressionContext()->getValueComparator().compare(*cmpElem, val) * _sense;
         if (cmp > 0) {
@@ -195,24 +222,10 @@ void AccumulatorMinMaxN::processValue(const Value& val) {
     _set.emplace(val);
 }
 
-void AccumulatorMinMaxN::processInternal(const Value& input, bool merging) {
-    tassert(5787904, "'n' must be initialized", _n);
-
-    if (merging) {
-        tassert(5787905, "input must be an array when 'merging' is true", input.isArray());
-        auto array = input.getArray();
-        for (auto&& val : array) {
-            processValue(val);
-        }
-    } else {
-        processValue(input);
-    }
-}
-
 Value AccumulatorMinMaxN::getValue(bool toBeMerged) {
     // Return the values in ascending order for 'kMin' and descending order for 'kMax'.
-    return Value(_sense == Sense::kMin ? std::vector<Value>(_set.begin(), _set.end())
-                                       : std::vector<Value>(_set.rbegin(), _set.rend()));
+    return Value(_sense == MinMaxSense::kMin ? std::vector<Value>(_set.begin(), _set.end())
+                                             : std::vector<Value>(_set.rbegin(), _set.rend()));
 }
 
 void AccumulatorMinMaxN::reset() {
@@ -235,4 +248,107 @@ const char* AccumulatorMaxN::getName() {
 boost::intrusive_ptr<AccumulatorState> AccumulatorMaxN::create(ExpressionContext* const expCtx) {
     return make_intrusive<AccumulatorMaxN>(expCtx);
 }
+
+AccumulatorFirstLastN::AccumulatorFirstLastN(ExpressionContext* const expCtx, FirstLastSense sense)
+    : AccumulatorN(expCtx), _deque(std::deque<Value>()), _variant(sense) {
+    _memUsageBytes = sizeof(*this);
+}
+
+// TODO SERVER-59327 Deduplicate with the block in 'AccumulatorMinMaxN::parseMinMaxN'
+template <FirstLastSense v>
+AccumulationExpression AccumulatorFirstLastN::parseFirstLastN(ExpressionContext* const expCtx,
+                                                              BSONElement elem,
+                                                              VariablesParseState vps) {
+    auto name = [] {
+        if constexpr (v == Sense::kFirst) {
+            return AccumulatorFirstN::getName();
+        } else {
+            return AccumulatorLastN::getName();
+        }
+    }();
+
+    // TODO SERVER-58379 Remove this uassert once the FCV constants are upgraded and the REGISTER
+    // macros above are updated accordingly.
+    uassert(5787800,
+            str::stream() << "Cannot create " << name << " accumulator if feature flag is disabled",
+            feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
+    uassert(5787801,
+            str::stream() << "specification must be an object; found " << elem,
+            elem.type() == BSONType::Object);
+    auto obj = elem.embeddedObject();
+
+    auto [n, output] = AccumulatorN::parseArgs(expCtx, obj, vps);
+
+    auto factory = [expCtx] {
+        if constexpr (v == Sense::kFirst) {
+            return AccumulatorFirstN::create(expCtx);
+        } else {
+            return AccumulatorLastN::create(expCtx);
+        }
+    };
+
+    return {std::move(n), std::move(output), std::move(factory), name};
+}
+
+void AccumulatorFirstLastN::processValue(const Value& val) {
+    // Only insert in the lastN case if we have 'n' elements.
+    if (static_cast<long long>(_deque.size()) == *_n) {
+        if (_variant == Sense::kLast) {
+            _memUsageBytes -= _deque.front().getApproximateSize();
+            _deque.pop_front();
+        } else {
+            return;
+        }
+    }
+
+    _memUsageBytes += val.getApproximateSize();
+    uassert(ErrorCodes::ExceededMemoryLimit,
+            str::stream() << getOpName()
+                          << " used too much memory and cannot spill to disk. Memory limit: "
+                          << _maxMemUsageBytes << " bytes",
+            _memUsageBytes < _maxMemUsageBytes);
+    _deque.push_back(val);
+}
+
+const char* AccumulatorFirstLastN::getOpName() const {
+    if (_variant == Sense::kFirst) {
+        return AccumulatorFirstN::getName();
+    } else {
+        return AccumulatorLastN::getName();
+    }
+}
+
+Document AccumulatorFirstLastN::serialize(boost::intrusive_ptr<Expression> initializer,
+                                          boost::intrusive_ptr<Expression> argument,
+                                          bool explain) const {
+    MutableDocument args;
+    AccumulatorN::serializeHelper(initializer, argument, explain, args);
+    return DOC(getOpName() << args.freeze());
+}
+
+void AccumulatorFirstLastN::reset() {
+    _deque = std::deque<Value>();
+    _memUsageBytes = sizeof(*this);
+}
+
+Value AccumulatorFirstLastN::getValue(bool toBeMerged) {
+    return Value(std::vector<Value>(_deque.begin(), _deque.end()));
+}
+
+const char* AccumulatorFirstN::getName() {
+    return kName.rawData();
+}
+
+boost::intrusive_ptr<AccumulatorState> AccumulatorFirstN::create(ExpressionContext* const expCtx) {
+    return make_intrusive<AccumulatorFirstN>(expCtx);
+}
+
+const char* AccumulatorLastN::getName() {
+    return kName.rawData();
+}
+
+boost::intrusive_ptr<AccumulatorState> AccumulatorLastN::create(ExpressionContext* const expCtx) {
+    return make_intrusive<AccumulatorLastN>(expCtx);
+}
+
 }  // namespace mongo
