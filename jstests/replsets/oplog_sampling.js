@@ -7,8 +7,15 @@
 "use strict";
 
 // Force oplog sampling to occur on start up for small numbers of oplog inserts.
-const replSet = new ReplSetTest(
-    {nodes: 1, nodeOptions: {setParameter: {"maxOplogTruncationPointsDuringStartup": 10}}});
+const replSet = new ReplSetTest({
+    nodes: 1,
+    nodeOptions: {
+        setParameter: {
+            "maxOplogTruncationPointsDuringStartup": 10,
+            logComponentVerbosity: tojson({storage: {verbosity: 2}}),
+        }
+    }
+});
 replSet.startSet();
 replSet.initiate();
 
