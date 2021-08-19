@@ -66,9 +66,9 @@ Value RemovableSum::getValue() const {
         return Value(decVal.toDouble());  // Narrow Decimal128 to double if overflows long.
     }
     if (val.getType() == NumberDouble && _doubleCount == 0 &&
-        val.getDouble() > std::numeric_limits<long long>::min() &&
-        val.getDouble() < std::numeric_limits<long long>::max()) {  // Narrow double to integral
-        return Value::createIntOrLong(llround(val.getDouble()));
+        val.getDouble() >= std::numeric_limits<long long>::min() &&
+        val.getDouble() < static_cast<double>(std::numeric_limits<long long>::max())) {
+        return Value::createIntOrLong(llround(val.getDouble()));  // Narrow double to integral.
     }
     if (val.getType() == NumberLong) {  // Narrow long to int
         return Value::createIntOrLong(val.getLong());
