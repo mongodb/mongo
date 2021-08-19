@@ -218,7 +218,8 @@ TEST(BSONElementHasher, HashIntOrLongOrDouble) {
     ASSERT_EQUALS(hashIt(o), 1143184177162245883LL);
 
     // Large/small double values.
-    ASSERT(std::numeric_limits<long long>::max() < std::numeric_limits<double>::max());
+    ASSERT(static_cast<double>(std::numeric_limits<long long>::max()) <
+           std::numeric_limits<double>::max());
     o = BSON("check" << std::numeric_limits<double>::max());
     ASSERT_EQUALS(hashIt(o), 921523596458303250LL);
     o = BSON("check" << std::numeric_limits<long long>::max());  // 9223372036854775807

@@ -487,8 +487,8 @@ class LongDoubleNoOverflow : public TwoOperandBase {
         return BSON("" << double(numeric_limits<long long>::max()));
     }
     BSONObj expectedResult() {
-        return BSON("" << numeric_limits<long long>::max() +
-                        double(numeric_limits<long long>::max()));
+        return BSON("" << static_cast<double>(numeric_limits<long long>::max()) +
+                        static_cast<double>(numeric_limits<long long>::max()));
     }
 };
 
@@ -3317,7 +3317,7 @@ TEST(ExpressionSubtractTest, OverflowLong) {
     expression = Expression::parseExpression(&expCtx, obj, expCtx.variablesParseState);
     result = expression->evaluate({}, &expCtx.variables);
     ASSERT_EQ(result.getType(), BSONType::NumberDouble);
-    ASSERT_EQ(result.getDouble(), static_cast<double>(minLong) - maxLong);
+    ASSERT_EQ(result.getDouble(), static_cast<double>(minLong) - static_cast<double>(maxLong));
 
     // minLong = -1 - maxLong. The below subtraction should fit into long long data type.
     obj = BSON("$subtract" << BSON_ARRAY(-1 << maxLong));

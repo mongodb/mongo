@@ -711,7 +711,7 @@ TEST_F(ExpressionTruncOneArgTest, DoubleArg1) {
 
     // Outside the range of long longs (there isn't enough precision for decimals in this range, so
     // should just preserve the number).
-    double largerThanLong = numeric_limits<long long>::max() * 2.0;
+    double largerThanLong = static_cast<double>(numeric_limits<long long>::max()) * 2.0;
     assertEval(largerThanLong, largerThanLong);
     double smallerThanLong = numeric_limits<long long>::min() * 2.0;
     assertEval(smallerThanLong, smallerThanLong);
@@ -933,7 +933,7 @@ TEST_F(ExpressionCeilTest, DoubleArg) {
 
     // Outside the range of long longs (there isn't enough precision for decimals in this range, so
     // ceil should just preserve the number).
-    double largerThanLong = numeric_limits<long long>::max() * 2.0;
+    double largerThanLong = static_cast<double>(numeric_limits<long long>::max()) * 2.0;
     assertEvaluates(Value(largerThanLong), Value(largerThanLong));
     double smallerThanLong = numeric_limits<long long>::min() * 2.0;
     assertEvaluates(Value(smallerThanLong), Value(smallerThanLong));
@@ -991,7 +991,7 @@ TEST_F(ExpressionFloorTest, DoubleArg) {
 
     // Outside the range of long longs (there isn't enough precision for decimals in this range, so
     // floor should just preserve the number).
-    double largerThanLong = numeric_limits<long long>::max() * 2.0;
+    double largerThanLong = static_cast<double>(numeric_limits<long long>::max()) * 2.0;
     assertEvaluates(Value(largerThanLong), Value(largerThanLong));
     double smallerThanLong = numeric_limits<long long>::min() * 2.0;
     assertEvaluates(Value(smallerThanLong), Value(smallerThanLong));
@@ -1076,7 +1076,7 @@ TEST_F(ExpressionRoundOneArgTest, DoubleArg1) {
 
     // Outside the range of long longs (there isn't enough precision for decimals in this range, so
     // should just preserve the number).
-    double largerThanLong = numeric_limits<long long>::max() * 2.0;
+    double largerThanLong = static_cast<double>(numeric_limits<long long>::max()) * 2.0;
     assertEval(largerThanLong, largerThanLong);
     double smallerThanLong = numeric_limits<long long>::min() * 2.0;
     assertEval(smallerThanLong, smallerThanLong);

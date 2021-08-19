@@ -189,9 +189,10 @@ TEST(Addition, Overflow64toDouble) {
     const SafeNum int64MinusOne(maxInt64 + -1);
     ASSERT_EQUALS(int64MinusOne.type(), mongo::NumberLong);
 
-    const SafeNum doubleResult(std::numeric_limits<int64_t>::max() + static_cast<double>(1));
+    const SafeNum doubleResult(static_cast<double>(std::numeric_limits<int64_t>::max()));
     ASSERT_EQUALS(doubleResult.type(), mongo::NumberDouble);
     ASSERT_NOT_EQUALS(int64PlusOne, doubleResult);
+    ASSERT_NOT_EQUALS(maxInt64, doubleResult);
 }
 
 TEST(Addition, OverflowDouble) {
@@ -474,7 +475,7 @@ TEST(Multiplication, Overflow64toDouble) {
     const SafeNum int64TimesTwo(maxInt64 * 2);
     ASSERT_EQUALS(int64TimesTwo.type(), mongo::EOO);
 
-    const SafeNum doubleResult(std::numeric_limits<int64_t>::max() * static_cast<double>(2));
+    const SafeNum doubleResult(static_cast<double>(std::numeric_limits<int64_t>::max()) * 2);
     ASSERT_EQUALS(doubleResult.type(), mongo::NumberDouble);
     ASSERT_NOT_EQUALS(int64TimesTwo, doubleResult);
 }
