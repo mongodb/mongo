@@ -1081,3 +1081,14 @@ TEST(Simple8b, RleEightSelectorLarge) {
                                            0x88, 0xF4, 0xE8, 0xD1, 0xA3, 0x47, 0x8F, 0x1E};
     testSimple8b(expectedInts, expectedBinary);
 }
+
+TEST(Simple8b, EightSelectorLargeMax) {
+    // Selector 8 value
+    // 1111 + 124 zeros
+    // This should be encoded as
+    // [001111] [11111]  x5 [1001] [1000] = 1FF3FE7FCFF9FF98
+    uint128_t val = absl::MakeUint128(0xF000000000000000, 0x0);
+    std::vector<boost::optional<uint128_t>> expectedInts(5, val);
+    std::vector<uint8_t> expectedBinary = {0x98, 0xFF, 0xF9, 0xCF, 0x7F, 0xFE, 0xF3, 0x1f};
+    testSimple8b(expectedInts, expectedBinary);
+}

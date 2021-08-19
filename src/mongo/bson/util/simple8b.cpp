@@ -468,9 +468,15 @@ bool Simple8bBuilder<T>::_appendValue(T value, bool tryRle) {
     } else if (trailingZerosCount == kTrailingZerosMaxCount[kEightSelectorSmall]) {
         meaningfulValueBitsStoredWithEightSmall =
             _countBitsWithoutLeadingZeros(value >> trailingZerosCount);
-    } else if (trailingZerosCount == kTrailingZerosMaxCount[kEightSelectorLarge]) {
-        meaningfulValueBitsStoredWithEightLarge =
-            _countBitsWithoutLeadingZeros(value >> trailingZerosCount);
+    }
+
+    // This case is specifically for 128 bit types where we have 124 zeros or max zeros
+    // count. We do not need to even check this for 64 bit types
+    if constexpr (std::is_same<T, uint128_t>::value) {
+        if (trailingZerosCount == kTrailingZerosMaxCount[kEightSelectorLarge]) {
+            meaningfulValueBitsStoredWithEightLarge =
+                _countBitsWithoutLeadingZeros(value >> trailingZerosCount);
+        }
     }
 
     std::array<uint8_t, 4> zeroCount = {0,
