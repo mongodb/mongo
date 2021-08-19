@@ -101,6 +101,17 @@ expectedResults = [
 ];
 testPipeline(pipeline, expectedResults, coll);
 
+// Basic non-equi theta join via $group.
+pipeline =
+    [{$lookup: {from: "from", pipeline: [{$group: {_id: "$_id", avg: {$avg: "$_id"}}}], as: "c"}}];
+
+expectedResults = [
+    {"_id": 1, x: 1, "c": [{"_id": 1, "avg": 1}, {"_id": 2, "avg": 2}, {"_id": 3, "avg": 3}]},
+    {"_id": 2, x: 2, "c": [{"_id": 1, "avg": 1}, {"_id": 2, "avg": 2}, {"_id": 3, "avg": 3}]},
+    {"_id": 3, x: 3, "c": [{"_id": 1, "avg": 1}, {"_id": 2, "avg": 2}, {"_id": 3, "avg": 3}]},
+];
+testPipeline(pipeline, expectedResults, coll);
+
 // Multi-level join using $match.
 pipeline = [
         {

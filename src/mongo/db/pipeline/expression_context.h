@@ -252,6 +252,10 @@ public:
         boost::optional<UUID> uuid = boost::none,
         boost::optional<std::unique_ptr<CollatorInterface>> updatedCollator = boost::none) const;
 
+    /**
+     * Returns an ExpressionContext that is identical to 'this' except for the 'subPipelineDepth'
+     * and 'needsMerge' fields.
+     */
     boost::intrusive_ptr<ExpressionContext> copyForSubPipeline(NamespaceString nss) const {
         uassert(ErrorCodes::MaxSubPipelineDepthExceeded,
                 str::stream() << "Maximum number of nested sub-pipelines exceeded. Limit is "
@@ -259,6 +263,10 @@ public:
                 subPipelineDepth < kMaxSubPipelineViewDepth);
         auto newCopy = copyWith(std::move(nss));
         newCopy->subPipelineDepth += 1;
+        // The original expCtx might have been attached to an aggregation pipeline running on the
+        // shards. We must reset 'needsMerge' in order to get fully merged results for the
+        // subpipeline.
+        newCopy->needsMerge = false;
         return newCopy;
     }
 
