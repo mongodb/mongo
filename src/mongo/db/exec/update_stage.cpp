@@ -138,7 +138,8 @@ UpdateStage::UpdateStage(ExpressionContext* expCtx,
 
     _isUserInitiatedWrite = opCtx()->writesAreReplicated() &&
         !(request->isFromOplogApplication() ||
-          params.driver->type() == UpdateDriver::UpdateType::kDelta || request->isFromMigration());
+          params.driver->type() == UpdateDriver::UpdateType::kDelta ||
+          request->source() == OperationSource::kFromMigrate);
 
     _specificStats.isModUpdate = params.driver->type() == UpdateDriver::UpdateType::kOperator;
 }
@@ -266,11 +267,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
         }
 
         // Ensure we set the type correctly
-        if (request->isFromMigration()) {
-            args.source = OperationSource::kFromMigrate;
-        } else if (request->isTimeseries()) {
-            args.source = OperationSource::kTimeseriesInsert;
-        }
+        args.source = request->source();
 
         if (inPlace) {
             if (!request->explain()) {

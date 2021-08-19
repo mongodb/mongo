@@ -201,15 +201,6 @@ public:
         return _source;
     }
 
-    bool isFromMigration() const {
-        return _source == OperationSource::kFromMigrate;
-    }
-
-    bool isTimeseries() const {
-        return _source == OperationSource::kTimeseriesInsert ||
-            _source == OperationSource::kTimeseriesUpdate;
-    }
-
     void setFromOplogApplication(bool value = true) {
         _fromOplogApplication = value;
     }
@@ -292,11 +283,11 @@ public:
             builder << " letParameters: " << _letParameters;
         }
 
+        builder << " source: " << mongo::toString(_source);
+
         builder << " god: " << _god;
         builder << " upsert: " << isUpsert();
         builder << " multi: " << isMulti();
-        builder << " fromMigration: " << isFromMigration();
-        builder << " timeseries: " << isTimeseries();
         builder << " fromOplogApplication: " << _fromOplogApplication;
         builder << " isExplain: " << static_cast<bool>(_explain);
         return builder.str();

@@ -160,8 +160,11 @@ void UpsertStage::_performInsert(BSONObj newDocument) {
             insertStmt.oplogSlot = oplogSlots.front();
         }
 
-        uassertStatusOK(collection()->insertDocument(
-            opCtx(), insertStmt, _params.opDebug, _params.request->isFromMigration()));
+        uassertStatusOK(collection()->insertDocument(opCtx(),
+                                                     insertStmt,
+                                                     _params.opDebug,
+                                                     _params.request->source() ==
+                                                         OperationSource::kFromMigrate));
 
         // Technically, we should save/restore state here, but since we are going to return
         // immediately after, it would just be wasted work.
