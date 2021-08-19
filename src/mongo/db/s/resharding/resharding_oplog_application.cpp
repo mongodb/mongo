@@ -86,7 +86,11 @@ void runWithTransaction(OperationContext* opCtx, unique_function<void(OperationC
         }
     });
 
-    txnParticipant.beginOrContinue(asr.opCtx(), txnNumber, false, true);
+    txnParticipant.beginOrContinue(asr.opCtx(),
+                                   txnNumber,
+                                   false /* autocommit */,
+                                   true /* startTransaction */,
+                                   boost::none /* txnRetryCounter */);
     txnParticipant.unstashTransactionResources(asr.opCtx(), "reshardingOplogApplication");
 
     func(asr.opCtx());

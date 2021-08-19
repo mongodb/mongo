@@ -55,6 +55,14 @@ types:
     cpp_type: "std::int32_t"
     deserializer: "mongo::BSONElement::_numberInt"
 
+  TxnRetryCounter:
+    description: "A strictly-increasing per-transaction counter that starts at 0 and is incremented
+                  every time the transaction is internally retried on a transient transaction
+                  error."
+    bson_serialization_type: int
+    cpp_type: "std::int32_t"
+    deserializer: "mongo::BSONElement::_numberInt"
+
 structs:
   InternalSessionFields:
     description: "Internal sessiond id fields"
@@ -131,6 +139,10 @@ structs:
                       operation executes."
         type: TxnNumber
         optional: true
+      txnRetryCounter:
+        description: "The transaction retry counter for this transaction."
+        type: TxnRetryCounter
+        optional: true
 
   OperationSessionInfoFromClient:
     description: "Parser for pulling out the sessionId/txnNumber combination from commands"
@@ -144,6 +156,10 @@ structs:
         description: "The transaction number relative to the session in which a particular write
                       operation executes."
         type: TxnNumber
+        optional: true
+      txnRetryCounter:
+        description: "The transaction retry counter for this transaction."
+        type: TxnRetryCounter
         optional: true
       autocommit:
         type: bool

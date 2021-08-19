@@ -64,6 +64,7 @@ env.Library(
         'grid',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/internal_transactions_feature_flag',
         '$BUILD_DIR/mongo/db/sessions_collection',
     ],
 )

@@ -275,6 +275,14 @@ public:
         }
 
         /**
+         * Returns the last used transaction retry counter for the currently active transaction on
+         * this participant.
+         */
+        TxnRetryCounter getActiveTxnRetryCounter() const {
+            return o().activeTxnRetryCounter;
+        }
+
+        /**
          * Returns the op time of the last committed write for this session and transaction. If no
          * write has completed yet, returns an empty timestamp.
          */
@@ -401,13 +409,20 @@ public:
          *
          * 'startTransaction' comes from the 'startTransaction' field in the original client
          * request. See below for the acceptable values and the meaning of the combinations of
-         * autocommit and startTransaction.
+         * autocommit, startTransaction and txnRetryCounter.
          *
-         * autocommit = boost::none, startTransaction = boost::none: Means retryable write
-         * autocommit = false, startTransaction = boost::none: Means continuation of a
-         * multi-statement transaction
-         * autocommit = false, startTransaction = true: Means abort whatever transaction is in
-         * progress on the session and start a new transaction
+         * autocommit = boost::none, startTransaction = boost::none and txnRetryCounter =
+         * boost::none means retryable write.
+         *
+         * autocommit = false, startTransaction = boost::none and txnRetryCounter = last seen
+         * txnRetryCounter means continuation of a multi-statement transaction.
+         *
+         * autocommit = false, startTransaction = true, txnNumber = active txnNumber and
+         * txnRetryCounter > last seen txnRetryCounter (defaults to 0) means restart the existing
+         * transaction as long as it has not been committed or prepared.
+         *
+         * autocommit = false, startTransaction = true, txnNumber > active txnNumber means abort
+         * whatever transaction is in progress on the session and starts a new transaction.
          *
          * Any combination other than the ones listed above will invariant since it is expected that
          * the caller has performed the necessary customer input validations.
@@ -415,6 +430,11 @@ public:
          * Exceptions of note, which can be thrown are:
          *   - TransactionTooOld - if an attempt is made to start a transaction older than the
          * currently active one or the last one which committed
+         *   - TxnRetryCounterTooOld - if an attempt is made to start or continue a transaction with
+         * a txnRetryCounter less than the last seen one.
+         *   - IllegalOperation - if an attempt is made to use a txnRetryCounter greater than the
+         * last seen one to continue a transaction, or to restart a transaction that has already
+         * been committed or prepared.
          *   - PreparedTransactionInProgress - if the transaction is in the prepared state and a new
          * transaction or retryable write is attempted
          *   - NotWritablePrimary - if the node is not a primary when this method is called.
@@ -426,7 +446,8 @@ public:
         void beginOrContinue(OperationContext* opCtx,
                              TxnNumber txnNumber,
                              boost::optional<bool> autocommit,
-                             boost::optional<bool> startTransaction);
+                             boost::optional<bool> startTransaction,
+                             boost::optional<TxnRetryCounter> txnRetryCounter);
 
         /**
          * Used only by the secondary oplog application logic. Similar to 'beginOrContinue' without
@@ -434,7 +455,8 @@ public:
          * the past.
          */
         void beginOrContinueTransactionUnconditionally(OperationContext* opCtx,
-                                                       TxnNumber txnNumber);
+                                                       TxnNumber txnNumber,
+                                                       TxnRetryCounter txnRetryCounter);
 
         /**
          * If the participant is in prepare, returns a future whose promise is fulfilled when
@@ -775,17 +797,24 @@ public:
                                            repl::ReadConcernArgs readConcernArgs) const;
 
         // Bumps up the transaction number of this transaction and perform the necessary cleanup.
-        void _setNewTxnNumber(OperationContext* opCtx, const TxnNumber& txnNumber);
+        void _setNewTxnNumber(OperationContext* opCtx,
+                              const TxnNumber& txnNumber,
+                              const TxnRetryCounter& txnRetryCounter);
 
         // Attempt to begin or retry a retryable write at the given transaction number.
-        void _beginOrContinueRetryableWrite(OperationContext* opCtx, TxnNumber txnNumber);
+        void _beginOrContinueRetryableWrite(OperationContext* opCtx, const TxnNumber& txnNumber);
 
-        // Attempt to begin a new multi document transaction at the given transaction number.
-        void _beginMultiDocumentTransaction(OperationContext* opCtx, TxnNumber txnNumber);
+        // Attempt to begin a new multi document transaction at the given transaction number and
+        // transaction retry counter.
+        void _beginMultiDocumentTransaction(OperationContext* opCtx,
+                                            const TxnNumber& txnNumber,
+                                            const TxnRetryCounter& txnRetryCounter);
 
         // Attempt to continue an in-progress multi document transaction at the given transaction
-        // number.
-        void _continueMultiDocumentTransaction(OperationContext* opCtx, TxnNumber txnNumber);
+        // number and transaction retry counter.
+        void _continueMultiDocumentTransaction(OperationContext* opCtx,
+                                               const TxnNumber& txnNumber,
+                                               const TxnRetryCounter& txnRetryCounter);
 
         // Implementation of public refreshFromStorageIfNeeded methods.
         void _refreshFromStorageIfNeeded(OperationContext* opCtx, bool fetchOplogEntries);
@@ -933,6 +962,11 @@ private:
         // record, this means a new transaction has begun on the session, but it hasn't yet
         // performed any writes.
         TxnNumber activeTxnNumber{kUninitializedTxnNumber};
+
+        // Tracks the last seen txnRetryCounter for the the current transaction. Should always be
+        // kUninitializedTxnRetryCounter for a retryable write, and non-negative for a
+        // multi-statement transaction.
+        TxnRetryCounter activeTxnRetryCounter{kUninitializedTxnRetryCounter};
 
         // Caches what is known to be the last optime written for the active transaction.
         repl::OpTime lastWriteOpTime;

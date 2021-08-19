@@ -148,7 +148,8 @@ void startTransactionForShardKeyUpdate(OperationContext* opCtx) {
     auto txnNumber = opCtx->getTxnNumber();
     invariant(txnNumber);
 
-    txnRouter.beginOrContinueTxn(opCtx, *txnNumber, TransactionRouter::TransactionActions::kStart);
+    txnRouter.beginOrContinueTxn(
+        opCtx, *txnNumber, TransactionRouter::TransactionActions::kStart, 0 /* txnRetryCounter */);
 }
 
 BSONObj commitShardKeyUpdateTransaction(OperationContext* opCtx) {

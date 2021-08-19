@@ -70,7 +70,11 @@ void runInTransaction(OperationContext* opCtx, Callable&& func) {
 
     auto txnParticipant = TransactionParticipant::get(opCtx);
     ASSERT(txnParticipant);
-    txnParticipant.beginOrContinue(opCtx, txnNum, false, true);
+    txnParticipant.beginOrContinue(opCtx,
+                                   txnNum,
+                                   false /* autocommit */,
+                                   true /* startTransaction */,
+                                   boost::none /* txnRetryCounter */);
     txnParticipant.unstashTransactionResources(opCtx, "SetDestinedRecipient");
 
     func();

@@ -63,6 +63,7 @@ env.Library(
         'field_ref_set.cpp',
         'field_parser.cpp',
         'keypattern.cpp',
+        'txn_retry_counter_too_old_info.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

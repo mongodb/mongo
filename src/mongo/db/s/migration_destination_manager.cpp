@@ -108,7 +108,8 @@ void checkOutSessionAndVerifyTxnState(OperationContext* opCtx) {
     TransactionParticipant::get(opCtx).beginOrContinue(opCtx,
                                                        *opCtx->getTxnNumber(),
                                                        boost::none /* autocommit */,
-                                                       boost::none /* startTransaction */);
+                                                       boost::none /* startTransaction */,
+                                                       boost::none /* txnRetryCounter */);
 }
 
 template <typename Callable>
@@ -921,7 +922,8 @@ void MigrationDestinationManager::_migrateThread() {
         txnParticipant.beginOrContinue(opCtx,
                                        *opCtx->getTxnNumber(),
                                        boost::none /* autocommit */,
-                                       boost::none /* startTransaction */);
+                                       boost::none /* startTransaction */,
+                                       boost::none /* txnRetryCounter */);
         _migrateDriver(opCtx);
     } catch (...) {
         _setStateFail(str::stream() << "migrate failed: " << redact(exceptionToStatus()));

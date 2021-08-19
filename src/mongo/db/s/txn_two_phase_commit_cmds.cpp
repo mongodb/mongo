@@ -314,7 +314,8 @@ public:
                 txnParticipant.beginOrContinue(opCtx,
                                                *opCtx->getTxnNumber(),
                                                false /* autocommit */,
-                                               boost::none /* startTransaction */);
+                                               boost::none /* startTransaction */,
+                                               *opCtx->getTxnRetryCounter());
 
                 if (txnParticipant.transactionIsCommitted())
                     return;
@@ -336,7 +337,8 @@ public:
                 txnParticipant.beginOrContinue(opCtx,
                                                *opCtx->getTxnNumber(),
                                                false /* autocommit */,
-                                               boost::none /* startTransaction */);
+                                               boost::none /* startTransaction */,
+                                               *opCtx->getTxnRetryCounter());
 
                 invariant(!txnParticipant.transactionIsOpen(),
                           "The participant should not be in progress after we waited for the "

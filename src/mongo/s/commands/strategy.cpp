@@ -627,6 +627,9 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
         auto txnNumber = opCtx->getTxnNumber();
         invariant(txnNumber);
 
+        auto txnRetryCounter = opCtx->getTxnRetryCounter();
+        invariant(txnRetryCounter);
+
         auto transactionAction = ([&] {
             auto startTxnSetting = _parc->_osi->getStartTransaction();
             if (startTxnSetting && *startTxnSetting) {
@@ -641,7 +644,7 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
         })();
 
         startTransaction = (transactionAction == TransactionRouter::TransactionActions::kStart);
-        txnRouter.beginOrContinueTxn(opCtx, *txnNumber, transactionAction);
+        txnRouter.beginOrContinueTxn(opCtx, *txnNumber, transactionAction, *txnRetryCounter);
     }
 
     bool supportsWriteConcern = invocation->supportsWriteConcern();

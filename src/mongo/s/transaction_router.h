@@ -83,6 +83,7 @@ public:
     struct SharedTransactionOptions {
         // Set for all distributed transactions.
         TxnNumber txnNumber;
+        TxnRetryCounter txnRetryCounter;
         APIParameters apiParameters;
         repl::ReadConcernArgs readConcernArgs;
 
@@ -367,7 +368,8 @@ public:
          */
         void beginOrContinueTxn(OperationContext* opCtx,
                                 TxnNumber txnNumber,
-                                TransactionActions action);
+                                TransactionActions action,
+                                TxnRetryCounter txnRetryCounter);
 
         /**
          * Updates transaction diagnostics when the transaction's session is checked in.
@@ -534,7 +536,35 @@ public:
          * time. This is required because we don't create a new router object for each transaction,
          * but instead reuse the same object across different transactions.
          */
-        void _resetRouterState(OperationContext* opCtx, const TxnNumber& txnNumber);
+        void _resetRouterState(OperationContext* opCtx,
+                               const TxnNumber& txnNumber,
+                               const TxnRetryCounter& txnRetryCounter);
+
+        /**
+         * Calls _resetRouterState and then resets the read concern and the cluster time of the
+         * timestamp that all participant shards in the current transaction with snapshot level read
+         * concern must read from.
+         */
+        void _resetRouterStateForStartTransaction(OperationContext* opCtx,
+                                                  const TxnNumber& txnNumber,
+                                                  const TxnRetryCounter& txnRetryCounter);
+
+        /**
+         * Continues or restarts the currently active transaction.
+         */
+        void _beginOrContinueActiveTxnNumber(OperationContext* opCtx,
+                                             TxnNumber txnNumber,
+                                             TransactionActions action,
+                                             TxnRetryCounter txnRetryCounter);
+
+        /**
+         * Starts a new transaction or continues a transaction started by a different router to
+         * recover the commit decision.
+         */
+        void _beginNewTxnNumber(OperationContext* opCtx,
+                                TxnNumber txnNumber,
+                                TransactionActions action,
+                                TxnRetryCounter txnRetryCounter);
 
         /**
          * Internal method for committing a transaction. Should only throw on failure to send
@@ -695,6 +725,10 @@ private:
         // The currently active transaction number on this router, if beginOrContinueTxn has been
         // called. Otherwise set to kUninitializedTxnNumber.
         TxnNumber txnNumber{kUninitializedTxnNumber};
+
+        // The last seen txnRetryCounter for the currently active transaction, if beginOrContinueTxn
+        // has been called. Otherwise set to kUninitializedTxnRetryCounter.
+        TxnRetryCounter txnRetryCounter{kUninitializedTxnRetryCounter};
 
         // Is updated at commit time to reflect which commit path was taken.
         CommitType commitType{CommitType::kNotInitiated};

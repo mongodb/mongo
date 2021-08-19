@@ -862,7 +862,8 @@ void CheckoutSessionAndInvokeCommand::_checkOutSession() {
                 _txnParticipant->beginOrContinue(opCtx,
                                                  *sessionOptions.getTxnNumber(),
                                                  sessionOptions.getAutocommit(),
-                                                 sessionOptions.getStartTransaction());
+                                                 sessionOptions.getStartTransaction(),
+                                                 sessionOptions.getTxnRetryCounter());
                 beganOrContinuedTxn = true;
             } catch (const ExceptionFor<ErrorCodes::PreparedTransactionInProgress>&) {
                 auto prepareCompleted = _txnParticipant->onExitPrepare();

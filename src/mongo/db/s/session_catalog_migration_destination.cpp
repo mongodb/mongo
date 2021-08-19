@@ -247,7 +247,11 @@ ProcessOplogResult processSessionOplog(const BSONObj& oplogBSON,
     auto txnParticipant = TransactionParticipant::get(opCtx);
 
     try {
-        txnParticipant.beginOrContinue(opCtx, result.txnNum, boost::none, boost::none);
+        txnParticipant.beginOrContinue(opCtx,
+                                       result.txnNum,
+                                       boost::none /* autocommit */,
+                                       boost::none /* startTransaction */,
+                                       boost::none /* txnRetryCounter */);
         if (txnParticipant.checkStatementExecuted(opCtx, stmtIds.front())) {
             // Skip the incoming statement because it has already been logged locally
             return lastResult;

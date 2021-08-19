@@ -958,6 +958,8 @@ void TenantMigrationRecipientService::Instance::_processCommittedTransactionEntr
     opCtx->setLogicalSessionId(sessionId);
     opCtx->setTxnNumber(txnNumber);
     opCtx->setInMultiDocumentTransaction();
+    auto txnRetryCounter = *opCtx->getTxnRetryCounter();
+    invariant(txnRetryCounter == 0);
     MongoDOperationContextSession ocs(opCtx);
 
     LOGV2_DEBUG(5351301,
@@ -994,7 +996,7 @@ void TenantMigrationRecipientService::Instance::_processCommittedTransactionEntr
         return;
     }
 
-    txnParticipant.beginOrContinueTransactionUnconditionally(opCtx, txnNumber);
+    txnParticipant.beginOrContinueTransactionUnconditionally(opCtx, txnNumber, txnRetryCounter);
 
     MutableOplogEntry noopEntry;
     noopEntry.setOpType(repl::OpTypeEnum::kNoop);

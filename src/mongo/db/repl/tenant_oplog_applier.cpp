@@ -579,6 +579,8 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
             opCtx->setLogicalSessionId(sessionId);
             opCtx->setTxnNumber(txnNumber);
             opCtx->setInMultiDocumentTransaction();
+            auto txnRetryCounter = *opCtx->getTxnRetryCounter();
+            invariant(txnRetryCounter == 0);
             LOGV2_DEBUG(5351502,
                         1,
                         "Tenant Oplog Applier committing transaction",
@@ -605,7 +607,8 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
                                   << " because the transaction number "
                                   << txnParticipant.getActiveTxnNumber() << " has already started",
                     txnParticipant.getActiveTxnNumber() < txnNumber);
-            txnParticipant.beginOrContinueTransactionUnconditionally(opCtx.get(), txnNumber);
+            txnParticipant.beginOrContinueTransactionUnconditionally(
+                opCtx.get(), txnNumber, txnRetryCounter);
 
             // Only set sessionId and txnNumber for the final applyOp in a transaction.
             noopEntry.setSessionId(sessionId);
@@ -735,7 +738,8 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
             txnParticipant.beginOrContinue(opCtx.get(),
                                            txnNumber,
                                            boost::none /* autocommit */,
-                                           boost::none /* startTransaction */);
+                                           boost::none /* startTransaction */,
+                                           boost::none /* txnRetryCounter */);
 
             // We could have an existing lastWriteOpTime for the same retryable write chain from a
             // previously aborted migration. This could also happen if the tenant being migrated has
@@ -766,7 +770,8 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
                 txnParticipant.beginOrContinue(opCtx.get(),
                                                txnNumber,
                                                boost::none /* autocommit */,
-                                               boost::none /* startTransaction */);
+                                               boost::none /* startTransaction */,
+                                               boost::none /* txnRetryCounter */);
             }
 
             // We should never process the same donor statement twice, except in failover

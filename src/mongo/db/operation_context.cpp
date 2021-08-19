@@ -406,6 +406,13 @@ void OperationContext::setTxnNumber(TxnNumber txnNumber) {
     _txnNumber = txnNumber;
 }
 
+void OperationContext::setTxnRetryCounter(TxnRetryCounter txnRetryCounter) {
+    invariant(_lsid);
+    invariant(_txnNumber);
+    invariant(!_txnRetryCounter.has_value());
+    _txnRetryCounter = txnRetryCounter;
+}
+
 std::unique_ptr<RecoveryUnit> OperationContext::releaseRecoveryUnit() {
     return std::move(_recoveryUnit);
 }

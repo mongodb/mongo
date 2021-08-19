@@ -40,6 +40,7 @@ namespace mongo {
 
 using TxnNumber = std::int64_t;
 using StmtId = std::int32_t;
+using TxnRetryCounter = std::int32_t;
 
 // Default value for unassigned statementId.
 const StmtId kUninitializedStmtId = -1;
@@ -48,6 +49,7 @@ const StmtId kUninitializedStmtId = -1;
 const StmtId kIncompleteHistoryStmtId = -2;
 
 const TxnNumber kUninitializedTxnNumber = -1;
+const TxnRetryCounter kUninitializedTxnRetryCounter = -1;
 
 class BSONObjBuilder;
 class OperationContext;

@@ -32,6 +32,7 @@
 #include "mongo/db/initialize_operation_session_info.h"
 
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/logical_session_cache.h"
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/operation_context.h"
@@ -96,6 +97,10 @@ OperationSessionInfoFromClient initializeOperationSessionInfo(OperationContext* 
 
         if (getParentSessionId(lsid)) {
             uassert(ErrorCodes::InvalidOptions,
+                    "Internal sessions are not enabled",
+                    feature_flags::gFeatureFlagInternalTransactions.isEnabled(
+                        serverGlobalParams.featureCompatibility));
+            uassert(ErrorCodes::InvalidOptions,
                     "Internal sessions are not supported outside of transactions",
                     osi.getTxnNumber() && osi.getAutocommit() && !osi.getAutocommit().value());
         }
@@ -120,6 +125,21 @@ OperationSessionInfoFromClient initializeOperationSessionInfo(OperationContext* 
                 *osi.getTxnNumber() >= 0);
 
         opCtx->setTxnNumber(*osi.getTxnNumber());
+
+        if (auto txnRetryCounter = osi.getTxnRetryCounter()) {
+            // TODO (SERVER-58759): Add a uassert that the client is internal.
+            uassert(ErrorCodes::InvalidOptions,
+                    "txnRetryCounter is not enabled",
+                    feature_flags::gFeatureFlagInternalTransactions.isEnabled(
+                        serverGlobalParams.featureCompatibility));
+            uassert(ErrorCodes::InvalidOptions,
+                    str::stream() << "Cannot specify txnRetryCounter for a retryable write",
+                    osi.getAutocommit().has_value());
+            uassert(ErrorCodes::InvalidOptions,
+                    "txnRetryCounter cannot be negative",
+                    txnRetryCounter >= 0);
+            opCtx->setTxnRetryCounter(*txnRetryCounter);
+        }
     } else {
         uassert(ErrorCodes::InvalidOptions,
                 "'autocommit' field requires a transaction number to also be specified",

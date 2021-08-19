@@ -482,9 +482,11 @@ MongoDOperationContextSessionWithoutRefresh::MongoDOperationContextSessionWithou
     : _operationContextSession(opCtx), _opCtx(opCtx) {
     invariant(!opCtx->getClient()->isInDirectClient());
     const auto clientTxnNumber = *opCtx->getTxnNumber();
+    const auto clientTxnRetryCounter = *opCtx->getTxnRetryCounter();
 
     auto txnParticipant = TransactionParticipant::get(opCtx);
-    txnParticipant.beginOrContinueTransactionUnconditionally(opCtx, clientTxnNumber);
+    txnParticipant.beginOrContinueTransactionUnconditionally(
+        opCtx, clientTxnNumber, clientTxnRetryCounter);
 }
 
 MongoDOperationContextSessionWithoutRefresh::~MongoDOperationContextSessionWithoutRefresh() {

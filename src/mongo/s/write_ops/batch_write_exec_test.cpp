@@ -1843,8 +1843,10 @@ public:
         _scopedSession.emplace(operationContext());
 
         auto txnRouter = TransactionRouter::get(operationContext());
-        txnRouter.beginOrContinueTxn(
-            operationContext(), kTxnNumber, TransactionRouter::TransactionActions::kStart);
+        txnRouter.beginOrContinueTxn(operationContext(),
+                                     kTxnNumber,
+                                     TransactionRouter::TransactionActions::kStart,
+                                     0 /* txnRetryCounter */);
         txnRouter.setDefaultAtClusterTime(operationContext());
     }
 
@@ -1994,8 +1996,10 @@ public:
         _scopedSession.emplace(operationContext());
 
         auto txnRouter = TransactionRouter::get(operationContext());
-        txnRouter.beginOrContinueTxn(
-            operationContext(), kTxnNumber, TransactionRouter::TransactionActions::kStart);
+        txnRouter.beginOrContinueTxn(operationContext(),
+                                     kTxnNumber,
+                                     TransactionRouter::TransactionActions::kStart,
+                                     0 /* txnRetryCounter */);
         txnRouter.setDefaultAtClusterTime(operationContext());
     }
 
@@ -2126,8 +2130,10 @@ public:
         _scopedSession.emplace(operationContext());
 
         auto txnRouter = TransactionRouter::get(operationContext());
-        txnRouter.beginOrContinueTxn(
-            operationContext(), kTxnNumber, TransactionRouter::TransactionActions::kStart);
+        txnRouter.beginOrContinueTxn(operationContext(),
+                                     kTxnNumber,
+                                     TransactionRouter::TransactionActions::kStart,
+                                     0 /* txnRetryCounter */);
         txnRouter.setDefaultAtClusterTime(operationContext());
     }
 

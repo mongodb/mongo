@@ -593,7 +593,11 @@ public:
                               NamespaceString nss,
                               TxnNumber txnNum,
                               StmtId stmtId) {
-        txnParticipant.beginOrContinue(opCtx, txnNum, boost::none, boost::none);
+        txnParticipant.beginOrContinue(opCtx,
+                                       txnNum,
+                                       boost::none /* autocommit */,
+                                       boost::none /* startTransaction */,
+                                       boost::none /* txnRetryCounter */);
 
         {
             AutoGetCollection autoColl(opCtx, nss, MODE_IX);
@@ -766,7 +770,11 @@ class OpObserverTransactionTest : public OpObserverTxnParticipantTest {
 public:
     void setUp() override {
         OpObserverTxnParticipantTest::setUp();
-        txnParticipant().beginOrContinue(opCtx(), *opCtx()->getTxnNumber(), false, true);
+        txnParticipant().beginOrContinue(opCtx(),
+                                         *opCtx()->getTxnNumber(),
+                                         false /* autocommit */,
+                                         true /* startTransaction */,
+                                         boost::none /* txnRetryCounter */);
     }
 
 protected:
@@ -1454,7 +1462,11 @@ class OpObserverRetryableFindAndModifyTest : public OpObserverTxnParticipantTest
 public:
     void setUp() override {
         OpObserverTxnParticipantTest::setUp();
-        txnParticipant().beginOrContinue(opCtx(), txnNum(), boost::none, boost::none);
+        txnParticipant().beginOrContinue(opCtx(),
+                                         txnNum(),
+                                         boost::none /* autocommit */,
+                                         boost::none /* startTransaction */,
+                                         boost::none /* txnRetryCounter */);
     }
 
     void tearDown() override {
@@ -1660,7 +1672,11 @@ TEST_F(OpObserverTest, TestFundamentalOnUpdateOutputs) {
             opCtx->setTxnNumber(TxnNumber(testIdx));
             contextSession.emplace(opCtx);
             txnParticipant.emplace(TransactionParticipant::get(opCtx));
-            txnParticipant->beginOrContinue(opCtx, TxnNumber(testIdx), boost::none, boost::none);
+            txnParticipant->beginOrContinue(opCtx,
+                                            TxnNumber(testIdx),
+                                            boost::none /* autocommit */,
+                                            boost::none /* startTransaction */,
+                                            boost::none /* txnRetryCounter */);
         }
 
         if (testCase.imageType == StoreDocOption::None && !testCase.alwaysRecordPreImages) {
@@ -1787,7 +1803,11 @@ TEST_F(OpObserverTest, TestFundamentalOnInsertsOutputs) {
             opCtx->setTxnNumber(TxnNumber(testIdx));
             contextSession.emplace(opCtx);
             txnParticipant.emplace(TransactionParticipant::get(opCtx));
-            txnParticipant->beginOrContinue(opCtx, TxnNumber(testIdx), boost::none, boost::none);
+            txnParticipant->beginOrContinue(opCtx,
+                                            TxnNumber(testIdx),
+                                            boost::none /* autocommit */,
+                                            boost::none /* startTransaction */,
+                                            boost::none /* txnRetryCounter */);
         }
 
         // Phase 2: Call the code we're testing.
@@ -1893,7 +1913,11 @@ TEST_F(OpObserverTest, TestFundamentalOnDeleteOutputs) {
             opCtx->setTxnNumber(TxnNumber(testIdx));
             contextSession.emplace(opCtx);
             txnParticipant.emplace(TransactionParticipant::get(opCtx));
-            txnParticipant->beginOrContinue(opCtx, TxnNumber(testIdx), boost::none, boost::none);
+            txnParticipant->beginOrContinue(opCtx,
+                                            TxnNumber(testIdx),
+                                            boost::none /* autocommit */,
+                                            boost::none /* startTransaction */,
+                                            boost::none /* txnRetryCounter */);
         }
         OpObserver::OplogDeleteEntryArgs deleteArgs;
         switch (testCase.retryableOptions) {

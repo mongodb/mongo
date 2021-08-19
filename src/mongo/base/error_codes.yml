@@ -416,7 +416,7 @@ error_codes:
     - {code: 336, name: TimeseriesBucketCleared, categories: [InternalOnly]}
 
     - {code: 337, name: AuthenticationAbandoned, categories: [InternalOnly]}
-    
+
     - {code: 338, name: ReshardCollectionInProgress}
     - {code: 339, name: NoSuchReshardCollection}
     - {code: 340, name: ReshardCollectionCommitted}
@@ -428,14 +428,14 @@ error_codes:
     # case where it would be possible for MongoS to retry where MongoD couldn't.
     - {code: 343, name: ShardCannotRefreshDueToLocksHeld,
                   extra: ShardCannotRefreshDueToLocksHeldInfo}
-    
+
     - {code: 344, name: AuditingNotEnabled}
     - {code: 345, name: RuntimeAuditConfigurationNotEnabled}
-    
+
     - {code: 346,name: ChangeStreamInvalidated, extra: ChangeStreamInvalidationInfo}
 
     - {code: 347, name: APIMismatchError, categories: [VersionedAPIError,VoteAbortError]}
-    
+
     - {code: 348,name: ChangeStreamTopologyChange, extra: ChangeStreamTopologyChangeInfo}
 
     - {code: 349, name: KeyPatternShorterThanBound}
@@ -450,6 +450,8 @@ error_codes:
     - {code: 354, name: LoadBalancerSupportMismatch, categories: [CloseConnectionError]}
 
     - {code: 355, name: InterruptedDueToStorageChange,categories: [Interruption,CancellationError]}
+
+    - {code: 356, name: TxnRetryCounterTooOld, extra: TxnRetryCounterTooOldInfo}
 
     # Error codes 4000-8999 are reserved.
 

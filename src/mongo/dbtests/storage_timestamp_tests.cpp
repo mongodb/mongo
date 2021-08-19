@@ -1767,8 +1767,11 @@ public:
         auto txnParticipant = TransactionParticipant::get(_opCtx);
         ASSERT(txnParticipant);
 
-        txnParticipant.beginOrContinue(
-            _opCtx, *_opCtx->getTxnNumber(), false /* autocommit */, true /* startTransaction */);
+        txnParticipant.beginOrContinue(_opCtx,
+                                       *_opCtx->getTxnNumber(),
+                                       false /* autocommit */,
+                                       true /* startTransaction */,
+                                       boost::none /* txnRetryCounter */);
         txnParticipant.unstashTransactionResources(_opCtx, "insert");
         {
             // Insert a document that will set the index as multikey.
@@ -3464,8 +3467,11 @@ public:
         auto txnParticipant = TransactionParticipant::get(_opCtx);
         ASSERT(txnParticipant);
         // Start a retryable write.
-        txnParticipant.beginOrContinue(
-            _opCtx, txnNumber, boost::none /* autocommit */, boost::none /* startTransaction */);
+        txnParticipant.beginOrContinue(_opCtx,
+                                       txnNumber,
+                                       boost::none /* autocommit */,
+                                       boost::none /* startTransaction */,
+                                       boost::none /* txnRetryCounter */);
     }
 
 protected:
@@ -3670,8 +3676,11 @@ public:
         auto txnParticipant = TransactionParticipant::get(_opCtx);
         ASSERT(txnParticipant);
 
-        txnParticipant.beginOrContinue(
-            _opCtx, *_opCtx->getTxnNumber(), false /* autocommit */, true /* startTransaction */);
+        txnParticipant.beginOrContinue(_opCtx,
+                                       *_opCtx->getTxnNumber(),
+                                       false /* autocommit */,
+                                       true /* startTransaction */,
+                                       boost::none /* txnRetryCounter */);
         txnParticipant.unstashTransactionResources(_opCtx, "insert");
         {
             AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);

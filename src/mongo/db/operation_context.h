@@ -235,6 +235,13 @@ public:
     }
 
     /**
+     * Returns the txnRetryCounter associated with this operation.
+     */
+    boost::optional<TxnRetryCounter> getTxnRetryCounter() const {
+        return _txnRetryCounter;
+    }
+
+    /**
      * Returns a CancellationToken that will be canceled when the OperationContext is killed via
      * markKilled (including for internal reasons, like the OperationContext deadline being
      * reached).
@@ -262,6 +269,13 @@ public:
      * lifetime of the operation and the operation must have a logical session id assigned.
      */
     void setTxnNumber(TxnNumber txnNumber);
+
+    /**
+     * Associates a txnRetryCounter with this operation context. May only be called once for the
+     * lifetime of the operation and the operation must have a logical session id and a transaction
+     * number assigned.
+     */
+    void setTxnRetryCounter(TxnRetryCounter txnRetryCounter);
 
     /**
      * Returns the top-level WriteUnitOfWork associated with this operation context, if any.
@@ -443,6 +457,9 @@ public:
      */
     void setInMultiDocumentTransaction() {
         _inMultiDocumentTransaction = true;
+        if (!_txnRetryCounter.has_value()) {
+            _txnRetryCounter = 0;
+        }
     }
 
     /**
@@ -495,6 +512,7 @@ public:
         _isStartingMultiDocumentTransaction = false;
         _lsid = boost::none;
         _txnNumber = boost::none;
+        _txnRetryCounter = boost::none;
     }
 
     /**
@@ -654,6 +672,7 @@ private:
 
     boost::optional<LogicalSessionId> _lsid;
     boost::optional<TxnNumber> _txnNumber;
+    boost::optional<TxnRetryCounter> _txnRetryCounter;
 
     std::unique_ptr<Locker> _locker;
 
