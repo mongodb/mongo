@@ -94,7 +94,6 @@ ALLOW_ANY_TYPE_LIST: List[str] = [
     'create-param-backwards',
     'saslStart-param-payload',
     'explain-param-use44SortKeys',
-    'explain-param-useNewUpsert',
     'saslStart-param-payload',
     'saslStart-reply-payload',
     'saslContinue-param-payload',
@@ -153,7 +152,6 @@ ALLOW_ANY_TYPE_LIST: List[str] = [
     'findAndModify-reply-upserted',
     'explain-param-collation',
     'explain-param-use44SortKeys',
-    'explain-param-useNewUpsert'
 ]
 
 SKIPPED_FILES = ["unittest.idl"]

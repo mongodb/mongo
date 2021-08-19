@@ -220,13 +220,3 @@ commands:
                 type: bool
                 ignore: true
                 unstable: true
-            useNewUpsert:
-                # TODO SERVER-46751: we must retain the ability to ingest the 'useNewUpsert' field for
-                # 5.0 upgrade purposes, since a 4.4 mongoS will always send {useNewUpsert:true} to the
-                # shards. We do nothing with it because useNewUpsert will be automatically used in 5.0
-                # when appropriate. Remove this final vestige of useNewUpsert when 5.0 becomes
-                # last-lts.
-                description: "A flag to indicate wether or not to use new upsert option."
-                type: bool
-                ignore: true
-                unstable: true

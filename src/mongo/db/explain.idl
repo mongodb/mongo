@@ -61,9 +61,5 @@ commands:
                 type: IDLAnyType
                 ignore: true
                 unstable: true
-            useNewUpsert:
-                type: IDLAnyType
-                ignore: true
-                unstable: true
         # Dummy reply type as we won't use it to parse explain reply.
         reply_type: OkReply

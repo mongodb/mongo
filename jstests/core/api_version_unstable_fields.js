@@ -21,7 +21,6 @@ const unstableFieldsForAggregate = {
     runtimeConstants: {a: 1},
     collectionUUID: UUID(),
     use44SortKeys: false,
-    useNewUpsert: false,
 };
 
 const unstableFieldsForFind = {
