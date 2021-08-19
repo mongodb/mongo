@@ -652,13 +652,15 @@ public:
             return buildSubPlan(plannerParams);
         }
 
-        auto statusWithSolutions = QueryPlanner::plan(*_cq, plannerParams);
-        if (!statusWithSolutions.isOK()) {
-            return statusWithSolutions.getStatus().withContext(
+        // We discard the post-multi-planned solution, but it will eventually be used to support
+        // '$group' pushdown.
+        auto&& [statusWithMultiPlanSolns, _] = QueryPlanner::plan(*_cq, plannerParams);
+        if (!statusWithMultiPlanSolns.isOK()) {
+            return statusWithMultiPlanSolns.getStatus().withContext(
                 str::stream() << "error processing query: " << _cq->toString()
                               << " planner returned error");
         }
-        auto solutions = std::move(statusWithSolutions.getValue());
+        auto solutions = std::move(statusWithMultiPlanSolns.getValue());
         // The planner should have returned an error status if there are no solutions.
         invariant(solutions.size() > 0);
 
@@ -2423,8 +2425,9 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDist
 
     // Ask the QueryPlanner for a list of solutions that scan one of the indexes from
     // fillOutPlannerParamsForDistinct() (i.e., the indexes that include the distinct field).
-    auto statusWithSolutions = QueryPlanner::plan(*parsedDistinct->getQuery(), plannerParams);
-    if (!statusWithSolutions.isOK()) {
+    auto statusWithMultiPlanSolns =
+        QueryPlanner::planForMultiPlanner(*parsedDistinct->getQuery(), plannerParams);
+    if (!statusWithMultiPlanSolns.isOK()) {
         if (plannerOptions & QueryPlannerParams::STRICT_DISTINCT_ONLY) {
             return {nullptr};
         } else {
@@ -2432,7 +2435,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDist
                 opCtx, coll, parsedDistinct->releaseQuery(), yieldPolicy, plannerOptions);
         }
     }
-    auto solutions = std::move(statusWithSolutions.getValue());
+    auto solutions = std::move(statusWithMultiPlanSolns.getValue());
 
     // See if any of the solutions can be rewritten using a DISTINCT_SCAN. Note that, if the
     // STRICT_DISTINCT_ONLY flag is not set, we may get a DISTINCT_SCAN plan that filters out some

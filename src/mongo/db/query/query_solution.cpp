@@ -1372,4 +1372,58 @@ QuerySolutionNode* TextMatchNode::clone() const {
     return copy.release();
 }
 
+/**
+ * GroupNode.
+ */
+void GroupNode::appendToString(str::stream* ss, int indent) const {
+    addIndent(ss, indent);
+    *ss << "GROUP\n";
+    addIndent(ss, indent + 1);
+    *ss << "key = ";
+    auto idx = 0;
+    for (auto&& [groupName, expr] : groupByExpressions) {
+        if (idx > 0) {
+            *ss << ", ";
+        }
+        *ss << "{" << groupName << ": " << expr->serialize(false).toString() << "}";
+        ++idx;
+    }
+    *ss << '\n';
+    addIndent(ss, indent + 1);
+    *ss << "accs = [";
+    for (size_t idx = 0; idx < accumulators.size(); ++idx) {
+        if (idx > 0) {
+            *ss << ", ";
+        }
+        auto& acc = accumulators[idx];
+        *ss << "{" << acc.fieldName << ": {" << acc.expr.name << ": "
+            << acc.expr.argument->serialize(true).toString() << "}}";
+    }
+    *ss << "]" << '\n';
+    addCommon(ss, indent);
+    addIndent(ss, indent + 1);
+    *ss << "Child:" << '\n';
+    children[0]->appendToString(ss, indent + 2);
+}
+
+QuerySolutionNode* GroupNode::clone() const {
+    auto copy =
+        std::make_unique<GroupNode>(std::unique_ptr<QuerySolutionNode>(children[0]->clone()),
+                                    groupByExpressions,
+                                    accumulators,
+                                    doingMerge);
+    return copy.release();
+}
+
+/**
+ * SentinelNode.
+ */
+QuerySolutionNode* SentinelNode::clone() const {
+    return std::make_unique<SentinelNode>().release();
+}
+
+void SentinelNode::appendToString(str::stream* ss, int indent) const {
+    addIndent(ss, indent);
+    *ss << "SENTINEL\n";
+}
 }  // namespace mongo

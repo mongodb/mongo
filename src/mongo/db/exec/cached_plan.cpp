@@ -211,13 +211,14 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache, s
     }
 
     // Use the query planning module to plan the whole query.
-    auto statusWithSolutions = QueryPlanner::plan(*_canonicalQuery, _plannerParams);
-    if (!statusWithSolutions.isOK()) {
-        return statusWithSolutions.getStatus().withContext(
+    auto statusWithMultiPlanSolns =
+        QueryPlanner::planForMultiPlanner(*_canonicalQuery, _plannerParams);
+    if (!statusWithMultiPlanSolns.isOK()) {
+        return statusWithMultiPlanSolns.getStatus().withContext(
             str::stream() << "error processing query: " << _canonicalQuery->toString()
                           << " planner returned error");
     }
-    auto solutions = std::move(statusWithSolutions.getValue());
+    auto solutions = std::move(statusWithMultiPlanSolns.getValue());
 
     if (1 == solutions.size()) {
         // Only one possible plan. Build the stages from the solution.

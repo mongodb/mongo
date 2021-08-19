@@ -106,13 +106,13 @@ Status SubplanStage::choosePlanWholeQuery(PlanYieldPolicy* yieldPolicy) {
     _ws->clear();
 
     // Use the query planning module to plan the whole query.
-    auto statusWithSolutions = QueryPlanner::plan(*_query, _plannerParams);
-    if (!statusWithSolutions.isOK()) {
-        return statusWithSolutions.getStatus().withContext(
+    auto statusWithMultiPlanSolns = QueryPlanner::planForMultiPlanner(*_query, _plannerParams);
+    if (!statusWithMultiPlanSolns.isOK()) {
+        return statusWithMultiPlanSolns.getStatus().withContext(
             str::stream() << "error processing query: " << _query->toString()
                           << " planner returned error");
     }
-    auto solutions = std::move(statusWithSolutions.getValue());
+    auto solutions = std::move(statusWithMultiPlanSolns.getValue());
 
     if (1 == solutions.size()) {
         // Only one possible plan.  Run it.  Build the stages from the solution.

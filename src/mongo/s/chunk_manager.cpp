@@ -601,9 +601,10 @@ IndexBounds ChunkManager::getIndexBoundsForQuery(const BSONObj& key,
                           nullptr /* projExec */);
     plannerParams.indices.push_back(std::move(indexEntry));
 
-    auto plannerResult = QueryPlanner::plan(canonicalQuery, plannerParams);
-    if (plannerResult.getStatus().code() != ErrorCodes::NoQueryExecutionPlans) {
-        auto solutions = uassertStatusOK(std::move(plannerResult));
+    auto statusWithMultiPlanSolns =
+        QueryPlanner::planForMultiPlanner(canonicalQuery, plannerParams);
+    if (statusWithMultiPlanSolns.getStatus().code() != ErrorCodes::NoQueryExecutionPlans) {
+        auto solutions = uassertStatusOK(std::move(statusWithMultiPlanSolns));
 
         // Pick any solution that has non-trivial IndexBounds. bounds.size() == 0 represents a
         // trivial IndexBounds where none of the fields' values are bounded.

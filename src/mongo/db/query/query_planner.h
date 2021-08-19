@@ -81,10 +81,29 @@ public:
     };
 
     /**
-     * Returns the list of possible query solutions for the provided 'query'. Uses the indices and
-     * other data in 'params' to determine the set of available plans.
+     * Carries the result of the QueryPlanner which consists of two pieces: an array of
+     * QuerySolutions that represents the portion of the query that will be multi-planned, and a
+     * QuerySolutionNode that represents the part of the query for the post-multi-planned portion.
+     * The post-multi-planned portion contains a 'SentinelNode' that can be used to graft the
+     * post-multi-planned tree on top of the "winning" plan from the multi-planned candidates.
      */
-    static StatusWith<std::vector<std::unique_ptr<QuerySolution>>> plan(
+    struct QueryPlannerResult {
+        StatusWith<std::vector<std::unique_ptr<QuerySolution>>> multiPlannedCandidates;
+        std::unique_ptr<QuerySolutionNode> postMultiPlan;
+    };
+
+    /**
+     * Returns the list of possible query solutions for the provided 'query' for multi-planning, and
+     * post-multi-planning. Uses the indices and other data in 'params' to determine the set of
+     * available plans.
+     */
+    static QueryPlannerResult plan(const CanonicalQuery& query, const QueryPlannerParams& params);
+
+    /**
+     * Returns the list of possible query solutions for the provided 'query' for multi-planning.
+     * Uses the indices and other data in 'params' to determine the set of available plans.
+     */
+    static StatusWith<std::vector<std::unique_ptr<QuerySolution>>> planForMultiPlanner(
         const CanonicalQuery& query, const QueryPlannerParams& params);
 
     /**

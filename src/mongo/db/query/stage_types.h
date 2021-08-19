@@ -123,6 +123,10 @@ enum StageType {
     STAGE_UNPACK_TIMESERIES_BUCKET,
 
     STAGE_UPDATE,
+
+    // Stages for DocumentSources.
+    STAGE_GROUP,
+    STAGE_SENTINEL,
 };
 
 inline bool isProjectionStageType(StageType stageType) {

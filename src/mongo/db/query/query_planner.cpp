@@ -44,6 +44,7 @@
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_text.h"
+#include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_interface.h"
@@ -580,7 +581,29 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::planFromCache(
 }
 
 // static
-StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
+QueryPlanner::QueryPlannerResult QueryPlanner::plan(const CanonicalQuery& query,
+                                                    const QueryPlannerParams& params) {
+    if (query.pipeline().empty()) {
+        return {planForMultiPlanner(query, params), nullptr};
+    }
+
+    std::unique_ptr<QuerySolutionNode> postMultiPlannedQSN = std::make_unique<SentinelNode>();
+    for (auto& innerStage : query.pipeline()) {
+        auto groupStage = dynamic_cast<DocumentSourceGroup*>(innerStage->documentSource());
+        tassert(5842400,
+                "Cannot support pushdown of a stage other than $group at the moment",
+                groupStage != nullptr);
+
+        postMultiPlannedQSN = std::make_unique<GroupNode>(std::move(postMultiPlannedQSN),
+                                                          groupStage->getIdFields(),
+                                                          groupStage->getAccumulatedFields(),
+                                                          groupStage->doingMerge());
+    }
+    return {planForMultiPlanner(query, params), std::move(postMultiPlannedQSN)};
+}
+
+// static
+StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::planForMultiPlanner(
     const CanonicalQuery& query, const QueryPlannerParams& params) {
     // It's a little silly to ask for a count and for owned data. This could indicate a bug earlier
     // on.
@@ -1197,14 +1220,15 @@ StatusWith<QueryPlanner::SubqueriesPlanningResult> QueryPlanner::planSubqueries(
             // We don't set NO_TABLE_SCAN because peeking at the cache data will keep us from
             // considering any plan that's a collscan.
             invariant(branchResult->solutions.empty());
-            auto solutions = QueryPlanner::plan(*branchResult->canonicalQuery, params);
-            if (!solutions.isOK()) {
+            auto statusWithMultiPlanSolns =
+                QueryPlanner::planForMultiPlanner(*branchResult->canonicalQuery, params);
+            if (!statusWithMultiPlanSolns.isOK()) {
                 str::stream ss;
                 ss << "Can't plan for subchild " << branchResult->canonicalQuery->toString() << " "
-                   << solutions.getStatus().reason();
+                   << statusWithMultiPlanSolns.getStatus().reason();
                 return Status(ErrorCodes::BadValue, ss);
             }
-            branchResult->solutions = std::move(solutions.getValue());
+            branchResult->solutions = std::move(statusWithMultiPlanSolns.getValue());
 
             LOGV2_DEBUG(20601,
                         5,

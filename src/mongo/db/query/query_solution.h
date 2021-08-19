@@ -36,6 +36,7 @@
 #include "mongo/db/fts/fts_query.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/plan_enumerator_explain_info.h"
@@ -108,6 +109,12 @@ private:
 };
 
 /**
+ * An empty ProvidedSortSet that can be used in QSNs that have no children and don't derive from
+ * QuerySolutionNodeWithSortSet.
+ */
+inline const static ProvidedSortSet kEmptySet;
+
+/**
  * This is an abstract representation of a query plan.  It can be transcribed into a tree of
  * PlanStages, which can then be handed to a PlanRunner for execution.
  */
@@ -158,7 +165,7 @@ struct QuerySolutionNode {
     /**
      * If true, one of these are true:
      *          1. All outputs are already fetched, or
-     *          2. There is a projection in place and a fetch is not required.
+     *          2. There is a stage in place that makes a FETCH stage unnecessary.
      *
      * If false, a fetch needs to be placed above the root in order to provide results.
      *
@@ -1252,4 +1259,69 @@ struct TextMatchNode : public QuerySolutionNodeWithSortSet {
     bool wantTextScore;
 };
 
+struct GroupNode : public QuerySolutionNode {
+    GroupNode(std::unique_ptr<QuerySolutionNode> child,
+              StringMap<boost::intrusive_ptr<Expression>> groupByExpressions,
+              std::vector<AccumulationStatement> accumulators,
+              bool doingMerge)
+        : QuerySolutionNode(std::move(child)),
+          groupByExpressions(std::move(groupByExpressions)),
+          accumulators(std::move(accumulators)),
+          doingMerge(doingMerge) {}
+
+    StageType getType() const override {
+        return STAGE_GROUP;
+    }
+
+    void appendToString(str::stream* ss, int indent) const override;
+
+    bool fetched() const {
+        return true;
+    }
+
+    FieldAvailability getFieldAvailability(const std::string& field) const {
+        return FieldAvailability::kFullyProvided;
+    }
+    bool sortedByDiskLoc() const override {
+        return false;
+    }
+
+    const ProvidedSortSet& providedSorts() const final {
+        return children.back()->providedSorts();
+    }
+
+    QuerySolutionNode* clone() const override;
+
+    StringMap<boost::intrusive_ptr<Expression>> groupByExpressions;
+    std::vector<AccumulationStatement> accumulators;
+    bool doingMerge;
+};
+
+struct SentinelNode : public QuerySolutionNode {
+
+    SentinelNode() {}
+
+    StageType getType() const override {
+        return STAGE_SENTINEL;
+    }
+
+    void appendToString(str::stream* ss, int indent) const override;
+
+    bool fetched() const {
+        return true;
+    }
+
+    FieldAvailability getFieldAvailability(const std::string& field) const {
+        return FieldAvailability::kFullyProvided;
+    }
+    bool sortedByDiskLoc() const override {
+        return false;
+    }
+
+    const ProvidedSortSet& providedSorts() const final {
+        return kEmptySet;
+    }
+
+    QuerySolutionNode* clone() const override;
+};
 }  // namespace mongo

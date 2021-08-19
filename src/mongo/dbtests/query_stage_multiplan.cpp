@@ -397,9 +397,9 @@ TEST_F(QueryStageMultiPlanTest, MPSBackupPlan) {
     fillOutPlannerParams(_opCtx.get(), collection.getCollection(), cq.get(), &plannerParams);
 
     // Plan.
-    auto statusWithSolutions = QueryPlanner::plan(*cq, plannerParams);
-    ASSERT_OK(statusWithSolutions.getStatus());
-    auto solutions = std::move(statusWithSolutions.getValue());
+    auto&& [statusWithMultiPlanSolns, _] = QueryPlanner::plan(*cq, plannerParams);
+    ASSERT_OK(statusWithMultiPlanSolns.getStatus());
+    auto solutions = std::move(statusWithMultiPlanSolns.getValue());
 
     // We expect a plan using index {a: 1} and plan using index {b: 1} and
     // an index intersection plan.

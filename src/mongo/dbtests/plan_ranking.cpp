@@ -120,9 +120,9 @@ public:
         fillOutPlannerParams(&_opCtx, collection.getCollection(), cq, &plannerParams);
 
         // Plan.
-        auto statusWithSolutions = QueryPlanner::plan(*cq, plannerParams);
-        ASSERT_OK(statusWithSolutions.getStatus());
-        auto solutions = std::move(statusWithSolutions.getValue());
+        auto&& [statusWithMultiPlanSolns, _] = QueryPlanner::plan(*cq, plannerParams);
+        ASSERT_OK(statusWithMultiPlanSolns.getStatus());
+        auto solutions = std::move(statusWithMultiPlanSolns.getValue());
 
         ASSERT_GREATER_THAN_OR_EQUALS(solutions.size(), 1U);
 

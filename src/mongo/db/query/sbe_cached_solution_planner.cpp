@@ -143,7 +143,8 @@ CandidatePlans CachedSolutionPlanner::replan(bool shouldCache, std::string reaso
     };
 
     // Use the query planning module to plan the whole query.
-    auto solutions = uassertStatusOK(QueryPlanner::plan(_cq, _queryParams));
+    auto statusWithMultiPlanSolns = QueryPlanner::planForMultiPlanner(_cq, _queryParams);
+    auto solutions = uassertStatusOK(std::move(statusWithMultiPlanSolns));
     if (solutions.size() == 1) {
         // Only one possible plan. Build the stages from the solution.
         auto [root, data] = buildExecutableTree(*solutions[0]);
