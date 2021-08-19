@@ -3561,24 +3561,10 @@ Status ReplicationCoordinatorImpl::_doReplSetReconfig(OperationContext* opCtx,
     BSONObj newConfigObj = newConfig.toBSON();
     audit::logReplSetReconfig(opCtx->getClient(), &oldConfigObj, &newConfigObj);
 
-    // Stepdown can interrupt the setFeatureCompatibilityVersion command after we've transitioned
-    // to the intermediary kUpgrading/kDowngrading state but before the reconfig to change the
-    // 'secondaryDelaySecs' field name. During a subsequent stepup's automatic reconfig, the config
-    // could have an incompatible field name based on the intermediate FCV, but since we must retry
-    // setFeatureCompatibilityVersion until we complete the upgrade/downgrade procedure, the
-    // reconfig to change the delay field name to the correct value will eventually succeed.
-    // Therefore, it is safe for us to skip the FCV compatibility check during the stepup reconfig
-    // to avoid crashing.
-    //
-    // (Generic FCV reference): feature flag support
-    // TODO (SERVER-53354): Remove this check once 5.0 becomes 'lastLTS'.
-    bool skipFCVCompatibilityCheck =
-        serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading() && skipSafetyChecks;
-
     bool allowSplitHorizonIP = !opCtx->getClient()->hasRemote();
 
-    Status validateStatus = validateConfigForReconfig(
-        oldConfig, newConfig, force, allowSplitHorizonIP, skipFCVCompatibilityCheck);
+    Status validateStatus =
+        validateConfigForReconfig(oldConfig, newConfig, force, allowSplitHorizonIP);
     if (!validateStatus.isOK()) {
         LOGV2_ERROR(21420,
                     "replSetReconfig got {error} while validating {newConfig}",

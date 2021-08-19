@@ -311,16 +311,16 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_NewConfigVersionNumberMustB
     ASSERT_OK(newConfig.validate());
 
     // Can reconfig from old to new.
-    ASSERT_OK(validateConfigForReconfig(oldConfig, newConfig, false, false, false));
+    ASSERT_OK(validateConfigForReconfig(oldConfig, newConfig, false, false));
 
 
     // Cannot reconfig from old to old (versions must be different).
     ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
-                  validateConfigForReconfig(oldConfig, oldConfig, false, false, false));
+                  validateConfigForReconfig(oldConfig, oldConfig, false, false));
 
     // Cannot reconfig from new to old (versions must increase).
     ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
-                  validateConfigForReconfig(newConfig, oldConfig, false, false, false));
+                  validateConfigForReconfig(newConfig, oldConfig, false, false));
 }
 
 TEST_F(ServiceContextTest, ValidateConfigForReconfig_memberId) {
@@ -345,7 +345,7 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_memberId) {
                                                                       << "h2"))));
     ASSERT_OK(oldConfig.validate());
     ASSERT_OK(newConfig.validate());
-    ASSERT_OK(validateConfigForReconfig(oldConfig, newConfig, false, false, false));
+    ASSERT_OK(validateConfigForReconfig(oldConfig, newConfig, false, false));
 
     // Case 2: Change the member config setting for the existing member with member id > 255.
     oldConfig = ReplSetConfig::parse(BSON("_id"
@@ -365,7 +365,7 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_memberId) {
                                                                       << "priority" << 0))));
     ASSERT_OK(oldConfig.validate());
     ASSERT_OK(newConfig.validate());
-    ASSERT_OK(validateConfigForReconfig(oldConfig, newConfig, false, false, false));
+    ASSERT_OK(validateConfigForReconfig(oldConfig, newConfig, false, false));
 }
 
 
@@ -400,10 +400,10 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_NewConfigMustNotChangeSetNa
     ASSERT_OK(oldConfig.validate());
     ASSERT_OK(newConfig.validate());
     ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
-                  validateConfigForReconfig(oldConfig, newConfig, false, false, false));
+                  validateConfigForReconfig(oldConfig, newConfig, false, false));
     // Forced reconfigs also do not allow this.
     ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
-                  validateConfigForReconfig(newConfig, oldConfig, true, false, false));
+                  validateConfigForReconfig(newConfig, oldConfig, true, false));
 }
 
 TEST_F(ServiceContextTest, ValidateConfigForReconfig_NewConfigMustNotChangeSetId) {
@@ -438,13 +438,13 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_NewConfigMustNotChangeSetId
 
     ASSERT_OK(oldConfig.validate());
     ASSERT_OK(newConfig.validate());
-    const auto status = validateConfigForReconfig(oldConfig, newConfig, false, false, false);
+    const auto status = validateConfigForReconfig(oldConfig, newConfig, false, false);
     ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible, status);
     ASSERT_STRING_CONTAINS(status.reason(), "New and old configurations differ in replica set ID");
 
     // Forced reconfigs also do not allow this.
     ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
-                  validateConfigForReconfig(newConfig, oldConfig, true, false, false));
+                  validateConfigForReconfig(newConfig, oldConfig, true, false));
 }
 
 TEST_F(ServiceContextTest, ValidateConfigForReconfig_NewConfigMustNotFlipBuildIndexesFlag) {
@@ -498,13 +498,13 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_NewConfigMustNotFlipBuildIn
     ASSERT_OK(oldConfig.validate());
     ASSERT_OK(newConfig.validate());
     ASSERT_OK(oldConfigRefresh.validate());
-    ASSERT_OK(validateConfigForReconfig(oldConfig, oldConfigRefresh, false, false, false));
+    ASSERT_OK(validateConfigForReconfig(oldConfig, oldConfigRefresh, false, false));
     ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
-                  validateConfigForReconfig(oldConfig, newConfig, false, false, false));
+                  validateConfigForReconfig(oldConfig, newConfig, false, false));
 
     // Forced reconfigs also do not allow this.
     ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
-                  validateConfigForReconfig(oldConfig, newConfig, true, false, false));
+                  validateConfigForReconfig(oldConfig, newConfig, true, false));
 }
 
 TEST_F(ServiceContextTest, ValidateConfigForReconfig_NewConfigMustNotFlipArbiterFlag) {
@@ -555,12 +555,12 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_NewConfigMustNotFlipArbiter
     ASSERT_OK(oldConfig.validate());
     ASSERT_OK(newConfig.validate());
     ASSERT_OK(oldConfigRefresh.validate());
-    ASSERT_OK(validateConfigForReconfig(oldConfig, oldConfigRefresh, false, false, false));
+    ASSERT_OK(validateConfigForReconfig(oldConfig, oldConfigRefresh, false, false));
     ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
-                  validateConfigForReconfig(oldConfig, newConfig, false, false, false));
+                  validateConfigForReconfig(oldConfig, newConfig, false, false));
     // Forced reconfigs also do not allow this.
     ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
-                  validateConfigForReconfig(oldConfig, newConfig, true, false, false));
+                  validateConfigForReconfig(oldConfig, newConfig, true, false));
 }
 
 TEST_F(ServiceContextTest, ValidateConfigForReconfig_HostAndIdRemappingRestricted) {
@@ -608,7 +608,6 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_HostAndIdRemappingRestricte
                                   legalNewConfigWithNewHostAndId,
                                   // Use 'force' since we're adding and removing a node atomically.
                                   true,
-                                  false,
                                   false));
 
     //
@@ -626,13 +625,11 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_HostAndIdRemappingRestricte
                                                 << BSON("_id" << 3 << "host"
                                                               << "h3"))));
     ASSERT_OK(illegalNewConfigReusingHost.validate());
-    ASSERT_EQUALS(
-        ErrorCodes::NewReplicaSetConfigurationIncompatible,
-        validateConfigForReconfig(oldConfig, illegalNewConfigReusingHost, false, false, false));
+    ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
+                  validateConfigForReconfig(oldConfig, illegalNewConfigReusingHost, false, false));
     // Forced reconfigs also do not allow this.
-    ASSERT_EQUALS(
-        ErrorCodes::NewReplicaSetConfigurationIncompatible,
-        validateConfigForReconfig(oldConfig, illegalNewConfigReusingHost, true, false, false));
+    ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
+                  validateConfigForReconfig(oldConfig, illegalNewConfigReusingHost, true, false));
     //
     // Here, the new config is valid, because all we've changed is the name of
     // the host representing _id 2.
@@ -648,7 +645,7 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_HostAndIdRemappingRestricte
                                                 << BSON("_id" << 3 << "host"
                                                               << "h3"))));
     ASSERT_OK(illegalNewConfigReusingId.validate());
-    ASSERT_OK(validateConfigForReconfig(oldConfig, illegalNewConfigReusingId, false, false, false));
+    ASSERT_OK(validateConfigForReconfig(oldConfig, illegalNewConfigReusingId, false, false));
 }
 
 TEST_F(ServiceContextTest, ValidateConfigForReconfig_ArbiterPriorityValueMustBeZeroOrOne) {
@@ -709,13 +706,13 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_ArbiterPriorityValueMustBeZ
     ASSERT_OK(zeroConfig.validate());
     ASSERT_OK(oneConfig.validate());
     ASSERT_OK(twoConfig.validate());
-    ASSERT_OK(validateConfigForReconfig(oldConfig, zeroConfig, false, false, false));
-    ASSERT_OK(validateConfigForReconfig(oldConfig, oneConfig, false, false, false));
+    ASSERT_OK(validateConfigForReconfig(oldConfig, zeroConfig, false, false));
+    ASSERT_OK(validateConfigForReconfig(oldConfig, oneConfig, false, false));
     ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig,
-                  validateConfigForReconfig(oldConfig, twoConfig, false, false, false));
+                  validateConfigForReconfig(oldConfig, twoConfig, false, false));
     // Forced reconfigs also do not allow this.
     ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig,
-                  validateConfigForReconfig(oldConfig, twoConfig, true, false, false));
+                  validateConfigForReconfig(oldConfig, twoConfig, true, false));
 }
 
 TEST_F(ServiceContextTest, ValidateConfigForInitiate_NewConfigInvalid) {
@@ -765,10 +762,10 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_NewConfigInvalid) {
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h2"));
     ASSERT_EQUALS(ErrorCodes::BadValue,
-                  validateConfigForReconfig(oldConfig, newConfig, false, false, false));
+                  validateConfigForReconfig(oldConfig, newConfig, false, false));
     // Forced reconfigs also do not allow this.
     ASSERT_EQUALS(ErrorCodes::BadValue,
-                  validateConfigForReconfig(oldConfig, newConfig, true, false, false));
+                  validateConfigForReconfig(oldConfig, newConfig, true, false));
 }
 
 TEST_F(ServiceContextTest, ValidateConfigForReconfig_NonDefaultGetLastErrorDefaults) {
@@ -793,13 +790,11 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_NonDefaultGetLastErrorDefau
 
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h2"));
-    ASSERT_THROWS_CODE(validateConfigForReconfig(oldConfig, newConfig, false, false, false),
-                       AssertionException,
-                       5624102);
+    ASSERT_THROWS_CODE(
+        validateConfigForReconfig(oldConfig, newConfig, false, false), AssertionException, 5624102);
     // Forced reconfigs also do not allow this.
-    ASSERT_THROWS_CODE(validateConfigForReconfig(oldConfig, newConfig, true, false, false),
-                       AssertionException,
-                       5624102);
+    ASSERT_THROWS_CODE(
+        validateConfigForReconfig(oldConfig, newConfig, true, false), AssertionException, 5624102);
 }
 
 TEST_F(ServiceContextTest, ValidateConfigForStartUp_NewConfigInvalid) {
@@ -952,7 +947,7 @@ TEST_F(ServiceContextTest, ValidateForReconfig_ForceStillNeedsValidConfig) {
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h2"));
     ASSERT_EQUALS(ErrorCodes::BadValue,
-                  validateConfigForReconfig(oldConfig, newConfig, true, false, false));
+                  validateConfigForReconfig(oldConfig, newConfig, true, false));
 }
 
 //
@@ -1011,9 +1006,7 @@ Status validateMemberReconfig(BSONArray oldMembers, BSONArray newMembers, BSONOb
     // Do reconfig.
     const bool force = false;
     const bool allowSplitHorizonIP = false;
-    const bool skipFCVCompatibilityCheck = false;
-    return validateConfigForReconfig(
-        oldConfig, newConfig, force, allowSplitHorizonIP, skipFCVCompatibilityCheck);
+    return validateConfigForReconfig(oldConfig, newConfig, force, allowSplitHorizonIP);
 }
 
 TEST_F(ServiceContextTest, ValidateForReconfig_SingleNodeAdditionAllowed) {

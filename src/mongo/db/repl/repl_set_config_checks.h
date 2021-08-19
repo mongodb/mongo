@@ -96,16 +96,12 @@ StatusWith<int> validateConfigForInitiate(ReplicationCoordinatorExternalState* e
  * If "allowSplitHorizonIP" is set to true, skips checking whether an IP address exists in
  * split horizon configuration.
  *
- * If "skipFCVCompatibilityCheck" is set to true, skips checking whether the
- * 'secondaryDelaySecs' field name is compatible with the current featureCompatibilityVersion.
- *
  * Returns an indicative error on validation failure.
  */
 Status validateConfigForReconfig(const ReplSetConfig& oldConfig,
                                  const ReplSetConfig& newConfig,
                                  bool force,
-                                 bool allowSplitHorizonIP,
-                                 bool skipFCVCompatibilityCheck);
+                                 bool allowSplitHorizonIP);
 
 /**
  * Validates that "newConfig" is an acceptable configuration when

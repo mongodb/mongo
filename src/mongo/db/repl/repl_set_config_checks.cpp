@@ -100,68 +100,6 @@ Status ensureNoNewlyAddedMembers(const ReplSetConfig& config) {
 }
 
 /**
- * Checks that the current feature compatibility version is compatible with
- * each member config's delay field name. If the feature flag 'featureFlagUseSecondaryDelaySecs' is
- * enabled, the nodes must use the 'secondaryDelaySecs' field instead of the 'slaveDelay' field.
- */
-Status isFCVCompatible(const ReplSetConfig& config) {
-    auto version = serverGlobalParams.featureCompatibility.getVersion();
-    // New shard servers using 'latest' binaries will default to the 'lastLTS' FCV prior to being
-    // added to the cluster. If they have not yet been added to a sharded cluster via addShard,
-    // allow them to use 'secondaryDelaySecs'.
-    bool isNewShardServer = (serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
-                             !ShardingState::get(getGlobalServiceContext())->enabled());
-    // TODO (SERVER-53354) If we are currently upgrading, we check if the feature flag is enabled
-    // for the target version. We use the generic FCV references here to avoid having to update the
-    // FCV constants used after each continuous release. After release, we should make sure to
-    // remove these references while removing the feature flag.
-    //
-    //(Generic FCV reference): feature flag support
-    if (version == ServerGlobalParams::FeatureCompatibility::kUpgradingFromLastLTSToLatest ||
-        version == ServerGlobalParams::FeatureCompatibility::kUpgradingFromLastContinuousToLatest) {
-        version = ServerGlobalParams::FeatureCompatibility::kLatest;
-    }
-    //(Generic FCV reference): feature flag support
-    if (version ==
-        ServerGlobalParams::FeatureCompatibility::kUpgradingFromLastLTSToLastContinuous) {
-        version = ServerGlobalParams::FeatureCompatibility::kLastContinuous;
-    }
-
-    ServerGlobalParams::FeatureCompatibility targetFCV;
-    targetFCV.setVersion(version);
-    bool isEnabled = feature_flags::gUseSecondaryDelaySecs.isEnabled(targetFCV);
-    // We must check that every member config has a valid delay field name.
-    for (auto iter = config.membersBegin(); iter != config.membersEnd(); ++iter) {
-        // TODO (SERVER-53354) If the feature flag is disabled, getVersion() will throw. In this
-        // case, the version should default to kLatest. We use the generic FCV references here
-        // to avoid having to update the FCV constants used after each continuous release. After
-        // release, we should make sure to remove these references while removing the feature
-        // flag.
-        //
-        //(Generic FCV reference): feature flag support
-        if (isEnabled && iter->hasSlaveDelay()) {
-            auto featureFlagVersion = FeatureCompatibilityVersionParser::toString(
-                feature_flags::gUseSecondaryDelaySecs.getVersion());
-            return Status(ErrorCodes::BadValue,
-                          str::stream()
-                              << "Incompatible delay field name. If the node is in FCV "
-                              << featureFlagVersion << ", it must use secondaryDelaySecs.");
-        }
-        //(Generic FCV reference): feature flag support
-        if (!isEnabled && iter->hasSecondaryDelaySecs() && !isNewShardServer) {
-            auto latestVersion = FeatureCompatibilityVersionParser::toString(
-                ServerGlobalParams::FeatureCompatibility::kLatest);
-            return Status(ErrorCodes::BadValue,
-                          str::stream() << "Incompatible delay field name. In FCV versions below "
-                                        << latestVersion << ", nodes must use slaveDelay.");
-        }
-    }
-
-
-    return Status::OK();
-}
-
-/**
  * Compares two initialized and validated replica set configurations and checks to see if the
  * transition from 'oldConfig' to 'newConfig' adds or removes at most 1 voting node.
  *
@@ -451,11 +389,6 @@ StatusWith<int> validateConfigForInitiate(ReplicationCoordinatorExternalState* e
         return StatusWith<int>(status);
     }
 
-    status = isFCVCompatible(newConfig);
-    if (!status.isOK()) {
-        return StatusWith<int>(status);
-    }
-
     if (newConfig.containsCustomizedGetLastErrorDefaults()) {
         fassertFailedWithStatusNoTrace(
             5624101,
@@ -494,19 +427,11 @@ StatusWith<int> validateConfigForInitiate(ReplicationCoordinatorExternalState* e
 Status validateConfigForReconfig(const ReplSetConfig& oldConfig,
                                  const ReplSetConfig& newConfig,
                                  bool force,
-                                 bool allowSplitHorizonIP,
-                                 bool skipFCVCompatibilityCheck) {
+                                 bool allowSplitHorizonIP) {
     Status status =
         allowSplitHorizonIP ? newConfig.validateAllowingSplitHorizonIP() : newConfig.validate();
     if (!status.isOK()) {
         return status;
-    }
-
-    if (!skipFCVCompatibilityCheck) {
-        status = isFCVCompatible(newConfig);
-        if (!status.isOK()) {
-            return status;
-        }
     }
 
     uassert(5624102,

@@ -175,13 +175,6 @@ public:
     }
 
     /**
-     * Returns true if this member has the field 'slaveDelay'.
-     */
-    bool hasSlaveDelay() const {
-        return false;
-    }
-
-    /**
      * Returns true if this member has the field 'secondaryDelaySecs'.
      */
     bool hasSecondaryDelaySecs() const {
