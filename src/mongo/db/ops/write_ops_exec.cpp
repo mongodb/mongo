@@ -1355,7 +1355,7 @@ Status performAtomicTimeseriesWrites(
         args.preImageDoc = original.value();
         args.update = update_oplog_entry::makeDeltaOplogEntry(update.getU().getDiff());
         args.criteria = update.getQ();
-        args.source = OperationSource::kTimeseriesUpdate;
+        args.source = OperationSource::kTimeseriesInsert;
         if (slot) {
             args.oplogSlot = **slot;
             fassert(5481600, opCtx->recoveryUnit()->setTimestamp(args.oplogSlot->getTimestamp()));

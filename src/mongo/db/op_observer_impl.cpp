@@ -682,8 +682,7 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
         ReadWriteConcernDefaults::get(opCtx).observeDirectWriteToConfigSettings(
             opCtx, args.updateArgs.updatedDoc["_id"], args.updateArgs.updatedDoc);
     } else if (args.nss.isTimeseriesBucketsCollection()) {
-        if (args.updateArgs.source != OperationSource::kTimeseriesInsert &&
-            args.updateArgs.source != OperationSource::kTimeseriesUpdate) {
+        if (args.updateArgs.source != OperationSource::kTimeseriesInsert) {
             auto& bucketCatalog = BucketCatalog::get(opCtx);
             bucketCatalog.clear(args.updateArgs.updatedDoc["_id"].OID());
         }

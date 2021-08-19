@@ -27,23 +27,31 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/db/catalog/collection_operation_source.h"
 
-#include "mongo/base/string_data.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
+StringData toString(OperationSource source) {
+    static constexpr StringData kStandardString = "standard"_sd;
+    static constexpr StringData kFromMigrateString = "from migrate"_sd;
+    static constexpr StringData kTimeseriesInsertString = "time-series insert"_sd;
+    static constexpr StringData kTimeseriesUpdateString = "time-series update"_sd;
+    static constexpr StringData kTimeseriesDeleteString = "time-series delete"_sd;
 
-/**
- * Enum used to differentiate between types of insert/update/delete operations based on how they
- * were issued.
- */
-enum class OperationSource {
-    kStandard,     // Default case, use this if none of the others applies.
-    kFromMigrate,  // From a chunk migration.
-    kTimeseriesInsert,
-    kTimeseriesUpdate,
-    kTimeseriesDelete,
-};
+    switch (source) {
+        case OperationSource::kStandard:
+            return kStandardString;
+        case OperationSource::kFromMigrate:
+            return kFromMigrateString;
+        case OperationSource::kTimeseriesInsert:
+            return kTimeseriesInsertString;
+        case OperationSource::kTimeseriesUpdate:
+            return kTimeseriesUpdateString;
+        case OperationSource::kTimeseriesDelete:
+            return kTimeseriesDeleteString;
+    }
 
-StringData toString(OperationSource source);
+    MONGO_UNREACHABLE;
+}
 }  // namespace mongo
