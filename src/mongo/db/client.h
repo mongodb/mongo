@@ -260,6 +260,11 @@ public:
         _supportsHello = newVal;
     }
 
+    /**
+     * Returns whether the connection was established through a load balancer.
+     */
+    bool isFromLoadBalancer() const;
+
 private:
     friend class ServiceContext;
     friend class ThreadClient;
@@ -304,6 +309,9 @@ private:
     bool _supportsHello = false;
 
     UUID _uuid;
+
+    // Whether the connection was established through a load balancer
+    const bool _isFromLoadBalancer = false;
 };
 
 /**
