@@ -76,14 +76,15 @@ public:
         MutableDocument spec;
         spec[kArgStep] = _step;
         spec[kArgBounds] = stdx::visit(
-            visit_helper::Overloaded{[&](Full full) { return Value(kValFull); },
-                                     [&](Partition partition) { return Value(kValPartition); },
-                                     [&](std::pair<Date_t, Date_t> dates) {
-                                         return Value({Value(dates.first), Value(dates.second)});
-                                     },
-                                     [&](std::pair<Value, Value> vals) {
-                                         return Value({vals.first, vals.second});
-                                     }},
+            visit_helper::Overloaded{
+                [&](Full full) { return Value(kValFull); },
+                [&](Partition partition) { return Value(kValPartition); },
+                [&](std::pair<Date_t, Date_t> dates) {
+                    return Value(std::vector<Value>({Value(dates.first), Value(dates.second)}));
+                },
+                [&](std::pair<Value, Value> vals) {
+                    return Value(std::vector<Value>({vals.first, vals.second}));
+                }},
             _bounds);
         if (_unit)
             spec[kArgUnit] = Value(serializeTimeUnit(*_unit));
