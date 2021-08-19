@@ -75,6 +75,11 @@ runAndAssert(["$str_arr", {$filter: {input: "$int_arr",
                                 ] }}}, "$int_arr"],
              [["a", "b", "c", 2, 3, 1, 2, 3, 4]]);
 
+// Confirm that empty arrays can be concatenated with variables.
+runAndAssert(
+    ["$str_arr", {$filter: {input: [], cond: {$isArray: [{$concatArrays: [[], "$$this"]}]}}}],
+    [["a", "b", "c"]]);
+
 // Confirm that having any combination of null or missing inputs and valid inputs produces null.
 runAndAssertNull(["$int_arr", "$null_val"]);
 runAndAssertNull(["$int_arr", null]);

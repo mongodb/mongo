@@ -311,7 +311,7 @@ std::pair<sbe::value::SlotId, EvalStage> projectEvalExpr(
     sbe::value::SlotIdGenerator* slotIdGenerator) {
     // If expr's value is already in a slot, return the slot.
     if (expr.getSlot()) {
-        return {*expr.getSlot(), std::move(stage)};
+        return {*expr.getSlot(), stageOrLimitCoScan(std::move(stage), planNodeId)};
     }
 
     // If expr's value is an expression, create a ProjectStage to evaluate the expression
