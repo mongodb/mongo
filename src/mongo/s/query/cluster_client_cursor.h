@@ -207,6 +207,11 @@ public:
     virtual void setLastUseDate(Date_t now) = 0;
 
     /**
+     * Returns the queryHash of the query.
+     */
+    virtual boost::optional<uint32_t> getQueryHash() const = 0;
+
+    /**
      * Returns the number of batches returned by this cursor.
      */
     virtual std::uint64_t getNBatches() const = 0;

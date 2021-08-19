@@ -609,13 +609,15 @@ public:
                                         << " tailable cursor requested on non capped collection");
         }
 
+        // Fill in some opDebug information.
+        const auto planCacheKey =
+            CollectionQueryInfo::get(_collection).getPlanCache()->computeKey(*_cq);
+        CurOp::get(_opCtx)->debug().queryHash =
+            canonical_query_encoder::computeHash(planCacheKey.getStableKeyStringData());
+
         // Check that the query should be cached.
         if (CollectionQueryInfo::get(_collection).getPlanCache()->shouldCacheQuery(*_cq)) {
-            // Fill in opDebug information.
-            const auto planCacheKey =
-                CollectionQueryInfo::get(_collection).getPlanCache()->computeKey(*_cq);
-            CurOp::get(_opCtx)->debug().queryHash =
-                canonical_query_encoder::computeHash(planCacheKey.getStableKeyStringData());
+            // Fill in the 'planCacheKey' too if the query is actually being cached.
             CurOp::get(_opCtx)->debug().planCacheKey =
                 canonical_query_encoder::computeHash(planCacheKey.toString());
 

@@ -44,6 +44,7 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/cursor_server_params.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/kill_sessions_common.h"
@@ -229,6 +230,10 @@ StatusWith<ClientCursorPin> CursorManager::pinCursor(OperationContext* opCtx,
             return cursorPrivilegeStatus;
         }
     }
+
+    // Pass along the original queryHash and planCacheKey for slow query logging.
+    CurOp::get(opCtx)->debug().queryHash = cursor->_queryHash;
+    CurOp::get(opCtx)->debug().planCacheKey = cursor->_planCacheKey;
 
     cursor->_operationUsingCursor = opCtx;
 

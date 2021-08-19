@@ -104,6 +104,8 @@ public:
 
     void setLastUseDate(Date_t now) final;
 
+    boost::optional<uint32_t> getQueryHash() const final;
+
     std::uint64_t getNBatches() const final;
 
     void incNBatches() final;

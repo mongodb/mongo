@@ -114,6 +114,8 @@ public:
 
     void setLastUseDate(Date_t now) final;
 
+    boost::optional<uint32_t> getQueryHash() const final;
+
     std::uint64_t getNBatches() const final;
 
     void incNBatches() final;
@@ -169,6 +171,9 @@ private:
 
     // The time when the cursor was last unpinned, i.e. the end of the last getMore.
     Date_t _lastUseDate;
+
+    // The hash of the query shape to be used for slow query logging;
+    boost::optional<uint32_t> _queryHash;
 
     // The number of batches returned by this cursor.
     std::uint64_t _nBatchesReturned = 0;

@@ -46,6 +46,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/cursor_server_params.h"
 #include "mongo/db/jsobj.h"
@@ -100,6 +101,8 @@ ClientCursor::ClientCursor(ClientCursorParams params,
       _lastUseDate(now),
       _createdDate(now),
       _planSummary(_exec->getPlanExplainer().getPlanSummary()),
+      _planCacheKey(CurOp::get(operationUsingCursor)->debug().planCacheKey),
+      _queryHash(CurOp::get(operationUsingCursor)->debug().queryHash),
       _opKey(operationUsingCursor->getOperationKey()) {
     invariant(_exec);
     invariant(_operationUsingCursor);

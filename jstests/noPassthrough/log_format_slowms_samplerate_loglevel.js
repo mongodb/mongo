@@ -386,13 +386,15 @@ function runLoggingTests({db, slowMs, logLevel, sampleRate}) {
         const cmdObj = originatingCommands[cmdName];
         const cmdRes = assert.commandWorked(db.runCommand(cmdObj));
         const expectedCountOfDocuments = 14;
+        // Make sure queryHash field is present of getMore logs following a find command.
+        const extra = cmdName === "find" ? {queryHash: ""} : {};
 
         testList.push({
             test: function(db) {
                 const cursor = new DBCommandCursor(db, cmdRes);
                 assert.eq(cursor.itcount(), expectedCountOfDocuments);
             },
-            logFields: Object.assign({getMore: cmdRes.cursor.id}, cmdObj, {
+            logFields: Object.assign({getMore: cmdRes.cursor.id}, cmdObj, extra, {
                 cursorid: cmdRes.cursor.id,
                 planSummary: "COLLSCAN",
                 cursorExhausted: 1,

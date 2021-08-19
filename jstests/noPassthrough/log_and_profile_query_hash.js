@@ -55,7 +55,7 @@ function retrieveLogLine(log, profileEntry) {
 
 // Run the find command, retrieve the corresponding profile object and log line, then ensure
 // that both the profile object and log line have matching stable query hashes (if any).
-function runTestsAndGetHashes(db, {comment, test, hasQueryHash}) {
+function runTestsAndGetHashes(db, {comment, test, hasPlanCacheKey}) {
     assert.commandWorked(db.adminCommand({clearLog: "global"}));
     assert.doesNotThrow(() => test(db, comment));
     const log = assert.commandWorked(db.adminCommand({getLog: "global"})).log;
@@ -67,11 +67,11 @@ function runTestsAndGetHashes(db, {comment, test, hasQueryHash}) {
     // Confirm that the query hashes either exist or don't exist in both log and profile
     // entries. If the queryHash and planCacheKey exist, ensure that the hashes from the
     // profile entry match the log line.
-    assert.eq(hasQueryHash, profileEntry.hasOwnProperty("queryHash"));
-    assert.eq(hasQueryHash, profileEntry.hasOwnProperty("planCacheKey"));
-    assert.eq(hasQueryHash, (logLine.indexOf(profileEntry["queryHash"]) >= 0));
-    assert.eq(hasQueryHash, (logLine.indexOf(profileEntry["planCacheKey"]) >= 0));
-    if (hasQueryHash) {
+    assert(profileEntry.hasOwnProperty("queryHash"));
+    assert.eq(hasPlanCacheKey, profileEntry.hasOwnProperty("planCacheKey"));
+    assert(logLine.indexOf(profileEntry["queryHash"]) >= 0);
+    assert.eq(hasPlanCacheKey, (logLine.indexOf(profileEntry["planCacheKey"]) >= 0));
+    if (hasPlanCacheKey) {
         return {queryHash: profileEntry["queryHash"], planCacheKey: profileEntry["planCacheKey"]};
     }
     return null;
@@ -107,7 +107,7 @@ const testList = [
         test: function(db, comment) {
             assert.eq(200, db.test.find().comment(comment).itcount());
         },
-        hasQueryHash: false
+        hasPlanCacheKey: false
     },
     {
         comment: "Test1 find query",
@@ -116,7 +116,7 @@ const testList = [
                       db.test.find(queryB, projectionB).sort(sortC).comment(comment).itcount(),
                       'unexpected document count');
         },
-        hasQueryHash: true
+        hasPlanCacheKey: true
     },
     {
         comment: "Test2 find query",
@@ -125,7 +125,7 @@ const testList = [
                       db.test.find(queryA, projectionB).sort(sortC).comment(comment).itcount(),
                       'unexpected document count');
         },
-        hasQueryHash: true
+        hasPlanCacheKey: true
     }
 ];
 
@@ -146,7 +146,7 @@ const testInactiveCreationLog = {
             db.test.find({b: {$lt: 12}, a: {$eq: 500}}).sort({a: -1}).comment(comment).itcount(),
             'unexpected document count');
     },
-    hasQueryHash: true
+    hasPlanCacheKey: true
 
 };
 const onCreationHashes = runTestsAndGetHashes(testDB, testInactiveCreationLog);

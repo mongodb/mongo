@@ -54,13 +54,17 @@ cursor.next();  // Perform initial query and retrieve first document in batch.
 
 let cursorid = getLatestProfilerEntry(testDB).cursorid;
 
-let logLine =
+let logLine = [
     'command log_getmore.test appName: "MongoDB Shell" command: find { find: "test", filter:' +
-    ' { a: { $gt: 0.0 } }, skip: 1.0, batchSize: 5.0, limit: 10.0, singleBatch: false, sort:' +
-    ' { a: 1.0 }, hint: { a: 1.0 }';
+        ' { a: { $gt: 0.0 } }, skip: 1.0, batchSize: 5.0, limit: 10.0, singleBatch: false, sort:' +
+        ' { a: 1.0 }, hint: { a: 1.0 }',
+    'queryHash:'
+];
 if (isJsonLog(conn)) {
-    logLine =
-        '"msg":"Slow query","attr":{"type":"command","ns":"log_getmore.test","appName":"MongoDB Shell","command":{"find":"test","filter":{"a":{"$gt":0}},"skip":1,"batchSize":5,"limit":10,"singleBatch":false,"sort":{"a":1},"hint":{"a":1}';
+    logLine = [
+        '"msg":"Slow query","attr":{"type":"command","ns":"log_getmore.test","appName":"MongoDB Shell","command":{"find":"test","filter":{"a":{"$gt":0}},"skip":1,"batchSize":5,"limit":10,"singleBatch":false,"sort":{"a":1},"hint":{"a":1}',
+        '"queryHash":'
+    ];
 }
 
 // Check the logs to verify that find appears as above.
@@ -87,14 +91,16 @@ logLine = [
         cursorIdToString(cursorid) + ', collection: "test", batchSize: 5.0',
     'originatingCommand: { find: "test", ' +
         'filter: { a: { $gt: 0.0 } }, skip: 1.0, batchSize: 5.0, limit: 10.0, singleBatch: ' +
-        'false, sort: { a: 1.0 }, hint: { a: 1.0 }'
+        'false, sort: { a: 1.0 }, hint: { a: 1.0 }',
+    'queryHash:'
 ];
 
 if (isJsonLog(conn)) {
     logLine = [
         `"msg":"Slow query","attr":{"type":"command","ns":"log_getmore.test","appName":"MongoDB Shell","command":{"getMore":${
             cursorIdToString(cursorid)},"collection":"test","batchSize":5,`,
-        '"originatingCommand":{"find":"test","filter":{"a":{"$gt":0}},"skip":1,"batchSize":5,"limit":10,"singleBatch":false,"sort":{"a":1},"hint":{"a":1}'
+        '"originatingCommand":{"find":"test","filter":{"a":{"$gt":0}},"skip":1,"batchSize":5,"limit":10,"singleBatch":false,"sort":{"a":1},"hint":{"a":1}',
+        '"queryHash":'
     ];
 }
 

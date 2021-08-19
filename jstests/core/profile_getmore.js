@@ -36,27 +36,28 @@ cursor.next();  // getMore performed, leaving open cursor.
 
 let profileObj = getLatestProfilerEntry(testDB, {op: "getmore"});
 
-assert.eq(profileObj.ns, coll.getFullName(), tojson(profileObj));
-assert.eq(profileObj.op, "getmore", tojson(profileObj));
-assert.eq(profileObj.keysExamined, 2, tojson(profileObj));
-assert.eq(profileObj.docsExamined, 2, tojson(profileObj));
-assert.eq(profileObj.cursorid, cursorId, tojson(profileObj));
-assert.eq(profileObj.nreturned, 2, tojson(profileObj));
-assert.eq(profileObj.command.getMore, cursorId, tojson(profileObj));
-assert.eq(profileObj.command.collection, coll.getName(), tojson(profileObj));
-assert.eq(profileObj.command.batchSize, 2, tojson(profileObj));
+assert.eq(profileObj.ns, coll.getFullName(), profileObj);
+assert.eq(profileObj.op, "getmore", profileObj);
+assert.eq(profileObj.keysExamined, 2, profileObj);
+assert.eq(profileObj.docsExamined, 2, profileObj);
+assert.eq(profileObj.cursorid, cursorId, profileObj);
+assert.eq(profileObj.nreturned, 2, profileObj);
+assert.eq(profileObj.command.getMore, cursorId, profileObj);
+assert.eq(profileObj.command.collection, coll.getName(), profileObj);
+assert.eq(profileObj.command.batchSize, 2, profileObj);
 assert.eq(profileObj.originatingCommand.filter, {a: {$gt: 0}});
 assert.eq(profileObj.originatingCommand.sort, {a: 1});
-assert.eq(profileObj.planSummary, "IXSCAN { a: 1 }", tojson(profileObj));
-assert(profileObj.hasOwnProperty("execStats"), tojson(profileObj));
-assert(profileObj.execStats.hasOwnProperty("stage"), tojson(profileObj));
-assert(profileObj.hasOwnProperty("responseLength"), tojson(profileObj));
-assert(profileObj.hasOwnProperty("numYield"), tojson(profileObj));
-assert(profileObj.hasOwnProperty("locks"), tojson(profileObj));
-assert(profileObj.locks.hasOwnProperty("Global"), tojson(profileObj));
-assert(profileObj.hasOwnProperty("millis"), tojson(profileObj));
-assert(!profileObj.hasOwnProperty("cursorExhausted"), tojson(profileObj));
-assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
+assert.eq(profileObj.planSummary, "IXSCAN { a: 1 }", profileObj);
+assert(profileObj.hasOwnProperty("execStats"), profileObj);
+assert(profileObj.execStats.hasOwnProperty("stage"), profileObj);
+assert(profileObj.hasOwnProperty("responseLength"), profileObj);
+assert(profileObj.hasOwnProperty("numYield"), profileObj);
+assert(profileObj.hasOwnProperty("locks"), profileObj);
+assert(profileObj.locks.hasOwnProperty("Global"), profileObj);
+assert(profileObj.hasOwnProperty("millis"), profileObj);
+assert(!profileObj.hasOwnProperty("cursorExhausted"), profileObj);
+assert.eq(profileObj.appName, "MongoDB Shell", profileObj);
+assert(profileObj.hasOwnProperty("queryHash"), profileObj);
 
 //
 // Confirm hasSortStage on getMore with a not-exhausted cursor and in-memory sort.
@@ -73,7 +74,7 @@ cursor.next();  // getMore performed, leaving open cursor.
 
 profileObj = getLatestProfilerEntry(testDB, {op: "getmore"});
 
-assert.eq(profileObj.hasSortStage, true, tojson(profileObj));
+assert.eq(profileObj.hasSortStage, true, profileObj);
 
 //
 // Confirm "cursorExhausted" metric.
@@ -90,10 +91,10 @@ cursor.itcount();  // Exhaust the cursor.
 profileObj = getLatestProfilerEntry(testDB, {op: "getmore"});
 
 assert(profileObj.hasOwnProperty("cursorid"),
-       tojson(profileObj));  // cursorid should always be present on getMore.
-assert.neq(0, profileObj.cursorid, tojson(profileObj));
-assert.eq(profileObj.cursorExhausted, true, tojson(profileObj));
-assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
+       profileObj);  // cursorid should always be present on getMore.
+assert.neq(0, profileObj.cursorid, profileObj);
+assert.eq(profileObj.cursorExhausted, true, profileObj);
+assert.eq(profileObj.appName, "MongoDB Shell", profileObj);
 
 //
 // Confirm getMore on aggregation.
@@ -112,19 +113,19 @@ cursor.next();  // Consume the result set.
 
 profileObj = getLatestProfilerEntry(testDB, {op: "getmore"});
 
-assert.eq(profileObj.ns, coll.getFullName(), tojson(profileObj));
-assert.eq(profileObj.op, "getmore", tojson(profileObj));
-assert.eq(profileObj.command.getMore, cursorId, tojson(profileObj));
-assert.eq(profileObj.command.collection, coll.getName(), tojson(profileObj));
-assert.eq(profileObj.originatingCommand.pipeline[0], {$match: {a: {$gte: 0}}}, tojson(profileObj));
-assert.eq(profileObj.cursorid, cursorId, tojson(profileObj));
-assert.eq(profileObj.nreturned, 20, tojson(profileObj));
-assert.eq(profileObj.planSummary, "IXSCAN { a: 1 }", tojson(profileObj));
-assert.eq(profileObj.cursorExhausted, true, tojson(profileObj));
-assert.eq(profileObj.keysExamined, 20, tojson(profileObj));
-assert.eq(profileObj.docsExamined, 20, tojson(profileObj));
-assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
-assert.eq(profileObj.originatingCommand.hint, {a: 1}, tojson(profileObj));
+assert.eq(profileObj.ns, coll.getFullName(), profileObj);
+assert.eq(profileObj.op, "getmore", profileObj);
+assert.eq(profileObj.command.getMore, cursorId, profileObj);
+assert.eq(profileObj.command.collection, coll.getName(), profileObj);
+assert.eq(profileObj.originatingCommand.pipeline[0], {$match: {a: {$gte: 0}}}, profileObj);
+assert.eq(profileObj.cursorid, cursorId, profileObj);
+assert.eq(profileObj.nreturned, 20, profileObj);
+assert.eq(profileObj.planSummary, "IXSCAN { a: 1 }", profileObj);
+assert.eq(profileObj.cursorExhausted, true, profileObj);
+assert.eq(profileObj.keysExamined, 20, profileObj);
+assert.eq(profileObj.docsExamined, 20, profileObj);
+assert.eq(profileObj.appName, "MongoDB Shell", profileObj);
+assert.eq(profileObj.originatingCommand.hint, {a: 1}, profileObj);
 
 //
 // Confirm that originatingCommand is truncated in the profiler as { $truncated: <string>,
@@ -145,6 +146,6 @@ cursor = coll.find(docToInsert).comment("profile_getmore").batchSize(2);
 assert.eq(cursor.itcount(), 4);  // Consume result set and trigger getMore.
 
 profileObj = getLatestProfilerEntry(testDB, {op: "getmore"});
-assert.eq((typeof profileObj.originatingCommand.$truncated), "string", tojson(profileObj));
-assert.eq(profileObj.originatingCommand.comment, "profile_getmore", tojson(profileObj));
+assert.eq((typeof profileObj.originatingCommand.$truncated), "string", profileObj);
+assert.eq(profileObj.originatingCommand.comment, "profile_getmore", profileObj);
 })();

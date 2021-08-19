@@ -36,6 +36,7 @@
 
 #include <set>
 
+#include "mongo/db/curop.h"
 #include "mongo/db/kill_sessions_common.h"
 #include "mongo/db/logical_session_cache.h"
 #include "mongo/logv2/log.h"
@@ -292,6 +293,8 @@ StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCur
         }
     }
     cursorGuard->reattachToOperationContext(opCtx);
+
+    CurOp::get(opCtx)->debug().queryHash = cursorGuard->getQueryHash();
 
     _log.push({LogEvent::Type::kCheckoutComplete, cursorId, now, nss});
     return PinnedCursor(this, std::move(cursorGuard), nss, cursorId);

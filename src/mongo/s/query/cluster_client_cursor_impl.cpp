@@ -33,6 +33,7 @@
 
 #include <memory>
 
+#include "mongo/db/curop.h"
 #include "mongo/s/query/router_stage_limit.h"
 #include "mongo/s/query/router_stage_merge.h"
 #include "mongo/s/query/router_stage_remove_metadata_fields.h"
@@ -73,7 +74,8 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
       _lsid(lsid),
       _opCtx(opCtx),
       _createdDate(opCtx->getServiceContext()->getPreciseClockSource()->now()),
-      _lastUseDate(_createdDate) {
+      _lastUseDate(_createdDate),
+      _queryHash(CurOp::get(opCtx)->debug().queryHash) {
     dassert(!_params.compareWholeSortKeyOnRouter ||
             SimpleBSONObjComparator::kInstance.evaluate(
                 _params.sortToApplyOnRouter == AsyncResultsMerger::kWholeSortKeySortPattern));
@@ -89,7 +91,8 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
       _lsid(lsid),
       _opCtx(opCtx),
       _createdDate(opCtx->getServiceContext()->getPreciseClockSource()->now()),
-      _lastUseDate(_createdDate) {
+      _lastUseDate(_createdDate),
+      _queryHash(CurOp::get(opCtx)->debug().queryHash) {
     dassert(!_params.compareWholeSortKeyOnRouter ||
             SimpleBSONObjComparator::kInstance.evaluate(
                 _params.sortToApplyOnRouter == AsyncResultsMerger::kWholeSortKeySortPattern));
@@ -208,6 +211,10 @@ Date_t ClusterClientCursorImpl::getLastUseDate() const {
 
 void ClusterClientCursorImpl::setLastUseDate(Date_t now) {
     _lastUseDate = std::move(now);
+}
+
+boost::optional<uint32_t> ClusterClientCursorImpl::getQueryHash() const {
+    return _queryHash;
 }
 
 std::uint64_t ClusterClientCursorImpl::getNBatches() const {

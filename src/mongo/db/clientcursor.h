@@ -419,6 +419,11 @@ private:
     // oplog fetching.
     boost::optional<repl::OpTime> _lastKnownCommittedOpTime;
 
+    // Passed along from the original query so that it can be logged if necessary in getMore
+    // requests.
+    boost::optional<uint32_t> _planCacheKey;
+    boost::optional<uint32_t> _queryHash;
+
     // The client OperationKey associated with this cursor.
     boost::optional<OperationKey> _opKey;
 };
