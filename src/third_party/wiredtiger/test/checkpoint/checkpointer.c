@@ -82,7 +82,6 @@ clock_thread(void *arg)
     testutil_check(g.conn->open_session(g.conn, NULL, NULL, &wt_session));
     session = (WT_SESSION_IMPL *)wt_session;
 
-    g.ts_stable = 0;
     while (g.running) {
         __wt_writelock(session, &g.clock_lock);
         ++g.ts_stable;

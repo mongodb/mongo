@@ -31,6 +31,7 @@
 import wiredtiger, wttest, re, suite_random
 from wtdataset import SimpleDataSet
 from contextlib import contextmanager
+from wtscenario import make_scenarios
 
 class test_timestamp22(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=50MB'
@@ -45,6 +46,12 @@ class test_timestamp22(wttest.WiredTigerTestCase):
     stable_ts = 0
     SUCCESS = 'success'
     FAILURE = 'failure'
+
+    key_format_values = [
+        ('integer-row', dict(key_format='i')),
+        ('column', dict(key_format='r')),
+    ]
+    scenarios = make_scenarios(key_format_values)
 
     # Control execution of an operation, looking for exceptions and error messages.
     # Usage:
@@ -240,7 +247,7 @@ class test_timestamp22(wttest.WiredTigerTestCase):
         msg = 'inserts with commit config(' + commit_config + ')'
 
         try:
-            for i in range(0, self.nrows):
+            for i in range(1, self.nrows + 1):
                 needs_rollback = False
                 if self.do_illegal():
                     # Illegal outside of transaction
@@ -380,14 +387,14 @@ class test_timestamp22(wttest.WiredTigerTestCase):
         else:
             iterations = 1000
 
-        create_params = 'value_format=S,key_format=i'
+        create_params = 'key_format={},value_format=S'.format(self.key_format)
         self.session.create(self.uri, create_params)
 
         self.set_global_timestamps(1, 1, -1, -1)
 
         # Create tables with no entries
         ds = SimpleDataSet(
-            self, self.uri, 0, key_format="i", value_format="S", config='log=(enabled=false)')
+            self, self.uri, 0, key_format=self.key_format, value_format="S", config='log=(enabled=false)')
 
         # We do a bunch of iterations, doing transactions, prepare, and global timestamp calls
         # with timestamps that are sometimes valid, sometimes not. We use the iteration number
@@ -430,7 +437,7 @@ class test_timestamp22(wttest.WiredTigerTestCase):
 
         # Make sure the resulting rows are what we expect.
         cursor = self.session.open_cursor(self.uri)
-        expect_key = 0
+        expect_key = 1
         expect_value = self.commit_value
         for k,v in cursor:
             self.assertEquals(k, expect_key)
@@ -440,7 +447,7 @@ class test_timestamp22(wttest.WiredTigerTestCase):
         # Although it's theoretically possible to never successfully update a single row,
         # with a large number of iterations that should never happen.  I'd rather catch
         # a test code error where we mistakenly don't update any rows.
-        self.assertGreater(expect_key, 0)
+        self.assertGreater(expect_key, 1)
         cursor.close()
 
 if __name__ == '__main__':

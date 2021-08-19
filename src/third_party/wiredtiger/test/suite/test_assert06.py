@@ -204,7 +204,7 @@ class test_assert06(wttest.WiredTigerTestCase, suite_subprocess):
         # That checking will verify any individual key is always or never
         # used with a timestamp. And if it is used with a timestamp that
         # the timestamps are in increasing order for that key.
-        self.session.create(uri, 'key_format={},value_format=S,write_timestamp_usage=key_consistent,assert=(write_timestamp=on)'.format(self.key_format))
+        self.session.create(uri, 'key_format={},value_format=S,verbose=(write_timestamp),write_timestamp_usage=key_consistent,assert=(write_timestamp=on)'.format(self.key_format))
 
         # Insert a data item at timestamp 2.
         c = self.session.open_cursor(uri)
@@ -437,6 +437,15 @@ class test_assert06(wttest.WiredTigerTestCase, suite_subprocess):
             'durable_timestamp=' + self.timestamp_str(23)), msg_usage)
         c.close()
         '''
+
+        # Confirm that rolling back after preparing doesn't fire an assertion.
+        c = self.session.open_cursor(uri)
+        self.session.begin_transaction()
+        c[key_ts6] = 'value24'
+        self.session.prepare_transaction(
+            'prepare_timestamp=' + self.timestamp_str(24))
+        self.session.rollback_transaction()
+        c.close()
 
 if __name__ == '__main__':
     wttest.run()

@@ -202,8 +202,8 @@ __bulk_row_keycmp_err(WT_CURSOR_BULK *cbulk)
     WT_ERR_MSG(session, EINVAL,
       "bulk-load presented with out-of-order keys: %s compares smaller than previously inserted "
       "key %s",
-      __wt_buf_set_printable(session, cursor->key.data, cursor->key.size, a),
-      __wt_buf_set_printable(session, cbulk->last.data, cbulk->last.size, b));
+      __wt_buf_set_printable(session, cursor->key.data, cursor->key.size, false, a),
+      __wt_buf_set_printable(session, cbulk->last.data, cbulk->last.size, false, b));
 
 err:
     __wt_scr_free(session, &a);

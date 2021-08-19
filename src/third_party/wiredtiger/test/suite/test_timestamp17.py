@@ -43,8 +43,14 @@ class test_timestamp17(wttest.WiredTigerTestCase, suite_subprocess):
     uri = 'table:' + tablename
     session_config = 'isolation=snapshot'
 
+    key_format_values = [
+        ('integer-row', dict(key_format='i')),
+        ('column', dict(key_format='r')),
+    ]
+    scenarios = make_scenarios(key_format_values)
+
     def test_inconsistent_timestamping(self):
-        self.session.create(self.uri, 'key_format=i,value_format=i')
+        self.session.create(self.uri, 'key_format={},value_format=i'.format(self.key_format))
         self.session.begin_transaction()
         cur1 = self.session.open_cursor(self.uri)
         cur1[1] = 1

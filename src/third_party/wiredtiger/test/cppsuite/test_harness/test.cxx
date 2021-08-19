@@ -137,8 +137,8 @@ test::run()
     /* The test will run for the duration as defined in the config. */
     duration_seconds = _config->get_int(DURATION_SECONDS);
     testutil_assert(duration_seconds >= 0);
-    logger::log_msg(
-      LOG_INFO, "Waiting {" + std::to_string(duration_seconds) + "} for testing to complete.");
+    logger::log_msg(LOG_INFO,
+      "Waiting {" + std::to_string(duration_seconds) + "} seconds for testing to complete.");
     std::this_thread::sleep_for(std::chrono::seconds(duration_seconds));
 
     /* End the test by calling finish on all known components. */

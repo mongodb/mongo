@@ -30,27 +30,37 @@
 #       Testing that we don't allow modifies on top of tombstone updates.
 
 import wiredtiger, wttest
+from wtscenario import make_scenarios
 
 class test_bug022(wttest.WiredTigerTestCase):
     uri = 'file:test_bug022'
     conn_config = 'cache_size=50MB'
     session_config = 'isolation=snapshot'
 
+    key_format_values = [
+        ('string-row', dict(key_format='S', usestrings=True)),
+        ('column', dict(key_format='r', usestrings=False)),
+    ]
+    scenarios = make_scenarios(key_format_values)
+
+    def get_key(self, i):
+        return str(i) if self.usestrings else i
+
     def test_apply_modifies_on_onpage_tombstone(self):
-        self.session.create(self.uri, 'key_format=S,value_format=S')
+        self.session.create(self.uri, 'key_format={},value_format=S'.format(self.key_format))
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
         cursor = self.session.open_cursor(self.uri)
 
         value = 'a' * 500
         for i in range(1, 10000):
             self.session.begin_transaction()
-            cursor[str(i)] = value
+            cursor[self.get_key(i)] = value
             self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
 
         # Apply tombstones for every key.
         for i in range(1, 10000):
             self.session.begin_transaction()
-            cursor.set_key(str(i))
+            cursor.set_key(self.get_key(i))
             cursor.remove()
             self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(3))
 
@@ -59,11 +69,11 @@ class test_bug022(wttest.WiredTigerTestCase):
         # Now try to apply a modify on top of the tombstone at timestamp 3.
         for i in range(1, 10000):
             self.session.begin_transaction()
-            cursor.set_key(str(i))
+            cursor.set_key(self.get_key(i))
             self.assertEqual(cursor.modify([wiredtiger.Modify('B', 0, 100)]), wiredtiger.WT_NOTFOUND)
             self.session.rollback_transaction()
 
         # Check that the tombstone is visible.
         for i in range(1, 10000):
-            cursor.set_key(str(i))
+            cursor.set_key(self.get_key(i))
             self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)

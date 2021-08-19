@@ -113,7 +113,6 @@ Decrement
 Decrypt
 DeleteFileW
 Destructor
-Dh
 EACCES
 EAGAIN
 EB
@@ -156,7 +155,6 @@ FindClose
 FindFirstFile
 FindNextFileW
 Fixup
-Fk
 FlushFileBuffers
 Fprintf
 FreeBSD
@@ -244,7 +242,6 @@ LevelDB
 Levyx
 LibFuzzer
 LmRrSVv
-LmsT
 LoadLoad
 LockFile
 Lookaside
@@ -498,7 +495,6 @@ abcdef
 abcdefghijklmnopqrstuvwxyz
 addl
 addr
-af
 agc
 alfred
 alloc
@@ -587,7 +583,6 @@ ccc
 ccr
 cd
 ce
-ceh
 celsius
 centric
 cfg
@@ -962,7 +957,6 @@ iter
 iteratively
 iters
 jjj
-jnr
 jprx
 json
 kb
@@ -1036,7 +1030,6 @@ lwsync
 lx
 lz
 lzo
-mT
 madvise
 majmin
 majorp
@@ -1159,8 +1152,6 @@ osfhandle
 other's
 ovfl
 ownp
-pR
-pS
 packv
 pagedump
 pagesize
@@ -1218,7 +1209,6 @@ pv
 pvA
 pwrite
 py
-qRrT
 qdown
 qqq
 qrrSS
@@ -1279,7 +1269,6 @@ runtime
 rwlock
 sH
 sHQ
-sT
 sanitizer
 sanitizers
 scalability
@@ -1472,7 +1461,6 @@ util
 utils
 uu
 vN
-vW
 va
 valgrind
 valuep
@@ -1493,10 +1481,7 @@ vsize
 vsnprintf
 vtype
 vunpack
-vw
 vxr
-vxz
-vz
 waitpid
 waker
 wakeup

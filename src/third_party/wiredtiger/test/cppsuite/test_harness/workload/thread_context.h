@@ -71,17 +71,28 @@ class transaction_context {
     void begin(const std::string &config = "");
     /* Begin a transaction if we are not currently in one. */
     void try_begin(const std::string &config = "");
-    void commit(const std::string &config = "");
-    /* Attempt to commit the transaction given the requirements are met. */
-    void try_commit(const std::string &config = "");
+    /*
+     * Commit a transaction and return true if a rollback is required.
+     */
+    bool commit(const std::string &config = "");
+    /* Rollback a transaction, failure will abort the test. */
     void rollback(const std::string &config = "");
     /* Attempt to rollback the transaction given the requirements are met. */
     void try_rollback(const std::string &config = "");
     /* Set a commit timestamp. */
     void set_commit_timestamp(wt_timestamp_t ts);
-
-    private:
-    bool can_commit_rollback();
+    /* Set that the transaction needs to be rolled back. */
+    void set_needs_rollback(bool rollback);
+    /*
+     * Returns true if a transaction can be committed as determined by the op count and the state of
+     * the transaction.
+     */
+    bool can_commit();
+    /*
+     * Returns true if a transaction can be rolled back as determined by the op count and the state
+     * of the transaction.
+     */
+    bool can_rollback();
 
     private:
     /*
@@ -99,6 +110,7 @@ class transaction_context {
     int64_t _max_op_count = INT64_MAX;
     int64_t _target_op_count = 0;
     bool _in_txn = false;
+    bool _needs_rollback = false;
 
     WT_SESSION *_session = nullptr;
     timestamp_manager *_timestamp_manager = nullptr;
@@ -124,24 +136,16 @@ class thread_context {
     /*
      * Generic update function, takes a collection_id and key, will generate the value.
      *
-     * Returns true if it successfully updates the key, false if it receives rollback from the API.
+     * Returns true if a rollback is required.
      */
     bool update(scoped_cursor &cursor, uint64_t collection_id, const std::string &key);
 
     /*
      * Generic insert function, takes a collection_id and key_id, will generate the value.
      *
-     * Returns true if it successfully inserts the key, false if it receives rollback from the API.
+     * Returns true if a rollback is required.
      */
     bool insert(scoped_cursor &cursor, uint64_t collection_id, uint64_t key_id);
-
-    /*
-     * Generic next function.
-     *
-     * Handles rollback and not found internally, but will return the error code to the caller so
-     * the caller can distinguish between them.
-     */
-    int next(scoped_cursor &cursor);
 
     void sleep();
     bool running() const;

@@ -141,19 +141,19 @@ configures WiredTiger to use gcc-based spinlocks).
 @section posix_compiler Changing compiler or loader options
 
 By default CMake will use your default system compiler (\c cc). If you want to use a specific toolchain you can pass a toolchain file. We have
-provided a toolchain file for both GCC (\c build_cmake/toolchains/gcc.cmake) and Clang (\c build_cmake/toolchains/clang.cmake). To use either
+provided a toolchain file for both GCC (\c cmake/toolchains/gcc.cmake) and Clang (\c cmake/toolchains/clang.cmake). To use either
 toolchain you can pass the \c -DCMAKE_TOOLCHAIN_FILE= to the CMake configuration step. For example:
 
 For example, to explicitly specify the GCC toolchain:
 
 @code
-cmake -DCMAKE_TOOLCHAIN_FILE=../build_cmake/toolchains/gcc.cmake -G Ninja ../.
+cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/gcc.cmake -G Ninja ../.
 @endcode
 
 To explicitly specify the Clang toolchain:
 
 @code
-cmake -DCMAKE_TOOLCHAIN_FILE=../build_cmake/toolchains/clang.cmake -G Ninja ../.
+cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake -G Ninja ../.
 @endcode
 
 By default, WiredTiger builds with the \c -O3 compiler optimization flag

@@ -68,6 +68,7 @@ following information:
 @hrow{String, Meaning}
 @row{hex, the dumped data is in a hexadecimal dump format}
 @row{print, the dumped data is in a printable format}
+@row{print hex, the dumped data is in a printable format with raw byte array elements printed same as in hex format}
 </table>
 
 The dump header follows a single \c "Header" line in the file and
@@ -77,10 +78,11 @@ string.  The table or file can be recreated by calling
 WT_SESSION::create for each pair of lines in the header.
 
 The dump body follows a single \c "Data" line in the file and consists
-of a text representation of the records in the table.  Each record is a
+of a text representation of the records in the table.  Each record is
 represented by a pair of lines: the first line is the key and the second
-line is the value.  These lines are encoded in one of two formats: a
-printable format and a hexadecimal format.
+line is the value.  These lines are encoded in one of the following formats: a
+printable format, a hexadecimal format, and a printable format with raw byte array elements in
+hexadecimal format.
 
 The printable format consists of literal printable characters, and
 hexadecimal encoded non-printable characters.  Encoded characters are
@@ -96,6 +98,9 @@ The hexadecimal format consists of encoded characters, where each
 literal character is written as a pair of characters (first the
 high-nibble and then the low-nibble).  For example, "0a" would be an
 ASCII newline character and "1b" would be an ASCII escape character.
+
+The printable hexadecimal format is the same as the printable except all raw
+byte array elements will be printed in hexadecimal format.
 
 Because the definition of "printable" may depend on the application's
 locale, dump files in the printable output format may be less portable

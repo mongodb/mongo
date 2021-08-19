@@ -140,6 +140,8 @@ main(int argc, char *argv[])
 
     testutil_work_dir_from_path(g.home, 512, working_dir);
 
+    g.ts_stable = 0;
+
     printf("%s: process %" PRIu64 "\n", progname, (uint64_t)getpid());
     for (cnt = 1; (runs == 0 || cnt <= runs) && g.status == 0; ++cnt) {
         cleanup(cnt == 1); /* Clean up previous runs */
@@ -171,7 +173,7 @@ main(int argc, char *argv[])
         free(g.cookies);
         g.cookies = NULL;
         if ((ret = wt_shutdown()) != 0) {
-            (void)log_print_err("Start workers failed", ret, 1);
+            (void)log_print_err("Shutdown failed", ret, 1);
             break;
         }
     }
@@ -250,7 +252,6 @@ cleanup(bool remove_dir)
     g.running = 0;
     g.ntables_created = 0;
     g.ts_oldest = 0;
-    g.ts_stable = 0;
 
     if (remove_dir)
         testutil_make_work_dir(g.home);

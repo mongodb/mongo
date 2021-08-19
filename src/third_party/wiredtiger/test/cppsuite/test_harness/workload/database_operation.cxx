@@ -52,8 +52,9 @@ populate_worker(thread_context *tc)
         for (uint64_t i = 0; i < tc->key_count; ++i) {
             /* Start a txn. */
             tc->transaction.begin();
-            if (!tc->insert(cursor, coll.id, i)) {
-                /* We failed to insert, and our transaction was rolled back retry. */
+            if (tc->insert(cursor, coll.id, i)) {
+                /* We failed to insert, rollback our transaction and retry. */
+                tc->transaction.rollback();
                 --i;
                 continue;
             }
@@ -162,24 +163,31 @@ database_operation::insert_operation(thread_context *tc)
         auto &cc = ccv[counter];
         while (tc->transaction.active() && tc->running()) {
             /* Insert a key value pair. */
-            if (!tc->insert(cc.cursor, cc.coll.id, start_key + added_count)) {
-                committed = false;
-                break;
+            bool rollback_required = tc->insert(cc.cursor, cc.coll.id, start_key + added_count);
+            if (!rollback_required) {
+                added_count++;
+                if (tc->transaction.can_commit()) {
+                    rollback_required = tc->transaction.commit();
+                    if (!rollback_required)
+                        /*
+                         * We need to inform the database model that we've added these keys as some
+                         * other thread may rely on the key_count data. Only do so if we
+                         * successfully committed.
+                         */
+                        cc.coll.increase_key_count(added_count);
+                }
             }
-            added_count++;
-            tc->transaction.try_commit();
+
+            if (rollback_required) {
+                added_count = 0;
+                tc->transaction.rollback();
+            }
+
             /* Sleep the duration defined by the op_rate. */
             tc->sleep();
         }
         /* Reset our cursor to avoid pinning content. */
         testutil_check(cc.cursor->reset(cc.cursor.get()));
-
-        /*
-         * We need to inform the database model that we've added these keys as some other thread may
-         * rely on the key_count data. Only do so if we successfully committed.
-         */
-        if (committed)
-            cc.coll.increase_key_count(added_count);
         counter++;
         if (counter == collections_per_thread)
             counter = 0;
@@ -208,9 +216,17 @@ database_operation::read_operation(thread_context *tc)
 
         tc->transaction.begin();
         while (tc->transaction.active() && tc->running()) {
-            if (tc->next(cursor) == WT_ROLLBACK)
-                /* We got an error, our transaction has been rolled back. */
-                break;
+            auto ret = cursor->next(cursor.get());
+            if (ret != 0) {
+                if (ret == WT_NOTFOUND) {
+                    cursor->reset(cursor.get());
+                } else if (ret == WT_ROLLBACK) {
+                    tc->transaction.rollback();
+                    tc->sleep();
+                    continue;
+                } else
+                    testutil_die(ret, "Unexpected error returned from cursor->next()");
+            }
             tc->transaction.add_op();
             tc->transaction.try_rollback();
             tc->sleep();
@@ -263,21 +279,21 @@ database_operation::update_operation(thread_context *tc)
         /* Choose a random key to update. */
         uint64_t key_id =
           random_generator::instance().generate_integer<uint64_t>(0, coll.get_key_count() - 1);
-        bool successful_update = tc->update(cursor, coll.id, tc->key_to_string(key_id));
+        bool rollback_required = tc->update(cursor, coll.id, tc->key_to_string(key_id));
 
         /* Reset our cursor to avoid pinning content. */
         testutil_check(cursor->reset(cursor.get()));
 
-        /* We received a rollback in update. */
-        if (!successful_update)
-            continue;
-
         /* Commit the current transaction if we're able to. */
-        tc->transaction.try_commit();
+        if (!rollback_required && tc->transaction.can_commit())
+            rollback_required = tc->transaction.commit();
+
+        if (rollback_required)
+            tc->transaction.rollback();
     }
 
-    /* Make sure the last operation is committed now the work is finished. */
+    /* Make sure the last operation is rolled back now the work is finished. */
     if (tc->transaction.active())
-        tc->transaction.commit();
+        tc->transaction.rollback();
 }
 } // namespace test_harness

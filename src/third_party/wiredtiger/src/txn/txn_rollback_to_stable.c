@@ -639,7 +639,7 @@ err:
  */
 static int
 __rollback_abort_ondisk_kv(WT_SESSION_IMPL *session, WT_REF *ref, WT_COL *cip, WT_ROW *rip,
-  wt_timestamp_t rollback_timestamp, uint64_t recno)
+  wt_timestamp_t rollback_timestamp, uint64_t recno, bool *is_ondisk_stable)
 {
     WT_CELL *kcell;
     WT_CELL_UNPACK_KV *vpack, _vpack;
@@ -653,6 +653,10 @@ __rollback_abort_ondisk_kv(WT_SESSION_IMPL *session, WT_REF *ref, WT_COL *cip, W
     page = ref->page;
     vpack = &_vpack;
     upd = NULL;
+
+    /* Initialize the on-disk stable version flag. */
+    if (is_ondisk_stable != NULL)
+        *is_ondisk_stable = false;
 
     /*
      * Assert an exclusive or for rip and cip such that either only a cip for a column store or a
@@ -768,9 +772,12 @@ __rollback_abort_ondisk_kv(WT_SESSION_IMPL *session, WT_REF *ref, WT_COL *cip, W
               __wt_timestamp_to_string(vpack->tw.durable_stop_ts, ts_string[4]), vpack->tw.stop_txn,
               prepared ? "true" : "false");
         }
-    } else
+    } else {
         /* Stable version according to the timestamp. */
+        if (is_ondisk_stable != NULL)
+            *is_ondisk_stable = true;
         return (0);
+    }
 
     if (rip != NULL)
         WT_ERR(__rollback_row_modify(session, page, rip, upd));
@@ -821,9 +828,19 @@ __rollback_abort_col_var(WT_SESSION_IMPL *session, WT_REF *ref, wt_timestamp_t r
             kcell = WT_COL_PTR(page, cip);
             __wt_cell_unpack_kv(session, page->dsk, kcell, &unpack);
             rle = __wt_cell_rle(&unpack);
-            for (j = 0; j < rle; j++)
-                WT_RET(__rollback_abort_ondisk_kv(
-                  session, ref, cip, NULL, rollback_timestamp, recno + j));
+            if (unpack.type != WT_CELL_DEL) {
+                for (j = 0; j < rle; j++) {
+                    WT_RET(__rollback_abort_ondisk_kv(session, ref, cip, NULL, rollback_timestamp,
+                      recno + j, &stable_update_found));
+                    /* Skip processing all RLE if the on-disk version is stable. */
+                    if (stable_update_found) {
+                        if (rle > 1)
+                            WT_STAT_CONN_DATA_INCR(session, txn_rts_stable_rle_skipped);
+                        break;
+                    }
+                }
+            } else
+                WT_STAT_CONN_DATA_INCR(session, txn_rts_delete_rle_skipped);
             recno += rle;
         } else {
             recno++;
@@ -910,7 +927,8 @@ __rollback_abort_row_leaf(WT_SESSION_IMPL *session, WT_REF *ref, wt_timestamp_t 
          * If there is no stable update found in the update list, abort any on-disk value.
          */
         if (!stable_update_found)
-            WT_ERR(__rollback_abort_ondisk_kv(session, ref, NULL, rip, rollback_timestamp, 0));
+            WT_ERR(
+              __rollback_abort_ondisk_kv(session, ref, NULL, rip, rollback_timestamp, 0, NULL));
     }
 
     /* Mark the page as dirty to reconcile the page. */

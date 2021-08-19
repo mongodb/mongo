@@ -666,7 +666,7 @@ select adaptive pthread mutexes by specifying
 <dt>LSM merge threads option change</dt>
 <dd>
 The WT_SESSION::create \c lsm=(merge_threads) configuration option has been
-replaced by the W::wiredtiger_open \c lsm_manager=(worker_thread_max) option.
+replaced by the ::wiredtiger_open \c lsm_manager=(worker_thread_max) option.
 The new version specifies a set of LSM threads that are shared across all
 LSM trees in a database, the older configuration was per LSM table.
 </dd>
