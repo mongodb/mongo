@@ -37,7 +37,7 @@ class TestSetupMultiversionBase(unittest.TestCase):
             ]
         }
 
-        download_options = _DownloadOptions(db=True, ds=False, da=False)
+        download_options = _DownloadOptions(db=True, ds=False, da=False, dv=False)
 
         options = Namespace(
             install_dir="install",

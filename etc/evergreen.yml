@@ -500,6 +500,16 @@ functions:
       bucket: mciuploads
       extract_to: src
 
+  "fetch venv": &fetch_venv
+    command: s3.get
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      remote_file: ${project}/${build_variant}/${revision}/mongodb-mongo-venv/${build_id}.tgz
+      bucket: mciuploads
+      # Python venv is not relocatable and should be placed in /data/mci
+      extract_to: ".."
+
   "fetch packages": &fetch_packages
     command: s3.get
     params:
@@ -848,9 +858,8 @@ functions:
   - *fetch_artifacts
   - *kill_processes
   - *cleanup_environment
+  - *fetch_venv
   - *fetch_binaries
-  - *set_up_venv
-  - *upload_pip_requirements
   - *extract_binaries
   - *check_binary_version
   - *get_buildnumber
@@ -1088,8 +1097,7 @@ functions:
     - *f_expansions_write
     - *kill_processes
     - *cleanup_environment
-    - *set_up_venv
-    - *upload_pip_requirements
+    - *fetch_venv
     - *f_expansions_write
     - *configure_evergreen_api_credentials
 
@@ -1974,7 +1982,6 @@ tasks:
           - "./etc/pip/**"
           - "./etc/repo_config.yaml"
           - "./etc/scons/**"
-          - "artifacts.json"
           - "buildscripts/**"
           - "compile_expansions.yml"
           - "all_feature_flags.txt"  # Must correspond to the definition in buildscripts/idl/lib.py.
@@ -2006,14 +2013,24 @@ tasks:
         content_type: application/tar
         display_name: Artifacts
 
-    # For patch builds that bypass compile, we upload links to pre-existing tarballs, except for the
-    # artifacts.tgz.
-    - command: attach.artifacts
+    - command: archive.targz_pack
       params:
-        optional: true
-        ignore_artifacts_for_spawn: false
-        files:
-          - src/artifacts.json
+        target: "mongodb-mongo-venv.tgz"
+        source_dir: ".."
+        include:
+          - "./mongodb-mongo-venv/**"
+
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: mongodb-mongo-venv.tgz
+        remote_file: ${project}/${build_variant}/${revision}/mongodb-mongo-venv/${build_id}.tgz
+        bucket: mciuploads
+        permissions: private
+        visibility: signed
+        content_type: application/tar
+        display_name: Python venv (see included README.txt)
 
 # Dummy task to activate `archive_dist_test_debug` since it can't be activated directly (not a generated task).
 - name: activate_archive_dist_test_debug

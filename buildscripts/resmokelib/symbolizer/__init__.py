@@ -91,9 +91,9 @@ class Symbolizer(Subcommand):
 
     def _get_multiversion_setup(self):
         if self.download_symbols_only:
-            download_options = _DownloadOptions(db=False, ds=True, da=False)
+            download_options = _DownloadOptions(db=False, ds=True, da=False, dv=False)
         else:
-            download_options = _DownloadOptions(db=True, ds=True, da=False)
+            download_options = _DownloadOptions(db=True, ds=True, da=False, dv=False)
         return SetupMultiversion(download_options=download_options, ignore_failed_push=True)
 
     def _get_compile_artifacts(self):

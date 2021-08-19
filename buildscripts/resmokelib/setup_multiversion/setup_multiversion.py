@@ -63,6 +63,7 @@ class SetupMultiversion(Subcommand):
         self.download_binaries = download_options.download_binaries
         self.download_symbols = download_options.download_symbols
         self.download_artifacts = download_options.download_artifacts
+        self.download_python_venv = download_options.download_python_venv
 
         self.evg_api = evergreen_conn.get_evergreen_api(evergreen_config)
         # In evergreen github oauth token is stored as `token ******`, so we remove the leading part
@@ -124,6 +125,8 @@ class SetupMultiversion(Subcommand):
         """Download and extract values indicated in `urls`."""
         artifacts_url = urls.get("Artifacts", "") if self.download_artifacts else None
         binaries_url = urls.get("Binaries", "") if self.download_binaries else None
+        python_venv_url = urls.get("Python venv (see included README.txt)",
+                                   "") if self.download_python_venv else None
         download_symbols_url = None
 
         if self.download_symbols:
@@ -141,8 +144,11 @@ class SetupMultiversion(Subcommand):
         if self.download_binaries and not binaries_url:
             raise download.DownloadError("Binaries download requested but not URL available")
 
-        self.setup_mongodb(artifacts_url, binaries_url, download_symbols_url, install_dir,
-                           bin_suffix, link_dir=self.link_dir,
+        if self.download_python_venv and not python_venv_url:
+            raise download.DownloadError("Python venv download requested but not URL available")
+
+        self.setup_mongodb(artifacts_url, binaries_url, download_symbols_url, python_venv_url,
+                           install_dir, bin_suffix, link_dir=self.link_dir,
                            install_dir_list=self._windows_bin_install_dirs)
 
         if self._is_windows:
@@ -226,12 +232,12 @@ class SetupMultiversion(Subcommand):
         return urls
 
     @staticmethod
-    def setup_mongodb(artifacts_url, binaries_url, symbols_url, install_dir, bin_suffix=None,
-                      link_dir=None, install_dir_list=None):
+    def setup_mongodb(artifacts_url, binaries_url, symbols_url, python_venv_url, install_dir,
+                      bin_suffix=None, link_dir=None, install_dir_list=None):
         # pylint: disable=too-many-arguments
         """Download, extract and symlink."""
 
-        for url in [artifacts_url, binaries_url, symbols_url]:
+        for url in [artifacts_url, binaries_url, symbols_url, python_venv_url]:
             if url is not None:
 
                 def try_download(download_url):
@@ -281,10 +287,11 @@ class SetupMultiversion(Subcommand):
 
 
 class _DownloadOptions(object):
-    def __init__(self, db, ds, da):
+    def __init__(self, db, ds, da, dv):
         self.download_binaries = db
         self.download_symbols = ds
         self.download_artifacts = da
+        self.download_python_venv = dv
 
 
 class SetupMultiversionPlugin(PluginInterface):
@@ -299,7 +306,8 @@ class SetupMultiversionPlugin(PluginInterface):
         args = parsed_args
 
         download_options = _DownloadOptions(db=args.download_binaries, ds=args.download_symbols,
-                                            da=args.download_artifacts)
+                                            da=args.download_artifacts,
+                                            dv=args.download_python_venv)
 
         return SetupMultiversion(install_dir=args.install_dir, link_dir=args.link_dir,
                                  mv_platform=args.platform, edition=args.edition,
@@ -342,13 +350,16 @@ class SetupMultiversionPlugin(PluginInterface):
 
         parser.add_argument("-db", "--downloadBinaries", dest="download_binaries",
                             action="store_true", default=True,
-                            help="whether to download binaries, default to True.")
+                            help="whether to download binaries, [default: %(default)s].")
         parser.add_argument("-ds", "--downloadSymbols", dest="download_symbols",
                             action="store_true", default=False,
-                            help="whether to download debug symbols.")
+                            help="whether to download debug symbols, [default: %(default)s].")
         parser.add_argument("-da", "--downloadArtifacts", dest="download_artifacts",
                             action="store_true", default=False,
-                            help="whether to download artifacts.")
+                            help="whether to download artifacts, [default: %(default)s].")
+        parser.add_argument("-dv", "--downloadPythonVenv", dest="download_python_venv",
+                            action="store_true", default=False,
+                            help="whether to download python venv, [default: %(default)s].")
         parser.add_argument(
             "-ec", "--evergreenConfig", dest="evergreen_config",
             help="Location of evergreen configuration file. If not specified it will look "

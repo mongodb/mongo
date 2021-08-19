@@ -1,11 +1,11 @@
 function activate_venv {
   # check if virtualenv is set up
-  if [ -d "${workdir}/venv" ]; then
+  if [ -d "${workdir}/../mongodb-mongo-venv" ]; then
     if [ "Windows_NT" = "$OS" ]; then
       # Need to quote the path on Windows to preserve the separator.
-      . "${workdir}/venv/Scripts/activate" 2> /tmp/activate_error.log
+      . "${workdir}/../mongodb-mongo-venv/Scripts/activate" 2> /tmp/activate_error.log
     else
-      . ${workdir}/venv/bin/activate 2> /tmp/activate_error.log
+      . ${workdir}/../mongodb-mongo-venv/bin/activate 2> /tmp/activate_error.log
     fi
     if [ $? -ne 0 ]; then
       echo "Failed to activate virtualenv: $(cat /tmp/activate_error.log)"
