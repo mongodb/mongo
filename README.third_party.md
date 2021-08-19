@@ -4,7 +4,7 @@ MongoDB depends on third party libraries to implement some
 functionality. This document describes which libraries are depended
 upon, and how. It is maintained by and for humans, and so while it is a
 best effort attempt to describe the server’s dependencies, it is subject
-to change as libraries are added or removed.
+to change as libraries are added or removed and modified.
 
 ## Server Vendored Libraries
 
