@@ -133,8 +133,11 @@ boost::optional<uint8_t> Simple8bTypeUtil::calculateDecimalShiftMultiplier(doubl
 }
 
 boost::optional<int64_t> Simple8bTypeUtil::encodeDouble(double val, uint8_t scaleIndex) {
-    if (scaleIndex == kMemoryAsInteger)
-        return *reinterpret_cast<int64_t*>(&val);
+    if (scaleIndex == kMemoryAsInteger) {
+        int64_t ret;
+        memcpy(&ret, &val, sizeof(ret));
+        return ret;
+    }
 
     // Checks for both overflow and handles NaNs
     // We use 2^53 because this is the max integer that we can guarentee can be
@@ -160,8 +163,11 @@ boost::optional<int64_t> Simple8bTypeUtil::encodeDouble(double val, uint8_t scal
 }
 
 double Simple8bTypeUtil::decodeDouble(int64_t val, uint8_t scaleIndex) {
-    if (scaleIndex == kMemoryAsInteger)
-        return *reinterpret_cast<double*>(&val);
+    if (scaleIndex == kMemoryAsInteger) {
+        double ret;
+        memcpy(&ret, &val, sizeof(ret));
+        return ret;
+    }
 
     return val / kScaleMultiplier[scaleIndex];
 }

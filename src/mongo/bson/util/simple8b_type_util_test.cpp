@@ -261,7 +261,10 @@ TEST(Simple8bTypeUtil, InterpretAsMemory) {
         boost::optional<int64_t> result =
             Simple8bTypeUtil::encodeDouble(val, Simple8bTypeUtil::kMemoryAsInteger);
         ASSERT_TRUE(result);
-        ASSERT_EQ(*result, *reinterpret_cast<const int64_t*>(&val));
+
+        int64_t valInt;
+        memcpy(&valInt, &val, sizeof(valInt));
+        ASSERT_EQ(*result, valInt);
 
         // Some of the special values above does not compare equal with themselves (signaling NaN).
         // Verify that we end up with the same memory after decoding
