@@ -93,7 +93,6 @@ ALLOW_ANY_TYPE_LIST: List[str] = [
     "commandDeserializerNotEqualUnstable",
     'create-param-backwards',
     'saslStart-param-payload',
-    'explain-param-use44SortKeys',
     'saslStart-param-payload',
     'saslStart-reply-payload',
     'saslContinue-param-payload',
@@ -151,7 +150,6 @@ ALLOW_ANY_TYPE_LIST: List[str] = [
     'findAndModify-param-update',
     'findAndModify-reply-upserted',
     'explain-param-collation',
-    'explain-param-use44SortKeys',
 ]
 
 SKIPPED_FILES = ["unittest.idl"]

@@ -212,11 +212,3 @@ commands:
                 type: uuid
                 optional: true
                 unstable: true
-            use44SortKeys:
-                # TODO SERVER-47065: A 5.0 node still has to accept the 'use44SortKeys' field, since it
-                # could be included in a command sent from a 4.4 mongos or 4.4 mongod. In 5.1, this
-                # code to tolerate the 'use44SortKeys' field can be deleted.
-                description: "If true, this aggregation will use the 4.4 sort key format."
-                type: bool
-                ignore: true
-                unstable: true

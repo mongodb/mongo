@@ -20,7 +20,6 @@ const unstableFieldsForAggregate = {
     explain: true,
     runtimeConstants: {a: 1},
     collectionUUID: UUID(),
-    use44SortKeys: false,
 };
 
 const unstableFieldsForFind = {
@@ -37,7 +36,6 @@ const unstableFieldsForFind = {
     allowSpeculativeMajorityRead: false,
     $_requestResumeToken: false,
     $_resumeAfter: {},
-    _use44SortKeys: false,
 };
 
 // Test that command with unstable fields and 'apiStrict: true' throws.

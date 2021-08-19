@@ -209,14 +209,6 @@ commands:
         type: object_owned_nonempty_serialize
         default: mongo::BSONObj()
         unstable: true
-      _use44SortKeys:
-        description: "An internal parameter used to determine the serialization format for sort
-        keys. TODO SERVER-47065: A 4.7+ node still has to accept the '_use44SortKeys' field, since
-        it could be included in a command sent from a 4.4 mongos. When 5.0 becomes last-lts, this
-        code to tolerate the '_use44SortKeys' field can be deleted."
-        type: bool
-        optional: true
-        unstable: true
       maxTimeMS:
         description: "The cumulative time limit in milliseconds for processing operations on the
         cursor."
