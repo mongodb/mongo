@@ -12,11 +12,10 @@ message LoggerConfig {
     DefaultLoggerOptions default = 1;
     FileLoggerOptions file = 2;
     InheritedLoggerOptions inherited = 3;
-    SumoLogicLoggerOptions sumo = 4;
-    InMemoryLoggerOptions in_memory = 5;
-    SplunkLoggerOptions splunk = 6;
-    BuildloggerV2Options buildloggerv2 = 7;
-    BuildloggerV3Options buildloggerv3 = 8;
+    InMemoryLoggerOptions in_memory = 4;
+    SplunkLoggerOptions splunk = 5;
+    BuildloggerV2Options buildloggerv2 = 6;
+    BuildloggerV3Options buildloggerv3 = 7;
     RawLoggerConfig raw = 9;
   }
 }
@@ -58,11 +57,6 @@ message FileLoggerOptions {
 
 message InheritedLoggerOptions {
   BaseOptions base = 1;
-}
-
-message SumoLogicLoggerOptions {
-  string sumo_endpoint = 1;
-  BaseOptions base = 2;
 }
 
 message InMemoryLoggerOptions {
@@ -403,10 +397,9 @@ message LoggingCacheInstance {
   google.protobuf.Timestamp accessed = 4;
 }
 
-message LoggingCacheSize {
+message LoggingCacheLenResponse {
   OperationOutcome outcome = 1 ;
-  string id = 2;
-  int64 size = 3;
+  int64 len = 2;
 }
 
 enum LoggingPayloadFormat {
@@ -467,7 +460,7 @@ service JasperProcessManager {
   rpc LoggingCacheRemove(LoggingCacheArgs) returns (OperationOutcome);
   rpc LoggingCacheCloseAndRemove(LoggingCacheArgs) returns (OperationOutcome);
   rpc LoggingCacheClear(google.protobuf.Empty) returns (OperationOutcome);
-  rpc LoggingCacheLen(google.protobuf.Empty) returns (LoggingCacheSize);
+  rpc LoggingCacheLen(google.protobuf.Empty) returns (LoggingCacheLenResponse);
   rpc LoggingCachePrune(google.protobuf.Timestamp) returns (OperationOutcome);
 
   // Remote specific functions
