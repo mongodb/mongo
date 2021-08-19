@@ -743,5 +743,26 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
     }
 }
 
+TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
+       OptimizeMapsGeoWithinPredicatesUsingInternalBucketGeoWithin) {
+    auto pipeline = Pipeline::parse(
+        makeVector(fromjson("{$_internalUnpackBucket: {exclude: [], timeField: "
+                            "'time', bucketMaxSpanSeconds: 3600}}"),
+                   fromjson("{$match: {loc: {$geoWithin: {$geometry: {type: \"Polygon\", "
+                            "coordinates: [ [ [ 0, 0 ], [ 3, 6 ], [ 6, 1 ], [ 0, 0 ] ] ]}}}}}")),
+        getExpCtx());
+    auto& container = pipeline->getSources();
+
+    ASSERT_EQ(container.size(), 2U);
+
+    auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
+    auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
+                         ->createPredicatesOnBucketLevelField(original->getMatchExpression());
+
+    ASSERT_BSONOBJ_EQ(predicate->serialize(true),
+                      fromjson("{$_internalBucketGeoWithin: { withinRegion: { $geometry: { type : "
+                               "\"Polygon\" ,coordinates: [ [ [ 0, 0 ], [ 3, 6 ], [ 6, 1 ], [ 0, 0 "
+                               "] ] ]}},field: \"loc\"}}"));
+}
 }  // namespace
 }  // namespace mongo

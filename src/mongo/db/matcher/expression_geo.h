@@ -64,6 +64,9 @@ public:
     const GeometryContainer& getGeometry() const {
         return *geoContainer;
     }
+    std::shared_ptr<GeometryContainer> getGeometryPtr() const {
+        return geoContainer;
+    }
 
 private:
     // Parse geospatial query
@@ -73,7 +76,7 @@ private:
 
     // Name of the field in the query.
     std::string field;
-    std::unique_ptr<GeometryContainer> geoContainer;
+    std::shared_ptr<GeometryContainer> geoContainer;
     Predicate predicate;
 };
 

@@ -41,6 +41,8 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_algo.h"
+#include "mongo/db/matcher/expression_geo.h"
+#include "mongo/db/matcher/expression_internal_bucket_geo_within.h"
 #include "mongo/db/matcher/expression_internal_expr_comparison.h"
 #include "mongo/db/pipeline/document_source_add_fields.h"
 #include "mongo/db/pipeline/document_source_geo_near.h"
@@ -732,6 +734,12 @@ DocumentSourceInternalUnpackBucket::createPredicatesOnBucketLevelField(
                                          _bucketUnpacker.bucketSpec(),
                                          _bucketMaxSpanSeconds,
                                          pExpCtx->collationMatchesDefault);
+    } else if (matchExpr->matchType() == MatchExpression::GEO) {
+        auto& geoExpr = static_cast<const GeoMatchExpression*>(matchExpr)->getGeoExpression();
+        if (geoExpr.getPred() == GeoExpression::WITHIN) {
+            return std::make_unique<InternalBucketGeoWithinMatchExpression>(
+                geoExpr.getGeometryPtr(), geoExpr.getField());
+        }
     }
 
     return nullptr;

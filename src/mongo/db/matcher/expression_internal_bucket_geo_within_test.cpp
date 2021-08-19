@@ -32,6 +32,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/matcher/expression_internal_bucket_geo_within.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -269,5 +270,4 @@ TEST_F(InternalBucketGeoWithinExpression, BucketContainsNonPointTypeLegacy) {
 
     ASSERT_TRUE(expr->matchesBSON(obj));
 }
-
 }  // namespace mongo
