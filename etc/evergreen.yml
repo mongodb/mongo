@@ -8862,7 +8862,7 @@ buildvariants:
   expansions:
     test_flags: --excludeWithAnyTags=incompatible_with_macos
     compile_env: DEVELOPER_DIR=/Applications/Xcode12.4.app
-    compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --libc++ --disable-warnings-as-errors --variables-files=etc/scons/xcode_macosx.vars
+    compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars
     resmoke_jobs_max: 6
     num_scons_link_jobs_available: 0.99
   tasks:
@@ -8889,7 +8889,7 @@ buildvariants:
   expansions:
     test_flags: --excludeWithAnyTags=incompatible_with_macos
     compile_env: DEVELOPER_DIR=/Applications/Xcode12.4.app
-    compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --libc++ --disable-warnings-as-errors --variables-files=etc/scons/xcode_macosx.vars
+    compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars
     resmoke_jobs_max: 6
     num_scons_link_jobs_available: 0.99
   tasks:
@@ -8915,7 +8915,7 @@ buildvariants:
   expansions:
     test_flags: --excludeWithAnyTags=incompatible_with_macos
     compile_env: DEVELOPER_DIR=/Applications/Xcode12.4.app
-    compile_flags: --ssl --js-engine=none -j$(sysctl -n hw.logicalcpu) --libc++ --disable-warnings-as-errors --variables-files=etc/scons/xcode_macosx_arm.vars
+    compile_flags: --ssl --js-engine=none -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx_arm.vars
     resmoke_jobs_max: 6
     num_scons_link_jobs_available: 0.99
   tasks:
