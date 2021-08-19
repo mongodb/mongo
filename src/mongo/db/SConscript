@@ -68,6 +68,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/index_names',
         '$BUILD_DIR/mongo/db/repl/tenant_migration_errors',
         '$BUILD_DIR/mongo/db/write_concern_options',
+        'process_health_feature_flag',
         'shutdown_in_progress_quiesce_info',
     ]
 )
@@ -650,6 +651,16 @@ env.Library(
         '$BUILD_DIR/mongo/idl/feature_flag',
         '$BUILD_DIR/mongo/idl/server_parameter',
         'server_options_core',
+    ]
+)
+
+env.Library(
+    target='process_health_feature_flag',
+    source=[
+        'process_health/health_monitoring.idl',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/idl/feature_flag',
     ]
 )
 
