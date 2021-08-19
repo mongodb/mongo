@@ -37,9 +37,7 @@
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/cst/cst_parser.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_array.h"
-#include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/canonical_query_encoder.h"
@@ -47,7 +45,6 @@
 #include "mongo/db/query/indexability.h"
 #include "mongo/db/query/projection_parser.h"
 #include "mongo/db/query/query_planner_common.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
 
 namespace mongo {
 namespace {
@@ -213,46 +210,6 @@ Status CanonicalQuery::init(OperationContext* opCtx,
         return status;
     }
 
-    {
-        // If there is a geo expression, extract it.
-        if (auto n = countNodes(_root.get(), MatchExpression::GEO_NEAR)) {
-            tassert(1234501, "isValidNormalized should have caught extra GEO_NEAR", n == 1);
-
-            if (_root->matchType() == MatchExpression::GEO_NEAR) {
-                std::unique_ptr<MatchExpression> nonGeoNear{
-                    static_cast<MatchExpression*>(new AlwaysTrueMatchExpression())};
-                std::unique_ptr<GeoNearMatchExpression> geoNear{
-                    static_cast<GeoNearMatchExpression*>(_root->shallowClone().release())};
-                _splitGeoNear = SplitGeoNear{std::move(nonGeoNear), std::move(geoNear)};
-            } else {
-                tassert(1234502,
-                        "GEO_NEAR can only happen in a top-level AND",
-                        _root->matchType() == MatchExpression::AND);
-
-                auto nonGeoNear = _root->shallowClone();
-                std::unique_ptr<GeoNearMatchExpression> geoNear;
-
-                for (size_t i = 0; i < nonGeoNear->numChildren(); ++i) {
-                    auto& children = *nonGeoNear->getChildVector();
-                    if (nonGeoNear->getChild(i)->matchType() == MatchExpression::GEO_NEAR) {
-                        // Found it.
-                        geoNear.reset(static_cast<GeoNearMatchExpression*>(children[i].release()));
-                        children.erase(children.begin() + i);
-                        break;
-                    }
-                }
-                tassert(1234503, "Expected a GEO_NEAR in here", geoNear);
-
-                // Removing one branch of an $and may have left us with only one remaining branch.
-                if (nonGeoNear->numChildren() == 1) {
-                    nonGeoNear = std::move(nonGeoNear->getChildVector()->at(0));
-                }
-
-                _splitGeoNear = SplitGeoNear{std::move(nonGeoNear), std::move(geoNear)};
-            }
-        }
-    }
-
     // Validate the projection if there is one.
     if (!_findCommand->getProjection().isEmpty()) {
         try {
@@ -332,10 +289,6 @@ void CanonicalQuery::setCollator(std::unique_ptr<CollatorInterface> collator) {
     // The collator associated with the match expression tree is now invalid, since we have reset
     // the collator owned by the ExpressionContext.
     _root->setCollator(collatorRaw);
-    if (_splitGeoNear) {
-        _splitGeoNear->geoNear->setCollator(collatorRaw);
-        _splitGeoNear->nonGeoNear->setCollator(collatorRaw);
-    }
 }
 
 // static
@@ -377,14 +330,6 @@ size_t CanonicalQuery::countNodes(const MatchExpression* root, MatchExpression::
         sum += countNodes(root->getChild(i), type);
     }
     return sum;
-}
-
-boost::optional<GeoNearMatchExpression*> CanonicalQuery::geoNear() const {
-    if (_splitGeoNear) {
-        return static_cast<GeoNearMatchExpression*>(_splitGeoNear->geoNear.get());
-    } else {
-        return boost::none;
-    }
 }
 
 /**
@@ -565,10 +510,6 @@ std::string CanonicalQuery::toString() const {
 
     // The expression tree puts an endl on for us.
     ss << "Tree: " << _root->debugString();
-    if (_splitGeoNear) {
-        ss << "NonGeoNear: " << _splitGeoNear->nonGeoNear->debugString();
-        ss << "GeoNear: " << _splitGeoNear->geoNear->debugString();
-    }
     ss << "Sort: " << _findCommand->getSort().toString() << '\n';
     ss << "Proj: " << _findCommand->getProjection().toString() << '\n';
     if (!_findCommand->getCollation().isEmpty()) {
@@ -605,222 +546,6 @@ std::string CanonicalQuery::toStringShort() const {
 
 CanonicalQuery::QueryShapeString CanonicalQuery::encodeKey() const {
     return canonical_query_encoder::encode(*this);
-}
-
-StatusWith<BSONObj> asAggregationCommand(const CanonicalQuery& cq) {
-    BSONObjBuilder aggregationBuilder;
-
-    const FindCommandRequest& findCommand = cq.getFindCommandRequest();
-
-    // The find command will translate away ntoreturn above this layer.
-    tassert(5746106, "ntoreturn should not be set in the findCommand", !findCommand.getNtoreturn());
-
-    // First, check if this query has options that are not supported in aggregation.
-    if (!findCommand.getMin().isEmpty()) {
-        return {ErrorCodes::InvalidPipelineOperator,
-                str::stream() << "Option " << FindCommandRequest::kMinFieldName
-                              << " not supported in aggregation."};
-    }
-    if (!findCommand.getMax().isEmpty()) {
-        return {ErrorCodes::InvalidPipelineOperator,
-                str::stream() << "Option " << FindCommandRequest::kMaxFieldName
-                              << " not supported in aggregation."};
-    }
-    if (findCommand.getReturnKey()) {
-        return {ErrorCodes::InvalidPipelineOperator,
-                str::stream() << "Option " << FindCommandRequest::kReturnKeyFieldName
-                              << " not supported in aggregation."};
-    }
-    if (findCommand.getShowRecordId()) {
-        return {ErrorCodes::InvalidPipelineOperator,
-                str::stream() << "Option " << FindCommandRequest::kShowRecordIdFieldName
-                              << " not supported in aggregation."};
-    }
-    if (findCommand.getTailable()) {
-        return {ErrorCodes::InvalidPipelineOperator,
-                "Tailable cursors are not supported in aggregation."};
-    }
-    if (findCommand.getNoCursorTimeout()) {
-        return {ErrorCodes::InvalidPipelineOperator,
-                str::stream() << "Option " << FindCommandRequest::kNoCursorTimeoutFieldName
-                              << " not supported in aggregation."};
-    }
-    if (findCommand.getAllowPartialResults()) {
-        return {ErrorCodes::InvalidPipelineOperator,
-                str::stream() << "Option " << FindCommandRequest::kAllowPartialResultsFieldName
-                              << " not supported in aggregation."};
-    }
-    if (findCommand.getSort()[query_request_helper::kNaturalSortField]) {
-        return {ErrorCodes::InvalidPipelineOperator,
-                str::stream() << "Sort option " << query_request_helper::kNaturalSortField
-                              << " not supported in aggregation."};
-    }
-    // The aggregation command normally does not support the 'singleBatch' option, but we make a
-    // special exception if 'limit' is set to 1.
-    if (findCommand.getSingleBatch() && findCommand.getLimit().value_or(0) != 1LL) {
-        return {ErrorCodes::InvalidPipelineOperator,
-                str::stream() << "Option " << FindCommandRequest::kSingleBatchFieldName
-                              << " not supported in aggregation."};
-    }
-    if (findCommand.getReadOnce()) {
-        return {ErrorCodes::InvalidPipelineOperator,
-                str::stream() << "Option " << FindCommandRequest::kReadOnceFieldName
-                              << " not supported in aggregation."};
-    }
-
-    if (findCommand.getAllowSpeculativeMajorityRead()) {
-        return {ErrorCodes::InvalidPipelineOperator,
-                str::stream() << "Option "
-                              << FindCommandRequest::kAllowSpeculativeMajorityReadFieldName
-                              << " not supported in aggregation."};
-    }
-
-    if (findCommand.getRequestResumeToken()) {
-        return {ErrorCodes::InvalidPipelineOperator,
-                str::stream() << "Option " << FindCommandRequest::kRequestResumeTokenFieldName
-                              << " not supported in aggregation."};
-    }
-
-    if (!findCommand.getResumeAfter().isEmpty()) {
-        return {ErrorCodes::InvalidPipelineOperator,
-                str::stream() << "Option " << FindCommandRequest::kResumeAfterFieldName
-                              << " not supported in aggregation."};
-    }
-
-    // Now that we've successfully validated this QR, begin building the aggregation command.
-    aggregationBuilder.append("aggregate",
-                              findCommand.getNamespaceOrUUID().nss()
-                                  ? findCommand.getNamespaceOrUUID().nss()->coll()
-                                  : "");
-
-    // Construct an aggregation pipeline that finds the equivalent documents to this query request.
-    BSONArrayBuilder pipelineBuilder(aggregationBuilder.subarrayStart("pipeline"));
-    {
-        if (auto geoNear = cq.geoNear()) {
-            const auto& args = (*geoNear)->getData();
-
-            BSONObjBuilder geoStage = pipelineBuilder.subobjStart();
-            BSONObjBuilder geoArgs = geoStage.subobjStart("$geoNear"_sd);
-
-            geoArgs.append("key"_sd, (*geoNear)->path());
-
-            // $near and $nearSphere both support two different syntaxes:
-            // - GeoJSON: {type: Point, coordinates: [x, y]}
-            // - legacy coordinate pair: [x, y]
-            bool spherical = [&]() {
-                // $nearSphere always uses spherical geometry, but $near can use either
-                // spherical or planar geometry, depending on how the centroid is specified.
-                switch (args.centroid->crs) {
-                    case CRS::FLAT:
-                        return false;
-                    case CRS::SPHERE:
-                        return true;
-                    case CRS::STRICT_SPHERE:
-                        tasserted(5844301,
-                                  "CRS::STRICT_SPHERE should not be possible in a "
-                                  "$near/$nearSphere query");
-                    case CRS::UNSET:
-                        tasserted(5844302,
-                                  "CRS::UNSET should not be possible in a $near/$nearSphere query");
-                }
-                tasserted(5844300, "Unhandled enum value for CRS, in $near/$nearSphere query");
-            }();
-            geoArgs.append("spherical"_sd, spherical);
-
-            if (args.unitsAreRadians || !spherical) {
-                // Write the $geoNear as [x, y] coordinates.
-                BSONArrayBuilder nearBuilder = geoArgs.subarrayStart("near"_sd);
-                nearBuilder.append(args.centroid->oldPoint.x);
-                nearBuilder.append(args.centroid->oldPoint.y);
-                nearBuilder.doneFast();
-            } else {
-                // Write the $geoNear as a GeoJSON point.
-                BSONObjBuilder nearBuilder = geoArgs.subobjStart("near"_sd);
-                nearBuilder.append("type"_sd, "Point"_sd);
-                {
-                    BSONArrayBuilder coordinates = nearBuilder.subarrayStart("coordinates"_sd);
-                    coordinates.append(args.centroid->oldPoint.x);
-                    coordinates.append(args.centroid->oldPoint.y);
-                    coordinates.doneFast();
-                }
-                nearBuilder.doneFast();
-            }
-
-            if (args.minDistance) {
-                geoArgs.append("minDistance"_sd, args.minDistance);
-            }
-            if (args.maxDistance) {
-                geoArgs.append("maxDistance"_sd, args.maxDistance);
-            }
-            geoArgs.doneFast();
-            geoStage.doneFast();
-        }
-        if (auto filter = cq.rootWithoutGeoNear(); !filter->isTriviallyTrue()) {
-            BSONObjBuilder matchBuilder = pipelineBuilder.subobjStart();
-            matchBuilder.append("$match"_sd, filter->serialize());
-            matchBuilder.doneFast();
-        }
-    }
-    if (!findCommand.getSort().isEmpty()) {
-        BSONObjBuilder sortBuilder(pipelineBuilder.subobjStart());
-        sortBuilder.append("$sort", findCommand.getSort());
-        sortBuilder.doneFast();
-    }
-    if (findCommand.getSkip()) {
-        BSONObjBuilder skipBuilder(pipelineBuilder.subobjStart());
-        skipBuilder.append("$skip", *findCommand.getSkip());
-        skipBuilder.doneFast();
-    }
-    if (findCommand.getLimit()) {
-        BSONObjBuilder limitBuilder(pipelineBuilder.subobjStart());
-        limitBuilder.append("$limit", *findCommand.getLimit());
-        limitBuilder.doneFast();
-    }
-    if (!findCommand.getProjection().isEmpty()) {
-        BSONObjBuilder projectBuilder(pipelineBuilder.subobjStart());
-        projectBuilder.append("$project", findCommand.getProjection());
-        projectBuilder.doneFast();
-    }
-    pipelineBuilder.doneFast();
-
-    // The aggregation 'cursor' option is always set, regardless of the presence of batchSize.
-    BSONObjBuilder batchSizeBuilder(aggregationBuilder.subobjStart("cursor"));
-    if (findCommand.getBatchSize()) {
-        batchSizeBuilder.append(FindCommandRequest::kBatchSizeFieldName,
-                                *findCommand.getBatchSize());
-    }
-    batchSizeBuilder.doneFast();
-
-    // Other options.
-    aggregationBuilder.append("collation", findCommand.getCollation());
-    int maxTimeMS = findCommand.getMaxTimeMS() ? static_cast<int>(*findCommand.getMaxTimeMS()) : 0;
-    if (maxTimeMS > 0) {
-        aggregationBuilder.append(query_request_helper::cmdOptionMaxTimeMS, maxTimeMS);
-    }
-    if (!findCommand.getHint().isEmpty()) {
-        aggregationBuilder.append(FindCommandRequest::kHintFieldName, findCommand.getHint());
-    }
-    if (findCommand.getReadConcern()) {
-        aggregationBuilder.append("readConcern", *findCommand.getReadConcern());
-    }
-    if (!findCommand.getUnwrappedReadPref().isEmpty()) {
-        aggregationBuilder.append(FindCommandRequest::kUnwrappedReadPrefFieldName,
-                                  findCommand.getUnwrappedReadPref());
-    }
-    if (findCommand.getAllowDiskUse()) {
-        aggregationBuilder.append(FindCommandRequest::kAllowDiskUseFieldName,
-                                  static_cast<bool>(findCommand.getAllowDiskUse()));
-    }
-    if (findCommand.getLegacyRuntimeConstants()) {
-        BSONObjBuilder rtcBuilder(
-            aggregationBuilder.subobjStart(FindCommandRequest::kLegacyRuntimeConstantsFieldName));
-        findCommand.getLegacyRuntimeConstants()->serialize(&rtcBuilder);
-        rtcBuilder.doneFast();
-    }
-    if (findCommand.getLet()) {
-        aggregationBuilder.append(FindCommandRequest::kLetFieldName, *findCommand.getLet());
-    }
-    return StatusWith<BSONObj>(aggregationBuilder.obj());
 }
 
 }  // namespace mongo

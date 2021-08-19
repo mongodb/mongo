@@ -54,21 +54,18 @@ let agg = tsColl.aggregate([{
 }]);
 assert.eq(agg.itcount(), nMeasurements);
 
-if (TimeseriesTest.timeseriesMetricIndexesEnabled(db.getMongo())) {
-    tsColl
-        .find({
-            "tags.loc": {
-                $nearSphere: {
-                    $geometry: {type: "Point", coordinates: [-73.9667, 40.78]},
-                    $minDistance: 10,
-                    $maxDistance: 20
-                }
-            }
-        })
-        .itcount();
-
-    tsColl.createIndex({'tags.loc': '2d'});
-    tsColl.find({"tags.loc": {$geoNear: [0, 0]}}).itcount();
-    tsColl.find({"tags.loc": {$near: [0, 0]}}).itcount();
-}
+/* TODO (SERVER-58443): enable these tests once they work
+assert.commandWorked(tsColl.find({"tags.distance": {$geoNear: [0, 0]}}).itcount());
+assert.commandWorked(tsColl.find({"tags.distance": {$near: [0, 0]}}).itcount());
+assert.commandWorked(tsColl
+                         .find({
+                             "tags.distance": {
+                                 $nearSphere: {
+                                     $geometry: {type: "Point", coordinates: [-73.9667, 40.78]},
+                                     $minDistance: 10,
+                                     $maxDistance: 20
+                                 }
+                             }
+                         })
+                         .itcount());*/
 })();

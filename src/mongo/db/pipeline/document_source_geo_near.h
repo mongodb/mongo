@@ -93,8 +93,8 @@ public:
     /**
      * The field in which the computed distance will be stored.
      */
-    boost::optional<FieldPath> getDistanceField() const {
-        return distanceField;
+    FieldPath getDistanceField() const {
+        return *distanceField;
     }
 
     /**
@@ -152,10 +152,10 @@ private:
     void parseOptions(BSONObj options);
 
     // These fields describe the command to run.
-    // 'coords' is required; the rest are optional.
+    // 'coords' and 'distanceField' are required; the rest are optional.
     BSONObj coords;  // "near" option, but near is a reserved keyword on windows
     bool coordsIsArray;
-    boost::optional<FieldPath> distanceField;
+    std::unique_ptr<FieldPath> distanceField;  // Using unique_ptr because FieldPath can't be empty
     BSONObj query;
     bool spherical;
     boost::optional<double> maxDistance;

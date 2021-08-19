@@ -92,8 +92,7 @@ ExpressionContext::ExpressionContext(
     StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces,
     boost::optional<UUID> collUUID,
     const boost::optional<BSONObj>& letParameters,
-    bool mayDbProfile,
-    bool omitVariables)
+    bool mayDbProfile)
     : explain(explain),
       fromMongos(fromMongos),
       needsMerge(needsMerge),
@@ -128,9 +127,6 @@ ExpressionContext::ExpressionContext(
     }
     if (letParameters)
         variables.seedVariablesWithLetParameters(this, *letParameters);
-
-    if (omitVariables)
-        variables = Variables{};
 }
 
 ExpressionContext::ExpressionContext(

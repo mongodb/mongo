@@ -54,7 +54,7 @@ boost::intrusive_ptr<DocumentSourceGeoNearCursor> DocumentSourceGeoNearCursor::c
     const CollectionPtr& collection,
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    boost::optional<FieldPath> distanceField,
+    FieldPath distanceField,
     boost::optional<FieldPath> locationField,
     double distanceMultiplier) {
     return {new DocumentSourceGeoNearCursor(collection,
@@ -69,7 +69,7 @@ DocumentSourceGeoNearCursor::DocumentSourceGeoNearCursor(
     const CollectionPtr& collection,
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    boost::optional<FieldPath> distanceField,
+    FieldPath distanceField,
     boost::optional<FieldPath> locationField,
     double distanceMultiplier)
     : DocumentSourceCursor(
@@ -94,9 +94,7 @@ Document DocumentSourceGeoNearCursor::transformDoc(Document&& objInput) const {
                   << output.peek().toString());
     const auto distance = output.peek().metadata().getGeoNearDistance() * _distanceMultiplier;
 
-    if (_distanceField) {
-        output.setNestedField(*_distanceField, Value(distance));
-    }
+    output.setNestedField(_distanceField, Value(distance));
     if (_locationField) {
         invariant(
             output.peek().metadata().hasGeoNearPoint(),

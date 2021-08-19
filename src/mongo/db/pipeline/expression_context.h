@@ -123,10 +123,6 @@ public:
      * Constructs an ExpressionContext to be used for Pipeline parsing and evaluation. This version
      * requires finer-grained parameters but does not require an AggregateCommandRequest.
      * 'resolvedNamespaces' maps collection names (not full namespaces) to ResolvedNamespaces.
-     *
-     * 'omitVariables == true' means the ExpressionContext should not have any variables defined.
-     * This lets you parse and optimize a query without assuming that top-level variables such as
-     * NOW are known.
      */
     ExpressionContext(OperationContext* opCtx,
                       const boost::optional<ExplainOptions::Verbosity>& explain,
@@ -142,8 +138,7 @@ public:
                       StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces,
                       boost::optional<UUID> collUUID,
                       const boost::optional<BSONObj>& letParameters = boost::none,
-                      bool mayDbProfile = true,
-                      bool omitVariables = false);
+                      bool mayDbProfile = true);
 
     /**
      * Constructs an ExpressionContext suitable for use outside of the aggregation system, including

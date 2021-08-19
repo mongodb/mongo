@@ -56,7 +56,6 @@
 #include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/stats/server_read_concern_metrics.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -120,8 +119,7 @@ std::unique_ptr<FindCommandRequest> parseCmdObjectToFindCommandRequest(Operation
 boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
     OperationContext* opCtx,
     const FindCommandRequest& findCommand,
-    boost::optional<ExplainOptions::Verbosity> verbosity,
-    bool isView) {
+    boost::optional<ExplainOptions::Verbosity> verbosity) {
     std::unique_ptr<CollatorInterface> collator;
     if (!findCommand.getCollation().isEmpty()) {
         collator = uassertStatusOK(CollatorFactoryInterface::get(opCtx->getServiceContext())
@@ -155,10 +153,9 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
         std::move(collator),
         nullptr,  // mongoProcessInterface
         StringMap<ExpressionContext::ResolvedNamespace>{},
-        boost::none,                              // uuid
-        findCommand.getLet(),                     // let
-        CurOp::get(opCtx)->dbProfileLevel() > 0,  // mayDbProfile
-        isView                                    // omitVariables
+        boost::none,                             // uuid
+        findCommand.getLet(),                    // let
+        CurOp::get(opCtx)->dbProfileLevel() > 0  // mayDbProfile
     );
     expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
     expCtx->startExpressionCounters();
@@ -305,24 +302,25 @@ public:
 
             // Finish the parsing step by using the FindCommandRequest to create a CanonicalQuery.
             const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
+            auto expCtx = makeExpressionContext(opCtx, *findCommand, verbosity);
             const bool isExplain = true;
-            if (ctx->getView()) {
-                auto expCtx =
-                    makeExpressionContext(opCtx, *findCommand, verbosity, true /* isView */);
-                auto cq = uassertStatusOK(
-                    CanonicalQuery::canonicalize(opCtx,
-                                                 std::move(findCommand),
-                                                 isExplain,
-                                                 std::move(expCtx),
-                                                 extensionsCallback,
-                                                 Pipeline::viewFindMatcherFeatures()));
+            auto cq = uassertStatusOK(
+                CanonicalQuery::canonicalize(opCtx,
+                                             std::move(findCommand),
+                                             isExplain,
+                                             std::move(expCtx),
+                                             extensionsCallback,
+                                             MatchExpressionParser::kAllowAllSpecialFeatures));
 
+            if (ctx->getView()) {
                 // Relinquish locks. The aggregation command will re-acquire them.
                 ctx.reset();
 
                 // Convert the find command into an aggregation using $match (and other stages, as
                 // necessary), if possible.
-                auto viewAggregationCommand = uassertStatusOK(asAggregationCommand(*cq));
+                const auto& findCommand = cq->getFindCommandRequest();
+                auto viewAggregationCommand =
+                    uassertStatusOK(query_request_helper::asAggregationCommand(findCommand));
 
                 auto viewAggCmd = OpMsgRequest::fromDBAndBody(_dbName, viewAggregationCommand).body;
                 // Create the agg request equivalent of the find operation, with the explain
@@ -348,15 +346,6 @@ public:
                 }
                 return;
             }
-
-            auto expCtx = makeExpressionContext(opCtx, *findCommand, verbosity, false /* isView */);
-            auto cq = uassertStatusOK(
-                CanonicalQuery::canonicalize(opCtx,
-                                             std::move(findCommand),
-                                             isExplain,
-                                             std::move(expCtx),
-                                             extensionsCallback,
-                                             MatchExpressionParser::kAllowAllSpecialFeatures));
 
             // The collection may be NULL. If so, getExecutor() should handle it by returning an
             // execution tree with an EOFStage.
@@ -456,26 +445,26 @@ public:
             // Fill out curop information.
             beginQueryOp(opCtx, nss, _request.body);
 
+            // Finish the parsing step by using the FindCommandRequest to create a CanonicalQuery.
             const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
+            auto expCtx = makeExpressionContext(opCtx, *findCommand, boost::none /* verbosity */);
+            auto cq = uassertStatusOK(
+                CanonicalQuery::canonicalize(opCtx,
+                                             std::move(findCommand),
+                                             isExplain,
+                                             std::move(expCtx),
+                                             extensionsCallback,
+                                             MatchExpressionParser::kAllowAllSpecialFeatures));
 
             if (ctx->getView()) {
-                auto expCtx = makeExpressionContext(
-                    opCtx, *findCommand, boost::none /* verbosity */, true /* isView */);
-
-                // Finish the parsing step by using the FindCommandRequest to create a
-                // CanonicalQuery. And then convert the find command into an aggregation using
-                // $match (and other stages, as necessary), if possible.
-                auto cq = uassertStatusOK(
-                    CanonicalQuery::canonicalize(opCtx,
-                                                 std::move(findCommand),
-                                                 isExplain,
-                                                 std::move(expCtx),
-                                                 extensionsCallback,
-                                                 Pipeline::viewFindMatcherFeatures()));
-                auto viewAggregationCommand = uassertStatusOK(asAggregationCommand(*cq));
-
                 // Relinquish locks. The aggregation command will re-acquire them.
                 ctx.reset();
+
+                // Convert the find command into an aggregation using $match (and other stages, as
+                // necessary), if possible.
+                const auto& findCommand = cq->getFindCommandRequest();
+                auto viewAggregationCommand =
+                    uassertStatusOK(query_request_helper::asAggregationCommand(findCommand));
 
                 BSONObj aggResult = CommandHelpers::runCommandDirectly(
                     opCtx, OpMsgRequest::fromDBAndBody(_dbName, std::move(viewAggregationCommand)));
@@ -488,17 +477,6 @@ public:
                 result->getBodyBuilder().appendElements(aggResult);
                 return;
             }
-
-            auto expCtx = makeExpressionContext(
-                opCtx, *findCommand, boost::none /* verbosity */, false /* isView */);
-            // Finish the parsing step by using the FindCommandRequest to create a CanonicalQuery.
-            auto cq = uassertStatusOK(
-                CanonicalQuery::canonicalize(opCtx,
-                                             std::move(findCommand),
-                                             isExplain,
-                                             std::move(expCtx),
-                                             extensionsCallback,
-                                             MatchExpressionParser::kAllowAllSpecialFeatures));
 
             const auto& collection = ctx->getCollection();
 
