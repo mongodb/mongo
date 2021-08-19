@@ -17,6 +17,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
         '$BUILD_DIR/mongo/db/db_raii',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
+        'write_conflict_exception',
     ],
 )
 
@@ -67,6 +68,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/collection_catalog',
         '$BUILD_DIR/mongo/db/concurrency/flow_control_ticketholder',
+        '$BUILD_DIR/mongo/db/namespace_string',
     ],
 )
 
