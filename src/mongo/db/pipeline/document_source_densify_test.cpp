@@ -50,13 +50,13 @@ using DensifyExplicitNumericTest = AggregationContextFixture;
 using DensifyCloneTest = AggregationContextFixture;
 
 MONGO_INITIALIZER_GENERAL(turnOnDensifyFlag,
-                          ("AllFailPointsRegistered"),
+                          ("AllFailPointsRegistered", "EndServerParameterRegistration"),
                           ("BeginDocumentSourceRegistration",
                            "addToDocSourceParserMap__internalDensify"))
 (InitializerContext*) {
     const auto& spMap = ServerParameterSet::getGlobal()->getMap();
     const auto& spIt = spMap.find("featureFlagDensify");
-    invariant(spIt != spMap.end());
+    invariant(spIt != spMap.end(), str::stream() << "spMap keys: " << spMap.size());
 
     auto* sp = spIt->second;
     invariant(sp);
