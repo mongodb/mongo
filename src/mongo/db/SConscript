@@ -60,6 +60,8 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/index_names',
         '$BUILD_DIR/mongo/db/write_concern_options',
+        'process_health_feature_flag',
+        'shutdown_in_progress_quiesce_info',
     ]
 )
 
@@ -610,6 +612,16 @@ env.Library(
         'catalog/database_holder',
         'storage/snapshot_helper',
     ],
+)
+
+env.Library(
+    target='process_health_feature_flag',
+    source=[
+        'process_health/health_monitoring.idl',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/idl/feature_flag',
+    ]
 )
 
 env.Library(
