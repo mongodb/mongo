@@ -120,7 +120,7 @@ TEST(Summation, AddLongs) {
                 ASSERT(sum.isInteger());
 
                 if (!sum.fitsLong()) {
-                    ASSERT(std::abs(sum.getDouble()) >= limits::max());
+                    ASSERT(std::abs(sum.getDouble()) >= static_cast<double>(limits::max()));
                     // Reduce sum to fit in a 64-bit integer.
                     while (!sum.fitsLong()) {
                         sum.addDouble(sum.getDouble() < 0 ? std::ldexp(1, 64) : -std::ldexp(1, 64));

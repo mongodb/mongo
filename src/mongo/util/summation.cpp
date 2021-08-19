@@ -52,7 +52,7 @@ bool DoubleDoubleSummation::fitsLong() const {
     using limits = std::numeric_limits<long long>;
     // Fast path: if the rounded _sum is strictly between the minimum and maximum long long value,
     // it must be valid. This is the common case. Note that this is correct for NaNs/infinities.
-    if (_sum > limits::min() && _sum < limits::max())
+    if (_sum > limits::min() && _sum < static_cast<double>(limits::max()))
         return true;
 
     // Now check the cases where the _sum equals one of the boundaries, and check the compensation
@@ -61,7 +61,7 @@ bool DoubleDoubleSummation::fitsLong() const {
     // If _sum is equal to limits::max() + 1, _addend must cause us to round down to a lower integer
     // and thus be strictly less than -0.5. limits.max() rounds up to limits.max() + 1, as double
     // precision does not have enough precision.
-    if (_sum == limits::max())
+    if (_sum == static_cast<double>(limits::max()))
         return _addend < -0.5;
 
     // If _sum is equal to limits::min(), _addend must not cause us to round down and thus be
@@ -78,7 +78,7 @@ bool DoubleDoubleSummation::fitsLong() const {
  */
 long long DoubleDoubleSummation::getLong() const {
     uassert(ErrorCodes::Overflow, "sum out of range of a 64-bit signed integer", fitsLong());
-    if (_sum == std::numeric_limits<long long>::max()) {
+    if (_sum == static_cast<double>(std::numeric_limits<long long>::max())) {
         // Can't directly convert, because _sum would overflow a signed 64-bit number.
         dassert(_addend < -0.5 && -_sum == std::numeric_limits<long long>::min());
         return llround(_addend) - std::numeric_limits<long long>::min();
