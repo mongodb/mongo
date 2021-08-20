@@ -23,6 +23,8 @@ var ocsp_options = {
     },
 };
 
+clearOCSPCache();
+
 let mock_ocsp = new MockOCSPServer("", 1, undefined, 3);
 mock_ocsp.start();
 
