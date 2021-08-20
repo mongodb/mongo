@@ -221,7 +221,8 @@ const RollbackResumableIndexBuildTest = class {
 
         // Wait until the parallel shells have all started.
         assert.soon(() => {
-            return (rawMongoProgramOutput().match(/5113600/g) || []).length === buildUUIDs.length;
+            return (rawMongoProgramOutput().match(/"id":5113600/g) || []).length ===
+                buildUUIDs.length;
         });
         getLogFp.off();
 
