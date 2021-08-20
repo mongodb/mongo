@@ -75,7 +75,7 @@ static const char *const uri_collection = "table:collection";
 
 static const char *const ckpt_file = "checkpoint_done";
 
-static bool compat, inmem, stable_set, use_columns, use_ts, use_txn;
+static bool compat, inmem, stable_set, use_ts, use_txn;
 static volatile uint64_t global_ts = 1;
 static volatile uint64_t uid = 1;
 typedef struct {
@@ -96,10 +96,9 @@ static volatile THREAD_TS th_ts[MAX_TH];
 
 /*
  * A minimum width of 10, along with zero filling, means that all the keys sort according to their
- * integer value, making each thread's key space distinct. For column-store we just use the integer
- * values and that has the same effect.
+ * integer value, making each thread's key space distinct.
  */
-#define ROW_KEY_FORMAT ("%010" PRIu64)
+#define KEY_FORMAT ("%010" PRIu64)
 
 typedef struct {
     uint64_t absent_key; /* Last absent key */
@@ -671,20 +670,14 @@ thread_run(void *arg)
             }
         if (use_ts)
             stable_ts = __wt_atomic_addv64(&global_ts, 1);
+        testutil_check(__wt_snprintf(kname, sizeof(kname), KEY_FORMAT, i));
 
         testutil_check(session->begin_transaction(session, NULL));
         if (use_prep)
             testutil_check(oplog_session->begin_transaction(oplog_session, NULL));
-        if (use_columns) {
-            cur_coll->set_key(cur_coll, i + 1);
-            cur_local->set_key(cur_local, i + 1);
-            cur_oplog->set_key(cur_oplog, i + 1);
-        } else {
-            testutil_check(__wt_snprintf(kname, sizeof(kname), ROW_KEY_FORMAT, i));
-            cur_coll->set_key(cur_coll, kname);
-            cur_local->set_key(cur_local, kname);
-            cur_oplog->set_key(cur_oplog, kname);
-        }
+        cur_coll->set_key(cur_coll, kname);
+        cur_local->set_key(cur_local, kname);
+        cur_oplog->set_key(cur_oplog, kname);
         /*
          * Put an informative string into the value so that it can be viewed well in a binary dump.
          */
@@ -771,7 +764,7 @@ run_workload(uint32_t nth)
     THREAD_DATA *td;
     wt_thread_t *thr;
     uint32_t ckpt_id, i, ts_id;
-    char envconf[512], tableconf[128];
+    char envconf[512];
 
     thr = dcalloc(nth + 2, sizeof(*thr));
     td = dcalloc(nth + 2, sizeof(THREAD_DATA));
@@ -790,13 +783,10 @@ run_workload(uint32_t nth)
     /*
      * Create all the tables.
      */
-    testutil_check(__wt_snprintf(tableconf, sizeof(tableconf),
-      "key_format=%s,value_format=u,log=(enabled=false)", use_columns ? "r" : "S"));
-    testutil_check(session->create(session, uri_collection, tableconf));
-    testutil_check(__wt_snprintf(
-      tableconf, sizeof(tableconf), "key_format=%s,value_format=u", use_columns ? "r" : "S"));
-    testutil_check(session->create(session, uri_local, tableconf));
-    testutil_check(session->create(session, uri_oplog, tableconf));
+    testutil_check(
+      session->create(session, uri_collection, "key_format=S,value_format=u,log=(enabled=false)"));
+    testutil_check(session->create(session, uri_local, "key_format=S,value_format=u"));
+    testutil_check(session->create(session, uri_oplog, "key_format=S,value_format=u"));
     /*
      * Don't log the stable timestamp table so that we know what timestamp was stored at the
      * checkpoint.
@@ -919,14 +909,10 @@ main(int argc, char *argv[])
     verify_only = false;
     working_dir = "WT_TEST.schema-abort";
 
-    while ((ch = __wt_getopt(progname, argc, argv, "Cch:mT:t:vxz")) != EOF)
+    while ((ch = __wt_getopt(progname, argc, argv, "Ch:mT:t:vxz")) != EOF)
         switch (ch) {
         case 'C':
             compat = true;
-            break;
-        case 'c':
-            /* Variable-length columns only; fixed would require considerable changes */
-            use_columns = true;
             break;
         case 'h':
             working_dir = __wt_optarg;
@@ -1101,16 +1087,10 @@ main(int argc, char *argv[])
                   key, last_key);
                 break;
             }
-            if (use_columns) {
-                cur_coll->set_key(cur_coll, key + 1);
-                cur_local->set_key(cur_local, key + 1);
-                cur_oplog->set_key(cur_oplog, key + 1);
-            } else {
-                testutil_check(__wt_snprintf(kname, sizeof(kname), ROW_KEY_FORMAT, key));
-                cur_coll->set_key(cur_coll, kname);
-                cur_local->set_key(cur_local, kname);
-                cur_oplog->set_key(cur_oplog, kname);
-            }
+            testutil_check(__wt_snprintf(kname, sizeof(kname), KEY_FORMAT, key));
+            cur_coll->set_key(cur_coll, kname);
+            cur_local->set_key(cur_local, kname);
+            cur_oplog->set_key(cur_oplog, kname);
             /*
              * The collection table should always only have the data as of the checkpoint.
              */

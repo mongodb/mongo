@@ -79,7 +79,7 @@ static const char *const uri_shadow = "shadow";
 
 static const char *const ckpt_file = "checkpoint_done";
 
-static bool columns, compat, inmem, stress, use_ts;
+static bool compat, inmem, stress, use_ts;
 static volatile uint64_t global_ts = 1;
 
 /*
@@ -107,10 +107,9 @@ static volatile uint64_t global_ts = 1;
 
 /*
  * A minimum width of 10, along with zero filling, means that all the keys sort according to their
- * integer value, making each thread's key space distinct. For column-store we just use the integer
- * values and that has the same effect.
+ * integer value, making each thread's key space distinct.
  */
-#define KEY_STRINGFORMAT ("%010" PRIu64)
+#define KEY_FORMAT ("%010" PRIu64)
 
 typedef struct {
     uint64_t absent_key; /* Last absent key */
@@ -335,6 +334,8 @@ thread_run(void *arg)
     printf("Thread %" PRIu32 " starts at %" PRIu64 "\n", td->info, td->start);
     active_ts = 0;
     for (i = td->start;; ++i) {
+        testutil_check(__wt_snprintf(kname, sizeof(kname), KEY_FORMAT, i));
+
         testutil_check(session->begin_transaction(session, NULL));
         if (use_prep)
             testutil_check(prepared_session->begin_transaction(prepared_session, NULL));
@@ -353,18 +354,10 @@ thread_run(void *arg)
             testutil_check(pthread_rwlock_unlock(&ts_lock));
         }
 
-        if (columns) {
-            cur_coll->set_key(cur_coll, i + 1);
-            cur_local->set_key(cur_local, i + 1);
-            cur_oplog->set_key(cur_oplog, i + 1);
-            cur_shadow->set_key(cur_shadow, i + 1);
-        } else {
-            testutil_check(__wt_snprintf(kname, sizeof(kname), KEY_STRINGFORMAT, i));
-            cur_coll->set_key(cur_coll, kname);
-            cur_local->set_key(cur_local, kname);
-            cur_oplog->set_key(cur_oplog, kname);
-            cur_shadow->set_key(cur_shadow, kname);
-        }
+        cur_coll->set_key(cur_coll, kname);
+        cur_local->set_key(cur_local, kname);
+        cur_oplog->set_key(cur_oplog, kname);
+        cur_shadow->set_key(cur_shadow, kname);
         /*
          * Put an informative string into the value so that it can be viewed well in a binary dump.
          */
@@ -466,7 +459,6 @@ run_workload(uint32_t nth)
     wt_thread_t *thr;
     uint32_t cache_mb, ckpt_id, i, ts_id;
     char envconf[512], uri[128];
-    const char *table_config, *table_config_nolog;
 
     thr = dcalloc(nth + 2, sizeof(*thr));
     td = dcalloc(nth + 2, sizeof(THREAD_DATA));
@@ -503,25 +495,19 @@ run_workload(uint32_t nth)
     printf("wiredtiger_open configuration: %s\n", envconf);
     testutil_check(wiredtiger_open(NULL, NULL, envconf, &conn));
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
-
     /*
      * Create all the tables.
      */
-    if (columns) {
-        table_config_nolog = "key_format=r,value_format=u,log=(enabled=false)";
-        table_config = "key_format=r,value_format=u";
-    } else {
-        table_config_nolog = "key_format=S,value_format=u,log=(enabled=false)";
-        table_config = "key_format=S,value_format=u";
-    }
     testutil_check(__wt_snprintf(uri, sizeof(uri), "%s:%s", table_pfx, uri_collection));
-    testutil_check(session->create(session, uri, table_config_nolog));
+    testutil_check(
+      session->create(session, uri, "key_format=S,value_format=u,log=(enabled=false)"));
     testutil_check(__wt_snprintf(uri, sizeof(uri), "%s:%s", table_pfx, uri_shadow));
-    testutil_check(session->create(session, uri, table_config_nolog));
+    testutil_check(
+      session->create(session, uri, "key_format=S,value_format=u,log=(enabled=false)"));
     testutil_check(__wt_snprintf(uri, sizeof(uri), "%s:%s", table_pfx, uri_local));
-    testutil_check(session->create(session, uri, table_config));
+    testutil_check(session->create(session, uri, "key_format=S,value_format=u"));
     testutil_check(__wt_snprintf(uri, sizeof(uri), "%s:%s", table_pfx, uri_oplog));
-    testutil_check(session->create(session, uri, table_config));
+    testutil_check(session->create(session, uri, "key_format=S,value_format=u"));
     /*
      * Don't log the stable timestamp table so that we know what timestamp was stored at the
      * checkpoint.
@@ -630,7 +616,7 @@ main(int argc, char *argv[])
 
     (void)testutil_set_progname(argv);
 
-    columns = compat = inmem = stress = false;
+    compat = inmem = stress = false;
     use_ts = true;
     nth = MIN_TH;
     rand_th = rand_time = true;
@@ -638,14 +624,10 @@ main(int argc, char *argv[])
     verify_only = false;
     working_dir = "WT_TEST.timestamp-abort";
 
-    while ((ch = __wt_getopt(progname, argc, argv, "Cch:LmsT:t:vz")) != EOF)
+    while ((ch = __wt_getopt(progname, argc, argv, "Ch:LmsT:t:vz")) != EOF)
         switch (ch) {
         case 'C':
             compat = true;
-            break;
-        case 'c':
-            /* Variable-length columns only (for now) */
-            columns = true;
             break;
         case 'h':
             working_dir = __wt_optarg;
@@ -717,9 +699,9 @@ main(int argc, char *argv[])
           compat ? "true" : "false", inmem ? "true" : "false", stress ? "true" : "false",
           use_ts ? "true" : "false");
         printf("Parent: Create %" PRIu32 " threads; sleep %" PRIu32 " seconds\n", nth, timeout);
-        printf("CONFIG: %s%s%s%s%s%s -h %s -T %" PRIu32 " -t %" PRIu32 "\n", progname,
-          compat ? " -C" : "", columns ? " -c" : "", inmem ? " -m" : "", stress ? " -s" : "",
-          !use_ts ? " -z" : "", working_dir, nth, timeout);
+        printf("CONFIG: %s%s%s%s%s -h %s -T %" PRIu32 " -t %" PRIu32 "\n", progname,
+          compat ? " -C" : "", inmem ? " -m" : "", stress ? " -s" : "", !use_ts ? " -z" : "",
+          working_dir, nth, timeout);
         /*
          * Fork a child to insert as many items. We will then randomly kill the child, run recovery
          * and make sure all items we wrote exist after recovery runs.
@@ -841,20 +823,11 @@ main(int argc, char *argv[])
                   key, last_key);
                 break;
             }
-
-            if (columns) {
-                cur_coll->set_key(cur_coll, key + 1);
-                cur_local->set_key(cur_local, key + 1);
-                cur_oplog->set_key(cur_oplog, key + 1);
-                cur_shadow->set_key(cur_shadow, key + 1);
-            } else {
-                testutil_check(__wt_snprintf(kname, sizeof(kname), KEY_STRINGFORMAT, key));
-                cur_coll->set_key(cur_coll, kname);
-                cur_local->set_key(cur_local, kname);
-                cur_oplog->set_key(cur_oplog, kname);
-                cur_shadow->set_key(cur_shadow, kname);
-            }
-
+            testutil_check(__wt_snprintf(kname, sizeof(kname), KEY_FORMAT, key));
+            cur_coll->set_key(cur_coll, kname);
+            cur_local->set_key(cur_local, kname);
+            cur_oplog->set_key(cur_oplog, kname);
+            cur_shadow->set_key(cur_shadow, kname);
             /*
              * The collection table should always only have the data as of the checkpoint. The
              * shadow table should always have the exact same data (or not) as the collection table,

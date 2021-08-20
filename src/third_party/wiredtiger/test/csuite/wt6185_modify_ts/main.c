@@ -50,10 +50,7 @@ static u_int tnext;
 
 static uint64_t ts; /* Current timestamp. */
 
-static char keystr[100], modify_repl[256], tmp[4 * 1024];
-static uint64_t keyrecno;
-
-static bool use_columns = false;
+static char key[100], modify_repl[256], tmp[4 * 1024];
 
 /*
  * trace --
@@ -117,32 +114,6 @@ mmrand(u_int min, u_int max)
     v %= range;
     v += min;
     return (v);
-}
-
-/*
- * change_key --
- *     Switch to a different key.
- */
-static void
-change_key(u_int n)
-{
-    if (use_columns)
-        keyrecno = n + 1;
-    else
-        testutil_check(__wt_snprintf(keystr, sizeof(keystr), "%010u.key", n));
-}
-
-/*
- * set_key --
- *     Set the current key in the cursor.
- */
-static void
-set_key(WT_CURSOR *c)
-{
-    if (use_columns)
-        c->set_key(c, keyrecno);
-    else
-        c->set_key(c, keystr);
 }
 
 /*
@@ -210,13 +181,13 @@ modify(WT_SESSION *session, WT_CURSOR *c)
     for (cnt = loop = 1; loop < 5; ++cnt, ++loop)
         if (mmrand(1, 10) <= 8) {
             modify_build(entries, &nentries, cnt);
-            set_key(c);
+            c->set_key(c, key);
             testutil_check(c->modify(c, entries, nentries));
         }
 
     /* Commit 90% of the time, else rollback. */
     if (mmrand(1, 10) != 1) {
-        set_key(c);
+        c->set_key(c, key);
         testutil_check(c->search(c));
         testutil_check(c->get_value(c, &v));
         free(list[lnext].v);
@@ -252,7 +223,7 @@ repeat(WT_SESSION *session, WT_CURSOR *c)
         testutil_check(__wt_snprintf(tmp, sizeof(tmp), "read_timestamp=%" PRIx64, list[i].ts));
         testutil_check(session->timestamp_transaction(session, tmp));
 
-        set_key(c);
+        c->set_key(c, key);
         testutil_check(c->search(c));
         testutil_check(c->get_value(c, &v));
 
@@ -275,7 +246,7 @@ evict(WT_CURSOR *c)
 {
     trace("%s", "eviction");
 
-    set_key(c);
+    c->set_key(c, key);
     testutil_check(c->search(c));
     F_SET(c, WT_CURSTD_DEBUG_RESET_EVICT);
     testutil_check(c->reset(c));
@@ -315,7 +286,7 @@ main(int argc, char *argv[])
     WT_SESSION *session;
     u_int i, j;
     int ch;
-    char path[1024], table_config[128], value[VALUE_SIZE];
+    char path[1024], value[VALUE_SIZE];
     const char *home, *v;
     bool no_checkpoint, no_eviction;
 
@@ -327,12 +298,8 @@ main(int argc, char *argv[])
 
     no_checkpoint = no_eviction = false;
     home = "WT_TEST.wt6185_modify_ts";
-    while ((ch = __wt_getopt(progname, argc, argv, "Cceh:S:")) != EOF)
+    while ((ch = __wt_getopt(progname, argc, argv, "ceh:S:")) != EOF)
         switch (ch) {
-        case 'C':
-            /* Variable-length columns only (for now anyway) */
-            use_columns = true;
-            break;
         case 'c':
             no_checkpoint = true;
             break;
@@ -355,17 +322,14 @@ main(int argc, char *argv[])
     testutil_work_dir_from_path(path, sizeof(path), home);
     testutil_make_work_dir(path);
 
-    testutil_check(__wt_snprintf(
-      table_config, sizeof(table_config), "key_format=%s,value_format=S", use_columns ? "r" : "S"));
-
     /* Load 100 records. */
     testutil_check(wiredtiger_open(path, NULL, "create", &conn));
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
-    testutil_check(session->create(session, "file:xxx", table_config));
+    testutil_check(session->create(session, "file:xxx", "key_format=S,value_format=S"));
     testutil_check(session->open_cursor(session, "file:xxx", NULL, NULL, &c));
     for (i = 0; i <= 100; ++i) {
-        change_key(i);
-        set_key(c);
+        testutil_check(__wt_snprintf(key, sizeof(key), "%010u.key", i));
+        c->set_key(c, key);
         SET_VALUE(i, value);
         c->set_value(c, value);
         testutil_check(c->insert(c));
@@ -377,8 +341,8 @@ main(int argc, char *argv[])
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
     testutil_check(session->create(session, "file:xxx", NULL));
     testutil_check(session->open_cursor(session, "file:xxx", NULL, NULL, &c));
-    change_key(KEYNO);
-    set_key(c);
+    testutil_check(__wt_snprintf(key, sizeof(key), "%010d.key", KEYNO));
+    c->set_key(c, key);
     testutil_check(c->search(c));
     testutil_check(c->get_value(c, &v));
     SET_VALUE(KEYNO, value);

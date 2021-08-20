@@ -43,6 +43,8 @@ class test_rollback_to_stable22(test_rollback_to_stable_base):
         nrows = 1000
         nds = 10
 
+        self.skipTest('Skip it until the fix is provided to handle concurrent internal transactions running in parallel.')
+
         # Create a few tables and populate them with some initial data.
         #
         # Our way of preventing history store operations from interfering with rollback to stable's

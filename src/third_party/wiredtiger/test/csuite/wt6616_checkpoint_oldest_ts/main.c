@@ -32,7 +32,6 @@
 #include <signal.h>
 
 static char home[1024]; /* Program working dir */
-static bool use_columns = false;
 
 /*
  * Spin up a child process to do operations and checkpoint. For each set of operations on a key,
@@ -49,7 +48,7 @@ static bool use_columns = false;
  * recovery by reading without a timestamp. Whether it is possible to read historical versions based
  * on timestamps from a logged table after recovery is not defined and implemented yet.
  */
-#define ROW_KEY_FORMAT ("%010" PRIu64)
+#define KEY_FORMAT ("%010" PRIu64)
 
 #define MAX_CKPT_INVL 5 /* Maximum interval between checkpoints */
 #define MAX_DATA 1000
@@ -148,14 +147,11 @@ thread_run(void *arg)
     /* Insert and then delete the keys until we're killed. */
     printf("Worker thread started.\n");
     for (oldest_ts = 0, ts = 1;; ++ts) {
-        testutil_check(__wt_snprintf(kname, sizeof(kname), ROW_KEY_FORMAT, ts));
+        testutil_check(__wt_snprintf(kname, sizeof(kname), KEY_FORMAT, ts));
 
         /* Insert the same value for key and value. */
         testutil_check(session->begin_transaction(session, NULL));
-        if (use_columns)
-            cursor->set_key(cursor, ts);
-        else
-            cursor->set_key(cursor, kname);
+        cursor->set_key(cursor, kname);
         data.data = kname;
         data.size = sizeof(kname);
         cursor->set_value(cursor, &data);
@@ -197,7 +193,7 @@ run_workload(void)
     WT_SESSION *session;
     wt_thread_t *thr;
     uint32_t i;
-    char envconf[512], tableconf[512];
+    char envconf[512];
 
     thr = dcalloc(2, sizeof(*thr));
 
@@ -210,9 +206,8 @@ run_workload(void)
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
     /* Create the table. */
-    testutil_check(__wt_snprintf(tableconf, sizeof(tableconf),
-      "key_format=%s,value_format=u,log=(enabled=false)", use_columns ? "r" : "S"));
-    testutil_check(session->create(session, uri, tableconf));
+    testutil_check(
+      session->create(session, uri, "key_format=S,value_format=u,log=(enabled=false)"));
     testutil_check(session->close(session, NULL));
 
     /* The checkpoint thread is added at the end. */
@@ -273,12 +268,8 @@ main(int argc, char *argv[])
     timeout = MIN_TIME;
     working_dir = "WT_TEST.wt6616-checkpoint-oldest-ts";
 
-    while ((ch = __wt_getopt(progname, argc, argv, "ch:t:")) != EOF)
+    while ((ch = __wt_getopt(progname, argc, argv, "h:t:")) != EOF)
         switch (ch) {
-        case 'c':
-            /* Variable-length columns only (for now) */
-            use_columns = true;
-            break;
         case 'h':
             working_dir = __wt_optarg;
             break;
@@ -372,11 +363,8 @@ main(int argc, char *argv[])
     for (ts = oldest_ts; ts <= stable_ts; ++ts) {
         testutil_check(__wt_snprintf(tscfg, sizeof(tscfg), "read_timestamp=%" PRIx64, ts));
         testutil_check(session->begin_transaction(session, tscfg));
-        testutil_check(__wt_snprintf(kname, sizeof(kname), ROW_KEY_FORMAT, ts));
-        if (use_columns)
-            cursor->set_key(cursor, ts);
-        else
-            cursor->set_key(cursor, kname);
+        testutil_check(__wt_snprintf(kname, sizeof(kname), KEY_FORMAT, ts));
+        cursor->set_key(cursor, kname);
         ret = cursor->search(cursor);
         if (ret == WT_NOTFOUND) {
             fatal = true;

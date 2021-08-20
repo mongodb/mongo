@@ -438,6 +438,8 @@ class test_hs18(wttest.WiredTigerTestCase):
         session_ts_reader = self.setUpSessionOpen(self.conn)
         cursor_ts_reader = session_ts_reader.open_cursor(uri)
 
+        self.skipTest('Skip this part of test_hs18 until WT-7931 is resolved')
+
         # The ID of the session corresponds the value it should see.
         sessions = []
         cursors = []
@@ -445,6 +447,8 @@ class test_hs18(wttest.WiredTigerTestCase):
         for i in range(0, 5):
             sessions.append(self.setUpSessionOpen(self.conn))
             cursors.append(sessions[i].open_cursor(uri))
+
+        value_junk = 'aaaaa' * 100
 
         values.append('f' * 10)
         values.append('a' + values[0])
@@ -481,13 +485,11 @@ class test_hs18(wttest.WiredTigerTestCase):
         # Start a long running transaction which could see modify 1.
         self.start_txn(sessions, cursors, values, 2)
 
-        # Evict the update using a debug cursor
-        cursor.reset()
-        evict_cursor = self.session.open_cursor(uri, None, "debug=(release_evict)")
-        evict_cursor.set_key(self.create_key(1))
-        self.assertEqual(evict_cursor.search(), 0)
-        evict_cursor.reset()
-        evict_cursor.close()
+        # Insert a bunch of contents to fill the cache
+        for i in range(2000, 10000):
+            self.session.begin_transaction()
+            cursor[self.create_key(i)] = value_junk
+            self.session.commit_transaction()
 
         # Commit a modify without a timestamp on our original key
         self.session.begin_transaction()
@@ -509,13 +511,11 @@ class test_hs18(wttest.WiredTigerTestCase):
         for i in range(0, 5):
             self.check_value(cursors[i], values[i])
 
-        # Evict the update using a debug cursor
-        cursor.reset()
-        evict_cursor = self.session.open_cursor(uri, None, "debug=(release_evict)")
-        evict_cursor.set_key(self.create_key(1))
-        self.assertEqual(evict_cursor.search(), 0)
-        evict_cursor.reset()
-        evict_cursor.close()
+        # Insert a bunch of other contents to trigger eviction
+        for i in range(10001, 11000):
+            self.session.begin_transaction()
+            cursor[self.create_key(i)] = value_junk
+            self.session.commit_transaction()
 
         # Check our values are still correct.
         for i in range(0, 5):

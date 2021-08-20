@@ -715,8 +715,6 @@ config_in_memory(void)
         return;
     if (config_is_perm("checkpoint"))
         return;
-    if (config_is_perm("format.abort"))
-        return;
     if (config_is_perm("import"))
         return;
     if (config_is_perm("logging"))

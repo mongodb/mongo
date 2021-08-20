@@ -37,7 +37,7 @@ all_TESTS += timestamp_abort/smoke.sh
 
 test_truncated_log_SOURCES = truncated_log/main.c
 noinst_PROGRAMS += test_truncated_log
-all_TESTS += truncated_log/smoke.sh
+all_TESTS += test_truncated_log
 
 test_wt1965_col_efficiency_SOURCES = wt1965_col_efficiency/main.c
 noinst_PROGRAMS += test_wt1965_col_efficiency
@@ -49,7 +49,8 @@ all_TESTS += test_wt2403_lsm_workload
 
 test_wt2246_col_append_SOURCES = wt2246_col_append/main.c
 noinst_PROGRAMS += test_wt2246_col_append
-all_TESTS += test_wt2246_col_append
+# Temporarily disabled (WT-5790)
+# all_TESTS += test_wt2246_col_append
 
 test_wt2323_join_visibility_SOURCES = wt2323_join_visibility/main.c
 noinst_PROGRAMS += test_wt2323_join_visibility
@@ -145,11 +146,11 @@ all_TESTS += test_wt4891_meta_ckptlist_get_alloc
 
 test_wt6185_modify_ts_SOURCES = wt6185_modify_ts/main.c
 noinst_PROGRAMS += test_wt6185_modify_ts
-all_TESTS += wt6185_modify_ts/smoke.sh
+all_TESTS += test_wt6185_modify_ts
 
 test_wt6616_checkpoint_oldest_ts_SOURCES = wt6616_checkpoint_oldest_ts/main.c
 noinst_PROGRAMS += test_wt6616_checkpoint_oldest_ts
-all_TESTS += wt6616_checkpoint_oldest_ts/smoke.sh
+all_TESTS += test_wt6616_checkpoint_oldest_ts
 
 # Run this during a "make check" smoke test.
 TESTS = $(all_TESTS)

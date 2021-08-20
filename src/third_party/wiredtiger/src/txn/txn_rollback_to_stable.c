@@ -594,9 +594,6 @@ __rollback_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE *page
 
     /* Finally remove that update from history store. */
     if (valid_update_found) {
-        /* Avoid freeing the updates while still in use if hs_cursor->remove fails. */
-        upd = tombstone = NULL;
-
         WT_ERR(hs_cursor->remove(hs_cursor));
         WT_STAT_CONN_DATA_INCR(session, txn_rts_hs_removed);
         WT_STAT_CONN_DATA_INCR(session, cache_hs_key_truncate_rts);
@@ -788,7 +785,7 @@ __rollback_abort_col_var(WT_SESSION_IMPL *session, WT_REF *ref, wt_timestamp_t r
     WT_PAGE *page;
     uint64_t recno, rle;
     uint32_t i, j;
-    bool is_ondisk_stable, stable_update_found;
+    bool stable_update_found;
 
     page = ref->page;
     /*
@@ -807,46 +804,26 @@ __rollback_abort_col_var(WT_SESSION_IMPL *session, WT_REF *ref, wt_timestamp_t r
             WT_RET(__rollback_abort_insert_list(
               session, page, ins, rollback_timestamp, &stable_update_found));
 
-        if (page->dsk != NULL) {
-            /* Unpack the cell. We need its RLE count whether or not we're going to iterate it. */
+        if (!stable_update_found && page->dsk != NULL) {
             kcell = WT_COL_PTR(page, cip);
             __wt_cell_unpack_kv(session, page->dsk, kcell, &unpack);
             rle = __wt_cell_rle(&unpack);
-
-            /*
-             * If we found a stable update on the insert list, this key needs no further attention.
-             * Any other keys in this cell with stable updates also do not require attention. But
-             * beyond that, the on-disk value must be older than
-             * the update we found. That means it too is stable(*), so any keys in the cell that
-             * _don't_ have stable updates on the update list don't need further attention either.
-             * (And any unstable updates were just handled above.) Thus we can skip iterating over
-             * the cell.
-             *
-             * Furthermore, if the cell is deleted it must be
-             * itself stable, because cells only appear as deleted if there is no older value that
-             * might need to be restored. We can skip iterating over the cell.
-             *
-             * (*) Either that, or the update is not timestamped, in which case the on-disk value
-             * might not be stable but the non-timestamp update will hide it until the next
-             * reconciliation and then overwrite it.
-             */
-            if (stable_update_found)
-                WT_STAT_CONN_DATA_INCR(session, txn_rts_stable_rle_skipped);
-            else if (unpack.type == WT_CELL_DEL)
-                WT_STAT_CONN_DATA_INCR(session, txn_rts_delete_rle_skipped);
-            else {
+            if (unpack.type != WT_CELL_DEL) {
                 for (j = 0; j < rle; j++) {
-                    WT_RET(__rollback_abort_ondisk_kv(
-                      session, ref, cip, NULL, rollback_timestamp, recno + j, &is_ondisk_stable));
-                    /* We can stop right away if the on-disk version is stable. */
-                    if (is_ondisk_stable) {
+                    WT_RET(__rollback_abort_ondisk_kv(session, ref, cip, NULL, rollback_timestamp,
+                      recno + j, &stable_update_found));
+                    /* Skip processing all RLE if the on-disk version is stable. */
+                    if (stable_update_found) {
                         if (rle > 1)
                             WT_STAT_CONN_DATA_INCR(session, txn_rts_stable_rle_skipped);
                         break;
                     }
                 }
-            }
+            } else
+                WT_STAT_CONN_DATA_INCR(session, txn_rts_delete_rle_skipped);
             recno += rle;
+        } else {
+            recno++;
         }
     }
 
@@ -1217,16 +1194,17 @@ __rollback_to_stable_check(WT_SESSION_IMPL *session)
     bool txn_active;
 
     /*
-     * Help the user comply with the requirement that there are no concurrent user operations. It is
-     * okay to have a transaction in prepared state.
+     * Help the user comply with the requirement that there are no concurrent operations. Protect
+     * against spurious conflicts with the sweep server: we exclude it from running concurrent with
+     * rolling back the history store contents.
      */
-    txn_active = __wt_txn_user_active(session);
+    ret = __wt_txn_activity_check(session, &txn_active);
 #ifdef HAVE_DIAGNOSTIC
     if (txn_active)
         WT_TRET(__wt_verbose_dump_txn(session));
 #endif
 
-    if (txn_active)
+    if (ret == 0 && txn_active)
         WT_RET_MSG(session, EINVAL, "rollback_to_stable illegal with active transactions");
 
     return (ret);
@@ -1624,14 +1602,83 @@ err:
 static int
 __rollback_to_stable(WT_SESSION_IMPL *session, bool no_ckpt)
 {
+    WT_CACHE *cache;
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     WT_TXN_GLOBAL *txn_global;
     wt_timestamp_t rollback_timestamp;
+    size_t retries;
+    uint32_t cache_flags;
     char ts_string[2][WT_TS_INT_STRING_SIZE];
 
     conn = S2C(session);
+    cache = conn->cache;
     txn_global = &conn->txn_global;
+
+    /*
+     * We're about to run a check for active transactions in the system to stop users from shooting
+     * themselves in the foot. Eviction threads may interfere with this check if they involve writes
+     * to the history store so we need to wait until the system is no longer evicting content.
+     *
+     * If we detect active evictions, we should wait a millisecond and check again. If we're waiting
+     * for evictions to quiesce for more than 2 minutes, we should give up on waiting and proceed
+     * with the transaction check anyway.
+     */
+#define WT_RTS_EVICT_MAX_RETRIES (2 * WT_MINUTE * WT_THOUSAND)
+    /*
+     * These are the types of evictions that can result in a history store operation. Since we want
+     * to avoid these happening concurrently with our check, we need to look for these flags.
+     */
+#define WT_CACHE_EVICT_HS_FLAGS \
+    (WT_CACHE_EVICT_DIRTY | WT_CACHE_EVICT_UPDATES | WT_CACHE_EVICT_URGENT)
+    for (retries = 0; retries < WT_RTS_EVICT_MAX_RETRIES; ++retries) {
+        /*
+         * If we're shutting down or running with an in-memory configuration, we aren't at risk of
+         * racing with history store transactions.
+         */
+        if (F_ISSET(conn, WT_CONN_CLOSING_TIMESTAMP | WT_CONN_IN_MEMORY))
+            break;
+
+        /* Check whether eviction has quiesced. */
+        WT_ORDERED_READ(cache_flags, cache->flags);
+        if (!FLD_ISSET(cache_flags, WT_CACHE_EVICT_HS_FLAGS)) {
+            /*
+             * If we we find that the eviction flags are unset, interrupt the eviction server and
+             * acquire the pass lock to stop the server from setting the eviction flags AFTER this
+             * point and racing with our check.
+             */
+            (void)__wt_atomic_addv32(&cache->pass_intr, 1);
+            __wt_spin_lock(session, &cache->evict_pass_lock);
+            (void)__wt_atomic_subv32(&cache->pass_intr, 1);
+            FLD_SET(session->lock_flags, WT_SESSION_LOCKED_PASS);
+
+            /*
+             * Check that the flags didn't get set in between when we checked and when we acquired
+             * the server lock. If it did get set, release the locks and keep trying. If they're
+             * still unset, break out of this loop and commence our check.
+             */
+            WT_ORDERED_READ(cache_flags, cache->flags);
+            if (!FLD_ISSET(cache_flags, WT_CACHE_EVICT_HS_FLAGS))
+                break;
+            else {
+                __wt_spin_unlock(session, &cache->evict_pass_lock);
+                FLD_CLR(session->lock_flags, WT_SESSION_LOCKED_PASS);
+            }
+        }
+        /* If we're retrying, pause for a millisecond and let eviction make some progress. */
+        __wt_sleep(0, WT_THOUSAND);
+    }
+    if (retries == WT_RTS_EVICT_MAX_RETRIES) {
+        WT_ERR(__wt_msg(
+          session, "timed out waiting for eviction to quiesce, running rollback to stable"));
+        /*
+         * FIXME: WT-7877 RTS fails when there are active transactions running in parallel to it.
+         * Waiting in a loop for eviction to quiesce is not efficient in some scenarios where the
+         * cache is not cleared in 2 minutes. Enable the following assert and
+         * test_rollback_to_stable22.py when the cache issue is addressed.
+         */
+        /* WT_ASSERT(session, false && "Timed out waiting for eviction to quiesce prior to rts"); */
+    }
 
     /*
      * Rollback to stable should ignore tombstones in the history store since it needs to scan the
@@ -1640,6 +1687,11 @@ __rollback_to_stable(WT_SESSION_IMPL *session, bool no_ckpt)
     F_SET(session, WT_SESSION_ROLLBACK_TO_STABLE);
 
     WT_ERR(__rollback_to_stable_check(session));
+
+    if (FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_PASS)) {
+        __wt_spin_unlock(session, &cache->evict_pass_lock);
+        FLD_CLR(session->lock_flags, WT_SESSION_LOCKED_PASS);
+    }
 
     /*
      * Copy the stable timestamp, otherwise we'd need to lock it each time it's accessed. Even
@@ -1674,6 +1726,10 @@ __rollback_to_stable(WT_SESSION_IMPL *session, bool no_ckpt)
         WT_ERR(session->iface.checkpoint(&session->iface, "force=1"));
 
 err:
+    if (FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_PASS)) {
+        __wt_spin_unlock(session, &cache->evict_pass_lock);
+        FLD_CLR(session->lock_flags, WT_SESSION_LOCKED_PASS);
+    }
     F_CLR(session, WT_SESSION_ROLLBACK_TO_STABLE);
     return (ret);
 }
