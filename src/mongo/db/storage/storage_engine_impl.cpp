@@ -148,18 +148,8 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx, LastShutdownState l
         _catalogRecordStore.get(), _options.directoryPerDB, _options.directoryForIndexes, this));
     _catalog->init(opCtx);
 
-    // We populate 'identsKnownToStorageEngine' only if:
-    // - doing repair; or
-    // - or asked to recover orphaned idents, which is the case when loading after an unclean
-    //   shutdown.
-    auto loadingFromUncleanShutdownOrRepair =
-        lastShutdownState == LastShutdownState::kUnclean || _options.forRepair;
-
-    std::vector<std::string> identsKnownToStorageEngine;
-    if (loadingFromUncleanShutdownOrRepair) {
-        identsKnownToStorageEngine = _engine->getAllIdents(opCtx);
-        std::sort(identsKnownToStorageEngine.begin(), identsKnownToStorageEngine.end());
-    }
+    std::vector<std::string> identsKnownToStorageEngine = _engine->getAllIdents(opCtx);
+    std::sort(identsKnownToStorageEngine.begin(), identsKnownToStorageEngine.end());
 
     std::vector<DurableCatalog::Entry> catalogEntries = _catalog->getAllCatalogEntries(opCtx);
 
@@ -235,6 +225,8 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx, LastShutdownState l
         }
     }
 
+    const auto loadingFromUncleanShutdownOrRepair =
+        lastShutdownState == LastShutdownState::kUnclean || _options.forRepair;
     for (DurableCatalog::Entry entry : catalogEntries) {
         if (loadingFromUncleanShutdownOrRepair) {
             // If we are loading the catalog after an unclean shutdown or during repair, it's
@@ -271,6 +263,26 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx, LastShutdownState l
                     continue;
                 }
             }
+        }
+
+        if (!entry.nss.isReplicated() &&
+            !std::binary_search(identsKnownToStorageEngine.begin(),
+                                identsKnownToStorageEngine.end(),
+                                entry.ident)) {
+            // All collection drops are non-transactional and unreplicated collections are dropped
+            // immediately as they do not use two-phase drops. It's possible to run into a situation
+            // where there are collections in the catalog that are unknown to the storage engine
+            // after restoring from backed up data files. See SERVER-55552.
+            WriteUnitOfWork wuow(opCtx);
+            fassert(5555200, _catalog->_removeEntry(opCtx, entry.catalogId));
+            wuow.commit();
+
+            LOGV2_INFO(5555201,
+                       "Removed unknown unreplicated collection from the catalog",
+                       "catalogId"_attr = entry.catalogId,
+                       logAttrs(entry.nss),
+                       "ident"_attr = entry.ident);
+            continue;
         }
 
         Timestamp minVisibleTs = Timestamp::min();
@@ -1091,16 +1103,7 @@ void StorageEngineImpl::_onMinOfCheckpointAndOldestTimestampChanged(const Timest
 }
 
 StorageEngineImpl::TimestampMonitor::TimestampMonitor(KVEngine* engine, PeriodicRunner* runner)
-    : _engine(engine), _running(false), _periodicRunner(runner) {
-    _currentTimestamps.checkpoint = _engine->getCheckpointTimestamp();
-    _currentTimestamps.oldest = _engine->getOldestTimestamp();
-    _currentTimestamps.stable = _engine->getStableTimestamp();
-    _currentTimestamps.minOfCheckpointAndOldest =
-        (_currentTimestamps.checkpoint.isNull() ||
-         (_currentTimestamps.checkpoint > _currentTimestamps.oldest))
-        ? _currentTimestamps.oldest
-        : _currentTimestamps.checkpoint;
-}
+    : _engine(engine), _running(false), _periodicRunner(runner) {}
 
 StorageEngineImpl::TimestampMonitor::~TimestampMonitor() {
     LOGV2(22261, "Timestamp monitor shutting down");
@@ -1122,11 +1125,6 @@ void StorageEngineImpl::TimestampMonitor::startup() {
                 }
             }
 
-            Timestamp checkpoint = _currentTimestamps.checkpoint;
-            Timestamp oldest = _currentTimestamps.oldest;
-            Timestamp stable = _currentTimestamps.stable;
-            Timestamp minOfCheckpointAndOldest = _currentTimestamps.minOfCheckpointAndOldest;
-
             try {
                 auto opCtx = client->getOperationContext();
                 mongo::ServiceContext::UniqueOperationContext uOpCtx;
@@ -1134,6 +1132,11 @@ void StorageEngineImpl::TimestampMonitor::startup() {
                     uOpCtx = client->makeOperationContext();
                     opCtx = uOpCtx.get();
                 }
+
+                Timestamp checkpoint;
+                Timestamp oldest;
+                Timestamp stable;
+                Timestamp minOfCheckpointAndOldest;
 
                 {
                     // Take a global lock in MODE_IS while fetching timestamps to guarantee that
@@ -1154,20 +1157,14 @@ void StorageEngineImpl::TimestampMonitor::startup() {
                 {
                     stdx::lock_guard<Latch> lock(_monitorMutex);
                     for (const auto& listener : _listeners) {
-                        // Notify the listener if the timestamp changed.
-                        if (listener->getType() == TimestampType::kCheckpoint &&
-                            _currentTimestamps.checkpoint != checkpoint) {
+                        if (listener->getType() == TimestampType::kCheckpoint) {
                             listener->notify(checkpoint);
-                        } else if (listener->getType() == TimestampType::kOldest &&
-                                   _currentTimestamps.oldest != oldest) {
+                        } else if (listener->getType() == TimestampType::kOldest) {
                             listener->notify(oldest);
-                        } else if (listener->getType() == TimestampType::kStable &&
-                                   _currentTimestamps.stable != stable) {
+                        } else if (listener->getType() == TimestampType::kStable) {
                             listener->notify(stable);
                         } else if (listener->getType() ==
-                                       TimestampType::kMinOfCheckpointAndOldest &&
-                                   _currentTimestamps.minOfCheckpointAndOldest !=
-                                       minOfCheckpointAndOldest) {
+                                   TimestampType::kMinOfCheckpointAndOldest) {
                             listener->notify(minOfCheckpointAndOldest);
                         } else if (stable == Timestamp::min()) {
                             // Special case notification of all listeners when writes do not have
@@ -1177,10 +1174,6 @@ void StorageEngineImpl::TimestampMonitor::startup() {
                     }
                 }
 
-                _currentTimestamps.checkpoint = checkpoint;
-                _currentTimestamps.oldest = oldest;
-                _currentTimestamps.stable = stable;
-                _currentTimestamps.minOfCheckpointAndOldest = minOfCheckpointAndOldest;
             } catch (const ExceptionForCat<ErrorCategory::Interruption>& ex) {
                 if (!ErrorCodes::isCancellationError(ex))
                     throw;

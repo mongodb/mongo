@@ -274,18 +274,8 @@ public:
         }
 
     private:
-        struct MonitoredTimestamps {
-            Timestamp checkpoint;
-            Timestamp oldest;
-            Timestamp stable;
-            Timestamp minOfCheckpointAndOldest;
-        };
-
         KVEngine* _engine;
         bool _running;
-
-        // The set of timestamps that were last reported to the listeners by the monitor.
-        MonitoredTimestamps _currentTimestamps;
 
         // Periodic runner that the timestamp monitor schedules its job on.
         PeriodicRunner* _periodicRunner;
