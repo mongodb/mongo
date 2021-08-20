@@ -50,6 +50,9 @@ COMMON_LINT_PATTERN = r'(?P<lint>Fix\slint)'
 COMMON_IMPORT_PATTERN = r'(?P<imported>Import\s(wiredtiger|tools):\s.*)'
 """Common Import pattern format."""
 
+COMMON_REVERT_IMPORT_PATTERN = r'Revert\s+[\"\']?(?P<imported>Import\s(wiredtiger|tools):\s.*)'
+"""Common revert Import pattern format."""
+
 COMMON_PRIVATE_PATTERN = r'''
     ((?P<revert>Revert)\s+[\"\']?)?                                     # Revert (optional)
     ((?P<ticket>[A-Z]+-[0-9]+)[\"\']?\s*)                               # ticket identifier
@@ -103,6 +106,10 @@ VALID_PATTERNS = [
     re.compile(old_patch_description(COMMON_LINT_PATTERN), re.MULTILINE | re.DOTALL | re.VERBOSE),
     re.compile(new_patch_description(COMMON_IMPORT_PATTERN), re.MULTILINE | re.DOTALL | re.VERBOSE),
     re.compile(old_patch_description(COMMON_IMPORT_PATTERN), re.MULTILINE | re.DOTALL | re.VERBOSE),
+    re.compile(
+        new_patch_description(COMMON_REVERT_IMPORT_PATTERN), re.MULTILINE | re.DOTALL | re.VERBOSE),
+    re.compile(
+        old_patch_description(COMMON_REVERT_IMPORT_PATTERN), re.MULTILINE | re.DOTALL | re.VERBOSE),
 ]
 """valid public patterns."""
 
