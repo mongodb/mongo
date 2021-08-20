@@ -1,10 +1,6 @@
 /**
  * Tests that $lookup and $graphLookup against a sharded collection are banned in a transaction.
  * @tags: [
- *   featureFlagShardedLookup,
- *   # Prior to FCV 5.1, these commands will fail with a different error code because $lookup and
- *   # $graphLookup against sharded collections were banned.
- *   requires_fcv_51,
  *   uses_transactions,
  * ]
  */
@@ -48,7 +44,7 @@ assertFailsInTransaction([{
         as: "res",
     }
 }],
-3904800);
+28769);
 
 assertFailsInTransaction([{
     $graphLookup: {
@@ -59,7 +55,7 @@ assertFailsInTransaction([{
         as: "res"
     }
 }],
-3904801);
+28769);
 
 st.stop();
 }());

@@ -102,14 +102,16 @@ void LiteParsedPipeline::verifyIsSupported(
     const boost::optional<ExplainOptions::Verbosity> explain,
     bool enableMajorityReadConcern) const {
     // Verify litePipe can be run in a transaction.
-    if (opCtx->inMultiDocumentTransaction()) {
+    const bool inMultiDocumentTransaction = opCtx->inMultiDocumentTransaction();
+    if (inMultiDocumentTransaction) {
         assertSupportsMultiDocumentTransaction(explain);
     }
     // Verify that no involved namespace is sharded unless allowed by the pipeline.
     for (const auto& nss : getInvolvedNamespaces()) {
         uassert(28769,
                 str::stream() << nss.ns() << " cannot be sharded",
-                allowShardedForeignCollection(nss) || !isSharded(opCtx, nss));
+                allowShardedForeignCollection(nss, inMultiDocumentTransaction) ||
+                    !isSharded(opCtx, nss));
     }
 }
 

@@ -20,10 +20,6 @@ selector:
   # values:
   - jstests/concurrency/fsm_workloads/agg_match.js
 
-  # $lookup and $graphLookup are not supported on sharded collections.
-  - jstests/concurrency/fsm_workloads/agg_graph_lookup.js
-  - jstests/concurrency/fsm_workloads/view_catalog_cycle_lookup.js
-
   # Disabled because MapReduce can lose cursors if the primary goes down during the operation.
   - jstests/concurrency/fsm_workloads/map_reduce_drop.js
   - jstests/concurrency/fsm_workloads/map_reduce_inline.js
@@ -148,6 +144,7 @@ selector:
   - jstests/concurrency/fsm_workloads/invalidated_cursors.js
   - jstests/concurrency/fsm_workloads/kill_multicollection_aggregation.js
   - jstests/concurrency/fsm_workloads/view_catalog.js
+  - jstests/concurrency/fsm_workloads/view_catalog_cycle_lookup.js
   - jstests/concurrency/fsm_workloads/view_catalog_cycle_with_drop.js
   - jstests/concurrency/fsm_workloads/view_catalog_direct_system_writes.js
 

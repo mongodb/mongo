@@ -50,7 +50,8 @@ public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec);
 
-        bool allowShardedForeignCollection(NamespaceString nss) const final {
+        bool allowShardedForeignCollection(NamespaceString nss,
+                                           bool inMultiDocumentTransaction) const final {
             return _foreignNss != nss;
         }
 

@@ -118,10 +118,13 @@ public:
      * Returns false if at least one of the stages does not allow the involved namespace 'nss' to be
      * sharded.
      */
-    bool allowShardedForeignCollection(NamespaceString nss) const {
-        return std::all_of(_stageSpecs.begin(), _stageSpecs.end(), [&nss](auto&& spec) {
-            return spec->allowShardedForeignCollection(nss);
-        });
+    bool allowShardedForeignCollection(NamespaceString nss, bool isMultiDocumentTransaction) const {
+        return std::all_of(_stageSpecs.begin(),
+                           _stageSpecs.end(),
+                           [&nss, isMultiDocumentTransaction](auto&& spec) {
+                               return spec->allowShardedForeignCollection(
+                                   nss, isMultiDocumentTransaction);
+                           });
     }
 
     /**

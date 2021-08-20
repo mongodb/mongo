@@ -224,7 +224,7 @@ TEST_F(DocumentSourceLookUpTest, RejectLookupWhenDepthLimitIsExceeded) {
     expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
         {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
 
-    expCtx->subPipelineDepth = ExpressionContext::kMaxSubPipelineViewDepth;
+    expCtx->subPipelineDepth = internalMaxSubPipelineViewDepth.load();
 
     ASSERT_THROWS_CODE(
         DocumentSourceLookUp::createFromBson(

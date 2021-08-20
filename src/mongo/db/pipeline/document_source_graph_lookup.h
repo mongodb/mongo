@@ -51,9 +51,11 @@ public:
                                                  const BSONElement& spec);
 
 
-        bool allowShardedForeignCollection(NamespaceString nss) const override {
+        bool allowShardedForeignCollection(NamespaceString nss,
+                                           bool inMultiDocumentTransaction) const override {
             if (feature_flags::gFeatureFlagShardedLookup.isEnabled(
-                    serverGlobalParams.featureCompatibility)) {
+                    serverGlobalParams.featureCompatibility) &&
+                !inMultiDocumentTransaction) {
                 return true;
             }
             return _foreignNss != nss;

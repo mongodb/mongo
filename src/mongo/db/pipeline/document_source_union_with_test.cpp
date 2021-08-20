@@ -48,6 +48,7 @@
 #include "mongo/db/pipeline/document_source_union_with.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/process_interface/stub_lookup_single_document_process_interface.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
 
@@ -453,7 +454,7 @@ TEST_F(DocumentSourceUnionWithTest, RejectUnionWhenDepthLimitIsExceeded) {
     expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
         {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
 
-    expCtx->subPipelineDepth = ExpressionContext::kMaxSubPipelineViewDepth;
+    expCtx->subPipelineDepth = internalMaxSubPipelineViewDepth.load();
 
     ASSERT_THROWS_CODE(
         DocumentSourceUnionWith::createFromBson(

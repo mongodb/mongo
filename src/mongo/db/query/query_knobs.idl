@@ -153,6 +153,16 @@ server_parameters:
     validator:
       gt: 0
 
+  internalMaxSubPipelineViewDepth:
+    description: "The maximum length allowed for an an aggregation sub-pipeline view."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalMaxSubPipelineViewDepth"
+    cpp_vartype: AtomicWord<long long>
+    default: 20
+    test_only: true
+    validator:
+      gt: 0
+
   #
   # Planning and enumeration
   #

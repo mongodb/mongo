@@ -21,7 +21,7 @@ selector:
   # values:
   - jstests/concurrency/fsm_workloads/agg_match.js
 
-  # $lookup and $graphLookup are not supported on sharded collections.
+  # $lookup and $graphLookup are not supported on sharded collections with transactions.
   - jstests/concurrency/fsm_workloads/agg_graph_lookup.js
   - jstests/concurrency/fsm_workloads/view_catalog_cycle_lookup.js
 

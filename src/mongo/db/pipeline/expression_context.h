@@ -48,6 +48,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/explain_options.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/tailable_mode.h"
 #include "mongo/db/server_options.h"
 #include "mongo/util/intrusive_counter.h"
@@ -69,7 +70,6 @@ struct ExpressionCounters {
 
 class ExpressionContext : public RefCountable {
 public:
-    static constexpr size_t kMaxSubPipelineViewDepth = 20;
     struct ResolvedNamespace {
         ResolvedNamespace() = default;
         ResolvedNamespace(NamespaceString ns, std::vector<BSONObj> pipeline);
@@ -254,8 +254,8 @@ public:
     boost::intrusive_ptr<ExpressionContext> copyForSubPipeline(NamespaceString nss) const {
         uassert(ErrorCodes::MaxSubPipelineDepthExceeded,
                 str::stream() << "Maximum number of nested sub-pipelines exceeded. Limit is "
-                              << ExpressionContext::kMaxSubPipelineViewDepth,
-                subPipelineDepth < kMaxSubPipelineViewDepth);
+                              << internalMaxSubPipelineViewDepth.load(),
+                subPipelineDepth < internalMaxSubPipelineViewDepth.load());
         auto newCopy = copyWith(std::move(nss));
         newCopy->subPipelineDepth += 1;
         // The original expCtx might have been attached to an aggregation pipeline running on the
@@ -391,7 +391,7 @@ public:
     BSONObj initialPostBatchResumeToken;
 
     // Tracks the depth of nested aggregation sub-pipelines. Used to enforce depth limits.
-    size_t subPipelineDepth = 0;
+    long long subPipelineDepth = 0;
 
     // If set, this will disallow use of features introduced in versions above the provided version.
     boost::optional<ServerGlobalParams::FeatureCompatibility::Version>
