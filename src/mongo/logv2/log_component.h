@@ -58,6 +58,7 @@ namespace mongo::logv2 {
     X(kGeo,                    , "geo"                   , "GEO"     , kDefault) \
     X(kIndex,                  , "index"                 , "INDEX"   , kDefault) \
     X(kNetwork,                , "network"               , "NETWORK" , kDefault) \
+    X(kProcessHealth,          , "processHealth"         , "HEALTH"  , kDefault) \
     X(kQuery,                  , "query"                 , "QUERY"   , kDefault) \
     X(kReplication,            , "replication"           , "REPL"    , kDefault) \
     X(kReplicationElection,    , "election"              , "ELECTION", kReplication) \

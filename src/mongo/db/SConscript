@@ -30,6 +30,7 @@ env.SConscript(
         'fts',
         'ftdc',
         'geo',
+        'process_health',
         'index',
         'matcher',
         'ops',
