@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/document_source.h"
@@ -44,6 +46,7 @@
 #include "mongo/db/pipeline/document_source_sequential_document_cache.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
@@ -182,6 +185,14 @@ bool DocumentSource::pushMatchBefore(Pipeline::SourceContainer::iterator itr,
             // and put the independent part before this stage. If splitMatch.second is not null,
             // then there is a new $match stage to insert after ourselves which is dependent on the
             // modified fields.
+            LOGV2_DEBUG(
+                5943503,
+                5,
+                "Swapping all or part of a $match stage in front of another stage: ",
+                "matchMovingBefore"_attr = redact(splitMatch.first->serializeToBSONForDebug()),
+                "thisStage"_attr = redact(serializeToBSONForDebug()),
+                "matchLeftAfter"_attr = redact(
+                    splitMatch.second ? splitMatch.second->serializeToBSONForDebug() : BSONObj()));
             container->erase(std::next(itr));
             container->insert(itr, std::move(splitMatch.first));
             if (splitMatch.second) {
@@ -207,12 +218,34 @@ bool DocumentSource::pushSampleBefore(Pipeline::SourceContainer::iterator itr,
     return false;
 }
 
+BSONObj DocumentSource::serializeToBSONForDebug() const {
+    std::vector<Value> serialized;
+    serializeToArray(serialized, ExplainOptions::Verbosity::kQueryPlanner);
+    if (serialized.empty()) {
+        LOGV2_DEBUG(5943501,
+                    5,
+                    "warning: stage did not serialize to anything as it was trying to be printed "
+                    "for debugging");
+        return BSONObj();
+    }
+    if (serialized.size() > 1) {
+        LOGV2_DEBUG(5943502, 5, "stage serialized to multiple stages. Ignoring all but the first");
+    }
+    return serialized[0].getDocument().toBson();
+}
+
 bool DocumentSource::pushSingleDocumentTransformBefore(Pipeline::SourceContainer::iterator itr,
                                                        Pipeline::SourceContainer* container) {
     auto singleDocTransform =
         dynamic_cast<DocumentSourceSingleDocumentTransformation*>((*std::next(itr)).get());
 
     if (constraints().canSwapWithSingleDocTransform && singleDocTransform) {
+        LOGV2_DEBUG(5943500,
+                    5,
+                    "Swapping a single document transform stage in front of another stage: ",
+                    "singleDocTransform"_attr =
+                        redact(singleDocTransform->serializeToBSONForDebug()),
+                    "thisStage"_attr = redact(serializeToBSONForDebug()));
         container->insert(itr, std::move(singleDocTransform));
         container->erase(std::next(itr));
         return true;

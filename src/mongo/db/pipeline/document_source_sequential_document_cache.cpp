@@ -142,6 +142,7 @@ Pipeline::SourceContainer::iterator DocumentSourceSequentialDocumentCache::doOpt
     // If the cache has been populated and is serving results, remove the non-correlated prefix.
     if (_cache->isServing()) {
         // Need to dispose last stage to be removed.
+        Pipeline::stitch(container);
         lastPtr->dispose();
         container->erase(container->begin(), prefixSplit);
     }
