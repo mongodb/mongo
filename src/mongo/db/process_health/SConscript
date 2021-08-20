@@ -1,0 +1,28 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env = env.Clone()
+
+env.Library(
+    target='fault_manager',
+    source=[
+        "fault_manager.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+        '$BUILD_DIR/mongo/db/service_context',
+    ],
+    LIBDEPS_PRIVATE=[
+    ],
+)
+
+env.CppUnitTest(
+    target="fault_manager_test",
+    source=[
+        "fault_manager_test.cpp",
+    ],
+    LIBDEPS=[
+        "fault_manager",
+    ],
+)
