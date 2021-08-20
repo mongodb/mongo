@@ -4,7 +4,11 @@
 const kFailPointName = "setYieldAllLocksHang";
 const kCommandComment = "interruptedWhileYieldedComment";
 
+const conn = MongoRunner.runMongod();
+assert.neq(null, conn, "mongod was unable to start up");
+const db = conn.getDB("test");
 const coll = db.interrupt_while_yielded;
+
 coll.drop();
 assert.commandWorked(coll.insert({a: 1, b: 1, c: 1}));
 assert.commandWorked(coll.insert({a: 1, b: 1, c: 1}));
@@ -15,6 +19,11 @@ assert.commandWorked(coll.createIndex({a: 1, c: 1}));
 // This is needed to make sure that a yield point is reached.
 assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}));
 
+/**
+ * Executes 'queryFn' in a parallel shell while a failpoint is enabled to hang operations during
+ * yield. Ensures that operation run by 'queryFn' reaches the yield point, then runs killOp()
+ * against the yielded operation.
+ */
 function runTestWithQuery(queryFn) {
     let waitForParallelShell = null;
 
@@ -35,7 +44,7 @@ function runTestWithQuery(queryFn) {
         }
         code += "(" + parallelShellFn.toString() + ")();";
 
-        waitForParallelShell = startParallelShell(code);
+        waitForParallelShell = startParallelShell(code, conn.port);
 
         // Find the operation running the query.
         let opId = null;
@@ -76,7 +85,7 @@ function runTestWithQuery(queryFn) {
     }
 
     // Check that the server is still up.
-    assert.commandWorked(db.adminCommand({isMaster: 1}));
+    assert.commandWorked(db.adminCommand({hello: 1}));
 }
 
 function rootedOr() {
@@ -108,4 +117,6 @@ function sortAndProjectionImmediatelyAfterMatch() {
         .itcount();
 }
 runTestWithQuery(sortAndProjectionImmediatelyAfterMatch);
+
+MongoRunner.stopMongod(conn);
 }());
