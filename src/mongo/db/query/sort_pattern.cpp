@@ -30,6 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/query/sort_pattern.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 
 namespace mongo {
 SortPattern::SortPattern(const BSONObj& obj,
@@ -57,6 +58,14 @@ SortPattern::SortPattern(const BSONObj& obj,
                 // Valid meta sort. Just fall through.
             } else if (metaElem.valueStringDataSafe() == "randVal"_sd) {
                 // Valid meta sort. Just fall through.
+            } else if (metaElem.valueStringDataSafe() == "geoNearDistance"_sd) {
+                if (!feature_flags::gTimeseriesMetricIndexes.isEnabled(
+                        serverGlobalParams.featureCompatibility)) {
+                    uasserted(5917100,
+                              "$meta sort by 'geoNearDistance' is allowed only with "
+                              "featureFlagTimeseriesMetricIndexes flag");
+                }
+                // Valid meta sort if the flag is enabled. Just fall through.
             } else if (metaElem.valueStringDataSafe() == "searchScore"_sd) {
                 uasserted(31218, "$meta sort by 'searchScore' metadata is not supported");
             } else if (metaElem.valueStringDataSafe() == "searchHighlights"_sd) {

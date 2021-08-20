@@ -46,6 +46,7 @@
 #include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 
@@ -197,6 +198,46 @@ TEST_F(DocumentSourceSortTest, ReportsNoPathsModified) {
     auto modifiedPaths = sort()->getModifiedPaths();
     ASSERT(modifiedPaths.type == DocumentSource::GetModPathsReturn::Type::kFiniteSet);
     ASSERT_EQUALS(0U, modifiedPaths.paths.size());
+}
+
+TEST_F(DocumentSourceSortTest, AllowsSortOnMetaGeoNearDistance) {
+    BSONObj spec = BSON("$sort" << BSON("dist" << BSON("$meta"
+                                                       << "geoNearDistance")));
+    BSONElement specElement = spec.firstElement();
+    // The {$meta: 'geoNearDistance'} is allowed only when the featureFlagTimeseriesMetricIndexes
+    // flag is enabled.
+    {
+        RAIIServerParameterControllerForTest controller("featureFlagTimeseriesMetricIndexes", true);
+        auto sort = DocumentSourceSort::createFromBson(specElement, getExpCtx());
+
+        vector<Value> arr;
+        sort->serializeToArray(arr);
+        ASSERT_BSONOBJ_EQ(arr[0].getDocument().toBson(),
+                          BSON("$sort" << BSON("$computed0" << BSON("$meta"
+                                                                    << "geoNearDistance"))));
+    }
+    {
+        RAIIServerParameterControllerForTest controller("featureFlagTimeseriesMetricIndexes",
+                                                        false);
+        ASSERT_THROWS_CODE(DocumentSourceSort::createFromBson(specElement, getExpCtx()),
+                           AssertionException,
+                           5917100);
+    }
+}
+
+TEST_F(DocumentSourceSortTest, DetectsDependencyOnMeta) {
+    BSONObj spec = BSON("$sort" << BSON("dist" << BSON("$meta"
+                                                       << "geoNearDistance")));
+    BSONElement specElement = spec.firstElement();
+    // The {$meta: 'geoNearDistance'} is allowed only when the featureFlagTimeseriesMetricIndexes
+    // flag is enabled.
+    RAIIServerParameterControllerForTest controller("featureFlagTimeseriesMetricIndexes", true);
+    auto sort = DocumentSourceSort::createFromBson(specElement, getExpCtx());
+
+    DepsTracker dependencies;
+    ASSERT_EQUALS(DepsTracker::State::SEE_NEXT, sort->getDependencies(&dependencies));
+    ASSERT_EQUALS(0U, dependencies.fields.size());
+    ASSERT_EQUALS(true, dependencies.getNeedsMetadata(DocumentMetadataFields::kGeoNearDist));
 }
 
 class DocumentSourceSortExecutionTest : public DocumentSourceSortTest {
