@@ -54,6 +54,9 @@ replSet.initiateWithHighElectionTimeout(config);
 replSet.awaitReplication();
 assert.eq(replSet.getPrimary(), nodes[0]);
 
+const statusBeforeTakeover =
+    assert.commandWorked(nodes[1].adminCommand({serverStatus: 1, wiredTiger: 0}));
+
 // Failpoint to hang node1 before the automatic reconfig on stepup bumps the config term.
 const hangBeforeTermBumpFpNode1 = configureFailPoint(nodes[1], "hangBeforeReconfigOnDrainComplete");
 const initialConfig = assert.commandWorked(nodes[0].adminCommand({replSetGetConfig: 1})).config;
@@ -90,8 +93,6 @@ assert.soon(() => {
     return status.syncSourceHost === nodes[2].host;
 });
 
-const statusBeforeTakeover = assert.commandWorked(nodes[1].adminCommand({serverStatus: 1}));
-
 // Lift the failpoint on node1 to let it finish reconfig and bump the config term.
 hangBeforeTermBumpFpNode1.off();
 
@@ -117,7 +118,8 @@ hangBeforeTermBumpFpNode2.off();
 replSet.awaitNodesAgreeOnPrimary(replSet.kDefaultTimeoutMS, nodes, nodes[1]);
 
 // Check that election metrics has been updated with the new reason counter.
-const statusAfterTakeover = assert.commandWorked(nodes[1].adminCommand({serverStatus: 1}));
+const statusAfterTakeover =
+    assert.commandWorked(nodes[1].adminCommand({serverStatus: 1, wiredTiger: 0}));
 verifyServerStatusElectionReasonCounterChange(statusBeforeTakeover.electionMetrics,
                                               statusAfterTakeover.electionMetrics,
                                               "catchUpTakeover",
