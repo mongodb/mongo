@@ -594,6 +594,9 @@ __rollback_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE *page
 
     /* Finally remove that update from history store. */
     if (valid_update_found) {
+        /* Avoid freeing the updates while still in use if hs_cursor->remove fails. */
+        upd = tombstone = NULL;
+
         WT_ERR(hs_cursor->remove(hs_cursor));
         WT_STAT_CONN_DATA_INCR(session, txn_rts_hs_removed);
         WT_STAT_CONN_DATA_INCR(session, cache_hs_key_truncate_rts);
@@ -785,7 +788,7 @@ __rollback_abort_col_var(WT_SESSION_IMPL *session, WT_REF *ref, wt_timestamp_t r
     WT_PAGE *page;
     uint64_t recno, rle;
     uint32_t i, j;
-    bool stable_update_found;
+    bool is_ondisk_stable, stable_update_found;
 
     page = ref->page;
     /*
@@ -804,26 +807,46 @@ __rollback_abort_col_var(WT_SESSION_IMPL *session, WT_REF *ref, wt_timestamp_t r
             WT_RET(__rollback_abort_insert_list(
               session, page, ins, rollback_timestamp, &stable_update_found));
 
-        if (!stable_update_found && page->dsk != NULL) {
+        if (page->dsk != NULL) {
+            /* Unpack the cell. We need its RLE count whether or not we're going to iterate it. */
             kcell = WT_COL_PTR(page, cip);
             __wt_cell_unpack_kv(session, page->dsk, kcell, &unpack);
             rle = __wt_cell_rle(&unpack);
-            if (unpack.type != WT_CELL_DEL) {
+
+            /*
+             * If we found a stable update on the insert list, this key needs no further attention.
+             * Any other keys in this cell with stable updates also do not require attention. But
+             * beyond that, the on-disk value must be older than
+             * the update we found. That means it too is stable(*), so any keys in the cell that
+             * _don't_ have stable updates on the update list don't need further attention either.
+             * (And any unstable updates were just handled above.) Thus we can skip iterating over
+             * the cell.
+             *
+             * Furthermore, if the cell is deleted it must be
+             * itself stable, because cells only appear as deleted if there is no older value that
+             * might need to be restored. We can skip iterating over the cell.
+             *
+             * (*) Either that, or the update is not timestamped, in which case the on-disk value
+             * might not be stable but the non-timestamp update will hide it until the next
+             * reconciliation and then overwrite it.
+             */
+            if (stable_update_found)
+                WT_STAT_CONN_DATA_INCR(session, txn_rts_stable_rle_skipped);
+            else if (unpack.type == WT_CELL_DEL)
+                WT_STAT_CONN_DATA_INCR(session, txn_rts_delete_rle_skipped);
+            else {
                 for (j = 0; j < rle; j++) {
-                    WT_RET(__rollback_abort_ondisk_kv(session, ref, cip, NULL, rollback_timestamp,
-                      recno + j, &stable_update_found));
-                    /* Skip processing all RLE if the on-disk version is stable. */
-                    if (stable_update_found) {
+                    WT_RET(__rollback_abort_ondisk_kv(
+                      session, ref, cip, NULL, rollback_timestamp, recno + j, &is_ondisk_stable));
+                    /* We can stop right away if the on-disk version is stable. */
+                    if (is_ondisk_stable) {
                         if (rle > 1)
                             WT_STAT_CONN_DATA_INCR(session, txn_rts_stable_rle_skipped);
                         break;
                     }
                 }
-            } else
-                WT_STAT_CONN_DATA_INCR(session, txn_rts_delete_rle_skipped);
+            }
             recno += rle;
-        } else {
-            recno++;
         }
     }
 

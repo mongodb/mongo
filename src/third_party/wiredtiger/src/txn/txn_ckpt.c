@@ -922,6 +922,14 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
     }
 
     /*
+     * As part of recovery, rollback to stable may have left out clearing stale transaction ids.
+     * Update the connection base write generation based on the latest checkpoint write generations
+     * to reset these transaction ids present on the pages when reading them.
+     */
+    if (F_ISSET(conn, WT_CONN_RECOVERING))
+        WT_ERR(__wt_metadata_correct_base_write_gen(session));
+
+    /*
      * Clear the dhandle so the visibility check doesn't get confused about the snap min. Don't
      * bother restoring the handle since it doesn't make sense to carry a handle across a
      * checkpoint.

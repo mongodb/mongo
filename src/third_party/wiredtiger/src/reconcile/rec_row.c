@@ -808,10 +808,9 @@ __wt_rec_row_leaf(
         upd = upd_select.upd;
 
         /* Take the timestamp from the update or the cell. */
-        if (upd == NULL) {
-            __cell_pack_kv_window_cleanup(session, page->dsk, vpack);
+        if (upd == NULL)
             twp = &vpack->tw;
-        } else
+        else
             twp = &upd_select.tw;
 
         /*
