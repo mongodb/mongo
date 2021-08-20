@@ -109,6 +109,8 @@ private:
     using sa_family_t = int;
 #endif
 
+    CIDR();
+
     auto equalityLens() const {
         return std::tie(_ip, _family, _len);
     }
