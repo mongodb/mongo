@@ -91,7 +91,7 @@ BSONColumnBuilder& BSONColumnBuilder::append(BSONElement elem) {
         _storePrevious(elem);
         _simple8bBuilder128.flush();
         _simple8bBuilder64.flush();
-        _storeWith128 = elem.type() == NumberDecimal;
+        _storeWith128 = elem.type() == NumberDecimal || elem.type() == BinData;
         _writeLiteralFromPrevious();
         return *this;
     }
@@ -106,23 +106,36 @@ BSONColumnBuilder& BSONColumnBuilder::append(BSONElement elem) {
         }
     }
 
+    bool encodingPossible = true;
     if (!compressed) {
         if (_storeWith128) {
             int128_t delta = 0;
             switch (type) {
-                case NumberDecimal:
-                    delta = (Simple8bTypeUtil::encodeDecimal128(elem._numberDecimal()) -
-                             Simple8bTypeUtil::encodeDecimal128(previous._numberDecimal()));
-                    break;
+                case BinData: {
+                    encodingPossible =
+                        elem.valuestrsize() == previous.valuestrsize() && elem.valuestrsize() <= 16;
+                    if (!encodingPossible)
+                        break;
+                    int128_t curEncoded =
+                        Simple8bTypeUtil::encodeBinary(elem.valuestr(), elem.valuestrsize());
+                    delta = curEncoded - _prevEncoded128;
+                    _prevEncoded128 = curEncoded;
+                } break;
+                case NumberDecimal: {
+                    int128_t curEncoded = Simple8bTypeUtil::encodeDecimal128(elem._numberDecimal());
+                    delta = curEncoded - _prevEncoded128;
+                    _prevEncoded128 = curEncoded;
+                } break;
                 default:
                     // Nothing else is implemented yet
                     invariant(false);
             };
-            compressed = _simple8bBuilder128.append(Simple8bTypeUtil::encodeInt128(delta));
+            if (encodingPossible) {
+                compressed = _simple8bBuilder128.append(Simple8bTypeUtil::encodeInt128(delta));
+            }
         } else if (type == NumberDouble) {
             compressed = _appendDouble(elem._numberDouble(), previous._numberDouble());
         } else {
-            bool encodingPossible = true;
             int64_t value = 0;
             switch (type) {
                 case NumberInt:
@@ -253,7 +266,7 @@ bool BSONColumnBuilder::_appendDouble(double value, double previous) {
         if (rescaled) {
             // Re-scale possible, use this Simple8b builder
             std::swap(_simple8bBuilder64, *rescaled);
-            _prevEncoded = encoded;
+            _prevEncoded64 = encoded;
             _scaleIndex = scaleIndex;
             return true;
         }
@@ -264,10 +277,10 @@ bool BSONColumnBuilder::_appendDouble(double value, double previous) {
 
         // Make sure value and previous are using the same scale factor.
         uint8_t prevScaleIndex;
-        std::tie(_prevEncoded, prevScaleIndex) = scaleAndEncodeDouble(previous, scaleIndex);
+        std::tie(_prevEncoded64, prevScaleIndex) = scaleAndEncodeDouble(previous, scaleIndex);
         if (scaleIndex != prevScaleIndex) {
             std::tie(encoded, scaleIndex) = scaleAndEncodeDouble(value, prevScaleIndex);
-            std::tie(_prevEncoded, prevScaleIndex) = scaleAndEncodeDouble(previous, scaleIndex);
+            std::tie(_prevEncoded64, prevScaleIndex) = scaleAndEncodeDouble(previous, scaleIndex);
         }
 
         // Record our new scale factor
@@ -277,14 +290,15 @@ bool BSONColumnBuilder::_appendDouble(double value, double previous) {
     // Append delta and check if we wrote a Simple8b block. If we did we may be able to reduce the
     // scale factor when starting a new block
     auto before = _bufBuilder.len();
-    if (!_simple8bBuilder64.append(Simple8bTypeUtil::encodeInt64(calcDelta(encoded, _prevEncoded))))
+    if (!_simple8bBuilder64.append(
+            Simple8bTypeUtil::encodeInt64(calcDelta(encoded, _prevEncoded64))))
         return false;
 
     if (_bufBuilder.len() != before) {
         // Reset the scale factor to 0 and append all pending values to a new Simple8bBuilder. In
         // the worse case we will end up with an identical scale factor.
         auto prevScale = _scaleIndex;
-        std::tie(_prevEncoded, _scaleIndex) = scaleAndEncodeDouble(_lastValueInPrevBlock, 0);
+        std::tie(_prevEncoded64, _scaleIndex) = scaleAndEncodeDouble(_lastValueInPrevBlock, 0);
 
         // Create a new Simple8bBuilder.
         Simple8bBuilder<uint64_t> builder(_createBufferWriter());
@@ -306,7 +320,7 @@ bool BSONColumnBuilder::_appendDouble(double value, double previous) {
         }
     }
 
-    _prevEncoded = encoded;
+    _prevEncoded64 = encoded;
     return true;
 }
 
@@ -319,7 +333,7 @@ BSONColumnBuilder& BSONColumnBuilder::skip() {
     }
     // Rescale previous known value if this skip caused Simple-8b blocks to be written
     if (before != _bufBuilder.len() && _previous().type() == NumberDouble) {
-        std::tie(_prevEncoded, _scaleIndex) = scaleAndEncodeDouble(_lastValueInPrevBlock, 0);
+        std::tie(_prevEncoded64, _scaleIndex) = scaleAndEncodeDouble(_lastValueInPrevBlock, 0);
     }
     return *this;
 }
@@ -358,15 +372,28 @@ void BSONColumnBuilder::_storePrevious(BSONElement elem) {
 void BSONColumnBuilder::_writeLiteralFromPrevious() {
     // Write literal without field name and reset control byte to force new one to be written when
     // appending next value.
+    auto prevElem = _previous();
     _bufBuilder.appendBuf(_prev.get(), _prevSize);
     _controlByteOffset = 0;
     // There is no previous timestamp delta. Set to default.
     _prevDelta = 0;
+    switch (prevElem.type()) {
+        case BinData:
+            if (prevElem.valuestrsize() <= 16)
+                _prevEncoded128 =
+                    Simple8bTypeUtil::encodeBinary(prevElem.valuestr(), prevElem.valuestrsize());
+            break;
+        case NumberDecimal:
+            _prevEncoded128 = Simple8bTypeUtil::encodeDecimal128(prevElem._numberDecimal());
+            break;
+        default:
+            break;
+    }
 
     // Set scale factor for this literal and values needed to append values
     if (_prev[0] == NumberDouble) {
-        _lastValueInPrevBlock = _previous()._numberDouble();
-        std::tie(_prevEncoded, _scaleIndex) = scaleAndEncodeDouble(_lastValueInPrevBlock, 0);
+        _lastValueInPrevBlock = prevElem._numberDouble();
+        std::tie(_prevEncoded64, _scaleIndex) = scaleAndEncodeDouble(_lastValueInPrevBlock, 0);
     } else {
         _scaleIndex = Simple8bTypeUtil::kMemoryAsInteger;
     }

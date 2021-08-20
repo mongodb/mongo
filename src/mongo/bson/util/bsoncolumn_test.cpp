@@ -130,6 +130,22 @@ public:
         return _elementMemory.front().firstElement();
     }
 
+    BSONElement createElementBinData(const std::vector<uint8_t>& val) {
+        BSONObjBuilder ob;
+        ob.appendBinData("f", val.size(), BinDataGeneral, val.data());
+        _elementMemory.emplace_front(ob.obj());
+        return _elementMemory.front().firstElement();
+    }
+
+    static uint128_t deltaBinData(BSONElement val, BSONElement prev) {
+        if (val.binaryEqualValues(prev)) {
+            return 0;
+        }
+        return Simple8bTypeUtil::encodeInt128(
+            Simple8bTypeUtil::encodeBinary(val.valuestr(), val.valuestrsize()) -
+            Simple8bTypeUtil::encodeBinary(prev.valuestr(), prev.valuestrsize()));
+    }
+
     static uint64_t deltaInt32(BSONElement val, BSONElement prev) {
         return Simple8bTypeUtil::encodeInt64(val.Int() - prev.Int());
     }
@@ -1537,6 +1553,157 @@ TEST_F(BSONColumnTest, SymbolAfterChangeBack) {
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlock64(expected, kDeltaForBinaryEqualValues);
 
+    appendEOO(expected);
+
+    verifyBinary(cb.finalize(), expected);
+}
+
+TEST_F(BSONColumnTest, BinDataBase) {
+    BSONColumnBuilder cb("test"_sd);
+    std::vector<uint8_t> input{'1', '2', '3', '4'};
+    auto elemBinData = createElementBinData(input);
+
+    cb.append(elemBinData);
+
+    BufBuilder expected;
+    appendLiteral(expected, elemBinData);
+    appendEOO(expected);
+
+    verifyBinary(cb.finalize(), expected);
+}
+
+TEST_F(BSONColumnTest, BinDataOdd) {
+    BSONColumnBuilder cb("test"_sd);
+    std::vector<uint8_t> input{'\n', '2', '\n', '4'};
+    auto elemBinData = createElementBinData(input);
+
+    cb.append(elemBinData);
+
+    BufBuilder expected;
+    appendLiteral(expected, elemBinData);
+    appendEOO(expected);
+
+    verifyBinary(cb.finalize(), expected);
+}
+
+TEST_F(BSONColumnTest, BinDataDelta) {
+    BSONColumnBuilder cb("test"_sd);
+    std::vector<uint8_t> input{'1', '2', '3', '4'};
+    auto elemBinData = createElementBinData(input);
+
+    cb.append(elemBinData);
+    cb.append(elemBinData);
+
+    BufBuilder expected;
+    appendLiteral(expected, elemBinData);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlock128(expected, deltaBinData(elemBinData, elemBinData));
+    appendEOO(expected);
+
+    verifyBinary(cb.finalize(), expected);
+}
+
+TEST_F(BSONColumnTest, BinDataDeltaShouldFail) {
+    BSONColumnBuilder cb("test"_sd);
+    std::vector<uint8_t> input{'1', '2', '3', '4'};
+    auto elemBinData = createElementBinData(input);
+
+    cb.append(elemBinData);
+
+    std::vector<uint8_t> inputLong{'1', '2', '3', '4', '5'};
+    auto elemBinDataLong = createElementBinData(inputLong);
+    cb.append(elemBinDataLong);
+
+    BufBuilder expected;
+    appendLiteral(expected, elemBinData);
+    appendLiteral(expected, elemBinDataLong);
+    appendEOO(expected);
+
+    verifyBinary(cb.finalize(), expected);
+}
+
+TEST_F(BSONColumnTest, BinDataDeltaCheckSkips) {
+    BSONColumnBuilder cb("test"_sd);
+    std::vector<uint8_t> input{'1', '2', '3', '4'};
+    auto elemBinData = createElementBinData(input);
+
+    cb.append(elemBinData);
+
+    std::vector<uint8_t> inputLong{'1', '2', '3', '3'};
+    auto elemBinDataLong = createElementBinData(inputLong);
+    cb.append(elemBinDataLong);
+    cb.skip();
+    cb.append(elemBinData);
+
+    BufBuilder expected;
+    appendLiteral(expected, elemBinData);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    std::vector<boost::optional<uint128_t>> expectedValues = {
+        deltaBinData(elemBinDataLong, elemBinData),
+        boost::none,
+        deltaBinData(elemBinData, elemBinDataLong)};
+    appendSimple8bBlocks128(expected, expectedValues, 1);
+    appendEOO(expected);
+
+    verifyBinary(cb.finalize(), expected);
+}
+
+TEST_F(BSONColumnTest, BinDataLargerThan16) {
+    BSONColumnBuilder cb("test"_sd);
+    std::vector<uint8_t> input{
+        '1', '2', '3', '4', '5', '6', '7', '8', '9', '1', '2', '3', '4', '5', '6', '7', '8'};
+    auto elemBinData = createElementBinData(input);
+
+    cb.append(elemBinData);
+
+    std::vector<uint8_t> inputLong{
+        '1', '2', '3', '4', '5', '6', '7', '8', '9', '1', '2', '3', '4', '5', '6', '7', '9'};
+    auto elemBinDataLong = createElementBinData(inputLong);
+    cb.append(elemBinDataLong);
+
+    BufBuilder expected;
+    appendLiteral(expected, elemBinData);
+    appendLiteral(expected, elemBinDataLong);
+    appendEOO(expected);
+
+    verifyBinary(cb.finalize(), expected);
+}
+
+TEST_F(BSONColumnTest, BinDataEqualTo16) {
+    BSONColumnBuilder cb("test"_sd);
+    std::vector<uint8_t> input{
+        '1', '2', '3', '4', '5', '6', '7', '8', '9', '1', '2', '3', '4', '5', '6', '7'};
+    auto elemBinData = createElementBinData(input);
+
+    cb.append(elemBinData);
+
+    std::vector<uint8_t> inputLong{
+        '1', '2', '3', '4', '5', '6', '7', '8', '9', '1', '2', '3', '4', '5', '6', '8'};
+    auto elemBinDataLong = createElementBinData(inputLong);
+    cb.append(elemBinDataLong);
+
+    BufBuilder expected;
+    appendLiteral(expected, elemBinData);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlock128(expected, deltaBinData(elemBinDataLong, elemBinData));
+    appendEOO(expected);
+
+    verifyBinary(cb.finalize(), expected);
+}
+
+TEST_F(BSONColumnTest, BinDataLargerThan16SameValue) {
+    BSONColumnBuilder cb("test"_sd);
+    std::vector<uint8_t> input{
+        '1', '2', '3', '4', '5', '6', '7', '8', '9', '1', '2', '3', '4', '5', '6', '7', '8'};
+    auto elemBinData = createElementBinData(input);
+
+    cb.append(elemBinData);
+    cb.append(elemBinData);
+
+    BufBuilder expected;
+    appendLiteral(expected, elemBinData);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlock128(expected, deltaBinData(elemBinData, elemBinData));
     appendEOO(expected);
 
     verifyBinary(cb.finalize(), expected);

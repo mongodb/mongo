@@ -78,6 +78,12 @@ public:
     static int128_t encodeDecimal128(Decimal128 val);
     static Decimal128 decodeDecimal128(int128_t val);
 
+    // These methods allow encoding binary with simple8b. We do not make any
+    // assumptions about the data other than the fact that the data is valid up to the size
+    // provided. The max size must be less than or equal to 16 bytes.
+    static int128_t encodeBinary(const char* val, size_t size);
+    static void decodeBinary(int128_t val, char* result, size_t size);
+
     // Array is a double as it will always be multiplied by a double and we don't want to do an
     // extra cast for
     static constexpr uint8_t kMemoryAsInteger = 5;

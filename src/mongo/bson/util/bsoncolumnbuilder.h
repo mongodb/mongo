@@ -109,7 +109,8 @@ private:
     std::ptrdiff_t _controlByteOffset = 0;
 
     // Additional variables needed for previous state
-    int64_t _prevEncoded;
+    int64_t _prevEncoded64 = 0;
+    int128_t _prevEncoded128 = 0;
     double _lastValueInPrevBlock = 0;
     uint8_t _scaleIndex;
 

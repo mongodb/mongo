@@ -185,4 +185,27 @@ Decimal128 Simple8bTypeUtil::decodeDecimal128(int128_t val) {
     return res;
 }
 
+int128_t Simple8bTypeUtil::encodeBinary(const char* val, size_t size) {
+    char arr[16] = {};
+    memcpy(arr, val, size);
+    uint64_t low = ConstDataView(arr).read<LittleEndian<uint64_t>>();
+    uint64_t high = ConstDataView(arr + 8).read<LittleEndian<uint64_t>>();
+    return absl::MakeInt128(high, low);
+}
+
+void Simple8bTypeUtil::decodeBinary(int128_t val, char* result, size_t size) {
+    uint64_t low = absl::Int128Low64(val);
+    uint64_t high = absl::Int128High64(val);
+    if (size > 8) {
+        memcpy(result, &low, 8);
+        memcpy(result + 8, &high, size - 8);
+    } else {
+        memcpy(result, &low, size);
+    }
+    if (size < 16) {
+        // Set the position at end of binary to be always one.
+        result[size] = 1;
+    }
+}
+
 }  // namespace mongo

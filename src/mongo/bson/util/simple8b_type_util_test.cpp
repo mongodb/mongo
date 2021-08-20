@@ -54,6 +54,17 @@ void assertDecimal128Equal(Decimal128 val) {
     ASSERT_TRUE(decodeResult == val);
 }
 
+void assertBinaryEqual(char* val, size_t size, int128_t expected) {
+    int128_t encodeResult = Simple8bTypeUtil::encodeBinary(val, size);
+    ASSERT_EQUALS(encodeResult, expected);
+    char charPtr[16] = {1};
+    Simple8bTypeUtil::decodeBinary(encodeResult, charPtr, size);
+    ASSERT_EQUALS(std::memcmp(charPtr, val, size), 0);
+    if (size <= 16) {
+        ASSERT_EQUALS(charPtr[size], 1);
+    }
+}
+
 TEST(Simple8bTypeUtil, EncodeAndDecodePositiveSignedInt) {
     int64_t signedVal = 1;
     uint64_t unsignedVal = Simple8bTypeUtil::encodeInt64(signedVal);
@@ -391,4 +402,45 @@ TEST(Simple8bTypeUtil, Decimal128Min) {
 
 TEST(Simple8bTypeUtil, Decimal128Lowest) {
     assertDecimal128Equal(Decimal128(std::numeric_limits<Decimal128>::lowest()));
+}
+
+TEST(Simple8bTypeUtil, EmptyBinary) {
+    char arr[0];
+    assertBinaryEqual(arr, 0, 0);
+}
+
+TEST(Simple8bTypeUtil, SingleLetterBinary) {
+    char arr[1] = {'a'};
+    assertBinaryEqual(arr, 1, 97);
+}
+
+TEST(Simple8bTypeUtil, MultiLetterBinary) {
+    // a = 97 = 01100001
+    // b = 98 = 01100010
+    // c = 99 = 01100011
+    // abc = 011000110110001001100001 = 6513249
+    char arr[3] = {'a', 'b', 'c'};
+    assertBinaryEqual(arr, 3, 6513249);
+}
+
+TEST(Simple8bTypeUtil, MultiCharWithOddValues) {
+    char arr[5] = {'a', char(1), '\n'};
+    // a = 97 = 01100001
+    // 1 = 00000001
+    // \n = 00001010
+    // a1\n = 000010100000000101100001 = 655713
+    assertBinaryEqual(arr, 5, 655713);
+}
+
+TEST(Simple8bTypeUtil, LargeChar) {
+    char arr[15] = "abcdefghijklmn";
+    assertBinaryEqual(arr, 15, absl::MakeInt128(0x6E6D6C6B6A69, 0x6867666564636261));
+}
+
+TEST(Simple8bTypeUtil, LeadingAndTrailingZeros) {
+    char arr[7] = {'0', '0', '0', 'a', '0', '0', '0'};
+    // 0 = 48 = 0011000
+    // Our reuslt should be
+    // 00110000 0011000 00110000 1100001 00110000 00110000 00110000
+    assertBinaryEqual(arr, 7, absl::MakeInt128(0, 0x30303061303030));
 }
