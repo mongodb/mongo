@@ -313,12 +313,8 @@ StatusWith<repl::ReadConcernArgs> _extractReadConcern(OperationContext* opCtx,
                     ReadWriteConcernDefaults::get(opCtx->getServiceContext()).getDefault(opCtx);
                 const auto rcDefault = rwcDefaults.getDefaultReadConcern();
                 if (rcDefault) {
-                    const bool isDefaultRCLocalFeatureFlagEnabled =
-                        serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-                        repl::feature_flags::gDefaultRCLocal.isEnabled(
-                            serverGlobalParams.featureCompatibility);
                     const auto readConcernSource = rwcDefaults.getDefaultReadConcernSource();
-                    customDefaultWasApplied = !isDefaultRCLocalFeatureFlagEnabled ||
+                    customDefaultWasApplied =
                         (readConcernSource &&
                          readConcernSource.get() == DefaultReadConcernSourceEnum::kGlobal);
 

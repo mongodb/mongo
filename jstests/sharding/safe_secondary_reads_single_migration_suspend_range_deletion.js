@@ -27,7 +27,6 @@
 "use strict";
 
 load('jstests/libs/profiler.js');
-load('jstests/replsets/rslib.js');  // For isDefaultReadConcernLocalFlagEnabled.
 load('jstests/sharding/libs/last_lts_mongos_commands.js');
 
 let db = "test";
@@ -543,50 +542,21 @@ for (let command of commands) {
                                   commandProfile)
         });
 
-        if (isDefaultReadConcernLocalFlagEnabled(st.s)) {
-            // Check that the donor shard secondary then returned stale shardVersion for the request
-            // that did not specify read concern, so used the implicit default of local.
-            profilerHasSingleMatchingEntryOrThrow({
-                profileDB: donorShardSecondary.getDB(db),
-                filter: Object.extend({
-                    "command.shardVersion": {"$exists": true},
-                    "command.$readPreference": {"mode": "secondary"},
-                    "$or": [
-                        {"command.readConcern": {"$exists": false}},
-                        {"command.readConcern.provenance": "implicitDefault"},
-                    ],
-                    "errCode": ErrorCodes.StaleConfig,
-                },
-                                      commandProfile)
-            });
-        } else {
-            profilerHasSingleMatchingEntryOrThrow({
-                profileDB: donorShardSecondary.getDB(db),
-                filter: Object.extend({
-                    "command.shardVersion": {"$exists": true},
-                    "command.$readPreference": {"mode": "secondary"},
-                    "$or": [
-                        {"command.readConcern": {"$exists": false}},
-                        {"command.readConcern": {"provenance": "implicitDefault"}},
-                    ],
-                    "errCode": {"$ne": ErrorCodes.StaleConfig},
-                },
-                                      commandProfile)
-            });
-
-            // Check that the donor shard secondary then returned stale shardVersion for the request
-            // with local read concern.
-            profilerHasSingleMatchingEntryOrThrow({
-                profileDB: donorShardSecondary.getDB(db),
-                filter: Object.extend({
-                    "command.shardVersion": {"$exists": true},
-                    "command.$readPreference": {"mode": "secondary"},
-                    "command.readConcern": {"level": "local"},
-                    "errCode": ErrorCodes.StaleConfig
-                },
-                                      commandProfile)
-            });
-        }
+        // Check that the donor shard secondary then returned stale shardVersion for the request
+        // that did not specify read concern, so used the implicit default of local.
+        profilerHasSingleMatchingEntryOrThrow({
+            profileDB: donorShardSecondary.getDB(db),
+            filter: Object.extend({
+                "command.shardVersion": {"$exists": true},
+                "command.$readPreference": {"mode": "secondary"},
+                "$or": [
+                    {"command.readConcern": {"$exists": false}},
+                    {"command.readConcern.provenance": "implicitDefault"},
+                ],
+                "errCode": ErrorCodes.StaleConfig,
+            },
+                                  commandProfile)
+        });
 
         // Check that the recipient shard secondary received the request with local read concern
         // and returned success, since the previous command refreshed the metadata.

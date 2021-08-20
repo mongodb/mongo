@@ -23,7 +23,6 @@ var waitForNewlyAddedRemovalForNodeToBeCommitted;
 var assertVoteCount;
 var disconnectSecondaries;
 var reconnectSecondaries;
-var isDefaultReadConcernLocalFlagEnabled;
 
 (function() {
 "use strict";
@@ -831,21 +830,5 @@ reconnectSecondaries = function(rst) {
             }
         }
     }
-};
-
-/**
- * Returns whether featureFlagDefaultReadConcernLocal is enabled. Returns false if the node is
- * running an older version with no knowledge of the flag.
- */
-isDefaultReadConcernLocalFlagEnabled = function(conn) {
-    let res = conn.adminCommand({getParameter: 1, featureFlagDefaultReadConcernLocal: 1});
-    if (!res.ok) {
-        // Running with old version which doesn't have the flag.
-        if (res.errmsg == "no option found to get")
-            return false;
-        assert(false);
-    }
-
-    return res.featureFlagDefaultReadConcernLocal.value;
 };
 }());

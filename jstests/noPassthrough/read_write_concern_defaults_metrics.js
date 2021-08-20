@@ -8,7 +8,6 @@
 "use strict";
 
 load("jstests/libs/ftdc.js");
-load('jstests/replsets/rslib.js');  // For isDefaultReadConcernLocalFlagEnabled.
 
 // Verifies the transaction server status response has the fields that we expect.
 function verifyServerStatus(conn,
@@ -23,16 +22,12 @@ function verifyServerStatus(conn,
     assert.hasFields(res, ["defaultRWConcern"]);
     const defaultsRes = res.defaultRWConcern;
 
-    if (isDefaultReadConcernLocalFlagEnabled(conn)) {
-        assert.hasFields(defaultsRes, ["defaultReadConcernSource"]);
-        if (!expectedRC) {
-            assert.eq("implicit", defaultsRes.defaultReadConcernSource, tojson(defaultsRes));
-            expectedRC = {level: "local"};
-        } else {
-            assert.eq("global", defaultsRes.defaultReadConcernSource, tojson(defaultsRes));
-        }
+    assert.hasFields(defaultsRes, ["defaultReadConcernSource"]);
+    if (!expectedRC) {
+        assert.eq("implicit", defaultsRes.defaultReadConcernSource, tojson(defaultsRes));
+        expectedRC = {level: "local"};
     } else {
-        assert.eq(undefined, defaultsRes.defaultReadConcernSource);
+        assert.eq("global", defaultsRes.defaultReadConcernSource, tojson(defaultsRes));
     }
 
     if (expectedRC) {
