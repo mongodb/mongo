@@ -113,24 +113,24 @@ $ cd build
 $ ccmake .
 ```
 
-*The configuration options can also be viewed in `build_cmake/configs/base.cmake`*.
+*The configuration options can also be viewed in `cmake/configs/base.cmake`*.
 
 ###### Switching between GCC and Clang (POSIX only)
 
-By default CMake will use your default system compiler (`cc`). If you want to use a specific toolchain you can pass a toolchain file! We have provided a toolchain file for both GCC (`build_cmake/toolchains/gcc.cmake`) and Clang (`build_cmake/toolchains/clang.cmake`). To use either toolchain you can pass the `-DCMAKE_TOOLCHAIN_FILE=` to the CMake configuration step. For example:
+By default CMake will use your default system compiler (`cc`). If you want to use a specific toolchain you can pass a toolchain file! We have provided a toolchain file for both GCC (`cmake/toolchains/gcc.cmake`) and Clang (`cmake/toolchains/clang.cmake`). To use either toolchain you can pass the `-DCMAKE_TOOLCHAIN_FILE=` to the CMake configuration step. For example:
 
 *Using the GCC Toolchain*
 
 ```bash
 $ cd build
-$ cmake -DCMAKE_TOOLCHAIN_FILE=../build_cmake/toolchains/gcc.cmake -G Ninja ../.
+$ cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/gcc.cmake -G Ninja ../.
 ```
 
 *Using the Clang Toolchain*
 
 ```bash
 $ cd build
-$ cmake -DCMAKE_TOOLCHAIN_FILE=../build_cmake/toolchains/clang.cmake -G Ninja ../.
+$ cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake -G Ninja ../.
 ```
 
 ### Running WiredTiger C Tests

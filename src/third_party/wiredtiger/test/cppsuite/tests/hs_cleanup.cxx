@@ -62,8 +62,24 @@ class hs_cleanup : public test {
         while (tc->running()) {
             tc->sleep();
 
-            if (tc->next(cursor) != 0)
-                continue;
+            auto ret = cursor->next(cursor.get());
+            if (ret != 0) {
+                if (ret == WT_NOTFOUND) {
+                    cursor->reset(cursor.get());
+                    continue;
+                }
+                if (ret == WT_ROLLBACK) {
+                    /*
+                     * As a result of the logic in this test its possible that the previous next
+                     * call can happen outside the context of a transaction. Assert that we are in
+                     * one if we got a rollback.
+                     */
+                    testutil_check(tc->transaction.can_rollback());
+                    tc->transaction.rollback();
+                    continue;
+                }
+                testutil_die(ret, "Unexpected error returned from cursor->next()");
+            }
 
             testutil_check(cursor->get_key(cursor.get(), &key_tmp));
 
@@ -75,14 +91,17 @@ class hs_cleanup : public test {
              * API doesn't guarantee our buffer will still be valid once it is called, as such we
              * copy the buffer and then pass it into the API.
              */
-            if (!tc->update(cursor, coll.id, key_value_t(key_tmp)))
-                continue;
+            bool rollback_required = tc->update(cursor, coll.id, key_value_t(key_tmp));
 
             /* Commit our transaction. */
-            tc->transaction.try_commit();
+            if (!rollback_required && tc->transaction.can_commit())
+                rollback_required = tc->transaction.commit();
+
+            if (rollback_required)
+                tc->transaction.rollback();
         }
         /* Ensure our last transaction is resolved. */
         if (tc->transaction.active())
-            tc->transaction.commit();
+            tc->transaction.rollback();
     }
 };

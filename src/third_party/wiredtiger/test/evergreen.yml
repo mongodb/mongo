@@ -116,7 +116,7 @@ functions:
             mkdir -p cmake_build
             cd cmake_build
             $CMAKE \
-            ${posix_configure_flags|-DCMAKE_TOOLCHAIN_FILE=../build_cmake/toolchains/mongodbtoolchain_v3_gcc.cmake -DCMAKE_C_FLAGS="-ggdb" -DHAVE_DIAGNOSTIC=1 -DENABLE_PYTHON=1 -DENABLE_ZLIB=1 -DENABLE_STATIC=1 -DENABLE_STRICT=1 -DCMAKE_INSTALL_PREFIX=$(pwd)/LOCAL_INSTALL} -G "${cmake_generator|Ninja}" ./..
+            ${posix_configure_flags|-DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_v3_gcc.cmake -DCMAKE_C_FLAGS="-ggdb" -DHAVE_DIAGNOSTIC=1 -DENABLE_PYTHON=1 -DENABLE_ZLIB=1 -DENABLE_STATIC=1 -DENABLE_STRICT=1 -DCMAKE_INSTALL_PREFIX=$(pwd)/LOCAL_INSTALL} -G "${cmake_generator|Ninja}" ./..
           fi
         elif [ "$OS" != "Windows_NT" ]; then
           # Compiling with Autoconf/Libtool.
@@ -2623,7 +2623,20 @@ tasks:
             virtualenv -p python3 venv
             source venv/bin/activate
             pip3 install lorem pymongo
-            ./run_many_coll.sh ../../mongo/build/install/bin/mongod mongodb.log config/many-collection-testing many-collection clean-and-populate
+            ./run_many_coll.sh ../../mongo/build/opt/install/bin/mongod mongodb.log config/many-collection-testing many-collection clean-and-populate
+      - command: shell.exec
+        params:
+          working_dir: mongo-tests/largescale
+          shell: bash
+          silent: true
+          script: |
+            set -o errexit
+            set -o verbose
+            virtualenv -p python3 venv
+            source venv/bin/activate
+            pip3 install "pymongo[srv]"
+            res_dir=`find ./ -type d -name "many-collection-[0-9]*" -print`
+            ./upload-results-atlas.py ${atlas_wt_perf_test_user} ${atlas_wt_perf_pass} wt-perf-tests many-collection-test ${branch_name} $res_dir/results/results.json
 
   - name: cyclomatic-complexity
     commands:
@@ -2689,7 +2702,7 @@ buildvariants:
   - ubuntu1804-test
   expansions:
     test_env_vars: LD_LIBRARY_PATH=$(pwd) WT_BUILDDIR=$(pwd)
-    posix_configure_flags: -DCMAKE_TOOLCHAIN_FILE=../build_cmake/toolchains/mongodbtoolchain_v3_gcc.cmake -DCMAKE_C_FLAGS="-ggdb" -DHAVE_DIAGNOSTIC=1 -DENABLE_PYTHON=1 -DENABLE_ZLIB=1  -DENABLE_SNAPPY=1 -DENABLE_STRICT=1 -DCMAKE_INSTALL_PREFIX=$(pwd)/LOCAL_INSTALL
+    posix_configure_flags: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_v3_gcc.cmake -DCMAKE_C_FLAGS="-ggdb" -DHAVE_DIAGNOSTIC=1 -DENABLE_PYTHON=1 -DENABLE_ZLIB=1  -DENABLE_SNAPPY=1 -DENABLE_STRICT=1 -DCMAKE_INSTALL_PREFIX=$(pwd)/LOCAL_INSTALL
     python_binary: '/opt/mongodbtoolchain/v3/bin/python3'
     smp_command: -j $(echo "`grep -c ^processor /proc/cpuinfo` * 2" | bc)
     cmake_generator: Ninja
@@ -3069,7 +3082,7 @@ buildvariants:
   batchtime: 10080 # 7 days
   expansions:
     test_env_vars: LD_LIBRARY_PATH=$(pwd) WT_BUILDDIR=$(pwd)
-    posix_configure_flags: -DCMAKE_TOOLCHAIN_FILE=../build_cmake/toolchains/mongodbtoolchain_v3_gcc.cmake -DCMAKE_C_FLAGS="-ggdb" -DHAVE_DIAGNOSTIC=1 -DENABLE_PYTHON=1 -DENABLE_ZLIB=1  -DENABLE_SNAPPY=1 -DENABLE_STRICT=1 -DCMAKE_INSTALL_PREFIX=$(pwd)/LOCAL_INSTALL
+    posix_configure_flags: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_v3_gcc.cmake -DCMAKE_C_FLAGS="-ggdb" -DHAVE_DIAGNOSTIC=1 -DENABLE_PYTHON=1 -DENABLE_ZLIB=1  -DENABLE_SNAPPY=1 -DENABLE_STRICT=1 -DCMAKE_INSTALL_PREFIX=$(pwd)/LOCAL_INSTALL
     python_binary: '/opt/mongodbtoolchain/v3/bin/python3'
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     cmake_generator: Ninja
@@ -3108,7 +3121,7 @@ buildvariants:
   batchtime: 10080 # 7 days
   expansions:
     test_env_vars: LD_LIBRARY_PATH=$(pwd) WT_BUILDDIR=$(pwd)
-    posix_configure_flags: -DCMAKE_TOOLCHAIN_FILE=../build_cmake/toolchains/mongodbtoolchain_v3_gcc.cmake -DCMAKE_C_FLAGS="-ggdb" -DHAVE_DIAGNOSTIC=1 -DENABLE_PYTHON=1 -DENABLE_ZLIB=1  -DENABLE_SNAPPY=1 -DENABLE_STRICT=1 -DCMAKE_INSTALL_PREFIX=$(pwd)/LOCAL_INSTALL
+    posix_configure_flags: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_v3_gcc.cmake -DCMAKE_C_FLAGS="-ggdb" -DHAVE_DIAGNOSTIC=1 -DENABLE_PYTHON=1 -DENABLE_ZLIB=1  -DENABLE_SNAPPY=1 -DENABLE_STRICT=1 -DCMAKE_INSTALL_PREFIX=$(pwd)/LOCAL_INSTALL
     python_binary: '/opt/mongodbtoolchain/v3/bin/python3'
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     cmake_generator: Ninja

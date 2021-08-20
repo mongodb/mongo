@@ -1189,6 +1189,8 @@ __wt_cursor_init(
             dump_flag = WT_CURSTD_DUMP_PRINT;
         else if (WT_STRING_MATCH("pretty", cval.str, cval.len))
             dump_flag = WT_CURSTD_DUMP_PRETTY;
+        else if (WT_STRING_MATCH("pretty_hex", cval.str, cval.len))
+            dump_flag = WT_CURSTD_DUMP_HEX | WT_CURSTD_DUMP_PRETTY;
         else
             dump_flag = WT_CURSTD_DUMP_HEX;
         F_SET(cursor, dump_flag);

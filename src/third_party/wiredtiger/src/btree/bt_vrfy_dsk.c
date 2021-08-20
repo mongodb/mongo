@@ -249,8 +249,9 @@ __verify_row_key_order_check(WT_SESSION_IMPL *session, WT_ITEM *last, uint32_t l
     ret = WT_ERROR;
     WT_ERR_VRFY(session,
       "the %" PRIu32 " and %" PRIu32 " keys on page at %s are incorrectly sorted: %s, %s",
-      last_cell_num, cell_num, tag, __wt_buf_set_printable(session, last->data, last->size, tmp1),
-      __wt_buf_set_printable(session, current->data, current->size, tmp2));
+      last_cell_num, cell_num, tag,
+      __wt_buf_set_printable(session, last->data, last->size, false, tmp1),
+      __wt_buf_set_printable(session, current->data, current->size, false, tmp2));
 
 err:
     __wt_scr_free(session, &tmp1);

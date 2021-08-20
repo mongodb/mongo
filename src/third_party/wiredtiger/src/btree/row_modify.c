@@ -109,8 +109,8 @@ __wt_row_modify(WT_CURSOR_BTREE *cbt, const WT_ITEM *key, const WT_ITEM *value, 
             upd_entry = &cbt->ins->upd;
 
         if (upd_arg == NULL) {
-            /* Make sure the update can proceed. */
-            WT_ERR(__wt_txn_update_check(session, cbt, old_upd = *upd_entry, &prev_upd_ts));
+            /* Make sure the modify can proceed. */
+            WT_ERR(__wt_txn_modify_check(session, cbt, old_upd = *upd_entry, &prev_upd_ts));
 
             /* Allocate a WT_UPDATE structure and transaction ID. */
             WT_ERR(__wt_upd_alloc(session, value, modify_type, &upd, &upd_size));
@@ -139,6 +139,7 @@ __wt_row_modify(WT_CURSOR_BTREE *cbt, const WT_ITEM *key, const WT_ITEM *value, 
                   upd_arg->next == NULL) ||
                 (upd_arg->type == WT_UPDATE_TOMBSTONE && upd_arg->next != NULL &&
                   upd_arg->next->type == WT_UPDATE_STANDARD && upd_arg->next->next == NULL));
+
             upd_size = __wt_update_list_memsize(upd);
 
             /* If there are existing updates, append them after the new updates. */
@@ -182,7 +183,6 @@ __wt_row_modify(WT_CURSOR_BTREE *cbt, const WT_ITEM *key, const WT_ITEM *value, 
          * slot. That's hard, so we set a flag.
          */
         WT_PAGE_ALLOC_AND_SWAP(session, page, mod->mod_row_insert, ins_headp, page->entries + 1);
-
         ins_slot = F_ISSET(cbt, WT_CBT_SEARCH_SMALLEST) ? page->entries : cbt->slot;
         ins_headp = &mod->mod_row_insert[ins_slot];
 
@@ -218,6 +218,7 @@ __wt_row_modify(WT_CURSOR_BTREE *cbt, const WT_ITEM *key, const WT_ITEM *value, 
                 (upd_arg->type == WT_UPDATE_TOMBSTONE && upd_arg->next != NULL &&
                   upd_arg->next->type == WT_UPDATE_STANDARD && upd_arg->next->next == NULL) ||
                 (upd_arg->type == WT_UPDATE_STANDARD && upd_arg->next == NULL));
+
             upd_size = __wt_update_list_memsize(upd);
         }
 
@@ -250,8 +251,10 @@ __wt_row_modify(WT_CURSOR_BTREE *cbt, const WT_ITEM *key, const WT_ITEM *value, 
 
     inserted_to_update_chain = true;
 
+    /* If the update was successful, add it to the in-memory log. */
     if (logged && modify_type != WT_UPDATE_RESERVE) {
         WT_ERR(__wt_txn_log_op(session, cbt));
+
         /*
          * Set the key in the transaction operation to be used in case this transaction is prepared
          * to retrieve the update corresponding to this operation.
@@ -261,15 +264,23 @@ __wt_row_modify(WT_CURSOR_BTREE *cbt, const WT_ITEM *key, const WT_ITEM *value, 
 
     if (0) {
 err:
-        /*
-         * Remove the update from the current transaction, so we don't try to modify it on rollback.
-         */
+        /* Remove the update from the current transaction, don't try to modify it on rollback. */
         if (logged)
             __wt_txn_unmodify(session);
+
+        /* Free any allocated insert list object. */
         __wt_free(session, ins);
+
         cbt->ins = NULL;
+
+        /* Discard any allocated update, unless we failed after linking it into page memory. */
         if (upd_arg == NULL && !inserted_to_update_chain)
             __wt_free(session, upd);
+
+        /*
+         * When prepending a list of updates to an update chain, we link them together; sever that
+         * link so our callers list doesn't point into page memory.
+         */
         if (last_upd != NULL)
             last_upd->next = NULL;
     }

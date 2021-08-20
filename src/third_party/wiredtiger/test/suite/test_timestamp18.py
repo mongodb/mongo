@@ -41,15 +41,23 @@ from wtscenario import make_scenarios
 class test_timestamp18(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=50MB'
     session_config = 'isolation=snapshot'
+
+    key_format_values = [
+        ('string-row', dict(key_format='S', usestrings=True)),
+        ('column', dict(key_format='r', usestrings=False)),
+    ]
     non_ts_writes = [
         ('insert', dict(delete=False)),
         ('delete', dict(delete=True)),
     ]
-    scenarios = make_scenarios(non_ts_writes)
+    scenarios = make_scenarios(key_format_values, non_ts_writes)
+
+    def get_key(self, i):
+        return str(i) if self.usestrings else i
 
     def test_ts_writes_with_non_ts_write(self):
         uri = 'table:test_timestamp18'
-        self.session.create(uri, 'key_format=S,value_format=S')
+        self.session.create(uri, 'key_format={},value_format=S'.format(self.key_format))
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
         cursor = self.session.open_cursor(uri)
 
@@ -61,17 +69,17 @@ class test_timestamp18(wttest.WiredTigerTestCase):
         # A series of timestamped writes on each key.
         for i in range(1, 10000):
             self.session.begin_transaction()
-            cursor[str(i)] = value1
+            cursor[self.get_key(i)] = value1
             self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
 
         for i in range(1, 10000):
             self.session.begin_transaction()
-            cursor[str(i)] = value2
+            cursor[self.get_key(i)] = value2
             self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(3))
 
         for i in range(1, 10000):
             self.session.begin_transaction()
-            cursor[str(i)] = value3
+            cursor[self.get_key(i)] = value3
             self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(4))
 
         # Add a non-timestamped delete.
@@ -80,10 +88,10 @@ class test_timestamp18(wttest.WiredTigerTestCase):
         for i in range(1, 10000):
             if i % 2 == 0:
                 if self.delete:
-                    cursor.set_key(str(i))
+                    cursor.set_key(self.get_key(i))
                     cursor.remove()
                 else:
-                    cursor[str(i)] = value4
+                    cursor[self.get_key(i)] = value4
 
         self.session.checkpoint()
 
@@ -94,16 +102,16 @@ class test_timestamp18(wttest.WiredTigerTestCase):
                 # invisible.
                 if i % 2 == 0:
                     if self.delete:
-                        cursor.set_key(str(i))
+                        cursor.set_key(self.get_key(i))
                         self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
                     else:
-                        self.assertEqual(cursor[str(i)], value4)
+                        self.assertEqual(cursor[self.get_key(i)], value4)
                 # Otherwise, expect one of the timestamped writes.
                 else:
                     if ts == 2:
-                        self.assertEqual(cursor[str(i)], value1)
+                        self.assertEqual(cursor[self.get_key(i)], value1)
                     elif ts == 3:
-                        self.assertEqual(cursor[str(i)], value2)
+                        self.assertEqual(cursor[self.get_key(i)], value2)
                     else:
-                        self.assertEqual(cursor[str(i)], value3)
+                        self.assertEqual(cursor[self.get_key(i)], value3)
             self.session.rollback_transaction()

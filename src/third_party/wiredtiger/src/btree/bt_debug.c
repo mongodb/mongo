@@ -146,7 +146,7 @@ __debug_item_value(WT_DBG *ds, const char *tag, const void *data_arg, size_t siz
 
     if (session->dump_raw)
         return (ds->f(ds, "\t%s%s{%s}\n", tag == NULL ? "" : tag, tag == NULL ? "" : " ",
-          __wt_buf_set_printable(session, data_arg, size, ds->t1)));
+          __wt_buf_set_printable(session, data_arg, size, false, ds->t1)));
 
     /*
      * If the format is 'S', it's a string and our version of it may not yet be nul-terminated.
@@ -157,7 +157,7 @@ __debug_item_value(WT_DBG *ds, const char *tag, const void *data_arg, size_t siz
         size = ds->t2->size + 1;
     }
     return (ds->f(ds, "\t%s%s{%s}\n", tag == NULL ? "" : tag, tag == NULL ? "" : " ",
-      __wt_buf_set_printable_format(session, data_arg, size, ds->value_format, ds->t1)));
+      __wt_buf_set_printable_format(session, data_arg, size, ds->value_format, false, ds->t1)));
 }
 
 /*

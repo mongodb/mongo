@@ -89,7 +89,7 @@ be corrected.
 
 Consider the following update chain for a user table with btree id 1000 and data store key "AAA":
 
-@plantuml_start{hs_update_chain.png}
+@plantuml_start{hs_update_chain.png }
 @startuml{hs_update_chain.png}
 
 together {

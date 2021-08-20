@@ -28,6 +28,7 @@
 
 from helper import copy_wiredtiger_home
 import wiredtiger, wttest
+from wtscenario import make_scenarios
 
 # test_durable_ts03.py
 #    Check that the checkpoint honors the durable timestamp of updates.
@@ -35,11 +36,17 @@ class test_durable_ts03(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=10MB'
     session_config = 'isolation=snapshot'
 
+    key_format_values = [
+        ('integer-row', dict(key_format='i')),
+        ('column', dict(key_format='r')),
+    ]
+    scenarios = make_scenarios(key_format_values)
+
     def test_durable_ts03(self):
         # Create a table.
         uri = 'table:test_durable_ts03'
         nrows = 3000
-        self.session.create(uri, 'key_format=i,value_format=u')
+        self.session.create(uri, 'key_format={},value_format=u'.format(self.key_format))
         valueA = b"aaaaa" * 100
         valueB = b"bbbbb" * 100
         valueC = b"ccccc" * 100
@@ -51,7 +58,7 @@ class test_durable_ts03(wttest.WiredTigerTestCase):
         # Load the data into the table.
         session = self.conn.open_session(self.session_config)
         cursor = session.open_cursor(uri, None)
-        for i in range(0, nrows):
+        for i in range(1, nrows + 1):
             session.begin_transaction()
             cursor[i] = valueA
             session.commit_transaction('commit_timestamp=' + self.timestamp_str(50))
@@ -65,7 +72,7 @@ class test_durable_ts03(wttest.WiredTigerTestCase):
         # Update all the values within transaction. Commit the transaction with
         # a durable timestamp newer than the stable timestamp.
         cursor = session.open_cursor(uri, None)
-        for i in range(0, nrows):
+        for i in range(1, nrows + 1):
             session.begin_transaction()
             cursor[i] = valueB
             session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(150))
@@ -105,7 +112,7 @@ class test_durable_ts03(wttest.WiredTigerTestCase):
             self.assertEqual(value, valueA)
 
         self.assertEquals(cursor.reset(), 0)
-        for i in range(0, nrows):
+        for i in range(1, nrows + 1):
             session.begin_transaction()
             cursor[i] = valueC
             session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(220))

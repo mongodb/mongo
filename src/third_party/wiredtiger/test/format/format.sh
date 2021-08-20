@@ -20,27 +20,27 @@ usage() {
 	echo "usage: $0 [-aEFRSv] [-b format-binary] [-c config] [-e env-var]"
 	echo "    [-h home] [-j parallel-jobs] [-n total-jobs] [-r live-record-binary] [-t minutes] [format-configuration]"
 	echo
-	echo "    -a           abort/recovery testing (defaults to off)"
+	echo "    -a           add configuration for abort/recovery testing (defaults to off)"
 	echo "    -b binary    format binary (defaults to "./t")"
 	echo "    -c config    format configuration file (defaults to CONFIG.stress)"
-	echo "    -e envvar    Environment variable setting (default to none)"
 	echo "    -E           skip known errors (defaults to off)"
+	echo "    -e envvar    Environment variable setting (default to none)"
 	echo "    -F           quit on first failure (defaults to off)"
 	echo "    -h home      run directory (defaults to .)"
 	echo "    -j parallel  jobs to execute in parallel (defaults to 8)"
 	echo "    -n total     total jobs to execute (defaults to no limit)"
-	echo "    -R           run timing stress split test configurations (defaults to off)"
+	echo "    -R           add configuration for randomized split stress (defaults to none)"
 	echo "    -r binary    record with UndoDB binary (defaults to no recording)"
 	echo "    -S           run smoke-test configurations (defaults to off)"
 	echo "    -t minutes   minutes to run (defaults to no limit)"
 	echo "    -v           verbose output (defaults to off)"
-	echo "    --           separates $name arguments from format arguments"
+	echo "    --           separates $name arguments from additional format arguments"
 
 	exit 1
 }
 
 # Smoke-tests.
-smoke_base_1="data_source=table rows=100000 threads=6 timer=4"
+smoke_base_1="runs.source=table rows=100000 threads=6 timer=4"
 smoke_base_2="$smoke_base_1 leaf_page_max=9 internal_page_max=9"
 smoke_list=(
 	# Three access methods.
@@ -49,14 +49,14 @@ smoke_list=(
 	# "$smoke_base_1 file_type=fix"
 	# "$smoke_base_1 file_type=var"
 
-	# Huffman key/value encoding.
+	# Huffman value encoding.
 	"$smoke_base_1 file_type=row huffman_value=1"
     # Temporarily disabled
 	# "$smoke_base_1 file_type=var huffman_value=1"
 
 	# LSM
     # Temporarily disabled
-	# "$smoke_base_1 file_type=row data_source=lsm"
+	# "$smoke_base_1 file_type=row runs.source=lsm"
 
 	# Force the statistics server.
 	"$smoke_base_1 file_type=row statistics_server=1"
@@ -74,16 +74,16 @@ build=""
 config="CONFIG.stress"
 first_failure=0
 format_args=""
+format_binary="./t"
 home="."
+live_record_binary=""
 minutes=0
 parallel_jobs=8
-live_record_binary=""
 skip_errors=0
 smoke_test=0
-timing_stress_split_test=0
+stress_split_test=0
 total_jobs=0
 verbose=0
-format_binary="./t"
 
 while :; do
 	case "$1" in
@@ -96,12 +96,12 @@ while :; do
 	-c)
 		config="$2"
 		shift ; shift ;;
-	-e)
-		export "$2"
-		shift ; shift ;;
 	-E)
 		skip_errors=1
 		shift ;;
+	-e)
+		export "$2"
+		shift ; shift ;;
 	-F)
 		first_failure=1
 		shift ;;
@@ -123,7 +123,7 @@ while :; do
 		}
 		shift ; shift ;;
 	-R)
-		timing_stress_split_test=1
+		stress_split_test=1
 		shift ;;
         -r)
 		live_record_binary="$2"
@@ -394,7 +394,7 @@ resolve()
 
 			# Everything is a table unless explicitly a file.
 			uri="table:wt"
-			grep 'data_source=file' $dir/CONFIG > /dev/null && uri="file:wt"
+			grep 'runs.source=file' $dir/CONFIG > /dev/null && uri="file:wt"
 
 			# Use the wt utility to recover & verify the object.
 			if  $($wt_binary -m -R -h $dir verify $uri >> $log 2>&1); then
@@ -474,25 +474,21 @@ format()
 	dir="$home/RUNDIR.$count_jobs"
 	log="$dir.log"
 
+	args=""
 	if [[ $smoke_test -ne 0 ]]; then
 		args=${smoke_list[$smoke_next]}
 		smoke_next=$(($smoke_next + 1))
-		echo "$name: starting smoke-test job in $dir ($(date))"
-	elif [[ $timing_stress_split_test -ne 0 ]]; then
-		args=$format_args
-		for k in {1..7}; do
-			args+=" timing_stress_split_$k=$(($RANDOM%2))"
-		done
-		echo "$name: starting timing-stress-split job in $dir ($(date))"
-	else
-		args=$format_args
-
-		# If abort/recovery testing is configured, do it 5% of the time.
-		[[ $abort_test -ne 0 ]] &&
-		    [[ $(($count_jobs % 20)) -eq 0 ]] && args="$args format.abort=1"
-
-		echo "$name: starting job in $dir ($(date))"
 	fi
+	if [[ $abort_test -ne 0 ]]; then
+		args+=" format.abort=1"
+	fi
+	if [[ $stress_split_test -ne 0 ]]; then
+		for k in {1..8}; do
+			args+=" stress_split_$k=$(($RANDOM%2))"
+		done
+	fi
+	args+=" $format_args"
+	echo "$name: starting job in $dir ($(date))"
 
 	# If we're using UndoDB, append our default arguments.
 	#

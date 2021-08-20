@@ -30,7 +30,10 @@ import os, wiredtiger, wttest
 FileSystem = wiredtiger.FileSystem  # easy access to constants
 
 # test_tiered06.py
-#    Test the local storage source.
+#    Test the local storage source's file system implementation.
+# Note that the APIs we are testing are not meant to be used directly
+# by any WiredTiger application, these APIs are used internally.
+# However, it is useful to do tests of this API independently.
 class test_tiered06(wttest.WiredTigerTestCase):
     # Load the local store extension.
     def conn_extensions(self, extlist):
@@ -64,16 +67,26 @@ class test_tiered06(wttest.WiredTigerTestCase):
         # The object doesn't exist yet.
         self.assertFalse(fs.fs_exist(session, 'foobar'))
 
-        fh = fs.fs_open_file(session, 'foobar', FileSystem.open_file_type_data, FileSystem.open_create)
+        # We cannot use the file system to create files, it is readonly.
+        # So use python I/O to build up the file.
+        f = open('foobar', 'wb')
 
-        # Just like a regular file system, the object exists now.
-        self.assertTrue(fs.fs_exist(session, 'foobar'))
+        # The object still doesn't exist yet.
+        self.assertFalse(fs.fs_exist(session, 'foobar'))
 
         outbytes = ('MORE THAN ENOUGH DATA\n'*100000).encode()
-        fh.fh_write(session, 0, outbytes)
+        f.write(outbytes)
+        f.close()
 
-        # The object exists after close
-        fh.close(session)
+        # Nothing is in the directory list until a flush.
+        self.assertEquals(fs.fs_directory_list(session, '', ''), [])
+
+        # Flushing moves the file into the file system
+        local.ss_flush(session, fs, 'foobar', 'foobar', None)
+        local.ss_flush_finish(session, fs, 'foobar', 'foobar', None)
+
+        # The object exists now.
+        self.assertEquals(fs.fs_directory_list(session, '', ''), ['foobar'])
         self.assertTrue(fs.fs_exist(session, 'foobar'))
 
         fh = fs.fs_open_file(session, 'foobar', FileSystem.open_file_type_data, FileSystem.open_readonly)
@@ -90,39 +103,14 @@ class test_tiered06(wttest.WiredTigerTestCase):
         fh.fh_lock(session, False)
         fh.close(session)
 
-        # Nothing is in the directory list until a flush.
-        self.assertEquals(fs.fs_directory_list(session, '', ''), [])
-
-        fh = fs.fs_open_file(session, 'zzz', FileSystem.open_file_type_data, FileSystem.open_create)
-
-        # Sync merely syncs to the local disk.
-        fh.fh_sync(session)
-        fh.close(session)    # zero length
-        self.assertEquals(sorted(fs.fs_directory_list(session, '', '')), [])
-
-        # See that we can rename objects.
-        fs.fs_rename(session, 'zzz', 'yyy', 0)
-        self.assertEquals(sorted(fs.fs_directory_list(session, '', '')), [])
-
-        # See that we can remove objects.
-        fs.fs_remove(session, 'yyy', 0)
-
-        # Nothing is in the directory list until a flush.
-        self.assertEquals(fs.fs_directory_list(session, '', ''), [])
-
-        # Flushing moves the file.
-        local.ss_flush(session, fs, 'foobar', 'foobar', None)
-        local.ss_flush_finish(session, fs, 'foobar', 'foobar', None)
-        self.assertEquals(fs.fs_directory_list(session, '', ''), ['foobar'])
-
         # Files that have been flushed cannot be manipulated.
-        with self.expectedStderrPattern('foobar: rename of flushed file not allowed'):
+        with self.expectedStderrPattern('foobar: rename of file not supported'):
             self.assertRaisesException(wiredtiger.WiredTigerError,
                 lambda: fs.fs_rename(session, 'foobar', 'barfoo', 0))
         self.assertEquals(fs.fs_directory_list(session, '', ''), ['foobar'])
 
         # Files that have been flushed cannot be manipulated through the custom file system.
-        with self.expectedStderrPattern('foobar: remove of flushed file not allowed'):
+        with self.expectedStderrPattern('foobar: remove of file not supported'):
             self.assertRaisesException(wiredtiger.WiredTigerError,
                 lambda: fs.fs_remove(session, 'foobar', 0))
         self.assertEquals(fs.fs_directory_list(session, '', ''), ['foobar'])
@@ -136,14 +124,17 @@ class test_tiered06(wttest.WiredTigerTestCase):
         session = self.session
         local = self.get_local_storage_source()
 
+        cachedir = ("objects_cache")
         os.mkdir("objects")
-        fs = local.ss_customize_file_system(session, "./objects", "Secret", None)
+        os.mkdir("objects_cache")
+        fs = local.ss_customize_file_system(
+            session, "./objects", "Secret", "cache_directory=" + cachedir)
 
         # We call these 4K chunks of data "blocks" for this test, but that doesn't
         # necessarily relate to WT block sizing.
         nblocks = 1000
         block_size = 4096
-        fh = fs.fs_open_file(session, 'abc', FileSystem.open_file_type_data, FileSystem.open_create)
+        f = open('abc', 'wb')
 
         # blocks filled with 'a', etc.
         a_block = ('a' * block_size).encode()
@@ -153,47 +144,63 @@ class test_tiered06(wttest.WiredTigerTestCase):
 
         # write all blocks as 'a', but in reverse order
         for pos in range(file_size - block_size, 0, -block_size):
-            fh.fh_write(session, pos, a_block)
+            f.seek(pos)
+            f.write(a_block)
 
         # write the even blocks as 'b', forwards
         for pos in range(0, file_size, block_size * 2):
-            fh.fh_write(session, pos, b_block)
+            f.seek(pos)
+            f.write(b_block)
 
         # write every third block as 'c', backwards
         for pos in range(file_size - block_size, 0, -block_size * 3):
-            fh.fh_write(session, pos, c_block)
-        fh.close(session)
+            f.seek(pos)
+            f.write(c_block)
+        f.close()
 
-        in_block = bytes(block_size)
-        fh = fs.fs_open_file(session, 'abc', FileSystem.open_file_type_data, FileSystem.open_readonly)
+        # Flushing moves the file into the file system
+        local.ss_flush(session, fs, 'abc', 'abc', None)
+        local.ss_flush_finish(session, fs, 'abc', 'abc', None)
 
-        # Do some spot checks, reading non-sequentially
-        fh.fh_read(session, 500 * block_size, in_block)  # divisible by 2, not 3
-        self.assertEquals(in_block, b_block)
-        fh.fh_read(session, 333 * block_size, in_block)  # divisible by 3, not 2
-        self.assertEquals(in_block, c_block)
-        fh.fh_read(session, 401 * block_size, in_block)  # not divisible by 2 or 3
-        self.assertEquals(in_block, a_block)
+        # Use the file system to open and read the file.
+        # We do this twice, and between iterations, we remove the cached file to make sure
+        # it is copied back from the bucket directory.
+        #
+        # XXX: this uses knowledge of the implementation, but at the current time,
+        # we don't have a way via the API to "age out" a file from the cache.
+        for i in range(0, 2):
+            in_block = bytes(block_size)
+            fh = fs.fs_open_file(session, 'abc', FileSystem.open_file_type_data, FileSystem.open_readonly)
 
-        # Read the whole file, backwards checking to make sure
-        # each block was written correctly.
-        for block_num in range(nblocks - 1, 0, -1):
-            pos = block_num * block_size
-            fh.fh_read(session, pos, in_block)
-            if block_num % 3 == 0:
-                self.assertEquals(in_block, c_block)
-            elif block_num % 2 == 0:
-                self.assertEquals(in_block, b_block)
-            else:
-                self.assertEquals(in_block, a_block)
-        fh.close(session)
+            # Do some spot checks, reading non-sequentially
+            fh.fh_read(session, 500 * block_size, in_block)  # divisible by 2, not 3
+            self.assertEquals(in_block, b_block)
+            fh.fh_read(session, 333 * block_size, in_block)  # divisible by 3, not 2
+            self.assertEquals(in_block, c_block)
+            fh.fh_read(session, 401 * block_size, in_block)  # not divisible by 2 or 3
+            self.assertEquals(in_block, a_block)
+
+            # Read the whole file, backwards checking to make sure
+            # each block was written correctly.
+            for block_num in range(nblocks - 1, 0, -1):
+                pos = block_num * block_size
+                fh.fh_read(session, pos, in_block)
+                if block_num % 3 == 0:
+                    self.assertEquals(in_block, c_block)
+                elif block_num % 2 == 0:
+                    self.assertEquals(in_block, b_block)
+                else:
+                    self.assertEquals(in_block, a_block)
+            fh.close(session)
+            os.remove(os.path.join(cachedir, 'abc'))
+
         local.terminate(session)
 
     def create_with_fs(self, fs, fname):
         session = self.session
-        fh = fs.fs_open_file(session, fname, FileSystem.open_file_type_data, FileSystem.open_create)
-        fh.fh_write(session, 0, 'some stuff'.encode())
-        fh.close(session)
+        f = open(fname, 'wb')
+        f.write('some stuff'.encode())
+        f.close()
 
     objectdir1 = "./objects1"
     objectdir2 = "./objects2"
@@ -298,7 +305,7 @@ class test_tiered06(wttest.WiredTigerTestCase):
         # A flush copies to the cloud, nothing is removed.
         local.ss_flush(session, fs1, 'beagle.wt', 'beagle.wtobj')
         self.check_home(['beagle', 'bird', 'bison', 'bat', 'cat', 'cougar', 'coyote', 'cub'])
-        self.check_dirlist(fs1, '', [])
+        self.check_dirlist(fs1, '', ['beagle'])
         self.check_dirlist(fs2, '', [])
         self.check_caches([], [])
         self.check_objects(['beagle'], [])
@@ -311,7 +318,7 @@ class test_tiered06(wttest.WiredTigerTestCase):
         # It's okay to flush again, nothing changes
         local.ss_flush(session, fs1, 'beagle.wt', 'beagle.wtobj')
         self.check_home(['beagle', 'bird', 'bison', 'bat', 'cat', 'cougar', 'coyote', 'cub'])
-        self.check_dirlist(fs1, '', [])
+        self.check_dirlist(fs1, '', ['beagle'])
         self.check_dirlist(fs2, '', [])
         self.check_caches([], [])
         self.check_objects(['beagle'], [])
@@ -333,13 +340,13 @@ class test_tiered06(wttest.WiredTigerTestCase):
         local.ss_flush_finish(session, fs1, 'bat.wt', 'bat.wtobj')
 
         self.check_home(['bird', 'bison', 'cougar', 'coyote', 'cub'])
-        self.check_dirlist(fs1, '', ['beagle', 'bat'])
-        self.check_dirlist(fs2, '', ['cat'])
+        self.check_dirlist(fs1, '', ['beagle', 'bat', 'bison'])
+        self.check_dirlist(fs2, '', ['cat', 'cub'])
         self.check_caches(['beagle', 'bat'], ['cat'])
         self.check_objects(['beagle', 'bat', 'bison'], ['cat', 'cub'])
 
         # Test directory listing prefixes
-        self.check_dirlist(fs1, '', ['beagle', 'bat'])
+        self.check_dirlist(fs1, '', ['beagle', 'bat', 'bison'])
         self.check_dirlist(fs1, 'ba', ['bat'])
         self.check_dirlist(fs1, 'be', ['beagle'])
         self.check_dirlist(fs1, 'x', [])

@@ -6,7 +6,7 @@
 #  See the file LICENSE for redistribution information
 #
 
-include(build_cmake/helpers.cmake)
+include(cmake/helpers.cmake)
 
 # WiredTiger-related configuration options.
 
@@ -70,6 +70,16 @@ config_bool(
     ENABLE_PYTHON
     "Configure the python API"
     DEFAULT OFF
+)
+
+config_string(
+    PYTHON3_REQUIRED_VERSION
+    "Exact Python version to use when building the Python API. \
+    By default, when this configuration is unset, CMake will preference the \
+    highest python version found to be installed in the users system path. \
+    Expected format of version string: major[.minor[.patch]]"
+    DEFAULT ""
+    DEPENDS "ENABLE_PYTHON"
 )
 
 config_bool(
