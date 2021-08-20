@@ -680,6 +680,37 @@ __wt_txn_tw_stop_visible_all(WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw)
 }
 
 /*
+ * __wt_txn_visible_id_snapshot --
+ *     Is the id visible in terms of the given snapshot?
+ */
+static inline bool
+__wt_txn_visible_id_snapshot(
+  uint64_t id, uint64_t snap_min, uint64_t snap_max, uint64_t *snapshot, uint32_t snapshot_count)
+{
+    bool found;
+
+    /*
+     * WT_ISO_SNAPSHOT, WT_ISO_READ_COMMITTED: the ID is visible if it is not the result of a
+     * concurrent transaction, that is, if was committed before the snapshot was taken.
+     *
+     * The order here is important: anything newer than or equal to the maximum ID we saw when
+     * taking the snapshot should be invisible, even if the snapshot is empty.
+     *
+     * Snapshot data:
+     *	ids >= snap_max not visible,
+     *	ids < snap_min are visible,
+     *	everything else is visible unless it is found in the snapshot.
+     */
+    if (WT_TXNID_LE(snap_max, id))
+        return (false);
+    if (snapshot_count == 0 || WT_TXNID_LT(id, snap_min))
+        return (true);
+
+    WT_BINARY_SEARCH(id, snapshot, snapshot_count, found);
+    return (!found);
+}
+
+/*
  * __txn_visible_id --
  *     Can the current transaction see the given ID?
  */
@@ -687,7 +718,6 @@ static inline bool
 __txn_visible_id(WT_SESSION_IMPL *session, uint64_t id)
 {
     WT_TXN *txn;
-    bool found;
 
     txn = session->txn;
 
@@ -710,20 +740,8 @@ __txn_visible_id(WT_SESSION_IMPL *session, uint64_t id)
     /* Otherwise, we should be called with a snapshot. */
     WT_ASSERT(session, F_ISSET(txn, WT_TXN_HAS_SNAPSHOT) || session->dhandle->checkpoint != NULL);
 
-    /*
-     * WT_ISO_SNAPSHOT, WT_ISO_READ_COMMITTED: the ID is visible if it is not the result of a
-     * concurrent transaction, that is, if was committed before the snapshot was taken.
-     *
-     * The order here is important: anything newer than the maximum ID we saw when taking the
-     * snapshot should be invisible, even if the snapshot is empty.
-     */
-    if (WT_TXNID_LE(txn->snap_max, id))
-        return (false);
-    if (txn->snapshot_count == 0 || WT_TXNID_LT(id, txn->snap_min))
-        return (true);
-
-    WT_BINARY_SEARCH(id, txn->snapshot, txn->snapshot_count, found);
-    return (!found);
+    return (__wt_txn_visible_id_snapshot(
+      id, txn->snap_min, txn->snap_max, txn->snapshot, txn->snapshot_count));
 }
 
 /*
