@@ -62,7 +62,8 @@ class ValidateCommitMessageTest(unittest.TestCase):
             "Revert 'SERVER-8000",
             'Revert "SERVER-90000',
             "Import wiredtiger: 58115abb6fbb3c1cc7bfd087d41a47347bce9a69 from branch mongodb-4.4",
-            "Import tools: 58115abb6fbb3c1cc7bfd087d41a47347bce9a69 from branch mongodb-4.4"
+            "Import tools: 58115abb6fbb3c1cc7bfd087d41a47347bce9a69 from branch mongodb-4.4",
+            'Revert "Import wiredtiger: 58115abb6fbb3c1cc7bfd087d41a47347bce9a69 from branch mongodb-4.4"',
         ]
         api_mock = create_mock_evg_client(interleave_new_format(messages))
 
