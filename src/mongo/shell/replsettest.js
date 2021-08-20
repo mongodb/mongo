@@ -1441,7 +1441,11 @@ var ReplSetTest = function(opts) {
                 assert.commandWorked(
                     self.getPrimary().adminCommand({setFeatureCompatibilityVersion: fcv}));
                 checkFCV(self.getPrimary().getDB("admin"), fcv);
-                print("Fetch the config version from primay since 4.4 downgrade runs a reconfig.");
+
+                // The server has a practice of adding a reconfig as part of upgrade/downgrade logic
+                // in the setFeatureCompatibilityVersion command.
+                print("Fetch the config version from primary since last-lts downgrade might " +
+                      "perform a reconfig.");
                 config.version = self.getReplSetConfigFromNode().version;
             });
         }
