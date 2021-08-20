@@ -874,6 +874,7 @@ Status runAggregate(OperationContext* opCtx,
             APIParameters::get(opCtx),
             opCtx->getWriteConcern(),
             repl::ReadConcernArgs::get(opCtx),
+            ReadPreferenceSetting::get(opCtx),
             cmdObj,
             privileges);
         if (expCtx->tailableMode == TailableModeEnum::kTailable) {

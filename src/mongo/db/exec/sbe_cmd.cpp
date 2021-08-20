@@ -159,6 +159,7 @@ public:
              APIParameters::get(opCtx),
              opCtx->getWriteConcern(),
              repl::ReadConcernArgs::get(opCtx),
+             ReadPreferenceSetting::get(opCtx),
              cmdObj,
              {}});
 

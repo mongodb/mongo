@@ -449,7 +449,7 @@ Status AsyncResultsMerger::_askForNextBatch(WithLock, size_t remoteIndex) {
         getMoreRequest.setMaxTimeMS(
             static_cast<std::int64_t>(durationCount<Milliseconds>(*_awaitDataTimeout)));
     }
-    BSONObj cmdObj = getMoreRequest.toBSON(ReadPreferenceSetting::get(_opCtx).toContainingBSON());
+    BSONObj cmdObj = getMoreRequest.toBSON({});
 
     if (_params.getSessionId()) {
         BSONObjBuilder newCmdBob(std::move(cmdObj));

@@ -32,6 +32,7 @@
 #include <boost/optional.hpp>
 #include <functional>
 
+#include "mongo/client/read_preference.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/user_name.h"
@@ -61,6 +62,7 @@ struct ClientCursorParams {
                        APIParameters apiParameters,
                        WriteConcernOptions writeConcernOptions,
                        repl::ReadConcernArgs readConcernArgs,
+                       ReadPreferenceSetting readPreferenceSetting,
                        BSONObj originatingCommandObj,
                        PrivilegeVector originatingPrivileges)
         : exec(std::move(planExecutor)),
@@ -68,6 +70,7 @@ struct ClientCursorParams {
           apiParameters(std::move(apiParameters)),
           writeConcernOptions(std::move(writeConcernOptions)),
           readConcernArgs(std::move(readConcernArgs)),
+          readPreferenceSetting(std::move(readPreferenceSetting)),
           queryOptions(exec->getCanonicalQuery() ? exec->getCanonicalQuery()->getOptions() : 0),
           originatingCommandObj(originatingCommandObj.getOwned()),
           originatingPrivileges(std::move(originatingPrivileges)) {
@@ -96,6 +99,7 @@ struct ClientCursorParams {
     const APIParameters apiParameters;
     const WriteConcernOptions writeConcernOptions;
     const repl::ReadConcernArgs readConcernArgs;
+    const ReadPreferenceSetting readPreferenceSetting;
     int queryOptions = 0;
     BSONObj originatingCommandObj;
     PrivilegeVector originatingPrivileges;
@@ -152,6 +156,10 @@ public:
 
     repl::ReadConcernArgs getReadConcernArgs() const {
         return _readConcernArgs;
+    }
+
+    ReadPreferenceSetting getReadPreferenceSetting() const {
+        return _readPreferenceSetting;
     }
 
     /**
@@ -366,6 +374,7 @@ private:
     const APIParameters _apiParameters;
     const WriteConcernOptions _writeConcernOptions;
     const repl::ReadConcernArgs _readConcernArgs;
+    const ReadPreferenceSetting _readPreferenceSetting;
 
     // Tracks whether dispose() has been called, to make sure it happens before destruction. It is
     // an error to use a ClientCursor once it has been disposed.
