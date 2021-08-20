@@ -444,6 +444,35 @@ private:
 
 
 /**
+ * RAII-style class to opt out of the ticket acquisition mechanism when acquiring a global lock.
+ *
+ * Operations that acquire the global lock but do not use any storage engine resources are eligible
+ * to skip ticket acquisition. Otherwise, a ticket acquisition is required to prevent throughput
+ * from suffering under high load.
+ */
+class SkipTicketAcquisitionForLock {
+public:
+    SkipTicketAcquisitionForLock(const SkipTicketAcquisitionForLock&) = delete;
+    SkipTicketAcquisitionForLock& operator=(const SkipTicketAcquisitionForLock&) = delete;
+    explicit SkipTicketAcquisitionForLock(OperationContext* opCtx)
+        : _opCtx(opCtx), _shouldAcquireTicket(_opCtx->lockState()->shouldAcquireTicket()) {
+        if (_shouldAcquireTicket) {
+            _opCtx->lockState()->skipAcquireTicket();
+        }
+    }
+
+    ~SkipTicketAcquisitionForLock() {
+        if (_shouldAcquireTicket) {
+            _opCtx->lockState()->setAcquireTicket();
+        }
+    }
+
+private:
+    OperationContext* _opCtx;
+    const bool _shouldAcquireTicket;
+};
+
+/**
  * Retrieves the global lock manager instance.
  */
 LockManager* getGlobalLockManager();

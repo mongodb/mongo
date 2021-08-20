@@ -433,13 +433,18 @@ public:
     }
 
     /**
-     * This will opt out of the ticket mechanism. This should be used sparingly for special purpose
-     * threads, such as FTDC and committing or aborting transactions.
+     * This will opt in or out of the ticket mechanism. This should be used sparingly for special
+     * purpose threads, such as FTDC and committing or aborting prepared transactions.
      */
     void skipAcquireTicket() {
         // Should not hold or wait for the ticket.
         invariant(isNoop() || getClientState() == Locker::ClientState::kInactive);
         _shouldAcquireTicket = false;
+    }
+    void setAcquireTicket() {
+        // Should hold or wait for the ticket.
+        invariant(isNoop() || getClientState() == Locker::ClientState::kInactive);
+        _shouldAcquireTicket = true;
     }
 
     bool shouldAcquireTicket() const {
