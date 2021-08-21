@@ -1560,9 +1560,7 @@ def main(parser_actions, options):  # pylint: disable=too-many-branches,too-many
         host_port = f"localhost:{secret_port}"
         new_config_file = NamedTempFile.create(suffix=".yml", directory="tmp")
         temp_client_files.append(new_config_file)
-        validation_test_data = {
-            "skipValidationOnNamespaceNotFound": True, "allowUncleanShutdowns": True
-        }
+        validation_test_data = {"skipValidationOnNamespaceNotFound": True}
         new_resmoke_config(with_external_server, new_config_file, validation_test_data)
         ret, output = resmoke_client(mongo_repo_root_dir, mongo_path, host_port,
                                      "jstests/hooks/run_validate_collections.js", new_config_file)

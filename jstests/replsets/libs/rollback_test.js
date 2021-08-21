@@ -250,6 +250,11 @@ function RollbackTest(name = "RollbackTest", replSet) {
         rst.nodes.forEach(TwoPhaseDropCollectionTest.waitForAllCollectionDropsToComplete);
 
         const name = rst.name;
+        // We must check counts before we validate since validate fixes counts. We cannot check
+        // counts if unclean shutdowns occur.
+        if (!TestData.allowUncleanShutdowns || !TestData.rollbackShutdowns) {
+            rst.checkCollectionCounts(name);
+        }
         rst.checkOplogs(name);
         rst.checkReplicatedDataHashes(name);
         collectionValidator.validateNodes(rst.nodeList());

@@ -397,7 +397,7 @@ executor:
     shell_options:
       global_vars:
         TestData:
-          skipEnforceFastCountOnValidate: true
+          checkCollectionCounts: true
   - class: CleanEveryN
     n: 20
   fixture:

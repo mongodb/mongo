@@ -1,6 +1,7 @@
 /**
- * Tests that ReplSetTest consistency checks, namely checkDBHashesForReplSet, wait for secondaries
- * to have fully transitioned to SECONDARY state before attempting data reads.
+ * Tests that ReplSetTest consistency checks, namely checkDBHashesForReplSet and
+ * checkCollectionCounts, wait for secondaries to have fully transitioned to SECONDARY state before
+ * attempting data reads.
  */
 (function() {
 "use strict";
@@ -35,9 +36,15 @@ assert.commandWorked(secondary.adminCommand({
     maxTimeMS: kDefaultWaitForFailPointTimeout
 }));
 
-// Turn off the failpoint and immediately proceeed with checking db hashes.
+// Turn off the failpoint and immediately proceeed with collection counts checks.
+jsTestLog("Trying checkCollectionCounts");
 assert.commandWorked(secondary.adminCommand(
     {configureFailPoint: "initialSyncHangBeforeCopyingDatabases", mode: "off"}));
+rst.checkCollectionCounts();
+
+// Restart the node so we can try checkReplicatedDBHashes.
+rst.stop(1);
+rst.start(1, {startClean: true});
 
 // stopSet() will call checkReplicatedDBHashes
 rst.stopSet();

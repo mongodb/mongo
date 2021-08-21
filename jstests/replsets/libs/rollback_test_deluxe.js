@@ -225,6 +225,12 @@ function RollbackTestDeluxe(name = "FiveNodeDoubleRollbackTest", replSet) {
         });
 
         const name = rst.name;
+        // Check collection counts except when unclean shutdowns are allowed, as such a shutdown is
+        // not guaranteed to preserve accurate collection counts. This count check must occur before
+        // collection validation as the validate command will fix incorrect counts.
+        if (!TestData.allowUncleanShutdowns || !TestData.rollbackShutdowns) {
+            rst.checkCollectionCounts(name);
+        }
         rst.checkOplogs(name);
         rst.checkReplicatedDataHashes(name);
         collectionValidator.validateNodes(rst.nodeList());
