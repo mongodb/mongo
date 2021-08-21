@@ -335,7 +335,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
     // Only record doc modifications if they wrote (exclude no-ops). Explains get
     // recorded as if they wrote.
     if (docWasModified || request->explain()) {
-        _specificStats.nModified++;
+        _specificStats.nModified += _params.numStatsForDoc ? _params.numStatsForDoc(newObj) : 1;
     }
 
     return newObj;
@@ -478,7 +478,7 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
         }
 
         // This should be after transformAndUpdate to make sure we actually updated this doc.
-        ++_specificStats.nMatched;
+        _specificStats.nMatched += _params.numStatsForDoc ? _params.numStatsForDoc(newObj) : 1;
 
         // Restore state after modification
 

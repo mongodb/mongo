@@ -42,6 +42,8 @@ class OperationContext;
 class PlanExecutor;
 
 struct DeleteStageParams {
+    using DocumentCounter = std::function<size_t(const BSONObj&)>;
+
     DeleteStageParams()
         : isMulti(false),
           fromMigrate(false),
@@ -84,6 +86,10 @@ struct DeleteStageParams {
     // reaches the removeSaver. However, this is still best effort since the RemoveSaver
     // operates on a different persistence system from the the database storage engine.
     std::unique_ptr<RemoveSaver> removeSaver;
+
+    // Determines how the delete stats should be incremented. Will be incremented by 1 if the
+    // function is empty.
+    DocumentCounter numStatsForDoc;
 };
 
 /**

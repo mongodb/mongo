@@ -67,7 +67,7 @@ bool updateOnlyModifiesMetaField(OperationContext* opCtx,
 BSONObj translateQuery(const BSONObj& query, StringData metaField);
 
 
-/*
+/**
  * Translates the given update on the time-series collection to an update on the time-series
  * collection's underlying buckets collection. Creates and returns a translated UpdateModification
  * where all occurrences of metaField in updateMod are replaced with the literal "meta". Requires
@@ -75,4 +75,9 @@ BSONObj translateQuery(const BSONObj& query, StringData metaField);
  */
 write_ops::UpdateModification translateUpdate(const write_ops::UpdateModification& updateMod,
                                               StringData metaField);
+
+/**
+ * Returns the function to use to count the number of documents updated or deleted.
+ */
+std::function<size_t(const BSONObj&)> numMeasurementsForBucketCounter(StringData timeField);
 }  // namespace mongo::timeseries

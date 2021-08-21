@@ -29,6 +29,7 @@
 
 #include "mongo/db/timeseries/timeseries_update_delete_util.h"
 
+#include "mongo/db/exec/bucket_unpacker.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
@@ -232,5 +233,12 @@ write_ops::UpdateModification translateUpdate(const write_ops::UpdateModificatio
     }
 
     return write_ops::UpdateModification::parseFromClassicUpdate(updateDoc.getObject());
+}
+
+std::function<size_t(const BSONObj&)> numMeasurementsForBucketCounter(StringData timeField) {
+    return [timeField = timeField.toString()](const BSONObj& bucket) {
+        return BucketUnpacker::computeMeasurementCount(
+            bucket.getObjectField("data")[timeField].objsize());
+    };
 }
 }  // namespace mongo::timeseries
