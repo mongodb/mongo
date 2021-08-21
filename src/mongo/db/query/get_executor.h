@@ -30,6 +30,8 @@
 #pragma once
 
 #include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/db/exec/delete.h"
+#include "mongo/db/exec/update_stage.h"
 #include "mongo/db/ops/delete_request_gen.h"
 #include "mongo/db/ops/parsed_delete.h"
 #include "mongo/db/ops/parsed_update.h"
@@ -236,7 +238,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
     OpDebug* opDebug,
     const CollectionPtr* collection,
     ParsedDelete* parsedDelete,
-    boost::optional<ExplainOptions::Verbosity> verbosity);
+    boost::optional<ExplainOptions::Verbosity> verbosity,
+    DeleteStageParams::DocumentCounter&& documentCounter = nullptr);
 
 /**
  * Get a PlanExecutor for an update operation. 'parsedUpdate' describes the query predicate
@@ -262,5 +265,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
     OpDebug* opDebug,
     const CollectionPtr* collection,
     ParsedUpdate* parsedUpdate,
-    boost::optional<ExplainOptions::Verbosity> verbosity);
+    boost::optional<ExplainOptions::Verbosity> verbosity,
+    UpdateStageParams::DocumentCounter&& documentCounter = nullptr);
 }  // namespace mongo

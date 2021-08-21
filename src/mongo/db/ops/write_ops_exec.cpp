@@ -757,6 +757,8 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
         makeCollection(opCtx, ns);
     }
 
+    UpdateStageParams::DocumentCounter documentCounter = nullptr;
+
     if (source == OperationSource::kTimeseriesUpdate) {
         uassert(ErrorCodes::NamespaceNotFound,
                 "Could not find time-series buckets collection for update",
@@ -817,6 +819,9 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
 
         updateRequest->setQuery(timeseries::translateQuery(updateQuery, *metaField));
         updateRequest->setUpdateModification(timeseries::translateUpdate(updateMod, *metaField));
+
+        documentCounter =
+            timeseries::numMeasurementsForBucketCounter(timeseriesOptions->getTimeField());
     }
 
     if (const auto& coll = collection->getCollection()) {
@@ -843,7 +848,8 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
         getExecutorUpdate(&curOp.debug(),
                           collection ? &collection->getCollection() : &CollectionPtr::null,
                           &parsedUpdate,
-                          boost::none /* verbosity */));
+                          boost::none /* verbosity */,
+                          std::move(documentCounter)));
 
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
@@ -1110,6 +1116,8 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
 
     AutoGetCollection collection(opCtx, ns, fixLockModeForSystemDotViewsChanges(ns, MODE_IX));
 
+    DeleteStageParams::DocumentCounter documentCounter = nullptr;
+
     if (source == OperationSource::kTimeseriesDelete) {
         uassert(ErrorCodes::NamespaceNotFound,
                 "Could not find time-series buckets collection for write",
@@ -1146,6 +1154,9 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
         if (auto metaField = timeseriesOptions->getMetaField()) {
             request.setQuery(timeseries::translateQuery(request.getQuery(), *metaField));
         }
+
+        documentCounter =
+            timeseries::numMeasurementsForBucketCounter(timeseriesOptions->getTimeField());
     }
 
     ParsedDelete parsedDelete(opCtx, &request);
@@ -1160,8 +1171,11 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &hangWithLockDuringBatchRemove, opCtx, "hangWithLockDuringBatchRemove");
 
-    auto exec = uassertStatusOK(getExecutorDelete(
-        &curOp.debug(), &collection.getCollection(), &parsedDelete, boost::none /* verbosity */));
+    auto exec = uassertStatusOK(getExecutorDelete(&curOp.debug(),
+                                                  &collection.getCollection(),
+                                                  &parsedDelete,
+                                                  boost::none /* verbosity */,
+                                                  std::move(documentCounter)));
 
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());

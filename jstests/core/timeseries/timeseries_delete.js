@@ -76,6 +76,7 @@ TimeseriesTest.run((insert) => {
 
     // Query on a single field that is the metaField using dot notation.
     testDelete([objA], [], 1, [{q: {[metaFieldName + ".a"]: "A"}, limit: 0}]);
+    testDelete([objA, objA], [], 2, [{q: {[metaFieldName + ".a"]: "A"}, limit: 0}]);
 
     // Compound query on a single field that is the metaField using dot notation.
     testDelete([{[timeFieldName]: ISODate(), [metaFieldName]: {"a": "A", "b": "B"}}], [], 1, [

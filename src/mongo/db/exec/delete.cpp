@@ -209,7 +209,7 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
             return prepareToRetryWSM(id, out);
         }
     }
-    ++_specificStats.docsDeleted;
+    _specificStats.docsDeleted += _params->numStatsForDoc ? _params->numStatsForDoc(bsonObjDoc) : 1;
 
     if (_params->returnDeleted) {
         // After deleting the document, the RecordId associated with this member is invalid.

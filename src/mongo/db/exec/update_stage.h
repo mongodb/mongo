@@ -46,8 +46,17 @@ class OpDebug;
 struct PlanSummaryStats;
 
 struct UpdateStageParams {
-    UpdateStageParams(const UpdateRequest* r, UpdateDriver* d, OpDebug* o)
-        : request(r), driver(d), opDebug(o), canonicalQuery(nullptr) {}
+    using DocumentCounter = std::function<size_t(const BSONObj&)>;
+
+    UpdateStageParams(const UpdateRequest* r,
+                      UpdateDriver* d,
+                      OpDebug* o,
+                      DocumentCounter&& documentCounter = nullptr)
+        : request(r),
+          driver(d),
+          opDebug(o),
+          canonicalQuery(nullptr),
+          numStatsForDoc(std::move(documentCounter)) {}
 
     // Contains update parameters like whether it's a multi update or an upsert. Not owned.
     // Must outlive the UpdateStage.
@@ -62,6 +71,10 @@ struct UpdateStageParams {
 
     // Not owned here.
     CanonicalQuery* canonicalQuery;
+
+    // Determines how the update stats should be incremented. Will be incremented by 1 if the
+    // function is empty.
+    DocumentCounter numStatsForDoc;
 
 private:
     // Default constructor not allowed.
