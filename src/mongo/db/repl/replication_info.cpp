@@ -250,13 +250,21 @@ boost::optional<Milliseconds> handleHelloFailPoint(const BSONObj& args, const BS
 
 // Sleep implementation outside the fail point handler itself to avoid the problem that
 // processing a fail point will block its state.
-void sleepForDurationOrUntilShutdown(Milliseconds sleep) {
+void sleepHelloForDurationOrUntilShutdown(Milliseconds sleep) {
     while (sleep > Milliseconds(0) && !globalInShutdownDeprecated()) {
         auto nextSleep = std::min(sleep, Milliseconds(1000));
         try {
             sleepmillis(nextSleep.count());
             sleep -= nextSleep;
         } catch (...) {
+            break;
+        }
+        bool stillEnabled = false;
+        MONGO_FAIL_POINT_BLOCK(waitInHello, customArgs) {
+            stillEnabled = true;
+        }
+        if (!stillEnabled) {
+            log() << "Fail point Hello was turned off";
             break;
         }
     }
@@ -298,7 +306,7 @@ public:
             sleepTimeout = handleHelloFailPoint(customArgs.getData(), cmdObj);
         }
         if (MONGO_unlikely(sleepTimeout)) {
-            sleepForDurationOrUntilShutdown(*sleepTimeout);
+            sleepHelloForDurationOrUntilShutdown(*sleepTimeout);
         }
 
         /* currently request to arbiter is (somewhat arbitrarily) an ismaster request that is not

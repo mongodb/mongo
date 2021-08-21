@@ -35,15 +35,19 @@ const allHosts = cfg.members.map(x => x.host);
 const mongosDB = mongos.getDB(kDbName);
 const primaryOnly = [primary.name];
 
-function configureReplSetFailpoint(name, modeValue) {
+function configureReplSetFailpoint(name, modeValue, extraData = undefined) {
+    let data = {
+        shouldCheckForInterrupt: true,
+        nss: kDbName + ".test",
+    };
+    if (extraData) {
+        data = Object.assign({}, data, extraData);
+    }
     st.rs0.nodes.forEach(function(node) {
         assert.commandWorked(node.getDB("admin").runCommand({
             configureFailPoint: name,
             mode: modeValue,
-            data: {
-                shouldCheckForInterrupt: true,
-                nss: kDbName + ".test",
-            },
+            data: data,
         }));
     });
 }
@@ -85,7 +89,7 @@ function hasConnPoolStats(args) {
     function checkStats(res, host) {
         var stats = res.hosts[host];
         if (!stats) {
-            jsTestLog("Connection stats for " + host + " are absent");
+            jsTestLog("Connection stats for " + host + " are absent in: " + tojson(res));
             return isAbsent;
         }
 
@@ -184,7 +188,7 @@ runSubTest("MaxConnecting", function() {
         ShardingTaskExecutorPoolMaxConnecting: maxPending1,
     });
 
-    configureReplSetFailpoint("waitInHello", "alwaysOn");
+    configureReplSetFailpoint("waitInHello", "alwaysOn", {delay: 10000});
     configureReplSetFailpoint("waitInFindBeforeMakingBatch", "alwaysOn");
     dropConnections();
 
@@ -242,7 +246,7 @@ runSubTest("Timeouts", function() {
     hasConnPoolStats({ready: conns});
 
     // Block refreshes and wait for the toRefresh timeout
-    configureReplSetFailpoint("waitInHello", "alwaysOn");
+    configureReplSetFailpoint("waitInHello", "alwaysOn", {delay: 100000});
     sleep(toRefreshTimeoutMS);
 
     // Confirm that we're in pending for all of our conns

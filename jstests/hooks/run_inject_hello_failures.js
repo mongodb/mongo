@@ -79,7 +79,10 @@ function injectHelloFail(connection) {
     assert.commandWorked(adminDB.runCommand({
         configureFailPoint: 'waitInHello',
         mode: "alwaysOn",
-        data: {internalClient: 1}  // No effect if client is mongo shell.
+        data: {
+            internalClient: 1,  // No effect if client is mongo shell.
+            delay: kInjectedHelloDelayMs
+        }
     }));
     const res = adminDB.runCommand({getParameter: 1, "failpoint.waitInHello": 1});
     assert.commandWorked(res);
