@@ -405,7 +405,8 @@ TEST(Simple8bTypeUtil, Decimal128Lowest) {
 }
 
 TEST(Simple8bTypeUtil, EmptyBinary) {
-    char arr[0];
+    // Array contents are ignored because we are passing zero for 'size'.
+    char arr[1] = {'a'};
     assertBinaryEqual(arr, 0, 0);
 }
 
