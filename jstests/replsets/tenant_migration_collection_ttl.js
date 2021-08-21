@@ -125,12 +125,17 @@ function assertTTLDeleteExpiredDocs(dbName, node) {
 
     hangDuringCollectionClone.wait();
 
-    waitForOneTTLPassAtNode(donorPrimary);
-    waitForOneTTLPassAtNode(recipientPrimary);
+    // On a very slow machine, there is a chance that a TTL cycle happened at the donor before the
+    // recipient cloned the documents. Therefore, these checks are only valid when we are sure the
+    // TTL cycle hasn't occurred yet on the donor.
+    if (getDocumentCount(dbName, donorPrimary) == numDocs) {
+        waitForOneTTLPassAtNode(donorPrimary);
+        waitForOneTTLPassAtNode(recipientPrimary);
 
-    // All documents should expire on the donor but not on the recipient.
-    assertTTLDeleteExpiredDocs(dbName, donorPrimary);
-    assertTTLNotDeleteExpiredDocs(dbName, recipientPrimary);
+        // All documents should expire on the donor but not on the recipient.
+        assertTTLDeleteExpiredDocs(dbName, donorPrimary);
+        assertTTLNotDeleteExpiredDocs(dbName, recipientPrimary);
+    }
 
     hangDuringCollectionClone.off();
 
