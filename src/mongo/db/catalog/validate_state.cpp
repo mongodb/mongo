@@ -55,10 +55,12 @@ ValidateState::ValidateState(OperationContext* opCtx,
                              const NamespaceString& nss,
                              bool background,
                              ValidateOptions options,
+                             RepairMode repairMode,
                              bool turnOnExtraLoggingForTest)
     : _nss(nss),
       _background(background),
       _options(options),
+      _repairMode(repairMode),
       _dataThrottle(opCtx),
       _extraLoggingForTest(turnOnExtraLoggingForTest) {
 
@@ -87,6 +89,11 @@ ValidateState::ValidateState(OperationContext* opCtx,
 
         uasserted(ErrorCodes::NamespaceNotFound,
                   str::stream() << "Collection '" << _nss << "' does not exist to validate.");
+    }
+
+    // RepairMode is incompatible with the background mode.
+    if (shouldRunRepair()) {
+        invariant(!isBackground());
     }
 
     _uuid = _collection->uuid();

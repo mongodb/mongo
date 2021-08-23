@@ -60,6 +60,17 @@ inline bool operator&(ValidateOptions lhs, ValidateOptions rhs) {
 }
 
 /**
+ * RepairMode indicates whether validate should repair the data inconsistencies it detects. When set
+ * to kRepair, if any repairs are made, the 'repaired' flag in ValidateResults will be set to true.
+ * If all errors are fixed, then 'valid' will also be set to true. kRepair is incompatible with the
+ * background mode.
+ */
+enum class RepairMode {
+    kNone,
+    kRepair,
+};
+
+/**
  * Expects the caller to hold no locks.
  *
  * Background validation does not support any type of full validation above.
@@ -74,6 +85,7 @@ Status validate(OperationContext* opCtx,
                 const NamespaceString& nss,
                 ValidateOptions options,
                 bool background,
+                RepairMode repairMode,
                 ValidateResults* results,
                 BSONObjBuilder* output,
                 bool turnOnExtraLoggingForTest = false);

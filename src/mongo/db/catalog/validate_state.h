@@ -63,6 +63,7 @@ public:
                   const NamespaceString& nss,
                   bool background,
                   ValidateOptions options,
+                  RepairMode repairMode,
                   bool turnOnExtraLoggingForTest = false);
 
     const NamespaceString& nss() const {
@@ -79,6 +80,10 @@ public:
 
     bool isFullIndexValidation() const {
         return (_options & ValidateOptions::kFullIndexValidation);
+    }
+
+    bool shouldRunRepair() const {
+        return _repairMode == RepairMode::kRepair;
     }
 
     const UUID uuid() const {
@@ -187,6 +192,7 @@ private:
     NamespaceString _nss;
     bool _background;
     ValidateOptions _options;
+    RepairMode _repairMode;
     OptionalCollectionUUID _uuid;
 
     boost::optional<ShouldNotConflictWithSecondaryBatchApplicationBlock> _noPBWM;

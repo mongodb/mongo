@@ -106,11 +106,18 @@ protected:
         auto options = (_full) ? CollectionValidation::ValidateOptions::kFullValidation
                                : CollectionValidation::ValidateOptions::kNoFullValidation;
 
+        auto repairMode = CollectionValidation::RepairMode::kNone;
         ValidateResults results;
         BSONObjBuilder output;
 
-        ASSERT_OK(CollectionValidation::validate(
-            &_opCtx, _nss, options, _background, &results, &output, kTurnOnExtraLoggingForTest));
+        ASSERT_OK(CollectionValidation::validate(&_opCtx,
+                                                 _nss,
+                                                 options,
+                                                 _background,
+                                                 repairMode,
+                                                 &results,
+                                                 &output,
+                                                 kTurnOnExtraLoggingForTest));
 
         //  Check if errors are reported if and only if valid is set to false.
         ASSERT_EQ(results.valid, results.errors.empty());
@@ -1211,6 +1218,7 @@ public:
                 _nss,
                 CollectionValidation::ValidateOptions::kFullValidation,
                 _background,
+                CollectionValidation::RepairMode::kNone,
                 &results,
                 &output,
                 kTurnOnExtraLoggingForTest));
@@ -1333,6 +1341,7 @@ public:
                 _nss,
                 CollectionValidation::ValidateOptions::kFullValidation,
                 _background,
+                CollectionValidation::RepairMode::kNone,
                 &results,
                 &output,
                 kTurnOnExtraLoggingForTest));
@@ -1432,6 +1441,7 @@ public:
                 _nss,
                 CollectionValidation::ValidateOptions::kFullValidation,
                 _background,
+                CollectionValidation::RepairMode::kNone,
                 &results,
                 &output,
                 kTurnOnExtraLoggingForTest));
