@@ -2580,6 +2580,17 @@ tasks:
     name: recovery-stress-test-3
     tags: ["stress-test-3", "stress-test-zseries-3"]
 
+  - name: format-abort-recovery-stress-test
+    commands:
+      - command: timeout.update
+        params:
+          exec_timeout_secs: 2500
+      - func: "get project"
+      - func: "compile wiredtiger with builtins"
+      - func: "format test script"
+        vars:
+          format_test_script_args: -a -t 30
+
   - name: many-dhandle-stress-test
     commands:
       - func: "get project"
@@ -2830,6 +2841,7 @@ buildvariants:
     - name: ".stress-test-2"
     - name: ".stress-test-3"
     - name: ".stress-test-4"
+    - name: format-abort-recovery-stress-test
 
 - name: large-scale-tests
   display_name: "Large scale tests"

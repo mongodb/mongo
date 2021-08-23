@@ -974,6 +974,40 @@ err:
 }
 
 /*
+ * __wt_metadata_correct_base_write_gen --
+ *     Update the connection's base write generation from all files in metadata at then end of the
+ *     recovery checkpoint.
+ */
+int
+__wt_metadata_correct_base_write_gen(WT_SESSION_IMPL *session)
+{
+    WT_CURSOR *cursor;
+    WT_DECL_RET;
+    char *config, *uri;
+
+    uri = NULL;
+    WT_RET(__wt_metadata_cursor(session, &cursor));
+    while ((ret = cursor->next(cursor)) == 0) {
+        WT_ERR(cursor->get_key(cursor, &uri));
+
+        if (!WT_PREFIX_MATCH(uri, "file:") && !WT_PREFIX_MATCH(uri, "tiered:"))
+            continue;
+
+        WT_ERR(cursor->get_value(cursor, &config));
+
+        /* Update base write gen to the write gen. */
+        WT_ERR(__wt_metadata_update_base_write_gen(session, config));
+    }
+    WT_ERR_NOTFOUND_OK(ret, false);
+
+err:
+    if (ret != 0 && uri != NULL)
+        __wt_err(session, ret, "unable to correct write gen for %s", uri);
+    WT_TRET(__wt_metadata_cursor_release(session, &cursor));
+    return (ret);
+}
+
+/*
  * __wt_meta_ckptlist_to_meta --
  *     Convert a checkpoint list into its metadata representation.
  */

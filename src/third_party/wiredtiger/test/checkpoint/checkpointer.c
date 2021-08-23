@@ -36,12 +36,26 @@ static int real_checkpointer(void);
 static int verify_consistency(WT_SESSION *, char *);
 
 /*
+ * set_stable --
+ *     Set the stable timestamp from g.ts_stable.
+ */
+static void
+set_stable(void)
+{
+    char buf[128];
+
+    testutil_check(__wt_snprintf(buf, sizeof(buf), "stable_timestamp=%x", g.ts_stable));
+    testutil_check(g.conn->set_timestamp(g.conn, buf));
+}
+
+/*
  * start_checkpoints --
  *     Responsible for creating the checkpoint thread.
  */
 void
 start_checkpoints(void)
 {
+    set_stable();
     testutil_check(__wt_thread_create(NULL, &g.checkpoint_thread, checkpointer, NULL));
     if (g.use_timestamps) {
         testutil_check(__wt_rwlock_init(NULL, &g.clock_lock));
@@ -74,7 +88,6 @@ clock_thread(void *arg)
     WT_SESSION *wt_session;
     WT_SESSION_IMPL *session;
     uint64_t delay;
-    char buf[128];
 
     WT_UNUSED(arg);
 
@@ -85,8 +98,7 @@ clock_thread(void *arg)
     while (g.running) {
         __wt_writelock(session, &g.clock_lock);
         ++g.ts_stable;
-        testutil_check(__wt_snprintf(buf, sizeof(buf), "stable_timestamp=%x", g.ts_stable));
-        testutil_check(g.conn->set_timestamp(g.conn, buf));
+        set_stable();
         if (g.ts_stable % 997 == 0) {
             /*
              * Random value between 6 and 10 seconds.
