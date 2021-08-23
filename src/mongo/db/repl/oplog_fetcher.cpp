@@ -432,8 +432,8 @@ void OplogFetcher::_runQuery(const executor::TaskExecutor::CallbackArgs& callbac
         if (_cursor->isDead()) {
             if (!_cursor->tailable()) {
                 try {
-                    stdx::unique_lock<Latch> lk(_mutex);
                     auto opCtx = cc().makeOperationContext();
+                    stdx::unique_lock<Latch> lk(_mutex);
                     // Wait a little before re-running the aggregation command on the donor's
                     // oplog. We are not actually intending to wait for shutdown here, we use
                     // this as a way to wait while still being able to be interrupted outside of
