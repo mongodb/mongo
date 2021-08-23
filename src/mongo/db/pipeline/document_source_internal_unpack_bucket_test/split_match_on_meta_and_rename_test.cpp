@@ -261,10 +261,16 @@ TEST_F(InternalUnpackBucketSplitMatchOnMetaAndRename, OptimizeSplitsMatchAndMaps
     // $_internalUnpackBucket and merged.
     auto serialized = pipeline->serializeToBson();
     ASSERT_EQ(3u, serialized.size());
-    ASSERT_BSONOBJ_EQ(fromjson("{$match: {$and: [{meta: {$gte: 0}}, {meta: {$lte: 5}}, "
-                               "{$or: [ {'control.min.a': {$_internalExprLte: 4}},"
-                               "{$or: [ {$expr: {$ne: [ {$type: [ \"$control.min.a\" ]},"
-                               "{$type: [ \"$control.max.a\" ]} ]}} ]} ]} ]}}"),
+    ASSERT_BSONOBJ_EQ(fromjson("{$match: {$and: ["
+                               "  {meta: {$gte: 0}},"
+                               "  {meta: {$lte: 5}},"
+                               "  {$or: ["
+                               "  {'control.min.a': {$_internalExprLte: 4}},"
+                               "    {$expr: {$ne: [ {$type: [ \"$control.min.a\" ]},"
+                               "                    {$type: [ \"$control.max.a\" ]}"
+                               "    ]}}"
+                               "  ]}"
+                               "]}}"),
                       serialized[0]);
     ASSERT_BSONOBJ_EQ(unpack, serialized[1]);
     ASSERT_BSONOBJ_EQ(fromjson("{$match: {a: {$lte: 4}}}"), serialized[2]);
@@ -293,8 +299,13 @@ TEST_F(InternalUnpackBucketSplitMatchOnMetaAndRename,
         "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta', "
         "bucketMaxSpanSeconds: 3600}}");
     auto match = fromjson(
-        "{$match: {$and: [{x: {$lte: 1}}, {$or: [{'myMeta.a': "
-        "{$gt: 1}}, {y: {$lt: 1}}]}]}}");
+        "{$match: {$and: ["
+        "  {x: {$lte: 1}},"
+        "  {$or: ["
+        "    {'myMeta.a': {$gt: 1}},"
+        "    {y: {$lt: 1}}"
+        "  ]}"
+        "]}}");
     auto pipeline = Pipeline::parse(makeVector(unpack, match), getExpCtx());
     ASSERT_EQ(2u, pipeline->getSources().size());
 
@@ -304,10 +315,25 @@ TEST_F(InternalUnpackBucketSplitMatchOnMetaAndRename,
     // map the predicate on 'x' to a predicate on the control field.
     auto serialized = pipeline->serializeToBson();
     ASSERT_EQ(3u, serialized.size());
-    ASSERT_BSONOBJ_EQ(fromjson("{$match: {$or: [ {'control.min.x': {$_internalExprLte: 1}},"
-                               "{$or: [ {$expr: {$ne: [ {$type: [ \"$control.min.x\" ]},"
-                               "{$type: [ \"$control.max.x\" ]} ]}} ]} ]}}"),
-                      serialized[0]);
+    auto expected = fromjson(
+        "{$match: {$and: ["
+        // Result of pushing down {x: {$lte: 1}}.
+        "  {$or: ["
+        "    {'control.min.x': {$_internalExprLte: 1}},"
+        "    {$expr: {$ne: [ {$type: [ \"$control.min.x\" ]},"
+        "                    {$type: [ \"$control.max.x\" ]} ]}}"
+        "  ]},"
+        // Result of pushing down {$or ... myMeta.a ... y ...}.
+        "  {$or: ["
+        "    {'meta.a': {$gt: 1}},"
+        "    {$or: ["
+        "      {'control.min.y': {$_internalExprLt: 1}},"
+        "      {$expr: {$ne: [ {$type: [ \"$control.min.y\" ]},"
+        "                      {$type: [ \"$control.max.y\" ]} ]}}"
+        "    ]}"
+        "  ]}"
+        "]}}");
+    ASSERT_BSONOBJ_EQ(expected, serialized[0]);
     ASSERT_BSONOBJ_EQ(unpack, serialized[1]);
     ASSERT_BSONOBJ_EQ(match, serialized[2]);
 }

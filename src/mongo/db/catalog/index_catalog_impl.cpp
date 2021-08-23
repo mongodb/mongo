@@ -582,19 +582,12 @@ Status _checkValidFilterExpressions(const MatchExpression* expression,
             }
             return Status::OK();
         case MatchExpression::GEO:
-            if (timeseriesMetricIndexesFeatureFlagEnabled) {
-                return Status::OK();
-            }
-            return Status(ErrorCodes::CannotCreateIndex,
-                          str::stream() << "Expression not supported in partial index: "
-                                        << expression->debugString());
         case MatchExpression::INTERNAL_BUCKET_GEO_WITHIN:
-            if (timeseriesMetricIndexesFeatureFlagEnabled) {
-                return Status::OK();
-            }
-            return Status(ErrorCodes::CannotCreateIndex,
-                          str::stream() << "Expression not supported in partial index: "
-                                        << expression->debugString());
+        case MatchExpression::INTERNAL_EXPR_EQ:
+        case MatchExpression::INTERNAL_EXPR_LT:
+        case MatchExpression::INTERNAL_EXPR_LTE:
+        case MatchExpression::INTERNAL_EXPR_GT:
+        case MatchExpression::INTERNAL_EXPR_GTE:
         case MatchExpression::MATCH_IN:
             if (timeseriesMetricIndexesFeatureFlagEnabled) {
                 return Status::OK();

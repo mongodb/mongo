@@ -58,6 +58,7 @@
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
+#include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
@@ -511,12 +512,15 @@ std::pair<BSONObj, bool> DocumentSourceInternalUnpackBucket::extractOrBuildProje
 std::unique_ptr<MatchExpression>
 DocumentSourceInternalUnpackBucket::createPredicatesOnBucketLevelField(
     const MatchExpression* matchExpr) const {
-    return BucketSpec::createPredicatesOnBucketLevelField(matchExpr,
-                                                          _bucketUnpacker.bucketSpec(),
-                                                          _bucketMaxSpanSeconds,
-                                                          pExpCtx->collationMatchesDefault,
-                                                          pExpCtx,
-                                                          _assumeNoMixedSchemaData);
+    return BucketSpec::createPredicatesOnBucketLevelField(
+        matchExpr,
+        _bucketUnpacker.bucketSpec(),
+        _bucketMaxSpanSeconds,
+        pExpCtx->collationMatchesDefault,
+        pExpCtx,
+        haveComputedMetaField(),
+        _assumeNoMixedSchemaData,
+        BucketSpec::IneligiblePredicatePolicy::kIgnore);
 }
 
 std::pair<boost::intrusive_ptr<DocumentSourceMatch>, boost::intrusive_ptr<DocumentSourceMatch>>
@@ -645,6 +649,12 @@ DocumentSourceInternalUnpackBucket::rewriteGroupByMinMax(Pipeline::SourceContain
     return {};
 }
 
+bool DocumentSourceInternalUnpackBucket::haveComputedMetaField() const {
+    return _bucketUnpacker.bucketSpec().metaField() &&
+        _bucketUnpacker.bucketSpec().fieldIsComputed(
+            _bucketUnpacker.bucketSpec().metaField().get());
+}
+
 Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimizeAt(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
     invariant(*itr == this);
@@ -655,8 +665,7 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
 
     // Some optimizations may not be safe to do if we have computed the metaField via an $addFields
     // or a computed $project. We won't do those optimizations if 'haveComputedMetaField' is true.
-    bool haveComputedMetaField = _bucketUnpacker.bucketSpec().metaField() &&
-        _bucketUnpacker.bucketSpec().fieldIsComputed(_bucketUnpacker.bucketSpec().metaField().get());
+    bool haveComputedMetaField = this->haveComputedMetaField();
 
     // Before any other rewrites for the current stage, consider reordering with $sort.
     if (auto sortPtr = dynamic_cast<DocumentSourceSort*>(std::next(itr)->get())) {

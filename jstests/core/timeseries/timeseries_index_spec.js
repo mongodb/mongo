@@ -77,20 +77,19 @@ TimeseriesTest.run(() => {
         assert.commandWorked(coll.createIndex({x: 1}));
         verifyAndDropIndex(/*isDowngradeCompatible=*/false);
 
+        assert.commandWorked(coll.createIndex({x: 1}, {partialFilterExpression: {x: {$gt: 5}}}));
+        verifyAndDropIndex(/*isDowngradeCompatible=*/false);
+
         assert.commandWorked(
-            coll.createIndex({x: 1}, {partialFilterExpression: {x: {$type: "number"}}}));
+            coll.createIndex({[timeFieldName]: 1}, {partialFilterExpression: {x: {$gt: 5}}}));
         verifyAndDropIndex(/*isDowngradeCompatible=*/false);
 
-        assert.commandWorked(coll.createIndex({[timeFieldName]: 1},
-                                              {partialFilterExpression: {x: {$type: "number"}}}));
+        assert.commandWorked(
+            coll.createIndex({[metaFieldName]: 1}, {partialFilterExpression: {x: {$gt: 5}}}));
         verifyAndDropIndex(/*isDowngradeCompatible=*/false);
 
-        assert.commandWorked(coll.createIndex({[metaFieldName]: 1},
-                                              {partialFilterExpression: {x: {$type: "number"}}}));
-        verifyAndDropIndex(/*isDowngradeCompatible=*/false);
-
-        assert.commandWorked(coll.createIndex({[metaFieldName]: 1, x: 1},
-                                              {partialFilterExpression: {x: {$type: "number"}}}));
+        assert.commandWorked(
+            coll.createIndex({[metaFieldName]: 1, x: 1}, {partialFilterExpression: {x: {$gt: 5}}}));
         verifyAndDropIndex(/*isDowngradeCompatible=*/false);
     }
 

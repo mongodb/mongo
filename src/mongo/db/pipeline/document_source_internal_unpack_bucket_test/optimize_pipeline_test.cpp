@@ -84,26 +84,45 @@ TEST_F(OptimizePipeline, MetaMatchPushedDown) {
     ASSERT_BSONOBJ_EQ(unpack, serialized[1]);
 }
 
-TEST_F(OptimizePipeline, MixedMatchOnlyControlPredicatesPushedDown) {
+TEST_F(OptimizePipeline, MixedMatchOr) {
     auto unpack = fromjson(
         "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta', "
         "bucketMaxSpanSeconds: 3600}}");
     auto match = fromjson(
-        "{$match: {$and: [{x: {$lte: 1}}, {$or: [{'myMeta.a': "
-        "{$gt: 1}}, {y: {$lt: 1}}]}]}}");
+        "{$match: {$and: ["
+        "  {x: {$lte: 1}},"
+        "  {$or: ["
+        // This $or is mixed: it contains both metadata and metric predicates.
+        "    {'myMeta.a': {$gt: 1}},"
+        "    {y: {$lt: 1}}"
+        "  ]}"
+        "]}}");
     auto pipeline = Pipeline::parse(makeVector(unpack, match), getExpCtx());
     ASSERT_EQ(2u, pipeline->getSources().size());
 
     pipeline->optimizePipeline();
 
-    // We should fail to push down the $match on meta because of the $or clause. We should still be
-    // able to map the predicate on 'x' to a predicate on the control field.
     auto stages = pipeline->writeExplainOps(ExplainOptions::Verbosity::kQueryPlanner);
     ASSERT_EQ(3u, stages.size());
-    ASSERT_BSONOBJ_EQ(fromjson("{$match: {$or: [ {'control.min.x': {$_internalExprLte: 1}},"
-                               "{$expr: {$ne: [ {$type: [ \"$control.min.x\" ]},"
-                               "{$type: [ \"$control.max.x\" ] } ] } } ] }}"),
-                      stages[0].getDocument().toBson());
+    auto expected = fromjson(
+        "{$match: {$and: ["
+        // Result of pushing down {x: {$lte: 1}}.
+        "  {$or: ["
+        "    {'control.min.x': {$_internalExprLte: 1}},"
+        "    {$expr: {$ne: [ {$type: [ \"$control.min.x\" ]},"
+        "                    {$type: [ \"$control.max.x\" ]}"
+        "    ]}}"
+        "  ]},"
+        // Result of pushing down the $or predicate.
+        "  {$or: ["
+        "    {'meta.a': {$gt: 1}},"
+        "    {'control.min.y': {$_internalExprLt: 1}},"
+        "    {$expr: {$ne: [ {$type: [ \"$control.min.y\" ]},"
+        "                    {$type: [ \"$control.max.y\" ]}"
+        "    ]}}"
+        "  ]}"
+        "]}}");
+    ASSERT_BSONOBJ_EQ(expected, stages[0].getDocument().toBson());
     ASSERT_BSONOBJ_EQ(unpack, stages[1].getDocument().toBson());
     ASSERT_BSONOBJ_EQ(match, stages[2].getDocument().toBson());
 }
@@ -113,20 +132,21 @@ TEST_F(OptimizePipeline, MixedMatchOnlyMetaMatchPushedDown) {
         "{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: 'myMeta', "
         "bucketMaxSpanSeconds: 3600}}");
     auto pipeline = Pipeline::parse(
-        makeVector(unpack, fromjson("{$match: {myMeta: {$gte: 0, $lte: 5}, a: {$in: [1, 2, 3]}}}")),
+        makeVector(unpack,
+                   fromjson("{$match: {myMeta: {$gte: 0, $lte: 5}, a: {$type: \"string\"}}}")),
         getExpCtx());
     ASSERT_EQ(2u, pipeline->getSources().size());
 
     pipeline->optimizePipeline();
 
     // We should push down the $match on the metaField but not the predicate on '$a', which is
-    // ineligible because of the $in.
+    // ineligible because of the $type.
     auto serialized = pipeline->serializeToBson();
     ASSERT_EQ(3u, serialized.size());
     ASSERT_BSONOBJ_EQ(fromjson("{$match: {$and: [{meta: {$gte: 0}}, {meta: {$lte: 5}}]}}"),
                       serialized[0]);
     ASSERT_BSONOBJ_EQ(unpack, serialized[1]);
-    ASSERT_BSONOBJ_EQ(fromjson("{$match: {a: {$in: [1, 2, 3]}}}"), serialized[2]);
+    ASSERT_BSONOBJ_EQ(fromjson("{$match: {a: {$type: [ 2 ]}}}"), serialized[2]);
 }
 
 TEST_F(OptimizePipeline, MultipleMatchesPushedDown) {
@@ -242,11 +262,17 @@ TEST_F(OptimizePipeline, SortThenMixedMatchPushedDown) {
     // We should push down both the $sort and parts of the $match.
     auto serialized = pipeline->serializeToBson();
     ASSERT_EQ(4u, serialized.size());
-    ASSERT_BSONOBJ_EQ(fromjson("{$match: {$and: [{meta: {$eq: 'abc'}},"
-                               "{$or: [ {'control.max.a': {$_internalExprGte: 5}},"
-                               "{$or: [ {$expr: {$ne: [ {$type: [ \"$control.min.a\" ]},"
-                               "{$type: [ \"$control.max.a\" ]} ]}} ]} ]} ]}}"),
-                      serialized[0]);
+    auto expected = fromjson(
+        "{$match: {$and: ["
+        "  {meta: {$eq: 'abc'}},"
+        "  {$or: ["
+        "    {'control.max.a': {$_internalExprGte: 5}},"
+        "    {$expr: {$ne: [ {$type: [ \"$control.min.a\" ]},"
+        "                    {$type: [ \"$control.max.a\" ]}"
+        "    ]}}"
+        "  ]}"
+        "]}}");
+    ASSERT_BSONOBJ_EQ(expected, serialized[0]);
     ASSERT_BSONOBJ_EQ(fromjson("{$sort: {meta: -1}}"), serialized[1]);
     ASSERT_BSONOBJ_EQ(unpack, serialized[2]);
     ASSERT_BSONOBJ_EQ(fromjson("{$match: {a: {$gte: 5}}}"), serialized[3]);
@@ -437,7 +463,7 @@ TEST_F(OptimizePipeline, ComputedProjectThenMetaMatchNotPushedDown) {
 
     pipeline->optimizePipeline();
 
-    // We should push down both the project and internalize the remaining project, but we can't
+    // We should both push down the project and internalize the remaining project, but we can't
     // push down the meta match due to the (now invalid) renaming.
     auto serialized = pipeline->serializeToBson();
     ASSERT_EQ(3u, serialized.size());

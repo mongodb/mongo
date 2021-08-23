@@ -2017,8 +2017,8 @@ Status CollectionImpl::prepareForIndexBuild(OperationContext* opCtx,
 
     if (getTimeseriesOptions() && feature_flags::gTimeseriesMetricIndexes.isEnabledAndIgnoreFCV() &&
         serverGlobalParams.featureCompatibility.isFCVUpgradingToOrAlreadyLatest() &&
-        timeseries::doesBucketsIndexIncludeKeyOnMeasurement(*getTimeseriesOptions(),
-                                                            spec->infoObj())) {
+        timeseries::doesBucketsIndexIncludeMeasurement(
+            opCtx, ns(), *getTimeseriesOptions(), spec->infoObj())) {
         invariant(_metadata->timeseriesBucketsMayHaveMixedSchemaData);
         if (*_metadata->timeseriesBucketsMayHaveMixedSchemaData) {
             LOGV2(6057502,

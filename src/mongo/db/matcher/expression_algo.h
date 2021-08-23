@@ -93,9 +93,9 @@ bool isSplittableBy(const MatchExpression& expr, const std::set<std::string>& pa
 bool isIndependentOf(const MatchExpression& expr, const std::set<std::string>& pathSet);
 
 /**
- * Determine if 'expr' is reliant only upon paths rooted in 'roots'.
+ * Determine if 'expr' is reliant only upon paths from 'pathSet'.
  */
-bool isOnlyDependentOn(const MatchExpression& expr, const std::set<std::string>& roots);
+bool isOnlyDependentOn(const MatchExpression& expr, const std::set<std::string>& pathSet);
 
 /**
  * Returns whether the path represented by 'first' is an prefix of the path represented by 'second'.

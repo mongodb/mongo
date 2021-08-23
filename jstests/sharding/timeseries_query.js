@@ -291,14 +291,13 @@ function runQuery(
         expectedShards: [otherShard.shardName]
     });
 
-    // OR queries are currently not re-written. So expect the query to be sent to both the shards,
-    // and do a full collection scan on each shard.
+    // OR queries are rewritten if all their arguments are.
     runQuery({
         query: {$or: [{time: ISODate("2019-11-11")}, {time: ISODate("2019-11-12")}]},
         expectedDocs: 2,
-        expectedShards: [primaryShard.shardName, otherShard.shardName],
-        expectQueryRewrite: false,
-        expectCollScan: true,
+        expectedShards: [primaryShard.shardName],
+        expectQueryRewrite: true,
+        expectCollScan: false,
     });
 
     assert(coll.drop());

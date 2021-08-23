@@ -32,6 +32,8 @@
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 
 #include "mongo/db/index_names.h"
+#include "mongo/db/matcher/expression_algo.h"
+#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
@@ -400,11 +402,13 @@ bool isBucketsIndexSpecCompatibleForDowngrade(const TimeseriesOptions& timeserie
                /*timeseriesMetricIndexesFeatureFlagEnabled=*/false) != boost::none;
 }
 
-bool doesBucketsIndexIncludeKeyOnMeasurement(const TimeseriesOptions& timeseriesOptions,
-                                             const BSONObj& bucketsIndex) {
-    if (!bucketsIndex.hasField(kKeyFieldName)) {
-        return false;
-    }
+bool doesBucketsIndexIncludeMeasurement(OperationContext* opCtx,
+                                        const NamespaceString& bucketNs,
+                                        const TimeseriesOptions& timeseriesOptions,
+                                        const BSONObj& bucketsIndex) {
+    tassert(5916306,
+            str::stream() << "Index spec has no 'key': " << bucketsIndex.toString(),
+            bucketsIndex.hasField(kKeyFieldName));
 
     auto timeField = timeseriesOptions.getTimeField();
     auto metaField = timeseriesOptions.getMetaField();
@@ -413,22 +417,58 @@ bool doesBucketsIndexIncludeKeyOnMeasurement(const TimeseriesOptions& timeseries
         << timeseries::kControlMinFieldNamePrefix << timeField;
     const std::string controlMaxTimeField = str::stream()
         << timeseries::kControlMaxFieldNamePrefix << timeField;
+    static const std::string idField = "_id";
 
-    const BSONObj keyObj = bucketsIndex.getField(kKeyFieldName).Obj();
-    for (const auto& elem : keyObj) {
-        if (elem.fieldNameStringData() == controlMinTimeField ||
-            elem.fieldNameStringData() == controlMaxTimeField) {
-            continue;
+    auto isMeasurementField = [&](StringData name) -> bool {
+        if (name == controlMinTimeField || name == controlMaxTimeField) {
+            return false;
         }
 
         if (metaField) {
-            if (elem.fieldNameStringData() == timeseries::kBucketMetaFieldName ||
-                elem.fieldNameStringData().startsWith(timeseries::kBucketMetaFieldName + ".")) {
-                continue;
+            if (name == timeseries::kBucketMetaFieldName ||
+                name.startsWith(timeseries::kBucketMetaFieldName + ".")) {
+                return false;
             }
         }
 
         return true;
+    };
+
+    // Check index key.
+    const BSONObj keyObj = bucketsIndex.getField(kKeyFieldName).Obj();
+    for (const auto& elem : keyObj) {
+        if (isMeasurementField(elem.fieldNameStringData()))
+            return true;
+    }
+
+    // Check partial filter expression.
+    if (auto filterElem = bucketsIndex[kPartialFilterExpressionFieldName]) {
+        tassert(5916302,
+                str::stream() << "Partial filter expression is not an object: " << filterElem,
+                filterElem.type() == BSONType::Object);
+
+        auto expCtx = make_intrusive<ExpressionContext>(opCtx, nullptr /* collator */, bucketNs);
+
+        MatchExpressionParser::AllowedFeatureSet allowedFeatures =
+            MatchExpressionParser::kDefaultSpecialFeatures;
+
+        // TODO SERVER-53380 convert to tassertStatusOK.
+        auto statusWithFilter = MatchExpressionParser::parse(
+            filterElem.Obj(), expCtx, ExtensionsCallbackNoop{}, allowedFeatures);
+        tassert(5916303,
+                str::stream() << "Partial filter expression failed to parse: "
+                              << statusWithFilter.getStatus(),
+                statusWithFilter.isOK());
+        auto filter = std::move(statusWithFilter.getValue());
+
+        if (!expression::isOnlyDependentOn(*filter,
+                                           {std::string{timeseries::kBucketMetaFieldName},
+                                            controlMinTimeField,
+                                            controlMaxTimeField,
+                                            idField})) {
+            // Partial filter expression depends on a non-time, non-metadata field.
+            return true;
+        }
     }
 
     return false;

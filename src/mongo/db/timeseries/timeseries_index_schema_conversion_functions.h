@@ -77,11 +77,15 @@ bool isBucketsIndexSpecCompatibleForDowngrade(const TimeseriesOptions& timeserie
                                               const BSONObj& bucketsIndex);
 
 /**
- * Returns true if 'bucketsIndex' contains a key on a measurement field, excluding the time field.
- * This is helpful to detect if the 'bucketsIndex' contains a key on a field that was allowed to
- * have mixed-schema data in MongoDB versions < 5.2.
+ * Returns true if 'bucketsIndex' uses a measurement field, excluding the time field. Checks both
+ * the index key and the partialFilterExpression, if present.
+ *
+ * This is helpful to detect if the 'bucketsIndex' relies on a field that was allowed to have
+ * mixed-schema data in MongoDB versions < 5.2.
  */
-bool doesBucketsIndexIncludeKeyOnMeasurement(const TimeseriesOptions& timeseriesOptions,
-                                             const BSONObj& bucketsIndex);
+bool doesBucketsIndexIncludeMeasurement(OperationContext* opCtx,
+                                        const NamespaceString& bucketNs,
+                                        const TimeseriesOptions& timeseriesOptions,
+                                        const BSONObj& bucketsIndex);
 
 }  // namespace mongo::timeseries

@@ -609,18 +609,20 @@ private:
                             // in 5.2 and up. If the user tries to downgrade the cluster to an
                             // earlier version, they must first remove all incompatible secondary
                             // indexes on time-series measurements.
-                            uassert(ErrorCodes::CannotDowngrade,
-                                    str::stream()
-                                        << "Cannot downgrade the cluster when there are secondary "
-                                           "indexes on time-series measurements present. Drop all "
-                                           "secondary indexes on time-series measurements before "
-                                           "downgrading. First detected incompatible index name: '"
-                                        << indexEntry->descriptor()->indexName()
-                                        << "' on collection: '"
-                                        << collection->ns().getTimeseriesViewNamespace() << "'",
-                                    timeseries::isBucketsIndexSpecCompatibleForDowngrade(
-                                        *collection->getTimeseriesOptions(),
-                                        indexEntry->descriptor()->infoObj()));
+                            uassert(
+                                ErrorCodes::CannotDowngrade,
+                                str::stream()
+                                    << "Cannot downgrade the cluster when there are secondary "
+                                       "indexes on time-series measurements present, or when there "
+                                       "are partial indexes on a time-series collection. Drop all "
+                                       "secondary indexes on time-series measurements, and all "
+                                       "partial indexes on time-series collections, before "
+                                       "downgrading. First detected incompatible index name: '"
+                                    << indexEntry->descriptor()->indexName() << "' on collection: '"
+                                    << collection->ns().getTimeseriesViewNamespace() << "'",
+                                timeseries::isBucketsIndexSpecCompatibleForDowngrade(
+                                    *collection->getTimeseriesOptions(),
+                                    indexEntry->descriptor()->infoObj()));
 
                             if (auto filter = indexEntry->getFilterExpression()) {
                                 auto status = IndexCatalogImpl::checkValidFilterExpressions(

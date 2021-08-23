@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/checked_cast.h"
@@ -42,6 +44,7 @@
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/logv2/log.h"
 
 namespace mongo {
 
@@ -133,9 +136,88 @@ bool _isSubsetOf(const ComparisonMatchExpression* lhs, const ComparisonMatchExpr
     }
 }
 
+bool _isSubsetOfInternalExpr(const ComparisonMatchExpressionBase* lhs,
+                             const ComparisonMatchExpressionBase* rhs) {
+    // An expression can only match a subset of the documents matched by another if they are
+    // comparing the same field.
+    if (lhs->path() != rhs->path()) {
+        return false;
+    }
+
+    const BSONElement lhsData = lhs->getData();
+    const BSONElement rhsData = rhs->getData();
+
+    if (!CollatorInterface::collatorsMatch(lhs->getCollator(), rhs->getCollator()) &&
+        CollationIndexKey::isCollatableType(lhsData.type())) {
+        return false;
+    }
+
+    int cmp = lhsData.woCompare(
+        rhsData, BSONElement::ComparisonRules::kConsiderFieldName, rhs->getCollator());
+
+    // Check whether the two expressions are equivalent.
+    if (lhs->matchType() == rhs->matchType() && cmp == 0) {
+        return true;
+    }
+
+    switch (rhs->matchType()) {
+        case MatchExpression::INTERNAL_EXPR_LT:
+        case MatchExpression::INTERNAL_EXPR_LTE:
+            switch (lhs->matchType()) {
+                case MatchExpression::INTERNAL_EXPR_LT:
+                case MatchExpression::INTERNAL_EXPR_LTE:
+                case MatchExpression::INTERNAL_EXPR_EQ:
+                    //
+                    if (rhs->matchType() == MatchExpression::LTE) {
+                        return cmp <= 0;
+                    }
+                    return cmp < 0;
+                default:
+                    return false;
+            }
+        case MatchExpression::INTERNAL_EXPR_GT:
+        case MatchExpression::INTERNAL_EXPR_GTE:
+            switch (lhs->matchType()) {
+                case MatchExpression::INTERNAL_EXPR_GT:
+                case MatchExpression::INTERNAL_EXPR_GTE:
+                case MatchExpression::INTERNAL_EXPR_EQ:
+                    if (rhs->matchType() == MatchExpression::GTE) {
+                        return cmp >= 0;
+                    }
+                    return cmp > 0;
+                default:
+                    return false;
+            }
+        default:
+            return false;
+    }
+}
+
 /**
  * Returns true if the documents matched by 'lhs' are a subset of the documents matched by
  * 'rhs', i.e. a document matched by 'lhs' must also be matched by 'rhs', and false otherwise.
+ *
+ * This overload handles the $_internalExpr family of comparisons.
+ */
+bool _isSubsetOfInternalExpr(const MatchExpression* lhs, const ComparisonMatchExpressionBase* rhs) {
+    // An expression can only match a subset of the documents matched by another if they are
+    // comparing the same field.
+    if (lhs->path() != rhs->path()) {
+        return false;
+    }
+
+    if (ComparisonMatchExpressionBase::isInternalExprComparison(lhs->matchType())) {
+        return _isSubsetOfInternalExpr(static_cast<const ComparisonMatchExpressionBase*>(lhs), rhs);
+    }
+
+    return false;
+}
+
+/**
+ * Returns true if the documents matched by 'lhs' are a subset of the documents matched by
+ * 'rhs', i.e. a document matched by 'lhs' must also be matched by 'rhs', and false otherwise.
+ *
+ * This overload handles comparisons such as $lt, $eq, $gte, but not $_internalExprLt, etc.
  */
 bool _isSubsetOf(const MatchExpression* lhs, const ComparisonMatchExpression* rhs) {
     // An expression can only match a subset of the documents matched by another if they are
@@ -508,6 +590,10 @@ bool isSubsetOf(const MatchExpression* lhs, const MatchExpression* rhs) {
         return _isSubsetOf(lhs, static_cast<const ComparisonMatchExpression*>(rhs));
     }
 
+    if (ComparisonMatchExpressionBase::isInternalExprComparison(rhs->matchType())) {
+        return _isSubsetOfInternalExpr(lhs, static_cast<const ComparisonMatchExpressionBase*>(rhs));
+    }
+
     if (rhs->matchType() == MatchExpression::EXISTS) {
         return _isSubsetOf(lhs, static_cast<const ExistsMatchExpression*>(rhs));
     }
@@ -555,7 +641,7 @@ bool isIndependentOf(const MatchExpression& expr, const std::set<std::string>& p
         });
 }
 
-bool isOnlyDependentOn(const MatchExpression& expr, const std::set<std::string>& roots) {
+bool isOnlyDependentOn(const MatchExpression& expr, const std::set<std::string>& pathSet) {
     // Any expression types that do not have renaming implemented cannot have their independence
     // evaluated here. See applyRenamesToExpression().
     if (!hasOnlyRenameableMatchExpressionChildren(expr)) {
@@ -564,11 +650,11 @@ bool isOnlyDependentOn(const MatchExpression& expr, const std::set<std::string>&
 
     auto depsTracker = DepsTracker{};
     expr.addDependencies(&depsTracker);
-    return std::all_of(
-        depsTracker.fields.begin(), depsTracker.fields.end(), [&roots](auto&& field) {
-            auto fieldRef = FieldRef{field};
-            return !fieldRef.empty() && roots.find(fieldRef.getPart(0).toString()) != roots.end();
+    return std::all_of(depsTracker.fields.begin(), depsTracker.fields.end(), [&](auto&& field) {
+        return std::any_of(pathSet.begin(), pathSet.end(), [&](auto&& path) {
+            return path == field || isPathPrefixOf(path, field);
         });
+    });
 }
 
 std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitMatchExpressionBy(

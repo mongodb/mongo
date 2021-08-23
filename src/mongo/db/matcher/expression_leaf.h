@@ -702,6 +702,10 @@ public:
         return _hasNull;
     }
 
+    bool hasRegex() const {
+        return !_regexes.empty();
+    }
+
     bool hasEmptyArray() const {
         return _hasEmptyArray;
     }

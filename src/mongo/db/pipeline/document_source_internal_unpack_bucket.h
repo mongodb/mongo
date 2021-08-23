@@ -190,6 +190,7 @@ public:
 
 private:
     GetNextResult doGetNext() final;
+    bool haveComputedMetaField() const;
 
     // If buckets contained a mixed type schema along some path, we have to push down special
     // predicates in order to ensure correctness.

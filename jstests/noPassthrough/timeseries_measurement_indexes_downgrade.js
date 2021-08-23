@@ -117,33 +117,33 @@ checkIndexForDowngrade(lastContinuousFCV, true, false);
 
 // Partial indexes are not supported in versions earlier than v5.2.
 assert.commandWorked(
-    coll.createIndex({[timeFieldName]: 1}, {partialFilterExpression: {x: {$type: "number"}}}));
+    coll.createIndex({[timeFieldName]: 1}, {partialFilterExpression: {x: {$gt: 5}}}));
 checkIndexForDowngrade(lastLTSFCV, false, false);
 
 assert.commandWorked(
-    coll.createIndex({[timeFieldName]: 1}, {partialFilterExpression: {x: {$type: "number"}}}));
+    coll.createIndex({[timeFieldName]: 1}, {partialFilterExpression: {x: {$gt: 5}}}));
 checkIndexForDowngrade(lastContinuousFCV, true, false);
 
 assert.commandWorked(
-    coll.createIndex({[metaFieldName]: 1}, {partialFilterExpression: {x: {$type: "number"}}}));
+    coll.createIndex({[metaFieldName]: 1}, {partialFilterExpression: {x: {$gt: 5}}}));
 checkIndexForDowngrade(lastLTSFCV, false, false);
 
 assert.commandWorked(
-    coll.createIndex({[metaFieldName]: 1}, {partialFilterExpression: {x: {$type: "number"}}}));
+    coll.createIndex({[metaFieldName]: 1}, {partialFilterExpression: {x: {$gt: 5}}}));
 checkIndexForDowngrade(lastContinuousFCV, true, false);
 
-assert.commandWorked(coll.createIndex({x: 1}, {partialFilterExpression: {x: {$type: "number"}}}));
+assert.commandWorked(coll.createIndex({x: 1}, {partialFilterExpression: {x: {$gt: 5}}}));
 checkIndexForDowngrade(lastLTSFCV, false, false);
 
-assert.commandWorked(coll.createIndex({x: 1}, {partialFilterExpression: {x: {$type: "number"}}}));
+assert.commandWorked(coll.createIndex({x: 1}, {partialFilterExpression: {x: {$gt: 5}}}));
 checkIndexForDowngrade(lastContinuousFCV, true, false);
 
-assert.commandWorked(coll.createIndex({[metaFieldName]: 1, x: 1},
-                                      {partialFilterExpression: {x: {$type: "number"}}}));
+assert.commandWorked(
+    coll.createIndex({[metaFieldName]: 1, x: 1}, {partialFilterExpression: {x: {$gt: 5}}}));
 checkIndexForDowngrade(lastLTSFCV, false, false);
 
-assert.commandWorked(coll.createIndex({x: 1, [metaFieldName]: 1},
-                                      {partialFilterExpression: {x: {$type: "number"}}}));
+assert.commandWorked(
+    coll.createIndex({x: 1, [metaFieldName]: 1}, {partialFilterExpression: {x: {$gt: 5}}}));
 checkIndexForDowngrade(lastContinuousFCV, true, false);
 
 MongoRunner.stopMongod(conn);

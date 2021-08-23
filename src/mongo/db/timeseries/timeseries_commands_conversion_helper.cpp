@@ -33,6 +33,9 @@
 
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_names.h"
+#include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
@@ -83,12 +86,59 @@ CreateIndexesCommand makeTimeseriesCreateIndexesCommand(OperationContext* opCtx,
             if (elem.fieldNameStringData() == IndexDescriptor::kPartialFilterExprFieldName) {
                 if (feature_flags::gTimeseriesMetricIndexes.isEnabledAndIgnoreFCV() &&
                     serverGlobalParams.featureCompatibility.isFCVUpgradingToOrAlreadyLatest()) {
-                    // Partial indexes are not supported in FCV < 5.2.
                     isBucketsIndexSpecCompatibleForDowngrade = false;
                 } else {
                     uasserted(ErrorCodes::InvalidOptions,
                               "Partial indexes are not supported on time-series collections");
                 }
+
+                uassert(ErrorCodes::CannotCreateIndex,
+                        "Partial indexes on time-series collections require FCV 5.3",
+                        feature_flags::gTimeseriesMetricIndexes.isEnabled(
+                            serverGlobalParams.featureCompatibility));
+                BSONObj pred = elem.Obj();
+
+                // If the createIndexes command specifies a collation for this index, then that
+                // collation affects how we should interpret expressions in the partial filter
+                // ($gt, $lt, etc).
+                if (auto collatorSpec = origIndex[NewIndexSpec::kCollationFieldName]) {
+                    uasserted(
+                        5916300,
+                        std::string{"On a time-series collection, partialFilterExpression and "} +
+                            NewIndexSpec::kCollationFieldName + " arguments are incompatible"_sd);
+                }
+                // Since no collation was specified in the command, we know the index collation will
+                // match the collection's collation.
+                auto collationMatchesDefault = ExpressionContext::CollationMatchesDefault::kYes;
+
+                // Even though the index collation will match the collection's collation, we don't
+                // know whether or not that collation is simple. However, I think we can correctly
+                // rewrite the filter expression without knowing this... Looking up the correct
+                // value would require handling mongos and mongod separately.
+                std::unique_ptr<CollatorInterface> collator{nullptr};
+
+                auto expCtx = make_intrusive<ExpressionContext>(opCtx, std::move(collator), origNs);
+                expCtx->collationMatchesDefault = collationMatchesDefault;
+
+                // partialFilterExpression is evaluated against a collection, so there are no
+                // computed fields.
+                bool haveComputedMetaField = false;
+
+                // As part of building the index, we verify that the collection does not contain
+                // any mixed-schema buckets. So by the time the index is visible to the query
+                // planner, this will be true.
+                bool assumeNoMixedSchemaData = true;
+
+                BSONObj bucketPred =
+                    BucketSpec::pushdownPredicate(expCtx,
+                                                  options,
+                                                  collationMatchesDefault,
+                                                  pred,
+                                                  haveComputedMetaField,
+                                                  assumeNoMixedSchemaData,
+                                                  BucketSpec::IneligiblePredicatePolicy::kError);
+                builder.append(IndexDescriptor::kPartialFilterExprFieldName, bucketPred);
+                continue;
             }
 
             if (elem.fieldNameStringData() == IndexDescriptor::kSparseFieldName) {
@@ -149,6 +199,9 @@ CreateIndexesCommand makeTimeseriesCreateIndexesCommand(OperationContext* opCtx,
                                std::move(bucketsIndexSpecWithStatus.getValue()));
                 continue;
             }
+
+            // Any index option that's not explicitly banned, and not handled specially, we pass
+            // through unchanged.
             builder.append(elem);
         }
 

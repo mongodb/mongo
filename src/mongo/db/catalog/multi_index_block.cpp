@@ -275,7 +275,8 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
             boost::optional<TimeseriesOptions> options = collection->getTimeseriesOptions();
             if (options &&
                 serverGlobalParams.featureCompatibility.isFCVUpgradingToOrAlreadyLatest() &&
-                timeseries::doesBucketsIndexIncludeKeyOnMeasurement(*options, info)) {
+                timeseries::doesBucketsIndexIncludeMeasurement(
+                    opCtx, collection->ns(), *options, info)) {
                 invariant(collection->getTimeseriesBucketsMayHaveMixedSchemaData());
                 _containsIndexBuildOnTimeseriesMeasurement = true;
             }

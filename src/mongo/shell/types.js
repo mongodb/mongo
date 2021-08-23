@@ -276,6 +276,8 @@ Object.extend = function(dst, src, deep) {
                 eval("v = " + tojson(v));
             } else if ("floatApprox" in v) {  // convert NumberLong properly
                 eval("v = " + tojson(v));
+            } else if (v.constructor === Date) {  // convert Date properly
+                eval("v = " + tojson(v));
             } else {
                 v = Object.extend(typeof (v.length) == "number" ? [] : {}, v, true);
             }
