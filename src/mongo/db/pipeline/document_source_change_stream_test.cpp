@@ -4042,6 +4042,21 @@ TEST_F(ChangeStreamRewriteTest, CannotInexactlyRewriteNegatedPredicate) {
     ASSERT_BSONOBJ_EQ(rewrittenPredicate, fromjson("{$nor: [{ts: {$type: [17]}}]}"));
 }
 
+TEST_F(ChangeStreamRewriteTest, DoesNotRewriteUnrequestedField) {
+    // This 'operationType' predicate could be rewritten but will be discarded in this test because
+    // the 'operationType' field is not requested in the call to the 'rewriteFilterForFields()'
+    // function.
+    auto spec = fromjson("{operationType: 'insert', clusterTime: {$type: [17]}}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        getExpCtx(), statusWithMatchExpression.getValue().get(), {"clusterTime", "lsid"});
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(rewrittenPredicate, fromjson("{$and: [{ts: {$type: [17]}}]}"));
+}
+
 TEST_F(ChangeStreamRewriteTest, CanRewriteExprWhenAllFieldsAreRenameable) {
     auto spec = fromjson(
         "{$expr: {$and: [{$eq: [{$tsSecond: '$clusterTime'}, 0]}, {$isNumber: '$lsid'}]}}");
@@ -4122,6 +4137,22 @@ TEST_F(ChangeStreamRewriteTest, CanInexactlyRewriteExprAndWithUnrewritableChild)
     ASSERT_BSONOBJ_EQ(rewrittenPredicate, fromjson("{$expr: {$and: [{$isNumber: ['$lsid']}]}}"));
 }
 
+TEST_F(ChangeStreamRewriteTest, CanInexactlyRewriteExprAndWithUnknownField) {
+    // $expr cannot be split into individual expressions based on dependency analysis, but because
+    // we rewrite the entire tree and discard expressions which we cannot rewrite or which the user
+    // did not request, we are able to produce a correct output expression even when unknown fields
+    // exist.
+    auto spec = fromjson("{$expr: {$and: [{$isNumber: '$lsid'}, {$isArray: '$unknown'}]}}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        getExpCtx(), statusWithMatchExpression.getValue().get(), {"lsid"});
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(rewrittenPredicate, fromjson("{$expr: {$and: [{$isNumber: ['$lsid']}]}}"));
+}
+
 TEST_F(ChangeStreamRewriteTest, CannotRewriteExprOrWithUnrewritableChild) {
     // Note that rewrite of "$$ROOT" without a path is unsupported.
     auto spec = fromjson(
@@ -4142,6 +4173,23 @@ TEST_F(ChangeStreamRewriteTest, CanInexactlyRewriteExprNorWithUnrewritableChild)
     auto spec = fromjson(
         "{$expr: {$and: [{$isNumber: '$clusterTime'},"
         "{$not: {$or: [{$isNumber: '$lsid'}, {$isArray: '$$ROOT'}]}}]}}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        getExpCtx(), statusWithMatchExpression.getValue().get(), {"clusterTime", "lsid"});
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(
+        rewrittenPredicate,
+        fromjson(
+            "{$expr: {$and: [{$isNumber: ['$ts']}, {$not: [{$or: [{$isNumber: ['$lsid']}]}]}]}}"));
+}
+
+TEST_F(ChangeStreamRewriteTest, CanInexactlyRewriteExprNorWithUnknownField) {
+    // Note that rewrite of "$$ROOT" without a path is unsupported.
+    auto spec = fromjson(
+        "{$expr: {$and: [{$isNumber: '$clusterTime'},"
+        "{$not: {$or: [{$isNumber: '$lsid'}, {$isArray: '$unknown'}]}}]}}");
     auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
 
     auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
@@ -4215,6 +4263,22 @@ TEST_F(ChangeStreamRewriteTest, CannotRewriteExprFieldRefWithReassignedCurrentPr
     ASSERT(!rewrittenMatchExpression);
 }
 
+TEST_F(ChangeStreamRewriteTest, DoesNotRewriteUnrequestedFieldInExpr) {
+    // The 'operationType' predicate could be rewritten but will be discarded in this test because
+    // the 'operationType' field is not requested in the call to the 'rewriteFilterForFields()'
+    // function.
+    auto spec = fromjson(
+        "{$expr: {$and: [{$eq: ['$operationType', 'insert']}, {$isNumber: '$clusterTime'}]}}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        getExpCtx(), statusWithMatchExpression.getValue().get(), {"clusterTime", "lsid"});
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(rewrittenPredicate, fromjson("{$expr: {$and: [{$isNumber: ['$ts']}]}}"));
+}
+
 TEST_F(ChangeStreamRewriteTest, CanRewriteEqPredicateOnOperationTypeWithInvalidOperandType) {
     auto statusWithMatchExpression =
         MatchExpressionParser::parse(BSON("operationType" << 1), getExpCtx());
@@ -4240,10 +4304,8 @@ TEST_F(ChangeStreamRewriteTest, CannotRewriteEqPredicateOnOperationTypeWithUnkno
 }
 
 TEST_F(ChangeStreamRewriteTest, CanRewriteEqPredicateOnOperationTypeInsert) {
-    auto statusWithMatchExpression =
-        MatchExpressionParser::parse(BSON("fullDocument.foo" << 1 << "operationType"
-                                                             << "insert"),
-                                     getExpCtx());
+    auto spec = fromjson("{operationType: 'insert'}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
     ASSERT_OK(statusWithMatchExpression.getStatus());
 
     auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
@@ -4251,16 +4313,12 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteEqPredicateOnOperationTypeInsert) {
     ASSERT(rewrittenMatchExpression);
 
     auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
-                      BSON("op" << BSON("$eq"
-                                        << "i")));
+    ASSERT_BSONOBJ_EQ(rewrittenPredicate, fromjson("{op: {$eq: 'i'}}"));
 }
 
 TEST_F(ChangeStreamRewriteTest, CanRewriteEqPredicateOnOperationTypeReplace) {
-    auto statusWithMatchExpression =
-        MatchExpressionParser::parse(BSON("fullDocument.foo" << 1 << "operationType"
-                                                             << "replace"),
-                                     getExpCtx());
+    auto spec = fromjson("{operationType: 'replace'}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
     ASSERT_OK(statusWithMatchExpression.getStatus());
 
     auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
@@ -4273,10 +4331,8 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteEqPredicateOnOperationTypeReplace) {
 }
 
 TEST_F(ChangeStreamRewriteTest, CanRewriteEqPredicateOnOperationTypeDrop) {
-    auto statusWithMatchExpression =
-        MatchExpressionParser::parse(BSON("fullDocument.foo" << 1 << "operationType"
-                                                             << "drop"),
-                                     getExpCtx());
+    auto spec = fromjson("{operationType: 'drop'}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
     ASSERT_OK(statusWithMatchExpression.getStatus());
 
     auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
@@ -4289,10 +4345,8 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteEqPredicateOnOperationTypeDrop) {
 }
 
 TEST_F(ChangeStreamRewriteTest, CanRewriteEqPredicateOnOperationTypeRename) {
-    auto statusWithMatchExpression =
-        MatchExpressionParser::parse(BSON("fullDocument.foo" << 1 << "operationType"
-                                                             << "rename"),
-                                     getExpCtx());
+    auto spec = fromjson("{operationType: 'rename'}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
     ASSERT_OK(statusWithMatchExpression.getStatus());
 
     auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
@@ -4306,10 +4360,8 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteEqPredicateOnOperationTypeRename) {
 }
 
 TEST_F(ChangeStreamRewriteTest, CanRewriteEqPredicateOnOperationTypeDropDatabase) {
-    auto statusWithMatchExpression =
-        MatchExpressionParser::parse(BSON("fullDocument.foo" << 1 << "operationType"
-                                                             << "dropDatabase"),
-                                     getExpCtx());
+    auto spec = fromjson("{operationType: 'dropDatabase'}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
     ASSERT_OK(statusWithMatchExpression.getStatus());
 
     auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(

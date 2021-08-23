@@ -329,6 +329,7 @@ StringMap<AggExpressionRewrite> exprRewriteRegistry = {{"operationType", exprRew
 boost::intrusive_ptr<Expression> rewriteAggExpressionTree(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     boost::intrusive_ptr<Expression> expr,
+    const std::set<std::string>& fields,
     bool allowInexact) {
     tassert(5920001, "Expression required for rewriteAggExpressionTree", expr);
 
@@ -338,7 +339,8 @@ boost::intrusive_ptr<Expression> rewriteAggExpressionTree(
         while (childIt != children.end()) {
             // If inexact rewrites are permitted and any children of an $and cannot be rewritten, we
             // can omit those children without expanding the set of rejected documents.
-            if (auto rewrittenPred = rewriteAggExpressionTree(expCtx, *childIt, allowInexact)) {
+            if (auto rewrittenPred =
+                    rewriteAggExpressionTree(expCtx, *childIt, fields, allowInexact)) {
                 *childIt = rewrittenPred;
                 ++childIt;
             } else if (allowInexact) {
@@ -354,7 +356,8 @@ boost::intrusive_ptr<Expression> rewriteAggExpressionTree(
             // Dropping any children of an $or would expand the set of documents rejected by the
             // filter. There is no valid rewrite of a $or if we cannot rewrite all of its children.
             // It is, however, valid for children of an $or to be inexact.
-            if (auto rewrittenPred = rewriteAggExpressionTree(expCtx, *childIt, allowInexact)) {
+            if (auto rewrittenPred =
+                    rewriteAggExpressionTree(expCtx, *childIt, fields, allowInexact)) {
                 *childIt = rewrittenPred;
             } else {
                 return nullptr;
@@ -373,8 +376,8 @@ boost::intrusive_ptr<Expression> rewriteAggExpressionTree(
             auto& norChildren = norExpr->getChildren();
             auto childIt = norChildren.begin();
             while (childIt != norChildren.end()) {
-                if (auto rewrittenPred =
-                        rewriteAggExpressionTree(expCtx, *childIt, false /* allowInexact */)) {
+                if (auto rewrittenPred = rewriteAggExpressionTree(
+                        expCtx, *childIt, fields, false /* allowInexact */)) {
                     *childIt = rewrittenPred;
                     ++childIt;
                 } else if (allowInexact) {
@@ -387,7 +390,7 @@ boost::intrusive_ptr<Expression> rewriteAggExpressionTree(
         }
 
         if (auto rewrittenPred =
-                rewriteAggExpressionTree(expCtx, notChild, false /* allowInexact */)) {
+                rewriteAggExpressionTree(expCtx, notChild, fields, false /* allowInexact */)) {
             notChild = rewrittenPred;
             return notExpr;
         }
@@ -408,6 +411,11 @@ boost::intrusive_ptr<Expression> rewriteAggExpressionTree(
         // The remaining case is a reference to a field path in the current document.
         tassert(5920002, "Unexpected empty path", fieldExpr->getFieldPath().getPathLength() > 1);
         auto firstPath = fieldExpr->getFieldPathWithoutCurrentPrefix().getFieldName(0).toString();
+
+        // Only attempt to rewrite paths that begin with one of the caller-requested fields.
+        if (fields.find(firstPath) == fields.end()) {
+            return nullptr;
+        }
 
         // Some paths can be rewritten just by renaming the path.
         if (renameRegistry.contains(firstPath)) {
@@ -440,8 +448,8 @@ boost::intrusive_ptr<Expression> rewriteAggExpressionTree(
             if (!*childIt) {
                 // Some expressions have null children, which we leave in place.
                 continue;
-            } else if (auto rewrittenPred =
-                           rewriteAggExpressionTree(expCtx, *childIt, false /* allowInexact */)) {
+            } else if (auto rewrittenPred = rewriteAggExpressionTree(
+                           expCtx, *childIt, fields, false /* allowInexact */)) {
                 *childIt = rewrittenPred;
             } else {
                 return nullptr;
@@ -466,6 +474,7 @@ boost::intrusive_ptr<Expression> rewriteAggExpressionTree(
 std::unique_ptr<MatchExpression> rewriteMatchExpressionTree(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const MatchExpression* root,
+    const std::set<std::string>& fields,
     bool allowInexact) {
     tassert(5687200, "MatchExpression required for rewriteMatchExpressionTree", root);
 
@@ -476,8 +485,8 @@ std::unique_ptr<MatchExpression> rewriteMatchExpressionTree(
                 // If inexact rewrites are permitted and any children of an $and cannot be
                 // rewritten, we can omit those children without expanding the set of rejected
                 // documents.
-                if (auto rewrittenPred =
-                        rewriteMatchExpressionTree(expCtx, root->getChild(i), allowInexact)) {
+                if (auto rewrittenPred = rewriteMatchExpressionTree(
+                        expCtx, root->getChild(i), fields, allowInexact)) {
                     rewrittenAnd->add(std::move(rewrittenPred));
                 } else if (!allowInexact) {
                     return nullptr;
@@ -491,8 +500,8 @@ std::unique_ptr<MatchExpression> rewriteMatchExpressionTree(
                 // Dropping any children of an $or would expand the set of documents rejected by the
                 // filter. There is no valid rewrite of a $or if we cannot rewrite all of its
                 // children. It is, however, valid for children of an $or to be inexact.
-                if (auto rewrittenPred =
-                        rewriteMatchExpressionTree(expCtx, root->getChild(i), allowInexact)) {
+                if (auto rewrittenPred = rewriteMatchExpressionTree(
+                        expCtx, root->getChild(i), fields, allowInexact)) {
                     rewrittenOr->add(std::move(rewrittenPred));
                 } else {
                     return nullptr;
@@ -508,7 +517,7 @@ std::unique_ptr<MatchExpression> rewriteMatchExpressionTree(
             auto rewrittenNor = std::make_unique<NorMatchExpression>();
             for (size_t i = 0; i < root->numChildren(); ++i) {
                 if (auto rewrittenPred = rewriteMatchExpressionTree(
-                        expCtx, root->getChild(i), false /* allowInexact */)) {
+                        expCtx, root->getChild(i), fields, false /* allowInexact */)) {
                     rewrittenNor->add(std::move(rewrittenPred));
                 } else if (!allowInexact) {
                     return nullptr;
@@ -520,7 +529,7 @@ std::unique_ptr<MatchExpression> rewriteMatchExpressionTree(
             // Note that children of a $not _cannot_ be inexact. If predicate P rejects a _subset_
             // of documents, then {$not: P} will incorrectly reject a _superset_ of documents.
             if (auto rewrittenPred = rewriteMatchExpressionTree(
-                    expCtx, root->getChild(0), false /* allowInexact */)) {
+                    expCtx, root->getChild(0), fields, false /* allowInexact */)) {
                 return std::make_unique<NotMatchExpression>(std::move(rewrittenPred));
             }
             return nullptr;
@@ -533,7 +542,8 @@ std::unique_ptr<MatchExpression> rewriteMatchExpressionTree(
                 expCtx.get(), BSON("" << origExprVal).firstElement(), expCtx->variablesParseState);
 
             // Attempt to rewrite the aggregation expression and return a new ExprMatchExpression.
-            if (auto rewrittenExpr = rewriteAggExpressionTree(expCtx, clonedExpr, allowInexact)) {
+            if (auto rewrittenExpr =
+                    rewriteAggExpressionTree(expCtx, clonedExpr, fields, allowInexact)) {
                 return std::make_unique<ExprMatchExpression>(rewrittenExpr, expCtx);
             }
             return nullptr;
@@ -542,6 +552,11 @@ std::unique_ptr<MatchExpression> rewriteMatchExpressionTree(
             if (auto pathME = dynamic_cast<const PathMatchExpression*>(root)) {
                 tassert(5687201, "Unexpected empty path", !pathME->path().empty());
                 auto firstPath = pathME->fieldRef()->getPart(0).toString();
+
+                // Only attempt to rewrite paths that begin with one of the caller-requested fields.
+                if (fields.find(firstPath) == fields.end()) {
+                    return nullptr;
+                }
 
                 // Some paths can be rewritten just by renaming the path.
                 if (renameRegistry.contains(firstPath)) {
@@ -587,14 +602,8 @@ std::unique_ptr<MatchExpression> rewriteFilterForFields(
         }
     }
 
-    // Extract the required fields from the user's original match expression.
-    auto [dsToRewrite, _] = DocumentSourceMatch::splitMatchByModifiedFields(
-        make_intrusive<DocumentSourceMatch>(userMatch->shallowClone(), expCtx),
-        {DocumentSource::GetModPathsReturn::Type::kAllExcept, std::move(fields), {}});
-
-    return !dsToRewrite ? nullptr
-                        : rewriteMatchExpressionTree(
-                              expCtx, dsToRewrite->getMatchExpression(), true /* allowInexact */);
+    // Attempt to rewrite the tree. Predicates on unknown or unrequested fields will be discarded.
+    return rewriteMatchExpressionTree(expCtx, userMatch, fields, true /* allowInexact */);
 }
 }  // namespace change_stream_rewrite
 }  // namespace mongo
