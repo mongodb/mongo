@@ -16,7 +16,11 @@
 (function() {
 "use strict";
 
+load("jstests/aggregation/extras/utils.js");  // For resultsEq.
+
 const dbName = jsTestName();
+// TODO SERVER-59097 - expose $documents and get rid of internal
+// client here
 const writeConcernOptions = {
     writeConcern: {w: "majority"}
 };
@@ -36,6 +40,11 @@ const coll = currDB.documents;
 coll.drop(writeConcernOptions);
 coll.insert({a: 1}, writeConcernOptions);
 
+const lookup_coll = currDB.lookup_coll;
+lookup_coll.drop(writeConcernOptions);
+for (let i = 0; i < 10; i++) {
+    lookup_coll.insert({id_name: i, name: "name_" + i}, writeConcernOptions);
+}
 // $documents given an array of objects.
 const docs = coll.aggregate([{$documents: [{a1: 1}, {a1: 2}]}], writeConcernOptions).toArray();
 
@@ -62,39 +71,106 @@ const docsUnionWith =
                 {
                     $unionWith: {
                         pipeline:
-                            [{$documents: {$map: {input: {$range: [0, 10]}, in : {x: "$$this"}}}}]
+                            [{$documents: {$map: {input: {$range: [0, 5]}, in : {x: "$$this"}}}}]
                     }
                 }
             ],
             writeConcernOptions)
         .toArray();
 
-assert.eq(11, docsUnionWith.length);
-assert.eq(docsUnionWith[0], {a: 13});
-for (let i = 1; i < 11; i++) {
-    assert.eq(docsUnionWith[i], {x: i - 1});
+assert(resultsEq([{a: 13}, {x: 0}, {x: 1}, {x: 2}, {x: 3}, {x: 4}], docsUnionWith));
+
+{  // $documents with const objects inside $unionWith (no "coll").
+    const res = coll.aggregate(
+                        [
+                            {$unionWith: {pipeline: [{$documents: [{xx: 1}, {xx: 2}]}]}},
+                            {$project: {_id: 0}}
+                        ],
+                        writeConcernOptions)
+                    .toArray();
+    assert(resultsEq([{a: 1}, {xx: 1}, {xx: 2}], res));
 }
 
-// $documents with const objects inside $unionWith (no "coll").
-const res = coll.aggregate([{$unionWith: {pipeline: [{$documents: [{xx: 1}, {xx: 2}]}]}}],
-                           writeConcernOptions)
-                .toArray();
-assert.eq(3, res.length);
-assert.eq(res[0]["a"], 1);
-assert.eq(res[1], {xx: 1});
-assert.eq(res[2], {xx: 2});
+{  // $documents with const objects inside $lookup (no "coll", explicit $match).
+    const res = lookup_coll.aggregate([
+                {
+                    $lookup: {
+                        let: {"id_lookup": "$id_name"},
+                        pipeline: [
+                            {$documents: [{xx: 1}, {xx: 2}]},
+                            {
+                                $match:
+                                    {
+                                        $expr:
+                                            {
+                                                $eq:
+                                                    ["$$id_lookup", "$xx"]
+                                            }
+                                    }
+                            }
+                            ],
+                        as: "names"
+                    }
+                },
+                {$match: {"names": {"$ne": []}}},
+                {$project: {_id: 0}}
+            ],
+            writeConcernOptions)
+            .toArray();
+    assert(resultsEq(
+        [
+            {id_name: 1, name: "name_1", names: [{"xx": 1}]},
+            {id_name: 2, name: "name_2", names: [{"xx": 2}]}
+        ],
+        res));
+}
+
+{  // $documents with const objects inside $lookup (no "coll", + localField/foreignField).
+    const res = lookup_coll.aggregate([
+                {
+                    $lookup: {
+                        localField: "id_name",
+                        foreignField: "xx",
+                        pipeline: [
+                            {$documents: [{xx: 1}, {xx: 2}]}
+                        ],
+                        as: "names"
+                    }
+                },
+                {$match: {"names": {"$ne": []}}},
+                {$project: {_id: 0}}
+            ],
+            writeConcernOptions)
+            .toArray();
+    assert(resultsEq(
+        [
+            {id_name: 1, name: "name_1", names: [{"xx": 1}]},
+            {id_name: 2, name: "name_2", names: [{"xx": 2}]}
+        ],
+        res));
+}
 
 // Must fail due to misplaced $document.
 assert.throwsWithCode(() => {
     coll.aggregate([{$project: {a: [{xx: 1}, {xx: 2}]}}, {$documents: [{a: 1}]}],
                    writeConcernOptions);
 }, 40602);
+
 // $unionWith must fail due to no $document
 assert.throwsWithCode(() => {
     coll.aggregate([{$unionWith: {pipeline: [{$project: {a: [{xx: 1}, {xx: 2}]}}]}}],
                    writeConcernOptions);
 }, 9);
 
+// Test that $lookup fails due to no 'from' argument and no $documents stage.
+assert.throwsWithCode(() => {
+    coll.aggregate([{$lookup: {let: {"id_lookup": "$id_name"}, as: "aa", pipeline: [{$project: {a: [{xx: 1}, {xx: 2}]}}]}}],
+        writeConcernOptions);
+}, 9);
+// Test that $lookup fails due to no 'from' argument and no pipeline field.
+assert.throwsWithCode(() => {
+    coll.aggregate([{$lookup: {let : {"id_lookup": "$id_name"}, as: "aa"}}], writeConcernOptions);
+}, 9);
 // Must fail due to $documents producing array of non-objects.
 assert.throwsWithCode(() => {
     coll.aggregate([{$documents: [1, 2, 3]}], writeConcernOptions);

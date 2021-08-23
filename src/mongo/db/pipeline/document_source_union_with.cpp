@@ -88,6 +88,7 @@ void validateUnionWithCollectionlessPipeline(
             "$unionWith stage without explicit collection must have a pipeline with $documents as "
             "first stage",
             pipeline && pipeline->size() > 0 &&
+                // TODO SERVER-59628 replace with constraints check
                 !(*pipeline)[0].getField(DocumentSourceDocuments::kStageName).eoo());
 }
 
