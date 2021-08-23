@@ -8777,7 +8777,7 @@ buildvariants:
     jstestfuzz_concurrent_num_files: 10
     target_resmoke_time: 10
     large_distro_name: rhel62-large
-    burn_in_tag_buildvariants: enterprise-rhel-62-64-bit-majority-read-concern-off enterprise-rhel-62-64-bit-inmem linux-64-duroff
+    burn_in_tag_buildvariants: enterprise-rhel-62-64-bit-majority-read-concern-off enterprise-rhel-62-64-bit-inmem linux-64-duroff enterprise-rhel-62-64-bit-multiversion enterprise-rhel-62-64-bit-store-fam-images-in-side-coll
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -8860,7 +8860,7 @@ buildvariants:
     distros:
     - rhel62-small
 
-- name: enterprise-rhel-62-64-bit-store_fam_images_in_side_coll
+- name: enterprise-rhel-62-64-bit-store-fam-images-in-side-coll
   display_name: "Enterprise RHEL 6.2 (storeFindAndModifyImagesInSideCollection=True)"
   modules:
   - enterprise
@@ -8901,10 +8901,6 @@ buildvariants:
   - name: lint
   - name: lint_fuzzer_sanity_patch
   - name: lint_yaml
-  - name: burn_in_tests_gen
-    distros:
-    - rhel62-large
-  - name: burn_in_tags_gen
   - name: .aggfuzzer
   - name: .aggregation
   - name: audit
@@ -10931,7 +10927,7 @@ buildvariants:
     jstestfuzz_concurrent_num_files: 10
     target_resmoke_time: 10
     large_distro_name: rhel62-large
-    burn_in_tag_buildvariants: enterprise-rhel-62-64-bit-majority-read-concern-off enterprise-rhel-62-64-bit-inmem linux-64-duroff
+    burn_in_tag_buildvariants: enterprise-rhel-62-64-bit-majority-read-concern-off enterprise-rhel-62-64-bit-inmem linux-64-duroff enterprise-rhel-62-64-bit-store-fam-images-in-side-coll
   tasks:
   - name: commit_queue_placeholder
   - name: compile_core_tools_TG
