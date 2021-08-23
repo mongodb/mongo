@@ -1087,7 +1087,7 @@ def get_command(env, node, action):  # pylint: disable=too-many-branches
     # Generate a real CommandAction
     if isinstance(action, SCons.Action.CommandGeneratorAction):
         # pylint: disable=protected-access
-        action = action._generate(tlist, slist, sub_env, 1, executor=executor)
+        action = action._generate(tlist, slist, sub_env, 0, executor=executor)
 
     variables = {}
 
