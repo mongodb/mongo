@@ -28,41 +28,27 @@
  */
 #pragma once
 
-#include "mongo/db/process_health/fault.h"
-
-#include "mongo/db/service_context.h"
-#include "mongo/util/clock_source.h"
-#include "mongo/util/timer.h"
+#include "mongo/db/process_health/health_check_status.h"
 
 namespace mongo {
 namespace process_health {
 
 /**
- * Internal implementation of the Fault class.
- * @see Fault
+ * Tracks the state of one particular fault facet.
+ * The instance is created and deleted by the fault observer when a fault
+ * condition is detected or resolved.
  */
-class FaultImpl : public Fault {
+class FaultFacet {
 public:
-    explicit FaultImpl(ServiceContext* svcCtx);
+    virtual ~FaultFacet() = default;
 
-    ~FaultImpl() override = default;
-
-    // Fault interface.
-
-    UUID getId() const override;
-
-    double getSeverity() const override;
-
-    Milliseconds getActiveFaultDuration() const override;
-
-    Milliseconds getDuration() const override;
-
-    void appendDescription(BSONObjBuilder* builder) const override;
-
-private:
-    ServiceContext* const _svcCtx;
-    const UUID _id = UUID::gen();
-    const Date_t _startTime;
+    /**
+     * The interface used to communicate with the Fault instance that
+     * owns all facets.
+     *
+     * @return HealthCheckStatus
+     */
+    virtual HealthCheckStatus getStatus() const = 0;
 };
 
 }  // namespace process_health

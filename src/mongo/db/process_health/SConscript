@@ -22,9 +22,11 @@ env.CppUnitTest(
     target='fault_base_classes_test',
     source=[
         'fault_impl_test.cpp',
+        'fault_facet_test.cpp',
         'fault_manager_test.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/util/clock_source_mock',
         'fault_manager',
     ],

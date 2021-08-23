@@ -26,44 +26,36 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#pragma once
 
-#include "mongo/db/process_health/fault.h"
-
-#include "mongo/db/service_context.h"
-#include "mongo/util/clock_source.h"
-#include "mongo/util/timer.h"
+#include "mongo/db/process_health/fault_facet.h"
+#include "mongo/db/process_health/fault_facet_mock.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace process_health {
 
-/**
- * Internal implementation of the Fault class.
- * @see Fault
- */
-class FaultImpl : public Fault {
+namespace {
+
+class FaultFacetTest : public unittest::Test {
 public:
-    explicit FaultImpl(ServiceContext* svcCtx);
+    void startMock(FaultFacetMock::MockCallback callback) {
+        _facetMock = std::make_unique<FaultFacetMock>(callback);
+    }
 
-    ~FaultImpl() override = default;
-
-    // Fault interface.
-
-    UUID getId() const override;
-
-    double getSeverity() const override;
-
-    Milliseconds getActiveFaultDuration() const override;
-
-    Milliseconds getDuration() const override;
-
-    void appendDescription(BSONObjBuilder* builder) const override;
+    HealthCheckStatus getStatus() const {
+        return _facetMock->getStatus();
+    }
 
 private:
-    ServiceContext* const _svcCtx;
-    const UUID _id = UUID::gen();
-    const Date_t _startTime;
+    std::unique_ptr<FaultFacetMock> _facetMock;
 };
 
+TEST_F(FaultFacetTest, FacetWithFailure) {
+    startMock([](double* severity) { *severity = 0.5; });
+    auto status = getStatus();
+    ASSERT_APPROX_EQUAL(0.5, status.getSeverity(), 0.001);
+}
+
+}  // namespace
 }  // namespace process_health
 }  // namespace mongo
