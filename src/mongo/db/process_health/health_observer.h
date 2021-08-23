@@ -28,41 +28,25 @@
  */
 #pragma once
 
-#include "mongo/db/process_health/fault.h"
-
-#include "mongo/db/service_context.h"
-#include "mongo/util/clock_source.h"
-#include "mongo/util/timer.h"
 
 namespace mongo {
 namespace process_health {
 
 /**
- * Internal implementation of the Fault class.
- * @see Fault
+ * Interface to conduct periodic health checks.
+ * Every instance of health observer is wired internally to update the state of the FaultManager
+ * when a problem is detected.
  */
-class FaultImpl : public Fault {
+class HealthObserver {
 public:
-    explicit FaultImpl(ServiceContext* svcCtx);
+    virtual ~HealthObserver() = default;
 
-    ~FaultImpl() override = default;
-
-    // Fault interface.
-
-    UUID getId() const override;
-
-    double getSeverity() const override;
-
-    Milliseconds getActiveFaultDuration() const override;
-
-    Milliseconds getDuration() const override;
-
-    void appendDescription(BSONObjBuilder* builder) const override;
-
-private:
-    ServiceContext* const _svcCtx;
-    const UUID _id = UUID::gen();
-    const Date_t _startTime;
+    /**
+     * Triggers health check.
+     * It should be safe to invoke this method arbitrary often, the implementation
+     * should prorate the invocations to avoid DoS.
+     */
+    virtual void periodicCheck() = 0;
 };
 
 }  // namespace process_health

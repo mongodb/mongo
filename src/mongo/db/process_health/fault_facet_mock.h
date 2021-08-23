@@ -28,41 +28,36 @@
  */
 #pragma once
 
-#include "mongo/db/process_health/fault.h"
+#include <functional>
 
-#include "mongo/db/service_context.h"
-#include "mongo/util/clock_source.h"
+#include "mongo/db/process_health/fault_facet.h"
+
+#include "mongo/util/clock_source_mock.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
 namespace process_health {
 
-/**
- * Internal implementation of the Fault class.
- * @see Fault
- */
-class FaultImpl : public Fault {
+class FaultFacetMock : public FaultFacet {
 public:
-    explicit FaultImpl(ServiceContext* svcCtx);
+    // Testing callback to fill up mocked values.
+    using MockCallback = std::function<void(double* severity)>;
 
-    ~FaultImpl() override = default;
+    FaultFacetMock(MockCallback callback) : _callback(callback) {}
 
-    // Fault interface.
+    ~FaultFacetMock() = default;
 
-    UUID getId() const override;
-
-    double getSeverity() const override;
-
-    Milliseconds getActiveFaultDuration() const override;
-
-    Milliseconds getDuration() const override;
-
-    void appendDescription(BSONObjBuilder* builder) const override;
+    HealthCheckStatus getStatus() const override {
+        double severity;
+        _callback(&severity);
+        HealthCheckStatus healthCheckStatus(FaultFacetType::kMock, severity, "Mock facet");
+        return healthCheckStatus;
+    }
 
 private:
-    ServiceContext* const _svcCtx;
-    const UUID _id = UUID::gen();
-    const Date_t _startTime;
+    ClockSourceMock _mockClockSource;
+    const Date_t _startTime = _mockClockSource.now();
+    const MockCallback _callback;
 };
 
 }  // namespace process_health

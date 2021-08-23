@@ -28,41 +28,55 @@
  */
 #pragma once
 
-#include "mongo/db/process_health/fault.h"
+#include <memory>
 
-#include "mongo/db/service_context.h"
-#include "mongo/util/clock_source.h"
-#include "mongo/util/timer.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobjbuilder.h"
 
 namespace mongo {
 namespace process_health {
 
 /**
- * Internal implementation of the Fault class.
- * @see Fault
+ * All fault types we support in this package.
  */
-class FaultImpl : public Fault {
+enum class FaultFacetType { kMock = 0 };
+
+/**
+ * The immutable class representing current status of an ongoing fault tracked by facet.
+ */
+class HealthCheckStatus {
 public:
-    explicit FaultImpl(ServiceContext* svcCtx);
+    HealthCheckStatus(FaultFacetType type, double severity, StringData description)
+        : _type(type), _severity(severity), _description(description) {}
 
-    ~FaultImpl() override = default;
+    HealthCheckStatus(const HealthCheckStatus&) = default;
+    HealthCheckStatus& operator=(const HealthCheckStatus&) = default;
 
-    // Fault interface.
+    /**
+     * @return FaultFacetType of this status.
+     */
+    FaultFacetType getType() const {
+        return _type;
+    }
 
-    UUID getId() const override;
+    /**
+     * The fault severity value if any.
+     *
+     * @return Current fault severity. The expected values:
+     *         0: Ok
+     *         (0, 1.0): Transient fault condition
+     *         [1.0, Inf): Active fault condition
+     */
+    double getSeverity() const {
+        return _severity;
+    }
 
-    double getSeverity() const override;
-
-    Milliseconds getActiveFaultDuration() const override;
-
-    Milliseconds getDuration() const override;
-
-    void appendDescription(BSONObjBuilder* builder) const override;
+    void appendDescription(BSONObjBuilder* builder) const {}
 
 private:
-    ServiceContext* const _svcCtx;
-    const UUID _id = UUID::gen();
-    const Date_t _startTime;
+    const FaultFacetType _type;
+    const double _severity;
+    const std::string _description;
 };
 
 }  // namespace process_health
