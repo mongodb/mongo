@@ -93,7 +93,6 @@ public:
     template <class T>
     class FutureHandle {
     public:
-
         FutureHandle<T>(stdx::future<T> future,
                         executor::TaskExecutor* executor,
                         executor::NetworkInterfaceMock* network)
