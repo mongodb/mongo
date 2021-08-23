@@ -41,5 +41,15 @@ namespace startup_recovery {
 void repairAndRecoverDatabases(OperationContext* opCtx,
                                StorageEngine::LastShutdownState lastShutdownState);
 
+/**
+ * Runs startup recovery after system startup, specifying whether to recover as a replica set
+ * being started in standalone mode (no index build resumption).
+ */
+enum class StartupRecoveryMode { kAuto, kReplicaSetMember, kReplicaSetMemberInStandalone };
+
+void runStartupRecoveryInMode(OperationContext* opCtx,
+                              StorageEngine::LastShutdownState lastShutdownState,
+                              StartupRecoveryMode mode);
+
 }  // namespace startup_recovery
 }  // namespace mongo

@@ -65,6 +65,7 @@
 
 namespace mongo {
 namespace {
+using startup_recovery::StartupRecoveryMode;
 
 // Exit after repair has started, but before data is repaired.
 MONGO_FAIL_POINT_DEFINE(exitBeforeDataRepair);
@@ -423,7 +424,15 @@ void reconcileCatalogAndRebuildUnfinishedIndexes(
  * Sets the appropriate flag on the service context decorable 'replSetMemberInStandaloneMode' to
  * 'true' if this is a replica set node running in standalone mode, otherwise 'false'.
  */
-void setReplSetMemberInStandaloneMode(OperationContext* opCtx) {
+void setReplSetMemberInStandaloneMode(OperationContext* opCtx, StartupRecoveryMode mode) {
+    if (mode == StartupRecoveryMode::kReplicaSetMember) {
+        setReplSetMemberInStandaloneMode(opCtx->getServiceContext(), false);
+        return;
+    } else if (mode == StartupRecoveryMode::kReplicaSetMemberInStandalone) {
+        setReplSetMemberInStandaloneMode(opCtx->getServiceContext(), true);
+        return;
+    }
+
     const repl::ReplSettings& replSettings =
         repl::ReplicationCoordinator::get(opCtx)->getSettings();
 
@@ -483,7 +492,7 @@ void startupRepair(OperationContext* opCtx, StorageEngine* storageEngine) {
         fassertNoTrace(4805001, repair::repairDatabase(opCtx, storageEngine, *it));
 
         // This must be set before rebuilding index builds on replicated collections.
-        setReplSetMemberInStandaloneMode(opCtx);
+        setReplSetMemberInStandaloneMode(opCtx, StartupRecoveryMode::kAuto);
         dbNames.erase(it);
     }
 
@@ -531,7 +540,7 @@ void startupRepair(OperationContext* opCtx, StorageEngine* storageEngine) {
 void startupRecoveryReadOnly(OperationContext* opCtx, StorageEngine* storageEngine) {
     invariant(!storageGlobalParams.repair);
 
-    setReplSetMemberInStandaloneMode(opCtx);
+    setReplSetMemberInStandaloneMode(opCtx, StartupRecoveryMode::kAuto);
 
     FeatureCompatibilityVersion::initializeForStartup(opCtx);
 
@@ -544,12 +553,13 @@ void startupRecoveryReadOnly(OperationContext* opCtx, StorageEngine* storageEngi
 // Perform routine startup recovery procedure.
 void startupRecovery(OperationContext* opCtx,
                      StorageEngine* storageEngine,
-                     StorageEngine::LastShutdownState lastShutdownState) {
+                     StorageEngine::LastShutdownState lastShutdownState,
+                     StartupRecoveryMode mode) {
     invariant(!storageGlobalParams.readOnly && !storageGlobalParams.repair);
 
     // Determine whether this is a replica set node running in standalone mode. This must be set
     // before determining whether to restart index builds.
-    setReplSetMemberInStandaloneMode(opCtx);
+    setReplSetMemberInStandaloneMode(opCtx, mode);
 
     // Initialize FCV before rebuilding indexes that may have features dependent on FCV.
     FeatureCompatibilityVersion::initializeForStartup(opCtx);
@@ -614,8 +624,28 @@ void repairAndRecoverDatabases(OperationContext* opCtx,
     } else if (storageGlobalParams.readOnly) {
         startupRecoveryReadOnly(opCtx, storageEngine);
     } else {
-        startupRecovery(opCtx, storageEngine, lastShutdownState);
+        startupRecovery(opCtx, storageEngine, lastShutdownState, StartupRecoveryMode::kAuto);
     }
+}
+
+/**
+ * Runs startup recovery after system startup, either in replSet mode (will
+ * restart index builds) or replSet standalone mode (will not restart index builds).  In no
+ * case will it create an FCV document nor run repair or read-only recovery.
+ */
+void runStartupRecoveryInMode(OperationContext* opCtx,
+                              StorageEngine::LastShutdownState lastShutdownState,
+                              StartupRecoveryMode mode) {
+    auto const storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    Lock::GlobalWrite lk(opCtx);
+
+    invariant(isWriteableStorageEngine() && !storageGlobalParams.readOnly);
+    invariant(!storageGlobalParams.repair);
+    const auto& replSettings = repl::ReplicationCoordinator::get(opCtx)->getSettings();
+    invariant(replSettings.usingReplSets());
+    invariant(mode == StartupRecoveryMode::kReplicaSetMember ||
+              mode == StartupRecoveryMode::kReplicaSetMemberInStandalone);
+    startupRecovery(opCtx, storageEngine, lastShutdownState, mode);
 }
 
 }  // namespace startup_recovery
