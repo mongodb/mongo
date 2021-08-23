@@ -386,13 +386,13 @@ var ShardingTest = function(params) {
         }
     };
 
-    this.stopAllConfigServers = function(opts) {
-        this.configRS.stopSet(undefined, undefined, opts);
+    this.stopAllConfigServers = function(opts, forRestart = undefined) {
+        this.configRS.stopSet(undefined, forRestart, opts);
     };
 
-    this.stopAllShards = function(opts) {
+    this.stopAllShards = function(opts, forRestart = undefined) {
         this._rs.forEach((rs) => {
-            rs.test.stopSet(15, undefined, opts);
+            rs.test.stopSet(15, forRestart, opts);
         });
     };
 
@@ -436,6 +436,22 @@ var ShardingTest = function(params) {
             return true;
 
         throw _getErrorWithCode(res, "command " + tojson(cmd) + " failed: " + tojson(res));
+    };
+
+    this.restartAllConfigServers = function(opts) {
+        this.configRS.startSet(opts, true);
+    };
+
+    this.restartAllShards = function(opts) {
+        this._rs.forEach((rs) => {
+            rs.test.startSet(opts, true);
+        });
+    };
+
+    this.restartAllMongos = function(opts) {
+        for (var i = 0; i < this._mongos.length; i++) {
+            this.restartMongos(i, opts);
+        }
     };
 
     this.forEachConnection = function(fn) {
