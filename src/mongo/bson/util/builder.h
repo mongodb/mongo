@@ -454,9 +454,7 @@ protected:
     /* "slow" portion of 'grow()'  */
     void grow_reallocate(int minSize) {
         if (minSize > BufferMaxSize) {
-            std::stringstream ss;
-            ss << "BufBuilder attempted to grow() to " << minSize << " bytes, past the 64MB limit.";
-            msgasserted(13548, ss.str().c_str());
+            growFailure(minSize);
         }
 
         int a = 64;
@@ -466,6 +464,15 @@ protected:
         _buf.realloc(a);
     }
 
+    /*
+     * A failure path of 'grow' is marked as noinline as it is almost never called and needlesly
+     * expands the callee stack if inlined.
+     */
+    MONGO_COMPILER_NOINLINE void growFailure(int minSize) {
+        std::stringstream ss;
+        ss << "BufBuilder attempted to grow() to " << minSize << " bytes, past the 64MB limit.";
+        msgasserted(13548, ss.str().c_str());
+    }
 
     BufferAllocator _buf;
     int l{0};
