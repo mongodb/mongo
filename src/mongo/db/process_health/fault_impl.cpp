@@ -27,50 +27,33 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kProcessHealth
-
-#include "mongo/db/process_health/fault_manager.h"
-
-#include "mongo/logv2/log.h"
+#include "mongo/db/process_health/fault_impl.h"
 
 namespace mongo {
-
 namespace process_health {
 
-namespace {
-
-const auto sFaultManager = ServiceContext::declareDecoration<std::unique_ptr<FaultManager>>();
-
-}  // namespace
-
-ServiceContext::ConstructorActionRegisterer faultManagerRegisterer{
-    "FaultManagerRegisterer", [](ServiceContext* svcCtx) {
-        auto faultManager = std::make_unique<FaultManager>();
-        FaultManager::set(svcCtx, std::move(faultManager));
-    }};
-
-
-FaultManager* FaultManager::get(ServiceContext* svcCtx) {
-    return sFaultManager(svcCtx).get();
+FaultImpl::FaultImpl(ServiceContext* svcCtx)
+    : _svcCtx(svcCtx), _startTime(_svcCtx->getFastClockSource()->now()) {
+    invariant(svcCtx);  // Will crash before this line, just for readability.
 }
 
-void FaultManager::set(ServiceContext* svcCtx, std::unique_ptr<FaultManager> newFaultManager) {
-    invariant(newFaultManager);
-    auto& faultManager = sFaultManager(svcCtx);
-    faultManager = std::move(newFaultManager);
+UUID FaultImpl::getId() const {
+    return _id;
 }
 
-FaultManager::~FaultManager() {}
-
-FaultState FaultManager::getFaultState() const {
-    return FaultState::kOk;
+double FaultImpl::getSeverity() const {
+    return 0;
 }
 
-boost::optional<FaultConstPtr> FaultManager::activeFault() const {
-    return {};
+Milliseconds FaultImpl::getActiveFaultDuration() const {
+    return Milliseconds(0);
 }
 
-void FaultManager::healthCheck() {}
+Milliseconds FaultImpl::getDuration() const {
+    return Milliseconds(_svcCtx->getFastClockSource()->now() - _startTime);
+}
+
+void FaultImpl::appendDescription(BSONObjBuilder* builder) const {}
 
 }  // namespace process_health
 }  // namespace mongo

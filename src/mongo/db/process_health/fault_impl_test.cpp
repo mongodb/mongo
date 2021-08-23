@@ -27,50 +27,45 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kProcessHealth
+#include "mongo/db/process_health/fault_impl.h"
 
-#include "mongo/db/process_health/fault_manager.h"
-
-#include "mongo/logv2/log.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/clock_source_mock.h"
 
 namespace mongo {
-
 namespace process_health {
-
 namespace {
 
-const auto sFaultManager = ServiceContext::declareDecoration<std::unique_ptr<FaultManager>>();
+class FaultImplTest : public unittest::Test {
+public:
+    void setUp() override {
+        _svcCtx = ServiceContext::make();
+        _svcCtx->setFastClockSource(std::make_unique<ClockSourceMock>());
+        _faultImpl = std::make_unique<FaultImpl>(_svcCtx.get());
+    }
+
+    ClockSourceMock& clockSource() {
+        return *static_cast<ClockSourceMock*>(_svcCtx->getFastClockSource());
+    }
+
+    FaultImpl& fault() {
+        return *_faultImpl;
+    }
+
+private:
+    ServiceContext::UniqueServiceContext _svcCtx;
+
+    std::unique_ptr<FaultImpl> _faultImpl;
+};
+
+
+TEST_F(FaultImplTest, TimeSourceWorks) {
+    // Fault was just created, duration should be zero.
+    ASSERT_EQ(Milliseconds(0), fault().getDuration());
+    clockSource().advance(Milliseconds(1));
+    ASSERT_EQ(Milliseconds(1), fault().getDuration());
+}
 
 }  // namespace
-
-ServiceContext::ConstructorActionRegisterer faultManagerRegisterer{
-    "FaultManagerRegisterer", [](ServiceContext* svcCtx) {
-        auto faultManager = std::make_unique<FaultManager>();
-        FaultManager::set(svcCtx, std::move(faultManager));
-    }};
-
-
-FaultManager* FaultManager::get(ServiceContext* svcCtx) {
-    return sFaultManager(svcCtx).get();
-}
-
-void FaultManager::set(ServiceContext* svcCtx, std::unique_ptr<FaultManager> newFaultManager) {
-    invariant(newFaultManager);
-    auto& faultManager = sFaultManager(svcCtx);
-    faultManager = std::move(newFaultManager);
-}
-
-FaultManager::~FaultManager() {}
-
-FaultState FaultManager::getFaultState() const {
-    return FaultState::kOk;
-}
-
-boost::optional<FaultConstPtr> FaultManager::activeFault() const {
-    return {};
-}
-
-void FaultManager::healthCheck() {}
-
 }  // namespace process_health
 }  // namespace mongo
