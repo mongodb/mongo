@@ -138,6 +138,7 @@ var TagsTest = function(options) {
         assert.soonNoExcept(() => replTest.nodes[2].adminCommand({replSetStepUp: 1}).ok);
         replTest.waitForState(replTest.nodes[2], ReplSetTest.State.PRIMARY);
         replTest.awaitReplication();
+        replTest.waitForAllNewlyAddedRemovals();
 
         // Create collection to guard against timeouts due to file allocation.
         assert.commandWorked(replTest.getPrimary().getDB('foo').createCollection('bar'));
