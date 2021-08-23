@@ -46,9 +46,16 @@ class AccumulatorN : public AccumulatorState {
 public:
     AccumulatorN(ExpressionContext* expCtx);
 
+    /**
+     * Verifies that 'input' is a positive integer.
+     */
+    static long long validateN(const Value& input);
+
     void processInternal(const Value& input, bool merging) final;
 
-    // Initialize 'n' with 'input'. In particular, verifies that 'input' is a positive integer.
+    /**
+     * Initialize 'n' with 'input'.
+     */
     void startNewGroup(const Value& input) final;
 
     /**

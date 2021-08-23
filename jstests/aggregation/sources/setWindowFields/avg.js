@@ -36,7 +36,7 @@ for (let index = 0; index < results.length; index++) {
     let groupRes = computeAsGroup({
         coll: coll,
         partitionKey: {ticker: results[index].ticker},
-        accum: "$avg",
+        accumSpec: {"$avg": "$price"},
         bounds: ["unbounded", 0],
         indexInPartition: results[index].partIndex,
         defaultValue: null
@@ -47,7 +47,7 @@ for (let index = 0; index < results.length; index++) {
     groupRes = computeAsGroup({
         coll: coll,
         partitionKey: {ticker: results[index].ticker},
-        accum: "$avg",
+        accumSpec: {"$avg": "$price"},
         bounds: ["unbounded", 3],
         indexInPartition: results[index].partIndex,
         defaultValue: null

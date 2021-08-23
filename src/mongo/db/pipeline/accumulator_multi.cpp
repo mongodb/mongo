@@ -60,25 +60,27 @@ REGISTER_ACCUMULATOR_WITH_MIN_VERSION(
     AccumulatorFirstLastN::parseFirstLastN<FirstLastSense::kLast>,
     ServerGlobalParams::FeatureCompatibility::Version::kVersion51);
 // TODO SERVER-57881 Add $firstN/$lastN as expressions.
-// TODO SERVER-57885 Add $minN/$maxN as window functions.
 // TODO SERVER-57884 Add $firstN/$lastN as window functions.
 
 AccumulatorN::AccumulatorN(ExpressionContext* const expCtx)
     : AccumulatorState(expCtx), _maxMemUsageBytes(internalQueryMaxNAccumulatorBytes.load()) {}
 
-void AccumulatorN::startNewGroup(const Value& input) {
+long long AccumulatorN::validateN(const Value& input) {
     // Obtain the value for 'n' and error if it's not a positive integral.
     uassert(5787902,
             str::stream() << "Value for 'n' must be of integral type, but found "
                           << input.toString(),
-            isNumericBSONType(input.getType()));
+            input.numeric());
     auto n = input.coerceToLong();
     uassert(5787903,
             str::stream() << "Value for 'n' must be of integral type, but found "
                           << input.toString(),
             n == input.coerceToDouble());
     uassert(5787908, str::stream() << "'n' must be greater than 0, found " << n, n > 0);
-    _n = n;
+    return n;
+}
+void AccumulatorN::startNewGroup(const Value& input) {
+    _n = validateN(input);
 }
 
 void AccumulatorN::processInternal(const Value& input, bool merging) {

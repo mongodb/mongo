@@ -35,30 +35,18 @@
 namespace mongo {
 
 template <AccumulatorMinMax::Sense sense>
-class WindowFunctionMinMax : public WindowFunctionState {
+class WindowFunctionMinMaxCommon : public WindowFunctionState {
 public:
-    static inline const Value kDefault = Value{BSONNULL};
-
-    static std::unique_ptr<WindowFunctionState> create(ExpressionContext* const expCtx) {
-        return std::make_unique<WindowFunctionMinMax<sense>>(expCtx);
-    }
-
-    explicit WindowFunctionMinMax(ExpressionContext* const expCtx)
-        : WindowFunctionState(expCtx),
-          _values(_expCtx->getValueComparator().makeOrderedValueMultiset()) {
-        _memUsageBytes = sizeof(*this);
-    }
-
-    void add(Value value) final {
+    void add(Value value) override {
         _memUsageBytes += value.getApproximateSize();
         _values.insert(std::move(value));
     }
 
-    void remove(Value value) final {
+    void remove(Value value) override {
         // std::multiset::insert is guaranteed to put the element after any equal elements
         // already in the container. So find() / erase() will remove the oldest equal element,
         // which is what we want, to satisfy "remove() undoes add() when called in FIFO order".
-        auto iter = _values.find(std::move(value));
+        auto iter = _values.find(value);
         tassert(5371400, "Can't remove from an empty WindowFunctionMinMax", iter != _values.end());
         _memUsageBytes -= iter->getApproximateSize();
         _values.erase(iter);
@@ -69,23 +57,111 @@ public:
         _memUsageBytes = sizeof(*this);
     }
 
-    Value getValue() const final {
-        if (_values.empty())
-            return kDefault;
-        switch (sense) {
-            case AccumulatorMinMax::Sense::kMin:
-                return *_values.begin();
-            case AccumulatorMinMax::Sense::kMax:
-                return *_values.rbegin();
-        }
-        MONGO_UNREACHABLE_TASSERT(5371401);
-    }
-
 protected:
+    // Constructor hidden so that only instances of the derived types can be created.
+    explicit WindowFunctionMinMaxCommon(ExpressionContext* const expCtx)
+        : WindowFunctionState(expCtx),
+          _values(_expCtx->getValueComparator().makeOrderedValueMultiset()) {}
+
     // Holds all the values in the window, in order, with constant-time access to both ends.
     ValueMultiset _values;
 };
+
+template <AccumulatorMinMax::Sense sense>
+class WindowFunctionMinMax : public WindowFunctionMinMaxCommon<sense> {
+public:
+    using WindowFunctionMinMaxCommon<sense>::_values;
+    using WindowFunctionMinMaxCommon<sense>::_memUsageBytes;
+
+    static inline const Value kDefault = Value{BSONNULL};
+
+    static std::unique_ptr<WindowFunctionState> create(ExpressionContext* const expCtx) {
+        return std::make_unique<WindowFunctionMinMax<sense>>(expCtx);
+    }
+
+    explicit WindowFunctionMinMax(ExpressionContext* const expCtx)
+        : WindowFunctionMinMaxCommon<sense>(expCtx) {
+        _memUsageBytes = sizeof(*this);
+    }
+
+    Value getValue() const final {
+        if (_values.empty())
+            return kDefault;
+        if constexpr (sense == AccumulatorMinMax::Sense::kMin) {
+            return *_values.begin();
+        } else {
+            return *_values.rbegin();
+        }
+        MONGO_UNREACHABLE_TASSERT(5371401);
+    }
+};
+
+template <AccumulatorMinMax::Sense sense>
+class WindowFunctionMinMaxN : public WindowFunctionMinMaxCommon<sense> {
+public:
+    using WindowFunctionMinMaxCommon<sense>::_values;
+    using WindowFunctionMinMaxCommon<sense>::_memUsageBytes;
+
+    static std::unique_ptr<WindowFunctionState> create(ExpressionContext* const expCtx,
+                                                       long long n) {
+        return std::make_unique<WindowFunctionMinMaxN<sense>>(expCtx, n);
+    }
+    explicit WindowFunctionMinMaxN(ExpressionContext* const expCtx, long long n)
+        : WindowFunctionMinMaxCommon<sense>(expCtx), _n(n) {
+        _memUsageBytes = sizeof(*this);
+    }
+
+    void add(Value value) final {
+        // Ignore nullish values.
+        if (value.nullish())
+            return;
+        WindowFunctionMinMaxCommon<sense>::add(std::move(value));
+    }
+
+    void remove(Value value) final {
+        // Ignore nullish values.
+        if (value.nullish())
+            return;
+        WindowFunctionMinMaxCommon<sense>::remove(std::move(value));
+    }
+
+    Value getValue() const final {
+        if (_values.empty()) {
+            return Value(std::vector<Value>());
+        }
+
+        auto processVal = [&](auto begin, auto end, size_t size) -> Value {
+            auto n = static_cast<size_t>(_n);
+
+            // If 'n' is greater than the size of the current window, then return all the values.
+            if (n >= size) {
+                return Value(std::vector(begin, end));
+            } else {
+                std::vector<Value> result;
+                result.reserve(n);
+                auto it = begin;
+                for (size_t i = 0; i < n; ++i, ++it) {
+                    result.push_back(*it);
+                }
+                return Value(std::move(result));
+            }
+        };
+
+        auto size = _values.size();
+        if constexpr (sense == AccumulatorMinMax::Sense::kMin) {
+            return processVal(_values.begin(), _values.end(), size);
+        } else {
+            return processVal(_values.rbegin(), _values.rend(), size);
+        }
+    }
+
+
+private:
+    long long _n;
+};
 using WindowFunctionMin = WindowFunctionMinMax<AccumulatorMinMax::Sense::kMin>;
 using WindowFunctionMax = WindowFunctionMinMax<AccumulatorMinMax::Sense::kMax>;
+using WindowFunctionMinN = WindowFunctionMinMaxN<AccumulatorMinMax::Sense::kMin>;
+using WindowFunctionMaxN = WindowFunctionMinMaxN<AccumulatorMinMax::Sense::kMax>;
 
 }  // namespace mongo

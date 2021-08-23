@@ -65,14 +65,23 @@ function forEachDocumentBoundsCombo(callback) {
  *
  * The skip/limit values are calculated from the given bounds and the current index.
  *
+ * 'accumSpec' is the specification of accumulator being tested and is an object of the form
+ * {accumulatorName: <accumulator arguments>}.
+ *
  * 'defaultValue' is used in cases when the skip/limit combination result in $group not getting any
  * documents. The most likely scenario is that the window has gone off the side of the partition.
  *
  * Note that this function assumes that the data in 'coll' has been seeded with the documents from
  * the seedWithTickerData() method above.
  */
-function computeAsGroup(
-    {coll, partitionKey, accum, bounds, indexInPartition, defaultValue = null}) {
+function computeAsGroup({
+    coll,
+    partitionKey,
+    accumSpec,
+    bounds,
+    indexInPartition,
+    defaultValue = null,
+}) {
     const skip = calculateSkip(bounds[0], indexInPartition);
     const limit = calculateLimit(bounds[0], bounds[1], indexInPartition);
     if (skip < 0 || limit <= 0)
@@ -85,8 +94,7 @@ function computeAsGroup(
         prefixPipe = prefixPipe.concat([{$limit: limit}]);
 
     const result =
-        coll.aggregate(prefixPipe.concat([{$group: {_id: null, res: {[accum]: "$price"}}}]))
-            .toArray();
+        coll.aggregate(prefixPipe.concat([{$group: {_id: null, res: accumSpec}}])).toArray();
     // If the window is completely off the edge of the right side of the partition, return null.
     if (result.length == 0) {
         return defaultValue;
@@ -201,19 +209,19 @@ function assertExplainResult(explainResult) {
  * Note that this function assumes that the documents in 'coll' were initialized using the
  * seedWithTickerData() method above.
  */
-function testAccumAgainstGroup(coll, accum, onNoResults = null) {
+function testAccumAgainstGroup(coll, accum, onNoResults = null, accumArgs = "$price") {
+    const accumSpec = {[accum]: accumArgs};
     forEachPartitionCase(function(partition) {
         documentBounds.forEach(function(bounds, index) {
-            jsTestLog("Testing accumulator " + accum + " against " + tojson(partition) +
+            jsTestLog("Testing accumulator " + tojson(accumSpec) + " against " + tojson(partition) +
                       " partition and [" + bounds + "] bounds");
 
+            let outputSpec = {window: {documents: bounds}};
+            Object.assign(outputSpec, accumSpec);
             const pipeline = [
                 {
-                    $setWindowFields: {
-                        partitionBy: partition,
-                        sortBy: {_id: 1},
-                        output: {res: {[accum]: "$price", window: {documents: bounds}}}
-                    },
+                    $setWindowFields:
+                        {partitionBy: partition, sortBy: {_id: 1}, output: {res: outputSpec}},
                 },
             ];
             const wfResults = coll.aggregate(pipeline, {allowDiskUse: true}).toArray();
@@ -226,19 +234,19 @@ function testAccumAgainstGroup(coll, accum, onNoResults = null) {
                     groupRes = computeAsGroup({
                         coll: coll,
                         partitionKey: {},
-                        accum: accum,
+                        accumSpec: accumSpec,
                         bounds: bounds,
                         indexInPartition: indexInPartition,
-                        defaultValue: onNoResults
+                        defaultValue: onNoResults,
                     });
                 } else {
                     groupRes = computeAsGroup({
                         coll: coll,
                         partitionKey: {ticker: wfRes.ticker},
-                        accum: accum,
+                        accumSpec: accumSpec,
                         bounds: bounds,
                         indexInPartition: indexInPartition,
-                        defaultValue: onNoResults
+                        defaultValue: onNoResults,
                     });
                 }
 
@@ -257,7 +265,7 @@ function testAccumAgainstGroup(coll, accum, onNoResults = null) {
         // combinations of various window types in the same $setWindowFields stage. This is more of
         // a fuzz test so no need to check results.
         forEachDocumentBoundsCombo(function(arrayOfBounds) {
-            jsTestLog("Testing accumulator " + accum +
+            jsTestLog("Testing accumulator " + tojson(accumSpec) +
                       " against multiple bounds: " + tojson(arrayOfBounds));
             let baseSpec = {
                 partitionBy: partition,
@@ -265,7 +273,9 @@ function testAccumAgainstGroup(coll, accum, onNoResults = null) {
             };
             let outputFields = {};
             arrayOfBounds.forEach(function(bounds, index) {
-                outputFields["res" + index] = {[accum]: "$price", window: {documents: bounds}};
+                let outputSpec = {window: {documents: bounds}};
+                Object.assign(outputSpec, accumSpec);
+                outputFields["res" + index] = outputSpec;
             });
             let specWithOutput = Object.merge(baseSpec, {output: outputFields});
             const wfResults =
