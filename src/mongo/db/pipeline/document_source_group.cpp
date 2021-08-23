@@ -829,7 +829,9 @@ DocumentSourceGroup::rewriteGroupAsTransformOnFirstDocument() const {
         // each document has a unique _id, it will just return the entire collection). We only
         // apply the rewrite when grouping by a single field, so we cannot apply it in this case,
         // where we are grouping by the entire document.
-        invariant(fieldPath.getFieldName(0) == "CURRENT" || fieldPath.getFieldName(0) == "ROOT");
+        tassert(5943200,
+                "Optimization attempted on group by always-dissimilar system variable",
+                fieldPath.getFieldName(0) == "CURRENT" || fieldPath.getFieldName(0) == "ROOT");
         return nullptr;
     }
 
