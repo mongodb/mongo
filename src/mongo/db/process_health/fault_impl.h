@@ -26,51 +26,45 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#pragma once
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kProcessHealth
+#include "mongo/db/process_health/fault.h"
 
-#include "mongo/db/process_health/fault_manager.h"
-
-#include "mongo/logv2/log.h"
+#include "mongo/db/service_context.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/system_clock_source.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
-
 namespace process_health {
 
-namespace {
+/**
+ * Internal implementation of the Fault class.
+ * @see Fault
+ */
+class FaultImpl : public Fault {
+public:
+    explicit FaultImpl(ServiceContext* svcCtx);
 
-const auto sFaultManager = ServiceContext::declareDecoration<std::unique_ptr<FaultManager>>();
+    ~FaultImpl() override = default;
 
-}  // namespace
+    // Fault interface.
 
-ServiceContext::ConstructorActionRegisterer faultManagerRegisterer{
-    "FaultManagerRegisterer", [](ServiceContext* svcCtx) {
-        auto faultManager = std::make_unique<FaultManager>();
-        FaultManager::set(svcCtx, std::move(faultManager));
-    }};
+    UUID getId() const override;
 
+    double getSeverity() const override;
 
-FaultManager* FaultManager::get(ServiceContext* svcCtx) {
-    return sFaultManager(svcCtx).get();
-}
+    Milliseconds getActiveFaultDuration() const override;
 
-void FaultManager::set(ServiceContext* svcCtx, std::unique_ptr<FaultManager> newFaultManager) {
-    invariant(newFaultManager);
-    auto& faultManager = sFaultManager(svcCtx);
-    faultManager = std::move(newFaultManager);
-}
+    Milliseconds getDuration() const override;
 
-FaultManager::~FaultManager() {}
+    void appendDescription(BSONObjBuilder* builder) const override;
 
-FaultState FaultManager::getFaultState() const {
-    return FaultState::kOk;
-}
-
-boost::optional<FaultConstPtr> FaultManager::activeFault() const {
-    return {};
-}
-
-void FaultManager::healthCheck() {}
+private:
+    ServiceContext* const _svcCtx;
+    const UUID _id = UUID::gen();
+    const Date_t _startTime;
+};
 
 }  // namespace process_health
 }  // namespace mongo

@@ -30,6 +30,7 @@
 
 #include <memory>
 
+#include "mongo/db/process_health/fault.h"
 #include "mongo/db/service_context.h"
 
 namespace mongo {
@@ -68,9 +69,6 @@ class FaultManager {
     FaultManager& operator=(const FaultManager&) = delete;
 
 public:
-    class Fault;
-    using FaultConstPtr = std::shared_ptr<const Fault>;
-
     FaultManager() = default;
     virtual ~FaultManager();
 
@@ -83,15 +81,6 @@ public:
 
     // Returns the current fault, if any.
     virtual boost::optional<FaultConstPtr> activeFault() const;
-
-    /**
-     * Detailed description of the current fault.
-     */
-    class Fault {
-    public:
-        Fault() = default;
-        virtual ~Fault() {}
-    };
 
 protected:
     // Starts the health check sequence and updates the internal state on completion.

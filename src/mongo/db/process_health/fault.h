@@ -26,51 +26,65 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#pragma once
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kProcessHealth
+#include <memory>
 
-#include "mongo/db/process_health/fault_manager.h"
-
-#include "mongo/logv2/log.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
-
 namespace process_health {
 
-namespace {
+/**
+ * Detailed description of the current fault.
+ * @see FaultManager for more details.
+ */
+class Fault {
+    Fault(const Fault&) = delete;
+    Fault& operator=(const Fault&) = delete;
 
-const auto sFaultManager = ServiceContext::declareDecoration<std::unique_ptr<FaultManager>>();
+public:
+    Fault() = default;
+    virtual ~Fault() = default;
 
-}  // namespace
+    virtual UUID getId() const = 0;
 
-ServiceContext::ConstructorActionRegisterer faultManagerRegisterer{
-    "FaultManagerRegisterer", [](ServiceContext* svcCtx) {
-        auto faultManager = std::make_unique<FaultManager>();
-        FaultManager::set(svcCtx, std::move(faultManager));
-    }};
+    /**
+     * The fault severity value is an aggregate severity calculated
+     * from all facets currently owned by this instance.
+     *
+     * @return Current fault severity. The expected values:
+     *         0: Ok
+     *         (0, 1.0): Transient fault condition
+     *         [1.0, Inf): Active fault condition
+     */
+    virtual double getSeverity() const = 0;
 
+    /**
+     * Gets the duration of an active fault, if any.
+     * This is the time from the moment the severity reached the 1.0 value
+     * and stayed on or above 1.0.
+     *
+     * Note: each time the severity drops below 1.0 the duration is reset.
+     */
+    virtual Milliseconds getActiveFaultDuration() const = 0;
 
-FaultManager* FaultManager::get(ServiceContext* svcCtx) {
-    return sFaultManager(svcCtx).get();
-}
+    /**
+     * @return The lifetime of this fault from the moment it was created.
+     *         Invariant: getDuration() >= getActiveFaultDuration()
+     */
+    virtual Milliseconds getDuration() const = 0;
 
-void FaultManager::set(ServiceContext* svcCtx, std::unique_ptr<FaultManager> newFaultManager) {
-    invariant(newFaultManager);
-    auto& faultManager = sFaultManager(svcCtx);
-    faultManager = std::move(newFaultManager);
-}
+    /**
+     * Describes the current fault.
+     */
+    virtual void appendDescription(BSONObjBuilder* builder) const = 0;
+};
 
-FaultManager::~FaultManager() {}
+using FaultConstPtr = std::shared_ptr<const Fault>;
 
-FaultState FaultManager::getFaultState() const {
-    return FaultState::kOk;
-}
-
-boost::optional<FaultConstPtr> FaultManager::activeFault() const {
-    return {};
-}
-
-void FaultManager::healthCheck() {}
 
 }  // namespace process_health
 }  // namespace mongo
