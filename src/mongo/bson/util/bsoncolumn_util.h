@@ -33,6 +33,9 @@
 #include "mongo/platform/int128.h"
 
 namespace mongo::bsoncolumn {
+// Number of bytes for element count at the beginning of BSON Column binary
+static constexpr uint8_t kElementCountBytes = 4;
+
 bool usesDeltaOfDelta(BSONType type);
 bool uses128bit(BSONType type);
 

@@ -407,12 +407,13 @@ BSONColumn::BSONColumn(BSONElement bin) {
             "Invalid BSON type for column",
             bin.type() == BSONType::BinData && bin.binDataType() == BinDataType::Column);
     _binary = bin.binData(_size);
-    _controlLastLiteral = _binary;
-    uassert(ErrorCodes::BadValue, "Invalid BSON Column encoding", _size > 0);
+    uassert(ErrorCodes::BadValue, "Invalid BSON Column encoding", _size > kElementCountBytes);
+    _elementCount = ConstDataView(_binary).read<LittleEndian<uint32_t>>();
+    _controlLastLiteral = _binary + kElementCountBytes;
 }
 
 BSONColumn::Iterator BSONColumn::begin() {
-    Iterator it{*this, _binary, _binary + _size};
+    Iterator it{*this, _binary + kElementCountBytes, _binary + _size};
     it._loadControl(BSONElement());
     return it;
 }
@@ -449,47 +450,5 @@ BSONElement BSONColumn::operator[](size_t index) {
 
     return *it;
 }
-
-size_t BSONColumn::size() const {
-    // Size is known when we are fully decompressed
-    if (_fullyDecompressed)
-        return _decompressed.size();
-
-    // We can begin iterating from last known literal
-    auto e = _binary + _size;
-    size_t num = _indexLastLiteral;
-
-    // Iterate as long as we are within the Column binary
-    const char* pos = _controlLastLiteral;
-    while (pos < e) {
-        uint8_t control = *pos;
-        if (Iterator::_literal(control)) {
-            // We are done at EOO
-            if (control == EOO) {
-                break;
-            }
-
-            // Count our literal and set our position to the byte after
-            ++num;
-            pos += BSONElement(pos, 1, -1, BSONElement::CachedSizeTag{}).size();
-        } else {
-            // Count elements in Simple-8b blocks, no need to decompress
-            uint8_t blocks = Iterator::_numSimple8bBlocks(control);
-            int blockSize = blocks * sizeof(uint64_t);
-            uassert(
-                ErrorCodes::BadValue, "Invalid BSON Column encoding", (pos + blockSize + 1) < e);
-            Simple8b<uint128_t> s8b(pos + 1, blockSize);
-            for (auto it = s8b.begin(), s8bEnd = s8b.end(); it != s8bEnd; it.advanceBlock()) {
-                num += it.blockSize();
-            }
-
-            // Set our position to the byte after the Simple-8b blocks
-            pos += blockSize + 1;
-        }
-    }
-
-    return num;
-}
-
 
 }  // namespace mongo

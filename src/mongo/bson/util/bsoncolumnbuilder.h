@@ -116,7 +116,7 @@ private:
     // Buffer for the BSON Column binary
     BufBuilder _bufBuilder;
 
-    // Field name
+    uint32_t _elementCount = 0;
     std::string _fieldName;
 
     // Chose whether to use 128 or 64 Simple-8b builder

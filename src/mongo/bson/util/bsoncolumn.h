@@ -182,12 +182,11 @@ public:
     /**
      * Number of elements stored in this BSONColumn
      *
-     * O(1) time complexity if BSONColumn is fully decompressed
-     * O(N) time complexity otherwise
-     *
-     * Throws BadValue if invalid encoding is encountered
+     * O(1) time complexity
      */
-    size_t size() const;
+    size_t size() const {
+        return _elementCount;
+    }
 
 private:
     /**
@@ -245,6 +244,8 @@ private:
 
     const char* _binary;
     int _size;
+
+    uint32_t _elementCount;
 
     const char* _controlLastLiteral;
     size_t _indexLastLiteral = 0;

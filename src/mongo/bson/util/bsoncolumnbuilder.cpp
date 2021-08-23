@@ -64,6 +64,10 @@ BSONColumnBuilder::BSONColumnBuilder(StringData fieldName)
       _simple8bBuilder128(_createBufferWriter()),
       _scaleIndex(Simple8bTypeUtil::kMemoryAsInteger),
       _fieldName(fieldName) {
+    // Leave space for element count at the beginning
+    static_assert(sizeof(_elementCount) == kElementCountBytes,
+                  "Element count for BSONColumn should be 4 bytes");
+    _bufBuilder.skip(kElementCountBytes);
     // Store EOO type with empty field name as previous.
     _storePrevious(BSONElement());
 }
@@ -75,6 +79,7 @@ BSONElement BSONColumnBuilder::_previous() const {
 BSONColumnBuilder& BSONColumnBuilder::append(BSONElement elem) {
     auto type = elem.type();
     auto previous = _previous();
+    ++_elementCount;
 
     // If we detect a type change (or this is first value). Flush all pending values in Simple-8b
     // and write uncompressed literal. Reset all default values.
@@ -322,6 +327,8 @@ bool BSONColumnBuilder::_appendDouble(double value, double previous) {
 }
 
 BSONColumnBuilder& BSONColumnBuilder::skip() {
+    ++_elementCount;
+
     auto before = _bufBuilder.len();
     if (_storeWith128) {
         _simple8bBuilder128.skip();
@@ -341,6 +348,9 @@ BSONBinData BSONColumnBuilder::finalize() {
 
     // Write EOO at the end
     _bufBuilder.appendChar(EOO);
+
+    // Write element count at the beginning
+    DataView(_bufBuilder.buf()).write<LittleEndian<uint32_t>>(_elementCount);
 
     return {_bufBuilder.buf(), _bufBuilder.len(), BinDataType::Column};
 }
