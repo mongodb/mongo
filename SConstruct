@@ -2574,6 +2574,14 @@ if get_option("system-boost-lib-search-suffixes") is not None:
 # discover modules, and load the (python) module for each module's build.py
 mongo_modules = moduleconfig.discover_modules('src/mongo/db/modules', get_option('modules'))
 
+if get_option('ninja') != 'disabled':
+    for module in mongo_modules:
+        if hasattr(module, 'NinjaFile'):
+            env.FatalError(textwrap.dedent("""\
+                ERROR: Ninja tool option '--ninja' should not be used with the ninja module.
+                    Remove the ninja module directory or use '--modules= ' to select no modules.
+                    If using enterprise module, explicitly set '--modules=<name-of-enterprise-module>' to exclude the ninja module."""))
+
 # --- check system ---
 ssl_provider = None
 free_monitoring = get_option("enable-free-mon")
