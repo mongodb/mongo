@@ -424,11 +424,11 @@ commands:
             tempUsersCollection:
                 description: "Temporary users collection name"
                 type: string
-                default: ''
+                default: '""'
             tempRolesCollection:
                 description: "Temporary roles collection name"
                 type: string
-                default: ''
+                default: '""'
             db:
                 description: "Database name"
                 type: string
