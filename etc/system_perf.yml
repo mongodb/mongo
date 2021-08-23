@@ -677,6 +677,13 @@ tasks:
         vars:
           test_control: "mixed_workloads_genny_rolling_restarts"
 
+  - name: big_update_10k
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "BigUpdate10k"
+
   - name: misc_workloads
     priority: 5
     commands:
@@ -1397,6 +1404,7 @@ buildvariants:
       - name: tsbs_query_manual_bucketing
       - name: sb_large_scale
       - name: sb_timeseries
+      - name: big_update_10k
 
   - name: linux-3-node-replSet-last-continuous-fcv
     display_name: Linux 3-Node ReplSet (Last Continuous FCV)
