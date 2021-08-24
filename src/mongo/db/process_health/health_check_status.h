@@ -46,8 +46,28 @@ enum class FaultFacetType { kMock = 0 };
  */
 class HealthCheckStatus {
 public:
-    HealthCheckStatus(FaultFacetType type, double severity, StringData description)
-        : _type(type), _severity(severity), _description(description) {}
+    static constexpr double kResolvedSeverity = 0;
+    // The range for active fault is inclusive: [ 1, Inf ).
+    static constexpr double kActiveFaultSeverity = 1.0;
+    // We chose to subtract a small 'epsilon' value from 1.0 to
+    // avoid rounding problems and be sure that severity of 1.0 is guaranteed to be an active fault.
+    static constexpr double kActiveFaultSeverityEpsilon = 0.000001;
+
+    HealthCheckStatus(FaultFacetType type,
+                      double severity,
+                      StringData description,
+                      Milliseconds activeFaultDuration,
+                      Milliseconds duration)
+        : _type(type),
+          _severity(severity),
+          _description(description),
+          _activeFaultDuration(activeFaultDuration),
+          _duration(duration) {
+        uassert(5949601,
+                str::stream() << "Active fault duration " << _activeFaultDuration
+                              << " cannot be longer than duration " << _duration,
+                _duration >= _activeFaultDuration);
+    }
 
     HealthCheckStatus(const HealthCheckStatus&) = default;
     HealthCheckStatus& operator=(const HealthCheckStatus&) = default;
@@ -71,13 +91,57 @@ public:
         return _severity;
     }
 
+    /**
+     * Gets the duration of an active fault, if any.
+     * This is the time from the moment the severity reached the 1.0 value
+     * and stayed on or above 1.0.
+     *
+     * Note: each time the severity drops below 1.0 the duration is reset.
+     */
+    Milliseconds getActiveFaultDuration() const {
+        return _activeFaultDuration;
+    }
+
+    /**
+     * @return duration of the fault facet or fault from the moment it was created.
+     */
+    Milliseconds getDuration() const {
+        return _duration;
+    }
+
     void appendDescription(BSONObjBuilder* builder) const {}
+
+    // Helpers for severity levels.
+
+    static const bool isResolved(double severity) {
+        return severity <= kResolvedSeverity;
+    }
+
+    static const bool isTransientFault(double severity) {
+        return severity > kResolvedSeverity && severity < kActiveFaultSeverity;
+    }
+
+    static const bool isActiveFault(double severity) {
+        // Range is inclusive.
+        return severity >= kActiveFaultSeverity - kActiveFaultSeverityEpsilon;
+    }
 
 private:
     const FaultFacetType _type;
     const double _severity;
     const std::string _description;
+    const Milliseconds _activeFaultDuration;
+    const Milliseconds _duration;
 };
+
+inline std::ostream& operator<<(std::ostream& os, const FaultFacetType& type) {
+    switch (type) {
+        case FaultFacetType::kMock:
+            return os << "kMock"_sd;
+        default:
+            return os << "Uknown"_sd;
+    }
+}
 
 }  // namespace process_health
 }  // namespace mongo

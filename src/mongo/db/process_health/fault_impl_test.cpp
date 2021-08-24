@@ -29,6 +29,7 @@
 
 #include "mongo/db/process_health/fault_impl.h"
 
+#include "mongo/db/process_health/fault_facet_mock.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 
@@ -52,6 +53,10 @@ public:
         return *_faultImpl;
     }
 
+    ServiceContext* svcCtx() {
+        return _svcCtx.get();
+    }
+
 private:
     ServiceContext::UniqueServiceContext _svcCtx;
 
@@ -64,6 +69,17 @@ TEST_F(FaultImplTest, TimeSourceWorks) {
     ASSERT_EQ(Milliseconds(0), fault().getDuration());
     clockSource().advance(Milliseconds(1));
     ASSERT_EQ(Milliseconds(1), fault().getDuration());
+}
+
+TEST_F(FaultImplTest, SeverityLevelHelpersWork) {
+    FaultFacetMock resolvedFacet(svcCtx(), [](double* severity) { *severity = 0; });
+    ASSERT_TRUE(HealthCheckStatus::isResolved(resolvedFacet.getStatus().getSeverity()));
+
+    FaultFacetMock transientFacet(svcCtx(), [](double* severity) { *severity = 0.99; });
+    ASSERT_TRUE(HealthCheckStatus::isTransientFault(transientFacet.getStatus().getSeverity()));
+
+    FaultFacetMock faultyFacet(svcCtx(), [](double* severity) { *severity = 1.0; });
+    ASSERT_TRUE(HealthCheckStatus::isActiveFault(faultyFacet.getStatus().getSeverity()));
 }
 
 }  // namespace
