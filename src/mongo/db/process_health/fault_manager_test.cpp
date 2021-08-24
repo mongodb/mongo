@@ -42,6 +42,93 @@ TEST(FaultManagerTest, Registration) {
     ASSERT_TRUE(FaultManager::get(serviceCtx.get()));
 }
 
+class FaultManagerTestImpl : public FaultManager {
+public:
+    Status transitionStateTest(FaultState newState) {
+        return transitionToState(newState);
+    }
+
+    FaultState getFaultStateTest() {
+        return getFaultState();
+    }
+};
+
+// State machine tests.
+TEST(FaultManagerForTest, StateTransitionsFromOk) {
+    std::vector<std::pair<FaultState, bool>> transitionValidPairs{
+        {FaultState::kOk, false},
+        {FaultState::kStartupCheck, false},
+        {FaultState::kTransientFault, true},
+        {FaultState::kActiveFault, false}};
+
+    for (auto& pair : transitionValidPairs) {
+        FaultManagerTestImpl faultManager;
+        ASSERT_OK(faultManager.transitionStateTest(FaultState::kOk));
+
+        if (pair.second) {
+            ASSERT_OK(faultManager.transitionStateTest(pair.first));
+        } else {
+            ASSERT_NOT_OK(faultManager.transitionStateTest(pair.first));
+        }
+    }
+}
+
+TEST(FaultManagerForTest, StateTransitionsFromStartupCheck) {
+    std::vector<std::pair<FaultState, bool>> transitionValidPairs{
+        {FaultState::kOk, true},
+        {FaultState::kStartupCheck, false},
+        {FaultState::kTransientFault, true},
+        {FaultState::kActiveFault, false}};
+
+    for (auto& pair : transitionValidPairs) {
+        FaultManagerTestImpl faultManager;
+
+        if (pair.second) {
+            ASSERT_OK(faultManager.transitionStateTest(pair.first));
+        } else {
+            ASSERT_NOT_OK(faultManager.transitionStateTest(pair.first));
+        }
+    }
+}
+
+TEST(FaultManagerForTest, StateTransitionsFromTransientFault) {
+    std::vector<std::pair<FaultState, bool>> transitionValidPairs{
+        {FaultState::kOk, true},
+        {FaultState::kStartupCheck, false},
+        {FaultState::kTransientFault, false},
+        {FaultState::kActiveFault, true}};
+
+    for (auto& pair : transitionValidPairs) {
+        FaultManagerTestImpl faultManager;
+        ASSERT_OK(faultManager.transitionStateTest(FaultState::kTransientFault));
+
+        if (pair.second) {
+            ASSERT_OK(faultManager.transitionStateTest(pair.first));
+        } else {
+            ASSERT_NOT_OK(faultManager.transitionStateTest(pair.first));
+        }
+    }
+}
+
+TEST(FaultManagerForTest, StateTransitionsFromActiveFault) {
+    std::vector<std::pair<FaultState, bool>> transitionValidPairs{
+        {FaultState::kOk, false},
+        {FaultState::kStartupCheck, false},
+        {FaultState::kTransientFault, false},
+        {FaultState::kActiveFault, false}};
+
+    for (auto& pair : transitionValidPairs) {
+        FaultManagerTestImpl faultManager;
+        ASSERT_OK(faultManager.transitionStateTest(FaultState::kTransientFault));
+        ASSERT_OK(faultManager.transitionStateTest(FaultState::kActiveFault));
+
+        if (pair.second) {
+            ASSERT_OK(faultManager.transitionStateTest(pair.first));
+        } else {
+            ASSERT_NOT_OK(faultManager.transitionStateTest(pair.first));
+        }
+    }
+}
 }  // namespace
 }  // namespace process_health
 }  // namespace mongo

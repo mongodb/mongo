@@ -63,7 +63,8 @@ void FaultManager::set(ServiceContext* svcCtx, std::unique_ptr<FaultManager> new
 FaultManager::~FaultManager() {}
 
 FaultState FaultManager::getFaultState() const {
-    return FaultState::kOk;
+    stdx::lock_guard<Latch> lk(_stateMutex);
+    return _currentState;
 }
 
 boost::optional<FaultConstPtr> FaultManager::activeFault() const {
@@ -71,6 +72,65 @@ boost::optional<FaultConstPtr> FaultManager::activeFault() const {
 }
 
 void FaultManager::healthCheck() {}
+
+Status FaultManager::transitionToState(FaultState newState) {
+    Status status = Status::OK();
+    switch (newState) {
+        case FaultState::kOk:
+            status = _transitionToKOk();
+            break;
+        case FaultState::kTransientFault:
+            status = _transitionToKTransientFault();
+            break;
+        case FaultState::kActiveFault:
+            status = _transitionToKActiveFault();
+            break;
+        default:
+            return Status(ErrorCodes::BadValue,
+                          fmt::format("Illegal transition from {} to {}", _currentState, newState));
+            break;
+    }
+
+    if (status.isOK())
+        LOGV2_DEBUG(5936201, 1, "Transitioned fault manager state", "newState"_attr = newState);
+
+    return status;
+}
+
+Status FaultManager::_transitionToKOk() {
+    stdx::lock_guard<Latch> lk(_stateMutex);
+    if (_currentState != FaultState::kStartupCheck && _currentState != FaultState::kTransientFault)
+        return Status(
+            ErrorCodes::BadValue,
+            fmt::format("Illegal transition from {} to {}", _currentState, FaultState::kOk));
+
+    _currentState = FaultState::kOk;
+    return Status::OK();
+}
+
+Status FaultManager::_transitionToKTransientFault() {
+    stdx::lock_guard<Latch> lk(_stateMutex);
+    if (_currentState != FaultState::kStartupCheck && _currentState != FaultState::kOk)
+        return Status(ErrorCodes::BadValue,
+                      fmt::format("Illegal transition from {} to {}",
+                                  _currentState,
+                                  FaultState::kTransientFault));
+
+    _currentState = FaultState::kTransientFault;
+    return Status::OK();
+}
+
+Status FaultManager::_transitionToKActiveFault() {
+    stdx::lock_guard<Latch> lk(_stateMutex);
+    if (_currentState != FaultState::kTransientFault)
+        return Status(ErrorCodes::BadValue,
+                      fmt::format("Illegal transition from {} to {}",
+                                  _currentState,
+                                  FaultState::kActiveFault));
+
+    _currentState = FaultState::kActiveFault;
+    return Status::OK();
+}
 
 }  // namespace process_health
 }  // namespace mongo
