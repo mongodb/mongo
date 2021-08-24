@@ -89,8 +89,8 @@ int
 main(int argc, char *argv[])
 {
     WT_SESSION *session;
+    wt_thread_t idlist[100];
     clock_t ce, cs;
-    pthread_t idlist[100];
     uint64_t i, id;
     char buf[100];
 
@@ -125,15 +125,16 @@ main(int argc, char *argv[])
 
     (void)signal(SIGINT, onsig);
 
+    memset(idlist, 0, sizeof(idlist));
     cs = clock();
     id = 0;
     for (i = 0; i < opts->n_append_threads; ++i, ++id) {
         printf("append: %" PRIu64 "\n", id);
-        testutil_check(pthread_create(&idlist[id], NULL, thread_append, opts));
+        testutil_check(__wt_thread_create(NULL, &idlist[id], thread_append, opts));
     }
 
     for (i = 0; i < id; ++i)
-        testutil_check(pthread_join(idlist[i], NULL));
+        testutil_check(__wt_thread_join(NULL, &idlist[i]));
 
     ce = clock();
     printf("%" PRIu64 "M records: %.2lf processor seconds\n", opts->max_inserted_id / MILLION,

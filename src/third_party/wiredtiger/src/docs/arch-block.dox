@@ -1,9 +1,248 @@
 /*! @arch_page arch-block Block Manager
 
-The Block Manager manages the reading and writing of disk blocks
-in WiredTiger.  It does compression and encryption when these
-are configured.
+The WiredTiger block manager subsystem manages the reading and writing of data
+from the disk. It is designed to facilitate high performance, economic use of
+disk space and customizability.
 
-The state of the block manager is represented by the \c WT_BM structure.
-Individual blocks being tracked are in \c WT_BLOCK structures.
+@section block What is a block?
+
+A block is a chunk of data that is stored on the disk and operated on as a
+single unit. Each WiredTiger data file (any file in the home directory with the
+\c .wt suffix) is made up of these blocks. Each block consists of a page header,
+a block header and contains a single page of the btree from which it was
+generated. WiredTiger is a no-overwrite storage engine, and when blocks are
+re-written, they are written to new locations in the file. The size of a block
+is a multiple of the allocation size which is set during creation of the
+associated WiredTiger data file see: WT_SESSION::create.
+
+Once a block is written an address cookie is returned. This address cookie is
+stored as the \c addr on the associated page ref. The \c WT_REF structure can
+be found in \c btmem.h. The address cookie is opaque to other parts of the
+system and cannot be interpreted meaningfully.
+
+The address cookie is made up of 4 components:
+ - offset: The offset in the file. In order to avoid storing large offsets this
+   value is divided by the allocation size.
+ - file_id: Optional and only relevant to the tiered storage type, the file_id
+   is maintained in the address.
+ - size: The size of the block, also divided by the allocation size.
+ - checksum: The checksum of the block for validation purposes.
+
+The block header contains the following fields:
+ - size: The size of the block on disk, used when salvaging data from a corrupt
+   file.
+ - checksum: The checksum of the block, again used for salvaging.
+ - flags: Flags set on the block itself.
+ - padding
+
+The page header is not described in this document but can be found in
+\c btmem.h.
+
+@section block_implementation Block manager implementation details
+
+@subsection write_once Writing
+
+The block manager decides where in the file a block will be written. It has two
+forms of writing modes, "first fit" and "best fit". The default behavior is best
+fit. While operating in best fit mode the block manager will search a skip list
+of extents sorted by size, returning either an exact match or the next largest.
+This is done to avoid fragmenting the file when possible. In first fit mode the
+block manager will place the newly created block in the first available extent.
+First fit mode is used for all root pages.
+
+Additionally the block manager is a no-overwrite system. As such once a block is
+written it cannot be modified.  This is for crash recovery reasons, because if
+the system were to crash during an overwrite the block state would be unknown.
+This doesn't mean that the associated page cannot be modified, once the
+associated page is modified a subsequent reconciliation will result in a new
+block being created.
+
+@subsection desc_block Descriptor blocks
+
+A file is divided up into blocks. The first block in a file is special as it
+contains metadata about the file and is referred to as the "descriptor block".
+It contains the WiredTiger major and minor version, a checksum of the block
+contents as well as a "magic" number to check against.
+
+The descriptor block serves as a safety check to ensure that the file being
+loaded into the block manager is actually a WiredTiger data file, that it
+belongs to a compatible version of WiredTiger and that the entire file has not
+been corrupted. WiredTiger also uses checksums to defend against file corruption
+which is described in the \ref checksum section.
+
+@subsection block_lists Extent lists
+
+Internally, the block manager uses a data structure called an extent list or a
+\c WT_EXTLIST to track file usage. An extent list consists of a series of
+extents (or \c WT_EXT elements). Each extent uses a file offset and size to
+track a portion of the file.
+
+There are three extent lists that are maintained per checkpoint:
+
+- \c alloc: The file ranges allocated for a given checkpoint.
+- \c avail: The file ranges that are unused and available for allocation.
+- \c discard: The file ranges freed in the current checkpoint.
+
+The alloc and discard extent lists are maintained as a skiplist sorted by file
+offset. The avail extent list also maintains an extra skiplist sorted by the
+extent size to aid with allocating new blocks.
+
+@section configuration Configuration options
+
+There are a number of configuration options that affect the block manager's
+behavior. This does not aim to be an exhaustive list, however, these are the
+configuration options that are more commonly of interest to developers.
+
+All of the configuration options below are passed into the \c WT_SESSION::create
+API at the time of file creation.
+
+@subsection alloc_size Allocation size
+
+The allocation_size configuration controls the file unit allocation_size.
+Any blocks allocated by the block manager must be a multiple of this value.
+
+For example, if we specify an allocation_size of \c 4KB, blocks of size
+\c 8KB and \c 12KB would be permitted but NOT \c 10KB. The allocation_size
+is set to \c 4KB by default which is a good choice unless the OS or storage
+device has special requirements.
+
+@subsection checksum Checksum
+
+The \c checksum "on" configuration can be provided during creation of the file.
+This configuration instructs the block manager to checksum the full length of
+the buffer provided to be written into the block. Be default it is enabled.
+When disabled the block manager still does perform a checksum operation but only
+the first 64 bytes of the buffer are included.
+
+The checksum is used when reading blocks to validate their contents, it
+is compared with the checksum extracted from the address cookie and it is
+compared with a checksum generated from the buffer that was held in the block
+being read. In both cases the checksum has to match.
+
+There are other options that can be provided for this configuration option,
+they are not discussed here.
+
+@section block_usage How WiredTiger uses the block manager
+
+@subsection creation File creation and the block manager
+
+When a new file is created in WiredTiger via WT_SESSION::create, the file is
+created on disk and the associated \c allocation_size is written out to the
+metadata file. However the block manager itself only exists on the btree
+structure and is allocated when opening a closed btree.
+
+@subsection read Reading files and pages
+
+When an existing btree is opened for the first time, the location of the root
+block is contained in the metadata file \c WiredTiger.wt. The block manager will
+read the block at the location specified and return the page image as a buffer
+to the layer above. This will then be instantiated as a page in memory.
+
+From there subsequent page addresses can be read from the root page and the
+process repeated as required. If a cursor traverses to a page which hasn't been
+read into memory the same process will take place.
+
+@subsection Writing
+
+Two cases exist for writing out data using the block manager: checkpoint and
+eviction. When a page image is written out the block manager the \c bm->write
+API is called. See \c bt_io.c for more detail.
+
+@subsubsection Checkpoint
+
+For details on checkpoint at the WiredTiger level see: @ref arch-checkpoint.
+
+At the block manager level, a checkpoint corresponds with a set of blocks that
+are stored in the file associated with the given URI. Typically each file will
+contain a minimum of two checkpoints. Upon opening an existing file the most
+recent checkpoint is read.
+
+During a checkpoint new blocks are only written out for dirty pages. A block can
+be included in multiple checkpoints. Assuming a page \c X is dirty and gets
+checkpointed in checkpoint \c A, it will be created as a new block on disk. Now
+the same page \c X isn't modified and another checkpoint is taken. The page is
+clean and as such will not require a new block to be written for it. The address
+of the original block is still valid.
+
+Checkpoints are created in depth first order, leaf blocks are created, then
+the parent blocks. This is a requirement as the parent blocks contain the
+addresses of the leaf blocks.
+
+The block manager doesn't guarantee that calling \c bm->write will result in
+the data being flushed to disk. In the checkpoint scenario WiredTiger will also
+call \c bm->sync once all blocks have been written which will call the file
+system dependent flush function.
+
+* Checkpoint deletion and merging *
+
+As a checkpoint progresses it takes a snapshot of the three extent lists kept
+by the block manager, these extent lists are written out to disk as part of
+the checkpoint in blocks. Between checkpoints these extent lists are being
+updated via normal operation of WiredTiger.
+
+Suppose we have a checkpoint \c A, which has an alloc list which contains 3
+blocks \c I, \c J, \c K as such its extent lists are as follows:
+
+Alloc: \c I, \c J, \c K
+Avail: \c L, \c M
+Discard: Empty
+
+A second checkpoint \c B completes and has removed a page which corresponds with
+block \c J, it also has allocated an additional block \c L.
+
+Checkpoint \c B's extent lists are as follows:
+Alloc: \c L
+Avail: \c M
+Discard: \c J
+
+Finally we complete a 3rd checkpoint \c C which allocates an additional block
+\c M. Upon completion of this checkpoint we are able to remove checkpoint \c A,
+to do that, the block manager will merge checkpoint \c A's extent lists into
+checkpoint \c B's.
+
+What's important here is that if a block appears in both the alloc list and
+the discard list it can be freed which means it goes on the avail list.
+
+Which gives us the following lists for checkpoint \c C:
+Alloc: \c M
+Avail: Empty
+Discard: Empty
+
+And the following lists for checkpoint \c B:
+Alloc: \c I, \c, K, \c L
+Avail: \c J
+Discard: Empty
+
+These extent lists are written out with the checkpoint \c C. Anything on the
+avail list is considered free space and can be reused as of the completion
+of checkpoint \c C.
+
+We don't want to list each block individually in the extent lists, so instead of
+listing each block separately in the list, we use extents, which can describe a
+range in the file, that is, any number of contiguous blocks.
+
+@subsubsection Eviction
+
+For more detail on how WiredTiger eviction works see: @ref arch-eviction.
+
+Eviction also utilizes the block manager. When a page is evicted and contains
+data that needs to be maintained, logically a block needs to be written.
+Eviction calls \c bm->write however it does not instruct the block manager to
+sync the data.
+
+@subsection Compaction
+
+As new blocks are written, the block manager will place them where they fit best.
+Because of this it's common that removal of data will not result in the file
+shrinking. The file can only be shrunk when there are available blocks at the
+end of the file.
+
+To manage this, WiredTiger provides a compaction API call WT_SESSION::compact.
+The block manager operates in first fit mode during compaction to maximize block
+movement towards the beginning of the file. WiredTiger walks the btree and asks
+the block manager if relocating that page will reduce the file size. If so, the
+page is marked dirty, forcing the block to be rewritten. WiredTiger then
+performs two checkpoints, as at least two checkpoints are required to delete the
+checkpoint originally containing the block.
+
 */
