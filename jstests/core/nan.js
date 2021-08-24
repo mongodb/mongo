@@ -21,7 +21,7 @@ assert.commandWorked(coll.insert({_id: 10, a: {b: 1}}));
 assert.commandWorked(coll.insert({_id: 11, a: {b: 1}}));
 
 /**
- * Ensures correct results for EQ, LT, LTE, GT, and GTE cases.
+ * Ensures correct results for EQ, LT, LTE, GT, GTE, and IN cases.
  */
 function testNaNComparisons() {
     // EQ
@@ -46,6 +46,33 @@ function testNaNComparisons() {
 
     // GTE
     cursor = coll.find({a: {$gte: NaN}}).sort({_id: 1});
+    assert.eq(5, cursor.next()["_id"]);
+    assert.eq(6, cursor.next()["_id"]);
+    assert(!cursor.hasNext());
+
+    // IN
+    // Positive NaN should match both positive and negative NaN. Note that the second value protects
+    // the $in from being optimized away.
+    cursor = coll.find({a: {$in: [NaN, 1000]}}).sort({_id: 1});
+    assert.eq(5, cursor.next()["_id"]);
+    assert.eq(6, cursor.next()["_id"]);
+    assert(!cursor.hasNext());
+
+    // Negative NaN should match both positive and negative NaN. Note that the second value protects
+    // the $in from being optimized away.
+    cursor = coll.find({a: {$in: [-NaN, 1000]}}).sort({_id: 1});
+    assert.eq(5, cursor.next()["_id"]);
+    assert.eq(6, cursor.next()["_id"]);
+    assert(!cursor.hasNext());
+
+    // NaNs of different types should match both positive and negative NaN. Note that the second
+    // value protects the $in from being optimized away.
+    cursor = coll.find({a: {$in: [NumberDecimal(NaN), 1000]}}).sort({_id: 1});
+    assert.eq(5, cursor.next()["_id"]);
+    assert.eq(6, cursor.next()["_id"]);
+    assert(!cursor.hasNext());
+
+    cursor = coll.find({a: {$in: [NumberDecimal(-NaN), 1000]}}).sort({_id: 1});
     assert.eq(5, cursor.next()["_id"]);
     assert.eq(6, cursor.next()["_id"]);
     assert(!cursor.hasNext());
