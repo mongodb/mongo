@@ -1,13 +1,114 @@
 /*! @arch_page arch-cache Cache
 
-Cache in WiredTiger is represented by the various shared data structures
-that make up in-memory Btrees and subordinate data structures.
+The WiredTiger cache is memory used to hold copies of recently accessed or modified data.
+WiredTiger reads Btree pages into the cache on demand.  When the cache runs low on space, Eviction
+removes unneeded pages.  Updates modify data in the cache and
+are flushed to storage asynchronously, either by @ref arch-checkpoint "Checkpoint" or
+@ref arch-eviction "Eviction".
 
-Memory used to read in and write out the on-disk representations of Btrees
-is not cached, it only exists temporarily during the I/O operation and
-while the data is transferred to or from the on-disk format.
+The page layout in the WiredTiger cache is optimized for fast, concurrent access by multiple
+application threads.  In contrast, WiredTiger organizes pages in storage minimize storage space.
+As a result, WiredTiger has to convert between the in-memory and on-storage representations of a
+page whenever it reads or writes the page.
 
-Internally, the current cache state is represented by the WT_CACHE structure,
-which contains various counters that drive statistics and information
-used for eviction.
+@section arch_cache_basics Basic operation
+
+Cached Btree pages point to each other, mirroring the structure of the on-disk Btree.
+When WiredTiger opens a file, it loads the root page of the Btree into memory along with the first
+level of internal pages.  To lookup an entry in a Btree, WiredTiger starts from the root page
+and searches the Btree until finds the entry.  If WiredTiger encounters a page that is not in
+memory, it loads that page from storage and continues the search.
+
+To load a page into the cache, WiredTiger passes the page's address cookie to the
+@ref arch-block "Block Manager"
+and gets back a buffer containing the corresponding block from the underlying file.
+If necessary, WiredTiger decrypts and decompresses the block.  Then it allocates indexing
+structures to facilitate quick binary search of the keys in the page.  The first time WiredTiger
+needs to modify or insert an entry on a page, it allocates additional structures to track these
+changes.
+
+WiredTiger tracks the total amount of data in the cache.  It also tracks the space used by
+_clean_, (unmodified) pages and by _dirty_ (modified) pages.  When the cache becomes too
+full or contains too much dirty data, WiredTiger invokes @ref arch-eviction "Eviction" to
+remove data from the
+cache.  To remove a clean page from the cache, WiredTiger simply frees the page's memory.
+To remove a dirty page, WiredTiger must first _reconcile_ the page (converting it from
+in-memory format to on-disk format) and then write it to storage.
+
+@section arch_cache_structure Cache structure
+
+Internally, WiredTiger's cache state is represented by the \c WT_CACHE structure, which contains
+counters and parameter settings for tracking cache usage and controlling eviction policy.
+The \c WT_CACHE also includes state WiredTiger uses to track the progress of eviction.  There
+is a single \c WT_CACHE for each connection, accessed via the \c WT_CONNECTION structure.
+
+Each page in the cache is accessed via a \c WT_REF structure.  When WiredTiger opens a Btree,
+it places a \c WT_REF for the cached root page in the corresponding \c WT_BTREE structure.
+A \c WT_REF can represent either
+a page in the cache or one that has not been loaded yet.
+The page itself is represented by a \c WT_PAGE structure.  This includes a pointer to a buffer
+that contains the on-disk page image (decrypted and uncompressed).  It also holds the supplemental
+structures that WiredTiger uses to access and update the page while it is cached.
+
+When WiredTiger loads a page into the cache, it allocates an internal table with one entry
+for each entry on the page.  The type and content of these entries depends on the page type. An
+internal Btree page will have an array of \c WT_REF structures.  A row-store leaf page will have
+an array of \c WT_ROW structures representing the KV pairs stored on the page.  A variable-length
+column-store leaf page will have an array of \c WT_COL structures along with a parallel array
+of \c WT_COL_RLE structures indicating run lengths for items that are repeated more then once
+on the page.  Both of these leaf page formats support binary search to quickly find an entry.
+In a fixed-length column-store leaf page, values will be packed into a simple byte array, allowing
+WiredTiger to access entries using bit operations based on the value length.
+
+The first time a KV pair on a leaf page is inserted or modified, WiredTiger adds a
+\c WT_PAGE_MODIFY structure to the corresponding \c WT_PAGE in the cache.
+The \c WT_PAGE_MODIFY includes an array of \c WT_UPDATE pointers with one element for each
+KV pair on the leaf page.  When WiredTiger updates an entry, it inserts a \c WT_UPDATE in
+this array.  If there are multiple updates to the same item, WiredTiger chains them together
+in a linked list.  When a record is deleted,
+WiredTiger adds an update with a special tombstone value.  WiredTiger stores newly inserted
+elements in a similar array of skip lists represented by \c WT_INSERT structures.  There is a
+separate skiplist for the gap between each pair of keys on the page, as well as skiplists for
+the gaps between the beginning and end of the page and the first and last keys, respectively.
+
+Almost all operations on these data structures are lock-free, allowing a high level of
+concurrency in the cache.
+
+@section arch_cache_size Cache size and content
+
+The amount of memory used by the WiredTiger cache is controlled by the cache_size configuration
+parameter, which defaults to 100 MB.  (Note that MongoDB sets the cache_size, by default, to be
+half the size of RAM.)  WiredTiger does not explicitly manage this memory, relying instead on
+the C memory allocator to acquire and free memory as needed.  Since the cache is
+allocated from the heap, evicting data from the cache simply returns the memory to the allocator;
+it does not reduce the application's memory footprint.
+
+The WiredTiger cache is only used for Btree data, including associated in-memory structures such
+as indexes, insert lists, and update chains.  Other WiredTiger data structures, such as
+dhandles, cursors, and sessions, are not considered part of the cache and do not count against
+the cache size.  Similarly, memory used to read in and write out the on-disk representations of
+Btree pages is not cached; it is only allocated temporarily during the I/O operation and
+while the data is converted to or from the on-disk format.
+
+@section arch_cache_shared Shared caches
+
+WiredTiger supports sharing a single cache among multiple databases within a process.  Normally
+if a process opens connections to multiple different databases, each connection would use a
+separate fixed-size cache.  With a shared cache, WiredTiger dynamically partitions a fixed
+amount of cache space between participating connections.
+
+When shared caching is enabled, WiredTiger creates a cache pool server thread to manage the
+shared cache.  It also allocates a global \c WT_CACHE_POOL structure, which stores settings
+and statistics for the shared cache.  These settings include a minimum and
+maximum cache size for connections participating in the shared cache.
+
+The cache pool server thread wakes up periodically and adjusts the sizes of the individual
+per-connection caches.  Adjustments are based on a pressure metric for each cache computed
+using a weighted average of the amount of data read into the cache (i.e., cache misses)
+and how often applications threads have evicted data from the cache or waited while
+performing eviction.  If a cache has higher pressure than average and is not yet at the maximum
+size, WiredTiger grows that cache.  Conversely, if a cache has low pressure, WiredTiger shrinks
+it, subject to the minimum cache size.  To change the size of a cache, the cache pool server
+simply changes the cache size parameters in the corresponding \c WT_CACHE structure.  WiredTiger's
+eviction code will adjust the amount of data in the cache accordingly.
 */

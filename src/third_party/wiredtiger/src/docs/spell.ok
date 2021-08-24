@@ -257,6 +257,7 @@ decrement
 decrementing
 decrypt
 decrypted
+decrypts
 del
 desc
 destructor
@@ -574,6 +575,7 @@ sess
 sid
 skinparam
 skiplist
+skiplists
 sortable
 spinlock
 spinlocks
