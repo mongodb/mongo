@@ -142,13 +142,11 @@ const assertTransactionEntries = (donorTxnEntries, recipientTxnEntries) => {
     const donorTxnEntries = runTransaction(donorPrimary, tenantDB, collName2);
     assert.eq(2, donorTxnEntries.length);
 
-    // Remove wait to recreate aggregation cursors to eliminate race conditions when waiting for
-    // the recipient to retry.
-    configureFailPoint(recipientPrimary, "skipWaitingToRecreateCursor");
-
-    // Hang the recipient after it updates the first transaction entry.
-    const hangAfterUpdatingTransactionEntry =
-        configureFailPoint(recipientPrimary, "hangAfterUpdatingTransactionEntry");
+    // Hang the recipient after it updates the first transaction entry. Have the failpoint throw
+    // a retriable error to avoid the potential race condition where the recipient continues
+    // processing transaction entries in the same batch after the failpoint is released.
+    const hangAfterUpdatingTransactionEntry = configureFailPoint(
+        recipientPrimary, "hangAfterUpdatingTransactionEntry", {"failAfterHanging": true});
 
     jsTestLog("Starting a migration");
     const migrationId = UUID();
@@ -215,13 +213,11 @@ const assertTransactionEntries = (donorTxnEntries, recipientTxnEntries) => {
     const initialDonorTxnEntries = runTransaction(donorPrimary, tenantDB, collName2, session);
     assert.eq(2, initialDonorTxnEntries.length);
 
-    // Remove wait to recreate aggregation cursors to eliminate race conditions when waiting for
-    // the recipient to retry.
-    configureFailPoint(recipientPrimary, "skipWaitingToRecreateCursor");
-
-    // Hang the recipient after it updates the first transaction entry.
-    const hangAfterUpdatingTransactionEntry =
-        configureFailPoint(recipientPrimary, "hangAfterUpdatingTransactionEntry");
+    // Hang the recipient after it updates the first transaction entry. Have the failpoint throw
+    // a retriable error to avoid the potential race condition where the recipient continues
+    // processing transaction entries in the same batch after the failpoint is released.
+    const hangAfterUpdatingTransactionEntry = configureFailPoint(
+        recipientPrimary, "hangAfterUpdatingTransactionEntry", {"failAfterHanging": true});
 
     jsTestLog("Starting a migration");
     const migrationId = UUID();

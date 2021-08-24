@@ -1030,10 +1030,15 @@ void TenantMigrationRecipientService::Instance::_processCommittedTransactionEntr
     // the transaction state from 'config.transactions'.
     txnParticipant.invalidate(opCtx);
 
-    if (MONGO_unlikely(hangAfterUpdatingTransactionEntry.shouldFail())) {
+    hangAfterUpdatingTransactionEntry.execute([&](const BSONObj& data) {
         LOGV2(5351400, "hangAfterUpdatingTransactionEntry failpoint enabled");
         hangAfterUpdatingTransactionEntry.pauseWhileSet();
-    }
+        if (data["failAfterHanging"].trueValue()) {
+            // Simulate the sync source shutting down/restarting.
+            uasserted(ErrorCodes::ShutdownInProgress,
+                      "Throwing error due to hangAfterUpdatingTransactionEntry failpoint");
+        }
+    });
 }
 
 SemiFuture<void>
