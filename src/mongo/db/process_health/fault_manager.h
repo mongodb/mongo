@@ -32,6 +32,7 @@
 
 #include "mongo/db/process_health/fault.h"
 #include "mongo/db/service_context.h"
+#include "mongo/platform/mutex.h"
 
 namespace mongo {
 namespace process_health {
@@ -86,6 +87,17 @@ protected:
     // Starts the health check sequence and updates the internal state on completion.
     // This is invoked by the internal timer.
     virtual void healthCheck();
+
+    virtual Status transitionToState(FaultState newState);
+
+private:
+    Status _transitionToKOk();
+    Status _transitionToKTransientFault();
+    Status _transitionToKActiveFault();
+
+    mutable Mutex _stateMutex =
+        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "ProcessHealthFaultManager::_stateMutex");
+    FaultState _currentState = FaultState::kStartupCheck;
 };
 
 }  // namespace process_health
