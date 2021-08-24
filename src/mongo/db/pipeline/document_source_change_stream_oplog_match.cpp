@@ -190,9 +190,12 @@ BSONObj buildMatchFilter(const boost::intrusive_ptr<ExpressionContext>& expCtx,
     // 3) Look for 'applyOps' which were created as part of a transaction.
     BSONObj applyOps = getTxnApplyOpsFilter(opNsMatch["ns"], nss);
 
-    // Either (1) or (3), excluding those resulting from chunk migration.
+    // Exclude 'fromMigrate' events if 'showMigrationEvents' has not been specified as $changeStream
+    // option.
     BSONObj commandAndApplyOpsMatch =
-        BSON("$and" << BSON_ARRAY(BSON(OR(commandMatch, applyOps)) << notFromMigrateFilter));
+        (showMigrationEvents ? BSON(OR(commandMatch, applyOps))
+                             : BSON("$and" << BSON_ARRAY(BSON(OR(commandMatch, applyOps))
+                                                         << notFromMigrateFilter)));
 
     // Match oplog entries after "start" that are either supported (1) commands or (2) operations.
     // Only include CRUD operations tagged "fromMigrate" when the "showMigrationEvents" option is
