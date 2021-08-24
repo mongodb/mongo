@@ -147,7 +147,7 @@ TEST_F(SBEConcatTest, ComputesManyMoreStringsConcat) {
                        smallArityLimit - 1,
                        smallArityLimit + 1,
                        smallArityLimit * 10}) {
-        std::vector<std::unique_ptr<EExpression>> args;
+        EExpression::Vector args;
         args.reserve(arity);
         for (size_t idx = 0; idx < arity; ++idx) {
             args.push_back(makeE<EConstant>("x"));

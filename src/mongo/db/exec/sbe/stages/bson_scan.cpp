@@ -149,7 +149,7 @@ std::unique_ptr<PlanStageStats> BSONScanStage::getStats(bool includeDebugInfo) c
             bob.appendNumber("recordSlot", static_cast<long long>(*_recordSlot));
         }
         bob.append("field", _fields);
-        bob.append("outputSlots", _vars);
+        bob.append("outputSlots", _vars.begin(), _vars.end());
         ret->debugInfo = bob.obj();
     }
 

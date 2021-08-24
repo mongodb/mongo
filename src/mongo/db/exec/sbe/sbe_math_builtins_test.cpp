@@ -520,7 +520,7 @@ TEST_F(SBEMathBuiltinTest, DoubleDoubleSummation) {
     {
         constexpr auto arity = 3;
         std::vector<Decimal128> vals = {Decimal128("1.0"), Decimal128("2.0"), Decimal128("3.0")};
-        std::vector<std::unique_ptr<EExpression>> args;
+        EExpression::Vector args;
 
         for (size_t i = 0; i < arity; ++i) {
             auto [tag, val] = value::makeCopyDecimal(vals[i]);

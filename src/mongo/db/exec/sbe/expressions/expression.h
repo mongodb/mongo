@@ -253,6 +253,11 @@ private:
  */
 class EExpression {
 public:
+    /**
+     * Let's optimistically assume a nice binary tree.
+     */
+    using Vector = absl::InlinedVector<std::unique_ptr<EExpression>, 2>;
+
     virtual ~EExpression() = default;
 
     /**
@@ -264,12 +269,16 @@ public:
     /**
      * Returns bytecode directly executable by VM.
      */
-    virtual std::unique_ptr<vm::CodeFragment> compile(CompileCtx& ctx) const = 0;
+    std::unique_ptr<vm::CodeFragment> compile(CompileCtx& ctx) const {
+        return std::make_unique<vm::CodeFragment>(compileDirect(ctx));
+    }
+
+    virtual vm::CodeFragment compileDirect(CompileCtx& ctx) const = 0;
 
     virtual std::vector<DebugPrinter::Block> debugPrint() const = 0;
 
 protected:
-    std::vector<std::unique_ptr<EExpression>> _nodes;
+    Vector _nodes;
 
     /**
      * Expressions can never be constructed with nullptr children.
@@ -287,8 +296,8 @@ inline std::unique_ptr<EExpression> makeE(Args&&... args) {
 }
 
 template <typename... Ts>
-inline std::vector<std::unique_ptr<EExpression>> makeEs(Ts&&... pack) {
-    std::vector<std::unique_ptr<EExpression>> exprs;
+inline auto makeEs(Ts&&... pack) {
+    EExpression::Vector exprs;
 
     (exprs.emplace_back(std::forward<Ts>(pack)), ...);
 
@@ -349,7 +358,7 @@ public:
 
     std::unique_ptr<EExpression> clone() const override;
 
-    std::unique_ptr<vm::CodeFragment> compile(CompileCtx& ctx) const override;
+    vm::CodeFragment compileDirect(CompileCtx& ctx) const override;
 
     std::vector<DebugPrinter::Block> debugPrint() const override;
 
@@ -371,7 +380,7 @@ public:
 
     std::unique_ptr<EExpression> clone() const override;
 
-    std::unique_ptr<vm::CodeFragment> compile(CompileCtx& ctx) const override;
+    vm::CodeFragment compileDirect(CompileCtx& ctx) const override;
 
     std::vector<DebugPrinter::Block> debugPrint() const override;
 
@@ -435,7 +444,7 @@ public:
 
     std::unique_ptr<EExpression> clone() const override;
 
-    std::unique_ptr<vm::CodeFragment> compile(CompileCtx& ctx) const override;
+    vm::CodeFragment compileDirect(CompileCtx& ctx) const override;
 
     std::vector<DebugPrinter::Block> debugPrint() const override;
 
@@ -460,7 +469,7 @@ public:
 
     std::unique_ptr<EExpression> clone() const override;
 
-    std::unique_ptr<vm::CodeFragment> compile(CompileCtx& ctx) const override;
+    vm::CodeFragment compileDirect(CompileCtx& ctx) const override;
 
     std::vector<DebugPrinter::Block> debugPrint() const override;
 
@@ -475,14 +484,14 @@ private:
  */
 class EFunction final : public EExpression {
 public:
-    EFunction(StringData name, std::vector<std::unique_ptr<EExpression>> args) : _name(name) {
+    EFunction(StringData name, EExpression::Vector args) : _name(name) {
         _nodes = std::move(args);
         validateNodes();
     }
 
     std::unique_ptr<EExpression> clone() const override;
 
-    std::unique_ptr<vm::CodeFragment> compile(CompileCtx& ctx) const override;
+    vm::CodeFragment compileDirect(CompileCtx& ctx) const override;
 
     std::vector<DebugPrinter::Block> debugPrint() const override;
 
@@ -506,7 +515,7 @@ public:
 
     std::unique_ptr<EExpression> clone() const override;
 
-    std::unique_ptr<vm::CodeFragment> compile(CompileCtx& ctx) const override;
+    vm::CodeFragment compileDirect(CompileCtx& ctx) const override;
 
     std::vector<DebugPrinter::Block> debugPrint() const override;
 };
@@ -516,9 +525,7 @@ public:
  */
 class ELocalBind final : public EExpression {
 public:
-    ELocalBind(FrameId frameId,
-               std::vector<std::unique_ptr<EExpression>> binds,
-               std::unique_ptr<EExpression> in)
+    ELocalBind(FrameId frameId, EExpression::Vector binds, std::unique_ptr<EExpression> in)
         : _frameId(frameId) {
         _nodes = std::move(binds);
         _nodes.emplace_back(std::move(in));
@@ -527,7 +534,7 @@ public:
 
     std::unique_ptr<EExpression> clone() const override;
 
-    std::unique_ptr<vm::CodeFragment> compile(CompileCtx& ctx) const override;
+    vm::CodeFragment compileDirect(CompileCtx& ctx) const override;
 
     std::vector<DebugPrinter::Block> debugPrint() const override;
 
@@ -547,7 +554,7 @@ public:
 
     std::unique_ptr<EExpression> clone() const override;
 
-    std::unique_ptr<vm::CodeFragment> compile(CompileCtx& ctx) const override;
+    vm::CodeFragment compileDirect(CompileCtx& ctx) const override;
 
     std::vector<DebugPrinter::Block> debugPrint() const override;
 
@@ -570,7 +577,7 @@ public:
 
     std::unique_ptr<EExpression> clone() const override;
 
-    std::unique_ptr<vm::CodeFragment> compile(CompileCtx& ctx) const override;
+    vm::CodeFragment compileDirect(CompileCtx& ctx) const override;
 
     std::vector<DebugPrinter::Block> debugPrint() const override;
 
@@ -602,7 +609,7 @@ public:
 
     std::unique_ptr<EExpression> clone() const override;
 
-    std::unique_ptr<vm::CodeFragment> compile(CompileCtx& ctx) const override;
+    vm::CodeFragment compileDirect(CompileCtx& ctx) const override;
 
     std::vector<DebugPrinter::Block> debugPrint() const override;
 
@@ -624,7 +631,7 @@ public:
 
     std::unique_ptr<EExpression> clone() const override;
 
-    std::unique_ptr<vm::CodeFragment> compile(CompileCtx& ctx) const override;
+    vm::CodeFragment compileDirect(CompileCtx& ctx) const override;
 
     std::vector<DebugPrinter::Block> debugPrint() const override;
 

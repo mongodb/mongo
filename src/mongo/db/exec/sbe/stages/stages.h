@@ -358,6 +358,8 @@ class PlanStage : public CanSwitchOperationContext<PlanStage>,
                   public CanTrackStats<PlanStage>,
                   public CanInterrupt {
 public:
+    using Vector = absl::InlinedVector<std::unique_ptr<PlanStage>, 2>;
+
     PlanStage(StringData stageType, PlanYieldPolicy* yieldPolicy, PlanNodeId nodeId)
         : CanTrackStats{stageType, nodeId}, CanInterrupt{yieldPolicy} {}
 
@@ -424,12 +426,22 @@ protected:
     virtual void doDetachFromTrialRunTracker() {}
     virtual void doAttachToTrialRunTracker(TrialRunTracker* tracker) {}
 
-    std::vector<std::unique_ptr<PlanStage>> _children;
+    Vector _children;
 };
 
 template <typename T, typename... Args>
 inline std::unique_ptr<PlanStage> makeS(Args&&... args) {
     return std::make_unique<T>(std::forward<Args>(args)...);
 }
+
+template <typename... Ts>
+inline auto makeSs(Ts&&... pack) {
+    PlanStage::Vector stages;
+
+    (stages.emplace_back(std::forward<Ts>(pack)), ...);
+
+    return stages;
+}
+
 }  // namespace sbe
 }  // namespace mongo

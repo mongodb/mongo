@@ -424,7 +424,7 @@ std::unique_ptr<PlanStageStats> IndexScanStage::getStats(bool includeDebugInfo) 
         if (_seekKeySlotHigh) {
             bob.appendNumber("seekKeySlotHigh", static_cast<long long>(*_seekKeySlotHigh));
         }
-        bob.append("outputSlots", _vars);
+        bob.append("outputSlots", _vars.begin(), _vars.end());
         bob.append("indexKeysToInclude", _indexKeysToInclude.to_string());
         ret->debugInfo = bob.obj();
     }

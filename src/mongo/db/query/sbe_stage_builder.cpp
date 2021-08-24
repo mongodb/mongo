@@ -281,7 +281,7 @@ std::unique_ptr<IndexKeyPatternTreeNode> buildKeyPatternTree(const BSONObj& keyP
  */
 std::unique_ptr<sbe::EExpression> buildNewObjExpr(const IndexKeyPatternTreeNode* kpTree) {
 
-    std::vector<std::unique_ptr<sbe::EExpression>> args;
+    sbe::EExpression::Vector args;
     for (auto&& fieldName : kpTree->childrenOrder) {
         auto it = kpTree->children.find(fieldName);
 
@@ -822,7 +822,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         _state, _collection, ixn, indexKeyBitset, _yieldPolicy, iamMap, reqs.has(kIndexKeyPattern));
 
     if (reqs.has(PlanStageSlots::kReturnKey)) {
-        std::vector<std::unique_ptr<sbe::EExpression>> mkObjArgs;
+        sbe::EExpression::Vector mkObjArgs;
 
         size_t i = 0;
         for (auto&& elem : ixn->index.keyPattern) {
@@ -1431,7 +1431,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                              : sbe::value::SortDirection::Descending);
     }
 
-    std::vector<std::unique_ptr<sbe::PlanStage>> inputStages;
+    sbe::PlanStage::Vector inputStages;
     std::vector<sbe::value::SlotVector> inputKeys;
     std::vector<sbe::value::SlotVector> inputVals;
 
@@ -1714,7 +1714,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
     invariant(!reqs.getIndexKeyBitset());
 
-    std::vector<std::unique_ptr<sbe::PlanStage>> inputStages;
+    sbe::PlanStage::Vector inputStages;
     std::vector<sbe::value::SlotVector> inputSlots;
 
     auto orn = static_cast<const OrNode*>(root);
@@ -2116,8 +2116,7 @@ SlotBasedStageBuilder::makeUnionForTailableCollScan(const QuerySolutionNode* roo
 
     // Branch output slots become the input slots to the union.
     auto unionStage =
-        sbe::makeS<sbe::UnionStage>(makeVector<std::unique_ptr<sbe::PlanStage>>(
-                                        std::move(anchorBranch), std::move(resumeBranch)),
+        sbe::makeS<sbe::UnionStage>(sbe::makeSs(std::move(anchorBranch), std::move(resumeBranch)),
                                     branchSlots,
                                     unionOutputSlots,
                                     root->nodeId());

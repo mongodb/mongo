@@ -39,6 +39,8 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 
+#include <absl/container/inlined_vector.h>
+
 namespace mongo {
 namespace sbe {
 namespace vm {
@@ -395,9 +397,9 @@ public:
     }
     void removeFixup(FrameId frameId);
 
-    void append(std::unique_ptr<CodeFragment> code);
-    void appendNoStack(std::unique_ptr<CodeFragment> code);
-    void append(std::unique_ptr<CodeFragment> lhs, std::unique_ptr<CodeFragment> rhs);
+    void append(CodeFragment&& code);
+    void appendNoStack(CodeFragment&& code);
+    void append(CodeFragment&& lhs, CodeFragment&& rhs);
     void appendConstVal(value::TypeTags tag, value::Value val);
     void appendAccessVal(value::SlotAccessor* accessor);
     void appendMoveVal(value::SlotAccessor* accessor);
@@ -528,9 +530,9 @@ private:
     }
 
     void adjustStackSimple(const Instruction& i);
-    void copyCodeAndFixup(const CodeFragment& from);
+    void copyCodeAndFixup(CodeFragment&& from);
 
-    std::vector<uint8_t> _instrs;
+    absl::InlinedVector<uint8_t, 16> _instrs;
 
     /**
      * Local variables bound by the let expressions live on the stack and are accessed by knowing an

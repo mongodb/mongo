@@ -54,7 +54,6 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
-#include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/unittest/unittest.h"
 
 #include <regex>
@@ -110,7 +109,7 @@ class SBEParserTest : public unittest::Test {
 protected:
     SBEParserTest() : planNodeId(12345) {
         auto fakeUuid = unittest::assertGet(UUID::parse("00000000-0000-0000-0000-000000000000"));
-        stages = makeVector(
+        stages = sbe::makeSs(
             // IXSCAN with 'recordSlot' and 'recordIdSlot' slots only.
             sbe::makeS<sbe::IndexScanStage>(fakeUuid,
                                             "_id",
@@ -556,7 +555,7 @@ protected:
             // UNION
             sbe::makeS<sbe::UnionStage>(
                 ([this]() {
-                    std::vector<std::unique_ptr<sbe::PlanStage>> ret;
+                    sbe::PlanStage::Vector ret;
                     ret.push_back(sbe::makeS<sbe::CoScanStage>(planNodeId));
                     ret.push_back(sbe::makeS<sbe::CoScanStage>(planNodeId));
                     return ret;
@@ -568,7 +567,7 @@ protected:
             // SORTED_MERGE
             sbe::makeS<sbe::SortedMergeStage>(
                 ([this]() {
-                    std::vector<std::unique_ptr<sbe::PlanStage>> ret;
+                    sbe::PlanStage::Vector ret;
                     ret.push_back(sbe::makeS<sbe::CoScanStage>(planNodeId));
                     ret.push_back(sbe::makeS<sbe::CoScanStage>(planNodeId));
                     return ret;
@@ -582,7 +581,7 @@ protected:
     }
 
     PlanNodeId planNodeId;
-    std::vector<std::unique_ptr<sbe::PlanStage>> stages;
+    sbe::PlanStage::Vector stages;
 };
 
 TEST_F(SBEParserTest, TestIdenticalDebugOutputAfterParse) {

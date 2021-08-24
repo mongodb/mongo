@@ -350,7 +350,7 @@ std::unique_ptr<PlanStageStats> MakeObjStageBase<O>::getStats(bool includeDebugI
         }
         bob.append("fields", _fields);
         bob.append("projectFields", _projectFields);
-        bob.append("projectSlots", _projectVars);
+        bob.append("projectSlots", _projectVars.begin(), _projectVars.end());
         bob.append("forceNewObject", _forceNewObject);
         bob.append("returnOldObject", _returnOldObject);
         ret->debugInfo = bob.obj();

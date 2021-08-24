@@ -254,11 +254,11 @@ TEST_F(SbeSpoolTest, SpoolAndConsumeCloseAndReopen) {
 
     // Union the two mock scans.
     auto unionOutputSlot = generateSlotId();
-    auto unionStage = makeS<UnionStage>(
-        makeVector<std::unique_ptr<PlanStage>>(std::move(scanStage1), std::move(scanStage2)),
-        makeVector<value::SlotVector>(makeSV(scanSlot1), makeSV(scanSlot2)),
-        makeSV(unionOutputSlot),
-        kEmptyPlanNodeId);
+    auto unionStage =
+        makeS<UnionStage>(makeSs(std::move(scanStage1), std::move(scanStage2)),
+                          makeVector<value::SlotVector>(makeSV(scanSlot1), makeSV(scanSlot2)),
+                          makeSV(unionOutputSlot),
+                          kEmptyPlanNodeId);
 
     // The union stage feeds a lazy spool consumer.
     auto spoolId = generateSpoolId();

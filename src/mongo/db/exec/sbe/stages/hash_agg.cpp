@@ -240,7 +240,7 @@ std::unique_ptr<PlanStageStats> HashAggStage::getStats(bool includeDebugInfo) co
     if (includeDebugInfo) {
         DebugPrinter printer;
         BSONObjBuilder bob;
-        bob.append("groupBySlots", _gbs);
+        bob.append("groupBySlots", _gbs.begin(), _gbs.end());
         if (!_aggs.empty()) {
             BSONObjBuilder childrenBob(bob.subobjStart("expressions"));
             for (auto&& [slot, expr] : _aggs) {

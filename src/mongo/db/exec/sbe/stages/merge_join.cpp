@@ -336,10 +336,10 @@ std::unique_ptr<PlanStageStats> MergeJoinStage::getStats(bool includeDebugInfo) 
 
     if (includeDebugInfo) {
         BSONObjBuilder bob;
-        bob.append("outerKeys", _outerKeys);
-        bob.append("outerProjects", _outerProjects);
-        bob.append("innerKeys", _innerKeys);
-        bob.append("innerProjects", _innerProjects);
+        bob.append("outerKeys", _outerKeys.begin(), _outerKeys.end());
+        bob.append("outerProjects", _outerProjects.begin(), _outerProjects.end());
+        bob.append("innerKeys", _innerKeys.begin(), _innerKeys.end());
+        bob.append("innerProjects", _innerProjects.begin(), _innerProjects.end());
         bob.append("sortDirs", _dirs);
         ret->debugInfo = bob.obj();
     }

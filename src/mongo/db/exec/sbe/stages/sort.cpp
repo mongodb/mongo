@@ -251,7 +251,7 @@ std::unique_ptr<PlanStageStats> SortStage::getStats(bool includeDebugInfo) const
                                _dirs[idx] == sbe::value::SortDirection::Ascending ? "asc" : "desc");
         }
         childrenBob.doneFast();
-        bob.append("outputSlots", _vals);
+        bob.append("outputSlots", _vals.begin(), _vals.end());
         ret->debugInfo = bob.obj();
     }
 

@@ -787,10 +787,10 @@ public:
             _context->pushExpr(
                 sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(addExpr)));
         } else {
-            std::vector<std::unique_ptr<sbe::EExpression>> binds;
-            std::vector<std::unique_ptr<sbe::EExpression>> argVars;
-            std::vector<std::unique_ptr<sbe::EExpression>> checkExprsNull;
-            std::vector<std::unique_ptr<sbe::EExpression>> checkExprsNotNumberOrDate;
+            sbe::EExpression::Vector binds;
+            sbe::EExpression::Vector argVars;
+            sbe::EExpression::Vector checkExprsNull;
+            sbe::EExpression::Vector checkExprsNotNumberOrDate;
             binds.reserve(arity);
             argVars.reserve(arity);
             checkExprsNull.reserve(arity);
@@ -809,7 +809,7 @@ public:
             // precision errors from floating point types.
             std::reverse(std::begin(binds), std::end(binds));
 
-            using iter_t = std::vector<std::unique_ptr<sbe::EExpression>>::iterator;
+            using iter_t = sbe::EExpression::Vector::iterator;
             auto checkNullAllArguments = std::accumulate(
                 std::move_iterator<iter_t>(checkExprsNull.begin() + 1),
                 std::move_iterator<iter_t>(checkExprsNull.end()),
@@ -954,7 +954,7 @@ public:
     }
     void visit(const ExpressionCompare* expr) final {
         _context->ensureArity(2);
-        std::vector<std::unique_ptr<sbe::EExpression>> operands(2);
+        sbe::EExpression::Vector operands(2);
         for (auto it = operands.rbegin(); it != operands.rend(); ++it) {
             *it = _context->popExpr();
         }
@@ -1023,10 +1023,10 @@ public:
         _context->ensureArity(arity);
         auto frameId = _context->state.frameId();
 
-        std::vector<std::unique_ptr<sbe::EExpression>> binds;
-        std::vector<std::unique_ptr<sbe::EExpression>> checkNullArg;
-        std::vector<std::unique_ptr<sbe::EExpression>> checkStringArg;
-        std::vector<std::unique_ptr<sbe::EExpression>> argVars;
+        sbe::EExpression::Vector binds;
+        sbe::EExpression::Vector checkNullArg;
+        sbe::EExpression::Vector checkStringArg;
+        sbe::EExpression::Vector argVars;
         sbe::value::SlotId slot{0};
         for (size_t idx = 0; idx < arity; ++idx, ++slot) {
             sbe::EVariable var(frameId, slot);
@@ -1037,7 +1037,7 @@ public:
         }
         std::reverse(std::begin(binds), std::end(binds));
 
-        using iter_t = std::vector<std::unique_ptr<sbe::EExpression>>::iterator;
+        using iter_t = sbe::EExpression::Vector::iterator;
 
         auto checkNullAnyArgument = std::accumulate(
             std::move_iterator<iter_t>(checkNullArg.begin() + 1),
@@ -1204,8 +1204,8 @@ public:
     void visit(const ExpressionDateDiff* expr) final {
         using namespace std::literals;
         auto frameId = _context->state.frameId();
-        std::vector<std::unique_ptr<sbe::EExpression>> arguments;
-        std::vector<std::unique_ptr<sbe::EExpression>> bindings;
+        sbe::EExpression::Vector arguments;
+        sbe::EExpression::Vector bindings;
         sbe::EVariable startDateRef(frameId, 0);
         sbe::EVariable endDateRef(frameId, 1);
         sbe::EVariable unitRef(frameId, 2);
@@ -1457,7 +1457,7 @@ public:
             boundChecks;  // checks for lower and upper bounds of date fields.
 
         // Operands is for the outer let bindings.
-        std::vector<std::unique_ptr<sbe::EExpression>> operands;
+        sbe::EExpression::Vector operands;
         if (isIsoWeekYear) {
             if (!eIsoWeekYear) {
                 eIsoWeekYear = sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32,
@@ -1575,17 +1575,16 @@ public:
         // Make a disjunction of null checks for each date part by over this vector. These checks
         // are necessary after the initial conversion computation because we need have the outer let
         // binding evaluate to null if any field is null.
-        auto nullExprs =
-            makeVector<std::unique_ptr<sbe::EExpression>>(generateNullOrMissing(frameId, 7),
-                                                          generateNullOrMissing(frameId, 6),
-                                                          generateNullOrMissing(frameId, 5),
-                                                          generateNullOrMissing(frameId, 4),
-                                                          generateNullOrMissing(frameId, 3),
-                                                          generateNullOrMissing(frameId, 2),
-                                                          generateNullOrMissing(frameId, 1),
-                                                          generateNullOrMissing(frameId, 0));
+        auto nullExprs = sbe::makeEs(generateNullOrMissing(frameId, 7),
+                                     generateNullOrMissing(frameId, 6),
+                                     generateNullOrMissing(frameId, 5),
+                                     generateNullOrMissing(frameId, 4),
+                                     generateNullOrMissing(frameId, 3),
+                                     generateNullOrMissing(frameId, 2),
+                                     generateNullOrMissing(frameId, 1),
+                                     generateNullOrMissing(frameId, 0));
 
-        using iter_t = std::vector<std::unique_ptr<sbe::EExpression>>::iterator;
+        using iter_t = sbe::EExpression::Vector::iterator;
         auto checkPartsForNull = std::accumulate(
             std::move_iterator<iter_t>(nullExprs.begin() + 1),
             std::move_iterator<iter_t>(nullExprs.end()),
@@ -1638,9 +1637,9 @@ public:
         auto children = expr->getChildren();
         std::unique_ptr<sbe::EExpression> date, timezone, isoflag;
         std::unique_ptr<sbe::EExpression> totalExprDateToParts;
-        std::vector<std::unique_ptr<sbe::EExpression>> args;
-        std::vector<std::unique_ptr<sbe::EExpression>> isoargs;
-        std::vector<std::unique_ptr<sbe::EExpression>> operands;
+        sbe::EExpression::Vector args;
+        sbe::EExpression::Vector isoargs;
+        sbe::EExpression::Vector operands;
         sbe::EVariable dateRef(frameId, 0);
         sbe::EVariable timezoneRef(frameId, 1);
         sbe::EVariable isoflagRef(frameId, 2);
@@ -2153,10 +2152,10 @@ public:
         _context->ensureArity(arity);
         auto frameId = _context->state.frameId();
 
-        std::vector<std::unique_ptr<sbe::EExpression>> binds;
-        std::vector<std::unique_ptr<sbe::EExpression>> variables;
-        std::vector<std::unique_ptr<sbe::EExpression>> checkExprsNull;
-        std::vector<std::unique_ptr<sbe::EExpression>> checkExprsNumber;
+        sbe::EExpression::Vector binds;
+        sbe::EExpression::Vector variables;
+        sbe::EExpression::Vector checkExprsNull;
+        sbe::EExpression::Vector checkExprsNumber;
         binds.reserve(arity);
         variables.reserve(arity);
         checkExprsNull.reserve(arity);
@@ -2177,7 +2176,7 @@ public:
         // precision errors from floating point types.
         std::reverse(std::begin(binds), std::end(binds));
 
-        using iter_t = std::vector<std::unique_ptr<sbe::EExpression>>::iterator;
+        using iter_t = sbe::EExpression::Vector::iterator;
         auto checkNullAnyArgument = std::accumulate(
             std::move_iterator<iter_t>(checkExprsNull.begin() + 1),
             std::move_iterator<iter_t>(checkExprsNull.end()),
@@ -2440,8 +2439,8 @@ public:
     }
     void visit(const ExpressionSplit* expr) final {
         auto frameId = _context->state.frameId();
-        std::vector<std::unique_ptr<sbe::EExpression>> args;
-        std::vector<std::unique_ptr<sbe::EExpression>> binds;
+        sbe::EExpression::Vector args;
+        sbe::EExpression::Vector binds;
         sbe::EVariable stringExpressionRef(frameId, 0);
         sbe::EVariable delimiterRef(frameId, 1);
 
@@ -2922,8 +2921,8 @@ private:
 
     void generateDayOfExpression(StringData exprName, const Expression* expr) {
         auto frameId = _context->state.frameId();
-        std::vector<std::unique_ptr<sbe::EExpression>> args;
-        std::vector<std::unique_ptr<sbe::EExpression>> binds;
+        sbe::EExpression::Vector args;
+        sbe::EExpression::Vector binds;
         sbe::EVariable dateRef(frameId, 0);
         sbe::EVariable timezoneRef(frameId, 1);
 
@@ -3128,8 +3127,8 @@ private:
         auto frameId = _context->state.frameId();
         auto children = expr->getChildren();
         auto operandSize = children.size() <= 3 ? 3 : 4;
-        std::vector<std::unique_ptr<sbe::EExpression>> operands(operandSize);
-        std::vector<std::unique_ptr<sbe::EExpression>> bindings;
+        sbe::EExpression::Vector operands(operandSize);
+        sbe::EExpression::Vector bindings;
         sbe::EVariable strRef(frameId, 0);
         sbe::EVariable substrRef(frameId, 1);
         boost::optional<sbe::EVariable> startIndexRef;
@@ -3249,10 +3248,10 @@ private:
             return makeNot(makeFunction("isArray", var.clone()));
         };
 
-        std::vector<std::unique_ptr<sbe::EExpression>> binds;
-        std::vector<std::unique_ptr<sbe::EExpression>> argVars;
-        std::vector<std::unique_ptr<sbe::EExpression>> checkExprsNull;
-        std::vector<std::unique_ptr<sbe::EExpression>> checkExprsNotArray;
+        sbe::EExpression::Vector binds;
+        sbe::EExpression::Vector argVars;
+        sbe::EExpression::Vector checkExprsNull;
+        sbe::EExpression::Vector checkExprsNotArray;
         binds.reserve(arity);
         argVars.reserve(arity);
         checkExprsNull.reserve(arity);
@@ -3293,7 +3292,7 @@ private:
         // operations, such as $setDifference, are not commutative.
         std::reverse(std::begin(binds), std::end(binds));
 
-        using iter_t = std::vector<std::unique_ptr<sbe::EExpression>>::iterator;
+        using iter_t = sbe::EExpression::Vector::iterator;
         auto checkNullAnyArgument = std::accumulate(
             std::move_iterator<iter_t>(checkExprsNull.begin() + 1),
             std::move_iterator<iter_t>(checkExprsNull.end()),
@@ -3533,7 +3532,7 @@ private:
         auto unitExpr = _context->popExpr();
         auto startDateExpr = _context->popExpr();
 
-        std::vector<std::unique_ptr<sbe::EExpression>> binds;
+        sbe::EExpression::Vector binds;
         binds.push_back(std::move(startDateExpr));
         binds.push_back(std::move(unitExpr));
         binds.push_back(std::move(amountExpr));
@@ -3560,7 +3559,7 @@ private:
         }();
         binds.push_back(std::move(convertedAmountInt64));
 
-        std::vector<std::unique_ptr<sbe::EExpression>> args;
+        sbe::EExpression::Vector args;
         auto timeZoneDBSlot = _context->state.env->getSlot("timeZoneDB"_sd);
         args.push_back(sbe::makeE<sbe::EVariable>(timeZoneDBSlot));
         args.push_back(startDateRef.clone());
@@ -3568,13 +3567,13 @@ private:
         args.push_back(amountRef.clone());
         args.push_back(tzRef.clone());
 
-        std::vector<std::unique_ptr<sbe::EExpression>> checkNullArg;
+        sbe::EExpression::Vector checkNullArg;
         sbe::value::SlotId slot{0};
         for (size_t idx = 0; idx < arity; ++idx, ++slot) {
             checkNullArg.push_back(generateNullOrMissing(frameId, slot));
         }
 
-        using iter_t = std::vector<std::unique_ptr<sbe::EExpression>>::iterator;
+        using iter_t = sbe::EExpression::Vector::iterator;
         auto checkNullAnyArgument = std::accumulate(
             std::move_iterator<iter_t>(checkNullArg.begin() + 1),
             std::move_iterator<iter_t>(checkNullArg.end()),

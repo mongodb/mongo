@@ -55,7 +55,7 @@ public:
         const int numSlots = checkNumSlots(inputStreams);
         invariant(numKeySlots < numSlots);
 
-        std::vector<std::unique_ptr<PlanStage>> inputScans;
+        PlanStage::Vector inputScans;
         std::vector<value::SlotVector> inputSlots;
         for (auto&& array : inputStreams) {
             auto [tag, val] = stage_builder::makeValue(array);

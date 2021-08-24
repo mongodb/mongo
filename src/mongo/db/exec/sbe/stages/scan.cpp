@@ -407,7 +407,7 @@ std::unique_ptr<PlanStageStats> ScanStage::getStats(bool includeDebugInfo) const
         }
 
         bob.append("fields", _fields);
-        bob.append("outputSlots", _vars);
+        bob.append("outputSlots", _vars.begin(), _vars.end());
         ret->debugInfo = bob.obj();
     }
     return ret;

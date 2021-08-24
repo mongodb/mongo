@@ -53,7 +53,7 @@ public:
      *  be propagated.
      * -outputVals: Slots where the output should be stored.
      */
-    SortedMergeStage(std::vector<std::unique_ptr<PlanStage>> inputStages,
+    SortedMergeStage(PlanStage::Vector inputStages,
                      // Each element of 'inputKeys' must be the same size as 'dirs'.
                      std::vector<value::SlotVector> inputKeys,
                      // Sort directions. Used to interpret each input key.

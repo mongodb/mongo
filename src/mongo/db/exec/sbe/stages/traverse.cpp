@@ -316,7 +316,7 @@ std::unique_ptr<PlanStageStats> TraverseStage::getStats(bool includeDebugInfo) c
         bob.appendNumber("inputSlot", static_cast<long long>(_inField));
         bob.appendNumber("outputSlot", static_cast<long long>(_outField));
         bob.appendNumber("outputSlotInner", static_cast<long long>(_outFieldInner));
-        bob.append("correlatedSlots", _correlatedSlots);
+        bob.append("correlatedSlots", _correlatedSlots.begin(), _correlatedSlots.end());
         if (_nestedArraysDepth) {
             bob.appendNumber("nestedArraysDepth", static_cast<long long>(*_nestedArraysDepth));
         }

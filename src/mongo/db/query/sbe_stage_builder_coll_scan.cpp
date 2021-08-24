@@ -203,7 +203,7 @@ std::unique_ptr<sbe::PlanStage> buildResumeFromRecordIdSubtree(
     // Construct a union stage from the 'seek' and 'fail' branches. Note that this stage will ever
     // produce a single call to getNext() due to a 'limit 1' sitting on top of it.
     auto unionStage = sbe::makeS<sbe::UnionStage>(
-        makeVector<std::unique_ptr<sbe::PlanStage>>(std::move(seekBranch), std::move(failBranch)),
+        sbe::makeSs(std::move(seekBranch), std::move(failBranch)),
         std::vector<sbe::value::SlotVector>{sbe::makeSV(seekSlot), sbe::makeSV(unusedSlot)},
         sbe::makeSV(seekRecordIdSlot),
         csn->nodeId());
@@ -421,7 +421,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
 
         // Create the union stage. The left branch, which runs first, is our resumability check.
         stage = sbe::makeS<sbe::UnionStage>(
-            makeVector<std::unique_ptr<sbe::PlanStage>>(std::move(minTsBranch), std::move(stage)),
+            sbe::makeSs(std::move(minTsBranch), std::move(stage)),
             makeVector<sbe::value::SlotVector>(std::move(minTsSlots), std::move(realSlots)),
             std::move(outputSlots),
             csn->nodeId());

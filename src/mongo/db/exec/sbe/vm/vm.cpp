@@ -185,40 +185,44 @@ void CodeFragment::removeFixup(FrameId frameId) {
                   _fixUps.end());
 }
 
-void CodeFragment::copyCodeAndFixup(const CodeFragment& from) {
+void CodeFragment::copyCodeAndFixup(CodeFragment&& from) {
     for (auto fixUp : from._fixUps) {
         fixUp.offset += _instrs.size();
         _fixUps.push_back(fixUp);
     }
 
-    _instrs.insert(_instrs.end(), from._instrs.begin(), from._instrs.end());
+    if (_instrs.empty()) {
+        _instrs = std::move(from._instrs);
+    } else {
+        _instrs.insert(_instrs.end(), from._instrs.begin(), from._instrs.end());
+    }
 }
 
-void CodeFragment::append(std::unique_ptr<CodeFragment> code) {
+void CodeFragment::append(CodeFragment&& code) {
     // Fixup before copying.
-    code->fixup(_stackSize);
+    code.fixup(_stackSize);
 
-    copyCodeAndFixup(*code);
+    _stackSize += code._stackSize;
 
-    _stackSize += code->_stackSize;
+    copyCodeAndFixup(std::move(code));
 }
 
-void CodeFragment::appendNoStack(std::unique_ptr<CodeFragment> code) {
-    invariant(code->_fixUps.empty());
-    copyCodeAndFixup(*code);
+void CodeFragment::appendNoStack(CodeFragment&& code) {
+    invariant(code._fixUps.empty());
+    copyCodeAndFixup(std::move(code));
 }
 
-void CodeFragment::append(std::unique_ptr<CodeFragment> lhs, std::unique_ptr<CodeFragment> rhs) {
-    invariant(lhs->stackSize() == rhs->stackSize());
+void CodeFragment::append(CodeFragment&& lhs, CodeFragment&& rhs) {
+    invariant(lhs.stackSize() == rhs.stackSize());
 
     // Fixup before copying.
-    lhs->fixup(_stackSize);
-    rhs->fixup(_stackSize);
+    lhs.fixup(_stackSize);
+    rhs.fixup(_stackSize);
 
-    copyCodeAndFixup(*lhs);
-    copyCodeAndFixup(*rhs);
+    _stackSize += lhs._stackSize;
 
-    _stackSize += lhs->_stackSize;
+    copyCodeAndFixup(std::move(lhs));
+    copyCodeAndFixup(std::move(rhs));
 }
 
 void CodeFragment::appendConstVal(value::TypeTags tag, value::Value val) {

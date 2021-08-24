@@ -56,7 +56,7 @@ private:
     T _incrementStep;
 };
 
-template <class T>
+template <class T, class Container = std::vector<T>>
 class IdGenerator : IncrementingIdGenerator<T> {
 public:
     IdGenerator(T startingId = 0, T incrementStep = 1)
@@ -67,7 +67,7 @@ public:
     }
 
     auto generateMultiple(size_t num) {
-        std::vector<T> idVector(num);
+        Container idVector(num);
         for (T& id : idVector) {
             id = generate();
         }

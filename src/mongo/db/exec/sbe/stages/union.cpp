@@ -34,7 +34,7 @@
 #include "mongo/db/exec/sbe/expressions/expression.h"
 
 namespace mongo::sbe {
-UnionStage::UnionStage(std::vector<std::unique_ptr<PlanStage>> inputStages,
+UnionStage::UnionStage(PlanStage::Vector inputStages,
                        std::vector<value::SlotVector> inputVals,
                        value::SlotVector outputVals,
                        PlanNodeId planNodeId)
@@ -52,7 +52,7 @@ UnionStage::UnionStage(std::vector<std::unique_ptr<PlanStage>> inputStages,
 }
 
 std::unique_ptr<PlanStage> UnionStage::clone() const {
-    std::vector<std::unique_ptr<PlanStage>> inputStages;
+    Vector inputStages;
     for (auto& child : _children) {
         inputStages.emplace_back(child->clone());
     }
@@ -163,10 +163,10 @@ std::unique_ptr<PlanStageStats> UnionStage::getStats(bool includeDebugInfo) cons
         BSONObjBuilder bob;
         BSONArrayBuilder childrenBob(bob.subarrayStart("inputSlots"));
         for (auto&& slots : _inputVals) {
-            childrenBob.append(slots);
+            childrenBob.append(slots.begin(), slots.end());
         }
         childrenBob.doneFast();
-        bob.append("outputSlots", _outputVals);
+        bob.append("outputSlots", _outputVals.begin(), _outputVals.end());
         ret->debugInfo = bob.obj();
     }
 

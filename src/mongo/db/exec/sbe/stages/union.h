@@ -50,7 +50,7 @@ namespace mongo::sbe {
  */
 class UnionStage final : public PlanStage {
 public:
-    UnionStage(std::vector<std::unique_ptr<PlanStage>> inputStages,
+    UnionStage(PlanStage::Vector inputStages,
                std::vector<value::SlotVector> inputVals,
                value::SlotVector outputVals,
                PlanNodeId planNodeId);

@@ -585,7 +585,7 @@ void Parser::walkLetExpr(AstQuery& ast) {
     walkChildren(ast);
 
     auto plist = ast.nodes[0];
-    std::vector<std::unique_ptr<EExpression>> binds;
+    EExpression::Vector binds;
 
     binds.resize(frame->table.size());
     for (auto& symbol : frame->table) {
@@ -632,7 +632,7 @@ void Parser::walkIfExpr(AstQuery& ast) {
 
 void Parser::walkFunCall(AstQuery& ast) {
     walkChildren(ast);
-    std::vector<std::unique_ptr<EExpression>> args;
+    EExpression::Vector args;
 
     for (size_t idx = 1; idx < ast.nodes.size(); ++idx) {
         args.emplace_back(std::move(ast.nodes[idx]->expr));
@@ -987,7 +987,7 @@ void Parser::walkSort(AstQuery& ast) {
 void Parser::walkUnion(AstQuery& ast) {
     walkChildren(ast);
 
-    std::vector<std::unique_ptr<PlanStage>> inputStages;
+    PlanStage::Vector inputStages;
     std::vector<value::SlotVector> inputVals;
     value::SlotVector outputVals{lookupSlots(ast.nodes[0]->identifiers)};
 
@@ -1019,7 +1019,7 @@ void Parser::walkUnionBranch(AstQuery& ast) {
 void Parser::walkSortedMerge(AstQuery& ast) {
     walkChildren(ast);
 
-    std::vector<std::unique_ptr<PlanStage>> inputStages;
+    PlanStage::Vector inputStages;
     std::vector<value::SlotVector> inputKeys;
     std::vector<value::SlotVector> inputVals;
     value::SlotVector outputVals{lookupSlots(ast.nodes[0]->identifiers)};

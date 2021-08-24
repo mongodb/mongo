@@ -31,8 +31,6 @@
 
 #include <type_traits>
 
-#include <boost/container/small_vector.hpp>
-
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/util/id_generator.h"
 
@@ -660,9 +658,9 @@ using SlotAccessorMap = SlotMap<SlotAccessor*>;
 using FieldAccessorMap = StringMap<std::unique_ptr<OwnedValueAccessor>>;
 using FieldViewAccessorMap = StringMap<std::unique_ptr<ViewOfValueAccessor>>;
 using SlotSet = absl::flat_hash_set<SlotId>;
-using SlotVector = std::vector<SlotId>;
+using SlotVector = absl::InlinedVector<SlotId, 2>;
 
-using SlotIdGenerator = IdGenerator<value::SlotId>;
+using SlotIdGenerator = IdGenerator<value::SlotId, SlotVector>;
 using FrameIdGenerator = IdGenerator<FrameId>;
 using SpoolIdGenerator = IdGenerator<SpoolId>;
 

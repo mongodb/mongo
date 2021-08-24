@@ -242,7 +242,7 @@ public:
         if (includeDebugInfo) {
             BSONObjBuilder bob;
             bob.appendNumber("spoolId", static_cast<long long>(_spoolId));
-            bob.append("outputSlots", _vals);
+            bob.append("outputSlots", _vals.begin(), _vals.end());
             ret->debugInfo = bob.obj();
         }
 

@@ -445,7 +445,7 @@ EvalStage makeUnion(std::vector<EvalStage> inputStages,
                     std::vector<sbe::value::SlotVector> inputVals,
                     sbe::value::SlotVector outputVals,
                     PlanNodeId planNodeId) {
-    std::vector<std::unique_ptr<sbe::PlanStage>> branches;
+    sbe::PlanStage::Vector branches;
     branches.reserve(inputStages.size());
     for (auto& inputStage : inputStages) {
         branches.emplace_back(std::move(inputStage.stage));
@@ -503,7 +503,7 @@ EvalExprStagePair generateUnion(std::vector<EvalExprStagePair> branches,
                                 BranchFn branchFn,
                                 PlanNodeId planNodeId,
                                 sbe::value::SlotIdGenerator* slotIdGenerator) {
-    std::vector<std::unique_ptr<sbe::PlanStage>> stages;
+    sbe::PlanStage::Vector stages;
     std::vector<sbe::value::SlotVector> inputs;
     stages.reserve(branches.size());
     inputs.reserve(branches.size());

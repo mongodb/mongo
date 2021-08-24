@@ -184,9 +184,9 @@ std::unique_ptr<PlanStageStats> BranchStage::getStats(bool includeDebugInfo) con
         bob.appendNumber("elseBranchCloses",
                          static_cast<long long>(_specificStats.elseBranchCloses));
         bob.append("filter", DebugPrinter{}.print(_filter->debugPrint()));
-        bob.append("thenSlots", _inputThenVals);
-        bob.append("elseSlots", _inputElseVals);
-        bob.append("outputSlots", _outputVals);
+        bob.append("thenSlots", _inputThenVals.begin(), _inputThenVals.end());
+        bob.append("elseSlots", _inputElseVals.begin(), _inputElseVals.end());
+        bob.append("outputSlots", _outputVals.begin(), _outputVals.end());
         ret->debugInfo = bob.obj();
     }
 

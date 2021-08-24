@@ -128,7 +128,7 @@ std::unique_ptr<PlanStageStats> SpoolEagerProducerStage::getStats(bool includeDe
     if (includeDebugInfo) {
         BSONObjBuilder bob;
         bob.appendNumber("spoolId", static_cast<long long>(_spoolId));
-        bob.append("outputSlots", _vals);
+        bob.append("outputSlots", _vals.begin(), _vals.end());
         ret->debugInfo = bob.obj();
     }
 
@@ -291,7 +291,7 @@ std::unique_ptr<PlanStageStats> SpoolLazyProducerStage::getStats(bool includeDeb
     if (includeDebugInfo) {
         BSONObjBuilder bob;
         bob.appendNumber("spoolId", static_cast<long long>(_spoolId));
-        bob.append("outputSlots", _vals);
+        bob.append("outputSlots", _vals.begin(), _vals.end());
         if (_predicate) {
             bob.append("filter", DebugPrinter{}.print(_predicate->debugPrint()));
         }
