@@ -70,7 +70,7 @@ class FaultManager {
     FaultManager& operator=(const FaultManager&) = delete;
 
 public:
-    FaultManager() = default;
+    explicit FaultManager(ServiceContext* svcCtx);
     virtual ~FaultManager();
 
     static FaultManager* get(ServiceContext* svcCtx);
@@ -94,6 +94,8 @@ private:
     Status _transitionToKOk();
     Status _transitionToKTransientFault();
     Status _transitionToKActiveFault();
+
+    ServiceContext* const _svcCtx;
 
     mutable Mutex _stateMutex =
         MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "ProcessHealthFaultManager::_stateMutex");

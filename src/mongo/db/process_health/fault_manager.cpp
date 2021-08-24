@@ -45,7 +45,7 @@ const auto sFaultManager = ServiceContext::declareDecoration<std::unique_ptr<Fau
 
 ServiceContext::ConstructorActionRegisterer faultManagerRegisterer{
     "FaultManagerRegisterer", [](ServiceContext* svcCtx) {
-        auto faultManager = std::make_unique<FaultManager>();
+        auto faultManager = std::make_unique<FaultManager>(svcCtx);
         FaultManager::set(svcCtx, std::move(faultManager));
     }};
 
@@ -59,6 +59,8 @@ void FaultManager::set(ServiceContext* svcCtx, std::unique_ptr<FaultManager> new
     auto& faultManager = sFaultManager(svcCtx);
     faultManager = std::move(newFaultManager);
 }
+
+FaultManager::FaultManager(ServiceContext* svcCtx) : _svcCtx(svcCtx) {}
 
 FaultManager::~FaultManager() {}
 

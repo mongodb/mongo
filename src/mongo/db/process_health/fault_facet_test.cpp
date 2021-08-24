@@ -39,7 +39,8 @@ namespace {
 class FaultFacetTest : public unittest::Test {
 public:
     void startMock(FaultFacetMock::MockCallback callback) {
-        _facetMock = std::make_unique<FaultFacetMock>(callback);
+        _svcCtx = ServiceContext::make();
+        _facetMock = std::make_unique<FaultFacetMock>(_svcCtx.get(), callback);
     }
 
     HealthCheckStatus getStatus() const {
@@ -47,6 +48,7 @@ public:
     }
 
 private:
+    ServiceContext::UniqueServiceContext _svcCtx;
     std::unique_ptr<FaultFacetMock> _facetMock;
 };
 

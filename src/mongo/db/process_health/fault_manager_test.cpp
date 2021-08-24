@@ -44,6 +44,8 @@ TEST(FaultManagerTest, Registration) {
 
 class FaultManagerTestImpl : public FaultManager {
 public:
+    FaultManagerTestImpl(ServiceContext* svcCtx) : FaultManager(svcCtx) {}
+
     Status transitionStateTest(FaultState newState) {
         return transitionToState(newState);
     }
@@ -55,6 +57,7 @@ public:
 
 // State machine tests.
 TEST(FaultManagerForTest, StateTransitionsFromOk) {
+    auto serviceCtx = ServiceContext::make();
     std::vector<std::pair<FaultState, bool>> transitionValidPairs{
         {FaultState::kOk, false},
         {FaultState::kStartupCheck, false},
@@ -62,7 +65,7 @@ TEST(FaultManagerForTest, StateTransitionsFromOk) {
         {FaultState::kActiveFault, false}};
 
     for (auto& pair : transitionValidPairs) {
-        FaultManagerTestImpl faultManager;
+        FaultManagerTestImpl faultManager(serviceCtx.get());
         ASSERT_OK(faultManager.transitionStateTest(FaultState::kOk));
 
         if (pair.second) {
@@ -74,6 +77,7 @@ TEST(FaultManagerForTest, StateTransitionsFromOk) {
 }
 
 TEST(FaultManagerForTest, StateTransitionsFromStartupCheck) {
+    auto serviceCtx = ServiceContext::make();
     std::vector<std::pair<FaultState, bool>> transitionValidPairs{
         {FaultState::kOk, true},
         {FaultState::kStartupCheck, false},
@@ -81,7 +85,7 @@ TEST(FaultManagerForTest, StateTransitionsFromStartupCheck) {
         {FaultState::kActiveFault, false}};
 
     for (auto& pair : transitionValidPairs) {
-        FaultManagerTestImpl faultManager;
+        FaultManagerTestImpl faultManager(serviceCtx.get());
 
         if (pair.second) {
             ASSERT_OK(faultManager.transitionStateTest(pair.first));
@@ -92,6 +96,7 @@ TEST(FaultManagerForTest, StateTransitionsFromStartupCheck) {
 }
 
 TEST(FaultManagerForTest, StateTransitionsFromTransientFault) {
+    auto serviceCtx = ServiceContext::make();
     std::vector<std::pair<FaultState, bool>> transitionValidPairs{
         {FaultState::kOk, true},
         {FaultState::kStartupCheck, false},
@@ -99,7 +104,7 @@ TEST(FaultManagerForTest, StateTransitionsFromTransientFault) {
         {FaultState::kActiveFault, true}};
 
     for (auto& pair : transitionValidPairs) {
-        FaultManagerTestImpl faultManager;
+        FaultManagerTestImpl faultManager(serviceCtx.get());
         ASSERT_OK(faultManager.transitionStateTest(FaultState::kTransientFault));
 
         if (pair.second) {
@@ -111,6 +116,7 @@ TEST(FaultManagerForTest, StateTransitionsFromTransientFault) {
 }
 
 TEST(FaultManagerForTest, StateTransitionsFromActiveFault) {
+    auto serviceCtx = ServiceContext::make();
     std::vector<std::pair<FaultState, bool>> transitionValidPairs{
         {FaultState::kOk, false},
         {FaultState::kStartupCheck, false},
@@ -118,7 +124,7 @@ TEST(FaultManagerForTest, StateTransitionsFromActiveFault) {
         {FaultState::kActiveFault, false}};
 
     for (auto& pair : transitionValidPairs) {
-        FaultManagerTestImpl faultManager;
+        FaultManagerTestImpl faultManager(serviceCtx.get());
         ASSERT_OK(faultManager.transitionStateTest(FaultState::kTransientFault));
         ASSERT_OK(faultManager.transitionStateTest(FaultState::kActiveFault));
 
