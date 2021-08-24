@@ -2,6 +2,7 @@
  * Test the creation of views with various options.
  *
  * @tags: [
+ *   # Commands on views not supported in implicitly sharded suites.
  *   assumes_unsharded_collection,
  *   # applyOps is not available on mongos.
  *   assumes_against_mongod_not_mongos,

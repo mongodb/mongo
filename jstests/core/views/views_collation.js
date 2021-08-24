@@ -1,4 +1,5 @@
 // @tags: [
+//   # Commands on views not supported in implicitly sharded suites.
 //   assumes_unsharded_collection,
 //   does_not_support_stepdowns,
 //   requires_fastcount,

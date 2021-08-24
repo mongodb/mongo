@@ -2,7 +2,8 @@
  * Check that the special $-prefixed field names $ref, $id and $db all work in expressions, $group,
  * and $lookup.
  *
- * Uses $lookup, which doesn't support sharded foreign collection.
+ * Cannot implicitly shard accessed collections because of not being able to create unique index
+ * using hashed shard key pattern.
  * @tags: [
  *   assumes_unsharded_collection,
  * ]

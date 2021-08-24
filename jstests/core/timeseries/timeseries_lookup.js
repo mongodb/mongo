@@ -2,6 +2,7 @@
  * Test that time-series bucket collections work as expected with $lookup.
  *
  * @tags: [
+ *   # Timeseries collections cannot be sharded.
  *   assumes_unsharded_collection,
  *   does_not_support_transactions,
  *   requires_timeseries,

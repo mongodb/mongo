@@ -1,16 +1,24 @@
 // Tests that text search requires a text index.
-// TODO SERVER-29159: Enable test on passthroughs with sharded collections.
-// @tags: [assumes_unsharded_collection]
 (function() {
 "use strict";
 
 load("jstests/aggregation/extras/utils.js");  // For "assertErrorCode".
+load("jstests/libs/fixture_helpers.js");      // For isSharded.
 
 const coll = db.coll;
 const from = db.from;
 
 coll.drop();
 from.drop();
+
+// Do not run the rest of the tests if the foreign collection is implicitly sharded but the flag to
+// allow $lookup/$graphLookup into a sharded collection is disabled.
+const getShardedLookupParam = db.adminCommand({getParameter: 1, featureFlagShardedLookup: 1});
+const isShardedLookupEnabled = getShardedLookupParam.hasOwnProperty("featureFlagShardedLookup") &&
+    getShardedLookupParam.featureFlagShardedLookup.value;
+if (FixtureHelpers.isSharded(from) && !isShardedLookupEnabled) {
+    return;
+}
 
 const textPipeline = [{$match: {$text: {$search: "foo"}}}];
 

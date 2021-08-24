@@ -1,6 +1,5 @@
-// Cannot implicitly shard accessed collections as $lookup does not support sharded target
-// collection. Facet in a lookup cannot be wrapped in a facet.
-// @tags: [assumes_unsharded_collection, do_not_wrap_aggregations_in_facets]
+// Facet in a lookup cannot be wrapped in a facet.
+// @tags: [do_not_wrap_aggregations_in_facets]
 
 /**
  * Confirms that $lookup with a non-correlated prefix returns expected results.
@@ -8,10 +7,21 @@
 (function() {
 "use strict";
 
+load("jstests/libs/fixture_helpers.js");  // For isSharded.
+
 const testColl = db.lookup_non_correlated_prefix;
 testColl.drop();
 const joinColl = db.lookup_non_correlated_prefix_join;
 joinColl.drop();
+
+// Do not run the rest of the tests if the foreign collection is implicitly sharded but the flag to
+// allow $lookup/$graphLookup into a sharded collection is disabled.
+const getShardedLookupParam = db.adminCommand({getParameter: 1, featureFlagShardedLookup: 1});
+const isShardedLookupEnabled = getShardedLookupParam.hasOwnProperty("featureFlagShardedLookup") &&
+    getShardedLookupParam.featureFlagShardedLookup.value;
+if (FixtureHelpers.isSharded(joinColl) && !isShardedLookupEnabled) {
+    return;
+}
 
 const users = [
     {

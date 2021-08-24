@@ -2,9 +2,6 @@
  * Tests that $lookup respects the user-specified collation or the inherited local collation
  * when performing comparisons on a foreign collection with a different default collation. Exercises
  * the fix for SERVER-43350.
- * @tags: [
- *   assumes_unsharded_collection,
- * ]
  */
 load("jstests/aggregation/extras/utils.js");  // For anyEq.
 
@@ -12,12 +9,10 @@ load("jstests/aggregation/extras/utils.js");  // For anyEq.
 
 "use strict";
 
-const testDB = db.getSiblingDB(jsTestName());
-const noCollationColl = testDB.no_collation;
-const caseInsensitiveColl = testDB.case_insensitive;
+load("jstests/libs/fixture_helpers.js");  // For isSharded.
 
-caseInsensitiveColl.drop();
-noCollationColl.drop();
+const testDB = db.getSiblingDB(jsTestName());
+assert.commandWorked(testDB.dropDatabase());
 
 const caseInsensitiveCollation = {
     locale: "en_US",
@@ -28,9 +23,21 @@ const simpleCollation = {
     locale: "simple"
 };
 
-assert.commandWorked(testDB.createCollection(noCollationColl.getName()));
+assert.commandWorked(testDB.createCollection("no_collation"));
 assert.commandWorked(
-    testDB.createCollection(caseInsensitiveColl.getName(), {collation: caseInsensitiveCollation}));
+    testDB.createCollection("case_insensitive", {collation: caseInsensitiveCollation}));
+
+const noCollationColl = testDB.no_collation;
+const caseInsensitiveColl = testDB.case_insensitive;
+
+// Do not run the rest of the tests if the foreign collection is implicitly sharded but the flag to
+// allow $lookup/$graphLookup into a sharded collection is disabled.
+const getShardedLookupParam = db.adminCommand({getParameter: 1, featureFlagShardedLookup: 1});
+const isShardedLookupEnabled = getShardedLookupParam.hasOwnProperty("featureFlagShardedLookup") &&
+    getShardedLookupParam.featureFlagShardedLookup.value;
+if (FixtureHelpers.isSharded(caseInsensitiveColl) && !isShardedLookupEnabled) {
+    return;
+}
 
 assert.commandWorked(
     noCollationColl.insert([{_id: "a"}, {_id: "b"}, {_id: "c"}, {_id: "d"}, {_id: "e"}]));

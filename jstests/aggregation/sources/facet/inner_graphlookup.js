@@ -1,7 +1,3 @@
-// Cannot implicitly shard accessed collections because unsupported use of sharded collection
-// for target collection of $lookup and $graphLookup.
-// @tags: [assumes_unsharded_collection]
-
 /**
  * Tests that using a $graphLookup stage inside of a $facet stage will yield the same results as
  * using the $graphLookup stage outside of the $facet stage.
@@ -9,8 +5,20 @@
 (function() {
 "use strict";
 
+load("jstests/aggregation/extras/utils.js");  // For documentEq.
+load("jstests/libs/fixture_helpers.js");      // For isSharded.
+
 // We will only use one collection, the $graphLookup will look up from the same collection.
 var graphColl = db.facetGraphLookup;
+
+// Do not run the rest of the tests if the foreign collection is implicitly sharded but the flag to
+// allow $lookup/$graphLookup into a sharded collection is disabled.
+const getShardedLookupParam = db.adminCommand({getParameter: 1, featureFlagShardedLookup: 1});
+const isShardedLookupEnabled = getShardedLookupParam.hasOwnProperty("featureFlagShardedLookup") &&
+    getShardedLookupParam.featureFlagShardedLookup.value;
+if (FixtureHelpers.isSharded(graphColl) && !isShardedLookupEnabled) {
+    return;
+}
 
 // The graph in ASCII form: 0 --- 1 --- 2    3
 graphColl.drop();
@@ -38,7 +46,7 @@ const projectStage = {
 const normalResults = graphColl.aggregate([graphLookupStage, projectStage]).toArray();
 const facetedResults =
     graphColl.aggregate([{$facet: {nested: [graphLookupStage, projectStage]}}]).toArray();
-assert.eq(facetedResults, [{nested: normalResults}]);
+arrayEq(facetedResults, [{nested: normalResults}]);
 
 const sortStage = {
     $sort: {_id: 1, "connected._id": 1}
@@ -50,5 +58,5 @@ const facetedResultsUnwound =
     graphColl
         .aggregate([{$facet: {nested: [graphLookupStage, {$unwind: "$connected"}, sortStage]}}])
         .toArray();
-assert.eq(facetedResultsUnwound, [{nested: normalResultsUnwound}]);
+arrayEq(facetedResultsUnwound, [{nested: normalResultsUnwound}]);
 }());

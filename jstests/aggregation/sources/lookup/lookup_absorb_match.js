@@ -1,15 +1,11 @@
 /**
  * Tests that $match stages with a variety of expressions still return the correct results if they
  * have been absorbed by $lookup stages.
- *
- * Accessed collections cannot be implicitly sharded because you cannot $lookup into a sharded
- * collection.
- * @tags: [
- *   assumes_unsharded_collection,
- * ]
  */
 (function() {
 "use strict";
+
+load("jstests/libs/fixture_helpers.js");  // For isSharded.
 
 let testDB = db.getSiblingDB("lookup_absorb_match");
 testDB.dropDatabase();
@@ -29,6 +25,15 @@ assert.commandWorked(locations.insert({
 let animals = testDB.getCollection("animals");
 assert.commandWorked(animals.insert({_id: "dog", locationId: "doghouse"}));
 assert.commandWorked(animals.insert({_id: "bull", locationId: "bullpen"}));
+
+// Do not run the rest of the tests if the foreign collection is implicitly sharded but the flag to
+// allow $lookup/$graphLookup into a sharded collection is disabled.
+const getShardedLookupParam = db.adminCommand({getParameter: 1, featureFlagShardedLookup: 1});
+const isShardedLookupEnabled = getShardedLookupParam.hasOwnProperty("featureFlagShardedLookup") &&
+    getShardedLookupParam.featureFlagShardedLookup.value;
+if (FixtureHelpers.isSharded(locations) && !isShardedLookupEnabled) {
+    return;
+}
 
 // Test that a $match with $geoWithin works properly when performed directly on an absorbed
 // lookup field.

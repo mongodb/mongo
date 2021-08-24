@@ -3,6 +3,7 @@
  * foreign collection.
  *
  * @tags: [
+ *     # Should not run on sharded suites due to use of serverStatus()
  *     assumes_unsharded_collection,
  *     assumes_no_implicit_collection_creation_after_drop,
  *     do_not_wrap_aggregations_in_facets,

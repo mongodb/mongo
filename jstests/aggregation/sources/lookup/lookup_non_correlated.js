@@ -1,12 +1,11 @@
-// Cannot implicitly shard accessed collections as $lookup does not support sharded target
-// collection.
-// @tags: [assumes_unsharded_collection]
-
 /**
  * Confirms that $lookup with a non-correlated foreign pipeline returns expected results.
  */
 (function() {
 "use strict";
+
+load("jstests/aggregation/extras/utils.js");  // documentEq
+load("jstests/libs/fixture_helpers.js");      // For isSharded.
 
 const testDB = db.getSiblingDB("lookup_non_correlated");
 const localName = "local";
@@ -15,6 +14,15 @@ localColl.drop();
 const foreignName = "foreign";
 const foreignColl = testDB.getCollection(foreignName);
 foreignColl.drop();
+
+// Do not run the rest of the tests if the foreign collection is implicitly sharded but the flag to
+// allow $lookup/$graphLookup into a sharded collection is disabled.
+const getShardedLookupParam = db.adminCommand({getParameter: 1, featureFlagShardedLookup: 1});
+const isShardedLookupEnabled = getShardedLookupParam.hasOwnProperty("featureFlagShardedLookup") &&
+    getShardedLookupParam.featureFlagShardedLookup.value;
+if (FixtureHelpers.isSharded(foreignColl) && !isShardedLookupEnabled) {
+    return;
+}
 
 assert.commandWorked(localColl.insert({_id: "A"}));
 assert.commandWorked(localColl.insert({_id: "B"}));
@@ -32,9 +40,9 @@ let cursor = localColl.aggregate([
 ]);
 
 assert(cursor.hasNext());
-assert.docEq({_id: "B", foreignDocs: [{_id: 2}, {_id: 3}]}, cursor.next());
+documentEq({_id: "B", foreignDocs: [{_id: 2}, {_id: 3}]}, cursor.next());
 assert(cursor.hasNext());
-assert.docEq({_id: "C", foreignDocs: [{_id: 2}, {_id: 3}]}, cursor.next());
+documentEq({_id: "C", foreignDocs: [{_id: 2}, {_id: 3}]}, cursor.next());
 assert(!cursor.hasNext());
 
 // Non-correlated lookup followed by unwind on 'as' returns expected results.
@@ -45,9 +53,9 @@ cursor = localColl.aggregate([
 ]);
 
 assert(cursor.hasNext());
-assert.docEq({_id: "A", foreignDocs: {_id: 2}}, cursor.next());
+documentEq({_id: "A", foreignDocs: {_id: 2}}, cursor.next());
 assert(cursor.hasNext());
-assert.docEq({_id: "A", foreignDocs: {_id: 3}}, cursor.next());
+documentEq({_id: "A", foreignDocs: {_id: 3}}, cursor.next());
 assert(!cursor.hasNext());
 
 // Non-correlated lookup followed by unwind and filter on 'as' returns expected results.
@@ -59,6 +67,6 @@ cursor = localColl.aggregate([
 ]);
 
 assert(cursor.hasNext());
-assert.docEq({_id: "A", foreignDocs: {_id: 2}}, cursor.next());
+documentEq({_id: "A", foreignDocs: {_id: 2}}, cursor.next());
 assert(!cursor.hasNext());
 })();

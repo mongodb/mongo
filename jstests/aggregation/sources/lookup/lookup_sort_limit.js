@@ -1,19 +1,27 @@
 /**
  * Test that a $lookup correctly optimizes a foreign pipeline containing a $sort and a $limit. This
  * test is designed to reproduce SERVER-36715.
- *
- * @tags: [assumes_unsharded_collection]
  */
 (function() {
 "use strict";
 
-load("jstests/libs/analyze_plan.js");  // For getAggPlanStages().
+load("jstests/libs/analyze_plan.js");     // For getAggPlanStages().
+load("jstests/libs/fixture_helpers.js");  // For isSharded.
 
 const testDB = db.getSiblingDB("lookup_sort_limit");
 testDB.dropDatabase();
 
 const localColl = testDB.getCollection("local");
 const fromColl = testDB.getCollection("from");
+
+// Do not run the rest of the tests if the foreign collection is implicitly sharded but the flag to
+// allow $lookup/$graphLookup into a sharded collection is disabled.
+const getShardedLookupParam = db.adminCommand({getParameter: 1, featureFlagShardedLookup: 1});
+const isShardedLookupEnabled = getShardedLookupParam.hasOwnProperty("featureFlagShardedLookup") &&
+    getShardedLookupParam.featureFlagShardedLookup.value;
+if (FixtureHelpers.isSharded(fromColl) && !isShardedLookupEnabled) {
+    return;
+}
 
 const bulk = fromColl.initializeUnorderedBulkOp();
 for (let i = 0; i < 10; i++) {

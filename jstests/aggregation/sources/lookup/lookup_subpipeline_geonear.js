@@ -1,15 +1,24 @@
 // Tests that $geoNear can be within a $lookup stage.
-// TODO SERVER-29159: Enable test on passthroughs with sharded collections.
 // $geoNear is not allowed in a facet even within a lookup.
 // @tags: [
-//   assumes_unsharded_collection,
 //   do_not_wrap_aggregations_in_facets,
 // ]
 (function() {
 "use strict";
 
+load("jstests/libs/fixture_helpers.js");  // For isSharded.
+
 const coll = db.lookup_subpipeline_geonear;
 const from = db.from;
+
+// Do not run the rest of the tests if the foreign collection is implicitly sharded but the flag to
+// allow $lookup/$graphLookup into a sharded collection is disabled.
+const getShardedLookupParam = db.adminCommand({getParameter: 1, featureFlagShardedLookup: 1});
+const isShardedLookupEnabled = getShardedLookupParam.hasOwnProperty("featureFlagShardedLookup") &&
+    getShardedLookupParam.featureFlagShardedLookup.value;
+if (FixtureHelpers.isSharded(db.from) && !isShardedLookupEnabled) {
+    return;
+}
 
 coll.drop();
 assert.commandWorked(coll.insert({_id: 4, x: 4}));

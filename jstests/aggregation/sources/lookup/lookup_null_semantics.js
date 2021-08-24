@@ -1,21 +1,26 @@
 /**
  * Test that $lookup behaves correctly for null values, as well as "missing" and undefined.
- *
- * @tags: [
- *   # We don't yet support lookup into a sharded collection.
- *   assumes_unsharded_collection,
- * ]
  */
 (function() {
 "use strict";
 
 load("jstests/aggregation/extras/utils.js");
+load("jstests/libs/fixture_helpers.js");  // For isSharded.
 
 const localColl = db.lookup_null_semantics_local;
 const foreignColl = db.lookup_null_semantics_foreign;
 
 localColl.drop();
 foreignColl.drop();
+
+// Do not run the rest of the tests if the foreign collection is implicitly sharded but the flag to
+// allow $lookup/$graphLookup into a sharded collection is disabled.
+const getShardedLookupParam = db.adminCommand({getParameter: 1, featureFlagShardedLookup: 1});
+const isShardedLookupEnabled = getShardedLookupParam.hasOwnProperty("featureFlagShardedLookup") &&
+    getShardedLookupParam.featureFlagShardedLookup.value;
+if (FixtureHelpers.isSharded(foreignColl) && !isShardedLookupEnabled) {
+    return;
+}
 
 assert.commandWorked(localColl.insert([
     {_id: 0},
