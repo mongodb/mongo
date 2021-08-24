@@ -1,13 +1,9 @@
-/*
-
-Exhaustive test for authorization of commands with builtin roles.
-
-The test logic implemented here operates on the test cases defined
-in jstests/auth/lib/commands_lib.js
-
-@tags: [requires_sharding]
-
-*/
+/**
+ * Library for testing authorization of commands with builtin roles.
+ *
+ * The test logic implemented here operates on the test cases defined
+ * in jstests/auth/lib/commands_lib.js
+ */
 
 // This test involves killing all sessions, which will not work as expected if the kill command is
 // sent with an implicit session.
@@ -91,6 +87,10 @@ function testProperAuthorization(conn, t, testcase, r) {
     return out;
 }
 
+/**
+ * First of two entry points for this test library.
+ * To be invoked as an test argument to authCommandsLib.runTests().
+ */
 function runOneTest(conn, t) {
     var failures = [];
 
@@ -122,6 +122,10 @@ function runOneTest(conn, t) {
     return failures;
 }
 
+/**
+ * Second entry point for this test library.
+ * To be invoked as an test argument to authCommandsLib.runTests().
+ */
 function createUsers(conn) {
     var adminDb = conn.getDB(adminDbName);
     adminDb.createUser({user: "admin", pwd: "password", roles: ["__system"]});
@@ -135,56 +139,11 @@ function createUsers(conn) {
     adminDb.logout();
 }
 
-/*
- * Makes sure that none of the test cases reference roles
- * that aren't part of the global "roles" array.
+/**
+ * This tests the authorization of commands with builtin roles for a given server configuration
+ * represented in 'conn'.
  */
-function checkForNonExistentRoles() {
-    var tests = authCommandsLib.tests;
-    for (var i = 0; i < tests.length; i++) {
-        var test = tests[i];
-        for (var j = 0; j < test.testcases.length; j++) {
-            var testcase = test.testcases[j];
-            for (role in testcase.roles) {
-                var roleExists = false;
-                for (var k = 0; k < roles.length; k++) {
-                    if (roles[k].key === role) {
-                        roleExists = true;
-                        break;
-                    }
-                }
-                assert(roleExists,
-                       "Role " + role + " found in test: " + test.testname +
-                           ", but doesn't exist in roles array");
-            }
-        }
-    }
+function runAllCommandsBuiltinRoles(conn) {
+    const testFunctionImpls = {createUsers: createUsers, runOneTest: runOneTest};
+    authCommandsLib.runTests(conn, testFunctionImpls);
 }
-
-const dbPath = MongoRunner.toRealDir("$dataDir/commands_built_in_roles/");
-mkdir(dbPath);
-var opts = {
-    auth: "",
-    enableExperimentalStorageDetailsCmd: "",
-    setParameter: "trafficRecordingDirectory=" + dbPath
-};
-var impls = {createUsers: createUsers, runOneTest: runOneTest};
-
-checkForNonExistentRoles();
-
-// run all tests standalone
-var conn = MongoRunner.runMongod(opts);
-authCommandsLib.runTests(conn, impls);
-MongoRunner.stopMongod(conn);
-
-// run all tests sharded
-conn = new ShardingTest({
-    shards: 1,
-    mongos: 1,
-    config: 1,
-    keyFile: "jstests/libs/key1",
-    other:
-        {shardOptions: opts, mongosOptions: {setParameter: "trafficRecordingDirectory=" + dbPath}}
-});
-authCommandsLib.runTests(conn, impls);
-conn.stop();
