@@ -238,55 +238,48 @@ def main():  # pylint: disable=too-many-branches,too-many-statements
     shell_options = optparse.OptionGroup(parser, "Shell options")
     copy_options = optparse.OptionGroup(parser, "Copy options")
 
-    parser.add_option(
-        "--userHost", dest="user_host", default=None,
-        help=("User and remote host to execute commands on [REQUIRED]."
-              " Examples, 'user@1.2.3.4' or 'user@myhost.com'."))
+    parser.add_option("--userHost", dest="user_host", default=None,
+                      help=("User and remote host to execute commands on [REQUIRED]."
+                            " Examples, 'user@1.2.3.4' or 'user@myhost.com'."))
 
-    parser.add_option(
-        "--operation", dest="operation", default="shell", choices=_OPERATIONS,
-        help=("Remote operation to perform, choose one of '{}',"
-              " defaults to '%default'.".format(", ".join(_OPERATIONS))))
+    parser.add_option("--operation", dest="operation", default="shell", choices=_OPERATIONS,
+                      help=("Remote operation to perform, choose one of '{}',"
+                            " defaults to '%default'.".format(", ".join(_OPERATIONS))))
 
-    control_options.add_option(
-        "--sshConnectionOptions", dest="ssh_connection_options", default=None, action="append",
-        help=("SSH connection options which are common to ssh and scp."
-              " More than one option can be specified either"
-              " in one quoted string or by specifying"
-              " this option more than once. Example options:"
-              " '-i $HOME/.ssh/access.pem -o ConnectTimeout=10"
-              " -o ConnectionAttempts=10'"))
+    control_options.add_option("--sshConnectionOptions", dest="ssh_connection_options",
+                               default=None, action="append",
+                               help=("SSH connection options which are common to ssh and scp."
+                                     " More than one option can be specified either"
+                                     " in one quoted string or by specifying"
+                                     " this option more than once. Example options:"
+                                     " '-i $HOME/.ssh/access.pem -o ConnectTimeout=10"
+                                     " -o ConnectionAttempts=10'"))
 
-    control_options.add_option(
-        "--sshOptions", dest="ssh_options", default=None, action="append",
-        help=("SSH specific options."
-              " More than one option can be specified either"
-              " in one quoted string or by specifying"
-              " this option more than once. Example options:"
-              " '-t' or '-T'"))
+    control_options.add_option("--sshOptions", dest="ssh_options", default=None, action="append",
+                               help=("SSH specific options."
+                                     " More than one option can be specified either"
+                                     " in one quoted string or by specifying"
+                                     " this option more than once. Example options:"
+                                     " '-t' or '-T'"))
 
-    control_options.add_option(
-        "--scpOptions", dest="scp_options", default=None, action="append",
-        help=("SCP specific options."
-              " More than one option can be specified either"
-              " in one quoted string or by specifying"
-              " this option more than once. Example options:"
-              " '-l 5000'"))
+    control_options.add_option("--scpOptions", dest="scp_options", default=None, action="append",
+                               help=("SCP specific options."
+                                     " More than one option can be specified either"
+                                     " in one quoted string or by specifying"
+                                     " this option more than once. Example options:"
+                                     " '-l 5000'"))
 
-    control_options.add_option(
-        "--op_retry_count", dest="op_retry_count", type=int, default=0,
-        help=("Number of retries to attempt for operation,"
-              " defaults to '%default'."))
+    control_options.add_option("--op_retry_count", dest="op_retry_count", type=int, default=0,
+                               help=("Number of retries to attempt for operation,"
+                                     " defaults to '%default'."))
 
-    control_options.add_option(
-        "--access_retry_count", dest="access_retry_count", type=int, default=0,
-        help=("Number of retries to attempt remote access,"
-              " defaults to '%default'."))
+    control_options.add_option("--access_retry_count", dest="access_retry_count", type=int,
+                               default=0, help=("Number of retries to attempt remote access,"
+                                                " defaults to '%default'."))
 
-    control_options.add_option(
-        "--retrySleep", dest="retry_sleep", type=int, default=10,
-        help=("Number of seconds to wait between retries,"
-              " defaults to '%default'."))
+    control_options.add_option("--retrySleep", dest="retry_sleep", type=int, default=10,
+                               help=("Number of seconds to wait between retries,"
+                                     " defaults to '%default'."))
 
     control_options.add_option("--debug", dest="debug", action="store_true", default=False,
                                help="Provides debug output.")
