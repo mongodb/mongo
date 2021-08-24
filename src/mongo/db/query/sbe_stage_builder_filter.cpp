@@ -1653,11 +1653,10 @@ public:
             sbe::EVariable dividendConvertedToNumberInt64{frameId, 0};
             auto truncatedArgument = sbe::makeE<sbe::ENumericConvert>(
                 makeFunction("trunc"_sd, dividend.clone()), sbe::value::TypeTags::NumberInt64);
-            auto modExpression = buildMultiBranchConditional(
-                CaseValuePair{
-                    generateNullOrMissing(dividendConvertedToNumberInt64),
-                    sbe::makeE<sbe::EFail>(ErrorCodes::Error{5732102},
-                                           "cannot represent dividend as a 64-bit integer"_sd)},
+            auto modExpression = makeBinaryOp(
+                sbe::EPrimBinary::logicAnd,
+                // Return false if the dividend cannot be represented as a 64 bit integer.
+                makeNot(generateNullOrMissing(dividendConvertedToNumberInt64)),
                 makeFillEmptyFalse(makeBinaryOp(
                     sbe::EPrimBinary::eq,
                     makeFunction(

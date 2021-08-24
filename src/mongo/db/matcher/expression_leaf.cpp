@@ -332,10 +332,11 @@ bool ModMatchExpression::matchesSingleElement(const BSONElement& e, MatchDetails
             return false;
         }
         auto dividendLong = representAs<long long>(std::trunc(dividendDouble));
-        uassert(5732100,
-                str::stream() << "dividend value cannot be represented as a 64-bit integer: "
-                              << e.toString(false),
-                dividendLong);
+
+        // If the dividend value cannot be represented as a 64-bit integer, then we return false.
+        if (!dividendLong) {
+            return false;
+        }
         dividend = *dividendLong;
     } else if (e.type() == BSONType::NumberDecimal) {
         auto dividendDecimal = e.Decimal();
@@ -346,10 +347,11 @@ bool ModMatchExpression::matchesSingleElement(const BSONElement& e, MatchDetails
         }
         auto dividendLong =
             representAs<long long>(dividendDecimal.round(Decimal128::kRoundTowardZero));
-        uassert(5732101,
-                str::stream() << "dividend value cannot be represented as a 64-bit integer: "
-                              << e.toString(false),
-                dividendLong);
+
+        // If the dividend value cannot be represented as a 64-bit integer, then we return false.
+        if (!dividendLong) {
+            return false;
+        }
         dividend = *dividendLong;
     } else {
         dividend = e.numberLong();

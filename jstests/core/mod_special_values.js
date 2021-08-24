@@ -49,19 +49,15 @@ for (const value of ["NaN", "+Inf", "1e19"]) {
 
 // Tests for dividend parameter.
 // Double dividend value is too large.
-testCases.push({
-    inputDocuments: [{attribute: -1e19}],
-    divisor: 1,
-    remainder: 0,
-    expectedError: 5732100,
-});
+testCases.push(
+    {inputDocuments: [{attribute: -1e19}], divisor: 1, remainder: 0, expectedResults: []});
 
 // Decimal dividend value is too large.
 testCases.push({
     inputDocuments: [{attribute: NumberDecimal("1e19")}],
     divisor: 1,
     remainder: 0,
-    expectedError: 5732101,
+    expectedResults: []
 });
 
 // Verify that dividend value is truncated.
