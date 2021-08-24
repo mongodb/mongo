@@ -94,6 +94,7 @@ boost::optional<repl::OplogEntry> createMatchingTransactionTableUpdate(
         SessionTxnRecord newTxnRecord;
         newTxnRecord.setSessionId(*sessionInfo.getSessionId());
         newTxnRecord.setTxnNum(*sessionInfo.getTxnNumber());
+        newTxnRecord.setTxnRetryCounter(sessionInfo.getTxnRetryCounter());
         newTxnRecord.setLastWriteOpTime(entry.getOpTime());
         newTxnRecord.setLastWriteDate(entry.getWallClockTime());
 
@@ -309,6 +310,7 @@ boost::optional<OplogEntry> SessionUpdateTracker::_createTransactionTableUpdateF
         SessionTxnRecord newTxnRecord;
         newTxnRecord.setSessionId(*sessionInfo.getSessionId());
         newTxnRecord.setTxnNum(*sessionInfo.getTxnNumber());
+        newTxnRecord.setTxnRetryCounter(sessionInfo.getTxnRetryCounter());
         newTxnRecord.setLastWriteOpTime(entry.getOpTime());
         newTxnRecord.setLastWriteDate(entry.getWallClockTime());
 

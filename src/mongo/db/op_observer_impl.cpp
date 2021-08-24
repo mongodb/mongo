@@ -46,6 +46,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/keys_collection_document_gen.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/namespace_string.h"
@@ -127,9 +128,17 @@ void onWriteOpCompleted(OperationContext* opCtx,
         // be uninitialized.
         return;
 
+    const bool inMultiDocumentTransaction = txnParticipant.transactionIsOpen();
+
     // We add these here since they may not exist if we return early.
     sessionTxnRecord.setSessionId(*opCtx->getLogicalSessionId());
     sessionTxnRecord.setTxnNum(*opCtx->getTxnNumber());
+    if (feature_flags::gFeatureFlagInternalTransactions.isEnabled(
+            serverGlobalParams.featureCompatibility) &&
+        inMultiDocumentTransaction) {
+        invariant(opCtx->getTxnRetryCounter());
+        sessionTxnRecord.setTxnRetryCounter(*opCtx->getTxnRetryCounter());
+    }
     txnParticipant.onWriteOpCompletedOnPrimary(opCtx, std::move(stmtIdsWritten), sessionTxnRecord);
 }
 
@@ -1188,6 +1197,11 @@ OpTimeBundle logApplyOpsForTransaction(OperationContext* opCtx,
     oplogEntry->setNss({"admin", "$cmd"});
     oplogEntry->setSessionId(opCtx->getLogicalSessionId());
     oplogEntry->setTxnNumber(opCtx->getTxnNumber());
+    if (feature_flags::gFeatureFlagInternalTransactions.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        invariant(opCtx->getTxnRetryCounter());
+        oplogEntry->getOperationSessionInfo().setTxnRetryCounter(*opCtx->getTxnRetryCounter());
+    }
 
     try {
         OpTimeBundle times;
@@ -1369,6 +1383,11 @@ void logCommitOrAbortForPreparedTransaction(OperationContext* opCtx,
     oplogEntry->setNss({"admin", "$cmd"});
     oplogEntry->setSessionId(opCtx->getLogicalSessionId());
     oplogEntry->setTxnNumber(opCtx->getTxnNumber());
+    if (feature_flags::gFeatureFlagInternalTransactions.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        invariant(opCtx->getTxnRetryCounter());
+        oplogEntry->getOperationSessionInfo().setTxnRetryCounter(*opCtx->getTxnRetryCounter());
+    }
     oplogEntry->setPrevWriteOpTimeInTransaction(
         TransactionParticipant::get(opCtx).getLastWriteOpTime());
 

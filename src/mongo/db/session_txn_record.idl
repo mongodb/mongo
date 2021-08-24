@@ -61,6 +61,10 @@ structs:
             txnNum:
                 type: TxnNumber
                 description: "The id representing this transaction."
+            txnRetryCounter:
+                description: "The last seen transaction retry counter for this transaction."
+                type: TxnRetryCounter
+                optional: true # Retryable writes do not have a txnRetryCounter field.
             startOpTime:
                 type: optime
                 description: "The optime of this transaction's first oplog entry."

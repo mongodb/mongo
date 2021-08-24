@@ -52,6 +52,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/query/get_executor.h"
@@ -640,7 +641,9 @@ void TransactionParticipant::Participant::beginOrContinue(
 }
 
 void TransactionParticipant::Participant::beginOrContinueTransactionUnconditionally(
-    OperationContext* opCtx, TxnNumber txnNumber, TxnRetryCounter txnRetryCounter) {
+    OperationContext* opCtx,
+    TxnNumber txnNumber,
+    boost::optional<TxnRetryCounter> txnRetryCounter) {
     invariant(opCtx->inMultiDocumentTransaction());
 
     // We don't check or fetch any on-disk state, so treat the transaction as 'valid' for the
@@ -648,7 +651,8 @@ void TransactionParticipant::Participant::beginOrContinueTransactionUnconditiona
     p().isValid = true;
 
     if (o().activeTxnNumber != txnNumber) {
-        _beginMultiDocumentTransaction(opCtx, txnNumber, txnRetryCounter);
+        _beginMultiDocumentTransaction(
+            opCtx, txnNumber, txnRetryCounter.has_value() ? *txnRetryCounter : 0);
     } else {
         invariant(o().txnState.isInSet(TransactionState::kInProgress | TransactionState::kPrepared),
                   str::stream() << "Current state: " << o().txnState);
@@ -2276,7 +2280,23 @@ void TransactionParticipant::Participant::_refreshFromStorageIfNeeded(OperationC
     if (lastTxnRecord) {
         stdx::lock_guard<Client> lg(*opCtx->getClient());
         o(lg).activeTxnNumber = lastTxnRecord->getTxnNum();
-        o(lg).activeTxnRetryCounter = lastTxnRecord->getState() ? 0 : kUninitializedTxnRetryCounter;
+        o(lg).activeTxnRetryCounter = [&] {
+            if (lastTxnRecord->getState()) {
+                if (feature_flags::gFeatureFlagInternalTransactions.isEnabled(
+                        serverGlobalParams.featureCompatibility)) {
+                    uassert(5875200,
+                            str::stream()
+                                << "Expected the config.transactions entry for transaction "
+                                << lastTxnRecord->getTxnNum() << " on session "
+                                << lastTxnRecord->getSessionId()
+                                << " to have a 'txnRetryCounter' field",
+                            lastTxnRecord->getTxnRetryCounter().has_value());
+                    return *lastTxnRecord->getTxnRetryCounter();
+                }
+                return 0;
+            }
+            return kUninitializedTxnRetryCounter;
+        }();
         o(lg).lastWriteOpTime = lastTxnRecord->getLastWriteOpTime();
         p().activeTxnCommittedStatements = std::move(activeTxnHistory.committedStatements);
         p().hasIncompleteHistory = activeTxnHistory.hasIncompleteHistory;

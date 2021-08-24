@@ -454,9 +454,10 @@ public:
          * performing any checks for whether the new txnNumber will start a transaction number in
          * the past.
          */
-        void beginOrContinueTransactionUnconditionally(OperationContext* opCtx,
-                                                       TxnNumber txnNumber,
-                                                       TxnRetryCounter txnRetryCounter);
+        void beginOrContinueTransactionUnconditionally(
+            OperationContext* opCtx,
+            TxnNumber txnNumber,
+            boost::optional<TxnRetryCounter> txnRetryCounter);
 
         /**
          * If the participant is in prepare, returns a future whose promise is fulfilled when

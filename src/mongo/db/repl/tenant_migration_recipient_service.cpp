@@ -946,6 +946,10 @@ void TenantMigrationRecipientService::Instance::_processCommittedTransactionEntr
         SessionTxnRecord::parse(IDLParserErrorContext("SessionTxnRecord"), entry);
     auto sessionId = sessionTxnRecord.getSessionId();
     auto txnNumber = sessionTxnRecord.getTxnNum();
+    auto optTxnRetryCounter = sessionTxnRecord.getTxnRetryCounter();
+    uassert(ErrorCodes::InvalidOptions,
+            "txnRetryCounter is only supported in sharded clusters",
+            !optTxnRetryCounter.has_value() || *optTxnRetryCounter == 0);
 
     auto uniqueOpCtx = cc().makeOperationContext();
     auto opCtx = uniqueOpCtx.get();
@@ -957,9 +961,10 @@ void TenantMigrationRecipientService::Instance::_processCommittedTransactionEntr
         boost::make_optional<TenantMigrationRecipientInfo>(getMigrationUUID());
     opCtx->setLogicalSessionId(sessionId);
     opCtx->setTxnNumber(txnNumber);
+    if (optTxnRetryCounter) {
+        opCtx->setTxnRetryCounter(*optTxnRetryCounter);
+    }
     opCtx->setInMultiDocumentTransaction();
-    auto txnRetryCounter = *opCtx->getTxnRetryCounter();
-    invariant(txnRetryCounter == 0);
     MongoDOperationContextSession ocs(opCtx);
 
     LOGV2_DEBUG(5351301,
@@ -996,7 +1001,7 @@ void TenantMigrationRecipientService::Instance::_processCommittedTransactionEntr
         return;
     }
 
-    txnParticipant.beginOrContinueTransactionUnconditionally(opCtx, txnNumber, txnRetryCounter);
+    txnParticipant.beginOrContinueTransactionUnconditionally(opCtx, txnNumber, optTxnRetryCounter);
 
     MutableOplogEntry noopEntry;
     noopEntry.setOpType(repl::OpTypeEnum::kNoop);
@@ -1009,6 +1014,7 @@ void TenantMigrationRecipientService::Instance::_processCommittedTransactionEntr
     noopEntry.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
     noopEntry.setSessionId(sessionId);
     noopEntry.setTxnNumber(txnNumber);
+    noopEntry.getOperationSessionInfo().setTxnRetryCounter(optTxnRetryCounter);
 
     // Use the same wallclock time as the noop entry.
     sessionTxnRecord.setStartOpTime(boost::none);
