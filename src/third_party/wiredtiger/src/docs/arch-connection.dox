@@ -42,9 +42,9 @@ by running rollback to stable, see @ref arch-rts for more details.
 At runtime, database-wide operations can be executed using the connection interface. For instance,
 it is possible to reconfigure WiredTiger features and behavior using WT_CONNECTION::reconfigure
 instead of closing the connection and calling WT_CONNECTION::open again. However, almost all CRUD
-operations on the database are executed in the context of a session which can be created using
-WT_CONNECTION::open_session. See the WT_CONNECTION:: documentation to discover other available APIs
-related to WiredTiger connections.
+operations on the database are executed in the context of a session (see @ref arch-session) which
+can be created using WT_CONNECTION::open_session. See the WT_CONNECTION:: documentation to discover
+other available APIs related to WiredTiger connections.
 
 A connection also keeps tracks of global information, see \c WT_CONNECTION_IMPL defined in \c
 connection.h. Finally, a \c WT_CONNECTION handle may be shared between threads, see @ref threads for

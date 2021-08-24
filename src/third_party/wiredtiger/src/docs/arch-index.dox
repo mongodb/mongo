@@ -200,6 +200,10 @@ Rollback to stable to remove the unstable updates from the database.
 
 A schema defines the format of the application data in WiredTiger.
 
+@subpage arch-session
+
+A session defines the context for most operations performed in WiredTiger.
+
 @subpage arch-snapshot
 
 Snapshots are implemented by storing transaction ids committed before
