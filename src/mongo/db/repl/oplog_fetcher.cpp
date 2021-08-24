@@ -60,7 +60,6 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeStartingOplogFetcher);
 MONGO_FAIL_POINT_DEFINE(hangBeforeOplogFetcherRetries);
 MONGO_FAIL_POINT_DEFINE(hangBeforeProcessingSuccessfulBatch);
 MONGO_FAIL_POINT_DEFINE(hangOplogFetcherBeforeAdvancingLastFetched);
-MONGO_FAIL_POINT_DEFINE(skipWaitingToRecreateCursor);
 
 namespace {
 class OplogBatchStats {
@@ -429,18 +428,16 @@ void OplogFetcher::_runQuery(const executor::TaskExecutor::CallbackArgs& callbac
         if (_cursor->isDead()) {
             if (!_cursor->tailable()) {
                 try {
-                    if (!MONGO_unlikely(skipWaitingToRecreateCursor.shouldFail())) {
-                        auto opCtx = cc().makeOperationContext();
-                        stdx::unique_lock<Latch> lk(_mutex);
-                        // Wait a little before re-running the aggregation command on the donor's
-                        // oplog. We are not actually intending to wait for shutdown here, we use
-                        // this as a way to wait while still being able to be interrupted outside of
-                        // primary-only service shutdown.
-                        opCtx->waitForConditionOrInterruptFor(
-                            _shutdownCondVar, lk, _awaitDataTimeout, [&] {
-                                return _isShuttingDown_inlock();
-                            });
-                    }
+                    auto opCtx = cc().makeOperationContext();
+                    stdx::unique_lock<Latch> lk(_mutex);
+                    // Wait a little before re-running the aggregation command on the donor's
+                    // oplog. We are not actually intending to wait for shutdown here, we use
+                    // this as a way to wait while still being able to be interrupted outside of
+                    // primary-only service shutdown.
+                    opCtx->waitForConditionOrInterruptFor(_shutdownCondVar,
+                                                          lk,
+                                                          _awaitDataTimeout,
+                                                          [&] { return _isShuttingDown_inlock(); });
                     _cursor.reset();
                     continue;
                 } catch (const DBException& e) {

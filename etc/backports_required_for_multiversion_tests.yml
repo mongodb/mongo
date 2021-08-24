@@ -46,6 +46,8 @@ last-continuous:
       test_file: jstests/replsets/rollback_transaction_table.js
     - ticket: SERVER-59023
       test_file: jstests/sharding/resharding_secondary_recovers_temp_ns_metadata.js
+    - ticket: SERVER-51943
+      test_file: jstests/replsets/tenant_migration_fetch_committed_transactions_retry.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -244,6 +246,8 @@ last-lts:
       test_file: jstests/sharding/resharding_secondary_recovers_temp_ns_metadata.js
     - ticket: SERVER-59765
       test_file: jstests/aggregation/expressions/date_add_subtract.js
+    - ticket: SERVER-51943
+      test_file: jstests/replsets/tenant_migration_fetch_committed_transactions_retry.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
