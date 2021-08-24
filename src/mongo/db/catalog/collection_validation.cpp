@@ -428,10 +428,6 @@ Status validate(OperationContext* opCtx,
     // Background validation does not support any type of full validation.
     invariant(!(background && (options != ValidateOptions::kNoFullValidation)));
 
-    if (repairMode == RepairMode::kRepair) {
-        invariant(storageGlobalParams.repair);
-    }
-
     // This is deliberately outside of the try-catch block, so that any errors thrown in the
     // constructor fail the cmd, as opposed to returning OK with valid:false.
     ValidateState validateState(
@@ -463,7 +459,7 @@ Status validate(OperationContext* opCtx,
     });
     if (!validateState.isBackground() && !storageGlobalParams.repair) {
         opCtx->recoveryUnit()->setPrepareConflictBehavior(
-            PrepareConflictBehavior::kIgnoreConflicts);
+            PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
     } else {
         // isBackground().
         invariant(oldPrepareConflictBehavior == PrepareConflictBehavior::kEnforce);
