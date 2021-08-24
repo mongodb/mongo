@@ -32,6 +32,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/client/dbclient_connection.h"
 #include "mongo/client/fetcher.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/sync_source_selector.h"
@@ -44,6 +45,12 @@ namespace repl {
  */
 class InitialSyncerInterface {
 public:
+    /**
+     * Type of function to create a database client
+     *
+     * Used for testing only.
+     */
+    using CreateClientFn = std::function<std::unique_ptr<DBClientConnection>()>;
     struct Options {
         /** Function to return optime of last operation applied on this node */
         using GetMyLastOptimeFn = std::function<OpTime()>;
@@ -90,6 +97,7 @@ public:
 
     /**
      * Shuts down replication if "start" has been called, and blocks until shutdown has completed.
+     * Must be called before the executor that the initial syncer uses is shutdown.
      */
     virtual Status shutdown() = 0;
 

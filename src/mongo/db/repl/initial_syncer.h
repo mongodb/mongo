@@ -99,13 +99,6 @@ public:
      */
     using OnCompletionGuard = CallbackCompletionGuard<StatusWith<OpTimeAndWallTime>>;
 
-    /**
-     * Type of function to create a database client
-     *
-     * Used for testing only.
-     */
-    using CreateClientFn = std::function<std::unique_ptr<DBClientConnection>()>;
-
     struct InitialSyncAttemptInfo {
         int durationMillis;
         Status status;
