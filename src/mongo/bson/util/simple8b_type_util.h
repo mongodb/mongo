@@ -75,16 +75,26 @@ public:
     static boost::optional<int64_t> encodeDouble(double val, uint8_t scaleIndex);
     static double decodeDouble(int64_t val, uint8_t scaleIndex);
 
-    // These methods allow encoding decimal 128 with simple8b. We do not do any transformation to
-    // the bits themselves and this can be thought of as a reinterpret cast.
+    // These methods allow encoding decimal 128 with simple8b.
     static int128_t encodeDecimal128(Decimal128 val);
     static Decimal128 decodeDecimal128(int128_t val);
 
     // These methods allow encoding binary with simple8b. We do not make any
     // assumptions about the data other than the fact that the data is valid up to the size
-    // provided. The max size must be less than or equal to 16 bytes.
-    static int128_t encodeBinary(const char* val, size_t size);
+    // provided. Encoding is only possible for sizes less than or equal to 16 bytes. boost::none is
+    // returned if encoding is not possible.
+    static boost::optional<int128_t> encodeBinary(const char* val, size_t size);
     static void decodeBinary(int128_t val, char* result, size_t size);
+
+    // These methods allow encoding strings with simple8b. Encoding is only possible for strings
+    // less than or equal to 16 bytes and for strings starting with a non-null character.
+    // boost::none is returned if encoding is not possible.
+    struct SmallString {
+        std::array<char, 16> str;
+        uint8_t size;
+    };
+    static boost::optional<int128_t> encodeString(StringData str);
+    static SmallString decodeString(int128_t val);
 
     // Array is a double as it will always be multiplied by a double and we don't want to do an
     // extra cast for

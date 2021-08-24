@@ -35,6 +35,13 @@
 #include <cmath>
 
 namespace mongo {
+namespace {
+int128_t encodeCharArray(const char (&arr)[16]) {
+    uint64_t low = ConstDataView(arr).read<LittleEndian<uint64_t>>();
+    uint64_t high = ConstDataView(arr + 8).read<LittleEndian<uint64_t>>();
+    return absl::MakeInt128(high, low);
+}
+}  // namespace
 
 uint64_t Simple8bTypeUtil::encodeInt64(int64_t val) {
     return (static_cast<uint64_t>(val) << 1) ^ (val >> 63);
@@ -189,13 +196,14 @@ Decimal128 Simple8bTypeUtil::decodeDecimal128(int128_t val) {
     return res;
 }
 
-int128_t Simple8bTypeUtil::encodeBinary(const char* val, size_t size) {
+boost::optional<int128_t> Simple8bTypeUtil::encodeBinary(const char* val, size_t size) {
+    if (size > 16)
+        return boost::none;
+
     char arr[16];
     memcpy(arr, val, size);
     memset(arr + size, 0, sizeof(arr) - size);
-    uint64_t low = ConstDataView(arr).read<LittleEndian<uint64_t>>();
-    uint64_t high = ConstDataView(arr + 8).read<LittleEndian<uint64_t>>();
-    return absl::MakeInt128(high, low);
+    return encodeCharArray(arr);
 }
 
 void Simple8bTypeUtil::decodeBinary(int128_t val, char* result, size_t size) {
@@ -207,6 +215,40 @@ void Simple8bTypeUtil::decodeBinary(int128_t val, char* result, size_t size) {
     } else {
         memcpy(result, &low, size);
     }
+}
+
+boost::optional<int128_t> Simple8bTypeUtil::encodeString(StringData str) {
+    auto size = str.size();
+    if (size > 16)
+        return boost::none;
+
+    // Strings are reversed as it is deemed likely that entopy is located at the end of the string.
+    // This will put the entropy in the least significant byte creating a smaller delta. We can't
+    // have leading zero bytes as that would create a decoding ambiguity. Empty strings are fine
+    // however, they are just encoded as 0.
+    if (!str.empty() && str[0] == '\0')
+        return boost::none;
+
+    char arr[16] = {};
+    std::reverse_copy(str.begin(), str.end(), arr);
+    return encodeCharArray(arr);
+}
+Simple8bTypeUtil::SmallString Simple8bTypeUtil::decodeString(int128_t val) {
+    // String may be up to 16 characters, provide that decode and then we need to scan the result to
+    // find actual size
+    char str[16] = {};
+    decodeBinary(val, str, 16);
+
+    // Find first non null character from the end of the string to determine actual size
+    int8_t i = 15;
+    for (; i >= 0 && str[i] == '\0'; --i) {
+    }
+
+    // Reverse and return string
+    SmallString ret;
+    ret.size = i + 1;
+    std::reverse_copy(str, str + ret.size, ret.str.data());
+    return ret;
 }
 
 }  // namespace mongo

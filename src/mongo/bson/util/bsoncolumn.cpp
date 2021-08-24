@@ -190,12 +190,14 @@ void BSONColumn::Iterator::_loadControl(const BSONElement& prev) {
         // deltas from this literal
         BSONElement literalElem(_control, 1, -1, BSONElement::CachedSizeTag{});
         switch (literalElem.type()) {
+            case String:
+                _lastEncodedValue128 =
+                    Simple8bTypeUtil::encodeString(literalElem.valueStringData()).value_or(0);
+                break;
             case BinData: {
                 int size;
                 const char* binary = literalElem.binData(size);
-                if (size <= 16) {
-                    _lastEncodedValue128 = Simple8bTypeUtil::encodeBinary(binary, size);
-                }
+                _lastEncodedValue128 = Simple8bTypeUtil::encodeBinary(binary, size).value_or(0);
                 break;
             }
             case jstOID:
@@ -330,8 +332,8 @@ void BSONColumn::Iterator::_loadDelta(const BSONElement& prev,
             DataView(elem.value()).write<LittleEndian<long long>>(_lastEncodedValueForDeltaOfDelta);
         } break;
         default:
-            // unhandled for now
-            break;
+            // No other types use int64 and need to allocate value storage
+            MONGO_UNREACHABLE;
     }
 
     // Append our written BSONElement to decompressed values
@@ -365,29 +367,45 @@ void BSONColumn::Iterator::_loadDelta(const BSONElement& prev,
         return;
     }
 
-    // Allocate a new BSONElement that fits same value size as previous
-    ElementStorage::Element elem = _column._elementStorage.allocate(type, prev.valuesize());
-
     // Write value depending on type
-    switch (type) {
-        case BinData:
-            // The first 5 bytes in binData is a count and subType, copy them from previous
-            memcpy(elem.value(), prev.value(), 5);
-            Simple8bTypeUtil::decodeBinary(
-                _lastEncodedValue128, elem.value() + 5, prev.valuestrsize());
-            break;
-        case NumberDecimal: {
-            Decimal128 d128 = Simple8bTypeUtil::decodeDecimal128(_lastEncodedValue128);
-            Decimal128::Value d128Val = d128.getValue();
-            DataView(elem.value()).write<LittleEndian<long long>>(d128Val.low64);
-            DataView(elem.value() + sizeof(long long))
-                .write<LittleEndian<long long>>(d128Val.high64);
-            break;
+    auto elem = [&]() -> ElementStorage::Element {
+        switch (type) {
+            case String: {
+                Simple8bTypeUtil::SmallString ss =
+                    Simple8bTypeUtil::decodeString(_lastEncodedValue128);
+                // Add 5 bytes to size, strings begin with a 4 byte count and ends with a null
+                // terminator
+                auto elem = _column._elementStorage.allocate(type, ss.size + 5);
+                // Write count, size includes null terminator
+                DataView(elem.value()).write<LittleEndian<int32_t>>(ss.size + 1);
+                // Write string value
+                memcpy(elem.value() + sizeof(int32_t), ss.str.data(), ss.size);
+                // Write null terminator
+                DataView(elem.value()).write<char>('\0', ss.size + sizeof(int32_t));
+                return elem;
+            }
+            case BinData: {
+                auto elem = _column._elementStorage.allocate(type, prev.valuesize());
+                // The first 5 bytes in binData is a count and subType, copy them from previous
+                memcpy(elem.value(), prev.value(), 5);
+                Simple8bTypeUtil::decodeBinary(
+                    _lastEncodedValue128, elem.value() + 5, prev.valuestrsize());
+                return elem;
+            }
+            case NumberDecimal: {
+                auto elem = _column._elementStorage.allocate(type, prev.valuesize());
+                Decimal128 d128 = Simple8bTypeUtil::decodeDecimal128(_lastEncodedValue128);
+                Decimal128::Value d128Val = d128.getValue();
+                DataView(elem.value()).write<LittleEndian<long long>>(d128Val.low64);
+                DataView(elem.value() + sizeof(long long))
+                    .write<LittleEndian<long long>>(d128Val.high64);
+                return elem;
+            }
+            default:
+                // No other types should use int128
+                MONGO_UNREACHABLE;
         }
-        default:
-            // unhandled for now
-            break;
-    }
+    }();
 
     _column._decompressed.push_back(elem.element());
 }

@@ -102,37 +102,48 @@ BSONColumnBuilder& BSONColumnBuilder::append(BSONElement elem) {
         }
     }
 
-    bool encodingPossible = true;
     if (!compressed) {
         if (_storeWith128) {
-            int128_t delta = 0;
+            auto appendEncoded = [&](int128_t encoded) {
+                compressed = _simple8bBuilder128.append(
+                    Simple8bTypeUtil::encodeInt128(calcDelta(encoded, _prevEncoded128)));
+                _prevEncoded128 = encoded;
+            };
+
             switch (type) {
+                case String:
+                    if (auto encoded = Simple8bTypeUtil::encodeString(elem.valueStringData())) {
+                        appendEncoded(*encoded);
+                    }
+                    break;
                 case BinData: {
                     int size;
                     const char* binary = elem.binData(size);
-                    encodingPossible = size == previous.valuestrsize() && elem.valuestrsize() <= 16;
-                    if (!encodingPossible)
+                    // We only do delta encoding of binary if the binary size is exactly the same.
+                    // To support size difference we'd need to add a count to be able to reconstruct
+                    // binaries starting with zero bytes. We don't want to waste bits for this.
+                    if (size != previous.valuestrsize())
                         break;
 
-                    int128_t curEncoded = Simple8bTypeUtil::encodeBinary(binary, size);
-                    delta = calcDelta(curEncoded, _prevEncoded128);
-                    _prevEncoded128 = curEncoded;
+                    if (auto encoded = Simple8bTypeUtil::encodeBinary(binary, size)) {
+                        appendEncoded(*encoded);
+                    }
                 } break;
-                case NumberDecimal: {
-                    int128_t curEncoded = Simple8bTypeUtil::encodeDecimal128(elem._numberDecimal());
-                    delta = calcDelta(curEncoded, _prevEncoded128);
-                    _prevEncoded128 = curEncoded;
-                } break;
+                case NumberDecimal:
+                    appendEncoded(Simple8bTypeUtil::encodeDecimal128(elem._numberDecimal()));
+                    break;
                 default:
                     // Nothing else is implemented yet
                     invariant(false);
             };
-            if (encodingPossible) {
-                compressed = _simple8bBuilder128.append(Simple8bTypeUtil::encodeInt128(delta));
-            }
         } else if (type == NumberDouble) {
             compressed = _appendDouble(elem._numberDouble(), previous._numberDouble());
         } else {
+            // Variable to indicate that it was possible to encode this BSONElement as an integer
+            // for storage inside Simple8b. If encoding is not possible the element is stored as
+            // uncompressed.
+            bool encodingPossible = true;
+            // Value to store in Simple8b if encoding is possible.
             int64_t value = 0;
             switch (type) {
                 case NumberInt:
@@ -393,13 +404,15 @@ void BSONColumnBuilder::_writeLiteralFromPrevious() {
             _lastValueInPrevBlock = prevElem._numberDouble();
             std::tie(_prevEncoded64, _scaleIndex) = scaleAndEncodeDouble(_lastValueInPrevBlock, 0);
             break;
+        case String:
+            _prevEncoded128 =
+                Simple8bTypeUtil::encodeString(prevElem.valueStringData()).value_or(0);
+            break;
         case BinData: {
             int size;
             const char* binary = prevElem.binData(size);
-            if (size <= 16)
-                _prevEncoded128 = Simple8bTypeUtil::encodeBinary(binary, size);
-            break;
-        }
+            _prevEncoded128 = Simple8bTypeUtil::encodeBinary(binary, size).value_or(0);
+        } break;
         case NumberDecimal:
             _prevEncoded128 = Simple8bTypeUtil::encodeDecimal128(prevElem._numberDecimal());
             break;

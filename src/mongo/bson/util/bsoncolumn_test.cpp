@@ -83,17 +83,11 @@ public:
     }
 
     BSONElement createDate(Date_t dt) {
-        BSONObjBuilder ob;
-        ob.appendDate("0"_sd, dt);
-        _elementMemory.emplace_front(ob.obj());
-        return _elementMemory.front().firstElement();
+        return _createElement(dt);
     }
 
     BSONElement createBool(bool b) {
-        BSONObjBuilder ob;
-        ob.appendBool("0"_sd, b);
-        _elementMemory.emplace_front(ob.obj());
-        return _elementMemory.front().firstElement();
+        return _createElement(b);
     }
 
     BSONElement createNull() {
@@ -145,6 +139,10 @@ public:
         return _elementMemory.front().firstElement();
     }
 
+    BSONElement createElementString(StringData val) {
+        return _createElement(val);
+    }
+
     static boost::optional<uint128_t> deltaBinData(BSONElement val, BSONElement prev) {
         if (val.binaryEqualValues(prev)) {
             return uint128_t(0);
@@ -158,8 +156,15 @@ public:
             return boost::none;
         }
 
-        return Simple8bTypeUtil::encodeInt128(Simple8bTypeUtil::encodeBinary(valBinary, valSize) -
-                                              Simple8bTypeUtil::encodeBinary(prevBinary, prevSize));
+        return Simple8bTypeUtil::encodeInt128(
+            *Simple8bTypeUtil::encodeBinary(valBinary, valSize) -
+            *Simple8bTypeUtil::encodeBinary(prevBinary, prevSize));
+    }
+
+    static uint128_t deltaString(BSONElement val, BSONElement prev) {
+        return Simple8bTypeUtil::encodeInt128(
+            *Simple8bTypeUtil::encodeString(val.valueStringData()) -
+            *Simple8bTypeUtil::encodeString(prev.valueStringData()));
     }
 
     static uint64_t deltaInt32(BSONElement val, BSONElement prev) {
@@ -2016,6 +2021,154 @@ TEST_F(BSONColumnTest, BinDataLargerThan16SameValue) {
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
     verifyDecompression(binData, {elemBinData, elemBinData});
+}
+
+TEST_F(BSONColumnTest, StringBase) {
+    BSONColumnBuilder cb("test"_sd);
+    auto elem = createElementString("test");
+    cb.append(elem);
+
+    BufBuilder expected;
+    appendElementCount(expected, 1);
+    appendLiteral(expected, elem);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {elem});
+}
+
+TEST_F(BSONColumnTest, StringDeltaSame) {
+    BSONColumnBuilder cb("test"_sd);
+    auto elemString = createElementString("test");
+    cb.append(elemString);
+    cb.append(elemString);
+
+    BufBuilder expected;
+    appendElementCount(expected, 2);
+    appendLiteral(expected, elemString);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlock128(expected, deltaString(elemString, elemString));
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {elemString, elemString});
+}
+
+TEST_F(BSONColumnTest, StringDeltaDiff) {
+    BSONColumnBuilder cb("test"_sd);
+    auto elemString = createElementString("mongo");
+    cb.append(elemString);
+    auto elemString2 = createElementString("tests");
+    cb.append(elemString2);
+
+    BufBuilder expected;
+    appendElementCount(expected, 2);
+    appendLiteral(expected, elemString);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlock128(expected, deltaString(elemString2, elemString));
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {elemString, elemString2});
+}
+
+TEST_F(BSONColumnTest, StringDeltaLarge) {
+    BSONColumnBuilder cb("test"_sd);
+    auto elemString = createElementString("mongoaaaaaaa");
+    cb.append(elemString);
+    // Need to make sure we have a significant overlap in delta so we can have a trailingZeroCount
+    // thats viable.
+    auto elemString2 = createElementString("testxaaaaaaa");
+    cb.append(elemString2);
+
+    BufBuilder expected;
+    appendElementCount(expected, 2);
+    appendLiteral(expected, elemString);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlock128(expected, deltaString(elemString2, elemString));
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {elemString, elemString2});
+}
+
+TEST_F(BSONColumnTest, StringDeltaAfterInvalid) {
+    BSONColumnBuilder cb("test"_sd);
+    auto elem = createElementString("mongo");
+    cb.append(elem);
+
+    auto elemInvalid = createElementString("\0mongo"_sd);
+    cb.append(elemInvalid);
+
+    auto elem2 = createElementString("test");
+    cb.append(elem2);
+
+    BufBuilder expected;
+    appendElementCount(expected, 3);
+    appendLiteral(expected, elem);
+    appendLiteral(expected, elemInvalid);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+
+    // If previous is not encodable use 0 as previous. An empty string will encode as 0
+    auto elemEmpty = createElementString(""_sd);
+    ASSERT_EQ(*Simple8bTypeUtil::encodeString(elemEmpty.valueStringData()), 0);
+    appendSimple8bBlock128(expected, deltaString(elem2, elemEmpty));
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {elem, elemInvalid, elem2});
+}
+
+TEST_F(BSONColumnTest, StringMultiType) {
+    BSONColumnBuilder cb("test"_sd);
+    // Add decimals first
+    auto elemDec128Max = createElementDecimal128(std::numeric_limits<Decimal128>::max());
+    auto elemDec128Zero = createElementDecimal128(std::numeric_limits<Decimal128>::min());
+    auto elemDec128One = createElementDecimal128(Decimal128(1));
+    cb.append(elemDec128Zero);
+    cb.append(elemDec128Max);
+    cb.append(elemDec128Zero);
+    cb.append(elemDec128Zero);
+    cb.append(elemDec128One);
+
+    // Add strings
+    auto elemString = createElementString("mongoisgreat");
+    cb.append(elemString);
+    // Need to make sure we have a significant overlap in delta so we can have a trailingZeroCount
+    // thats viable.
+    auto elemString2 = createElementString("testisagreat");
+    cb.append(elemString2);
+
+    BufBuilder expected;
+    appendElementCount(expected, 7);
+    appendLiteral(expected, elemDec128Zero);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    std::vector<boost::optional<uint128_t>> valuesToAppend = {
+        deltaDecimal128(elemDec128Max, elemDec128Zero),
+        deltaDecimal128(elemDec128Zero, elemDec128Max),
+        deltaDecimal128(elemDec128Zero, elemDec128Zero),
+        deltaDecimal128(elemDec128One, elemDec128Zero)};
+    appendSimple8bBlocks128(expected, valuesToAppend, 1);
+    appendLiteral(expected, elemString);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlock128(expected, deltaString(elemString2, elemString));
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData,
+                        {elemDec128Zero,
+                         elemDec128Max,
+                         elemDec128Zero,
+                         elemDec128Zero,
+                         elemDec128One,
+                         elemString,
+                         elemString2});
 }
 
 TEST_F(BSONColumnTest, InvalidControlByte) {

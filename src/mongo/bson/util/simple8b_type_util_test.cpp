@@ -55,16 +55,25 @@ void assertDecimal128Equal(Decimal128 val) {
 }
 
 void assertBinaryEqual(char* val, size_t size, int128_t expected) {
-    int128_t encodeResult = Simple8bTypeUtil::encodeBinary(val, size);
-    ASSERT_EQUALS(encodeResult, expected);
+    boost::optional<int128_t> encodeResult = Simple8bTypeUtil::encodeBinary(val, size);
+    ASSERT_EQUALS(*encodeResult, expected);
 
     // Initialize to something non zero so we can verify that we did not write out of bounds
     char charPtr[17];
     char unused = 'x';
     memset(charPtr, unused, sizeof(charPtr));
-    Simple8bTypeUtil::decodeBinary(encodeResult, charPtr, size);
+    Simple8bTypeUtil::decodeBinary(*encodeResult, charPtr, size);
     ASSERT_EQUALS(std::memcmp(charPtr, val, size), 0);
     ASSERT_EQUALS(charPtr[size], unused);
+}
+
+void assertStringEqual(StringData val, int128_t expected) {
+    boost::optional<int128_t> encodeResult = Simple8bTypeUtil::encodeString(val);
+    ASSERT_EQUALS(*encodeResult, expected);
+
+    Simple8bTypeUtil::SmallString decodeResult = Simple8bTypeUtil::decodeString(*encodeResult);
+    ASSERT_EQUALS(val.size(), decodeResult.size);
+    ASSERT_EQUALS(std::memcmp(val.rawData(), decodeResult.str.data(), val.size()), 0);
 }
 
 TEST(Simple8bTypeUtil, EncodeAndDecodePositiveSignedInt) {
@@ -414,7 +423,7 @@ TEST(Simple8bTypeUtil, EmptyBinary) {
 
 TEST(Simple8bTypeUtil, SingleLetterBinary) {
     char arr[1] = {'a'};
-    assertBinaryEqual(arr, 1, 97);
+    assertBinaryEqual(arr, sizeof(arr), 97);
 }
 
 TEST(Simple8bTypeUtil, MultiLetterBinary) {
@@ -423,7 +432,7 @@ TEST(Simple8bTypeUtil, MultiLetterBinary) {
     // c = 99 = 01100011
     // abc = 011000110110001001100001 = 6513249
     char arr[3] = {'a', 'b', 'c'};
-    assertBinaryEqual(arr, 3, 6513249);
+    assertBinaryEqual(arr, sizeof(arr), 6513249);
 }
 
 TEST(Simple8bTypeUtil, MultiCharWithOddValues) {
@@ -432,12 +441,18 @@ TEST(Simple8bTypeUtil, MultiCharWithOddValues) {
     // 1 = 00000001
     // \n = 00001010
     // a1\n = 000010100000000101100001 = 655713
-    assertBinaryEqual(arr, 5, 655713);
+    assertBinaryEqual(arr, sizeof(arr), 655713);
 }
 
 TEST(Simple8bTypeUtil, LargeChar) {
     char arr[15] = "abcdefghijklmn";
-    assertBinaryEqual(arr, 15, absl::MakeInt128(0x6E6D6C6B6A69, 0x6867666564636261));
+    assertBinaryEqual(arr, sizeof(arr), absl::MakeInt128(0x6E6D6C6B6A69, 0x6867666564636261));
+}
+
+TEST(Simple8bTypeUtil, OversizedBinary) {
+    char arr[17] = "aaaaabbbbbcccccd";
+    auto encoded = Simple8bTypeUtil::encodeBinary(arr, sizeof(arr));
+    ASSERT_FALSE(encoded);
 }
 
 TEST(Simple8bTypeUtil, LeadingAndTrailingZeros) {
@@ -445,5 +460,50 @@ TEST(Simple8bTypeUtil, LeadingAndTrailingZeros) {
     // 0 = 48 = 0011000
     // Our reuslt should be
     // 00110000 0011000 00110000 1100001 00110000 00110000 00110000
-    assertBinaryEqual(arr, 7, absl::MakeInt128(0, 0x30303061303030));
+    assertBinaryEqual(arr, sizeof(arr), absl::MakeInt128(0, 0x30303061303030));
+}
+
+TEST(Simple8bTypeUtil, BaseString) {
+    assertStringEqual("a"_sd, 97);
+}
+
+TEST(Simple8bTypeUtil, BaseString2Letter) {
+    // a = 97 = 01100001
+    // b = 98 = 01100010
+    // reversed in little endian = 0110000101100010
+    assertStringEqual("ab"_sd, 24930);
+}
+
+TEST(Simple8bTypeUtil, LargeString) {
+    // a = 97 = 01100001
+    // b = 98
+    // c = 99
+    // d = 100
+    // reversed in little endian = 1100001 01100001 01100001 01100001 01100010 01100010 01100010
+    // 01100010 01100011 01100011 01100011 01100011 01100100 01100100 01100100 01100100
+    assertStringEqual("aaaabbbbccccdddd"_sd,
+                      absl::MakeInt128(0x6161616162626262, 0x6363636364646464));
+}
+
+TEST(Simple8bTypeUtil, EmptyString) {
+    assertStringEqual("", 0);
+}
+
+TEST(Simple8bTypeUtil, OddCharString) {
+    // a = 97 = 01100001
+    // b = 98
+    // \n = 10 = 1010
+    // reversed in little endian = 1100001 00001010 01100010
+    assertStringEqual("a\nb", 6359650);
+}
+
+TEST(Simple8bTypeUtil, OversizdString) {
+    boost::optional<int128_t> encodeResult = Simple8bTypeUtil::encodeString("aaaaabbbbbcccccdd"_sd);
+    ASSERT_FALSE(encodeResult);
+}
+
+TEST(Simple8bTypeUtil, BrokenString) {
+    StringData val("\0a", 3);
+    boost::optional<int128_t> encodeResult = Simple8bTypeUtil::encodeString(val);
+    ASSERT_FALSE(encodeResult);
 }
