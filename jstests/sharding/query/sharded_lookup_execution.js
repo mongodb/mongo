@@ -361,6 +361,63 @@ assertLookupExecution(pipeline, {comment: "sharded_to_sharded_to_sharded_scatter
     nestedExec: [3, 3]
 });
 
+// Test sharded local collection where the foreign namespace is a sharded view with another
+// $lookup against a sharded collection. Note that the $lookup in the view should be treated as
+// "nested" $lookup and should execute on the merging node.
+st.shardColl(ordersColl, {_id: 1}, {_id: 1}, {_id: 1}, mongosDB.getName());
+st.shardColl(
+    reviewsColl, {product_id: 1}, {product_id: "hat"}, {product_id: "hat"}, mongosDB.getName());
+st.shardColl(updatesColl,
+             {original_review_id: 1},
+             {original_review_id: 1},
+             {original_review_id: 1},
+             mongosDB.getName());
+
+assert.commandWorked(mongosDB.createView("reviewsView", reviewsColl.getName(), 
+    [{$lookup: {
+        from: "updates",
+        let: {review_id: "$_id"},
+        pipeline: [{$match: {$expr: {$eq: ["$original_review_id", "$$review_id"]}}}],
+        as: "updates"
+    }},
+    {$unwind: {path: "$updates", preserveNullAndEmptyArrays: true}},
+    {$project: {product_id: 1, stars: {$ifNull: ["$updates.updated_stars", "$stars"]}}}
+]));
+pipeline = [
+    {$match: {customer: "Alice"}},
+    {$unwind: "$products"},
+    {$lookup: {
+        from: "reviewsView",
+        let: {customers_product_id: "$products._id"},
+        pipeline: [
+            {$match: {$expr: {$eq: ["$product_id", "$$customers_product_id"]}}},
+        ],
+        as: "reviews"
+    }},
+    {$group: {
+        _id: "$_id",
+        products: {$push: {
+            _id: "$products._id",
+            price: "$products.price",
+            avg_review: {$avg: "$reviews.stars"}
+        }}
+    }}
+];
+
+assertLookupExecution(pipeline, {comment: "sharded_to_sharded_view_to_sharded"}, {
+    results: expectedRes,
+    // The 'orders' collection is sharded, so the top-level stage $lookup is executed in parallel on
+    // every shard that contains the local collection.
+    toplevelExec: [1, 1],
+    // For every document that flows through the $lookup stage, the node executing the $lookup will
+    // target the shard(s) that holds the relevant data for the sharded foreign view.
+    subpipelineExec: [0, 2],
+    // When executing the subpipeline, the "nested" $lookup stage contained in the view pipeline
+    // will stay on the merging half of the pipeline and execute on the merging node, targeting
+    // shards to execute the nested subpipeline.
+    nestedExec: [1, 2]
+});
+
 // Test that a targeted $lookup on a sharded collection can execute correctly on mongos.
 st.shardColl(ordersColl, {_id: 1}, {_id: 1}, {_id: 1}, mongosDB.getName());
 st.shardColl(
