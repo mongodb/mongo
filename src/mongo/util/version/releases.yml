@@ -3,8 +3,10 @@
 # multiversion_constants.h. Please consult the STAR team before 
 # modifying this file. 
 
-# All FCVs starting with 4.4.
+# All FCVs starting with 4.0.
 featureCompatibilityVersions:
+  - "4.0"
+  - "4.2"
   - "4.4"
   - "4.7"
   - "4.8"

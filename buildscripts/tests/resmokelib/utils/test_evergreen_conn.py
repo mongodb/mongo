@@ -103,13 +103,6 @@ class TestGetGenericBuildvariantName(unittest.TestCase):
 
 
 class TestGetEvergreenProjectAndVersion(unittest.TestCase):
-    def setUp(self):
-        raw_yaml = {"evergreen_projects": [
-            "mongodb-mongo-master",
-            "mongodb-mongo-v4.4",
-        ]}
-        self.config = SetupMultiversionConfig(raw_yaml)
-
     @patch("evergreen.version.Version")
     @patch("evergreen.api.EvergreenApi.version_by_id")
     @patch("evergreen.api.EvergreenApi")
@@ -118,7 +111,7 @@ class TestGetEvergreenProjectAndVersion(unittest.TestCase):
         mock_version_by_id.return_value = mock_version
 
         evg_project, evg_version = evergreen_conn.get_evergreen_project_and_version(
-            self.config, mock_evg_api, "commit_hash")
+            mock_evg_api, "commit_hash")
         self.assertEqual(expected_evg_project, evg_project)
         self.assertEqual(mock_version, evg_version)
 
@@ -127,8 +120,8 @@ class TestGetEvergreenProjectAndVersion(unittest.TestCase):
     def test_version_not_found(self, mock_evg_api, mock_version_by_id):
         mock_version_by_id.side_effect = HTTPError
         self.assertRaises(evergreen_conn.EvergreenConnError,
-                          evergreen_conn.get_evergreen_project_and_version, self.config,
-                          mock_evg_api, "commit_hash")
+                          evergreen_conn.get_evergreen_project_and_version, mock_evg_api,
+                          "commit_hash")
 
 
 class TestGetCompileArtifactUrls(unittest.TestCase):

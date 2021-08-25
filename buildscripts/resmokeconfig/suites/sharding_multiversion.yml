@@ -7,6 +7,8 @@ selector:
   - jstests/sharding/query/*.js
   exclude_with_any_tags:
   - multiversion_incompatible
+  # TODO (SERVER-55857): Remove this hardcoded tag once tests are filtered out using the
+  # 'REQUIRES_FCV_TAG' list in 'multiversion_constants.py'.
   - requires_fcv_51
   - backport_required_multiversion
   - replica_sets_multiversion_backport_required_multiversion

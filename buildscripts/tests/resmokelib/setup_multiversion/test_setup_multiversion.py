@@ -71,7 +71,7 @@ class TestSetupMultiversionGetLatestUrls(TestSetupMultiversionBase):
     def test_no_compile_artifacts(self, mock_get_compile_artifact_urls, mock_versions_by_project,
                                   mock_version):
         mock_version.build_variants_map = {self.buildvariant_name: "build_id"}
-        mock_versions_by_project.return_value = [mock_version]
+        mock_versions_by_project.return_value = iter([mock_version])
         mock_get_compile_artifact_urls.return_value = {}
 
         urls = self.setup_multiversion.get_latest_urls("4.4")
@@ -88,7 +88,7 @@ class TestSetupMultiversionGetLatestUrls(TestSetupMultiversionBase):
         }
 
         mock_version.build_variants_map = {self.buildvariant_name: "build_id"}
-        mock_versions_by_project.return_value = [mock_version]
+        mock_versions_by_project.return_value = iter([mock_version])
         mock_get_compile_artifact_urls.return_value = expected_urls
 
         urls = self.setup_multiversion.get_latest_urls("4.4")
@@ -110,6 +110,7 @@ class TestSetupMultiversionGetLatestUrls(TestSetupMultiversionBase):
         mock_expected_version.build_variants_map = {self.buildvariant_name: "build_id"}
         evg_versions = [mock_version for _ in range(3)]
         evg_versions.append(mock_expected_version)
+        evg_versions = iter(evg_versions)
         mock_versions_by_project.return_value = evg_versions
         print(self.setup_multiversion.evg_api)
         print(self.buildvariant_name)
@@ -134,7 +135,7 @@ class TestSetupMultiversionGetLatestUrls(TestSetupMultiversionBase):
         }
 
         mock_version.build_variants_map = {self.generic_buildvariant_name: "build_id"}
-        mock_versions_by_project.return_value = [mock_version]
+        mock_versions_by_project.return_value = iter([mock_version])
         mock_get_compile_artifact_urls.return_value = expected_urls
 
         urls = self.setup_multiversion.get_latest_urls("4.4")
