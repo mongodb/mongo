@@ -15,7 +15,7 @@
 // that cursors #5 and #6 are killed as a result.
 //
 // @tags: [
-//   requires_sharding,
+//   requires_sharding, requires_fcv_51
 // ]
 (function() {
 'use strict';
@@ -171,6 +171,55 @@ assert.eq(killRes.cursorsUnknown, []);
 // +1 because we already advanced one. Ensure that the session-unattached cursors are still valid.
 assert.eq(routerColl.count(), routerCursorWithNoTimeout.itcount() + 1);
 assert.eq(shardColl.count(), shardCursorWithNoTimeout.itcount() + 1);
+
+// Confirm that cursors opened within a session will timeout when the
+// 'enableTimeoutOfInactiveSessionCursors' setParameter has been enabled.
+(function() {
+assert.commandWorked(
+    mongosDB.adminCommand({setParameter: 1, enableTimeoutOfInactiveSessionCursors: true}));
+assert.commandWorked(
+    shardDB.adminCommand({setParameter: 1, enableTimeoutOfInactiveSessionCursors: true}));
+
+// Open a session on mongos.
+routerSession = mongosDB.getMongo().startSession();
+routerSessionDB = routerSession.getDatabase(mongosDB.getName());
+routerSessionCursor = routerSessionDB.user.find().batchSize(1);
+const numRouterCursorsTimedOut = routerColl.getDB().serverStatus().metrics.cursor.timedOut;
+
+// Open a session on mongod.
+shardSession = shardDB.getMongo().startSession();
+shardSessionDB = shardSession.getDatabase(shardDB.getName());
+shardSessionCursor = shardSessionDB.user.find().batchSize(1);
+const numShardCursorsTimedOut = routerColl.getDB().serverStatus().metrics.cursor.timedOut;
+
+// Execute initial find on each cursor.
+routerSessionCursor.next();
+shardSessionCursor.next();
+
+// Wait until mongos reflects the newly timed out cursors.
+assert.soon(function() {
+    return shardColl.getDB().serverStatus().metrics.cursor.timedOut >=
+        (numRouterCursorsTimedOut + 1);
+}, "sharded cursor failed to time out");
+
+// Wait until mongod reflects the newly timed out cursors.
+assert.soon(function() {
+    return routerColl.getDB().serverStatus().metrics.cursor.timedOut >=
+        (numShardCursorsTimedOut + 1);
+}, "router cursor failed to time out");
+
+assert.throws(function() {
+    routerCursorWithTimeout.itcount();
+});
+assert.throws(function() {
+    shardCursorWithTimeout.itcount();
+});
+
+assert.commandWorked(
+    mongosDB.adminCommand({setParameter: 1, enableTimeoutOfInactiveSessionCursors: false}));
+assert.commandWorked(
+    shardDB.adminCommand({setParameter: 1, enableTimeoutOfInactiveSessionCursors: false}));
+})();
 
 st.stop();
 })();

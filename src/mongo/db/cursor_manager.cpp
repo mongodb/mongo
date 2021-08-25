@@ -52,6 +52,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
@@ -165,7 +166,8 @@ CursorManager::~CursorManager() {
 }
 
 bool CursorManager::cursorShouldTimeout_inlock(const ClientCursor* cursor, Date_t now) {
-    if (cursor->isNoTimeout() || cursor->_operationUsingCursor || cursor->getSessionId()) {
+    if (cursor->isNoTimeout() || cursor->_operationUsingCursor ||
+        (cursor->getSessionId() && !enableTimeoutOfInactiveSessionCursors.load())) {
         return false;
     }
     return (now - cursor->_lastUseDate) >= Milliseconds(getCursorTimeoutMillis());

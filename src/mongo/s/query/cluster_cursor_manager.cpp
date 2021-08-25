@@ -39,6 +39,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/kill_sessions_common.h"
 #include "mongo/db/logical_session_cache.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/str.h"
@@ -414,8 +415,13 @@ std::size_t ClusterCursorManager::killMortalCursorsInactiveSince(OperationContex
     stdx::unique_lock<Latch> lk(_mutex);
 
     auto pred = [cutoff](CursorId cursorId, const CursorEntry& entry) -> bool {
-        bool res = entry.getLifetimeType() == CursorLifetime::Mortal && !entry.getLsid() &&
-            !entry.getOperationUsingCursor() && entry.getLastActive() <= cutoff;
+        if (entry.getLifetimeType() == CursorLifetime::Immortal ||
+            entry.getOperationUsingCursor() ||
+            (entry.getLsid() && !enableTimeoutOfInactiveSessionCursors.load())) {
+            return false;
+        }
+
+        bool res = entry.getLastActive() <= cutoff;
 
         if (res) {
             LOGV2(22837,
