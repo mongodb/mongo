@@ -29,8 +29,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 
 #include "mongo/db/timeseries/timeseries_constants.h"
@@ -38,9 +36,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/redaction.h"
 
-namespace mongo {
-
-namespace timeseries {
+namespace mongo::timeseries {
 
 namespace {
 StatusWith<BSONObj> createBucketsSpecFromTimeseriesSpec(const TimeseriesOptions& timeseriesOptions,
@@ -212,5 +208,4 @@ std::list<BSONObj> createTimeseriesIndexesFromBucketsIndexes(
     return indexSpecs;
 }
 
-}  // namespace timeseries
-}  // namespace mongo
+}  // namespace mongo::timeseries

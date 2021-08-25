@@ -33,8 +33,10 @@
 
 #include "mongo/db/commands.h"
 #include "mongo/db/drop_indexes_gen.h"
+#include "mongo/db/timeseries/timeseries_commands_conversion_helper.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/chunk_manager_targeter.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 
@@ -142,17 +144,29 @@ public:
 
         // If the collection is sharded, we target only the primary shard and the shards that own
         // chunks for the collection.
-        auto routingInfo =
-            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+        auto targeter = ChunkManagerTargeter(opCtx, nss);
+        auto routingInfo = targeter.getRoutingInfo();
+        auto cmdToBeSent = cmdObj;
+        if (targeter.timeseriesNamespaceNeedsRewrite(nss)) {
+            auto timeseriesCmd = timeseries::makeTimeseriesDropIndexesCommand(
+                opCtx,
+                DropIndexes::parse(
+                    IDLParserErrorContext("dropIndexes",
+                                          APIParameters::get(opCtx).getAPIStrict().value_or(false)),
+                    cmdObj),
+                routingInfo.getTimeseriesFields()->getTimeseriesOptions());
+            cmdToBeSent = timeseriesCmd.toBSON(cmdObj);
+        }
+
         auto shardResponses =
             scatterGatherVersionedTargetByRoutingTableNoThrowOnStaleShardVersionErrors(
                 opCtx,
                 nss.db(),
-                nss,
+                targeter.getNS(),
                 routingInfo,
                 retryState.shardsWithSuccessResponses,
                 applyReadWriteConcern(
-                    opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
+                    opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdToBeSent)),
                 ReadPreferenceSetting::get(opCtx),
                 Shard::RetryPolicy::kNotIdempotent,
                 BSONObj() /* query */,

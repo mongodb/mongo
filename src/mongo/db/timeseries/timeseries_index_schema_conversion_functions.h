@@ -31,17 +31,13 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
-
-namespace mongo {
-
-class OperationContext;
-class TimeseriesOptions;
+#include "mongo/db/timeseries/timeseries_options.h"
 
 /**
  * Namespace for helper functions converting index spec schema between time-series collection and
  * underlying buckets collection.
  */
-namespace timeseries {
+namespace mongo::timeseries {
 
 /**
  * Maps the time-series collection index spec 'timeseriesIndexSpecBSON' to the index schema of the
@@ -98,5 +94,4 @@ boost::optional<BSONObj> createTimeseriesIndexFromBucketsIndex(
 std::list<BSONObj> createTimeseriesIndexesFromBucketsIndexes(
     const TimeseriesOptions& timeseriesOptions, const std::list<BSONObj>& bucketsIndexes);
 
-}  // namespace timeseries
-}  // namespace mongo
+}  // namespace mongo::timeseries

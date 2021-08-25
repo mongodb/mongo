@@ -35,6 +35,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/list_indexes_gen.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/chunk_manager_targeter.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/query/store_possible_cursor.h"
 
@@ -111,14 +112,15 @@ public:
 
         ListIndexesReply typedRun(OperationContext* opCtx) final {
             CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
+
             // The command's IDL definition permits namespace or UUID, but mongos requires a
             // namespace.
-            const auto cm = uassertStatusOK(
-                Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, ns()));
+            auto targetter = ChunkManagerTargeter(opCtx, ns());
+            auto cm = targetter.getRoutingInfo();
 
             return cursorCommandPassthroughShardWithMinKeyChunk(
                 opCtx,
-                ns(),
+                targetter.getNS(),
                 cm,
                 applyReadWriteConcern(opCtx, this, request().toBSON({})),
                 {Privilege(ResourcePattern::forExactNamespace(ns()), ActionType::listIndexes)});

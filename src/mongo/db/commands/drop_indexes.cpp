@@ -51,7 +51,7 @@
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
+#include "mongo/db/timeseries/timeseries_commands_conversion_helper.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/views/view_catalog.h"
@@ -64,44 +64,6 @@ namespace mongo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(reIndexCrashAfterDrop);
-
-/**
- * Returns a DropIndexes for dropping indexes on the bucket collection.
- *
- * The 'index' dropIndexes parameter may refer to an index name, or array of names, or "*" for all
- * indexes, or an index spec key (an object). Only the index spec key has to be translated for the
- * bucket collection. The other forms of 'index' can be passed along unmodified.
- *
- * Returns null if 'origCmd' is not for a time-series collection.
- */
-std::unique_ptr<DropIndexes> makeTimeseriesDropIndexesCommand(OperationContext* opCtx,
-                                                              const DropIndexes& origCmd) {
-    const auto& origNs = origCmd.getNamespace();
-
-    auto timeseriesOptions = timeseries::getTimeseriesOptions(opCtx, origNs);
-
-    // Return early with null if we are not working with a time-series collection.
-    if (!timeseriesOptions) {
-        return {};
-    }
-
-    auto ns = origNs.makeTimeseriesBucketsNamespace();
-
-    const auto& origIndex = origCmd.getIndex();
-    if (auto keyPtr = stdx::get_if<BSONObj>(&origIndex)) {
-        auto bucketsIndexSpecWithStatus =
-            timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(*timeseriesOptions, *keyPtr);
-
-        uassert(ErrorCodes::IndexNotFound,
-                str::stream() << bucketsIndexSpecWithStatus.getStatus().toString()
-                              << " Command request: " << redact(origCmd.toBSON({})),
-                bucketsIndexSpecWithStatus.isOK());
-
-        return std::make_unique<DropIndexes>(ns, std::move(bucketsIndexSpecWithStatus.getValue()));
-    }
-
-    return std::make_unique<DropIndexes>(ns, origIndex);
-}
 
 class CmdDropIndexes : public DropIndexesCmdVersion1Gen<CmdDropIndexes> {
 public:
@@ -134,8 +96,10 @@ public:
         Reply typedRun(OperationContext* opCtx) final {
             // If the request namespace refers to a time-series collection, transform the user
             // time-series index request to one on the underlying bucket.
-            if (auto timeseriesCmd = makeTimeseriesDropIndexesCommand(opCtx, request())) {
-                return dropIndexes(opCtx, timeseriesCmd->getNamespace(), timeseriesCmd->getIndex());
+            if (auto options = timeseries::getTimeseriesOptions(opCtx, request().getNamespace())) {
+                auto timeseriesCmd =
+                    timeseries::makeTimeseriesDropIndexesCommand(opCtx, request(), *options);
+                return dropIndexes(opCtx, timeseriesCmd.getNamespace(), timeseriesCmd.getIndex());
             }
 
             return dropIndexes(opCtx, request().getNamespace(), request().getIndex());

@@ -616,6 +616,10 @@ bool ChunkManagerTargeter::isShardedTimeSeriesBucketsNamespace() const {
     return _cm.isSharded() && _cm.getTimeseriesFields();
 }
 
+bool ChunkManagerTargeter::timeseriesNamespaceNeedsRewrite(const NamespaceString& nss) const {
+    return isShardedTimeSeriesBucketsNamespace() && !nss.isTimeseriesBucketsCollection();
+}
+
 const ChunkManager& ChunkManagerTargeter::getRoutingInfo() const {
     return _cm;
 }

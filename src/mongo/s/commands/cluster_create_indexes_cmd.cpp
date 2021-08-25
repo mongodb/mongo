@@ -34,8 +34,10 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/create_indexes_gen.h"
+#include "mongo/db/timeseries/timeseries_commands_conversion_helper.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/chunk_manager_targeter.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/cluster_ddl.h"
 #include "mongo/s/grid.h"
@@ -89,15 +91,27 @@ public:
 
         cluster::createDatabase(opCtx, dbName);
 
-        auto routingInfo =
-            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+        auto targeter = ChunkManagerTargeter(opCtx, nss);
+        auto routingInfo = targeter.getRoutingInfo();
+        auto cmdToBeSent = cmdObj;
+        if (targeter.timeseriesNamespaceNeedsRewrite(nss)) {
+            auto timeseriesCmd = timeseries::makeTimeseriesCreateIndexesCommand(
+                opCtx,
+                CreateIndexesCommand::parse(
+                    IDLParserErrorContext("createIndexes",
+                                          APIParameters::get(opCtx).getAPIStrict().value_or(false)),
+                    cmdObj),
+                routingInfo.getTimeseriesFields()->getTimeseriesOptions());
+            cmdToBeSent = timeseriesCmd.toBSON(cmdObj);
+        }
+
         auto shardResponses = scatterGatherVersionedTargetByRoutingTable(
             opCtx,
             nss.db(),
-            nss,
+            targeter.getNS(),
             routingInfo,
             CommandHelpers::filterCommandRequestForPassthrough(
-                applyReadWriteConcern(opCtx, this, cmdObj)),
+                applyReadWriteConcern(opCtx, this, cmdToBeSent)),
             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
             Shard::RetryPolicy::kNoRetry,
             BSONObj() /* query */,

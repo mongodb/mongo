@@ -112,6 +112,8 @@ public:
 
     bool isShardedTimeSeriesBucketsNamespace() const override;
 
+    bool timeseriesNamespaceNeedsRewrite(const NamespaceString& nss) const;
+
     const ChunkManager& getRoutingInfo() const;
 
     static BSONObj extractBucketsShardKeyFromTimeseriesDoc(
