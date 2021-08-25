@@ -7,7 +7,7 @@ are flushed to storage asynchronously, either by @ref arch-checkpoint "Checkpoin
 @ref arch-eviction "Eviction".
 
 The page layout in the WiredTiger cache is optimized for fast, concurrent access by multiple
-application threads.  In contrast, WiredTiger organizes pages in storage minimize storage space.
+application threads.  In contrast, WiredTiger organizes pages in storage to minimize storage space.
 As a result, WiredTiger has to convert between the in-memory and on-storage representations of a
 page whenever it reads or writes the page.
 
@@ -40,7 +40,7 @@ in-memory format to on-disk format) and then write it to storage.
 Internally, WiredTiger's cache state is represented by the \c WT_CACHE structure, which contains
 counters and parameter settings for tracking cache usage and controlling eviction policy.
 The \c WT_CACHE also includes state WiredTiger uses to track the progress of eviction.  There
-is a single \c WT_CACHE for each connection, accessed via the \c WT_CONNECTION structure.
+is a single \c WT_CACHE for each connection, accessed via the \c WT_CONNECTION_IMPL structure.
 
 Each page in the cache is accessed via a \c WT_REF structure.  When WiredTiger opens a Btree,
 it places a \c WT_REF for the cached root page in the corresponding \c WT_BTREE structure.
@@ -60,9 +60,10 @@ on the page.  Both of these leaf page formats support binary search to quickly f
 In a fixed-length column-store leaf page, values will be packed into a simple byte array, allowing
 WiredTiger to access entries using bit operations based on the value length.
 
-The first time a KV pair on a leaf page is inserted or modified, WiredTiger adds a
-\c WT_PAGE_MODIFY structure to the corresponding \c WT_PAGE in the cache.
-The \c WT_PAGE_MODIFY includes an array of \c WT_UPDATE pointers with one element for each
+The first time an entry on a leaf page is inserted or modified, WiredTiger adds a
+\c WT_PAGE_MODIFY structure to the corresponding \c WT_PAGE in the cache. For a row-store leaf
+page the \c WT_PAGE_MODIFY tracks changes using an array of \c WT_UPDATE pointers with one element
+for each
 KV pair on the leaf page.  When WiredTiger updates an entry, it inserts a \c WT_UPDATE in
 this array.  If there are multiple updates to the same item, WiredTiger chains them together
 in a linked list.  When a record is deleted,
@@ -71,13 +72,16 @@ elements in a similar array of skip lists represented by \c WT_INSERT structures
 separate skiplist for the gap between each pair of keys on the page, as well as skiplists for
 the gaps between the beginning and end of the page and the first and last keys, respectively.
 
+For a column-store leaf page the \c WT_PAGE_MODIFY structure tracks changes using a pair of
+skip lists, one for appended items and one for updated items.
+
 Almost all operations on these data structures are lock-free, allowing a high level of
 concurrency in the cache.
 
 @section arch_cache_size Cache size and content
 
-The amount of memory used by the WiredTiger cache is controlled by the cache_size configuration
-parameter, which defaults to 100 MB.  (Note that MongoDB sets the cache_size, by default, to be
+The amount of memory used by the WiredTiger cache is controlled by the \c cache_size configuration
+parameter, which defaults to 100 MB.  (Note that MongoDB sets the cache size, by default, to be
 half the size of RAM.)  WiredTiger does not explicitly manage this memory, relying instead on
 the C memory allocator to acquire and free memory as needed.  Since the cache is
 allocated from the heap, evicting data from the cache simply returns the memory to the allocator;
