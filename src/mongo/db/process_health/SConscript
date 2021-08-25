@@ -9,6 +9,8 @@ env.Library(
     source=[
         'fault_impl.cpp',
         'fault_manager.cpp',
+        'health_observer_base.cpp',
+        'health_observer_registration.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -23,6 +25,7 @@ env.CppUnitTest(
     source=[
         'fault_impl_test.cpp',
         'fault_facet_test.cpp',
+        'health_observer_test.cpp',
         'fault_manager_test.cpp',
     ],
     LIBDEPS=[

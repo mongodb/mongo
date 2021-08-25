@@ -29,6 +29,7 @@
 #pragma once
 
 #include <memory>
+#include <ostream>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"

@@ -28,6 +28,7 @@
  */
 #pragma once
 
+#include "mongo/db/process_health/fault_facet.h"
 
 namespace mongo {
 namespace process_health {
@@ -40,6 +41,14 @@ namespace process_health {
 class HealthObserver {
 public:
     virtual ~HealthObserver() = default;
+
+    /**
+     * Health observer of this type is unique and can only create the fault facet
+     * of the same type.
+     *
+     * @return FaultFacetType of this health observer.
+     */
+    virtual FaultFacetType getType() const = 0;
 
     /**
      * Triggers health check.

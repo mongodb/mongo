@@ -82,6 +82,38 @@ TEST_F(FaultImplTest, SeverityLevelHelpersWork) {
     ASSERT_TRUE(HealthCheckStatus::isActiveFault(faultyFacet.getStatus().getSeverity()));
 }
 
+TEST_F(FaultImplTest, FindFacetByType) {
+    ASSERT_EQ(0, fault().getFacets().size());
+    ASSERT_FALSE(fault().getFaultFacet(FaultFacetType::kMock));
+
+    fault().getOrCreateFaultFacet(FaultFacetType::kMock, [this] {
+        return std::make_shared<FaultFacetMock>(svcCtx(), [](double* severity) { *severity = 0; });
+    });
+    auto facet = fault().getFaultFacet(FaultFacetType::kMock);
+    ASSERT_TRUE(facet);
+    auto status = (*facet)->getStatus();
+    ASSERT_EQ(FaultFacetType::kMock, status.getType());
+}
+
+TEST_F(FaultImplTest, CanCreateAndGarbageCollectFacetsAfterTimeout) {
+    ASSERT_EQ(0, fault().getFacets().size());
+    fault().getOrCreateFaultFacet(FaultFacetType::kMock, [this] {
+        return std::make_shared<FaultFacetMock>(svcCtx(), [](double* severity) { *severity = 0; });
+    });
+    // New facet was added successfully.
+    ASSERT_EQ(1, fault().getFacets().size());
+
+    // The facet has severity of 0 but it cannot be garbage collected because the timeout did not
+    // pass yet.
+    fault().garbageCollectResolvedFacets();
+    ASSERT_EQ(1, fault().getFacets().size());
+
+    // After the time was advanced by the minimum timeout the GC works.
+    clockSource().advance(FaultFacetContainer::kMinimalFacetLifetimeToDelete);
+    fault().garbageCollectResolvedFacets();
+    ASSERT_EQ(0, fault().getFacets().size());
+}
+
 }  // namespace
 }  // namespace process_health
 }  // namespace mongo

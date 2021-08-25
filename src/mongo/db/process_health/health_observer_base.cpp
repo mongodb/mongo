@@ -26,34 +26,17 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#pragma once
 
-#include "mongo/db/process_health/health_check_status.h"
+#include "mongo/db/process_health/health_observer_base.h"
+
+#include "mongo/db/service_context.h"
 
 namespace mongo {
 namespace process_health {
 
-/**
- * Tracks the state of one particular fault facet.
- * The instance is created and deleted by the fault observer when a fault
- * condition is detected or resolved.
- */
-class FaultFacet : public std::enable_shared_from_this<FaultFacet> {
-public:
-    virtual ~FaultFacet() = default;
+HealthObserverBase::HealthObserverBase(ServiceContext* svcCtx) : _svcCtx(svcCtx) {}
 
-    virtual FaultFacetType getType() const = 0;
-
-    /**
-     * The interface used to communicate with the Fault instance that
-     * owns all facets.
-     *
-     * @return HealthCheckStatus
-     */
-    virtual HealthCheckStatus getStatus() const = 0;
-};
-
-using FaultFacetPtr = std::shared_ptr<FaultFacet>;
+void HealthObserverBase::periodicCheck() {}
 
 }  // namespace process_health
 }  // namespace mongo

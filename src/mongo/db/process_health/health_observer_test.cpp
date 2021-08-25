@@ -26,34 +26,47 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#pragma once
 
-#include "mongo/db/process_health/health_check_status.h"
+#include "mongo/db/process_health/health_observer.h"
+
+#include "mongo/db/process_health/health_observer_mock.h"
+#include "mongo/db/process_health/health_observer_registration.h"
+#include "mongo/db/service_context.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
+
 namespace process_health {
 
-/**
- * Tracks the state of one particular fault facet.
- * The instance is created and deleted by the fault observer when a fault
- * condition is detected or resolved.
- */
-class FaultFacet : public std::enable_shared_from_this<FaultFacet> {
+namespace {
+
+class HealthObserverTest : public unittest::Test {
 public:
-    virtual ~FaultFacet() = default;
+    void setUp() override {
+        _svcCtx = ServiceContext::make();
+    }
 
-    virtual FaultFacetType getType() const = 0;
+    void registerMock() {
+        HealthObserverRegistration* reg = HealthObserverRegistration::get(_svcCtx.get());
+        reg->registerObserverFactory(
+            [](ServiceContext* svcCtx) { return std::make_unique<HealthObserverMock>(svcCtx); });
+    }
 
-    /**
-     * The interface used to communicate with the Fault instance that
-     * owns all facets.
-     *
-     * @return HealthCheckStatus
-     */
-    virtual HealthCheckStatus getStatus() const = 0;
+    HealthObserverRegistration* registration() {
+        return HealthObserverRegistration::get(_svcCtx.get());
+    }
+
+private:
+    ServiceContext::UniqueServiceContext _svcCtx;
 };
 
-using FaultFacetPtr = std::shared_ptr<FaultFacet>;
+TEST_F(HealthObserverTest, Registration) {
+    registerMock();
+    auto allObservers = registration()->instantiateAllObservers();
+    ASSERT_EQ(1, allObservers.size());
+    ASSERT_EQ(FaultFacetType::kMock, allObservers[0]->getType());
+}
 
+}  // namespace
 }  // namespace process_health
 }  // namespace mongo
