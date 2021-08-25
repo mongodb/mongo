@@ -26,40 +26,76 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#pragma once
 
-#include "mongo/db/process_health/health_observer.h"
+#include <memory>
 
-#include "mongo/db/process_health/fault_manager_test_suite.h"
+#include "mongo/db/process_health/fault_manager.h"
+
 #include "mongo/db/process_health/health_observer_mock.h"
 #include "mongo/db/process_health/health_observer_registration.h"
-#include "mongo/db/service_context.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 
 namespace process_health {
 
-// Using the common fault manager test suite.
-using test::FaultManagerTest;
+namespace test {
 
-namespace {
+/**
+ * Test wrapper class for FaultManager that has access to protected methods
+ * for testing.
+ */
+class FaultManagerTestImpl : public FaultManager {
+public:
+    FaultManagerTestImpl(ServiceContext* svcCtx) : FaultManager(svcCtx) {}
 
-TEST_F(FaultManagerTest, Registration) {
-    registerMockHealthObserver([] { return 0; });
-    auto allObservers = healthObserverRegistration().instantiateAllObservers();
-    ASSERT_EQ(1, allObservers.size());
-    ASSERT_EQ(FaultFacetType::kMock, allObservers[0]->getType());
-}
+    Status transitionStateTest(FaultState newState) {
+        return transitionToState(newState);
+    }
 
-TEST_F(FaultManagerTest, HealthCheckCreatesObservers) {
-    registerMockHealthObserver([] { return 0.1; });
-    ASSERT_EQ(0, manager().getHealthObserversTest().size());
+    FaultState getFaultStateTest() {
+        return getFaultState();
+    }
 
-    // Trigger periodic health check.
-    manager().healthCheckTest();
-    ASSERT_EQ(1, manager().getHealthObserversTest().size());
-}
+    void healthCheckTest() {
+        healthCheck();
+    }
 
-}  // namespace
+    std::vector<HealthObserver*> getHealthObserversTest() {
+        return getHealthObservers();
+    }
+};
+
+/**
+ * Test suite for fault manager.
+ */
+class FaultManagerTest : public unittest::Test {
+public:
+    void setUp() override {
+        _svcCtx = ServiceContext::make();
+        FaultManager::set(_svcCtx.get(), std::make_unique<FaultManagerTestImpl>(_svcCtx.get()));
+    }
+
+    void registerMockHealthObserver(std::function<double()> getSeverityCallback) {
+        HealthObserverRegistration* reg = HealthObserverRegistration::get(_svcCtx.get());
+        reg->registerObserverFactory([getSeverityCallback](ServiceContext* svcCtx) {
+            return std::make_unique<HealthObserverMock>(svcCtx, getSeverityCallback);
+        });
+    }
+
+    FaultManagerTestImpl& manager() {
+        return *static_cast<FaultManagerTestImpl*>(FaultManager::get(_svcCtx.get()));
+    }
+
+    HealthObserverRegistration& healthObserverRegistration() {
+        return *HealthObserverRegistration::get(_svcCtx.get());
+    }
+
+private:
+    ServiceContext::UniqueServiceContext _svcCtx;
+};
+
+}  // namespace test
 }  // namespace process_health
 }  // namespace mongo

@@ -32,8 +32,10 @@
 
 #include "mongo/db/process_health/fault.h"
 #include "mongo/db/process_health/fault_facet.h"
-#include "mongo/db/process_health/fault_facets_container.h"
+#include "mongo/db/process_health/fault_facet_container.h"
+#include "mongo/db/process_health/health_observer.h"
 #include "mongo/db/service_context.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
 
 namespace mongo {
@@ -92,6 +94,10 @@ protected:
 
     virtual Status transitionToState(FaultState newState);
 
+    // All observers remain valid for the manager lifetime, thus returning
+    // just pointers is safe, as long as they are used while manager exists.
+    std::vector<HealthObserver*> getHealthObservers();
+
     // Protected interface FaultFacetsContainerFactory implementation.
 
     // The interface FaultFacetsContainerFactory is implemented by the member '_fault'.
@@ -104,11 +110,18 @@ private:
     Status _transitionToKTransientFault();
     Status _transitionToKActiveFault();
 
+    // One time init.
+    void _initHealthObserversIfNeeded();
+
     ServiceContext* const _svcCtx;
 
     mutable Mutex _mutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "FaultManager::_mutex");
+        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(1), "FaultManager::_mutex");
     std::shared_ptr<FaultInternal> _fault;
+    // We lazily init all health observers.
+    AtomicWord<bool> _initializedAllHealthObservers{false};
+    // Manager owns all observer instances.
+    std::vector<std::unique_ptr<HealthObserver>> _observers;
 
     mutable Mutex _stateMutex =
         MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "FaultManager::_stateMutex");

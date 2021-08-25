@@ -32,6 +32,7 @@
 #include "mongo/db/process_health/fault_manager.h"
 
 #include "mongo/db/process_health/fault_impl.h"
+#include "mongo/db/process_health/health_observer_registration.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
@@ -91,7 +92,10 @@ FaultFacetsContainerPtr FaultManager::getOrCreateFaultFacetsContainer() {
     return std::static_pointer_cast<FaultFacetsContainer>(_fault);
 }
 
-void FaultManager::healthCheck() {}
+void FaultManager::healthCheck() {
+    // One time init.
+    _initHealthObserversIfNeeded();
+}
 
 Status FaultManager::transitionToState(FaultState newState) {
     Status status = Status::OK();
@@ -111,8 +115,9 @@ Status FaultManager::transitionToState(FaultState newState) {
             break;
     }
 
-    if (status.isOK())
+    if (status.isOK()) {
         LOGV2_DEBUG(5936201, 1, "Transitioned fault manager state", "newState"_attr = newState);
+    }
 
     return status;
 }
@@ -150,6 +155,46 @@ Status FaultManager::_transitionToKActiveFault() {
 
     _currentState = FaultState::kActiveFault;
     return Status::OK();
+}
+
+void FaultManager::_initHealthObserversIfNeeded() {
+    if (_initializedAllHealthObservers.load()) {
+        return;
+    }
+
+    stdx::lock_guard<Latch> lk(_mutex);
+    // One more time under lock to avoid race.
+    if (_initializedAllHealthObservers.load()) {
+        return;
+    }
+    _initializedAllHealthObservers.store(true);
+
+    HealthObserverRegistration& registration = *HealthObserverRegistration::get(_svcCtx);
+    _observers = registration.instantiateAllObservers();
+
+    // Verify that all observer types are unique.
+    std::set<FaultFacetType> allTypes;
+    for (const auto& observer : _observers) {
+        allTypes.insert(observer->getType());
+    }
+    invariant(allTypes.size() == _observers.size());
+
+    stdx::lock_guard<Latch> lk2(_stateMutex);
+    LOGV2(5956701,
+          "Instantiated health observers, periodic health checking starts",
+          "managerState"_attr = _currentState,
+          "observersCount"_attr = _observers.size());
+}
+
+std::vector<HealthObserver*> FaultManager::getHealthObservers() {
+    std::vector<HealthObserver*> result;
+    stdx::lock_guard<Latch> lk(_mutex);
+    result.reserve(_observers.size());
+    std::transform(_observers.cbegin(),
+                   _observers.cend(),
+                   std::back_inserter(result),
+                   [](const std::unique_ptr<HealthObserver>& value) { return value.get(); });
+    return result;
 }
 
 }  // namespace process_health
