@@ -122,8 +122,8 @@ protected:
 
     /**
      * Returns those lsids from the input 'sessions' array which are not present in the sessions
-     * collection (essentially performs an inner join of 'sessions' against the sessions
-     * collection).
+     * collection. Note that a parent session and its child sessions are tracked as one session in
+     * the sessions collection.
      */
     LogicalSessionIdSet _doFindRemoved(const NamespaceString& ns,
                                        const std::vector<LogicalSessionId>& sessions,

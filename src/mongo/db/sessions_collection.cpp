@@ -39,6 +39,7 @@
 #include "mongo/client/dbclient_base.h"
 #include "mongo/db/create_indexes_gen.h"
 #include "mongo/db/logical_session_id.h"
+#include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -231,7 +232,8 @@ LogicalSessionIdSet SessionsCollection::_doFindRemoved(
         batch.push_back(record);
     };
 
-    LogicalSessionIdSet removed{sessions.begin(), sessions.end()};
+
+    LogicalSessionIdSet activeSessions;
 
     auto wrappedSend = [&](BSONObj batch) {
         BSONObjBuilder batchWithReadConcernLocal(batch);
@@ -243,7 +245,7 @@ LogicalSessionIdSet SessionsCollection::_doFindRemoved(
             SessionsCollectionFetchResult::parse("SessionsCollectionFetchResult"_sd, swBatchResult);
 
         for (const auto& lsid : result.getCursor().getFirstBatch()) {
-            removed.erase(lsid.get_id());
+            activeSessions.insert(lsid.get_id());
         }
     };
 
@@ -265,6 +267,18 @@ LogicalSessionIdSet SessionsCollection::_doFindRemoved(
     };
 
     runBulkGeneric(makeT, add, sendLocal, sessions);
+
+    LogicalSessionIdSet removed;
+    for (const auto& session : sessions) {
+        if (activeSessions.find(session) != activeSessions.end()) {
+            continue;
+        }
+        if (auto parentSession = getParentSessionId(session);
+            parentSession && (activeSessions.find(*parentSession) != activeSessions.end())) {
+            continue;
+        }
+        removed.insert(session);
+    }
 
     return removed;
 }
