@@ -31,7 +31,7 @@
 #include <memory>
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/process_health/fault_facet_container.h"
+#include "mongo/db/process_health/fault_facets_container.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/uuid.h"
 
@@ -89,7 +89,7 @@ using FaultConstPtr = std::shared_ptr<const Fault>;
 /**
  * Internal Fault interface that has accessors to manage Facets this Fault owns.
  */
-class FaultInternal : public Fault, public FaultFacetContainer {
+class FaultInternal : public Fault, public FaultFacetsContainer {
 public:
     ~FaultInternal() override = default;
 };

@@ -78,12 +78,14 @@ FaultFacetPtr FaultImpl::getOrCreateFaultFacet(FaultFacetType type,
     auto it = std::find_if(_facets.begin(), _facets.end(), [type](const FaultFacetPtr& facet) {
         return facet->getType() == type;
     });
-    if (it == _facets.end()) {
-        auto facet = createCb();
-        _facets.push_back(facet);
-        return facet;
+
+    if (it != _facets.end()) {
+        return *it;  // Found existing.
     }
-    return *it;
+
+    // Created a new one.
+    _facets.push_back(createCb());
+    return _facets.back();
 }
 
 void FaultImpl::garbageCollectResolvedFacets() {

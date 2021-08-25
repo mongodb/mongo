@@ -109,7 +109,7 @@ TEST_F(FaultImplTest, CanCreateAndGarbageCollectFacetsAfterTimeout) {
     ASSERT_EQ(1, fault().getFacets().size());
 
     // After the time was advanced by the minimum timeout the GC works.
-    clockSource().advance(FaultFacetContainer::kMinimalFacetLifetimeToDelete);
+    clockSource().advance(FaultFacetsContainer::kMinimalFacetLifetimeToDelete);
     fault().garbageCollectResolvedFacets();
     ASSERT_EQ(0, fault().getFacets().size());
 }

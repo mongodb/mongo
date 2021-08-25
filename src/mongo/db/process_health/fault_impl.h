@@ -46,7 +46,7 @@ class FaultImpl : public FaultInternal {
 public:
     explicit FaultImpl(ServiceContext* svcCtx,
                        Milliseconds minimalGarbageCollectTimeout =
-                           FaultFacetContainer::kMinimalFacetLifetimeToDelete);
+                           FaultFacetsContainer::kMinimalFacetLifetimeToDelete);
 
     ~FaultImpl() override = default;
 
@@ -62,7 +62,7 @@ public:
 
     void appendDescription(BSONObjBuilder* builder) const override;
 
-    // FaultFacetContainer interface.
+    // FaultFacetsContainer interface.
 
     std::vector<FaultFacetPtr> getFacets() const override;
 

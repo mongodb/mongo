@@ -32,7 +32,7 @@
 
 #include "mongo/db/process_health/fault.h"
 #include "mongo/db/process_health/fault_facet.h"
-#include "mongo/db/process_health/fault_facet_container.h"
+#include "mongo/db/process_health/fault_facets_container.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/mutex.h"
 
@@ -67,7 +67,7 @@ enum class FaultState {
  * If an active fault state persists, FaultManager puts the server into quiesce
  * mode and shuts it down.
  */
-class FaultManager : protected FaultFacetContainerFactory {
+class FaultManager : protected FaultFacetsContainerFactory {
     FaultManager(const FaultManager&) = delete;
     FaultManager& operator=(const FaultManager&) = delete;
 
@@ -92,12 +92,12 @@ protected:
 
     virtual Status transitionToState(FaultState newState);
 
-    // Protected interface FaultFacetContainerFactory implementation.
+    // Protected interface FaultFacetsContainerFactory implementation.
 
-    // The interface FaultFacetContainerFactory is implemented by the member '_fault'.
-    boost::optional<FaultFacetContainerPtr> getFaultFacetContainer() override;
+    // The interface FaultFacetsContainerFactory is implemented by the member '_fault'.
+    boost::optional<FaultFacetsContainerPtr> getFaultFacetsContainer() override;
 
-    FaultFacetContainerPtr getOrCreateFaultFacetContainer() override;
+    FaultFacetsContainerPtr getOrCreateFaultFacetsContainer() override;
 
 private:
     Status _transitionToKOk();
@@ -111,7 +111,7 @@ private:
     std::shared_ptr<FaultInternal> _fault;
 
     mutable Mutex _stateMutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "ProcessHealthFaultManager::_stateMutex");
+        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "FaultManager::_stateMutex");
     FaultState _currentState = FaultState::kStartupCheck;
 };
 
