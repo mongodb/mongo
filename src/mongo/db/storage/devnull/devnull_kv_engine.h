@@ -160,9 +160,16 @@ public:
 
     virtual void setPinnedOplogTimestamp(const Timestamp& pinnedTimestamp) {}
 
+    // This sets the results of the backup cursor for unit tests.
+    void setBackupBlocks_forTest(std::vector<StorageEngine::BackupBlock> newBackupBlocks) {
+        _mockBackupBlocks = newBackupBlocks;
+    }
+
 private:
     std::shared_ptr<void> _catalogInfo;
 
     int _cachePressureForTest;
+
+    std::vector<StorageEngine::BackupBlock> _mockBackupBlocks = {{"filename.wt"}};
 };
 }  // namespace mongo

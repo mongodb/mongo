@@ -261,9 +261,9 @@ namespace {
 class StreamingCursorImpl : public StorageEngine::StreamingCursor {
 public:
     StreamingCursorImpl() = delete;
-    StreamingCursorImpl(StorageEngine::BackupOptions options)
-        : StorageEngine::StreamingCursor(options) {
-        _backupBlocks = {{"filename.wt"}};
+    StreamingCursorImpl(StorageEngine::BackupOptions options,
+                        std::vector<StorageEngine::BackupBlock> backupBlocks)
+        : StorageEngine::StreamingCursor(options), _backupBlocks(std::move(backupBlocks)) {
         _exhaustCursor = false;
     };
 
@@ -291,7 +291,7 @@ private:
 
 StatusWith<std::unique_ptr<StorageEngine::StreamingCursor>> DevNullKVEngine::beginNonBlockingBackup(
     OperationContext* opCtx, const StorageEngine::BackupOptions& options) {
-    return std::make_unique<StreamingCursorImpl>(options);
+    return std::make_unique<StreamingCursorImpl>(options, _mockBackupBlocks);
 }
 
 StatusWith<std::vector<std::string>> DevNullKVEngine::extendBackupCursor(OperationContext* opCtx) {
