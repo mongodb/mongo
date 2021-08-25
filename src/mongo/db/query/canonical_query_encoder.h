@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/query/plan_cache.h"
+#include "mongo/db/query/canonical_query.h"
 
 namespace mongo {
 

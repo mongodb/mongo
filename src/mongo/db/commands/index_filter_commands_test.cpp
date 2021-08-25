@@ -145,6 +145,7 @@ void addQueryShapeToPlanCache(OperationContext* opCtx,
     std::vector<QuerySolution*> solns;
     solns.push_back(&qs);
     ASSERT_OK(planCache->set(*cq,
+                             qs.cacheData->clone(),
                              solns,
                              createDecision(1U),
                              opCtx->getServiceContext()->getPreciseClockSource()->now()));

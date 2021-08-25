@@ -47,7 +47,6 @@
 #include "mongo/db/index/wildcard_access_method.h"
 #include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 #include "mongo/db/query/get_executor.h"
-#include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/planner_ixselect.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"

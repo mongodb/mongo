@@ -446,7 +446,7 @@ void Explain::planCacheEntryToBSON(const PlanCacheEntry& entry, BSONObjBuilder* 
         scoresBuilder.doneFast();
     }
 
-    out->append("indexFilterSet", entry.plannerData->indexFilterApplied);
+    out->append("indexFilterSet", entry.cachedPlan->indexFilterApplied);
 
     out->append("estimatedSizeBytes", static_cast<long long>(entry.estimatedEntrySizeBytes));
 }

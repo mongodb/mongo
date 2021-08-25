@@ -181,9 +181,20 @@ void updatePlanCache(
         }
 
         if (validSolutions) {
+            // The caller of this constructor is responsible for ensuring that the QuerySolution
+            // has valid cacheData. If there's no data to cache you shouldn't be trying to
+            // construct a PlanCacheEntry.
+            //
+            // The first solution is the winner, so we can discard the cache data from all
+            // subsequent solutions.
+            invariant(!solutions.empty());
+            invariant(solutions[0]->cacheData);
+            auto plannerDataForCache = solutions[0]->cacheData->clone();
+
             uassertStatusOK(CollectionQueryInfo::get(collection)
                                 .getPlanCache()
                                 ->set(query,
+                                      std::move(plannerDataForCache),
                                       solutions,
                                       std::move(ranking),
                                       opCtx->getServiceContext()->getPreciseClockSource()->now()));

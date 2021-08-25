@@ -484,13 +484,13 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::planFromCache(
     const CanonicalQuery& query,
     const QueryPlannerParams& params,
     const CachedSolution& cachedSoln) {
-    invariant(cachedSoln.plannerData);
+    invariant(cachedSoln.cachedPlan);
 
     // A query not suitable for caching should not have made its way into the cache.
     invariant(PlanCache::shouldCacheQuery(query));
 
     // Look up winning solution in cached solution's array.
-    const auto& winnerCacheData = *cachedSoln.plannerData;
+    const auto& winnerCacheData = *cachedSoln.cachedPlan;
 
     if (SolutionCacheData::WHOLE_IXSCAN_SOLN == winnerCacheData.solnType) {
         // The solution can be constructed by a scan over the entire index.
@@ -1257,7 +1257,7 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::choosePlanForSubqueries
             // We can get the index tags we need out of the cache.
             Status tagStatus =
                 tagOrChildAccordingToCache(cacheData.get(),
-                                           branchResult->cachedSolution->plannerData.get(),
+                                           branchResult->cachedSolution->cachedPlan.get(),
                                            orChild,
                                            planningResult.indexMap);
             if (!tagStatus.isOK()) {
