@@ -29,11 +29,14 @@
 
 #include "mongo/db/process_health/fault_manager.h"
 
+#include "mongo/db/process_health/fault_manager_test_suite.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 
 namespace process_health {
+
+using test::FaultManagerTestImpl;
 
 namespace {
 
@@ -41,19 +44,6 @@ TEST(FaultManagerTest, Registration) {
     auto serviceCtx = ServiceContext::make();
     ASSERT_TRUE(FaultManager::get(serviceCtx.get()));
 }
-
-class FaultManagerTestImpl : public FaultManager {
-public:
-    FaultManagerTestImpl(ServiceContext* svcCtx) : FaultManager(svcCtx) {}
-
-    Status transitionStateTest(FaultState newState) {
-        return transitionToState(newState);
-    }
-
-    FaultState getFaultStateTest() {
-        return getFaultState();
-    }
-};
 
 // State machine tests.
 TEST(FaultManagerForTest, StateTransitionsFromOk) {

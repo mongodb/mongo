@@ -45,9 +45,15 @@ public:
     HealthObserverBase(ServiceContext* svcCtx);
     virtual ~HealthObserverBase() = default;
 
-    void periodicCheck() override;
+    // Implements the common logic for periodic checks.
+    // Every observer should implement periodicCheckImpl() for specific tests.
+    void periodicCheck() final;
 
 protected:
+    // Returns the severity after the check.
+    // TODO(SERVER-59592): futurize this.
+    virtual double periodicCheckImpl() = 0;
+
     ServiceContext* const _svcCtx;
 };
 

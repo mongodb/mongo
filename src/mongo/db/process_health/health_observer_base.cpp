@@ -36,7 +36,12 @@ namespace process_health {
 
 HealthObserverBase::HealthObserverBase(ServiceContext* svcCtx) : _svcCtx(svcCtx) {}
 
-void HealthObserverBase::periodicCheck() {}
+void HealthObserverBase::periodicCheck() {
+    double severity = periodicCheckImpl();
+
+    if (HealthCheckStatus::isResolved(severity)) {
+    }
+}
 
 }  // namespace process_health
 }  // namespace mongo

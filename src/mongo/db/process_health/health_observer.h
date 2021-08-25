@@ -54,6 +54,8 @@ public:
      * Triggers health check.
      * It should be safe to invoke this method arbitrary often, the implementation
      * should prorate the invocations to avoid DoS.
+     * The implementation may or may not block for the completion of the check, this remains
+     * unspecified.
      */
     virtual void periodicCheck() = 0;
 };

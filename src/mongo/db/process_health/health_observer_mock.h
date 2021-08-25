@@ -28,26 +28,34 @@
  */
 #pragma once
 
+#include <functional>
+
 #include "mongo/db/process_health/health_observer_base.h"
 
 namespace mongo {
 namespace process_health {
 
 /**
- * Interface to conduct periodic health checks.
- * Every instance of health observer is wired internally to update the state of the FaultManager
- * when a problem is detected.
+ * Mocked health observer is using a test callback to fetch the next
+ * fault severity value every time the periodic check is invoked.
  */
 class HealthObserverMock : public HealthObserverBase {
 public:
-    HealthObserverMock(ServiceContext* svcCtx) : HealthObserverBase(svcCtx) {}
+    HealthObserverMock(ServiceContext* svcCtx, std::function<double()> getSeverityCallback)
+        : HealthObserverBase(svcCtx), _getSeverityCallback(getSeverityCallback) {}
+
     virtual ~HealthObserverMock() = default;
 
     FaultFacetType getType() const override {
         return FaultFacetType::kMock;
     }
 
-    void periodicCheck() override {}
+    double periodicCheckImpl() override {
+        return _getSeverityCallback();
+    }
+
+private:
+    std::function<double()> _getSeverityCallback;
 };
 
 }  // namespace process_health
