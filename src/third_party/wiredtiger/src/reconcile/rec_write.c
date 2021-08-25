@@ -159,6 +159,9 @@ __reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage, u
     WT_DECL_RET;
     WT_PAGE *page;
     WT_RECONCILE *r;
+#ifdef HAVE_DIAGNOSTIC
+    void *addr;
+#endif
 
     btree = S2BT(session);
     page = ref->page;
@@ -215,11 +218,17 @@ __reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage, u
       F_ISSET(r, WT_REC_CALL_URGENT) && !r->update_used && r->cache_write_restore)
         ret = __wt_set_return(session, EBUSY);
 
+#ifdef HAVE_DIAGNOSTIC
+    addr = ref->addr;
+#endif
     /* Wrap up the page reconciliation. */
     if (ret == 0 && (ret = __rec_write_wrapup(session, r, page)) == 0)
         __rec_write_page_status(session, r);
-    else
+    else {
+        /* Make sure that reconciliation doesn't free the page that has been written to disk. */
+        WT_ASSERT(session, addr == NULL || ref->addr != NULL);
         WT_TRET(__rec_write_wrapup_err(session, r, page));
+    }
 
     /* Release the reconciliation lock. */
     *page_lockedp = false;
@@ -2088,6 +2097,22 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
     WT_TIME_AGGREGATE_INIT(&ta);
 
     /*
+     * If using the history store table eviction path and we found updates that weren't globally
+     * visible when reconciling this page, copy them into the database's history store. This can
+     * fail, so try before clearing the page's previous reconciliation state.
+     */
+    if (F_ISSET(r, WT_REC_HS))
+        WT_RET(__rec_hs_wrapup(session, r));
+
+    /*
+     * Wrap up overflow tracking. If we are about to create a checkpoint, the system must be
+     * entirely consistent at that point (the underlying block manager is presumably going to do
+     * some action to resolve the list of allocated/free/whatever blocks that are associated with
+     * the checkpoint).
+     */
+    WT_RET(__wt_ovfl_track_wrapup(session, page));
+
+    /*
      * This page may have previously been reconciled, and that information is now about to be
      * replaced. Make sure it's discarded at some point, and clear the underlying modification
      * information, we're creating a new reality.
@@ -2136,21 +2161,6 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
     /* Reset the reconciliation state. */
     mod->rec_result = 0;
-
-    /*
-     * If using the history store table eviction path and we found updates that weren't globally
-     * visible when reconciling this page, copy them into the database's history store.
-     */
-    if (F_ISSET(r, WT_REC_HS))
-        WT_RET(__rec_hs_wrapup(session, r));
-
-    /*
-     * Wrap up overflow tracking. If we are about to create a checkpoint, the system must be
-     * entirely consistent at that point (the underlying block manager is presumably going to do
-     * some action to resolve the list of allocated/free/whatever blocks that are associated with
-     * the checkpoint).
-     */
-    WT_RET(__wt_ovfl_track_wrapup(session, page));
 
     __wt_verbose(session, WT_VERB_RECONCILE, "%p reconciled into %" PRIu32 " pages", (void *)ref,
       r->multi_next);
