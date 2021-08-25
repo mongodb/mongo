@@ -3777,10 +3777,11 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 case Instruction::pushLocalLambda: {
                     auto offset = readFromMemory<int>(pcPointer);
                     pcPointer += sizeof(offset);
-                    auto position = pcPointer - code->instrs().data() + offset;
+                    auto newPosition = pcPointer - code->instrs().data() + offset;
 
-                    pushStack(
-                        false, value::TypeTags::LocalLambda, value::bitcastFrom<int64_t>(position));
+                    pushStack(false,
+                              value::TypeTags::LocalLambda,
+                              value::bitcastFrom<int64_t>(newPosition));
                     break;
                 }
                 case Instruction::pop: {
