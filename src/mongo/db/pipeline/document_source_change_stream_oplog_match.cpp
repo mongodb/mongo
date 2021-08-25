@@ -137,6 +137,13 @@ Pipeline::SourceContainer::iterator DocumentSourceChangeStreamOplogMatch::doOpti
         return nextChangeStreamStageItr;
     }
 
+    // It is not safe to combine any parts of a user $match with this stage when the $user match has
+    // a non-simple collation, because this stage's MatchExpression always executes wtih the simple
+    // collation.
+    if (pExpCtx->getCollator()) {
+        return nextChangeStreamStageItr;
+    }
+
     // Seek to the stage that immediately follows the change streams stages.
     itr = std::find_if_not(itr, container->end(), [](const auto& stage) {
         return stage->constraints().isChangeStreamStage();

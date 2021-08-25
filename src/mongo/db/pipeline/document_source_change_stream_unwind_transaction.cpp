@@ -405,6 +405,12 @@ Pipeline::SourceContainer::iterator DocumentSourceChangeStreamUnwindTransaction:
         return nextChangeStreamStageItr;
     }
 
+    // The additional filtering added by this optimization may incorrectly filter out events if it
+    // runs with the non-simple collation.
+    if (pExpCtx->getCollator()) {
+        return nextChangeStreamStageItr;
+    }
+
     // We never expect to apply these optimizations more than once. The filter should be in its
     // default state.
     tassert(5902200,

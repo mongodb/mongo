@@ -90,12 +90,15 @@ assert.commandWorked(db.createCollection(collNameAlternate));
     const changeStream = coll.aggregate([{$changeStream: {}}, {$match: {operationType: "insert"}}],
                                         {comment: changeStreamComment});
 
+    // Store a resume token that can be used to start the change stream from the beginning.
+    const resumeAfterToken = changeStream.getResumeToken();
+
     // These commands will result in 6 oplog events, with all but 2 will be filtered out by the
     // $match.
-    assert.commandWorked(coll.insert({_id: 1}));
+    assert.commandWorked(coll.insert({_id: 1, string: "Value"}));
     assert.commandWorked(coll.update({_id: 1}, {$set: {foo: "bar"}}));
     assert.commandWorked(coll.remove({_id: 1}));
-    assert.commandWorked(coll.insert({_id: 2}));
+    assert.commandWorked(coll.insert({_id: 2, string: "vAlue"}));
     assert.commandWorked(coll.update({_id: 2}, {$set: {foo: "bar"}}));
     assert.commandWorked(coll.remove({_id: 2}));
 
@@ -192,10 +195,10 @@ assert.commandWorked(db.createCollection(collNameAlternate));
     // Generate a second transaction.
     session.startTransaction({readConcern: {level: "majority"}});
 
-    assert.commandWorked(sessionColl.insert({_id: 1, a: 1}));
+    assert.commandWorked(sessionColl.insert({_id: 1, a: 1, string: "vaLue"}));
     assert.commandWorked(sessionColl.update({_id: 1}, {$set: {foo: "bar"}}));
     assert.commandWorked(sessionColl.remove({_id: 1}));
-    assert.commandWorked(sessionColl.insert({_id: 2, a: 2}));
+    assert.commandWorked(sessionColl.insert({_id: 2, a: 2, string: "valUe"}));
     assert.commandWorked(sessionColl.update({_id: 2}, {$set: {foo: "bar"}}));
     assert.commandWorked(sessionColl.remove({_id: 2}));
 
@@ -216,6 +219,23 @@ assert.commandWorked(db.createCollection(collNameAlternate));
 
     const txnExecStatsShard1 = getOplogExecutionStatsForShard(txnStats, st.rs1.name);
     assert.eq(txnExecStatsShard1.nReturned, 1, txnExecStatsShard1);
+
+    // Ensure that optimization does not attempt to create a filter that disregards the collation.
+    const collationChangeStream = coll.aggregate(
+        [
+            {$changeStream: {resumeAfter: resumeAfterToken}},
+            {$match: {"fullDocument.string": "value"}}
+        ],
+        {collation: {locale: "en_US", strength: 2}});
+
+    ["Value", "vAlue", "vaLue", "valUe"].forEach(val => {
+        assert.soon(() => collationChangeStream.hasNext());
+        const fullDocumentEvent = collationChangeStream.next();
+        assert.eq(fullDocumentEvent.fullDocument.string, val, fullDocumentEvent);
+    });
+
+    assert(!collationChangeStream.hasNext());
+    collationChangeStream.close();
 })();
 
 (function testOperationTypeRewrites() {
