@@ -638,6 +638,10 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     logShardingVersionInfo(nullptr);
     audit::logStartupOptions(tc.get(), serverGlobalParams.parsedOpts);
 
+    ReadWriteConcernDefaults::create(serviceContext, readWriteConcernDefaultsCacheLookupMongoS);
+
+    startMongoSFTDC();
+
     // Set up the periodic runner for background job execution
     {
         auto runner = makePeriodicRunner(serviceContext);
@@ -685,8 +689,6 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
         quickExit(EXIT_BADOPTIONS);
     }
 
-    ReadWriteConcernDefaults::create(serviceContext, readWriteConcernDefaultsCacheLookupMongoS);
-
     auto opCtxHolder = tc->makeOperationContext();
     auto const opCtx = opCtxHolder.get();
 
@@ -718,8 +720,6 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
                       "Error loading read and write concern defaults at startup",
                       "error"_attr = redact(ex));
     }
-
-    startMongoSFTDC();
 
     if (mongosGlobalParams.scriptingEnabled) {
         ScriptEngine::setup();

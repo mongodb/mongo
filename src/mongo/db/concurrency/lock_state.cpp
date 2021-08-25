@@ -58,6 +58,15 @@ MONGO_FAIL_POINT_DEFINE(enableTestOnlyFlagforRSTL);
 
 namespace {
 
+// Ignore data races in certain functions when running with TSAN. For performance reasons,
+// diagnostic commands are expected to race with concurrent lock acquisitions while gathering
+// statistics.
+#if defined(__has_feature) && __has_feature(thread_sanitizer)
+#define MONGO_TSAN_IGNORE __attribute__((no_sanitize("thread")))
+#else
+#define MONGO_TSAN_IGNORE
+#endif
+
 /**
  * Tracks global (across all clients) lock acquisition statistics, partitioned into multiple
  * buckets to minimize concurrent access conflicts.
@@ -692,13 +701,7 @@ ResourceId LockerImpl::getWaitingResource() const {
     return _waitingResource;
 }
 
-// Ignore data races in this function when running with TSAN. For performance reasons, diagnostic
-// commands are expected to race with concurrent lock acquisitions while gathering statistics.
-#if defined(__has_feature)
-#if __has_feature(thread_sanitizer)
-__attribute__((no_sanitize("thread")))
-#endif
-#endif
+MONGO_TSAN_IGNORE
 void LockerImpl::getLockerInfo(LockerInfo* lockerInfo,
                                const boost::optional<SingleThreadedLockStats> lockStatsBase) const {
     invariant(lockerInfo);
@@ -837,6 +840,12 @@ void LockerImpl::restoreLockState(OperationContext* opCtx, const Locker::LockSna
     invariant(_modeForTicket != MODE_NONE);
 }
 
+MONGO_TSAN_IGNORE
+FlowControlTicketholder::CurOp LockerImpl::getFlowControlStats() const {
+    return _flowControlStats;
+}
+
+MONGO_TSAN_IGNORE
 LockResult LockerImpl::_lockBegin(OperationContext* opCtx, ResourceId resId, LockMode mode) {
     dassert(!getWaitingResource().isValid());
 
