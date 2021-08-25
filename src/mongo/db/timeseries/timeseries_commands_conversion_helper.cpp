@@ -29,19 +29,17 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/timeseries/timeseries_commands_conversion_helper.h"
 
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_names.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
-#include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/redaction.h"
 
-namespace mongo {
-
-namespace timeseries {
+namespace mongo::timeseries {
 
 BSONObj makeTimeseriesCommand(const BSONObj& origCmd,
                               const NamespaceString& ns,
@@ -59,5 +57,93 @@ BSONObj makeTimeseriesCommand(const BSONObj& origCmd,
     return builder.obj();
 }
 
-}  // namespace timeseries
-}  // namespace mongo
+CreateIndexesCommand makeTimeseriesCreateIndexesCommand(OperationContext* opCtx,
+                                                        const CreateIndexesCommand& origCmd,
+                                                        const TimeseriesOptions& options) {
+    const auto& origNs = origCmd.getNamespace();
+    const auto& origIndexes = origCmd.getIndexes();
+
+    std::vector<mongo::BSONObj> indexes;
+    for (const auto& origIndex : origIndexes) {
+        BSONObjBuilder builder;
+        bool isBucketsIndexSpecCompatibleForDowngrade = false;
+        for (const auto& elem : origIndex) {
+            if (elem.fieldNameStringData() == IndexDescriptor::kPartialFilterExprFieldName) {
+                uasserted(ErrorCodes::InvalidOptions,
+                          "Partial indexes are not supported on time-series collections");
+            }
+
+            if (elem.fieldNameStringData() == IndexDescriptor::kExpireAfterSecondsFieldName) {
+                uasserted(ErrorCodes::InvalidOptions,
+                          "TTL indexes are not supported on time-series collections");
+            }
+
+            if (elem.fieldNameStringData() == NewIndexSpec::kKeyFieldName) {
+                auto pluginName = IndexNames::findPluginName(elem.Obj());
+                uassert(ErrorCodes::InvalidOptions,
+                        "Text indexes are not supported on time-series collections",
+                        pluginName != IndexNames::TEXT);
+
+                auto bucketsIndexSpecWithStatus =
+                    timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(options, elem.Obj());
+                uassert(ErrorCodes::CannotCreateIndex,
+                        str::stream() << bucketsIndexSpecWithStatus.getStatus().toString()
+                                      << " Command request: " << redact(origCmd.toBSON({})),
+                        bucketsIndexSpecWithStatus.isOK());
+
+                isBucketsIndexSpecCompatibleForDowngrade =
+                    timeseries::isBucketsIndexSpecCompatibleForDowngrade(
+                        options,
+                        BSON(NewIndexSpec::kKeyFieldName << bucketsIndexSpecWithStatus.getValue()));
+
+                builder.append(NewIndexSpec::kKeyFieldName,
+                               std::move(bucketsIndexSpecWithStatus.getValue()));
+                continue;
+            }
+            builder.append(elem);
+        }
+
+        if (feature_flags::gTimeseriesMetricIndexes.isEnabledAndIgnoreFCV() &&
+            !isBucketsIndexSpecCompatibleForDowngrade) {
+            // Store the original user index definition on the transformed index definition for the
+            // time-series buckets collection if this is a newly supported index type on time-series
+            // collections. This is to avoid any additional downgrade steps for index types already
+            // supported in 5.0.
+            builder.appendObject(IndexDescriptor::kOriginalSpecFieldName, origIndex.objdata());
+        }
+
+        indexes.push_back(builder.obj());
+    }
+
+    auto ns = origNs.makeTimeseriesBucketsNamespace();
+    auto cmd = CreateIndexesCommand(ns, std::move(indexes));
+    cmd.setV(origCmd.getV());
+    cmd.setIgnoreUnknownIndexOptions(origCmd.getIgnoreUnknownIndexOptions());
+    cmd.setCommitQuorum(origCmd.getCommitQuorum());
+
+    return cmd;
+}
+
+DropIndexes makeTimeseriesDropIndexesCommand(OperationContext* opCtx,
+                                             const DropIndexes& origCmd,
+                                             const TimeseriesOptions& options) {
+    const auto& origNs = origCmd.getNamespace();
+    auto ns = origNs.makeTimeseriesBucketsNamespace();
+
+    const auto& origIndex = origCmd.getIndex();
+    if (auto keyPtr = stdx::get_if<BSONObj>(&origIndex)) {
+        auto bucketsIndexSpecWithStatus =
+            timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(options, *keyPtr);
+
+        uassert(ErrorCodes::IndexNotFound,
+                str::stream() << bucketsIndexSpecWithStatus.getStatus().toString()
+                              << " Command request: " << redact(origCmd.toBSON({})),
+                bucketsIndexSpecWithStatus.isOK());
+
+        return DropIndexes(ns, std::move(bucketsIndexSpecWithStatus.getValue()));
+    }
+
+    return DropIndexes(ns, origIndex);
+}
+
+}  // namespace mongo::timeseries

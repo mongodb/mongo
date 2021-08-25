@@ -31,13 +31,12 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/create_indexes_gen.h"
+#include "mongo/db/drop_indexes_gen.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/timeseries/timeseries_gen.h"
 
-namespace mongo {
-
-class OperationContext;
-class TimeseriesOptions;
-namespace timeseries {
+namespace mongo::timeseries {
 
 /**
  * Returns a command object with time-series view namespace translated to bucket namespace.
@@ -46,5 +45,22 @@ BSONObj makeTimeseriesCommand(const BSONObj& origCmd,
                               const NamespaceString& ns,
                               StringData nsFieldName);
 
-}  // namespace timeseries
-}  // namespace mongo
+/*
+ * Returns a CreateIndexesCommand for creating indexes on the bucket collection.
+ */
+CreateIndexesCommand makeTimeseriesCreateIndexesCommand(OperationContext* opCtx,
+                                                        const CreateIndexesCommand& origCmd,
+                                                        const TimeseriesOptions& options);
+
+/**
+ * Returns a DropIndexes for dropping indexes on the bucket collection.
+ *
+ * The 'index' dropIndexes parameter may refer to an index name, or array of names, or "*" for all
+ * indexes, or an index spec key (an object). Only the index spec key has to be translated for the
+ * bucket collection. The other forms of 'index' can be passed along unmodified.
+ */
+DropIndexes makeTimeseriesDropIndexesCommand(OperationContext* opCtx,
+                                             const DropIndexes& origCmd,
+                                             const TimeseriesOptions& options);
+
+}  // namespace mongo::timeseries

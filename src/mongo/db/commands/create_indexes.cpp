@@ -59,8 +59,8 @@
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/two_phase_index_build_knobs_gen.h"
+#include "mongo/db/timeseries/timeseries_commands_conversion_helper.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/views/view_catalog.h"
@@ -619,83 +619,6 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
 }
 
 /**
- * Returns a CreateIndexesCommand for creating indexes on the bucket collection.
- * Returns null if 'origCmd' is not for a time-series collection.
- */
-std::unique_ptr<CreateIndexesCommand> makeTimeseriesCreateIndexesCommand(
-    OperationContext* opCtx, const CreateIndexesCommand& origCmd) {
-    const auto& origNs = origCmd.getNamespace();
-
-    auto timeseriesOptions = timeseries::getTimeseriesOptions(opCtx, origNs);
-
-    // Return early with null if we are not working with a time-series collection.
-    if (!timeseriesOptions) {
-        return {};
-    }
-
-    const auto& origIndexes = origCmd.getIndexes();
-    std::vector<mongo::BSONObj> indexes;
-    for (const auto& origIndex : origIndexes) {
-        BSONObjBuilder builder;
-        bool isBucketsIndexSpecCompatibleForDowngrade = false;
-        for (const auto& elem : origIndex) {
-            if (elem.fieldNameStringData() == NewIndexSpec::kKeyFieldName) {
-                auto pluginName = IndexNames::findPluginName(elem.Obj());
-                uassert(ErrorCodes::InvalidOptions,
-                        "Text indexes are not supported on time-series collections",
-                        pluginName != IndexNames::TEXT);
-
-                auto bucketsIndexSpecWithStatus =
-                    timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(*timeseriesOptions,
-                                                                              elem.Obj());
-                uassert(ErrorCodes::CannotCreateIndex,
-                        str::stream() << bucketsIndexSpecWithStatus.getStatus().toString()
-                                      << " Command request: " << redact(origCmd.toBSON({})),
-                        bucketsIndexSpecWithStatus.isOK());
-
-                isBucketsIndexSpecCompatibleForDowngrade =
-                    timeseries::isBucketsIndexSpecCompatibleForDowngrade(
-                        *timeseriesOptions,
-                        BSON(NewIndexSpec::kKeyFieldName << bucketsIndexSpecWithStatus.getValue()));
-
-                builder.append(NewIndexSpec::kKeyFieldName,
-                               std::move(bucketsIndexSpecWithStatus.getValue()));
-                continue;
-            }
-            builder.append(elem);
-            if (elem.fieldNameStringData() == IndexDescriptor::kPartialFilterExprFieldName) {
-                uasserted(ErrorCodes::InvalidOptions,
-                          "Partial indexes are not supported on time-series collections");
-            }
-
-            if (elem.fieldNameStringData() == IndexDescriptor::kExpireAfterSecondsFieldName) {
-                uasserted(ErrorCodes::InvalidOptions,
-                          "TTL indexes are not supported on time-series collections");
-            }
-        }
-
-        if (feature_flags::gTimeseriesMetricIndexes.isEnabledAndIgnoreFCV() &&
-            !isBucketsIndexSpecCompatibleForDowngrade) {
-            // Store the original user index definition on the transformed index definition for the
-            // time-series buckets collection if this is a newly supported index type on time-series
-            // collections. This is to avoid any additional downgrade steps for index types already
-            // supported in 5.0.
-            builder.appendObject(IndexDescriptor::kOriginalSpecFieldName, origIndex.objdata());
-        }
-
-        indexes.push_back(builder.obj());
-    }
-
-    auto ns = origNs.makeTimeseriesBucketsNamespace();
-    auto cmd = std::make_unique<CreateIndexesCommand>(ns, std::move(indexes));
-    cmd->setV(origCmd.getV());
-    cmd->setIgnoreUnknownIndexOptions(origCmd.getIgnoreUnknownIndexOptions());
-    cmd->setCommitQuorum(origCmd.getCommitQuorum());
-
-    return cmd;
-}
-
-/**
  * { createIndexes : "bar",
  *   indexes : [ { ns : "test.bar", key : { x : 1 }, name: "x_1" } ],
  *   commitQuorum: "majority" }
@@ -726,12 +649,13 @@ public:
             const auto& origCmd = request();
             const auto* cmd = &origCmd;
 
-            // 'timeseriesCmd' is null if the request namespace does not refer to a time-series
-            // collection. Otherwise, transforms the user time-series index request to one on the
-            // underlying bucket.
-            auto timeseriesCmd = makeTimeseriesCreateIndexesCommand(opCtx, origCmd);
-            if (timeseriesCmd) {
-                cmd = timeseriesCmd.get();
+            // If the request namespace refers to a time-series collection, transforms the user
+            // time-series index request to one on the underlying bucket.
+            boost::optional<CreateIndexesCommand> timeseriesCmdOwnership;
+            if (auto options = timeseries::getTimeseriesOptions(opCtx, origCmd.getNamespace())) {
+                timeseriesCmdOwnership =
+                    timeseries::makeTimeseriesCreateIndexesCommand(opCtx, origCmd, *options);
+                cmd = &timeseriesCmdOwnership.get();
             }
 
             // If we encounter an IndexBuildAlreadyInProgress error for any of the requested index
