@@ -74,21 +74,21 @@ boost::optional<FaultConstPtr> FaultManager::activeFault() const {
     return {};
 }
 
-boost::optional<FaultFacetContainerPtr> FaultManager::getFaultFacetContainer() {
+boost::optional<FaultFacetsContainerPtr> FaultManager::getFaultFacetsContainer() {
     auto lk = stdx::lock_guard(_mutex);
     if (!_fault) {
         return {};
     }
-    return std::static_pointer_cast<FaultFacetContainer>(_fault);
+    return std::static_pointer_cast<FaultFacetsContainer>(_fault);
 }
 
-FaultFacetContainerPtr FaultManager::getOrCreateFaultFacetContainer() {
+FaultFacetsContainerPtr FaultManager::getOrCreateFaultFacetsContainer() {
     auto lk = stdx::lock_guard(_mutex);
     if (!_fault) {
         // Create a new one.
         _fault = std::make_shared<FaultImpl>(_svcCtx);
     }
-    return std::static_pointer_cast<FaultFacetContainer>(_fault);
+    return std::static_pointer_cast<FaultFacetsContainer>(_fault);
 }
 
 void FaultManager::healthCheck() {}
