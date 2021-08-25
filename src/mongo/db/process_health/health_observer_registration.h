@@ -28,63 +28,46 @@
  */
 #pragma once
 
-#include "mongo/db/process_health/fault.h"
+#include <functional>
+#include <vector>
+
+#include "mongo/db/process_health/health_observer.h"
 
 #include "mongo/db/service_context.h"
-#include "mongo/util/clock_source.h"
-#include "mongo/util/duration.h"
-#include "mongo/util/timer.h"
+#include "mongo/platform/mutex.h"
 
 namespace mongo {
 namespace process_health {
 
 /**
- * Internal implementation of the Fault class.
- * @see Fault
+ * Registration mechanism for all health observers.
  */
-class FaultImpl : public FaultInternal {
+class HealthObserverRegistration {
 public:
-    explicit FaultImpl(ServiceContext* svcCtx,
-                       Milliseconds minimalGarbageCollectTimeout =
-                           FaultFacetContainer::kMinimalFacetLifetimeToDelete);
+    static HealthObserverRegistration* get(ServiceContext* svcCtx);
 
-    ~FaultImpl() override = default;
+    explicit HealthObserverRegistration(ServiceContext* svcCtx);
 
-    // Fault interface.
+    /**
+     * Registers a factory method, which will be invoked later to instantiate the observer.
+     *
+     * @param factoryCallback creates observer instance when invoked.
+     */
+    void registerObserverFactory(
+        std::function<std::unique_ptr<HealthObserver>(ServiceContext* svcCtx)> factoryCallback);
 
-    UUID getId() const override;
-
-    double getSeverity() const override;
-
-    Milliseconds getActiveFaultDuration() const override;
-
-    Milliseconds getDuration() const override;
-
-    void appendDescription(BSONObjBuilder* builder) const override;
-
-    // FaultFacetContainer interface.
-
-    std::vector<FaultFacetPtr> getFacets() const override;
-
-    boost::optional<FaultFacetPtr> getFaultFacet(FaultFacetType type) override;
-
-    FaultFacetPtr getOrCreateFaultFacet(FaultFacetType type,
-                                        std::function<FaultFacetPtr()> createCb) override;
-
-    void garbageCollectResolvedFacets() override;
+    /**
+     * Invokes all registered factories and returns new instances.
+     * The ownership of all observers is transferred to the invoker.
+     */
+    std::vector<std::unique_ptr<HealthObserver>> instantiateAllObservers() const;
 
 private:
-    const UUID _id = UUID::gen();
-
     ServiceContext* const _svcCtx;
-    // A resolved instance of facet can be garbage collected only after this timeout.
-    const Milliseconds _minimalGarbageCollectTimeout;
-    const Date_t _startTime;
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "FaultImpl::_mutex");
-    // We don't need a map by type because we expect to have only few facets.
-    // Linear search is much faster, we want to avoid any lock contention here.
-    std::deque<FaultFacetPtr> _facets;
+    mutable Mutex _mutex =
+        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "HealthObserverRegistration::_mutex");
+    std::vector<std::function<std::unique_ptr<HealthObserver>(ServiceContext* svcCtx)>> _factories;
 };
 
 }  // namespace process_health

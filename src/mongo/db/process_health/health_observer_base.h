@@ -28,63 +28,27 @@
  */
 #pragma once
 
-#include "mongo/db/process_health/fault.h"
+#include "mongo/db/process_health/health_observer.h"
 
 #include "mongo/db/service_context.h"
-#include "mongo/util/clock_source.h"
-#include "mongo/util/duration.h"
-#include "mongo/util/timer.h"
 
 namespace mongo {
 namespace process_health {
 
 /**
- * Internal implementation of the Fault class.
- * @see Fault
+ * Interface to conduct periodic health checks.
+ * Every instance of health observer is wired internally to update the state of the FaultManager
+ * when a problem is detected.
  */
-class FaultImpl : public FaultInternal {
+class HealthObserverBase : public HealthObserver {
 public:
-    explicit FaultImpl(ServiceContext* svcCtx,
-                       Milliseconds minimalGarbageCollectTimeout =
-                           FaultFacetContainer::kMinimalFacetLifetimeToDelete);
+    HealthObserverBase(ServiceContext* svcCtx);
+    virtual ~HealthObserverBase() = default;
 
-    ~FaultImpl() override = default;
+    void periodicCheck() override;
 
-    // Fault interface.
-
-    UUID getId() const override;
-
-    double getSeverity() const override;
-
-    Milliseconds getActiveFaultDuration() const override;
-
-    Milliseconds getDuration() const override;
-
-    void appendDescription(BSONObjBuilder* builder) const override;
-
-    // FaultFacetContainer interface.
-
-    std::vector<FaultFacetPtr> getFacets() const override;
-
-    boost::optional<FaultFacetPtr> getFaultFacet(FaultFacetType type) override;
-
-    FaultFacetPtr getOrCreateFaultFacet(FaultFacetType type,
-                                        std::function<FaultFacetPtr()> createCb) override;
-
-    void garbageCollectResolvedFacets() override;
-
-private:
-    const UUID _id = UUID::gen();
-
+protected:
     ServiceContext* const _svcCtx;
-    // A resolved instance of facet can be garbage collected only after this timeout.
-    const Milliseconds _minimalGarbageCollectTimeout;
-    const Date_t _startTime;
-
-    mutable Mutex _mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "FaultImpl::_mutex");
-    // We don't need a map by type because we expect to have only few facets.
-    // Linear search is much faster, we want to avoid any lock contention here.
-    std::deque<FaultFacetPtr> _facets;
 };
 
 }  // namespace process_health

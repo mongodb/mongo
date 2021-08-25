@@ -26,34 +26,47 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#pragma once
 
-#include "mongo/db/process_health/health_check_status.h"
+#include "mongo/db/process_health/health_observer_registration.h"
 
 namespace mongo {
 namespace process_health {
 
-/**
- * Tracks the state of one particular fault facet.
- * The instance is created and deleted by the fault observer when a fault
- * condition is detected or resolved.
- */
-class FaultFacet : public std::enable_shared_from_this<FaultFacet> {
-public:
-    virtual ~FaultFacet() = default;
+namespace {
 
-    virtual FaultFacetType getType() const = 0;
+const auto sRegistration =
+    ServiceContext::declareDecoration<std::unique_ptr<HealthObserverRegistration>>();
 
-    /**
-     * The interface used to communicate with the Fault instance that
-     * owns all facets.
-     *
-     * @return HealthCheckStatus
-     */
-    virtual HealthCheckStatus getStatus() const = 0;
-};
+ServiceContext::ConstructorActionRegisterer healthObserverRegisterer{
+    "healthObserverRegisterer", [](ServiceContext* svcCtx) {
+        auto healthObserver = std::make_unique<HealthObserverRegistration>(svcCtx);
+        auto& instance = sRegistration(svcCtx);
+        instance = std::move(healthObserver);
+    }};
 
-using FaultFacetPtr = std::shared_ptr<FaultFacet>;
+}  // namespace
+
+HealthObserverRegistration* HealthObserverRegistration::get(ServiceContext* svcCtx) {
+    return sRegistration(svcCtx).get();
+}
+
+HealthObserverRegistration::HealthObserverRegistration(ServiceContext* svcCtx) : _svcCtx(svcCtx) {}
+
+void HealthObserverRegistration::registerObserverFactory(
+    std::function<std::unique_ptr<HealthObserver>(ServiceContext* svcCtx)> factoryCallback) {
+    auto lk = stdx::lock_guard(_mutex);
+    _factories.push_back(std::move(factoryCallback));
+}
+
+std::vector<std::unique_ptr<HealthObserver>> HealthObserverRegistration::instantiateAllObservers()
+    const {
+    std::vector<std::unique_ptr<HealthObserver>> result;
+    auto lk = stdx::lock_guard(_mutex);
+    for (auto& cb : _factories) {
+        result.push_back(cb(_svcCtx));
+    }
+    return result;
+}
 
 }  // namespace process_health
 }  // namespace mongo

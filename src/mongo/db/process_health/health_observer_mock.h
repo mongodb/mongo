@@ -28,32 +28,27 @@
  */
 #pragma once
 
-#include "mongo/db/process_health/health_check_status.h"
+#include "mongo/db/process_health/health_observer_base.h"
 
 namespace mongo {
 namespace process_health {
 
 /**
- * Tracks the state of one particular fault facet.
- * The instance is created and deleted by the fault observer when a fault
- * condition is detected or resolved.
+ * Interface to conduct periodic health checks.
+ * Every instance of health observer is wired internally to update the state of the FaultManager
+ * when a problem is detected.
  */
-class FaultFacet : public std::enable_shared_from_this<FaultFacet> {
+class HealthObserverMock : public HealthObserverBase {
 public:
-    virtual ~FaultFacet() = default;
+    HealthObserverMock(ServiceContext* svcCtx) : HealthObserverBase(svcCtx) {}
+    virtual ~HealthObserverMock() = default;
 
-    virtual FaultFacetType getType() const = 0;
+    FaultFacetType getType() const override {
+        return FaultFacetType::kMock;
+    }
 
-    /**
-     * The interface used to communicate with the Fault instance that
-     * owns all facets.
-     *
-     * @return HealthCheckStatus
-     */
-    virtual HealthCheckStatus getStatus() const = 0;
+    void periodicCheck() override {}
 };
-
-using FaultFacetPtr = std::shared_ptr<FaultFacet>;
 
 }  // namespace process_health
 }  // namespace mongo

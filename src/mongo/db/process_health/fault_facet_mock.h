@@ -49,6 +49,10 @@ public:
 
     ~FaultFacetMock() = default;
 
+    FaultFacetType getType() const override {
+        return FaultFacetType::kMock;
+    }
+
     HealthCheckStatus getStatus() const override {
         double severity;
         _callback(&severity);
@@ -68,7 +72,6 @@ public:
                                             "Mock facet",
                                             now - _activeFaultTime,
                                             now - _startTime);
-
 
         return healthCheckStatus;
     }

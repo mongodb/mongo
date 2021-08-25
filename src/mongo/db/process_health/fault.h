@@ -31,6 +31,7 @@
 #include <memory>
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/process_health/fault_facet_container.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/uuid.h"
 
@@ -41,7 +42,7 @@ namespace process_health {
  * Detailed description of the current fault.
  * @see FaultManager for more details.
  */
-class Fault {
+class Fault : public std::enable_shared_from_this<Fault> {
     Fault(const Fault&) = delete;
     Fault& operator=(const Fault&) = delete;
 
@@ -84,6 +85,14 @@ public:
 };
 
 using FaultConstPtr = std::shared_ptr<const Fault>;
+
+/**
+ * Internal Fault interface that has accessors to manage Facets this Fault owns.
+ */
+class FaultInternal : public Fault, public FaultFacetContainer {
+public:
+    ~FaultInternal() override = default;
+};
 
 
 }  // namespace process_health

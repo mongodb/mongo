@@ -31,6 +31,7 @@
 
 #include "mongo/db/process_health/fault_manager.h"
 
+#include "mongo/db/process_health/fault_impl.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
@@ -41,13 +42,13 @@ namespace {
 
 const auto sFaultManager = ServiceContext::declareDecoration<std::unique_ptr<FaultManager>>();
 
-}  // namespace
-
 ServiceContext::ConstructorActionRegisterer faultManagerRegisterer{
     "FaultManagerRegisterer", [](ServiceContext* svcCtx) {
         auto faultManager = std::make_unique<FaultManager>(svcCtx);
         FaultManager::set(svcCtx, std::move(faultManager));
     }};
+
+}  // namespace
 
 
 FaultManager* FaultManager::get(ServiceContext* svcCtx) {
@@ -71,6 +72,23 @@ FaultState FaultManager::getFaultState() const {
 
 boost::optional<FaultConstPtr> FaultManager::activeFault() const {
     return {};
+}
+
+boost::optional<FaultFacetContainerPtr> FaultManager::getFaultFacetContainer() {
+    auto lk = stdx::lock_guard(_mutex);
+    if (!_fault) {
+        return {};
+    }
+    return std::static_pointer_cast<FaultFacetContainer>(_fault);
+}
+
+FaultFacetContainerPtr FaultManager::getOrCreateFaultFacetContainer() {
+    auto lk = stdx::lock_guard(_mutex);
+    if (!_fault) {
+        // Create a new one.
+        _fault = std::make_shared<FaultImpl>(_svcCtx);
+    }
+    return std::static_pointer_cast<FaultFacetContainer>(_fault);
 }
 
 void FaultManager::healthCheck() {}

@@ -32,8 +32,10 @@
 namespace mongo {
 namespace process_health {
 
-FaultImpl::FaultImpl(ServiceContext* svcCtx)
-    : _svcCtx(svcCtx), _startTime(_svcCtx->getFastClockSource()->now()) {
+FaultImpl::FaultImpl(ServiceContext* svcCtx, Milliseconds minimalGarbageCollectTimeout)
+    : _svcCtx(svcCtx),
+      _minimalGarbageCollectTimeout(minimalGarbageCollectTimeout),
+      _startTime(_svcCtx->getFastClockSource()->now()) {
     invariant(svcCtx);  // Will crash before this line, just for readability.
 }
 
@@ -51,6 +53,50 @@ Milliseconds FaultImpl::getActiveFaultDuration() const {
 
 Milliseconds FaultImpl::getDuration() const {
     return Milliseconds(_svcCtx->getFastClockSource()->now() - _startTime);
+}
+
+std::vector<FaultFacetPtr> FaultImpl::getFacets() const {
+    auto lk = stdx::lock_guard(_mutex);
+    std::vector<FaultFacetPtr> result(_facets.begin(), _facets.end());
+    return result;
+}
+
+boost::optional<FaultFacetPtr> FaultImpl::getFaultFacet(FaultFacetType type) {
+    auto lk = stdx::lock_guard(_mutex);
+    auto it = std::find_if(_facets.begin(), _facets.end(), [type](const FaultFacetPtr& facet) {
+        return facet->getType() == type;
+    });
+    if (it == _facets.end()) {
+        return {};
+    }
+    return *it;
+}
+
+FaultFacetPtr FaultImpl::getOrCreateFaultFacet(FaultFacetType type,
+                                               std::function<FaultFacetPtr()> createCb) {
+    auto lk = stdx::lock_guard(_mutex);
+    auto it = std::find_if(_facets.begin(), _facets.end(), [type](const FaultFacetPtr& facet) {
+        return facet->getType() == type;
+    });
+    if (it == _facets.end()) {
+        auto facet = createCb();
+        _facets.push_back(facet);
+        return facet;
+    }
+    return *it;
+}
+
+void FaultImpl::garbageCollectResolvedFacets() {
+    auto lk = stdx::lock_guard(_mutex);
+    _facets.erase(std::remove_if(_facets.begin(),
+                                 _facets.end(),
+                                 [this](const FaultFacetPtr& facet) {
+                                     auto status = facet->getStatus();
+                                     // Remove if severity is zero and duration > threshold.
+                                     return HealthCheckStatus::isResolved(status.getSeverity()) &&
+                                         status.getDuration() >= _minimalGarbageCollectTimeout;
+                                 }),
+                  _facets.end());
 }
 
 void FaultImpl::appendDescription(BSONObjBuilder* builder) const {}
