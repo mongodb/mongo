@@ -737,7 +737,6 @@ void StorageEngineImpl::finishInit() {
     if (_engine->supportsRecoveryTimestamp()) {
         _timestampMonitor = std::make_unique<TimestampMonitor>(
             _engine.get(), getGlobalServiceContext()->getPeriodicRunner());
-        _timestampMonitor->startup();
         _timestampMonitor->addListener(&_minOfCheckpointAndOldestTimestampListener);
     }
 }
@@ -1103,7 +1102,9 @@ void StorageEngineImpl::_onMinOfCheckpointAndOldestTimestampChanged(const Timest
 }
 
 StorageEngineImpl::TimestampMonitor::TimestampMonitor(KVEngine* engine, PeriodicRunner* runner)
-    : _engine(engine), _running(false), _periodicRunner(runner) {}
+    : _engine(engine), _running(false), _periodicRunner(runner) {
+    _startup();
+}
 
 StorageEngineImpl::TimestampMonitor::~TimestampMonitor() {
     LOGV2(22261, "Timestamp monitor shutting down");
@@ -1111,7 +1112,7 @@ StorageEngineImpl::TimestampMonitor::~TimestampMonitor() {
     invariant(_listeners.empty());
 }
 
-void StorageEngineImpl::TimestampMonitor::startup() {
+void StorageEngineImpl::TimestampMonitor::_startup() {
     invariant(!_running);
 
     LOGV2(22262, "Timestamp monitor starting");

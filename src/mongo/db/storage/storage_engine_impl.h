@@ -253,12 +253,6 @@ public:
         ~TimestampMonitor();
 
         /**
-         * Monitor changes in timestamps and to notify the listeners on change. Notifies all
-         * listeners on Timestamp::min() in order to support standalone mode that is untimestamped.
-         */
-        void startup();
-
-        /**
          * Adds a new listener to the monitor if it isn't already registered. A listener can only be
          * bound to one type of timestamp at a time.
          */
@@ -274,6 +268,12 @@ public:
         }
 
     private:
+        /**
+         * Monitor changes in timestamps and to notify the listeners on change. Notifies all
+         * listeners on Timestamp::min() in order to support standalone mode that is untimestamped.
+         */
+        void _startup();
+
         KVEngine* _engine;
         bool _running;
 
