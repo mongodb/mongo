@@ -4587,6 +4587,20 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteInPredicateOnFieldDocumentKey) {
                                "]}"));
 }
 
+TEST_F(ChangeStreamRewriteTest, CannotInexactlyRewriteExprPredicateOnFieldDocumentKey) {
+    auto spec = fromjson("{$expr: {$or: ['$documentKey']}}");
+
+    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        getExpCtx(), statusWithMatchExpression.getValue().get(), {"documentKey"});
+
+    // $expr predicates that refer to the full 'documentKey' field (and not a subfield thereof)
+    // cannot be rewritten (exactly or inexactly).
+    ASSERT(rewrittenMatchExpression == nullptr);
+}
+
 TEST_F(ChangeStreamRewriteTest, CanRewriteArbitraryPredicateOnFieldDocumentKeyId) {
     auto spec = fromjson("{'documentKey._id': {$lt: 'bar'}}");
     auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
@@ -4612,6 +4626,33 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteArbitraryPredicateOnFieldDocumentKeyId
                                "    {'o._id': {$lt: 'bar'}}"
                                "  ]}"
                                "]}"));
+}
+
+TEST_F(ChangeStreamRewriteTest, CanExactlyRewriteExprPredicateOnFieldDocumentKeyId) {
+    auto spec = fromjson("{$expr: {$lt: ['$documentKey._id', 'bar']}}");
+
+    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        getExpCtx(), statusWithMatchExpression.getValue().get(), {"documentKey"});
+    ASSERT(rewrittenMatchExpression);
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(
+        rewrittenPredicate,
+        fromjson("{$expr:"
+                 "  {$lt: ["
+                 "    {$switch: {"
+                 "      branches: ["
+                 "        {case: {$in: ['$op', [{$const: 'i'}, {$const: 'd'}]]}, then: '$o._id'},"
+                 "        {case: {$eq: ['$op', {$const: 'u'}]}, then: '$o2._id'}"
+                 "      ],"
+                 "      default: '$$REMOVE'"
+                 "    }},"
+                 "    {$const: 'bar'}"
+                 "  ]}"
+                 "}"));
 }
 
 TEST_F(ChangeStreamRewriteTest, CanRewriteArbitraryPredicateOnFieldDocumentKeyFoo) {
@@ -4695,6 +4736,46 @@ TEST_F(ChangeStreamRewriteTest, CannotExactlyRewritePredicateOnFieldDocumentKeyF
 
     // We cannot be sure that the path for this predicate is actually a valid field in the
     // documentKey. Therefore, we cannot exactly rewrite a predicate on this field.
+    ASSERT(rewrittenMatchExpression == nullptr);
+}
+
+TEST_F(ChangeStreamRewriteTest, CanInexactlyRewriteExprPredicateOnFieldDocumentKeyFoo) {
+    auto spec = fromjson("{$expr: {$or: ['$documentKey.foo']}}");
+
+    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        getExpCtx(), statusWithMatchExpression.getValue().get(), {"documentKey"});
+    ASSERT(rewrittenMatchExpression);
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(
+        rewrittenPredicate,
+        fromjson("{$expr:"
+                 "  {$or: ["
+                 "    {$switch: {"
+                 "      branches: ["
+                 "        {case: {$in: ['$op', [{$const: 'i'}, {$const: 'd'}]]}, then: '$o.foo'},"
+                 "        {case: {$eq: ['$op', {$const: 'u'}]}, then: '$o2.foo'}"
+                 "      ],"
+                 "      default: '$$REMOVE'"
+                 "    }}"
+                 "  ]}"
+                 "}"));
+}
+
+TEST_F(ChangeStreamRewriteTest, CannotExactlyRewriteExprPredicateOnFieldDocumentKeyFoo) {
+    auto spec = fromjson("{$expr: {$lt: ['$documentKey.foo', 'bar']}}");
+
+    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        getExpCtx(), statusWithMatchExpression.getValue().get(), {"documentKey"});
+
+    // We cannot be sure that the field path is actually a valid field in the documentKey.
+    // Therefore, we cannot exactly rewrite this expression.
     ASSERT(rewrittenMatchExpression == nullptr);
 }
 

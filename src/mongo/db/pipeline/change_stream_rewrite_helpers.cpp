@@ -196,6 +196,7 @@ boost::intrusive_ptr<Expression> exprRewriteOperationType(
     // ... and parse it into an Expression before returning.
     return Expression::parseExpression(expCtx.get(), exprObj, expCtx->variablesParseState);
 }
+
 /**
  * Rewrites filters on 'documentKey' in a format that can be applied directly to the oplog. Returns
  * nullptr if the predicate cannot be rewritten.
@@ -244,7 +245,7 @@ std::unique_ptr<MatchExpression> matchRewriteDocumentKey(
         return rewrittenPredicate;
     }
 
-    // Otherwise, we must handle the {op: "i"} case where the predicate is on the full documentKey
+    // Otherwise, we must handle the {op: "i"} case where the predicate is on the full 'documentKey'
     // field. Create an $and filter for the insert case, and seed it with {op: "i"}. If we are
     // unable to rewrite the predicate below, this filter will simply return all insert events.
     auto insertCase = std::make_unique<AndMatchExpression>();
@@ -314,6 +315,71 @@ const CollatorInterface* getMatchExpressionCollator(const MatchExpression* me) {
     } else {
         return nullptr;
     }
+}
+
+/**
+ * Attempt to rewrite a reference to the 'documentKey' field such that, when evaluated over an oplog
+ * document, it produces the expected change stream value for the field.
+ */
+boost::intrusive_ptr<Expression> exprRewriteDocumentKey(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const ExpressionFieldPath* expr,
+    bool allowInexact) {
+    auto fieldPath = expr->getFieldPathWithoutCurrentPrefix();
+    tassert(5942300,
+            str::stream() << "Unexpected field path" << fieldPath.fullPathWithPrefix(),
+            fieldPath.getFieldName(0) == DocumentSourceChangeStream::kDocumentKeyField);
+
+    // If the field path refers to the full "documentKey" field (and not a subfield thereof), we
+    // don't attempt to generate a rewritten expression.
+    if (fieldPath.getPathLength() == 1) {
+        return nullptr;
+    }
+
+    // Check if the field path starts with "documentKey._id". If so, then we can always perform an
+    // exact rewrite. If not, because of the complexities of the 'op' == 'i' case, it's impractical
+    // to try to generate a rewritten expression that matches exactly.
+    bool pathStartsWithDKId = (fieldPath.getPathLength() >= 2 &&
+                               fieldPath.getFieldName(1) == DocumentSourceChangeStream::kIdField);
+    if (!pathStartsWithDKId && !allowInexact) {
+        return nullptr;
+    }
+
+    // We intend to build a $switch statement which returns the correct change stream operationType
+    // based on the contents of the oplog event. Start by enumerating the different opType cases.
+    std::vector<BSONObj> opCases;
+
+    // Cases for 'insert' and 'delete'.
+    auto insertAndDeletePath =
+        static_cast<ExpressionFieldPath*>(expr->copyWithSubstitution({{"documentKey", "o"}}).get())
+            ->getFieldPathWithoutCurrentPrefix()
+            .fullPathWithPrefix();
+    opCases.push_back(
+        fromjson("{case: {$in: ['$op', ['i', 'd']]}, then: '" + insertAndDeletePath + "'}"));
+
+    // Cases for 'update' and 'replace'.
+    auto updateAndReplacePath =
+        static_cast<ExpressionFieldPath*>(expr->copyWithSubstitution({{"documentKey", "o2"}}).get())
+            ->getFieldPathWithoutCurrentPrefix()
+            .fullPathWithPrefix();
+    opCases.push_back(
+        fromjson("{case: {$eq: ['$op', 'u']}, then: '" + updateAndReplacePath + "'}"));
+
+    // The default case, if nothing matches.
+    auto defaultCase = ExpressionConstant::create(expCtx.get(), Value())->serialize(false);
+
+    // Build the expression BSON object.
+    BSONObjBuilder exprBuilder;
+
+    BSONObjBuilder switchBuilder(exprBuilder.subobjStart("$switch"));
+    switchBuilder.append("branches", opCases);
+    switchBuilder << "default" << defaultCase;
+    switchBuilder.doneFast();
+
+    auto exprObj = exprBuilder.obj();
+
+    // Parse the expression BSON object into an Expression and return the Expression.
+    return Expression::parseExpression(expCtx.get(), exprObj, expCtx->variablesParseState);
 }
 
 /**
@@ -750,7 +816,8 @@ StringMap<MatchExpressionRewrite> matchRewriteRegistry = {
     {"to", matchRewriteTo}};
 
 // Map of field names to corresponding agg Expression rewrite functions.
-StringMap<AggExpressionRewrite> exprRewriteRegistry = {{"operationType", exprRewriteOperationType}};
+StringMap<AggExpressionRewrite> exprRewriteRegistry = {{"operationType", exprRewriteOperationType},
+                                                       {"documentKey", exprRewriteDocumentKey}};
 
 // Traverse the Expression tree and rewrite as many of them as possible. Note that the rewrite is
 // performed in-place; that is, the Expression passed into the function is mutated by it.

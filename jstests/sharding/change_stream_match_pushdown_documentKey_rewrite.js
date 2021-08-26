@@ -153,10 +153,16 @@ const coll = (() => {
     assert.commandWorked(coll.deleteOne({_id: 2, shard: 1}));
     assert.commandWorked(coll.deleteOne({_id: 3, shard: 1}));
 
+    // Enable a failpoint that will prevent $expr match expressions from generating $_internalExprEq
+    // or similar expressions. This ensures that the following test-cases only exercise the $expr
+    // rewrites.
+    assert.commandWorked(db.adminCommand(
+        {configureFailPoint: "disableMatchExpressionOptimization", mode: "alwaysOn"}));
+
     // Ensure that the '$match' on the 'insert', 'update', 'replace', and 'delete' operation types
     // with various predicates are rewritten correctly.
     for (const op of ["insert", "update", "replace", "delete"]) {
-        // Test out predicates on the full 'documentKey' field.
+        // Test out a predicate on the full 'documentKey' field.
         verifyOps(resumeAfterToken,
                   {$match: {operationType: op, documentKey: {shard: 0, _id: 2}}},
                   "rewritten_" + op + "_with_eq_predicate_on_documentKey",
@@ -209,6 +215,70 @@ const coll = (() => {
                   "rewritten_" + op + "_with_exists_false_predicate_on_documentKey_z",
                   [[op, 2, 0], [op, 3, 0], [op, 2, 1], [op, 3, 1]],
                   [2, 2] /* expectedOplogCursorReturnedDocs */);
+
+        // Test out an $expr predicate on the full 'documentKey' field.
+        verifyOps(
+            resumeAfterToken,
+            {
+                $match: {
+                    $and:
+                        [{operationType: op}, {$expr: {$eq: ["$documentKey", {shard: 0, _id: 2}]}}]
+                }
+            },
+            "rewritten_" + op + "_with_expr_eq_predicate_on_documentKey",
+            [[op, 2, 0]],
+            [2, 2] /* expectedOplogCursorReturnedDocs */);
+
+        // Test out a negated predicate on the full 'documentKey' field.
+        verifyOps(resumeAfterToken,
+                  {
+                      $match: {
+                          $and: [
+                              {operationType: op},
+                              {$expr: {$not: {$eq: ["$documentKey", {shard: 0, _id: 2}]}}}
+                          ]
+                      }
+                  },
+                  "rewritten_" + op + "_with_negated_expr_eq_predicate_on_documentKey",
+                  [[op, 3, 0], [op, 2, 1], [op, 3, 1]],
+                  [2, 2] /* expectedOplogCursorReturnedDocs */);
+
+        // Test out an $expr predicate on 'documentKey._id'.
+        verifyOps(resumeAfterToken,
+                  {$match: {$and: [{operationType: op}, {$expr: {$eq: ["$documentKey._id", 2]}}]}},
+                  "rewritten_" + op + "_with_expr_eq_predicate_on_documentKey_id",
+                  [[op, 2, 0], [op, 2, 1]],
+                  [1, 1] /* expectedOplogCursorReturnedDocs */);
+
+        // Test out a negated $expr predicate on 'documentKey._id'.
+        verifyOps(
+            resumeAfterToken,
+            {
+                $match:
+                    {$and: [{operationType: op}, {$expr: {$not: {$eq: ["$documentKey._id", 2]}}}]}
+            },
+            "rewritten_" + op + "_with_negated_expr_eq_predicate_on_documentKey_id",
+            [[op, 3, 0], [op, 3, 1]],
+            [1, 1] /* expectedOplogCursorReturnedDocs */);
+
+        // Test out an $expr predicate on 'documentKey.shard'.
+        verifyOps(
+            resumeAfterToken,
+            {$match: {$and: [{operationType: op}, {$expr: {$eq: ["$documentKey.shard", 1]}}]}},
+            "rewritten_" + op + "_with_expr_eq_predicate_on_documentKey_shard",
+            [[op, 2, 1], [op, 3, 1]],
+            [2, 2] /* expectedOplogCursorReturnedDocs */);
+
+        // Test out a negated $expr predicate on 'documentKey.shard'.
+        verifyOps(
+            resumeAfterToken,
+            {
+                $match:
+                    {$and: [{operationType: op}, {$expr: {$not: {$eq: ["$documentKey.shard", 1]}}}]}
+            },
+            "rewritten_" + op + "_with_negated_expr_eq_predicate_on_documentKey_shard",
+            [[op, 2, 0], [op, 3, 0]],
+            [2, 2] /* expectedOplogCursorReturnedDocs */);
     }
 })();
 
