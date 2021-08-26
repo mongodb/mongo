@@ -67,6 +67,27 @@ def build_mock_sub_suite(index, test_list):
     )
 
 
+class TestSubSuite(unittest.TestCase):
+    def test_tests_with_0_runtime_should_not_override_timeouts(self):
+        test_list = [f"test_{i}" for i in range(10)]
+        runtime_list = [
+            MagicMock(spec_set=TestRuntime, test_name=test, runtime=3.14) for test in test_list
+        ]
+        runtime_list[3].runtime = 0
+        sub_suite = under_test.SubSuite.from_test_list(0, "my_suite", test_list, None, runtime_list)
+
+        assert not sub_suite.should_overwrite_timeout()
+
+    def test_tests_with_full_runtime_history_should_override_timeouts(self):
+        test_list = [f"test_{i}" for i in range(10)]
+        runtime_list = [
+            MagicMock(spec_set=TestRuntime, test_name=test, runtime=3.14) for test in test_list
+        ]
+        sub_suite = under_test.SubSuite.from_test_list(0, "my_suite", test_list, None, runtime_list)
+
+        assert sub_suite.should_overwrite_timeout()
+
+
 class TestGeneratedSuite(unittest.TestCase):
     def test_get_test_list_should_run_tests_in_sub_tasks(self):
         n_sub_suites = 3

@@ -111,7 +111,7 @@ class SubSuite(object):
         if runtime_list:
             runtime_map = {test.test_name: test.runtime for test in runtime_list}
             for test in test_list:
-                if test in runtime_map:
+                if test in runtime_map and runtime_map[test] > 0:
                     runtime_count += 1
                     total_runtime += runtime_map[test]
                     max_runtime = max(max_runtime, runtime_map[test])
