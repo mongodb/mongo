@@ -172,6 +172,7 @@ DocumentSource::GetNextResult DocumentSourceFacet::doGetNext() {
                 results[facetId].emplace_back(next.releaseDocument());
             }
             allPipelinesEOF = allPipelinesEOF && next.isEOF();
+            accumulatePipelinePlanSummaryStats(*pipeline, _stats.planSummaryStats);
         }
     }
 
@@ -264,10 +265,12 @@ StageConstraints DocumentSourceFacet::constraints(Pipeline::SplitState) const {
 
 bool DocumentSourceFacet::usedDisk() {
     for (auto&& facet : _facets) {
-        if (facet.pipeline->usedDisk())
-            return true;
+        if (facet.pipeline->usedDisk()) {
+            _stats.planSummaryStats.usedDisk = true;
+            break;
+        }
     }
-    return false;
+    return _stats.planSummaryStats.usedDisk;
 }
 
 DepsTracker::State DocumentSourceFacet::getDependencies(DepsTracker* deps) const {

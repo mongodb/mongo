@@ -74,6 +74,15 @@ struct ParserRegistration {
 static StringMap<ParserRegistration> parserMap;
 }  // namespace
 
+void accumulatePipelinePlanSummaryStats(const Pipeline& pipeline,
+                                        PlanSummaryStats& planSummaryStats) {
+    for (auto&& source : pipeline.getSources()) {
+        if (auto specificStats = source->getSpecificStats()) {
+            specificStats->accumulate(planSummaryStats);
+        }
+    }
+}
+
 void DocumentSource::registerParser(
     string name,
     Parser parser,

@@ -141,6 +141,9 @@ public:
     void reattachToOperationContext(OperationContext* opCtx) final;
     StageConstraints constraints(Pipeline::SplitState pipeState) const final;
     bool usedDisk() final;
+    const SpecificStats* getSpecificStats() const final {
+        return &_stats;
+    }
 
 protected:
     /**
@@ -163,5 +166,7 @@ private:
     const size_t _maxOutputDocSizeBytes;
 
     bool _done = false;
+
+    DocumentSourceFacetStats _stats;
 };
 }  // namespace mongo

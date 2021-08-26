@@ -480,7 +480,7 @@ DocumentSource::GetNextResult DocumentSourceLookUp::doGetNext() {
         results.emplace_back(std::move(*result));
     }
 
-    recordPlanSummaryStats(*pipeline);
+    accumulatePipelinePlanSummaryStats(*pipeline, _stats.planSummaryStats);
     MutableDocument output(std::move(inputDoc));
     output.setNestedField(_as, Value(std::move(results)));
     return output.freeze();
@@ -806,7 +806,7 @@ bool DocumentSourceLookUp::usedDisk() {
 
 void DocumentSourceLookUp::doDispose() {
     if (_pipeline) {
-        recordPlanSummaryStats(*_pipeline);
+        accumulatePipelinePlanSummaryStats(*_pipeline, _stats.planSummaryStats);
         _pipeline->dispose(pExpCtx->opCtx);
         _pipeline.reset();
     }
@@ -922,7 +922,7 @@ DocumentSource::GetNextResult DocumentSourceLookUp::unwindResult() {
         }
 
         if (_pipeline) {
-            recordPlanSummaryStats(*_pipeline);
+            accumulatePipelinePlanSummaryStats(*_pipeline, _stats.planSummaryStats);
             _pipeline->dispose(pExpCtx->opCtx);
         }
 
@@ -981,14 +981,6 @@ void DocumentSourceLookUp::initializeResolvedIntrospectionPipeline() {
     _resolvedIntrospectionPipeline =
         Pipeline::parse(_resolvedPipeline, _fromExpCtx, lookupPipeValidator);
     _fromExpCtx->stopExpressionCounters();
-}
-
-void DocumentSourceLookUp::recordPlanSummaryStats(const Pipeline& pipeline) {
-    for (auto&& source : pipeline.getSources()) {
-        if (auto specificStats = source->getSpecificStats()) {
-            specificStats->accumulate(_stats.planSummaryStats);
-        }
-    }
 }
 
 void DocumentSourceLookUp::appendSpecificExecStats(MutableDocument& doc) const {

@@ -170,8 +170,6 @@ private:
 
     void addViewDefinition(NamespaceString nss, std::vector<BSONObj> viewPipeline);
 
-    void recordPlanSummaryStats(const Pipeline& pipeline);
-
     void logStartingSubPipeline(const std::vector<BSONObj>& serializedPipeline);
     void logShardedViewFound(
         const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e);

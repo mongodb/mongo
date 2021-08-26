@@ -709,4 +709,11 @@ private:
         boost::optional<ExplainOptions::Verbosity> explain = boost::none) const = 0;
 };
 
+/**
+ * Method to accumulate the plan summary stats from all stages of the pipeline into the given
+ * `planSummaryStats` object.
+ */
+void accumulatePipelinePlanSummaryStats(const Pipeline& pipeline,
+                                        PlanSummaryStats& planSummaryStats);
+
 }  // namespace mongo

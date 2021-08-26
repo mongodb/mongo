@@ -252,7 +252,7 @@ DocumentSource::GetNextResult DocumentSourceUnionWith::doGetNext() {
         return std::move(*res);
 
     // Record the plan summary stats after $unionWith operation is done.
-    recordPlanSummaryStats(*_pipeline);
+    accumulatePipelinePlanSummaryStats(*_pipeline, _stats.planSummaryStats);
 
     _executionState = ExecutionProgress::kFinished;
     return GetNextResult::makeEOF();
@@ -318,7 +318,7 @@ void DocumentSourceUnionWith::doDispose() {
         _pipeline.get_deleter().dismissDisposal();
         _stats.planSummaryStats.usedDisk =
             _stats.planSummaryStats.usedDisk || _pipeline->usedDisk();
-        recordPlanSummaryStats(*_pipeline);
+        accumulatePipelinePlanSummaryStats(*_pipeline, _stats.planSummaryStats);
 
         if (!_pipeline->getContext()->explain) {
             _pipeline->dispose(pExpCtx->opCtx);
@@ -410,14 +410,6 @@ void DocumentSourceUnionWith::addInvolvedCollections(
     stdx::unordered_set<NamespaceString>* collectionNames) const {
     collectionNames->insert(_pipeline->getContext()->ns);
     collectionNames->merge(_pipeline->getInvolvedCollections());
-}
-
-void DocumentSourceUnionWith::recordPlanSummaryStats(const Pipeline& pipeline) {
-    for (auto&& source : pipeline.getSources()) {
-        if (auto specificStats = source->getSpecificStats()) {
-            specificStats->accumulate(_stats.planSummaryStats);
-        }
-    }
 }
 
 }  // namespace mongo

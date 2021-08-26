@@ -308,11 +308,6 @@ private:
     }
 
     /**
-     * Method to accumulate the plan summary stats from all stages of the pipeline.
-     */
-    void recordPlanSummaryStats(const Pipeline& pipeline);
-
-    /**
      * Method to add a DocumentSourceSequentialDocumentCache stage and optimize the pipeline to
      * move the cache to its final position.
      */

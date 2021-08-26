@@ -32,6 +32,7 @@
 #include "mongo/db/pipeline/plan_explainer_pipeline.h"
 
 #include "mongo/db/pipeline/document_source_cursor.h"
+#include "mongo/db/pipeline/document_source_facet.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/document_source_union_with.h"
@@ -88,6 +89,9 @@ void PlanExplainerPipeline::getSummaryStats(PlanSummaryStats* statsOut) const {
         } else if (auto docSourceUnionWith = dynamic_cast<DocumentSourceUnionWith*>(source.get())) {
             collectPlanSummaryStats<DocumentSourceUnionWith, UnionWithStats>(*docSourceUnionWith,
                                                                              statsOut);
+        } else if (auto docSourceFacet = dynamic_cast<DocumentSourceFacet*>(source.get())) {
+            collectPlanSummaryStats<DocumentSourceFacet, DocumentSourceFacetStats>(*docSourceFacet,
+                                                                                   statsOut);
         }
     }
 

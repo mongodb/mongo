@@ -864,6 +864,24 @@ struct UnionWithStats final : public SpecificStats {
     PlanSummaryStats planSummaryStats;
 };
 
+struct DocumentSourceFacetStats : public SpecificStats {
+    std::unique_ptr<SpecificStats> clone() const final {
+        return std::make_unique<DocumentSourceFacetStats>(*this);
+    }
+
+    uint64_t estimateObjectSizeInBytes() const {
+        return sizeof(*this) +
+            (planSummaryStats.estimateObjectSizeInBytes() - sizeof(planSummaryStats));
+    }
+
+    void accumulate(PlanSummaryStats& summary) const final {
+        summary.accumulate(planSummaryStats);
+    }
+
+    // Tracks the cumulative summary stats across all facets.
+    PlanSummaryStats planSummaryStats;
+};
+
 struct UnpackTimeseriesBucketStats final : public SpecificStats {
     std::unique_ptr<SpecificStats> clone() const final {
         return std::make_unique<UnpackTimeseriesBucketStats>(*this);
