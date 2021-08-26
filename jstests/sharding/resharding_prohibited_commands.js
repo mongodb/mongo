@@ -208,5 +208,6 @@ if (!reshardingTest.isMixedVersionCluster()) {
     assert(indexes.cursor.firstBatch.some((index) => index.name === 'idx2'));
 }
 
+awaitAbort();
 reshardingTest.teardown();
 })();

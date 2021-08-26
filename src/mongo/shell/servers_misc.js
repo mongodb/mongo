@@ -77,6 +77,10 @@ var allocatePort;
  */
 var resetAllocatedPorts;
 
+var uncheckedParallelShellPids;
+
+var startParallelShell;
+
 (function() {
 // Defer initializing these variables until the first call, as TestData attributes may be
 // initialized as part of the --eval argument (e.g. by resmoke.py), which will not be evaluated
@@ -100,22 +104,13 @@ resetAllocatedPorts = function() {
     jsTest.log("Resetting the range of allocated ports");
     maxPort = nextPort = undefined;
 };
-})();
 
-/**
- * Returns a list of 'numPorts' port numbers that have not been given out to any other caller from
- * the same mongo shell.
- */
-allocatePorts = function(numPorts) {
-    var ports = [];
-    for (var i = 0; i < numPorts; i++) {
-        ports.push(allocatePort());
-    }
-
-    return ports;
+var parallelShellPids = [];
+uncheckedParallelShellPidsString = function() {
+    return parallelShellPids.join(", ");
 };
 
-function startParallelShell(jsCode, port, noConnect, ...optionArgs) {
+startParallelShell = function(jsCode, port, noConnect, ...optionArgs) {
     var shellPath = MongoRunner.mongoShellPath;
     var args = [shellPath];
 
@@ -165,6 +160,7 @@ function startParallelShell(jsCode, port, noConnect, ...optionArgs) {
     args.push("--eval", jsCode);
 
     var pid = startMongoProgramNoConnect.apply(null, args);
+    parallelShellPids.push(pid);
 
     // Returns a function that when called waits for the parallel shell to exit and returns the exit
     // code of the process. By default an error is thrown if the parallel shell exits with a nonzero
@@ -179,11 +175,27 @@ function startParallelShell(jsCode, port, noConnect, ...optionArgs) {
             }
         }
         var exitCode = waitProgram(pid);
+        var pidIndex = parallelShellPids.indexOf(pid);
+        parallelShellPids.splice(pidIndex);
         if (arguments.length === 0 || options.checkExitSuccess) {
             assert.eq(0, exitCode, "encountered an error in the parallel shell");
         }
         return exitCode;
     };
-}
+};
+})();
+
+/**
+ * Returns a list of 'numPorts' port numbers that have not been given out to any other caller from
+ * the same mongo shell.
+ */
+allocatePorts = function(numPorts) {
+    var ports = [];
+    for (var i = 0; i < numPorts; i++) {
+        ports.push(allocatePort());
+    }
+
+    return ports;
+};
 
 var testingReplication = false;

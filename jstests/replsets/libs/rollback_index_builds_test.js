@@ -71,6 +71,7 @@ class RollbackIndexBuildsTest {
 
             let transitionedToSteadyState = false;
             let createdColl = false;
+            let indexBuilds = [];
 
             schedule.forEach(function(op) {
                 print("Running operation: " + op);
@@ -112,8 +113,8 @@ class RollbackIndexBuildsTest {
 
                         // This test create indexes with majority of nodes not available for
                         // replication. So, disabling index build commit quorum.
-                        IndexBuildTest.startIndexBuild(
-                            primary, collection.getFullName(), indexSpec, {}, [], 0);
+                        indexBuilds.push(IndexBuildTest.startIndexBuild(
+                            primary, collection.getFullName(), indexSpec, {}, [], 0));
                         IndexBuildTest.waitForIndexBuildToStart(primaryDB, collName, "a_1");
                         break;
                     case "commit":
@@ -133,6 +134,9 @@ class RollbackIndexBuildsTest {
                         assert(false, "unknown operation for test: " + op);
                 }
             });
+
+            // TODO: SERVER-59685
+            indexBuilds.forEach(indexBuild => indexBuild({checkExitSuccess: false}));
 
             if (!transitionedToSteadyState) {
                 self.rollbackTest.transitionToSyncSourceOperationsBeforeRollback();

@@ -53,9 +53,9 @@ replTest.awaitReplication();
 
 // Pause the index build on the primary after replicating the startIndexBuild oplog entry.
 IndexBuildTest.pauseIndexBuilds(primaryDB);
-IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {i: 1});
-IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {x: 1});
-IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {y: 1});
+const indexi = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {i: 1});
+const indexx = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {x: 1});
+const indexy = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {y: 1});
 
 // Wait for build to start on the secondary.
 jsTestLog("Waiting for all index builds to start on the secondary");
@@ -91,6 +91,9 @@ IndexBuildTest.resumeIndexBuilds(primaryDB);
 assert.soonNoExcept(function() {
     return 4 === secondaryDB.getCollection(collectionName).getIndexes().length;
 }, "Index build did not complete after restart");
+indexi();
+indexx();
+indexy();
 
 replTest.stopSet();
 }());

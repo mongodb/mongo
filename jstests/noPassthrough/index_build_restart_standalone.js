@@ -110,4 +110,7 @@ function restartStandalone(node) {
     IndexBuildTest.assertIndexes(coll, 2, ["_id_", indexName]);
     MongoRunner.stopMongod(mongod);
 })();
+
+// TODO: SERVER-59688
+createIndexCmd({checkExitSuccess: false});
 })();

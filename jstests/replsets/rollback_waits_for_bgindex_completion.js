@@ -90,6 +90,8 @@ rollbackTest.transitionToSteadyStateOperations();
 
 // Ensure index build is not running.
 IndexBuildTest.waitForIndexBuildToStop(testDB, collName, "x_1");
+// TODO: SERVER-59687
+bgIndexThread({checkExitSuccess: false});
 
 // Check the replica set.
 rollbackTest.stop();

@@ -64,6 +64,7 @@ function testShutDownAfterFailPoint(failPointName) {
 
     // Ensure we are able to shut down the donor primary by asserting that its exit code is 0.
     assert.eq(0, MongoRunner.stopMongod(st.rs0.getPrimary(), null, {}, true /* waitpid */));
+    awaitResult();
 
     st.stop();
 }

@@ -108,7 +108,7 @@ let failPoint = configureFailPoint(coordinatorPrimaryConn, "hangBeforeWritingDec
 
 // Run commit through mongos in a parallel shell. This should timeout since we have set the
 // failpoint.
-runCommitThroughMongosInParallelShellExpectTimeOut();
+const commit = runCommitThroughMongosInParallelShellExpectTimeOut();
 failPoint.wait();
 
 jsTest.log("Stopping coordinator shard");
@@ -155,5 +155,7 @@ assert.commandWorked(st.s.adminCommand({
     autocommit: false
 }));
 
+// TODO: SERVER-59686
+commit({checkExitSuccess: false});
 st.stop();
 })();

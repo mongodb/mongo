@@ -922,6 +922,23 @@ int mongo_main(int argc, char* argv[]) {
             }
         }
 
+        {
+            const StringData parallelShellCode = "uncheckedParallelShellPidsString();"_sd;
+            shellMainScope->invokeSafe(parallelShellCode.rawData(), nullptr, nullptr);
+            std::string ret = shellMainScope->getString("__returnValue");
+            if (!ret.empty()) {
+                std::cout << "exiting due to parallel shells with unchecked return values. "
+                             "When starting a parallel shell, always call the returned "
+                             "function to ensure correct process cleanup and handling "
+                             "of failed assertions."
+                          << std::endl;
+                std::cout << "pids of parallel shells: " << ret << std::endl;
+                std::cout << "exiting with code " << static_cast<int>(kUnterminatedProcess)
+                          << std::endl;
+                return kUnterminatedProcess;
+            }
+        }
+
         if (shellGlobalParams.files.size() == 0 && shellGlobalParams.script.empty())
             shellGlobalParams.runShell = true;
 

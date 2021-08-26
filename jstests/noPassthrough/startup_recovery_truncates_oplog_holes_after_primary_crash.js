@@ -35,14 +35,14 @@ assert.commandWorked(primaryDB.createCollection(collName, {writeConcern: {w: "ma
 const failPoint = configureFailPoint(primaryDB,
                                      "hangAfterCollectionInserts",
                                      {collectionNS: primaryColl.getFullName(), first_id: "b"});
-
+let ps = undefined;
 try {
     // Hold back the durable timestamp by leaving an uncommitted transaction hanging.
 
     TestData.dbName = dbName;
     TestData.collName = collName;
 
-    startParallelShell(() => {
+    ps = startParallelShell(() => {
         jsTestLog("Insert a document that will hang before the insert completes.");
         // Crashing the server while this command is running may cause the parallel shell code to
         // error and stop executing. We will therefore ignore the result of this command and
@@ -75,6 +75,10 @@ try {
     // shuts down or in post-test hooks.
     failPoint.off();
     throw error;
+} finally {
+    if (ps) {
+        ps({checkExitSuccess: false});
+    }
 }
 
 rst.start(primary);
