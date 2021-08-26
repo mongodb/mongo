@@ -265,18 +265,7 @@ Status UpdateDriver::update(OperationContext* opCtx,
     invariant(!modifiedPaths || modifiedPaths->empty());
 
     if (_logOp && logOpRec) {
-        const auto& fcvState = serverGlobalParams.featureCompatibility;
-
-        // Updates may be run as part of the startup sequence, before the global FCV state has been
-        // initialized. We conservatively do not permit the use of $v:2 oplog entries in these
-        // situations.
-
-        // TODO SERVER-51075: Remove FCV check for $v:2 delta oplog entries.
-        const bool fcvAllowsV2Entries = fcvState.isVersionInitialized() &&
-            fcvState.isGreaterThanOrEqualTo(
-                ServerGlobalParams::FeatureCompatibility::Version::kVersion47);
-
-        applyParams.logMode = fcvAllowsV2Entries && internalQueryEnableLoggingV2OplogEntries.load()
+        applyParams.logMode = internalQueryEnableLoggingV2OplogEntries.load()
             ? ApplyParams::LogMode::kGenerateOplogEntry
             : ApplyParams::LogMode::kGenerateOnlyV1OplogEntry;
 

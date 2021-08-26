@@ -1432,18 +1432,6 @@ Status applyOperation_inlock(OperationContext* opCtx,
             }
             auto updateMod = write_ops::UpdateModification::parseFromOplogEntry(o, options);
 
-            // TODO SERVER-51075: Remove FCV checks for $v:2 delta oplog entries.
-            if (updateMod.type() == write_ops::UpdateModification::Type::kDelta) {
-                // If we are validating features as primary, only allow $v:2 delta entries if we are
-                // at FCV 4.7 or newer to prevent them from being written to the oplog.
-                if (serverGlobalParams.validateFeaturesAsPrimary.load()) {
-                    uassert(4773100,
-                            "Delta oplog entries may not be used in FCV below 4.7",
-                            serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
-                                ServerGlobalParams::FeatureCompatibility::Version::kVersion47));
-                }
-            }
-
             request.setUpdateModification(std::move(updateMod));
             request.setUpsert(upsert);
             request.setFromOplogApplication(true);
