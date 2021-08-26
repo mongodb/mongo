@@ -40,6 +40,7 @@
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/sync_tail.h"
 #include "mongo/util/log.h"
+#include "mongo/util/processinfo.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -53,7 +54,12 @@ std::unique_ptr<ThreadPool> OplogApplier::makeWriterPool() {
         severe() << "replWriterMinThreadCount must be less than or equal to replWriterThreadCount.";
         fassertFailedNoTrace(5605400);
     }
-    return makeWriterPool(replWriterThreadCount);
+
+    // Reduce content pinned in cache by single oplog batch on small machines by reducing the number
+    // of threads of ReplWriter to reduce the number of concurrent open WT transactions.
+    auto numberOfThreads =
+        std::min(replWriterThreadCount, 2 * static_cast<int>(ProcessInfo::getNumAvailableCores()));
+    return makeWriterPool(numberOfThreads);
 }
 
 // static
