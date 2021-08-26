@@ -435,11 +435,10 @@ std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceLookUp::buildPipelineFr
     // first input document.
     _resolvedPipeline = pipeline->serializeToBson();
 
-    // In the case of a foreign field join we expect the match to be found in the last position of
-    // _resolvedPipeline, but optimizing might move this stage elsewhere or merge it with another
-    // stage.
+    // The index of the field join match stage needs to be set to the length of the view
+    // pipeline, as it is no longer the first stage in the resolved pipeline.
     if (hasLocalFieldForeignFieldJoin()) {
-        _fieldMatchPipelineIdx = _resolvedPipeline.size() - 1;
+        _fieldMatchPipelineIdx = resolvedNamespace.pipeline.size();
     }
 
     // Update the expression context with any new namespaces the resolved pipeline has introduced.
