@@ -59,7 +59,17 @@ REGISTER_ACCUMULATOR_WITH_MIN_VERSION(
     lastN,
     AccumulatorFirstLastN::parseFirstLastN<FirstLastSense::kLast>,
     ServerGlobalParams::FeatureCompatibility::Version::kVersion51);
-// TODO SERVER-57881 Add $firstN/$lastN as expressions.
+REGISTER_EXPRESSION_WITH_MIN_VERSION(firstN,
+                                     AccumulatorFirstLastN::parseExpression<FirstLastSense::kFirst>,
+                                     AllowedWithApiStrict::kNeverInVersion1,
+                                     AllowedWithClientType::kAny,
+                                     ServerGlobalParams::FeatureCompatibility::Version::kVersion51);
+REGISTER_EXPRESSION_WITH_MIN_VERSION(lastN,
+                                     AccumulatorFirstLastN::parseExpression<FirstLastSense::kLast>,
+                                     AllowedWithApiStrict::kNeverInVersion1,
+                                     AllowedWithClientType::kAny,
+                                     ServerGlobalParams::FeatureCompatibility::Version::kVersion51);
+// TODO SERVER-57885 Add $minN/$maxN as window functions.
 // TODO SERVER-57884 Add $firstN/$lastN as window functions.
 
 AccumulatorN::AccumulatorN(ExpressionContext* const expCtx)
@@ -326,6 +336,19 @@ Document AccumulatorFirstLastN::serialize(boost::intrusive_ptr<Expression> initi
     MutableDocument args;
     AccumulatorN::serializeHelper(initializer, argument, explain, args);
     return DOC(getOpName() << args.freeze());
+}
+
+template <FirstLastSense s>
+boost::intrusive_ptr<Expression> AccumulatorFirstLastN::parseExpression(
+    ExpressionContext* expCtx, BSONElement exprElement, const VariablesParseState& vps) {
+    auto accExpr = AccumulatorFirstLastN::parseFirstLastN<s>(expCtx, exprElement, vps);
+    if constexpr (s == FirstLastSense::kFirst) {
+        return make_intrusive<ExpressionFromAccumulatorN<AccumulatorFirstN>>(
+            expCtx, std::move(accExpr.initializer), std::move(accExpr.argument));
+    } else {
+        return make_intrusive<ExpressionFromAccumulatorN<AccumulatorLastN>>(
+            expCtx, std::move(accExpr.initializer), std::move(accExpr.argument));
+    }
 }
 
 void AccumulatorFirstLastN::reset() {

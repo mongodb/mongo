@@ -440,6 +440,8 @@ public:
     void visit(const ExpressionFromAccumulator<AccumulatorAvg>* expr) final {}
     void visit(const ExpressionFromAccumulator<AccumulatorMax>* expr) final {}
     void visit(const ExpressionFromAccumulator<AccumulatorMin>* expr) final {}
+    void visit(const ExpressionFromAccumulatorN<AccumulatorFirstN>* expr) final {}
+    void visit(const ExpressionFromAccumulatorN<AccumulatorLastN>* expr) final {}
     void visit(const ExpressionFromAccumulatorN<AccumulatorMaxN>* expr) final {}
     void visit(const ExpressionFromAccumulatorN<AccumulatorMinN>* expr) final {}
     void visit(const ExpressionFromAccumulator<AccumulatorStdDevPop>* expr) final {}
@@ -645,6 +647,8 @@ public:
     void visit(const ExpressionFromAccumulator<AccumulatorAvg>* expr) final {}
     void visit(const ExpressionFromAccumulator<AccumulatorMax>* expr) final {}
     void visit(const ExpressionFromAccumulator<AccumulatorMin>* expr) final {}
+    void visit(const ExpressionFromAccumulatorN<AccumulatorFirstN>* expr) final {}
+    void visit(const ExpressionFromAccumulatorN<AccumulatorLastN>* expr) final {}
     void visit(const ExpressionFromAccumulatorN<AccumulatorMaxN>* expr) final {}
     void visit(const ExpressionFromAccumulatorN<AccumulatorMinN>* expr) final {}
     void visit(const ExpressionFromAccumulator<AccumulatorStdDevPop>* expr) final {}
@@ -2676,6 +2680,12 @@ public:
         unsupportedExpression("$year");
     }
     void visit(const ExpressionFromAccumulator<AccumulatorAvg>* expr) final {
+        unsupportedExpression(expr->getOpName());
+    }
+    void visit(const ExpressionFromAccumulatorN<AccumulatorFirstN>* expr) final {
+        unsupportedExpression(expr->getOpName());
+    }
+    void visit(const ExpressionFromAccumulatorN<AccumulatorLastN>* expr) final {
         unsupportedExpression(expr->getOpName());
     }
     void visit(const ExpressionFromAccumulator<AccumulatorMax>* expr) final {

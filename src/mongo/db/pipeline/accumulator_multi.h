@@ -188,6 +188,14 @@ public:
         return true;
     }
 
+    /**
+     * Constructs an Expression representing $firstN or $lastN depending on 's'.
+     */
+    template <Sense s>
+    static boost::intrusive_ptr<Expression> parseExpression(ExpressionContext* expCtx,
+                                                            BSONElement exprElement,
+                                                            const VariablesParseState& vps);
+
     Value getValue(bool toBeMerged) final;
 
 private:

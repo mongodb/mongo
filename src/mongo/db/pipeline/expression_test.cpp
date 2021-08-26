@@ -143,6 +143,17 @@ Value valueFromBson(BSONObj obj) {
     return Value(element);
 }
 
+/** Asserts that the Expression parsed from 'spec' returns a BSONArray and is equal to 'expected'.
+ */
+void assertExpectedArray(const BSONObj& spec, const BSONArray& expected) {
+    auto expCtx = ExpressionContextForTest{};
+    VariablesParseState vps = expCtx.variablesParseState;
+    auto expression = Expression::parseExpression(&expCtx, spec, vps);
+    auto result = expression->evaluate({}, &expCtx.variables);
+    ASSERT_EQ(result.getType(), BSONType::Array);
+    ASSERT_VALUE_EQ(result, Value(expected));
+};
+
 /* ------------------------- ExpressionArrayToObject -------------------------- */
 
 TEST(ExpressionArrayToObjectTest, KVFormatSimple) {
@@ -719,6 +730,34 @@ TEST(ExpressionFromAccumulators, Avg) {
                            {{}, Value(BSONNULL)}});
 }
 
+TEST(ExpressionFromAccumulators, FirstNLastN) {
+    RAIIServerParameterControllerForTest controller("featureFlagExactTopNAccumulator", true);
+
+    // $firstN
+    assertExpectedArray(fromjson("{$firstN: {n: 3, output: [19, 7, 28, 3, 5]}}"),
+                        BSONArray(fromjson("[19, 7, 28]")));
+    assertExpectedArray(fromjson("{$firstN: {n: 6, output: [19, 7, 28, 3, 5]}}"),
+                        BSONArray(fromjson("[19, 7, 28, 3, 5]")));
+    assertExpectedArray(fromjson("{$firstN: {n: 3, output: [1,2,3,4,5,6]}}"),
+                        BSONArray(fromjson("[1,2,3]")));
+    assertExpectedArray(fromjson("{$firstN: {n: 3, output: [1,2,null,null]}}"),
+                        BSONArray(fromjson("[1,2,null]")));
+    assertExpectedArray(fromjson("{$firstN: {n: 3, output: [1.1, 2.713, 3, 3.4]}}"),
+                        BSONArray(fromjson("[1.1, 2.713, 3]")));
+
+    // $lastN
+    assertExpectedArray(fromjson("{$lastN: {n: 3, output: [19, 7, 28, 3, 5]}}"),
+                        BSONArray(fromjson("[28,3,5]")));
+    assertExpectedArray(fromjson("{$lastN: {n: 6, output: [19, 7, 28, 3, 5]}}"),
+                        BSONArray(fromjson("[19, 7, 28, 3, 5]")));
+    assertExpectedArray(fromjson("{$lastN: {n: 3, output: [3,2,1,4,5,6]}}"),
+                        BSONArray(fromjson("[4,5,6]")));
+    assertExpectedArray(fromjson("{$lastN: {n: 3, output: [1,2,null,3]}}"),
+                        BSONArray(fromjson("[2,null,3]")));
+    assertExpectedArray(fromjson("{$lastN: {n: 3, output: [3, 2.713, 1.1, 2.7]}}"),
+                        BSONArray(fromjson("[2.713, 1.1, 2.7]")));
+}
+
 TEST(ExpressionFromAccumulators, Max) {
     assertExpectedResults("$max",
                           {// $max treats non-numeric inputs as valid arguments.
@@ -743,36 +782,31 @@ TEST(ExpressionFromAccumulators, Min) {
 }
 
 TEST(ExpressionFromAccumulators, MinNMaxN) {
-    auto assertEq = [](const BSONObj& spec, const BSONArray& expected) {
-        auto expCtx = ExpressionContextForTest{};
-        VariablesParseState vps = expCtx.variablesParseState;
-        auto expression = Expression::parseExpression(&expCtx, spec, vps);
-        auto result = expression->evaluate({}, &expCtx.variables);
-        ASSERT_EQ(result.getType(), BSONType::Array);
-        ASSERT_VALUE_EQ(result, Value(expected));
-    };
-
     RAIIServerParameterControllerForTest controller("featureFlagExactTopNAccumulator", true);
 
     // $maxN
-    assertEq(fromjson("{$maxN: {n: 3, output: [19, 7, 28, 3, 5]}}"),
-             BSONArray(fromjson("[28, 19, 7]")));
-    assertEq(fromjson("{$maxN: {n: 6, output: [19, 7, 28, 3, 5]}}"),
-             BSONArray(fromjson("[28, 19, 7, 5, 3]")));
-    assertEq(fromjson("{$maxN: {n: 3, output: [1,2,3]}}"), BSONArray(fromjson("[3,2,1]")));
-    assertEq(fromjson("{$maxN: {n: 3, output: [1,2,null]}}"), BSONArray(fromjson("[2,1]")));
-    assertEq(fromjson("{$maxN: {n: 3, output: [1.1, 2.713, 3]}}"),
-             BSONArray(fromjson("[3, 2.713, 1.1]")));
+    assertExpectedArray(fromjson("{$maxN: {n: 3, output: [19, 7, 28, 3, 5]}}"),
+                        BSONArray(fromjson("[28, 19, 7]")));
+    assertExpectedArray(fromjson("{$maxN: {n: 6, output: [19, 7, 28, 3, 5]}}"),
+                        BSONArray(fromjson("[28, 19, 7, 5, 3]")));
+    assertExpectedArray(fromjson("{$maxN: {n: 3, output: [1,2,3]}}"),
+                        BSONArray(fromjson("[3,2,1]")));
+    assertExpectedArray(fromjson("{$maxN: {n: 3, output: [1,2,null]}}"),
+                        BSONArray(fromjson("[2,1]")));
+    assertExpectedArray(fromjson("{$maxN: {n: 3, output: [1.1, 2.713, 3]}}"),
+                        BSONArray(fromjson("[3, 2.713, 1.1]")));
 
     // $minN
-    assertEq(fromjson("{$minN: {n: 3, output: [19, 7, 28, 3, 5]}}"),
-             BSONArray(fromjson("[3,5,7]")));
-    assertEq(fromjson("{$minN: {n: 6, output: [19, 7, 28, 3, 5]}}"),
-             BSONArray(fromjson("[3,5,7,19,28]")));
-    assertEq(fromjson("{$minN: {n: 3, output: [3,2,1]}}"), BSONArray(fromjson("[1,2,3]")));
-    assertEq(fromjson("{$minN: {n: 3, output: [1,2,null]}}"), BSONArray(fromjson("[1,2]")));
-    assertEq(fromjson("{$minN: {n: 3, output: [3, 2.713, 1.1]}}"),
-             BSONArray(fromjson("[1.1, 2.713, 3]")));
+    assertExpectedArray(fromjson("{$minN: {n: 3, output: [19, 7, 28, 3, 5]}}"),
+                        BSONArray(fromjson("[3,5,7]")));
+    assertExpectedArray(fromjson("{$minN: {n: 6, output: [19, 7, 28, 3, 5]}}"),
+                        BSONArray(fromjson("[3,5,7,19,28]")));
+    assertExpectedArray(fromjson("{$minN: {n: 3, output: [3,2,1]}}"),
+                        BSONArray(fromjson("[1,2,3]")));
+    assertExpectedArray(fromjson("{$minN: {n: 3, output: [1,2,null]}}"),
+                        BSONArray(fromjson("[1,2]")));
+    assertExpectedArray(fromjson("{$minN: {n: 3, output: [3, 2.713, 1.1]}}"),
+                        BSONArray(fromjson("[1.1, 2.713, 3]")));
 }
 
 TEST(ExpressionFromAccumulators, Sum) {

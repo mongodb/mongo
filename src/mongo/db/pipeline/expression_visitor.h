@@ -163,6 +163,8 @@ class ExpressionGetField;
 class ExpressionSetField;
 
 class AccumulatorAvg;
+class AccumulatorFirstN;
+class AccumulatorLastN;
 class AccumulatorMax;
 class AccumulatorMin;
 class AccumulatorMaxN;
@@ -316,6 +318,12 @@ public:
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionYear>) = 0;
     virtual void visit(
         expression_walker::MaybeConstPtr<IsConst, ExpressionFromAccumulator<AccumulatorAvg>>) = 0;
+    virtual void visit(
+        expression_walker::MaybeConstPtr<IsConst,
+                                         ExpressionFromAccumulatorN<AccumulatorFirstN>>) = 0;
+    virtual void visit(
+        expression_walker::MaybeConstPtr<IsConst,
+                                         ExpressionFromAccumulatorN<AccumulatorLastN>>) = 0;
     virtual void visit(
         expression_walker::MaybeConstPtr<IsConst, ExpressionFromAccumulator<AccumulatorMax>>) = 0;
     virtual void visit(

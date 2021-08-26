@@ -1,6 +1,5 @@
 /**
  * Tests the 'n' family of accumulators implemented as expressions.
- * TODO SERVER-57881: Add testcases for $firstN/$lastN.
  */
 (function() {
 'use strict';
@@ -37,28 +36,38 @@ function testExpr(expression, expected) {
 let args = {n: 3, output: [5, 4, 3, 2, 1]};
 testExpr({$minN: args}, [1, 2, 3]);
 testExpr({$maxN: args}, [5, 4, 3]);
+testExpr({$firstN: args}, [5, 4, 3]);
+testExpr({$lastN: args}, [3, 2, 1]);
 args = {
     n: 3,
     output: [null, 2, null, 1]
 };
 testExpr({$minN: args}, [1, 2]);
 testExpr({$maxN: args}, [2, 1]);
+testExpr({$firstN: args}, [null, 2, null]);
+testExpr({$lastN: args}, [2, null, 1]);
 args = {
     n: 3,
     output: "$a"
 };
 testExpr({$minN: args}, [1, 2, 3]);
 testExpr({$maxN: args}, [9, 7, 5]);
+testExpr({$firstN: args}, [1, 2, 3]);
+testExpr({$lastN: args}, [5, 7, 9]);
 args = {
     n: "$n",
     output: "$a"
 };
 testExpr({$minN: args}, [1, 2, 3, 5]);
 testExpr({$maxN: args}, [9, 7, 5, 3]);
+testExpr({$firstN: args}, [1, 2, 3, 5]);
+testExpr({$lastN: args}, [3, 5, 7, 9]);
 args = {
     n: {$subtract: ["$n", "$diff"]},
     output: [3, 4, 5]
 };
 testExpr({$minN: args}, [3, 4]);
 testExpr({$maxN: args}, [5, 4]);
+testExpr({$firstN: args}, [3, 4]);
+testExpr({$lastN: args}, [4, 5]);
 })();
