@@ -1183,7 +1183,7 @@ void StorageEngineImpl::TimestampMonitor::startup() {
                 return;
             } catch (const DBException& ex) {
                 // Logs and rethrows the exceptions of other types.
-                LOGV2_ERROR(58025, "Timestamp monitor throws an exception", "error"_attr = ex);
+                LOGV2_ERROR(5802500, "Timestamp monitor throws an exception", "error"_attr = ex);
                 throw;
             }
         },
