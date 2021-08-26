@@ -69,40 +69,6 @@ MONGO_FAIL_POINT_DEFINE(hangCollectionFlush);
 
 AtomicWord<unsigned long long> taskIdGenerator{0};
 
-void dropChunksIfEpochChanged(OperationContext* opCtx,
-                              const NamespaceString& nss,
-                              const CollectionAndChangedChunks& collAndChunks,
-                              const ChunkVersion& maxLoaderVersion) {
-    if (collAndChunks.epoch != maxLoaderVersion.epoch() &&
-        maxLoaderVersion != ChunkVersion::UNSHARDED()) {
-        // If the collection has a new epoch, delete all existing chunks in the persisted routing
-        // table cache.
-
-        // TODO (SERVER-58361): Reduce the access to local collections.
-        const auto statusWithCollectionEntry = readShardCollectionsEntry(opCtx, nss);
-        if (statusWithCollectionEntry.getStatus() == ErrorCodes::NamespaceNotFound) {
-            return;
-        }
-        uassertStatusOKWithContext(
-            statusWithCollectionEntry,
-            str::stream() << "Failed to read persisted collection entry for '" << nss.ns() << "'.");
-        const auto& collectionEntry = statusWithCollectionEntry.getValue();
-
-        dropChunks(opCtx, nss, collectionEntry.getUuid(), collectionEntry.getSupportingLongName());
-
-        if (MONGO_unlikely(hangPersistCollectionAndChangedChunksAfterDropChunks.shouldFail())) {
-            LOGV2(22093, "Hit hangPersistCollectionAndChangedChunksAfterDropChunks failpoint");
-            hangPersistCollectionAndChangedChunksAfterDropChunks.pauseWhileSet(opCtx);
-        }
-
-        LOGV2(3463203,
-              "Dropped chunks cache due to epoch change",
-              "collectionNamespace"_attr = nss,
-              "collectionEpoch"_attr = collAndChunks.epoch,
-              "maxLoaderVersionEpoch"_attr = maxLoaderVersion.epoch());
-    }
-}
-
 /**
  * Takes a CollectionAndChangedChunks object and persists the changes to the shard's metadata
  * collections.
@@ -113,14 +79,29 @@ Status persistCollectionAndChangedChunks(OperationContext* opCtx,
                                          const NamespaceString& nss,
                                          const CollectionAndChangedChunks& collAndChunks,
                                          const ChunkVersion& maxLoaderVersion) {
-    // If the collection has a new epoch, delete all existing chunks in the persisted cache.
-    try {
-        dropChunksIfEpochChanged(opCtx, nss, collAndChunks, maxLoaderVersion);
-    } catch (const DBException& ex) {
-        return ex.toStatus();
+    // If the collection's epoch has changed, delete the collections entry and drop all chunks from
+    // the persisted cache.
+    if (maxLoaderVersion != ChunkVersion::UNSHARDED() &&
+        maxLoaderVersion.epoch() != collAndChunks.epoch) {
+        auto status = dropChunksAndDeleteCollectionsEntry(opCtx, nss);
+
+        if (MONGO_unlikely(hangPersistCollectionAndChangedChunksAfterDropChunks.shouldFail())) {
+            LOGV2(22093, "Hit hangPersistCollectionAndChangedChunksAfterDropChunks failpoint");
+            hangPersistCollectionAndChangedChunksAfterDropChunks.pauseWhileSet(opCtx);
+        }
+
+        if (!status.isOK()) {
+            return status;
+        }
+
+        LOGV2(5836200,
+              "Dropped collection and chunks cache due to epoch change",
+              "namespace"_attr = nss,
+              "currentEpoch"_attr = collAndChunks.epoch,
+              "previousEpoch"_attr = maxLoaderVersion.epoch());
     }
 
-    // Update the collections collection entry for 'nss' in case there are any new updates.
+    // Set the collection entry.
     ShardCollectionType update(nss,
                                collAndChunks.epoch,
                                collAndChunks.creationTime,
