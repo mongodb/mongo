@@ -1,0 +1,53 @@
+/*! @arch_page arch-session Session
+
+@section arch_session_def Definition
+After a @ref arch-connection has been established between the application and WiredTiger, the
+application can start sending requests to WiredTiger using a session. A session is internally
+represented by WT_SESSION and plays an important role since almost all operations are performed
+under the context of a session.
+
+A session can only be created through an existing connection with the API
+WT_CONNECTION::open_session and it is possible to create multiple sessions through the same
+connection. In fact, one connection can have multiple sessions but one session can only be
+associated with one connection. The maximum number of sessions is set through the configuration item
+\c session_max as part of the configuration string in ::wiredtiger_open.
+
+Sessions created by the calling application are called "user sessions". WiredTiger also performs
+some internal operations such as @ref arch-eviction through self-created sessions. These sessions
+are called "internal sessions". The usage rules and guidelines for both internal sessions and user
+sessions are the same and the only difference between them is their origin of creation.
+
+@section arch_session_ops Operations
+The different operations that can be performed on a WiredTiger session are related to cursors,
+tables and transactions. You can read the complete description of each possible operation in the
+documentation related to WT_SESSION.
+
+@section arch_session_txn Transactions
+It is possible to group several operations within a session, in other words, multiple operations can
+be treated as a single atomic operation. This can be done using @ref arch-transaction. Furthermore,
+a session can hold only one running transaction at any given time and this transaction only belongs
+to that session.
+
+@section arch_session_cur Cursors
+A session can perform multiple data operations on one or several collections using multiple cursors
+(see @ref arch-cursor for more details). All the cursors associated with a session share that
+session transaction context. It is also possible to cache those cursors if required through the
+configuration string given to WT_CONNECTION::open_session or ::wiredtiger_open. The configuration
+item for this purpose is \c cache_cursors.
+
+@section arch_session_dhandles Data Handles
+During its lifetime, a session can accumulate a list of data handles (see @ref arch-dhandle).
+Indeed, when a session accesses a table for the first time, the data handle of that table is
+acquired and cached. Once a session no longer needs to operate on a table, it marks the associated
+data handle as idle. This helps the sweep server release data handles that are inactive, see @ref
+arch-dhandle-lifecycle for more details.
+
+@section arch_session_closure Closure
+A session can be closed using WT_SESSION::close. Closing the connection will also close all opened
+sessions. When a session is closed, it releases all the resources associated with it including
+rolling back any active transaction and closing the cursors that are still open.
+
+@section arch_session_thread Multithreading
+A session is always executed as a single thread, see @ref threads for more details.
+
+*/

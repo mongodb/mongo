@@ -32,6 +32,7 @@
 
 static char home[1024]; /* Program working dir */
 static const char *const uri = "table:main";
+static bool use_columns = false;
 
 #define RECORDS_FILE "records"
 
@@ -128,7 +129,13 @@ fill_db(void)
     WT_SESSION *session;
     uint32_t i, max_key, min_key, units, unused;
     char k[K_SIZE], v[V_SIZE];
+    const char *table_config;
     bool first;
+
+    if (use_columns)
+        table_config = "key_format=r,value_format=S";
+    else
+        table_config = "key_format=S,value_format=S";
 
     /*
      * Run in the home directory so that the records file is in there too.
@@ -137,7 +144,7 @@ fill_db(void)
         testutil_die(errno, "chdir: %s", home);
     testutil_check(wiredtiger_open(NULL, NULL, ENV_CONFIG, &conn));
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
-    testutil_check(session->create(session, uri, "key_format=S,value_format=S"));
+    testutil_check(session->create(session, uri, table_config));
     testutil_check(session->open_cursor(session, uri, NULL, NULL, &cursor));
 
     /*
@@ -164,10 +171,14 @@ fill_db(void)
     max_key = min_key * 2;
     first = true;
     for (i = 0; i < max_key; ++i) {
-        testutil_check(__wt_snprintf(k, sizeof(k), "key%03d", (int)i));
+        if (use_columns)
+            cursor->set_key(cursor, i + 1);
+        else {
+            testutil_check(__wt_snprintf(k, sizeof(k), "key%03" PRIu32, i));
+            cursor->set_key(cursor, k);
+        }
         testutil_check(
-          __wt_snprintf(v, sizeof(v), "value%0*d", (int)(V_SIZE - (strlen("value") + 1)), (int)i));
-        cursor->set_key(cursor, k);
+          __wt_snprintf(v, sizeof(v), "value%0*" PRIu32, (int)(V_SIZE - (strlen("value") + 1)), i));
         cursor->set_value(cursor, v);
         testutil_check(cursor->insert(cursor));
 
@@ -230,8 +241,12 @@ main(int argc, char *argv[])
     (void)testutil_set_progname(argv);
 
     working_dir = "WT_TEST.truncated-log";
-    while ((ch = __wt_getopt(progname, argc, argv, "h:")) != EOF)
+    while ((ch = __wt_getopt(progname, argc, argv, "ch:")) != EOF)
         switch (ch) {
+        case 'c':
+            /* Variable-length columns only (for now) */
+            use_columns = true;
+            break;
         case 'h':
             working_dir = __wt_optarg;
             break;

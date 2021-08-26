@@ -139,6 +139,47 @@ __wt_txn_release_snapshot(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __wt_txn_user_active --
+ *     Check whether there are any running user transactions. Note that a new transactions may start
+ *     on a session we have already examined and the caller needs to be aware of this limitation.
+ *     Exclude prepared user transactions from this check.
+ */
+bool
+__wt_txn_user_active(WT_SESSION_IMPL *session)
+{
+    WT_CONNECTION_IMPL *conn;
+    WT_SESSION_IMPL *session_in_list;
+    uint32_t i, session_cnt;
+    bool txn_active;
+
+    conn = S2C(session);
+    txn_active = false;
+
+    /*
+     * No lock is required because the session array is fixed size, but it may contain inactive
+     * entries. We must review any active session, so insert a read barrier after reading the active
+     * session count. That way, no matter what sessions come or go, we'll check the slots for all of
+     * the user sessions for active transactions when we started our check.
+     */
+    WT_ORDERED_READ(session_cnt, conn->session_cnt);
+    for (i = 0, session_in_list = conn->sessions; i < session_cnt; i++, session_in_list++) {
+        /* Skip inactive sessions. */
+        if (!session_in_list->active)
+            continue;
+        /* Check if a user session has a running transaction. Ignore prepared transactions. */
+        if (F_ISSET(session_in_list->txn, WT_TXN_RUNNING) &&
+          !F_ISSET(session_in_list, WT_SESSION_INTERNAL) &&
+          !F_ISSET(session_in_list->txn, WT_TXN_PREPARE)) {
+
+            txn_active = true;
+            break;
+        }
+    }
+
+    return (txn_active);
+}
+
+/*
  * __wt_txn_active --
  *     Check if a transaction is still active. If not, it is either committed, prepared, or rolled
  *     back. It is possible that we race with commit, prepare or rollback and a transaction is still

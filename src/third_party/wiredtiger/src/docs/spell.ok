@@ -48,6 +48,7 @@ ECMA
 EINVAL
 ENCRYPTOR
 ENOTSUP
+EXTLIST
 EmpId
 Encryptors
 Facebook
@@ -180,7 +181,9 @@ bokeh
 bool
 boolean
 booleans
+bm
 br
+bt
 btmem
 btree
 btrees
@@ -236,6 +239,7 @@ curhs
 cursortype
 curtable
 customerABC
+customizability
 cv
 cyclomatic
 dN
@@ -257,6 +261,7 @@ decrement
 decrementing
 decrypt
 decrypted
+decrypts
 del
 desc
 destructor
@@ -574,6 +579,7 @@ sess
 sid
 skinparam
 skiplist
+skiplists
 sortable
 spinlock
 spinlocks
@@ -596,6 +602,7 @@ subdatabases
 subdirectory
 subpage
 substring
+subsubsection
 sudo
 superset
 svg
