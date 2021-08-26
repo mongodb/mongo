@@ -47,6 +47,12 @@ errchk()
 		return
 	fi
 
+	# Return if evergreen validate runs sucessfully.
+	if echo "$1" | grep -q evergreen && [ "$(cat "$2")" = "../test/evergreen.yml is valid" ] ; then
+		rm -f "$2"
+		return
+	fi
+
 	echo "####################### MESSAGE ############################"
 	echo "s_all run of: \"$1\" resulted in:"
 	sed -e 's/^/    /' $2
@@ -81,6 +87,9 @@ run "./s_clang-format"
 run "python prototypes.py"
 run "sh ./s_typedef -b"
 run "python test_tag.py"
+if command -v evergreen > /dev/null; then
+	run "evergreen validate ../test/evergreen.yml"
+fi
 
 COMMANDS="
 2>&1 ./s_define > ${t_pfx}s_define

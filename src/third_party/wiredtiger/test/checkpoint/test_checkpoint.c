@@ -140,7 +140,8 @@ main(int argc, char *argv[])
 
     testutil_work_dir_from_path(g.home, 512, working_dir);
 
-    g.ts_stable = 0;
+    /* Start time at 1 since 0 is not a valid timestamp. */
+    g.ts_stable = 1;
 
     printf("%s: process %" PRIu64 "\n", progname, (uint64_t)getpid());
     for (cnt = 1; (runs == 0 || cnt <= runs) && g.status == 0; ++cnt) {

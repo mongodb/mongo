@@ -1045,24 +1045,6 @@ __cell_unpack_window_cleanup(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk
 }
 
 /*
- * __cell_pack_kv_window_cleanup --
- *     Clean up cells loaded from a previous run while writing to disk.
- */
-static inline void
-__cell_pack_kv_window_cleanup(
-  WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, WT_CELL_UNPACK_KV *unpack_kv)
-{
-    /*
-     * If the page came from a previous run, reset the transaction ids to "none" and timestamps to 0
-     * as appropriate when the cell information is used for packing the new cell.
-     */
-    if (F_ISSET(S2C(session), WT_CONN_RECOVERING) &&
-      dsk->write_gen > S2BT(session)->base_write_gen &&
-      dsk->write_gen < S2BT(session)->run_write_gen)
-        __cell_kv_window_cleanup(session, unpack_kv);
-}
-
-/*
  * __wt_cell_unpack_addr --
  *     Unpack an address WT_CELL into a structure.
  */
