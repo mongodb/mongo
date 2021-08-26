@@ -200,10 +200,6 @@ if (typeof _threadInject != "undefined") {
             "views/views_all_commands.js",        // Drops test DB.
             "views/view_with_invalid_dbname.js",  // Puts invalid view definitions in system.views.
 
-            // This test works close to the BSON document limit for entries in the durable catalog,
-            // so running it in parallel with other tests will cause failures.
-            "long_collection_names.js",
-
             // This test causes collMod commands to hang, which interferes with other tests running
             // collMod.
             "crud_ops_do_not_throw_locktimeout.js",

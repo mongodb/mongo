@@ -758,9 +758,17 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx) {
 
     coll.setKeyPattern(_shardKeyPattern->getKeyPattern());
 
+    // Prevent the FCV from changing before committing the new collection to the config server. This
+    // ensures that the 'supportingLongName' field is properly set (and committed) based on the
+    // current shard's FCV.
+    //
+    // TODO: Remove once FCV 6.0 becomes last-lts
+    FixedFCVRegion fixedFCVRegion(opCtx);
+
+    // TODO: Remove condition once FCV 6.0 becomes last-lts
     const auto& currentFCV = serverGlobalParams.featureCompatibility;
     if (currentFCV.isGreaterThanOrEqualTo(
-            ServerGlobalParams::FeatureCompatibility::Version::kVersion51)) {
+            ServerGlobalParams::FeatureCompatibility::Version::kUpgradingFrom50To51)) {
         coll.setSupportingLongName(SupportingLongNameStatusEnum::kImplicitlyEnabled);
     }
 

@@ -397,7 +397,6 @@ private:
                 !failUpgrading.shouldFail());
 
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-
             // Tell the shards to enter phase-2 of setFCV (fully upgraded)
             auto requestPhase2 = request;
             requestPhase2.setFromConfigServer(true);
@@ -406,6 +405,12 @@ private:
             uassertStatusOK(
                 ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
                     opCtx, CommandHelpers::appendMajorityWriteConcern(requestPhase2.toBSON({}))));
+
+            // TODO: Remove once FCV 6.0 becomes last-lts
+            const auto requestedVersion = request.getCommandParameter();
+            if (requestedVersion >= FeatureCompatibility::Version::kVersion51) {
+                ShardingCatalogManager::get(opCtx)->upgradeMetadataTo51Phase2(opCtx);
+            }
 
             // Always abort the reshardCollection regardless of version to ensure that it will run
             // on a consistent version from start to finish. This will ensure that it will be able
@@ -503,6 +508,11 @@ private:
             uassertStatusOK(
                 ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
                     opCtx, CommandHelpers::appendMajorityWriteConcern(requestPhase2.toBSON({}))));
+
+            // TODO: Remove once FCV 6.0 becomes last-lts
+            if (requestedVersion < FeatureCompatibility::Version::kVersion51) {
+                ShardingCatalogManager::get(opCtx)->downgradeMetadataToPre51Phase2(opCtx);
+            }
         }
 
         hangWhileDowngrading.pauseWhileSet(opCtx);
