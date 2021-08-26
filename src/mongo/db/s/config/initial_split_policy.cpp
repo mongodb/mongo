@@ -74,46 +74,12 @@ void appendChunk(const SplitPolicyParams& params,
                  const Timestamp& creationTimestamp,
                  const ShardId& shardId,
                  std::vector<ChunkType>* chunks) {
-    switch (params.configFormat) {
-        case ChunkEntryFormat::kNamespaceOnlyNoTimestamps:
-            chunks->emplace_back(params.nss,
-                                 ChunkRange(min, max),
-                                 ChunkVersion(version->majorVersion(),
-                                              version->minorVersion(),
-                                              version->epoch(),
-                                              boost::none),
-                                 shardId);
-            break;
-        case ChunkEntryFormat::kNamespaceAndUUIDNoTimestamps:
-            chunks->emplace_back(params.nss,
-                                 params.collectionUUID,
-                                 ChunkRange(min, max),
-                                 ChunkVersion(version->majorVersion(),
-                                              version->minorVersion(),
-                                              version->epoch(),
-                                              boost::none),
-                                 shardId);
-            break;
-        case ChunkEntryFormat::kNamespaceAndUUIDWithTimestamps:
-            chunks->emplace_back(params.nss,
-                                 params.collectionUUID,
-                                 ChunkRange(min, max),
-                                 ChunkVersion(version->majorVersion(),
-                                              version->minorVersion(),
-                                              version->epoch(),
-                                              creationTimestamp),
-                                 shardId);
-            break;
-        case ChunkEntryFormat::kUUIDOnlyWithTimestamps:
-            chunks->emplace_back(params.collectionUUID,
-                                 ChunkRange(min, max),
-                                 ChunkVersion(version->majorVersion(),
-                                              version->minorVersion(),
-                                              version->epoch(),
-                                              creationTimestamp),
-                                 shardId);
-            break;
-    }
+    chunks->emplace_back(
+        params.collectionUUID,
+        ChunkRange(min, max),
+        ChunkVersion(
+            version->majorVersion(), version->minorVersion(), version->epoch(), creationTimestamp),
+        shardId);
 
     auto& chunk = chunks->back();
     chunk.setHistory({ChunkHistory(creationTimestamp, shardId)});

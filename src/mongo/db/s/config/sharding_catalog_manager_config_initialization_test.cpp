@@ -41,7 +41,6 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
-#include "mongo/db/s/sharding_ddl_50_upgrade_downgrade.h"
 #include "mongo/db/s/type_lockpings.h"
 #include "mongo/db/s/type_locks.h"
 #include "mongo/s/catalog/config_server_version.h"

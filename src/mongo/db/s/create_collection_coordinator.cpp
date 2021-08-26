@@ -672,13 +672,7 @@ void CreateCollectionCoordinator::_createPolicyAndChunks(OperationContext* opCtx
         *_collectionEmpty);
 
     _initialChunks = _splitPolicy->createFirstChunks(
-        opCtx,
-        *_shardKeyPattern,
-        {nss(),
-         *_collectionUUID,
-         ShardingState::get(opCtx)->shardId(),
-         ChunkEntryFormat::getForVersionCallerGuaranteesFCVStability(
-             ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo50)});
+        opCtx, *_shardKeyPattern, {nss(), *_collectionUUID, ShardingState::get(opCtx)->shardId()});
 
     // There must be at least one chunk.
     invariant(!_initialChunks.chunks.empty());

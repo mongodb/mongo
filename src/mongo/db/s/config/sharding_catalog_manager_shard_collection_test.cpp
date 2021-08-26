@@ -161,12 +161,8 @@ TEST_F(CreateFirstChunksTest, NonEmptyCollection_SplitPoints_FromSplitVector_Man
             3 /* numShards */,
             false /* collectionIsEmpty */);
         ASSERT(!optimization->isOptimized());
-        return optimization->createFirstChunks(opCtx.get(),
-                                               kShardKeyPattern,
-                                               {kNamespace,
-                                                UUID::gen(),
-                                                ShardId("shard1"),
-                                                ChunkEntryFormat::kNamespaceOnlyNoTimestamps});
+        return optimization->createFirstChunks(
+            opCtx.get(), kShardKeyPattern, {kNamespace, UUID::gen(), ShardId("shard1")});
     });
 
     expectSplitVector(connStr.getServers()[0], kShardKeyPattern, BSON_ARRAY(BSON("x" << 0)));
@@ -215,12 +211,8 @@ TEST_F(CreateFirstChunksTest, NonEmptyCollection_SplitPoints_FromClient_ManyChun
             3 /* numShards */,
             collectionIsEmpty);
         ASSERT(optimization->isOptimized());
-        return optimization->createFirstChunks(opCtx.get(),
-                                               kShardKeyPattern,
-                                               {kNamespace,
-                                                UUID::gen(),
-                                                ShardId("shard1"),
-                                                ChunkEntryFormat::kNamespaceOnlyNoTimestamps});
+        return optimization->createFirstChunks(
+            opCtx.get(), kShardKeyPattern, {kNamespace, UUID::gen(), ShardId("shard1")});
     });
 
     const auto& firstChunks = future.default_timed_get();
@@ -257,9 +249,7 @@ TEST_F(CreateFirstChunksTest, NonEmptyCollection_WithZones_OneChunkToPrimary) {
     ASSERT(optimization->isOptimized());
 
     const auto firstChunks = optimization->createFirstChunks(
-        operationContext(),
-        kShardKeyPattern,
-        {kNamespace, UUID::gen(), ShardId("shard1"), ChunkEntryFormat::kNamespaceOnlyNoTimestamps});
+        operationContext(), kShardKeyPattern, {kNamespace, UUID::gen(), ShardId("shard1")});
 
     ASSERT_EQ(1U, firstChunks.chunks.size());
     ASSERT_EQ(kShards[1].getName(), firstChunks.chunks[0].getShard());
@@ -304,12 +294,8 @@ TEST_F(CreateFirstChunksTest, EmptyCollection_SplitPoints_FromClient_ManyChunksD
             collectionIsEmpty);
         ASSERT(optimization->isOptimized());
 
-        return optimization->createFirstChunks(operationContext(),
-                                               kShardKeyPattern,
-                                               {kNamespace,
-                                                UUID::gen(),
-                                                ShardId("shard1"),
-                                                ChunkEntryFormat::kNamespaceOnlyNoTimestamps});
+        return optimization->createFirstChunks(
+            operationContext(), kShardKeyPattern, {kNamespace, UUID::gen(), ShardId("shard1")});
     });
 
     const auto& firstChunks = future.default_timed_get();
@@ -358,12 +344,8 @@ TEST_F(CreateFirstChunksTest, EmptyCollection_NoSplitPoints_OneChunkToPrimary) {
             collectionIsEmpty);
         ASSERT(optimization->isOptimized());
 
-        return optimization->createFirstChunks(operationContext(),
-                                               kShardKeyPattern,
-                                               {kNamespace,
-                                                UUID::gen(),
-                                                ShardId("shard1"),
-                                                ChunkEntryFormat::kNamespaceOnlyNoTimestamps});
+        return optimization->createFirstChunks(
+            operationContext(), kShardKeyPattern, {kNamespace, UUID::gen(), ShardId("shard1")});
     });
 
     const auto& firstChunks = future.default_timed_get();
@@ -399,9 +381,7 @@ TEST_F(CreateFirstChunksTest, EmptyCollection_WithZones_ManyChunksOnFirstZoneSha
     ASSERT(optimization->isOptimized());
 
     const auto firstChunks = optimization->createFirstChunks(
-        operationContext(),
-        kShardKeyPattern,
-        {kNamespace, UUID::gen(), ShardId("shard1"), ChunkEntryFormat::kNamespaceOnlyNoTimestamps});
+        operationContext(), kShardKeyPattern, {kNamespace, UUID::gen(), ShardId("shard1")});
 
     ASSERT_EQ(2U, firstChunks.chunks.size());
     ASSERT_EQ(kShards[0].getName(), firstChunks.chunks[0].getShard());

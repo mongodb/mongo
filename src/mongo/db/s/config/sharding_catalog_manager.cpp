@@ -43,7 +43,6 @@
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/balancer/type_migration.h"
-#include "mongo/db/s/sharding_ddl_50_upgrade_downgrade.h"
 #include "mongo/db/s/sharding_util.h"
 #include "mongo/db/s/type_lockpings.h"
 #include "mongo/db/s/type_locks.h"

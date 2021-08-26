@@ -249,7 +249,6 @@ env.Library(
         'dist_lock_manager_replset.cpp',
         'dist_lock_manager.cpp',
         'sharding_config_server_parameters.idl',
-        'sharding_ddl_50_upgrade_downgrade.cpp',
         'sharding_ddl_util.cpp',
         'sharding_util.cpp',
         'type_lockpings.cpp',
