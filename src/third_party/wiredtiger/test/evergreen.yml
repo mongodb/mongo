@@ -2061,6 +2061,14 @@ tasks:
             set -o verbose
             env CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++ PATH=/opt/mongodbtoolchain/v3/bin:/opt/java/jdk11/bin:$PATH sh s_release `date +%Y%m%d`
 
+  - name: doc-compile
+    tags: ["pull_request"]
+    run_on:
+    - ubuntu2004-test
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger docs"
+
   - name: doc-update
     patchable: false
     commands:
@@ -2886,7 +2894,7 @@ buildvariants:
   tasks:
     - name: package
 
-- name: doc-update
+- name: documentation-update
   display_name: "~ Documentation update"
   batchtime: 1440 # 1 day
   run_on:
