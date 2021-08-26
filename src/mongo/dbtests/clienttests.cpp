@@ -78,12 +78,6 @@ class DropIndex : public Base {
 public:
     DropIndex() : Base("dropindex") {}
     void run() {
-        // TODO (SERVER-57194): enable lock-free reads.
-        bool disableLockFreeReadsOriginalValue = storageGlobalParams.disableLockFreeReads;
-        storageGlobalParams.disableLockFreeReads = true;
-        ON_BLOCK_EXIT(
-            [&] { storageGlobalParams.disableLockFreeReads = disableLockFreeReadsOriginalValue; });
-
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient db(&opCtx);

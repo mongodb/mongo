@@ -938,12 +938,6 @@ public:
         index();
     }
     void run() {
-        // TODO (SERVER-57194): enable lock-free reads.
-        bool disableLockFreeReadsOriginalValue = storageGlobalParams.disableLockFreeReads;
-        storageGlobalParams.disableLockFreeReads = true;
-        ON_BLOCK_EXIT(
-            [&] { storageGlobalParams.disableLockFreeReads = disableLockFreeReadsOriginalValue; });
-
         _client.dropDatabase("unittests");
         noIndex();
         checkIndex();
