@@ -715,7 +715,7 @@ std::string StorageEngineImpl::getFilesystemPathForDb(const std::string& dbName)
 
 void StorageEngineImpl::cleanShutdown() {
     if (_timestampMonitor) {
-        _timestampMonitor->removeListener(&_minOfCheckpointAndOldestTimestampListener);
+        _timestampMonitor->clearListeners();
     }
 
     CollectionCatalog::write(getGlobalServiceContext(), [](CollectionCatalog& catalog) {
@@ -1208,13 +1208,9 @@ void StorageEngineImpl::TimestampMonitor::addListener(TimestampListener* listene
     _listeners.push_back(listener);
 }
 
-void StorageEngineImpl::TimestampMonitor::removeListener(TimestampListener* listener) {
+void StorageEngineImpl::TimestampMonitor::clearListeners() {
     stdx::lock_guard<Latch> lock(_monitorMutex);
-    if (std::find(_listeners.begin(), _listeners.end(), listener) == _listeners.end()) {
-        bool listenerNotRegistered = true;
-        invariant(!listenerNotRegistered);
-    }
-    _listeners.erase(std::remove(_listeners.begin(), _listeners.end(), listener));
+    _listeners.clear();
 }
 
 int64_t StorageEngineImpl::sizeOnDiskForDb(OperationContext* opCtx, StringData dbName) {

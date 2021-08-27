@@ -521,16 +521,14 @@ TEST_F(TimestampKVEngineTest, TimestampListeners) {
     // Can only register the listener once.
     _storageEngine->getTimestampMonitor()->addListener(&first);
 
-    _storageEngine->getTimestampMonitor()->removeListener(&first);
+    _storageEngine->getTimestampMonitor()->clearListeners();
     _storageEngine->getTimestampMonitor()->addListener(&first);
 
     // Can register all three types of listeners.
     _storageEngine->getTimestampMonitor()->addListener(&second);
     _storageEngine->getTimestampMonitor()->addListener(&third);
 
-    _storageEngine->getTimestampMonitor()->removeListener(&first);
-    _storageEngine->getTimestampMonitor()->removeListener(&second);
-    _storageEngine->getTimestampMonitor()->removeListener(&third);
+    _storageEngine->getTimestampMonitor()->clearListeners();
 }
 
 TEST_F(TimestampKVEngineTest, TimestampMonitorNotifiesListeners) {
@@ -587,10 +585,7 @@ TEST_F(TimestampKVEngineTest, TimestampMonitorNotifiesListeners) {
         return true;
     });
 
-    _storageEngine->getTimestampMonitor()->removeListener(&first);
-    _storageEngine->getTimestampMonitor()->removeListener(&second);
-    _storageEngine->getTimestampMonitor()->removeListener(&third);
-    _storageEngine->getTimestampMonitor()->removeListener(&fourth);
+    _storageEngine->getTimestampMonitor()->clearListeners();
 }
 
 TEST_F(TimestampKVEngineTest, TimestampAdvancesOnNotification) {
@@ -610,7 +605,7 @@ TEST_F(TimestampKVEngineTest, TimestampAdvancesOnNotification) {
         sleepmillis(100);
     }
 
-    _storageEngine->getTimestampMonitor()->removeListener(&listener);
+    _storageEngine->getTimestampMonitor()->clearListeners();
 }
 
 TEST_F(StorageEngineDurableTest, UseAlternateStorageLocation) {

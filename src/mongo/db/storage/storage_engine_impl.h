@@ -257,15 +257,11 @@ public:
         ~TimestampMonitor();
 
         /**
-         * Adds a new listener to the monitor if it isn't already registered. A listener can only be
-         * bound to one type of timestamp at a time.
+         * Removes registered listeners from the monitor.
          */
-        void addListener(TimestampListener* listener);
+        void clearListeners();
 
-        /**
-         * Removes an existing listener from the monitor if it was registered.
-         */
-        void removeListener(TimestampListener* listener);
+        void addListener(TimestampListener* listener);
 
         bool isRunning_forTestOnly() const {
             return _running;
