@@ -449,10 +449,16 @@ __rollback_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE *page
          * If we have fixed the out-of-order timestamps, then the newer update reinserted with an
          * older timestamp may have a durable timestamp that is smaller than the current stop
          * durable timestamp.
+         *
+         * It is possible that there can be an update in the history store with a max stop timestamp
+         * in the middle of the same key updates. This occurs when the checkpoint writes the
+         * committed prepared update and further updates on that key including the history store
+         * changes before the transaction fixes the history store update to have a proper stop
+         * timestamp. It is a rare scenario.
          */
         WT_ASSERT(session,
           hs_stop_durable_ts <= newer_hs_durable_ts || hs_start_ts == hs_stop_durable_ts ||
-            hs_start_ts == newer_hs_durable_ts || first_record);
+            hs_start_ts == newer_hs_durable_ts || first_record || hs_stop_durable_ts == WT_TS_MAX);
 
         if (hs_stop_durable_ts < newer_hs_durable_ts)
             WT_STAT_CONN_DATA_INCR(session, txn_rts_hs_stop_older_than_newer_start);
