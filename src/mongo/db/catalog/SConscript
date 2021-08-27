@@ -382,6 +382,7 @@ env.Library(
     source=[
         'collection_validation.cpp',
         'validate_adaptor.cpp',
+        'validate_results.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
@@ -400,19 +401,8 @@ env.Library(
         'collection_options',
         'index_catalog',
         'throttle_cursor',
-        'validate_results',
         'validate_state',
     ]
-)
-
-env.Library(
-    target='validate_results',
-    source=[
-        'validate_results.cpp',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
-    ],
 )
 
 env.Library(
