@@ -536,15 +536,7 @@ Status _checkValidFilterExpressions(MatchExpression* expression, int level = 0) 
                 return Status::OK();
             }
             return Status(ErrorCodes::CannotCreateIndex,
-                          "$geoWithin only supported in partialFilterExpression in v5.1");
-        case MatchExpression::INTERNAL_BUCKET_GEO_WITHIN:
-            if (feature_flags::gTimeseriesMetricIndexes.isEnabled(
-                    serverGlobalParams.featureCompatibility)) {
-                return Status::OK();
-            }
-            return Status(
-                ErrorCodes::CannotCreateIndex,
-                "$_internalBucketGeoWithin only supported in partialFilterExpression in v5.1");
+                          "$geoWithin only supported in partialFilterExpression in v5.0");
         case MatchExpression::EQ:
         case MatchExpression::LT:
         case MatchExpression::LTE:

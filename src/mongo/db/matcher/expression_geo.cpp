@@ -361,41 +361,29 @@ GeoMatchExpression::GeoMatchExpression(StringData path,
       _canSkipValidation(false) {}
 
 bool GeoMatchExpression::matchesSingleElement(const BSONElement& e, MatchDetails* details) const {
-    return contains(_query->getGeometry(), _query->getPred(), _canSkipValidation, e, details);
-}
-
-bool GeoMatchExpression::contains(const GeometryContainer& queryGeom,
-                                  const GeoExpression::Predicate& queryPredicate,
-                                  bool skipValidation,
-                                  const BSONElement& e,
-                                  MatchDetails* details) {
     if (!e.isABSONObj())
         return false;
 
     GeometryContainer geometry;
-    if (!geometry.parseFromStorage(e, skipValidation).isOK())
+
+    if (!geometry.parseFromStorage(e, _canSkipValidation).isOK())
         return false;
 
     // Never match big polygon
     if (geometry.getNativeCRS() == STRICT_SPHERE)
         return false;
 
-    // Project this geometry into the CRS of the larger geometry.
-
-    // In the case of index validation, we are projecting the geometry of the query
-    // into the CRS of the index to confirm that the index region convers/includes
-    // the region described by the predicate.
-
-    if (!geometry.supportsProject(queryGeom.getNativeCRS()))
+    // Project this geometry into the CRS of the query
+    if (!geometry.supportsProject(_query->getGeometry().getNativeCRS()))
         return false;
 
-    geometry.projectInto(queryGeom.getNativeCRS());
+    geometry.projectInto(_query->getGeometry().getNativeCRS());
 
-    if (GeoExpression::WITHIN == queryPredicate) {
-        return queryGeom.contains(geometry);
+    if (GeoExpression::WITHIN == _query->getPred()) {
+        return _query->getGeometry().contains(geometry);
     } else {
-        verify(GeoExpression::INTERSECT == queryPredicate);
-        return queryGeom.intersects(geometry);
+        verify(GeoExpression::INTERSECT == _query->getPred());
+        return _query->getGeometry().intersects(geometry);
     }
 }
 
