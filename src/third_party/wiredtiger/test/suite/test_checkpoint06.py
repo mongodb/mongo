@@ -28,6 +28,7 @@
 
 import time
 import wiredtiger, wttest
+from wtscenario import make_scenarios
 
 # test_checkpoint06.py
 # Verify that we rollback the truncation that is committed after stable
@@ -36,16 +37,23 @@ class test_checkpoint06(wttest.WiredTigerTestCase):
     conn_config = 'create,cache_size=50MB'
     session_config = 'isolation=snapshot'
 
+    key_format_values = [
+        ('column', dict(key_format='r')),
+        ('integer_row', dict(key_format='i')),
+    ]
+
+    scenarios = make_scenarios(key_format_values)
+
     def test_rollback_truncation_in_checkpoint(self):
         self.uri = 'table:ckpt06'
-        self.session.create(self.uri, 'key_format=i,value_format=S')
+        self.session.create(self.uri, 'key_format={},value_format=S'.format(self.key_format))
 
         value = "abcdefghijklmnopqrstuvwxyz" * 3
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
         cursor = self.session.open_cursor(self.uri)
         self.session.begin_transaction()
         # Setup: Insert some data
-        for i in range(10000):
+        for i in range(1, 10001):
             cursor[i] = value
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(2))
@@ -70,5 +78,5 @@ class test_checkpoint06(wttest.WiredTigerTestCase):
 
         # Verify the truncation is rolled back.
         cursor = self.session.open_cursor(self.uri)
-        for i in range(1000):
+        for i in range(1, 1001):
             self.assertEqual(cursor[i], value)

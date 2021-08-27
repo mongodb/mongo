@@ -86,15 +86,28 @@ main(int argc, char *argv[])
     WT_CURSOR *cursor1, *cursor2, *jcursor;
     WT_ITEM d;
     WT_SESSION *session;
-    uint64_t maincount;
+    uint64_t maincount, i64;
     int half, i, j;
-    char bloom_cfg[128], index1uri[256], index2uri[256], joinuri[256];
+    char bloom_cfg[128], index1uri[256], index2uri[256], joinuri[256], table_cfg[128];
     const char *tablename;
 
     opts = &_opts;
     memset(opts, 0, sizeof(*opts));
+    /* 0 isn't a valid table_type; use rows by default */
+    opts->table_type = TABLE_ROW;
     testutil_check(testutil_parse_opts(argc, argv, opts));
     testutil_make_work_dir(opts->home);
+
+    switch (opts->table_type) {
+    case TABLE_COL:
+        printf("Table type: columns\n");
+        break;
+    case TABLE_FIX:
+        testutil_die(ENOTSUP, "Fixed-length column store not supported");
+    case TABLE_ROW:
+        printf("Table type: rows\n");
+        break;
+    }
 
     tablename = strchr(opts->uri, ':');
     testutil_assert(tablename != NULL);
@@ -106,8 +119,10 @@ main(int argc, char *argv[])
     testutil_check(wiredtiger_open(opts->home, NULL, "statistics=(all),create", &opts->conn));
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
 
-    testutil_check(
-      session->create(session, opts->uri, "key_format=i,value_format=iiu,columns=(k,v1,v2,d)"));
+    testutil_check(__wt_snprintf(table_cfg, sizeof(table_cfg),
+      "key_format=%s,value_format=iiu,columns=(k,v1,v2,d)",
+      opts->table_type == TABLE_ROW ? "i" : "r"));
+    testutil_check(session->create(session, opts->uri, table_cfg));
     testutil_check(session->create(session, index1uri, "columns=(v1)"));
     testutil_check(session->create(session, index2uri, "columns=(v2)"));
 
@@ -117,7 +132,7 @@ main(int argc, char *argv[])
     d.data = dmalloc(d.size);
     memset((char *)d.data, 7, d.size);
 
-    for (i = 0; i < N_RECORDS; ++i) {
+    for (i = 1; i < N_RECORDS + 1; ++i) {
         cursor1->set_key(cursor1, i);
         cursor1->set_value(cursor1, i, i, &d);
         testutil_check(cursor1->insert(cursor1));
@@ -150,13 +165,18 @@ main(int argc, char *argv[])
     /* Expect one value returned */
     testutil_assert(jcursor->next(jcursor) == 0);
     i = 0;
-    testutil_assert(jcursor->get_key(jcursor, &i) == 0);
-    testutil_assert(i == (int)half);
+    if (opts->table_type == TABLE_ROW)
+        testutil_assert(jcursor->get_key(jcursor, &i) == 0);
+    else {
+        testutil_assert(jcursor->get_key(jcursor, &i64) == 0);
+        i = (int)i64;
+    }
+    testutil_assert(i == half);
     i = j = 0;
     memset(&d, 0, sizeof(d));
     testutil_assert(jcursor->get_value(jcursor, &i, &j, &d) == 0);
-    testutil_assert(i == (int)half);
-    testutil_assert(j == (int)half);
+    testutil_assert(i == half);
+    testutil_assert(j == half);
     testutil_assert(d.size == 4100);
     for (i = 0; i < 4100; i++)
         testutil_assert(((char *)d.data)[i] == 7);

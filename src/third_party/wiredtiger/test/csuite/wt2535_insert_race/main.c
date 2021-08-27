@@ -38,6 +38,48 @@ void *thread_insert_race(void *);
 
 static uint64_t ready_counter;
 
+/*
+ * set_key --
+ *     Wrapper providing the correct typing for the WT_CURSOR::set_key variadic argument.
+ */
+static void
+set_key(WT_CURSOR *c, uint64_t value)
+{
+    c->set_key(c, value);
+}
+
+/*
+ * set_value --
+ *     Wrapper providing the correct typing for the WT_CURSOR::set_value variadic argument.
+ */
+static void
+set_value(TEST_OPTS *opts, WT_CURSOR *c, uint64_t value)
+{
+    if (opts->table_type == TABLE_FIX)
+        c->set_value(c, (uint8_t)value);
+    else
+        c->set_value(c, value);
+}
+
+/*
+ * get_value --
+ *     Wrapper providing the correct typing for the WT_CURSOR::get_value variadic argument.
+ */
+static uint64_t
+get_value(TEST_OPTS *opts, WT_CURSOR *c)
+{
+    uint64_t value64;
+    uint8_t value8;
+
+    if (opts->table_type == TABLE_FIX) {
+        testutil_check(c->get_value(c, &value8));
+        return (value8);
+    } else {
+        testutil_check(c->get_value(c, &value64));
+        return (value64);
+    }
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -46,8 +88,9 @@ main(int argc, char *argv[])
     WT_SESSION *session;
     clock_t ce, cs;
     pthread_t id[100];
-    uint64_t current_value;
+    uint64_t current_value, expected_value;
     int i;
+    char tableconf[128];
 
     /* Bypass this test for valgrind */
     if (testutil_is_flag_set("TESTUTIL_BYPASS_VALGRIND"))
@@ -64,13 +107,15 @@ main(int argc, char *argv[])
     testutil_check(wiredtiger_open(opts->home, NULL,
       "create,cache_size=2G,eviction=(threads_max=5),statistics=(fast)", &opts->conn));
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
-    testutil_check(
-      session->create(session, opts->uri, "key_format=Q,value_format=Q,leaf_page_max=32k,"));
+    testutil_check(__wt_snprintf(tableconf, sizeof(tableconf),
+      "key_format=%s,value_format=%s,leaf_page_max=32k,", opts->table_type == TABLE_ROW ? "Q" : "r",
+      opts->table_type == TABLE_FIX ? "8t" : "Q"));
+    testutil_check(session->create(session, opts->uri, tableconf));
 
     /* Create the single record. */
     testutil_check(session->open_cursor(session, opts->uri, NULL, NULL, &c));
-    c->set_key(c, 1);
-    c->set_value(c, 0);
+    set_key(c, 1);
+    set_value(opts, c, 0);
     testutil_check(c->insert(c));
     testutil_check(c->close(c));
     cs = clock();
@@ -80,10 +125,13 @@ main(int argc, char *argv[])
     while (--i >= 0)
         testutil_check(pthread_join(id[i], NULL));
     testutil_check(session->open_cursor(session, opts->uri, NULL, NULL, &c));
-    c->set_key(c, 1);
+    set_key(c, 1);
     testutil_check(c->search(c));
-    testutil_check(c->get_value(c, &current_value));
-    if (current_value != opts->nthreads * opts->nrecords) {
+    current_value = get_value(opts, c);
+    expected_value = opts->nthreads * opts->nrecords;
+    if (opts->table_type == TABLE_FIX)
+        expected_value %= 256;
+    if (current_value != expected_value) {
         fprintf(stderr, "ERROR: didn't get expected number of changes\n");
         fprintf(stderr, "got: %" PRIu64 ", expected: %" PRIu64 "\n", current_value,
           opts->nthreads * opts->nrecords);
@@ -129,11 +177,11 @@ thread_insert_race(void *arg)
 
     for (i = 0; i < opts->nrecords; ++i) {
         testutil_check(session->begin_transaction(session, "isolation=snapshot"));
-        cursor->set_key(cursor, 1);
+        set_key(cursor, 1);
         testutil_check(cursor->search(cursor));
-        testutil_check(cursor->get_value(cursor, &value));
-        cursor->set_key(cursor, 1);
-        cursor->set_value(cursor, value + 1);
+        value = get_value(opts, cursor);
+        set_key(cursor, 1);
+        set_value(opts, cursor, value + 1);
         if ((ret = cursor->update(cursor)) != 0) {
             if (ret == WT_ROLLBACK) {
                 testutil_check(session->rollback_transaction(session, NULL));

@@ -229,6 +229,13 @@ macro(define_c_test)
         if(NOT "${C_TEST_FLAGS}" STREQUAL "")
             list(APPEND additional_executable_args FLAGS ${C_TEST_FLAGS})
         endif()
+        set(exec_wrapper)
+        if(WT_WIN)
+            # This is a workaround to run our csuite tests under Windows using CTest. When executing a test,
+            # CTests by-passes the shell and directly executes the test as a child process. In doing so CTest executes the binary with forward-slash paths.
+            # Which while technically valid breaks assumptions in our testing utilities. Wrap the execution in powershell to avoid this.
+            set(exec_wrapper "powershell.exe")
+        endif()
         if (C_TEST_SMOKE)
             # csuite test comes with a smoke execution wrapper.
             create_test_executable(${C_TEST_TARGET}
@@ -238,7 +245,7 @@ macro(define_c_test)
                 ${additional_executable_args}
             )
             add_test(NAME ${C_TEST_TARGET}
-                COMMAND ${CMAKE_CURRENT_BINARY_DIR}/${C_TEST_DIR_NAME}/smoke.sh ${C_TEST_ARGUMENTS} $<TARGET_FILE:${C_TEST_TARGET}>
+                COMMAND ${exec_wrapper} ${CMAKE_CURRENT_BINARY_DIR}/${C_TEST_DIR_NAME}/smoke.sh ${C_TEST_ARGUMENTS} $<TARGET_FILE:${C_TEST_TARGET}>
                 WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/${C_TEST_DIR_NAME}
             )
         else()
@@ -253,13 +260,6 @@ macro(define_c_test)
             # Ensure each DB home directory is run under the tests working directory.
             set(command_args -h ${wt_test_home_dir})
             list(APPEND command_args ${C_TEST_ARGUMENTS})
-            set(exec_wrapper)
-            if(WT_WIN)
-                # This is a workaround to run our csuite tests under Windows using CTest. When executing a test,
-                # CTests by-passes the shell and directly executes the test as a child process. In doing so CTest executes the binary with forward-slash paths.
-                # Which while technically valid breaks assumptions in our testing utilities. Wrap the execution in powershell to avoid this.
-                set(exec_wrapper "powershell.exe")
-            endif()
             add_test(NAME ${C_TEST_TARGET}
                 COMMAND ${exec_wrapper} $<TARGET_FILE:${C_TEST_TARGET}> ${command_args}
                 WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/${C_TEST_DIR_NAME}

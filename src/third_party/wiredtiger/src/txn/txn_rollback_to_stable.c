@@ -822,11 +822,10 @@ __rollback_abort_col_var(WT_SESSION_IMPL *session, WT_REF *ref, wt_timestamp_t r
             /*
              * If we found a stable update on the insert list, this key needs no further attention.
              * Any other keys in this cell with stable updates also do not require attention. But
-             * beyond that, the on-disk value must be older than
-             * the update we found. That means it too is stable(*), so any keys in the cell that
-             * _don't_ have stable updates on the update list don't need further attention either.
-             * (And any unstable updates were just handled above.) Thus we can skip iterating over
-             * the cell.
+             * beyond that, the on-disk value must be older than the update we found. That means it
+             * too is stable(*), so any keys in the cell that _don't_ have stable updates on the
+             * update list don't need further attention either. (And any unstable updates were just
+             * handled above.) Thus we can skip iterating over the cell.
              *
              * Furthermore, if the cell is deleted it must be
              * itself stable, because cells only appear as deleted if there is no older value that

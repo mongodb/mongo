@@ -75,7 +75,8 @@ static const char *const uri_collection = "table:collection";
 
 static const char *const ckpt_file = "checkpoint_done";
 
-static bool compat, inmem, stable_set, use_columns, use_ts, use_txn;
+static bool compat, inmem, use_columns, use_ts, use_txn;
+static volatile bool stable_set;
 static volatile uint64_t global_ts = 1;
 static volatile uint64_t uid = 1;
 typedef struct {
