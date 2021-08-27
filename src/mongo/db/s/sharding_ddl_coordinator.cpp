@@ -117,9 +117,13 @@ ExecutorFuture<void> ShardingDDLCoordinator::_acquireLockAsync(
                auto distLockManager = DistLockManager::get(opCtx);
 
                const auto coorName = DDLCoordinatorType_serializer(_coordId.getOperationType());
-               auto distLock = uassertStatusOK(distLockManager->lock(
+
+               auto distLock = distLockManager->lockDirectLocally(
+                   opCtx, resource, DistLockManager::kDefaultLockTimeout);
+               _scopedLocks.emplace(std::move(distLock));
+
+               uassertStatusOK(distLockManager->lockDirect(
                    opCtx, resource, coorName, DistLockManager::kDefaultLockTimeout));
-               _scopedLocks.emplace(distLock.moveToAnotherThread());
            })
         .until([this](Status status) { return (!_recoveredFromDisk) || status.isOK(); })
         .withBackoffBetweenIterations(kExponentialBackoff)
@@ -237,10 +241,12 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
 
             auto completionStatus = status;
 
-            // Release the coordinator only if we are not stepping down
-            if ((!status.isA<ErrorCategory::NotPrimaryError>() &&
-                 !status.isA<ErrorCategory::ShutdownError>()) ||
-                (!status.isOK() && _completeOnError)) {
+            bool isSteppingDown = status.isA<ErrorCategory::NotPrimaryError>() ||
+                status.isA<ErrorCategory::ShutdownError>();
+
+            // Release the coordinator only in case the node is not stepping down or in case of
+            // acceptable error
+            if (!isSteppingDown || (!status.isOK() && _completeOnError)) {
                 try {
                     LOGV2(5565601,
                           "Releasing sharding DDL coordinator",
@@ -271,8 +277,20 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
                 }
             }
 
+            if (isSteppingDown) {
+                LOGV2(5950000,
+                      "Not releasing distributed locks because the node is stepping down or "
+                      "shutting down",
+                      "coordinatorId"_attr = _coordId,
+                      "status"_attr = status);
+            }
+
             while (!_scopedLocks.empty()) {
-                _scopedLocks.top().assignNewOpCtx(opCtx);
+                if (!isSteppingDown) {
+                    // (SERVER-59500) Only release the remote locks in case of no stepdown/shutdown
+                    const auto& resource = _scopedLocks.top().getNs();
+                    DistLockManager::get(opCtx)->unlock(opCtx, resource);
+                }
                 _scopedLocks.pop();
             }
 

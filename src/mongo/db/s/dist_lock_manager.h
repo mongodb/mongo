@@ -76,6 +76,10 @@ public:
 
         ScopedLock(ScopedLock&& other);
 
+        const StringData getNs() {
+            return _ns;
+        }
+
     private:
         std::string _ns;
         DistLockManager* _lockManager;
