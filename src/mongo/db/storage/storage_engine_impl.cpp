@@ -1199,7 +1199,7 @@ void StorageEngineImpl::TimestampMonitor::_startup() {
     _running = true;
 }
 
-void StorageEngineImpl::TimestampMonitor::addListener(TimestampListener* listener) {
+void StorageEngineImpl::TimestampMonitor::addListener_forTestOnly(TimestampListener* listener) {
     stdx::lock_guard<Latch> lock(_monitorMutex);
     if (std::find(_listeners.begin(), _listeners.end(), listener) != _listeners.end()) {
         bool listenerAlreadyRegistered = true;

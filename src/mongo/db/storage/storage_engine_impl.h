@@ -261,7 +261,11 @@ public:
          */
         void clearListeners();
 
-        void addListener(TimestampListener* listener);
+        /**
+         * Adds a new listener to the monitor if it isn't already registered. A listener can only be
+         * bound to one type of timestamp at a time.
+         */
+        void addListener_forTestOnly(TimestampListener* listener);
 
         bool isRunning_forTestOnly() const {
             return _running;
