@@ -560,8 +560,6 @@ void ExpressionKeysPrivate::getS2Keys(SharedBufferFragmentBuilder& pooledBufferB
         BSONElementSet fieldElements;
         const bool expandArrayOnTrailingField = false;
         MultikeyComponents* arrayComponents = multikeyPaths ? &(*multikeyPaths)[posInIdx] : nullptr;
-        dps::extractAllElementsAlongPath(
-            obj, keyElem.fieldName(), fieldElements, expandArrayOnTrailingField, arrayComponents);
 
         // Trailing array values aren't being expanded, so we still need to determine whether the
         // last component of the indexed path 'keyElem.fieldName()' causes the index to be multikey.
@@ -572,50 +570,92 @@ void ExpressionKeysPrivate::getS2Keys(SharedBufferFragmentBuilder& pooledBufferB
         //       multiple cells for its covering.
         bool lastPathComponentCausesIndexToBeMultikey;
         std::vector<KeyString::HeapBuilder> updatedKeysToAdd;
-        if (IndexNames::GEO_2DSPHERE == keyElem.valuestr()) {
-            if (params.indexVersion >= S2_INDEX_VERSION_2) {
-                // For >= V2,
-                // geo: null,
-                // geo: undefined
-                // geo: []
-                // should all behave like there is no geo field.  So we look for these cases and
-                // throw out the field elements if we find them.
-                if (1 == fieldElements.size()) {
-                    BSONElement elt = *fieldElements.begin();
-                    // Get the :null and :undefined cases.
-                    if (elt.isNull() || Undefined == elt.type()) {
-                        fieldElements.clear();
-                    } else if (elt.isABSONObj()) {
-                        // And this is the :[] case.
-                        BSONObj obj = elt.Obj();
-                        if (0 == obj.nFields()) {
+
+        if (IndexNames::GEO_2DSPHERE_BUCKET == keyElem.valuestr()) {
+            timeseries::dotted_path_support::extractAllElementsAlongBucketPath(
+                obj,
+                keyElem.fieldName(),
+                fieldElements,
+                expandArrayOnTrailingField,
+                arrayComponents);
+
+            // null, undefined, {} and [] should all behave like there is no geo field. So we look
+            // for these cases and ignore those measurements if we find them.
+            for (auto it = fieldElements.begin(); it != fieldElements.end();) {
+                decltype(it) next = std::next(it);
+                if (it->isNull() || Undefined == it->type() ||
+                    (it->isABSONObj() && 0 == it->Obj().nFields())) {
+                    fieldElements.erase(it);
+                }
+                it = next;
+            }
+
+            // 2dsphere indices require that at least one geo field to be present in a
+            // document in order to index it.
+            if (fieldElements.size() > 0) {
+                haveGeoField = true;
+            }
+
+            lastPathComponentCausesIndexToBeMultikey = getS2BucketGeoKeys(obj,
+                                                                          fieldElements,
+                                                                          params,
+                                                                          keysToAdd,
+                                                                          &updatedKeysToAdd,
+                                                                          keyStringVersion,
+                                                                          ordering);
+        } else {
+            dps::extractAllElementsAlongPath(obj,
+                                             keyElem.fieldName(),
+                                             fieldElements,
+                                             expandArrayOnTrailingField,
+                                             arrayComponents);
+
+            if (IndexNames::GEO_2DSPHERE == keyElem.valuestr()) {
+                if (params.indexVersion >= S2_INDEX_VERSION_2) {
+                    // For >= V2,
+                    // geo: null,
+                    // geo: undefined
+                    // geo: []
+                    // should all behave like there is no geo field.  So we look for these cases and
+                    // throw out the field elements if we find them.
+                    if (1 == fieldElements.size()) {
+                        BSONElement elt = *fieldElements.begin();
+                        // Get the :null and :undefined cases.
+                        if (elt.isNull() || Undefined == elt.type()) {
                             fieldElements.clear();
+                        } else if (elt.isABSONObj()) {
+                            // And this is the :[] case.
+                            BSONObj obj = elt.Obj();
+                            if (0 == obj.nFields()) {
+                                fieldElements.clear();
+                            }
                         }
+                    }
+
+                    // >= V2 2dsphere indices require that at least one geo field to be present in a
+                    // document in order to index it.
+                    if (fieldElements.size() > 0) {
+                        haveGeoField = true;
                     }
                 }
 
-                // >= V2 2dsphere indices require that at least one geo field to be present in a
-                // document in order to index it.
-                if (fieldElements.size() > 0) {
-                    haveGeoField = true;
-                }
-            }
-
-            lastPathComponentCausesIndexToBeMultikey = getS2GeoKeys(obj,
-                                                                    fieldElements,
-                                                                    params,
-                                                                    keysToAdd,
-                                                                    &updatedKeysToAdd,
-                                                                    keyStringVersion,
-                                                                    ordering);
-        } else {
-            lastPathComponentCausesIndexToBeMultikey = getS2LiteralKeys(fieldElements,
-                                                                        params.collator,
+                lastPathComponentCausesIndexToBeMultikey = getS2GeoKeys(obj,
+                                                                        fieldElements,
+                                                                        params,
                                                                         keysToAdd,
                                                                         &updatedKeysToAdd,
                                                                         keyStringVersion,
                                                                         ordering);
+            } else {
+                lastPathComponentCausesIndexToBeMultikey = getS2LiteralKeys(fieldElements,
+                                                                            params.collator,
+                                                                            keysToAdd,
+                                                                            &updatedKeysToAdd,
+                                                                            keyStringVersion,
+                                                                            ordering);
+            }
         }
+
 
         // We expect there to be the missing field element present in the keys if data is
         // missing.  So, this should be non-empty.
@@ -642,104 +682,6 @@ void ExpressionKeysPrivate::getS2Keys(SharedBufferFragmentBuilder& pooledBufferB
         LOGV2_WARNING(23755,
                       "Insert of geo object generated a high number of keys. num keys: "
                       "{numKeys} obj inserted: {obj}",
-                      "Insert of geo object generated a large number of keys",
-                      "obj"_attr = redact(obj),
-                      "numKeys"_attr = keysToAdd.size());
-    }
-
-    invariant(keys->empty());
-    auto keysSequence = keys->extract_sequence();
-    for (auto& ks : keysToAdd) {
-        if (id) {
-            ks.appendRecordId(*id);
-        }
-        keysSequence.push_back(ks.release());
-    }
-    keys->adopt_sequence(std::move(keysSequence));
-}
-
-void ExpressionKeysPrivate::getS2BucketKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
-                                            const BSONObj& obj,
-                                            const BSONObj& keyPattern,
-                                            const S2IndexingParams& params,
-                                            KeyStringSet* keys,
-                                            MultikeyPaths* multikeyPaths,
-                                            KeyString::Version keyStringVersion,
-                                            Ordering ordering,
-                                            boost::optional<RecordId> id) {
-    std::vector<KeyString::HeapBuilder> keysToAdd;
-
-    // Does one of our documents have a geo field?
-    bool haveGeoField = false;
-
-    if (multikeyPaths) {
-        invariant(multikeyPaths->empty());
-        multikeyPaths->resize(keyPattern.nFields());
-    }
-
-    size_t posInIdx = 0;
-
-    // We output keys in the same order as the fields we index.
-    for (const auto& keyElem : keyPattern) {
-        // First, we get the keys that this field adds.  Either they're added literally from
-        // the value of the field, or they're transformed if the field is geo.
-        BSONElementSet fieldElements;
-        const bool expandArrayOnTrailingField = false;
-        MultikeyComponents* arrayComponents = multikeyPaths ? &(*multikeyPaths)[posInIdx] : nullptr;
-        timeseries::dotted_path_support::extractAllElementsAlongBucketPath(
-            obj, keyElem.fieldName(), fieldElements, expandArrayOnTrailingField, arrayComponents);
-
-        // Trailing array values aren't being expanded, so we still need to determine whether the
-        // last component of the indexed path 'keyElem.fieldName()' causes the index to be multikey.
-        // We say that it does if
-        //   (a) the last component of the indexed path ever refers to an array value (regardless of
-        //       the number of array elements)
-        //   (b) the last component of the indexed path ever refers to GeoJSON data that requires
-        //       multiple cells for its covering.
-        bool lastPathComponentCausesIndexToBeMultikey;
-        std::vector<KeyString::HeapBuilder> updatedKeysToAdd;
-
-        // null, undefined, {} and [] should all behave like there is no geo field. So we look for
-        // these cases and ignore those measurements if we find them.
-        for (auto it = fieldElements.begin(); it != fieldElements.end();) {
-            decltype(it) next = std::next(it);
-            if (it->isNull() || Undefined == it->type() ||
-                (it->isABSONObj() && 0 == it->Obj().nFields())) {
-                fieldElements.erase(it);
-            }
-            it = next;
-        }
-
-        // 2dsphere indices require that at least one geo field to be present in a
-        // document in order to index it.
-        if (fieldElements.size() > 0) {
-            haveGeoField = true;
-        }
-
-        lastPathComponentCausesIndexToBeMultikey = getS2BucketGeoKeys(
-            obj, fieldElements, params, keysToAdd, &updatedKeysToAdd, keyStringVersion, ordering);
-
-        // We expect there to be the missing field element present in the keys if data is
-        // missing.  So, this should be non-empty.
-        invariant(!updatedKeysToAdd.empty());
-
-        if (multikeyPaths && lastPathComponentCausesIndexToBeMultikey) {
-            const size_t pathLengthOfThisField = FieldRef{keyElem.fieldNameStringData()}.numParts();
-            invariant(pathLengthOfThisField > 0);
-            (*multikeyPaths)[posInIdx].insert(pathLengthOfThisField - 1);
-        }
-
-        keysToAdd = std::move(updatedKeysToAdd);
-        ++posInIdx;
-    }
-
-    // Make sure that there's at least one geo field present in the doc
-    if (!haveGeoField) {
-        return;
-    }
-
-    if (keysToAdd.size() > params.maxKeysPerInsert) {
-        LOGV2_WARNING(237551,
                       "Insert of geo object generated a large number of keys",
                       "obj"_attr = redact(obj),
                       "numKeys"_attr = keysToAdd.size());

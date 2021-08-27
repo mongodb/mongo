@@ -135,89 +135,90 @@ struct S2BucketKeyGeneratorTest : public unittest::Test {
 };
 
 TEST_F(S2BucketKeyGeneratorTest, GetS2BucketKeys) {
-    BSONObj keyPattern = fromjson("{'data.geo': '2dsphere'}");
+    BSONObj keyPattern = fromjson("{'data.geo': '2dsphere_bucket'}");
     BSONObj genKeysFrom = fromjson(
         "{data: {geo: {"
         "'0': {type: 'Point', coordinates: [0, 0]},"
         "'1': {type: 'Point', coordinates: [3, 3]}"
         "}}}");
-    BSONObj infoObj = fromjson("{key: {'data.geo': '2dsphere'}, '2dsphereIndexVersion': 3}");
+    BSONObj infoObj = fromjson("{key: {'data.geo': '2dsphere_bucket'}, '2dsphereIndexVersion': 3}");
     S2IndexingParams params;
     CollatorInterfaceMock* collator = nullptr;
     ExpressionParams::initialize2dsphereParams(infoObj, collator, &params);
 
     KeyStringSet actualKeys;
     MultikeyPaths actualMultikeyPaths;
-    ExpressionKeysPrivate::getS2BucketKeys(allocator,
-                                           genKeysFrom,
-                                           keyPattern,
-                                           params,
-                                           &actualKeys,
-                                           &actualMultikeyPaths,
-                                           KeyString::Version::kLatestVersion,
-                                           Ordering::make(BSONObj()));
+    ExpressionKeysPrivate::getS2Keys(allocator,
+                                     genKeysFrom,
+                                     keyPattern,
+                                     params,
+                                     &actualKeys,
+                                     &actualMultikeyPaths,
+                                     KeyString::Version::kLatestVersion,
+                                     Ordering::make(BSONObj()));
 
     PointSet set{{0, 0}, {3, 3}};
     verifySetIsCoveredByKeys(actualKeys, set);
 }
 
 TEST_F(S2BucketKeyGeneratorTest, GetS2BucketKeysSubField) {
-    BSONObj keyPattern = fromjson("{'data.geo.sub': '2dsphere'}");
+    BSONObj keyPattern = fromjson("{'data.geo.sub': '2dsphere_bucket'}");
     BSONObj genKeysFrom = fromjson(
         "{data: {geo: {"
         "'0': {sub: {type: 'Point', coordinates: [0, 0]}},"
         "'1': {sub: {type: 'Point', coordinates: [3, 3]}}"
         "}}}");
-    BSONObj infoObj = fromjson("{key: {'data.geo.sub': '2dsphere'}, '2dsphereIndexVersion': 3}");
+    BSONObj infoObj =
+        fromjson("{key: {'data.geo.sub': '2dsphere_bucket'}, '2dsphereIndexVersion': 3}");
     S2IndexingParams params;
     CollatorInterfaceMock* collator = nullptr;
     ExpressionParams::initialize2dsphereParams(infoObj, collator, &params);
 
     KeyStringSet actualKeys;
     MultikeyPaths actualMultikeyPaths;
-    ExpressionKeysPrivate::getS2BucketKeys(allocator,
-                                           genKeysFrom,
-                                           keyPattern,
-                                           params,
-                                           &actualKeys,
-                                           &actualMultikeyPaths,
-                                           KeyString::Version::kLatestVersion,
-                                           Ordering::make(BSONObj()));
+    ExpressionKeysPrivate::getS2Keys(allocator,
+                                     genKeysFrom,
+                                     keyPattern,
+                                     params,
+                                     &actualKeys,
+                                     &actualMultikeyPaths,
+                                     KeyString::Version::kLatestVersion,
+                                     Ordering::make(BSONObj()));
 
     PointSet set{{0, 0}, {3, 3}};
     verifySetIsCoveredByKeys(actualKeys, set);
 }
 
 TEST_F(S2BucketKeyGeneratorTest, GetS2BucketKeysDeepSubField) {
-    BSONObj keyPattern = fromjson("{'data.geo.sub1.sub2.sub3': '2dsphere'}");
+    BSONObj keyPattern = fromjson("{'data.geo.sub1.sub2.sub3': '2dsphere_bucket'}");
     BSONObj genKeysFrom = fromjson(
         "{data: {geo: {"
         "'0': {sub1: {sub2: {sub3: {type: 'Point', coordinates: [0, 0]}}}},"
         "'1': {sub1: {sub2: {sub3: {type: 'Point', coordinates: [3, 3]}}}}"
         "}}}");
-    BSONObj infoObj =
-        fromjson("{key: {'data.geo.sub1.sub2.sub3': '2dsphere'}, '2dsphereIndexVersion': 3}");
+    BSONObj infoObj = fromjson(
+        "{key: {'data.geo.sub1.sub2.sub3': '2dsphere_bucket'}, '2dsphereIndexVersion': 3}");
     S2IndexingParams params;
     CollatorInterfaceMock* collator = nullptr;
     ExpressionParams::initialize2dsphereParams(infoObj, collator, &params);
 
     KeyStringSet actualKeys;
     MultikeyPaths actualMultikeyPaths;
-    ExpressionKeysPrivate::getS2BucketKeys(allocator,
-                                           genKeysFrom,
-                                           keyPattern,
-                                           params,
-                                           &actualKeys,
-                                           &actualMultikeyPaths,
-                                           KeyString::Version::kLatestVersion,
-                                           Ordering::make(BSONObj()));
+    ExpressionKeysPrivate::getS2Keys(allocator,
+                                     genKeysFrom,
+                                     keyPattern,
+                                     params,
+                                     &actualKeys,
+                                     &actualMultikeyPaths,
+                                     KeyString::Version::kLatestVersion,
+                                     Ordering::make(BSONObj()));
 
     PointSet set{{0, 0}, {3, 3}};
     verifySetIsCoveredByKeys(actualKeys, set);
 }
 
 TEST_F(S2BucketKeyGeneratorTest, GetS2BucketKeysSubFieldSomeMissing) {
-    BSONObj keyPattern = fromjson("{'data.geo.sub': '2dsphere'}");
+    BSONObj keyPattern = fromjson("{'data.geo.sub': '2dsphere_bucket'}");
     BSONObj genKeysFrom = fromjson(
         "{data: {geo: {"
         "'0': {sub: {type: 'Point', coordinates: [0, 0]}},"
@@ -228,21 +229,22 @@ TEST_F(S2BucketKeyGeneratorTest, GetS2BucketKeysSubFieldSomeMissing) {
         "'5': {sub: {type: 'Point', coordinates: [5, 5]}},"
         "'6': {foo: 'bar'}"
         "}}}");
-    BSONObj infoObj = fromjson("{key: {'data.geo.sub': '2dsphere'}, '2dsphereIndexVersion': 3}");
+    BSONObj infoObj =
+        fromjson("{key: {'data.geo.sub': '2dsphere_bucket'}, '2dsphereIndexVersion': 3}");
     S2IndexingParams params;
     CollatorInterfaceMock* collator = nullptr;
     ExpressionParams::initialize2dsphereParams(infoObj, collator, &params);
 
     KeyStringSet actualKeys;
     MultikeyPaths actualMultikeyPaths;
-    ExpressionKeysPrivate::getS2BucketKeys(allocator,
-                                           genKeysFrom,
-                                           keyPattern,
-                                           params,
-                                           &actualKeys,
-                                           &actualMultikeyPaths,
-                                           KeyString::Version::kLatestVersion,
-                                           Ordering::make(BSONObj()));
+    ExpressionKeysPrivate::getS2Keys(allocator,
+                                     genKeysFrom,
+                                     keyPattern,
+                                     params,
+                                     &actualKeys,
+                                     &actualMultikeyPaths,
+                                     KeyString::Version::kLatestVersion,
+                                     Ordering::make(BSONObj()));
 
     PointSet set{{0, 0}, {3, 3}, {5, 5}};
     verifySetIsCoveredByKeys(actualKeys, set);
