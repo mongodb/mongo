@@ -2,7 +2,9 @@
  * Test that aggregation log lines include remoteOpWaitMillis: the amount of time the merger spent
  * waiting for results from shards.
  *
- * @tags: [disabled_due_to_server_58295]
+ * @tags: [
+ * # Meaning of attribute durationMillis for change streams changed in 5.1.
+ * requires_fcv_51]
  *
  */
 (function() {
