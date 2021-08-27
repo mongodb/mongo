@@ -31,7 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/storage/storage_debug_util.h"
+#include "mongo/dbtests/storage_debug_util.h"
 
 #include "mongo/db/catalog/validate_results.h"
 #include "mongo/db/db_raii.h"

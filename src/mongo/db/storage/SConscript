@@ -265,18 +265,6 @@ env.Library(
 )
 
 env.Library(
-    target='storage_debug_util',
-    source=[
-        'storage_debug_util.cpp',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/catalog/index_catalog',
-        '$BUILD_DIR/mongo/db/catalog/validate_results',
-        '$BUILD_DIR/mongo/db/db_raii',
-    ],
-)
-
-env.Library(
     target='storage_engine_lock_file',
     source=[
         'storage_engine_lock_file.cpp',

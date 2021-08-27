@@ -43,8 +43,8 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/execution_context.h"
-#include "mongo/db/storage/storage_debug_util.h"
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/dbtests/storage_debug_util.h"
 
 namespace ValidateTests {
 
