@@ -233,7 +233,8 @@ boost::intrusive_ptr<Expression> ExpressionMinMaxN<S>::parse(
             str::stream() << "Cannot create " << name
                           << " accumulator in $setWindowFields"
                              " if feature flag is disabled",
-            feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
+            feature_flags::gFeatureFlagExactTopNAccumulator.isEnabled(
+                serverGlobalParams.featureCompatibility));
 
     boost::intrusive_ptr<::mongo::Expression> nExpr;
     boost::intrusive_ptr<::mongo::Expression> outputExpr;

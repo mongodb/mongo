@@ -90,7 +90,8 @@ public:
             if (bucketsColl || createCmdRequest.getTimeseries()) {
                 uassert(5731502,
                         "Sharding a timeseries collection feature is not enabled",
-                        feature_flags::gFeatureFlagShardedTimeSeries.isEnabledAndIgnoreFCV());
+                        feature_flags::gFeatureFlagShardedTimeSeries.isEnabled(
+                            serverGlobalParams.featureCompatibility));
 
                 if (!createCmdRequest.getTimeseries()) {
                     createCmdRequest.setTimeseries(bucketsColl->getTimeseriesOptions());

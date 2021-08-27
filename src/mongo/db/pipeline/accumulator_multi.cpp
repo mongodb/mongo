@@ -185,7 +185,8 @@ AccumulationExpression AccumulatorMinMaxN::parseMinMaxN(ExpressionContext* const
     // macros above are updated accordingly.
     uassert(5787909,
             str::stream() << "Cannot create " << name << " accumulator if feature flag is disabled",
-            feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
+            feature_flags::gFeatureFlagExactTopNAccumulator.isEnabled(
+                serverGlobalParams.featureCompatibility));
     uassert(5787900,
             str::stream() << "specification must be an object; found " << elem,
             elem.type() == BSONType::Object);
@@ -280,7 +281,8 @@ AccumulationExpression AccumulatorFirstLastN::parseFirstLastN(ExpressionContext*
     // macros above are updated accordingly.
     uassert(5787800,
             str::stream() << "Cannot create " << name << " accumulator if feature flag is disabled",
-            feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
+            feature_flags::gFeatureFlagExactTopNAccumulator.isEnabled(
+                serverGlobalParams.featureCompatibility));
     uassert(5787801,
             str::stream() << "specification must be an object; found " << elem,
             elem.type() == BSONType::Object);
