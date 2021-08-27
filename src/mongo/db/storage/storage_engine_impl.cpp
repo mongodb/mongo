@@ -735,9 +735,10 @@ StorageEngineImpl::~StorageEngineImpl() {}
 
 void StorageEngineImpl::finishInit() {
     if (_engine->supportsRecoveryTimestamp()) {
-        _timestampMonitor = std::make_unique<TimestampMonitor>(
-            _engine.get(), getGlobalServiceContext()->getPeriodicRunner());
-        _timestampMonitor->addListener(&_minOfCheckpointAndOldestTimestampListener);
+        _timestampMonitor =
+            std::make_unique<TimestampMonitor>(_engine.get(),
+                                               &_minOfCheckpointAndOldestTimestampListener,
+                                               getGlobalServiceContext()->getPeriodicRunner());
     }
 }
 
@@ -1101,8 +1102,11 @@ void StorageEngineImpl::_onMinOfCheckpointAndOldestTimestampChanged(const Timest
     }
 }
 
-StorageEngineImpl::TimestampMonitor::TimestampMonitor(KVEngine* engine, PeriodicRunner* runner)
+StorageEngineImpl::TimestampMonitor::TimestampMonitor(KVEngine* engine,
+                                                      TimestampListener* listener,
+                                                      PeriodicRunner* runner)
     : _engine(engine), _running(false), _periodicRunner(runner) {
+    _listeners.push_back(listener);
     _startup();
 }
 

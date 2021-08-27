@@ -249,7 +249,11 @@ public:
             Callback _callback;
         };
 
-        TimestampMonitor(KVEngine* engine, PeriodicRunner* runner);
+        /**
+         * Starts monitoring timestamp changes in the background with an initial listener.
+         */
+        TimestampMonitor(KVEngine* engine, TimestampListener* listener, PeriodicRunner* runner);
+
         ~TimestampMonitor();
 
         /**
