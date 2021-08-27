@@ -200,7 +200,7 @@ private:
     SharedPromise<void> _constructionCompletionPromise;
     SharedPromise<void> _completionPromise;
 
-    std::stack<DistLockManager::ScopedDistLock> _scopedLocks;
+    std::stack<DistLockManager::ScopedLock> _scopedLocks;
 };
 
 class ShardingDDLCoordinator_NORESILIENT {
