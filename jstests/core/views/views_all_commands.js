@@ -70,6 +70,8 @@ load('jstests/sharding/libs/last_lts_mongod_commands.js');
 // Pre-written reasons for skipping a test.
 const isAnInternalCommand = "internal command";
 const isUnrelated = "is unrelated";
+const wasRemovedInBinaryVersion50 =
+    "must define test coverage for the multiversion passthrough suite";
 
 let viewsCommandTests = {
     _addShard: {skip: isAnInternalCommand},
@@ -298,6 +300,7 @@ let viewsCommandTests = {
     flushRouterConfig: {skip: isUnrelated},
     fsync: {skip: isUnrelated},
     fsyncUnlock: {skip: isUnrelated},
+    geoSearch: {skip: wasRemovedInBinaryVersion50},
     getAuditConfig: {skip: isUnrelated},
     getDatabaseVersion: {skip: isUnrelated},
     getCmdLineOpts: {skip: isUnrelated},
@@ -344,9 +347,19 @@ let viewsCommandTests = {
     getParameter: {skip: isUnrelated},
     getShardMap: {skip: isUnrelated},
     getShardVersion: {
-        command: {getShardVersion: "test.view"},
-        expectFailure: true,
-        expectedErrorCode: ErrorCodes.NoShardingEnabled,
+        command: function(conn) {
+            // getShardVersion was updated to throw 'NoShardingEnabled' on v5.0, but in v4.4 the
+            // command would have succeeded. Ignore a 'NoShardingEnabled' error code so that the
+            // test passes in the mixed-version replica sets passthrough.
+            try {
+                assert.commandWorked(conn.adminCommand({getShardVersion: "test.view"}));
+            } catch (e) {
+                if (e.code == ErrorCodes.NoShardingEnabled) {
+                    return;
+                }
+                throw e;
+            }
+        },
         isAdminCommand: true,
         skipSharded: true,  // mongos is tested in views/views_sharded.js
     },
@@ -489,6 +502,7 @@ let viewsCommandTests = {
     replSetTestEgress: {skip: isUnrelated},
     replSetUpdatePosition: {skip: isUnrelated},
     replSetResizeOplog: {skip: isUnrelated},
+    resetError: {skip: wasRemovedInBinaryVersion50},
     reshardCollection: {
         command: {reshardCollection: "test.view", key: {_id: 1}},
         setup: function(conn) {
@@ -537,6 +551,7 @@ let viewsCommandTests = {
         expectFailure: true,
         isAdminCommand: true,
     },
+    shardConnPoolStats: {skip: wasRemovedInBinaryVersion50},
     shardingState: {skip: isUnrelated},
     shutdown: {skip: isUnrelated},
     sleep: {skip: isUnrelated},
@@ -581,6 +596,7 @@ let viewsCommandTests = {
     testVersion2: {skip: isAnInternalCommand},
     testVersions1And2: {skip: isAnInternalCommand},
     top: {skip: "tested in views/views_stats.js"},
+    unsetSharding: {skip: wasRemovedInBinaryVersion50},
     update: {command: {update: "view", updates: [{q: {x: 1}, u: {x: 2}}]}, expectFailure: true},
     updateRole: {
         command: {
