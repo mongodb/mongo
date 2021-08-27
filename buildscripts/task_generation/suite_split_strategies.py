@@ -79,11 +79,11 @@ def greedy_division(tests_runtimes: List[TestRuntime], max_time_seconds: float,
                  max_suites=max_suites, max_tests_per_suite=max_tests_per_suite)
     current_test_list = []
     for idx, test_instance in enumerate(tests_runtimes):
-        logger.debug("Adding test", test=test_instance)
+        logger.debug("Adding test", test=test_instance, suite_index=len(suites))
         if _new_suite_needed(current_test_list, test_instance.runtime, max_time_seconds,
                              max_tests_per_suite):
             logger.debug("Finished suite", test_runtime=test_instance.runtime,
-                         max_time=max_time_seconds)
+                         max_time=max_time_seconds, suite_index=len(suites))
             if current_test_list:
                 suites.append(current_test_list)
                 current_test_list = []

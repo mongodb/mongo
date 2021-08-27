@@ -21,7 +21,7 @@ class GeneratedFile(NamedTuple):
 
         :param directory: Directory to write file to.
         """
-        write_file_to_dir(directory, self.file_name, self.content)
+        write_file_to_dir(directory, self.file_name, self.content, overwrite=False)
 
 
 class GeneratedConfiguration(NamedTuple):

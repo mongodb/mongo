@@ -100,7 +100,8 @@ class MultiversionGenTaskService:
         :param params: Parameters for how tasks should be generated.
         :return: Shrub configuration for task specified.
         """
-        suite_file = self.gen_task_options.suite_location(f"{sub_suite_name}_{build_variant}.yml")
+        suite_file = self.gen_task_options.suite_location(
+            f"{sub_suite_name}_multiversion_{build_variant}.yml")
 
         run_tests_vars = {
             "resmoke_args": self._build_resmoke_args(suite_file, mixed_version_config, params),
