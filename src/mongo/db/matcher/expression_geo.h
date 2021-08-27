@@ -81,6 +81,7 @@ private:
 };
 
 class GeoMatchExpression : public LeafMatchExpression {
+
 public:
     GeoMatchExpression(StringData path,
                        const GeoExpression* query,
@@ -92,7 +93,11 @@ public:
                        clonable_ptr<ErrorAnnotation> annotation = nullptr);
 
     virtual ~GeoMatchExpression() {}
-
+    static bool contains(const GeometryContainer& queryGeom,
+                         const GeoExpression::Predicate& queryPredicate,
+                         bool skipValidation,
+                         const BSONElement& e,
+                         MatchDetails* details);
     bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 
     virtual void debugString(StringBuilder& debug, int indentationLevel = 0) const;

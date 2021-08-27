@@ -35,6 +35,7 @@
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/matcher/expression_geo.h"
+#include "mongo/db/matcher/expression_internal_bucket_geo_within.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
@@ -353,6 +354,50 @@ bool isSubsetOf(const MatchExpression* lhs, const MatchExpression* rhs) {
 
     if (lhs->equivalent(rhs)) {
         return true;
+    }
+
+    if (lhs->matchType() == MatchExpression::INTERNAL_BUCKET_GEO_WITHIN &&
+        rhs->matchType() == MatchExpression::INTERNAL_BUCKET_GEO_WITHIN) {
+        const InternalBucketGeoWithinMatchExpression* indexMatchExpression =
+            static_cast<const InternalBucketGeoWithinMatchExpression*>(rhs);
+
+        // {$_internalBucketGeoWithin: {$withinRegion: {$geometry: ...}, field: 'loc' }}
+        auto queryInternalBucketGeoWithinObj = lhs->serialize();
+        // '$_internalBucketGeoWithin: {$withinRegion: ... , field: 'loc' }'
+        auto queryInternalBucketGeoWithinElement = queryInternalBucketGeoWithinObj.firstElement();
+        // Confirm that the "field" arguments match before continuing.
+        if (queryInternalBucketGeoWithinElement["field"].type() != mongo::String ||
+            queryInternalBucketGeoWithinElement["field"].valueStringData() !=
+                indexMatchExpression->getField()) {
+            return false;
+        }
+        // {$withinRegion: {$geometry: {type: "Polygon", coords:[...]}}
+        auto queryWithinRegionObj = queryInternalBucketGeoWithinElement.Obj();
+        // '$withinRegion: {$geometry: {type: "Polygon", coords:[...]}'
+        auto queryWithinRegionElement = queryWithinRegionObj.firstElement();
+        // {$geometry: {type: "Polygon", coordinates: [...]}}
+        auto queryGeometryObj = queryWithinRegionElement.Obj();
+
+        // We only handle $_internalBucketGeoWithin queries that use the $geometry operator.
+        if (!queryGeometryObj.hasField("$geometry"))
+            return false;
+
+        // geometryElement is '$geometry: {type: ... }'
+        auto queryGeometryElement = queryGeometryObj.firstElement();
+        MatchDetails* details = nullptr;
+
+
+        if (GeoMatchExpression::contains(*indexMatchExpression->getGeoContainer(),
+                                         GeoExpression::WITHIN,
+                                         false,
+                                         queryGeometryElement,
+                                         details)) {
+            // The region described by query is within the region captured by the index.
+            // For example, a query over the $geometry for the city of Houston is covered by an
+            // index over the $geometry for the entire state of texas. Therefore this index can be
+            // used in a potential solution for this query.
+            return true;
+        }
     }
 
     if (lhs->matchType() == MatchExpression::GEO && rhs->matchType() == MatchExpression::GEO) {
