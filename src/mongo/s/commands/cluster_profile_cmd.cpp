@@ -53,6 +53,8 @@ protected:
         OperationContext* opCtx,
         const std::string& dbName,
         const ProfileCmdRequest& request) const final {
+        invariant(!opCtx->lockState()->isW());
+
         const auto profilingLevel = request.getCommandParameter();
 
         // The only valid profiling level for mongoS is 0, because mongoS has no system.profile
