@@ -43,36 +43,6 @@ namespace mongo {
 
 namespace StorageDebugUtil {
 
-void printKeyString(const RecordId& recordId,
-                    const KeyString::Value& keyStringValue,
-                    const BSONObj& keyPatternBson,
-                    const BSONObj& keyStringBson,
-                    std::string callerLogPrefix) {
-    // We need to rehydrate the keyString to something readable.
-    auto keyPatternIter = keyPatternBson.begin();
-    auto keyStringIter = keyStringBson.begin();
-    BSONObjBuilder b;
-    while (keyPatternIter != keyPatternBson.end() && keyStringIter != keyStringBson.end()) {
-        b.appendAs(*keyStringIter, keyPatternIter->fieldName());
-        ++keyPatternIter;
-        ++keyStringIter;
-    }
-    // Wildcard index documents can have more values in the keystring.
-    while (keyStringIter != keyStringBson.end()) {
-        b.append(*keyStringIter);
-        ++keyStringIter;
-    }
-    BSONObj rehydratedKey = b.done();
-
-    LOGV2(51811,
-          "{caller} {record_id}, key: {rehydrated_key}, keystring: "
-          "{key_string}",
-          "caller"_attr = callerLogPrefix,
-          "record_id"_attr = recordId,
-          "rehydrated_key"_attr = rehydratedKey,
-          "key_string"_attr = keyStringValue);
-}
-
 void printCollectionAndIndexTableEntries(OperationContext* opCtx, const NamespaceString& nss) {
     invariant(!opCtx->lockState()->isLocked());
     AutoGetCollection coll(opCtx, nss, MODE_IS);
@@ -118,11 +88,11 @@ void printCollectionAndIndexTableEntries(OperationContext* opCtx, const Namespac
                                                    keyStringEntry->keyString.getSize(),
                                                    ordering,
                                                    keyStringEntry->keyString.getTypeBits());
-            printKeyString(keyStringEntry->loc,
-                           keyStringEntry->keyString,
-                           keyPattern,
-                           keyString,
-                           "[Debugging](index)");
+            KeyString::logKeyString(keyStringEntry->loc,
+                                    keyStringEntry->keyString,
+                                    keyPattern,
+                                    keyString,
+                                    "[Debugging](index)");
         }
     }
 }

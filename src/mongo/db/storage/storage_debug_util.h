@@ -45,18 +45,6 @@ struct ValidateResults;
 namespace StorageDebugUtil {
 
 /**
- * Takes key string and key pattern information and uses it to present human-readable information
- * about an index or collection entry.
- *
- * 'logPrefix' addes a logging prefix. Useful for differentiating callers.
- */
-void printKeyString(const RecordId& recordId,
-                    const KeyString::Value& keyStringValue,
-                    const BSONObj& keyPatternBson,
-                    const BSONObj& keyStringBson,
-                    std::string callerLogPrefix);
-
-/**
  * Prints all the document entries in the collection table and index tables associated with
  * 'coll'.
  *

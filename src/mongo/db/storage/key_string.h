@@ -1027,6 +1027,18 @@ int Value::compareWithoutRecordIdLong(const T& other) const {
         !other.isEmpty() ? sizeWithoutRecordIdLongAtEnd(other.getBuffer(), other.getSize()) : 0);
 }
 
+/**
+ * Takes key string and key pattern information and uses it to present human-readable information
+ * about an index or collection entry.
+ *
+ * 'logPrefix' addes a logging prefix. Useful for differentiating callers.
+ */
+void logKeyString(const RecordId& recordId,
+                  const Value& keyStringValue,
+                  const BSONObj& keyPatternBson,
+                  const BSONObj& keyStringBson,
+                  std::string callerLogPrefix);
+
 }  // namespace KeyString
 
 using KeyStringSet = boost::container::flat_set<KeyString::Value>;

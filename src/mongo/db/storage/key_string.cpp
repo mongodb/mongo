@@ -40,6 +40,7 @@
 #include "mongo/base/data_view.h"
 #include "mongo/bson/bson_depth.h"
 #include "mongo/db/exec/sbe/values/value_builder.h"
+#include "mongo/logv2/log.h"
 #include "mongo/platform/bits.h"
 #include "mongo/platform/strnlen.h"
 #include "mongo/util/decimal_counter.h"
@@ -2643,6 +2644,36 @@ void Value::serializeWithoutRecordIdLong(BufBuilder& buf) const {
 template class BuilderBase<Builder>;
 template class BuilderBase<HeapBuilder>;
 template class BuilderBase<PooledBuilder>;
+
+void logKeyString(const RecordId& recordId,
+                  const Value& keyStringValue,
+                  const BSONObj& keyPatternBson,
+                  const BSONObj& keyStringBson,
+                  std::string callerLogPrefix) {
+    // We need to rehydrate the keyString to something readable.
+    auto keyPatternIter = keyPatternBson.begin();
+    auto keyStringIter = keyStringBson.begin();
+    BSONObjBuilder b;
+    while (keyPatternIter != keyPatternBson.end() && keyStringIter != keyStringBson.end()) {
+        b.appendAs(*keyStringIter, keyPatternIter->fieldName());
+        ++keyPatternIter;
+        ++keyStringIter;
+    }
+    // Wildcard index documents can have more values in the keystring.
+    while (keyStringIter != keyStringBson.end()) {
+        b.append(*keyStringIter);
+        ++keyStringIter;
+    }
+    BSONObj rehydratedKey = b.done();
+
+    LOGV2(51811,
+          "{caller} {record_id}, key: {rehydrated_key}, keystring: "
+          "{key_string}",
+          "caller"_attr = callerLogPrefix,
+          "record_id"_attr = recordId,
+          "rehydrated_key"_attr = rehydratedKey,
+          "key_string"_attr = keyStringValue);
+}
 
 }  // namespace KeyString
 

@@ -43,7 +43,6 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/record_id_helpers.h"
-#include "mongo/db/storage/storage_debug_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/string_map.h"
 
@@ -330,7 +329,7 @@ void IndexConsistency::addDocKey(OperationContext* opCtx,
             const BSONObj& keyPatternBson = indexInfo->keyPattern;
             auto keyStringBson = KeyString::toBsonSafe(
                 ks.getBuffer(), ks.getSize(), indexInfo->ord, ks.getTypeBits());
-            StorageDebugUtil::printKeyString(
+            KeyString::logKeyString(
                 recordId, ks, keyPatternBson, keyStringBson, "[validate](record)");
         }
     } else if (lower.indexKeyCount || upper.indexKeyCount) {
@@ -383,7 +382,7 @@ void IndexConsistency::addIndexKey(OperationContext* opCtx,
             const BSONObj& keyPatternBson = indexInfo->keyPattern;
             auto keyStringBson = KeyString::toBsonSafe(
                 ks.getBuffer(), ks.getSize(), indexInfo->ord, ks.getTypeBits());
-            StorageDebugUtil::printKeyString(
+            KeyString::logKeyString(
                 recordId, ks, keyPatternBson, keyStringBson, "[validate](index)");
         }
     } else if (lower.indexKeyCount || upper.indexKeyCount) {
