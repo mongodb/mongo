@@ -7,6 +7,7 @@ Optionally replaces zero codes in source code with new distinct values.
 
 import bisect
 import os.path
+import re
 import sys
 from collections import defaultdict, namedtuple
 from optparse import OptionParser
@@ -16,12 +17,6 @@ from pathlib import Path
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-try:
-    import regex as re
-except ImportError:
-    print("*** Run 'pip3 install --user regex' to speed up error code checking")
-    import re  # type: ignore
 
 ASSERT_NAMES = ["uassert", "massert", "fassert", "fassertFailed"]
 MAXIMUM_CODE = 9999999  # JIRA Ticket + XX
