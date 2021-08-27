@@ -69,7 +69,6 @@ REGISTER_EXPRESSION_WITH_MIN_VERSION(lastN,
                                      AllowedWithApiStrict::kNeverInVersion1,
                                      AllowedWithClientType::kAny,
                                      ServerGlobalParams::FeatureCompatibility::Version::kVersion51);
-// TODO SERVER-57885 Add $minN/$maxN as window functions.
 // TODO SERVER-57884 Add $firstN/$lastN as window functions.
 
 AccumulatorN::AccumulatorN(ExpressionContext* const expCtx)
