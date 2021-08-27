@@ -320,7 +320,7 @@ selector:
   - assumes_unsharded_collection
   - cannot_create_unique_index_when_using_hashed_shard_key
 
-  # The next three tags correspond to the special errors thrown by the
+  # The next tags correspond to the special errors thrown by the
   # fail_unclean_shutdown_incompatible_commands.js override when it refuses to run commands that are
   # inaccurate after an unclean shutdown. Above each tag is the message that causes the tag to be
   # warranted.
@@ -333,6 +333,9 @@ selector:
   - requires_collstats
   # "Cowardly fail if unbounded dataSize is run with a mongod that had an unclean shutdown: ..."
   - requires_datasize
+  # "Cowardly fail if startParallelShell is run with a mongod that had an unclean shutdown: ..."
+  - uses_parallel_shell
+
   # system.profile collection doesn't exist on mongos. Also, transactions are not allowed to operate
   # on capped collections.
   - requires_profiling
@@ -355,8 +358,8 @@ executor:
     shell_options:
       # Note: fail_unclean_shutdown_incompatible_commands.js not included because it conflicts with
       # implicitly_shard_accessed_collections.js use of collstats (usage is safe with unclean
-      # shutdown). Workaround by relying on the requires_fastcount/dbstats/collstats/datasize tags
-      # to denylist tests that uses them unsafely.
+      # shutdown). Workaround by relying on the requires_fastcount/dbstats/collstats/datasize and
+      # uses_parallel_shell tags to denylist tests that uses them unsafely.
       eval: >-
         var testingReplication = true;
         load("jstests/libs/override_methods/mongos_manual_intervention_actions.js");
