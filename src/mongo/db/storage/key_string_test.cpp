@@ -234,8 +234,8 @@ TEST(TypeBitsTest, AllZerosTypeBits) {
     }
 
     {
-        std::string allZerosBuffer = "0000000000000000";
-        BufReader reader(allZerosBuffer.c_str(), 0);
+        char allZerosBuffer[16] = {0};
+        BufReader reader(allZerosBuffer, sizeof(allZerosBuffer));
         KeyString::TypeBits typeBits =
             KeyString::TypeBits::fromBuffer(KeyString::Version::V1, &reader);
         ASSERT_EQ(typeBits.getSize(), 1u);
