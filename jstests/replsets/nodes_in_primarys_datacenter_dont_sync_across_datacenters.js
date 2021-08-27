@@ -98,14 +98,14 @@ assert.soon(() => {
     const primaryTimestamp = replSetGetStatus.members[0].optime.ts;
     const receivedPrimaryHb = (bsonWoCompare(primaryTimestamp, advancedTimestamp) >= 0);
 
-    // Wait for enough heartbeats from the test node's current sync source so that our understanding
-    // of the ping time is over 10 ms. This makes it likely to re-evaluate the sync source, since
-    // the latency is most likely greater than 'changeSyncSourceThresholdMillis' over the primary's
-    // ping time.
+    // Wait for enough heartbeats from the test node's current sync source so that the difference
+    // between the sync source's and the primary's ping time is greater than
+    // 'changeSyncSourceThresholdMillis'.
     const syncSourcePingTime = replSetGetStatus.members[2].pingMs;
-    const receivedSyncSourceHb = (syncSourcePingTime > 10);
+    const primaryPingTime = replSetGetStatus.members[0].pingMs;
+    const exceedsChangeSyncSourceThreshold = (syncSourcePingTime - primaryPingTime > 5);
 
-    return (receivedPrimaryHb && receivedSyncSourceHb);
+    return (receivedPrimaryHb && exceedsChangeSyncSourceThreshold);
 });
 
 const replSetGetStatus = assert.commandWorked(testNode.adminCommand({replSetGetStatus: 1}));
