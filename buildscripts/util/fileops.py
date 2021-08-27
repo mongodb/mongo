@@ -40,7 +40,7 @@ def write_file(path: str, contents: str) -> None:
         file_handle.write(contents)
 
 
-def write_file_to_dir(directory: str, file: str, contents: str) -> None:
+def write_file_to_dir(directory: str, file: str, contents: str, overwrite: bool = True) -> None:
     """
     Write the contents provided to the file in the given directory.
 
@@ -49,11 +49,17 @@ def write_file_to_dir(directory: str, file: str, contents: str) -> None:
     :param directory: Directory to write to.
     :param file: Name of file to write.
     :param contents: Contents to write to file.
+    :param overwrite: If True it is ok to overwrite an existing file.
     """
+    target_file = os.path.join(directory, file)
+    if not overwrite:
+        if os.path.exists(target_file):
+            raise FileExistsError(target_file)
+
     if not os.path.exists(directory):
         os.makedirs(directory)
 
-    write_file(os.path.join(directory, file), contents)
+    write_file(target_file, contents)
 
 
 def read_yaml_file(path: str) -> Dict[str, Any]:
