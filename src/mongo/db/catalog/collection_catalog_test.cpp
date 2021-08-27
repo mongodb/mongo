@@ -66,16 +66,17 @@ public:
 
     void setUp() override {
         ServiceContextMongoDTest::setUp();
+        opCtx = makeOperationContext();
 
         std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
         col = CollectionPtr(collection.get(), CollectionPtr::NoYieldTag{});
         // Register dummy collection in catalog.
-        catalog.registerCollection(&opCtx, colUUID, std::move(collection));
+        catalog.registerCollection(opCtx.get(), colUUID, std::move(collection));
     }
 
 protected:
     CollectionCatalog catalog;
-    OperationContextNoop opCtx;
+    ServiceContext::UniqueOperationContext opCtx;
     NamespaceString nss;
     CollectionPtr col;
     CollectionUUID colUUID;
@@ -396,22 +397,22 @@ TEST_F(CollectionCatalogIterationTest, GetUUIDWontRepositionEvenIfEntryIsDropped
 }
 
 TEST_F(CollectionCatalogTest, OnCreateCollection) {
-    ASSERT(catalog.lookupCollectionByUUID(&opCtx, colUUID) == col);
+    ASSERT(catalog.lookupCollectionByUUID(opCtx.get(), colUUID) == col);
 }
 
 TEST_F(CollectionCatalogTest, LookupCollectionByUUID) {
     // Ensure the string value of the NamespaceString of the obtained Collection is equal to
     // nss.ns().
-    ASSERT_EQUALS(catalog.lookupCollectionByUUID(&opCtx, colUUID)->ns().ns(), nss.ns());
+    ASSERT_EQUALS(catalog.lookupCollectionByUUID(opCtx.get(), colUUID)->ns().ns(), nss.ns());
     // Ensure lookups of unknown UUIDs result in null pointers.
-    ASSERT(catalog.lookupCollectionByUUID(&opCtx, CollectionUUID::gen()) == nullptr);
+    ASSERT(catalog.lookupCollectionByUUID(opCtx.get(), CollectionUUID::gen()) == nullptr);
 }
 
 TEST_F(CollectionCatalogTest, LookupNSSByUUID) {
     // Ensure the string value of the obtained NamespaceString is equal to nss.ns().
-    ASSERT_EQUALS(catalog.lookupNSSByUUID(&opCtx, colUUID)->ns(), nss.ns());
+    ASSERT_EQUALS(catalog.lookupNSSByUUID(opCtx.get(), colUUID)->ns(), nss.ns());
     // Ensure namespace lookups of unknown UUIDs result in empty NamespaceStrings.
-    ASSERT_EQUALS(catalog.lookupNSSByUUID(&opCtx, CollectionUUID::gen()), boost::none);
+    ASSERT_EQUALS(catalog.lookupNSSByUUID(opCtx.get(), CollectionUUID::gen()), boost::none);
 }
 
 TEST_F(CollectionCatalogTest, InsertAfterLookup) {
@@ -421,17 +422,17 @@ TEST_F(CollectionCatalogTest, InsertAfterLookup) {
     auto newCol = newCollShared.get();
 
     // Ensure that looking up non-existing UUIDs doesn't affect later registration of those UUIDs.
-    ASSERT(catalog.lookupCollectionByUUID(&opCtx, newUUID) == nullptr);
-    ASSERT_EQUALS(catalog.lookupNSSByUUID(&opCtx, newUUID), boost::none);
-    catalog.registerCollection(&opCtx, newUUID, std::move(newCollShared));
-    ASSERT_EQUALS(catalog.lookupCollectionByUUID(&opCtx, newUUID), newCol);
-    ASSERT_EQUALS(*catalog.lookupNSSByUUID(&opCtx, colUUID), nss);
+    ASSERT(catalog.lookupCollectionByUUID(opCtx.get(), newUUID) == nullptr);
+    ASSERT_EQUALS(catalog.lookupNSSByUUID(opCtx.get(), newUUID), boost::none);
+    catalog.registerCollection(opCtx.get(), newUUID, std::move(newCollShared));
+    ASSERT_EQUALS(catalog.lookupCollectionByUUID(opCtx.get(), newUUID), newCol);
+    ASSERT_EQUALS(*catalog.lookupNSSByUUID(opCtx.get(), colUUID), nss);
 }
 
 TEST_F(CollectionCatalogTest, OnDropCollection) {
-    catalog.deregisterCollection(&opCtx, colUUID);
+    catalog.deregisterCollection(opCtx.get(), colUUID);
     // Ensure the lookup returns a null pointer upon removing the colUUID entry.
-    ASSERT(catalog.lookupCollectionByUUID(&opCtx, colUUID) == nullptr);
+    ASSERT(catalog.lookupCollectionByUUID(opCtx.get(), colUUID) == nullptr);
 }
 
 TEST_F(CollectionCatalogTest, RenameCollection) {
@@ -439,22 +440,31 @@ TEST_F(CollectionCatalogTest, RenameCollection) {
     NamespaceString oldNss(nss.db(), "oldcol");
     std::shared_ptr<Collection> collShared = std::make_shared<CollectionMock>(oldNss);
     auto collection = collShared.get();
-    catalog.registerCollection(&opCtx, uuid, std::move(collShared));
-    ASSERT_EQUALS(catalog.lookupCollectionByUUID(&opCtx, uuid), collection);
+    catalog.registerCollection(opCtx.get(), uuid, std::move(collShared));
+    ASSERT_EQUALS(catalog.lookupCollectionByUUID(opCtx.get(), uuid), collection);
 
     NamespaceString newNss(nss.db(), "newcol");
-    ASSERT_OK(collection->rename(&opCtx, newNss, false));
+    ASSERT_OK(collection->rename(opCtx.get(), newNss, false));
     ASSERT_EQ(collection->ns(), newNss);
-    ASSERT_EQUALS(catalog.lookupCollectionByUUID(&opCtx, uuid), collection);
+    ASSERT_EQUALS(catalog.lookupCollectionByUUID(opCtx.get(), uuid), collection);
 }
 
 TEST_F(CollectionCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsOldNSSIfDropped) {
-    catalog.onCloseCatalog(&opCtx);
-    catalog.deregisterCollection(&opCtx, colUUID);
-    ASSERT(catalog.lookupCollectionByUUID(&opCtx, colUUID) == nullptr);
-    ASSERT_EQUALS(*catalog.lookupNSSByUUID(&opCtx, colUUID), nss);
-    catalog.onOpenCatalog(&opCtx);
-    ASSERT_EQUALS(catalog.lookupNSSByUUID(&opCtx, colUUID), boost::none);
+    {
+        Lock::GlobalLock globalLk(opCtx.get(), MODE_X);
+        catalog.onCloseCatalog(opCtx.get());
+    }
+
+    catalog.deregisterCollection(opCtx.get(), colUUID);
+    ASSERT(catalog.lookupCollectionByUUID(opCtx.get(), colUUID) == nullptr);
+    ASSERT_EQUALS(*catalog.lookupNSSByUUID(opCtx.get(), colUUID), nss);
+
+    {
+        Lock::GlobalLock globalLk(opCtx.get(), MODE_X);
+        catalog.onOpenCatalog(opCtx.get());
+    }
+
+    ASSERT_EQUALS(catalog.lookupNSSByUUID(opCtx.get(), colUUID), boost::none);
 }
 
 TEST_F(CollectionCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsNewlyCreatedNSS) {
@@ -464,17 +474,25 @@ TEST_F(CollectionCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsNewlyCreated
     auto newCol = newCollShared.get();
 
     // Ensure that looking up non-existing UUIDs doesn't affect later registration of those UUIDs.
-    catalog.onCloseCatalog(&opCtx);
-    ASSERT(catalog.lookupCollectionByUUID(&opCtx, newUUID) == nullptr);
-    ASSERT_EQUALS(catalog.lookupNSSByUUID(&opCtx, newUUID), boost::none);
-    catalog.registerCollection(&opCtx, newUUID, std::move(newCollShared));
-    ASSERT_EQUALS(catalog.lookupCollectionByUUID(&opCtx, newUUID), newCol);
-    ASSERT_EQUALS(*catalog.lookupNSSByUUID(&opCtx, colUUID), nss);
+    {
+        Lock::GlobalLock globalLk(opCtx.get(), MODE_X);
+        catalog.onCloseCatalog(opCtx.get());
+    }
+
+    ASSERT(catalog.lookupCollectionByUUID(opCtx.get(), newUUID) == nullptr);
+    ASSERT_EQUALS(catalog.lookupNSSByUUID(opCtx.get(), newUUID), boost::none);
+    catalog.registerCollection(opCtx.get(), newUUID, std::move(newCollShared));
+    ASSERT_EQUALS(catalog.lookupCollectionByUUID(opCtx.get(), newUUID), newCol);
+    ASSERT_EQUALS(*catalog.lookupNSSByUUID(opCtx.get(), colUUID), nss);
 
     // Ensure that collection still exists after opening the catalog again.
-    catalog.onOpenCatalog(&opCtx);
-    ASSERT_EQUALS(catalog.lookupCollectionByUUID(&opCtx, newUUID), newCol);
-    ASSERT_EQUALS(*catalog.lookupNSSByUUID(&opCtx, colUUID), nss);
+    {
+        Lock::GlobalLock globalLk(opCtx.get(), MODE_X);
+        catalog.onOpenCatalog(opCtx.get());
+    }
+
+    ASSERT_EQUALS(catalog.lookupCollectionByUUID(opCtx.get(), newUUID), newCol);
+    ASSERT_EQUALS(*catalog.lookupNSSByUUID(opCtx.get(), colUUID), nss);
 }
 
 TEST_F(CollectionCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsFreshestNSS) {
@@ -482,25 +500,38 @@ TEST_F(CollectionCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsFreshestNSS)
     std::shared_ptr<Collection> newCollShared = std::make_shared<CollectionMock>(newNss);
     auto newCol = newCollShared.get();
 
-    catalog.onCloseCatalog(&opCtx);
-    catalog.deregisterCollection(&opCtx, colUUID);
-    ASSERT(catalog.lookupCollectionByUUID(&opCtx, colUUID) == nullptr);
-    ASSERT_EQUALS(*catalog.lookupNSSByUUID(&opCtx, colUUID), nss);
-    catalog.registerCollection(&opCtx, colUUID, std::move(newCollShared));
-    ASSERT_EQUALS(catalog.lookupCollectionByUUID(&opCtx, colUUID), newCol);
-    ASSERT_EQUALS(*catalog.lookupNSSByUUID(&opCtx, colUUID), newNss);
+    {
+        Lock::GlobalLock globalLk(opCtx.get(), MODE_X);
+        catalog.onCloseCatalog(opCtx.get());
+    }
+
+    catalog.deregisterCollection(opCtx.get(), colUUID);
+    ASSERT(catalog.lookupCollectionByUUID(opCtx.get(), colUUID) == nullptr);
+    ASSERT_EQUALS(*catalog.lookupNSSByUUID(opCtx.get(), colUUID), nss);
+    catalog.registerCollection(opCtx.get(), colUUID, std::move(newCollShared));
+    ASSERT_EQUALS(catalog.lookupCollectionByUUID(opCtx.get(), colUUID), newCol);
+    ASSERT_EQUALS(*catalog.lookupNSSByUUID(opCtx.get(), colUUID), newNss);
 
     // Ensure that collection still exists after opening the catalog again.
-    catalog.onOpenCatalog(&opCtx);
-    ASSERT_EQUALS(catalog.lookupCollectionByUUID(&opCtx, colUUID), newCol);
-    ASSERT_EQUALS(*catalog.lookupNSSByUUID(&opCtx, colUUID), newNss);
+    {
+        Lock::GlobalLock globalLk(opCtx.get(), MODE_X);
+        catalog.onOpenCatalog(opCtx.get());
+    }
+
+    ASSERT_EQUALS(catalog.lookupCollectionByUUID(opCtx.get(), colUUID), newCol);
+    ASSERT_EQUALS(*catalog.lookupNSSByUUID(opCtx.get(), colUUID), newNss);
 }
 
 // Re-opening the catalog should increment the CollectionCatalog's epoch.
 TEST_F(CollectionCatalogTest, CollectionCatalogEpoch) {
     auto originalEpoch = catalog.getEpoch();
-    catalog.onCloseCatalog(&opCtx);
-    catalog.onOpenCatalog(&opCtx);
+
+    {
+        Lock::GlobalLock globalLk(opCtx.get(), MODE_X);
+        catalog.onCloseCatalog(opCtx.get());
+        catalog.onOpenCatalog(opCtx.get());
+    }
+
     auto incrementedEpoch = catalog.getEpoch();
     ASSERT_EQ(originalEpoch + 1, incrementedEpoch);
 }
@@ -523,11 +554,13 @@ TEST_F(CollectionCatalogTest, GetAllCollectionNamesAndGetAllDbNames) {
     for (auto& nss : nsss) {
         std::shared_ptr<Collection> newColl = std::make_shared<CollectionMock>(nss);
         auto uuid = CollectionUUID::gen();
-        catalog.registerCollection(&opCtx, uuid, std::move(newColl));
+        catalog.registerCollection(opCtx.get(), uuid, std::move(newColl));
     }
 
     std::vector<NamespaceString> dCollList = {d1Coll, d2Coll, d3Coll};
-    auto res = catalog.getAllCollectionNamesFromDb(&opCtx, "dbD");
+
+    Lock::DBLock dbLock(opCtx.get(), "dbD", MODE_S);
+    auto res = catalog.getAllCollectionNamesFromDb(opCtx.get(), "dbD");
     std::sort(res.begin(), res.end());
     ASSERT(res == dCollList);
 
@@ -572,15 +605,16 @@ TEST_F(CollectionCatalogTest, GetAllCollectionNamesAndGetAllDbNamesWithUncommitt
     for (auto& nss : nsss) {
         std::shared_ptr<Collection> newColl = std::make_shared<CollectionMock>(nss);
         auto uuid = CollectionUUID::gen();
-        catalog.registerCollection(&opCtx, uuid, std::move(newColl));
+        catalog.registerCollection(opCtx.get(), uuid, std::move(newColl));
     }
 
     // One dbName with only an invisible collection does not appear in dbNames.
     auto invisibleCollA = catalog.lookupCollectionByNamespaceForMetadataWrite(
-        &opCtx, CollectionCatalog::LifetimeMode::kInplace, aColl);
+        opCtx.get(), CollectionCatalog::LifetimeMode::kInplace, aColl);
     invisibleCollA->setCommitted(false);
 
-    auto res = catalog.getAllCollectionNamesFromDb(&opCtx, "dbA");
+    Lock::DBLock dbLock(opCtx.get(), "dbA", MODE_S);
+    auto res = catalog.getAllCollectionNamesFromDb(opCtx.get(), "dbA");
     ASSERT(res.empty());
 
     std::vector<std::string> dbNames = {"dbB", "dbC", "dbD", "testdb"};
@@ -595,10 +629,11 @@ TEST_F(CollectionCatalogTest, GetAllCollectionNamesAndGetAllDbNamesWithUncommitt
         dCollList.erase(std::find(dCollList.begin(), dCollList.end(), nss));
 
         auto invisibleCollD = catalog.lookupCollectionByNamespaceForMetadataWrite(
-            &opCtx, CollectionCatalog::LifetimeMode::kInplace, nss);
+            opCtx.get(), CollectionCatalog::LifetimeMode::kInplace, nss);
         invisibleCollD->setCommitted(false);
 
-        res = catalog.getAllCollectionNamesFromDb(&opCtx, "dbD");
+        Lock::DBLock dbLock(opCtx.get(), "dbD", MODE_S);
+        res = catalog.getAllCollectionNamesFromDb(opCtx.get(), "dbD");
         std::sort(res.begin(), res.end());
         ASSERT(res == dCollList);
 
@@ -611,7 +646,7 @@ TEST_F(CollectionCatalogTest, GetAllCollectionNamesAndGetAllDbNamesWithUncommitt
     // If all dbNames consist only of invisible collections, none of these dbs is visible.
     for (auto& nss : nsss) {
         auto invisibleColl = catalog.lookupCollectionByNamespaceForMetadataWrite(
-            &opCtx, CollectionCatalog::LifetimeMode::kInplace, nss);
+            opCtx.get(), CollectionCatalog::LifetimeMode::kInplace, nss);
         invisibleColl->setCommitted(false);
     }
 

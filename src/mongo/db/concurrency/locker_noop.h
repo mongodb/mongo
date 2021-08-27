@@ -211,7 +211,7 @@ public:
     }
 
     virtual bool isW() const {
-        return true;
+        return false;
     }
 
     virtual bool isR() const {

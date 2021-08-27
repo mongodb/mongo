@@ -32,7 +32,7 @@
 #include "mongo/db/catalog/database_holder_mock.h"
 #include "mongo/db/client.h"
 #include "mongo/db/index_builds_coordinator_mongod.h"
-#include "mongo/db/operation_context_noop.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine_mock.h"
 #include "mongo/unittest/unittest.h"
@@ -72,10 +72,12 @@ void CatalogControlTest::tearDown() {
 }
 
 TEST_F(CatalogControlTest, CloseAndOpenCatalog) {
-    OperationContextNoop opCtx(&cc(), 0);
-    auto map = catalog::closeCatalog(&opCtx);
+    ServiceContext::UniqueOperationContext opCtx = cc().makeOperationContext();
+    Lock::GlobalLock globalLk(opCtx.get(), MODE_X);
+
+    auto map = catalog::closeCatalog(opCtx.get());
     ASSERT_EQUALS(0U, map.size());
-    catalog::openCatalog(&opCtx, {}, Timestamp());
+    catalog::openCatalog(opCtx.get(), {}, Timestamp());
 }
 
 }  // namespace
