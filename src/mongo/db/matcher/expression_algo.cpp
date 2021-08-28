@@ -383,7 +383,7 @@ bool isSubsetOf(const MatchExpression* lhs, const MatchExpression* rhs) {
 
         // geometryElement is '$geometry: {type: ... }'
         auto queryGeometryElement = queryGeometryObj.firstElement();
-        auto details = (MatchDetails*){nullptr};
+        MatchDetails* details = nullptr;
 
         if (GeoMatchExpression::contains(*indexMatchExpression->getGeoContainer(),
                                          GeoExpression::WITHIN,
