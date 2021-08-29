@@ -74,7 +74,7 @@ public:
         std::unique_ptr<CollatorInterface> defaultCollator) {
         const OID epoch = OID::gen();
         std::vector<ChunkType> chunks = {ChunkType{
-            _sourceNss,
+            _sourceUUID,
             ChunkRange{BSON(_currentShardKey << MINKEY), BSON(_currentShardKey << MAXKEY)},
             ChunkVersion(100, 0, epoch, boost::none /* timestamp */),
             _myDonorId}};

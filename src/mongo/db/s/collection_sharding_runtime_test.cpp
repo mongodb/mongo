@@ -57,7 +57,7 @@ protected:
                                                   UUID uuid = UUID::gen()) {
         const OID epoch = OID::gen();
         auto range = ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY));
-        auto chunk = ChunkType(kTestNss,
+        auto chunk = ChunkType(uuid,
                                std::move(range),
                                ChunkVersion(1, 0, epoch, boost::none /* timestamp */),
                                ShardId("other"));
@@ -275,14 +275,15 @@ public:
     }
 
     std::vector<ChunkType> createChunks(const OID& epoch,
+                                        const UUID& uuid,
                                         boost::optional<Timestamp> timestamp = boost::none) {
         auto range1 = ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << 5));
         ChunkType chunk1(
-            kNss, range1, ChunkVersion(1, 0, epoch, timestamp), kShardList[0].getName());
+            uuid, range1, ChunkVersion(1, 0, epoch, timestamp), kShardList[0].getName());
 
         auto range2 = ChunkRange(BSON(kShardKey << 5), BSON(kShardKey << MAXKEY));
         ChunkType chunk2(
-            kNss, range2, ChunkVersion(1, 1, epoch, timestamp), kShardList[0].getName());
+            uuid, range2, ChunkVersion(1, 1, epoch, timestamp), kShardList[0].getName());
 
         return {chunk1, chunk2};
     }
@@ -302,10 +303,10 @@ TEST_F(CollectionShardingRuntimeTestWithMockedLoader,
     const Timestamp timestamp(42);
 
     const auto coll = createCollection(epoch);
-    const auto chunks = createChunks(epoch);
+    const auto chunks = createChunks(epoch, coll.getUuid());
 
     const auto timestampedColl = createCollection(epoch, timestamp);
-    const auto timestampedChunks = createChunks(epoch, timestamp);
+    const auto timestampedChunks = createChunks(epoch, timestampedColl.getUuid(), timestamp);
 
     auto checkForceFilteringMetadataRefresh = [&](const auto& coll, const auto& chunks) {
         auto opCtx = operationContext();
@@ -340,11 +341,11 @@ TEST_F(CollectionShardingRuntimeTestWithMockedLoader,
     const Timestamp timestamp(42);
 
     const auto coll = createCollection(epoch);
-    const auto chunks = createChunks(epoch);
+    const auto chunks = createChunks(epoch, coll.getUuid());
     const auto collVersion = chunks.back().getVersion();
 
     const auto timestampedColl = createCollection(epoch, timestamp);
-    const auto timestampedChunks = createChunks(epoch, timestamp);
+    const auto timestampedChunks = createChunks(epoch, timestampedColl.getUuid(), timestamp);
     const auto timestampedCollVersion = timestampedChunks.back().getVersion();
 
     auto opCtx = operationContext();

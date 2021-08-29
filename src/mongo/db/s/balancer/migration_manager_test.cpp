@@ -71,18 +71,18 @@ protected:
      * Sets up mock network to expect a moveChunk command and returns a fixed BSON response or a
      * "returnStatus".
      */
-    void expectMoveChunkCommand(const ChunkType& chunk,
+    void expectMoveChunkCommand(const NamespaceString& nss,
+                                const ChunkType& chunk,
                                 const ShardId& toShardId,
                                 const BSONObj& response) {
-        onCommand([&chunk, &toShardId, &response](const RemoteCommandRequest& request) {
+        onCommand([&nss, &chunk, &toShardId, &response](const RemoteCommandRequest& request) {
             NamespaceString nss(request.cmdObj.firstElement().valueStringData());
-            ASSERT_EQ(chunk.getNS(), nss);
 
             const StatusWith<MoveChunkRequest> moveChunkRequestWithStatus =
                 MoveChunkRequest::createFromCommand(nss, request.cmdObj);
             ASSERT_OK(moveChunkRequestWithStatus.getStatus());
 
-            ASSERT_EQ(chunk.getNS(), moveChunkRequestWithStatus.getValue().getNss());
+            ASSERT_EQ(nss, moveChunkRequestWithStatus.getValue().getNss());
             ASSERT_BSONOBJ_EQ(chunk.getMin(), moveChunkRequestWithStatus.getValue().getMinKey());
             ASSERT_BSONOBJ_EQ(chunk.getMax(), moveChunkRequestWithStatus.getValue().getMaxKey());
             ASSERT_EQ(chunk.getShard(), moveChunkRequestWithStatus.getValue().getFromShardId());
@@ -93,12 +93,13 @@ protected:
         });
     }
 
-    void expectMoveChunkCommand(const ChunkType& chunk,
+    void expectMoveChunkCommand(const NamespaceString& nss,
+                                const ChunkType& chunk,
                                 const ShardId& toShardId,
                                 const Status& returnStatus) {
         BSONObjBuilder resultBuilder;
         CommandHelpers::appendCommandStatusNoThrow(resultBuilder, returnStatus);
-        expectMoveChunkCommand(chunk, toShardId, resultBuilder.obj());
+        expectMoveChunkCommand(nss, chunk, toShardId, resultBuilder.obj());
     }
 
     std::unique_ptr<MigrationManager> _migrationManager;
@@ -156,8 +157,8 @@ TEST_F(MigrationManagerTest, OneCollectionTwoMigrations) {
     });
 
     // Expect two moveChunk commands.
-    expectMoveChunkCommand(chunk1, kShardId1, Status::OK());
-    expectMoveChunkCommand(chunk2, kShardId3, Status::OK());
+    expectMoveChunkCommand(collName, chunk1, kShardId1, Status::OK());
+    expectMoveChunkCommand(collName, chunk2, kShardId3, Status::OK());
 
     // Run the MigrationManager code.
     future.default_timed_get();
@@ -232,10 +233,10 @@ TEST_F(MigrationManagerTest, TwoCollectionsTwoMigrationsEach) {
     });
 
     // Expect four moveChunk commands.
-    expectMoveChunkCommand(chunk1coll1, kShardId1, Status::OK());
-    expectMoveChunkCommand(chunk2coll1, kShardId3, Status::OK());
-    expectMoveChunkCommand(chunk1coll2, kShardId1, Status::OK());
-    expectMoveChunkCommand(chunk2coll2, kShardId3, Status::OK());
+    expectMoveChunkCommand(collName1, chunk1coll1, kShardId1, Status::OK());
+    expectMoveChunkCommand(collName1, chunk2coll1, kShardId3, Status::OK());
+    expectMoveChunkCommand(collName2, chunk1coll2, kShardId1, Status::OK());
+    expectMoveChunkCommand(collName2, chunk2coll2, kShardId3, Status::OK());
 
     // Run the MigrationManager code.
     future.default_timed_get();
@@ -296,7 +297,7 @@ TEST_F(MigrationManagerTest, SourceShardNotFound) {
     });
 
     // Expect only one moveChunk command to be called.
-    expectMoveChunkCommand(chunk1, kShardId1, Status::OK());
+    expectMoveChunkCommand(collName, chunk1, kShardId1, Status::OK());
 
     // Run the MigrationManager code.
     future.default_timed_get();
@@ -343,7 +344,7 @@ TEST_F(MigrationManagerTest, JumboChunkResponseBackwardsCompatibility) {
     });
 
     // Expect only one moveChunk command to be called.
-    expectMoveChunkCommand(chunk1, kShardId1, BSON("ok" << 0 << "chunkTooBig" << true));
+    expectMoveChunkCommand(collName, chunk1, kShardId1, BSON("ok" << 0 << "chunkTooBig" << true));
 
     // Run the MigrationManager code.
     future.default_timed_get();
@@ -490,7 +491,7 @@ TEST_F(MigrationManagerTest, RestartMigrationManager) {
     });
 
     // Expect only one moveChunk command to be called.
-    expectMoveChunkCommand(chunk1, kShardId1, Status::OK());
+    expectMoveChunkCommand(collName, chunk1, kShardId1, Status::OK());
 
     // Run the MigrationManager code.
     future.default_timed_get();
@@ -523,8 +524,8 @@ TEST_F(MigrationManagerTest, MigrationRecovery) {
     _migrationManager->interruptAndDisableMigrations();
     _migrationManager->drainActiveMigrations();
 
-    setUpMigration(chunk1, kShardId1.toString());
-    setUpMigration(chunk2, kShardId3.toString());
+    setUpMigration(collName, chunk1, kShardId1.toString());
+    setUpMigration(collName, chunk2, kShardId3.toString());
 
     // Mimic all config distlocks being released on config server stepup to primary.
     DistLockManager::get(operationContext())->unlockAll(operationContext());
@@ -544,8 +545,8 @@ TEST_F(MigrationManagerTest, MigrationRecovery) {
     });
 
     // Expect two moveChunk commands.
-    expectMoveChunkCommand(chunk1, kShardId1, Status::OK());
-    expectMoveChunkCommand(chunk2, kShardId3, Status::OK());
+    expectMoveChunkCommand(collName, chunk1, kShardId1, Status::OK());
+    expectMoveChunkCommand(collName, chunk2, kShardId3, Status::OK());
 
     // Run the MigrationManager code.
     future.default_timed_get();
@@ -577,7 +578,7 @@ TEST_F(MigrationManagerTest, FailMigrationRecovery) {
     _migrationManager->interruptAndDisableMigrations();
     _migrationManager->drainActiveMigrations();
 
-    setUpMigration(chunk1, kShardId1.toString());
+    setUpMigration(collName, chunk1, kShardId1.toString());
 
     // Set up a fake active migration document that will fail MigrationType parsing -- missing
     // field.
@@ -663,6 +664,7 @@ TEST_F(MigrationManagerTest, RemoteCallErrorConversionToOperationFailed) {
 
     // Expect a moveChunk command that will fail with a retriable error.
     expectMoveChunkCommand(
+        collName,
         chunk1,
         kShardId1,
         Status(ErrorCodes::NotPrimaryOrSecondary,
@@ -670,6 +672,7 @@ TEST_F(MigrationManagerTest, RemoteCallErrorConversionToOperationFailed) {
 
     // Expect a moveChunk command that will fail with a replset monitor updating error.
     expectMoveChunkCommand(
+        collName,
         chunk2,
         kShardId3,
         Status(ErrorCodes::NetworkInterfaceExceededTimeLimit,

@@ -72,6 +72,15 @@ public:
      */
     static BSONObj serializeToRebalanceCommandForConfig(const ChunkType& chunk);
 
+    // an pre 5.1 mongos might send the namespace instead of the UUID
+    const boost::optional<NamespaceString>& getNss() const {
+        return _nss;
+    }
+
+    void setCollectionUUID(UUID const& uuid) {
+        _chunk.setCollectionUUID(uuid);
+    }
+
     const ChunkType& getChunk() const {
         return _chunk;
     }
@@ -102,6 +111,9 @@ public:
 
 private:
     BalanceChunkRequest(ChunkType chunk, MigrationSecondaryThrottleOptions secondaryThrottle);
+
+    // legacy code might send the namespace instead of UUID
+    boost::optional<NamespaceString> _nss;
 
     // Complete description of the chunk to be manipulated
     ChunkType _chunk;

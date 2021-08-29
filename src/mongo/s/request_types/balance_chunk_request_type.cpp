@@ -40,6 +40,7 @@ namespace mongo {
 namespace {
 
 const char kConfigSvrMoveChunk[] = "_configsvrMoveChunk";
+const char kNS[] = "ns";
 const char kMaxChunkSizeBytes[] = "maxChunkSizeBytes";
 const char kToShardId[] = "toShard";
 const char kSecondaryThrottle[] = "secondaryThrottle";
@@ -58,7 +59,30 @@ BalanceChunkRequest::BalanceChunkRequest(ChunkType chunk,
     : _chunk(std::move(chunk)), _secondaryThrottle(std::move(secondaryThrottle)) {}
 
 StatusWith<BalanceChunkRequest> BalanceChunkRequest::parseFromConfigCommand(const BSONObj& obj) {
-    auto chunkStatus = ChunkType::parseFromConfigBSONCommand(obj);
+
+    boost::optional<NamespaceString> nss;
+    {
+        std::string chunkNS;
+        Status status = bsonExtractStringField(obj, kNS, &chunkNS);
+        if (status.isOK()) {
+            nss = NamespaceString(chunkNS);
+        } else if (status != ErrorCodes::NoSuchKey) {
+            return status;
+        }
+    }
+
+    const auto chunkStatus = [&]() {
+        if (nss) {
+            // Append an empty UUID because the ChunkType code expects it
+            BSONObjBuilder copy;
+            copy.appendElements(obj);
+            std::array<unsigned char, UUID::kNumBytes> empty;
+            UUID::fromCDR(empty).appendToBuilder(&copy, ChunkType::collectionUUID.name());
+            return ChunkType::parseFromConfigBSONCommand(copy.obj());
+        }
+        return ChunkType::parseFromConfigBSONCommand(obj);
+    }();
+
     if (!chunkStatus.isOK()) {
         return chunkStatus.getStatus();
     }
@@ -88,7 +112,7 @@ StatusWith<BalanceChunkRequest> BalanceChunkRequest::parseFromConfigCommand(cons
 
     BalanceChunkRequest request(std::move(chunkStatus.getValue()),
                                 std::move(secondaryThrottleStatus.getValue()));
-
+    request._nss = nss;
     {
         Status status =
             bsonExtractBooleanFieldWithDefault(obj, kWaitForDelete, false, &request._waitForDelete);
@@ -154,6 +178,8 @@ BSONObj BalanceChunkRequest::serializeToMoveCommandForConfig(
     BSONObjBuilder cmdBuilder;
     cmdBuilder.append(kConfigSvrMoveChunk, 1);
     cmdBuilder.appendElements(chunk.toConfigBSON());
+    // ChunkType::toConfigBSON() no longer adds the epoch
+    cmdBuilder.append(ChunkType::lastmod() + "Epoch", chunk.getVersion().epoch());
     cmdBuilder.append(kToShardId, newShardId.toString());
     cmdBuilder.append(kMaxChunkSizeBytes, static_cast<long long>(maxChunkSizeBytes));
     {
@@ -175,6 +201,8 @@ BSONObj BalanceChunkRequest::serializeToRebalanceCommandForConfig(const ChunkTyp
     BSONObjBuilder cmdBuilder;
     cmdBuilder.append(kConfigSvrMoveChunk, 1);
     cmdBuilder.appendElements(chunk.toConfigBSON());
+    // ChunkType::toConfigBSON() no longer returns the epoch
+    cmdBuilder.append(ChunkType::lastmod() + "Epoch", chunk.getVersion().epoch());
     cmdBuilder.append(WriteConcernOptions::kWriteConcernField,
                       kMajorityWriteConcernNoTimeout.toBSON());
 

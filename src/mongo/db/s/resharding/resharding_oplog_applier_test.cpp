@@ -167,18 +167,18 @@ public:
         const OID epoch = OID::gen();
         std::vector<ChunkType> chunks = {
             ChunkType{
-                kCrudNs,
+                kCrudUUID,
                 ChunkRange{BSON(kOriginalShardKey << MINKEY),
                            BSON(kOriginalShardKey << -std::numeric_limits<double>::infinity())},
                 ChunkVersion(1, 0, epoch, boost::none /* timestamp */),
                 _sourceId.getShardId()},
             ChunkType{
-                kCrudNs,
+                kCrudUUID,
                 ChunkRange{BSON(kOriginalShardKey << -std::numeric_limits<double>::infinity()),
                            BSON(kOriginalShardKey << 0)},
                 ChunkVersion(1, 0, epoch, boost::none /* timestamp */),
                 kOtherShardId},
-            ChunkType{kCrudNs,
+            ChunkType{kCrudUUID,
                       ChunkRange{BSON(kOriginalShardKey << 0), BSON(kOriginalShardKey << MAXKEY)},
                       ChunkVersion(1, 0, epoch, boost::none /* timestamp */),
                       _sourceId.getShardId()}};

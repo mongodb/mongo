@@ -68,7 +68,7 @@ RoutingTableHistory splitChunk(const RoutingTableHistory& rt,
     for (const auto& range : newChunkRanges) {
         // Chunks must be inserted ordered by version
         curVersion.incMajor();
-        newChunks.emplace_back(kNss, range, curVersion, kThisShard);
+        newChunks.emplace_back(*rt.getUUID(), range, curVersion, kThisShard);
     }
 
     return rt.makeUpdated(boost::none, boost::none, true, newChunks);
@@ -150,18 +150,19 @@ void assertCorrectBytesWritten(const RoutingTableHistory& rt,
 class RoutingTableHistoryTest : public unittest::Test {
 public:
     void setUp() override {
+        const UUID uuid = UUID::gen();
         const OID epoch = OID::gen();
         const Timestamp kRouting(100, 0);
         ChunkVersion version{1, 0, epoch, boost::none /* timestamp */};
 
         auto initChunk =
-            ChunkType{kNss,
+            ChunkType{uuid,
                       ChunkRange{_shardKeyPattern.globalMin(), _shardKeyPattern.globalMax()},
                       version,
                       kThisShard};
 
         _rt.emplace(RoutingTableHistory::makeNew(kNss,
-                                                 UUID::gen(),
+                                                 uuid,
                                                  _shardKeyPattern,
                                                  nullptr,
                                                  false,
@@ -327,17 +328,18 @@ TEST_F(RoutingTableHistoryTestThreeInitialChunks,
 }
 
 TEST_F(RoutingTableHistoryTest, TestSplits) {
+    const UUID uuid = UUID::gen();
     const OID epoch = OID::gen();
     ChunkVersion version{1, 0, epoch, boost::none /* timestamp */};
 
     auto chunkAll =
-        ChunkType{kNss,
+        ChunkType{uuid,
                   ChunkRange{getShardKeyPattern().globalMin(), getShardKeyPattern().globalMax()},
                   version,
                   kThisShard};
 
     auto rt = RoutingTableHistory::makeNew(kNss,
-                                           UUID::gen(),
+                                           uuid,
                                            getShardKeyPattern(),
                                            nullptr,
                                            false,
@@ -350,11 +352,11 @@ TEST_F(RoutingTableHistoryTest, TestSplits) {
                                            {chunkAll});
 
     std::vector<ChunkType> chunks1 = {
-        ChunkType{kNss,
+        ChunkType{uuid,
                   ChunkRange{getShardKeyPattern().globalMin(), BSON("a" << 0)},
                   ChunkVersion{2, 1, epoch, boost::none /* timestamp */},
                   kThisShard},
-        ChunkType{kNss,
+        ChunkType{uuid,
                   ChunkRange{BSON("a" << 0), getShardKeyPattern().globalMax()},
                   ChunkVersion{2, 2, epoch, boost::none /* timestamp */},
                   kThisShard}};
@@ -364,15 +366,15 @@ TEST_F(RoutingTableHistoryTest, TestSplits) {
     ASSERT_EQ(v1, rt1.getVersion(kThisShard));
 
     std::vector<ChunkType> chunks2 = {
-        ChunkType{kNss,
+        ChunkType{uuid,
                   ChunkRange{BSON("a" << 0), getShardKeyPattern().globalMax()},
                   ChunkVersion{2, 2, epoch, boost::none /* timestamp */},
                   kThisShard},
-        ChunkType{kNss,
+        ChunkType{uuid,
                   ChunkRange{getShardKeyPattern().globalMin(), BSON("a" << -1)},
                   ChunkVersion{3, 1, epoch, boost::none /* timestamp */},
                   kThisShard},
-        ChunkType{kNss,
+        ChunkType{uuid,
                   ChunkRange{BSON("a" << -1), BSON("a" << 0)},
                   ChunkVersion{3, 2, epoch, boost::none /* timestamp */},
                   kThisShard}};
@@ -383,16 +385,17 @@ TEST_F(RoutingTableHistoryTest, TestSplits) {
 }
 
 TEST_F(RoutingTableHistoryTest, TestReplaceEmptyChunk) {
+    const UUID uuid = UUID::gen();
     const OID epoch = OID::gen();
 
     std::vector<ChunkType> initialChunks = {
-        ChunkType{kNss,
+        ChunkType{uuid,
                   ChunkRange{getShardKeyPattern().globalMin(), getShardKeyPattern().globalMax()},
                   ChunkVersion{1, 0, epoch, boost::none /* timestamp */},
                   kThisShard}};
 
     auto rt = RoutingTableHistory::makeNew(kNss,
-                                           UUID::gen(),
+                                           uuid,
                                            getShardKeyPattern(),
                                            nullptr,
                                            false,
@@ -406,11 +409,11 @@ TEST_F(RoutingTableHistoryTest, TestReplaceEmptyChunk) {
     ASSERT_EQ(rt.numChunks(), 1);
 
     std::vector<ChunkType> changedChunks = {
-        ChunkType{kNss,
+        ChunkType{uuid,
                   ChunkRange{getShardKeyPattern().globalMin(), BSON("a" << 0)},
                   ChunkVersion{2, 1, epoch, boost::none /* timestamp */},
                   kThisShard},
-        ChunkType{kNss,
+        ChunkType{uuid,
                   ChunkRange{BSON("a" << 0), getShardKeyPattern().globalMax()},
                   ChunkVersion{2, 2, epoch, boost::none /* timestamp */},
                   kThisShard}};
@@ -435,16 +438,17 @@ TEST_F(RoutingTableHistoryTest, TestReplaceEmptyChunk) {
 }
 
 TEST_F(RoutingTableHistoryTest, TestUseLatestVersions) {
+    const UUID uuid = UUID::gen();
     const OID epoch = OID::gen();
 
     std::vector<ChunkType> initialChunks = {
-        ChunkType{kNss,
+        ChunkType{uuid,
                   ChunkRange{getShardKeyPattern().globalMin(), getShardKeyPattern().globalMax()},
                   ChunkVersion{1, 0, epoch, boost::none /* timestamp */},
                   kThisShard}};
 
     auto rt = RoutingTableHistory::makeNew(kNss,
-                                           UUID::gen(),
+                                           uuid,
                                            getShardKeyPattern(),
                                            nullptr,
                                            false,
@@ -458,15 +462,15 @@ TEST_F(RoutingTableHistoryTest, TestUseLatestVersions) {
     ASSERT_EQ(rt.numChunks(), 1);
 
     std::vector<ChunkType> changedChunks = {
-        ChunkType{kNss,
+        ChunkType{uuid,
                   ChunkRange{getShardKeyPattern().globalMin(), getShardKeyPattern().globalMax()},
                   ChunkVersion{1, 0, epoch, boost::none /* timestamp */},
                   kThisShard},
-        ChunkType{kNss,
+        ChunkType{uuid,
                   ChunkRange{getShardKeyPattern().globalMin(), BSON("a" << 0)},
                   ChunkVersion{2, 1, epoch, boost::none /* timestamp */},
                   kThisShard},
-        ChunkType{kNss,
+        ChunkType{uuid,
                   ChunkRange{BSON("a" << 0), getShardKeyPattern().globalMax()},
                   ChunkVersion{2, 2, epoch, boost::none /* timestamp */},
                   kThisShard}};
@@ -478,20 +482,21 @@ TEST_F(RoutingTableHistoryTest, TestUseLatestVersions) {
 }
 
 TEST_F(RoutingTableHistoryTest, TestOutOfOrderVersion) {
+    const UUID uuid = UUID::gen();
     const OID epoch = OID::gen();
 
     std::vector<ChunkType> initialChunks = {
-        ChunkType{kNss,
+        ChunkType{uuid,
                   ChunkRange{getShardKeyPattern().globalMin(), BSON("a" << 0)},
                   ChunkVersion{2, 1, epoch, boost::none /* timestamp */},
                   kThisShard},
-        ChunkType{kNss,
+        ChunkType{uuid,
                   ChunkRange{BSON("a" << 0), getShardKeyPattern().globalMax()},
                   ChunkVersion{2, 2, epoch, boost::none /* timestamp */},
                   kThisShard}};
 
     auto rt = RoutingTableHistory::makeNew(kNss,
-                                           UUID::gen(),
+                                           uuid,
                                            getShardKeyPattern(),
                                            nullptr,
                                            false,
@@ -505,11 +510,11 @@ TEST_F(RoutingTableHistoryTest, TestOutOfOrderVersion) {
     ASSERT_EQ(rt.numChunks(), 2);
 
     std::vector<ChunkType> changedChunks = {
-        ChunkType{kNss,
+        ChunkType{uuid,
                   ChunkRange{BSON("a" << 0), getShardKeyPattern().globalMax()},
                   ChunkVersion{3, 0, epoch, boost::none /* timestamp */},
                   kThisShard},
-        ChunkType{kNss,
+        ChunkType{uuid,
                   ChunkRange{getShardKeyPattern().globalMin(), BSON("a" << 0)},
                   ChunkVersion{3, 1, epoch, boost::none /* timestamp */},
                   kThisShard}};
@@ -526,24 +531,25 @@ TEST_F(RoutingTableHistoryTest, TestOutOfOrderVersion) {
 }
 
 TEST_F(RoutingTableHistoryTest, TestMergeChunks) {
+    const UUID uuid = UUID::gen();
     const OID epoch = OID::gen();
 
     std::vector<ChunkType> initialChunks = {
-        ChunkType{kNss,
+        ChunkType{uuid,
                   ChunkRange{BSON("a" << 0), BSON("a" << 10)},
                   ChunkVersion{2, 0, epoch, boost::none /* timestamp */},
                   kThisShard},
-        ChunkType{kNss,
+        ChunkType{uuid,
                   ChunkRange{getShardKeyPattern().globalMin(), BSON("a" << 0)},
                   ChunkVersion{2, 1, epoch, boost::none /* timestamp */},
                   kThisShard},
-        ChunkType{kNss,
+        ChunkType{uuid,
                   ChunkRange{BSON("a" << 10), getShardKeyPattern().globalMax()},
                   ChunkVersion{2, 2, epoch, boost::none /* timestamp */},
                   kThisShard}};
 
     auto rt = RoutingTableHistory::makeNew(kNss,
-                                           UUID::gen(),
+                                           uuid,
                                            getShardKeyPattern(),
                                            nullptr,
                                            false,
@@ -558,11 +564,11 @@ TEST_F(RoutingTableHistoryTest, TestMergeChunks) {
     ASSERT_EQ(rt.getVersion(), ChunkVersion(2, 2, epoch, boost::none /* timestamp */));
 
     std::vector<ChunkType> changedChunks = {
-        ChunkType{kNss,
+        ChunkType{uuid,
                   ChunkRange{BSON("a" << 10), getShardKeyPattern().globalMax()},
                   ChunkVersion{3, 0, epoch, boost::none /* timestamp */},
                   kThisShard},
-        ChunkType{kNss,
+        ChunkType{uuid,
                   ChunkRange{getShardKeyPattern().globalMin(), BSON("a" << 10)},
                   ChunkVersion{3, 1, epoch, boost::none /* timestamp */},
                   kThisShard}};
@@ -574,24 +580,25 @@ TEST_F(RoutingTableHistoryTest, TestMergeChunks) {
 }
 
 TEST_F(RoutingTableHistoryTest, TestMergeChunksOrdering) {
+    const UUID uuid = UUID::gen();
     const OID epoch = OID::gen();
 
     std::vector<ChunkType> initialChunks = {
-        ChunkType{kNss,
+        ChunkType{uuid,
                   ChunkRange{BSON("a" << -10), getShardKeyPattern().globalMax()},
                   ChunkVersion{2, 0, epoch, boost::none /* timestamp */},
                   kThisShard},
-        ChunkType{kNss,
+        ChunkType{uuid,
                   ChunkRange{getShardKeyPattern().globalMin(), BSON("a" << -500)},
                   ChunkVersion{2, 1, epoch, boost::none /* timestamp */},
                   kThisShard},
-        ChunkType{kNss,
+        ChunkType{uuid,
                   ChunkRange{BSON("a" << -500), BSON("a" << -10)},
                   ChunkVersion{2, 2, epoch, boost::none /* timestamp */},
                   kThisShard}};
 
     auto rt = RoutingTableHistory::makeNew(kNss,
-                                           UUID::gen(),
+                                           uuid,
                                            getShardKeyPattern(),
                                            nullptr,
                                            false,
@@ -606,11 +613,11 @@ TEST_F(RoutingTableHistoryTest, TestMergeChunksOrdering) {
     ASSERT_EQ(rt.getVersion(), ChunkVersion(2, 2, epoch, boost::none /* timestamp */));
 
     std::vector<ChunkType> changedChunks = {
-        ChunkType{kNss,
+        ChunkType{uuid,
                   ChunkRange{BSON("a" << -500), BSON("a" << -10)},
                   ChunkVersion{2, 2, epoch, boost::none /* timestamp */},
                   kThisShard},
-        ChunkType{kNss,
+        ChunkType{uuid,
                   ChunkRange{getShardKeyPattern().globalMin(), BSON("a" << -10)},
                   ChunkVersion{3, 1, epoch, boost::none /* timestamp */},
                   kThisShard}};
@@ -627,30 +634,31 @@ TEST_F(RoutingTableHistoryTest, TestMergeChunksOrdering) {
 }
 
 TEST_F(RoutingTableHistoryTest, TestFlatten) {
+    const UUID uuid = UUID::gen();
     const OID epoch = OID::gen();
 
     std::vector<ChunkType> initialChunks = {
-        ChunkType{kNss,
+        ChunkType{uuid,
                   ChunkRange{getShardKeyPattern().globalMin(), BSON("a" << 10)},
                   ChunkVersion{2, 0, epoch, boost::none /* timestamp */},
                   kThisShard},
-        ChunkType{kNss,
+        ChunkType{uuid,
                   ChunkRange{BSON("a" << 10), BSON("a" << 20)},
                   ChunkVersion{2, 1, epoch, boost::none /* timestamp */},
                   kThisShard},
-        ChunkType{kNss,
+        ChunkType{uuid,
                   ChunkRange{BSON("a" << 20), getShardKeyPattern().globalMax()},
                   ChunkVersion{2, 2, epoch, boost::none /* timestamp */},
                   kThisShard},
-        ChunkType{kNss,
+        ChunkType{uuid,
                   ChunkRange{getShardKeyPattern().globalMin(), getShardKeyPattern().globalMax()},
                   ChunkVersion{3, 0, epoch, boost::none /* timestamp */},
                   kThisShard},
-        ChunkType{kNss,
+        ChunkType{uuid,
                   ChunkRange{getShardKeyPattern().globalMin(), BSON("a" << 10)},
                   ChunkVersion{4, 0, epoch, boost::none /* timestamp */},
                   kThisShard},
-        ChunkType{kNss,
+        ChunkType{uuid,
                   ChunkRange{BSON("a" << 10), getShardKeyPattern().globalMax()},
                   ChunkVersion{4, 1, epoch, boost::none /* timestamp */},
                   kThisShard},

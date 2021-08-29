@@ -511,9 +511,9 @@ void removeChunkAndTagsDocs(OperationContext* opCtx,
         opCtx,
         TagsType::ConfigNS,
         BatchedCommandRequest::buildDeleteOp(TagsType::ConfigNS,
-                                             BSON(ChunkType::ns(ns.ns())),  // query
-                                             true,                          // multi
-                                             hint                           // hint
+                                             BSON(TagsType::ns(ns.ns())),  // query
+                                             true,                         // multi
+                                             hint                          // hint
                                              ),
         txnNumber);
 }
@@ -821,25 +821,17 @@ ReshardingCoordinatorExternalStateImpl::calculateParticipantShardsAndChunks(
 
     if (const auto& chunks = coordinatorDoc.getPresetReshardedChunks()) {
         auto version = calculateChunkVersionForInitialChunks(opCtx);
+        invariant(version.getTimestamp());
 
         // Use the provided shardIds from presetReshardedChunks to construct the
         // recipient list.
         for (const auto& reshardedChunk : *chunks) {
             recipientShardIds.emplace(reshardedChunk.getRecipientShardId());
 
-            if (version.getTimestamp()) {
-                initialChunks.emplace_back(
-                    coordinatorDoc.getReshardingUUID(),
-                    ChunkRange{reshardedChunk.getMin(), reshardedChunk.getMax()},
-                    version,
-                    reshardedChunk.getRecipientShardId());
-            } else {
-                initialChunks.emplace_back(
-                    coordinatorDoc.getTempReshardingNss(),
-                    ChunkRange{reshardedChunk.getMin(), reshardedChunk.getMax()},
-                    version,
-                    reshardedChunk.getRecipientShardId());
-            }
+            initialChunks.emplace_back(coordinatorDoc.getReshardingUUID(),
+                                       ChunkRange{reshardedChunk.getMin(), reshardedChunk.getMax()},
+                                       version,
+                                       reshardedChunk.getRecipientShardId());
             version.incMinor();
         }
     } else {

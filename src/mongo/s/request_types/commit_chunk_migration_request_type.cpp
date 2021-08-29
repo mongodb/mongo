@@ -164,7 +164,12 @@ void CommitChunkMigrationRequest::appendAsCommand(BSONObjBuilder* builder,
     builder->append(kConfigSvrCommitChunkMigration, nss.ns());
     builder->append(kFromShard, fromShard.toString());
     builder->append(kToShard, toShard.toString());
-    builder->append(kMigratedChunk, migratedChunk.toConfigBSON());
+    {
+        BSONObjBuilder migrateChunk(builder->subobjStart(kMigratedChunk));
+        migrateChunk.appendElements(migratedChunk.toConfigBSON());
+        // ChunkType::toConfigBSON() no longer adds the epoch
+        migrateChunk.append(ChunkType::lastmod() + "Epoch", migratedChunk.getVersion().epoch());
+    }
     fromShardCollectionVersion.appendWithField(builder, kFromShardCollectionVersion);
 
     builder->append(kValidAfter, validAfter);

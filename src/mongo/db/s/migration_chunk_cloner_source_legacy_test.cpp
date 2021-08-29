@@ -175,7 +175,7 @@ protected:
                 boost::none /* resharding Fields */,
                 boost::none /* chunkSizeBytes */,
                 true,
-                {ChunkType{kNss,
+                {ChunkType{uuid,
                            ChunkRange{BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY)},
                            ChunkVersion(1, 0, epoch, boost::none /* timestamp */),
                            ShardId("dummyShardId")}});

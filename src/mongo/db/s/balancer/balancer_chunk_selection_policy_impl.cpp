@@ -76,7 +76,7 @@ StatusWith<DistributionStatus> createCollectionDistributionStatus(
 
     chunkMgr.forEachChunk([&](const auto& chunkEntry) {
         ChunkType chunk;
-        chunk.setNS(nss);
+        chunk.setCollectionUUID(*chunkMgr.getUUID());
         chunk.setMin(chunkEntry.getMin());
         chunk.setMax(chunkEntry.getMax());
         chunk.setJumbo(chunkEntry.isJumbo());
@@ -442,7 +442,10 @@ BalancerChunkSelectionPolicyImpl::selectSpecificChunkToMove(OperationContext* op
 
     const auto& shardStats = shardStatsStatus.getValue();
 
-    const auto& nss = chunk.getNS();
+    const CollectionType collection = Grid::get(opCtx)->catalogClient()->getCollection(
+        opCtx, chunk.getCollectionUUID(), repl::ReadConcernLevel::kLocalReadConcern);
+
+    const auto& nss = collection.getNss();
 
     auto routingInfoStatus =
         Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx, nss);
@@ -470,7 +473,10 @@ Status BalancerChunkSelectionPolicyImpl::checkMoveAllowed(OperationContext* opCt
         return shardStatsStatus.getStatus();
     }
 
-    const auto& nss = chunk.getNS();
+    const CollectionType collection = Grid::get(opCtx)->catalogClient()->getCollection(
+        opCtx, chunk.getCollectionUUID(), repl::ReadConcernLevel::kLocalReadConcern);
+    const auto& nss = collection.getNss();
+
 
     auto shardStats = std::move(shardStatsStatus.getValue());
 

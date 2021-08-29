@@ -73,11 +73,7 @@ ChunkType MigrationTestFixture::setUpChunk(const NamespaceString& collName,
                                            const ShardId& shardId,
                                            const ChunkVersion& version) {
     ChunkType chunk;
-    // The ns is not present in 5.0 chunks but some testing utils rely on it
-    chunk.setNS(collName);
-
-    if (version.getTimestamp())
-        chunk.setCollectionUUID(collUUID);
+    chunk.setCollectionUUID(collUUID);
 
     chunk.setMin(chunkMin);
     chunk.setMax(chunkMax);
@@ -105,26 +101,27 @@ void MigrationTestFixture::setUpTags(const NamespaceString& collName,
     }
 }
 
-void MigrationTestFixture::removeAllDocs(const NamespaceString& configNS,
-                                         const NamespaceString& collName) {
+void MigrationTestFixture::removeAllTags(const NamespaceString& collName) {
     const auto query = BSON("ns" << collName.ns());
     ASSERT_OK(catalogClient()->removeConfigDocuments(
-        operationContext(), configNS, query, kMajorityWriteConcern));
-    auto findStatus = findOneOnConfigCollection(operationContext(), configNS, query);
+        operationContext(), TagsType::ConfigNS, query, kMajorityWriteConcern));
+    auto findStatus = findOneOnConfigCollection(operationContext(), collName, query);
     ASSERT_EQ(ErrorCodes::NoMatchingDocument, findStatus);
 }
 
-void MigrationTestFixture::removeAllTags(const NamespaceString& collName) {
-    removeAllDocs(TagsType::ConfigNS, collName);
+void MigrationTestFixture::removeAllChunks(const NamespaceString& collName, const UUID& uuid) {
+    const auto query = BSON("uuid" << uuid);
+    ASSERT_OK(catalogClient()->removeConfigDocuments(
+        operationContext(), ChunkType::ConfigNS, query, kMajorityWriteConcern));
+    auto findStatus = findOneOnConfigCollection(operationContext(), collName, query);
+    ASSERT_EQ(ErrorCodes::NoMatchingDocument, findStatus);
 }
 
-void MigrationTestFixture::removeAllChunks(const NamespaceString& collName) {
-    removeAllDocs(ChunkType::ConfigNS, collName);
-}
-
-void MigrationTestFixture::setUpMigration(const ChunkType& chunk, const ShardId& toShard) {
+void MigrationTestFixture::setUpMigration(const NamespaceString& ns,
+                                          const ChunkType& chunk,
+                                          const ShardId& toShard) {
     BSONObjBuilder builder;
-    builder.append(MigrationType::ns(), chunk.getNS().ns());
+    builder.append(MigrationType::ns(), ns.ns());
     builder.append(MigrationType::min(), chunk.getMin());
     builder.append(MigrationType::max(), chunk.getMax());
     builder.append(MigrationType::toShard(), toShard.toString());

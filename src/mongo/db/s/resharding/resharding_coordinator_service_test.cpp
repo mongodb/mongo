@@ -87,20 +87,13 @@ class ExternalStateForTest : public ReshardingCoordinatorExternalState {
         // Use the provided shardIds from presetReshardedChunks to construct the
         // recipient list.
         if (const auto& chunks = coordinatorDoc.getPresetReshardedChunks()) {
+            invariant(version.getTimestamp());
             for (const auto& reshardedChunk : *chunks) {
-                if (version.getTimestamp()) {
-                    initialChunks.emplace_back(
-                        coordinatorDoc.getReshardingUUID(),
-                        ChunkRange{reshardedChunk.getMin(), reshardedChunk.getMax()},
-                        version,
-                        reshardedChunk.getRecipientShardId());
-                } else {
-                    initialChunks.emplace_back(
-                        coordinatorDoc.getTempReshardingNss(),
-                        ChunkRange{reshardedChunk.getMin(), reshardedChunk.getMax()},
-                        version,
-                        reshardedChunk.getRecipientShardId());
-                }
+                initialChunks.emplace_back(
+                    coordinatorDoc.getReshardingUUID(),
+                    ChunkRange{reshardedChunk.getMin(), reshardedChunk.getMax()},
+                    version,
+                    reshardedChunk.getRecipientShardId());
                 version.incMinor();
             }
         }

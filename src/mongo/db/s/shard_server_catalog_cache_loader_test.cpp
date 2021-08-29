@@ -116,6 +116,7 @@ vector<ChunkType> ShardServerCatalogCacheLoaderTest::makeFiveChunks(
     const ChunkVersion& collectionVersion) {
     ChunkVersion collVersion(collectionVersion);
     vector<ChunkType> chunks;
+    const UUID uuid = UUID::gen();
 
     BSONObj mins[] = {
         BSON("a" << MINKEY), BSON("a" << 10), BSON("a" << 50), BSON("a" << 100), BSON("a" << 200)};
@@ -126,7 +127,7 @@ vector<ChunkType> ShardServerCatalogCacheLoaderTest::makeFiveChunks(
         collVersion.incMajor();
 
         ChunkType chunk;
-        chunk.setNS(kNss);
+        chunk.setCollectionUUID(uuid);
         chunk.setMin(mins[i]);
         chunk.setMax(maxs[i]);
         chunk.setShard(kShardId);
@@ -142,6 +143,7 @@ vector<ChunkType> ShardServerCatalogCacheLoaderTest::makeThreeUpdatedChunksDiff(
     const ChunkVersion& collectionVersion) {
     ChunkVersion collVersion(collectionVersion);
     vector<ChunkType> chunks;
+    const UUID uuid = UUID::gen();
 
     // The diff query is for GTE a known version, so prepend the previous newest chunk, which is
     // unmodified by this change and so should be found. Note: it is important for testing that the
@@ -149,7 +151,7 @@ vector<ChunkType> ShardServerCatalogCacheLoaderTest::makeThreeUpdatedChunksDiff(
     // dependent on a race between persistence and retrieving data because it combines enqueued and
     // persisted results without applying modifications.
     ChunkType oldChunk;
-    oldChunk.setNS(kNss);
+    oldChunk.setCollectionUUID(uuid);
     oldChunk.setMin(BSON("a" << 200));
     oldChunk.setMax(BSON("a" << MAXKEY));
     oldChunk.setShard(kShardId);
@@ -165,7 +167,7 @@ vector<ChunkType> ShardServerCatalogCacheLoaderTest::makeThreeUpdatedChunksDiff(
         collVersion.incMinor();
 
         ChunkType chunk;
-        chunk.setNS(kNss);
+        chunk.setCollectionUUID(uuid);
         chunk.setMin(mins[i]);
         chunk.setMax(maxs[i]);
         chunk.setShard(kShardId);

@@ -39,6 +39,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/balancer/balancer.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/request_types/balance_chunk_request_type.h"
 #include "mongo/util/str.h"
 
@@ -92,6 +93,13 @@ public:
             repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
         auto request = uassertStatusOK(BalanceChunkRequest::parseFromConfigCommand(cmdObj));
+
+        // pre v5.1 compatibility
+        if (request.getNss()) {
+            const auto collection = Grid::get(opCtx)->catalogClient()->getCollection(
+                opCtx, *request.getNss(), repl::ReadConcernLevel::kLocalReadConcern);
+            request.setCollectionUUID(collection.getUuid());
+        }
 
         if (request.hasToShardId()) {
             uassertStatusOK(Balancer::get(opCtx)->moveSingleChunk(opCtx,

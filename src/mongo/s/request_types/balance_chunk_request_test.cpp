@@ -53,7 +53,28 @@ TEST(BalanceChunkRequest, ParseFromConfigCommandNoSecondaryThrottle) {
              << "lastmod" << Date_t::fromMillisSinceEpoch(version.toLong()) << "lastmodEpoch"
              << version.epoch())));
     const auto& chunk = request.getChunk();
-    ASSERT_EQ("TestDB.TestColl", chunk.getNS().ns());
+    ASSERT_EQ("TestDB.TestColl", request.getNss()->ns());
+    ASSERT_BSONOBJ_EQ(BSON("a" << -100LL), chunk.getMin());
+    ASSERT_BSONOBJ_EQ(BSON("a" << 100LL), chunk.getMax());
+    ASSERT_EQ(ShardId("TestShard0000"), chunk.getShard());
+    ASSERT_EQ(version, chunk.getVersion());
+
+    const auto& secondaryThrottle = request.getSecondaryThrottle();
+    ASSERT_EQ(MigrationSecondaryThrottleOptions::kDefault,
+              secondaryThrottle.getSecondaryThrottle());
+}
+
+TEST(BalanceChunkRequest, ParseFromConfigCommandWithUUID) {
+    const auto uuid = UUID::gen();
+    const ChunkVersion version(1, 0, OID::gen(), boost::none /* timestamp */);
+    auto request = assertGet(BalanceChunkRequest::parseFromConfigCommand(
+        BSON("_configsvrMoveChunk" << 1 << "uuid" << uuid << "min" << BSON("a" << -100LL) << "max"
+                                   << BSON("a" << 100LL) << "shard"
+                                   << "TestShard0000"
+                                   << "lastmod" << Date_t::fromMillisSinceEpoch(version.toLong())
+                                   << "lastmodEpoch" << version.epoch())));
+    const auto& chunk = request.getChunk();
+    ASSERT_EQ(uuid, chunk.getCollectionUUID());
     ASSERT_BSONOBJ_EQ(BSON("a" << -100LL), chunk.getMin());
     ASSERT_BSONOBJ_EQ(BSON("a" << 100LL), chunk.getMax());
     ASSERT_EQ(ShardId("TestShard0000"), chunk.getShard());
@@ -76,7 +97,7 @@ TEST(BalanceChunkRequest, ParseFromConfigCommandWithSecondaryThrottle) {
              << version.epoch() << "secondaryThrottle"
              << BSON("_secondaryThrottle" << true << "writeConcern" << BSON("w" << 2)))));
     const auto& chunk = request.getChunk();
-    ASSERT_EQ("TestDB.TestColl", chunk.getNS().ns());
+    ASSERT_EQ("TestDB.TestColl", request.getNss()->ns());
     ASSERT_BSONOBJ_EQ(BSON("a" << -100LL), chunk.getMin());
     ASSERT_BSONOBJ_EQ(BSON("a" << 100LL), chunk.getMax());
     ASSERT_EQ(ShardId("TestShard0000"), chunk.getShard());

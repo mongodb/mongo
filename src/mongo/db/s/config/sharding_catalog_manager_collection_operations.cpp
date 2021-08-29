@@ -134,21 +134,14 @@ boost::optional<UUID> checkCollectionOptions(OperationContext* opCtx,
 }
 
 void triggerFireAndForgetShardRefreshes(OperationContext* opCtx, const CollectionType& coll) {
+    invariant(coll.getTimestamp());
     const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
     const auto allShards = uassertStatusOK(Grid::get(opCtx)->catalogClient()->getAllShards(
                                                opCtx, repl::ReadConcernLevel::kLocalReadConcern))
                                .value;
-
     for (const auto& shardEntry : allShards) {
-        const auto query = [&]() {
-            if (coll.getTimestamp()) {
-                return BSON(ChunkType::collectionUUID << coll.getUuid()
-                                                      << ChunkType::shard(shardEntry.getName()));
-            } else {
-                return BSON(ChunkType::ns(coll.getNss().ns())
-                            << ChunkType::shard(shardEntry.getName()));
-            }
-        }();
+        const auto query = BSON(ChunkType::collectionUUID
+                                << coll.getUuid() << ChunkType::shard(shardEntry.getName()));
 
         const auto chunk = uassertStatusOK(shardRegistry->getConfigShard()->exhaustiveFindOnConfig(
                                                opCtx,
@@ -359,13 +352,7 @@ void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
         // to the newly-generated objectid, (ii) their bounds for each new field in the refined
         // key to MinKey (except for the global max chunk where the max bounds are set to
         // MaxKey), and unsetting (iii) their jumbo field.
-        const auto chunksQuery = [&]() {
-            if (collType.getTimestamp()) {
-                return BSON(ChunkType::collectionUUID << collType.getUuid());
-            } else {
-                return BSON(ChunkType::ns(collType.getNss().ns()));
-            }
-        }();
+        const auto chunksQuery = BSON(ChunkType::collectionUUID << collType.getUuid());
         writeToConfigDocumentInTxn(
             opCtx,
             ChunkType::ConfigNS,

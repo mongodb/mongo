@@ -168,6 +168,10 @@ Status MigrationManager::executeManualMigration(
     _waitForRecovery();
 
     ScopedMigrationRequestsMap scopedMigrationRequests;
+    const auto nssStatus = migrateInfo.getNss(opCtx);
+    if (!nssStatus.isOK()) {
+        return nssStatus.getStatus();
+    }
 
     RemoteCommandResponse remoteCommandResponse = _schedule(opCtx,
                                                             migrateInfo,
@@ -178,7 +182,7 @@ Status MigrationManager::executeManualMigration(
                                                       ->get();
 
     auto swCM = Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(
-        opCtx, migrateInfo.nss);
+        opCtx, nssStatus.getValue());
     if (!swCM.isOK()) {
         return swCM.getStatus();
     }
@@ -344,7 +348,7 @@ void MigrationManager::finishRecovery(OperationContext* opCtx,
 
         while (!migrateInfos.empty()) {
             auto migrationType = std::move(migrateInfos.front());
-            const auto migrationInfo = migrationType.toMigrateInfo();
+            const auto migrationInfo = migrationType.toMigrateInfo(opCtx);
             auto waitForDelete = migrationType.getWaitForDelete();
             migrateInfos.pop_front();
 
@@ -439,7 +443,10 @@ std::shared_ptr<Notification<RemoteCommandResponse>> MigrationManager::_schedule
     const MigrationSecondaryThrottleOptions& secondaryThrottle,
     bool waitForDelete,
     ScopedMigrationRequestsMap* scopedMigrationRequests) {
-    const NamespaceString& nss = migrateInfo.nss;
+
+    const CollectionType collection = Grid::get(opCtx)->catalogClient()->getCollection(
+        opCtx, migrateInfo.uuid, repl::ReadConcernLevel::kLocalReadConcern);
+    const NamespaceString& nss = collection.getNss();
 
     // Ensure we are not stopped in order to avoid doing the extra work
     {

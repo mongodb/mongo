@@ -151,7 +151,7 @@ protected:
     }
 
     std::vector<ChunkType> makeChunks(ChunkVersion version) {
-        ChunkType chunk(kNss,
+        ChunkType chunk(kUUID,
                         {kShardKeyPattern.getKeyPattern().globalMin(),
                          kShardKeyPattern.getKeyPattern().globalMax()},
                         version,
@@ -162,13 +162,14 @@ protected:
 
     CollectionType makeCollectionType(const ChunkVersion& collVersion) {
         CollectionType coll(
-            kNss, collVersion.epoch(), collVersion.getTimestamp(), Date_t::now(), UUID::gen());
+            kNss, collVersion.epoch(), collVersion.getTimestamp(), Date_t::now(), kUUID);
         coll.setKeyPattern(kShardKeyPattern.getKeyPattern());
         coll.setUnique(false);
         return coll;
     }
 
     const NamespaceString kNss{"catalgoCacheTestDB.foo"};
+    const UUID kUUID = UUID::gen();
     const std::string kPattern{"_id"};
     const ShardKeyPattern kShardKeyPattern{BSON(kPattern << 1)};
     const int kDummyPort{12345};
@@ -384,13 +385,13 @@ TEST_F(CatalogCacheTest,
     const auto coll = makeCollectionType(collVersionWithoutTimestamp);
     const auto scopedCollProv = scopedCollectionProvider(coll);
 
-    ChunkType chunk1(kNss,
+    ChunkType chunk1(kUUID,
                      {kShardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << 100)},
                      collVersionWithTimestamp,
                      {"0"});
     chunk1.setName(OID::gen());
 
-    ChunkType chunk2(kNss,
+    ChunkType chunk2(kUUID,
                      {BSON("_id" << 100), kShardKeyPattern.getKeyPattern().globalMax()},
                      collVersionWithoutTimestamp,
                      {"0"});

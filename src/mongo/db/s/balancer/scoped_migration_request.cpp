@@ -98,8 +98,14 @@ StatusWith<ScopedMigrationRequest> ScopedMigrationRequest::writeMigration(
     OperationContext* opCtx, const MigrateInfo& migrateInfo, bool waitForDelete) {
     auto const grid = Grid::get(opCtx);
 
+    const auto nssStatus = migrateInfo.getNss(opCtx);
+    if (!nssStatus.isOK()) {
+        return nssStatus.getStatus();
+    }
+    const auto nss = nssStatus.getValue();
+
     // Try to write a unique migration document to config.migrations.
-    const MigrationType migrationType(migrateInfo, waitForDelete);
+    const MigrationType migrationType(nss, migrateInfo, waitForDelete);
 
     for (int retry = 0; retry < kDuplicateKeyErrorMaxRetries; ++retry) {
         Status result = grid->catalogClient()->insertConfigDocument(
@@ -115,7 +121,7 @@ StatusWith<ScopedMigrationRequest> ScopedMigrationRequest::writeMigration(
                     ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                     repl::ReadConcernLevel::kLocalReadConcern,
                     MigrationType::ConfigNS,
-                    migrateInfo.getMigrationTypeQuery(),
+                    migrateInfo.getMigrationTypeQuery(nss),
                     BSONObj(),
                     boost::none);
             if (!statusWithMigrationQueryResult.isOK()) {
@@ -141,7 +147,8 @@ StatusWith<ScopedMigrationRequest> ScopedMigrationRequest::writeMigration(
                                   << redact(activeMigrationBSON.toString()) << "'.");
             }
 
-            MigrateInfo activeMigrateInfo = statusWithActiveMigration.getValue().toMigrateInfo();
+            MigrateInfo activeMigrateInfo =
+                statusWithActiveMigration.getValue().toMigrateInfo(opCtx);
             if (activeMigrateInfo.to != migrateInfo.to ||
                 activeMigrateInfo.from != migrateInfo.from) {
                 LOGV2(
@@ -163,7 +170,7 @@ StatusWith<ScopedMigrationRequest> ScopedMigrationRequest::writeMigration(
         // As long as there isn't a DuplicateKey error, the document may have been written, and it's
         // safe (won't delete another migration's document) and necessary to try to clean up the
         // document via the destructor.
-        ScopedMigrationRequest scopedMigrationRequest(opCtx, migrateInfo.nss, migrateInfo.minKey);
+        ScopedMigrationRequest scopedMigrationRequest(opCtx, nss, migrateInfo.minKey);
 
         // If there was a write error, let the object go out of scope and clean up in the
         // destructor.
@@ -178,7 +185,7 @@ StatusWith<ScopedMigrationRequest> ScopedMigrationRequest::writeMigration(
                   str::stream() << "Failed to insert the config.migrations document after max "
                                 << "number of retries. Chunk '"
                                 << ChunkRange(migrateInfo.minKey, migrateInfo.maxKey).toString()
-                                << "' in collection '" << migrateInfo.nss.ns()
+                                << "' in collection '" << nss
                                 << "' was being moved (somewhere) by another operation.");
 }
 

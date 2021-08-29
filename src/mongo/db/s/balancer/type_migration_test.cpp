@@ -48,13 +48,14 @@ const ShardId kToShard("shard0001");
 const bool kWaitForDelete{true};
 
 TEST(MigrationTypeTest, ConvertFromMigrationInfo) {
+    const auto collUuid = UUID::gen();
     const auto collEpoch = OID::gen();
     const auto collTimestamp = boost::none;
     const ChunkVersion version(1, 2, collEpoch, collTimestamp);
 
     BSONObjBuilder chunkBuilder;
     chunkBuilder.append(ChunkType::name(), OID::gen());
-    chunkBuilder.append(ChunkType::ns(), kNs);
+    collUuid.appendToBuilder(&chunkBuilder, ChunkType::collectionUUID.name());
     chunkBuilder.append(ChunkType::min(), kMin);
     chunkBuilder.append(ChunkType::max(), kMax);
     version.appendLegacyWithField(&chunkBuilder, ChunkType::lastmod());
@@ -68,7 +69,7 @@ TEST(MigrationTypeTest, ConvertFromMigrationInfo) {
                             chunkType,
                             MoveChunkRequest::ForceJumbo::kDoNotForce,
                             MigrateInfo::chunksImbalance);
-    MigrationType migrationType(migrateInfo, kWaitForDelete);
+    MigrationType migrationType(NamespaceString(kNs), migrateInfo, kWaitForDelete);
 
     BSONObjBuilder builder;
     builder.append(MigrationType::ns(), kNs);

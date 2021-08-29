@@ -429,8 +429,26 @@ CollectionType ShardingCatalogClientImpl::getCollection(OperationContext* opCtx,
             stream() << "collection " << nss.ns() << " not found",
             !collDoc.empty());
 
-    CollectionType coll(collDoc[0]);
-    return coll;
+    return CollectionType(collDoc[0]);
+}
+
+CollectionType ShardingCatalogClientImpl::getCollection(OperationContext* opCtx,
+                                                        const UUID& uuid,
+                                                        repl::ReadConcernLevel readConcernLevel) {
+    auto collDoc =
+        uassertStatusOK(_exhaustiveFindOnConfig(opCtx,
+                                                kConfigReadSelector,
+                                                readConcernLevel,
+                                                CollectionType::ConfigNS,
+                                                BSON(CollectionType::kUuidFieldName << uuid),
+                                                BSONObj(),
+                                                1))
+            .value;
+    uassert(ErrorCodes::NamespaceNotFound,
+            stream() << "Collection with UUID '" << uuid << "' not found",
+            !collDoc.empty());
+
+    return CollectionType(collDoc[0]);
 }
 
 std::vector<CollectionType> ShardingCatalogClientImpl::getCollections(
@@ -865,7 +883,7 @@ bool ShardingCatalogClientImpl::runUserManagementReadCommand(OperationContext* o
 Status ShardingCatalogClientImpl::applyChunkOpsDeprecated(OperationContext* opCtx,
                                                           const BSONArray& updateOps,
                                                           const BSONArray& preCondition,
-                                                          const NamespaceStringOrUUID& nsOrUUID,
+                                                          const UUID& uuid,
                                                           const NamespaceString& nss,
                                                           const ChunkVersion& lastChunkVersion,
                                                           const WriteConcernOptions& writeConcern,
@@ -912,11 +930,8 @@ Status ShardingCatalogClientImpl::applyChunkOpsDeprecated(OperationContext* opCt
         // mod made it to the config server, then transaction was successful.
         BSONObjBuilder query;
         lastChunkVersion.appendLegacyWithField(&query, ChunkType::lastmod());
-        if (nsOrUUID.uuid()) {
-            query.append(ChunkType::collectionUUID(), nsOrUUID.uuid()->toBSON());
-        } else {
-            query.append(ChunkType::ns(), nsOrUUID.nss()->ns());
-        }
+        query.append(ChunkType::collectionUUID(), uuid.toBSON());
+
         auto chunkWithStatus = getChunks(opCtx,
                                          query.obj(),
                                          BSONObj(),

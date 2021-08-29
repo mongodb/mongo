@@ -63,22 +63,26 @@ public:
      */
     ScopedMigrationRequest makeScopedMigrationRequest(const MigrateInfo& migrateInfo);
 
+    MigrateInfo makeMigrateInfo();
+
 private:
     void setUp() override;
 };
 
 void ScopedMigrationRequestTest::setUp() {
     setUpAndInitializeConfigDb();
+    setupShards({ShardType{"shard", "shard:12"}});
 }
 
 void ScopedMigrationRequestTest::checkMigrationsCollectionForDocument(
     const MigrateInfo& migrateInfo, unsigned long expectedNumberOfDocuments) {
+    auto const query = BSON(MigrationType::ns(kNs) << MigrationType::min(migrateInfo.minKey));
     auto response = shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
         operationContext(),
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         repl::ReadConcernLevel::kMajorityReadConcern,
         MigrationType::ConfigNS,
-        migrateInfo.getMigrationTypeQuery(),
+        query,
         BSONObj(),
         boost::none);
     Shard::QueryResponse queryResponse = unittest::assertGet(response);
@@ -96,11 +100,12 @@ ScopedMigrationRequest ScopedMigrationRequestTest::makeScopedMigrationRequest(
     return scopedMigrationRequest;
 }
 
-MigrateInfo makeMigrateInfo() {
+MigrateInfo ScopedMigrationRequestTest::makeMigrateInfo() {
+    const auto collUuid = UUID::gen();
     const ChunkVersion kChunkVersion{1, 2, OID::gen(), boost::none /* timestamp */};
 
     BSONObjBuilder chunkBuilder;
-    chunkBuilder.append(ChunkType::ns(), kNs);
+    collUuid.appendToBuilder(&chunkBuilder, ChunkType::collectionUUID.name());
     chunkBuilder.append(ChunkType::min(), kMin);
     chunkBuilder.append(ChunkType::max(), kMax);
     kChunkVersion.appendLegacyWithField(&chunkBuilder, ChunkType::lastmod());
@@ -108,6 +113,9 @@ MigrateInfo makeMigrateInfo() {
 
     ChunkType chunkType = assertGet(ChunkType::parseFromConfigBSONCommand(chunkBuilder.obj()));
     ASSERT_OK(chunkType.validate());
+
+    // Initialize the sharded TO collection
+    setupCollection(NamespaceString(kNs), KeyPattern(BSON("_id" << 1)), {chunkType});
 
     return MigrateInfo(kToShard,
                        chunkType,
@@ -169,7 +177,7 @@ TEST_F(ScopedMigrationRequestTest, CreateScopedMigrationRequestOnRecovery) {
     // still removes the document corresponding to the MigrationRequest.
     {
         ScopedMigrationRequest scopedMigrationRequest = ScopedMigrationRequest::createForRecovery(
-            operationContext(), migrateInfo.nss, migrateInfo.minKey);
+            operationContext(), NamespaceString(kNs), migrateInfo.minKey);
 
         checkMigrationsCollectionForDocument(migrateInfo, 1);
     }

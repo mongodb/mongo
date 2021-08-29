@@ -163,7 +163,7 @@ public:
 
             ChunkVersion version(1, 0, epoch, boost::none /* timestamp */);
 
-            ChunkType chunk(tempNss,
+            ChunkType chunk(uuid,
                             {skey.getKeyPattern().globalMin(), skey.getKeyPattern().globalMax()},
                             version,
                             {"0"});
@@ -188,7 +188,7 @@ public:
 
             ChunkVersion version(1, 0, epoch, boost::none /* timestamp */);
 
-            ChunkType chunk(origNss,
+            ChunkType chunk(uuid,
                             {skey.getKeyPattern().globalMin(), skey.getKeyPattern().globalMax()},
                             version,
                             {"0"});

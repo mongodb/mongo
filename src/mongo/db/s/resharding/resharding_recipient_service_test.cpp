@@ -78,7 +78,7 @@ public:
 
         const OID epoch = OID::gen();
         std::vector<ChunkType> chunks = {ChunkType{
-            nss,
+            _sourceUUID,
             ChunkRange{BSON(_currentShardKey << MINKEY), BSON(_currentShardKey << MAXKEY)},
             ChunkVersion(100, 0, epoch, boost::none /* timestamp */),
             _someDonorId}};

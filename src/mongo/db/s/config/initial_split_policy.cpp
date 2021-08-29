@@ -80,7 +80,6 @@ void appendChunk(const SplitPolicyParams& params,
         ChunkVersion(
             version->majorVersion(), version->minorVersion(), version->epoch(), creationTimestamp),
         shardId);
-
     auto& chunk = chunks->back();
     chunk.setHistory({ChunkHistory(creationTimestamp, shardId)});
     version->incMinor();

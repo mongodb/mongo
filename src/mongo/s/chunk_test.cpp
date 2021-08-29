@@ -47,9 +47,10 @@ const KeyPattern kShardKeyPattern(BSON("a" << 1));
 
 TEST(ChunkTest, HasMovedSincePinnedTimestamp) {
     const OID epoch = OID::gen();
+    const UUID uuid = UUID::gen();
     ChunkVersion version{1, 0, epoch, boost::none /* timestamp */};
 
-    ChunkType chunkType(kNss,
+    ChunkType chunkType(uuid,
                         ChunkRange{kShardKeyPattern.globalMin(), kShardKeyPattern.globalMax()},
                         version,
                         kShardOne);
@@ -63,9 +64,10 @@ TEST(ChunkTest, HasMovedSincePinnedTimestamp) {
 
 TEST(ChunkTest, HasMovedAndReturnedSincePinnedTimestamp) {
     const OID epoch = OID::gen();
+    const UUID uuid = UUID::gen();
     ChunkVersion version{1, 0, epoch, boost::none /* timestamp */};
 
-    ChunkType chunkType(kNss,
+    ChunkType chunkType(uuid,
                         ChunkRange{kShardKeyPattern.globalMin(), kShardKeyPattern.globalMax()},
                         version,
                         kShardOne);
@@ -80,9 +82,10 @@ TEST(ChunkTest, HasMovedAndReturnedSincePinnedTimestamp) {
 
 TEST(ChunkTest, HasNotMovedSincePinnedTimestamp) {
     const OID epoch = OID::gen();
+    const UUID uuid = UUID::gen();
     ChunkVersion version{1, 0, epoch, boost::none /* timestamp */};
 
-    ChunkType chunkType(kNss,
+    ChunkType chunkType(uuid,
                         ChunkRange{kShardKeyPattern.globalMin(), kShardKeyPattern.globalMax()},
                         version,
                         kShardOne);
@@ -97,9 +100,10 @@ TEST(ChunkTest, HasNotMovedSincePinnedTimestamp) {
 
 TEST(ChunkTest, HasNoHistoryValidForPinnedTimestamp_OneEntry) {
     const OID epoch = OID::gen();
+    const UUID uuid = UUID::gen();
     ChunkVersion version{1, 0, epoch, boost::none /* timestamp */};
 
-    ChunkType chunkType(kNss,
+    ChunkType chunkType(uuid,
                         ChunkRange{kShardKeyPattern.globalMin(), kShardKeyPattern.globalMax()},
                         version,
                         kShardOne);
@@ -112,9 +116,10 @@ TEST(ChunkTest, HasNoHistoryValidForPinnedTimestamp_OneEntry) {
 
 TEST(ChunkTest, HasNoHistoryValidForPinnedTimestamp_MoreThanOneEntry) {
     const OID epoch = OID::gen();
+    const UUID uuid = UUID::gen();
     ChunkVersion version{1, 0, epoch, boost::none /* timestamp */};
 
-    ChunkType chunkType(kNss,
+    ChunkType chunkType(uuid,
                         ChunkRange{kShardKeyPattern.globalMin(), kShardKeyPattern.globalMax()},
                         version,
                         kShardOne);

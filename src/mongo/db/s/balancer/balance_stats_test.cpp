@@ -43,7 +43,7 @@ class BalanceStatsTest : public mongo::unittest::Test {
 public:
     ChunkType makeChunk(const BSONObj& minKey, const BSONObj& maxKey, const ShardId& shard) {
         _nextVersion.incMinor();
-        return ChunkType(_nss, ChunkRange(minKey, maxKey), _nextVersion, shard);
+        return ChunkType(_uuid, ChunkRange(minKey, maxKey), _nextVersion, shard);
     }
 
     ShardType makeShard(const std::string& name, std::vector<std::string> tags = {}) {
@@ -53,7 +53,7 @@ public:
     ChunkManager makeRoutingInfo(const KeyPattern& shardKeyPattern,
                                  const std::vector<ChunkType>& chunks) {
         auto routingTableHistory = RoutingTableHistory::makeNew(_nss,
-                                                                boost::none,  // UUID
+                                                                _uuid,  // UUID
                                                                 shardKeyPattern,
                                                                 {},     // collator
                                                                 false,  // unique
@@ -73,6 +73,7 @@ public:
 
 private:
     const NamespaceString _nss{"foo.bar"};
+    const UUID _uuid = UUID::gen();
     const OID _epoch{OID::gen()};
     const ShardId _shardPrimary{"dummyShardPrimary"};
     const DatabaseVersion _dbVersion{UUID::gen(), Timestamp()};

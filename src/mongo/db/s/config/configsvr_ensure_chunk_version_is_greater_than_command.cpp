@@ -58,7 +58,6 @@ public:
                     opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
             ShardingCatalogManager::get(opCtx)->ensureChunkVersionIsGreaterThan(
                 opCtx,
-                request().getNss(),
                 request().getCollectionUUID(),
                 request().getMinKey(),
                 request().getMaxKey(),

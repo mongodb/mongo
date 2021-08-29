@@ -220,7 +220,7 @@ TEST_F(ShardingDDLUtilTest, ShardedRenamePreconditionsAreMet) {
     ChunkVersion chunkVersion(1, 1, OID::gen(), boost::none);
     ChunkType chunk;
     chunk.setName(OID::gen());
-    chunk.setNS(kToNss);
+    chunk.setCollectionUUID(UUID::gen());
     chunk.setVersion(chunkVersion);
     chunk.setShard(shard0.getName());
     chunk.setHistory({ChunkHistory(Timestamp(1, 1), shard0.getName())});
@@ -240,7 +240,7 @@ TEST_F(ShardingDDLUtilTest, ShardedRenamePreconditionsTargetCollectionExists) {
     ChunkVersion chunkVersion(1, 1, OID::gen(), boost::none);
     ChunkType chunk;
     chunk.setName(OID::gen());
-    chunk.setNS(kToNss);
+    chunk.setCollectionUUID(UUID::gen());
     chunk.setVersion(chunkVersion);
     chunk.setShard(shard0.getName());
     chunk.setHistory({ChunkHistory(Timestamp(1, 1), shard0.getName())});

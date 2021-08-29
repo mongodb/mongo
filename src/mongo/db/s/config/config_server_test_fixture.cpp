@@ -326,19 +326,11 @@ void ConfigServerTestFixture::setupCollection(const NamespaceString& nss,
         setupDatabase(nss.db().toString(), ShardId(shard.getName()), true /* sharded */);
     }
 
-    const auto collUUID = [&]() {
-        const auto& chunk = chunks.front();
-        if (chunk.getVersion().getTimestamp()) {
-            return chunk.getCollectionUUID();
-        } else {
-            return UUID::gen();
-        }
-    }();
     CollectionType coll(nss,
                         chunks[0].getVersion().epoch(),
                         chunks[0].getVersion().getTimestamp(),
                         Date_t::now(),
-                        collUUID);
+                        chunks[0].getCollectionUUID());
     coll.setTimestamp(chunks.front().getVersion().getTimestamp());
     coll.setKeyPattern(shardKey);
     ASSERT_OK(
@@ -352,13 +344,12 @@ void ConfigServerTestFixture::setupCollection(const NamespaceString& nss,
 
 StatusWith<ChunkType> ConfigServerTestFixture::getChunkDoc(
     OperationContext* opCtx,
-    const NamespaceStringOrUUID& nssOrUuid,
+    const UUID& uuid,
     const BSONObj& minKey,
     const OID& collEpoch,
     const boost::optional<Timestamp>& collTimestamp) {
-    const auto query = nssOrUuid.uuid()
-        ? BSON(ChunkType::collectionUUID() << *nssOrUuid.uuid() << ChunkType::min(minKey))
-        : BSON(ChunkType::ns(nssOrUuid.nss()->ns()) << ChunkType::min(minKey));
+
+    const auto query = BSON(ChunkType::collectionUUID() << uuid << ChunkType::min(minKey));
     auto doc = findOneOnConfigCollection(opCtx, ChunkType::ConfigNS, query);
     if (!doc.isOK())
         return doc.getStatus();
@@ -387,12 +378,12 @@ StatusWith<ChunkVersion> ConfigServerTestFixture::getCollectionVersion(Operation
 
     const CollectionType coll(collectionDoc.getValue());
 
-    auto chunkDoc = findOneOnConfigCollection(
-        opCtx,
-        ChunkType::ConfigNS,
-        coll.getTimestamp() ? BSON(ChunkType::collectionUUID << coll.getUuid())
-                            : BSON(ChunkType::ns << coll.getNss().ns()) /* query */,
-        BSON(ChunkType::lastmod << -1) /* sort */);
+    invariant(coll.getTimestamp());
+    auto chunkDoc =
+        findOneOnConfigCollection(opCtx,
+                                  ChunkType::ConfigNS,
+                                  BSON(ChunkType::collectionUUID << coll.getUuid()) /* query */,
+                                  BSON(ChunkType::lastmod << -1) /* sort */);
 
     if (!chunkDoc.isOK())
         return chunkDoc.getStatus();

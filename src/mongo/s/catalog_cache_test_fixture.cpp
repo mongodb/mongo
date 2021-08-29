@@ -130,7 +130,7 @@ ChunkManager CatalogCacheTestFixture::makeChunkManager(
     bool unique,
     const std::vector<BSONObj>& splitPoints,
     boost::optional<ReshardingFields> reshardingFields) {
-    ChunkVersion version(1, 0, OID::gen(), boost::none /* timestamp */);
+    ChunkVersion version(1, 0, OID::gen(), Timestamp(42) /* timestamp */);
 
     const BSONObj databaseBSON = [&]() {
         DatabaseType db(
@@ -138,8 +138,9 @@ ChunkManager CatalogCacheTestFixture::makeChunkManager(
         return db.toBSON();
     }();
 
+    const auto uuid = UUID::gen();
     const BSONObj collectionBSON = [&]() {
-        CollectionType coll(nss, version.epoch(), Date_t::now(), UUID::gen());
+        CollectionType coll(nss, version.epoch(), Date_t::now(), uuid);
         coll.setKeyPattern(shardKeyPattern.getKeyPattern());
         coll.setUnique(unique);
 
@@ -163,7 +164,7 @@ ChunkManager CatalogCacheTestFixture::makeChunkManager(
 
     for (size_t i = 1; i < splitPointsIncludingEnds.size(); ++i) {
         ChunkType chunk(
-            nss,
+            uuid,
             {shardKeyPattern.getKeyPattern().extendRangeBound(splitPointsIncludingEnds[i - 1],
                                                               false),
              shardKeyPattern.getKeyPattern().extendRangeBound(splitPointsIncludingEnds[i], false)},
@@ -273,12 +274,12 @@ ChunkManager CatalogCacheTestFixture::loadRoutingTableWithTwoChunksAndTwoShardsI
         ChunkVersion version(1, 0, epoch, boost::none /* timestamp */);
 
         ChunkType chunk1(
-            nss, {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << 0)}, version, {"0"});
+            uuid, {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << 0)}, version, {"0"});
         chunk1.setName(OID::gen());
         version.incMinor();
 
         ChunkType chunk2(
-            nss, {BSON("_id" << 0), shardKeyPattern.getKeyPattern().globalMax()}, version, {"1"});
+            uuid, {BSON("_id" << 0), shardKeyPattern.getKeyPattern().globalMax()}, version, {"1"});
         chunk2.setName(OID::gen());
         version.incMinor();
 

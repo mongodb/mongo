@@ -76,13 +76,13 @@ public:
         return stages.front();
     }
 
-    std::vector<ChunkType> makeChunks(const NamespaceString& nss,
+    std::vector<ChunkType> makeChunks(const UUID& uuid,
                                       const OID epoch,
                                       std::vector<std::pair<ChunkRange, ShardId>> chunkInfos) {
         ChunkVersion version(1, 0, epoch, boost::none /* timestamp */);
         std::vector<ChunkType> chunks;
         for (auto&& pair : chunkInfos) {
-            chunks.emplace_back(nss, pair.first, version, pair.second);
+            chunks.emplace_back(uuid, pair.first, version, pair.second);
             chunks.back().setName(OID::gen());
             version.incMinor();
         }

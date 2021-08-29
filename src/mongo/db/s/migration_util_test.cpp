@@ -448,22 +448,23 @@ public:
     }
 
     std::vector<ChunkType> makeChangedChunks(ChunkVersion startingVersion) {
-        ChunkType chunk1(kNss,
+        const auto uuid = UUID::gen();
+        ChunkType chunk1(uuid,
                          {kShardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << -100)},
                          startingVersion,
                          {"0"});
         chunk1.setName(OID::gen());
         startingVersion.incMinor();
 
-        ChunkType chunk2(kNss, {BSON("_id" << -100), BSON("_id" << 0)}, startingVersion, {"1"});
+        ChunkType chunk2(uuid, {BSON("_id" << -100), BSON("_id" << 0)}, startingVersion, {"1"});
         chunk2.setName(OID::gen());
         startingVersion.incMinor();
 
-        ChunkType chunk3(kNss, {BSON("_id" << 0), BSON("_id" << 100)}, startingVersion, {"0"});
+        ChunkType chunk3(uuid, {BSON("_id" << 0), BSON("_id" << 100)}, startingVersion, {"0"});
         chunk3.setName(OID::gen());
         startingVersion.incMinor();
 
-        ChunkType chunk4(kNss,
+        ChunkType chunk4(uuid,
                          {BSON("_id" << 100), kShardKeyPattern.getKeyPattern().globalMax()},
                          startingVersion,
                          {"1"});

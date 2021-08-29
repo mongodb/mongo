@@ -155,15 +155,17 @@ public:
     }
 
 protected:
-    std::vector<ChunkType> createChunks(const OID& epoch, const std::string& shardKey) {
+    std::vector<ChunkType> createChunks(const OID& epoch,
+                                        const UUID& uuid,
+                                        const std::string& shardKey) {
         auto range1 = ChunkRange(BSON(shardKey << MINKEY), BSON(shardKey << 5));
-        ChunkType chunk1(kNss,
+        ChunkType chunk1(uuid,
                          range1,
                          ChunkVersion(1, 0, epoch, boost::none /* timestamp */),
                          kShardList[0].getName());
 
         auto range2 = ChunkRange(BSON(shardKey << 5), BSON(shardKey << MAXKEY));
-        ChunkType chunk2(kNss,
+        ChunkType chunk2(uuid,
                          range2,
                          ChunkVersion(1, 0, epoch, boost::none /* timestamp */),
                          kShardList[1].getName());
@@ -221,9 +223,12 @@ protected:
         _mockCatalogCacheLoader->setDatabaseRefreshReturnValue(
             DatabaseType(kNss.db().toString(), kShardList[0].getName(), true, env.dbVersion));
         _mockCatalogCacheLoader->setCollectionRefreshValues(
-            kNss, coll, createChunks(env.version.epoch(), kShardKey), reshardingFields);
+            kNss,
+            coll,
+            createChunks(env.version.epoch(), env.sourceUuid, kShardKey),
+            reshardingFields);
         _mockCatalogCacheLoader->setCollectionRefreshValues(
-            env.tempNss, coll, createChunks(env.version.epoch(), "y"), boost::none);
+            env.tempNss, coll, createChunks(env.version.epoch(), env.sourceUuid, "y"), boost::none);
 
         forceDatabaseRefresh(opCtx, kNss.db());
         forceShardFilteringMetadataRefresh(opCtx, kNss);

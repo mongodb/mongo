@@ -39,6 +39,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
+#include "mongo/s/grid.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
 
@@ -667,13 +668,13 @@ string ZoneRange::toString() const {
 MigrateInfo::MigrateInfo(const ShardId& a_to,
                          const ChunkType& a_chunk,
                          const MoveChunkRequest::ForceJumbo a_forceJumbo,
-                         MigrationReason a_reason) {
+                         MigrationReason a_reason)
+    : uuid(a_chunk.getCollectionUUID()) {
     invariant(a_chunk.validate());
     invariant(a_to.isValid());
 
     to = a_to;
 
-    nss = a_chunk.getNS();
     from = a_chunk.getShard();
     minKey = a_chunk.getMin();
     maxKey = a_chunk.getMax();
@@ -686,7 +687,7 @@ std::string MigrateInfo::getName() const {
     // Generates a unique name for a MigrateInfo based on the namespace and the lower bound of the
     // chunk being moved.
     StringBuilder buf;
-    buf << nss.ns() << "-";
+    buf << uuid << "-";
 
     BSONObjIterator i(minKey);
     while (i.more()) {
@@ -697,14 +698,28 @@ std::string MigrateInfo::getName() const {
     return buf.str();
 }
 
-BSONObj MigrateInfo::getMigrationTypeQuery() const {
+StatusWith<NamespaceString> MigrateInfo::getNss(OperationContext* opCtx) const {
+    auto grid = Grid::get(opCtx);
+    invariant(grid != nullptr);
+    auto catalogClient = grid->catalogClient();
+    invariant(catalogClient != nullptr);
+    try {
+        const CollectionType collection =
+            catalogClient->getCollection(opCtx, uuid, repl::ReadConcernLevel::kLocalReadConcern);
+        return collection.getNss();
+    } catch (DBException const& e) {
+        return StatusWith<NamespaceString>(e.code(), e.reason());
+    }
+}
+
+BSONObj MigrateInfo::getMigrationTypeQuery(NamespaceString const& nss) const {
     // Generates a query object for a single MigrationType based on the namespace and the lower
     // bound of the chunk being moved.
     return BSON(MigrationType::ns(nss.ns()) << MigrationType::min(minKey));
 }
 
 string MigrateInfo::toString() const {
-    return str::stream() << nss.ns() << ": [" << minKey << ", " << maxKey << "), from " << from
+    return str::stream() << uuid << ": [" << minKey << ", " << maxKey << "), from " << from
                          << ", to " << to;
 }
 

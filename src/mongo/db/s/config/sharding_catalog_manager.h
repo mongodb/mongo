@@ -300,8 +300,7 @@ public:
      * that doesn't pass these extra fields.
      */
     void ensureChunkVersionIsGreaterThan(OperationContext* opCtx,
-                                         const boost::optional<NamespaceString>& nss,
-                                         const boost::optional<UUID>& collUUID,
+                                         const UUID& collUUID,
                                          const BSONObj& minKey,
                                          const BSONObj& maxKey,
                                          const ChunkVersion& version);
@@ -572,7 +571,7 @@ private:
      * Retrieve the full chunk description from the config.
      */
     StatusWith<ChunkType> _findChunkOnConfig(OperationContext* opCtx,
-                                             const NamespaceStringOrUUID& nsOrUUID,
+                                             const UUID& uuid,
                                              const OID& epoch,
                                              const boost::optional<Timestamp>& timestamp,
                                              const BSONObj& key);

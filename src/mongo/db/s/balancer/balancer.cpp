@@ -660,6 +660,7 @@ Status Balancer::_splitChunksIfNeeded(OperationContext* opCtx) {
 int Balancer::_moveChunks(OperationContext* opCtx,
                           const BalancerChunkSelectionPolicy::MigrateInfoVector& candidateChunks) {
     auto balancerConfig = Grid::get(opCtx)->getBalancerConfiguration();
+    auto catalogClient = Grid::get(opCtx)->catalogClient();
 
     // If the balancer was disabled since we started this round, don't start new chunk moves
     if (_stopOrPauseRequested() || !balancerConfig->shouldBalance()) {
@@ -707,8 +708,11 @@ int Balancer::_moveChunks(OperationContext* opCtx,
                   "migrateInfo"_attr = redact(requestIt->toString()),
                   "error"_attr = redact(status));
 
+            const CollectionType collection = catalogClient->getCollection(
+                opCtx, requestIt->uuid, repl::ReadConcernLevel::kLocalReadConcern);
+
             ShardingCatalogManager::get(opCtx)->splitOrMarkJumbo(
-                opCtx, requestIt->nss, requestIt->minKey);
+                opCtx, collection.getNss(), requestIt->minKey);
             continue;
         }
 

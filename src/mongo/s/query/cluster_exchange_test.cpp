@@ -452,7 +452,7 @@ TEST_F(ClusterExchangeTest, WordCountUseCaseExampleShardedByWord) {
     loadRoutingTable(kTestTargetNss,
                      epoch,
                      shardKey,
-                     makeChunks(kTestTargetNss,
+                     makeChunks(UUID::gen(),
                                 epoch,
                                 {{ChunkRange{BSON("word" << MINKEY),
                                              BSON("word"
@@ -522,6 +522,7 @@ TEST_F(ClusterExchangeTest, WordCountUseCaseExampleShardedByWord) {
 // SERVER-36787 for an example.
 TEST_F(ClusterExchangeTest, CompoundShardKeyThreeShards) {
     const OID epoch = OID::gen();
+    const UUID uuid = UUID::gen();
     ShardKeyPattern shardKey(BSON("x" << 1 << "y" << 1));
 
     setupNShards(3);
@@ -529,21 +530,21 @@ TEST_F(ClusterExchangeTest, CompoundShardKeyThreeShards) {
     auto chunks = [&]() {
         std::vector<ChunkType> chunks;
         ChunkVersion version(1, 0, epoch, boost::none /* timestamp */);
-        chunks.emplace_back(kTestTargetNss,
+        chunks.emplace_back(uuid,
                             ChunkRange{BSON("x" << MINKEY << "y" << MINKEY),
                                        BSON("x" << xBoundaries[0] << "y" << MINKEY)},
                             version,
                             ShardId("0"));
         chunks.back().setName(OID::gen());
         for (std::size_t i = 0; i < xBoundaries.size() - 1; ++i) {
-            chunks.emplace_back(kTestTargetNss,
+            chunks.emplace_back(uuid,
                                 ChunkRange{BSON("x" << xBoundaries[i] << "y" << MINKEY),
                                            BSON("x" << xBoundaries[i + 1] << "y" << MINKEY)},
                                 version,
                                 ShardId(str::stream() << (i + 1) % 3));
             chunks.back().setName(OID::gen());
         }
-        chunks.emplace_back(kTestTargetNss,
+        chunks.emplace_back(uuid,
                             ChunkRange{BSON("x" << xBoundaries.back() << "y" << MINKEY),
                                        BSON("x" << MAXKEY << "y" << MAXKEY)},
                             version,

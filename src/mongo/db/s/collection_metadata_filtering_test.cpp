@@ -62,12 +62,13 @@ protected:
      */
     void prepareTestData(
         boost::optional<TypeCollectionTimeseriesFields> timeseriesFields = boost::none) {
+        const UUID uuid = UUID::gen();
         const OID epoch = OID::gen();
         const ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
 
         auto rt = RoutingTableHistory::makeNew(
             kNss,
-            UUID::gen(),
+            uuid,
             shardKeyPattern.getKeyPattern(),
             nullptr,
             false,
@@ -80,7 +81,7 @@ protected:
             [&] {
                 ChunkVersion version(1, 0, epoch, boost::none /* timestamp */);
 
-                ChunkType chunk1(kNss,
+                ChunkType chunk1(uuid,
                                  {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << -100)},
                                  version,
                                  {"0"});
@@ -88,17 +89,17 @@ protected:
                                    ChunkHistory(Timestamp(25, 0), ShardId("1"))});
                 version.incMinor();
 
-                ChunkType chunk2(kNss, {BSON("_id" << -100), BSON("_id" << 0)}, version, {"1"});
+                ChunkType chunk2(uuid, {BSON("_id" << -100), BSON("_id" << 0)}, version, {"1"});
                 chunk2.setHistory({ChunkHistory(Timestamp(75, 0), ShardId("1")),
                                    ChunkHistory(Timestamp(25, 0), ShardId("0"))});
                 version.incMinor();
 
-                ChunkType chunk3(kNss, {BSON("_id" << 0), BSON("_id" << 100)}, version, {"0"});
+                ChunkType chunk3(uuid, {BSON("_id" << 0), BSON("_id" << 100)}, version, {"0"});
                 chunk3.setHistory({ChunkHistory(Timestamp(75, 0), ShardId("0")),
                                    ChunkHistory(Timestamp(25, 0), ShardId("1"))});
                 version.incMinor();
 
-                ChunkType chunk4(kNss,
+                ChunkType chunk4(uuid,
                                  {BSON("_id" << 100), shardKeyPattern.getKeyPattern().globalMax()},
                                  version,
                                  {"1"});

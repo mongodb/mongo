@@ -61,8 +61,8 @@ commands:
             collectionUUID:
                 description: The collection's UUID. This field was introduced in 5.0 as mandatory.
                 type: uuid
-                optional: true
+                optional: false
             nss:
                 description: The collection's namespace. This field was introduced in 5.0 as mandatory.
                 type: namespacestring
-                optional: true
+                optional: false

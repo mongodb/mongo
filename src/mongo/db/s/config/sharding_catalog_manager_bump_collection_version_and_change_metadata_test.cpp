@@ -73,14 +73,14 @@ class ShardingCatalogManagerBumpCollectionVersionAndChangeMetadataTest
     }
 
 protected:
-    ChunkType generateChunkType(const NamespaceString& nss,
+    ChunkType generateChunkType(const UUID& uuid,
                                 const ChunkVersion& chunkVersion,
                                 const ShardId& shardId,
                                 const BSONObj& minKey,
                                 const BSONObj& maxKey) {
         ChunkType chunkType;
         chunkType.setName(OID::gen());
-        chunkType.setNS(nss);
+        chunkType.setCollectionUUID(uuid);
         chunkType.setVersion(chunkVersion);
         chunkType.setShard(shardId);
         chunkType.setMin(minKey);
@@ -113,19 +113,20 @@ protected:
 TEST_F(ShardingCatalogManagerBumpCollectionVersionAndChangeMetadataTest,
        BumpsOnlyMinorVersionOfNewestChunk) {
     const auto collEpoch = OID::gen();
-    const auto collTimestamp = boost::none;
+    const auto collTimestamp = Timestamp(42);
+    const auto collUUID = UUID::gen();
 
-    const auto shard0Chunk0 = generateChunkType(kNss,
+    const auto shard0Chunk0 = generateChunkType(collUUID,
                                                 ChunkVersion(10, 1, collEpoch, collTimestamp),
                                                 kShard0.getName(),
                                                 BSON("a" << 1),
                                                 BSON("a" << 10));
-    const auto shard0Chunk1 = generateChunkType(kNss,
+    const auto shard0Chunk1 = generateChunkType(collUUID,
                                                 ChunkVersion(11, 2, collEpoch, collTimestamp),
                                                 kShard0.getName(),
                                                 BSON("a" << 11),
                                                 BSON("a" << 20));
-    const auto shard1Chunk0 = generateChunkType(kNss,
+    const auto shard1Chunk0 = generateChunkType(collUUID,
                                                 ChunkVersion(8, 1, collEpoch, collTimestamp),
                                                 kShard1.getName(),
                                                 BSON("a" << 21),
@@ -148,9 +149,10 @@ TEST_F(ShardingCatalogManagerBumpCollectionVersionAndChangeMetadataTest,
 
 TEST_F(ShardingCatalogManagerBumpCollectionVersionAndChangeMetadataTest, NoChunks) {
     const auto collEpoch = OID::gen();
-    const auto collTimestamp = boost::none;
+    const auto collTimestamp = Timestamp(42);
+    const auto collUUID = UUID::gen();
 
-    const auto shard0Chunk0 = generateChunkType(kNss,
+    const auto shard0Chunk0 = generateChunkType(collUUID,
                                                 ChunkVersion(10, 1, collEpoch, collTimestamp),
                                                 kShard0.getName(),
                                                 BSON("a" << 1),
@@ -172,14 +174,15 @@ TEST_F(ShardingCatalogManagerBumpCollectionVersionAndChangeMetadataTest, NoChunk
 TEST_F(ShardingCatalogManagerBumpCollectionVersionAndChangeMetadataTest,
        SucceedsInThePresenceOfTransientTransactionErrors) {
     const auto collEpoch = OID::gen();
-    const auto collTimestamp = boost::none;
+    const auto collTimestamp = Timestamp(42);
+    const auto collUUID = UUID::gen();
 
-    const auto shard0Chunk0 = generateChunkType(kNss,
+    const auto shard0Chunk0 = generateChunkType(collUUID,
                                                 ChunkVersion(10, 1, collEpoch, collTimestamp),
                                                 kShard0.getName(),
                                                 BSON("a" << 1),
                                                 BSON("a" << 10));
-    const auto shard1Chunk0 = generateChunkType(kNss,
+    const auto shard1Chunk0 = generateChunkType(collUUID,
                                                 ChunkVersion(11, 2, collEpoch, collTimestamp),
                                                 kShard1.getName(),
                                                 BSON("a" << 11),
@@ -233,14 +236,15 @@ TEST_F(ShardingCatalogManagerBumpCollectionVersionAndChangeMetadataTest,
 TEST_F(ShardingCatalogManagerBumpCollectionVersionAndChangeMetadataTest,
        StopsRetryingOnPermanentServerErrors) {
     const auto collEpoch = OID::gen();
-    const auto collTimestamp = boost::none;
+    const auto collTimestamp = Timestamp(42);
+    const auto collUUID = UUID::gen();
 
-    const auto shard0Chunk0 = generateChunkType(kNss,
+    const auto shard0Chunk0 = generateChunkType(collUUID,
                                                 ChunkVersion(10, 1, collEpoch, collTimestamp),
                                                 kShard0.getName(),
                                                 BSON("a" << 1),
                                                 BSON("a" << 10));
-    const auto shard1Chunk0 = generateChunkType(kNss,
+    const auto shard1Chunk0 = generateChunkType(collUUID,
                                                 ChunkVersion(11, 2, collEpoch, collTimestamp),
                                                 kShard1.getName(),
                                                 BSON("a" << 11),

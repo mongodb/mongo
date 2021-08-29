@@ -183,7 +183,7 @@ public:
             uassertStatusOK(MigrationSecondaryThrottleOptions::createFromCommand(cmdObj));
 
         ChunkType chunkType;
-        chunkType.setNS(nss);
+        chunkType.setCollectionUUID(*cm.getUUID());
         chunkType.setMin(chunk->getMin());
         chunkType.setMax(chunk->getMax());
         chunkType.setShard(chunk->getShardId());

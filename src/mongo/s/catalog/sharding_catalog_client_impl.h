@@ -75,6 +75,11 @@ public:
                                  const NamespaceString& nss,
                                  repl::ReadConcernLevel readConcernLevel) override;
 
+    CollectionType getCollection(OperationContext* opCtx,
+                                 const UUID& uuid,
+                                 repl::ReadConcernLevel readConcernLevel) override;
+
+
     std::vector<CollectionType> getCollections(OperationContext* opCtx,
                                                StringData db,
                                                repl::ReadConcernLevel readConcernLevel) override;
@@ -122,7 +127,7 @@ public:
     Status applyChunkOpsDeprecated(OperationContext* opCtx,
                                    const BSONArray& updateOps,
                                    const BSONArray& preCondition,
-                                   const NamespaceStringOrUUID& nsOrUUID,
+                                   const UUID& uuid,
                                    const NamespaceString& nss,
                                    const ChunkVersion& lastChunkVersion,
                                    const WriteConcernOptions& writeConcern,

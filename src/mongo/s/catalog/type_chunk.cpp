@@ -49,7 +49,6 @@ const std::string ChunkType::ShardNSPrefix = "config.cache.chunks.";
 
 const BSONField<OID> ChunkType::name("_id");
 const BSONField<BSONObj> ChunkType::minShardID("_id");
-const BSONField<std::string> ChunkType::ns("ns");
 const BSONField<UUID> ChunkType::collectionUUID("uuid");
 const BSONField<BSONObj> ChunkType::min("min");
 const BSONField<BSONObj> ChunkType::max("max");
@@ -207,25 +206,6 @@ StatusWith<std::vector<ChunkHistory>> ChunkHistory::fromBSON(const BSONArray& so
 
 ChunkType::ChunkType() = default;
 
-ChunkType::ChunkType(NamespaceString nss, ChunkRange range, ChunkVersion version, ShardId shardId)
-    : _nss(std::move(nss)),
-      _min(range.getMin()),
-      _max(range.getMax()),
-      _version(std::move(version)),
-      _shard(std::move(shardId)) {}
-
-ChunkType::ChunkType(NamespaceString nss,
-                     CollectionUUID collectionUUID,
-                     ChunkRange range,
-                     ChunkVersion version,
-                     ShardId shardId)
-    : _nss(std::move(nss)),
-      _collectionUUID(std::move(collectionUUID)),
-      _min(range.getMin()),
-      _max(range.getMax()),
-      _version(std::move(version)),
-      _shard(std::move(shardId)) {}
-
 ChunkType::ChunkType(CollectionUUID collectionUUID,
                      ChunkRange range,
                      ChunkVersion version,
@@ -253,18 +233,6 @@ StatusWith<ChunkType> ChunkType::parseFromConfigBSONCommand(const BSONObj& sourc
     }
 
     {
-        std::string chunkNS;
-        Status status = bsonExtractStringField(source, ns.name(), &chunkNS);
-        if (status.isOK()) {
-            chunk._nss = NamespaceString(chunkNS);
-        } else if (status == ErrorCodes::NoSuchKey) {
-            // Ignore NoSuchKey because in 5.0 and beyond chunks don't include a ns.
-        } else {
-            return status;
-        }
-    }
-
-    {
         BSONElement collectionUUIDElem;
         Status status = bsonExtractField(source, collectionUUID.name(), &collectionUUIDElem);
         if (status.isOK()) {
@@ -280,10 +248,9 @@ StatusWith<ChunkType> ChunkType::parseFromConfigBSONCommand(const BSONObj& sourc
         }
     }
 
-    // There must be at least one of nss or uuid (or both)
-    if (!chunk._nss && !chunk._collectionUUID) {
-        return {ErrorCodes::FailedToParse,
-                str::stream() << "There must be at least one of nss or uuid"};
+    // There must be at least uuid
+    if (!chunk._collectionUUID) {
+        return {ErrorCodes::FailedToParse, str::stream() << "There must be a uuid present"};
     }
 
     {
@@ -376,8 +343,6 @@ BSONObj ChunkType::toConfigBSON() const {
     BSONObjBuilder builder;
     if (_id)
         builder.append(name.name(), getName());
-    if (_nss)
-        builder.append(ns.name(), getNS().ns());
     if (_collectionUUID)
         _collectionUUID->appendToBuilder(&builder, collectionUUID.name());
     if (_min)
@@ -387,10 +352,7 @@ BSONObj ChunkType::toConfigBSON() const {
     if (_shard)
         builder.append(shard.name(), getShard().toString());
     if (_version) {
-        if (_collectionUUID && !_nss)
-            builder.appendTimestamp(lastmod.name(), _version->toLong());
-        else
-            _version->appendLegacyWithField(&builder, ChunkType::lastmod());
+        builder.appendTimestamp(lastmod.name(), _version->toLong());
     }
     if (_jumbo)
         builder.append(jumbo.name(), getJumbo());
@@ -485,11 +447,6 @@ const OID& ChunkType::getName() const {
 
 void ChunkType::setName(const OID& id) {
     _id = id;
-}
-
-void ChunkType::setNS(const NamespaceString& nss) {
-    invariant(nss.isValid());
-    _nss = nss;
 }
 
 void ChunkType::setCollectionUUID(const CollectionUUID& uuid) {

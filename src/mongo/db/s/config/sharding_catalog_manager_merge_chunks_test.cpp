@@ -65,7 +65,6 @@ TEST_F(MergeChunkTest, MergeExistingChunksCorrectlyShouldSucceed) {
     const auto collUuid = UUID::gen();
     ChunkType chunk;
     chunk.setName(OID::gen());
-    chunk.setNS(_nss1);
     chunk.setCollectionUUID(collUuid);
 
     auto origVersion = ChunkVersion(1, 0, collEpoch, collTimestamp);
@@ -146,7 +145,6 @@ TEST_F(MergeChunkTest, MergeSeveralChunksCorrectlyShouldSucceed) {
     const auto collUuid = UUID::gen();
     ChunkType chunk;
     chunk.setName(OID::gen());
-    chunk.setNS(_nss1);
     chunk.setCollectionUUID(collUuid);
 
     auto origVersion = ChunkVersion(1, 0, collEpoch, collTimestamp);
@@ -220,10 +218,8 @@ TEST_F(MergeChunkTest, NewMergeShouldClaimHighestVersion) {
     const auto collUuid = UUID::gen();
     ChunkType chunk, otherChunk;
     chunk.setName(OID::gen());
-    chunk.setNS(_nss1);
     chunk.setCollectionUUID(collUuid);
     otherChunk.setName(OID::gen());
-    otherChunk.setNS(_nss1);
     otherChunk.setCollectionUUID(collUuid);
 
     auto origVersion = ChunkVersion(1, 2, collEpoch, collTimestamp);
@@ -301,7 +297,6 @@ TEST_F(MergeChunkTest, MergeLeavesOtherChunksAlone) {
     ShardId shardId(_shardName);
     ChunkType chunk;
     chunk.setName(OID::gen());
-    chunk.setNS(_nss1);
     chunk.setCollectionUUID(collUuid);
 
     auto origVersion = ChunkVersion(1, 2, collEpoch, collTimestamp);
@@ -377,7 +372,6 @@ TEST_F(MergeChunkTest, NonExistingNamespace) {
     const auto collUuidAtRequest = UUID::gen();
     const boost::optional<Timestamp> collTimestamp(42);
     ChunkType chunk;
-    chunk.setNS(_nss1);
     chunk.setCollectionUUID(UUID::gen());
 
     auto origVersion = ChunkVersion(1, 0, collEpoch, collTimestamp);
@@ -415,10 +409,9 @@ TEST_F(MergeChunkTest, NonExistingNamespace) {
 TEST_F(MergeChunkTest, NonMatchingUUIDsOfChunkAndRequestErrors) {
     const auto collEpoch = OID::gen();
     const boost::optional<Timestamp> collTimestamp(42);
-    ChunkType chunk;
-    chunk.setNS(_nss1);
     const auto collUuid = UUID::gen();
     const auto requestUuid = UUID::gen();
+    ChunkType chunk;
     chunk.setCollectionUUID(collUuid);
 
     auto origVersion = ChunkVersion(1, 0, collEpoch, collTimestamp);
@@ -469,7 +462,6 @@ TEST_F(MergeChunkTest, MergeAlreadyHappenedSucceeds) {
     mergedChunk.setMin(chunkMin);
     mergedChunk.setMax(chunkMax);
     mergedChunk.setName(OID::gen());
-    mergedChunk.setNS(_nss1);
     mergedChunk.setCollectionUUID(collUuid);
     mergedChunk.setShard(_shardId);
 
@@ -510,7 +502,6 @@ TEST_F(MergeChunkTest, MergingChunksWithDollarPrefixShouldSucceed) {
     const auto collUuid = UUID::gen();
     ChunkType chunk1;
     chunk1.setName(OID::gen());
-    chunk1.setNS(_nss1);
     chunk1.setCollectionUUID(collUuid);
 
 
@@ -587,7 +578,6 @@ TEST_F(MergeChunkTest, MergeExistingChunksCorrectlyShouldSucceedWithLegacyMethod
         const auto collUuid = UUID::gen();
         ChunkType chunk;
         chunk.setName(OID::gen());
-        chunk.setNS(nss);
         chunk.setCollectionUUID(collUuid);
 
         auto origVersion = ChunkVersion(1, 0, collEpoch, collTimestamp);
@@ -633,8 +623,7 @@ TEST_F(MergeChunkTest, MergeExistingChunksCorrectlyShouldSucceedWithLegacyMethod
         ASSERT_EQ(expectedShardVersion, shardVersion);
 
 
-        const auto query = collTimestamp ? BSON(ChunkType::collectionUUID() << collUuid)
-                                         : BSON(ChunkType::ns(nss.ns()));
+        const auto query = BSON(ChunkType::collectionUUID() << collUuid);
         auto findResponse = uassertStatusOK(getConfigShard()->exhaustiveFindOnConfig(
             operationContext(),
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
@@ -663,7 +652,6 @@ TEST_F(MergeChunkTest, MergeExistingChunksCorrectlyShouldSucceedWithLegacyMethod
         ASSERT_EQ(validAfter, mergedChunk.getHistory().front().getValidAfter());
     };
 
-    test(_nss1, boost::none /* timestamp */);
     test(_nss2, Timestamp(42));
 }
 
@@ -673,7 +661,6 @@ TEST_F(MergeChunkTest, MergeSeveralChunksCorrectlyShouldSucceedWithLegacyMethod)
         const auto collUuid = UUID::gen();
         ChunkType chunk;
         chunk.setName(OID::gen());
-        chunk.setNS(nss);
         chunk.setCollectionUUID(collUuid);
 
         auto origVersion = ChunkVersion(1, 0, collEpoch, collTimestamp);
@@ -712,8 +699,7 @@ TEST_F(MergeChunkTest, MergeSeveralChunksCorrectlyShouldSucceedWithLegacyMethod)
                 ->commitChunkMerge(
                     operationContext(), nss, collEpoch, chunkBoundaries, "shard0000", validAfter));
 
-        const auto query = collTimestamp ? BSON(ChunkType::collectionUUID() << collUuid)
-                                         : BSON(ChunkType::ns(nss.ns()));
+        const auto query = BSON(ChunkType::collectionUUID() << collUuid);
         auto findResponse = uassertStatusOK(getConfigShard()->exhaustiveFindOnConfig(
             operationContext(),
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
@@ -745,7 +731,6 @@ TEST_F(MergeChunkTest, MergeSeveralChunksCorrectlyShouldSucceedWithLegacyMethod)
         ASSERT_EQ(validAfter, mergedChunk.getHistory().front().getValidAfter());
     };
 
-    test(_nss1, boost::none /* timestamp */);
     test(_nss2, Timestamp(42));
 }
 
@@ -756,10 +741,8 @@ TEST_F(MergeChunkTest, NewMergeShouldClaimHighestVersionWithLegacyMethod) {
         const auto collUuid = UUID::gen();
         ChunkType chunk, otherChunk;
         chunk.setName(OID::gen());
-        chunk.setNS(nss);
         chunk.setCollectionUUID(collUuid);
         otherChunk.setName(OID::gen());
-        otherChunk.setNS(nss);
         otherChunk.setCollectionUUID(collUuid);
 
         auto origVersion = ChunkVersion(1, 2, collEpoch, collTimestamp);
@@ -799,8 +782,7 @@ TEST_F(MergeChunkTest, NewMergeShouldClaimHighestVersionWithLegacyMethod) {
                 ->commitChunkMerge(
                     operationContext(), nss, collEpoch, chunkBoundaries, "shard0000", validAfter));
 
-        const auto query = collTimestamp ? BSON(ChunkType::collectionUUID() << collUuid)
-                                         : BSON(ChunkType::ns(nss.ns()));
+        const auto query = BSON(ChunkType::collectionUUID() << collUuid);
         auto findResponse = uassertStatusOK(getConfigShard()->exhaustiveFindOnConfig(
             operationContext(),
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
@@ -832,7 +814,6 @@ TEST_F(MergeChunkTest, NewMergeShouldClaimHighestVersionWithLegacyMethod) {
         ASSERT_EQ(validAfter, mergedChunk.getHistory().front().getValidAfter());
     };
 
-    test(_nss1, boost::none /* timestamp */);
     test(_nss2, Timestamp(42));
 }
 
@@ -843,7 +824,6 @@ TEST_F(MergeChunkTest, MergeLeavesOtherChunksAloneWithLegacyMethod) {
         const auto collUuid = UUID::gen();
         ChunkType chunk;
         chunk.setName(OID::gen());
-        chunk.setNS(nss);
         chunk.setCollectionUUID(collUuid);
 
         auto origVersion = ChunkVersion(1, 2, collEpoch, collTimestamp);
@@ -880,8 +860,7 @@ TEST_F(MergeChunkTest, MergeLeavesOtherChunksAloneWithLegacyMethod) {
             ShardingCatalogManager::get(operationContext())
                 ->commitChunkMerge(
                     operationContext(), nss, collEpoch, chunkBoundaries, "shard0000", validAfter));
-        const auto query = collTimestamp ? BSON(ChunkType::collectionUUID() << collUuid)
-                                         : BSON(ChunkType::ns(nss.ns()));
+        const auto query = BSON(ChunkType::collectionUUID() << collUuid);
         auto findResponse = uassertStatusOK(getConfigShard()->exhaustiveFindOnConfig(
             operationContext(),
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
@@ -915,7 +894,6 @@ TEST_F(MergeChunkTest, MergeLeavesOtherChunksAloneWithLegacyMethod) {
         ASSERT_BSONOBJ_EQ(otherChunk.getMax(), foundOtherChunk.getMax());
     };
 
-    test(_nss1, boost::none /* timestamp */);
     test(_nss2, Timestamp(42));
 }
 
@@ -924,7 +902,6 @@ TEST_F(MergeChunkTest, NonExistingNamespaceWithLegacyMethod) {
         const auto collEpoch = OID::gen();
 
         ChunkType chunk;
-        chunk.setNS(nss);
         chunk.setCollectionUUID(UUID::gen());
 
         auto origVersion = ChunkVersion(1, 0, collEpoch, collTimestamp);
@@ -960,7 +937,6 @@ TEST_F(MergeChunkTest, NonExistingNamespaceWithLegacyMethod) {
         ASSERT_NOT_OK(mergeStatus);
     };
 
-    test(_nss1, boost::none /* timestamp */);
     test(_nss2, Timestamp(42));
 }
 
@@ -969,7 +945,6 @@ TEST_F(MergeChunkTest, NonMatchingEpochsOfChunkAndRequestErrorsWithLegacyMethod)
         const auto collEpoch = OID::gen();
 
         ChunkType chunk;
-        chunk.setNS(nss);
         chunk.setCollectionUUID(UUID::gen());
 
         auto origVersion = ChunkVersion(1, 0, collEpoch, collTimestamp);
@@ -1002,7 +977,6 @@ TEST_F(MergeChunkTest, NonMatchingEpochsOfChunkAndRequestErrorsWithLegacyMethod)
         ASSERT_EQ(ErrorCodes::StaleEpoch, mergeStatus);
     };
 
-    test(_nss1, boost::none /* timestamp */);
     test(_nss2, Timestamp(42));
 }
 
@@ -1013,7 +987,6 @@ TEST_F(MergeChunkTest, MergeAlreadyHappenedSucceedsWithLegacyMethod) {
         const auto collUuid = UUID::gen();
         ChunkType chunk;
         chunk.setName(OID::gen());
-        chunk.setNS(nss);
         chunk.setCollectionUUID(collUuid);
 
         auto origVersion = ChunkVersion(1, 0, collEpoch, collTimestamp);
@@ -1052,8 +1025,7 @@ TEST_F(MergeChunkTest, MergeAlreadyHappenedSucceedsWithLegacyMethod) {
                     operationContext(), nss, collEpoch, chunkBoundaries, "shard0000", validAfter));
 
         // Verify that no change to config.chunks happened.
-        const auto query = collTimestamp ? BSON(ChunkType::collectionUUID() << collUuid)
-                                         : BSON(ChunkType::ns(nss.ns()));
+        const auto query = BSON(ChunkType::collectionUUID() << collUuid);
         auto findResponse = uassertStatusOK(getConfigShard()->exhaustiveFindOnConfig(
             operationContext(),
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
@@ -1074,7 +1046,6 @@ TEST_F(MergeChunkTest, MergeAlreadyHappenedSucceedsWithLegacyMethod) {
         ASSERT_BSONOBJ_EQ(mergedChunk.toConfigBSON(), foundChunk.toConfigBSON());
     };
 
-    test(_nss1, boost::none /* timestamp */);
     test(_nss2, Timestamp(42));
 }
 
@@ -1090,7 +1061,6 @@ TEST_F(MergeChunkTest, ChunkBoundariesOutOfOrderFailsWithLegacyMethod) {
 
             ChunkType chunk;
             chunk.setName(OID::gen());
-            chunk.setNS(nss);
             chunk.setCollectionUUID(UUID::gen());
 
             chunk.setShard(_shardId);
@@ -1126,7 +1096,6 @@ TEST_F(MergeChunkTest, ChunkBoundariesOutOfOrderFailsWithLegacyMethod) {
                     operationContext(), nss, collEpoch, chunkBoundaries, "shard0000", validAfter));
     };
 
-    test(_nss1, boost::none /* timestamp */);
     test(_nss2, Timestamp(42));
 }
 
@@ -1137,7 +1106,6 @@ TEST_F(MergeChunkTest, MergingChunksWithDollarPrefixShouldSucceedWithLegacyMetho
         const auto collUuid = UUID::gen();
         ChunkType chunk1;
         chunk1.setName(OID::gen());
-        chunk1.setNS(nss);
         chunk1.setCollectionUUID(collUuid);
 
 
@@ -1176,8 +1144,7 @@ TEST_F(MergeChunkTest, MergingChunksWithDollarPrefixShouldSucceedWithLegacyMetho
                 ->commitChunkMerge(
                     operationContext(), nss, collEpoch, chunkBoundaries, "shard0000", validAfter));
 
-        const auto query = collTimestamp ? BSON(ChunkType::collectionUUID() << collUuid)
-                                         : BSON(ChunkType::ns(nss.ns()));
+        const auto query = BSON(ChunkType::collectionUUID() << collUuid);
         auto findResponse = uassertStatusOK(getConfigShard()->exhaustiveFindOnConfig(
             operationContext(),
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
@@ -1209,7 +1176,6 @@ TEST_F(MergeChunkTest, MergingChunksWithDollarPrefixShouldSucceedWithLegacyMetho
         ASSERT_EQ(validAfter, mergedChunk.getHistory().front().getValidAfter());
     };
 
-    test(_nss1, boost::none /* timestamp */);
     test(_nss2, Timestamp(42));
 }
 

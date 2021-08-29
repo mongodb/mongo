@@ -133,7 +133,7 @@ TEST_F(ShardedUnionTest, ForwardsMaxTimeMSToRemotes) {
 TEST_F(ShardedUnionTest, RetriesSubPipelineOnStaleConfigError) {
     // Sharded by {_id: 1}, [MinKey, 0) on shard "0", [0, MaxKey) on shard "1".
     setupNShards(2);
-    loadRoutingTableWithTwoChunksAndTwoShards(kTestAggregateNss);
+    const auto cm = loadRoutingTableWithTwoChunksAndTwoShards(kTestAggregateNss);
 
     auto pipeline = Pipeline::create(
         {DocumentSourceMatch::create(fromjson("{_id: 'unionResult'}"), expCtx())}, expCtx());
@@ -168,14 +168,14 @@ TEST_F(ShardedUnionTest, RetriesSubPipelineOnStaleConfigError) {
 
     ChunkVersion version(1, 0, epoch, boost::none /* timestamp */);
 
-    ChunkType chunk1(kTestAggregateNss,
+    ChunkType chunk1(*cm.getUUID(),
                      {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << 0)},
                      version,
                      {"0"});
     chunk1.setName(OID::gen());
     version.incMinor();
 
-    ChunkType chunk2(kTestAggregateNss,
+    ChunkType chunk2(*cm.getUUID(),
                      {BSON("_id" << 0), shardKeyPattern.getKeyPattern().globalMax()},
                      version,
                      {"1"});
@@ -197,7 +197,7 @@ TEST_F(ShardedUnionTest, RetriesSubPipelineOnStaleConfigError) {
 TEST_F(ShardedUnionTest, CorrectlySplitsSubPipelineIfRefreshedDistributionRequiresIt) {
     // Sharded by {_id: 1}, [MinKey, 0) on shard "0", [0, MaxKey) on shard "1".
     auto shards = setupNShards(2);
-    loadRoutingTableWithTwoChunksAndTwoShards(kTestAggregateNss);
+    const auto cm = loadRoutingTableWithTwoChunksAndTwoShards(kTestAggregateNss);
 
     auto&& parser = AccumulationStatement::getParser("$sum", boost::none);
     auto accumulatorArg = BSON("" << 1);
@@ -244,7 +244,7 @@ TEST_F(ShardedUnionTest, CorrectlySplitsSubPipelineIfRefreshedDistributionRequir
 
     ChunkVersion version(1, 0, epoch, boost::none /* timestamp */);
 
-    ChunkType chunk1(kTestAggregateNss,
+    ChunkType chunk1(*cm.getUUID(),
                      {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << 0)},
                      version,
                      {shards[0].getName()});
@@ -252,11 +252,11 @@ TEST_F(ShardedUnionTest, CorrectlySplitsSubPipelineIfRefreshedDistributionRequir
     version.incMinor();
 
     ChunkType chunk2(
-        kTestAggregateNss, {BSON("_id" << 0), BSON("_id" << 10)}, version, {shards[1].getName()});
+        *cm.getUUID(), {BSON("_id" << 0), BSON("_id" << 10)}, version, {shards[1].getName()});
     chunk2.setName(OID::gen());
     version.incMinor();
 
-    ChunkType chunk3(kTestAggregateNss,
+    ChunkType chunk3(*cm.getUUID(),
                      {BSON("_id" << 10), shardKeyPattern.getKeyPattern().globalMax()},
                      version,
                      {shards[0].getName()});
@@ -283,7 +283,7 @@ TEST_F(ShardedUnionTest, CorrectlySplitsSubPipelineIfRefreshedDistributionRequir
 TEST_F(ShardedUnionTest, AvoidsSplittingSubPipelineIfRefreshedDistributionDoesNotRequire) {
     // Sharded by {_id: 1}, [MinKey, 0) on shard "0", [0, MaxKey) on shard "1".
     auto shards = setupNShards(2);
-    loadRoutingTableWithTwoChunksAndTwoShards(kTestAggregateNss);
+    const auto cm = loadRoutingTableWithTwoChunksAndTwoShards(kTestAggregateNss);
 
     auto&& parser = AccumulationStatement::getParser("$sum", boost::none);
     auto accumulatorArg = BSON("" << 1);
@@ -330,7 +330,7 @@ TEST_F(ShardedUnionTest, AvoidsSplittingSubPipelineIfRefreshedDistributionDoesNo
     const ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
     ChunkVersion version(1, 0, epoch, boost::none /* timestamp */);
     ChunkType chunk1(
-        kTestAggregateNss,
+        *cm.getUUID(),
         {shardKeyPattern.getKeyPattern().globalMin(), shardKeyPattern.getKeyPattern().globalMax()},
         version,
         {shards[0].getName()});

@@ -45,7 +45,6 @@ namespace mongo {
 class TestingDurableHistoryPin : public DurableHistoryPin {
 public:
     std::string getName() override;
-
     boost::optional<Timestamp> calculatePin(OperationContext* opCtx) override;
 };
 }  // namespace mongo

@@ -66,6 +66,7 @@ template <typename ShardSelectorFn>
 CollectionMetadata makeChunkManagerWithShardSelector(int nShards,
                                                      uint32_t nChunks,
                                                      ShardSelectorFn selectShard) {
+    const auto collUuid = UUID::gen();
     const auto collEpoch = OID::gen();
     const auto shardKeyPattern = KeyPattern(BSON("_id" << 1));
 
@@ -73,14 +74,14 @@ CollectionMetadata makeChunkManagerWithShardSelector(int nShards,
     chunks.reserve(nChunks);
 
     for (uint32_t i = 0; i < nChunks; ++i) {
-        chunks.emplace_back(kNss,
+        chunks.emplace_back(collUuid,
                             getRangeForChunk(i, nChunks),
                             ChunkVersion{i + 1, 0, collEpoch, boost::none /* timestamp */},
                             selectShard(i, nShards, nChunks));
     }
 
     auto rt = RoutingTableHistory::makeNew(kNss,
-                                           UUID::gen(),
+                                           collUuid,
                                            shardKeyPattern,
                                            nullptr,
                                            true,
@@ -135,11 +136,12 @@ void BM_IncrementalRefreshOfPessimalBalancedDistribution(benchmark::State& state
     auto metadata = makeChunkManagerWithPessimalBalancedDistribution(nShards, nChunks);
 
     auto postMoveVersion = metadata.getChunkManager()->getVersion();
+    auto const uuid = *metadata.getUUID();
     std::vector<ChunkType> newChunks;
     postMoveVersion.incMajor();
-    newChunks.emplace_back(kNss, getRangeForChunk(1, nChunks), postMoveVersion, ShardId("shard0"));
+    newChunks.emplace_back(uuid, getRangeForChunk(1, nChunks), postMoveVersion, ShardId("shard0"));
     postMoveVersion.incMajor();
-    newChunks.emplace_back(kNss, getRangeForChunk(3, nChunks), postMoveVersion, ShardId("shard1"));
+    newChunks.emplace_back(uuid, getRangeForChunk(3, nChunks), postMoveVersion, ShardId("shard1"));
 
     for (auto keepRunning : state) {
         benchmark::DoNotOptimize(runIncrementalUpdate(metadata, newChunks));
@@ -156,6 +158,7 @@ auto BM_FullBuildOfChunkManager(benchmark::State& state, ShardSelectorFn selectS
     const int nShards = state.range(0);
     const uint32_t nChunks = state.range(1);
 
+    const auto collUuid = UUID::gen();
     const auto collEpoch = OID::gen();
     const auto shardKeyPattern = KeyPattern(BSON("_id" << 1));
 
@@ -163,7 +166,7 @@ auto BM_FullBuildOfChunkManager(benchmark::State& state, ShardSelectorFn selectS
     chunks.reserve(nChunks);
 
     for (uint32_t i = 0; i < nChunks; ++i) {
-        chunks.emplace_back(kNss,
+        chunks.emplace_back(collUuid,
                             getRangeForChunk(i, nChunks),
                             ChunkVersion{i + 1, 0, collEpoch, boost::none /* timestamp */},
                             selectShard(i, nShards, nChunks));
@@ -171,7 +174,7 @@ auto BM_FullBuildOfChunkManager(benchmark::State& state, ShardSelectorFn selectS
 
     for (auto keepRunning : state) {
         auto rt = RoutingTableHistory::makeNew(kNss,
-                                               UUID::gen(),
+                                               collUuid,
                                                shardKeyPattern,
                                                nullptr,
                                                true,

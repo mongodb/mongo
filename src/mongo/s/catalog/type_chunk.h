@@ -162,7 +162,7 @@ public:
  * Expected config server config.chunks collection format:
  *   {
  *      _id : "test.foo-a_MinKey",
- *      ns : "test.foo",
+ *      uuid : Bindata(UUID),
  *      min : {
  *              "a" : { "$minKey" : 1 }
  *      },
@@ -171,7 +171,6 @@ public:
  *      },
  *      shard : "test-rs1",
  *      lastmod : Timestamp(1, 0),
- *      lastmodEpoch : ObjectId("587fc60cef168288439ad6ed"),
  *      jumbo : false              // optional field
  *   }
  *
@@ -202,7 +201,6 @@ public:
     // Field names and types in the chunks collections.
     static const BSONField<OID> name;
     static const BSONField<BSONObj> minShardID;
-    static const BSONField<std::string> ns;
     static const BSONField<UUID> collectionUUID;
     static const BSONField<BSONObj> min;
     static const BSONField<BSONObj> max;
@@ -214,12 +212,6 @@ public:
     static const BSONField<BSONObj> history;
 
     ChunkType();
-    ChunkType(NamespaceString nss, ChunkRange range, ChunkVersion version, ShardId shardId);
-    ChunkType(NamespaceString nss,
-              CollectionUUID collectionUUID,
-              ChunkRange range,
-              ChunkVersion version,
-              ShardId shardId);
     ChunkType(CollectionUUID collectionUUID,
               ChunkRange range,
               ChunkVersion version,
@@ -265,11 +257,6 @@ public:
     /**
      * Getters and setters.
      */
-    const NamespaceString& getNS() const {
-        invariant(_nss);
-        return _nss.get();
-    }
-    void setNS(const NamespaceString& nss);
 
     const CollectionUUID& getCollectionUUID() const {
         invariant(_collectionUUID);
@@ -337,8 +324,6 @@ private:
 
     // (M)(C)     auto-generated object id
     boost::optional<OID> _id;
-    // (O)(C)     collection this chunk is in
-    boost::optional<NamespaceString> _nss;
     // (O)(C)     uuid of the collection in the CollectionCatalog
     boost::optional<CollectionUUID> _collectionUUID;
     // (M)(C)(S)  first key of the range, inclusive

@@ -222,7 +222,7 @@ TEST_F(BalancerChunkSelectionTest, TagRangeMaxNotAlignedWithChunkMax) {
 
         expectGetStatsCommands(2);
         future.default_timed_get();
-        removeAllChunks(kNamespace);
+        removeAllChunks(kNamespace, collUUID);
     };
 
     assertErrorWhenMoveChunk({{kKeyPattern.globalMin(), BSON(kPattern << -5)},

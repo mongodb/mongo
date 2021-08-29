@@ -97,11 +97,6 @@ protected:
     void setUpTags(const NamespaceString& collName, const StringMap<ChunkRange>& tagChunkRanges);
 
     /**
-     * Removes all document in the given config collection for the collection.
-     */
-    void removeAllDocs(const NamespaceString& configNS, const NamespaceString& collName);
-
-    /**
      * Removes all document in the config.tags for the collection.
      */
     void removeAllTags(const NamespaceString& collName);
@@ -109,12 +104,12 @@ protected:
     /**
      * Removes all document in the config.chunks for the collection.
      */
-    void removeAllChunks(const NamespaceString& collName);
+    void removeAllChunks(const NamespaceString& collName, const UUID& uuid);
 
     /**
      * Inserts a document into the config.migrations collection as an active migration.
      */
-    void setUpMigration(const ChunkType& chunk, const ShardId& toShard);
+    void setUpMigration(const NamespaceString& ns, const ChunkType& chunk, const ShardId& toShard);
 
     /**
      * Asserts that config.migrations is empty and config.locks contains no locked documents other

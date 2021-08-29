@@ -129,6 +129,11 @@ public:
         const NamespaceString& nss,
         repl::ReadConcernLevel readConcernLevel = repl::ReadConcernLevel::kMajorityReadConcern) = 0;
 
+    virtual CollectionType getCollection(
+        OperationContext* opCtx,
+        const UUID& uuid,
+        repl::ReadConcernLevel readConcernLevel = repl::ReadConcernLevel::kMajorityReadConcern) = 0;
+
     /**
      * Retrieves all collections under a specified database (or in the system). If the dbName
      * parameter is empty, returns all collections.
@@ -240,7 +245,7 @@ public:
      *
      * @param updateOps: documents to write to the chunks collection.
      * @param preCondition: preconditions for applying documents.
-     * @param nsOrUUID: collection name if version < 5.0, collection UUID otherwise.
+     * @param uuid: collection UUID.
      * @param nss: namespace string for the chunks collection.
      * @param lastChunkVersion: version of the last document being written to the chunks
      * collection.
@@ -256,7 +261,7 @@ public:
     virtual Status applyChunkOpsDeprecated(OperationContext* opCtx,
                                            const BSONArray& updateOps,
                                            const BSONArray& preCondition,
-                                           const NamespaceStringOrUUID& nsOrUUID,
+                                           const UUID& uuid,
                                            const NamespaceString& nss,
                                            const ChunkVersion& lastChunkVersion,
                                            const WriteConcernOptions& writeConcern,

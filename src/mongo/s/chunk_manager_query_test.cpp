@@ -502,18 +502,19 @@ TEST_F(ChunkManagerQueryTest, SimpleCollationNumbersMultiShard) {
 }
 
 TEST_F(ChunkManagerQueryTest, SnapshotQueryWithMoreShardsThanLatestMetadata) {
+    const auto uuid = UUID::gen();
     const auto epoch = OID::gen();
     ChunkVersion version(1, 0, epoch, boost::none /* timestamp */);
 
-    ChunkType chunk0(kNss, {BSON("x" << MINKEY), BSON("x" << 0)}, version, ShardId("0"));
+    ChunkType chunk0(uuid, {BSON("x" << MINKEY), BSON("x" << 0)}, version, ShardId("0"));
     chunk0.setName(OID::gen());
 
     version.incMajor();
-    ChunkType chunk1(kNss, {BSON("x" << 0), BSON("x" << MAXKEY)}, version, ShardId("1"));
+    ChunkType chunk1(uuid, {BSON("x" << 0), BSON("x" << MAXKEY)}, version, ShardId("1"));
     chunk1.setName(OID::gen());
 
     auto oldRoutingTable = RoutingTableHistory::makeNew(kNss,
-                                                        boost::none,
+                                                        uuid,
                                                         BSON("x" << 1),
                                                         nullptr,
                                                         false,

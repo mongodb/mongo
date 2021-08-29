@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/grid.h"
 
 namespace mongo {
 namespace {
@@ -54,8 +55,10 @@ const BSONField<std::string> MigrationType::forceJumbo("forceJumbo");
 
 MigrationType::MigrationType() = default;
 
-MigrationType::MigrationType(MigrateInfo info, bool waitForDelete)
-    : _nss(info.nss),
+MigrationType::MigrationType(const NamespaceString& nss,
+                             const MigrateInfo& info,
+                             bool waitForDelete)
+    : _nss(nss),
       _min(info.minKey),
       _max(info.maxKey),
       _fromShard(info.from),
@@ -153,10 +156,13 @@ BSONObj MigrationType::toBSON() const {
     return builder.obj();
 }
 
-MigrateInfo MigrationType::toMigrateInfo() const {
+MigrateInfo MigrationType::toMigrateInfo(OperationContext* opCtx) const {
+    const CollectionType collection = Grid::get(opCtx)->catalogClient()->getCollection(
+        opCtx, _nss, repl::ReadConcernLevel::kLocalReadConcern);
+
     ChunkType chunk;
-    chunk.setNS(_nss);
     chunk.setShard(_fromShard);
+    chunk.setCollectionUUID(collection.getUuid());
     chunk.setMin(_min);
     chunk.setMax(_max);
     chunk.setVersion(_chunkVersion);

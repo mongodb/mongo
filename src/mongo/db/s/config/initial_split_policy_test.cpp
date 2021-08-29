@@ -207,7 +207,7 @@ public:
 
         for (unsigned long i = 0; i < chunkRanges.size(); ++i) {
             ChunkVersion version(1, 0, OID::gen(), boost::none /* timestamp */);
-            ChunkType chunk(_nss, chunkRanges[i], version, shardIds[i]);
+            ChunkType chunk(_uuid, chunkRanges[i], version, shardIds[i]);
             chunk.setHistory({ChunkHistory(timeStamp, shardIds[i])});
             chunks.push_back(chunk);
         }
@@ -230,6 +230,10 @@ public:
         return _nss;
     }
 
+    const UUID& uuid() {
+        return _uuid;
+    }
+
     const ShardKeyPattern& shardKeyPattern() {
         return _shardKeyPattern;
     }
@@ -248,6 +252,7 @@ public:
 
 private:
     const NamespaceString _nss{"test.foo"};
+    const UUID _uuid{UUID::gen()};
     const ShardKeyPattern _shardKeyPattern = ShardKeyPattern(BSON("x"
                                                                   << "hashed"));
     const std::string _shardName = "testShard";

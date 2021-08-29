@@ -62,12 +62,13 @@ struct MigrateInfo {
                 MigrationReason a_reason);
 
     std::string getName() const;
+    StatusWith<NamespaceString> getNss(OperationContext* opCtx) const;
 
-    BSONObj getMigrationTypeQuery() const;
+    BSONObj getMigrationTypeQuery(NamespaceString const& nss) const;
 
     std::string toString() const;
 
-    NamespaceString nss;
+    UUID uuid;
     ShardId to;
     ShardId from;
     BSONObj minKey;
