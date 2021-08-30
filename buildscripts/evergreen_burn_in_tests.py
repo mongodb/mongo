@@ -21,7 +21,7 @@ from buildscripts.patch_builds.change_data import RevisionMap
 from buildscripts.patch_builds.evg_change_data import generate_revision_map_from_manifest
 from buildscripts.patch_builds.task_generation import TimeoutInfo, resmoke_commands, \
     validate_task_generation_limit
-from buildscripts.task_generation.constants import CONFIG_FILE, EVERGREEN_FILE, ARCHIVE_DIST_TEST_TASK
+from buildscripts.task_generation.constants import CONFIG_FILE, EVERGREEN_FILE, ARCHIVE_DIST_TEST_DEBUG_TASK
 from buildscripts.util.fileops import write_file
 from buildscripts.util.taskname import name_generated_task
 from buildscripts.util.teststats import TestRuntime, HistoricTaskData
@@ -239,7 +239,7 @@ class TaskGenerator:
         timeout = self.generate_timeouts(test_name)
         commands = resmoke_commands("run tests", run_tests_vars, timeout,
                                     self.task_info.require_multiversion)
-        dependencies = {TaskDependency(ARCHIVE_DIST_TEST_TASK)}
+        dependencies = {TaskDependency(ARCHIVE_DIST_TEST_DEBUG_TASK)}
 
         return Task(sub_task_name, commands, dependencies)
 
