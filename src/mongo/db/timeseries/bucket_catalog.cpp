@@ -150,9 +150,9 @@ OperationId getOpId(OperationContext* opCtx,
     MONGO_UNREACHABLE;
 }
 
-BSONObj buildControlMinTimestampDoc(StringData timeField, long long roundedSeconds) {
+BSONObj buildControlMinTimestampDoc(StringData timeField, Date_t roundedTime) {
     BSONObjBuilder builder;
-    builder.append(timeField, Date_t::fromMillisSinceEpoch(1000 * roundedSeconds));
+    builder.append(timeField, roundedTime);
     return builder.obj();
 }
 }  // namespace
@@ -368,10 +368,12 @@ void BucketCatalog::abort(std::shared_ptr<WriteBatch> batch,
 
     if (batch->finished()) {
         auto batchStatus = batch->getResult().getStatus();
-        invariant(batchStatus == ErrorCodes::TimeseriesBucketCleared ||
-                      batchStatus.isA<ErrorCategory::Interruption>(),
-                  str::stream() << "Unexpected error when aborting time-series batch: "
-                                << batchStatus);
+        tassert(5916403,
+                str::stream() << "Unexpected error when aborting time-series batch: "
+                              << batchStatus,
+                batchStatus == ErrorCodes::TimeseriesBucketCleared ||
+                    batchStatus.isA<ErrorCategory::Interruption>() ||
+                    batchStatus.isA<ErrorCategory::StaleShardVersionError>());
         return;
     }
 
@@ -652,7 +654,7 @@ void BucketCatalog::_setIdTimestamp(Bucket* bucket,
     bucket->_id.setTimestamp(roundedSeconds);
 
     // Make sure we set the control.min time field to match the rounded _id timestamp.
-    auto controlDoc = buildControlMinTimestampDoc(options.getTimeField(), roundedSeconds);
+    auto controlDoc = buildControlMinTimestampDoc(options.getTimeField(), roundedTime);
     bucket->_minmax.update(
         controlDoc, bucket->_metadata.getMetaField(), bucket->_metadata.getComparator());
 

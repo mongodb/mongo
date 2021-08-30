@@ -51,9 +51,13 @@ var ChunkHelper = (function() {
         return res;
     }
 
-    function splitChunkAtPoint(db, collName, splitPoint) {
-        var cmd = {split: db[collName].getFullName(), middle: {_id: splitPoint}};
+    function splitChunkAt(db, collName, middle) {
+        var cmd = {split: db[collName].getFullName(), middle: middle};
         return runCommandWithRetries(db, cmd, res => res.code === ErrorCodes.LockBusy);
+    }
+
+    function splitChunkAtPoint(db, collName, splitPoint) {
+        return splitChunkAt(db, collName, {_id: splitPoint});
     }
 
     function splitChunkWithBounds(db, collName, bounds) {
@@ -222,6 +226,7 @@ var ChunkHelper = (function() {
     }
 
     return {
+        splitChunkAt: splitChunkAt,
         splitChunkAtPoint: splitChunkAtPoint,
         splitChunkWithBounds: splitChunkWithBounds,
         moveChunk: moveChunk,

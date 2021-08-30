@@ -123,6 +123,10 @@ public:
         return 0;
     }
 
+    bool isShardedTimeSeriesBucketsNamespace() const override {
+        return false;
+    }
+
 private:
     /**
      * Returns the first ShardEndpoint for the query from the mock ranges. Only handles queries of

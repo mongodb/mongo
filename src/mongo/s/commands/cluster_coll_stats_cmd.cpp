@@ -215,7 +215,7 @@ public:
         BSONObj cmdObjToSend = cmdObj.removeField("scale");
 
         // Translate command collection namespace for time-series collection.
-        if (cm.isSharded() && cm.getTimeseriesFields()) {
+        if (cm.isSharded() && cm.getTimeseriesFields() && !nss.isTimeseriesBucketsCollection()) {
             cmdObjToSend = timeseries::makeTimeseriesCommand(cmdObjToSend, nss, getName());
         }
 
