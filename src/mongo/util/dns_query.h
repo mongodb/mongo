@@ -89,7 +89,7 @@ struct SRVHostEntry {
  * found and `ErrorCodes::DNSProtocolError` as the status value if the DNS lookup fails, for any
  * other reason
  */
-std::vector<SRVHostEntry> lookupSRVRecords(const std::string& service);
+std::vector<std::pair<SRVHostEntry, Seconds>> lookupSRVRecords(const std::string& service);
 
 /**
  * Returns a group of strings containing text from DNS TXT entries for a specified service.

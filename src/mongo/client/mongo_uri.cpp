@@ -421,14 +421,14 @@ MongoURI MongoURI::parseImpl(StringData url) {
         using std::end;
         std::transform(
             begin(srvEntries), end(srvEntries), back_inserter(servers), [&domain](auto&& srv) {
-                const dns::HostName target(srv.host);  // FQDN
+                const dns::HostName target(srv.first.host);  // FQDN
 
                 if (!domain.contains(target)) {
                     uasserted(ErrorCodes::FailedToParse,
                               str::stream() << "Hostname " << target << " is not within the domain "
                                             << domain);
                 }
-                return HostAndPort(target.noncanonicalName(), srv.port);
+                return HostAndPort(target.noncanonicalName(), srv.first.port);
             });
     }
 

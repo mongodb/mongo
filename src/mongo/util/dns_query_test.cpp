@@ -28,6 +28,9 @@
  */
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
+#include <algorithm>
+#include <iterator>
+
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/dns_query.h"
@@ -37,7 +40,6 @@ using namespace std::literals::string_literals;
 namespace {
 std::string getFirstARecord(const std::string& service) {
     auto resPair = mongo::dns::lookupARecords(service);
-    ASSERT_GT(resPair.size(), 0);
     auto res = resPair.front().first;
     if (res.empty())
         return "";
@@ -152,7 +154,15 @@ TEST(MongoDnsQuery, srvRecords) {
             continue;
         }
 
-        auto witness = mongo::dns::lookupSRVRecords(kMongodbSRVPrefix + test.query);
+        auto witnessPairs = mongo::dns::lookupSRVRecords(kMongodbSRVPrefix + test.query);
+        std::vector<mongo::dns::SRVHostEntry> witness;
+        witness.reserve(witnessPairs.size());
+        std::transform(witnessPairs.begin(),
+                       witnessPairs.end(),
+                       std::back_inserter(witness),
+                       [](const auto& p) { return p.first; });
+        // std::transform(witnessPairs.begin(), witnessPairs.end(), std::back_inserter(witness),
+        // [](std::pair<mongo::dns::SRVHostEntry, mongo::Seconds> &p) { return p.first;});
         std::sort(begin(witness), end(witness));
 
         for (const auto& entry : witness) {

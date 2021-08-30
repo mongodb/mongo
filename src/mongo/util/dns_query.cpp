@@ -62,6 +62,9 @@ using namespace std::literals::string_literals;
 
 namespace mongo {
 
+/**
+ * Returns a string with the IP address or domain name listed...
+ */
 std::vector<std::pair<std::string, Seconds>> dns::lookupARecords(const std::string& service) {
     DNSQueryState dnsQuery;
     auto response = dnsQuery.lookup(service, DNSQueryClass::kInternet, DNSQueryType::kAddress);
@@ -92,16 +95,17 @@ std::vector<std::pair<std::string, Seconds>> dns::lookupARecords(const std::stri
     return res;
 }
 
-std::vector<dns::SRVHostEntry> dns::lookupSRVRecords(const std::string& service) {
+std::vector<std::pair<dns::SRVHostEntry, Seconds>> dns::lookupSRVRecords(
+    const std::string& service) {
     DNSQueryState dnsQuery;
 
     auto response = dnsQuery.lookup(service, DNSQueryClass::kInternet, DNSQueryType::kSRV);
 
-    std::vector<SRVHostEntry> rv;
+    std::vector<std::pair<dns::SRVHostEntry, Seconds>> rv;
 
     for (const auto& entry : response) {
         try {
-            rv.push_back(entry.srvHostEntry());
+            rv.push_back({entry.srvHostEntry(), entry.getTtl()});
         } catch (const ExceptionFor<ErrorCodes::DNSRecordTypeMismatch>&) {
         }
     }
