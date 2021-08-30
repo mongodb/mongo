@@ -53,6 +53,9 @@ public:
      */
     Status writeToMetadata(BSONObjBuilder* metadataBob) const;
 
+    ShardingMetadata(repl::OpTime lastOpTime, OID lastElectionId);
+
+private:
     /**
      * Gets the OpTime of the oplog entry of the last successful write operation executed by the
      * server that produced the metadata.
@@ -64,9 +67,6 @@ public:
      */
     const OID& getLastElectionId() const;
 
-    ShardingMetadata(repl::OpTime lastOpTime, OID lastElectionId);
-
-private:
     repl::OpTime _lastOpTime;
     OID _lastElectionId;
 };

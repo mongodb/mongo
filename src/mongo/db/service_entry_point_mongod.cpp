@@ -210,10 +210,18 @@ public:
             replCoord->prepareReplMetadata(request.body, lastOpTimeFromClient, metadataBob);
 
             if (isShardingAware || isConfig) {
-                // For commands from mongos, append some info to help getLastError(w) work.
-                rpc::ShardingMetadata(lastOpTimeFromClient, replCoord->getElectionId())
-                    .writeToMetadata(metadataBob)
-                    .transitional_ignore();
+                // The getLastError command is removed in version 5.1 and 'ShardingMetadata' is for
+                // mongos getLastError processing. So, it's not necessary to send 'ShardingMetadata'
+                // when FCV >= 5.1.
+                // TODO: SERVER-58743: Remove following 'if' block.
+                if (auto& fcv = serverGlobalParams.featureCompatibility;
+                    !fcv.isVersionInitialized() ||
+                    fcv.isLessThan(FeatureCompatibilityParams::Version::kVersion51)) {
+                    // For commands from mongos, append some info to help getLastError(w) work.
+                    rpc::ShardingMetadata(lastOpTimeFromClient, replCoord->getElectionId())
+                        .writeToMetadata(metadataBob)
+                        .transitional_ignore();
+                }
 
                 auto lastCommittedOpTime = replCoord->getLastCommittedOpTime();
                 metadataBob->append(kLastCommittedOpTimeFieldName,
