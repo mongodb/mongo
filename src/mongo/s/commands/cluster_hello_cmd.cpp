@@ -47,6 +47,7 @@
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/rewrite_state_change_errors.h"
 #include "mongo/rpc/topology_version_gen.h"
+#include "mongo/s/load_balancer_support.h"
 #include "mongo/s/mongos_topology_coordinator.h"
 #include "mongo/transport/message_compressor_manager.h"
 #include "mongo/util/net/socket_utils.h"
@@ -167,6 +168,8 @@ public:
         mongosHelloResponse->appendToBuilder(&result, useLegacyResponseFields());
         // The hello response always includes a topologyVersion.
         auto currentMongosTopologyVersion = mongosHelloResponse->getTopologyVersion();
+
+        load_balancer_support::handleHello(opCtx, &result, cmd.getLoadBalanced().value_or(false));
 
         // Try to parse the optional 'helloOk' field. On mongos, if we see this field, we will
         // respond with helloOk: true so the client knows that it can continue to send the hello

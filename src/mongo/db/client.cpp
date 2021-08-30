@@ -47,15 +47,12 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/exit.h"
-#include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
 
 namespace {
 thread_local ServiceContext::UniqueClient currentClient;
-
-MONGO_FAIL_POINT_DEFINE(clientIsFromLoadBalancer);
 
 void invariantNoCurrentClient() {
     invariant(!haveClient(),
@@ -201,13 +198,6 @@ ThreadClient::~ThreadClient() {
 
 Client* ThreadClient::get() const {
     return &cc();
-}
-
-bool Client::isFromLoadBalancer() const {
-    if (MONGO_unlikely(clientIsFromLoadBalancer.shouldFail())) {
-        return true;
-    }
-    return _isFromLoadBalancer;
 }
 
 }  // namespace mongo
