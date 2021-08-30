@@ -47,6 +47,7 @@
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/query_planner.h"
+#include "mongo/db/record_id_helpers.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 
@@ -145,8 +146,9 @@ bool Helpers::findById(OperationContext* opCtx,
     invariant(database);
 
     // TODO ForRead?
+    NamespaceString nss{ns};
     CollectionPtr collection =
-        CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, NamespaceString(ns));
+        CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
     if (!collection) {
         return false;
     }
@@ -157,11 +159,26 @@ bool Helpers::findById(OperationContext* opCtx,
     const IndexCatalog* catalog = collection->getIndexCatalog();
     const IndexDescriptor* desc = catalog->findIdIndex(opCtx);
 
-    if (!desc)
+    bool isTimeseriesBucketNs = nss.isTimeseriesBucketsCollection();
+    if (!desc && !isTimeseriesBucketNs) {
         return false;
+    }
 
     if (indexFound)
         *indexFound = 1;
+
+    // A time-series buckets collection does not have an index on _id. However, the RecordId can be
+    // constructed using the _id field. So we can retrive the document by using the RecordId
+    // instead.
+    if (isTimeseriesBucketNs) {
+        Snapshotted<BSONObj> doc;
+        if (collection->findDoc(
+                opCtx, RecordId(record_id_helpers::keyForOID(query["_id"].OID())), &doc)) {
+            result = std::move(doc.value());
+            return true;
+        }
+        return false;
+    }
 
     auto recordId =
         catalog->getEntry(desc)->accessMethod()->findSingle(opCtx, collection, query["_id"].wrap());

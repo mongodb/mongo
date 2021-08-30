@@ -126,7 +126,7 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                                   const BatchedCommandRequest& clientRequest,
                                   BatchedCommandResponse* clientResponse,
                                   BatchWriteExecStats* stats) {
-    const auto& nss(clientRequest.getNS());
+    const auto& nss(targeter.getNS());
 
     LOGV2_DEBUG(22904,
                 4,
@@ -231,7 +231,7 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                 stats->noteTargetedShard(targetShardId);
 
                 const auto request = [&] {
-                    const auto shardBatchRequest(batchOp.buildBatchRequest(*nextBatch));
+                    const auto shardBatchRequest(batchOp.buildBatchRequest(*nextBatch, targeter));
 
                     BSONObjBuilder requestBuilder;
                     shardBatchRequest.serialize(&requestBuilder);

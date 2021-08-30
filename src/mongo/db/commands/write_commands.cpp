@@ -110,17 +110,29 @@ bool shouldSkipOutput(OperationContext* opCtx) {
  * Returns true if 'ns' is a time-series collection. That is, this namespace is backed by a
  * time-series buckets collection.
  */
-bool isTimeseries(OperationContext* opCtx, const NamespaceString& ns) {
+template <class Request>
+bool isTimeseries(OperationContext* opCtx, const Request& request) {
+    uassert(5916400,
+            "'isTimeseriesNamespace' parameter can only be set when the request is sent on "
+            "system.buckets namespace",
+            !request.getIsTimeseriesNamespace() ||
+                request.getNamespace().isTimeseriesBucketsCollection());
+
     // If the buckets collection exists now, the time-series insert path will check for the
     // existence of the buckets collection later on with a lock.
     // If this check is concurrent with the creation of a time-series collection and the buckets
     // collection does not yet exist, this check may return false unnecessarily. As a result, an
     // insert attempt into the time-series namespace will either succeed or fail, depending on who
     // wins the race.
-    auto bucketsNs = ns.makeTimeseriesBucketsNamespace();
-    return CollectionCatalog::get(opCtx)
-        ->lookupCollectionByNamespaceForRead(opCtx, bucketsNs)
-        .get();
+    return request.getIsTimeseriesNamespace() ||
+        CollectionCatalog::get(opCtx)
+            ->lookupCollectionByNamespaceForRead(
+                opCtx, request.getNamespace().makeTimeseriesBucketsNamespace())
+            .get();
+}
+
+NamespaceString makeTimeseriesBucketsNamespace(const NamespaceString& nss) {
+    return nss.isTimeseriesBucketsCollection() ? nss : nss.makeTimeseriesBucketsNamespace();
 }
 
 // Default for control.version in time-series bucket collection.
@@ -450,7 +462,7 @@ void transactionChecks(OperationContext* opCtx, const NamespaceString& ns) {
     uassert(50791,
             str::stream() << "Cannot write to system collection " << ns.toString()
                           << " within a transaction.",
-            !ns.isSystem() || ns.isPrivilegeCollection());
+            !ns.isSystem() || ns.isPrivilegeCollection() || ns.isTimeseriesBucketsCollection());
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     uassert(50790,
             str::stream() << "Cannot write to unreplicated collection " << ns.toString()
@@ -505,7 +517,7 @@ public:
             transactionChecks(opCtx, ns());
             write_ops::InsertCommandReply insertReply;
 
-            if (isTimeseries(opCtx, ns())) {
+            if (isTimeseries(opCtx, request())) {
                 // Re-throw parsing exceptions to be consistent with CmdInsert::Invocation's
                 // constructor.
                 try {
@@ -580,7 +592,7 @@ public:
             std::shared_ptr<BucketCatalog::WriteBatch> batch,
             const BSONObj& metadata,
             std::vector<StmtId>&& stmtIds) const {
-            write_ops::InsertCommandRequest op{ns().makeTimeseriesBucketsNamespace(),
+            write_ops::InsertCommandRequest op{makeTimeseriesBucketsNamespace(ns()),
                                                {makeTimeseriesInsertDocument(batch, metadata)}};
             op.setWriteCommandRequestBase(_makeTimeseriesWriteOpBase(std::move(stmtIds)));
             return op;
@@ -592,7 +604,7 @@ public:
             const BSONObj& metadata,
             std::vector<StmtId>&& stmtIds) const {
             write_ops::UpdateCommandRequest op(
-                ns().makeTimeseriesBucketsNamespace(),
+                makeTimeseriesBucketsNamespace(ns()),
                 {makeTimeseriesUpdateOpEntry(opCtx, batch, metadata)});
             op.setWriteCommandRequestBase(_makeTimeseriesWriteOpBase(std::move(stmtIds)));
             return op;
@@ -643,11 +655,14 @@ public:
             bool prepared = bucketCatalog.prepareCommit(batch);
             if (!prepared) {
                 invariant(batch->finished());
-                invariant(batch->getResult().getStatus() == ErrorCodes::TimeseriesBucketCleared,
-                          str::stream()
-                              << "Got unexpected error (" << batch->getResult().getStatus()
-                              << ") preparing time-series bucket to be committed for " << ns()
-                              << ": " << redact(request().toBSON({})));
+                auto batchStatus = batch->getResult().getStatus();
+                tassert(5916402,
+                        str::stream() << "Got unexpected error (" << batch->getResult().getStatus()
+                                      << ") preparing time-series bucket to be committed for "
+                                      << ns() << ": " << redact(request().toBSON({})),
+                        batchStatus == ErrorCodes::TimeseriesBucketCleared ||
+                            batchStatus.isA<ErrorCategory::StaleShardVersionError>());
+
                 docsToRetry->push_back(index);
                 return;
             }
@@ -770,7 +785,7 @@ public:
             bool* containsRetry) const {
             auto& bucketCatalog = BucketCatalog::get(opCtx);
 
-            auto bucketsNs = ns().makeTimeseriesBucketsNamespace();
+            auto bucketsNs = makeTimeseriesBucketsNamespace(ns());
             // Holding this shared pointer to the collection guarantees that the collator is not
             // invalidated.
             auto bucketsColl =
@@ -800,13 +815,13 @@ public:
                     return true;
                 }
 
-                auto result =
-                    bucketCatalog.insert(opCtx,
-                                         ns(),
-                                         bucketsColl->getDefaultCollator(),
-                                         *bucketsColl->getTimeseriesOptions(),
-                                         request().getDocuments()[start + index],
-                                         _canCombineTimeseriesInsertWithOtherClients(opCtx));
+                auto result = bucketCatalog.insert(
+                    opCtx,
+                    ns().isTimeseriesBucketsCollection() ? ns().getTimeseriesViewNamespace() : ns(),
+                    bucketsColl->getDefaultCollator(),
+                    *bucketsColl->getTimeseriesOptions(),
+                    request().getDocuments()[start + index],
+                    _canCombineTimeseriesInsertWithOtherClients(opCtx));
 
                 if (auto error = generateError(opCtx, result, start + index, errors->size())) {
                     errors->push_back(*error);
@@ -980,7 +995,7 @@ public:
                 curOp.done();
                 Top::get(opCtx->getServiceContext())
                     .record(opCtx,
-                            request().getNamespace().ns(),
+                            ns().ns(),
                             LogicalOp::opInsert,
                             Top::LockType::WriteLocked,
                             durationCount<Microseconds>(curOp.elapsedTimeExcludingPauses()),
@@ -1139,7 +1154,7 @@ public:
             write_ops::UpdateCommandReply updateReply;
             OperationSource source = OperationSource::kStandard;
 
-            if (isTimeseries(opCtx, ns())) {
+            if (isTimeseries(opCtx, request())) {
                 uassert(ErrorCodes::InvalidOptions,
                         "Time-series updates are not enabled",
                         feature_flags::gTimeseriesUpdatesAndDeletes.isEnabled(
@@ -1315,7 +1330,7 @@ public:
             write_ops::DeleteCommandReply deleteReply;
             OperationSource source = OperationSource::kStandard;
 
-            if (isTimeseries(opCtx, ns())) {
+            if (isTimeseries(opCtx, request())) {
                 uassert(ErrorCodes::InvalidOptions,
                         "Time-series deletes are not enabled",
                         feature_flags::gTimeseriesUpdatesAndDeletes.isEnabled(

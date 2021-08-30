@@ -770,6 +770,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/server_status_core',
+        'record_id_helpers',
     ],
 )
 

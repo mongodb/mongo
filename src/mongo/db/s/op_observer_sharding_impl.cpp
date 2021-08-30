@@ -77,7 +77,8 @@ bool isMigratingWithCSRLock(CollectionShardingRuntime* csr,
 }
 
 void assertMovePrimaryInProgress(OperationContext* opCtx, NamespaceString const& nss) {
-    if (!nss.isNormalCollection() && nss.coll() != "system.views") {
+    if (!nss.isNormalCollection() && nss.coll() != "system.views" &&
+        !nss.isTimeseriesBucketsCollection()) {
         return;
     }
 

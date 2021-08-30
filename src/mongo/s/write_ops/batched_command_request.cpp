@@ -57,6 +57,14 @@ BatchedCommandRequest constructBatchedCommandRequest(const OpMsgRequest& request
         batchRequest.setWriteConcern(writeConcernField.Obj());
     }
 
+    // The 'isTimeseriesNamespace' is an internal parameter used for communication between mongos
+    // and mongod.
+    auto isTimeseriesNamespace =
+        request.body[write_ops::WriteCommandRequestBase::kIsTimeseriesNamespaceFieldName];
+    uassert(5916401,
+            "the 'isTimeseriesNamespace' parameter cannot be used on mongos",
+            !isTimeseriesNamespace.trueValue());
+
     return batchRequest;
 }
 

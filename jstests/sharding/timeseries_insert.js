@@ -87,6 +87,20 @@ function runTest(getShardKey, insert) {
         collName, {timeseries: {timeField: timeField, metaField: metaField}}));
     const coll = mainDB.getCollection(collName);
 
+    // The 'isTimeseriesNamespace' parameter is not allowed on mongos.
+    assert.commandFailedWithCode(mainDB.runCommand({
+        insert: `system.buckets.${collName}`,
+        documents: [{[timeField]: ISODate()}],
+        isTimeseriesNamespace: true
+    }),
+                                 5916401);
+
+    // On a mongod node, 'isTimeseriesNamespace' can only be used on time-series buckets namespace.
+    assert.commandFailedWithCode(
+        st.shard0.getDB(dbName).runCommand(
+            {insert: collName, documents: [{[timeField]: ISODate()}], isTimeseriesNamespace: true}),
+        5916400);
+
     // Shard timeseries collection.
     const shardKey = getShardKey(1, 1);
     assert.commandWorked(coll.createIndex(shardKey));

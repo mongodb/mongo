@@ -235,11 +235,9 @@ bool isMetadataDifferent(const ChunkManager& managerA, const ChunkManager& manag
 ChunkManagerTargeter::ChunkManagerTargeter(OperationContext* opCtx,
                                            const NamespaceString& nss,
                                            boost::optional<OID> targetEpoch)
-    : _nss(nss), _targetEpoch(std::move(targetEpoch)) {
-    _init(opCtx);
-}
+    : _nss(nss), _targetEpoch(std::move(targetEpoch)), _cm(_init(opCtx)) {}
 
-void ChunkManagerTargeter::_init(OperationContext* opCtx) {
+ChunkManager ChunkManagerTargeter::_init(OperationContext* opCtx) {
     cluster::createDatabase(opCtx, _nss.db());
 
     // Check if we target sharded time-series collection. For such collections we target write
@@ -251,29 +249,24 @@ void ChunkManagerTargeter::_init(OperationContext* opCtx) {
     // routing info for the underlying buckets collection. The absense of this routing info means
     // that this collection does not exist. Finally, we check if this underlying collection is
     // sharded. If all these conditions pass, we are targeting sharded time-series collection.
-    bool isShardedTimeseriesCollection = false;
-    auto routingInfo = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, _nss));
-    if (!routingInfo.isSharded()) {
+    auto cm = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, _nss));
+    if (!cm.isSharded()) {
         auto bucketsNs = _nss.makeTimeseriesBucketsNamespace();
-        auto bucketsRoutingInfo = getCollectionRoutingInfoForTxnCmd(opCtx, bucketsNs);
-        if (bucketsRoutingInfo.isOK() && bucketsRoutingInfo.getValue().isSharded()) {
+        auto bucketsRoutingInfo =
+            uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, bucketsNs));
+        if (bucketsRoutingInfo.isSharded()) {
             _nss = bucketsNs;
-            _cm = bucketsRoutingInfo.getValue();
-            isShardedTimeseriesCollection = true;
+            cm = std::move(bucketsRoutingInfo);
         }
     }
 
-    // For all other collections, use the original routing info.
-    if (!isShardedTimeseriesCollection) {
-        _cm = routingInfo;
-    }
-
     if (_targetEpoch) {
-        uassert(ErrorCodes::StaleEpoch, "Collection has been dropped", _cm->isSharded());
+        uassert(ErrorCodes::StaleEpoch, "Collection has been dropped", cm.isSharded());
         uassert(ErrorCodes::StaleEpoch,
                 "Collection epoch has changed",
-                _cm->getVersion().epoch() == *_targetEpoch);
+                cm.getVersion().epoch() == *_targetEpoch);
     }
+    return cm;
 }
 
 const NamespaceString& ChunkManagerTargeter::getNS() const {
@@ -300,9 +293,7 @@ BSONObj ChunkManagerTargeter::extractBucketsShardKeyFromTimeseriesDoc(
             BSONObjBuilder minBuilder{
                 controlBuilder.subobjStart(timeseries::kBucketControlMinFieldName)};
             minBuilder.append(timeField, roundedTimeValue);
-            minBuilder.done();
         }
-        controlBuilder.done();
     }
 
     if (auto metaField = timeseriesOptions.getMetaField(); metaField) {
@@ -319,10 +310,10 @@ ShardEndpoint ChunkManagerTargeter::targetInsert(OperationContext* opCtx,
                                                  const BSONObj& doc) const {
     BSONObj shardKey;
 
-    if (_cm->isSharded()) {
-        const auto& shardKeyPattern = _cm->getShardKeyPattern();
+    if (_cm.isSharded()) {
+        const auto& shardKeyPattern = _cm.getShardKeyPattern();
         if (_nss.isTimeseriesBucketsCollection()) {
-            auto tsFields = _cm->getTimeseriesFields();
+            auto tsFields = _cm.getTimeseriesFields();
             tassert(5743701, "Missing timeseriesFields on buckets collection", tsFields);
             shardKey = extractBucketsShardKeyFromTimeseriesDoc(
                 doc, shardKeyPattern, tsFields->getTimeseriesOptions());
@@ -347,9 +338,9 @@ ShardEndpoint ChunkManagerTargeter::targetInsert(OperationContext* opCtx,
     // TODO (SERVER-51070): Remove the boost::none when the config server can support shardVersion
     // in commands
     return ShardEndpoint(
-        _cm->dbPrimary(),
+        _cm.dbPrimary(),
         _nss.isOnInternalDb() ? boost::optional<ChunkVersion>() : ChunkVersion::UNSHARDED(),
-        _nss.isOnInternalDb() ? boost::optional<DatabaseVersion>() : _cm->dbVersion());
+        _nss.isOnInternalDb() ? boost::optional<DatabaseVersion>() : _cm.dbVersion());
 }
 
 std::vector<ShardEndpoint> ChunkManagerTargeter::targetUpdate(OperationContext* opCtx,
@@ -371,16 +362,16 @@ std::vector<ShardEndpoint> ChunkManagerTargeter::targetUpdate(OperationContext* 
     const auto updateType = getUpdateExprType(updateOp);
 
     // If the collection is not sharded, forward the update to the primary shard.
-    if (!_cm->isSharded()) {
+    if (!_cm.isSharded()) {
         // TODO (SERVER-51070): Remove the boost::none when the config server can support
         // shardVersion in commands
         return std::vector{ShardEndpoint(
-            _cm->dbPrimary(),
+            _cm.dbPrimary(),
             _nss.isOnInternalDb() ? boost::optional<ChunkVersion>() : ChunkVersion::UNSHARDED(),
-            _nss.isOnInternalDb() ? boost::optional<DatabaseVersion>() : _cm->dbVersion())};
+            _nss.isOnInternalDb() ? boost::optional<DatabaseVersion>() : _cm.dbVersion())};
     }
 
-    const auto& shardKeyPattern = _cm->getShardKeyPattern();
+    const auto& shardKeyPattern = _cm.getShardKeyPattern();
     const auto collation = write_ops::collationOf(updateOp);
 
     auto expCtx = makeExpressionContextWithDefaultsForTargeter(opCtx,
@@ -435,7 +426,7 @@ std::vector<ShardEndpoint> ChunkManagerTargeter::targetUpdate(OperationContext* 
                    "single shard (and have the simple collation), but this update targeted "
                 << endPoints.size() << " shards. Update request: " << updateOp.toBSON()
                 << ", shard key pattern: " << shardKeyPattern.toString(),
-            updateOp.getMulti() || isExactIdQuery(opCtx, _nss, query, collation, *_cm));
+            updateOp.getMulti() || isExactIdQuery(opCtx, _nss, query, collation, _cm));
 
     // If the request is {multi:false}, then this is a single op-style update which we are
     // broadcasting to multiple shards by exact _id. Record this event in our serverStatus metrics.
@@ -459,12 +450,12 @@ std::vector<ShardEndpoint> ChunkManagerTargeter::targetDelete(OperationContext* 
                                                                itemRef.getLegacyRuntimeConstants());
 
     BSONObj shardKey;
-    if (_cm->isSharded()) {
+    if (_cm.isSharded()) {
         // Sharded collections have the following further requirements for targeting:
         //
         // Limit-1 deletes must be targeted exactly by shard key *or* exact _id
         shardKey = uassertStatusOK(
-            _cm->getShardKeyPattern().extractShardKeyFromQuery(expCtx, deleteOp.getQ()));
+            _cm.getShardKeyPattern().extractShardKeyFromQuery(expCtx, deleteOp.getQ()));
     }
 
     // Target the shard key or delete query
@@ -498,8 +489,8 @@ std::vector<ShardEndpoint> ChunkManagerTargeter::targetDelete(OperationContext* 
                              "on _id (and have the collection default collation) or contain the "
                              "shard key (and have the simple collation). Delete request: "
                           << deleteOp.toBSON()
-                          << ", shard key pattern: " << _cm->getShardKeyPattern().toString(),
-            !_cm->isSharded() || deleteOp.getMulti() || isExactIdQuery(opCtx, *cq, *_cm));
+                          << ", shard key pattern: " << _cm.getShardKeyPattern().toString(),
+            !_cm.isSharded() || deleteOp.getMulti() || isExactIdQuery(opCtx, *cq, _cm));
 
     return uassertStatusOK(_targetQuery(expCtx, deleteOp.getQ(), collation));
 }
@@ -508,25 +499,25 @@ StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::_targetQuery(
     boost::intrusive_ptr<ExpressionContext> expCtx,
     const BSONObj& query,
     const BSONObj& collation) const {
-    if (!_cm->isSharded()) {
+    if (!_cm.isSharded()) {
         // TODO (SERVER-51070): Remove the boost::none when the config server can support
         // shardVersion in commands
         return std::vector{ShardEndpoint(
-            _cm->dbPrimary(),
+            _cm.dbPrimary(),
             _nss.isOnInternalDb() ? boost::optional<ChunkVersion>() : ChunkVersion::UNSHARDED(),
-            _nss.isOnInternalDb() ? boost::optional<DatabaseVersion>() : _cm->dbVersion())};
+            _nss.isOnInternalDb() ? boost::optional<DatabaseVersion>() : _cm.dbVersion())};
     }
 
     std::set<ShardId> shardIds;
     try {
-        _cm->getShardIdsForQuery(expCtx, query, collation, &shardIds);
+        _cm.getShardIdsForQuery(expCtx, query, collation, &shardIds);
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
 
     std::vector<ShardEndpoint> endpoints;
     for (auto&& shardId : shardIds) {
-        endpoints.emplace_back(std::move(shardId), _cm->getVersion(shardId), boost::none);
+        endpoints.emplace_back(std::move(shardId), _cm.getVersion(shardId), boost::none);
     }
 
     return endpoints;
@@ -535,8 +526,8 @@ StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::_targetQuery(
 StatusWith<ShardEndpoint> ChunkManagerTargeter::_targetShardKey(const BSONObj& shardKey,
                                                                 const BSONObj& collation) const {
     try {
-        auto chunk = _cm->findIntersectingChunk(shardKey, collation);
-        return ShardEndpoint(chunk.getShardId(), _cm->getVersion(chunk.getShardId()), boost::none);
+        auto chunk = _cm.findIntersectingChunk(shardKey, collation);
+        return ShardEndpoint(chunk.getShardId(), _cm.getVersion(chunk.getShardId()), boost::none);
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
@@ -546,13 +537,13 @@ StatusWith<ShardEndpoint> ChunkManagerTargeter::_targetShardKey(const BSONObj& s
 std::vector<ShardEndpoint> ChunkManagerTargeter::targetAllShards(OperationContext* opCtx) const {
     // This function is only called if doing a multi write that targets more than one shard. This
     // implies the collection is sharded, so we should always have a chunk manager.
-    invariant(_cm->isSharded());
+    invariant(_cm.isSharded());
 
     auto shardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIdsNoReload();
 
     std::vector<ShardEndpoint> endpoints;
     for (auto&& shardId : shardIds) {
-        endpoints.emplace_back(std::move(shardId), _cm->getVersion(shardId), boost::none);
+        endpoints.emplace_back(std::move(shardId), _cm.getVersion(shardId), boost::none);
     }
 
     return endpoints;
@@ -598,27 +589,35 @@ bool ChunkManagerTargeter::refreshIfNeeded(OperationContext* opCtx) {
                 "staleDbVersion"_attr = _lastError.get() == LastErrorType::kStaleDbVersion);
 
     // Get the latest metadata information from the cache if there were issues
-    auto lastManager = *_cm;
-    _init(opCtx);
-    auto metadataChanged = isMetadataDifferent(lastManager, *_cm);
+    auto lastManager = _cm;
+    _cm = _init(opCtx);
+    auto metadataChanged = isMetadataDifferent(lastManager, _cm);
 
     if (_lastError.get() == LastErrorType::kCouldNotTarget && !metadataChanged) {
         // If we couldn't target and we dind't already update the metadata we must force a refresh
         uassertStatusOK(
             Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx, _nss));
-        _init(opCtx);
-        metadataChanged = isMetadataDifferent(lastManager, *_cm);
+        _cm = _init(opCtx);
+        metadataChanged = isMetadataDifferent(lastManager, _cm);
     }
 
     return metadataChanged;
 }
 
 int ChunkManagerTargeter::getNShardsOwningChunks() const {
-    if (_cm->isSharded()) {
-        return _cm->getNShardsOwningChunks();
+    if (_cm.isSharded()) {
+        return _cm.getNShardsOwningChunks();
     }
 
     return 0;
+}
+
+bool ChunkManagerTargeter::isShardedTimeSeriesBucketsNamespace() const {
+    return _cm.isSharded() && _cm.getTimeseriesFields();
+}
+
+const ChunkManager& ChunkManagerTargeter::getRoutingInfo() const {
+    return _cm;
 }
 
 }  // namespace mongo

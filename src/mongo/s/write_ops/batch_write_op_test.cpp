@@ -248,7 +248,8 @@ TEST_F(BatchWriteOpTest, SingleWriteConcernErrorOrdered) {
     ASSERT_EQUALS(targeted.size(), 1u);
     assertEndpointsEqual(targeted.begin()->second->getEndpoint(), endpoint);
 
-    BatchedCommandRequest targetBatch = batchOp.buildBatchRequest(*targeted.begin()->second);
+    BatchedCommandRequest targetBatch =
+        batchOp.buildBatchRequest(*targeted.begin()->second, targeter);
     ASSERT(targetBatch.getWriteConcern().woCompare(request.getWriteConcern()) == 0);
 
     BatchedCommandResponse response;
