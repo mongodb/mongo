@@ -222,10 +222,25 @@ void PlanStageSlots::forEachSlot(const PlanStageReqs& reqs,
  * is needed to execute the PlanStage tree.
  */
 struct PlanStageData {
-    PlanStageData() = default;
+    PlanStageData(PlanStageData&&) = default;
+    PlanStageData& operator=(PlanStageData&&) = default;
 
     explicit PlanStageData(std::unique_ptr<sbe::RuntimeEnvironment> env)
         : env(env.get()), ctx(std::move(env)) {}
+
+    PlanStageData(const PlanStageData& other) : PlanStageData(other.env->makeCopy()) {
+        copyFrom(other);
+    }
+
+    PlanStageData& operator=(const PlanStageData& other) {
+        if (this != &other) {
+            auto envCopy = other.env->makeCopy();
+            env = envCopy.get();
+            ctx = sbe::CompileCtx(std::move(envCopy));
+            copyFrom(other);
+        }
+        return *this;
+    }
 
     std::string debugString() const;
 
@@ -251,6 +266,23 @@ struct PlanStageData {
     // If this candidate plan has completed the trial run early by achieving one of the trial run
     // metrics, the stats are cached in here.
     std::unique_ptr<sbe::PlanStageStats> savedStatsOnEarlyExit{nullptr};
+
+private:
+    // This copy function copies data from 'other' but will not create a copy of its
+    // RuntimeEnvironment and CompileCtx.
+    void copyFrom(const PlanStageData& other) {
+        outputs = other.outputs;
+        iamMap = other.iamMap;
+        shouldTrackLatestOplogTimestamp = other.shouldTrackLatestOplogTimestamp;
+        shouldTrackResumeToken = other.shouldTrackResumeToken;
+        shouldUseTailableScan = other.shouldUseTailableScan;
+        replanReason = other.replanReason;
+        if (other.savedStatsOnEarlyExit) {
+            savedStatsOnEarlyExit.reset(other.savedStatsOnEarlyExit->clone());
+        } else {
+            savedStatsOnEarlyExit.reset();
+        }
+    }
 };
 
 /**

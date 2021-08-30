@@ -156,14 +156,15 @@ public:
     Accessor* getAccessor(value::SlotId slot);
 
     /**
-     * Make a copy of his environment. The new environment will have its own set of SlotAccessors
+     * Make a copy of this environment. The new environment will have its own set of SlotAccessors
      * pointing to the same shared data holding slot values.
      *
-     * To create a copy of the runtime environment for a parallel execution plan, the 'isSmp' flag
-     * must be set to 'true'. This will result in this environment being unconverted to a parallel
-     * environment, as well as the newly created copy.
+     * To create a copy of the runtime environment for a parallel execution plan, please use
+     * makeCopyForParallelUse() method. This will result in this environment being converted to a
+     * parallel environment, as well as the newly created copy.
      */
-    std::unique_ptr<RuntimeEnvironment> makeCopy(bool isSmp);
+    std::unique_ptr<RuntimeEnvironment> makeCopyForParallelUse();
+    std::unique_ptr<RuntimeEnvironment> makeCopy() const;
 
     /**
      * Dumps all the slots currently defined in this environment into the given string builder.
@@ -226,7 +227,15 @@ struct CompileCtx {
     void pushCorrelated(value::SlotId slot, value::SlotAccessor* accessor);
     void popCorrelated();
 
-    CompileCtx makeCopy(bool isSmp);
+    /**
+     * Make a copy of this CompileCtx. The underlying RuntimeEnvironment will also be copied.
+     *
+     * To create a copy of the underlying runtime environment for a parallel execution plan, please
+     * use makeCopyForParallelUse() method. This will result in the environment in this CompileCtx
+     * being converted to a parallel environment, as well as the newly created copy.
+     */
+    CompileCtx makeCopyForParallelUse();
+    CompileCtx makeCopy() const;
 
     PlanStage* root{nullptr};
     value::SlotAccessor* accumulator{nullptr};

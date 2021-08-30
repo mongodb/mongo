@@ -931,14 +931,17 @@ RuntimeEnvironment::Accessor* RuntimeEnvironment::getAccessor(value::SlotId slot
     uasserted(4946301, str::stream() << "undefined slot accessor:" << slot);
 }
 
-std::unique_ptr<RuntimeEnvironment> RuntimeEnvironment::makeCopy(bool isSmp) {
+
+std::unique_ptr<RuntimeEnvironment> RuntimeEnvironment::makeCopy() const {
+    return std::unique_ptr<RuntimeEnvironment>(new RuntimeEnvironment(*this));
+}
+
+std::unique_ptr<RuntimeEnvironment> RuntimeEnvironment::makeCopyForParallelUse() {
     // Once this environment is used to create a copy for a parallel plan execution, it becomes
     // a parallel environment itself.
-    if (isSmp) {
-        _isSmp = isSmp;
-    }
+    _isSmp = true;
 
-    return std::unique_ptr<RuntimeEnvironment>(new RuntimeEnvironment(*this));
+    return makeCopy();
 }
 
 void RuntimeEnvironment::debugString(StringBuilder* builder) {
@@ -995,8 +998,12 @@ void CompileCtx::popCorrelated() {
     correlated.pop_back();
 }
 
-CompileCtx CompileCtx::makeCopy(bool isSmp) {
-    return {env->makeCopy(isSmp)};
+CompileCtx CompileCtx::makeCopyForParallelUse() {
+    return {env->makeCopyForParallelUse()};
+}
+
+CompileCtx CompileCtx::makeCopy() const {
+    return {env->makeCopy()};
 }
 }  // namespace sbe
 }  // namespace mongo

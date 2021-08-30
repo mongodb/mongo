@@ -1267,6 +1267,7 @@ env.Library(
         'query/sbe_cached_solution_planner.cpp',
         'query/sbe_multi_planner.cpp',
         'query/sbe_plan_ranker.cpp',
+        'query/sbe_plan_cache.cpp',
         'query/sbe_runtime_planner.cpp',
         'query/sbe_stage_builder.cpp',
         'query/sbe_stage_builder_accumulator.cpp',

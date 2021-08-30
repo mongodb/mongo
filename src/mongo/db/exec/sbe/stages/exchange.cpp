@@ -191,7 +191,7 @@ void ExchangeConsumer::prepare(CompileCtx& ctx) {
         // Only consumer ID 0 prepares (copies) the compilation context. Note that we do not have to
         // lock the shared state here - it is accessed only by consmer ID 0 again in the future.
         for (size_t idx = 0; idx < _state->numOfProducers(); ++idx) {
-            _state->producerCompileCtxs().push_back(ctx.makeCopy(true));
+            _state->producerCompileCtxs().push_back(ctx.makeCopyForParallelUse());
         }
     }
 
