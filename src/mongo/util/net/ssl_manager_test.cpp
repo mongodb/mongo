@@ -695,7 +695,7 @@ TEST(SSLManager, TransientSSLParamsStressTestWithManager) {
     Mutex mutex = MONGO_MAKE_LATCH("::test_mutex");
     std::deque<std::shared_ptr<SSLManagerInterface>> managers;
     std::vector<stdx::thread> threads;
-    int iterations = 0;
+    Counter64 iterations;
 
     for (int t = 0; t < kThreads; ++t) {
         stdx::thread thread([&]() {
@@ -719,7 +719,7 @@ TEST(SSLManager, TransientSSLParamsStressTestWithManager) {
                         managers.pop_front();
                     }
                 }
-                ++iterations;
+                iterations.increment();
             }
         });
         threads.push_back(std::move(thread));
