@@ -130,12 +130,9 @@ void replaceQueryMetaFieldName(mutablebson::Element elem,
         elem, elem.getFieldName(), metaField, shouldReplaceFieldValue, isTopLevelField);
     isTopLevelField = parentIsArray && elem.isType(BSONType::Object);
     parentIsArray = elem.isType(BSONType::Array);
-    for (size_t i = 0; i < elem.countChildren(); ++i) {
-        replaceQueryMetaFieldName(elem.findNthChild(i),
-                                  metaField,
-                                  shouldReplaceFieldValue,
-                                  isTopLevelField,
-                                  parentIsArray);
+    for (auto child = elem.leftChild(); child.ok(); child = child.rightSibling()) {
+        replaceQueryMetaFieldName(
+            child, metaField, shouldReplaceFieldValue, isTopLevelField, parentIsArray);
     }
 }
 }  // namespace
@@ -219,15 +216,13 @@ write_ops::UpdateModification translateUpdate(const write_ops::UpdateModificatio
     // updateDoc.root() = <updateOperator> : { <field1>: <value1>, ... },
     //                    <updateOperator> : { <field1>: <value1>, ... },
     //                    ...
-    for (size_t i = 0; i < updateDoc.root().countChildren(); ++i) {
-        // TODO: SERVER-59104 Remove usages of findNthChild().
-        auto updatePair = updateDoc.root().findNthChild(i);
+    for (auto updatePair = updateDoc.root().leftChild(); updatePair.ok();
+         updatePair = updatePair.rightSibling()) {
         // updatePair = <updateOperator> : { <field1>: <value1>, ... }
         // Check each field that is being modified by the update operator
         // and replace it if it is the metaField.
-        for (size_t j = 0; j < updatePair.countChildren(); j++) {
-            // TODO: SERVER-59104 Remove usages of findNthChild().
-            auto fieldValuePair = updatePair.findNthChild(j);
+        for (auto fieldValuePair = updatePair.leftChild(); fieldValuePair.ok();
+             fieldValuePair = fieldValuePair.rightSibling()) {
             replaceQueryMetaFieldName(fieldValuePair, fieldValuePair.getFieldName(), metaField);
         }
     }
