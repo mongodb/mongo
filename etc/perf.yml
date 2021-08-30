@@ -709,8 +709,9 @@ tasks:
              read_cmd: 'true'}
 
 
-buildvariants:
-  - name: linux-wt-standalone
+microbenchmark-buildvariants:
+  _linux-wt-standalone: &linux-wt-standalone
+    name: linux-wt-standalone
     display_name: Standalone Linux inMemory
     batchtime: 240  # 4 hours
     modules: *modules
@@ -757,7 +758,8 @@ buildvariants:
     - name: pipeline-updates
     - name: javascript
 
-  - name: linux-wt-repl
+  _linux-wt-repl: &linux-wt-repl
+    name: linux-wt-repl
     display_name: 1-Node ReplSet Linux inMemory
     batchtime: 240  # 4 hours
     modules: *modules
@@ -780,3 +782,22 @@ buildvariants:
     - name: singleThreaded_read_commands
     - name: wildcard-index-write_read_commands
     - name: pipeline-updates
+
+buildvariants:
+  - *linux-wt-standalone
+
+  - *linux-wt-repl
+
+  - <<: *linux-wt-standalone
+    name: linux-wt-standalone-all-feature-flags
+    display_name: Standalone Linux inMemory (all feature flags)
+    batchtime: 1440  # 24 hours
+    expansions:
+      mongodb_setup: microbenchmarks_standalone-all-feature-flags
+
+  - <<: *linux-wt-repl
+    name: linux-wt-repl-all-feature-flags
+    display_name: 1-Node ReplSet Linux inMemory (all feature flags)
+    batchtime: 1440  # 24 hours
+    expansions:
+      mongodb_setup: microbenchmarks_replica-all-feature-flags
