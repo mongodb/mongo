@@ -187,9 +187,9 @@ StatusWith<std::vector<ChunkType>> readShardChunks(OperationContext* opCtx,
  * collection data!
  *
  * nss - the collection namespace for which chunk metadata is being updated.
- * supportingLongName - when enabled, chunk metadata is accessed by collection 'uuid' rather than
- *                      'nss'.
  * uuid - the collection UUID for which chunk metadata is being updated.
+ * supportingLongName - when enabled, chunks metadata is accessed by collection 'uuid' rather than
+ *                      collection 'nss'.
  * chunks - chunks retrieved from the config server, sorted in ascending chunk version order.
  * currEpoch - what this shard server expects the collection epoch to be.
  *

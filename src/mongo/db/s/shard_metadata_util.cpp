@@ -70,6 +70,21 @@ Status getStatusFromWriteCommandResponse(const BSONObj& commandResult) {
     return batchResponse.toStatus();
 }
 
+/**
+ * Returns the namespace of the shard server's chunks collection correspoding to the collection
+ * namespace. The actual chunks collection namespace is based on the collection namespace or UUID
+ * depending on the current collection configuration.
+ */
+NamespaceString getShardChunksNss(const NamespaceString& collectionNss,
+                                  const UUID& collectionUuid,
+                                  SupportingLongNameStatusEnum supportingLongName) {
+    const auto chunksNsPostfix{supportingLongName == SupportingLongNameStatusEnum::kDisabled ||
+                                       collectionNss.isTemporaryReshardingCollection()
+                                   ? collectionNss.ns()
+                                   : collectionUuid.toString()};
+    return NamespaceString{ChunkType::ShardNSPrefix + chunksNsPostfix};
+}
+
 }  // namespace
 
 QueryAndSort createShardChunkDiffQuery(const ChunkVersion& collectionVersion) {
@@ -285,11 +300,7 @@ StatusWith<std::vector<ChunkType>> readShardChunks(OperationContext* opCtx,
                                                    boost::optional<long long> limit,
                                                    const OID& epoch,
                                                    const boost::optional<Timestamp>& timestamp) {
-    const auto chunksNsPostfix{supportingLongName == SupportingLongNameStatusEnum::kDisabled ||
-                                       nss.isTemporaryReshardingCollection()
-                                   ? nss.ns()
-                                   : uuid.toString()};
-    const NamespaceString chunksNss{ChunkType::ShardNSPrefix + chunksNsPostfix};
+    const auto chunksNss = getShardChunksNss(nss, uuid, supportingLongName);
 
     try {
         DBDirectClient client(opCtx);
@@ -327,11 +338,7 @@ Status updateShardChunks(OperationContext* opCtx,
                          const OID& currEpoch) {
     invariant(!chunks.empty());
 
-    const auto chunksNsPostfix{supportingLongName == SupportingLongNameStatusEnum::kDisabled ||
-                                       nss.isTemporaryReshardingCollection()
-                                   ? nss.ns()
-                                   : uuid.toString()};
-    const NamespaceString chunksNss{ChunkType::ShardNSPrefix + chunksNsPostfix};
+    const auto chunksNss = getShardChunksNss(nss, uuid, supportingLongName);
 
     try {
         DBDirectClient client(opCtx);
@@ -484,11 +491,7 @@ void dropChunks(OperationContext* opCtx,
                 const NamespaceString& nss,
                 const UUID& uuid,
                 SupportingLongNameStatusEnum supportingLongName) {
-    const auto chunksNsPostfix{supportingLongName == SupportingLongNameStatusEnum::kDisabled ||
-                                       nss.isTemporaryReshardingCollection()
-                                   ? nss.ns()
-                                   : uuid.toString()};
-    const NamespaceString chunksNss{ChunkType::ShardNSPrefix + chunksNsPostfix};
+    const auto chunksNss = getShardChunksNss(nss, uuid, supportingLongName);
 
     DBDirectClient client(opCtx);
     BSONObj result;
