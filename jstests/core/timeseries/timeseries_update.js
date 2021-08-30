@@ -80,6 +80,10 @@ TimeseriesTest.run((insert) => {
     const doc4 = {_id: 4, [timeFieldName]: dateTime, [metaFieldName]: {a: "A", b: "B"}, f: "F"};
     const doc5 = {_id: 5, [timeFieldName]: dateTime, [metaFieldName]: {a: "A", b: "B", c: "C"}};
 
+    const arrayDoc1 = {_id: 1, [timeFieldName]: dateTime, [metaFieldName]: [1, 4, 7, 11, 13]};
+    const arrayDoc2 = {_id: 2, [timeFieldName]: dateTime, [metaFieldName]: [2, 5, 9, 12]};
+    const arrayDoc3 = {_id: 3, [timeFieldName]: dateTime, [metaFieldName]: [3, 6, 10]};
+
     /************************************ multi:false updates ************************************/
     testUpdate({
         initialDocList: [doc1],
@@ -164,6 +168,31 @@ TimeseriesTest.run((insert) => {
         ],
         ordered: false,
         n: 3,
+    });
+
+    testUpdate({
+        initialDocList: [{_id: 1, [timeFieldName]: dateTime, [metaFieldName]: 200, f: "F"}, doc3],
+        updateList: [{
+            q: {[metaFieldName]: {$nin: [5, 15]}},
+            u: {$mul: {[metaFieldName]: 10}},
+            multi: true,
+        }],
+        resultDocList: [
+            {_id: 1, [timeFieldName]: dateTime, [metaFieldName]: 2000, f: "F"},
+            {_id: 3, [timeFieldName]: dateTime, [metaFieldName]: 0, f: "F"}
+        ],
+        n: 2,
+    });
+
+    testUpdate({
+        initialDocList: [{_id: 1, [timeFieldName]: dateTime, [metaFieldName]: 200, f: "F"}, doc3],
+        updateList: [{
+            q: {[metaFieldName]: {$exists: true, $nin: [5, 15]}},
+            u: {$mul: {[metaFieldName]: 10}},
+            multi: true,
+        }],
+        resultDocList: [{_id: 1, [timeFieldName]: dateTime, [metaFieldName]: 2000, f: "F"}, doc3],
+        n: 1,
     });
 
     // Query on a field that is not the metaField.
@@ -294,6 +323,98 @@ TimeseriesTest.run((insert) => {
         n: 2,
     });
 
+    // Remove the metaField.
+    testUpdate({
+        initialDocList: [doc1],
+        updateList: [{
+            q: {[metaFieldName]: {a: "A", b: "B"}},
+            u: {$unset: {[metaFieldName]: ""}},
+            multi: true
+        }],
+        resultDocList: [{_id: 1, [timeFieldName]: dateTime}],
+        n: 1,
+    });
+
+    // Rename the metaField.
+    // TODO: SERVER-59173 Change the error message when attempting to rename the metaField.
+    testUpdate({
+        initialDocList: [doc1, doc2, doc4],
+        updateList: [{
+            q: {[metaFieldName + ".a"]: "A"},
+            u: {$rename: {[metaFieldName]: "Z"}},
+            multi: true,
+        }],
+        resultDocList: [doc1, doc2, doc4],
+        n: 0,
+        failCode: ErrorCodes.DocumentValidationFailure,
+    });
+
+    // For all documents that have at least one 2 in its metaField array, update the first 2
+    // to be 100 using the positional $ operator.
+    testUpdate({
+        initialDocList: [
+            {_id: 1, [timeFieldName]: dateTime, [metaFieldName]: [1, 2, 2]},
+            {_id: 2, [timeFieldName]: dateTime, [metaFieldName]: [2, 3, 4]}
+        ],
+        updateList: [{
+            q: {[metaFieldName]: 2},
+            u: {$set: {[metaFieldName + ".$"]: 1000}},
+            multi: true,
+        }],
+        resultDocList: [
+            {_id: 1, [timeFieldName]: dateTime, [metaFieldName]: [1, 1000, 2]},
+            {_id: 2, [timeFieldName]: dateTime, [metaFieldName]: [1000, 3, 4]}
+        ],
+        n: 2,
+    });
+
+    // Decrement (i.e. increment by a negative amount) all elements in the metaField array using the
+    // positional $[] operator.
+    testUpdate({
+        initialDocList: [arrayDoc2, arrayDoc3],
+        updateList: [{
+            q: {},
+            u: {$inc: {[metaFieldName + ".$[]"]: -3}},
+            multi: true,
+        }],
+        resultDocList: [
+            {_id: 2, [timeFieldName]: dateTime, [metaFieldName]: [-1, 2, 6, 9]},
+            {_id: 3, [timeFieldName]: dateTime, [metaFieldName]: [0, 3, 7]}
+        ],
+        n: 2,
+    });
+
+    // Remove elements from all metaField arrays that match a condition.
+    testUpdate({
+        initialDocList: [arrayDoc1, arrayDoc2],
+        updateList: [{
+            q: {},
+            u: {$pull: {[metaFieldName]: {$gt: 10}}},
+            multi: true,
+        }],
+        resultDocList: [
+            {_id: 1, [timeFieldName]: dateTime, [metaFieldName]: [1, 4, 7]},
+            {_id: 2, [timeFieldName]: dateTime, [metaFieldName]: [2, 5, 9]}
+        ],
+        n: 2,
+    });
+
+    // Multiple updates, ordered: Remove elements from the metaField array that match a condition,
+    // and then add elements to the metaField array.
+    testUpdate({
+        initialDocList: [arrayDoc2, arrayDoc3],
+        updateList: [{
+            q: {},
+            u: {$pull: {[metaFieldName]: {$in: [1, 2, 3, 4, 5]}}},
+            multi: true,
+        }],
+        resultDocList: [
+            {_id: 2, [timeFieldName]: dateTime, [metaFieldName]: [9, 12]},
+            {_id: 3, [timeFieldName]: dateTime, [metaFieldName]: [6, 10]}
+        ],
+        n: 2,
+    });
+
     // Multiple updates, ordered: Query on the metaField and modify the metaField multiple times.
     testUpdate({
         initialDocList: [doc2],
@@ -323,7 +444,42 @@ TimeseriesTest.run((insert) => {
         n: 3,
     });
 
+    testUpdate({
+        initialDocList: [{_id: 1, [timeFieldName]: dateTime, [metaFieldName]: 200, f: "F"}],
+        updateList: [
+            {q: {}, u: {$min: {[metaFieldName]: 180}}, multi: true},
+            {q: {}, u: {$max: {[metaFieldName]: 190}}, multi: true},
+            {q: {}, u: {$mul: {[metaFieldName]: 3}}, multi: true}
+        ],
+        resultDocList: [{_id: 1, [timeFieldName]: dateTime, [metaFieldName]: 570, f: "F"}],
+        n: 3,
+    });
+
     // Multiple updates, ordered: Query on the metaField and modify the metaField multiple times.
+    testUpdate({
+        initialDocList: [
+            {_id: 1, [timeFieldName]: dateTime, [metaFieldName]: {arr: [3, 6, 10], f: 10}},
+            {_id: 2, [timeFieldName]: dateTime, [metaFieldName]: {arr: [1, 2], f: 3}}
+        ],
+        updateList: [
+            {
+                q: {[metaFieldName + ".arr"]: {$ne: 7}},
+                u: {$pop: {[metaFieldName + ".arr"]: 1}},
+                multi: true,
+            },
+            {
+                q: {[metaFieldName + ".f"]: {$mod: [2, 1]}},
+                u: {$pop: {[metaFieldName + ".arr"]: -1}},
+                multi: true,
+            }
+        ],
+        resultDocList: [
+            {_id: 1, [timeFieldName]: dateTime, [metaFieldName]: {arr: [3, 6], f: 10}},
+            {_id: 2, [timeFieldName]: dateTime, [metaFieldName]: {arr: [], f: 3}}
+        ],
+        n: 3,
+    });
+
     testUpdate({
         initialDocList: [doc1],
         updateList: [
@@ -719,10 +875,6 @@ TimeseriesTest.run((insert) => {
         n: 0,
         failCode: ErrorCodes.InvalidOptions
     });
-
-    const arrayDoc1 = {_id: 1, [timeFieldName]: dateTime, [metaFieldName]: [1, 4, 7, 11, 13]};
-    const arrayDoc2 = {_id: 2, [timeFieldName]: dateTime, [metaFieldName]: [2, 5, 9, 12]};
-    const arrayDoc3 = {_id: 3, [timeFieldName]: dateTime, [metaFieldName]: [3, 6, 10]};
 
     // Multiple updates, unordered: Modify the metaField of all documents using arrayFilters.
     testUpdate({

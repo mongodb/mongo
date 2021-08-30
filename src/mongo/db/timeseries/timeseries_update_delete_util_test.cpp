@@ -395,6 +395,7 @@ TEST_F(TimeseriesUpdateDeleteUtilTest, UpdateOnlyModifiesMetaField) {
                           << "inc" << BSON(_metaField + "ggg" << 10))),
         _metaField));
 
+    // TODO: SERVER-59173 Modify this test since renaming the metaField is not allowed.
     // {$rename: {"tag.a.a": "A", "tag.b": "B"}}
     ASSERT_TRUE(timeseries::updateOnlyModifiesMetaField(
         _opCtx.get(),
@@ -405,6 +406,7 @@ TEST_F(TimeseriesUpdateDeleteUtilTest, UpdateOnlyModifiesMetaField) {
                                    << "B"))),
         _metaField));
 
+    // TODO: SERVER-59173 Modify this test since renaming the metaField is not allowed.
     // {$rename: {tag.tag.tag: 8}}
     ASSERT_TRUE(timeseries::updateOnlyModifiesMetaField(
         _opCtx.get(),
@@ -465,6 +467,7 @@ TEST_F(TimeseriesUpdateDeleteUtilTest, TranslateUpdate) {
                                                         << "")
                                                 << "inc" << BSON("nonMetaField" << 10)));
 
+    // TODO: SERVER-59173 Remove or modify this test since renaming the metaField is not allowed.
     // {$rename: {"tag.a.a": "A", "tag.b": "B"}}
     _testClassicUpdateTranslation(BSON("$rename" << BSON(_metaField + ".a.a"
                                                          << "A" << _metaField + ".b"
@@ -474,6 +477,7 @@ TEST_F(TimeseriesUpdateDeleteUtilTest, TranslateUpdate) {
                                                          << "meta.b"
                                                          << "B")));
 
+    // TODO: SERVER-59173 Remove or modify this test since renaming the metaField is not allowed.
     // {$rename: {tag.tag.tag: 8}}
     _testClassicUpdateTranslation(
         BSON("$rename" << BSON(_metaField + "." + _metaField + "." + _metaField << 8)),
