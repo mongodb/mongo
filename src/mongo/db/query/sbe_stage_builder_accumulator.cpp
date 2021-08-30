@@ -169,6 +169,32 @@ std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> buildFinalizeAvg(
         makeBinaryOp(sbe::EPrimBinary::div, makeVariable(aggSlots[0]), makeVariable(aggSlots[1])),
         std::move(inputStage)};
 }
+
+std::pair<std::vector<std::unique_ptr<sbe::EExpression>>, EvalStage> buildAccumulatorAddToSet(
+    StageBuilderState& state,
+    const AccumulationExpression& expr,
+    std::unique_ptr<sbe::EExpression> arg,
+    EvalStage inputStage,
+    PlanNodeId planNodeId) {
+    std::vector<std::unique_ptr<sbe::EExpression>> aggs;
+    aggs.push_back(makeFunction("addToSet", std::move(arg)));
+    return {std::move(aggs), std::move(inputStage)};
+}
+
+std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> buildFinalizeAddToSet(
+    StageBuilderState& state,
+    const AccumulationExpression& expr,
+    const sbe::value::SlotVector& addToSetSlots,
+    EvalStage inputStage,
+    PlanNodeId planNodeId) {
+    tassert(5755001,
+            str::stream() << "Expected one slot to finalize addToSet, got: "
+                          << addToSetSlots.size(),
+            addToSetSlots.size() == 1);
+
+    return {makeVariable(addToSetSlots[0]), std::move(inputStage)};
+}
+
 };  // namespace
 
 std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> buildArgument(
@@ -201,7 +227,8 @@ std::pair<std::vector<std::unique_ptr<sbe::EExpression>>, EvalStage> buildAccumu
         {AccumulatorMax::kName, &buildAccumulatorMax},
         {AccumulatorFirst::kName, &buildAccumulatorFirst},
         {AccumulatorLast::kName, &buildAccumulatorLast},
-        {AccumulatorAvg::kName, &buildAccumulatorAvg}};
+        {AccumulatorAvg::kName, &buildAccumulatorAvg},
+        {AccumulatorAddToSet::kName, &buildAccumulatorAddToSet}};
 
     auto accExprName = acc.expr.name;
     uassert(5754701,
@@ -235,7 +262,7 @@ std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> buildFinalize(
         {AccumulatorFirst::kName, &buildFinalizeFirst},
         {AccumulatorLast::kName, &buildFinalizeLast},
         {AccumulatorAvg::kName, &buildFinalizeAvg},
-    };
+        {AccumulatorAddToSet::kName, &buildFinalizeAddToSet}};
 
     auto accExprName = acc.expr.name;
     uassert(5754700,

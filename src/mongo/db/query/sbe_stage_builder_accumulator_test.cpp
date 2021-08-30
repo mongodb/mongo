@@ -83,16 +83,16 @@ protected:
                                                 &_spoolIdGenerator);
     }
 
-    void runAggregationWithNoGroupByTest(StringData queryStatement,
-                                         std::vector<BSONArray> docs,
-                                         const struct mongo::BSONArray& expectedValue) {
+    std::pair<sbe::value::TypeTags, sbe::value::Value> getResultsForAggregationWithNoGroupByTest(
+        StringData queryStatement, std::vector<BSONArray> docs) {
         auto expCtx = ExpressionContextForTest{};
         auto acc = fromjson(queryStatement.rawData());
         auto accStmt = makeAccumulator(&expCtx, acc.firstElement());
 
-        // Build the a VirtualScan input sub-tree to feed test docs into the argument expression.
+        // Build a VirtualScan input sub-tree to feed test docs into the argument expression.
         auto querySolution = makeQuerySolution(makeVirtualScanTree(docs));
-        auto [resultSlots, stage, data] = buildPlanStage(std::move(querySolution), false, nullptr);
+        auto [resultSlots, stage, data] =
+            buildPlanStage(std::move(querySolution), false /* hasRecordId */, nullptr);
 
         stage_builder::EvalStage evalStage;
         evalStage.stage = std::move(stage);
@@ -126,7 +126,14 @@ protected:
             makeProject(std::move(finalStage), kEmptyPlanNodeId, outSlot, std::move(finalExpr));
 
         auto resultAccessors = prepareTree(&data.ctx, outStage.stage.get(), outSlot);
-        auto [resultsTag, resultsVal] = getAllResults(outStage.stage.get(), &resultAccessors[0]);
+        return getAllResults(outStage.stage.get(), &resultAccessors[0]);
+    }
+
+    void runAggregationWithNoGroupByTest(StringData queryStatement,
+                                         std::vector<BSONArray> docs,
+                                         const struct mongo::BSONArray& expectedValue) {
+        auto [resultsTag, resultsVal] =
+            getResultsForAggregationWithNoGroupByTest(queryStatement, docs);
         sbe::value::ValueGuard resultGuard{resultsTag, resultsVal};
 
         auto [expectedTag, expectedVal] = stage_builder::makeValue(expectedValue);
@@ -242,6 +249,57 @@ protected:
         }
         sortedResultsGuard.reset();
         return {sortedResultsTag, sortedResultsVal};
+    }
+
+    /**
+     * $addToSet doesn't guarantee any particular order of the accumulated values. To make the
+     * result checking deterministic, we convert the array of the expected values into an arraySet
+     * as well and compare the sets.
+     * Note: Currently, the order agnostic comparison only works for arraySets with
+     * non-pointer-based accumulated values.
+     */
+    void runAddToSetTest(StringData queryStatement,
+                         std::vector<BSONArray> docs,
+                         const BSONArray& expectedResult) {
+        using namespace mongo::sbe::value;
+
+        // Create ArraySet Value from the expectedResult BSON Array.
+        auto [tmpTag, tmpVal] =
+            copyValue(TypeTags::bsonArray, bitcastFrom<const char*>(expectedResult.objdata()));
+        ValueGuard tmpGuard{tmpTag, tmpVal};
+        auto [expectedTag, expectedSet] = arrayToSet(tmpTag, tmpVal);
+        ValueGuard expectedValueGuard{expectedTag, expectedSet};
+
+        // Run the accumulator.
+        auto [resultsTag, resultsVal] =
+            getResultsForAggregationWithNoGroupByTest(queryStatement, docs);
+        ValueGuard resultGuard{resultsTag, resultsVal};
+        ASSERT_EQ(resultsTag, TypeTags::Array);
+
+        // Extract the accumulated ArraySet from the result and compare it to the expected.
+        auto arr = getArrayView(resultsVal);
+        ASSERT_EQ(1, arr->size());
+
+        auto [aggregatedTag, aggregatedSet] = arr->getAt(0);
+        ASSERT_EQ(aggregatedTag, TypeTags::ArraySet);
+
+        // TODO SERVER-59631: replace the lookup loop below with a call to valueEquals on sets.
+        // ASSERT(valueEquals(expectedTag, expectedSet, aggregatedTag, aggregatedSet))
+        //     << "expected set: " << std::make_pair(expectedTag, expectedSet)
+        //     << " but got set: " << std::make_pair(aggregatedTag, aggregatedSet);
+        const auto& lhsSet = getArraySetView(expectedSet)->values();
+        const auto& rhsSet = getArraySetView(aggregatedSet)->values();
+        bool areEqual = (lhsSet.size() == rhsSet.size());
+        if (areEqual) {
+            for (const auto& e : rhsSet) {
+                if (!lhsSet.contains(e)) {
+                    areEqual = false;
+                    break;
+                }
+            }
+        }
+        ASSERT(areEqual) << "expected set: " << std::make_pair(expectedTag, expectedSet)
+                         << " but got set: " << std::make_pair(aggregatedTag, aggregatedSet);
     }
 
 private:
@@ -645,4 +703,59 @@ TEST_F(SbeAccumulatorBuilderTest, AvgAccumulatorOneGroupByTranslation) {
 
     ASSERT_TRUE(valueEquals(sortedResultsTag, sortedResultsVal, expectedTag, expectedVal));
 }
+
+TEST_F(SbeAccumulatorBuilderTest, AddToSetAccumulatorTranslationSingleDoc) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 1))};
+    runAddToSetTest("{x: {$addToSet: '$b'}}", docs, BSON_ARRAY(1));
+}
+
+TEST_F(SbeAccumulatorBuilderTest, AddToSetAccumulatorTranslationBasic) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 3)),
+                                       BSON_ARRAY(BSON("a" << 2 << "b" << 1)),
+                                       BSON_ARRAY(BSON("a" << 3 << "b" << 2))};
+    runAddToSetTest("{x: {$addToSet: '$b'}}", docs, BSON_ARRAY(1 << 2 << 3));
+}
+
+TEST_F(SbeAccumulatorBuilderTest, AddToSetAccumulatorTranslationSubfield) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << BSON("c" << 1))),
+                                       BSON_ARRAY(BSON("a" << 2 << "b" << BSON("c" << 2))),
+                                       BSON_ARRAY(BSON("a" << 3 << "b" << BSON("c" << 3)))};
+    runAddToSetTest("{x: {$addToSet: '$b.c'}}", docs, BSON_ARRAY(1 << 2 << 3));
+}
+
+TEST_F(SbeAccumulatorBuilderTest, AddToSetAccumulatorTranslationRepeatedValue) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 2)),
+                                       BSON_ARRAY(BSON("a" << 2 << "b" << 1)),
+                                       BSON_ARRAY(BSON("a" << 3 << "b" << 2))};
+    runAddToSetTest("{x: {$addToSet: '$b'}}", docs, BSON_ARRAY(1 << 2));
+}
+
+TEST_F(SbeAccumulatorBuilderTest, AddToSetAccumulatorTranslationMixedTypes) {
+    const auto bsonArr = BSON_ARRAY(1 << 2 << 3);
+    const auto bsonObj = BSON("c" << 1);
+    const auto strVal = "hello"_sd;
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 42)),
+                                       BSON_ARRAY(BSON("a" << 2 << "b" << 4.2)),
+                                       BSON_ARRAY(BSON("a" << 3 << "b" << true)),
+                                       BSON_ARRAY(BSON("a" << 4 << "b" << strVal)),
+                                       BSON_ARRAY(BSON("a" << 5 << "b" << bsonObj)),
+                                       BSON_ARRAY(BSON("a" << 6 << "b" << bsonArr))};
+    auto expectedSet = BSON_ARRAY(42 << 4.2 << true << strVal << bsonObj << bsonArr);
+    runAddToSetTest("{x: {$addToSet: '$b'}}", docs, expectedSet);
+}
+
+TEST_F(SbeAccumulatorBuilderTest, AddToSetAccumulatorTranslationSomeMissingFields) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1)),
+                                       BSON_ARRAY(BSON("a" << 2 << "b" << 2)),
+                                       BSON_ARRAY(BSON("a" << 3 << "b" << BSONNULL)),
+                                       BSON_ARRAY(BSON("a" << 4 << "c" << 1))};
+    runAddToSetTest("{x: {$addToSet: '$b'}}", docs, BSON_ARRAY(BSONNULL << 2));
+}
+
+TEST_F(SbeAccumulatorBuilderTest, AddToSetAccumulatorTranslationAllMissingFields) {
+    auto docs = std::vector<BSONArray>{
+        BSON_ARRAY(BSON("a" << 1)), BSON_ARRAY(BSON("a" << 2)), BSON_ARRAY(BSON("a" << 3))};
+    runAddToSetTest("{x: {$addToSet: '$b'}}", docs, BSONArray{});
+}
+
 }  // namespace mongo
