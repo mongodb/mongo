@@ -123,7 +123,6 @@ config_run(void)
                 break;
             }
     }
-    config_map_file_type(g.c_file_type, &g.type);
 
     if (!config_is_perm("runs.source")) {
         config_single("runs.source=table", false);
@@ -1321,14 +1320,58 @@ config_single(const char *s, bool perm)
 static void
 config_map_file_type(const char *s, u_int *vp)
 {
-    if (strcmp(s, "fix") == 0 || strcmp(s, "fixed-length column-store") == 0)
+    uint32_t v;
+    const char *arg;
+    bool fix, row, var;
+
+    arg = s;
+
+    /* Accumulate choices. */
+    fix = row = var = false;
+    while (*s != '\0') {
+        if (WT_PREFIX_SKIP(s, "fixed-length column-store") || WT_PREFIX_SKIP(s, "fix"))
+            fix = true;
+        else if (WT_PREFIX_SKIP(s, "row-store") || WT_PREFIX_SKIP(s, "row"))
+            row = true;
+        else if (WT_PREFIX_SKIP(s, "variable-length column-store") || WT_PREFIX_SKIP(s, "var"))
+            var = true;
+        else
+            testutil_die(EINVAL, "illegal file type configuration: %s", arg);
+
+        if (*s == ',') /* Allow, but don't require, comma-separators. */
+            ++s;
+    }
+    if (!fix && !row && !var)
+        testutil_die(EINVAL, "illegal file type configuration: %s", arg);
+
+    /* Check for a single configuration. */
+    if (fix && !row && !var) {
         *vp = FIX;
-    else if (strcmp(s, "var") == 0 || strcmp(s, "variable-length column-store") == 0)
-        *vp = VAR;
-    else if (strcmp(s, "row") == 0 || strcmp(s, "row-store") == 0)
+        return;
+    }
+    if (!fix && row && !var) {
         *vp = ROW;
+        return;
+    }
+    if (!fix && !row && var) {
+        *vp = VAR;
+        return;
+    }
+
+    /*
+     * Handle multiple configurations.
+     *
+     * Fixed-length column-store is 10% in all cases.
+     *
+     * Variable-length column-store is 90% vs. fixed, 30% vs. fixed and row, and 40% vs row.
+     */
+    v = mmrand(NULL, 1, 10);
+    if (fix && v == 1)
+        *vp = FIX;
+    else if (var && (v < 5 || !row))
+        *vp = VAR;
     else
-        testutil_die(EINVAL, "illegal file type configuration: %s", s);
+        *vp = ROW;
 }
 
 /*
