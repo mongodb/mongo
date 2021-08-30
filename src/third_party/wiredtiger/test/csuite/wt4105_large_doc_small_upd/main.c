@@ -76,10 +76,11 @@ main(int argc, char *argv[])
     WT_MODIFY modify_entry;
     WT_SESSION *session, *session2;
     uint64_t i, j, offset;
-    char *large_doc;
+    char *large_doc, tableconf[128];
 
     opts = &_opts;
     memset(opts, 0, sizeof(*opts));
+    opts->table_type = TABLE_ROW;
     testutil_check(testutil_parse_opts(argc, argv, opts));
     testutil_make_work_dir(opts->home);
 
@@ -87,12 +88,14 @@ main(int argc, char *argv[])
       "create,cache_size=1G,statistics_log=(json,wait=1)", &opts->conn));
 
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
-    testutil_check(session->create(session, uri,
-      "key_format=Q,value_format=u,leaf_item_max=64M,leaf_page_max=32k,memory_page_max=1M"));
+    testutil_check(__wt_snprintf(tableconf, sizeof(tableconf),
+      "key_format=%s,value_format=u,leaf_item_max=64M,leaf_page_max=32k,memory_page_max=1M",
+      opts->table_type == TABLE_ROW ? "Q" : "r"));
+    testutil_check(session->create(session, uri, tableconf));
 
     testutil_check(session->open_cursor(session, uri, NULL, NULL, &c));
 
-    /* Value is initialized with 'v' and has not significance to it. */
+    /* Value is initialized with 'v' and has no significance to it. */
     large_doc = dmalloc(DATASIZE);
     memset(large_doc, 'v', DATASIZE);
     value.data = large_doc;
@@ -100,7 +103,7 @@ main(int argc, char *argv[])
 
     /* Insert records. */
     for (i = 0; i < NUM_DOCS; i++) {
-        c->set_key(c, i);
+        c->set_key(c, i + 1);
         c->set_value(c, &value);
         testutil_check(c->insert(c));
     }
@@ -124,7 +127,7 @@ main(int argc, char *argv[])
         for (i = 0; i < NUM_DOCS; i++) {
             /* Position the cursor. */
             testutil_check(session2->begin_transaction(session2, "isolation=snapshot"));
-            c->set_key(c, i);
+            c->set_key(c, i + 1);
             modify_entry.data.data = "abcdefghijklmnopqrstuvwxyz";
             modify_entry.data.size = strlen(modify_entry.data.data);
             modify_entry.offset = offset;

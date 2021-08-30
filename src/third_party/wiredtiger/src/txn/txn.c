@@ -1190,13 +1190,13 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
      * updates first, the history search logic may race with other sessions modifying the same key
      * and checkpoint moving the new updates to the history store.
      *
-     * For prepared delete commit, we don't need to fix the history store. Whereas for rollback, if
-     * the update is also from the same prepared transaction, restore the update from history store
-     * or remove the key.
+     * Fix the history store entry for the updates other than tombstone type or the tombstone
+     * followed by the update is also from the same prepared transaction by either restoring the
+     * previous update from history store or removing the key.
      */
     prepare_on_disk = F_ISSET(upd, WT_UPDATE_PREPARE_RESTORED_FROM_DS) &&
       (upd->type != WT_UPDATE_TOMBSTONE ||
-        (!commit && upd->next != NULL && upd->durable_ts == upd->next->durable_ts &&
+        (upd->next != NULL && upd->durable_ts == upd->next->durable_ts &&
           upd->txnid == upd->next->txnid && upd->start_ts == upd->next->start_ts));
     first_committed_upd_in_hs =
       first_committed_upd != NULL && F_ISSET(first_committed_upd, WT_UPDATE_HS);

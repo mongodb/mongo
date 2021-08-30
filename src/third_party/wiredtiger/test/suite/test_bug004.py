@@ -35,6 +35,7 @@
 
 import wiredtiger, wttest
 from wtdataset import SimpleDataSet, simple_key, simple_value
+from wtscenario import make_scenarios
 
 # Check to make sure we see the right versions of overflow keys and values
 # when they are deleted in reconciliation without having been instantiated
@@ -44,17 +45,31 @@ class test_bug004(wttest.WiredTigerTestCase):
     uri = 'file:test_ovfl_key'
 
     # Use a small page size because we want to create overflow items
-    config = 'allocation_size=512,' +\
-        'leaf_page_max=512,value_format=S,key_format=S'
+    config = 'allocation_size=512,leaf_page_max=512,'
 
     nentries = 30
 
+    key_format_values = [
+        ('column', dict(key_format='r')),
+        ('string_row', dict(key_format='S')),
+    ]
+
+    scenarios = make_scenarios(key_format_values)
+
+    def make_key(self, c1, i):
+        if self.key_format == 'S':
+            return simple_key(c1, i) + 'abcdef' * 100
+        else:
+            return simple_key(c1, i) * 1000 + 551
+
     def test_bug004(self):
         # Create the object, fill with overflow keys and values.
-        self.session.create(self.uri, self.config)
+        format = 'key_format={},value_format=S'.format(self.key_format)
+        self.session.create(self.uri, self.config + format)
+
         c1 = self.session.open_cursor(self.uri, None)
         for i in range(1, self.nentries):
-            c1[simple_key(c1, i) + 'abcdef' * 100] = \
+            c1[self.make_key(c1, i)] = \
                 simple_value(c1, i) + 'abcdef' * 100
         c1.close()
 
@@ -73,9 +88,9 @@ class test_bug004(wttest.WiredTigerTestCase):
         # currently do -- that's unlikely to change, but is a problem for the
         # test going forward.)
         c1 = self.session.open_cursor(self.uri, None)
-        c1.set_key(simple_key(c1, self.nentries - 5) + 'abcdef' * 100)
+        c1.set_key(self.make_key(c1, self.nentries - 5))
         c2 = self.session.open_cursor(self.uri, None)
-        c2.set_key(simple_key(c2, self.nentries + 5) + 'abcdef' * 100)
+        c2.set_key(self.make_key(c2, self.nentries + 5))
         self.session.truncate(None, c1, c2, None)
         c1.close()
         c2.close()
@@ -85,12 +100,12 @@ class test_bug004(wttest.WiredTigerTestCase):
 
         # Use the snapshot cursor to retrieve the old key/value pairs
         c1 = tmp_session.open_cursor(self.uri, None)
-        c1.set_key(simple_key(c1, 1) + 'abcdef' * 100)
+        c1.set_key(self.make_key(c1, 1))
         c1.search()
         for i in range(2, self.nentries):
             c1.next()
             self.assertEquals(
-                c1.get_key(), simple_key(c1, i) + 'abcdef' * 100)
+                c1.get_key(), self.make_key(c1, i))
             self.assertEquals(
                 c1.get_value(), simple_value(c1, i) + 'abcdef' * 100)
 

@@ -149,9 +149,13 @@ thread_ts_run(void *arg)
     WT_RAND_STATE rnd;
     WT_SESSION *session;
     THREAD_DATA *td;
+    wt_timestamp_t all_dur_ts, prev_all_dur_ts;
+    uint32_t rand_op;
     int dbg;
     char tscfg[64], ts_string[WT_TS_HEX_STRING_SIZE];
     bool first;
+
+    prev_all_dur_ts = WT_TS_NONE;
 
     td = (THREAD_DATA *)arg;
     __wt_random_init(&rnd);
@@ -168,16 +172,39 @@ thread_ts_run(void *arg)
         ret = td->conn->query_timestamp(td->conn, ts_string, "get=all_durable");
         testutil_check(pthread_rwlock_unlock(&ts_lock));
         testutil_assert(ret == 0 || ret == WT_NOTFOUND);
+        /*
+         * All durable can intermittently move backwards, we do not want to set stable and the
+         * oldest timestamps backwards - refer WT-8001.
+         */
+        all_dur_ts = strtoul(ts_string, NULL, 16);
+        if (!first && all_dur_ts < prev_all_dur_ts) {
+            __wt_sleep(0, 1000);
+            continue;
+        }
         if (ret == 0) {
-            /* Periodically let the oldest timestamp lag. */
-            if (!first && __wt_random(&rnd) % 4 == 0)
+            rand_op = __wt_random(&rnd) % 4;
+            /*
+             * Periodically let the oldest timestamp lag. Other times set the stable and oldest
+             * timestamps as separate API calls. The rest of the time set them both as one call.
+             */
+            if (rand_op == 0) {
                 testutil_check(
                   __wt_snprintf(tscfg, sizeof(tscfg), "stable_timestamp=%s", ts_string));
-            else
-                testutil_check(__wt_snprintf(tscfg, sizeof(tscfg),
-                  "oldest_timestamp=%s,stable_timestamp=%s", ts_string, ts_string));
-            testutil_check(td->conn->set_timestamp(td->conn, tscfg));
+                testutil_check(td->conn->set_timestamp(td->conn, tscfg));
+                testutil_check(
+                  __wt_snprintf(tscfg, sizeof(tscfg), "oldest_timestamp=%s", ts_string));
+                testutil_check(td->conn->set_timestamp(td->conn, tscfg));
+            } else {
+                if (!first && rand_op == 1)
+                    testutil_check(
+                      __wt_snprintf(tscfg, sizeof(tscfg), "stable_timestamp=%s", ts_string));
+                else
+                    testutil_check(__wt_snprintf(tscfg, sizeof(tscfg),
+                      "oldest_timestamp=%s,stable_timestamp=%s", ts_string, ts_string));
+                testutil_check(td->conn->set_timestamp(td->conn, tscfg));
+            }
             first = false;
+            prev_all_dur_ts = all_dur_ts;
             /*
              * Set and reset the checkpoint retention setting on a regular basis. We want to test
              * racing with the internal archive thread while we're here.
