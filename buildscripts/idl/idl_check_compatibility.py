@@ -148,8 +148,7 @@ ALLOW_ANY_TYPE_LIST: List[str] = [
     'delete-param-hint',
     'findAndModify-param-hint',
     'findAndModify-param-update',
-    'findAndModify-reply-upserted',
-    'explain-param-collation',
+    'findAndModify-reply-upserted'
 ]
 
 SKIPPED_FILES = ["unittest.idl"]

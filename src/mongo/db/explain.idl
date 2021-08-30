@@ -49,13 +49,5 @@ commands:
                 description: "The verbosity for explain command."
                 type: Verbosity
                 default : kExecAllPlans
-            # TODO SERVER-48560: we ingest these fields for compatibility with 4.4,
-            # whose mongoS incorrectly adds them to the explain command for an
-            # aggregation instead of adding them into the wrapped aggregate command
-            # itself. Remove these fields when 5.0 becomes last-lts.
-            collation:
-                type: IDLAnyType
-                ignore: true
-                unstable: true
         # Dummy reply type as we won't use it to parse explain reply.
         reply_type: OkReply
