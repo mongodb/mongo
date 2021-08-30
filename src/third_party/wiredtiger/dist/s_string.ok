@@ -457,6 +457,7 @@ WTPERF
 WaitForSingleObject
 WakeAllConditionVariable
 Wconditional
+Wduplicated
 WeakHashLen
 Werror
 Wformat

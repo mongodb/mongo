@@ -434,7 +434,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
     uint64_t internal_bytes, internal_pages, leaf_bytes, leaf_pages;
     uint64_t oldest_id, saved_pinned_id, time_start, time_stop;
     uint32_t flags, rec_flags;
-    bool dirty, is_hs, timer, tried_eviction;
+    bool dirty, internal_cleanup, is_hs, timer, tried_eviction;
 
     conn = S2C(session);
     btree = S2BT(session);
@@ -557,6 +557,20 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
         /* Read pages with history store entries and evict them asap. */
         LF_SET(WT_READ_WONT_NEED);
 
+        /*
+         * Perform checkpoint cleanup when not in startup or shutdown phase by traversing internal
+         * pages looking for obsolete child pages. This is row-store specific, column-store pages
+         * cannot be discarded and must be rewritten as they contain chunks of the name space. For
+         * the same reason, only read in-memory pages when doing column-store checkpoints (row-store
+         * reads all of the internal pages to improve cleanup).
+         */
+        if (btree->type == BTREE_ROW)
+            internal_cleanup = !F_ISSET(conn, WT_CONN_RECOVERING | WT_CONN_CLOSING_TIMESTAMP);
+        else {
+            LF_SET(WT_READ_CACHE);
+            internal_cleanup = false;
+        }
+
         for (;;) {
             WT_ERR(__sync_dup_walk(session, walk, flags, &prev));
             WT_ERR(__wt_tree_walk_custom_skip(session, &walk, __sync_page_skip, NULL, flags));
@@ -564,12 +578,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
             if (walk == NULL)
                 break;
 
-            /*
-             * Perform checkpoint cleanup when not in startup or shutdown phase by traversing
-             * through internal pages looking for obsolete child pages.
-             */
-            if (!F_ISSET(conn, WT_CONN_RECOVERING | WT_CONN_CLOSING_TIMESTAMP) &&
-              F_ISSET(walk, WT_REF_FLAG_INTERNAL)) {
+            if (F_ISSET(walk, WT_REF_FLAG_INTERNAL) && internal_cleanup) {
                 WT_WITH_PAGE_INDEX(
                   session, ret = __sync_ref_int_obsolete_cleanup(session, walk, &ref_list));
                 WT_ERR(ret);

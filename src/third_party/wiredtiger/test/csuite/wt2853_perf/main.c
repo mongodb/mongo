@@ -62,6 +62,7 @@ typedef struct {
     char baluri[256];
     char flaguri[256];
     bool bloom;
+    bool usecolumns;
 } SHARED_OPTS;
 
 typedef struct {
@@ -83,7 +84,8 @@ main(int argc, char *argv[])
     WT_CURSOR *maincur;
     WT_SESSION *session;
     pthread_t get_tid[N_GET_THREAD], insert_tid[N_INSERT_THREAD];
-    int i, nfail;
+    int i, key, nfail;
+    char tableconf[128];
     const char *tablename;
 
     /*
@@ -96,6 +98,7 @@ main(int argc, char *argv[])
     opts = &_opts;
     sharedopts = &_sharedopts;
     memset(opts, 0, sizeof(*opts));
+    opts->table_type = TABLE_ROW;
     memset(sharedopts, 0, sizeof(*sharedopts));
     memset(insert_args, 0, sizeof(insert_args));
     memset(get_args, 0, sizeof(get_args));
@@ -103,6 +106,10 @@ main(int argc, char *argv[])
 
     sharedopts->bloom = BLOOM;
     testutil_check(testutil_parse_opts(argc, argv, opts));
+    if (opts->table_type == TABLE_FIX)
+        testutil_die(ENOTSUP, "Fixed-length column store not supported");
+    sharedopts->usecolumns = (opts->table_type == TABLE_COL);
+
     testutil_make_work_dir(opts->home);
     testutil_progress(opts, "start");
 
@@ -116,8 +123,10 @@ main(int argc, char *argv[])
      * Note: id is repeated as id2. This makes it easier to identify the primary key in dumps of the
      * index files.
      */
-    testutil_check(session->create(
-      session, opts->uri, "key_format=i,value_format=iiSii,columns=(id,post,bal,extra,flag,id2)"));
+    testutil_check(__wt_snprintf(tableconf, sizeof(tableconf),
+      "key_format=%s,value_format=iiSii,columns=(id,post,bal,extra,flag,id2)",
+      sharedopts->usecolumns ? "r" : "i"));
+    testutil_check(session->create(session, opts->uri, tableconf));
 
     tablename = strchr(opts->uri, ':');
     testutil_assert(tablename != NULL);
@@ -138,8 +147,17 @@ main(int argc, char *argv[])
      * easier.
      */
     testutil_check(session->open_cursor(session, opts->uri, NULL, NULL, &maincur));
-    maincur->set_key(maincur, N_RECORDS);
-    maincur->set_value(maincur, 54321, 0, "", 0, N_RECORDS);
+    /*
+     * Do not constant-fold this assignment: in gcc 10.3, if you pass the constant directly to
+     * set_key, -Wduplicated-branches fails to notice the type difference between the two cases and
+     * gives a spurious warning, and diagnostic builds fail.
+     */
+    key = N_RECORDS + 1;
+    if (sharedopts->usecolumns)
+        maincur->set_key(maincur, (uint64_t)key);
+    else
+        maincur->set_key(maincur, key);
+    maincur->set_value(maincur, 54321, 0, "", 0, N_RECORDS + 1);
     testutil_check(maincur->insert(maincur));
     testutil_check(maincur->close(maincur));
     testutil_check(session->close(session, NULL));
@@ -199,6 +217,7 @@ main(int argc, char *argv[])
 static void *
 thread_insert(void *arg)
 {
+    SHARED_OPTS *sharedopts;
     TEST_OPTS *opts;
     THREAD_ARGS *threadargs;
     WT_CURSOR *maincur;
@@ -210,6 +229,7 @@ thread_insert(void *arg)
 
     threadargs = (THREAD_ARGS *)arg;
     opts = threadargs->testopts;
+    sharedopts = threadargs->sharedopts;
 
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
 
@@ -223,9 +243,12 @@ thread_insert(void *arg)
         /*
          * Insert threads may stomp on each other's records; that's okay.
          */
-        key = (int)(__wt_random(&rnd) % N_RECORDS);
+        key = (int)(__wt_random(&rnd) % N_RECORDS) + 1;
         testutil_check(session->begin_transaction(session, NULL));
-        maincur->set_key(maincur, key);
+        if (sharedopts->usecolumns)
+            maincur->set_key(maincur, (uint64_t)key);
+        else
+            maincur->set_key(maincur, key);
         if (__wt_random(&rnd) % 2 == 0)
             post = 54321;
         else
@@ -299,7 +322,11 @@ thread_get(void *arg)
             testutil_check(postcur->get_value(postcur, &post2, &bal, &extra, &flag, &key));
             testutil_assert((flag > 0 && bal < 0) || (flag == 0 && bal >= 0));
 
-            maincur->set_key(maincur, key);
+            if (sharedopts->usecolumns)
+                maincur->set_key(maincur, (uint64_t)key);
+            else
+                maincur->set_key(maincur, key);
+            fflush(stdout);
             testutil_check(maincur->search(maincur));
             testutil_check(maincur->get_value(maincur, &post2, &bal2, &extra, &flag2, &key2));
             testutil_check(maincur->reset(maincur));

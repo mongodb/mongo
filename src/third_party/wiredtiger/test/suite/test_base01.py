@@ -27,6 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wttest
+from wtscenario import make_scenarios
 
 # test_base01.py
 #    Basic operations
@@ -37,12 +38,19 @@ class test_base01(wttest.WiredTigerTestCase):
     table_name1 = 'test_base01a.wt'
     table_name2 = 'test_base01b.wt'
 
+    key_format_values = [
+        ('column', dict(key_format='r')),
+        ('string_row', dict(key_format='S')),
+    ]
+
+    scenarios = make_scenarios(key_format_values)
+
     def create_table(self, tablename):
+        format = 'key_format={},value_format=S'.format(self.key_format)
         extra_params = ',allocation_size=512,' +\
             'internal_page_max=16384,leaf_page_max=131072'
         self.pr('create_table')
-        self.session.create('table:' + tablename,
-            'key_format=S,value_format=S' + extra_params)
+        self.session.create('table:' + tablename, format + extra_params)
 
     def cursor_s(self, tablename, key):
         cursor = self.session.open_cursor('table:' + tablename, None, None)
@@ -72,9 +80,11 @@ class test_base01(wttest.WiredTigerTestCase):
         """
         Create a table, look for a nonexistent key
         """
+        somekey = 'somekey' if self.key_format == 'S' else 12345
+
         self.create_table(self.table_name1)
         self.pr('creating cursor')
-        cursor = self.cursor_s(self.table_name1, 'somekey')
+        cursor = self.cursor_s(self.table_name1, somekey)
         self.pr('search')
         ret = cursor.search()
         self.assertTrue(ret == wiredtiger.WT_NOTFOUND)
@@ -85,15 +95,17 @@ class test_base01(wttest.WiredTigerTestCase):
         """
         Create a table, add a key, get it back
         """
+        key1 = 'key1' if self.key_format == 'S' else 42
+
         self.create_table(self.table_name2)
 
         self.pr('insert')
-        inscursor = self.cursor_ss(self.table_name2, 'key1', 'value1')
+        inscursor = self.cursor_ss(self.table_name2, key1, 'value1')
         inscursor.insert()
         inscursor.close
 
         self.pr('search')
-        getcursor = self.cursor_s(self.table_name2, 'key1')
+        getcursor = self.cursor_s(self.table_name2, key1)
         ret = getcursor.search()
         self.assertTrue(ret == 0)
         self.assertEqual(getcursor.get_value(), 'value1')
