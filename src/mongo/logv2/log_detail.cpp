@@ -173,11 +173,11 @@ void doLogImpl(int32_t id,
                     attrs)));
 
         if (auto fn = getTenantID()) {
-            if (auto id = fn()) {
+            if (auto tenant = fn()) {
                 record.attribute_values().insert(
                     attributes::tenant(),
                     boost::log::attribute_value(
-                        new boost::log::attributes::attribute_value_impl<OID>(id.get())));
+                        new boost::log::attributes::attribute_value_impl<OID>(tenant.get())));
             }
         }
 
