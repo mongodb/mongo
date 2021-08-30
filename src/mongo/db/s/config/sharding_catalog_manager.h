@@ -30,9 +30,11 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/logical_session_cache.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime_with.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/mutex.h"
@@ -43,6 +45,7 @@
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/shard_key_pattern.h"
+#include "mongo/s/write_ops/batched_command_request.h"
 
 namespace mongo {
 
@@ -197,14 +200,14 @@ public:
                                        TxnNumber txnNumber);
 
     /**
-     * Inserts 'docs' to namespace 'nss' in a transaction with 'txnNumber'. Breaks into multiple
-     * batches if 'docs' is larger than the max batch size. Write must be on a collection in the
-     * config database. Does not support running transaction operations remotely.
+     * Inserts 'docs' to namespace 'nss'. If a txnNumber is passed in, the write will be done in a
+     * transaction with 'txnNumber'. Breaks into multiple batches if 'docs' is larger than the max
+     * batch size. Write must be on a collection in the config database.
      */
-    void insertConfigDocumentsInTxn(OperationContext* opCtx,
-                                    const NamespaceString& nss,
-                                    std::vector<BSONObj> docs,
-                                    TxnNumber txnNumber);
+    void insertConfigDocuments(OperationContext* opCtx,
+                               const NamespaceString& nss,
+                               std::vector<BSONObj> docs,
+                               boost::optional<TxnNumber> txnNumber = boost::none);
 
     /**
      * Find a single document while under a local transaction.

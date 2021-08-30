@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/s/resharding/coordinator_document_gen.h"
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 #include "mongo/platform/basic.h"
@@ -622,9 +623,16 @@ protected:
 
         auto tagDoc = client.findOne(TagsType::ConfigNS.ns(), BSON("ns" << _tempNss.ns()));
         ASSERT(tagDoc.isEmpty());
+    }
 
+    void cleanupSourceCollectionExpectSuccess(OperationContext* opCtx,
+                                              ReshardingCoordinatorDocument expectedCoordinatorDoc,
+                                              std::vector<ChunkType> expectedChunks,
+                                              std::vector<TagsType> expectedZones) {
+        cleanupSourceConfigCollections(opCtx, expectedCoordinatorDoc);
         // Check that chunks and tags entries previously under the temporary namespace have been
         // correctly updated to the original namespace
+
         readChunkCatalogEntriesAndAssertMatchExpected(
             opCtx, _reshardingUUID, expectedChunks, _finalEpoch, _finalTimestamp);
         readTagCatalogEntriesAndAssertMatchExpected(opCtx, expectedZones);
@@ -898,6 +906,45 @@ TEST_F(ReshardingCoordinatorPersistenceTest,
     ASSERT_THROWS_CODE(insertCoordDocAndChangeOrigCollEntry(operationContext(), coordinatorDoc),
                        AssertionException,
                        ErrorCodes::NamespaceNotFound);
+}
+
+TEST_F(ReshardingCoordinatorPersistenceTest, SourceCleanupBetweenTransitionsSucceeds) {
+
+    Timestamp fetchTimestamp = Timestamp(1, 1);
+    auto coordinatorDoc = insertStateAndCatalogEntries(
+        CoordinatorStateEnum::kBlockingWrites, _originalEpoch, fetchTimestamp);
+    auto initialChunksIds = std::vector{OID::gen(), OID::gen()};
+
+    auto tempNssChunks = makeChunks(_reshardingUUID, _tempEpoch, _newShardKey, initialChunksIds);
+    auto recipientChunk = tempNssChunks[1];
+    insertChunkAndZoneEntries(tempNssChunks, makeZones(_tempNss, _newShardKey));
+
+    insertChunkAndZoneEntries(
+        makeChunks(_originalUUID, OID::gen(), _oldShardKey, std::vector{OID::gen(), OID::gen()}),
+        makeZones(_originalNss, _oldShardKey));
+
+    // Persist the updates on disk
+    auto expectedCoordinatorDoc = coordinatorDoc;
+    expectedCoordinatorDoc.setState(CoordinatorStateEnum::kCommitting);
+
+    // The new epoch to use for the resharded collection to indicate that the collection is a
+    // new incarnation of the namespace
+    auto updatedChunks = makeChunks(_originalUUID, _finalEpoch, _newShardKey, initialChunksIds);
+    auto updatedZones = makeZones(_originalNss, _newShardKey);
+
+    auto initialCollectionVersion =
+        assertGet(getCollectionVersion(operationContext(), _originalNss));
+
+
+    writeDecisionPersistedStateExpectSuccess(
+        operationContext(), expectedCoordinatorDoc, fetchTimestamp, updatedChunks, updatedZones);
+
+    // Since the epoch is changed, there is no need to bump the chunk versions with the transition.
+    auto finalCollectionVersion = assertGet(getCollectionVersion(operationContext(), _originalNss));
+    ASSERT_EQ(initialCollectionVersion.toLong(), finalCollectionVersion.toLong());
+
+    cleanupSourceCollectionExpectSuccess(
+        operationContext(), expectedCoordinatorDoc, updatedChunks, updatedZones);
 }
 
 }  // namespace

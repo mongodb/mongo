@@ -27,13 +27,16 @@
  *    it in the license file.
  */
 
+#include "mongo/db/ops/write_ops_parsers.h"
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 
+#include <algorithm>
 #include <tuple>
+#include <vector>
 
 #include "mongo/db/auth/authorization_session_impl.h"
 #include "mongo/db/dbdirectclient.h"
@@ -95,6 +98,20 @@ OpMsg runCommandInLocalTxn(OperationContext* opCtx,
                             OpMsgRequest::fromDBAndBody(db.toString(), bob.obj()).serialize())
             .get()
             .response);
+}
+
+/**
+ * Runs the BatchedCommandRequest 'request' on namespace 'nss' It transforms the request to BSON
+ * and then uses a DBDirectClient to run the command locally.
+ */
+BSONObj executeConfigRequest(OperationContext* opCtx,
+                             const NamespaceString& nss,
+                             const BatchedCommandRequest& request) {
+    invariant(nss.db() == NamespaceString::kConfigDb);
+    DBDirectClient client(opCtx);
+    BSONObj result;
+    client.runCommand(nss.db().toString(), request.toBSON(), result);
+    return result;
 }
 
 void startTransactionWithNoopFind(OperationContext* opCtx,
@@ -207,6 +224,41 @@ Status createIndexesForConfigChunks(OperationContext* opCtx) {
 
     return Status::OK();
 }
+
+// creates a vector of a vector of BSONObj (one for each batch) from the docs vector
+// each batch can only be as big as the maximum BSON Object size and be below the maximum
+// document count
+std::vector<std::vector<BSONObj>> createBulkWriteBatches(const std::vector<BSONObj>& docs,
+                                                         int documentOverhead) {
+
+    const auto maxBatchSize = write_ops::kMaxWriteBatchSize;
+
+    // creates a vector of a vector of BSONObj (one for each batch) from the docs vector
+    // each batch can only be as big as the maximum BSON Object size and be below the maximum
+    // document count
+    std::vector<std::vector<BSONObj>> out;
+    size_t batchIndex = 0;
+    int workingBatchDocSize = 0;
+
+    std::for_each(docs.begin(), docs.end(), [&](const BSONObj& doc) {
+        if (out.size() == batchIndex) {
+            out.emplace_back(std::vector<BSONObj>());
+        }
+
+        auto currentBatchBSONSize = workingBatchDocSize + doc.objsize() + documentOverhead;
+
+        if (currentBatchBSONSize > BSONObjMaxUserSize ||
+            out[batchIndex].size() + 1 > maxBatchSize) {
+            ++batchIndex;
+            workingBatchDocSize = 0;
+            out.emplace_back(std::vector<BSONObj>());
+        }
+        out[batchIndex].emplace_back(doc);
+        workingBatchDocSize += doc.objsize() + documentOverhead;
+    });
+
+    return out;
+};
 }  // namespace
 
 void ShardingCatalogManager::create(ServiceContext* serviceContext,
@@ -713,49 +765,33 @@ BSONObj ShardingCatalogManager::writeToConfigDocumentInTxn(OperationContext* opC
     return response;
 }
 
-void ShardingCatalogManager::insertConfigDocumentsInTxn(OperationContext* opCtx,
-                                                        const NamespaceString& nss,
-                                                        std::vector<BSONObj> docs,
-                                                        TxnNumber txnNumber) {
+void ShardingCatalogManager::insertConfigDocuments(OperationContext* opCtx,
+                                                   const NamespaceString& nss,
+                                                   std::vector<BSONObj> docs,
+                                                   boost::optional<TxnNumber> txnNumber) {
     invariant(nss.db() == NamespaceString::kConfigDb);
 
-    std::vector<BSONObj> workingBatch;
-    size_t workingBatchItemSize = 0;
-    int workingBatchDocSize = 0;
+    // if the operation is in a transaction then the overhead for each document is different.
+    const auto documentOverhead = txnNumber
+        ? write_ops::kWriteCommandBSONArrayPerElementOverheadBytes
+        : write_ops::kRetryableAndTxnBatchWriteBSONSizeOverhead;
 
-    auto doBatchInsert = [&]() {
-        BatchedCommandRequest request([&] {
+    std::vector<std::vector<BSONObj>> batches = createBulkWriteBatches(docs, documentOverhead);
+
+    std::for_each(batches.begin(), batches.end(), [&](const std::vector<BSONObj>& batch) {
+        BatchedCommandRequest request([nss, batch] {
             write_ops::InsertCommandRequest insertOp(nss);
-            insertOp.setDocuments(workingBatch);
+            insertOp.setDocuments(batch);
             return insertOp;
         }());
 
-        writeToConfigDocumentInTxn(opCtx, nss, request, txnNumber);
-    };
-
-    while (!docs.empty()) {
-        BSONObj toAdd = docs.back();
-        docs.pop_back();
-
-        const int docSizePlusOverhead =
-            toAdd.objsize() + write_ops::kRetryableAndTxnBatchWriteBSONSizeOverhead;
-        // Check if pushing this object will exceed the batch size limit or the max object size
-        if ((workingBatchItemSize + 1 > write_ops::kMaxWriteBatchSize) ||
-            (workingBatchDocSize + docSizePlusOverhead > BSONObjMaxUserSize)) {
-            doBatchInsert();
-
-            workingBatch.clear();
-            workingBatchItemSize = 0;
-            workingBatchDocSize = 0;
+        if (txnNumber) {
+            writeToConfigDocumentInTxn(opCtx, nss, request, txnNumber.get());
+        } else {
+            uassertStatusOK(
+                getStatusFromWriteCommandReply(executeConfigRequest(opCtx, nss, request)));
         }
-
-        workingBatch.push_back(toAdd);
-        ++workingBatchItemSize;
-        workingBatchDocSize += docSizePlusOverhead;
-    }
-
-    if (!workingBatch.empty())
-        doBatchInsert();
+    });
 }
 
 boost::optional<BSONObj> ShardingCatalogManager::findOneConfigDocumentInTxn(
@@ -813,10 +849,10 @@ void ShardingCatalogManager::withTransaction(
 
     size_t attempt = 1;
     while (true) {
-        // Some ErrorCategory::Interruption errors are also considered transient transaction errors.
-        // We don't attempt to enumerate them explicitly. Instead, we retry on all
-        // ErrorCategory::Interruption errors (e.g. LockTimeout) and detect whether asr.opCtx() was
-        // killed by explicitly checking if it has been interrupted.
+        // Some ErrorCategory::Interruption errors are also considered transient transaction
+        // errors. We don't attempt to enumerate them explicitly. Instead, we retry on all
+        // ErrorCategory::Interruption errors (e.g. LockTimeout) and detect whether asr.opCtx()
+        // was killed by explicitly checking if it has been interrupted.
         asr.opCtx()->checkForInterrupt();
         ++txnNumber;
 
@@ -861,10 +897,10 @@ void ShardingCatalogManager::withTransaction(
         }
 
         uassertStatusOK(cmdStatus);
-        // commitTransaction() specifies {writeConcern: {w: "majority"}} without a wtimeout, so it
-        // isn't expected to have a write concern error unless the primary is stepping down or
-        // shutting down or asr.opCtx() is killed. We throw because all of those cases are terminal
-        // for the caller running a local replica set transaction anyway.
+        // commitTransaction() specifies {writeConcern: {w: "majority"}} without a wtimeout, so
+        // it isn't expected to have a write concern error unless the primary is stepping down
+        // or shutting down or asr.opCtx() is killed. We throw because all of those cases are
+        // terminal for the caller running a local replica set transaction anyway.
         uassertStatusOK(wcStatus);
 
         guard.dismiss();

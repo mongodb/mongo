@@ -840,6 +840,32 @@ TEST_F(ReshardingCoordinatorServiceTest, StepDownStepUpEachTransition) {
         metrics->serializeCurrentOpMetrics(&metricsBuilder, ReshardingMetrics::Role::kCoordinator);
         ASSERT_BSONOBJ_EQ(BSONObj(), metricsBuilder.done());
     }
+
+    {
+        DBDirectClient client(opCtx);
+
+        // config.chunks should have been moved to the new UUID
+        std::vector<ChunkType> foundChunks;
+        auto chunkCursor = client.query(
+            ChunkType::ConfigNS, BSON(ChunkType::collectionUUID() << doc.getReshardingUUID()));
+        while (chunkCursor->more()) {
+            auto d = uassertStatusOK(ChunkType::fromConfigBSON(
+                chunkCursor->nextSafe().getOwned(), _originalEpoch, boost::none));
+            foundChunks.push_back(d);
+        }
+        ASSERT_EQUALS(foundChunks.size(), initialChunks.size());
+
+        // config.collections should not have the document with the old UUID.
+        std::vector<ChunkType> foundCollections;
+        auto collection =
+            client.findOne(CollectionType::ConfigNS.ns(),
+                           BSON(CollectionType::kNssFieldName << doc.getSourceNss().ns()));
+
+        ASSERT_EQUALS(collection.isEmpty(), false);
+        ASSERT_EQUALS(
+            UUID::parse(collection.getField(CollectionType::kUuidFieldName)).getValue().toString(),
+            doc.getReshardingUUID().toString());
+    }
 }
 
 TEST_F(ReshardingCoordinatorServiceTest, ReshardingCoordinatorFailsIfMigrationNotAllowed) {

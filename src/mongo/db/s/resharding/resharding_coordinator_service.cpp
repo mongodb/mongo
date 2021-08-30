@@ -27,12 +27,17 @@
  *    it in the license file.
  */
 
+#include "mongo/base/string_data.h"
+#include "mongo/s/write_ops/batched_command_request.h"
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
 
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
 
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/auth/authorization_session_impl.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/logical_session_cache.h"
@@ -51,9 +56,11 @@
 #include "mongo/db/s/sharding_util.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/vector_clock.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/abort_reshard_collection_gen.h"
 #include "mongo/s/request_types/commit_reshard_collection_gen.h"
@@ -61,6 +68,7 @@
 #include "mongo/s/request_types/flush_routing_table_cache_updates_gen.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future_util.h"
 #include "mongo/util/string_map.h"
@@ -203,6 +211,7 @@ void writeToCoordinatorStateNss(OperationContext* opCtx,
     auto expectedNumModified = (request.getBatchType() == BatchedCommandRequest::BatchType_Insert)
         ? boost::none
         : boost::make_optional(1);
+
     auto res = ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
         opCtx, NamespaceString::kConfigReshardingOperationsNamespace, request, txnNumber);
 
@@ -471,8 +480,7 @@ void writeToConfigCollectionsForTempNss(OperationContext* opCtx,
 
 void insertChunkAndTagDocsForTempNss(OperationContext* opCtx,
                                      const std::vector<ChunkType>& initialChunks,
-                                     std::vector<BSONObj> newZones,
-                                     TxnNumber txnNumber) {
+                                     std::vector<BSONObj> newZones) {
     // Insert new initial chunk documents for temp nss
     std::vector<BSONObj> initialChunksBSON(initialChunks.size());
     std::transform(initialChunks.begin(),
@@ -480,60 +488,32 @@ void insertChunkAndTagDocsForTempNss(OperationContext* opCtx,
                    initialChunksBSON.begin(),
                    [](ChunkType chunk) { return chunk.toConfigBSON(); });
 
-    ShardingCatalogManager::get(opCtx)->insertConfigDocumentsInTxn(
-        opCtx, ChunkType::ConfigNS, std::move(initialChunksBSON), txnNumber);
+    ShardingCatalogManager::get(opCtx)->insertConfigDocuments(
+        opCtx, ChunkType::ConfigNS, std::move(initialChunksBSON));
 
-    ShardingCatalogManager::get(opCtx)->insertConfigDocumentsInTxn(
-        opCtx, TagsType::ConfigNS, newZones, txnNumber);
+
+    ShardingCatalogManager::get(opCtx)->insertConfigDocuments(opCtx, TagsType::ConfigNS, newZones);
 }
 
+// Requires that there be no session information on the opCtx.
 void removeChunkAndTagsDocs(OperationContext* opCtx,
-                            const NamespaceString& ns,
-                            const UUID& collUUID,
-                            TxnNumber txnNumber) {
-    // Remove all chunk documents for the original nss. We do not know how many chunk docs currently
-    // exist, so cannot pass a value for expectedNumModified
+                            const BSONObj& tagsQuery,
+                            const UUID& collUUID) {
+    // Remove all chunk documents for the original nss. We do not know how many chunk docs
+    // currently exist, so cannot pass a value for expectedNumModified
     const auto chunksQuery = BSON(ChunkType::collectionUUID() << collUUID);
+    const auto tagDeleteOperationHint = BSON(TagsType::ns() << 1 << TagsType::min() << 1);
 
-    ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
-        opCtx,
-        ChunkType::ConfigNS,
-        BatchedCommandRequest::buildDeleteOp(ChunkType::ConfigNS,
-                                             chunksQuery,
-                                             true  // multi
-                                             ),
-        txnNumber);
+    const auto catalogClient = Grid::get(opCtx)->catalogClient();
 
-    // Remove all tag documents for the original nss. We do not know how many tag docs currently
-    // exist, so cannot pass a value for expectedNumModified
-    auto hint = BSON("ns" << 1 << "min" << 1);
-    ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
-        opCtx,
-        TagsType::ConfigNS,
-        BatchedCommandRequest::buildDeleteOp(TagsType::ConfigNS,
-                                             BSON(TagsType::ns(ns.ns())),  // query
-                                             true,                         // multi
-                                             hint                          // hint
-                                             ),
-        txnNumber);
-}
-
-void removeConfigMetadataForTempNss(OperationContext* opCtx,
-                                    const ReshardingCoordinatorDocument& coordinatorDoc,
-                                    TxnNumber txnNumber) {
-    auto delCollEntryRequest = BatchedCommandRequest::buildDeleteOp(
-        CollectionType::ConfigNS,
-        BSON(CollectionType::kNssFieldName << coordinatorDoc.getTempReshardingNss().ns()),  // query
-        false                                                                               // multi
-    );
-
-    (void)ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
-        opCtx, CollectionType::ConfigNS, delCollEntryRequest, txnNumber);
-
-    removeChunkAndTagsDocs(opCtx,
-                           coordinatorDoc.getTempReshardingNss(),
-                           coordinatorDoc.getReshardingUUID(),
-                           txnNumber);
+    uassertStatusOK(catalogClient->removeConfigDocuments(
+        opCtx, ChunkType::ConfigNS, chunksQuery, ShardingCatalogClient::kMajorityWriteConcern));
+    uassertStatusOK(
+        catalogClient->removeConfigDocuments(opCtx,
+                                             TagsType::ConfigNS,
+                                             tagsQuery,
+                                             ShardingCatalogClient::kMajorityWriteConcern,
+                                             tagDeleteOperationHint));
 }
 
 void updateChunkAndTagsDocsForTempNss(OperationContext* opCtx,
@@ -603,10 +583,35 @@ CollectionType createTempReshardingCollectionType(
     return collType;
 }
 
+void cleanupSourceConfigCollections(OperationContext* opCtx,
+                                    const ReshardingCoordinatorDocument& coordinatorDoc) {
+    using Doc = Document;
+    using Arr = std::vector<Value>;
+    using V = Value;
+
+    auto createTagFilter = [](const V value) {
+        return V{Doc{{"$map",
+                      V{Doc{{"input", V{Doc{{"$objectToArray", value}}}},
+                            {"in", V{StringData("$$this.k")}}}}}}};
+    };
+
+
+    auto skipNewTagsFilter = Doc{
+        {"$ne",
+         Arr{createTagFilter(V{StringData("$min")}),
+             createTagFilter(V{Doc{{"$literal", coordinatorDoc.getReshardingKey().toBSON()}}})}}};
+
+    const auto removeTagsQuery =
+        BSON(TagsType::ns(coordinatorDoc.getSourceNss().ns()) << "$expr" << skipNewTagsFilter);
+
+    removeChunkAndTagsDocs(opCtx, removeTagsQuery, coordinatorDoc.getSourceUUID());
+}
+
 void writeDecisionPersistedState(OperationContext* opCtx,
                                  const ReshardingCoordinatorDocument& coordinatorDoc,
                                  OID newCollectionEpoch,
                                  Timestamp newCollectionTimestamp) {
+
     // No need to bump originalNss version because its epoch will be changed.
     executeMetadataChangesInTxn(opCtx, [&](OperationContext* opCtx, TxnNumber txnNumber) {
         // Update the config.reshardingOperations entry
@@ -621,11 +626,6 @@ void writeDecisionPersistedState(OperationContext* opCtx,
         updateConfigCollectionsForOriginalNss(
             opCtx, coordinatorDoc, newCollectionEpoch, newCollectionTimestamp, txnNumber);
 
-        // Remove all chunk and tag documents associated with the original collection, then
-        // update the chunk and tag docs currently associated with the temp nss to be associated
-        // with the original nss
-        removeChunkAndTagsDocs(
-            opCtx, coordinatorDoc.getSourceNss(), coordinatorDoc.getSourceUUID(), txnNumber);
         updateChunkAndTagsDocsForTempNss(opCtx, coordinatorDoc, newCollectionEpoch, txnNumber);
     });
 }
@@ -681,23 +681,25 @@ void writeParticipantShardsAndTempCollInfo(
     const ReshardingCoordinatorDocument& updatedCoordinatorDoc,
     std::vector<ChunkType> initialChunks,
     std::vector<BSONObj> zones) {
+    const auto tagsQuery = BSON(TagsType::ns(updatedCoordinatorDoc.getTempReshardingNss().ns()));
+
+    removeChunkAndTagsDocs(opCtx, tagsQuery, updatedCoordinatorDoc.getReshardingUUID());
+    insertChunkAndTagDocsForTempNss(opCtx, initialChunks, zones);
+
     ShardingCatalogManager::get(opCtx)->bumpCollectionVersionAndChangeMetadataInTxn(
         opCtx,
         updatedCoordinatorDoc.getSourceNss(),
         [&](OperationContext* opCtx, TxnNumber txnNumber) {
-            // Update on-disk state to reflect latest state transition.
-            writeToCoordinatorStateNss(opCtx, updatedCoordinatorDoc, txnNumber);
-            updateConfigCollectionsForOriginalNss(
-                opCtx, updatedCoordinatorDoc, boost::none, boost::none, txnNumber);
-
             // Insert the config.collections entry for the temporary resharding collection. The
             // chunks all have the same epoch, so picking the last chunk here is arbitrary.
             invariant(initialChunks.size() != 0);
             auto chunkVersion = initialChunks.back().getVersion();
             writeToConfigCollectionsForTempNss(
                 opCtx, updatedCoordinatorDoc, chunkVersion, CollationSpec::kSimpleSpec, txnNumber);
-
-            insertChunkAndTagDocsForTempNss(opCtx, initialChunks, zones, txnNumber);
+            // Update on-disk state to reflect latest state transition.
+            writeToCoordinatorStateNss(opCtx, updatedCoordinatorDoc, txnNumber);
+            updateConfigCollectionsForOriginalNss(
+                opCtx, updatedCoordinatorDoc, boost::none, boost::none, txnNumber);
         });
 }
 
@@ -745,6 +747,23 @@ void removeCoordinatorDocAndReshardingFields(OperationContext* opCtx,
     updatedCoordinatorDoc.setState(CoordinatorStateEnum::kDone);
     emplaceTruncatedAbortReasonIfExists(updatedCoordinatorDoc, abortReason);
 
+    const auto tagsQuery = BSON(TagsType::ns(coordinatorDoc.getTempReshardingNss().ns()));
+    // Once the decision has been persisted, the coordinator would have modified the
+    // config.chunks and config.collections entry. This means that the UUID of the
+    // non-temp collection is now the UUID of what was previously the UUID of the temp
+    // collection. So don't try to call remove as it will end up removing the metadata
+    // for the real collection.
+    if (!wasDecisionPersisted) {
+        const auto catalogClient = Grid::get(opCtx)->catalogClient();
+
+        uassertStatusOK(catalogClient->removeConfigDocuments(
+            opCtx,
+            CollectionType::ConfigNS,
+            BSON(CollectionType::kNssFieldName << coordinatorDoc.getTempReshardingNss().ns()),
+            ShardingCatalogClient::kMajorityWriteConcern));
+
+        removeChunkAndTagsDocs(opCtx, tagsQuery, coordinatorDoc.getReshardingUUID());
+    }
     ShardingCatalogManager::get(opCtx)->bumpCollectionVersionAndChangeMetadataInTxn(
         opCtx,
         updatedCoordinatorDoc.getSourceNss(),
@@ -755,15 +774,6 @@ void removeCoordinatorDocAndReshardingFields(OperationContext* opCtx,
             // Remove the resharding fields from the config.collections entry
             updateConfigCollectionsForOriginalNss(
                 opCtx, updatedCoordinatorDoc, boost::none, boost::none, txnNumber);
-
-            // Once the decision has been persisted, the coordinator would have modified the
-            // config.chunks and config.collections entry. This means that the UUID of the
-            // non-temp collection is now the UUID of what was previously the UUID of the temp
-            // collection. So don't try to call remove as it will end up removing the metadata
-            // for the real collection.
-            if (!wasDecisionPersisted) {
-                removeConfigMetadataForTempNss(opCtx, updatedCoordinatorDoc, txnNumber);
-            }
         });
 }
 }  // namespace resharding
@@ -1223,6 +1233,12 @@ ReshardingCoordinatorService::ReshardingCoordinator::_commitAndFinishReshardOper
                        _tellAllParticipantsToCommit(_coordinatorDoc.getSourceNss(), executor);
                    })
                    .then([this] { _updateChunkImbalanceMetrics(_coordinatorDoc.getSourceNss()); })
+                   .then([this, updatedCoordinatorDoc] {
+                       auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+                       resharding::cleanupSourceConfigCollections(opCtx.get(),
+                                                                  updatedCoordinatorDoc);
+                       return Status::OK();
+                   })
                    .then([this, executor] { return _awaitAllParticipantShardsDone(executor); })
                    .then([this, executor] {
                        // Best-effort attempt to trigger a refresh on the participant shards so
@@ -1657,6 +1673,7 @@ Future<void> ReshardingCoordinatorService::ReshardingCoordinator::_commit(
         const auto now = VectorClock::get(opCtx.get())->getTime();
         return now.clusterTime().asTimestamp();
     }();
+
 
     resharding::writeDecisionPersistedState(opCtx.get(),
                                             updatedCoordinatorDoc,

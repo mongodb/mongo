@@ -16,9 +16,8 @@ load("jstests/sharding/libs/find_chunks_util.js");
 // The total size of the zones and chunks documents that the config server writes in a single
 // replica set transaction totals to around 60 MB. WWhen combined with the other operations and
 // transactions occurring in the config server, this large transaction causes WiredTiger to run out
-// of dirty cache space. Hence, we need to increase the wiredTigerCacheSizeGB to 5 GB.
-const st = new ShardingTest(
-    {mongos: 1, shards: 2, config: 1, other: {configOptions: {wiredTigerCacheSizeGB: 5}}});
+// of dirty cache space. Hence, we need to increase the wiredTigerCacheSizeGB to 1 GB.
+const st = new ShardingTest({mongos: 1, shards: 2, config: 1});
 
 const kDbName = 'db';
 const collName = 'foo';
