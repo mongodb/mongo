@@ -46,7 +46,7 @@ const APIParametersFromClient initializeAPIParameters(const BSONObj& requestBody
     auto apiParamsFromClient =
         APIParametersFromClient::parse("APIParametersFromClient"_sd, requestBody);
 
-    if (command->acceptsAnyApiVersionParameters()) {
+    if (command->skipApiVersionCheck()) {
         return apiParamsFromClient;
     }
 

@@ -417,8 +417,9 @@ public:
 
     /*
      * Some commands permit any values for apiVersion, apiStrict, and apiDeprecationErrors.
+     * For internal (server to server) commands we should skip checking api version.
      */
-    virtual bool acceptsAnyApiVersionParameters() const {
+    virtual bool skipApiVersionCheck() const {
         return false;
     }
 

@@ -51,7 +51,8 @@ public:
                "directly. Drops a collection.";
     }
 
-    bool acceptsAnyApiVersionParameters() const override {
+    bool skipApiVersionCheck() const override {
+        /* Internal command (server to server) */
         return true;
     }
 

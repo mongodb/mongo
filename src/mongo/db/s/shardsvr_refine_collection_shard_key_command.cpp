@@ -41,7 +41,8 @@ namespace {
 class ShardsvrRefineCollectionShardKeyCommand final
     : public TypedCommand<ShardsvrRefineCollectionShardKeyCommand> {
 public:
-    bool acceptsAnyApiVersionParameters() const override {
+    bool skipApiVersionCheck() const override {
+        /* Internal command (server to server) */
         return true;
     }
 

@@ -51,7 +51,8 @@ MONGO_FAIL_POINT_DEFINE(participantReturnNetworkErrorForPrepareAfterExecutingPre
 
 class PrepareTransactionCmd : public TypedCommand<PrepareTransactionCmd> {
 public:
-    bool acceptsAnyApiVersionParameters() const override {
+    bool skipApiVersionCheck() const override {
+        /* Internal command (server to server) */
         return true;
     }
 
@@ -228,7 +229,8 @@ class CoordinateCommitTransactionCmd : public TypedCommand<CoordinateCommitTrans
 public:
     using Request = CoordinateCommitTransaction;
 
-    bool acceptsAnyApiVersionParameters() const override {
+    bool skipApiVersionCheck() const override {
+        /* Internal command (server to server) */
         return true;
     }
 

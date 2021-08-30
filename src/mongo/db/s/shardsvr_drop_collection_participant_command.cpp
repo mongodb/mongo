@@ -46,7 +46,8 @@ namespace {
 class ShardsvrDropCollectionParticipantCommand final
     : public TypedCommand<ShardsvrDropCollectionParticipantCommand> {
 public:
-    bool acceptsAnyApiVersionParameters() const override {
+    bool skipApiVersionCheck() const override {
+        /* Internal command (server to server) */
         return true;
     }
 

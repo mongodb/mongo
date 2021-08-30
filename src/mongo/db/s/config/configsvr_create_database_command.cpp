@@ -55,7 +55,8 @@ public:
      * We accept any apiVersion, apiStrict, and/or apiDeprecationErrors forwarded with this internal
      * command.
      */
-    bool acceptsAnyApiVersionParameters() const override {
+    bool skipApiVersionCheck() const override {
+        /* Internal command (server to server) */
         return true;
     }
 

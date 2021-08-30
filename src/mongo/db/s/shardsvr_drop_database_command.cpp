@@ -52,7 +52,8 @@ public:
                "directly. Drops a database.";
     }
 
-    bool acceptsAnyApiVersionParameters() const override {
+    bool skipApiVersionCheck() const override {
+        /* Internal command (server to server) */
         return true;
     }
 
