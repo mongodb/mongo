@@ -84,6 +84,8 @@ last-continuous:
       test_file: jstests/replsets/tenant_migration_find_and_modify_retry.js
     - ticket: SERVER-51943
       test_file: jstests/replsets/tenant_migration_fetch_committed_transactions_retry.js
+    - ticket: SERVER-59023
+      test_file: jstests/sharding/resharding_secondary_recovers_temp_ns_metadata.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -330,6 +332,8 @@ last-lts:
       test_file: jstests/replsets/tenant_migration_find_and_modify_retry.js
     - ticket: SERVER-51943
       test_file: jstests/replsets/tenant_migration_fetch_committed_transactions_retry.js
+    - ticket: SERVER-59023
+      test_file: jstests/sharding/resharding_secondary_recovers_temp_ns_metadata.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:

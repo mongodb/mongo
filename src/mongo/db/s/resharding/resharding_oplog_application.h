@@ -62,6 +62,10 @@ public:
                                     ChunkManager sourceChunkMgr,
                                     ReshardingMetrics* metrics);
 
+    const NamespaceString& getOutputNss() const {
+        return _outputNss;
+    }
+
     /**
      * Wraps the op application in a writeConflictRetry loop and is responsible for creating and
      * committing the WUOW.
