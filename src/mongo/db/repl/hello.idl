@@ -121,6 +121,9 @@ structs:
             msg:
                 type: string
                 optional: true
+            serviceId:
+                type: objectid
+                optional: true
             ##
             ## ReplicationInfo
             ##
@@ -251,4 +254,7 @@ commands:
                 optional: true
             speculativeAuthenticate:
                 type: object
+                optional: true
+            loadBalanced:
+                type: bool
                 optional: true
