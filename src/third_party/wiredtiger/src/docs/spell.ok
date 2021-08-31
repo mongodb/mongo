@@ -126,6 +126,7 @@ Seward's
 SiH
 TSC
 TXT
+TXID
 UBSAN
 UNC
 URIs
@@ -329,6 +330,7 @@ flamegraph
 flamegraphs
 flcs
 fnv
+fontsize
 forw
 fprofile
 fput
@@ -532,6 +534,7 @@ px
 py
 qnx
 qqq
+rankdir
 rVv
 rdbms
 rdlock
