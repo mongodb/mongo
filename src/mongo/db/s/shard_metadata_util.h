@@ -230,15 +230,6 @@ void updateTimestampOnShardCollections(OperationContext* opCtx,
 Status dropChunksAndDeleteCollectionsEntry(OperationContext* opCtx, const NamespaceString& nss);
 
 /**
- * Drops locally persisted chunk metadata associated with 'nss' or 'uuid': only drops the chunks
- * collection.
- */
-void dropChunks(OperationContext* opCtx,
-                const NamespaceString& nss,
-                const UUID& uuid,
-                SupportingLongNameStatusEnum supportingLongName);
-
-/**
  * Deletes locally persisted database metadata associated with 'dbName': removes the databases
  * collection entry.
  */

@@ -448,18 +448,26 @@ void updateTimestampOnShardCollections(OperationContext* opCtx,
 }
 
 Status dropChunksAndDeleteCollectionsEntry(OperationContext* opCtx, const NamespaceString& nss) {
-    // TODO (SERVER-58361): Reduce the access to local collections.
     const auto statusWithCollectionEntry = readShardCollectionsEntry(opCtx, nss);
-    if (statusWithCollectionEntry.getStatus() == ErrorCodes::NamespaceNotFound) {
-        return Status::OK();
+    if (!statusWithCollectionEntry.isOK()) {
+        const auto status = statusWithCollectionEntry.getStatus();
+        if (status == ErrorCodes::NamespaceNotFound) {
+            return Status::OK();
+        }
+
+        LOGV2_ERROR(5966300,
+                    "Failed to read persisted collection entry",
+                    "namespace"_attr = nss,
+                    "error"_attr = redact(status));
+
+        return status;
     }
-    uassertStatusOKWithContext(statusWithCollectionEntry,
-                               str::stream() << "Failed to read persisted collection entry for '"
-                                             << nss.ns() << "'.");
     const auto& collectionEntry = statusWithCollectionEntry.getValue();
 
     try {
         DBDirectClient client(opCtx);
+
+        // Delete the collection entry from config.cache.collections
         auto deleteCommandResponse = client.runCommand([&] {
             write_ops::DeleteCommandRequest deleteOp(
                 NamespaceString::kShardConfigCollectionsNamespace);
@@ -474,35 +482,33 @@ Status dropChunksAndDeleteCollectionsEntry(OperationContext* opCtx, const Namesp
         uassertStatusOK(
             getStatusFromWriteCommandResponse(deleteCommandResponse->getCommandReply()));
 
-        dropChunks(opCtx, nss, collectionEntry.getUuid(), collectionEntry.getSupportingLongName());
-
-        LOGV2(3463200,
-              "Dropped chunks and collection caches",
-              "collectionNamespace"_attr = nss,
-              "collectionUUID"_attr = collectionEntry.getUuid());
-
-        return Status::OK();
+        // Drop the corresponding config.cache.chunks.<ns/uuid> collection
+        const auto chunksNss = getShardChunksNss(
+            nss, collectionEntry.getUuid(), collectionEntry.getSupportingLongName());
+        BSONObj result;
+        if (!client.dropCollection(chunksNss.ns(), kLocalWriteConcern, &result)) {
+            auto status = getStatusFromCommandResult(result);
+            if (status != ErrorCodes::NamespaceNotFound) {
+                uassertStatusOK(status);
+            }
+        }
     } catch (const DBException& ex) {
+        LOGV2_ERROR(5966301,
+                    "Failed to drop chunks and collection entry",
+                    "namespace"_attr = nss,
+                    "uuid"_attr = collectionEntry.getUuid(),
+                    "error"_attr = redact(ex.toStatus()));
+
         return ex.toStatus();
     }
+
+    LOGV2(5966302,
+          "Dropped chunks and collection entry",
+          "namespace"_attr = nss,
+          "uuid"_attr = collectionEntry.getUuid());
+
+    return Status::OK();
 }
-
-void dropChunks(OperationContext* opCtx,
-                const NamespaceString& nss,
-                const UUID& uuid,
-                SupportingLongNameStatusEnum supportingLongName) {
-    const auto chunksNss = getShardChunksNss(nss, uuid, supportingLongName);
-
-    DBDirectClient client(opCtx);
-    BSONObj result;
-    if (!client.dropCollection(chunksNss.ns(), kLocalWriteConcern, &result)) {
-        auto status = getStatusFromCommandResult(result);
-        if (status != ErrorCodes::NamespaceNotFound) {
-            uassertStatusOK(status);
-        }
-    }
-}
-
 Status deleteDatabasesEntry(OperationContext* opCtx, StringData dbName) {
     try {
         DBDirectClient client(opCtx);
