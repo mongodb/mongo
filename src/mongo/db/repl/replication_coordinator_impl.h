@@ -1305,7 +1305,8 @@ private:
      */
     void _advanceCommitPoint(WithLock lk,
                              const OpTimeAndWallTime& committedOpTimeAndWallTime,
-                             bool fromSyncSource);
+                             bool fromSyncSource,
+                             bool forInitiate = false);
 
     /**
      * Scan the memberData and determine the highest last applied or last

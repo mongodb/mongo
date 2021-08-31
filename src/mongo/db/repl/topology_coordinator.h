@@ -308,7 +308,8 @@ public:
      * 'committedOpTime', so we update our commit point to min(committedOpTime, lastApplied).
      */
     bool advanceLastCommittedOpTimeAndWallTime(OpTimeAndWallTime committedOpTimeAndWallTime,
-                                               bool fromSyncSource);
+                                               bool fromSyncSource,
+                                               bool forInitiate = false);
 
     /**
      * Returns the OpTime of the latest majority-committed op known to this server.
