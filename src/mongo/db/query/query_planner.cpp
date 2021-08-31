@@ -270,20 +270,16 @@ static BSONObj stripFieldNamesAndApplyCollation(const BSONObj& obj,
 static BSONObj finishMinObj(const IndexEntry& indexEntry,
                             const BSONObj& minObj,
                             const BSONObj& maxObj) {
-    BSONObjBuilder bob;
-    bob.appendMinKey("");
-    BSONObj minKey = bob.obj();
-
     if (minObj.isEmpty()) {
-        if (0 > minKey.woCompare(maxObj, indexEntry.keyPattern, false)) {
-            BSONObjBuilder minKeyBuilder;
-            minKeyBuilder.appendMinKey("");
-            return minKeyBuilder.obj();
-        } else {
-            BSONObjBuilder maxKeyBuilder;
-            maxKeyBuilder.appendMaxKey("");
-            return maxKeyBuilder.obj();
+        BSONObjBuilder ret;
+        for (auto key : indexEntry.keyPattern) {
+            if (!key.isNumber() || key.numberInt() > 0) {
+                ret.appendMinKey("");
+            } else {
+                ret.appendMaxKey("");
+            }
         }
+        return ret.obj();
     } else {
         return stripFieldNamesAndApplyCollation(minObj, indexEntry.collator);
     }
@@ -299,20 +295,16 @@ static BSONObj finishMinObj(const IndexEntry& indexEntry,
 static BSONObj finishMaxObj(const IndexEntry& indexEntry,
                             const BSONObj& minObj,
                             const BSONObj& maxObj) {
-    BSONObjBuilder bob;
-    bob.appendMaxKey("");
-    BSONObj maxKey = bob.obj();
-
     if (maxObj.isEmpty()) {
-        if (0 < maxKey.woCompare(minObj, indexEntry.keyPattern, false)) {
-            BSONObjBuilder maxKeyBuilder;
-            maxKeyBuilder.appendMaxKey("");
-            return maxKeyBuilder.obj();
-        } else {
-            BSONObjBuilder minKeyBuilder;
-            minKeyBuilder.appendMinKey("");
-            return minKeyBuilder.obj();
+        BSONObjBuilder ret;
+        for (auto key : indexEntry.keyPattern) {
+            if (!key.isNumber() || key.numberInt() > 0) {
+                ret.appendMaxKey("");
+            } else {
+                ret.appendMinKey("");
+            }
         }
+        return ret.obj();
     } else {
         return stripFieldNamesAndApplyCollation(maxObj, indexEntry.collator);
     }

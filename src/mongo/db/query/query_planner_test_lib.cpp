@@ -249,6 +249,49 @@ static Status childrenMatch(const BSONObj& testSoln,
 Status QueryPlannerTestLib::boundsMatch(const BSONObj& testBounds,
                                         const IndexBounds trueBounds,
                                         bool relaxBoundsCheck) {
+    if (testBounds.firstElementFieldName() == "$startKey"_sd) {
+        if (!trueBounds.isSimpleRange) {
+            return {ErrorCodes::Error{5920202}, str::stream() << "Expected bounds to be simple"};
+        }
+
+        if (testBounds.nFields() != 2) {
+            return {ErrorCodes::Error{5920203},
+                    str::stream() << "Expected object of form {'$startKey': ..., '$endKey': ...}"};
+        }
+
+        BSONObjIterator it(testBounds);
+
+        {
+            auto minElt = it.next();
+            if (minElt.type() != BSONType::Object) {
+                return {ErrorCodes::Error{5920205}, str::stream() << "Expected min obj"};
+            }
+
+            auto minObj = minElt.embeddedObject();
+            if (minObj.woCompare(trueBounds.startKey)) {
+                return {ErrorCodes::Error{5920201},
+                        str::stream() << "'startKey' in bounds did not match. Expected "
+                                      << trueBounds.startKey << " got " << minObj};
+            }
+        }
+
+        {
+            auto maxElt = it.next();
+            if (maxElt.type() != BSONType::Object) {
+                return {ErrorCodes::Error{5920204}, str::stream() << "Expected max obj"};
+            }
+
+            auto maxObj = maxElt.embeddedObject();
+            if (maxObj.woCompare(trueBounds.endKey)) {
+                return {ErrorCodes::Error{5920206},
+                        str::stream() << "'endKey' in bounds did not match. Expected "
+                                      << trueBounds.endKey << " got " << maxObj};
+            }
+        }
+
+        return Status::OK();
+    }
+
     // Iterate over the fields on which we have index bounds.
     BSONObjIterator fieldIt(testBounds);
     size_t fieldItCount = 0;

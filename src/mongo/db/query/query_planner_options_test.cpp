@@ -91,6 +91,32 @@ TEST_F(QueryPlannerTest, MaxValid) {
         "node: {ixscan: {filter: null, pattern: {a: 1}}}}}");
 }
 
+TEST_F(QueryPlannerTest, MaxWithoutMinMultipleComponents) {
+    addIndex(BSON("a" << 1 << "b" << 1));
+    runQueryHintMinMax(
+        BSONObj(), BSONObj(fromjson("{a: 1, b: 1}")), BSONObj(), fromjson("{a: 1, b: 1}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: null, "
+        "node: {ixscan: {filter: null, pattern: {a: 1, b: 1},"
+        "bounds: {'$startKey': {'': {$minKey: 1}, '': {$minKey: 1}}, '$endKey': {'': 1, '': 1}}"
+        "}}}}");
+}
+
+TEST_F(QueryPlannerTest, MinWithoutMaxMultipleComponents) {
+    addIndex(BSON("a" << 1 << "b" << 1));
+    runQueryHintMinMax(
+        BSONObj(), BSONObj(fromjson("{a: 1, b: 1}")), fromjson("{a: 1, b: 1}"), BSONObj());
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: null, "
+        "node: {ixscan: {filter: null, pattern: {a: 1, b: 1},"
+        "bounds: {'$startKey': {'': 1, '': 1}, '$endKey': {'': {$maxKey:1}, '': {$maxKey:1}}}"
+        "}}}}");
+}
+
 TEST_F(QueryPlannerTest, MinMaxSameValue) {
     addIndex(BSON("a" << 1));
     runInvalidQueryHintMinMax(
