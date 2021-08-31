@@ -118,15 +118,15 @@ public:
 
     // Helpers for severity levels.
 
-    static const bool isResolved(double severity) {
+    static bool isResolved(double severity) {
         return severity <= kResolvedSeverity;
     }
 
-    static const bool isTransientFault(double severity) {
+    static bool isTransientFault(double severity) {
         return severity > kResolvedSeverity && severity < kActiveFaultSeverity;
     }
 
-    static const bool isActiveFault(double severity) {
+    static bool isActiveFault(double severity) {
         // Range is inclusive.
         return severity >= kActiveFaultSeverity - kActiveFaultSeverityEpsilon;
     }
