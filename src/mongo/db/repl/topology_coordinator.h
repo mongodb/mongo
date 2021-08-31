@@ -306,9 +306,12 @@ public:
      * 'committedOpTime' if it has a different term than our lastApplied, unless
      * 'fromSyncSource'=true, which guarantees we are on the same branch of history as
      * 'committedOpTime', so we update our commit point to min(committedOpTime, lastApplied).
+     * The 'forInitiate' flag is to force-advance our committedOpTime during the execution of
+     * the replSetInitiate command.
      */
     bool advanceLastCommittedOpTimeAndWallTime(OpTimeAndWallTime committedOpTimeAndWallTime,
-                                               bool fromSyncSource);
+                                               bool fromSyncSource,
+                                               bool forInitiate = false);
 
     /**
      * Returns the OpTime of the latest majority-committed op known to this server.
