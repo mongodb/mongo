@@ -22,6 +22,7 @@
   base_suite: concurrency_sharded_replication
   overrides:
     - "multiversion.sharded_fixture"
+    - "multiversion.concurrency_sharded_replication_multiversion_mongod_options"
 - suite_name: sharding_jscore_multiversion_passthrough
   base_suite: sharding_jscore_passthrough
   overrides:

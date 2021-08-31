@@ -236,7 +236,8 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
     _config.MONGOD_EXECUTABLE = _expand_user(config.pop("mongod_executable"))
 
     mongod_set_parameters = config.pop("mongod_set_parameters")
-    if _config.ENABLED_FEATURE_FLAGS:
+    # TODO: This should eventually be migrated entirely to _builder.py
+    if _config.ENABLED_FEATURE_FLAGS and not _config.MIXED_BIN_VERSIONS:
         feature_flag_dict = {ff: "true" for ff in _config.ENABLED_FEATURE_FLAGS}
         mongod_set_parameters.append(str(feature_flag_dict))
 
@@ -255,7 +256,7 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
     _config.MONGOS_EXECUTABLE = _expand_user(config.pop("mongos_executable"))
 
     mongos_set_parameters = config.pop("mongos_set_parameters")
-    if _config.ENABLED_FEATURE_FLAGS:
+    if _config.ENABLED_FEATURE_FLAGS and not _config.MIXED_BIN_VERSIONS:
         feature_flag_dict = {ff: "true" for ff in _config.ENABLED_FEATURE_FLAGS}
         mongos_set_parameters.append(str(feature_flag_dict))
 

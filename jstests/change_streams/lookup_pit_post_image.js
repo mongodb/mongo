@@ -1,5 +1,6 @@
 // Tests the behaviour of $changeStream's 'fullDocument' option when retrieving point-in-time
 // post-images.
+// @tags: [multiversion_incompatible]
 (function() {
 "use strict";
 

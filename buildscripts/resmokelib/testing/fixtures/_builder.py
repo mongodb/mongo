@@ -179,9 +179,14 @@ class ReplSetBuilder(FixtureBuilder):
             # changing the replicaset config.
             new_fixture_port = old_fixture.port
 
+        new_fixture_mongod_options = replset.get_options_for_mongod(replset_node_index)
+        if config.ENABLED_FEATURE_FLAGS is not None:
+            for ff in config.ENABLED_FEATURE_FLAGS:
+                new_fixture_mongod_options["set_parameters"][ff] = True
+
         new_fixture = make_fixture(classes[BinVersionEnum.NEW], mongod_logger, replset.job_num,
                                    mongod_executable=executables[BinVersionEnum.NEW],
-                                   mongod_options=mongod_options,
+                                   mongod_options=new_fixture_mongod_options,
                                    preserve_dbpath=replset.preserve_dbpath, port=new_fixture_port)
 
         return FixtureContainer(new_fixture, old_fixture, cur_version)

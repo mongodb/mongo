@@ -9519,13 +9519,14 @@ buildvariants:
 
 # This build variant is used to run multiversion tests as part of burn_in_tags as these tests are
 # currently only run on our daily builders.
-- name: enterprise-rhel-80-64-bit-multiversion
+- &enterprise-rhel-80-64-bit-multiversion-template
+  name: enterprise-rhel-80-64-bit-multiversion
   display_name: "Enterprise RHEL 8.0 (implicit multiversion)"
   modules:
   - enterprise
   run_on:
   - rhel80-small
-  expansions: &enterprise-rhel-80-64-bit-multiversion
+  expansions: &enterprise-rhel-80-64-bit-multiversion-expansions-template
     test_flags: >-
       --excludeWithAnyTags=requires_fcv_51,multiversion_incompatible,disabled_due_to_server_58295
     compile_flags: >-
@@ -9549,6 +9550,15 @@ buildvariants:
   - name: .multiversion_fuzzer
   - name: .multiversion_passthrough
   - name: .random_multiversion_ds
+
+- <<: *enterprise-rhel-80-64-bit-multiversion-template
+  name: enterprise-rhel-80-64-bit-multiversion-all-feature-flags
+  display_name: "Enterprise RHEL 8.0 (implicit multiversion & all feature flags)"
+  expansions:
+    <<: *enterprise-rhel-80-64-bit-multiversion-expansions-template
+    test_flags: >-
+      --excludeWithAnyTags=requires_fcv_51,multiversion_incompatible,disabled_due_to_server_58295
+      --runAllFeatureFlagTests
 
 - name: rhel-80-64-bit-nossl
   display_name: "RHEL 8.0 Shared Library (No SSL)"

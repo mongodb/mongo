@@ -261,7 +261,9 @@ class MatrixSuiteConfig(SuiteConfigInterface):
         if not isinstance(dict1, dict) or not isinstance(dict2, dict):
             return dict2
         for k in dict2:
-            if k in dict1:
+            if dict2[k] is None:
+                dict1.pop(k)
+            elif k in dict1:
                 dict1[k] = cls.merge_dicts(dict1[k], dict2[k])
             else:
                 dict1[k] = dict2[k]
