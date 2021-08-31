@@ -208,33 +208,14 @@ StatusWith<ChunkManager> CatalogCache::_getCollectionRoutingInfoAt(
                                     dbInfo.databaseVersion(),
                                     std::move(collEntry),
                                     atClusterTime);
-            } catch (ExceptionFor<ErrorCodes::ConflictingOperationInProgress>& ex) {
-                LOGV2_FOR_CATALOG_REFRESH(5310501,
-                                          0,
-                                          "Collection refresh failed",
-                                          "namespace"_attr = nss,
-                                          "exception"_attr = redact(ex));
-                _stats.totalRefreshWaitTimeMicros.addAndFetch(t.micros());
-                acquireTries++;
-                if (acquireTries == kMaxInconsistentRoutingInfoRefreshAttempts) {
+            } catch (const DBException& ex) {
+                bool isCatalogCacheRetriableError = ex.isA<ErrorCategory::SnapshotError>() ||
+                    ex.code() == ErrorCodes::ConflictingOperationInProgress ||
+                    ex.code() == ErrorCodes::QueryPlanKilled;
+                if (!isCatalogCacheRetriableError) {
                     return ex.toStatus();
                 }
-            } catch (ExceptionFor<ErrorCodes::QueryPlanKilled>& ex) {
-                // TODO SERVER-53283: Remove once 5.0 has branched out.
-                // This would happen when the query to config.chunks is killed because the index it
-                // relied on has been dropped while the query was ongoing.
-                LOGV2_FOR_CATALOG_REFRESH(5310503,
-                                          0,
-                                          "Collection refresh failed",
-                                          "namespace"_attr = nss,
-                                          "exception"_attr = redact(ex));
-                _stats.totalRefreshWaitTimeMicros.addAndFetch(t.micros());
-                acquireTries++;
-                if (acquireTries == kMaxInconsistentRoutingInfoRefreshAttempts) {
-                    return ex.toStatus();
-                }
-            } catch (ExceptionForCat<ErrorCategory::SnapshotError>& ex) {
-                LOGV2_FOR_CATALOG_REFRESH(5487402,
+                LOGV2_FOR_CATALOG_REFRESH(4086500,
                                           0,
                                           "Collection refresh failed",
                                           "namespace"_attr = nss,
