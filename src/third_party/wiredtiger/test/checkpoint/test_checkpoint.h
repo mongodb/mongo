@@ -68,6 +68,7 @@ typedef struct {
     u_int ts_oldest;               /* Current oldest timestamp */
     u_int ts_stable;               /* Current stable timestamp */
     bool use_timestamps;           /* Use txn timestamps */
+    bool race_timetamps;           /* Async update to oldest timestamp */
     bool prepare;                  /* Use prepare transactions */
     COOKIE *cookies;               /* Per-thread info */
     WT_RWLOCK clock_lock;          /* Clock synchronization */
@@ -79,5 +80,6 @@ extern GLOBAL g;
 void end_checkpoints(void);
 int log_print_err(const char *, int, int);
 void start_checkpoints(void);
-int start_workers(table_type);
+int start_workers(void);
 const char *type_to_string(table_type);
+int verify_consistency(WT_SESSION *, char *);

@@ -33,7 +33,6 @@ static WT_THREAD_RET clock_thread(void *);
 static int compare_cursors(WT_CURSOR *, const char *, WT_CURSOR *, const char *);
 static int diagnose_key_error(WT_CURSOR *, int, WT_CURSOR *, int);
 static int real_checkpointer(void);
-static int verify_consistency(WT_SESSION *, char *);
 
 /*
  * set_stable --
@@ -44,7 +43,11 @@ set_stable(void)
 {
     char buf[128];
 
-    testutil_check(__wt_snprintf(buf, sizeof(buf), "stable_timestamp=%x", g.ts_stable));
+    if (g.race_timetamps)
+        testutil_check(__wt_snprintf(
+          buf, sizeof(buf), "stable_timestamp=%x,oldest_timestamp=%x", g.ts_stable, g.ts_stable));
+    else
+        testutil_check(__wt_snprintf(buf, sizeof(buf), "stable_timestamp=%x", g.ts_stable));
     testutil_check(g.conn->set_timestamp(g.conn, buf));
 }
 
@@ -97,7 +100,14 @@ clock_thread(void *arg)
 
     while (g.running) {
         __wt_writelock(session, &g.clock_lock);
-        ++g.ts_stable;
+        if (g.prepare)
+            /*
+             * Leave a gap between timestamps so prepared insert followed by remove don't overlap
+             * with stable timestamp.
+             */
+            g.ts_stable += 5;
+        else
+            ++g.ts_stable;
         set_stable();
         if (g.ts_stable % 997 == 0) {
             /*
@@ -229,7 +239,7 @@ done:
  *     Open a cursor on each table at the last checkpoint and walk through the tables in parallel.
  *     The key/values should match across all tables.
  */
-static int
+int
 verify_consistency(WT_SESSION *session, char *stable_timestamp)
 {
     WT_CURSOR **cursors;
@@ -245,8 +255,8 @@ verify_consistency(WT_SESSION *session, char *stable_timestamp)
         return (log_print_err("verify_consistency", ENOMEM, 1));
 
     if (stable_timestamp != NULL) {
-        testutil_check(__wt_snprintf(
-          cfg_buf, sizeof(cfg_buf), "isolation=snapshot,read_timestamp=%s", stable_timestamp));
+        testutil_check(__wt_snprintf(cfg_buf, sizeof(cfg_buf),
+          "isolation=snapshot,read_timestamp=%s,roundup_timestamps=read", stable_timestamp));
     } else {
         testutil_check(__wt_snprintf(cfg_buf, sizeof(cfg_buf), "isolation=snapshot"));
     }
@@ -267,13 +277,19 @@ verify_consistency(WT_SESSION *session, char *stable_timestamp)
     }
 
     while (ret == 0) {
-        ret = cursors[0]->next(cursors[0]);
+        while ((ret = cursors[0]->next(cursors[0])) != 0) {
+            if (ret == WT_NOTFOUND)
+                break;
+            if (ret != WT_PREPARE_CONFLICT) {
+                (void)log_print_err("cursor->next", ret, 1);
+                goto err;
+            }
+            __wt_yield();
+        }
+
         if (ret == 0)
             ++key_count;
-        else if (ret != WT_NOTFOUND) {
-            (void)log_print_err("cursor->next", ret, 1);
-            goto err;
-        }
+
         /*
          * Check to see that all remaining cursors have the same key/value pair.
          */
@@ -283,10 +299,14 @@ verify_consistency(WT_SESSION *session, char *stable_timestamp)
              */
             if (g.cookies[i].type == LSM)
                 continue;
-            t_ret = cursors[i]->next(cursors[i]);
-            if (t_ret != 0 && t_ret != WT_NOTFOUND) {
-                (void)log_print_err("cursor->next", t_ret, 1);
-                goto err;
+            while ((t_ret = cursors[i]->next(cursors[i])) != 0) {
+                if (t_ret == WT_NOTFOUND)
+                    break;
+                if (t_ret != WT_PREPARE_CONFLICT) {
+                    (void)log_print_err("cursor->next", t_ret, 1);
+                    goto err;
+                }
+                __wt_yield();
             }
 
             if (ret == WT_NOTFOUND && t_ret == WT_NOTFOUND)

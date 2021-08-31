@@ -67,7 +67,7 @@ create_table(WT_SESSION *session, COOKIE *cookie)
  *     wait for them to finish.
  */
 int
-start_workers(table_type type)
+start_workers(void)
 {
     struct timeval start, stop;
     WT_SESSION *session;
@@ -85,16 +85,9 @@ start_workers(table_type type)
         (void)log_print_err("conn.open_session", ret, 1);
         goto err;
     }
-    /* Setup the cookies */
-    for (i = 0; i < g.ntables; ++i) {
-        g.cookies[i].id = i;
-        if (type == MIX)
-            g.cookies[i].type = (table_type)((i % MAX_TABLE_TYPE) + 1);
-        else
-            g.cookies[i].type = type;
-        testutil_check(__wt_snprintf(
-          g.cookies[i].uri, sizeof(g.cookies[i].uri), "%s%04d", URI_BASE, g.cookies[i].id));
 
+    /* Create tables */
+    for (i = 0; i < g.ntables; ++i) {
         /* Should probably be atomic to avoid races. */
         if ((ret = create_table(session, &g.cookies[i])) != 0)
             goto err;
@@ -280,29 +273,48 @@ real_worker(void)
                         } else
                             testutil_check(__wt_snprintf(
                               buf, sizeof(buf), "commit_timestamp=%x", g.ts_stable + 1));
-                        if ((ret = session->commit_transaction(session, buf)) != 0) {
-                            __wt_readunlock((WT_SESSION_IMPL *)session, &g.clock_lock);
-                            (void)log_print_err("real_worker:commit_transaction", ret, 1);
-                            goto err;
+
+                        // Commit majority of times
+                        if (next_rnd % 49 != 0) {
+                            if ((ret = session->commit_transaction(session, buf)) != 0) {
+                                __wt_readunlock((WT_SESSION_IMPL *)session, &g.clock_lock);
+                                (void)log_print_err("real_worker:commit_transaction", ret, 1);
+                                goto err;
+                            }
+                        } else {
+                            if ((ret = session->rollback_transaction(session, NULL)) != 0) {
+                                __wt_readunlock((WT_SESSION_IMPL *)session, &g.clock_lock);
+                                (void)log_print_err("real_worker:rollback_transaction", ret, 1);
+                                goto err;
+                            }
                         }
                         __wt_readunlock((WT_SESSION_IMPL *)session, &g.clock_lock);
                         start_txn = true;
-                        /* Occasionally reopen cursors after committing. */
+                        /* Occasionally reopen cursors after transaction finish. */
                         if (next_rnd % 13 == 0) {
                             reopen_cursors = true;
                         }
                     }
                 } else {
-                    if ((ret = session->commit_transaction(session, NULL)) != 0) {
-                        (void)log_print_err("real_worker:commit_transaction", ret, 1);
-                        goto err;
+                    // Commit majority of times
+                    if (next_rnd % 49 != 0) {
+                        if ((ret = session->commit_transaction(session, NULL)) != 0) {
+                            __wt_readunlock((WT_SESSION_IMPL *)session, &g.clock_lock);
+                            (void)log_print_err("real_worker:commit_transaction", ret, 1);
+                            goto err;
+                        }
+                    } else {
+                        if ((ret = session->rollback_transaction(session, NULL)) != 0) {
+                            __wt_readunlock((WT_SESSION_IMPL *)session, &g.clock_lock);
+                            (void)log_print_err("real_worker:rollback_transaction", ret, 1);
+                            goto err;
+                        }
                     }
                     start_txn = true;
                 }
-            } else if (next_rnd % 15 == 0) {
+            } else if (next_rnd % 15 == 0)
                 /* Occasionally reopen cursors during a running transaction. */
                 reopen_cursors = true;
-            }
         } else {
             if ((ret = session->rollback_transaction(session, NULL)) != 0) {
                 (void)log_print_err("real_worker:rollback_transaction", ret, 1);
