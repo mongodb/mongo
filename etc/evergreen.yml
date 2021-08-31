@@ -4986,14 +4986,13 @@ tasks:
       resmoke_args: --storageEngine=wiredTiger
       resmoke_jobs_max: 1
 
-- <<: *task_template
-  name: concurrency
+- <<: *gen_task_template
+  name: concurrency_gen
   tags: ["concurrency", "common"]
   commands:
-  - func: "do setup"
-  - func: "run tests"
+  - func: "generate resmoke tasks"
     vars:
-      resmoke_args: --suites=concurrency --storageEngine=wiredTiger
+      resmoke_args: "--storageEngine=wiredTiger"
       resmoke_jobs_max: 1
 
 - <<: *task_template
@@ -7309,8 +7308,7 @@ buildvariants:
   - name: jsCore_txns
   - name: .logical_session_cache
   - name: parallel_gen
-  # TODO(SERVER-58778): Re-enable concurrency_replication_multi_stmt_txn by removing !.txn
-  - name: .concurrency .common !.kill_terminate !.txn
+  - name: .concurrency .common !.kill_terminate
     distros:
       - rhel80-medium
   - name: concurrency_replication_causal_consistency_gen
@@ -7413,7 +7411,7 @@ buildvariants:
   - name: aggregation_auth
   - name: auth_gen
   - name: .misc_js !.sharded
-  - name: concurrency
+  - name: concurrency_gen
   - name: concurrency_simultaneous_gen
   - name: disk_wiredtiger
   - name: failpoints_auth
@@ -10899,7 +10897,7 @@ buildvariants:
   # SERVER-58597: Re-enable parallel
   - name: .misc_js !.parallel
   # SERVER-50296: Investigate concurrency test failures.
-  # - name: concurrency
+  # - name: concurrency_gen
   # - name: concurrency_replication_gen
   # - name: concurrency_replication_causal_consistency_gen
   # - name: concurrency_simultaneous_gen
