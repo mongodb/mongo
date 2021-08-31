@@ -200,9 +200,7 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
         "cpuFrequencyMHz",
         static_cast<int>((getSysctlByName<NumberVal>("hw.cpufrequency") / (1000 * 1000))));
     bExtra.append("cpuString", getSysctlByName<std::string>("machdep.cpu.brand_string"));
-    bExtra.append("cpuFeatures",
-                  getSysctlByName<std::string>("machdep.cpu.features") + std::string(" ") +
-                      getSysctlByName<std::string>("machdep.cpu.extfeatures"));
+    bExtra.append("cpuFeatures", getSysctlByName<std::string>("machdep.cpu.features"));
     bExtra.append("pageSize", static_cast<int>(getSysctlByName<NumberVal>("hw.pagesize")));
     bExtra.append("scheduler", getSysctlByName<std::string>("kern.sched"));
     _extraStats = bExtra.obj();
