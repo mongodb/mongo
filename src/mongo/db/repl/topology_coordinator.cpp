@@ -2858,7 +2858,17 @@ bool TopologyCoordinator::updateLastCommittedOpTimeAndWallTime() {
 }
 
 bool TopologyCoordinator::advanceLastCommittedOpTimeAndWallTime(OpTimeAndWallTime committedOpTime,
-                                                                bool fromSyncSource) {
+                                                                bool fromSyncSource,
+                                                                bool forInitiate) {
+    if (forInitiate) {
+        // Force update in the replSetInitiate case.
+        LOGV2_INFO(5872100,
+                   "Updating commit point for initiate",
+                   "_lastCommittedOpTimeAndWallTime"_attr = committedOpTime);
+        _lastCommittedOpTimeAndWallTime = committedOpTime;
+        return true;
+    }
+
     if (_selfIndex == -1) {
         // The config hasn't been installed or we are not in the config. This could happen
         // on heartbeats before installing a config.

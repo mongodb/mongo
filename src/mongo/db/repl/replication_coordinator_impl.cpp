@@ -4067,8 +4067,21 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* opCt
         _shouldSetStableTimestamp = true;
         _setStableTimestampForStorage(lk);
     }
-    _finishReplSetInitiate(opCtx, newConfig, myIndex.getValue());
 
+    // In the EMRC=true case, we need to advance the commit point and take a stable checkpoint,
+    // to make sure that we can recover if we happen to roll back our first entries after
+    // replSetInitiate.
+    if (serverGlobalParams.enableMajorityReadConcern) {
+        LOGV2_INFO(5872101, "Taking a stable checkpoint for replSetInitiate");
+        stdx::unique_lock<Latch> lk(_mutex);
+        // Will call _setStableTimestampForStorage() on success.
+        _advanceCommitPoint(
+            lk, lastAppliedOpTimeAndWallTime, false /* fromSyncSource */, true /* forInitiate */);
+        opCtx->recoveryUnit()->waitUntilUnjournaledWritesDurable(opCtx,
+                                                                 /*stableCheckpoint*/ true);
+    }
+
+    _finishReplSetInitiate(opCtx, newConfig, myIndex.getValue());
     // A configuration passed to replSetInitiate() with the current node as an arbiter
     // will fail validation with a "replSet initiate got ... while validating" reason.
     invariant(!newConfig.getMemberAt(myIndex.getValue()).isArbiter());
@@ -5263,9 +5276,12 @@ void ReplicationCoordinatorImpl::advanceCommitPoint(
 }
 
 void ReplicationCoordinatorImpl::_advanceCommitPoint(
-    WithLock lk, const OpTimeAndWallTime& committedOpTimeAndWallTime, bool fromSyncSource) {
-    if (_topCoord->advanceLastCommittedOpTimeAndWallTime(committedOpTimeAndWallTime,
-                                                         fromSyncSource)) {
+    WithLock lk,
+    const OpTimeAndWallTime& committedOpTimeAndWallTime,
+    bool fromSyncSource,
+    bool forInitiate) {
+    if (_topCoord->advanceLastCommittedOpTimeAndWallTime(
+            committedOpTimeAndWallTime, fromSyncSource, forInitiate)) {
         if (_getMemberState_inlock().arbiter()) {
             // Arbiters do not store replicated data, so we consider their data trivially
             // consistent.
