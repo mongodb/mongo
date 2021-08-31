@@ -510,6 +510,13 @@ functions:
       # Python venv is not relocatable and should be placed in /data/mci
       extract_to: ".."
 
+  "add symlinks back to venv": &add_symlinks_back_to_venv
+    command: subprocess.exec
+    params:
+      binary: bash
+      args:
+        - "src/evergreen/functions/venv_symlinks_add_back.sh"
+
   "fetch packages": &fetch_packages
     command: s3.get
     params:
@@ -859,6 +866,7 @@ functions:
   - *kill_processes
   - *cleanup_environment
   - *fetch_venv
+  - *add_symlinks_back_to_venv
   - *fetch_binaries
   - *extract_binaries
   - *check_binary_version
@@ -1098,6 +1106,7 @@ functions:
     - *kill_processes
     - *cleanup_environment
     - *fetch_venv
+    - *add_symlinks_back_to_venv
     - *f_expansions_write
     - *configure_evergreen_api_credentials
 
