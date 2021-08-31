@@ -1131,8 +1131,13 @@ struct __wt_update {
      */
     volatile uint8_t prepare_state; /* prepare state */
 
+/*
+ * WT_UPDATE_DS indicates that an update is being written or has been written to the data store
+ * during a round of reconciliation. This flag could be cleared if the reconciliation fails. It is
+ * not advisable to use this flag outside of reconciliation.
+ */
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WT_UPDATE_DS 0x01u                       /* Update has been written to the data store. */
+#define WT_UPDATE_DS 0x01u                       /* Update is to be written to the data store. */
 #define WT_UPDATE_FIXED_HS 0x02u                 /* Update that fixed the history store. */
 #define WT_UPDATE_HS 0x04u                       /* Update has been written to history store. */
 #define WT_UPDATE_PREPARE_RESTORED_FROM_DS 0x08u /* Prepared update restored from data store. */
@@ -1147,6 +1152,15 @@ struct __wt_update {
      * a C99 flexible array member which has the semantics we want.
      */
     uint8_t data[]; /* start of the data */
+};
+
+/*
+ * WT_UPDATE_CACHE --
+ *  A support structure that allows updates to be stored in queues.
+ */
+struct __wt_update_cache {
+    WT_UPDATE *upd;
+    TAILQ_ENTRY(__wt_update_cache) q;
 };
 
 /*

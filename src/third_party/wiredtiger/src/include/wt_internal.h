@@ -345,6 +345,8 @@ struct __wt_txn_shared;
 typedef struct __wt_txn_shared WT_TXN_SHARED;
 struct __wt_update;
 typedef struct __wt_update WT_UPDATE;
+struct __wt_update_cache;
+typedef struct __wt_update_cache WT_UPDATE_CACHE;
 struct __wt_update_value;
 typedef struct __wt_update_value WT_UPDATE_VALUE;
 struct __wt_update_vector;
