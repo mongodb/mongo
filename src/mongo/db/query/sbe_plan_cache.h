@@ -99,5 +99,15 @@ struct CachedSbePlan {
 
 using PlanCache = PlanCacheBase<sbe::PlanCacheKey, CachedSbePlan, sbe::PlanCacheKeyHasher>;
 
+/**
+ * A helper method to get the global SBE plan cache decorated in 'serviceCtx'.
+ */
+PlanCache& getPlanCache(ServiceContext* serviceCtx);
+
+/**
+ * A wrapper for the helper above. 'opCtx' cannot be null.
+ */
+PlanCache& getPlanCache(OperationContext* opCtx);
+
 }  // namespace sbe
 }  // namespace mongo

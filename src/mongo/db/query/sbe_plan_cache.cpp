@@ -29,8 +29,38 @@
 
 #include "mongo/db/query/sbe_plan_cache.h"
 
+#include "mongo/db/server_options.h"
+
 namespace mongo {
 namespace sbe {
+namespace {
+const auto sbePlanCacheDecoration =
+    ServiceContext::declareDecoration<std::unique_ptr<sbe::PlanCache>>();
+
+ServiceContext::ConstructorActionRegisterer planCacheRegisterer{
+    "PlanCacheRegisterer", [](ServiceContext* serviceCtx) {
+        if (feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
+            auto& globalPlanCache = sbePlanCacheDecoration(serviceCtx);
+            globalPlanCache = std::make_unique<sbe::PlanCache>();
+        }
+    }};
+
+}  // namespace
+
+sbe::PlanCache& getPlanCache(ServiceContext* serviceCtx) {
+    uassert(5933402,
+            "Cannot getPlanCache() if gFeatureFlagSbePlanCache is disabled",
+            feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV());
+    return *sbePlanCacheDecoration(serviceCtx);
+}
+
+sbe::PlanCache& getPlanCache(OperationContext* opCtx) {
+    uassert(5933401,
+            "Cannot getPlanCache() if gFeatureFlagSbePlanCache is disabled",
+            feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV());
+    tassert(5933400, "Cannot get the global SBE plan cache by a nullptr", opCtx);
+    return getPlanCache(opCtx->getServiceContext());
+}
 
 uint32_t PlanCacheKey::queryHash() const {
     return static_cast<uint32_t>(PlanCacheKeyHasher{}(*this));
