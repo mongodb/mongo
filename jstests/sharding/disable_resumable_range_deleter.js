@@ -105,8 +105,7 @@ if (jsTestOptions().useRandomBinVersionsWithinReplicaSet || jsTestOptions().shar
         remember: true,
         appendOptions: true,
         startClean: false,
-        setParameter:
-            {rangeDeleterBatchDelayMS: 60000, receiveChunkWaitForRangeDeleterTimeoutMS: 500}
+        setParameter: {rangeDeleterBatchDelayMS: 60000}
     });
 
     st.rs1.restart(0, {
@@ -115,6 +114,9 @@ if (jsTestOptions().useRandomBinVersionsWithinReplicaSet || jsTestOptions().shar
         startClean: false,
         setParameter: {disableResumableRangeDeleter: false}
     });
+
+    st.rs0.getPrimary().adminCommand(
+        {setParameter: 1, receiveChunkWaitForRangeDeleterTimeoutMS: 500});
 
     let bulkOp = st.s.getCollection(ns).initializeUnorderedBulkOp();
 

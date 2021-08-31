@@ -48,4 +48,6 @@ executor:
           keyFile: *keyFile
           keyFileData: *keyFileData
           roleGraphInvalidationIsFatal: true
+          setParameters:
+            receiveChunkWaitForRangeDeleterTimeoutMS: 90000
       nodb: ''
