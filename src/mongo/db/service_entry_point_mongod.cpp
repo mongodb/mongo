@@ -216,7 +216,7 @@ public:
                 // TODO: SERVER-58743: Remove following 'if' block.
                 if (auto& fcv = serverGlobalParams.featureCompatibility;
                     !fcv.isVersionInitialized() ||
-                    fcv.isLessThan(FeatureCompatibilityParams::Version::kVersion51)) {
+                    fcv.isLessThan(multiversion::FeatureCompatibilityVersion::kVersion_5_1)) {
                     // For commands from mongos, append some info to help getLastError(w) work.
                     rpc::ShardingMetadata(lastOpTimeFromClient, replCoord->getElectionId())
                         .writeToMetadata(metadataBob)

@@ -115,7 +115,7 @@ void validateDollarPrefixElement(mutablebson::ConstElement elem) {
         const auto replaceWithHint =
             serverGlobalParams.featureCompatibility.isVersionInitialized() &&
                 serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
-                    FeatureCompatibilityParams::Version::kFullyDowngradedTo50)
+                    multiversion::FeatureCompatibilityVersion::kFullyDowngradedTo_5_0)
             ? "' is not allowed in the context of an update's replacement document. Consider using "
               "an aggregation pipeline with $replaceWith."
             : "' is not valid for storage.";
@@ -140,7 +140,7 @@ Status storageValidIdField(const mongo::BSONElement& element) {
             if (!status.isOK() && status.code() == ErrorCodes::DollarPrefixedFieldName &&
                 serverGlobalParams.featureCompatibility.isVersionInitialized() &&
                 serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
-                    FeatureCompatibilityParams::Version::kFullyDowngradedTo50)) {
+                    multiversion::FeatureCompatibilityVersion::kFullyDowngradedTo_5_0)) {
                 return Status(status.code(),
                               str::stream() << "_id fields may not contain '$'-prefixed fields: "
                                             << status.reason());
@@ -203,7 +203,7 @@ void storageValid(mutablebson::ConstElement elem,
     const bool dotsAndDollarsFeatureEnabled =
         serverGlobalParams.featureCompatibility.isVersionInitialized() &&
         serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
-            FeatureCompatibilityParams::Version::kFullyDowngradedTo50);
+            multiversion::FeatureCompatibilityVersion::kFullyDowngradedTo_5_0);
     const bool checkFields = !dotsAndDollarsFeatureEnabled || checkTopLevelFields;
 
     auto fieldName = elem.getFieldName();

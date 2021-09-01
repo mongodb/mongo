@@ -52,16 +52,14 @@ namespace mongo {
 MONGO_FAIL_POINT_DEFINE(pauseBeforeCloseCxns);
 MONGO_FAIL_POINT_DEFINE(finishedDropConnections);
 
-using FeatureCompatibilityParams = ServerGlobalParams::FeatureCompatibility;
-
 void FcvOpObserver::_setVersion(OperationContext* opCtx,
-                                ServerGlobalParams::FeatureCompatibility::Version newVersion,
+                                multiversion::FeatureCompatibilityVersion newVersion,
                                 boost::optional<Timestamp> commitTs) {
     // We set the last FCV update timestamp before setting the new FCV, to make sure we never
     // read an FCV that is not stable.  We might still read a stale one.
     if (commitTs)
         FeatureCompatibilityVersion::advanceLastFCVUpdateTimestamp(*commitTs);
-    boost::optional<FeatureCompatibilityParams::Version> prevVersion;
+    boost::optional<multiversion::FeatureCompatibilityVersion> prevVersion;
 
     if (serverGlobalParams.featureCompatibility.isVersionInitialized()) {
         prevVersion = serverGlobalParams.featureCompatibility.getVersion();
@@ -71,7 +69,7 @@ void FcvOpObserver::_setVersion(OperationContext* opCtx,
 
     // (Generic FCV reference): This FCV check should exist across LTS binary versions.
     if (serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
-            FeatureCompatibilityParams::kLatest) ||
+            multiversion::GenericFCV::kLatest) ||
         serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading()) {
         // minWireVersion == maxWireVersion on kLatest FCV or upgrading/downgrading FCV.
         // Close all incoming connections from internal clients with binary versions lower than
@@ -110,13 +108,12 @@ void FcvOpObserver::_setVersion(OperationContext* opCtx,
     // 1. Setting featureCompatibilityVersion from downgrading to fullyDowngraded.
     // 2. Setting featureCompatibilityVersion from fullyDowngraded to upgrading.
     // (Generic FCV reference): This FCV check should exist across LTS binary versions.
-    const auto shouldIncrementTopologyVersion =
-        newVersion == FeatureCompatibilityParams::kLastLTS ||
+    const auto shouldIncrementTopologyVersion = newVersion == multiversion::GenericFCV::kLastLTS ||
         (prevVersion &&
-         prevVersion.get() == FeatureCompatibilityParams::kDowngradingFromLatestToLastContinuous) ||
-        newVersion == FeatureCompatibilityParams::kUpgradingFromLastLTSToLatest ||
-        newVersion == FeatureCompatibilityParams::kUpgradingFromLastContinuousToLatest ||
-        newVersion == FeatureCompatibilityParams::kUpgradingFromLastLTSToLastContinuous;
+         prevVersion.get() == multiversion::GenericFCV::kDowngradingFromLatestToLastContinuous) ||
+        newVersion == multiversion::GenericFCV::kUpgradingFromLastLTSToLatest ||
+        newVersion == multiversion::GenericFCV::kUpgradingFromLastContinuousToLatest ||
+        newVersion == multiversion::GenericFCV::kUpgradingFromLastLTSToLastContinuous;
 
     if (isReplSet && shouldIncrementTopologyVersion) {
         replCoordinator->incrementTopologyVersion();
@@ -126,7 +123,7 @@ void FcvOpObserver::_setVersion(OperationContext* opCtx,
 void FcvOpObserver::_onInsertOrUpdate(OperationContext* opCtx, const BSONObj& doc) {
     auto idElement = doc["_id"];
     if (idElement.type() != BSONType::String ||
-        idElement.String() != FeatureCompatibilityVersionParser::kParameterName) {
+        idElement.String() != multiversion::kParameterName) {
         return;
     }
     auto newVersion = uassertStatusOK(FeatureCompatibilityVersionParser::parse(doc));
@@ -137,12 +134,12 @@ void FcvOpObserver::_onInsertOrUpdate(OperationContext* opCtx, const BSONObj& do
     bool isDifferent = true;
     if (serverGlobalParams.featureCompatibility.isVersionInitialized()) {
         const auto currentVersion = serverGlobalParams.featureCompatibility.getVersion();
-        attrs.add("currentVersion", FeatureCompatibilityVersionParser::toString(currentVersion));
+        attrs.add("currentVersion", multiversion::toString(currentVersion));
         isDifferent = currentVersion != newVersion;
     }
 
     if (isDifferent) {
-        attrs.add("newVersion", FeatureCompatibilityVersionParser::toString(newVersion));
+        attrs.add("newVersion", multiversion::toString(newVersion));
         LOGV2(20459, "Setting featureCompatibilityVersion", attrs);
     }
 
@@ -183,8 +180,7 @@ void FcvOpObserver::onDelete(OperationContext* opCtx,
     invariant(optDocKey, nss.ns());
     if (nss.isServerConfigurationCollection()) {
         auto id = optDocKey.get().getId().firstElement();
-        if (id.type() == BSONType::String &&
-            id.String() == FeatureCompatibilityVersionParser::kParameterName) {
+        if (id.type() == BSONType::String && id.String() == multiversion::kParameterName) {
             uasserted(40670, "removing FeatureCompatibilityVersion document is not allowed");
         }
     }
@@ -193,7 +189,7 @@ void FcvOpObserver::onDelete(OperationContext* opCtx,
 void FcvOpObserver::onReplicationRollback(OperationContext* opCtx,
                                           const RollbackObserverInfo& rbInfo) {
     // Ensures the in-memory and on-disk FCV states are consistent after a rollback.
-    const auto query = BSON("_id" << FeatureCompatibilityVersionParser::kParameterName);
+    const auto query = BSON("_id" << multiversion::kParameterName);
     const auto swFcv = repl::StorageInterface::get(opCtx)->findById(
         opCtx, NamespaceString::kServerConfigurationNamespace, query["_id"]);
     if (swFcv.isOK()) {
@@ -204,8 +200,8 @@ void FcvOpObserver::onReplicationRollback(OperationContext* opCtx,
             auto diskFcv = swVersion.getValue();
             LOGV2(4675801,
                   "Setting featureCompatibilityVersion as part of rollback",
-                  "newVersion"_attr = FeatureCompatibilityVersionParser::toString(diskFcv),
-                  "oldVersion"_attr = FeatureCompatibilityVersionParser::toString(memoryFcv));
+                  "newVersion"_attr = multiversion::toString(diskFcv),
+                  "oldVersion"_attr = multiversion::toString(memoryFcv));
             _setVersion(opCtx, diskFcv);
             // The rollback FCV is already in the stable snapshot.
             FeatureCompatibilityVersion::clearLastFCVUpdateTimestamp();

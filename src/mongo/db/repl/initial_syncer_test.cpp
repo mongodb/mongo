@@ -74,6 +74,7 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
+#include "mongo/util/version/releases.h"
 
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/barrier.h"
@@ -666,14 +667,14 @@ void assertFCVRequest(RemoteCommandRequest request) {
         << request.toString();
     ASSERT_EQUALS(NamespaceString::kServerConfigurationNamespace.coll(),
                   request.cmdObj.getStringField("find"));
-    ASSERT_BSONOBJ_EQ(BSON("_id" << FeatureCompatibilityVersionParser::kParameterName),
+    ASSERT_BSONOBJ_EQ(BSON("_id" << multiversion::kParameterName),
                       request.cmdObj.getObjectField("filter"));
 }
 
 void InitialSyncerTest::processSuccessfulFCVFetcherResponseLastLTS() {
     FeatureCompatibilityVersionDocument fcvDoc;
     // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
-    fcvDoc.setVersion(ServerGlobalParams::FeatureCompatibility::kLastLTS);
+    fcvDoc.setVersion(multiversion::GenericFCV::kLastLTS);
     processSuccessfulFCVFetcherResponse({fcvDoc.toBSON()});
 }
 
@@ -1925,7 +1926,7 @@ TEST_F(InitialSyncerTest,
        InitialSyncerReturnsTooManyMatchingDocumentsWhenFCVFetcherReturnsMultipleDocuments) {
     FeatureCompatibilityVersionDocument fcvDoc;
     // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
-    fcvDoc.setVersion(ServerGlobalParams::FeatureCompatibility::kLastLTS);
+    fcvDoc.setVersion(multiversion::GenericFCV::kLastLTS);
     auto docs = {fcvDoc.toBSON(),
                  BSON("_id"
                       << "other")};
@@ -1936,8 +1937,8 @@ TEST_F(InitialSyncerTest,
        InitialSyncerReturnsIncompatibleServerVersionWhenFCVFetcherReturnsUpgradeTargetVersion) {
     FeatureCompatibilityVersionDocument fcvDoc;
     // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
-    fcvDoc.setVersion(ServerGlobalParams::FeatureCompatibility::kLastLTS);
-    fcvDoc.setTargetVersion(ServerGlobalParams::FeatureCompatibility::kLatest);
+    fcvDoc.setVersion(multiversion::GenericFCV::kLastLTS);
+    fcvDoc.setTargetVersion(multiversion::GenericFCV::kLatest);
     runInitialSyncWithBadFCVResponse({fcvDoc.toBSON()}, ErrorCodes::IncompatibleServerVersion);
 }
 
@@ -1945,15 +1946,16 @@ TEST_F(InitialSyncerTest,
        InitialSyncerReturnsIncompatibleServerVersionWhenFCVFetcherReturnsDowngradeTargetVersion) {
     FeatureCompatibilityVersionDocument fcvDoc;
     // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
-    fcvDoc.setVersion(ServerGlobalParams::FeatureCompatibility::kLastLTS);
-    fcvDoc.setTargetVersion(ServerGlobalParams::FeatureCompatibility::kLastLTS);
-    fcvDoc.setPreviousVersion(ServerGlobalParams::FeatureCompatibility::kLatest);
+    fcvDoc.setVersion(multiversion::GenericFCV::kLastLTS);
+    fcvDoc.setTargetVersion(multiversion::GenericFCV::kLastLTS);
+    fcvDoc.setPreviousVersion(multiversion::GenericFCV::kLatest);
     runInitialSyncWithBadFCVResponse({fcvDoc.toBSON()}, ErrorCodes::IncompatibleServerVersion);
 }
 
 TEST_F(InitialSyncerTest, InitialSyncerReturnsParseErrorWhenFCVFetcherReturnsNoVersion) {
-    auto docs = {BSON("_id" << FeatureCompatibilityVersionParser::kParameterName << "targetVersion"
-                            << FeatureCompatibilityVersionParser::kLatest)};
+    // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
+    auto docs = {BSON("_id" << multiversion::kParameterName << "targetVersion"
+                            << multiversion::toString(multiversion::GenericFCV::kLatest))};
     runInitialSyncWithBadFCVResponse(docs, ((ErrorCodes::Error)40414));
 }
 
@@ -1986,7 +1988,7 @@ TEST_F(InitialSyncerTest, InitialSyncerSucceedsWhenFCVFetcherReturnsOldVersion) 
 
         FeatureCompatibilityVersionDocument fcvDoc;
         // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
-        fcvDoc.setVersion(ServerGlobalParams::FeatureCompatibility::kLastLTS);
+        fcvDoc.setVersion(multiversion::GenericFCV::kLastLTS);
         processSuccessfulFCVFetcherResponse({fcvDoc.toBSON()});
     }
 
@@ -2024,7 +2026,7 @@ TEST_F(
     // This is what we want to test.
     // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
     FeatureCompatibilityVersionDocument fcvDoc;
-    fcvDoc.setVersion(ServerGlobalParams::FeatureCompatibility::kLastLTS);
+    fcvDoc.setVersion(multiversion::GenericFCV::kLastLTS);
     _mock
         ->expect([](auto& request) { return request["find"].str() == "system.version"; },
                  makeCursorResponse(

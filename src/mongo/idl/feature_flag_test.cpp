@@ -84,20 +84,19 @@ TEST(IDLFeatureFlag, Basic) {
     ASSERT(feature_flags::gFeatureFlagToaster.isEnabledAndIgnoreFCV() == true);
     ASSERT_NOT_OK(featureFlagToaster->setFromString("alpha"));
 
-    ASSERT(feature_flags::gFeatureFlagToaster.getVersion() ==
-           ServerGlobalParams::FeatureCompatibility::Version::kVersion51);
+    // (Generic FCV reference): feature flag test
+    ASSERT(feature_flags::gFeatureFlagToaster.getVersion() == multiversion::GenericFCV::kLatest);
 }
 
 // Verify getVersion works correctly when enabled and not enabled
 TEST_F(FeatureFlagTest, Version) {
-    ASSERT(feature_flags::gFeatureFlagBlender.getVersion() ==
-           ServerGlobalParams::FeatureCompatibility::Version::kVersion51);
+    // (Generic FCV reference): feature flag test
+    ASSERT(feature_flags::gFeatureFlagBlender.getVersion() == multiversion::GenericFCV::kLatest);
 
     // NOTE: if you are hitting this assertion, the version in feature_flag_test.idl may need to be
     // changed to match the current kLastLTS
     // (Generic FCV reference): feature flag test
-    ASSERT(feature_flags::gFeatureFlagSpoon.getVersion() ==
-           ServerGlobalParams::FeatureCompatibility::kLastLTS);
+    ASSERT(feature_flags::gFeatureFlagSpoon.getVersion() == multiversion::GenericFCV::kLastLTS);
 
     ASSERT_OK(_featureFlagBlender->setFromString("false"));
     ASSERT(feature_flags::gFeatureFlagBlender.isEnabledAndIgnoreFCV() == false);
@@ -137,8 +136,8 @@ TEST_F(FeatureFlagTest, ServerStatus) {
 TEST_F(FeatureFlagTest, IsEnabledTrue) {
     // Test FCV checks with enabled flag
     // Test newest version
-    serverGlobalParams.mutableFeatureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::Version::kVersion51);
+    // (Generic FCV reference): feature flag test
+    serverGlobalParams.mutableFeatureCompatibility.setVersion(multiversion::GenericFCV::kLatest);
 
     ASSERT_TRUE(
         feature_flags::gFeatureFlagBlender.isEnabled(serverGlobalParams.featureCompatibility));
@@ -147,8 +146,7 @@ TEST_F(FeatureFlagTest, IsEnabledTrue) {
 
     // Test oldest version
     // (Generic FCV reference): feature flag test
-    serverGlobalParams.mutableFeatureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::kLastLTS);
+    serverGlobalParams.mutableFeatureCompatibility.setVersion(multiversion::GenericFCV::kLastLTS);
 
     ASSERT_FALSE(
         feature_flags::gFeatureFlagBlender.isEnabled(serverGlobalParams.featureCompatibility));
@@ -163,8 +161,8 @@ TEST_F(FeatureFlagTest, IsEnabledFalse) {
     ASSERT_OK(_featureFlagBlender->setFromString("false"));
     ASSERT_OK(_featureFlagSpoon->setFromString("false"));
 
-    serverGlobalParams.mutableFeatureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::Version::kVersion51);
+    // (Generic FCV reference): feature flag test
+    serverGlobalParams.mutableFeatureCompatibility.setVersion(multiversion::GenericFCV::kLatest);
 
     ASSERT_FALSE(
         feature_flags::gFeatureFlagBlender.isEnabled(serverGlobalParams.featureCompatibility));
@@ -173,8 +171,7 @@ TEST_F(FeatureFlagTest, IsEnabledFalse) {
 
     // Test oldest version
     // (Generic FCV reference): feature flag test
-    serverGlobalParams.mutableFeatureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::kLastLTS);
+    serverGlobalParams.mutableFeatureCompatibility.setVersion(multiversion::GenericFCV::kLastLTS);
 
     ASSERT_FALSE(
         feature_flags::gFeatureFlagBlender.isEnabled(serverGlobalParams.featureCompatibility));

@@ -199,7 +199,7 @@ public:
     Validator parseValidator(OperationContext* opCtx,
                              const BSONObj& validator,
                              MatchExpressionParser::AllowedFeatureSet allowedFeatures,
-                             boost::optional<ServerGlobalParams::FeatureCompatibility::Version>
+                             boost::optional<multiversion::FeatureCompatibilityVersion>
                                  maxFeatureCompatibilityVersion) const {
         std::abort();
     }

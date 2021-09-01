@@ -59,6 +59,7 @@
 #include "mongo/util/signal_handlers_synchronous.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/timer.h"
+#include "mongo/util/version/releases.h"
 
 namespace mongo::unittest {
 namespace {
@@ -156,8 +157,7 @@ namespace {
 // with a meaningful value will trigger failures as of SERVER-32630.
 // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
 void setUpFCV() {
-    serverGlobalParams.mutableFeatureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::kLatest);
+    serverGlobalParams.mutableFeatureCompatibility.setVersion(multiversion::GenericFCV::kLatest);
 }
 void tearDownFCV() {
     serverGlobalParams.mutableFeatureCompatibility.reset();

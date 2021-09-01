@@ -1153,7 +1153,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
         requestNss == NamespaceString::kServerConfigurationNamespace) {
         std::string oID;
         auto status = bsonExtractStringField(o, "_id", &oID);
-        if (status.isOK() && oID == FeatureCompatibilityVersionParser::kParameterName) {
+        if (status.isOK() && oID == multiversion::kParameterName) {
             return Status(ErrorCodes::OplogOperationUnsupported,
                           str::stream() << "Applying operation on feature compatibility version "
                                            "document not supported in initial sync: "

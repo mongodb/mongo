@@ -485,12 +485,11 @@ public:
     /**
      * Returns a non-ok Status if validator is not legal for this collection.
      */
-    virtual Validator parseValidator(
-        OperationContext* opCtx,
-        const BSONObj& validator,
-        MatchExpressionParser::AllowedFeatureSet allowedFeatures,
-        boost::optional<ServerGlobalParams::FeatureCompatibility::Version>
-            maxFeatureCompatibilityVersion) const = 0;
+    virtual Validator parseValidator(OperationContext* opCtx,
+                                     const BSONObj& validator,
+                                     MatchExpressionParser::AllowedFeatureSet allowedFeatures,
+                                     boost::optional<multiversion::FeatureCompatibilityVersion>
+                                         maxFeatureCompatibilityVersion) const = 0;
 
     /**
      * Sets the validator for this collection.

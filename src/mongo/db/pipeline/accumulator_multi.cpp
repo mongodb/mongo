@@ -28,47 +28,45 @@
  */
 
 #include "mongo/db/pipeline/accumulator_multi.h"
+#include "mongo/util/version/releases.h"
 
 namespace mongo {
 using FirstLastSense = AccumulatorFirstLastN::Sense;
 using MinMaxSense = AccumulatorMinMax::Sense;
 
-REGISTER_ACCUMULATOR_WITH_MIN_VERSION(
-    maxN,
-    AccumulatorMinMaxN::parseMinMaxN<MinMaxSense::kMax>,
-    ServerGlobalParams::FeatureCompatibility::Version::kVersion51);
-REGISTER_ACCUMULATOR_WITH_MIN_VERSION(
-    minN,
-    AccumulatorMinMaxN::parseMinMaxN<MinMaxSense::kMin>,
-    ServerGlobalParams::FeatureCompatibility::Version::kVersion51);
+REGISTER_ACCUMULATOR_WITH_MIN_VERSION(maxN,
+                                      AccumulatorMinMaxN::parseMinMaxN<MinMaxSense::kMax>,
+                                      multiversion::FeatureCompatibilityVersion::kVersion_5_1);
+REGISTER_ACCUMULATOR_WITH_MIN_VERSION(minN,
+                                      AccumulatorMinMaxN::parseMinMaxN<MinMaxSense::kMin>,
+                                      multiversion::FeatureCompatibilityVersion::kVersion_5_1);
 REGISTER_EXPRESSION_WITH_MIN_VERSION(maxN,
                                      AccumulatorMinMaxN::parseExpression<MinMaxSense::kMax>,
                                      AllowedWithApiStrict::kNeverInVersion1,
                                      AllowedWithClientType::kAny,
-                                     ServerGlobalParams::FeatureCompatibility::Version::kVersion51);
+                                     multiversion::FeatureCompatibilityVersion::kVersion_5_1);
 REGISTER_EXPRESSION_WITH_MIN_VERSION(minN,
                                      AccumulatorMinMaxN::parseExpression<MinMaxSense::kMin>,
                                      AllowedWithApiStrict::kNeverInVersion1,
                                      AllowedWithClientType::kAny,
-                                     ServerGlobalParams::FeatureCompatibility::Version::kVersion51);
+                                     multiversion::FeatureCompatibilityVersion::kVersion_5_1);
 REGISTER_ACCUMULATOR_WITH_MIN_VERSION(
     firstN,
     AccumulatorFirstLastN::parseFirstLastN<FirstLastSense::kFirst>,
-    ServerGlobalParams::FeatureCompatibility::Version::kVersion51);
-REGISTER_ACCUMULATOR_WITH_MIN_VERSION(
-    lastN,
-    AccumulatorFirstLastN::parseFirstLastN<FirstLastSense::kLast>,
-    ServerGlobalParams::FeatureCompatibility::Version::kVersion51);
+    multiversion::FeatureCompatibilityVersion::kVersion_5_1);
+REGISTER_ACCUMULATOR_WITH_MIN_VERSION(lastN,
+                                      AccumulatorFirstLastN::parseFirstLastN<FirstLastSense::kLast>,
+                                      multiversion::FeatureCompatibilityVersion::kVersion_5_1);
 REGISTER_EXPRESSION_WITH_MIN_VERSION(firstN,
                                      AccumulatorFirstLastN::parseExpression<FirstLastSense::kFirst>,
                                      AllowedWithApiStrict::kNeverInVersion1,
                                      AllowedWithClientType::kAny,
-                                     ServerGlobalParams::FeatureCompatibility::Version::kVersion51);
+                                     multiversion::FeatureCompatibilityVersion::kVersion_5_1);
 REGISTER_EXPRESSION_WITH_MIN_VERSION(lastN,
                                      AccumulatorFirstLastN::parseExpression<FirstLastSense::kLast>,
                                      AllowedWithApiStrict::kNeverInVersion1,
                                      AllowedWithClientType::kAny,
-                                     ServerGlobalParams::FeatureCompatibility::Version::kVersion51);
+                                     multiversion::FeatureCompatibilityVersion::kVersion_5_1);
 // TODO SERVER-57884 Add $firstN/$lastN as window functions.
 
 AccumulatorN::AccumulatorN(ExpressionContext* const expCtx)

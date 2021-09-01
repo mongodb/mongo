@@ -103,9 +103,8 @@ auto idlPreparsedValue(stdx::type_identity<T>) {
  * TODO(SERVER-50101): Remove 'FeatureCompatibility::Version' once IDL supports
  * a command cpp_type of C++ enum.
  */
-inline auto idlPreparsedValue(
-    stdx::type_identity<ServerGlobalParams::FeatureCompatibility::Version>) {
-    return ServerGlobalParams::FeatureCompatibility::Version::kUnsetDefault50Behavior;
+inline auto idlPreparsedValue(stdx::type_identity<multiversion::FeatureCompatibilityVersion>) {
+    return multiversion::FeatureCompatibilityVersion::kUnsetDefaultLastLTSBehavior;
 }
 
 }  // namespace preparsed_value_adl_barrier

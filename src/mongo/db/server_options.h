@@ -36,6 +36,7 @@
 #include "mongo/platform/process_id.h"
 #include "mongo/stdx/variant.h"
 #include "mongo/util/net/cidr.h"
+#include "mongo/util/version/releases.h"
 
 namespace mongo {
 
@@ -139,6 +140,8 @@ struct ServerGlobalParams {
     static constexpr bool kIsLTSBinaryVersion = false;
 
     struct FeatureCompatibility {
+        using FCV = multiversion::FeatureCompatibilityVersion;
+
         /**
          * The combination of the fields (version, targetVersion, previousVersion) in the
          * featureCompatibilityVersion document in the server configuration collection
@@ -175,89 +178,50 @@ struct ServerGlobalParams {
          *                        will return the default (kUnsetDefault{LTS}Behavior).
          *
          */
-        enum class Version {
-            // The order of these enums matter: sort by (version, targetVersion, previousVersion).
-            kInvalid,
-            kVersion44,              // To be removed once old feature flags are deleted
-            kVersion47,              // To be removed once old feature flags are deleted
-            kVersion48,              // To be removed once old feature flags are deleted
-            kVersion49,              // To be removed once old feature flags are deleted
-            kFullyDowngradedTo44,    // To be removed once old feature flags are deleted
-            kDowngradingFrom50To49,  // To be removed once old feature flags are deleted
-            kDowngradingFrom50To44,  // To be removed once old feature flags are deleted
-            kUpgradingFrom44To50,    // To be removed once old feature flags are deleted
-            kUpgradingFrom44To47,    // To be removed once old feature flags are deleted
-            kUpgradingFrom49To50,    // To be removed once old feature flags are deleted
-            kUnsetDefault50Behavior,
-            kFullyDowngradedTo50,    // { version: 5.0 }
-            kDowngradingFrom51To50,  // { version: 5.0, targetVersion: 5.0, previousVersion: 5.1 }
-            kUpgradingFrom50To51,    // { version: 5.0, targetVersion: 5.1 }
-            kVersion51,              // { version: 5.1 }
-        };
-
-        // These constants should only be used for generic FCV references. Generic references are
-        // FCV references that are expected to exist across LTS binary versions.
-        static constexpr Version kLatest = Version::kVersion51;
-        static constexpr Version kLastContinuous = Version::kFullyDowngradedTo50;
-        static constexpr Version kLastLTS = Version::kFullyDowngradedTo50;
-
-        // These constants should only be used for generic FCV references. Generic references are
-        // FCV references that are expected to exist across LTS binary versions.
-        // NOTE: DO NOT USE THEM FOR REGULAR FCV CHECKS.
-        static constexpr Version kUpgradingFromLastLTSToLatest = Version::kUpgradingFrom50To51;
-        static constexpr Version kUpgradingFromLastContinuousToLatest =
-            Version::kUpgradingFrom50To51;
-        static constexpr Version kDowngradingFromLatestToLastLTS = Version::kDowngradingFrom51To50;
-        static constexpr Version kDowngradingFromLatestToLastContinuous =
-            Version::kDowngradingFrom51To50;
-        // kUpgradingFromLastLTSToLastContinuous is only ever set to a valid FCV when
-        // kLastLTS and kLastContinuous are not equal. Otherwise, this value should be set to
-        // kInvalid.
-        static constexpr Version kUpgradingFromLastLTSToLastContinuous = Version::kInvalid;
 
         /**
          * On startup, the featureCompatibilityVersion may not have been explicitly set yet. This
          * exposes the actual state of the featureCompatibilityVersion if it is uninitialized.
          */
         const bool isVersionInitialized() const {
-            return _version.load() != Version::kUnsetDefault50Behavior;
+            return _version.load() != FCV::kUnsetDefaultLastLTSBehavior;
         }
 
         /**
          * This safe getter for the featureCompatibilityVersion parameter ensures the parameter has
          * been initialized with a meaningful value.
          */
-        const Version getVersion() const {
+        const FCV getVersion() const {
             invariant(isVersionInitialized());
             return _version.load();
         }
 
-        bool isLessThanOrEqualTo(Version version, Version* versionReturn = nullptr) const {
-            Version currentVersion = getVersion();
+        bool isLessThanOrEqualTo(FCV version, FCV* versionReturn = nullptr) const {
+            auto currentVersion = getVersion();
             if (versionReturn != nullptr) {
                 *versionReturn = currentVersion;
             }
             return currentVersion <= version;
         }
 
-        bool isGreaterThanOrEqualTo(Version version, Version* versionReturn = nullptr) const {
-            Version currentVersion = getVersion();
+        bool isGreaterThanOrEqualTo(FCV version, FCV* versionReturn = nullptr) const {
+            auto currentVersion = getVersion();
             if (versionReturn != nullptr) {
                 *versionReturn = currentVersion;
             }
             return currentVersion >= version;
         }
 
-        bool isLessThan(Version version, Version* versionReturn = nullptr) const {
-            Version currentVersion = getVersion();
+        bool isLessThan(FCV version, FCV* versionReturn = nullptr) const {
+            auto currentVersion = getVersion();
             if (versionReturn != nullptr) {
                 *versionReturn = currentVersion;
             }
             return currentVersion < version;
         }
 
-        bool isGreaterThan(Version version, Version* versionReturn = nullptr) const {
-            Version currentVersion = getVersion();
+        bool isGreaterThan(FCV version, FCV* versionReturn = nullptr) const {
+            auto currentVersion = getVersion();
             if (versionReturn != nullptr) {
                 *versionReturn = currentVersion;
             }
@@ -265,23 +229,27 @@ struct ServerGlobalParams {
         }
 
         // This function is to be used for generic FCV references only, and not for FCV-gating.
-        bool isUpgradingOrDowngrading(boost::optional<Version> version = boost::none) const {
+        bool isUpgradingOrDowngrading(boost::optional<FCV> version = boost::none) const {
             if (version == boost::none) {
                 version = getVersion();
             }
-            return version != kLatest && version != kLastContinuous && version != kLastLTS;
+
+            // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
+            return version != multiversion::GenericFCV::kLatest &&
+                version != multiversion::GenericFCV::kLastContinuous &&
+                version != multiversion::GenericFCV::kLastLTS;
         }
 
         void reset() {
-            _version.store(Version::kUnsetDefault50Behavior);
+            _version.store(FCV::kUnsetDefaultLastLTSBehavior);
         }
 
-        void setVersion(Version version) {
+        void setVersion(FCV version) {
             return _version.store(version);
         }
 
     private:
-        AtomicWord<Version> _version{Version::kUnsetDefault50Behavior};
+        AtomicWord<FCV> _version{FCV::kUnsetDefaultLastLTSBehavior};
 
     } mutableFeatureCompatibility;
 

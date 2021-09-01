@@ -39,9 +39,9 @@ using namespace fmt::literals;
 
 const std::string kCompatibilityLink =
     "https://docs.mongodb.com/master/release-notes/{}-compatibility/#feature-compatibility"_format(
-        FeatureCompatibilityVersionParser::kLastLTS);
+        multiversion::toString(multiversion::GenericFCV::kLastLTS));
 const std::string kUpgradeLink =
     "https://docs.mongodb.com/master/release-notes/{}/#upgrade-procedures"_format(
-        FeatureCompatibilityVersionParser::kLastLTS);
+        multiversion::toString(multiversion::GenericFCV::kLastLTS));
 }  // namespace feature_compatibility_version_documentation
 }  // namespace mongo

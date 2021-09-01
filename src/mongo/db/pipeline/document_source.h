@@ -409,7 +409,7 @@ public:
     static void registerParser(
         std::string name,
         Parser parser,
-        boost::optional<ServerGlobalParams::FeatureCompatibility::Version> requiredMinVersion);
+        boost::optional<multiversion::FeatureCompatibilityVersion> requiredMinVersion);
     /**
      * Convenience wrapper for the common case, when DocumentSource::Parser returns a list of one
      * DocumentSource.
@@ -420,7 +420,7 @@ public:
     static void registerParser(
         std::string name,
         SimpleParser simpleParser,
-        boost::optional<ServerGlobalParams::FeatureCompatibility::Version> requiredMinVersion);
+        boost::optional<multiversion::FeatureCompatibilityVersion> requiredMinVersion);
 
     /**
      * Returns true if the DocumentSource has a query.

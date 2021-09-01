@@ -76,6 +76,7 @@
 #include "mongo/util/system_clock_source.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
+#include "mongo/util/version/releases.h"
 
 namespace mongo {
 namespace repl {
@@ -1060,7 +1061,7 @@ void InitialSyncer::_lastOplogEntryFetcherCallbackForBeginApplyingTimestamp(
     BSONObjBuilder queryBob;
     queryBob.append("find", NamespaceString::kServerConfigurationNamespace.coll());
     auto filterBob = BSONObjBuilder(queryBob.subobjStart("filter"));
-    filterBob.append("_id", FeatureCompatibilityVersionParser::kParameterName);
+    filterBob.append("_id", multiversion::kParameterName);
     filterBob.done();
     // As part of reading the FCV, we ensure the source node's all_durable timestamp has advanced
     // to at least the timestamp of the last optime that we found in the lastOplogEntryFetcher.
@@ -1140,7 +1141,7 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
             lock,
             Status(ErrorCodes::IncompatibleServerVersion,
                    str::stream() << "Sync source had unsafe feature compatibility version: "
-                                 << FeatureCompatibilityVersionParser::toString(version)));
+                                 << multiversion::toString(version)));
         return;
     }
 

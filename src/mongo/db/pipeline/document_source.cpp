@@ -68,7 +68,7 @@ DocumentSource::DocumentSource(const StringData stageName,
 namespace {
 struct ParserRegistration {
     Parser parser;
-    boost::optional<ServerGlobalParams::FeatureCompatibility::Version> requiredMinVersion;
+    boost::optional<multiversion::FeatureCompatibilityVersion> requiredMinVersion;
 };
 // Used to keep track of which DocumentSources are registered under which name.
 static StringMap<ParserRegistration> parserMap;
@@ -77,7 +77,7 @@ static StringMap<ParserRegistration> parserMap;
 void DocumentSource::registerParser(
     string name,
     Parser parser,
-    boost::optional<ServerGlobalParams::FeatureCompatibility::Version> requiredMinVersion) {
+    boost::optional<multiversion::FeatureCompatibilityVersion> requiredMinVersion) {
     auto it = parserMap.find(name);
     massert(28707,
             str::stream() << "Duplicate document source (" << name << ") registered.",
@@ -87,7 +87,7 @@ void DocumentSource::registerParser(
 void DocumentSource::registerParser(
     string name,
     SimpleParser simpleParser,
-    boost::optional<ServerGlobalParams::FeatureCompatibility::Version> requiredMinVersion) {
+    boost::optional<multiversion::FeatureCompatibilityVersion> requiredMinVersion) {
 
     Parser parser =
         [simpleParser = std::move(simpleParser)](

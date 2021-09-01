@@ -222,7 +222,7 @@ types:
         description: >-
             Ensures that the version strings in featureCompatibilityVersion documents
             serialize/deserialize to a fixed set of string values
-        cpp_type: "ServerGlobalParams::FeatureCompatibility::Version"
+        cpp_type: "multiversion::FeatureCompatibilityVersion"
         serializer: "::mongo::FeatureCompatibilityVersionParser::serializeVersion"
         deserializer: "mongo::FeatureCompatibilityVersionParser::parseVersion"
 

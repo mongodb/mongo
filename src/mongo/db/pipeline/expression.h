@@ -298,7 +298,7 @@ public:
         Parser parser,
         AllowedWithApiStrict allowedWithApiStrict,
         AllowedWithClientType allowedWithClientType,
-        boost::optional<ServerGlobalParams::FeatureCompatibility::Version> requiredMinVersion);
+        boost::optional<multiversion::FeatureCompatibilityVersion> requiredMinVersion);
 
     const auto& getChildren() const {
         return _children;

@@ -2366,7 +2366,7 @@ TEST_F(OplogApplierImplTest, FailOnInsertFCVDocument) {
         ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
 
     auto op = makeInsertDocumentOplogEntry(
-        nextOpTime(), fcvNS, BSON("_id" << FeatureCompatibilityVersionParser::kParameterName));
+        nextOpTime(), fcvNS, BSON("_id" << multiversion::kParameterName));
     ASSERT_EQUALS(runOpInitialSync(op), ErrorCodes::OplogOperationUnsupported);
 }
 

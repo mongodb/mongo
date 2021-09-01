@@ -394,8 +394,7 @@ public:
     long long subPipelineDepth = 0;
 
     // If set, this will disallow use of features introduced in versions above the provided version.
-    boost::optional<ServerGlobalParams::FeatureCompatibility::Version>
-        maxFeatureCompatibilityVersion;
+    boost::optional<multiversion::FeatureCompatibilityVersion> maxFeatureCompatibilityVersion;
 
     // True if this ExpressionContext is used to parse a view definition pipeline.
     bool isParsingViewDefinition = false;

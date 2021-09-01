@@ -110,7 +110,7 @@ REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(
     document_source_densify::createFromBson,
     AllowedWithApiStrict::kNeverInVersion1,
     AllowedWithClientType::kAny,
-    ServerGlobalParams::FeatureCompatibility::Version::kVersion51,
+    multiversion::FeatureCompatibilityVersion::kVersion_5_1,
     ::mongo::feature_flags::gFeatureFlagDensify.isEnabledAndIgnoreFCV());
 
 REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(
@@ -119,7 +119,7 @@ REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(
     DocumentSourceInternalDensify::createFromBson,
     AllowedWithApiStrict::kInternal,
     AllowedWithClientType::kInternal,
-    ServerGlobalParams::FeatureCompatibility::Version::kVersion51,
+    multiversion::FeatureCompatibilityVersion::kVersion_5_1,
     ::mongo::feature_flags::gFeatureFlagDensify.isEnabledAndIgnoreFCV());
 
 namespace document_source_densify {

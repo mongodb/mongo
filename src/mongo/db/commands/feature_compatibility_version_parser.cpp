@@ -36,123 +36,76 @@
 #include "mongo/db/commands/feature_compatibility_version_document_gen.h"
 #include "mongo/db/commands/feature_compatibility_version_documentation.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/util/version/releases.h"
 
 namespace mongo {
 
-using FeatureCompatibilityParams = ServerGlobalParams::FeatureCompatibility;
+using GenericFCV = multiversion::GenericFCV;
 
-constexpr StringData FeatureCompatibilityVersionParser::kParameterName;
-
-constexpr StringData FeatureCompatibilityVersionParser::kLastLTS;
-constexpr StringData FeatureCompatibilityVersionParser::kLastContinuous;
-constexpr StringData FeatureCompatibilityVersionParser::kLatest;
-
-FeatureCompatibilityParams::Version FeatureCompatibilityVersionParser::parseVersion(
+multiversion::FeatureCompatibilityVersion FeatureCompatibilityVersionParser::parseVersion(
     StringData versionString) {
-    if (versionString == kLastLTS) {
-        return FeatureCompatibilityParams::kLastLTS;
+    if (versionString == multiversion::toString(GenericFCV::kLastLTS)) {
+        return GenericFCV::kLastLTS;
     }
-    if (versionString == kLastContinuous) {
-        return FeatureCompatibilityParams::kLastContinuous;
+    if (versionString == multiversion::toString(GenericFCV::kLastContinuous)) {
+        return GenericFCV::kLastContinuous;
     }
-    if (versionString == kLatest) {
-        return FeatureCompatibilityParams::kLatest;
+    if (versionString == multiversion::toString(GenericFCV::kLatest)) {
+        return GenericFCV::kLatest;
     }
-    uasserted(4926900,
-              str::stream() << "Invalid value for " << kParameterName << "document in "
-                            << NamespaceString::kServerConfigurationNamespace.toString()
-                            << ", found " << versionString << ", expected '" << kLastLTS << "' or '"
-                            << kLastContinuous << "' or '" << kLatest << ". See "
-                            << feature_compatibility_version_documentation::kCompatibilityLink
-                            << ".");
+
+    uasserted(
+        4926900,
+        str::stream() << "Invalid value for " << multiversion::kParameterName << "document in "
+                      << NamespaceString::kServerConfigurationNamespace.toString() << ", found "
+                      << versionString << ", expected '"
+                      << multiversion::toString(GenericFCV::kLastLTS) << "' or '"
+                      << multiversion::toString(GenericFCV::kLastContinuous) << "' or '"
+                      << multiversion::toString(GenericFCV::kLatest) << ". See "
+                      << feature_compatibility_version_documentation::kCompatibilityLink << ".");
 }
 
-FeatureCompatibilityParams::Version FeatureCompatibilityVersionParser::parseVersionForFeatureFlags(
-    StringData versionString) {
-    if (versionString == kVersion51) {
-        return FeatureCompatibilityParams::Version::kVersion51;
-    }
-
-    if (versionString == kVersion50) {
-        return FeatureCompatibilityParams::Version::kFullyDowngradedTo50;
-    }
-
-    if (versionString == kVersion49) {
-        return FeatureCompatibilityParams::Version::kVersion49;
-    }
-
-    if (versionString == kVersion48) {
-        return FeatureCompatibilityParams::Version::kVersion48;
-    }
-
-    if (versionString == kVersion47) {
-        return FeatureCompatibilityParams::Version::kVersion47;
-    }
-
-    if (versionString == kVersion44) {
-        return FeatureCompatibilityParams::Version::kFullyDowngradedTo44;
-    }
-
-    uasserted(5715400,
-              str::stream() << "Invalid FCV version " << versionString << " for feature flag");
+multiversion::FeatureCompatibilityVersion
+FeatureCompatibilityVersionParser::parseVersionForFeatureFlags(StringData versionString) {
+    return multiversion::parseVersionForFeatureFlags(versionString);
 }
 
 StringData FeatureCompatibilityVersionParser::serializeVersion(
-    FeatureCompatibilityParams::Version version) {
-    if (version == FeatureCompatibilityParams::kLastLTS) {
-        return kLastLTS;
-    }
-    if (version == FeatureCompatibilityParams::kLastContinuous) {
-        return kLastContinuous;
-    }
-    if (version == FeatureCompatibilityParams::kLatest) {
-        return kLatest;
-    }
-    // It is a bug if we hit here.
-    invariant(false, "Invalid version value for featureCompatibilityVersion documents");
-    MONGO_UNREACHABLE
+    multiversion::FeatureCompatibilityVersion version) {
+    invariant(version == GenericFCV::kLastLTS || version == GenericFCV::kLastContinuous ||
+                  version == GenericFCV::kLatest,
+              "Invalid version value for featureCompatibilityVersion documents");
+
+    return multiversion::toString(version);
 }
 
 StringData FeatureCompatibilityVersionParser::serializeVersionForFeatureFlags(
-    FeatureCompatibilityParams::Version version) {
-    if (version == FeatureCompatibilityParams::Version::kVersion51) {
-        return kVersion51;
+    multiversion::FeatureCompatibilityVersion version) {
+    switch (version) {
+        case multiversion::FeatureCompatibilityVersion::kVersion_4_4:
+        case multiversion::FeatureCompatibilityVersion::kVersion_4_7:
+        case multiversion::FeatureCompatibilityVersion::kVersion_4_8:
+        case multiversion::FeatureCompatibilityVersion::kVersion_4_9:
+        case multiversion::FeatureCompatibilityVersion::kFullyDowngradedTo_5_0:
+        case multiversion::FeatureCompatibilityVersion::kVersion_5_1:
+            return multiversion::toString(version);
+        default:
+            invariant(false, "Invalid version value for feature flag.");
     }
 
-    if (version == FeatureCompatibilityParams::Version::kFullyDowngradedTo50) {
-        return kVersion50;
-    }
-
-    if (version == FeatureCompatibilityParams::Version::kVersion49) {
-        return kVersion49;
-    }
-
-    if (version == FeatureCompatibilityParams::Version::kVersion48) {
-        return kVersion48;
-    }
-
-    if (version == FeatureCompatibilityParams::Version::kVersion47) {
-        return kVersion47;
-    }
-
-    if (version == FeatureCompatibilityParams::Version::kFullyDowngradedTo44) {
-        return kVersion44;
-    }
-    // It is a bug if we hit here.
-    invariant(false, "Invalid version value for feature flag");
-    MONGO_UNREACHABLE
+    MONGO_UNREACHABLE;
 }
 
 Status FeatureCompatibilityVersionParser::validatePreviousVersionField(
-    FeatureCompatibilityParams::Version version) {
-    if (version == FeatureCompatibilityParams::kLatest) {
+    multiversion::FeatureCompatibilityVersion version) {
+    if (version == GenericFCV::kLatest) {
         return Status::OK();
     }
     return Status(ErrorCodes::Error(4926901),
                   "when present, 'previousVersion' field must be the latest binary version");
 }
 
-StatusWith<FeatureCompatibilityParams::Version> FeatureCompatibilityVersionParser::parse(
+StatusWith<multiversion::FeatureCompatibilityVersion> FeatureCompatibilityVersionParser::parse(
     const BSONObj& featureCompatibilityVersionDoc) {
     try {
         auto fcvDoc = FeatureCompatibilityVersionDocument::parse(
@@ -163,8 +116,7 @@ StatusWith<FeatureCompatibilityParams::Version> FeatureCompatibilityVersionParse
         auto previousVersion = fcvDoc.getPreviousVersion();
 
         // Downgrading FCV.
-        if ((version == FeatureCompatibilityParams::kLastLTS ||
-             version == FeatureCompatibilityParams::kLastContinuous) &&
+        if ((version == GenericFCV::kLastLTS || version == GenericFCV::kLastContinuous) &&
             version == targetVersion) {
             // Downgrading FCV must have a "previousVersion" field.
             if (!previousVersion) {
@@ -172,18 +124,18 @@ StatusWith<FeatureCompatibilityParams::Version> FeatureCompatibilityVersionParse
                               str::stream()
                                   << "Missing field "
                                   << FeatureCompatibilityVersionDocument::kPreviousVersionFieldName
-                                  << " in downgrading states for " << kParameterName
+                                  << " in downgrading states for " << multiversion::kParameterName
                                   << " document in "
                                   << NamespaceString::kServerConfigurationNamespace.toString()
                                   << ": " << featureCompatibilityVersionDoc << ". See "
                                   << feature_compatibility_version_documentation::kCompatibilityLink
                                   << ".");
             }
-            if (version == FeatureCompatibilityParams::kLastLTS) {
+            if (version == GenericFCV::kLastLTS) {
                 // Downgrading to last-lts.
-                return FeatureCompatibilityParams::kDowngradingFromLatestToLastLTS;
+                return GenericFCV::kDowngradingFromLatestToLastLTS;
             } else {
-                return FeatureCompatibilityParams::kDowngradingFromLatestToLastContinuous;
+                return GenericFCV::kDowngradingFromLatestToLastContinuous;
             }
         }
 
@@ -193,7 +145,7 @@ StatusWith<FeatureCompatibilityParams::Version> FeatureCompatibilityVersionParse
                           str::stream()
                               << "Unexpected field "
                               << FeatureCompatibilityVersionDocument::kPreviousVersionFieldName
-                              << " in non-downgrading states for " << kParameterName
+                              << " in non-downgrading states for " << multiversion::kParameterName
                               << " document in "
                               << NamespaceString::kServerConfigurationNamespace.toString() << ": "
                               << featureCompatibilityVersionDoc << ". See "
@@ -205,31 +157,30 @@ StatusWith<FeatureCompatibilityParams::Version> FeatureCompatibilityVersionParse
         if (targetVersion) {
             // For upgrading FCV, "targetVersion" must be kLatest or kLastContinuous and "version"
             // must be kLastContinuous or kLastLTS.
-            if (targetVersion == FeatureCompatibilityParams::kLastLTS ||
-                version == ServerGlobalParams::FeatureCompatibility::kLatest) {
+            if (targetVersion == GenericFCV::kLastLTS || version == GenericFCV::kLatest) {
                 return Status(ErrorCodes::Error(4926904),
                               str::stream()
-                                  << "Invalid " << kParameterName << " document in "
+                                  << "Invalid " << multiversion::kParameterName << " document in "
                                   << NamespaceString::kServerConfigurationNamespace.toString()
                                   << ": " << featureCompatibilityVersionDoc << ". See "
                                   << feature_compatibility_version_documentation::kCompatibilityLink
                                   << ".");
             }
 
-            if (version == FeatureCompatibilityParams::kLastLTS) {
-                return targetVersion == FeatureCompatibilityParams::kLastContinuous
-                    ? FeatureCompatibilityParams::kUpgradingFromLastLTSToLastContinuous
-                    : FeatureCompatibilityParams::kUpgradingFromLastLTSToLatest;
+            if (version == GenericFCV::kLastLTS) {
+                return targetVersion == GenericFCV::kLastContinuous
+                    ? GenericFCV::kUpgradingFromLastLTSToLastContinuous
+                    : GenericFCV::kUpgradingFromLastLTSToLatest;
             } else {
                 uassert(5070601,
                         str::stream()
-                            << "Invalid " << kParameterName << " document in "
+                            << "Invalid " << multiversion::kParameterName << " document in "
                             << NamespaceString::kServerConfigurationNamespace.toString() << ": "
                             << featureCompatibilityVersionDoc << ". See "
                             << feature_compatibility_version_documentation::kCompatibilityLink
                             << ".",
-                        version == ServerGlobalParams::FeatureCompatibility::kLastContinuous);
-                return FeatureCompatibilityParams::kUpgradingFromLastContinuousToLatest;
+                        version == GenericFCV::kLastContinuous);
+                return GenericFCV::kUpgradingFromLastContinuousToLatest;
             }
         }
 
@@ -238,7 +189,7 @@ StatusWith<FeatureCompatibilityParams::Version> FeatureCompatibilityVersionParse
     } catch (const DBException& e) {
         auto status = e.toStatus();
         status.addContext(str::stream()
-                          << "Invalid " << kParameterName << " document in "
+                          << "Invalid " << multiversion::kParameterName << " document in "
                           << NamespaceString::kServerConfigurationNamespace.toString() << ": "
                           << featureCompatibilityVersionDoc << ". See "
                           << feature_compatibility_version_documentation::kCompatibilityLink

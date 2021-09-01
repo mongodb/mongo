@@ -56,13 +56,13 @@
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/transport/service_entry_point.h"
+#include "mongo/util/version/releases.h"
 
 namespace mongo {
 
 using repl::UnreplicatedWritesBlock;
-using FCVP = FeatureCompatibilityVersionParser;
-using FCVParams = ServerGlobalParams::FeatureCompatibility;
-using FCV = FCVParams::Version;
+using GenericFCV = multiversion::GenericFCV;
+using FCV = multiversion::FeatureCompatibilityVersion;
 
 using namespace fmt::literals;
 
@@ -91,17 +91,17 @@ public:
 
         // Steady states - they have FCV documents but no _transitions entries.
         for (auto fcv :
-             std::vector{FCVParams::kLastLTS, FCVParams::kLastContinuous, FCVParams::kLatest}) {
+             std::vector{GenericFCV::kLastLTS, GenericFCV::kLastContinuous, GenericFCV::kLatest}) {
             _fcvDocuments[fcv] = makeFCVDoc(fcv);
         }
 
         for (auto [from, upgrading, to] :
-             std::vector{std::make_tuple(FCVParams::kLastLTS,
-                                         FCVParams::kUpgradingFromLastLTSToLatest,
-                                         FCVParams::kLatest),
-                         std::make_tuple(FCVParams::kLastContinuous,
-                                         FCVParams::kUpgradingFromLastContinuousToLatest,
-                                         FCVParams::kLatest)}) {
+             std::vector{std::make_tuple(GenericFCV::kLastLTS,
+                                         GenericFCV::kUpgradingFromLastLTSToLatest,
+                                         GenericFCV::kLatest),
+                         std::make_tuple(GenericFCV::kLastContinuous,
+                                         GenericFCV::kUpgradingFromLastContinuousToLatest,
+                                         GenericFCV::kLatest)}) {
             for (auto isFromConfigServer : std::vector{false, true}) {
                 // Start or complete upgrading to latest. If this release's lastContinuous ==
                 // lastLTS then the second loop iteration just overwrites the first.
@@ -111,36 +111,36 @@ public:
             _fcvDocuments[upgrading] = makeFCVDoc(from /* effective */, to /* target */);
         }
 
-        if (FCVParams::kLastLTS != FCVParams::kLastContinuous) {
+        if (GenericFCV::kLastLTS != GenericFCV::kLastContinuous) {
             // Only config servers may request an upgrade from lastLTS to lastContinuous.
-            _transitions[{FCVParams::kLastLTS, FCVParams::kLastContinuous, true}] =
-                FCVParams::kUpgradingFromLastLTSToLastContinuous;
-            _transitions[{FCVParams::kUpgradingFromLastLTSToLastContinuous,
-                          FCVParams::kLastContinuous,
-                          true}] = FCVParams::kLastContinuous;
-            _fcvDocuments[FCVParams::kUpgradingFromLastLTSToLastContinuous] = makeFCVDoc(
-                FCVParams::kLastLTS /* effective */, FCVParams::kLastContinuous /* target */);
+            _transitions[{GenericFCV::kLastLTS, GenericFCV::kLastContinuous, true}] =
+                GenericFCV::kUpgradingFromLastLTSToLastContinuous;
+            _transitions[{GenericFCV::kUpgradingFromLastLTSToLastContinuous,
+                          GenericFCV::kLastContinuous,
+                          true}] = GenericFCV::kLastContinuous;
+            _fcvDocuments[GenericFCV::kUpgradingFromLastLTSToLastContinuous] = makeFCVDoc(
+                GenericFCV::kLastLTS /* effective */, GenericFCV::kLastContinuous /* target */);
         }
 
         for (auto [downgrading, to] :
-             std::vector{std::make_tuple(FCVParams::kDowngradingFromLatestToLastContinuous,
-                                         FCVParams::kLastContinuous),
-                         std::make_tuple(FCVParams::kDowngradingFromLatestToLastLTS,
-                                         FCVParams::kLastLTS)}) {
+             std::vector{std::make_tuple(GenericFCV::kDowngradingFromLatestToLastContinuous,
+                                         GenericFCV::kLastContinuous),
+                         std::make_tuple(GenericFCV::kDowngradingFromLatestToLastLTS,
+                                         GenericFCV::kLastLTS)}) {
             for (auto isFromConfigServer : std::vector{false, true}) {
                 // Start or complete downgrade from latest.  If this release's lastContinuous ==
                 // lastLTS then the second loop iteration just overwrites the first.
-                _transitions[{FCVParams::kLatest, to, isFromConfigServer}] = downgrading;
+                _transitions[{GenericFCV::kLatest, to, isFromConfigServer}] = downgrading;
                 _transitions[{downgrading, to, isFromConfigServer}] = to;
             }
             _fcvDocuments[downgrading] =
-                makeFCVDoc(to /* effective */, to /* target */, FCVParams::kLatest /* previous */
+                makeFCVDoc(to /* effective */, to /* target */, GenericFCV::kLatest /* previous */
                 );
         }
     }
 
     /**
-     * True if a server in ServerGlobalParams::FeatureCompatibility::Version "fromVersion" can
+     * True if a server in multiversion::FeatureCompatibilityVersion "fromVersion" can
      * transition to "newVersion". Different rules apply if the request is from a config server.
      */
     bool permitsTransition(FCV fromVersion, FCV newVersion, bool isFromConfigServer) const {
@@ -150,7 +150,7 @@ public:
 
     /**
      * Get a feature compatibility version enum value from a document representing the
-     * ServerGlobalParams::FeatureCompatibility::Version, or uassert if the document is invalid.
+     * multiversion::FeatureCompatibilityVersion, or uassert if the document is invalid.
      */
     FCV versionFromFCVDoc(const FeatureCompatibilityVersionDocument& fcvDoc) const {
         auto it = std::find_if(_fcvDocuments.begin(), _fcvDocuments.end(), [&](const auto& value) {
@@ -219,7 +219,7 @@ void runUpdateCommand(OperationContext* opCtx, const FeatureCompatibilityVersion
             BSONObjBuilder updateSpec(updates.subobjStart());
             {
                 BSONObjBuilder queryFilter(updateSpec.subobjStart("q"));
-                queryFilter.append("_id", FeatureCompatibilityVersionParser::kParameterName);
+                queryFilter.append("_id", multiversion::kParameterName);
             }
             {
                 BSONObjBuilder updateMods(updateSpec.subobjStart("u"));
@@ -249,7 +249,7 @@ boost::optional<BSONObj> FeatureCompatibilityVersion::findFeatureCompatibilityVe
     AutoGetCollection autoColl(opCtx, NamespaceString::kServerConfigurationNamespace, MODE_IX);
     invariant(autoColl.ensureDbExists(), NamespaceString::kServerConfigurationNamespace.ns());
 
-    const auto query = BSON("_id" << FeatureCompatibilityVersionParser::kParameterName);
+    const auto query = BSON("_id" << multiversion::kParameterName);
     const auto swFcv = repl::StorageInterface::get(opCtx)->findById(
         opCtx, NamespaceString::kServerConfigurationNamespace, query["_id"]);
     if (!swFcv.isOK()) {
@@ -267,7 +267,7 @@ void FeatureCompatibilityVersion::validateSetFeatureCompatibilityVersionRequest(
     uassert(
         5147403,
         "cannot set featureCompatibilityVersion to '{}' while featureCompatibilityVersion is '{}'"_format(
-            FCVP::toString(newVersion), FCVP::toString(fromVersion)),
+            multiversion::toString(newVersion), multiversion::toString(fromVersion)),
         fcvTransitions.permitsTransition(fromVersion, newVersion, isFromConfigServer));
 
     auto setFCVPhase = setFCVRequest.getPhase();
@@ -316,8 +316,8 @@ void FeatureCompatibilityVersion::validateSetFeatureCompatibilityVersionRequest(
 
 void FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
     OperationContext* opCtx,
-    ServerGlobalParams::FeatureCompatibility::Version fromVersion,
-    ServerGlobalParams::FeatureCompatibility::Version newVersion,
+    FCV fromVersion,
+    FCV newVersion,
     bool isFromConfigServer,
     boost::optional<Timestamp> changeTimestamp,
     bool setTargetVersion) {
@@ -336,9 +336,7 @@ void FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
 
     // The timestamp must be removed when downgrading to version 4.9 or 4.4. This is necessary to
     // avoid the presence of an unknown field that old binaries are unable to deserialize.
-    if (transitioningVersion == ServerGlobalParams::FeatureCompatibility::Version::kVersion49 ||
-        transitioningVersion ==
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo44) {
+    if (transitioningVersion == FCV::kVersion_4_9 || transitioningVersion == FCV::kVersion_4_4) {
         fcvDoc.setChangeTimestamp(boost::none);
     } else {
         fcvDoc.setChangeTimestamp(changeTimestamp);
@@ -370,9 +368,9 @@ void FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* opCtx,
 
     FeatureCompatibilityVersionDocument fcvDoc;
     if (storeUpgradeVersion) {
-        fcvDoc.setVersion(FCVParams::kLatest);
+        fcvDoc.setVersion(GenericFCV::kLatest);
     } else {
-        fcvDoc.setVersion(FCVParams::kLastLTS);
+        fcvDoc.setVersion(GenericFCV::kLastLTS);
     }
 
     // We then insert the featureCompatibilityVersion document into the server configuration
@@ -400,23 +398,23 @@ bool FeatureCompatibilityVersion::isCleanStartUp() {
 void FeatureCompatibilityVersion::updateMinWireVersion() {
     WireSpec& wireSpec = WireSpec::instance();
     const auto currentFcv = serverGlobalParams.featureCompatibility.getVersion();
-    if (currentFcv == FCVParams::kLatest ||
+    if (currentFcv == GenericFCV::kLatest ||
         (serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading() &&
-         currentFcv != FCVParams::kUpgradingFromLastLTSToLastContinuous)) {
+         currentFcv != GenericFCV::kUpgradingFromLastLTSToLastContinuous)) {
         // FCV == kLatest or FCV is upgrading/downgrading to or from kLatest.
         WireSpec::Specification newSpec = *wireSpec.get();
         newSpec.incomingInternalClient.minWireVersion = LATEST_WIRE_VERSION;
         newSpec.outgoing.minWireVersion = LATEST_WIRE_VERSION;
         wireSpec.reset(std::move(newSpec));
-    } else if (currentFcv == FCVParams::kUpgradingFromLastLTSToLastContinuous ||
-               currentFcv == FCVParams::kLastContinuous) {
+    } else if (currentFcv == GenericFCV::kUpgradingFromLastLTSToLastContinuous ||
+               currentFcv == GenericFCV::kLastContinuous) {
         // FCV == kLastContinuous or upgrading to kLastContinuous.
         WireSpec::Specification newSpec = *wireSpec.get();
         newSpec.incomingInternalClient.minWireVersion = LAST_CONT_WIRE_VERSION;
         newSpec.outgoing.minWireVersion = LAST_CONT_WIRE_VERSION;
         wireSpec.reset(std::move(newSpec));
     } else {
-        invariant(currentFcv == FCVParams::kLastLTS);
+        invariant(currentFcv == GenericFCV::kLastLTS);
         WireSpec::Specification newSpec = *wireSpec.get();
         newSpec.incomingInternalClient.minWireVersion = LAST_LTS_WIRE_VERSION;
         newSpec.outgoing.minWireVersion = LAST_LTS_WIRE_VERSION;
@@ -461,8 +459,7 @@ void FeatureCompatibilityVersion::initializeForStartup(OperationContext* opCtx) 
             {logv2::LogTag::kStartupWarnings},
             "A featureCompatibilityVersion upgrade/downgrade did not complete. To fix this, use "
             "the setFeatureCompatibilityVersion command to resume the upgrade/downgrade",
-            "currentfeatureCompatibilityVersion"_attr =
-                FeatureCompatibilityVersionParser::toString(version));
+            "currentfeatureCompatibilityVersion"_attr = multiversion::toString(version));
     }
 }
 
@@ -594,13 +591,11 @@ const ServerGlobalParams::FeatureCompatibility* FixedFCVRegion::operator->() con
     return &serverGlobalParams.featureCompatibility;
 }
 
-bool FixedFCVRegion::operator==(
-    const ServerGlobalParams::FeatureCompatibility::Version& other) const {
+bool FixedFCVRegion::operator==(const FCV& other) const {
     return serverGlobalParams.featureCompatibility.getVersion() == other;
 }
 
-bool FixedFCVRegion::operator!=(
-    const ServerGlobalParams::FeatureCompatibility::Version& other) const {
+bool FixedFCVRegion::operator!=(const FCV& other) const {
     return !(*this == other);
 }
 

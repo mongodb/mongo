@@ -855,8 +855,7 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SetFeatureCompatibilityVersionLatest,
                                      ("EndStartupOptionStorage"))
 // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
 (InitializerContext* context) {
-    serverGlobalParams.mutableFeatureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::kLatest);
+    serverGlobalParams.mutableFeatureCompatibility.setVersion(multiversion::GenericFCV::kLatest);
 }
 
 #ifdef MONGO_CONFIG_SSL

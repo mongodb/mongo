@@ -1022,7 +1022,7 @@ void DocumentSourceLookUp::serializeToArrayWithBothSyntaxes(
 void DocumentSourceLookUp::serializeToArray(
     std::vector<Value>& array, boost::optional<ExplainOptions::Verbosity> explain) const {
     if (serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
-            FeatureCompatibilityParams::Version::kVersion49)) {
+            multiversion::FeatureCompatibilityVersion::kVersion_4_9)) {
         return serializeToArrayWithBothSyntaxes(array, explain);
     }
 
@@ -1258,7 +1258,7 @@ intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(
                 "$lookup with 'pipeline' may not specify 'localField' or 'foreignField'",
                 (localField.empty() && foreignField.empty()) ||
                     serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
-                        FeatureCompatibilityParams::Version::kVersion49));
+                        multiversion::FeatureCompatibilityVersion::kVersion_4_9));
 
         if (localField.empty() && foreignField.empty()) {
             // $lookup specified with only pipeline syntax.

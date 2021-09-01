@@ -142,7 +142,7 @@ BSONObj genericTransformForShards(MutableDocument&& cmdForShards,
     // TODO SERVER-52900 This code can be remove when we branch for the next LTS release.
     if (serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
         !serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
-            ServerGlobalParams::FeatureCompatibility::Version::kVersion49)) {
+            multiversion::FeatureCompatibilityVersion::kVersion_4_9)) {
         // A mixed version cluster. Use the old format to be sure it is understood.
         auto [legacyRuntimeConstants, unusedSerializedVariables] =
             expCtx->variablesParseState.transitionalCompatibilitySerialize(expCtx->variables);

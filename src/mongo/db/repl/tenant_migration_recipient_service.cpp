@@ -1901,7 +1901,7 @@ void TenantMigrationRecipientService::Instance::_compareRecipientAndDonorFCV() c
 
     auto donorFCVbson =
         _client->findOne(NamespaceString::kServerConfigurationNamespace.ns(),
-                         BSON("_id" << FeatureCompatibilityVersionParser::kParameterName),
+                         BSON("_id" << multiversion::kParameterName),
                          Query(),
                          nullptr,
                          QueryOption_SecondaryOk,

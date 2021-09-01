@@ -56,6 +56,7 @@
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/version/releases.h"
 
 namespace mongo {
 namespace {
@@ -136,7 +137,7 @@ protected:
                                               StatusWith<BSONObj> response,
                                               BSONObj writeConcern) {
         // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
-        SetFeatureCompatibilityVersion fcvCmd(ServerGlobalParams::FeatureCompatibility::kLatest);
+        SetFeatureCompatibilityVersion fcvCmd(multiversion::GenericFCV::kLatest);
         fcvCmd.setFromConfigServer(true);
         fcvCmd.setDbName(NamespaceString::kAdminDb);
         const auto setFcvObj = fcvCmd.toBSON(BSON("writeConcern" << writeConcern));

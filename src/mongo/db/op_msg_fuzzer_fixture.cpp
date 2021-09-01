@@ -102,8 +102,7 @@ OpMsgFuzzerFixture::OpMsgFuzzerFixture(bool skipGlobalInitializers)
     storageGlobalParams.repair = false;
     serverGlobalParams.enableMajorityReadConcern = false;
     // (Generic FCV reference): Initialize FCV.
-    serverGlobalParams.mutableFeatureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::kLatest);
+    serverGlobalParams.mutableFeatureCompatibility.setVersion(multiversion::GenericFCV::kLatest);
 
     initializeStorageEngine(opCtx.get(),
                             StorageEngineInitFlags::kAllowNoLockFile |

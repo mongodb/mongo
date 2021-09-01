@@ -104,7 +104,7 @@ UpdateExecutor::ApplyResult PipelineExecutor::applyUpdate(ApplyParams applyParam
     bool allowTopLevelDollarPrefixedFields =
         serverGlobalParams.featureCompatibility.isVersionInitialized() &&
         serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
-            FeatureCompatibilityParams::Version::kFullyDowngradedTo50);
+            multiversion::FeatureCompatibilityVersion::kFullyDowngradedTo_5_0);
     auto ret = ObjectReplaceExecutor::applyReplacementUpdate(
         applyParams, transformedDoc, transformedDocHasIdField, allowTopLevelDollarPrefixedFields);
 

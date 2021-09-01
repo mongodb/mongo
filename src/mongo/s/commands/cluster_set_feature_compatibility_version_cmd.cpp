@@ -38,6 +38,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/str.h"
+#include "mongo/util/version/releases.h"
 
 namespace mongo {
 
@@ -57,7 +58,7 @@ class SetFeatureCompatibilityVersionCmd final
     : public TypedCommand<SetFeatureCompatibilityVersionCmd> {
 public:
     using Request = SetFeatureCompatibilityVersion;
-    using FCVP = FeatureCompatibilityVersionParser;
+    using GenericFCV = multiversion::GenericFCV;
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
@@ -70,15 +71,18 @@ public:
     std::string help() const override {
         std::stringstream h;
         h << "Set the featureCompatibilityVersion used by this cluster. If set to '"
-          << FCVP::kLastLTS << "', then features introduced in versions greater than '"
-          << FCVP::kLastLTS << "' will be disabled";
-        if (FCVP::kLastContinuous != FCVP::kLastLTS) {
-            h << " If set to '" << FCVP::kLastContinuous << "', then features introduced in '"
-              << FCVP::kLatest << "' will be disabled.";
+          << multiversion::toString(GenericFCV::kLastLTS)
+          << "', then features introduced in versions greater than '"
+          << multiversion::toString(GenericFCV::kLastLTS) << "' will be disabled";
+        if (GenericFCV::kLastContinuous != GenericFCV::kLastLTS) {
+            h << " If set to '" << multiversion::toString(GenericFCV::kLastContinuous)
+              << "', then features introduced in '" << multiversion::toString(GenericFCV::kLatest)
+              << "' will be disabled.";
         }
-        h << " If set to '" << FCVP::kLatest << "', then '" << FCVP::kLatest
+        h << " If set to '" << multiversion::toString(GenericFCV::kLatest) << "', then '"
+          << multiversion::toString(GenericFCV::kLatest)
           << "' features are enabled, and all nodes in the cluster must be binary version "
-          << FCVP::kLatest << ". See "
+          << multiversion::toString(GenericFCV::kLatest) << ". See "
           << feature_compatibility_version_documentation::kCompatibilityLink << ".";
         return h.str();
     }

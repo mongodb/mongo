@@ -80,6 +80,7 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
+#include "mongo/util/version/releases.h"
 
 namespace mongo {
 namespace {
@@ -88,7 +89,6 @@ using CallbackHandle = executor::TaskExecutor::CallbackHandle;
 using CallbackArgs = executor::TaskExecutor::CallbackArgs;
 using RemoteCommandCallbackArgs = executor::TaskExecutor::RemoteCommandCallbackArgs;
 using RemoteCommandCallbackFn = executor::TaskExecutor::RemoteCommandCallbackFn;
-using FeatureCompatibility = ServerGlobalParams::FeatureCompatibility;
 
 const ReadPreferenceSetting kConfigReadSelector(ReadPreference::Nearest, TagSet{});
 
@@ -691,9 +691,9 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
                 !fcvRegion->isUpgradingOrDowngrading());
 
         // (Generic FCV reference): These FCV checks should exist across LTS binary versions.
-        invariant(fcvRegion == FeatureCompatibility::kLatest ||
-                  fcvRegion == FeatureCompatibility::kLastContinuous ||
-                  fcvRegion == FeatureCompatibility::kLastLTS);
+        invariant(fcvRegion == multiversion::GenericFCV::kLatest ||
+                  fcvRegion == multiversion::GenericFCV::kLastContinuous ||
+                  fcvRegion == multiversion::GenericFCV::kLastLTS);
 
         SetFeatureCompatibilityVersion setFcvCmd(fcvRegion->getVersion());
         setFcvCmd.setDbName(NamespaceString::kAdminDb);

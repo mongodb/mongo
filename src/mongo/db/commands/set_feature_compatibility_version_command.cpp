@@ -75,14 +75,14 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
+#include "mongo/util/version/releases.h"
 
 using namespace fmt::literals;
 
 namespace mongo {
 namespace {
 
-using FCVP = FeatureCompatibilityVersionParser;
-using FeatureCompatibility = ServerGlobalParams::FeatureCompatibility;
+using GenericFCV = multiversion::GenericFCV;
 
 MONGO_FAIL_POINT_DEFINE(failUpgrading);
 MONGO_FAIL_POINT_DEFINE(hangWhileUpgrading);
@@ -192,15 +192,18 @@ public:
     std::string help() const override {
         std::stringstream h;
         h << "Set the featureCompatibilityVersion used by this cluster. If set to '"
-          << FCVP::kLastLTS << "', then features introduced in versions greater than '"
-          << FCVP::kLastLTS << "' will be disabled";
-        if (FCVP::kLastContinuous != FCVP::kLastLTS) {
-            h << " If set to '" << FCVP::kLastContinuous << "', then features introduced in '"
-              << FCVP::kLatest << "' will be disabled.";
+          << multiversion::toString(GenericFCV::kLastLTS)
+          << "', then features introduced in versions greater than '"
+          << multiversion::toString(GenericFCV::kLastLTS) << "' will be disabled";
+        if (GenericFCV::kLastContinuous != GenericFCV::kLastLTS) {
+            h << " If set to '" << multiversion::toString(GenericFCV::kLastContinuous)
+              << "', then features introduced in '" << multiversion::toString(GenericFCV::kLatest)
+              << "' will be disabled.";
         }
-        h << " If set to '" << FCVP::kLatest << "', then '" << FCVP::kLatest
+        h << " If set to '" << multiversion::toString(GenericFCV::kLatest) << "', then '"
+          << multiversion::toString(GenericFCV::kLatest)
           << "' features are enabled, and all nodes in the cluster must be binary version "
-          << FCVP::kLatest << ". See "
+          << multiversion::toString(GenericFCV::kLatest) << ". See "
           << feature_compatibility_version_documentation::kCompatibilityLink << ".";
         return h.str();
     }
@@ -254,15 +257,16 @@ public:
         const auto requestedVersion = request.getCommandParameter();
         const auto actualVersion = serverGlobalParams.featureCompatibility.getVersion();
         if (request.getDowngradeOnDiskChanges()) {
-            uassert(
-                ErrorCodes::IllegalOperation,
-                str::stream() << "Cannot set featureCompatibilityVersion to "
-                              << FCVP::serializeVersion(requestedVersion) << " with '"
-                              << SetFeatureCompatibilityVersion::kDowngradeOnDiskChangesFieldName
-                              << "' set to true. This is only allowed when downgrading to "
-                              << FCVP::kLastContinuous,
-                requestedVersion <= actualVersion &&
-                    requestedVersion == FeatureCompatibility::kLastContinuous);
+            uassert(ErrorCodes::IllegalOperation,
+                    str::stream()
+                        << "Cannot set featureCompatibilityVersion to "
+                        << FeatureCompatibilityVersionParser::serializeVersion(requestedVersion)
+                        << " with '"
+                        << SetFeatureCompatibilityVersion::kDowngradeOnDiskChangesFieldName
+                        << "' set to true. This is only allowed when downgrading to "
+                        << multiversion::toString(GenericFCV::kLastContinuous),
+                    requestedVersion <= actualVersion &&
+                        requestedVersion == GenericFCV::kLastContinuous);
         }
 
         if (requestedVersion == actualVersion) {
@@ -408,7 +412,7 @@ private:
 
             // TODO: Remove once FCV 6.0 becomes last-lts
             const auto requestedVersion = request.getCommandParameter();
-            if (requestedVersion >= FeatureCompatibility::Version::kVersion51) {
+            if (requestedVersion >= multiversion::FeatureCompatibilityVersion::kVersion_5_1) {
                 ShardingCatalogManager::get(opCtx)->upgradeMetadataTo51Phase2(opCtx);
             }
 
@@ -442,7 +446,7 @@ private:
         // Secondary indexes on time-series measurements are only supported in 5.1 and up. If the
         // user tries to downgrade the cluster to an earlier version, they must first remove all
         // incompatible secondary indexes on time-series measurements.
-        if (requestedVersion < FeatureCompatibility::Version::kVersion51) {
+        if (requestedVersion < multiversion::FeatureCompatibilityVersion::kVersion_5_1) {
             for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
                 Lock::DBLock dbLock(opCtx, dbName, MODE_IS);
                 catalog::forEachCollectionFromDb(
@@ -510,7 +514,7 @@ private:
                     opCtx, CommandHelpers::appendMajorityWriteConcern(requestPhase2.toBSON({}))));
 
             // TODO: Remove once FCV 6.0 becomes last-lts
-            if (requestedVersion < FeatureCompatibility::Version::kVersion51) {
+            if (requestedVersion < multiversion::FeatureCompatibilityVersion::kVersion_5_1) {
                 ShardingCatalogManager::get(opCtx)->downgradeMetadataToPre51Phase2(opCtx);
             }
         }
@@ -518,7 +522,7 @@ private:
         hangWhileDowngrading.pauseWhileSet(opCtx);
 
         if (request.getDowngradeOnDiskChanges()) {
-            invariant(requestedVersion == FeatureCompatibility::kLastContinuous);
+            invariant(requestedVersion == GenericFCV::kLastContinuous);
             _downgradeOnDiskChanges();
             LOGV2(4875603, "Downgrade of on-disk format complete.");
         }
@@ -531,7 +535,7 @@ private:
     void _downgradeOnDiskChanges() {
         LOGV2(4975602,
               "Downgrading on-disk format to reflect the last-continuous version.",
-              "last_continuous_version"_attr = FCVP::kLastContinuous);
+              "last_continuous_version"_attr = multiversion::toString(GenericFCV::kLastContinuous));
     }
 
     /**

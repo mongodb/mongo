@@ -488,7 +488,7 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::writeConflict
     if (updateResult.containsDotsAndDollarsField &&
         serverGlobalParams.featureCompatibility.isVersionInitialized() &&
         serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
-            FeatureCompatibilityParams::Version::kFullyDowngradedTo50)) {
+            multiversion::FeatureCompatibilityVersion::kFullyDowngradedTo_5_0)) {
         // If it's an upsert, increment 'inserts' metric, otherwise increment 'updates'.
         dotsAndDollarsFieldsCounters.incrementForUpsert(!updateResult.upsertedId.isEmpty());
     }

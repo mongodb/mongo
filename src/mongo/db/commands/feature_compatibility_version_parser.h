@@ -29,95 +29,40 @@
 
 #pragma once
 
-#include "mongo/db/server_options.h"
+#include "mongo/util/version/releases.h"
 
 namespace mongo {
-using FeatureCompatibilityParams = ServerGlobalParams::FeatureCompatibility;
-
 /**
  * Helpers to parse featureCompatibilityVersion document BSON objects into
- * ServerGlobalParams::FeatureCompatibility::Version enums and convert
- * ServerGlobalParams::FeatureCompatibility::Version enums into strings.
+ * multiversion::FeatureCompatibilityVersion enums.
  */
 class FeatureCompatibilityVersionParser {
 public:
-    static constexpr StringData kVersion44 = "4.4"_sd;  // Remove once old feature flags are deleted
-    static constexpr StringData kVersion47 = "4.7"_sd;  // Remove once old feature flags are deleted
-    static constexpr StringData kVersion48 = "4.8"_sd;  // Remove once old feature flags are deleted
-    static constexpr StringData kVersion49 = "4.9"_sd;  // Remove once old feature flags are deleted
-    static constexpr StringData kVersion50 = "5.0"_sd;
-    static constexpr StringData kVersion51 = "5.1"_sd;
-    static constexpr StringData kVersionDowngradingFrom51To50 = "downgrading from 5.1 to 5.0"_sd;
-    static constexpr StringData kVersionUpgradingFrom50To51 = "upgrading from 5.0 to 5.1"_sd;
-    static constexpr StringData kVersionUnset = "Unset"_sd;
-
-    static constexpr StringData kParameterName = "featureCompatibilityVersion"_sd;
-
-    static constexpr StringData kLastLTS = kVersion50;
-    static constexpr StringData kLastContinuous = kVersion50;
-    static constexpr StringData kLatest = kVersion51;
-    static constexpr StringData kUpgradingFromLastLTSToLatest = kVersionUpgradingFrom50To51;
-    static constexpr StringData kUpgradingFromLastContinuousToLatest = kVersionUpgradingFrom50To51;
-    // kVersionUpgradingFromLastLTSToLastContinuous should assigned kVersionUnset when kLastLTS and
-    // kLastContinuous are equal.
-    static constexpr StringData kVersionUpgradingFromLastLTSToLastContinuous = kVersionUnset;
-    static constexpr StringData kDowngradingFromLatestToLastLTS = kVersionDowngradingFrom51To50;
-    static constexpr StringData kDowngradingFromLatestToLastContinuous =
-        kVersionDowngradingFrom51To50;
-
     // Used to verify that FCV values in 'admin.system.version' are valid and equal to one of
     // { lastLTS, lastContinuous, latest }.
-    static FeatureCompatibilityParams::Version parseVersion(StringData versionString);
+    static multiversion::FeatureCompatibilityVersion parseVersion(StringData versionString);
 
     // Used to parse FCV values for feature flags. It is acceptable to have feature flag versions
     // that are not one of { lastLTS, lastContinuous, latest } while the server code is
     // transitioning to the next LTS release. This is to avoid having the upgrade of FCV constants
     // be blocked on old code removal.
-    static FeatureCompatibilityParams::Version parseVersionForFeatureFlags(
+    static multiversion::FeatureCompatibilityVersion parseVersionForFeatureFlags(
         StringData versionString);
 
-    static StringData serializeVersion(FeatureCompatibilityParams::Version version);
+    static StringData serializeVersion(multiversion::FeatureCompatibilityVersion version);
 
-    static StringData serializeVersionForFeatureFlags(FeatureCompatibilityParams::Version version);
+    static StringData serializeVersionForFeatureFlags(
+        multiversion::FeatureCompatibilityVersion version);
 
-    static Status validatePreviousVersionField(FeatureCompatibilityParams::Version version);
+    static Status validatePreviousVersionField(multiversion::FeatureCompatibilityVersion version);
 
     /**
      * Parses the featureCompatibilityVersion document from the server configuration collection
      * (admin.system.version), and returns the state represented by the combination of the
      * targetVersion and version.
      */
-    static StatusWith<FeatureCompatibilityParams::Version> parse(
+    static StatusWith<multiversion::FeatureCompatibilityVersion> parse(
         const BSONObj& featureCompatibilityVersionDoc);
-
-    /**
-     * Useful for message logging.
-     */
-    static StringData toString(FeatureCompatibilityParams::Version version) {
-        if (version == FeatureCompatibilityParams::Version::kUnsetDefault50Behavior) {
-            return kVersionUnset;
-        } else if (version == FeatureCompatibilityParams::kLastLTS) {
-            return kLastLTS;
-        } else if (version == FeatureCompatibilityParams::kDowngradingFromLatestToLastLTS) {
-            return kDowngradingFromLatestToLastLTS;
-        } else if (version == FeatureCompatibilityParams::kUpgradingFromLastLTSToLastContinuous) {
-            // kUpgradingFromLastLTSToLastContinuous is only a valid FCV state when last-continuous
-            // and last-lts are not equal. Otherwise, it is set to kInvalid.
-            invariant(version != FeatureCompatibilityParams::Version::kInvalid);
-            return kVersionUpgradingFromLastLTSToLastContinuous;
-        } else if (version == FeatureCompatibilityParams::kUpgradingFromLastLTSToLatest) {
-            return kUpgradingFromLastLTSToLatest;
-        } else if (version == FeatureCompatibilityParams::kLastContinuous) {
-            return kLastContinuous;
-        } else if (version == FeatureCompatibilityParams::kDowngradingFromLatestToLastContinuous) {
-            return kDowngradingFromLatestToLastContinuous;
-        } else if (version == FeatureCompatibilityParams::kUpgradingFromLastContinuousToLatest) {
-            return kUpgradingFromLastContinuousToLatest;
-        } else if (version == FeatureCompatibilityParams::kLatest) {
-            return kLatest;
-        }
-        MONGO_UNREACHABLE;
-    }
 };
 
 }  // namespace mongo

@@ -100,7 +100,7 @@ Status restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx
         LOGV2(4926905,
               "Re-creating featureCompatibilityVersion document that was deleted. Creating new "
               "document with last LTS version.",
-              "version"_attr = FeatureCompatibilityVersionParser::kLastLTS);
+              "version"_attr = multiversion::toString(multiversion::GenericFCV::kLastLTS));
         uassertStatusOK(
             createCollection(opCtx, fcvNss.db().toString(), BSON("create" << fcvNss.coll())));
     }
@@ -113,19 +113,17 @@ Status restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx
     BSONObj featureCompatibilityVersion;
     if (!Helpers::findOne(opCtx,
                           fcvColl,
-                          BSON("_id" << FeatureCompatibilityVersionParser::kParameterName),
+                          BSON("_id" << multiversion::kParameterName),
                           featureCompatibilityVersion)) {
         // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
         LOGV2(21000,
               "Re-creating featureCompatibilityVersion document that was deleted. Creating new "
-              "document with version "
-              "{FeatureCompatibilityVersionParser_kLastLTS}.",
-              "Re-creating featureCompatibilityVersion document that was deleted",
-              "version"_attr = FeatureCompatibilityVersionParser::kLastLTS);
+              "document with version ",
+              "version"_attr = multiversion::toString(multiversion::GenericFCV::kLastLTS));
 
         FeatureCompatibilityVersionDocument fcvDoc;
         // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
-        fcvDoc.setVersion(ServerGlobalParams::FeatureCompatibility::kLastLTS);
+        fcvDoc.setVersion(multiversion::GenericFCV::kLastLTS);
 
         writeConflictRetry(opCtx, "insertFCVDocument", fcvNss.ns(), [&] {
             WriteUnitOfWork wunit(opCtx);
@@ -136,10 +134,8 @@ Status restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx
         });
     }
 
-    invariant(Helpers::findOne(opCtx,
-                               fcvColl,
-                               BSON("_id" << FeatureCompatibilityVersionParser::kParameterName),
-                               featureCompatibilityVersion));
+    invariant(Helpers::findOne(
+        opCtx, fcvColl, BSON("_id" << multiversion::kParameterName), featureCompatibilityVersion));
 
     return Status::OK();
 }

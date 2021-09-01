@@ -40,7 +40,7 @@ namespace unittest {
  */
 class EnsureFCV {
 public:
-    using Version = ServerGlobalParams::FeatureCompatibility::Version;
+    using Version = multiversion::FeatureCompatibilityVersion;
     EnsureFCV(Version version)
         : _origVersion(serverGlobalParams.featureCompatibility.getVersion()) {
         serverGlobalParams.mutableFeatureCompatibility.setVersion(version);

@@ -61,7 +61,7 @@ const Seconds kRefreshPeriod(30);
 bool useActualTopologyTime() {
     return serverGlobalParams.featureCompatibility.isVersionInitialized() &&
         serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
-            ServerGlobalParams::FeatureCompatibility::Version::kVersion47);
+            multiversion::FeatureCompatibilityVersion::kVersion_4_7);
 }
 
 }  // namespace

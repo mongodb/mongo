@@ -566,8 +566,8 @@ Collection::Validator CollectionImpl::parseValidator(
     OperationContext* opCtx,
     const BSONObj& validator,
     MatchExpressionParser::AllowedFeatureSet allowedFeatures,
-    boost::optional<ServerGlobalParams::FeatureCompatibility::Version>
-        maxFeatureCompatibilityVersion) const {
+    boost::optional<multiversion::FeatureCompatibilityVersion> maxFeatureCompatibilityVersion)
+    const {
     if (MONGO_unlikely(allowSettingMalformedCollectionValidators.shouldFail())) {
         return {validator, nullptr, nullptr};
     }
@@ -894,7 +894,7 @@ void CollectionImpl::_cappedDeleteAsNeeded(OperationContext* opCtx,
     }
 
     bool useOldCappedDeleteBehaviour = serverGlobalParams.featureCompatibility.isLessThan(
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo50);
+        multiversion::FeatureCompatibilityVersion::kFullyDowngradedTo_5_0);
 
     if (!useOldCappedDeleteBehaviour && !opCtx->isEnforcingConstraints()) {
         // With new capped delete behavior, secondaries only delete from capped collections via

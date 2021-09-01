@@ -768,7 +768,7 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx) {
     // TODO: Remove condition once FCV 6.0 becomes last-lts
     const auto& currentFCV = serverGlobalParams.featureCompatibility;
     if (currentFCV.isGreaterThanOrEqualTo(
-            ServerGlobalParams::FeatureCompatibility::Version::kUpgradingFrom50To51)) {
+            multiversion::FeatureCompatibilityVersion::kUpgradingFrom_5_0_To_5_1)) {
         coll.setSupportingLongName(SupportingLongNameStatusEnum::kImplicitlyEnabled);
     }
 

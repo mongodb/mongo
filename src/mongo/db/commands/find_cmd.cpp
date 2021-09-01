@@ -82,7 +82,7 @@ std::unique_ptr<FindCommandRequest> translateNtoReturnToLimitOrBatchSize(
             "the ntoreturn find command parameter is not supported when FCV >= 5.1",
             !(fcvState.isVersionInitialized() &&
               fcvState.isGreaterThanOrEqualTo(
-                  ServerGlobalParams::FeatureCompatibility::Version::kVersion51) &&
+                  multiversion::FeatureCompatibilityVersion::kVersion_5_1) &&
               findCmd->getNtoreturn()));
 
     const auto ntoreturn = findCmd->getNtoreturn().get_value_or(0);

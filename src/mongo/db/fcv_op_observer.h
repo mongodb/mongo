@@ -31,6 +31,7 @@
 
 #include "mongo/db/op_observer_noop.h"
 #include "mongo/db/server_options.h"
+#include "mongo/util/version/releases.h"
 
 namespace mongo {
 
@@ -197,7 +198,7 @@ private:
      * servers and closing open transactions if necessary. Increments the server TopologyVersion.
      */
     static void _setVersion(OperationContext* opCtx,
-                            ServerGlobalParams::FeatureCompatibility::Version newVersion,
+                            multiversion::FeatureCompatibilityVersion newVersion,
                             boost::optional<Timestamp> commitTs = boost::none);
 
     /**

@@ -49,8 +49,9 @@ using boost::intrusive_ptr;
 REGISTER_ACCUMULATOR(sum, genericParseSingleExpressionAccumulator<AccumulatorSum>);
 REGISTER_STABLE_EXPRESSION(sum, ExpressionFromAccumulator<AccumulatorSum>::parse);
 REGISTER_REMOVABLE_WINDOW_FUNCTION(sum, AccumulatorSum, WindowFunctionSum);
-REGISTER_ACCUMULATOR_WITH_MIN_VERSION(
-    count, parseCountAccumulator, ServerGlobalParams::FeatureCompatibility::Version::kVersion51);
+REGISTER_ACCUMULATOR_WITH_MIN_VERSION(count,
+                                      parseCountAccumulator,
+                                      multiversion::FeatureCompatibilityVersion::kVersion_5_1);
 
 REGISTER_WINDOW_FUNCTION(count, window_function::parseCountWindowFunction);
 

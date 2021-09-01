@@ -112,7 +112,7 @@ struct ParserRegistration {
     Parser parser;
     AllowedWithApiStrict allowedWithApiStrict;
     AllowedWithClientType allowedWithClientType;
-    boost::optional<ServerGlobalParams::FeatureCompatibility::Version> requiredMinVersion;
+    boost::optional<multiversion::FeatureCompatibilityVersion> requiredMinVersion;
 };
 
 /**
@@ -175,7 +175,7 @@ void Expression::registerExpression(
     Parser parser,
     AllowedWithApiStrict allowedWithApiStrict,
     AllowedWithClientType allowedWithClientType,
-    boost::optional<ServerGlobalParams::FeatureCompatibility::Version> requiredMinVersion) {
+    boost::optional<multiversion::FeatureCompatibilityVersion> requiredMinVersion) {
     auto op = parserMap.find(key);
     massert(17064,
             str::stream() << "Duplicate expression (" << key << ") registered.",
@@ -7395,7 +7395,7 @@ REGISTER_EXPRESSION_WITH_MIN_VERSION(
     ExpressionGetField::parse,
     AllowedWithApiStrict::kNeverInVersion1,
     AllowedWithClientType::kAny,
-    ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo50);
+    multiversion::FeatureCompatibilityVersion::kFullyDowngradedTo_5_0);
 
 intrusive_ptr<Expression> ExpressionGetField::parse(ExpressionContext* const expCtx,
                                                     BSONElement expr,
@@ -7507,7 +7507,7 @@ REGISTER_EXPRESSION_WITH_MIN_VERSION(
     ExpressionSetField::parse,
     AllowedWithApiStrict::kNeverInVersion1,
     AllowedWithClientType::kAny,
-    ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo50);
+    multiversion::FeatureCompatibilityVersion::kFullyDowngradedTo_5_0);
 
 // $unsetField is syntactic sugar for $setField where value is set to $$REMOVE.
 REGISTER_EXPRESSION_WITH_MIN_VERSION(
@@ -7515,7 +7515,7 @@ REGISTER_EXPRESSION_WITH_MIN_VERSION(
     ExpressionSetField::parse,
     AllowedWithApiStrict::kNeverInVersion1,
     AllowedWithClientType::kAny,
-    ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo50);
+    multiversion::FeatureCompatibilityVersion::kFullyDowngradedTo_5_0);
 
 intrusive_ptr<Expression> ExpressionSetField::parse(ExpressionContext* const expCtx,
                                                     BSONElement expr,
@@ -7651,7 +7651,7 @@ REGISTER_EXPRESSION_WITH_MIN_VERSION(
     ExpressionTsSecond::parse,
     AllowedWithApiStrict::kNeverInVersion1,
     AllowedWithClientType::kAny,
-    ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo50);
+    multiversion::FeatureCompatibilityVersion::kFullyDowngradedTo_5_0);
 
 /* ------------------------- ExpressionTsIncrement ----------------------------- */
 
@@ -7675,7 +7675,7 @@ REGISTER_EXPRESSION_WITH_MIN_VERSION(
     ExpressionTsIncrement::parse,
     AllowedWithApiStrict::kNeverInVersion1,
     AllowedWithClientType::kAny,
-    ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo50);
+    multiversion::FeatureCompatibilityVersion::kFullyDowngradedTo_5_0);
 
 MONGO_INITIALIZER_GROUP(BeginExpressionRegistration, ("default"), ("EndExpressionRegistration"))
 MONGO_INITIALIZER_GROUP(EndExpressionRegistration, ("BeginExpressionRegistration"), ())

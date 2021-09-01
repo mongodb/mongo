@@ -36,6 +36,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/idl/server_parameter.h"
 #include "mongo/idl/server_parameter_with_storage.h"
+#include "mongo/util/version/releases.h"
 
 namespace mongo {
 
@@ -72,14 +73,14 @@ public:
      *
      * Throws if feature is not enabled.
      */
-    ServerGlobalParams::FeatureCompatibility::Version getVersion() const;
+    multiversion::FeatureCompatibilityVersion getVersion() const;
 
 private:
     void set(bool enabled);
 
 private:
     bool _enabled;
-    ServerGlobalParams::FeatureCompatibility::Version _version;
+    multiversion::FeatureCompatibilityVersion _version;
 };
 
 /**
