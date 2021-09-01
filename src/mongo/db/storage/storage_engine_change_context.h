@@ -51,7 +51,7 @@ private:
 
 public:
     using StorageChangeToken = stdx::unique_lock<SharedSpinLock>;
-    // TODO(SERVER-59185): Replace two uses of std::shared_lock with stdx::shared_lock or remove
+    // TODO(SERVER-59157): Replace two uses of std::shared_lock with stdx::shared_lock or remove
     // NOLINT according to resolution of this ticket.
     using SharedStorageChangeToken = std::shared_lock<SharedSpinLock>;  // NOLINT
 
