@@ -59,11 +59,10 @@ TimeseriesTest.run((insert) => {
         assert.eq(initialDocList.length, resultDocList.length);
 
         resultDocList.forEach(resultDoc => {
-            const actualDoc = coll.findOne(resultDoc);
-            assert(actualDoc,
-                   "Document " + tojson(resultDoc) +
-                       " is not found in the result collection as expected");
-            assert.docEq(resultDoc, actualDoc);
+            assert.docEq(resultDoc,
+                         coll.findOne({_id: resultDoc._id}),
+                         "Expected document not found in result collection:" +
+                             tojson(coll.find().toArray()));
         });
 
         assert(coll.drop());
@@ -336,7 +335,6 @@ TimeseriesTest.run((insert) => {
     });
 
     // Rename the metaField.
-    // TODO: SERVER-59173 Change the error message when attempting to rename the metaField.
     testUpdate({
         initialDocList: [doc1, doc2, doc4],
         updateList: [{
@@ -346,7 +344,33 @@ TimeseriesTest.run((insert) => {
         }],
         resultDocList: [doc1, doc2, doc4],
         n: 0,
-        failCode: ErrorCodes.DocumentValidationFailure,
+        failCode: ErrorCodes.InvalidOptions,
+    });
+
+    // Rename a subfield the metaField.
+    testUpdate({
+        initialDocList: [doc1, doc2],
+        updateList: [{
+            q: {[metaFieldName + ".a"]: "A"},
+            u: {$rename: {[metaFieldName + ".a"]: metaFieldName + ".z"}},
+            multi: true,
+        }],
+        resultDocList:
+            [{_id: 1, [timeFieldName]: dateTime, [metaFieldName]: {z: "A", b: "B"}}, doc2],
+        n: 1,
+    });
+
+    // Rename a subfield the metaField to something not in the metaField.
+    testUpdate({
+        initialDocList: [doc1, doc2, doc4],
+        updateList: [{
+            q: {[metaFieldName + ".a"]: "A"},
+            u: {$rename: {[metaFieldName + ".a"]: "notMetaField.a"}},
+            multi: true,
+        }],
+        resultDocList: [doc1, doc2, doc4],
+        n: 0,
+        failCode: ErrorCodes.InvalidOptions,
     });
 
     // For all documents that have at least one 2 in its metaField array, update the first 2

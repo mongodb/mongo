@@ -179,12 +179,16 @@ bool updateOnlyModifiesMetaField(OperationContext* opCtx,
     return std::all_of(document.begin(), document.end(), [metaField](const auto& updatePair) {
         // updatePair = <updateOperator> : {<field1> : <value1>, ... }
         // updatePair.embeddedObject() = {<field1> : <value1>, ... }
-        return std::all_of(updatePair.embeddedObject().begin(),
-                           updatePair.embeddedObject().end(),
-                           [metaField](const auto& fieldValuePair) {
-                               return isMetaFieldFirstElementOfDottedPathField(
-                                   fieldValuePair.fieldNameStringData(), metaField);
-                           });
+        return std::all_of(
+            updatePair.embeddedObject().begin(),
+            updatePair.embeddedObject().end(),
+            [metaField, op = updatePair.fieldNameStringData()](const auto& fieldValuePair) {
+                return isMetaFieldFirstElementOfDottedPathField(
+                           fieldValuePair.fieldNameStringData(), metaField) &&
+                    (op != "$rename" ||
+                     isMetaFieldFirstElementOfDottedPathField(fieldValuePair.valuestrsafe(),
+                                                              metaField));
+            });
     });
 }
 
@@ -223,7 +227,18 @@ write_ops::UpdateModification translateUpdate(const write_ops::UpdateModificatio
         // and replace it if it is the metaField.
         for (auto fieldValuePair = updatePair.leftChild(); fieldValuePair.ok();
              fieldValuePair = fieldValuePair.rightSibling()) {
-            replaceQueryMetaFieldName(fieldValuePair, fieldValuePair.getFieldName(), metaField);
+            auto fieldName = fieldValuePair.getFieldName();
+            if (isMetaFieldFirstElementOfDottedPathField(fieldName, metaField)) {
+                invariantStatusOK(fieldValuePair.rename(getRenamedField(fieldName, "meta")));
+            }
+
+            // If this is a $rename, we may also need to translate the value.
+            if (updatePair.getFieldName() == "$rename" && fieldValuePair.isType(BSONType::String) &&
+                isMetaFieldFirstElementOfDottedPathField(fieldValuePair.getValueString(),
+                                                         metaField)) {
+                invariantStatusOK(fieldValuePair.setValueString(
+                    getRenamedField(fieldValuePair.getValueString(), "meta")));
+            }
         }
     }
 
