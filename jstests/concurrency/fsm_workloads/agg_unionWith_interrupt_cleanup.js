@@ -87,7 +87,7 @@ var $config = extendWorkload($config, function($config, $super) {
                     cursors: [result.cursor.cursorId]
                 }));
         }
-        const remainingOps =
+        const remainingOps = () =>
             db.getSiblingDB("admin")
                 .aggregate([
                     {$currentOp: {idleCursors: true}},
@@ -104,7 +104,9 @@ var $config = extendWorkload($config, function($config, $super) {
                     }
                 ])
                 .toArray();
-        assertAlways.eq(remainingOps.length, 0, remainingOps);
+        assertAlways.soon(
+            () => remainingOps().length == 0,
+            () => "tried to kill cursors but they're still alive\n" + tojson(remainingOps()));
     };
 
     return $config;
