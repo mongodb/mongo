@@ -160,20 +160,16 @@ bool queryOnlyDependsOnMetaField(OperationContext* opCtx,
 }
 
 bool updateOnlyModifiesMetaField(OperationContext* opCtx,
-                                 const NamespaceString& ns,
                                  const mongo::write_ops::UpdateModification& updateMod,
                                  StringData metaField) {
     invariant(updateMod.type() != write_ops::UpdateModification::Type::kDelta);
     uassert(ErrorCodes::InvalidOptions,
-            str::stream() << "Pipeline updates are not supported for time-series collections: "
-                          << ns,
+            "Cannot perform an update on a time-series collection using a pipeline update",
             updateMod.type() != write_ops::UpdateModification::Type::kPipeline);
 
     const auto& document = updateMod.getUpdateClassic();
     uassert(ErrorCodes::InvalidOptions,
-            str::stream()
-                << "Replacement document updates are not supported for time-series collections: "
-                << ns,
+            "Cannot perform an update on a time-series collection using a replacement document",
             !isDocReplacement(document));
 
     return std::all_of(document.begin(), document.end(), [metaField](const auto& updatePair) {

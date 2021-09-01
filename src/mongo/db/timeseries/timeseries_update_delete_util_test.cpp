@@ -345,7 +345,6 @@ TEST_F(TimeseriesUpdateDeleteUtilTest, UpdateOnlyModifiesMetaField) {
     // {$set: {tag: "A"}}
     ASSERT_TRUE(timeseries::updateOnlyModifiesMetaField(
         _opCtx.get(),
-        _ns,
         write_ops::UpdateModification::parseFromClassicUpdate(
             BSON("$set" << BSON(_metaField << "A"))),
         _metaField));
@@ -353,7 +352,6 @@ TEST_F(TimeseriesUpdateDeleteUtilTest, UpdateOnlyModifiesMetaField) {
     // {$set: {nonMetaField: "A"}}
     ASSERT_FALSE(timeseries::updateOnlyModifiesMetaField(
         _opCtx.get(),
-        _ns,
         write_ops::UpdateModification::parseFromClassicUpdate(BSON("$set" << BSON("nonMetaField"
                                                                                   << "A"))),
         _metaField));
@@ -361,7 +359,6 @@ TEST_F(TimeseriesUpdateDeleteUtilTest, UpdateOnlyModifiesMetaField) {
     // {$set: {tag.a: "A"}}
     ASSERT_TRUE(timeseries::updateOnlyModifiesMetaField(
         _opCtx.get(),
-        _ns,
         write_ops::UpdateModification::parseFromClassicUpdate(BSON("$set" << BSON(_metaField + ".a"
                                                                                   << "A"))),
         _metaField));
@@ -369,7 +366,6 @@ TEST_F(TimeseriesUpdateDeleteUtilTest, UpdateOnlyModifiesMetaField) {
     // {$unset: {tag.a: ""}}
     ASSERT_TRUE(timeseries::updateOnlyModifiesMetaField(
         _opCtx.get(),
-        _ns,
         write_ops::UpdateModification::parseFromClassicUpdate(
             BSON("$unset" << BSON(_metaField + ".a"
                                   << ""))),
@@ -378,7 +374,6 @@ TEST_F(TimeseriesUpdateDeleteUtilTest, UpdateOnlyModifiesMetaField) {
     // {$unset: {tag.a: ""}, {$inc: {nonMetaField: 10}}}
     ASSERT_FALSE(timeseries::updateOnlyModifiesMetaField(
         _opCtx.get(),
-        _ns,
         write_ops::UpdateModification::parseFromClassicUpdate(
             BSON("$unset" << BSON(_metaField + ".a"
                                   << "")
@@ -388,7 +383,6 @@ TEST_F(TimeseriesUpdateDeleteUtilTest, UpdateOnlyModifiesMetaField) {
     // {$unset: {tag.a: ""}, {$inc: {tagggg: 10}}}
     ASSERT_FALSE(timeseries::updateOnlyModifiesMetaField(
         _opCtx.get(),
-        _ns,
         write_ops::UpdateModification::parseFromClassicUpdate(
             BSON("$unset" << BSON(_metaField + ".a"
                                   << "")
@@ -398,7 +392,6 @@ TEST_F(TimeseriesUpdateDeleteUtilTest, UpdateOnlyModifiesMetaField) {
     // {$rename: {"tag.a": "tag.b"}}
     ASSERT_TRUE(timeseries::updateOnlyModifiesMetaField(
         _opCtx.get(),
-        _ns,
         write_ops::UpdateModification::parseFromClassicUpdate(
             BSON("$rename" << BSON(_metaField + ".a" << _metaField + ".b"))),
         _metaField));
@@ -406,7 +399,6 @@ TEST_F(TimeseriesUpdateDeleteUtilTest, UpdateOnlyModifiesMetaField) {
     // {$rename: {"tag.a": "tag.b", "A": "tag.A"}}
     ASSERT_FALSE(timeseries::updateOnlyModifiesMetaField(
         _opCtx.get(),
-        _ns,
         write_ops::UpdateModification::parseFromClassicUpdate(
             BSON("$rename" << BSON(_metaField + ".a" << _metaField + ".b"
                                                      << "A" << _metaField + ".A"))),
@@ -415,7 +407,6 @@ TEST_F(TimeseriesUpdateDeleteUtilTest, UpdateOnlyModifiesMetaField) {
     // {$rename: {"tag": "notTag"}}
     ASSERT_FALSE(timeseries::updateOnlyModifiesMetaField(
         _opCtx.get(),
-        _ns,
         write_ops::UpdateModification::parseFromClassicUpdate(
             BSON("$rename" << BSON(_metaField << ".notTag"))),
         _metaField));
@@ -423,7 +414,6 @@ TEST_F(TimeseriesUpdateDeleteUtilTest, UpdateOnlyModifiesMetaField) {
     // {$rename: {"tag.a.a": "A", "tag.b": "B"}}
     ASSERT_FALSE(timeseries::updateOnlyModifiesMetaField(
         _opCtx.get(),
-        _ns,
         write_ops::UpdateModification::parseFromClassicUpdate(
             BSON("$rename" << BSON(_metaField + ".a.a"
                                    << "A" << _metaField + ".b"
@@ -433,7 +423,6 @@ TEST_F(TimeseriesUpdateDeleteUtilTest, UpdateOnlyModifiesMetaField) {
     // {$rename: {tag.tag.tag: 8}}
     ASSERT_FALSE(timeseries::updateOnlyModifiesMetaField(
         _opCtx.get(),
-        _ns,
         write_ops::UpdateModification::parseFromClassicUpdate(
             BSON("$rename" << BSON(_metaField + "." + _metaField + "." + _metaField << 8))),
         _metaField));
@@ -441,7 +430,6 @@ TEST_F(TimeseriesUpdateDeleteUtilTest, UpdateOnlyModifiesMetaField) {
     // {$set: {tag.$: 100}}
     ASSERT_TRUE(timeseries::updateOnlyModifiesMetaField(
         _opCtx.get(),
-        _ns,
         write_ops::UpdateModification::parseFromClassicUpdate(BSON("$set" << BSON(_metaField + ".$"
                                                                                   << ""))),
         _metaField));
@@ -449,7 +437,6 @@ TEST_F(TimeseriesUpdateDeleteUtilTest, UpdateOnlyModifiesMetaField) {
     // {$pull: {tag.arr: {$gte: 80}}}
     ASSERT_TRUE(timeseries::updateOnlyModifiesMetaField(
         _opCtx.get(),
-        _ns,
         write_ops::UpdateModification::parseFromClassicUpdate(
             BSON("$pull" << BSON(_metaField + ".arr" << BSON("gte" << 80)))),
         _metaField));
@@ -458,14 +445,13 @@ TEST_F(TimeseriesUpdateDeleteUtilTest, UpdateOnlyModifiesMetaField) {
     // {$inc: {nonMetaField: ""}}
     ASSERT_FALSE(timeseries::updateOnlyModifiesMetaField(
         _opCtx.get(),
-        _ns,
         write_ops::UpdateModification::parseFromClassicUpdate(BSON("$inc" << BSON("nonMetaField"
                                                                                   << ""))),
         StringData()));
 
     // Update with an empty document, which is considered a replacement document.
     ASSERT_THROWS(timeseries::updateOnlyModifiesMetaField(
-                      _opCtx.get(), _ns, write_ops::UpdateModification(), _metaField),
+                      _opCtx.get(), write_ops::UpdateModification(), _metaField),
                   ExceptionFor<ErrorCodes::InvalidOptions>);
 }
 
