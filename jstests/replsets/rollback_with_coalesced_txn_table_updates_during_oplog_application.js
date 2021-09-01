@@ -6,7 +6,7 @@
  * We also test that if a node crashes after oplog truncation during rollback, the update made to
  * the 'config.transactions' table is persisted on startup.
  *
- * @tags: [requires_persistence, disabled_due_to_server_58295]
+ * @tags: [requires_persistence]
  */
 
 (function() {

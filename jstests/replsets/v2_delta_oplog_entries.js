@@ -6,8 +6,6 @@
  * This test relies on the DBHash checker to run at the end to ensure that the primaries and
  * secondaries have the same data. For that reason it's important that this test not drop
  * intermediate collections.
- *
- * @tags: [disabled_due_to_server_58295]
  */
 (function() {
 const rst = new ReplSetTest({name: "v2_delta_oplog_entries", nodes: 2});

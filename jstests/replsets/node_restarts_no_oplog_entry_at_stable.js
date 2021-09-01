@@ -2,9 +2,13 @@
  * Test that we can restart a node that has an oplog hole open at the stable optime
  * when we kill it.
  *
+ * This test utilizes a single-node replica set and restarts its lone node during execution. Because
+ * single-node replica sets are initiated with the latest FCV, when this test restarts the
+ * node it is possible on multiversion suites for an older binary to be used that is incompatible
+ * with the latest FCV document. Therefore, this test is multiversion incompatible.
  * @tags: [
  *   requires_persistence,
- *   disabled_due_to_server_58295
+ *   multiversion_incompatible
  * ]
  */
 (function() {

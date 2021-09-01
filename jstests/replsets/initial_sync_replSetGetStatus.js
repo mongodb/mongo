@@ -1,8 +1,6 @@
 /**
  * This test tests that replSetGetStatus returns initial sync stats while initial sync is in
  * progress.
- *
- * @tags: [disabled_due_to_server_58295]
  */
 
 (function() {

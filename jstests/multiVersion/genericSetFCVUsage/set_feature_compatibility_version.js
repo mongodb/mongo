@@ -1,7 +1,5 @@
 /**
  * Tests setFeatureCompatibilityVersion.
- *
- * @tags: [disabled_due_to_server_58295]
  */
 
 // Checking UUID consistency involves talking to a shard node, which in this test is shutdown

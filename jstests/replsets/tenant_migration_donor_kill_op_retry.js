@@ -2,7 +2,6 @@
  * Tests that the donor will retry its steps if its OperationContext is interrupted by a killOp.
  *
  * @tags: [
- *   disabled_due_to_server_58295,
  *   incompatible_with_eft,
  *   incompatible_with_macos,
  *   incompatible_with_windows_tls,

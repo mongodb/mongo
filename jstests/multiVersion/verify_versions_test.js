@@ -4,8 +4,6 @@
  * In particular, it tests that the shell version (returned by version()) compares equal to
  * "latest", not equal to "last-lts", and x.y compares equal to x.y.z, but that x.w does
  * not.
- *
- * @tags: [disabled_due_to_server_58295]
  */
 
 // Checking UUID consistency involves talking to a shard node, which in this test is shutdown

@@ -1,5 +1,4 @@
 // SERVER-15310 Ensure that stepDown kills all other running operations
-// @tags: [disabled_due_to_server_58295]
 
 (function() {
 "use strict";
