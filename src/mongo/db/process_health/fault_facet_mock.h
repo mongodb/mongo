@@ -28,11 +28,14 @@
  */
 #pragma once
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 #include <functional>
 
 #include "mongo/db/process_health/fault_facet.h"
 
 #include "mongo/db/service_context.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/timer.h"
 
@@ -42,43 +45,43 @@ namespace process_health {
 class FaultFacetMock : public FaultFacet {
 public:
     // Testing callback to fill up mocked values.
-    using MockCallback = std::function<void(double* severity)>;
+    using MockCallback = std::function<double()>;
 
-    FaultFacetMock(ServiceContext* svcCtx, MockCallback callback)
-        : _svcCtx(svcCtx), _callback(callback) {}
+    FaultFacetMock(FaultFacetType mockType, ClockSource* clockSource, MockCallback callback)
+        : _mockType(mockType), _clockSource(clockSource), _callback(callback) {
+        invariant(mockType == FaultFacetType::kMock1 || mockType == FaultFacetType::kMock2);
+    }
 
     ~FaultFacetMock() = default;
 
     FaultFacetType getType() const override {
-        return FaultFacetType::kMock;
+        return _mockType;
     }
 
     HealthCheckStatus getStatus() const override {
-        double severity;
-        _callback(&severity);
+        double severity = _callback();
 
         auto lk = stdx::lock_guard(_mutex);
         if (HealthCheckStatus::isActiveFault(severity)) {
             if (_activeFaultTime == Date_t::max()) {
-                _activeFaultTime = _svcCtx->getFastClockSource()->now();
+                _activeFaultTime = _clockSource->now();
             }
         } else {
             _activeFaultTime = Date_t::max();
         }
 
-        auto now = _svcCtx->getFastClockSource()->now();
-        HealthCheckStatus healthCheckStatus(FaultFacetType::kMock,
-                                            severity,
-                                            "Mock facet",
-                                            now - _activeFaultTime,
-                                            now - _startTime);
+        auto now = _clockSource->now();
+        HealthCheckStatus healthCheckStatus(
+            _mockType, severity, "Mock facet", now - _activeFaultTime, now - _startTime);
+        LOGV2(5956702, "Mock fault facet status", "status"_attr = healthCheckStatus);
 
         return healthCheckStatus;
     }
 
 private:
-    ServiceContext* const _svcCtx;
-    const Date_t _startTime = _svcCtx->getFastClockSource()->now();
+    const FaultFacetType _mockType;
+    ClockSource* const _clockSource;
+    const Date_t _startTime = _clockSource->now();
     const MockCallback _callback;
 
     mutable Mutex _mutex;

@@ -45,19 +45,71 @@ using test::FaultManagerTest;
 namespace {
 
 TEST_F(FaultManagerTest, Registration) {
-    registerMockHealthObserver([] { return 0; });
+    registerMockHealthObserver(FaultFacetType::kMock1, [] { return 0; });
     auto allObservers = healthObserverRegistration().instantiateAllObservers();
     ASSERT_EQ(1, allObservers.size());
-    ASSERT_EQ(FaultFacetType::kMock, allObservers[0]->getType());
+    ASSERT_EQ(FaultFacetType::kMock1, allObservers[0]->getType());
 }
 
 TEST_F(FaultManagerTest, HealthCheckCreatesObservers) {
-    registerMockHealthObserver([] { return 0.1; });
+    registerMockHealthObserver(FaultFacetType::kMock1, [] { return 0.1; });
     ASSERT_EQ(0, manager().getHealthObserversTest().size());
 
     // Trigger periodic health check.
     manager().healthCheckTest();
     ASSERT_EQ(1, manager().getHealthObserversTest().size());
+}
+
+TEST_F(FaultManagerTest, HealthCheckCreatesFacetOnHealthCheckFoundFault) {
+    registerMockHealthObserver(FaultFacetType::kMock1, [] { return 0.1; });
+    auto activeFault = manager().activeFault();
+    ASSERT_TRUE(!activeFault);  // Not created yet.
+
+    manager().healthCheckTest();
+    activeFault = manager().activeFault();
+    ASSERT_TRUE(activeFault);  // Is created.
+}
+
+TEST_F(FaultManagerTest, HealthCheckCreatesCorrectFacetOnHealthCheckFoundFault) {
+    registerMockHealthObserver(FaultFacetType::kMock1, [] { return 0.1; });
+    registerMockHealthObserver(FaultFacetType::kMock2, [] { return 0.0; });
+    manager().healthCheckTest();
+    auto activeFault = manager().activeFault();
+    ASSERT_TRUE(activeFault);  // Is created.
+
+    FaultInternal& internalFault = manager().getFault();
+    ASSERT_TRUE(internalFault.getFaultFacet(FaultFacetType::kMock1));
+    ASSERT_FALSE(internalFault.getFaultFacet(FaultFacetType::kMock2));
+}
+
+TEST_F(FaultManagerTest, HealthCheckCreatesFacetThenIsGarbageCollected) {
+    AtomicDouble severity{0.1};
+    registerMockHealthObserver(FaultFacetType::kMock1, [&severity] { return severity.load(); });
+    manager().healthCheckTest();
+    ASSERT_TRUE(manager().activeFault());  // Is created.
+
+    // Resolve and it should be garbage collected.
+    severity.store(0.0);
+    manager().healthCheckTest();
+    ASSERT_FALSE(manager().activeFault());
+}
+
+TEST_F(FaultManagerTest, HealthCheckCreates2FacetsThenIsGarbageCollected) {
+    AtomicDouble severity1{0.1};
+    AtomicDouble severity2{0.1};
+    registerMockHealthObserver(FaultFacetType::kMock1, [&severity1] { return severity1.load(); });
+    registerMockHealthObserver(FaultFacetType::kMock2, [&severity2] { return severity2.load(); });
+    manager().healthCheckTest();
+
+    FaultInternal& internalFault = manager().getFault();
+    ASSERT_TRUE(internalFault.getFaultFacet(FaultFacetType::kMock1));
+    ASSERT_TRUE(internalFault.getFaultFacet(FaultFacetType::kMock2));
+
+    // Resolve one facet and it should be garbage collected.
+    severity1.store(0.0);
+    manager().healthCheckTest();
+    ASSERT_FALSE(internalFault.getFaultFacet(FaultFacetType::kMock1));
+    ASSERT_TRUE(internalFault.getFaultFacet(FaultFacetType::kMock2));
 }
 
 }  // namespace

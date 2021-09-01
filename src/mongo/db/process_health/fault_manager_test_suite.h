@@ -65,6 +65,12 @@ public:
     std::vector<HealthObserver*> getHealthObserversTest() {
         return getHealthObservers();
     }
+
+    FaultInternal& getFault() {
+        FaultFacetsContainerPtr fault = getFaultFacetsContainer();
+        invariant(fault);
+        return *(static_cast<FaultInternal*>(fault.get()));
+    }
 };
 
 /**
@@ -74,13 +80,16 @@ class FaultManagerTest : public unittest::Test {
 public:
     void setUp() override {
         _svcCtx = ServiceContext::make();
+        _svcCtx->setFastClockSource(std::make_unique<ClockSourceMock>());
         FaultManager::set(_svcCtx.get(), std::make_unique<FaultManagerTestImpl>(_svcCtx.get()));
     }
 
-    void registerMockHealthObserver(std::function<double()> getSeverityCallback) {
+    void registerMockHealthObserver(FaultFacetType mockType,
+                                    std::function<double()> getSeverityCallback) {
         HealthObserverRegistration* reg = HealthObserverRegistration::get(_svcCtx.get());
-        reg->registerObserverFactory([getSeverityCallback](ServiceContext* svcCtx) {
-            return std::make_unique<HealthObserverMock>(svcCtx, getSeverityCallback);
+        reg->registerObserverFactory([mockType, getSeverityCallback](ServiceContext* svcCtx) {
+            return std::make_unique<HealthObserverMock>(
+                mockType, svcCtx->getFastClockSource(), getSeverityCallback);
         });
     }
 
@@ -90,6 +99,10 @@ public:
 
     HealthObserverRegistration& healthObserverRegistration() {
         return *HealthObserverRegistration::get(_svcCtx.get());
+    }
+
+    ClockSourceMock& clockSource() {
+        return *static_cast<ClockSourceMock*>(_svcCtx->getFastClockSource());
     }
 
 private:

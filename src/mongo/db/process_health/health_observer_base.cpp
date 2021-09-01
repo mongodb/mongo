@@ -34,13 +34,35 @@
 namespace mongo {
 namespace process_health {
 
-HealthObserverBase::HealthObserverBase(ServiceContext* svcCtx) : _svcCtx(svcCtx) {}
+HealthObserverBase::HealthObserverBase(ClockSource* clockSource) : _clockSource(clockSource) {}
 
-void HealthObserverBase::periodicCheck() {
-    double severity = periodicCheckImpl();
+void HealthObserverBase::periodicCheck(FaultFacetsContainerFactory& factory) {
+    // Before invoking the implementation callback, we need to find out if
+    // there is an ongoing fault of this kind.
+    FaultFacetPtr optionalExistingFacet;
+    auto optionalExistingContainer = factory.getFaultFacetsContainer();
 
-    if (HealthCheckStatus::isResolved(severity)) {
+    if (optionalExistingContainer) {
+        optionalExistingFacet = optionalExistingContainer->getFaultFacet(getType());
     }
+
+    // Do the health check.
+    optionalExistingFacet = periodicCheckImpl(optionalExistingFacet);
+
+    // Send the result back to container.
+    optionalExistingContainer = factory.getFaultFacetsContainer();
+
+    if (!optionalExistingContainer && !optionalExistingFacet) {
+        return;  // Nothing to do.
+    }
+
+    if (!optionalExistingContainer) {
+        // Need to create container first.
+        optionalExistingContainer = factory.getOrCreateFaultFacetsContainer();
+    }
+    invariant(optionalExistingContainer);
+
+    optionalExistingContainer->updateWithSuppliedFacet(getType(), optionalExistingFacet);
 }
 
 }  // namespace process_health

@@ -40,37 +40,27 @@ namespace process_health {
  */
 class FaultFacetsContainer {
 public:
-    /**
-     * We do not allow the facets added to this container to be immediately deleted. This
-     * is the minimal lifetime before a fully resolved facet could be deleted.
-     */
-    static constexpr Milliseconds kMinimalFacetLifetimeToDelete = Milliseconds(10000);
-
     virtual ~FaultFacetsContainer() = default;
 
     virtual std::vector<FaultFacetPtr> getFacets() const = 0;
 
     /**
      * Checks that a Facet of a given type already exists and returns it.
+     *
+     * @returns existing facet or null.
      */
-    virtual boost::optional<FaultFacetPtr> getFaultFacet(FaultFacetType type) = 0;
+    virtual FaultFacetPtr getFaultFacet(FaultFacetType type) = 0;
 
     /**
-     * Getter that takes a create callback in case the facet of a given type is missing.
-     * We do not have a separate create factory interface to avoid having the registration
-     * mechanism for those factories, which is not necessary.
+     * Update the container with supplied facet. If the optional contains no
+     * value, remove the existing facet from the container.
      *
-     * @param createCb The callback is invoked only if the facet of this type does not exist.
+     * @param facet new value to insert/replace or nullptr to delete.
      */
-    virtual FaultFacetPtr getOrCreateFaultFacet(FaultFacetType type,
-                                                std::function<FaultFacetPtr()> createCb) = 0;
+    virtual void updateWithSuppliedFacet(FaultFacetType type, FaultFacetPtr facet) = 0;
 
     /**
-     * Performs necessary actions to delete all resolved facets with lifetime of
-     * at least kMinimalFacetLifetimeToDelete.
-     *
-     * The interface for deleting facets is not provided because the container should
-     * garbage collect them.
+     * Performs necessary actions to delete all resolved facets.
      */
     virtual void garbageCollectResolvedFacets() = 0;
 };
@@ -85,7 +75,7 @@ class FaultFacetsContainerFactory {
 public:
     virtual ~FaultFacetsContainerFactory() = default;
 
-    virtual boost::optional<FaultFacetsContainerPtr> getFaultFacetsContainer() = 0;
+    virtual FaultFacetsContainerPtr getFaultFacetsContainer() = 0;
 
     virtual FaultFacetsContainerPtr getOrCreateFaultFacetsContainer() = 0;
 };

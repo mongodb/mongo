@@ -42,19 +42,25 @@ namespace process_health {
  */
 class HealthObserverBase : public HealthObserver {
 public:
-    HealthObserverBase(ServiceContext* svcCtx);
+    HealthObserverBase(ClockSource* clockSource);
     virtual ~HealthObserverBase() = default;
 
     // Implements the common logic for periodic checks.
     // Every observer should implement periodicCheckImpl() for specific tests.
-    void periodicCheck() final;
+    void periodicCheck(FaultFacetsContainerFactory& factory) final;
 
 protected:
-    // Returns the severity after the check.
+    /**
+     * The main method every health observer should implement for a particular
+     * health check it does.
+     *
+     * @param optionalExistingFacet if a fault facet of this particular type already exists
+     *        (if there is an ongoing incident already)
+     */
     // TODO(SERVER-59592): futurize this.
-    virtual double periodicCheckImpl() = 0;
+    virtual FaultFacetPtr periodicCheckImpl(FaultFacetPtr optionalExistingFacet) = 0;
 
-    ServiceContext* const _svcCtx;
+    ClockSource* const _clockSource;
 };
 
 }  // namespace process_health

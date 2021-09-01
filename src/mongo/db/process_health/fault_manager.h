@@ -84,8 +84,8 @@ public:
     // Returns the current fault state for the server.
     virtual FaultState getFaultState() const;
 
-    // Returns the current fault, if any.
-    virtual boost::optional<FaultConstPtr> activeFault() const;
+    // Returns the current fault, if any. Otherwise returns an empty pointer.
+    virtual FaultConstPtr activeFault() const;
 
 protected:
     // Starts the health check sequence and updates the internal state on completion.
@@ -101,7 +101,7 @@ protected:
     // Protected interface FaultFacetsContainerFactory implementation.
 
     // The interface FaultFacetsContainerFactory is implemented by the member '_fault'.
-    boost::optional<FaultFacetsContainerPtr> getFaultFacetsContainer() override;
+    FaultFacetsContainerPtr getFaultFacetsContainer() override;
 
     FaultFacetsContainerPtr getOrCreateFaultFacetsContainer() override;
 

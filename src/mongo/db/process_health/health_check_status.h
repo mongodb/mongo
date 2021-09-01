@@ -40,7 +40,7 @@ namespace process_health {
 /**
  * All fault types we support in this package.
  */
-enum class FaultFacetType { kMock = 0 };
+enum class FaultFacetType { kMock1 = 0, kMock2 };
 
 /**
  * The immutable class representing current status of an ongoing fault tracked by facet.
@@ -110,7 +110,11 @@ public:
         return _duration;
     }
 
-    void appendDescription(BSONObjBuilder* builder) const {}
+    void appendDescription(BSONObjBuilder* builder) const;
+
+    BSONObj toBSON() const;
+
+    std::string toString() const;
 
     // Helpers for severity levels.
 
@@ -128,6 +132,9 @@ public:
     }
 
 private:
+    friend std::ostream& operator<<(std::ostream&, const HealthCheckStatus&);
+    friend StringBuilder& operator<<(StringBuilder& s, const HealthCheckStatus& hcs);
+
     const FaultFacetType _type;
     const double _severity;
     const std::string _description;
@@ -135,13 +142,54 @@ private:
     const Milliseconds _duration;
 };
 
-inline std::ostream& operator<<(std::ostream& os, const FaultFacetType& type) {
+inline StringBuilder& operator<<(StringBuilder& s, const FaultFacetType& type) {
     switch (type) {
-        case FaultFacetType::kMock:
-            return os << "kMock"_sd;
+        case FaultFacetType::kMock1:
+            return s << "kMock1"_sd;
+        case FaultFacetType::kMock2:
+            return s << "kMock2"_sd;
         default:
-            return os << "Uknown"_sd;
+            return s << "Uknown"_sd;
     }
+}
+
+inline std::ostream& operator<<(std::ostream& os, const FaultFacetType& type) {
+    StringBuilder sb;
+    sb << type;
+    os << sb.stringData();
+    return os;
+}
+
+inline void HealthCheckStatus::appendDescription(BSONObjBuilder* builder) const {
+    builder->append("type", _type);
+    builder->append("description", _description);
+    builder->append("severity", _severity);
+    builder->append("activeFaultDuration", _activeFaultDuration.toString());
+    builder->append("duration", _duration.toString());
+}
+
+inline StringBuilder& operator<<(StringBuilder& s, const HealthCheckStatus& hcs) {
+    BSONObjBuilder bob;
+    hcs.appendDescription(&bob);
+    return s << bob.obj();
+}
+
+inline std::ostream& operator<<(std::ostream& os, const HealthCheckStatus& hcs) {
+    BSONObjBuilder bob;
+    hcs.appendDescription(&bob);
+    return os << bob.obj();
+}
+
+inline BSONObj HealthCheckStatus::toBSON() const {
+    BSONObjBuilder bob;
+    appendDescription(&bob);
+    return bob.obj();
+}
+
+inline std::string HealthCheckStatus::toString() const {
+    BSONObjBuilder bob;
+    appendDescription(&bob);
+    return bob.obj().toString();
 }
 
 }  // namespace process_health

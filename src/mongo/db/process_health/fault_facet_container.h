@@ -53,7 +53,7 @@ public:
     /**
      * Checks that a Facet of a given type already exists and returns it.
      */
-    virtual boost::optional<FaultFacetPtr> getFaultFacet(FaultFacetType type) = 0;
+    virtual FaultFacetPtr getFaultFacet(FaultFacetType type) = 0;
 
     /**
      * Getter that takes a create callback in case the facet of a given type is missing.
@@ -85,7 +85,10 @@ class FaultFacetContainerFactory {
 public:
     virtual ~FaultFacetContainerFactory() = default;
 
-    virtual boost::optional<FaultFacetContainerPtr> getFaultFacetContainer() = 0;
+    /**
+     * @return FaultFacetContainer or null pointer if it doesn't exist.
+     */
+    virtual FaultFacetContainerPtr getFaultFacetContainer() = 0;
 
     virtual FaultFacetContainerPtr getOrCreateFaultFacetContainer() = 0;
 };
