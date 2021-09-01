@@ -9,8 +9,10 @@ from itertools import chain
 import logging
 import os
 import re
+import subprocess
 import sys
 import time
+from typing import Optional, Dict, Any
 
 import structlog
 import yaml
@@ -41,6 +43,19 @@ def setup_logging(debug=False):
     logging.getLogger("evergreen").setLevel(logging.WARNING)
     logging.getLogger("github").setLevel(logging.WARNING)
     structlog.configure(logger_factory=structlog.stdlib.LoggerFactory())
+
+
+def get_merge_base_commit(version: str) -> str:
+    """Get merge-base commit hash between origin/master and version."""
+    cmd = ["git", "merge-base", "origin/master", f"origin/v{version}"]
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+    if result.returncode:
+        LOGGER.error("Git merge-base command failed.", cmd=cmd,
+                     error=result.stderr.decode("utf-8").strip())
+        exit(result.returncode)
+    commit_hash = result.stdout.decode("utf-8").strip()
+    LOGGER.info("Found merge-base commit.", cmd=cmd, commit=commit_hash)
+    return commit_hash
 
 
 class SetupMultiversion(Subcommand):
@@ -112,10 +127,16 @@ class SetupMultiversion(Subcommand):
                 urls = {}
                 if self.use_latest:
                     urls = self.get_latest_urls(version)
+                if self.use_latest and not urls:
+                    LOGGER.warning("Latest URL is not available, falling back"
+                                   " to getting the URL from 'mongodb-mongo-master'"
+                                   " project preceding the merge-base commit.")
+                    merge_base_revision = get_merge_base_commit(version)
+                    urls = self.get_latest_urls("master", merge_base_revision)
                 if not urls:
-                    LOGGER.warning("Latest URL is not available or not requested, "
-                                   "we fallback to getting the URL for a specific "
-                                   "version.")
+                    LOGGER.warning("Latest URL is not available or not requested,"
+                                   " falling back to getting the URL for a specific"
+                                   " version.")
                     urls = self.get_urls(version)
 
                 bin_suffix = self._get_bin_suffix(version, urls["project_id"])
@@ -172,7 +193,8 @@ class SetupMultiversion(Subcommand):
 
         LOGGER.info(f"Finished writing binary paths on Windows to {config.WINDOWS_BIN_PATHS_FILE}")
 
-    def get_latest_urls(self, version):
+    def get_latest_urls(self, version: str,
+                        start_from_revision: Optional[str] = None) -> Dict[str, Any]:
         """Return latest urls."""
         urls = {}
 
@@ -195,7 +217,16 @@ class SetupMultiversion(Subcommand):
         major_minor_version = version
         LOGGER.debug("Found buildvariant.", buildvariant_name=buildvariant_name)
 
+        found_start_revision = start_from_revision is None
+
         for evg_version in chain(iter([evg_version]), evg_versions):
+            # Skip all versions until we get the revision we should start looking from
+            if found_start_revision is False and evg_version.revision != start_from_revision:
+                LOGGER.warning("Skipping evergreen version.", evg_version=evg_version)
+                continue
+            else:
+                found_start_revision = True
+
             if hasattr(evg_version, "build_variants_map"):
                 if buildvariant_name not in evg_version.build_variants_map:
                     buildvariant_name = self.fallback_to_generic_buildvariant(major_minor_version)
