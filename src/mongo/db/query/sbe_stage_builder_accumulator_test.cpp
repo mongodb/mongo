@@ -137,7 +137,9 @@ protected:
         sbe::value::ValueGuard resultGuard{resultsTag, resultsVal};
         auto [expectedTag, expectedVal] = stage_builder::makeValue(expectedValue);
         sbe::value::ValueGuard expectedGuard{expectedTag, expectedVal};
-        ASSERT_TRUE(valueEquals(resultsTag, resultsVal, expectedTag, expectedVal));
+        ASSERT_TRUE(valueEquals(resultsTag, resultsVal, expectedTag, expectedVal))
+            << "expected: " << std::make_pair(expectedTag, expectedVal)
+            << " but got: " << std::make_pair(resultsTag, resultsVal);
     }
 
     void runAggregationWithGroupByTest(StringData queryStatement,
@@ -1024,6 +1026,77 @@ TEST_F(SbeAccumulatorBuilderTest, AddToSetAccumulatorTranslationAllMissingFields
     auto docs = std::vector<BSONArray>{
         BSON_ARRAY(BSON("a" << 1)), BSON_ARRAY(BSON("a" << 2)), BSON_ARRAY(BSON("a" << 3))};
     runAddToSetTest("{x: {$addToSet: '$b'}}", docs, BSONArray{});
+}
+
+TEST_F(SbeAccumulatorBuilderTest, PushAccumulatorTranslationNoDocs) {
+    auto docs = std::vector<BSONArray>{BSONArray{}};
+    runAggregationWithNoGroupByTest("{x: {$push: '$b'}}", docs, BSON_ARRAY(BSONArray{}));
+}
+
+TEST_F(SbeAccumulatorBuilderTest, PushAccumulatorTranslationBasic) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 3)),
+                                       BSON_ARRAY(BSON("a" << 2 << "b" << 1)),
+                                       BSON_ARRAY(BSON("a" << 3 << "b" << 2)),
+                                       BSON_ARRAY(BSON("a" << 1 << "b" << 3))};
+    runAggregationWithNoGroupByTest(
+        "{x: {$push: '$b'}}", docs, BSON_ARRAY(BSON_ARRAY(3 << 1 << 2 << 3)));
+}
+
+TEST_F(SbeAccumulatorBuilderTest, PushAccumulatorTranslationSomeMissing) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 3)),
+                                       BSON_ARRAY(BSON("a" << 2 << "b" << 1)),
+                                       BSON_ARRAY(BSON("a" << 3))};
+    runAggregationWithNoGroupByTest("{x: {$push: '$b'}}", docs, BSON_ARRAY(BSON_ARRAY(3 << 1)));
+}
+
+TEST_F(SbeAccumulatorBuilderTest, PushAccumulatorTranslationAllMissing) {
+    auto docs = std::vector<BSONArray>{
+        BSON_ARRAY(BSON("a" << 1)), BSON_ARRAY(BSON("a" << 2)), BSON_ARRAY(BSON("a" << 3))};
+    runAggregationWithNoGroupByTest("{x: {$push: '$b'}}", docs, BSON_ARRAY(BSONArray{}));
+}
+
+TEST_F(SbeAccumulatorBuilderTest, PushAccumulatorTranslationExpression) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 3)),
+                                       BSON_ARRAY(BSON("a" << 2 << "b" << 1)),
+                                       BSON_ARRAY(BSON("a" << 3 << "b" << 2))};
+    runAggregationWithNoGroupByTest(
+        "{x: {$push: {$add: ['$a','$b']}}}", docs, BSON_ARRAY(BSON_ARRAY(1 + 3 << 2 + 1 << 3 + 2)));
+}
+
+TEST_F(SbeAccumulatorBuilderTest, PushAccumulatorTranslationExpressionMissingField) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 3)),
+                                       BSON_ARRAY(BSON("a" << 2 << "b" << 1)),
+                                       BSON_ARRAY(BSON("a" << 3))};
+    runAggregationWithNoGroupByTest(
+        "{x: {$push: {$add: ['$a','$b']}}}",
+        docs,
+        BSON_ARRAY(BSON_ARRAY(1 + 3 << 2 + 1 << BSONNULL /*3 + Nothing*/)));
+}
+
+TEST_F(SbeAccumulatorBuilderTest, PushAccumulatorTranslationExpressionInvalid) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 3)),
+                                       BSON_ARRAY(BSON("a" << 2 << "b" << 1)),
+                                       BSON_ARRAY(BSON("a" << 3 << "b"
+                                                           << "hello"))};
+    ASSERT_THROWS(
+        runAggregationWithNoGroupByTest("{x: {$push: {$add: ['$a','$b']}}}", docs, BSONArray{}),
+        AssertionException);
+}
+
+TEST_F(SbeAccumulatorBuilderTest, PushAccumulatorTranslationVariousTypes) {
+    const auto bsonArr = BSON_ARRAY(1 << 2 << 3);
+    const auto bsonObj = BSON("c" << 1);
+    const auto strVal = "hello"_sd;
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 42)),
+                                       BSON_ARRAY(BSON("a" << 2 << "b" << 4.2)),
+                                       BSON_ARRAY(BSON("a" << 3 << "b" << true)),
+                                       BSON_ARRAY(BSON("a" << 4 << "b" << strVal)),
+                                       BSON_ARRAY(BSON("a" << 5 << "b" << bsonObj)),
+                                       BSON_ARRAY(BSON("a" << 6 << "b" << bsonArr))};
+    runAggregationWithNoGroupByTest(
+        "{x: {$push: '$b'}}",
+        docs,
+        BSON_ARRAY(BSON_ARRAY(42 << 4.2 << true << strVal << bsonObj << bsonArr)));
 }
 
 }  // namespace mongo

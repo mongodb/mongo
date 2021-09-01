@@ -102,19 +102,6 @@ std::pair<std::vector<std::unique_ptr<sbe::EExpression>>, EvalStage> buildAccumu
     return {std::move(aggs), std::move(inputStage)};
 }
 
-std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> buildFinalizeFirst(
-    StageBuilderState& state,
-    const AccumulationExpression& expr,
-    const sbe::value::SlotVector& firstSlots,
-    EvalStage inputStage,
-    PlanNodeId planNodeId) {
-    tassert(5755101,
-            str::stream() << "Expected one input slot for finalization of first, got: "
-                          << firstSlots.size(),
-            firstSlots.size() == 1);
-    return {makeVariable(firstSlots[0]), std::move(inputStage)};
-}
-
 std::pair<std::vector<std::unique_ptr<sbe::EExpression>>, EvalStage> buildAccumulatorLast(
     StageBuilderState& state,
     const AccumulationExpression& expr,
@@ -124,19 +111,6 @@ std::pair<std::vector<std::unique_ptr<sbe::EExpression>>, EvalStage> buildAccumu
     std::vector<std::unique_ptr<sbe::EExpression>> aggs;
     aggs.push_back(makeFunction("last", makeFillEmptyNull(std::move(arg))));
     return {std::move(aggs), std::move(inputStage)};
-}
-
-std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> buildFinalizeLast(
-    StageBuilderState& state,
-    const AccumulationExpression& expr,
-    const sbe::value::SlotVector& lastSlots,
-    EvalStage inputStage,
-    PlanNodeId planNodeId) {
-    tassert(5755102,
-            str::stream() << "Expected one input slot for finalization of last, got: "
-                          << lastSlots.size(),
-            lastSlots.size() == 1);
-    return {makeVariable(lastSlots[0]), std::move(inputStage)};
 }
 
 std::pair<std::vector<std::unique_ptr<sbe::EExpression>>, EvalStage> buildAccumulatorAvg(
@@ -209,20 +183,30 @@ std::pair<std::vector<std::unique_ptr<sbe::EExpression>>, EvalStage> buildAccumu
     return {std::move(aggs), std::move(inputStage)};
 }
 
-std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> buildFinalizeAddToSet(
+std::pair<std::vector<std::unique_ptr<sbe::EExpression>>, EvalStage> buildAccumulatorPush(
     StageBuilderState& state,
     const AccumulationExpression& expr,
-    const sbe::value::SlotVector& addToSetSlots,
+    std::unique_ptr<sbe::EExpression> arg,
     EvalStage inputStage,
     PlanNodeId planNodeId) {
-    tassert(5755001,
-            str::stream() << "Expected one slot to finalize addToSet, got: "
-                          << addToSetSlots.size(),
-            addToSetSlots.size() == 1);
-
-    return {makeVariable(addToSetSlots[0]), std::move(inputStage)};
+    std::vector<std::unique_ptr<sbe::EExpression>> aggs;
+    aggs.push_back(makeFunction("addToArray", std::move(arg)));
+    return {std::move(aggs), std::move(inputStage)};
 }
 
+std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> buildFinalizePassthrough(
+    StageBuilderState& state,
+    const AccumulationExpression& expr,
+    const sbe::value::SlotVector& aggSlots,
+    EvalStage inputStage,
+    PlanNodeId planNodeId) {
+    tassert(5911101,
+            str::stream() << "Expected one slot in the trivial finalizer but got: "
+                          << aggSlots.size(),
+            aggSlots.size() == 1);
+
+    return {makeVariable(aggSlots[0]), std::move(inputStage)};
+}
 };  // namespace
 
 std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> buildArgument(
@@ -256,8 +240,10 @@ std::pair<std::vector<std::unique_ptr<sbe::EExpression>>, EvalStage> buildAccumu
         {AccumulatorFirst::kName, &buildAccumulatorFirst},
         {AccumulatorLast::kName, &buildAccumulatorLast},
         {AccumulatorAvg::kName, &buildAccumulatorAvg},
+        {AccumulatorAddToSet::kName, &buildAccumulatorAddToSet},
         {AccumulatorSum::kName, &buildAccumulatorSum},
-        {AccumulatorAddToSet::kName, &buildAccumulatorAddToSet}};
+        {AccumulatorPush::kName, &buildAccumulatorPush},
+    };
 
     auto accExprName = acc.expr.name;
     uassert(5754701,
@@ -288,11 +274,13 @@ std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> buildFinalize(
     static const StringDataMap<BuildFinalizeFn> kAccumulatorBuilders = {
         {AccumulatorMin::kName, &buildFinalizeMin},
         {AccumulatorMax::kName, &buildFinalizeMax},
-        {AccumulatorFirst::kName, &buildFinalizeFirst},
-        {AccumulatorLast::kName, &buildFinalizeLast},
+        {AccumulatorFirst::kName, &buildFinalizePassthrough},
+        {AccumulatorLast::kName, &buildFinalizePassthrough},
         {AccumulatorAvg::kName, &buildFinalizeAvg},
+        {AccumulatorAddToSet::kName, &buildFinalizePassthrough},
         {AccumulatorSum::kName, &buildFinalizeSum},
-        {AccumulatorAddToSet::kName, &buildFinalizeAddToSet}};
+        {AccumulatorPush::kName, &buildFinalizePassthrough},
+    };
 
     auto accExprName = acc.expr.name;
     uassert(5754700,
