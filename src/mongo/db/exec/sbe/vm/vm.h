@@ -249,6 +249,8 @@ struct Instruction {
         getArraySize,
 
         aggSum,
+        aggDoubleDoubleSum,
+        doubleDoubleSumFinalize,
         aggMin,
         aggMax,
         aggFirst,
@@ -381,6 +383,29 @@ enum class Builtin : uint8_t {
     tsIncrement,
 };
 
+/**
+ * This enum defines indices into an 'Array' that accumulates $sum results.
+ *
+ * The array might contain up to four elements:
+ * - The element at index `kNonDecimalTotalTag` keeps track of the widest type of the sum of
+ * non-decimal values.
+ * - The elements at indices `kNonDecimalTotalSum` and `kNonDecimalTotalAddend` together represent
+ * non-decimal value which is the sum of all non-decimal values.
+ * - The element at index `kDecimalTotal` is optional and represents the sum of all decimal values
+ * if any such values are encountered.
+ *
+ * See 'aggDoubleDoubleSumImpl()'/'aggDoubleDoubleSum()'/'doubleDoubleSumFinalize()' for more
+ * details.
+ */
+enum AggSumValueElems {
+    kNonDecimalTotalTag,
+    kNonDecimalTotalSum,
+    kNonDecimalTotalAddend,
+    kDecimalTotal,
+    // This is actually not an index but represents the maximum number of elements.
+    kMaxSizeOfArray
+};
+
 using SmallArityType = uint8_t;
 using ArityType = uint32_t;
 
@@ -480,6 +505,8 @@ public:
     void appendGetArraySize();
 
     void appendSum();
+    void appendDoubleDoubleSum();
+    void appendDoubleDoubleSumFinalize();
     void appendMin();
     void appendMax();
     void appendFirst();
@@ -666,6 +693,21 @@ private:
                                                            value::Value accValue,
                                                            value::TypeTags fieldTag,
                                                            value::Value fieldValue);
+
+    std::tuple<bool, value::TypeTags, value::Value> aggDoubleDoubleSumImpl(value::TypeTags lhsTag,
+                                                                           value::Value lhsValue,
+                                                                           value::TypeTags rhsTag,
+                                                                           value::Value rhsValue);
+
+    std::tuple<bool, value::TypeTags, value::Value> aggDoubleDoubleSum(value::TypeTags accTag,
+                                                                       value::Value accValue,
+                                                                       value::TypeTags fieldTag,
+                                                                       value::Value fieldValue);
+
+    // This function is necessary because 'aggDoubleDoubleSum()' result is 'Array' type but we need
+    // to produce a scalar value out of it.
+    std::tuple<bool, value::TypeTags, value::Value> doubleDoubleSumFinalize(
+        value::TypeTags fieldTag, value::Value fieldValue);
 
     std::tuple<bool, value::TypeTags, value::Value> aggMin(value::TypeTags accTag,
                                                            value::Value accValue,

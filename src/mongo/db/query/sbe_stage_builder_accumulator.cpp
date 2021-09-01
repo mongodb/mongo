@@ -170,6 +170,34 @@ std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> buildFinalizeAvg(
         std::move(inputStage)};
 }
 
+std::pair<std::vector<std::unique_ptr<sbe::EExpression>>, EvalStage> buildAccumulatorSum(
+    StageBuilderState& state,
+    const AccumulationExpression& expr,
+    std::unique_ptr<sbe::EExpression> arg,
+    EvalStage inputStage,
+    PlanNodeId planNodeId) {
+    std::vector<std::unique_ptr<sbe::EExpression>> aggs;
+    aggs.push_back(makeFunction("aggDoubleDoubleSum", std::move(arg)));
+    return {std::move(aggs), std::move(inputStage)};
+}
+
+std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> buildFinalizeSum(
+    StageBuilderState& state,
+    const AccumulationExpression& expr,
+    const sbe::value::SlotVector& sumSlots,
+    EvalStage inputStage,
+    PlanNodeId planNodeId) {
+    tassert(5755300,
+            str::stream() << "Expected one input slot for finalization of sum, got: "
+                          << sumSlots.size(),
+            sumSlots.size() == 1);
+    auto sumFinalize =
+        sbe::makeE<sbe::EIf>(generateNullOrMissing(makeVariable(sumSlots[0])),
+                             makeConstant(sbe::value::TypeTags::NumberInt32, 0),
+                             makeFunction("doubleDoubleSumFinalize", makeVariable(sumSlots[0])));
+    return {std::move(sumFinalize), std::move(inputStage)};
+}
+
 std::pair<std::vector<std::unique_ptr<sbe::EExpression>>, EvalStage> buildAccumulatorAddToSet(
     StageBuilderState& state,
     const AccumulationExpression& expr,
@@ -228,6 +256,7 @@ std::pair<std::vector<std::unique_ptr<sbe::EExpression>>, EvalStage> buildAccumu
         {AccumulatorFirst::kName, &buildAccumulatorFirst},
         {AccumulatorLast::kName, &buildAccumulatorLast},
         {AccumulatorAvg::kName, &buildAccumulatorAvg},
+        {AccumulatorSum::kName, &buildAccumulatorSum},
         {AccumulatorAddToSet::kName, &buildAccumulatorAddToSet}};
 
     auto accExprName = acc.expr.name;
@@ -262,6 +291,7 @@ std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> buildFinalize(
         {AccumulatorFirst::kName, &buildFinalizeFirst},
         {AccumulatorLast::kName, &buildFinalizeLast},
         {AccumulatorAvg::kName, &buildFinalizeAvg},
+        {AccumulatorSum::kName, &buildFinalizeSum},
         {AccumulatorAddToSet::kName, &buildFinalizeAddToSet}};
 
     auto accExprName = acc.expr.name;

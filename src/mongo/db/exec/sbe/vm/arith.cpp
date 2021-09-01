@@ -32,6 +32,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/platform/overflow_arithmetic.h"
 #include "mongo/util/represent_as.h"
+#include "mongo/util/summation.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -374,6 +375,142 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::genericAdd(value::Type
                                                                      value::TypeTags rhsTag,
                                                                      value::Value rhsValue) {
     return genericArithmeticOp<Addition>(lhsTag, lhsValue, rhsTag, rhsValue);
+}
+
+namespace {
+Array* reserveArrayCapacity(Value arrVal, size_t cap) {
+    auto arr = reinterpret_cast<Array*>(arrVal);
+    arr->reserve(cap);
+
+    return arr;
+}
+
+void setNonDecimalTotal(TypeTags nonDecimalTotalTag,
+                        const DoubleDoubleSummation& nonDecimalTotal,
+                        Array* arr) {
+    auto [sum, addend] = nonDecimalTotal.getDoubleDouble();
+    arr->push_back(nonDecimalTotalTag, value::bitcastFrom<int32_t>(0.0));
+    arr->push_back(TypeTags::NumberDouble, value::bitcastFrom<double>(sum));
+    arr->push_back(TypeTags::NumberDouble, value::bitcastFrom<double>(addend));
+}
+
+std::tuple<bool, value::TypeTags, value::Value> makeSumResultArray(
+    TypeTags nonDecimalTotalTag, const DoubleDoubleSummation& nonDecimalTotal) {
+    auto [retTag, retVal] = makeNewArray();
+    ValueGuard guard{retTag, retVal};
+    setNonDecimalTotal(nonDecimalTotalTag,
+                       nonDecimalTotal,
+                       reserveArrayCapacity(retVal, AggSumValueElems::kMaxSizeOfArray - 1));
+
+    guard.reset();
+    return {true, TypeTags::Array, retVal};
+}
+
+std::tuple<bool, value::TypeTags, value::Value> makeSumResultArray(
+    TypeTags nonDecimalTotalTag,
+    const DoubleDoubleSummation& nonDecimalTotal,
+    const Decimal128& decimalTotal) {
+    auto [retTag, retVal] = makeNewArray();
+    ValueGuard guard{retTag, retVal};
+    auto ret = reserveArrayCapacity(retVal, AggSumValueElems::kMaxSizeOfArray);
+    setNonDecimalTotal(nonDecimalTotalTag, nonDecimalTotal, ret);
+    // We don't need to use 'ValueGuard' for decimal because we've already allocated enough storage
+    // with `reserveArrayCapacity` and Array::push_back() is guaranteed to not throw.
+    auto [tag, val] = makeCopyDecimal(decimalTotal);
+    ret->push_back(tag, val);
+
+    guard.reset();
+    return {true, TypeTags::Array, retVal};
+}
+
+void addNonDecimal(TypeTags tag, Value val, DoubleDoubleSummation& nonDecimalTotal) {
+    switch (tag) {
+        case TypeTags::NumberInt64:
+            nonDecimalTotal.addLong(value::bitcastTo<int64_t>(val));
+            break;
+        case TypeTags::NumberInt32:
+            nonDecimalTotal.addInt(value::bitcastTo<int32_t>(val));
+            break;
+        case TypeTags::NumberDouble:
+            nonDecimalTotal.addDouble(value::bitcastTo<double>(val));
+            break;
+        default:
+            MONGO_UNREACHABLE_TASSERT(5755316);
+    }
+}
+}  // namespace
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::aggDoubleDoubleSumImpl(
+    value::TypeTags lhsTag, value::Value lhsValue, value::TypeTags rhsTag, value::Value rhsValue) {
+    if (!isNumber(rhsTag)) {
+        auto [tag, val] = value::copyValue(lhsTag, lhsValue);
+        return {true, tag, val};
+    }
+
+    tassert(5755317, "The result slot must be Array-typed", lhsTag == TypeTags::Array);
+    auto arr = getArrayView(lhsValue);
+    tassert(5755310,
+            str::stream() << "The result slot must have at least "
+                          << AggSumValueElems::kMaxSizeOfArray - 1
+                          << " elements but got: " << arr->size(),
+            arr->size() >= AggSumValueElems::kMaxSizeOfArray - 1);
+
+    // Only uses tag information from the kNonDecimalTotalTag element.
+    auto [nonDecimalTotalTag, _] = arr->getAt(AggSumValueElems::kNonDecimalTotalTag);
+    tassert(5755311,
+            "The nonDecimalTag can't be NumberDecimal",
+            nonDecimalTotalTag != TypeTags::NumberDecimal);
+    // Only uses values from the kNonDecimalTotalSum/kNonDecimalTotalAddend elements.
+    auto [sumTag, sum] = arr->getAt(AggSumValueElems::kNonDecimalTotalSum);
+    auto [addendTag, addend] = arr->getAt(AggSumValueElems::kNonDecimalTotalAddend);
+    tassert(5755312,
+            "The sum and addend must be NumberDouble",
+            sumTag == addendTag && sumTag == TypeTags::NumberDouble);
+
+    // We're guaranteed to always have a valid nonDecimalTotal value.
+    auto nonDecimalTotal = DoubleDoubleSummation::create(value::bitcastTo<double>(sum),
+                                                         value::bitcastTo<double>(addend));
+
+    if (auto nElems = arr->size(); nElems < AggSumValueElems::kMaxSizeOfArray) {
+        // We haven't seen any decimal value so far.
+        if (auto totalTag = getWidestNumericalType(nonDecimalTotalTag, rhsTag);
+            totalTag == TypeTags::NumberDecimal) {
+            // We have seen a decimal for the first time and start storing the total sum
+            // of decimal values into 'kDecimalTotal' element and the total sum of non-decimal
+            // values into 'kNonDecimalXXX' elements.
+            tassert(
+                5755313, "The arg value must be NumberDecimal", rhsTag == TypeTags::NumberDecimal);
+
+            return makeSumResultArray(
+                nonDecimalTotalTag, nonDecimalTotal, value::bitcastTo<Decimal128>(rhsValue));
+        } else {
+            addNonDecimal(rhsTag, rhsValue, nonDecimalTotal);
+            return makeSumResultArray(totalTag, nonDecimalTotal);
+        }
+    } else {
+        // We've seen a decimal value. We've already started storing the total sum of decimal values
+        // into 'kDecimalTotal' element and the total sum of non-decimal values into
+        // 'kNonDecimalXXX' elements.
+        tassert(5755314,
+                str::stream() << "The result slot must have at most "
+                              << AggSumValueElems::kMaxSizeOfArray
+                              << " elements but got: " << arr->size(),
+                nElems == AggSumValueElems::kMaxSizeOfArray);
+        auto [decimalTotalTag, decimalTotalVal] = arr->getAt(AggSumValueElems::kDecimalTotal);
+        tassert(5755315,
+                "The decimalTotal must be NumberDecimal",
+                decimalTotalTag == TypeTags::NumberDecimal);
+
+        auto decimalTotal = value::bitcastTo<Decimal128>(decimalTotalVal);
+        if (rhsTag == TypeTags::NumberDecimal) {
+            decimalTotal = decimalTotal.add(value::bitcastTo<Decimal128>(rhsValue));
+        } else {
+            nonDecimalTotalTag = getWidestNumericalType(nonDecimalTotalTag, rhsTag);
+            addNonDecimal(rhsTag, rhsValue, nonDecimalTotal);
+        }
+
+        return makeSumResultArray(nonDecimalTotalTag, nonDecimalTotal, decimalTotal);
+    }
 }
 
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::genericSub(value::TypeTags lhsTag,

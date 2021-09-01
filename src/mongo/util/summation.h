@@ -48,6 +48,15 @@ using DoubleDouble = std::pair<double, double>;
  */
 class DoubleDoubleSummation {
 public:
+    DoubleDoubleSummation() = default;
+
+    /**
+     * Factory method.
+     */
+    static constexpr DoubleDoubleSummation create(double sum, double addend) noexcept {
+        return DoubleDoubleSummation(sum, addend);
+    }
+
     /**
      * Adds x to the sum, keeping track of a compensation amount to be subtracted later.
      */
@@ -151,5 +160,8 @@ private:
     // Simple sum to be returned if _sum is NaN. This addresses infinities turning into NaNs when
     // using compensated addition.
     double _special = 0.0;
+
+    constexpr DoubleDoubleSummation(double sum, double addend) noexcept
+        : _sum(sum), _addend(addend), _special(sum) {}
 };
 }  // namespace mongo

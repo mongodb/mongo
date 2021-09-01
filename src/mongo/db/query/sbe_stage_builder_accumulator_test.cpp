@@ -135,7 +135,6 @@ protected:
         auto [resultsTag, resultsVal] =
             getResultsForAggregationWithNoGroupByTest(queryStatement, docs);
         sbe::value::ValueGuard resultGuard{resultsTag, resultsVal};
-
         auto [expectedTag, expectedVal] = stage_builder::makeValue(expectedValue);
         sbe::value::ValueGuard expectedGuard{expectedTag, expectedVal};
         ASSERT_TRUE(valueEquals(resultsTag, resultsVal, expectedTag, expectedVal));
@@ -704,6 +703,275 @@ TEST_F(SbeAccumulatorBuilderTest, AvgAccumulatorOneGroupByTranslation) {
     ASSERT_TRUE(valueEquals(sortedResultsTag, sortedResultsVal, expectedTag, expectedVal));
 }
 
+TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationBasic) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 2)),
+                                       BSON_ARRAY(BSON("a" << 1 << "b" << 4)),
+                                       BSON_ARRAY(BSON("a" << 1 << "b" << 6))};
+    runAggregationWithNoGroupByTest("{x: {$sum: '$b'}}", docs, BSON_ARRAY(12));
+}
+
+TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationOneDocInt) {
+    runAggregationWithNoGroupByTest(
+        "{x: {$sum: '$b'}}", {BSON_ARRAY(BSON("a" << 1 << "b" << 10))}, BSON_ARRAY(Value(10)));
+}
+
+TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationOneDocLong) {
+    runAggregationWithNoGroupByTest(
+        "{x: {$sum: '$b'}}",
+        std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 3 << "b" << 10ll))},
+        BSON_ARRAY(10ll));
+}
+
+TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationOneDocIntRepresentableDouble) {
+    runAggregationWithNoGroupByTest(
+        "{x: {$sum: '$b'}}",
+        std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 4 << "b" << 10.0))},
+        BSON_ARRAY(10.0));
+}
+
+TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationOneDocNonIntRepresentableLong) {
+    runAggregationWithNoGroupByTest(
+        "{x: {$sum: '$b'}}",
+        std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 5 << "b" << 60000000000ll))},
+        BSON_ARRAY(60000000000ll));
+}
+
+TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationNonIntegerValuedDouble) {
+    runAggregationWithNoGroupByTest(
+        "{x: {$sum: '$b'}}",
+        std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 9.5))},
+        BSON_ARRAY(9.5));
+}
+
+TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationOneDocNanDouble) {
+    runAggregationWithNoGroupByTest(
+        "{x: {$sum: '$b'}}",
+        std::vector<BSONArray>{
+            BSON_ARRAY(BSON("a" << 6 << "b" << std::numeric_limits<double>::quiet_NaN()))},
+        BSON_ARRAY(Value(std::numeric_limits<double>::quiet_NaN())));
+}
+
+TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationIntAndLong) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 4)),
+                                       BSON_ARRAY(BSON("a" << 1 << "b" << 5ll))};
+    runAggregationWithNoGroupByTest("{x: {$sum: '$b'}}", docs, BSON_ARRAY(Value(9ll)));
+}
+
+TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationIntAndDouble) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 4)),
+                                       BSON_ARRAY(BSON("a" << 1 << "b" << 5.5))};
+    runAggregationWithNoGroupByTest("{x: {$sum: '$b'}}", docs, BSON_ARRAY(9.5));
+}
+
+TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationLongAndDouble) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 4ll)),
+                                       BSON_ARRAY(BSON("a" << 1 << "b" << 5.5))};
+    runAggregationWithNoGroupByTest("{x: {$sum: '$b'}}", docs, BSON_ARRAY(9.5));
+}
+
+TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationIntLongDouble) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 4)),
+                                       BSON_ARRAY(BSON("a" << 1 << "b" << 4ll)),
+                                       BSON_ARRAY(BSON("a" << 1 << "b" << 5.5))};
+    runAggregationWithNoGroupByTest("{x: {$sum: '$b'}}", docs, BSON_ARRAY(13.5));
+}
+
+TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationLongLongDecimal) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 4ll)),
+                                       BSON_ARRAY(BSON("a" << 1 << "b" << 4ll)),
+                                       BSON_ARRAY(BSON("a" << 1 << "b" << Decimal128("5.5")))};
+    runAggregationWithNoGroupByTest("{x: {$sum: '$b'}}", docs, BSON_ARRAY(Decimal128("13.5")));
+}
+
+TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationDoubleAndDecimal) {
+    const auto doubleVal = 4.2;
+    DoubleDoubleSummation doubleDoubleSum;
+    doubleDoubleSum.addDouble(doubleVal);
+    const auto nonDecimal = doubleDoubleSum.getDecimal();
+
+    const auto decimalVal = Decimal128("5.5");
+    const auto expected = decimalVal.add(nonDecimal);
+
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << doubleVal)),
+                                       BSON_ARRAY(BSON("a" << 1 << "b" << decimalVal))};
+    runAggregationWithNoGroupByTest("{x: {$sum: '$b'}}", docs, BSON_ARRAY(expected));
+}
+
+TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationIntAndMissing) {
+    auto docs =
+        std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 4)), BSON_ARRAY(BSON("a" << 1))};
+    runAggregationWithNoGroupByTest("{x: {$sum: '$b'}}", docs, BSON_ARRAY(4));
+}
+
+TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationMixedTypesWithDecimal128) {
+    const auto doubleVal1 = 4.8;
+    const auto doubleVal2 = -5.0;
+    const auto intVal = 6;
+    const auto longVal = 3l;
+
+    DoubleDoubleSummation doubleDoubleSum;
+    doubleDoubleSum.addDouble(doubleVal1);
+    doubleDoubleSum.addInt(intVal);
+    doubleDoubleSum.addInt(longVal);
+    doubleDoubleSum.addDouble(doubleVal2);
+
+    const auto decimalVal = Decimal128(1.0);
+    const auto expected = decimalVal.add(doubleDoubleSum.getDecimal());
+
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << BSON_ARRAY(2 << 4 << 6))),
+                                       BSON_ARRAY(BSON("a" << 2 << "b" << doubleVal1)),
+                                       BSON_ARRAY(BSON("a" << 2)),
+                                       BSON_ARRAY(BSON("a" << 3 << "b" << intVal)),
+                                       BSON_ARRAY(BSON("a" << 3 << "b" << longVal)),
+                                       BSON_ARRAY(BSON("a" << 3 << "b" << decimalVal)),
+                                       BSON_ARRAY(BSON("a" << 3 << "b" << doubleVal2)),
+                                       BSON_ARRAY(BSON("a" << 3 << "b" << BSONNULL)),
+                                       BSON_ARRAY(BSON("a" << 3 << "b" << BSON("c" << 1)))};
+    runAggregationWithNoGroupByTest("{x: {$sum: '$b'}}", docs, BSON_ARRAY(expected));
+}
+
+TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationDecimalSum) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << Decimal128("-10.100"))),
+                                       BSON_ARRAY(BSON("a" << 1 << "b" << Decimal128("20.200")))};
+    runAggregationWithNoGroupByTest("{x: {$sum: '$b'}}", docs, BSON_ARRAY(Decimal128("10.100")));
+}
+
+TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationAllNull) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << BSONNULL)),
+                                       BSON_ARRAY(BSON("a" << 3 << "b" << BSONNULL)),
+                                       BSON_ARRAY(BSON("a" << 3 << "b" << BSONNULL))};
+    runAggregationWithNoGroupByTest("{x: {$sum: '$b'}}", docs, BSON_ARRAY(0));
+}
+
+TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationAllMissing) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1)), BSON_ARRAY(BSON("a" << 1))};
+    runAggregationWithNoGroupByTest("{x: {$sum: '$b'}}", docs, BSON_ARRAY(0));
+}
+
+TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationSomeNonNumeric) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b"
+                                                           << "c")),
+                                       BSON_ARRAY(BSON("a" << 1 << "b" << 3)),
+                                       BSON_ARRAY(BSON("a" << 1 << "b"
+                                                           << "m")),
+                                       BSON_ARRAY(BSON("a" << 1 << "b" << 4))};
+    runAggregationWithNoGroupByTest("{x: {$sum: '$b'}}", docs, BSON_ARRAY(7));
+}
+
+TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationTwoIntsDoNotOverflow) {
+    auto docs = std::vector<BSONArray>{
+        BSON_ARRAY(BSON("a" << 1 << "b" << Value(std::numeric_limits<int>::max()))),
+        BSON_ARRAY(BSON("a" << 1 << "b" << 10))};
+    runAggregationWithNoGroupByTest(
+        "{x: {$sum: '$b'}}", docs, BSON_ARRAY(Value(std::numeric_limits<int>::max() + 10LL)));
+}
+
+TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationTwoNegativeIntsDoNotOverflow) {
+    auto docs = std::vector<BSONArray>{
+        BSON_ARRAY(BSON("a" << 1 << "b" << Value(-std::numeric_limits<int>::max()))),
+        BSON_ARRAY(BSON("a" << 1 << "b" << -10))};
+    runAggregationWithNoGroupByTest(
+        "{x: {$sum: '$b'}}", docs, BSON_ARRAY(Value(-std::numeric_limits<int>::max() - 10LL)));
+}
+
+TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationIntAndLongDoNotTriggerIntOverflow) {
+    auto docs = std::vector<BSONArray>{
+        BSON_ARRAY(BSON("a" << 1 << "b" << Value(std::numeric_limits<int>::max()))),
+        BSON_ARRAY(BSON("a" << 1 << "b" << 1LL))};
+    runAggregationWithNoGroupByTest(
+        "{x: {$sum: '$b'}}",
+        docs,
+        BSON_ARRAY(Value(static_cast<long long>(std::numeric_limits<int>::max()) + 1)));
+}
+
+TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationIntAndDoubleDoNotTriggerOverflow) {
+    auto docs = std::vector<BSONArray>{
+        BSON_ARRAY(BSON("a" << 1 << "b" << Value(std::numeric_limits<int>::max()))),
+        BSON_ARRAY(BSON("a" << 1 << "b" << 1.0))};
+    runAggregationWithNoGroupByTest(
+        "{x: {$sum: '$b'}}",
+        docs,
+        BSON_ARRAY(Value(static_cast<long long>(std::numeric_limits<int>::max()) + 1.0)));
+}
+
+TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationIntAndLongOverflowIntoDouble) {
+    auto docs = std::vector<BSONArray>{
+        BSON_ARRAY(BSON("a" << 1 << "b" << Value(std::numeric_limits<long long>::max()))),
+        BSON_ARRAY(BSON("a" << 1 << "b" << 1))};
+    runAggregationWithNoGroupByTest(
+        "{x: {$sum: '$b'}}",
+        docs,
+        BSON_ARRAY(Value(-static_cast<double>(std::numeric_limits<long long>::min()))));
+}
+
+TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationTwoLongsOverflowIntoDouble) {
+    auto docs = std::vector<BSONArray>{
+        BSON_ARRAY(BSON("a" << 1 << "b" << Value(std::numeric_limits<long long>::max()))),
+        BSON_ARRAY(BSON("a" << 1 << "b" << Value(std::numeric_limits<long long>::max())))};
+    runAggregationWithNoGroupByTest(
+        "{x: {$sum: '$b'}}",
+        docs,
+        BSON_ARRAY(Value(static_cast<double>(std::numeric_limits<long long>::max()) * 2)));
+}
+
+TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationLongAndDoubleDoNotTriggerLongOverflow) {
+    auto docs = std::vector<BSONArray>{
+        BSON_ARRAY(BSON("a" << 1 << "b" << Value(std::numeric_limits<long long>::max()))),
+        BSON_ARRAY(BSON("a" << 1 << "b" << 1.0))};
+    runAggregationWithNoGroupByTest(
+        "{x: {$sum: '$b'}}", docs, BSON_ARRAY(Value(std::numeric_limits<long long>::max() + 1.0)));
+}
+
+TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationTwoDoublesOverflowToInfinity) {
+    auto docs = std::vector<BSONArray>{
+        BSON_ARRAY(BSON("a" << 1 << "b" << Value(std::numeric_limits<double>::max()))),
+        BSON_ARRAY(BSON("a" << 1 << "b" << Value(std::numeric_limits<double>::max())))};
+    runAggregationWithNoGroupByTest(
+        "{x: {$sum: '$b'}}", docs, BSON_ARRAY(Value(std::numeric_limits<double>::infinity())));
+}
+
+TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationTwoIntegersDoNotOverflowIfDoubleAdded) {
+    auto docs = std::vector<BSONArray>{
+        BSON_ARRAY(BSON("a" << 1 << "b" << Value(std::numeric_limits<long long>::max()))),
+        BSON_ARRAY(BSON("a" << 1 << "b" << Value(std::numeric_limits<long long>::max()))),
+        BSON_ARRAY(BSON("a" << 1 << "b" << 1.0))};
+    runAggregationWithNoGroupByTest(
+        "{x: {$sum: '$b'}}",
+        docs,
+        BSON_ARRAY(Value(static_cast<double>(std::numeric_limits<long long>::max()) +
+                         static_cast<double>(std::numeric_limits<long long>::max()))));
+}
+
+TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationIntAndNanDouble) {
+    auto docs = std::vector<BSONArray>{
+        BSON_ARRAY(BSON("a" << 1 << "b" << 3)),
+        BSON_ARRAY(BSON("a" << 1 << "b" << Value(std::numeric_limits<double>::quiet_NaN())))};
+    runAggregationWithNoGroupByTest(
+        "{x: {$sum: '$b'}}", docs, BSON_ARRAY(Value(std::numeric_limits<double>::quiet_NaN())));
+}
+
+TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationGroupByTest) {
+    auto docs = std::vector<BSONArray>{
+        BSON_ARRAY(BSON("a" << 1 << "b" << 3)),
+        BSON_ARRAY(BSON("a" << 1 << "b" << 4)),
+        BSON_ARRAY(BSON("a" << 2 << "b" << 13)),
+        BSON_ARRAY(BSON("a" << 2 << "b"
+                            << "a")),
+    };
+    runAggregationWithGroupByTest("{x: {$sum: '$b'}}", docs, {"$a"}, BSON_ARRAY(7 << 13));
+}
+
+TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationTwoGroupByTest) {
+    auto docs = std::vector<BSONArray>{
+        BSON_ARRAY(BSON("a" << 1 << "b" << 3 << "c" << 1)),
+        BSON_ARRAY(BSON("a" << 1 << "b" << 4 << "c" << 1)),
+        BSON_ARRAY(BSON("a" << 2 << "b" << 13 << "c" << 1)),
+        BSON_ARRAY(BSON("a" << 2 << "b"
+                            << "a"
+                            << "c" << 1)),
+    };
+    runAggregationWithGroupByTest("{x: {$sum: '$b'}}", docs, {"$a", "$c"}, BSON_ARRAY(20));
+}
 TEST_F(SbeAccumulatorBuilderTest, AddToSetAccumulatorTranslationSingleDoc) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 1))};
     runAddToSetTest("{x: {$addToSet: '$b'}}", docs, BSON_ARRAY(1));

@@ -521,6 +521,11 @@ static stdx::unordered_map<std::string, InstrFn> kInstrFunctions = {
     {"isTimestamp",
      InstrFn{[](size_t n) { return n == 1; }, &vm::CodeFragment::appendIsTimestamp, false}},
     {"sum", InstrFn{[](size_t n) { return n == 1; }, &vm::CodeFragment::appendSum, true}},
+    {"aggDoubleDoubleSum",
+     InstrFn{[](size_t n) { return n == 1; }, &vm::CodeFragment::appendDoubleDoubleSum, true}},
+    {"doubleDoubleSumFinalize",
+     InstrFn{
+         [](size_t n) { return n == 1; }, &vm::CodeFragment::appendDoubleDoubleSumFinalize, false}},
     {"min", InstrFn{[](size_t n) { return n == 1; }, &vm::CodeFragment::appendMin, true}},
     {"max", InstrFn{[](size_t n) { return n == 1; }, &vm::CodeFragment::appendMax, true}},
     {"first", InstrFn{[](size_t n) { return n == 1; }, &vm::CodeFragment::appendFirst, true}},
