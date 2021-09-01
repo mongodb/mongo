@@ -23,19 +23,3 @@ generateReleases = env.Command(
 )
 
 env.Alias('generated-sources', generateReleases)
-
-generateMongoVersionFile = env.Substfile(
-    target=[
-        'mongo_version.yml.in',
-    ],
-    SUBST_DICT=[
-        ('@mongo_version@', env['MONGO_VERSION']),
-    ]
-)
-
-env.AutoInstall(
-    target='$PREFIX_SHAREDIR/mongodb',
-    source=generateMongoVersionFile,
-    AIB_COMPONENT='dist-test',
-    AIB_ROLE='base',
-)
