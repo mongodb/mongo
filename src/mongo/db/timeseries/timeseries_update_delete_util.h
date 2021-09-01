@@ -54,7 +54,6 @@ bool queryOnlyDependsOnMetaField(OperationContext* opCtx,
  * document).
  */
 bool updateOnlyModifiesMetaField(OperationContext* opCtx,
-                                 const NamespaceString& ns,
                                  const write_ops::UpdateModification& updateMod,
                                  StringData metaField);
 

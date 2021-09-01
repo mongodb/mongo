@@ -770,28 +770,25 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
                 timeseriesOptions);
 
         auto metaField = timeseriesOptions->getMetaField();
+        uassert(
+            ErrorCodes::InvalidOptions,
+            "Cannot perform an update on a time-series collection that does not have a metaField",
+            metaField);
+
         uassert(ErrorCodes::InvalidOptions,
-                "Cannot perform an update on a time-series collection with no metaField",
-                metaField);
+                "Cannot perform a non-multi update on a time-series collection",
+                updateRequest->isMulti());
 
-        uassert(
-            ErrorCodes::InvalidOptions,
-            str::stream() << "multi:false updates are not supported for time-series collections: "
-                          << ns,
-            updateRequest->isMulti());
-
-        uassert(
-            ErrorCodes::InvalidOptions,
-            str::stream() << "upsert:true updates are not supported for time-series collections: "
-                          << ns,
-            !updateRequest->isUpsert());
+        uassert(ErrorCodes::InvalidOptions,
+                "Cannot perform an upsert on a time-series collection",
+                !updateRequest->isUpsert());
 
         // Get the original update query and check that it only depends on the metaField.
         const auto& updateQuery = updateRequest->getQuery();
         uassert(ErrorCodes::InvalidOptions,
                 str::stream() << "Cannot perform an update on a time-series collection "
-                                 "when querying on a field that is not the metaField "
-                              << *metaField << ": " << ns,
+                                 "when querying on a field that is not the metaField '"
+                              << *metaField << "'",
                 timeseries::queryOnlyDependsOnMetaField(opCtx,
                                                         ns,
                                                         updateQuery,
@@ -803,10 +800,10 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
         // modify the metaField.
         const auto& updateMod = updateRequest->getUpdateModification();
         uassert(ErrorCodes::InvalidOptions,
-                str::stream() << "Update on a time-series collection must only "
-                                 "modify the metaField "
-                              << *metaField << ": " << ns,
-                timeseries::updateOnlyModifiesMetaField(opCtx, ns, updateMod, *metaField));
+                str::stream() << "Cannot perform an update on a time-series collection which "
+                                 "updates a field that is not the metaField '"
+                              << *metaField << "'",
+                timeseries::updateOnlyModifiesMetaField(opCtx, updateMod, *metaField));
 
         // Only translate the hint (if there is one) if it is specified with an index specification
         // document.
@@ -1137,9 +1134,14 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
         }
 
         uassert(ErrorCodes::InvalidOptions,
+                "Cannot perform a delete with a non-empty query on a time-series collection that "
+                "does not have a metaField",
+                timeseriesOptions->getMetaField() || request.getQuery().isEmpty());
+
+        uassert(ErrorCodes::InvalidOptions,
                 str::stream() << "Cannot perform a delete on a time-series collection "
-                                 "when querying on a field that is not the metaField: "
-                              << ns,
+                                 "when querying on a field that is not the metaField '"
+                              << timeseriesOptions->getMetaField() << "'",
                 timeseries::queryOnlyDependsOnMetaField(opCtx,
                                                         ns,
                                                         request.getQuery(),
@@ -1147,9 +1149,7 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
                                                         runtimeConstants,
                                                         letParams));
         uassert(ErrorCodes::IllegalOperation,
-                str::stream() << "Cannot perform a delete with limit: 1 on a "
-                                 "time-series collection: "
-                              << ns,
+                "Cannot perform a non-multi delete on a time-series collection",
                 request.getMulti());
         if (auto metaField = timeseriesOptions->getMetaField()) {
             request.setQuery(timeseries::translateQuery(request.getQuery(), *metaField));
