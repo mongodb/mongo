@@ -40,7 +40,9 @@ class FaultFacetTest : public unittest::Test {
 public:
     void startMock(FaultFacetMock::MockCallback callback) {
         _svcCtx = ServiceContext::make();
-        _facetMock = std::make_unique<FaultFacetMock>(_svcCtx.get(), callback);
+        _svcCtx->setFastClockSource(std::make_unique<ClockSourceMock>());
+        _facetMock = std::make_unique<FaultFacetMock>(
+            FaultFacetType::kMock1, _svcCtx->getFastClockSource(), callback);
     }
 
     HealthCheckStatus getStatus() const {
@@ -53,7 +55,7 @@ private:
 };
 
 TEST_F(FaultFacetTest, FacetWithFailure) {
-    startMock([](double* severity) { *severity = 0.5; });
+    startMock([] { return 0.5; });
     auto status = getStatus();
     ASSERT_APPROX_EQUAL(0.5, status.getSeverity(), 0.001);
 }

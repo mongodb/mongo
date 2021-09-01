@@ -71,15 +71,13 @@ FaultState FaultManager::getFaultState() const {
     return _currentState;
 }
 
-boost::optional<FaultConstPtr> FaultManager::activeFault() const {
-    return {};
+FaultConstPtr FaultManager::activeFault() const {
+    auto lk = stdx::lock_guard(_mutex);
+    return std::static_pointer_cast<const Fault>(_fault);
 }
 
-boost::optional<FaultFacetsContainerPtr> FaultManager::getFaultFacetsContainer() {
+FaultFacetsContainerPtr FaultManager::getFaultFacetsContainer() {
     auto lk = stdx::lock_guard(_mutex);
-    if (!_fault) {
-        return {};
-    }
     return std::static_pointer_cast<FaultFacetsContainer>(_fault);
 }
 
@@ -87,7 +85,7 @@ FaultFacetsContainerPtr FaultManager::getOrCreateFaultFacetsContainer() {
     auto lk = stdx::lock_guard(_mutex);
     if (!_fault) {
         // Create a new one.
-        _fault = std::make_shared<FaultImpl>(_svcCtx);
+        _fault = std::make_shared<FaultImpl>(_svcCtx->getFastClockSource());
     }
     return std::static_pointer_cast<FaultFacetsContainer>(_fault);
 }
@@ -95,6 +93,29 @@ FaultFacetsContainerPtr FaultManager::getOrCreateFaultFacetsContainer() {
 void FaultManager::healthCheck() {
     // One time init.
     _initHealthObserversIfNeeded();
+
+    std::vector<HealthObserver*> observers = FaultManager::getHealthObservers();
+
+    // Start checks outside of lock.
+    for (auto observer : observers) {
+        observer->periodicCheck(*this);
+    }
+
+    // Garbage collect all resolved fault facets.
+    auto optionalActiveFault = getFaultFacetsContainer();
+    if (optionalActiveFault) {
+        optionalActiveFault->garbageCollectResolvedFacets();
+    }
+
+    // If the whole fault becomes resolved, garbage collect it
+    // with proper locking.
+    std::shared_ptr<FaultInternal> faultToDelete;
+    {
+        auto lk = stdx::lock_guard(_mutex);
+        if (_fault && _fault->getFacets().empty()) {
+            faultToDelete.swap(_fault);
+        }
+    }
 }
 
 Status FaultManager::transitionToState(FaultState newState) {

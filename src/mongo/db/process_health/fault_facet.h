@@ -51,6 +51,11 @@ public:
      * @return HealthCheckStatus
      */
     virtual HealthCheckStatus getStatus() const = 0;
+
+    // This interface contains no methods to change the state of the Facet
+    // because this update is handled by the particular implementation of
+    // the HealthObserver interface, updating its matching Facet.
+    // Please do not add any non-const methods here.
 };
 
 using FaultFacetPtr = std::shared_ptr<FaultFacet>;

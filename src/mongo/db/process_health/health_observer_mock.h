@@ -30,6 +30,7 @@
 
 #include <functional>
 
+#include "mongo/db/process_health/fault_facet_mock.h"
 #include "mongo/db/process_health/health_observer_base.h"
 
 namespace mongo {
@@ -41,20 +42,36 @@ namespace process_health {
  */
 class HealthObserverMock : public HealthObserverBase {
 public:
-    HealthObserverMock(ServiceContext* svcCtx, std::function<double()> getSeverityCallback)
-        : HealthObserverBase(svcCtx), _getSeverityCallback(getSeverityCallback) {}
+    HealthObserverMock(FaultFacetType mockType,
+                       ClockSource* clockSource,
+                       std::function<double()> getSeverityCallback)
+        : HealthObserverBase(clockSource),
+          _mockType(mockType),
+          _getSeverityCallback(getSeverityCallback) {}
 
     virtual ~HealthObserverMock() = default;
 
+protected:
     FaultFacetType getType() const override {
-        return FaultFacetType::kMock;
+        return _mockType;
     }
 
-    double periodicCheckImpl() override {
-        return _getSeverityCallback();
+    FaultFacetPtr periodicCheckImpl(FaultFacetPtr optionalExistingFacet) override {
+        // Detects mocked severity and handles it.
+        const double severity = _getSeverityCallback();
+
+        if (HealthCheckStatus::isResolved(severity)) {
+            return {};
+        } else if (!optionalExistingFacet) {
+            FaultFacetPtr facet =
+                std::make_unique<FaultFacetMock>(_mockType, _clockSource, _getSeverityCallback);
+            return facet;
+        }
+        return optionalExistingFacet;
     }
 
 private:
+    const FaultFacetType _mockType;
     std::function<double()> _getSeverityCallback;
 };
 

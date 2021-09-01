@@ -42,7 +42,7 @@ public:
     void setUp() override {
         _svcCtx = ServiceContext::make();
         _svcCtx->setFastClockSource(std::make_unique<ClockSourceMock>());
-        _faultImpl = std::make_unique<FaultImpl>(_svcCtx.get());
+        _faultImpl = std::make_unique<FaultImpl>(_svcCtx->getFastClockSource());
     }
 
     ClockSourceMock& clockSource() {
@@ -51,10 +51,6 @@ public:
 
     FaultImpl& fault() {
         return *_faultImpl;
-    }
-
-    ServiceContext* svcCtx() {
-        return _svcCtx.get();
     }
 
 private:
@@ -72,44 +68,44 @@ TEST_F(FaultImplTest, TimeSourceWorks) {
 }
 
 TEST_F(FaultImplTest, SeverityLevelHelpersWork) {
-    FaultFacetMock resolvedFacet(svcCtx(), [](double* severity) { *severity = 0; });
+    FaultFacetMock resolvedFacet(FaultFacetType::kMock1, &clockSource(), [] { return 0; });
     ASSERT_TRUE(HealthCheckStatus::isResolved(resolvedFacet.getStatus().getSeverity()));
 
-    FaultFacetMock transientFacet(svcCtx(), [](double* severity) { *severity = 0.99; });
+    FaultFacetMock transientFacet(FaultFacetType::kMock1, &clockSource(), [] { return 0.99; });
     ASSERT_TRUE(HealthCheckStatus::isTransientFault(transientFacet.getStatus().getSeverity()));
 
-    FaultFacetMock faultyFacet(svcCtx(), [](double* severity) { *severity = 1.0; });
+    FaultFacetMock faultyFacet(FaultFacetType::kMock1, &clockSource(), [] { return 1.0; });
     ASSERT_TRUE(HealthCheckStatus::isActiveFault(faultyFacet.getStatus().getSeverity()));
 }
 
 TEST_F(FaultImplTest, FindFacetByType) {
     ASSERT_EQ(0, fault().getFacets().size());
-    ASSERT_FALSE(fault().getFaultFacet(FaultFacetType::kMock));
+    ASSERT_FALSE(fault().getFaultFacet(FaultFacetType::kMock1));
 
-    fault().getOrCreateFaultFacet(FaultFacetType::kMock, [this] {
-        return std::make_shared<FaultFacetMock>(svcCtx(), [](double* severity) { *severity = 0; });
-    });
-    auto facet = fault().getFaultFacet(FaultFacetType::kMock);
+    FaultFacetPtr newFacet =
+        std::make_shared<FaultFacetMock>(FaultFacetType::kMock1, &clockSource(), [] { return 0; });
+    fault().updateWithSuppliedFacet(FaultFacetType::kMock1, newFacet);
+    auto facet = fault().getFaultFacet(FaultFacetType::kMock1);
     ASSERT_TRUE(facet);
-    auto status = (*facet)->getStatus();
-    ASSERT_EQ(FaultFacetType::kMock, status.getType());
+    auto status = facet->getStatus();
+    ASSERT_EQ(FaultFacetType::kMock1, status.getType());
 }
 
-TEST_F(FaultImplTest, CanCreateAndGarbageCollectFacetsAfterTimeout) {
+TEST_F(FaultImplTest, CanCreateAndGarbageCollectFacets) {
+    AtomicDouble severity{0.1};
+
     ASSERT_EQ(0, fault().getFacets().size());
-    fault().getOrCreateFaultFacet(FaultFacetType::kMock, [this] {
-        return std::make_shared<FaultFacetMock>(svcCtx(), [](double* severity) { *severity = 0; });
-    });
+    FaultFacetPtr newFacet = std::make_shared<FaultFacetMock>(
+        FaultFacetType::kMock1, &clockSource(), [&severity] { return severity.load(); });
+    fault().updateWithSuppliedFacet(FaultFacetType::kMock1, newFacet);
     // New facet was added successfully.
     ASSERT_EQ(1, fault().getFacets().size());
 
-    // The facet has severity of 0 but it cannot be garbage collected because the timeout did not
-    // pass yet.
+    // Facet cannot be garbage collected.
     fault().garbageCollectResolvedFacets();
     ASSERT_EQ(1, fault().getFacets().size());
 
-    // After the time was advanced by the minimum timeout the GC works.
-    clockSource().advance(FaultFacetsContainer::kMinimalFacetLifetimeToDelete);
+    severity.store(0);
     fault().garbageCollectResolvedFacets();
     ASSERT_EQ(0, fault().getFacets().size());
 }

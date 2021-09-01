@@ -44,9 +44,7 @@ namespace process_health {
  */
 class FaultImpl : public FaultInternal {
 public:
-    explicit FaultImpl(ServiceContext* svcCtx,
-                       Milliseconds minimalGarbageCollectTimeout =
-                           FaultFacetsContainer::kMinimalFacetLifetimeToDelete);
+    explicit FaultImpl(ClockSource* clockSource);
 
     ~FaultImpl() override = default;
 
@@ -66,19 +64,16 @@ public:
 
     std::vector<FaultFacetPtr> getFacets() const override;
 
-    boost::optional<FaultFacetPtr> getFaultFacet(FaultFacetType type) override;
+    FaultFacetPtr getFaultFacet(FaultFacetType type) override;
 
-    FaultFacetPtr getOrCreateFaultFacet(FaultFacetType type,
-                                        std::function<FaultFacetPtr()> createCb) override;
+    void updateWithSuppliedFacet(FaultFacetType type, FaultFacetPtr facet) override;
 
     void garbageCollectResolvedFacets() override;
 
 private:
     const UUID _id = UUID::gen();
 
-    ServiceContext* const _svcCtx;
-    // A resolved instance of facet can be garbage collected only after this timeout.
-    const Milliseconds _minimalGarbageCollectTimeout;
+    ClockSource* const _clockSource;
     const Date_t _startTime;
 
     mutable Mutex _mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "FaultImpl::_mutex");
