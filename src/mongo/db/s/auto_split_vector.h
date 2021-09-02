@@ -35,8 +35,43 @@
 namespace mongo {
 
 /**
- * Given a chunk, determines whether it satisfies the requisites to be auto-splitted and returns the
- * split points if so.
+ * Given a chunk, determines whether it satisfies the requisites to be auto-splitted and - if so -
+ * returns the split points (shard keys representing the lower bounds of the new chunks to create).
+ *
+ * The logic implemented can be summarized as follows: given a maxChunkSize of `x` MB, the algorithm
+ * aims to choose the split points so that the resulting chunks' size would be around `x / 2` MB.
+ * As it is too expensive to precisely determine the dimension of a chunk, it is assumed a uniform
+ * distribution of document sizes, hence the aim is to balance the number of documents per chunk.
+ *
+ * ALGORITHM DESCRIPTION
+ *
+ * The split points for a chunk `C` belonging to a collection `coll` are calculated as follows:
+ * - `averageDocumentSize` = `totalCollSizeOnShard / numberOfCollDocs`
+ * - `maxNumberOfDocsPerChunk` = `maxChunkSize / averageDocumentSize`
+ * - `maxNumberOfDocsPerSplittedChunk` = `maxNumberOfDocsPerChunk / 2`
+ * - Scan forward the shard key index entries for `coll` that are belonging to chunk `C`:
+ * - (1) Choose a split point every `maxNumberOfDocsPerSplittedChunk` scanned keys
+ * - (2) To avoid small chunks, remove the last split point and eventually recalculate it as
+ * follows:
+ * --- (2.1) IF the right-most interval's number of document is at least 90%
+ * `maxNumberOfDocsPerChunk`, pick the middle key.
+ * --- (2.2) ELSE no last split point (wait for more inserts and next iterations of the splitter).
+ *
+ * EXAMPLE
+ * `maxChunkSize` = 100MB
+ * `averageDocumentSize` = 1MB
+ * `maxNumberOfDocsPerChunk` = 100
+ * `maxNumberOfDocsPerSplittedChunk` = 50
+ *
+ * Shard key type: integer
+ * Chunk `C` bounds: `[0, maxKey)` . Chunk `C` contains 190 documents with shard keys [0...189].
+ *
+ * (1) Initially calculated split points: [49, 99, 149].
+ * (2) Removing the last split point `149` to avoid small chunks and recalculate:
+ * (2.1) Is the interval `[99-189]` eligible to be split? YES, because it contains 90 documents
+ * that is equivalent to 90% `maxNumberOfDocsPerChunk`: choose the middle key `134` as split point .
+ *
+ * Returned split points: [49, 99, 134].
  */
 std::vector<BSONObj> autoSplitVector(OperationContext* opCtx,
                                      const NamespaceString& nss,

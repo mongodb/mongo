@@ -202,7 +202,8 @@ std::vector<BSONObj> autoSplitVector(OperationContext* opCtx,
         const long long avgDocSize = dataSize / totalLocalCollDocuments;
 
         // Split at half the max chunk size
-        long long maxDocsPerSplittedChunk = maxChunkSizeBytes / (2 * avgDocSize);
+        long long maxDocsPerChunk = maxChunkSizeBytes / avgDocSize;
+        long long maxDocsPerSplittedChunk = maxDocsPerChunk / 2;
 
         BSONObj currentKey;               // Last key seen during the index scan
         long long numScannedKeys = 1;     // minKeyInOriginalChunk has already been scanned
@@ -210,8 +211,9 @@ std::vector<BSONObj> autoSplitVector(OperationContext* opCtx,
 
         // Reference to last split point that needs to be checked in order to avoid adding duplicate
         // split points. Initialized to the min of the first chunk being split.
-        auto lastSplitPoint = dotted_path_support::extractElementsBasedOnTemplate(
+        auto minKeyElement = dotted_path_support::extractElementsBasedOnTemplate(
             prettyKey(shardKeyIdx->keyPattern(), minKeyInOriginalChunk.getOwned()), keyPattern);
+        auto lastSplitPoint = minKeyElement;
 
         Timer timer;  // To measure time elapsed while searching split points
 
@@ -254,6 +256,51 @@ std::vector<BSONObj> autoSplitVector(OperationContext* opCtx,
                 numScannedKeys = 0;
 
                 LOGV2_DEBUG(5865003, 4, "Picked a split key", "key"_attr = redact(currentKey));
+            }
+        }
+
+        // Avoid creating small chunks by choosing more fairly the last split point:
+        // - Remove the last found split point
+        // -- IF the right-most new chunk would be at least 90% full, further split by adding its
+        // the middle key as last split point
+        // -- ELSE keep a bigger last chunk (maxDocsPerSplittedChunk <= size < 90% maxDocsPerChunk)
+        if (!splitKeys.empty()) {
+            splitKeys.pop_back();
+
+            const auto lastChunkNumberOfDocs = numScannedKeys + maxDocsPerSplittedChunk;
+            if (lastChunkNumberOfDocs >= maxDocsPerChunk * 0.9) {
+                auto lastSplitPointDistanceFromLastKey = lastChunkNumberOfDocs / 2;
+
+                auto exec = InternalPlanner::indexScan(opCtx,
+                                                       &collection.getCollection(),
+                                                       shardKeyIdx,
+                                                       maxKey,
+                                                       minKey,
+                                                       BoundInclusion::kIncludeEndKeyOnly,
+                                                       PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                                       InternalPlanner::BACKWARD);
+
+                numScannedKeys = 0;
+                while (exec->getNext(&currentKey, nullptr) == PlanExecutor::ADVANCED) {
+                    if (++numScannedKeys == lastSplitPointDistanceFromLastKey) {
+                        const auto previousSplitPoint =
+                            splitKeys.empty() ? minKeyElement : splitKeys.back();
+
+                        currentKey = dotted_path_support::extractElementsBasedOnTemplate(
+                            prettyKey(shardKeyIdx->keyPattern(), currentKey.getOwned()),
+                            keyPattern);
+
+                        const auto compareWithPreviousSplitPoint =
+                            currentKey.woCompare(previousSplitPoint);
+                        if (compareWithPreviousSplitPoint > 0) {
+                            splitKeys.push_back(currentKey.getOwned());
+                        } else if (compareWithPreviousSplitPoint == 0) {
+                            // Do not add again the same split point in case of frequent shard key.
+                            tooFrequentKeys.insert(currentKey.getOwned());
+                        }
+                        break;
+                    }
+                }
             }
         }
 

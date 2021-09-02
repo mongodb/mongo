@@ -166,7 +166,7 @@ runCase({
     docSize: 514 * 1024,
     stages: [
         {numDocsToInsert: 10, expectedNumChunks: 10},
-        {numDocsToInsert: 10, expectedNumChunks: 18},
+        {numDocsToInsert: 10, expectedNumChunks: 15},
     ],
 });
 

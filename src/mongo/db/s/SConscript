@@ -458,6 +458,7 @@ env.CppUnitTest(
     target='db_s_shard_server_test',
     source=[
         'active_migrations_registry_test.cpp',
+        'auto_split_vector_test.cpp',
         'balancer/balance_stats_test.cpp',
         'chunk_split_state_driver_test.cpp',
         'collection_metadata_filtering_test.cpp',
