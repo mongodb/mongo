@@ -3046,6 +3046,7 @@ bool TopologyCoordinator::shouldChangeSyncSource(const HostAndPort& currentSourc
     fassert(4612000, !currentSourceOpTime.isNull());
 
     int syncSourceIndex = oqMetadata.getSyncSourceIndex();
+    std::string syncSourceHost = oqMetadata.getSyncSourceHost();
 
     // Change sync source if chaining is disabled (without overrides), we are not syncing from the
     // primary, and we know who the new primary is. We do not consider chaining disabled if we are
@@ -3074,6 +3075,29 @@ bool TopologyCoordinator::shouldChangeSyncSource(const HostAndPort& currentSourc
               "lastOpTimeFetched"_attr = lastOpTimeFetched,
               "syncSourceLatestOplogOpTime"_attr = currentSourceOpTime,
               "isPrimary"_attr = replMetadata.getIsPrimary());
+        return true;
+    }
+
+    // Change sync source if our sync source is also syncing from us when we are in primary
+    // catchup mode, forming a sync source selection cycle, and the sync source is not ahead
+    // of us. This is to prevent a deadlock situation. See SERVER-58988 for details.
+    // When checking the sync source, we use syncSourceHost if it is set, otherwise fall back
+    // to use syncSourceIndex. The difference is that syncSourceIndex might not point to the
+    // node that we think of because it was inferred from the sender node, which could have
+    // a different config. This is acceptable since we are just choosing a different sync
+    // source if that happens and reconfigs are rare.
+    bool isSyncingFromMe = !syncSourceHost.empty()
+        ? syncSourceHost == _selfMemberData().getHostAndPort().toString()
+        : syncSourceIndex == _selfIndex;
+
+    if (isSyncingFromMe && _currentPrimaryIndex == _selfIndex &&
+        currentSourceOpTime <= lastOpTimeFetched) {
+        LOGV2(5898800,
+              "Choosing new sync source because we are in primary catchup but our current sync "
+              "source is also syncing from us but is not ahead of us",
+              "syncSource"_attr = currentSource,
+              "lastOpTimeFetched"_attr = lastOpTimeFetched,
+              "syncSourceLatestOplogOpTime"_attr = currentSourceOpTime);
         return true;
     }
 
@@ -3237,7 +3261,8 @@ rpc::OplogQueryMetadata TopologyCoordinator::prepareOplogQueryMetadata(int rbid)
                                    getMyLastAppliedOpTime(),
                                    rbid,
                                    _currentPrimaryIndex,
-                                   _rsConfig.findMemberIndexByHostAndPort(getSyncSourceAddress()));
+                                   _rsConfig.findMemberIndexByHostAndPort(getSyncSourceAddress()),
+                                   getSyncSourceAddress().toString());
 }
 
 void TopologyCoordinator::processReplSetRequestVotes(const ReplSetRequestVotesArgs& args,
