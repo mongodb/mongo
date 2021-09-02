@@ -199,6 +199,14 @@ DocumentSource::GetNextResult DocumentSourceUnionWith::doGetNext() {
     if (_executionState == ExecutionProgress::kStartingSubPipeline) {
         auto serializedPipe = _pipeline->serializeToBson();
         logStartingSubPipeline(serializedPipe);
+        // $$SEARCH_META can be set during runtime earlier in the pipeline, and therefore must be
+        // copied to the subpipeline manually.
+        if (pExpCtx->variables.hasConstantValue(Variables::kSearchMetaId)) {
+            _pipeline->getContext()->variables.setReservedValue(
+                Variables::kSearchMetaId,
+                pExpCtx->variables.getValue(Variables::kSearchMetaId, Document()),
+                true);
+        }
         try {
             _pipeline =
                 pExpCtx->mongoProcessInterface->attachCursorSourceToPipeline(_pipeline.release());
