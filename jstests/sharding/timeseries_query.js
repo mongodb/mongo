@@ -10,6 +10,7 @@
 
 (function() {
 load("jstests/core/timeseries/libs/timeseries.js");
+load("jstests/libs/analyze_plan.js");
 
 Random.setRandomSeed();
 
@@ -60,7 +61,8 @@ function runInsert(timestamp, metaValue) {
     assert.commandWorked(sDB.getCollection(unshardedColl).insert(doc));
 }
 
-function runQuery({query, expectedDocs, expectedShards, expectQueryRewrite = true}) {
+function runQuery(
+    {query, expectedDocs, expectedShards, expectQueryRewrite = true, expectCollScan = false}) {
     // Restart profiler.
     for (let shardDB of [shard0DB, shard1DB]) {
         shardDB.setProfilingLevel(0);
@@ -111,6 +113,24 @@ function runQuery({query, expectedDocs, expectedShards, expectQueryRewrite = tru
         } else {
             assert.eq(shard1Entries.length, 0, shard1Entries);
         }
+
+        // Test the explain plans from all of the expected shards.
+        const plans = [
+            coll.find(query).explain(),
+            coll.explain().aggregate([{$match: query}]),
+            coll.aggregate([{$match: query}], {explain: true})
+        ];
+        plans.forEach(plan => {
+            assert.eq(expectedShards.sort(), Object.keys(plan.shards).sort());
+            expectedShards.forEach(shard => {
+                const winningPlan = plan.shards[shard].stages[0].$cursor.queryPlanner.winningPlan;
+                if (expectCollScan) {
+                    assert(isCollscan(sDB, winningPlan));
+                } else {
+                    assert(isIxscan(sDB, winningPlan));
+                }
+            });
+        });
     }
 }
 
@@ -278,12 +298,14 @@ function runQuery({query, expectedDocs, expectedShards, expectQueryRewrite = tru
         expectedShards: [otherShard.shardName]
     });
 
-    // OR queries are currently not re-written. So expect the query to be sent to both the shards.
+    // OR queries are currently not re-written. So expect the query to be sent to both the shards,
+    // and do a full collection scan on each shard.
     runQuery({
         query: {$or: [{time: ISODate("2019-11-11")}, {time: ISODate("2019-11-12")}]},
         expectedDocs: 2,
         expectedShards: [primaryShard.shardName, otherShard.shardName],
         expectQueryRewrite: false,
+        expectCollScan: true,
     });
 
     sDB.dropDatabase();
@@ -342,7 +364,9 @@ function runQuery({query, expectedDocs, expectedShards, expectQueryRewrite = tru
     runQuery({
         query: {[`${metaField}.subField`]: 1},
         expectedDocs: 1,
-        expectedShards: [primaryShard.shardName, otherShard.shardName]
+        expectedShards: [primaryShard.shardName, otherShard.shardName],
+        // Since the index cannot be used on the meta sub-field, expect a full collection scan.
+        expectCollScan: true,
     });
 
     runQuery({
