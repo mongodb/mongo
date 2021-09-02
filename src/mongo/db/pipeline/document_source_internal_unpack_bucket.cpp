@@ -311,12 +311,6 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
                         field.find('.') == std::string::npos);
                 bucketSpec.computedMetaProjFields.emplace_back(field);
             }
-        } else if (fieldName == "includeBucketIdAndRowIndex") {
-            uassert(5809600,
-                    str::stream() << "includeBucketIdAndRowIndex field must be a boolean, got: "
-                                  << elem.type(),
-                    elem.type() == BSONType::Bool);
-            bucketSpec.includeBucketIdAndRowIndex = elem.boolean();
         } else {
             uasserted(5346506,
                       str::stream()
@@ -398,9 +392,6 @@ void DocumentSourceInternalUnpackBucket::serializeToArray(
     out.addField(timeseries::kTimeFieldName, Value{spec.timeField});
     if (spec.metaField) {
         out.addField(timeseries::kMetaFieldName, Value{*spec.metaField});
-    }
-    if (spec.includeBucketIdAndRowIndex) {
-        out.addField("includeBucketIdAndRowIndex", Value{true});
     }
     out.addField(kBucketMaxSpanSeconds, Value{_bucketMaxSpanSeconds});
 

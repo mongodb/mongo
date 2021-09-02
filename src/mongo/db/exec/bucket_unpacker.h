@@ -54,11 +54,6 @@ struct BucketSpec {
     // Vector of computed meta field projection names. Added at the end of materialized
     // measurements.
     std::vector<std::string> computedMetaProjFields;
-
-    // An includeBucketIdAndRowIndex flag to indicate that materialized measurements will
-    // contain the bucketId of the bucket that measurement was extracted from along with its row
-    // position.
-    bool includeBucketIdAndRowIndex = false;
 };
 
 /**
