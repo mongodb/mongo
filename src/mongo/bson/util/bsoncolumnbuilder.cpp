@@ -133,8 +133,7 @@ BSONColumnBuilder& BSONColumnBuilder::append(BSONElement elem) {
                     appendEncoded(Simple8bTypeUtil::encodeDecimal128(elem._numberDecimal()));
                     break;
                 default:
-                    // Nothing else is implemented yet
-                    invariant(false);
+                    MONGO_UNREACHABLE;
             };
         } else if (type == NumberDouble) {
             compressed = _appendDouble(elem._numberDouble(), previous._numberDouble());
@@ -184,11 +183,12 @@ BSONColumnBuilder& BSONColumnBuilder::append(BSONElement elem) {
                 case DBRef:
                 case CodeWScope:
                 case Symbol:
+                case Object:
+                case Array:
                     encodingPossible = false;
                     break;
                 default:
-                    // Nothing else is implemented yet
-                    invariant(false);
+                    MONGO_UNREACHABLE;
             };
             if (encodingPossible) {
                 compressed = _simple8bBuilder64.append(Simple8bTypeUtil::encodeInt64(value));
