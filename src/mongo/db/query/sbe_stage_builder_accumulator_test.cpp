@@ -809,7 +809,7 @@ TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationMixedTypesWithDecimal
     const auto doubleVal1 = 4.8;
     const auto doubleVal2 = -5.0;
     const auto intVal = 6;
-    const auto longVal = 3l;
+    const auto longVal = 3ll;
 
     DoubleDoubleSummation doubleDoubleSum;
     doubleDoubleSum.addDouble(doubleVal1);
