@@ -36,11 +36,21 @@
 
 namespace mongo {
 
+/**
+ * Stores a callback to be invoked upon destruction.
+ *
+ * `F` is normally deduced from the initializer.
+ * Examples:
+ *
+ *     ScopeGuard cleanup([&] { ... });
+ *     auto cleanup = ScopeGuard([&] { ... });
+ *     ScopeGuard cleanup = [&] { ... };
+ */
 template <typename F>
 class [[nodiscard]] ScopeGuard {
 public:
     template <typename FuncArg>
-    explicit ScopeGuard(FuncArg && f) : _func(std::forward<FuncArg>(f)) {}
+    ScopeGuard(FuncArg && f) : _func(std::forward<FuncArg>(f)) {}
 
     // Remove all move and copy, MCE (mandatory copy elision) covers us here.
     ScopeGuard(const ScopeGuard&) = delete;
@@ -53,6 +63,7 @@ public:
             _func();
     }
 
+    /** A dismissed ScopeGuard does not invoke its callback. */
     void dismiss() noexcept {
         _dismissed = true;
     }
@@ -62,6 +73,10 @@ private:
     bool _dismissed = false;
 };
 
+template <typename F>
+ScopeGuard(F &&)->ScopeGuard<std::decay_t<F>>;
+
+/** Obsolete: `ScopeGuard<F>` can deduce the `F` type. */
 template <typename F>
 auto makeGuard(F&& fun) {
     return ScopeGuard<std::decay_t<F>>(std::forward<F>(fun));
@@ -73,4 +88,9 @@ auto makeGuard(F&& fun) {
 #define MONGO_SCOPEGUARD_CAT(s1, s2) MONGO_SCOPEGUARD_CAT2(s1, s2)
 #define MONGO_SCOPEGUARD_ANON(str) MONGO_SCOPEGUARD_CAT(str, __LINE__)
 
-#define ON_BLOCK_EXIT(...) auto MONGO_SCOPEGUARD_ANON(onBlockExit) = makeGuard(__VA_ARGS__)
+/**
+ * Declares a ScopeGuard having a variable name based on line number.
+ * Example:
+ *     ON_BLOCK_EXIT([&] { ... });
+ */
+#define ON_BLOCK_EXIT ScopeGuard MONGO_SCOPEGUARD_ANON(onBlockExit)
