@@ -56,6 +56,7 @@ Facebook's
 FlameGraph
 FlameGraphs
 FlexeLint
+FSTREAM
 FreeBSD
 FreeBSD's
 GCC
@@ -151,6 +152,7 @@ XRay
 Yann
 Za
 Zstd
+aarch
 aR
 abc
 abstime
@@ -372,6 +374,7 @@ iflag
 incr
 indices
 init
+inmemory
 insn
 intl
 intpack
@@ -443,6 +446,7 @@ memp
 metadata
 metatracking
 minkey
+mips
 mispredictions
 mixin
 mixins
@@ -511,6 +515,7 @@ pid
 plantuml
 png
 posix
+ppc
 pre
 prealloc
 prepended
@@ -584,6 +589,7 @@ skinparam
 skiplist
 skiplists
 sortable
+sparc
 spinlock
 spinlocks
 sql
