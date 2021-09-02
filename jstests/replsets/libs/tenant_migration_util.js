@@ -10,11 +10,12 @@ var TenantMigrationUtil = (function() {
      */
     function isSliceMergeEnabled(db) {
         const admin = db.getSiblingDB("admin");
-        const getParam = admin.runCommand({getParameter: 1, featureFlagSliceMerge: 1});
-        const fcv = admin.system.version.findOne({_id: "featureCompatibilityVersion"}).version;
-        return getParam.hasOwnProperty("featureFlagSliceMerge") &&
-            getParam.featureFlagSliceMerge.value &&
-            MongoRunner.compareBinVersions(fcv, getParam.featureFlagSliceMerge.fcv) >= 0;
+        const flagDoc = admin.runCommand({getParameter: 1, featureFlagSliceMerge: 1});
+        const fcvDoc = admin.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
+        return flagDoc.hasOwnProperty("featureFlagSliceMerge") &&
+            flagDoc.featureFlagSliceMerge.value &&
+            MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version,
+                                           flagDoc.featureFlagSliceMerge.fcv) >= 0;
     }
 
     /**
