@@ -68,6 +68,15 @@ public:
 
             const auto& cmd = request();
 
+            if (cmd.getProtocol().value_or(MigrationProtocolEnum::kMultitenantMigrations) ==
+                MigrationProtocolEnum::kSliceMerge) {
+                uassert(5949300,
+                        "protocol \"slice merge\" not supported",
+                        repl::feature_flags::gSliceMerge.isEnabled(
+                            serverGlobalParams.featureCompatibility));
+            }
+
+            // TODO (SERVER-59494): tenantId should be optional in the state doc. Include protocol.
             TenantMigrationDonorDocument stateDoc(cmd.getMigrationId(),
                                                   cmd.getRecipientConnectionString().toString(),
                                                   cmd.getReadPreference(),

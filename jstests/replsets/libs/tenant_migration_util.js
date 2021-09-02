@@ -6,6 +6,18 @@ var TenantMigrationUtil = (function() {
     const kCreateRstRetryIntervalMS = 100;
 
     /**
+     * Returns true if feature flag 'featureFlagSliceMerge' is enabled, false otherwise.
+     */
+    function isSliceMergeEnabled(db) {
+        const admin = db.getSiblingDB("admin");
+        const getParam = admin.runCommand({getParameter: 1, featureFlagSliceMerge: 1});
+        const fcv = admin.system.version.findOne({_id: "featureCompatibilityVersion"}).version;
+        return getParam.hasOwnProperty("featureFlagSliceMerge") &&
+            getParam.featureFlagSliceMerge.value &&
+            MongoRunner.compareBinVersions(fcv, getParam.featureFlagSliceMerge.fcv) >= 0;
+    }
+
+    /**
      * Returns the external keys for the given migration id.
      */
     function getExternalKeys(conn, migrationId) {
@@ -456,6 +468,7 @@ var TenantMigrationUtil = (function() {
 
     return {
         kExternalKeysNs,
+        isSliceMergeEnabled,
         getExternalKeys,
         runMigrationAsync,
         forgetMigrationAsync,

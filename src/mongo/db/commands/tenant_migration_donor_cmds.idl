@@ -38,6 +38,14 @@ imports:
   - "mongo/idl/basic_types.idl"
   - "mongo/s/sharding_types.idl"
 
+enums:
+    MigrationProtocol:
+        description: "Determines which tenant migration protocol to use."
+        type: string
+        values:
+            kMultitenantMigrations: "multitenant migrations"
+            kSliceMerge: "slice merge"
+
 structs:
     DonorStartMigrationResponse:
         description: "Response of the donorStartMigration command"
@@ -88,6 +96,10 @@ commands:
           donor.
         type: TenantMigrationPEMPayload
         # TODO (SERVER-54085): Remove server parameter tenantMigrationDisableX509Auth.
+        optional: true
+      protocol:
+        description: "Which migration protocol to use, default 'multitenant migrations'."
+        type: MigrationProtocol
         optional: true
 
   donorForgetMigration:

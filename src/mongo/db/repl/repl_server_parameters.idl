@@ -549,3 +549,8 @@ feature_flags:
             When enabled, file copy based initial sync will be supported in Enterprise Server.
         cpp_varname: feature_flags::gFileCopyBasedInitialSync
         default: false
+
+    featureFlagSliceMerge:
+        description: When enabled, multitenant migration uses the "slice merge" protocol.
+        cpp_varname: feature_flags::gSliceMerge
+        default: false
