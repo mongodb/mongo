@@ -9,10 +9,10 @@
 ##
 #set $releases_file = open($releases_yml_path, 'r')
 #set $releases = yaml.safe_load($releases_file)
-#set $lts_releases = list(map(Version, $releases['majorReleases']))
+#set $lts_releases = list(map(Version, $releases['longTermSupportReleases']))
 ##
 ## Parse the "MAJOR.MINOR" version from mongo_version.
-#set $latest = Version(re.sub(r'-.*', '', $mongo_version))
+#set $latest = Version(re.match(r'^[0-9]+\.[0-9]+', $mongo_version).group(0))
 ##
 ## The most recent lts release prior to 'latest'.
 #set $last_lts = lts_releases[bisect.bisect_left(lts_releases, latest) - 1]

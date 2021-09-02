@@ -1,4 +1,4 @@
-# Stores all FCVs and all major release versions since v4.4. 
+# Stores all FCVs and all LTS release versions since v4.0. 
 # This information is used to generate the FCV constants in 
 # multiversion_constants.h. Please consult the STAR team before 
 # modifying this file. 
@@ -13,7 +13,9 @@ featureCompatibilityVersions:
   - "4.9"
   - "5.0"
   - "5.1"
-# All major releases starting with 4.4.
-majorReleases:
+# All LTS releases starting with 4.0.
+longTermSupportReleases:
+  - "4.0"
+  - "4.2"
   - "4.4"
   - "5.0"

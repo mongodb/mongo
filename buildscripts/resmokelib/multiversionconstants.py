@@ -83,7 +83,7 @@ def calculate_fcv_constants():
     mongo_version_yml_file = open(MONGO_VERSION_YAML, 'r')
     mongo_version_yml = yaml.safe_load(mongo_version_yml_file)
     mongo_version = mongo_version_yml['mongo_version']
-    latest = Version(re.sub(r'-.*', '', mongo_version))
+    latest = Version(re.match(r'^[0-9]+\.[0-9]+', mongo_version).group(0))
 
     releases_yml_file = open(RELEASES_YAML, 'r')
     releases_yml = yaml.safe_load(releases_yml_file)
@@ -93,7 +93,7 @@ def calculate_fcv_constants():
 
     fcvs = releases_yml['featureCompatibilityVersions']
     fcvs = list(map(Version, fcvs))
-    lts = releases_yml['majorReleases']
+    lts = releases_yml['longTermSupportReleases']
     lts = list(map(Version, lts))
 
     # Highest release less than latest.

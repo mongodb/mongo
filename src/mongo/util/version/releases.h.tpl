@@ -54,13 +54,13 @@
 #set mvc_file = open(releases_yml_path, 'r')
 #set mvc_doc = yaml.safe_load(mvc_file)
 #set mvc_fcvs = mvc_doc['featureCompatibilityVersions']
-#set mvc_majors = mvc_doc['majorReleases']
+#set mvc_majors = mvc_doc['longTermSupportReleases']
 ##
 ## Transform strings to versions.
 #set global fcvs = list(map(Version, mvc_fcvs))
 #set majors = list(map(Version, mvc_majors))
 
-#set global latest = Version(re.sub(r'-.*', '', mongo_version))
+#set global latest = Version(re.match(r'^[0-9]+\.[0-9]+', $mongo_version).group(0))
 ## Highest release less than latest.
 #set global last_continuous = $fcvs[bisect_left($fcvs, $latest) - 1]
 ## Highest LTS release less than latest.
@@ -83,6 +83,9 @@ namespace mongo::multiversion {
 fcvs = self.getVar('fcvs')
 last_lts, last_continuous, latest = self.getVar('last_lts'), self.getVar('last_continuous'), self.getVar('latest')
 generic_fcvs = self.getVar('generic_fcvs')
+
+# The 'latest' version must be one of the versions listed in releases.yml.
+assert (latest in fcvs)
 
 # The transition when used as a cpp variable.
 down = 'DowngradingFrom'
