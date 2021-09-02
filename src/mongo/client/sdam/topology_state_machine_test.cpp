@@ -168,7 +168,6 @@ TEST_F(TopologyStateMachineTestFixture, ShouldRemoveServerDescriptionIfNotInHost
     ASSERT_EQUALS(serverDescription, topologyDescription->getServers().front());
 }
 
-
 TEST_F(TopologyStateMachineTestFixture,
        ShouldNotRemoveReplicaSetMemberServerWhenTopologyIsReplicaSetNoPrimaryAndMeIsNotPresent) {
     const auto serverAddress = (*kTwoSeedReplicaSetNoPrimaryConfig.getSeedList()).front();
@@ -190,6 +189,37 @@ TEST_F(TopologyStateMachineTestFixture,
 
     auto serversAfter = map(topologyDescription->getServers(), getServerDescriptionAddress);
     ASSERT_EQUALS(adaptForAssert(serversBefore), adaptForAssert(serversAfter));
+}
+
+TEST_F(TopologyStateMachineTestFixture, ShouldRemoveServerDescriptionIfShardDoesntMatch) {
+    const auto expectedRemovedServer = (*kTwoSeedReplicaSetNoPrimaryConfig.getSeedList()).front();
+    const auto expectedRemainingServer = (*kTwoSeedReplicaSetNoPrimaryConfig.getSeedList()).back();
+
+    TopologyStateMachine stateMachine(kTwoSeedReplicaSetNoPrimaryConfig);
+    auto topologyDescription =
+        std::make_shared<TopologyDescription>(kTwoSeedReplicaSetNoPrimaryConfig);
+
+    auto serverDescription = ServerDescriptionBuilder()
+                                 .withAddress(expectedRemovedServer)
+                                 .withType(ServerType::kRSSecondary)
+                                 .withSetName(*topologyDescription->getSetName())
+                                 .instance();
+    auto serverDescriptionWithBadSetName = ServerDescriptionBuilder()
+                                               .withAddress(expectedRemovedServer)
+                                               .withType(ServerType::kRSSecondary)
+                                               .withSetName("wrong_name_should_not_match")
+                                               .instance();
+
+    ASSERT_EQUALS(static_cast<size_t>(2), topologyDescription->getServers().size());
+
+    // First tests that description is not removed if set name is correct.
+    stateMachine.onServerDescription(*topologyDescription, serverDescription);
+    ASSERT_EQUALS(static_cast<size_t>(2), topologyDescription->getServers().size());
+
+    // Tests that description is removed if the set name does not match.
+    stateMachine.onServerDescription(*topologyDescription, serverDescriptionWithBadSetName);
+    ASSERT_EQUALS(static_cast<size_t>(1), topologyDescription->getServers().size());
+    ASSERT_EQUALS(expectedRemainingServer, topologyDescription->getServers().front()->getAddress());
 }
 
 TEST_F(TopologyStateMachineTestFixture,

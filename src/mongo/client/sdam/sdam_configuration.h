@@ -63,6 +63,16 @@ public:
         Milliseconds localThreshholdMs = Milliseconds(sdamLocalThreshholdMs),
         boost::optional<std::string> setName = boost::none);
 
+    SdamConfiguration(boost::optional<std::vector<HostAndPort>> seedList,
+                      TopologyType initialType,
+                      boost::optional<std::string> setName)
+        : SdamConfiguration(seedList,
+                            initialType,
+                            Milliseconds(sdamHeartBeatFrequencyMs),
+                            Milliseconds(sdamConnectTimeoutMs),
+                            Milliseconds(sdamLocalThreshholdMs),
+                            setName) {}
+
     /**
      * The initial set of servers to monitor in the replica set.
      */

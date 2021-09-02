@@ -207,7 +207,11 @@ StreamableReplicaSetMonitor::StreamableReplicaSetMonitor(
         }
     }
 
-    _sdamConfig = SdamConfiguration(seedsNoDups);
+    // StreamableReplicaSetMonitor cannot be used with kSingle type, thus we know that the type is
+    // kReplicaSetNoPrimary. We need to save the expected set name to avoid the case when the
+    // provided seed address contains a ReplicaSet with different name (deployment mistake).
+    _sdamConfig =
+        SdamConfiguration(seedsNoDups, TopologyType::kReplicaSetNoPrimary, _uri.getSetName());
     _serverSelector = std::make_unique<SdamServerSelector>(_sdamConfig);
 }
 
