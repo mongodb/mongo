@@ -230,6 +230,7 @@ env.Library(
         'balancer/balance_stats.cpp',
         'balancer/balancer_chunk_selection_policy_impl.cpp',
         'balancer/balancer_chunk_selection_policy.cpp',
+        'balancer/balancer_commands_scheduler_impl.cpp',
         'balancer/balancer_policy.cpp',
         'balancer/balancer.cpp',
         'balancer/cluster_statistics_impl.cpp',
