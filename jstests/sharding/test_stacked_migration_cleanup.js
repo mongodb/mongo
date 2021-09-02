@@ -1,12 +1,13 @@
 // Tests "stacking" multiple migration cleanup threads and their behavior when the collection
 // changes
+// @tags: [assumes_balancer_off]
 (function() {
 'use strict';
 
 const clusterInFCV44 = jsTestOptions().mongosBinVersion != 'last-stable';
 
 // start up a new sharded cluster
-var st = new ShardingTest({shards: 2, mongos: 1});
+var st = new ShardingTest({shards: 2, mongos: 1, other: {enableBalancer: false}});
 
 var mongos = st.s;
 var admin = mongos.getDB("admin");
