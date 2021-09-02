@@ -9,8 +9,14 @@ def generate_eviction_configs(rng):
     eviction_checkpoint_target = rng.randint(1, 99)
     eviction_target = rng.randint(50, 95)
     eviction_trigger = rng.randint(eviction_target + 1, 99)
-    eviction_dirty_target = rng.randint(5, 50)
-    eviction_dirty_trigger = rng.randint(eviction_dirty_target, 75)
+
+    # Fuzz eviction_dirty_target and trigger both as relative and absolute values
+    target_bytes_min = 10 * 1024 * 1024  # 10MB
+    target_bytes_max = 256 * 1024 * 1024  # 256MB # 1GB default cache size on Evergreen
+    eviction_dirty_target = rng.choice(
+        [rng.randint(5, 50), rng.randint(target_bytes_min, target_bytes_max)])
+    trigger_max = 75 if eviction_dirty_target <= 50 else target_bytes_max
+    eviction_dirty_trigger = rng.randint(eviction_dirty_target, trigger_max)
 
     close_idle_time_secs = rng.randint(1, 100)
     close_handle_minimum = rng.randint(0, 1000)

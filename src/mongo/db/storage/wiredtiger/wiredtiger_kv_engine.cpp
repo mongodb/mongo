@@ -352,6 +352,14 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
     ss << "cache_size=" << cacheSizeMB << "M,";
     ss << "session_max=33000,";
     ss << "eviction=(threads_min=4,threads_max=4),";
+
+    if (gWiredTigerEvictionDirtyTargetGB)
+        ss << "eviction_dirty_target="
+           << static_cast<size_t>(gWiredTigerEvictionDirtyTargetGB * 1024) << "MB,";
+    if (gWiredTigerEvictionDirtyMaxGB)
+        ss << "eviction_dirty_trigger=" << static_cast<size_t>(gWiredTigerEvictionDirtyMaxGB * 1024)
+           << "MB,";
+
     ss << "config_base=false,";
     ss << "statistics=(fast),";
 
