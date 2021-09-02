@@ -57,7 +57,8 @@ public:
                        repl::OpTime lastOpApplied,
                        int rbid,
                        int currentPrimaryIndex,
-                       int currentSyncSourceIndex);
+                       int currentSyncSourceIndex,
+                       std::string currentSyncSourceHost);
 
     /**
      * format:
@@ -106,6 +107,14 @@ public:
     }
 
     /**
+     * Returns the host of the sync source of the sender.
+     * Returns empty string if it has no sync source.
+     */
+    std::string getSyncSourceHost() const {
+        return _currentSyncSourceHost;
+    }
+
+    /**
      * Returns the current rbid of the sender.
      */
     int getRBID() const {
@@ -123,6 +132,7 @@ private:
     int _rbid = -1;
     int _currentPrimaryIndex = kNoPrimary;
     int _currentSyncSourceIndex = -1;
+    std::string _currentSyncSourceHost;
 };
 
 }  // namespace rpc
