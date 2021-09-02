@@ -1,15 +1,86 @@
 /*! @arch_page arch-eviction Eviction
 
-Eviction represents the process or removing old data from the cache,
-writing it to disk if it is dirty. The general strategy uses a dedicated
-set of eviction threads that are tasked with identifying candidate data.
-If the data needs to be written, it is reconciled (converting the
-in-memory format to on-disk format), and then written. Clean memory
-can be freed if needed.
+@section eviction_overall Eviction
 
-Eviction cannot be triggered directly by API calls, but happens as a result
-of enough data being dirtied.
+The goal of eviction is to manage the @ref arch-cache and keep the cache in the margin set by the
+user. There is an upper limit for the total content and dirty content, whenever the cache
+goes above the target then eviction gets triggered to bring it down under the limits.
 
 Eviction is managed using \c WT_EVICT_QUEUE structures,
 each of which contains a list of \c WT_EVICT_ENTRY structures.
+
+Eviction is composed of one eviction server, zero or more eviction worker threads and three
+shared eviction_queues (two ordinary queues and one urgent queue). The eviction server's
+goal is to find the pages that can be evicted. It has to walk the pages in a tree, one tree
+after the other, and find evictable candidates. It makes fair judgments between
+the trees, remembers where it was in a tree, and proceeds to the next tree from there. It
+extracts all the pages that can be evicted, sorts them based on when they were accessed last, and
+takes one-third oldest of the evictable candidates. This simulates an approximate Least Recently
+Used (LRU) algorithm, as the references to these pages are then pushed into the eviction_queues.
+The whole goal is to remove the content which is older to be evicted and put it in the queue. A user
+can configure a minimum and a maximum number of eviction worker threads to be created through
+the connection configuration string. The goal of eviction worker threads is to pop the
+pages from the queues and evict them. Eviction worker threads wait for queues to be populated,
+working with the eviction server through a CV signaling mechanism. They then get to evicting the
+pages independently to the server, till the eviction queues are not empty. There is
+a mechanism where the number of worker threads can be scaled dynamically between the provided range.
+With this mechanism, the system automatically adjusts the available worker threads to an optimum
+number that gives a good eviction performance, while minimising the overhead of having a lot of
+eviction threads.
+
+It is possible to have just the eviction server and no worker threads. In such a case,
+the eviction server walks the tree to find pages to evict and evict these pages from the
+cache. Pages that are being marked for forced eviction go onto the urgent
+queue, and these pages take precedence over the pages from the ordinary eviction queues.
+
+If there are other threads reading the content, the page become un-evictable, and the
+eviction server/worker threads check for that. Eviction has to lock and get exclusive
+access to the page so that after having checked if the page is evictable and starting to
+evict, a parallel reader doesn't start to access it.
+
+@section clean_dirty_data Clean vs dirty data
+- Clean refers to data in the cache that is identical to the version stored on disk.
+- Dirty refers to data in the cache that has been modified and needs to be reconciled
+  with the data stored on the disk.
+
+@section clean_dirty_eviction Clean vs dirty eviction
+- In the case of clean eviction, there is no dirty content on the page and it is directly
+  removed from the memory. After that, the page remains solely on the disk unchanged.
+- In the case of dirty eviction, the dirty page goes through reconciliation. The obsolete
+  content on the page is thrown out, the latest value goes to the data store and older
+  values go to the history store.
+
+Sometimes the workload generates enough new data that eviction is unable to reduce the cache content
+and more new cotent is put into cache that can be removed by eviction. In such a case application
+threads are also forced to do the work of eviction workers threads, before they can read or write more data.
+
+Eviction triggers and targets
+
+WiredTiger provides several configuration options for tuning how pages are evicted from
+the cache.
+
+WiredTiger eviction tuning options can be configured when first opening
+a database via ::wiredtiger_open, or changed after open with
+WT_CONNECTION::reconfigure.
+
+The \c eviction_target configuration value is the level at
+which WiredTiger attempts to keep the overall cache usage.  Eviction worker
+threads are active when the cache contains at least this much content,
+expressed as a percentage of the total cache size.
+
+The \c eviction_trigger configuration value is the level at which application threads
+start to perform the eviction.
+
+The \c eviction_dirty_target and \c eviction_dirty_trigger operate in a similar way to
+the overall targets but only apply to dirty data in cache.  In particular, application
+threads will be throttled if the percentage of dirty data reaches the
+\c eviction_dirty_trigger. Any page that has been modified since it was read from disk is
+considered dirty.
+
+The \c eviction_updates_target perform eviction in worker threads when the cache contain
+at least this many bytes of updates
+
+The \c eviction_updates_trigger trigger application threads to perform eviction when the
+cache contains at least this many bytes of updates.
+
 */

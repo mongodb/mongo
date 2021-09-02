@@ -2,5 +2,5 @@
     "vendor": "wiredtiger",
     "github": "wiredtiger/wiredtiger.git",
     "branch": "mongodb-master",
-    "commit": "2fab3ae25129e7810de7a290e82289422d7e85d7"
+    "commit": "56193937634523b7d98cbcfcb005e54aad6d9a1c"
 }
