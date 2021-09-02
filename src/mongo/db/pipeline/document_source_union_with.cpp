@@ -38,6 +38,7 @@
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_source_union_with.h"
 #include "mongo/db/pipeline/document_source_union_with_gen.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/logv2/log.h"
 
@@ -211,6 +212,15 @@ DocumentSource::GetNextResult DocumentSourceUnionWith::doGetNext() {
                     1,
                     "$unionWith attaching cursor to pipeline {pipeline}",
                     "pipeline"_attr = serializedPipe);
+        // $$SEARCH_META can be set during runtime earlier in the pipeline, and therefore must be
+        // copied to the subpipeline manually.
+        if (enableSearchMeta.load()) {
+            auto metaVal = pExpCtx->variables.getValue(Variables::kSearchMetaId, Document());
+            if (!metaVal.missing()) {
+                _pipeline->getContext()->variables.setReservedValue(
+                    Variables::kSearchMetaId, std::move(metaVal), true);
+            }
+        }
         try {
             _pipeline =
                 pExpCtx->mongoProcessInterface->attachCursorSourceToPipeline(_pipeline.release());
