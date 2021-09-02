@@ -216,22 +216,25 @@ functions:
           set -o errexit
           set -o verbose
 
-          if [[ "${branch_name}" != "develop" ]]; then
-            echo "We only run the documentation update task on the WiredTiger (develop) Evergreen project."
-            exit 0
+          # Check if specific branches are provided to the function through the expansion variable
+          # defined in the documentation-update build variant. If none are specified, use the
+          # built-in Evergreen expansion ${branch_name}.
+          if [ -z ${doc_update_branches} ]; then
+            branches=${branch_name}
+          else
+            branches=${doc_update_branches}
           fi
 
-          # Go through each supported WiredTiger Github branch to build the docs.
-          #   Please note the "branch" variable used here is a normal shell variable to store the name of
-          #   a WiredTiger Github branch, while the "branch_name" used above is an Evergreen built-in variable
-          #   to store the name of the branch being tested by the Evergreen project.
-          for branch in develop mongodb-5.0 mongodb-4.4 mongodb-4.2 mongodb-4.0 ; do
-            echo "[Debug] Checking out branch $branch ..."
-            git checkout $branch && git pull --ff-only && git reset --hard origin/$branch && git clean -fdqx
+          # Because of Evergreen's expansion syntax, this is used to process each branch separately.
+          IFS=,
+          for branch in $branches; do
+
+            echo "Checking out branch $branch ..."
+            git checkout $branch
             sh reconf
 
             # Java API is removed in newer branches via WT-6675.
-            if [ "$branch" = "mongodb-4.2" -o "$branch" = "mongodb-4.0" ]; then
+            if [ $branch == "mongodb-4.2" ] || [ $branch == "mongodb-4.0" ]; then
               ../configure CFLAGS="-DMIGHT_NOT_RUN -Wno-error" --enable-java --enable-python --enable-strict
               (cd lang/python && make ../../../lang/python/wiredtiger_wrap.c)
               (cd lang/java && make ../../../lang/java/wiredtiger_wrap.c)
@@ -240,15 +243,20 @@ functions:
               (cd lang/python && make ../../../lang/python/wiredtiger_wrap.c)
             fi
 
-            (cd ../dist && sh s_docs)
-            (cd .. && rm -rf docs-$branch && mv docs docs-$branch)
+            (cd ../dist && sh s_docs && echo "The documentation for $branch was successfully generated.")
+            # Save generated documentation
+            (cd .. && mv docs docs-$branch)
           done
+
   "update wiredtiger docs":
     - command: shell.exec
       params:
-        working_dir: "wiredtiger"
         shell: bash
         script: |
+          # Use a single function to update the documentation of each supported WiredTiger branch.
+          # This is useful as not all branches have a dedicated Evergreen project. Furthermore, the
+          # documentation-update task is not triggered by every commit. We rely on the activity of
+          # the develop branch to update the documentation of all supported branches.
           set -o errexit
           set -o verbose
 
@@ -260,37 +268,36 @@ functions:
           git clone git@github.com:wiredtiger/wiredtiger.github.com.git
           cd wiredtiger.github.com
 
-          # Go through each supported WiredTiger Github branch to stage the doc changes.
-          #   Please note the "branch" variable used here is a normal shell variable to store the name of
-          #   a WiredTiger Github branch, while the "branch_name" used above is an Evergreen built-in variable
-          #   to store the name of the branch being tested by the Evergreen project.
-          for branch in mongodb-4.0 mongodb-4.2 mongodb-4.4 mongodb-5.0 develop ; do
-            echo "[Debug] Copying over doc directory for branch $branch ..."
-            rsync -avq ../docs-$branch/ $branch/
+          # Branches to update are defined through an expansion variable.
+          branches=${doc_update_branches}
 
-            # Commit and push the changes (if any).
-            git add $branch > /dev/null
+          # Go through each branch to stage the doc changes.
+          IFS=,
+          for branch in $branches; do
+
+            # Synchronize the generated documentation with the current one.
+            echo "Synchronizing documentation for branch $branch ..."
+            rsync -avq ../wiredtiger/docs-$branch/ $branch/ --delete
+
+            # Commit and push the changes if any.
+            if [[ $(git status "$branch" --porcelain) ]]; then
+              git add $branch
+              git commit -m "Update auto-generated docs for $branch" \
+                        --author="svc-bot-doc-build <svc-wiredtiger-doc-build@10gen.com>"
+            else
+              echo "No documentation changes for $branch."
+            fi
+
           done
-
-          git commit -m "Update auto-generated develop docs" \
-                     --author="svc-bot-doc-build <svc-wiredtiger-doc-build@10gen.com>" > /dev/null
-    # Use separate shell.exec with "silent" directive to avoid exposing credentail in task log.
     - command: shell.exec
       params:
-        working_dir: "wiredtiger"
+        working_dir: "wiredtiger.github.com"
         shell: bash
         silent: true
         script: |
           set -o errexit
-          set -o verbose
+          git push https://"${doc-update-github-token}"@github.com/wiredtiger/wiredtiger.github.com
 
-          if [[ "${branch_name}" != "develop" ]]; then
-            echo "We only run the documentation update task on the WiredTiger (develop) Evergreen project."
-            exit 0
-          fi
-
-          cd wiredtiger.github.com
-          git push https://${doc-update-github-token}@github.com/wiredtiger/wiredtiger.github.com
   "make check directory":
     command: shell.exec
     params:
@@ -2896,13 +2903,14 @@ buildvariants:
 
 - name: documentation-update
   display_name: "~ Documentation update"
-  batchtime: 1440 # 1 day
+  batchtime: 10080 # 7 days
   run_on:
   - ubuntu2004-test
-  tasks:
-    - name: doc-update
   expansions:
     configure_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
+    doc_update_branches: develop,mongodb-5.0,mongodb-4.4,mongodb-4.2,mongodb-4.0
+  tasks:
+    - name: doc-update
 
 - name: linux-no-ftruncate
   display_name: Linux no ftruncate
