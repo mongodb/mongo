@@ -162,6 +162,29 @@ rounding may not be perfect in the case of leap seconds and other irregularities
 and will generally be accomplished by basic modulus aritmetic operating on the number of seconds
 since the epoch, assuming 60 seconds per minute, 60 minutes per hour, and 24 hours per day.
 
+# Updates and Deletes
+
+Time-series collections support deletes which satisfy the following restrictions:
+* Query on only the `metaField`
+* `multi: true`
+
+and updates which satisfy these same conditions, plus the following:
+* Update only the `metaField`
+* Update specified as an update document (versus a replacement document or update pipeline)
+* `upsert: false`
+
+These updates and deletes are performed by translating the operation into a corresponding update or
+delete on the underlying buckets collection. In particular, for both the query and update document,
+we replace any references to the collection's `metaField` with literal `"meta"` (see
+[Bucket Collection Schema](#bucket-collection-schema)).
+
+For example, for a time-series collection `db.ts` created with `metaField: "tag"`, consider an
+update on this collection with query `{"tag.tag.a": "a"}` and update document
+`{$set: {"tag.tag.a": "A"}, $rename: {"tag.tag.b": "tag.tag.c"}}`. This gets translated into an
+update on `db.system.buckets.ts` with query `{"meta.tag.a": "a"}` and update document
+`{$set: {"meta.tag.a": "A"}, $rename: {"meta.tag.b": "meta.tag.c"}}`. We can then execute this
+translated update as a regular update operation. The same process applies for deletes.
+
 # References
 See:
 [MongoDB Blog: Time Series Data and MongoDB: Part 2 - Schema Design Best Practices](https://www.mongodb.com/blog/post/time-series-data-and-mongodb-part-2-schema-design-best-practices)
