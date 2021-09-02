@@ -1,6 +1,6 @@
 /*! @page arch-schema-ops Schema Operations
 
-A @ref arch-schema defines the format of the application data in WiredTiger.
+A @ref arch-schema "Schema" defines the format of the application data in WiredTiger.
 This section details the internals of various schema operations.
 
 Schema operations cause an update to the metadata and are performed under a

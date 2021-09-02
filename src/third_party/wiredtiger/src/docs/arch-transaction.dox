@@ -159,7 +159,7 @@ store to check if there is a version visible to the reader there.
 @subsection Durability
 
 WiredTiger transactions support commit level durability and checkpoint level durability. An
-operation is commit level durable if logging is enabled on the table (@ref arch-logging). After it
+operation is commit level durable if @ref arch-logging "Logging" is enabled on the table. After it
 has been successfully committed, the operation is guaranteed to survive restart. An operation will
 only survive across restart under checkpoint durability if it is included in the last successful
 checkpoint.
@@ -182,8 +182,8 @@ timestamp, which may cause excessive amounts of data to be pinned in memory. The
 is allowed to move beyond the prepared timestamp and at the commit time, the prepared transaction
 can then be committed after the current stable timestamp with a larger durable timestamp. The
 durable timestamp also marks the time the update is to be stable. If the stable timestamp is moved
-to or beyond the durable timestamp of an update, it will not be removed by rollback to stable from
-a checkpoint. See @ref arch-rts for more details.
+to or beyond the durable timestamp of an update, it will not be removed from a checkpoint by
+@ref arch-rts "rollback to stable".
 
 The visibility of the prepared transaction is also special when in the prepared state. Since in the
 prepared state, the transaction has released its snapshot, it should be visible to the transactions

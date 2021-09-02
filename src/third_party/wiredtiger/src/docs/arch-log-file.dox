@@ -1,7 +1,7 @@
 /*! @arch_page arch-log-file Log File Format
 
 This page assumes familiarity with the logging subsystem. Please see
-@ref arch-logging for the logging subsystem architecture description.
+@ref arch-logging "Logging" for a description of that subsystem.
 
 Each log file begins with a fixed length header, followed by a set of
 variable length log records. The fixed length header contains information
