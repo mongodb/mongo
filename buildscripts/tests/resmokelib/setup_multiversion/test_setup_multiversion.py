@@ -3,6 +3,7 @@
 import unittest
 from argparse import Namespace
 
+import requests
 from mock import patch
 
 from buildscripts.resmokelib.utils import evergreen_conn
@@ -59,9 +60,28 @@ class TestSetupMultiversionBase(unittest.TestCase):
 
 
 class TestSetupMultiversionGetLatestUrls(TestSetupMultiversionBase):
-    def test_no_such_project(self):
+    @patch("evergreen.api.EvergreenApi.versions_by_project")
+    def test_no_such_project(self, mock_versions_by_project):
         """Project `mongodb-mongo-v4.2.1` doesn't exist."""
         version = "4.2.1"
+
+        class DummyIterator:
+            def __init__(self):
+                self.current = 0
+
+            def __iter__(self):
+                return self
+
+            def __next__(self):
+                if self.current == 0:
+                    self.current += 1
+                    resp = requests.models.Response()
+                    resp.status_code = 500
+                    raise requests.HTTPError(response=resp)
+                raise StopIteration
+
+        mock_versions_by_project.return_value = DummyIterator()
+
         urls = self.setup_multiversion.get_latest_urls(version)
         self.assertEqual(urls, {})
 

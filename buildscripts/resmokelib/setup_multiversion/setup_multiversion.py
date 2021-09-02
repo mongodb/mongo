@@ -116,8 +116,9 @@ class SetupMultiversion(Subcommand):
 
         if self.install_last_lts:
             self.versions.append(multiversionconstants.LAST_LTS_FCV)
-        if self.install_last_continuous and multiversionconstants.LAST_LTS_FCV != multiversionconstants.LAST_CONTINUOUS_FCV:
+        if self.install_last_continuous:
             self.versions.append(multiversionconstants.LAST_CONTINUOUS_FCV)
+        self.versions = list(set(self.versions))
 
         for version in self.versions:
             LOGGER.info("Setting up version.", version=version)
@@ -210,7 +211,7 @@ class SetupMultiversion(Subcommand):
         except HTTPError as err:
             # Evergreen currently returns 500 if the version does not exist.
             # TODO (SERVER-59675): Remove the check for 500 once evergreen returns 404 instead.
-            if not err.response.status_code == 500 or err.response.status_code == 404:
+            if not (err.response.status_code == 500 or err.response.status_code == 404):
                 raise
         buildvariant_name = self.get_buildvariant_name(version)
 
@@ -394,11 +395,10 @@ class SetupMultiversionPlugin(PluginInterface):
             "otherwise we'll pull the highest non-rc version compatible with the version specified."
         )
         parser.add_argument("--installLastLTS", dest="install_last_lts", action="store_true",
-                            help="If specified, the last LTS version will be installed",
-                            default=True)
-        parser.add_argument(
-            "--installLastContinuous", dest="install_last_continuous", action="store_true",
-            help="If specified, the last continuous version will be installed", default=True)
+                            help="If specified, the last LTS version will be installed")
+        parser.add_argument("--installLastContinuous", dest="install_last_continuous",
+                            action="store_true",
+                            help="If specified, the last continuous version will be installed")
 
         parser.add_argument("-db", "--downloadBinaries", dest="download_binaries",
                             action="store_true", default=True,
