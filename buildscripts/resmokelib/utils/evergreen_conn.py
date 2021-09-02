@@ -114,13 +114,15 @@ def get_generic_buildvariant_name(config, major_minor_version):
     return generic_buildvariant_name
 
 
-def get_evergreen_version(config: SetupMultiversionConfig, evg_api: RetryingEvergreenApi,
-                          evg_ref: str) -> Optional[Version]:
+def get_evergreen_version(evg_api: RetryingEvergreenApi, evg_ref: str) -> Optional[Version]:
     """Return evergreen version by reference (commit_hash or evergreen_version_id)."""
+    from buildscripts.resmokelib import multiversionconstants
+
     # Evergreen reference as evergreen_version_id
     evg_refs = [evg_ref]
     # Evergreen reference as {project_name}_{commit_hash}
-    evg_refs.extend(f"{proj.replace('-', '_')}_{evg_ref}" for proj in config.evergreen_projects)
+    evg_refs.extend(
+        f"{proj.replace('-', '_')}_{evg_ref}" for proj in multiversionconstants.EVERGREEN_PROJECTS)
 
     for ref in evg_refs:
         try:

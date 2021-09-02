@@ -7,7 +7,7 @@ from git import Repo
 
 import buildscripts.resmokelib.utils.registry as registry
 import buildscripts.resmokelib.config as config
-from buildscripts.resmokelib import errors, multiversionconstants
+from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.utils import default_if_none
 from buildscripts.resmokelib.utils import autoloader
 from buildscripts.resmokelib.testing.fixtures.fixturelib import FixtureLib
@@ -86,6 +86,7 @@ class ReplSetBuilder(FixtureBuilder):
         num_nodes = kwargs["num_nodes"]
         latest_mongod = mongod_executable
 
+        from buildscripts.resmokelib import multiversionconstants
         fcv = multiversionconstants.LATEST_FCV
 
         executables = {BinVersionEnum.NEW: latest_mongod}

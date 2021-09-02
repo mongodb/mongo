@@ -115,9 +115,12 @@ TEST_F(FeatureFlagTest, ServerStatus) {
 
         _featureFlagBlender->append(nullptr, builder, "blender");
 
-        ASSERT_BSONOBJ_EQ(builder.obj(),
-                          BSON("blender" << BSON("value" << true << "version"
-                                                         << "5.1")));
+        ASSERT_BSONOBJ_EQ(
+            builder.obj(),
+            // (Generic FCV reference): feature flag test.
+            BSON("blender" << BSON("value"
+                                   << true << "version"
+                                   << multiversion::toString(multiversion::GenericFCV::kLatest))));
     }
 
     {

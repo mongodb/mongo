@@ -6,6 +6,8 @@ SETUP_MULTIVERSION_CONFIG = "buildscripts/resmokeconfig/setup_multiversion/setup
 # Records the paths of installed multiversion binaries on Windows.
 WINDOWS_BIN_PATHS_FILE = "windows_binary_paths.txt"
 
+USE_EXISTING_RELEASES_FILE = False
+
 
 class Buildvariant:
     """Class represents buildvariant in setup multiversion config."""

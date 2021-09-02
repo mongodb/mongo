@@ -70,4 +70,6 @@ $python buildscripts/resmoke.py setup-multiversion \
   --edition $edition \
   --platform $platform \
   --architecture $architecture \
-  --useLatest 4.4 5.0
+  --useLatest \
+  --installLastLTS \
+  --installLastContinuous 4.4

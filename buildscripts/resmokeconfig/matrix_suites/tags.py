@@ -1,5 +1,4 @@
 """Dynamically Generated tags."""
-from buildscripts.resmokelib.multiversionconstants import REQUIRES_FCV_TAG
 
 
 # TODO SERVER-55857: Let this file be the single source of truth for tags. Remove dupe definitions.
@@ -10,6 +9,7 @@ class Tags(object):
 
     BACKPORT_REQUIRED_TAG = "backport_required_multiversion"
 
+    from buildscripts.resmokelib.multiversionconstants import REQUIRES_FCV_TAG
     # Base exclusion tag list.
     EXCLUDE_TAGS_TEMPLATE = f"{REQUIRES_FCV_TAG},multiversion_incompatible,{BACKPORT_REQUIRED_TAG}"
 

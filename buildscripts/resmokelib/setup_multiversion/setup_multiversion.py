@@ -5,6 +5,8 @@ to include its version) into an install directory and symlinks the binaries
 with versions to another directory. This script supports community and
 enterprise builds.
 """
+from itertools import chain
+import argparse
 import logging
 import os
 import platform
@@ -17,6 +19,8 @@ from typing import Optional, Dict, Any
 import distro
 import structlog
 import yaml
+
+from requests.exceptions import HTTPError
 
 from buildscripts.resmokelib.plugin import PluginInterface, Subcommand
 from buildscripts.resmokelib.setup_multiversion import config, download, github_conn
@@ -70,9 +74,9 @@ def get_merge_base_commit(version: str) -> str:
     cmd = ["git", "merge-base", "origin/master", f"origin/v{version}"]
     result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
     if result.returncode:
-        LOGGER.error("Git merge-base command failed.", cmd=cmd,
+        LOGGER.error("Git merge-base command failed. Falling back to latest master", cmd=cmd,
                      error=result.stderr.decode("utf-8").strip())
-        exit(result.returncode)
+        return None
     commit_hash = result.stdout.decode("utf-8").strip()
     LOGGER.info("Found merge-base commit.", cmd=cmd, commit=commit_hash)
     return commit_hash
@@ -84,8 +88,8 @@ class SetupMultiversion(Subcommand):
     # pylint: disable=too-many-instance-attributes
     def __init__(self, download_options, install_dir="", link_dir="", mv_platform=None,
                  edition=None, architecture=None, use_latest=None, versions=None,
-                 evergreen_config=None, github_oauth_token=None, debug=None,
-                 ignore_failed_push=False):
+                 install_last_lts=None, install_last_continuous=None, evergreen_config=None,
+                 github_oauth_token=None, debug=None, ignore_failed_push=False):
         """Initialize."""
         setup_logging(debug)
         self.install_dir = os.path.abspath(install_dir)
@@ -97,6 +101,8 @@ class SetupMultiversion(Subcommand):
         self.architecture = architecture.lower() if architecture else None
         self.use_latest = use_latest
         self.versions = versions
+        self.install_last_lts = install_last_lts
+        self.install_last_continuous = install_last_continuous
         self.ignore_failed_push = ignore_failed_push
 
         self.download_binaries = download_options.download_binaries
@@ -131,6 +137,13 @@ class SetupMultiversion(Subcommand):
 
     def execute(self):
         """Execute setup multiversion mongodb."""
+        from buildscripts.resmokelib import multiversionconstants
+
+        if self.install_last_lts:
+            self.versions.append(multiversionconstants.LAST_LTS_FCV)
+        if self.install_last_continuous:
+            self.versions.append(multiversionconstants.LAST_CONTINUOUS_FCV)
+        self.versions = list(set(self.versions))
 
         for version in self.versions:
             LOGGER.info("Setting up version.", version=version)
@@ -218,25 +231,26 @@ class SetupMultiversion(Subcommand):
         """Return latest urls."""
         urls = {}
 
+        # Assuming that project names contain <major>.<minor> version
         evg_project = f"mongodb-mongo-v{version}"
         if version == "master":
             evg_project = "mongodb-mongo-master"
 
-        if evg_project not in self.config.evergreen_projects:
-            return urls
-
-        LOGGER.debug("Found evergreen project.", evergreen_project=evg_project)
-        # Assuming that project names contain <major>.<minor> version
-        major_minor_version = version
-
-        buildvariant_name = self.get_buildvariant_name(major_minor_version)
-        LOGGER.debug("Found buildvariant.", buildvariant_name=buildvariant_name)
-
         evg_versions = evergreen_conn.get_evergreen_versions(self.evg_api, evg_project)
+        evg_version = None
+        try:
+            evg_version = next(evg_versions)
+        except HTTPError as err:
+            # Evergreen currently returns 500 if the version does not exist.
+            # TODO (SERVER-59675): Remove the check for 500 once evergreen returns 404 instead.
+            if not (err.response.status_code == 500 or err.response.status_code == 404):
+                raise
+        buildvariant_name = self.get_buildvariant_name(version)
+        LOGGER.debug("Found buildvariant.", buildvariant_name=buildvariant_name)
 
         found_start_revision = start_from_revision is None
 
-        for evg_version in evg_versions:
+        for evg_version in chain(iter([evg_version]), evg_versions):
             # Skip all versions until we get the revision we should start looking from
             if found_start_revision is False and evg_version.revision != start_from_revision:
                 LOGGER.warning("Skipping evergreen version.", evg_version=evg_version)
@@ -260,13 +274,12 @@ class SetupMultiversion(Subcommand):
     def get_urls(self, version: str, buildvariant_name: Optional[str] = None) -> Dict[str, Any]:
         """Return multiversion urls for a given version (as binary version or commit hash or evergreen_version_id)."""
 
-        evg_version = evergreen_conn.get_evergreen_version(self.config, self.evg_api, version)
+        evg_version = evergreen_conn.get_evergreen_version(self.evg_api, version)
         if evg_version is None:
             git_tag, commit_hash = github_conn.get_git_tag_and_commit(self.github_oauth_token,
                                                                       version)
             LOGGER.info("Found git attributes.", git_tag=git_tag, commit_hash=commit_hash)
-            evg_version = evergreen_conn.get_evergreen_version(self.config, self.evg_api,
-                                                               commit_hash)
+            evg_version = evergreen_conn.get_evergreen_version(self.evg_api, commit_hash)
         if evg_version is None:
             return {}
 
@@ -362,10 +375,14 @@ class SetupMultiversionPlugin(PluginInterface):
                                             da=args.download_artifacts,
                                             dv=args.download_python_venv)
 
+        if args.use_existing_releases_file:
+            config.USE_EXISTING_RELEASES_FILE = True
+
         return SetupMultiversion(
             install_dir=args.install_dir, link_dir=args.link_dir, mv_platform=args.platform,
             edition=args.edition, architecture=args.architecture, use_latest=args.use_latest,
-            versions=args.versions, download_options=download_options,
+            versions=args.versions, install_last_lts=args.install_last_lts,
+            install_last_continuous=args.install_last_continuous, download_options=download_options,
             evergreen_config=args.evergreen_config, github_oauth_token=args.github_oauth_token,
             ignore_failed_push=(not args.require_push), debug=args.debug)
 
@@ -400,6 +417,11 @@ class SetupMultiversionPlugin(PluginInterface):
             "Binary version examples: 4.0, 4.0.1, 4.0.0-rc0. If 'rc' is included in the version name, "
             "we'll use the exact rc, otherwise we'll pull the highest non-rc version compatible with the "
             "version specified.")
+        parser.add_argument("--installLastLTS", dest="install_last_lts", action="store_true",
+                            help="If specified, the last LTS version will be installed")
+        parser.add_argument("--installLastContinuous", dest="install_last_continuous",
+                            action="store_true",
+                            help="If specified, the last continuous version will be installed")
 
         parser.add_argument("-db", "--downloadBinaries", dest="download_binaries",
                             action="store_true", default=True,
@@ -427,6 +449,11 @@ class SetupMultiversionPlugin(PluginInterface):
         parser.add_argument(
             "-rp", "--require-push", dest="require_push", action="store_true", default=False,
             help="Require the push task to be successful for assets to be downloaded")
+        # Hidden flag that determines if we should generate a new releases yaml file. This flag
+        # should be set to True if we are invoking setup_multiversion multiple times in parallel,
+        # to prevent multiple processes from modifying the releases yaml file simultaneously.
+        parser.add_argument("--useExistingReleasesFile", dest="use_existing_releases_file",
+                            action="store_true", default=False, help=argparse.SUPPRESS)
 
     def add_subcommand(self, subparsers):
         """Create and add the parser for the subcommand."""
