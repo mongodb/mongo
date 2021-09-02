@@ -211,8 +211,13 @@ Status validatePreImageRecording(OperationContext* opCtx, const NamespaceString&
     }
 
     if (serverGlobalParams.clusterRole != ClusterRole::None) {
-        return {ErrorCodes::InvalidOptions,
-                "recordPreImages collection option is not supported on shards or config servers"};
+        return {
+            ErrorCodes::InvalidOptions,
+            str::stream()
+                << "namespace " << ns.ns()
+                << " has the recordPreImages option set, this is not supported on a "
+                   "sharded cluster. Consider restarting without --shardsvr and --configsvr and "
+                   "disabling recordPreImages via collMod"};
     }
 
     return Status::OK();
