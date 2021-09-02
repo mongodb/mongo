@@ -50,6 +50,7 @@ const char kLastCommittedWallFieldName[] = "lastCommittedWall";
 const char kLastOpAppliedFieldName[] = "lastOpApplied";
 const char kPrimaryIndexFieldName[] = "primaryIndex";
 const char kSyncSourceIndexFieldName[] = "syncSourceIndex";
+const char kSyncSourceHostFieldName[] = "syncSourceHost";
 const char kRBIDFieldName[] = "rbid";
 
 }  // unnamed namespace
@@ -60,12 +61,14 @@ OplogQueryMetadata::OplogQueryMetadata(OpTimeAndWallTime lastOpCommitted,
                                        OpTime lastOpApplied,
                                        int rbid,
                                        int currentPrimaryIndex,
-                                       int currentSyncSourceIndex)
+                                       int currentSyncSourceIndex,
+                                       std::string currentSyncSourceHost)
     : _lastOpCommitted(std::move(lastOpCommitted)),
       _lastOpApplied(std::move(lastOpApplied)),
       _rbid(rbid),
       _currentPrimaryIndex(currentPrimaryIndex),
-      _currentSyncSourceIndex(currentSyncSourceIndex) {}
+      _currentSyncSourceIndex(currentSyncSourceIndex),
+      _currentSyncSourceHost(currentSyncSourceHost) {}
 
 StatusWith<OplogQueryMetadata> OplogQueryMetadata::readFromMetadata(const BSONObj& metadataObj,
                                                                     bool requireWallTime) {
@@ -85,6 +88,14 @@ StatusWith<OplogQueryMetadata> OplogQueryMetadata::readFromMetadata(const BSONOb
     long long syncSourceIndex;
     status = bsonExtractIntegerField(oqMetadataObj, kSyncSourceIndexFieldName, &syncSourceIndex);
     if (!status.isOK())
+        return status;
+
+    std::string syncSourceHost;
+    status = bsonExtractStringField(oqMetadataObj, kSyncSourceHostFieldName, &syncSourceHost);
+    // SyncSourceHost might not be set in older versions, checking NoSuchKey error
+    // for backward compatibility.
+    // TODO SERVER-59732: Remove the compatibility check once 6.0 is released.
+    if (!status.isOK() && status.code() != ErrorCodes::NoSuchKey)
         return status;
 
     long long rbid;
@@ -111,7 +122,8 @@ StatusWith<OplogQueryMetadata> OplogQueryMetadata::readFromMetadata(const BSONOb
     if (!status.isOK())
         return status;
 
-    return OplogQueryMetadata(lastOpCommitted, lastOpApplied, rbid, primaryIndex, syncSourceIndex);
+    return OplogQueryMetadata(
+        lastOpCommitted, lastOpApplied, rbid, primaryIndex, syncSourceIndex, syncSourceHost);
 }
 
 Status OplogQueryMetadata::writeToMetadata(BSONObjBuilder* builder) const {
@@ -122,6 +134,7 @@ Status OplogQueryMetadata::writeToMetadata(BSONObjBuilder* builder) const {
     oqMetadataBuilder.append(kRBIDFieldName, _rbid);
     oqMetadataBuilder.append(kPrimaryIndexFieldName, _currentPrimaryIndex);
     oqMetadataBuilder.append(kSyncSourceIndexFieldName, _currentSyncSourceIndex);
+    oqMetadataBuilder.append(kSyncSourceHostFieldName, _currentSyncSourceHost);
     oqMetadataBuilder.doneFast();
 
     return Status::OK();
@@ -132,6 +145,7 @@ std::string OplogQueryMetadata::toString() const {
     output << "OplogQueryMetadata";
     output << " Primary Index: " << _currentPrimaryIndex;
     output << " Sync Source Index: " << _currentSyncSourceIndex;
+    output << " Sync Source Host: " << _currentSyncSourceHost;
     output << " RBID: " << _rbid;
     output << " Last Op Committed: " << _lastOpCommitted.toString();
     output << " Last Op Applied: " << _lastOpApplied.toString();

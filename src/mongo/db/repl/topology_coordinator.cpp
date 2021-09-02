@@ -2664,18 +2664,21 @@ bool TopologyCoordinator::shouldChangeSyncSource(
     OpTime currentSourceOpTime;
     int syncSourceIndex = -1;
     int primaryIndex = -1;
+    std::string syncSourceHost;
     if (oqMetadata) {
         currentSourceOpTime =
             std::max(oqMetadata->getLastOpApplied(),
                      _memberData.at(currentSourceIndex).getHeartbeatAppliedOpTime());
         syncSourceIndex = oqMetadata->getSyncSourceIndex();
         primaryIndex = oqMetadata->getPrimaryIndex();
+        syncSourceHost = oqMetadata->getSyncSourceHost();
     } else {
         currentSourceOpTime =
             std::max(replMetadata.getLastOpVisible(),
                      _memberData.at(currentSourceIndex).getHeartbeatAppliedOpTime());
         syncSourceIndex = replMetadata.getSyncSourceIndex();
         primaryIndex = replMetadata.getPrimaryIndex();
+        syncSourceHost = "";
     }
 
     if (currentSourceOpTime.isNull()) {
@@ -2706,6 +2709,37 @@ bool TopologyCoordinator::shouldChangeSyncSource(
 
         logMessage << "Choosing new sync source. Our current sync source is not primary and does "
                       "not have a sync source, so we require that it is ahead of us. "
+                   << "Current sync source: " << currentSource.toString()
+                   << ", my last fetched oplog optime: " << myLastOpTime
+                   << ", latest oplog optime of sync source: " << currentSourceOpTime;
+
+        if (primaryIndex >= 0) {
+            logMessage << " (" << _rsConfig.getMemberAt(primaryIndex).getHostAndPort() << " is)";
+        } else {
+            logMessage << " (sync source does not know the primary)";
+        }
+        log() << logMessage.str();
+        return true;
+    }
+
+    // Change sync source if our sync source is also syncing from us when we are in primary
+    // catchup mode, forming a sync source selection cycle, and the sync source is not ahead
+    // of us. This is to prevent a deadlock situation. See SERVER-58988 for details.
+    // When checking the sync source, we use syncSourceHost if it is set, otherwise fall back
+    // to use syncSourceIndex. The difference is that syncSourceIndex might not point to the
+    // node that we think of because it was inferred from the sender node, which could have
+    // a different config. This is acceptable since we are just choosing a different sync
+    // source if that happens and reconfigs are rare.
+    bool isSyncingFromMe = !syncSourceHost.empty()
+        ? syncSourceHost == _selfMemberData().getHostAndPort().toString()
+        : syncSourceIndex == _selfIndex;
+
+    if (isSyncingFromMe && _currentPrimaryIndex == _selfIndex &&
+        currentSourceOpTime <= myLastOpTime) {
+        std::stringstream logMessage;
+
+        logMessage << "Choosing new sync source because we are in primary catchup but our current "
+                      "sync source is also syncing from us but is not ahead of us. "
                    << "Current sync source: " << currentSource.toString()
                    << ", my last fetched oplog optime: " << myLastOpTime
                    << ", latest oplog optime of sync source: " << currentSourceOpTime;
@@ -2769,7 +2803,8 @@ rpc::OplogQueryMetadata TopologyCoordinator::prepareOplogQueryMetadata(int rbid)
                                    getMyLastAppliedOpTime(),
                                    rbid,
                                    _currentPrimaryIndex,
-                                   _rsConfig.findMemberIndexByHostAndPort(getSyncSourceAddress()));
+                                   _rsConfig.findMemberIndexByHostAndPort(getSyncSourceAddress()),
+                                   getSyncSourceAddress().toString());
 }
 
 void TopologyCoordinator::processReplSetRequestVotes(const ReplSetRequestVotesArgs& args,

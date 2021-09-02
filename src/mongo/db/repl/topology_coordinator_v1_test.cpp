@@ -221,9 +221,14 @@ protected:
     OplogQueryMetadata makeOplogQueryMetadata(OpTime lastAppliedOpTime = OpTime(),
                                               int primaryIndex = -1,
                                               int syncSourceIndex = -1,
+                                              std::string syncSourceHost = "",
                                               Date_t lastCommittedWall = Date_t()) {
-        return OplogQueryMetadata(
-            {OpTime(), lastCommittedWall}, lastAppliedOpTime, -1, primaryIndex, syncSourceIndex);
+        return OplogQueryMetadata({OpTime(), lastCommittedWall},
+                                  lastAppliedOpTime,
+                                  -1,
+                                  primaryIndex,
+                                  syncSourceIndex,
+                                  syncSourceHost);
     }
 
     HeartbeatResponseAction receiveUpHeartbeat(const HostAndPort& member,
@@ -3762,6 +3767,92 @@ TEST_F(HeartbeatResponseTestV1,
                                               now()));
     ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(
         HostAndPort("host2"), makeReplSetMetadata(newerThanLastOpTimeApplied), boost::none, now()));
+}
+
+TEST_F(HeartbeatResponseTestV1, ShouldChangeSyncSourceWhenSyncSourceFormsCycleAndWeArePrimary) {
+    // In this test, the TopologyCoordinator will tell us change our sync source away from "host2"
+    // when it is not ahead of us and it selects us to be its sync source, forming a sync source
+    // cycle and we are currently in primary catchup.
+    setSelfMemberState(MemberState::RS_PRIMARY);
+    OpTime election = OpTime();
+    OpTime syncSourceOpTime = OpTime(Timestamp(400, 0), 0);
+
+    // Set lastOpTimeFetched to be same as the sync source's OpTime.
+    OpTime lastOpTimeFetched = OpTime(Timestamp(400, 0), 0);
+    setMyOpTime(lastOpTimeFetched);
+
+    // Show we like host2 while it is not syncing from us.
+    HeartbeatResponseAction nextAction = receiveUpHeartbeat(
+        HostAndPort("host2"), "rs0", MemberState::RS_SECONDARY, election, syncSourceOpTime);
+    ASSERT_NO_ACTION(nextAction.getAction());
+    ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(
+        HostAndPort("host2"),
+        makeReplSetMetadata(OpTime() /* visibleOpTime */, false /* isPrimary */),
+        makeOplogQueryMetadata(syncSourceOpTime,
+                               -1 /* primaryIndex */,
+                               2 /* syncSourceIndex */,
+                               "host3:27017" /* syncSourceHost */),
+        now()));
+
+    // Show that we also like host2 while we are not primary.
+    nextAction = receiveUpHeartbeat(
+        HostAndPort("host2"), "rs0", MemberState::RS_SECONDARY, election, syncSourceOpTime);
+    ASSERT_NO_ACTION(nextAction.getAction());
+    getTopoCoord().setPrimaryIndex(2);
+    ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(
+        HostAndPort("host2"),
+        makeReplSetMetadata(OpTime() /* visibleOpTime */, false /* isPrimary */),
+        // Sync source is also syncing from us.
+        makeOplogQueryMetadata(syncSourceOpTime,
+                               -1 /* primaryIndex */,
+                               0 /* syncSourceIndex */,
+                               "host1:27017" /* syncSourceHost */),
+        now()));
+
+    // Show that we also like host2 while it has some progress beyond our own.
+    getTopoCoord().setPrimaryIndex(0);
+    OpTime olderThanSyncSourceOpTime = OpTime(Timestamp(300, 0), 0);
+    topoCoordSetMyLastAppliedOpTime(olderThanSyncSourceOpTime, now(), true);
+    nextAction = receiveUpHeartbeat(
+        HostAndPort("host2"), "rs0", MemberState::RS_SECONDARY, election, syncSourceOpTime);
+    ASSERT_NO_ACTION(nextAction.getAction());
+    ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(
+        HostAndPort("host2"),
+        makeReplSetMetadata(OpTime() /* visibleOpTime */, false /* isPrimary */),
+        // Sync source is also syncing from us.
+        makeOplogQueryMetadata(syncSourceOpTime,
+                               -1 /* primaryIndex */,
+                               0 /* syncSourceIndex */,
+                               "host1:27017" /* syncSourceHost */),
+        now()));
+
+    // Show that we do not like host2 it forms a sync source selection cycle with us and we
+    // are primary and it lacks progress beyond our own.
+    setMyOpTime(lastOpTimeFetched);
+    nextAction = receiveUpHeartbeat(
+        HostAndPort("host2"), "rs0", MemberState::RS_SECONDARY, election, syncSourceOpTime);
+    ASSERT_NO_ACTION(nextAction.getAction());
+    ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(
+        HostAndPort("host2"),
+        makeReplSetMetadata(OpTime() /* visibleOpTime */, false /* isPrimary */),
+        // Sync source is also syncing from us.
+        makeOplogQueryMetadata(syncSourceOpTime,
+                               -1 /* primaryIndex */,
+                               0 /* syncSourceIndex */,
+                               "host1:27017" /* syncSourceHost */),
+        now()));
+
+    // Show that we still do not like it when syncSourceHost is not set, but we can rely on
+    // syncSourceIndex to decide if a sync source selection cycle has been formed.
+    nextAction = receiveUpHeartbeat(
+        HostAndPort("host2"), "rs0", MemberState::RS_SECONDARY, election, syncSourceOpTime);
+    ASSERT_NO_ACTION(nextAction.getAction());
+    ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(
+        HostAndPort("host2"),
+        makeReplSetMetadata(OpTime() /* visibleOpTime */, false /* isPrimary */),
+        // Sync source is also syncing from us.
+        makeOplogQueryMetadata(syncSourceOpTime, -1 /* primaryIndex */, 0 /* syncSourceIndex */),
+        now()));
 }
 
 TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceWhenFresherMemberIsDown) {

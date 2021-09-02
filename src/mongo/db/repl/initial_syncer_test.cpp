@@ -521,7 +521,8 @@ RemoteCommandResponse makeCursorResponse(CursorId cursorId,
                                          int rbid = 1) {
     OpTime futureOpTime(Timestamp(1000, 1000), 1000);
     Date_t futureWallTime = Date_t() + Seconds(futureOpTime.getSecs());
-    rpc::OplogQueryMetadata oqMetadata({futureOpTime, futureWallTime}, futureOpTime, rbid, 0, 0);
+    rpc::OplogQueryMetadata oqMetadata(
+        {futureOpTime, futureWallTime}, futureOpTime, rbid, 0, 0, "");
 
     BSONObjBuilder bob;
     {
