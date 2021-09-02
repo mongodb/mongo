@@ -4,15 +4,6 @@
 #
 # PLEASE DO NOT REMOVE ANYTHING, unless a build variant no longer runs in any Evergreen project.
 
-
-evergreen_projects:
-  - mongodb-mongo-master
-  - mongodb-mongo-v5.0
-  - mongodb-mongo-v4.4
-  - mongodb-mongo-v4.2
-  - mongodb-mongo-v4.0
-
-
 evergreen_buildvariants:
   - name: ubuntu1604
     edition: targeted

@@ -9,7 +9,6 @@ from subprocess import check_output
 import requests
 
 from buildscripts.ciconfig import tags as _tags
-from buildscripts.resmokelib import multiversionconstants
 from buildscripts.resmokelib.config import MultiversionOptions
 from buildscripts.resmokelib.core.programs import get_path_env_var
 from buildscripts.resmokelib.utils import is_windows
@@ -88,6 +87,8 @@ def generate_exclude_yaml(old_bin_version: str, output: str, logger: logging.Log
     # Get the state of the backports_required_for_multiversion_tests.yml file for the old
     # binary we are running tests against. We do this by using the commit hash from the old
     # mongo shell executable.
+    from buildscripts.resmokelib import multiversionconstants
+
     shell_version = {
         MultiversionOptions.LAST_LTS: multiversionconstants.LAST_LTS_MONGO_BINARY,
         MultiversionOptions.LAST_CONTINUOUS: multiversionconstants.LAST_CONTINUOUS_MONGO_BINARY,

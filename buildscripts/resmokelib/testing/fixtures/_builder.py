@@ -7,7 +7,7 @@ from git import Repo
 
 import buildscripts.resmokelib.utils.registry as registry
 import buildscripts.resmokelib.config as config
-from buildscripts.resmokelib import errors, multiversionconstants
+from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.utils import default_if_none
 from buildscripts.resmokelib.utils import autoloader
 from buildscripts.resmokelib.testing.fixtures.fixturelib import FixtureLib
@@ -68,6 +68,7 @@ class ReplSetBuilder(FixtureBuilder):
 
     def build_fixture(self, logger, job_num, fixturelib, *args, **kwargs):  # pylint: disable=too-many-locals
         """Build a replica set."""
+        from buildscripts.resmokelib import multiversionconstants
         # We hijack the mixed_bin_versions passed to the fixture.
         mixed_bin_versions = kwargs.pop("mixed_bin_versions", config.MIXED_BIN_VERSIONS)
         old_bin_version = kwargs.pop("old_bin_version", config.MULTIVERSION_BIN_VERSION)
