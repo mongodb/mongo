@@ -252,6 +252,7 @@ conn_stats = [
     CacheStat('cache_eviction_walk', 'pages walked for eviction'),
     CacheStat('cache_eviction_walk_leaf_notfound', 'eviction server waiting for a leaf page'),
     CacheStat('cache_eviction_walk_passes', 'eviction passes of a file'),
+    CacheStat('cache_eviction_walk_sleeps', 'eviction walk most recent sleeps for checkpoint handle gathering'),
     CacheStat('cache_eviction_walks_active', 'files with active eviction walks', 'no_clear,no_scale'),
     CacheStat('cache_eviction_walks_started', 'files with new eviction walks started'),
     CacheStat('cache_eviction_worker_created', 'eviction worker thread created'),
