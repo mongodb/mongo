@@ -123,8 +123,8 @@ enum class FeatureCompatibilityVersion {
 #end for
 };
 
-## Calculate number of versions since v4.0.
-constexpr size_t kSince_$underscores(Version('4.0')) = ${bisect_left(fcvs, latest)};
+## Calculate number of versions since v4.4.
+constexpr size_t kSince_$underscores(Version('4.4')) = ${bisect_left(fcvs, latest)};
 
 // Last LTS was "$last_lts".
 constexpr size_t kSinceLastLTS = ${bisect_left(fcvs, latest) - bisect_left(fcvs, last_lts)};

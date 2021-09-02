@@ -109,11 +109,10 @@ def get_generic_buildvariant_name(config, major_minor_version):
     return generic_buildvariant_name
 
 
-def get_evergreen_project_and_version(evg_api, commit_hash):
+def get_evergreen_project_and_version(config, evg_api, commit_hash):
     """Return evergreen project and version by commit hash."""
-    from buildscripts.resmokelib import multiversionconstants
 
-    for evg_project in multiversionconstants.EVERGREEN_PROJECTS:
+    for evg_project in config.evergreen_projects:
         try:
             version_id = evg_project.replace("-", "_") + "_" + commit_hash
             evg_version = evg_api.version_by_id(version_id)
@@ -127,11 +126,10 @@ def get_evergreen_project_and_version(evg_api, commit_hash):
     raise EvergreenConnError(f"Evergreen version for commit hash {commit_hash} not found.")
 
 
-def get_evergreen_project(evg_api, evergreen_version_id):
+def get_evergreen_project(config, evg_api, evergreen_version_id):
     """Return evergreen project for a given Evergreen version."""
-    from buildscripts.resmokelib import multiversionconstants
 
-    for evg_project in multiversionconstants.EVERGREEN_PROJECTS:
+    for evg_project in config.evergreen_projects:
         try:
             evg_version = evg_api.version_by_id(evergreen_version_id)
         except HTTPError:

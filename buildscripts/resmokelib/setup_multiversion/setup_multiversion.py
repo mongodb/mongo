@@ -5,7 +5,6 @@ to include its version) into an install directory and symlinks the binaries
 with versions to another directory. This script supports community and
 enterprise builds.
 """
-from itertools import chain
 import logging
 import os
 import re
@@ -16,8 +15,6 @@ from typing import Optional, Dict, Any
 
 import structlog
 import yaml
-
-from requests.exceptions import HTTPError
 
 from buildscripts.resmokelib.plugin import PluginInterface, Subcommand
 from buildscripts.resmokelib.setup_multiversion import config, download, github_conn
@@ -64,8 +61,8 @@ class SetupMultiversion(Subcommand):
     # pylint: disable=too-many-instance-attributes
     def __init__(self, download_options, install_dir="", link_dir="", mv_platform=None,
                  edition=None, architecture=None, use_latest=None, versions=None,
-                 install_last_lts=None, install_last_continuous=None, evergreen_config=None,
-                 github_oauth_token=None, debug=None, ignore_failed_push=False):
+                 evergreen_config=None, github_oauth_token=None, debug=None,
+                 ignore_failed_push=False):
         """Initialize."""
         setup_logging(debug)
         self.install_dir = os.path.abspath(install_dir)
@@ -76,8 +73,6 @@ class SetupMultiversion(Subcommand):
         self.architecture = architecture.lower() if architecture else None
         self.use_latest = use_latest
         self.versions = versions
-        self.install_last_lts = install_last_lts
-        self.install_last_continuous = install_last_continuous
         self.ignore_failed_push = ignore_failed_push
 
         self.download_binaries = download_options.download_binaries
@@ -112,13 +107,6 @@ class SetupMultiversion(Subcommand):
 
     def execute(self):
         """Execute setup multiversion mongodb."""
-        from buildscripts.resmokelib import multiversionconstants
-
-        if self.install_last_lts:
-            self.versions.append(multiversionconstants.LAST_LTS_FCV)
-        if self.install_last_continuous:
-            self.versions.append(multiversionconstants.LAST_CONTINUOUS_FCV)
-        self.versions = list(set(self.versions))
 
         for version in self.versions:
             LOGGER.info("Setting up version.", version=version)
@@ -199,28 +187,25 @@ class SetupMultiversion(Subcommand):
         """Return latest urls."""
         urls = {}
 
-        # Assuming that project names contain <major>.<minor> version
         evg_project = f"mongodb-mongo-v{version}"
         if version == "master":
             evg_project = "mongodb-mongo-master"
 
-        evg_versions = evergreen_conn.get_evergreen_versions(self.evg_api, evg_project)
-        evg_version = None
-        try:
-            evg_version = next(evg_versions)
-        except HTTPError as err:
-            # Evergreen currently returns 500 if the version does not exist.
-            # TODO (SERVER-59675): Remove the check for 500 once evergreen returns 404 instead.
-            if not (err.response.status_code == 500 or err.response.status_code == 404):
-                raise
-        buildvariant_name = self.get_buildvariant_name(version)
+        if evg_project not in self.config.evergreen_projects:
+            return urls
 
+        LOGGER.debug("Found evergreen project.", evergreen_project=evg_project)
+        # Assuming that project names contain <major>.<minor> version
         major_minor_version = version
+
+        buildvariant_name = self.get_buildvariant_name(major_minor_version)
         LOGGER.debug("Found buildvariant.", buildvariant_name=buildvariant_name)
+
+        evg_versions = evergreen_conn.get_evergreen_versions(self.evg_api, evg_project)
 
         found_start_revision = start_from_revision is None
 
-        for evg_version in chain(iter([evg_version]), evg_versions):
+        for evg_version in evg_versions:
             # Skip all versions until we get the revision we should start looking from
             if found_start_revision is False and evg_version.revision != start_from_revision:
                 LOGGER.warning("Skipping evergreen version.", evg_version=evg_version)
@@ -252,10 +237,10 @@ class SetupMultiversion(Subcommand):
             LOGGER.info("Found git attributes.", git_tag=git_tag, commit_hash=commit_hash)
 
             evg_project, evg_version = evergreen_conn.get_evergreen_project_and_version(
-                self.evg_api, commit_hash)
+                self.config, self.evg_api, commit_hash)
         else:
             evg_project, evg_version = evergreen_conn.get_evergreen_project(
-                self.evg_api, evergreen_version)
+                self.config, self.evg_api, evergreen_version)
 
         LOGGER.debug("Found evergreen project.", evergreen_project=evg_project)
 
@@ -355,13 +340,12 @@ class SetupMultiversionPlugin(PluginInterface):
                                             da=args.download_artifacts,
                                             dv=args.download_python_venv)
 
-        return SetupMultiversion(
-            install_dir=args.install_dir, link_dir=args.link_dir, mv_platform=args.platform,
-            edition=args.edition, architecture=args.architecture, use_latest=args.use_latest,
-            versions=args.versions, install_last_lts=args.install_last_lts,
-            install_last_continuous=args.install_last_continuous, download_options=download_options,
-            evergreen_config=args.evergreen_config, github_oauth_token=args.github_oauth_token,
-            debug=args.debug)
+        return SetupMultiversion(install_dir=args.install_dir, link_dir=args.link_dir,
+                                 mv_platform=args.platform, edition=args.edition,
+                                 architecture=args.architecture, use_latest=args.use_latest,
+                                 versions=args.versions, download_options=download_options,
+                                 evergreen_config=args.evergreen_config,
+                                 github_oauth_token=args.github_oauth_token, debug=args.debug)
 
     @classmethod
     def _add_args_to_parser(cls, parser):
@@ -394,11 +378,6 @@ class SetupMultiversionPlugin(PluginInterface):
             "Examples: 4.0, 4.0.1, 4.0.0-rc0. If 'rc' is included in the version name, we'll use the exact rc, "
             "otherwise we'll pull the highest non-rc version compatible with the version specified."
         )
-        parser.add_argument("--installLastLTS", dest="install_last_lts", action="store_true",
-                            help="If specified, the last LTS version will be installed")
-        parser.add_argument("--installLastContinuous", dest="install_last_continuous",
-                            action="store_true",
-                            help="If specified, the last continuous version will be installed")
 
         parser.add_argument("-db", "--downloadBinaries", dest="download_binaries",
                             action="store_true", default=True,

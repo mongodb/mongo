@@ -1978,21 +1978,11 @@ tasks:
         args:
           - "src/evergreen/gen_feature_flags.sh"
 
-    - *f_expansions_write
-    - command: subprocess.exec
-      type: test
-      params:
-        binary: bash
-        args:
-          - "src/evergreen/get_bin_and_fcv_versions.sh"
-
     - command: archive.targz_pack
       params:
         target: "artifacts.tgz"
         source_dir: "src"
         include:
-          - ".resmoke_mongo_version.yml"
-          - ".resmoke_mongo_release_values.yml"
           - "patch_test_tags.tgz"
           - "./build/**.gcno"
           - "./etc/*san.suppressions"
@@ -9539,8 +9529,6 @@ buildvariants:
   - rhel80-small
   expansions: &enterprise-rhel-80-64-bit-multiversion-expansions-template
     test_flags: >-
-      # TODO (SERVER-55857): Remove this hardcoded tag once tests are filtered out using the
-      # 'REQUIRES_FCV_TAG' list in 'multiversion_constants.py'.
       --excludeWithAnyTags=requires_fcv_51,multiversion_incompatible,disabled_due_to_server_58295
     compile_flags: >-
       -j$(grep -c ^processor /proc/cpuinfo)

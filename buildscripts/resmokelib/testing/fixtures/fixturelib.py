@@ -8,6 +8,7 @@ from buildscripts.resmokelib import logging
 from buildscripts.resmokelib.core import network
 from buildscripts.resmokelib.utils.history import make_historic as _make_historic
 from buildscripts.resmokelib.testing.fixtures import _builder
+from buildscripts.resmokelib.multiversionconstants import LAST_LTS_MONGOD_BINARY, LAST_LTS_MONGOS_BINARY, LAST_CONTINUOUS_MONGOD_BINARY, LAST_CONTINUOUS_MONGOS_BINARY
 
 
 class FixtureLib(object):
@@ -100,8 +101,6 @@ class _FixtureConfig(object):  # pylint: disable=too-many-instance-attributes
 
     def __init__(self):
         """Initialize FixtureConfig, setting values."""
-        from buildscripts.resmokelib.multiversionconstants import LAST_LTS_MONGOD_BINARY, LAST_LTS_MONGOS_BINARY, LAST_CONTINUOUS_MONGOD_BINARY, LAST_CONTINUOUS_MONGOS_BINARY
-
         # pylint: disable=invalid-name
         self.MONGOD_EXECUTABLE = config.MONGOD_EXECUTABLE
         self.DEFAULT_MONGOD_EXECUTABLE = config.DEFAULT_MONGOD_EXECUTABLE

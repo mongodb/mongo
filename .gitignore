@@ -202,10 +202,8 @@ resmoke.ini
 # UndoDB Recordings
 *.undo
 
-# Resmoke runtime configuration and trackers.
+# Resmoke runtime trackers
 .resmoke_start_time.yml
-.resmoke_mongo_version.yml
-.resmoke_mongo_release_values.yml
 
 # libfuzzer artifacts
 default.profraw
