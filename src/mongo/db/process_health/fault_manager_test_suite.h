@@ -66,6 +66,14 @@ public:
         return getHealthObservers();
     }
 
+    Status processFaultExistsEventTest() {
+        return processFaultExistsEvent();
+    }
+
+    Status processFaultIsResolvedEventTest() {
+        return processFaultIsResolvedEvent();
+    }
+
     FaultInternal& getFault() {
         FaultFacetsContainerPtr fault = getFaultFacetsContainer();
         invariant(fault);
@@ -81,6 +89,10 @@ public:
     void setUp() override {
         _svcCtx = ServiceContext::make();
         _svcCtx->setFastClockSource(std::make_unique<ClockSourceMock>());
+        resetManager();
+    }
+
+    void resetManager() {
         FaultManager::set(_svcCtx.get(), std::make_unique<FaultManagerTestImpl>(_svcCtx.get()));
     }
 

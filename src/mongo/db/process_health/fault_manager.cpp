@@ -116,6 +116,65 @@ void FaultManager::healthCheck() {
             faultToDelete.swap(_fault);
         }
     }
+
+    // Actions above can result is a state change.
+    checkForStateTransition();
+}
+
+void FaultManager::checkForStateTransition() {
+    Status status = Status::OK();
+    FaultConstPtr fault = activeFault();
+    if (fault && !HealthCheckStatus::isResolved(fault->getSeverity())) {
+        status = processFaultExistsEvent();
+    } else if (!fault || HealthCheckStatus::isResolved(fault->getSeverity())) {
+        status = processFaultIsResolvedEvent();
+    }
+
+    if (!status.isOK()) {
+        LOGV2_ERROR(5936701, "Error during Fault manager state transition", "error"_attr = status);
+    }
+}
+
+Status FaultManager::processFaultExistsEvent() {
+    Status status = Status::OK();
+    FaultState currentState = getFaultState();
+
+    switch (currentState) {
+        case FaultState::kStartupCheck:
+        case FaultState::kOk:
+            status = _transitionToKTransientFault();
+            break;
+        case FaultState::kTransientFault:
+        case FaultState::kActiveFault:
+            // NOP.
+            break;
+        default:
+            invariant(false);
+            break;
+    }
+    return status;
+}
+
+Status FaultManager::processFaultIsResolvedEvent() {
+    Status status = Status::OK();
+    FaultState currentState = getFaultState();
+
+    switch (currentState) {
+        case FaultState::kOk:
+            // NOP.
+            break;
+        case FaultState::kStartupCheck:
+        case FaultState::kTransientFault:
+            status = _transitionToKOk();
+            break;
+        case FaultState::kActiveFault:
+            // Too late, this state cannot be resolved to Ok.
+            break;
+        default:
+            invariant(false);
+            break;
+    }
+    return status;
 }
 
 Status FaultManager::transitionToState(FaultState newState) {
@@ -216,6 +275,29 @@ std::vector<HealthObserver*> FaultManager::getHealthObservers() {
                    std::back_inserter(result),
                    [](const std::unique_ptr<HealthObserver>& value) { return value.get(); });
     return result;
+}
+
+StringBuilder& operator<<(StringBuilder& s, const FaultState& state) {
+    switch (state) {
+        case FaultState::kOk:
+            return s << "Ok"_sd;
+        case FaultState::kStartupCheck:
+            return s << "StartupCheck"_sd;
+        case FaultState::kTransientFault:
+            return s << "TransientFault"_sd;
+        case FaultState::kActiveFault:
+            return s << "ActiveFault"_sd;
+        default:
+            const bool kStateIsValid = false;
+            invariant(kStateIsValid);
+            return s;
+    }
+}
+
+std::ostream& operator<<(std::ostream& os, const FaultState& state) {
+    StringBuilder sb;
+    sb << state;
+    return os << sb.stringData();
 }
 
 }  // namespace process_health

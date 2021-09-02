@@ -58,6 +58,10 @@ enum class FaultState {
     kActiveFault
 };
 
+StringBuilder& operator<<(StringBuilder& s, const FaultState& state);
+
+std::ostream& operator<<(std::ostream& os, const FaultState& state);
+
 /**
  * FaultManager is a singleton constantly monitoring the health of the
  * system.
@@ -92,8 +96,6 @@ protected:
     // This is invoked by the internal timer.
     virtual void healthCheck();
 
-    virtual Status transitionToState(FaultState newState);
-
     // All observers remain valid for the manager lifetime, thus returning
     // just pointers is safe, as long as they are used while manager exists.
     std::vector<HealthObserver*> getHealthObservers();
@@ -105,7 +107,20 @@ protected:
 
     FaultFacetsContainerPtr getOrCreateFaultFacetsContainer() override;
 
+    // State machine related.
+
+    void checkForStateTransition();  // Invoked by periodic thread.
+
+    // Methods that represent particular events that trigger state transition.
+    Status processFaultExistsEvent();
+    Status processFaultIsResolvedEvent();
+
+    // Makes a valid state transition or returns an error.
+    // State transition should be triggered by events above.
+    Status transitionToState(FaultState newState);
+
 private:
+    // State machine related.
     Status _transitionToKOk();
     Status _transitionToKTransientFault();
     Status _transitionToKActiveFault();

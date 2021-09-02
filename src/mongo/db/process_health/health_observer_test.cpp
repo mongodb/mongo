@@ -70,6 +70,14 @@ TEST_F(FaultManagerTest, HealthCheckCreatesFacetOnHealthCheckFoundFault) {
     ASSERT_TRUE(activeFault);  // Is created.
 }
 
+TEST_F(FaultManagerTest, StateTransitionOnHealthCheckFoundFault) {
+    registerMockHealthObserver(FaultFacetType::kMock1, [] { return 0.1; });
+    ASSERT_EQ(FaultState::kStartupCheck, manager().getFaultState());
+
+    manager().healthCheckTest();
+    ASSERT_EQ(FaultState::kTransientFault, manager().getFaultState());
+}
+
 TEST_F(FaultManagerTest, HealthCheckCreatesCorrectFacetOnHealthCheckFoundFault) {
     registerMockHealthObserver(FaultFacetType::kMock1, [] { return 0.1; });
     registerMockHealthObserver(FaultFacetType::kMock2, [] { return 0.0; });
@@ -82,6 +90,15 @@ TEST_F(FaultManagerTest, HealthCheckCreatesCorrectFacetOnHealthCheckFoundFault) 
     ASSERT_FALSE(internalFault.getFaultFacet(FaultFacetType::kMock2));
 }
 
+TEST_F(FaultManagerTest, SeverityIsMaxFromAllFacetsSeverity) {
+    registerMockHealthObserver(FaultFacetType::kMock1, [] { return 0.8; });
+    registerMockHealthObserver(FaultFacetType::kMock2, [] { return 0.5; });
+    manager().healthCheckTest();
+    auto activeFault = manager().activeFault();
+
+    ASSERT_APPROX_EQUAL(0.8, activeFault->getSeverity(), 0.001);
+}
+
 TEST_F(FaultManagerTest, HealthCheckCreatesFacetThenIsGarbageCollected) {
     AtomicDouble severity{0.1};
     registerMockHealthObserver(FaultFacetType::kMock1, [&severity] { return severity.load(); });
@@ -92,6 +109,18 @@ TEST_F(FaultManagerTest, HealthCheckCreatesFacetThenIsGarbageCollected) {
     severity.store(0.0);
     manager().healthCheckTest();
     ASSERT_FALSE(manager().activeFault());
+}
+
+TEST_F(FaultManagerTest, StateTransitionOnGarbageCollection) {
+    AtomicDouble severity{0.1};
+    registerMockHealthObserver(FaultFacetType::kMock1, [&severity] { return severity.load(); });
+    manager().healthCheckTest();
+    ASSERT_EQ(FaultState::kTransientFault, manager().getFaultState());
+
+    // Resolve, it should be garbage collected and the state should change.
+    severity.store(0.0);
+    manager().healthCheckTest();
+    ASSERT_EQ(FaultState::kOk, manager().getFaultState());
 }
 
 TEST_F(FaultManagerTest, HealthCheckCreates2FacetsThenIsGarbageCollected) {
