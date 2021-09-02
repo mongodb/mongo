@@ -26,6 +26,7 @@ env.CppUnitTest(
         'fault_impl_test.cpp',
         'fault_facet_test.cpp',
         'fault_manager_test.cpp',
+        'fault_state_machine_test.cpp',
         'health_observer_test.cpp',
     ],
     LIBDEPS=[

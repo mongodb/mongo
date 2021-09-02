@@ -42,7 +42,18 @@ UUID FaultImpl::getId() const {
 }
 
 double FaultImpl::getSeverity() const {
-    return 0;
+    auto facets = getFacets();
+
+    // Simple algo to compute aggregate severity: take the max from all facets.
+    double severity = 0;
+    for (auto& facet : facets) {
+        invariant(facet);
+        HealthCheckStatus status = facet->getStatus();
+        if (status.getSeverity() > severity) {
+            severity = status.getSeverity();
+        }
+    }
+    return severity;
 }
 
 Milliseconds FaultImpl::getActiveFaultDuration() const {
