@@ -32,10 +32,8 @@
 #include <boost/optional/optional.hpp>
 #include <set>
 
-#include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/canonical_query_encoder.h"
-#include "mongo/db/query/index_tag.h"
 #include "mongo/db/query/lru_key_value.h"
 #include "mongo/db/query/plan_cache_indexability.h"
 #include "mongo/db/query/plan_ranking_decision.h"
@@ -45,6 +43,18 @@
 #include "mongo/util/container_size_helper.h"
 
 namespace mongo {
+
+namespace plan_cache_detail {
+/**
+ * Serializes indexability discriminators, appending them to keyBuilder. This function is used
+ * during the computation of a query's plan cache key to ensure that two queries with different
+ * index eligibilities will have different cache keys.
+ */
+void encodeIndexability(const MatchExpression* tree,
+                        const PlanCacheIndexabilityState& indexabilityState,
+                        StringBuilder* keyBuilder);
+}  // namespace plan_cache_detail
+
 // The logging facility enforces the rule that logging should not be done in a header file. Since
 // template classes and functions below must be defined in the header file and since they use the
 // logging facility, we have to define the helper functions below to perform the actual logging
@@ -78,321 +88,8 @@ void logPromoteCacheEntry(std::string&& query,
                           size_t newWorks);
 }  // namespace log_detail
 
-/**
- * Represents the "key" used in the PlanCache mapping from query shape -> query plan.
- */
-class PlanCacheKey {
-public:
-    PlanCacheKey(CanonicalQuery::QueryShapeString shapeString,
-                 std::string indexabilityString,
-                 bool enableSlotBasedExecution) {
-        _lengthOfStablePart = shapeString.size();
-        _key = std::move(shapeString);
-        _key += indexabilityString;
-        _key += enableSlotBasedExecution ? "t" : "f";
-    }
-
-    CanonicalQuery::QueryShapeString getStableKey() const {
-        return std::string(_key, 0, _lengthOfStablePart);
-    }
-
-    StringData getStableKeyStringData() const {
-        return StringData(_key.c_str(), _lengthOfStablePart);
-    }
-
-    /**
-     * Return the 'indexability discriminators', that is, the plan cache key component after the
-     * stable key, but before the boolean indicating whether we are using the classic engine.
-     */
-    StringData getIndexabilityDiscriminators() const {
-        return StringData(_key.c_str() + _lengthOfStablePart,
-                          _key.size() - _lengthOfStablePart - 1);
-    }
-
-    /**
-     * Return the "unstable" portion of the key, which may vary across catalog changes.
-     */
-    StringData getUnstablePart() const {
-        return StringData(_key.c_str() + _lengthOfStablePart, _key.size() - _lengthOfStablePart);
-    }
-
-    StringData stringData() const {
-        return _key;
-    }
-
-    const std::string& toString() const {
-        return _key;
-    }
-
-    bool operator==(const PlanCacheKey& other) const {
-        return other._key == _key && other._lengthOfStablePart == _lengthOfStablePart;
-    }
-
-    bool operator!=(const PlanCacheKey& other) const {
-        return !(*this == other);
-    }
-
-    uint32_t queryHash() const {
-        return canonical_query_encoder::computeHash(getStableKeyStringData());
-    }
-
-    uint32_t planCacheKeyHash() const {
-        return canonical_query_encoder::computeHash(stringData());
-    }
-
-private:
-    // Key is broken into three parts:
-    // <stable key> | <indexability discriminators> | <enableSlotBasedExecution boolean>
-    // This third part can be removed once the classic query engine reaches EOL and SBE is used
-    // exclusively for all query execution. Combined, the three parts make up the plan cache key.
-    // We store them in one std::string so that we can easily/cheaply extract the stable key.
-    std::string _key;
-
-    // How long the "stable key" is.
-    size_t _lengthOfStablePart;
-};
-
-std::ostream& operator<<(std::ostream& stream, const PlanCacheKey& key);
-StringBuilder& operator<<(StringBuilder& builder, const PlanCacheKey& key);
-
-
-class PlanCacheKeyHasher {
-public:
-    std::size_t operator()(const PlanCacheKey& k) const {
-        return std::hash<std::string>{}(k.toString());
-    }
-};
-
 class QuerySolution;
 struct QuerySolutionNode;
-
-/**
- * A PlanCacheIndexTree is the meaty component of the data
- * stored in SolutionCacheData. It is a tree structure with
- * index tags that indicates to the access planner which indices
- * it should try to use.
- *
- * How a PlanCacheIndexTree is created:
- *   The query planner tags a match expression with indices. It
- *   then uses the tagged tree to create a PlanCacheIndexTree,
- *   using QueryPlanner::cacheDataFromTaggedTree. The PlanCacheIndexTree
- *   is isomorphic to the tagged match expression, and has matching
- *   index tags.
- *
- * How a PlanCacheIndexTree is used:
- *   When the query planner is planning from the cache, it uses
- *   the PlanCacheIndexTree retrieved from the cache in order to
- *   recreate index assignments. Specifically, a raw MatchExpression
- *   is tagged according to the index tags in the PlanCacheIndexTree.
- *   This is done by QueryPlanner::tagAccordingToCache.
- */
-struct PlanCacheIndexTree {
-
-    /**
-     * An OrPushdown is the cached version of an OrPushdownTag::Destination. It indicates that this
-     * node is a predicate that can be used inside of a sibling indexed OR, to tighten index bounds
-     * or satisfy the first field in the index.
-     */
-    struct OrPushdown {
-        uint64_t estimateObjectSizeInBytes() const {
-            return  // Add size of each element in 'route' vector.
-                container_size_helper::estimateObjectSizeInBytes(route) +
-                // Subtract static size of 'identifier' since it is already included in
-                // 'sizeof(*this)'.
-                (indexEntryId.estimateObjectSizeInBytes() - sizeof(indexEntryId)) +
-                // Add size of the object.
-                sizeof(*this);
-        }
-        IndexEntry::Identifier indexEntryId;
-        size_t position;
-        bool canCombineBounds;
-        std::deque<size_t> route;
-    };
-
-    PlanCacheIndexTree() : entry(nullptr), index_pos(0), canCombineBounds(true) {}
-
-    ~PlanCacheIndexTree() {
-        for (std::vector<PlanCacheIndexTree*>::const_iterator it = children.begin();
-             it != children.end();
-             ++it) {
-            delete *it;
-        }
-    }
-
-    /**
-     * Clone 'ie' and set 'this->entry' to be the clone.
-     */
-    void setIndexEntry(const IndexEntry& ie) {
-        entry.reset(new IndexEntry(ie));
-    }
-
-    /**
-     * Make a deep copy.
-     */
-    PlanCacheIndexTree* clone() const {
-        PlanCacheIndexTree* root = new PlanCacheIndexTree();
-        if (nullptr != entry.get()) {
-            root->index_pos = index_pos;
-            root->setIndexEntry(*entry.get());
-            root->canCombineBounds = canCombineBounds;
-        }
-        root->orPushdowns = orPushdowns;
-
-        for (std::vector<PlanCacheIndexTree*>::const_iterator it = children.begin();
-             it != children.end();
-             ++it) {
-            PlanCacheIndexTree* clonedChild = (*it)->clone();
-            root->children.push_back(clonedChild);
-        }
-        return root;
-    }
-
-    /**
-     * For debugging.
-     */
-    std::string toString(int indents = 0) const {
-        StringBuilder result;
-        if (!children.empty()) {
-            result << std::string(3 * indents, '-') << "Node\n";
-            int newIndent = indents + 1;
-            for (std::vector<PlanCacheIndexTree*>::const_iterator it = children.begin();
-                 it != children.end();
-                 ++it) {
-                result << (*it)->toString(newIndent);
-            }
-            return result.str();
-        } else {
-            result << std::string(3 * indents, '-') << "Leaf ";
-            if (nullptr != entry.get()) {
-                result << entry->identifier << ", pos: " << index_pos << ", can combine? "
-                       << canCombineBounds;
-            }
-            for (const auto& orPushdown : orPushdowns) {
-                result << "Move to ";
-                bool firstPosition = true;
-                for (auto position : orPushdown.route) {
-                    if (!firstPosition) {
-                        result << ",";
-                    }
-                    firstPosition = false;
-                    result << position;
-                }
-                result << ": " << orPushdown.indexEntryId << " pos: " << orPushdown.position
-                       << ", can combine? " << orPushdown.canCombineBounds << ". ";
-            }
-            result << '\n';
-        }
-        return result.str();
-    }
-
-    uint64_t estimateObjectSizeInBytes() const {
-        return  // Recursively add size of each element in 'children' vector.
-            container_size_helper::estimateObjectSizeInBytes(
-                children,
-                [](const auto& child) { return child->estimateObjectSizeInBytes(); },
-                true) +
-            // Add size of each element in 'orPushdowns' vector.
-            container_size_helper::estimateObjectSizeInBytes(
-                orPushdowns,
-                [](const auto& orPushdown) { return orPushdown.estimateObjectSizeInBytes(); },
-                false) +
-            // Add size of 'entry' if present.
-            (entry ? entry->estimateObjectSizeInBytes() : 0) +
-            // Add size of the object.
-            sizeof(*this);
-    }
-    // Children owned here.
-    std::vector<PlanCacheIndexTree*> children;
-
-    // Owned here.
-    std::unique_ptr<IndexEntry> entry;
-
-    size_t index_pos;
-
-    // The value for this member is taken from the IndexTag of the corresponding match expression
-    // and is used to ensure that bounds are correctly intersected and/or compounded when a query is
-    // planned from the plan cache.
-    bool canCombineBounds;
-
-    std::vector<OrPushdown> orPushdowns;
-};
-
-/**
- * Data stored inside a QuerySolution which can subsequently be
- * used to create a cache entry. When this data is retrieved
- * from the cache, it is sufficient to reconstruct the original
- * QuerySolution.
- */
-struct SolutionCacheData {
-    SolutionCacheData()
-        : tree(nullptr),
-          solnType(USE_INDEX_TAGS_SOLN),
-          wholeIXSolnDir(1),
-          indexFilterApplied(false) {}
-
-    std::unique_ptr<SolutionCacheData> clone() const {
-        auto other = std::make_unique<SolutionCacheData>();
-        if (nullptr != this->tree.get()) {
-            // 'tree' could be NULL if the cached solution
-            // is a collection scan.
-            other->tree.reset(this->tree->clone());
-        }
-        other->solnType = this->solnType;
-        other->wholeIXSolnDir = this->wholeIXSolnDir;
-        other->indexFilterApplied = this->indexFilterApplied;
-        return other;
-    }
-
-    // For debugging.
-    std::string toString() const {
-        switch (this->solnType) {
-            case WHOLE_IXSCAN_SOLN:
-                verify(this->tree.get());
-                return str::stream() << "(whole index scan solution: "
-                                     << "dir=" << this->wholeIXSolnDir << "; "
-                                     << "tree=" << this->tree->toString() << ")";
-            case COLLSCAN_SOLN:
-                return "(collection scan)";
-            case USE_INDEX_TAGS_SOLN:
-                verify(this->tree.get());
-                return str::stream() << "(index-tagged expression tree: "
-                                     << "tree=" << this->tree->toString() << ")";
-        }
-        MONGO_UNREACHABLE;
-    }
-
-    uint64_t estimateObjectSizeInBytes() const {
-        return (tree ? tree->estimateObjectSizeInBytes() : 0) + sizeof(*this);
-    }
-
-    // Owned here. If 'wholeIXSoln' is false, then 'tree'
-    // can be used to tag an isomorphic match expression. If 'wholeIXSoln'
-    // is true, then 'tree' is used to store the relevant IndexEntry.
-    // If 'collscanSoln' is true, then 'tree' should be NULL.
-    std::unique_ptr<PlanCacheIndexTree> tree;
-
-    enum SolutionType {
-        // Indicates that the plan should use
-        // the index as a proxy for a collection
-        // scan (e.g. using index to provide sort).
-        WHOLE_IXSCAN_SOLN,
-
-        // The cached plan is a collection scan.
-        COLLSCAN_SOLN,
-
-        // Build the solution by using 'tree'
-        // to tag the match expression.
-        USE_INDEX_TAGS_SOLN
-    } solnType;
-
-    // The direction of the index scan used as
-    // a proxy for a collection scan. Used only
-    // for WHOLE_IXSCAN_SOLN.
-    int wholeIXSolnDir;
-
-    // True if index filter was applied.
-    bool indexFilterApplied;
-};
 
 template <class CachedPlanType>
 class PlanCacheEntryBase;
@@ -418,8 +115,6 @@ public:
     // cached.
     const size_t decisionWorks;
 };
-
-using CachedSolution = CachedPlanHolder<SolutionCacheData>;
 
 /**
  * Used by the cache to track entries and their performance over time.
@@ -678,8 +373,6 @@ private:
         return size;
     }
 };
-
-using PlanCacheEntry = PlanCacheEntryBase<SolutionCacheData>;
 
 /**
  * Caches the best solution to a query.  Aside from the (CanonicalQuery -> QuerySolution)
@@ -985,7 +678,16 @@ public:
      *
      * Callers must hold the collection lock when calling this method.
      */
-    KeyType computeKey(const CanonicalQuery& cq) const;
+    KeyType computeKey(const CanonicalQuery& cq) const {
+        const auto shapeString = cq.encodeKey();
+
+        StringBuilder indexabilityKeyBuilder;
+        plan_cache_detail::encodeIndexability(
+            cq.root(), _indexabilityState, &indexabilityKeyBuilder);
+        return KeyType(std::move(shapeString),
+                       indexabilityKeyBuilder.str(),
+                       cq.getEnableSlotBasedExecutionEngine());
+    }
 
     /**
      * Returns a copy of a cache entry, looked up by CanonicalQuery.
@@ -1161,6 +863,4 @@ private:
     // are allowed.
     PlanCacheIndexabilityState _indexabilityState;
 };
-
-using PlanCache = PlanCacheBase<PlanCacheKey, SolutionCacheData, PlanCacheKeyHasher>;
 }  // namespace mongo

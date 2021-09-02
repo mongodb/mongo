@@ -30,8 +30,8 @@
 #pragma once
 
 #include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/query/classic_plan_cache.h"
 #include "mongo/db/query/explain_options.h"
-#include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/plan_enumerator_explain_info.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_solution.h"

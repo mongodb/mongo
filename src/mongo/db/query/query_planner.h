@@ -31,7 +31,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/plan_cache.h"
+#include "mongo/db/query/classic_plan_cache.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_solution.h"
 

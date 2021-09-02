@@ -32,7 +32,6 @@
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/index_entry.h"
-#include "mongo/db/query/query_solution.h"
 #include "mongo/stdx/unordered_set.h"
 
 namespace mongo {

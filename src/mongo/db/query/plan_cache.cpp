@@ -30,7 +30,8 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 #include "mongo/db/query/plan_cache.h"
-#include "mongo/db/commands/server_status_metric.h"
+
+#include "mongo/db/query/plan_cache_indexability.h"
 #include "mongo/db/query/planner_ixselect.h"
 #include "mongo/logv2/log.h"
 
@@ -123,12 +124,8 @@ void logPromoteCacheEntry(std::string&& query,
                 "newWorks"_attr = newWorks);
 }
 }  // namespace log_detail
-namespace {
 
-ServerStatusMetricField<Counter64> totalPlanCacheSizeEstimateBytesMetric(
-    "query.planCacheTotalSizeEstimateBytes",
-    &PlanCacheEntryBase<SolutionCacheData>::planCacheTotalSizeEstimateBytes);
-
+namespace plan_cache_detail {
 // Delimiters for cache key encoding.
 const char kEncodeDiscriminatorsBegin = '<';
 const char kEncodeDiscriminatorsEnd = '>';
@@ -169,33 +166,5 @@ void encodeIndexability(const MatchExpression* tree,
         encodeIndexability(tree->getChild(i), indexabilityState, keyBuilder);
     }
 }
-
-}  // namespace
-
-std::ostream& operator<<(std::ostream& stream, const PlanCacheKey& key) {
-    stream << key.stringData();
-    return stream;
-}
-
-StringBuilder& operator<<(StringBuilder& builder, const PlanCacheKey& key) {
-    builder << key.stringData();
-    return builder;
-}
-
-// TODO SERVER-59335: This is going to need to be more generic.
-template <class KeyType, class CachedPlanType, class KeyHasher>
-KeyType PlanCacheBase<KeyType, CachedPlanType, KeyHasher>::computeKey(
-    const CanonicalQuery& cq) const {
-    const auto shapeString = cq.encodeKey();
-
-    StringBuilder indexabilityKeyBuilder;
-    encodeIndexability(cq.root(), _indexabilityState, &indexabilityKeyBuilder);
-    return KeyType(std::move(shapeString),
-                   indexabilityKeyBuilder.str(),
-                   cq.getEnableSlotBasedExecutionEngine());
-}
-
-// TODO SERVER-59335: Avoid explicit template instantiation.
-template PlanCacheKey PlanCache::computeKey(const CanonicalQuery& cq) const;
-
+}  // namespace plan_cache_detail
 }  // namespace mongo

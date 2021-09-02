@@ -398,7 +398,7 @@ StatusWith<std::unique_ptr<PlanCacheIndexTree>> QueryPlanner::cacheDataFromTagge
         if (!statusWithTree.isOK()) {
             return statusWithTree.getStatus();
         }
-        indexTree->children.push_back(statusWithTree.getValue().release());
+        indexTree->children.push_back(std::move(statusWithTree.getValue()));
     }
 
     return {std::move(indexTree)};
@@ -429,7 +429,7 @@ Status QueryPlanner::tagAccordingToCache(MatchExpression* filter,
 
     // Continue the depth-first tree traversal.
     for (size_t i = 0; i < filter->numChildren(); ++i) {
-        Status s = tagAccordingToCache(filter->getChild(i), indexTree->children[i], indexMap);
+        Status s = tagAccordingToCache(filter->getChild(i), indexTree->children[i].get(), indexMap);
         if (!s.isOK()) {
             return s;
         }

@@ -29,7 +29,7 @@
 
 #include "mongo/db/commands/plan_cache_commands.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/query/plan_cache.h"
+#include "mongo/db/query/classic_plan_cache.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/unittest/unittest.h"
 

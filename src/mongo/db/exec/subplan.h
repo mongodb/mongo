@@ -38,7 +38,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/requires_all_indices_stage.h"
 #include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/plan_cache.h"
+#include "mongo/db/query/classic_plan_cache.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_params.h"

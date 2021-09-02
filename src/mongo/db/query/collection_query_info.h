@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/query/plan_cache.h"
+#include "mongo/db/query/classic_plan_cache.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/update_index_data.h"
 

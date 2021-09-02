@@ -33,6 +33,7 @@
 
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/index_bounds_builder.h"
+#include "mongo/db/query/index_tag.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_solution.h"
 

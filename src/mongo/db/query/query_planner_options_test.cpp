@@ -30,6 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/query/index_tag.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_test_fixture.h"
 #include "mongo/unittest/unittest.h"
@@ -837,9 +838,9 @@ TEST_F(QueryPlannerTest, TagAccordingToCacheFailsOnBadInput) {
     scopedCq = std::move(statusWithCQ.getValue());
 
     // Mismatched tree topology.
-    PlanCacheIndexTree* child = new PlanCacheIndexTree();
+    auto child = std::make_unique<PlanCacheIndexTree>();
     child->setIndexEntry(buildSimpleIndexEntry(BSON("a" << 1), "a_1"));
-    indexTree->children.push_back(child);
+    indexTree->children.push_back(std::move(child));
     s = QueryPlanner::tagAccordingToCache(scopedCq->root(), indexTree.get(), indexMap);
     ASSERT_NOT_OK(s);
 }
