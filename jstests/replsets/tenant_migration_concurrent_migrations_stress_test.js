@@ -87,6 +87,7 @@ while (setOfCompleteMigrations.size < kMigrationsCount) {
     }
     sleep(100);  // Do not query too often in any case.
 
+    let migrationsByState = {};  // Map of sets: key is state, value is set of IDs.
     assert.soon(function() {
         let currentOp = tenantMigrationTest.getDonorPrimary().adminCommand(
             {currentOp: true, desc: "tenant donor migration"});
@@ -94,12 +95,14 @@ while (setOfCompleteMigrations.size < kMigrationsCount) {
             return false;
         }
         currentOp.inprog.forEach((op) => {
+            let idPatternFound = op.tenantId.match(regexId);
+            assert(idPatternFound !== null);
+            assert.eq(idPatternFound.length, 2);
+            let id = parseInt(idPatternFound[1]);
+            assert(!isNaN(id));
+            assert(id >= 0, `${id}`);
+
             if (op.lastDurableState === migrationStates.kCommitted) {
-                let found = op.tenantId.match(regexId);
-                assert(found !== null);
-                assert.eq(found.length, 2);
-                let id = parseInt(found[1]);
-                assert(id >= 0, `${id}`);
                 assert(id <= kMigrationsCount, `${id}`);
                 // Check if this migration completed after previous check.
                 if (!setOfCompleteMigrations.has(id)) {
@@ -107,12 +110,26 @@ while (setOfCompleteMigrations.size < kMigrationsCount) {
                     --runningMigrations;
                 }
             }
+
+            if (!(op.lastDurableState in migrationsByState)) {
+                migrationsByState[op.lastDurableState] = new Set();
+            }
+            let idsForState = migrationsByState[op.lastDurableState];
+            idsForState.add(id);
         });
         return true;
     });
 
     jsTestLog("Currently running " + runningMigrations + ", complete count " +
               setOfCompleteMigrations.size);
+
+    for (let state in migrationsByState) {
+        let ids = migrationsByState[state];
+        if (ids.size > 0 && ids.size <= 10) {
+            // We only log the small collections to know which ones were stuck.
+            jsTestLog(`Migrations in state ${state}: ${tojson(new Array(...ids).join(' '))}`);
+        }
+    }
 }
 
 // Wait and forget all migrations.
