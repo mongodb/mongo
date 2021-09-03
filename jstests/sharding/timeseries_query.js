@@ -60,7 +60,7 @@ function runInsert(timestamp, metaValue) {
     assert.commandWorked(sDB.getCollection(unshardedColl).insert(doc));
 }
 
-function runQuery({query, expectedDocs, expectedShards}) {
+function runQuery({query, expectedDocs, expectedShards, expectQueryRewrite = true}) {
     // Restart profiler.
     for (let shardDB of [shard0DB, shard1DB]) {
         shardDB.setProfilingLevel(0);
@@ -81,7 +81,18 @@ function runQuery({query, expectedDocs, expectedShards}) {
     assert.sameMembers(unshardedOutput, aggOutput);
 
     if (expectedShards) {
-        const filter = {"command.aggregate": `system.buckets.${collName}`};
+        let filter = {
+            "command.aggregate": `system.buckets.${collName}`,
+        };
+
+        // If the query was rewritten to be a match expression on the buckets collection, we should
+        // expect a $match stage at the beginning of the pipeline.
+        if (expectQueryRewrite) {
+            filter["command.pipeline.0.$match"] = {$exists: true};
+        } else {
+            filter["command.pipeline.0.$_internalUnpackBucket"] = {$exists: true};
+        }
+
         const shard0Entries = shard0DB.system.profile.find(filter).toArray();
         const shard1Entries = shard1DB.system.profile.find(filter).toArray();
 
@@ -271,7 +282,8 @@ function runQuery({query, expectedDocs, expectedShards}) {
     runQuery({
         query: {$or: [{time: ISODate("2019-11-11")}, {time: ISODate("2019-11-12")}]},
         expectedDocs: 2,
-        expectedShards: [primaryShard.shardName, otherShard.shardName]
+        expectedShards: [primaryShard.shardName, otherShard.shardName],
+        expectQueryRewrite: false,
     });
 
     sDB.dropDatabase();
