@@ -30,6 +30,7 @@
 #include "mongo/db/exec/sbe/util/debug_print.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/sbe_stage_builder_accumulator.h"
 #include "mongo/db/query/sbe_stage_builder_eval_frame.h"
 #include "mongo/db/query/sbe_stage_builder_expression.h"
@@ -44,6 +45,8 @@ const NamespaceString kTestNss("TestDB", "TestColl");
 
 class SbeAccumulatorBuilderTest : public SbeStageBuilderTestFixture {
 protected:
+    std::unique_ptr<CollatorInterface> _collator;
+
     std::unique_ptr<QuerySolutionNode> makeVirtualScanTree(std::vector<BSONArray> docs) {
         return std::make_unique<VirtualScanNode>(docs, VirtualScanNode::ScanType::kCollScan, false);
     }
@@ -70,14 +73,12 @@ protected:
         return std::move(statusWithCQ.getValue());
     }
 
-    stage_builder::StageBuilderState makeStageBuilderState() {
+    stage_builder::StageBuilderState makeStageBuilderState(sbe::RuntimeEnvironment* env) {
         boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-        auto cq = canonicalize("{dummy: 'query'}");
-        auto env =
-            stage_builder::makeRuntimeEnvironment(*(cq.get()), expCtx->opCtx, &_slotIdGenerator);
+        _canonicalQuery = canonicalize("{dummy: 'query'}");
         return stage_builder::StageBuilderState(expCtx->opCtx,
-                                                env.get(),
-                                                cq->getExpCtxRaw()->variables,
+                                                env,
+                                                _canonicalQuery->getExpCtxRaw()->variables,
                                                 &_slotIdGenerator,
                                                 &_frameIdGenerator,
                                                 &_spoolIdGenerator);
@@ -97,7 +98,15 @@ protected:
         stage_builder::EvalStage evalStage;
         evalStage.stage = std::move(stage);
 
-        auto state = makeStageBuilderState();
+        auto state = makeStageBuilderState(data.env);
+        if (_collator) {
+            data.env->registerSlot(
+                "collator"_sd,
+                sbe::value::TypeTags::collator,
+                sbe::value::bitcastFrom<const CollatorInterface*>(_collator.get()),
+                false,
+                &_slotIdGenerator);
+        }
         auto [argExpr, argStage] =
             stage_builder::buildArgument(state,
                                          accStmt,
@@ -155,7 +164,7 @@ protected:
         stage_builder::EvalStage groupByStage;
         groupByStage.stage = std::move(stage);
 
-        auto state = makeStageBuilderState();
+        auto state = makeStageBuilderState(data.env);
         auto acc = fromjson(queryStatement.rawData());
         auto accStmt = makeAccumulator(&expCtx, acc.firstElement());
 
@@ -304,9 +313,12 @@ protected:
     }
 
 private:
-    sbe::value::SlotIdGenerator _slotIdGenerator;
+    // The slot id generator should be shared across all stages via the 'SlotBasedStageBuilder' but
+    // for now we will workaround by creating a generator with large enough starting id.
+    sbe::value::SlotIdGenerator _slotIdGenerator{1024 /*starting id*/};
     sbe::value::FrameIdGenerator _frameIdGenerator;
     sbe::value::SpoolIdGenerator _spoolIdGenerator;
+    std::unique_ptr<CanonicalQuery> _canonicalQuery;
 };
 
 TEST_F(SbeAccumulatorBuilderTest, MinAccumulatorTranslationBasic) {
@@ -368,6 +380,25 @@ TEST_F(SbeAccumulatorBuilderTest, MinAccumulatorTranslationOneGroupBy) {
     runAggregationWithGroupByTest("{x: {$min: '$b'}}", docs, {"$a"}, BSON_ARRAY(0 << 1));
 }
 
+TEST_F(SbeAccumulatorBuilderTest, MinAccumulatorTranslationStringsDefaultCollator) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b"
+                                                           << "az")),
+                                       BSON_ARRAY(BSON("a" << 1 << "b"
+                                                           << "za"))};
+    runAggregationWithNoGroupByTest("{x: {$min: '$b'}}", docs, BSON_ARRAY("az"));
+}
+
+TEST_F(SbeAccumulatorBuilderTest, MinAccumulatorTranslationStringsReverseStringCollator) {
+    _collator =
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString);
+
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b"
+                                                           << "az")),
+                                       BSON_ARRAY(BSON("a" << 1 << "b"
+                                                           << "za"))};
+    runAggregationWithNoGroupByTest("{x: {$min: '$b'}}", docs, BSON_ARRAY("za"));
+}
+
 TEST_F(SbeAccumulatorBuilderTest, MaxAccumulatorTranslationBasic) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 100ll)),
                                        BSON_ARRAY(BSON("a" << 1 << "b" << Decimal128(10.0))),
@@ -414,6 +445,25 @@ TEST_F(SbeAccumulatorBuilderTest, MaxAccumulatorTranslationOneGroupBy) {
                                        BSON_ARRAY(BSON("a" << 1 << "b" << 100)),
                                        BSON_ARRAY(BSON("a" << 2 << "b" << 1))};
     runAggregationWithGroupByTest("{x: {$max: '$b'}}", docs, {"$a"}, BSON_ARRAY(1 << 100));
+}
+
+TEST_F(SbeAccumulatorBuilderTest, MaxAccumulatorTranslationStringsDefaultCollator) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b"
+                                                           << "az")),
+                                       BSON_ARRAY(BSON("a" << 1 << "b"
+                                                           << "za"))};
+    runAggregationWithNoGroupByTest("{x: {$max: '$b'}}", docs, BSON_ARRAY("za"));
+}
+
+TEST_F(SbeAccumulatorBuilderTest, MaxAccumulatorTranslationStringsReverseStringCollator) {
+    _collator =
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString);
+
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b"
+                                                           << "az")),
+                                       BSON_ARRAY(BSON("a" << 1 << "b"
+                                                           << "za"))};
+    runAggregationWithNoGroupByTest("{x: {$max: '$b'}}", docs, BSON_ARRAY("az"));
 }
 
 TEST_F(SbeAccumulatorBuilderTest, FirstAccumulatorTranslationOneDoc) {
@@ -491,7 +541,7 @@ TEST_F(SbeAccumulatorBuilderTest, AvgAccumulatorTranslation) {
     stage_builder::EvalStage evalStage;
     evalStage.stage = std::move(stage);
 
-    auto state = makeStageBuilderState();
+    auto state = makeStageBuilderState(data.env);
     auto [argExpr, argStage] =
         stage_builder::buildArgument(state,
                                      accStmt,
@@ -558,7 +608,7 @@ TEST_F(SbeAccumulatorBuilderTest, TwoAvgAccumulatorTranslation) {
     sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> aggs;
     std::vector<sbe::value::SlotVector> accAggSlots;
     std::vector<AccumulationStatement> accStmts;
-    auto state = makeStageBuilderState();
+    auto state = makeStageBuilderState(data.env);
     for (auto& acc : accs) {
         auto accStmt = makeAccumulator(&expCtx, acc.firstElement());
         accStmts.push_back(accStmt);
@@ -638,7 +688,7 @@ TEST_F(SbeAccumulatorBuilderTest, AvgAccumulatorOneGroupByTranslation) {
     stage_builder::EvalStage evalStage;
     evalStage.stage = std::move(stage);
 
-    auto state = makeStageBuilderState();
+    auto state = makeStageBuilderState(data.env);
     auto acc = fromjson("{x: {$avg: '$b'}}");
     auto accStmt = makeAccumulator(&expCtx, acc.firstElement());
 

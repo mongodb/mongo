@@ -39,6 +39,19 @@
 
 namespace mongo::stage_builder {
 namespace {
+
+std::unique_ptr<sbe::EExpression> wrapMinMaxArg(StageBuilderState& state,
+                                                std::unique_ptr<sbe::EExpression> arg) {
+    return makeLocalBind(state.frameIdGenerator,
+                         [](sbe::EVariable input) {
+                             return sbe::makeE<sbe::EIf>(
+                                 generateNullOrMissing(input),
+                                 makeConstant(sbe::value::TypeTags::Nothing, 0),
+                                 input.clone());
+                         },
+                         std::move(arg));
+}
+
 std::pair<std::vector<std::unique_ptr<sbe::EExpression>>, EvalStage> buildAccumulatorMin(
     StageBuilderState& state,
     const AccumulationExpression& expr,
@@ -46,7 +59,14 @@ std::pair<std::vector<std::unique_ptr<sbe::EExpression>>, EvalStage> buildAccumu
     EvalStage inputStage,
     PlanNodeId planNodeId) {
     std::vector<std::unique_ptr<sbe::EExpression>> aggs;
-    aggs.push_back(buildAccumulatorMinMax("min", std::move(arg)));
+    auto collatorSlot = state.env->getSlotIfExists("collator"_sd);
+    if (collatorSlot) {
+        aggs.push_back(makeFunction("collMin"_sd,
+                                    sbe::makeE<sbe::EVariable>(*collatorSlot),
+                                    wrapMinMaxArg(state, std::move(arg))));
+    } else {
+        aggs.push_back(makeFunction("min"_sd, wrapMinMaxArg(state, std::move(arg))));
+    }
     return {std::move(aggs), std::move(inputStage)};
 }
 
@@ -73,7 +93,14 @@ std::pair<std::vector<std::unique_ptr<sbe::EExpression>>, EvalStage> buildAccumu
     EvalStage inputStage,
     PlanNodeId planNodeId) {
     std::vector<std::unique_ptr<sbe::EExpression>> aggs;
-    aggs.push_back(buildAccumulatorMinMax("max", std::move(arg)));
+    auto collatorSlot = state.env->getSlotIfExists("collator"_sd);
+    if (collatorSlot) {
+        aggs.push_back(makeFunction("collMax"_sd,
+                                    sbe::makeE<sbe::EVariable>(*collatorSlot),
+                                    wrapMinMaxArg(state, std::move(arg))));
+    } else {
+        aggs.push_back(makeFunction("max"_sd, wrapMinMaxArg(state, std::move(arg))));
+    }
     return {std::move(aggs), std::move(inputStage)};
 }
 

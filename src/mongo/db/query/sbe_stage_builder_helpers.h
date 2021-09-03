@@ -234,13 +234,6 @@ std::unique_ptr<sbe::EExpression> makeNothingArrayCheck(
     std::unique_ptr<sbe::EExpression> isArrayInput, std::unique_ptr<sbe::EExpression> otherwise);
 
 /**
- * Check if arg is null or missing and return a min/max expression with arg as Nothing if so.
- * Otherwise, return a min/max expression with arg.
- */
-std::unique_ptr<sbe::EExpression> buildAccumulatorMinMax(mongo::StringData name,
-                                                         std::unique_ptr<sbe::EExpression> arg);
-
-/**
  * Creates an expression to extract a shard key part from inputExpr. The generated expression is a
  * let binding that binds a getField expression to extract the shard key part value from the
  * inputExpr. The entire let binding evaluates to a constant expression carrying the Nothing value

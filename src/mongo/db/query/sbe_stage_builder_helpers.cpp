@@ -250,17 +250,6 @@ std::unique_ptr<sbe::EExpression> makeNothingArrayCheck(
                                 std::move(otherwise));
 }
 
-std::unique_ptr<sbe::EExpression> buildAccumulatorMinMax(mongo::StringData name,
-                                                         std::unique_ptr<sbe::EExpression> arg) {
-    tassert(5755103,
-            str::stream() << "Expected 'min' or 'max' for name but got: " << name,
-            name == "min" || name == "max");
-    return makeFunction(name,
-                        sbe::makeE<sbe::EIf>(generateNullOrMissing(arg->clone()),
-                                             makeConstant(sbe::value::TypeTags::Nothing, 0),
-                                             arg->clone()));
-}
-
 std::unique_ptr<sbe::EExpression> generateShardKeyBinding(
     const FieldRef& keyPatternField,
     sbe::value::FrameIdGenerator& frameIdGenerator,
