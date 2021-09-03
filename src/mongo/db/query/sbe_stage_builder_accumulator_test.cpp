@@ -814,7 +814,7 @@ TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationMixedTypesWithDecimal
     DoubleDoubleSummation doubleDoubleSum;
     doubleDoubleSum.addDouble(doubleVal1);
     doubleDoubleSum.addInt(intVal);
-    doubleDoubleSum.addInt(longVal);
+    doubleDoubleSum.addLong(longVal);
     doubleDoubleSum.addDouble(doubleVal2);
 
     const auto decimalVal = Decimal128(1.0);
