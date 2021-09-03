@@ -108,6 +108,7 @@ function testLimits(testDB, lengthLimit) {
      {$group: {_id: "$_id"}},
      {$limit: 1},
      {$lookup: {from: collname, localField: "_id", foreignField: "_id", as: "foo"}},
+     {$match: {_id: {$exists: true}}},
      {$project: {_id: 1}},
      {$redact: "$$KEEP"},
      {$replaceWith: "$$ROOT"},
