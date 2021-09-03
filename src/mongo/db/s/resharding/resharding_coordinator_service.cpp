@@ -876,8 +876,8 @@ ReshardingCoordinatorExternalStateImpl::calculateParticipantShardsAndChunks(
 
         // Note: The resharding initial split policy doesn't care about what is the real primary
         // shard, so just pass in a random shard.
-        const SplitPolicyParams splitParams{
-            tempNs, coordinatorDoc.getReshardingUUID(), *donorShardIds.begin()};
+        const SplitPolicyParams splitParams{coordinatorDoc.getReshardingUUID(),
+                                            *donorShardIds.begin()};
         auto splitResult = initialSplitter.createFirstChunks(opCtx, shardKey, splitParams);
         initialChunks = std::move(splitResult.chunks);
 

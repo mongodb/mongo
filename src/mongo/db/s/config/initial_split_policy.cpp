@@ -345,10 +345,12 @@ InitialSplitPolicy::ShardCollectionConfig UnoptimizedSplitPolicy::createFirstChu
     // the splitVector command and affects the number of chunks returned, has been loaded.
     const auto balancerConfig = Grid::get(opCtx)->getBalancerConfiguration();
     uassertStatusOK(balancerConfig->refreshAndCheck(opCtx));
+    auto optNss = CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, params.collectionUUID);
+    invariant(optNss);
     const auto shardSelectedSplitPoints = uassertStatusOK(
         shardutil::selectChunkSplitPoints(opCtx,
                                           params.primaryShardId,
-                                          params.nss,
+                                          *optNss,
                                           shardKeyPattern,
                                           ChunkRange(shardKeyPattern.getKeyPattern().globalMin(),
                                                      shardKeyPattern.getKeyPattern().globalMax()),
@@ -432,8 +434,7 @@ InitialSplitPolicy::ShardCollectionConfig AbstractTagsBasedSplitPolicy::createFi
         invariant(it != tagToShards.end());
         uassert(50973,
                 str::stream()
-                    << "Cannot shard collection " << params.nss.ns() << " due to zone "
-                    << tag.getTag()
+                    << "Cannot shard collection " << tag.getNS() << " due to zone " << tag.getTag()
                     << " which is not assigned to a shard. Please assign this zone to a shard.",
                 !it->second.empty());
 

@@ -44,7 +44,6 @@
 namespace mongo {
 
 struct SplitPolicyParams {
-    NamespaceString nss;
     UUID collectionUUID;
     ShardId primaryShardId;
 };

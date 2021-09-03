@@ -34,6 +34,7 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/db/catalog/collection_mock.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/config/initial_split_policy.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
@@ -144,6 +145,12 @@ TEST_F(CreateFirstChunksTest, NonEmptyCollection_SplitPoints_FromSplitVector_Man
     setupShards(kShards);
     shardRegistry()->reload(operationContext());
 
+    auto uuid = UUID::gen();
+    CollectionCatalog::write(getServiceContext(), [&](CollectionCatalog& catalog) {
+        catalog.registerCollection(
+            operationContext(), uuid, std::make_shared<CollectionMock>(kNamespace));
+    });
+
     auto future = launchAsync([&] {
         ThreadClient tc("Test", getServiceContext());
         auto opCtx = cc().makeOperationContext();
@@ -162,7 +169,7 @@ TEST_F(CreateFirstChunksTest, NonEmptyCollection_SplitPoints_FromSplitVector_Man
             false /* collectionIsEmpty */);
         ASSERT(!optimization->isOptimized());
         return optimization->createFirstChunks(
-            opCtx.get(), kShardKeyPattern, {kNamespace, UUID::gen(), ShardId("shard1")});
+            opCtx.get(), kShardKeyPattern, {uuid, ShardId("shard1")});
     });
 
     expectSplitVector(connStr.getServers()[0], kShardKeyPattern, BSON_ARRAY(BSON("x" << 0)));
@@ -212,7 +219,7 @@ TEST_F(CreateFirstChunksTest, NonEmptyCollection_SplitPoints_FromClient_ManyChun
             collectionIsEmpty);
         ASSERT(optimization->isOptimized());
         return optimization->createFirstChunks(
-            opCtx.get(), kShardKeyPattern, {kNamespace, UUID::gen(), ShardId("shard1")});
+            opCtx.get(), kShardKeyPattern, {UUID::gen(), ShardId("shard1")});
     });
 
     const auto& firstChunks = future.default_timed_get();
@@ -249,7 +256,7 @@ TEST_F(CreateFirstChunksTest, NonEmptyCollection_WithZones_OneChunkToPrimary) {
     ASSERT(optimization->isOptimized());
 
     const auto firstChunks = optimization->createFirstChunks(
-        operationContext(), kShardKeyPattern, {kNamespace, UUID::gen(), ShardId("shard1")});
+        operationContext(), kShardKeyPattern, {UUID::gen(), ShardId("shard1")});
 
     ASSERT_EQ(1U, firstChunks.chunks.size());
     ASSERT_EQ(kShards[1].getName(), firstChunks.chunks[0].getShard());
@@ -295,7 +302,7 @@ TEST_F(CreateFirstChunksTest, EmptyCollection_SplitPoints_FromClient_ManyChunksD
         ASSERT(optimization->isOptimized());
 
         return optimization->createFirstChunks(
-            operationContext(), kShardKeyPattern, {kNamespace, UUID::gen(), ShardId("shard1")});
+            operationContext(), kShardKeyPattern, {UUID::gen(), ShardId("shard1")});
     });
 
     const auto& firstChunks = future.default_timed_get();
@@ -345,7 +352,7 @@ TEST_F(CreateFirstChunksTest, EmptyCollection_NoSplitPoints_OneChunkToPrimary) {
         ASSERT(optimization->isOptimized());
 
         return optimization->createFirstChunks(
-            operationContext(), kShardKeyPattern, {kNamespace, UUID::gen(), ShardId("shard1")});
+            operationContext(), kShardKeyPattern, {UUID::gen(), ShardId("shard1")});
     });
 
     const auto& firstChunks = future.default_timed_get();
@@ -381,7 +388,7 @@ TEST_F(CreateFirstChunksTest, EmptyCollection_WithZones_ManyChunksOnFirstZoneSha
     ASSERT(optimization->isOptimized());
 
     const auto firstChunks = optimization->createFirstChunks(
-        operationContext(), kShardKeyPattern, {kNamespace, UUID::gen(), ShardId("shard1")});
+        operationContext(), kShardKeyPattern, {UUID::gen(), ShardId("shard1")});
 
     ASSERT_EQ(2U, firstChunks.chunks.size());
     ASSERT_EQ(kShards[0].getName(), firstChunks.chunks[0].getShard());
