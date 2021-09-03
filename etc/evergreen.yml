@@ -10410,10 +10410,6 @@ buildvariants:
       --mongodSetParameters="{storeFindAndModifyImagesInSideCollection: true}"
       --excludeWithAnyTags=requires_mmapv1,requires_storing_fam_images_in_oplog
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
-    push_path: linux
-    push_bucket: downloads.10gen.com
-    push_name: linux
-    push_arch: x86_64-enterprise-rhel62
     compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     multiversion_platform: rhel62
     multiversion_edition: enterprise
@@ -10500,9 +10496,6 @@ buildvariants:
   - name: .stitch
   - name: .updatefuzzer
   - name: secondary_reads_passthrough_gen
-  - name: .publish
-    distros:
-        - rhel62-small
   - name: server_discovery_and_monitoring_json_test_TG
   - name: server_selection_json_test_TG
 
