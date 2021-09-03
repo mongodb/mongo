@@ -45,13 +45,17 @@ var $config = extendWorkload($config, function($config, $super) {
             // cause all subsequent aggregations to fail, so give these a low probability to make
             // sure they don't happen too early in the test.
             convertToCapped: 0.01,
-            shardCollection: 0.01,
+            // TODO SERVER-59756: any DDL can potentially conflict with the rename performed by the
+            // $out stage. Re-enable shardCollection state only once SERVER-59756 is completed
+            /* shardCollection: 0.01, */
         },
         createIndexes: {query: 1},
         dropIndex: {query: 1},
         collMod: {query: 1},
         convertToCapped: {query: 1},
-        shardCollection: {query: 1},
+        // TODO SERVER-59756: any DDL can potentially conflict with the rename performed by the
+        // $out stage. Re-enable shardCollection state only once SERVER-59756 is completed
+        /* shardCollection: {query: 1}, */
     };
 
     /**
