@@ -428,6 +428,14 @@ public:
     }
 
     /**
+     * Sets that this operation should ignore interruption except for replication state change. Can
+     * only be called by the thread executing this on behalf of this OperationContext.
+     */
+    void setIgnoreInterruptsExceptForReplStateChange(bool target) {
+        _ignoreInterruptsExceptForReplStateChange = target;
+    }
+
+    /**
      * Clears metadata associated with a multi-document transaction.
      */
     void resetMultiDocumentTransactionState() {
@@ -620,10 +628,13 @@ private:
     bool _shouldParticipateInFlowControl = true;
     bool _inMultiDocumentTransaction = false;
     bool _isStartingMultiDocumentTransaction = false;
+    bool _ignoreInterruptsExceptForReplStateChange = false;
 
     // If true, this OpCtx will get interrupted during replica set stepUp and stepDown, regardless
     // of what locks it's taken.
     AtomicWord<bool> _alwaysInterruptAtStepDownOrUp{false};
+
+    AtomicWord<bool> _killRequestedForReplStateChange{false};
 
     // If populated, this is an owned singleton BSONObj whose only field, 'comment', is a copy of
     // the 'comment' field from the input command object.
