@@ -67,7 +67,10 @@ var $config = (function() {
         }
     };
 
-    let teardown = function(db, collName, cluster) {};
+    let teardown = function(db, collName, cluster) {
+        const configDB = db.getSiblingDB("config");
+        assertAlways(configDB.collections.countDocuments({allowMigrations: {$exists: true}}) == 0);
+    };
 
     let transitions = {
         create: {create: 0.33, drop: 0.33, rename: 0.34},
