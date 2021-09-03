@@ -9,6 +9,8 @@ selector:
   exclude_files:
 
 executor:
+  archive:
+    tests: true
   config:
     shell_options:
       nodb: ''

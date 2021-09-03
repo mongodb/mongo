@@ -14,16 +14,17 @@ load('jstests/replsets/libs/rollback_resumable_index_build.js');
 
 const dbName = "test";
 
-const numDocuments = 100;
+const numDocuments = 200;
 const maxIndexBuildMemoryUsageMB = 50;
 
 const rollbackTest = new RollbackTest(jsTestName());
 
-// Insert enough data so that the collection scan spills to disk.
+// Insert enough data so that the collection scan spills to disk. Keep the size of each document
+// small enough to report for validation, in case there are index inconsistencies.
 const docs = [];
 for (let i = 0; i < numDocuments; i++) {
-    // Each document is at least 1 MB.
-    docs.push({a: i.toString().repeat(1024 * 1024)});
+    // Since most integers will take two or three bytes, almost all documents are at least 0.5 MB.
+    docs.push({a: i.toString().repeat(1024 * 256)});
 }
 
 const runRollbackTo = function(rollbackEndFailPointName, rollbackEndFailPointLogIdWithBuildUUID) {
@@ -40,7 +41,7 @@ const runRollbackTo = function(rollbackEndFailPointName, rollbackEndFailPointLog
             name: "hangIndexBuildDuringCollectionScanPhaseBeforeInsertion",
             logIdWithBuildUUID: 20386
         }],
-        // Each document is at least 1 MB, so the index build must have spilled to disk by this
+        // Most documents are at least 0.5 MB, so the index build must have spilled to disk by this
         // point.
         maxIndexBuildMemoryUsageMB,  // rollbackStartFailPointsIteration
         [{
