@@ -42,7 +42,7 @@ During its lifetime, a session can accumulate a list of data handles (see @ref a
 Indeed, when a session accesses a table for the first time, the data handle of that table is
 acquired and cached. Once a session no longer needs to operate on a table, it marks the associated
 data handle as idle. This helps the sweep server release data handles that are inactive, see @ref
-arch-dhandle-lifecycle "Data Handle Lifecycle" for more details.
+arch-dhandle for more details.
 
 @section arch_session_closure Closure
 A session can be closed using WT_SESSION::close. Closing the connection will also close all opened

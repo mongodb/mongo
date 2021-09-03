@@ -186,6 +186,7 @@ boolean
 booleans
 br
 bt
+btcur
 btmem
 btree
 btree's
@@ -341,6 +342,7 @@ fs
 fsanitize
 fsync
 ftruncate
+func
 fuzzer
 fuzzers
 fuzzutil
