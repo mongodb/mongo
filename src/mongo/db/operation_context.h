@@ -432,6 +432,14 @@ public:
      */
     Microseconds getRemainingMaxTimeMicros() const;
 
+    /**
+     * Sets that this operation should ignore interruption except for replication state change. Can
+     * only be called by the thread executing this on behalf of this OperationContext.
+     */
+    void setIgnoreInterruptsExceptForReplStateChange(bool target) {
+        _ignoreInterruptsExceptForReplStateChange = target;
+    }
+
 private:
     /**
      * Returns true if this operation has a deadline and it has passed according to the fast clock
@@ -521,6 +529,9 @@ private:
     Timer _elapsedTime;
 
     bool _writesAreReplicated = true;
+
+    bool _ignoreInterruptsExceptForReplStateChange = false;
+    AtomicWord<bool> _killRequestedForReplStateChange{false};
 };
 
 namespace repl {

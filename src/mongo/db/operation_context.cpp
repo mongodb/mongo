@@ -196,6 +196,14 @@ bool opShouldFail(Client* client, const BSONObj& failPointInfo) {
 }  // namespace
 
 Status OperationContext::checkForInterruptNoAssert() {
+    const auto killStatus = getKillStatus();
+
+    if (_ignoreInterruptsExceptForReplStateChange &&
+        killStatus != ErrorCodes::InterruptedDueToReplStateChange &&
+        !_killRequestedForReplStateChange.loadRelaxed()) {
+        return Status::OK();
+    }
+
     // TODO: Remove the MONGO_likely(getClient()) once all operation contexts are constructed with
     // clients.
     if (MONGO_likely(getClient() && getServiceContext()) &&
@@ -215,7 +223,6 @@ Status OperationContext::checkForInterruptNoAssert() {
         }
     }
 
-    const auto killStatus = getKillStatus();
     if (killStatus != ErrorCodes::OK) {
         return Status(killStatus, "operation was interrupted");
     }
@@ -361,6 +368,14 @@ void OperationContext::markKilled(ErrorCodes::Error killCode) {
         });
         lkWaitMutex = stdx::unique_lock<stdx::mutex>{*_waitMutex};
     }
+
+    // Record that a kill was requested on this operationContext due to replication state change
+    // since it is possible to call markKilled() multiple times but only the first killCode will
+    // be preserved.
+    if (killCode == ErrorCodes::InterruptedDueToReplStateChange) {
+        _killRequestedForReplStateChange.store(true);
+    }
+
     _killCode.compareAndSwap(ErrorCodes::OK, killCode);
     if (lkWaitMutex && _numKillers == 0) {
         invariant(_waitCV);
