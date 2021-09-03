@@ -7,9 +7,13 @@
 //     requires_background_index,
 //
 //     uses_full_validation,
+//     requires_fcv_51,
+//
 // ]
 
 // Test partial index creation and drops.
+
+load("jstests/core/timeseries/libs/timeseries.js");
 
 (function() {
 "use strict";
@@ -42,11 +46,25 @@ assert.commandFailed(
 assert.commandFailed(coll.createIndex(
     {x: 1}, {partialFilterExpression: {$expr: {$eq: [{$trim: {input: "$x"}}, "hi"]}}}));
 
-// Only top-level $and is permitted in a partial filter expression.
-assert.commandFailedWithCode(coll.createIndex({x: 1}, {
-    partialFilterExpression: {$and: [{$and: [{x: {$lt: 2}}, {x: {$gt: 0}}]}, {x: {$exists: true}}]}
-}),
-                             ErrorCodes.CannotCreateIndex);
+if (!TimeseriesTest.timeseriesMetricIndexesEnabled(db.getMongo())) {
+    // Only top-level $and is permitted in a partial filter expression.
+    assert.commandFailedWithCode(coll.createIndex({x: 1}, {
+        partialFilterExpression:
+            {$and: [{$and: [{x: {$lt: 2}}, {x: {$gt: 0}}]}, {x: {$exists: true}}]}
+    }),
+                                 ErrorCodes.CannotCreateIndex);
+} else {
+    // Tree depth cannot exceed `internalPartialFilterExpressionMaxDepth`, which defaults to 4.
+    assert.commandFailedWithCode(
+        coll.createIndex({x: 1},
+                         {partialFilterExpression: {$and: [{$and: [{$and: [{$and: [{x: 3}]}]}]}]}}),
+        ErrorCodes.CannotCreateIndex);
+
+    // A tree depth of `internalPartialFilterExpressionMaxDepth` is allowed.
+    assert.commandWorked(
+        coll.createIndex({x: 1}, {partialFilterExpression: {$and: [{$and: [{$and: [{x: 3}]}]}]}}));
+    assert(coll.drop());
+}
 
 for (var i = 0; i < 10; i++) {
     assert.commandWorked(coll.insert({x: i, a: i}));
@@ -97,6 +115,7 @@ assert.commandWorked(
     coll.createIndex({x: 1}, {name: "partialIndex2", partialFilterExpression: {a: {$gte: 5}}}));
 assert.eq(coll.getIndexes().length, numIndexesBefore + 1);
 
+// Index drop by key pattern fails when more than one index exists with the given key.
 numIndexesBefore = coll.getIndexes().length;
 assert.commandFailedWithCode(coll.dropIndex({x: 1}), ErrorCodes.AmbiguousIndexKeyPattern);
 assert.commandWorked(coll.dropIndex("partialIndex2"));

@@ -176,6 +176,15 @@ server_parameters:
     validator:
       gt: 0
 
+  internalPartialFilterExpressionMaxDepth:
+    description: "The maximum depth allowed for a partialFilterExpression."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalPartialFilterExpressionMaxDepth"
+    cpp_vartype: AtomicWord<long long>
+    default: 4
+    validator:
+      gt: 0
+
   #
   # Planning and enumeration
   #

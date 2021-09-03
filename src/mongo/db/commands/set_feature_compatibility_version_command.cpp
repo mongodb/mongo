@@ -41,6 +41,7 @@
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog/drop_indexes.h"
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/index_catalog_impl.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/feature_compatibility_version_documentation.h"
@@ -474,6 +475,24 @@ private:
                                     timeseries::isBucketsIndexSpecCompatibleForDowngrade(
                                         *collection->getTimeseriesOptions(),
                                         indexEntry->descriptor()->infoObj()));
+
+                            if (auto filter = indexEntry->getFilterExpression()) {
+                                auto status = IndexCatalogImpl::checkValidFilterExpressions(
+                                    filter,
+                                    /*timeseriesMetricIndexesFeatureFlagEnabled*/ false);
+                                uassert(ErrorCodes::CannotDowngrade,
+                                        str::stream()
+                                            << "Cannot downgrade the cluster when there are "
+                                               "secondary indexes with partial filter expressions "
+                                               "that contain $in/$or/$geoWithin or an $and that is "
+                                               "not top level. Drop all indexes containing these "
+                                               "partial filter elements before downgrading. First "
+                                               "detected incompatible index name: '"
+                                            << indexEntry->descriptor()->indexName()
+                                            << "' on collection: '"
+                                            << collection->ns().getTimeseriesViewNamespace() << "'",
+                                        status.isOK());
+                            }
                         }
 
                         return true;

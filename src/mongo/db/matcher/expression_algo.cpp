@@ -170,6 +170,32 @@ bool _isSubsetOf(const MatchExpression* lhs, const ComparisonMatchExpression* rh
  * Returns true if the documents matched by 'lhs' are a subset of the documents matched by
  * 'rhs', i.e. a document matched by 'lhs' must also be matched by 'rhs', and false otherwise.
  */
+bool _isSubsetOf(const MatchExpression* lhs, const InMatchExpression* rhs) {
+    // An expression can only match a subset of the documents matched by another if they are
+    // comparing the same field.
+    if (lhs->path() != rhs->path()) {
+        return false;
+    }
+
+    if (!rhs->getRegexes().empty()) {
+        return false;
+    }
+
+    for (BSONElement elem : rhs->getEqualities()) {
+        // Each element in the $in-array represents an equality predicate.
+        EqualityMatchExpression equality(rhs->path(), elem);
+        equality.setCollator(rhs->getCollator());
+        if (_isSubsetOf(lhs, &equality)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Returns true if the documents matched by 'lhs' are a subset of the documents matched by
+ * 'rhs', i.e. a document matched by 'lhs' must also be matched by 'rhs', and false otherwise.
+ */
 bool _isSubsetOf(const MatchExpression* lhs, const ExistsMatchExpression* rhs) {
     // An expression can only match a subset of the documents matched by another if they are
     // comparing the same field. Defer checking the path for $not expressions until the
@@ -356,6 +382,53 @@ bool isSubsetOf(const MatchExpression* lhs, const MatchExpression* rhs) {
         return true;
     }
 
+    // $and/$or should be evaluated prior to leaf MatchExpressions. Additionally any recursion
+    // should be done through the 'rhs' expression prior to 'lhs'. Swapping the recursion order
+    // would cause a comparison like the following to fail as neither the 'a' or 'b' left hand
+    // clause would match the $and on the right hand side on their own.
+    //     lhs: {a:5, b:5}
+    //     rhs: {$or: [{a: 3}, {$and: [{a: 5}, {b: 5}]}]}
+
+    if (rhs->matchType() == MatchExpression::OR) {
+        // 'lhs' must match a subset of the documents matched by 'rhs'.
+        for (size_t i = 0; i < rhs->numChildren(); i++) {
+            if (isSubsetOf(lhs, rhs->getChild(i))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    if (rhs->matchType() == MatchExpression::AND) {
+        // 'lhs' must match a subset of the documents matched by each clause of 'rhs'.
+        for (size_t i = 0; i < rhs->numChildren(); i++) {
+            if (!isSubsetOf(lhs, rhs->getChild(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    if (lhs->matchType() == MatchExpression::AND) {
+        // At least one clause of 'lhs' must match a subset of the documents matched by 'rhs'.
+        for (size_t i = 0; i < lhs->numChildren(); i++) {
+            if (isSubsetOf(lhs->getChild(i), rhs)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    if (lhs->matchType() == MatchExpression::OR) {
+        // Every clause of 'lhs' must match a subset of the documents matched by 'rhs'.
+        for (size_t i = 0; i < lhs->numChildren(); i++) {
+            if (!isSubsetOf(lhs->getChild(i), rhs)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     if (lhs->matchType() == MatchExpression::INTERNAL_BUCKET_GEO_WITHIN &&
         rhs->matchType() == MatchExpression::INTERNAL_BUCKET_GEO_WITHIN) {
         auto indexMatchExpression = static_cast<const InternalBucketGeoWithinMatchExpression*>(rhs);
@@ -431,42 +504,16 @@ bool isSubsetOf(const MatchExpression* lhs, const MatchExpression* rhs) {
         }
     }
 
-    if (rhs->matchType() == MatchExpression::AND) {
-        // 'lhs' must match a subset of the documents matched by each clause of 'rhs'.
-        for (size_t i = 0; i < rhs->numChildren(); i++) {
-            if (!isSubsetOf(lhs, rhs->getChild(i))) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    if (lhs->matchType() == MatchExpression::AND) {
-        // At least one clause of 'lhs' must match a subset of the documents matched by 'rhs'.
-        for (size_t i = 0; i < lhs->numChildren(); i++) {
-            if (isSubsetOf(lhs->getChild(i), rhs)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    if (lhs->matchType() == MatchExpression::OR) {
-        // Every clause of 'lhs' must match a subset of the documents matched by 'rhs'.
-        for (size_t i = 0; i < lhs->numChildren(); i++) {
-            if (!isSubsetOf(lhs->getChild(i), rhs)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
     if (ComparisonMatchExpression::isComparisonMatchExpression(rhs)) {
         return _isSubsetOf(lhs, static_cast<const ComparisonMatchExpression*>(rhs));
     }
 
     if (rhs->matchType() == MatchExpression::EXISTS) {
         return _isSubsetOf(lhs, static_cast<const ExistsMatchExpression*>(rhs));
+    }
+
+    if (rhs->matchType() == MatchExpression::MATCH_IN) {
+        return _isSubsetOf(lhs, static_cast<const InMatchExpression*>(rhs));
     }
 
     return false;

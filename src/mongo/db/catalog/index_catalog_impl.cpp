@@ -65,6 +65,7 @@
 #include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl_set_member_in_standalone_mode.h"
 #include "mongo/db/server_options.h"
@@ -514,37 +515,73 @@ namespace {
 
 constexpr int kMaxNumIndexesAllowed = 64;
 
-// While technically recursive, only current possible with 2 levels.
-Status _checkValidFilterExpressions(MatchExpression* expression, int level = 0) {
+/**
+ * Recursive function which confirms whether 'expression' is valid for use in partial indexes.
+ * Recursion is restricted to 'internalPartialFilterExpressionMaxDepth' levels.
+ */
+Status _checkValidFilterExpressions(const MatchExpression* expression,
+                                    bool timeseriesMetricIndexesFeatureFlagEnabled,
+                                    int level = 0) {
     if (!expression)
         return Status::OK();
 
+    const auto kMaxDepth = internalPartialFilterExpressionMaxDepth.load();
+    if (timeseriesMetricIndexesFeatureFlagEnabled && (level + 1) > kMaxDepth) {
+        return Status(ErrorCodes::CannotCreateIndex,
+                      str::stream()
+                          << "partialFilterExpression depth may not exceed " << kMaxDepth);
+    }
+
     switch (expression->matchType()) {
         case MatchExpression::AND:
-            if (level > 0)
-                return Status(ErrorCodes::CannotCreateIndex,
-                              "$and only supported in partialFilterExpression at top level");
+            if (!timeseriesMetricIndexesFeatureFlagEnabled) {
+                if (level > 0)
+                    return Status(ErrorCodes::CannotCreateIndex,
+                                  "$and only supported in partialFilterExpression at top level");
+            }
             for (size_t i = 0; i < expression->numChildren(); i++) {
-                Status status = _checkValidFilterExpressions(expression->getChild(i), level + 1);
+                Status status = _checkValidFilterExpressions(
+                    expression->getChild(i), timeseriesMetricIndexesFeatureFlagEnabled, level + 1);
                 if (!status.isOK())
                     return status;
             }
             return Status::OK();
+
+        case MatchExpression::OR:
+            if (!timeseriesMetricIndexesFeatureFlagEnabled) {
+                return Status(ErrorCodes::CannotCreateIndex,
+                              str::stream() << "Expression not supported in partial index: "
+                                            << expression->debugString());
+            }
+            for (size_t i = 0; i < expression->numChildren(); i++) {
+                Status status = _checkValidFilterExpressions(
+                    expression->getChild(i), timeseriesMetricIndexesFeatureFlagEnabled, level + 1);
+                if (!status.isOK()) {
+                    return status;
+                }
+            }
+            return Status::OK();
         case MatchExpression::GEO:
-            if (feature_flags::gTimeseriesMetricIndexes.isEnabled(
-                    serverGlobalParams.featureCompatibility)) {
+            if (timeseriesMetricIndexesFeatureFlagEnabled) {
                 return Status::OK();
             }
             return Status(ErrorCodes::CannotCreateIndex,
-                          "$geoWithin only supported in partialFilterExpression in v5.1");
+                          str::stream() << "Expression not supported in partial index: "
+                                        << expression->debugString());
         case MatchExpression::INTERNAL_BUCKET_GEO_WITHIN:
-            if (feature_flags::gTimeseriesMetricIndexes.isEnabled(
-                    serverGlobalParams.featureCompatibility)) {
+            if (timeseriesMetricIndexesFeatureFlagEnabled) {
                 return Status::OK();
             }
-            return Status(
-                ErrorCodes::CannotCreateIndex,
-                "$_internalBucketGeoWithin only supported in partialFilterExpression in v5.1");
+            return Status(ErrorCodes::CannotCreateIndex,
+                          str::stream() << "Expression not supported in partial index: "
+                                        << expression->debugString());
+        case MatchExpression::MATCH_IN:
+            if (timeseriesMetricIndexesFeatureFlagEnabled) {
+                return Status::OK();
+            }
+            return Status(ErrorCodes::CannotCreateIndex,
+                          str::stream() << "Expression not supported in partial index: "
+                                        << expression->debugString());
         case MatchExpression::EQ:
         case MatchExpression::LT:
         case MatchExpression::LTE:
@@ -555,7 +592,7 @@ Status _checkValidFilterExpressions(MatchExpression* expression, int level = 0) 
             return Status::OK();
         default:
             return Status(ErrorCodes::CannotCreateIndex,
-                          str::stream() << "unsupported expression in partial index: "
+                          str::stream() << "Expression not supported in partial index: "
                                         << expression->debugString());
     }
 }
@@ -586,6 +623,11 @@ StatusWith<BSONObj> adjustIndexSpecObject(const BSONObj& obj) {
 }
 
 }  // namespace
+
+Status IndexCatalogImpl::checkValidFilterExpressions(
+    const MatchExpression* expression, bool timeseriesMetricIndexesFeatureFlagEnabled) {
+    return _checkValidFilterExpressions(expression, timeseriesMetricIndexesFeatureFlagEnabled);
+}
 
 Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx,
                                    const CollectionPtr& collection,
@@ -742,7 +784,10 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx,
         }
         const std::unique_ptr<MatchExpression> filterExpr = std::move(statusWithMatcher.getValue());
 
-        Status status = _checkValidFilterExpressions(filterExpr.get());
+        Status status =
+            _checkValidFilterExpressions(filterExpr.get(),
+                                         feature_flags::gTimeseriesMetricIndexes.isEnabled(
+                                             serverGlobalParams.featureCompatibility));
         if (!status.isOK()) {
             return status;
         }

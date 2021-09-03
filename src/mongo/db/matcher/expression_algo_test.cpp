@@ -103,6 +103,9 @@ TEST(ExpressionAlgoIsSubsetOf, NullAndIn) {
 
     ASSERT_TRUE(expression::isSubsetOf(inNull.get(), eqNull.get()));
     ASSERT_FALSE(expression::isSubsetOf(inNullOr2.get(), eqNull.get()));
+
+    ASSERT_TRUE(expression::isSubsetOf(eqNull.get(), inNull.get()));
+    ASSERT_TRUE(expression::isSubsetOf(eqNull.get(), inNullOr2.get()));
 }
 
 TEST(ExpressionAlgoIsSubsetOf, NullAndExists) {
@@ -187,6 +190,16 @@ TEST(ExpressionAlgoIsSubsetOf, CompareOr_LT) {
     ASSERT_TRUE(expression::isSubsetOf(eq2OrEq3.get(), lt5.get()));
     ASSERT_FALSE(expression::isSubsetOf(eq4OrEq5.get(), lt5.get()));
     ASSERT_FALSE(expression::isSubsetOf(eq4OrEq6.get(), lt5.get()));
+
+    ParsedMatchExpression lt4OrLt5("{$or: [{a: {$lt: 4}}, {a: {$lt: 5}}]}");
+
+    ASSERT_TRUE(expression::isSubsetOf(lt4OrLt5.get(), lt5.get()));
+    ASSERT_TRUE(expression::isSubsetOf(lt5.get(), lt4OrLt5.get()));
+
+    ParsedMatchExpression lt7OrLt8("{$or: [{a: {$lt: 7}}, {a: {$lt: 8}}]}");
+
+    ASSERT_FALSE(expression::isSubsetOf(lt7OrLt8.get(), lt5.get()));
+    ASSERT_TRUE(expression::isSubsetOf(lt5.get(), lt7OrLt8.get()));
 }
 
 TEST(ExpressionAlgoIsSubsetOf, CompareOr_GTE) {
@@ -198,6 +211,16 @@ TEST(ExpressionAlgoIsSubsetOf, CompareOr_GTE) {
     ASSERT_FALSE(expression::isSubsetOf(eq4OrEq6.get(), gte5.get()));
     ASSERT_TRUE(expression::isSubsetOf(eq5OrEq6.get(), gte5.get()));
     ASSERT_TRUE(expression::isSubsetOf(eq7OrEq8.get(), gte5.get()));
+
+    ParsedMatchExpression gte5OrGte6("{$or: [{a: {$gte: 5}}, {a: {$gte: 6}}]}");
+
+    ASSERT_TRUE(expression::isSubsetOf(gte5OrGte6.get(), gte5.get()));
+    ASSERT_TRUE(expression::isSubsetOf(gte5.get(), gte5OrGte6.get()));
+
+    ParsedMatchExpression gte3OrGte4("{$or: [{a: {$gte: 3}}, {a: {$gte: 4}}]}");
+
+    ASSERT_FALSE(expression::isSubsetOf(gte3OrGte4.get(), gte5.get()));
+    ASSERT_TRUE(expression::isSubsetOf(gte5.get(), gte3OrGte4.get()));
 }
 
 TEST(ExpressionAlgoIsSubsetOf, DifferentCanonicalTypes) {
@@ -382,6 +405,9 @@ TEST(ExpressionAlgoIsSubsetOf, Compare_LT_In) {
     ASSERT_TRUE(expression::isSubsetOf(inAllLt.get(), lt.get()));
     ASSERT_FALSE(expression::isSubsetOf(inStraddle.get(), lt.get()));
     ASSERT_FALSE(expression::isSubsetOf(inLtAndNull.get(), lt.get()));
+
+    ASSERT_FALSE(expression::isSubsetOf(lt.get(), inLt.get()));
+    ASSERT_FALSE(expression::isSubsetOf(lt.get(), inEq.get()));
 }
 
 TEST(ExpressionAlgoIsSubsetOf, Compare_LTE_In) {
@@ -407,6 +433,9 @@ TEST(ExpressionAlgoIsSubsetOf, Compare_LTE_In) {
     ASSERT_TRUE(expression::isSubsetOf(inAllLt.get(), lte.get()));
     ASSERT_FALSE(expression::isSubsetOf(inStraddle.get(), lte.get()));
     ASSERT_FALSE(expression::isSubsetOf(inLtAndNull.get(), lte.get()));
+
+    ASSERT_FALSE(expression::isSubsetOf(lte.get(), inLt.get()));
+    ASSERT_FALSE(expression::isSubsetOf(lte.get(), inEq.get()));
 }
 
 TEST(ExpressionAlgoIsSubsetOf, Compare_EQ_In) {
@@ -428,6 +457,9 @@ TEST(ExpressionAlgoIsSubsetOf, Compare_EQ_In) {
     ASSERT_TRUE(expression::isSubsetOf(inAllEq.get(), eq.get()));
     ASSERT_FALSE(expression::isSubsetOf(inStraddle.get(), eq.get()));
     ASSERT_FALSE(expression::isSubsetOf(inEqAndNull.get(), eq.get()));
+
+    ASSERT_TRUE(expression::isSubsetOf(eq.get(), inEq.get()));
+    ASSERT_FALSE(expression::isSubsetOf(eq.get(), inLt.get()));
 }
 
 TEST(ExpressionAlgoIsSubsetOf, Compare_GT_In) {
@@ -453,6 +485,9 @@ TEST(ExpressionAlgoIsSubsetOf, Compare_GT_In) {
     ASSERT_TRUE(expression::isSubsetOf(inAllGt.get(), gt.get()));
     ASSERT_FALSE(expression::isSubsetOf(inStraddle.get(), gt.get()));
     ASSERT_FALSE(expression::isSubsetOf(inGtAndNull.get(), gt.get()));
+
+    ASSERT_FALSE(expression::isSubsetOf(gt.get(), inGt.get()));
+    ASSERT_FALSE(expression::isSubsetOf(gt.get(), inEq.get()));
 }
 
 TEST(ExpressionAlgoIsSubsetOf, Compare_GTE_In) {
@@ -478,6 +513,9 @@ TEST(ExpressionAlgoIsSubsetOf, Compare_GTE_In) {
     ASSERT_TRUE(expression::isSubsetOf(inAllGt.get(), gte.get()));
     ASSERT_FALSE(expression::isSubsetOf(inStraddle.get(), gte.get()));
     ASSERT_FALSE(expression::isSubsetOf(inGtAndNull.get(), gte.get()));
+
+    ASSERT_FALSE(expression::isSubsetOf(gte.get(), inGt.get()));
+    ASSERT_FALSE(expression::isSubsetOf(gte.get(), inEq.get()));
 }
 
 TEST(ExpressionAlgoIsSubsetOf, RegexAndIn) {
@@ -491,6 +529,10 @@ TEST(ExpressionAlgoIsSubsetOf, RegexAndIn) {
     ASSERT_FALSE(expression::isSubsetOf(inRegexAOrEq1.get(), eq1.get()));
     ASSERT_FALSE(expression::isSubsetOf(inRegexA.get(), eqA.get()));
     ASSERT_FALSE(expression::isSubsetOf(inRegexAOrNull.get(), eqA.get()));
+
+    ASSERT_FALSE(expression::isSubsetOf(eq1.get(), inRegexAOrEq1.get()));
+    ASSERT_FALSE(expression::isSubsetOf(eqA.get(), inRegexA.get()));
+    ASSERT_FALSE(expression::isSubsetOf(eqA.get(), inRegexAOrNull.get()));
 }
 
 TEST(ExpressionAlgoIsSubsetOf, Exists) {
@@ -624,6 +666,10 @@ TEST(ExpressionAlgoIsSubsetOf, InAndExists) {
     ASSERT_TRUE(expression::isSubsetOf(aIn.get(), aExists.get()));
     ASSERT_FALSE(expression::isSubsetOf(bIn.get(), aExists.get()));
     ASSERT_FALSE(expression::isSubsetOf(aInWithNull.get(), aExists.get()));
+
+    ASSERT_FALSE(expression::isSubsetOf(aExists.get(), aIn.get()));
+    ASSERT_FALSE(expression::isSubsetOf(aExists.get(), bIn.get()));
+    ASSERT_FALSE(expression::isSubsetOf(aExists.get(), aInWithNull.get()));
 }
 
 TEST(ExpressionAlgoIsSubsetOf, NinAndExists) {
@@ -722,6 +768,54 @@ TEST(ExpressionAlgoIsSubsetOf, InternalExprEqIsSubsetOfNothing) {
         ParsedMatchExpression rhs("{a: {$lte: 0}}");
         ASSERT_FALSE(expression::isSubsetOf(exprEq.get(), rhs.get()));
         ASSERT_TRUE(expression::isSubsetOf(regularEq.get(), rhs.get()));
+    }
+}
+
+TEST(ExpressionAlgoIsSubsetOf, IsSubsetOfRHSAndWithinOr) {
+    ParsedMatchExpression rhs("{$or: [{a: 3}, {$and: [{a: 5}, {b: 5}]}]}");
+    {
+        ParsedMatchExpression lhs("{a:5, b:5}");
+        ASSERT_TRUE(expression::isSubsetOf(lhs.get(), rhs.get()));
+    }
+}
+
+TEST(ExpressionAlgoIsSubsetOf, IsSubsetOfComplexRHSExpression) {
+    ParsedMatchExpression complex("{$or: [{z: 1}, {$and: [{x: 1}, {$or: [{y: 1}, {y: 2}]}]}]}");
+    {
+        ParsedMatchExpression lhs("{z: 1}");
+        ASSERT_TRUE(expression::isSubsetOf(lhs.get(), complex.get()));
+    }
+
+    {
+        ParsedMatchExpression lhs("{z: 1, x: 1, y:2}");
+        ASSERT_TRUE(expression::isSubsetOf(lhs.get(), complex.get()));
+    }
+
+    {
+        ParsedMatchExpression lhs("{$or: [{z: 1}, {$and: [{x: 1}, {$or: [{y: 1}, {y: 2}]}]}]}");
+        ASSERT_TRUE(expression::isSubsetOf(lhs.get(), complex.get()));
+    }
+
+
+    {
+        ParsedMatchExpression lhs("{$or: [{z: 2}, {$and: [{x: 2}, {$or: [{y: 3}, {y: 4}]}]}]}");
+        ASSERT_FALSE(expression::isSubsetOf(lhs.get(), complex.get()));
+    }
+
+
+    {
+        ParsedMatchExpression lhs("{z: 1, y:2}");
+        ASSERT_TRUE(expression::isSubsetOf(lhs.get(), complex.get()));
+    }
+
+    {
+        ParsedMatchExpression lhs("{z: 2, y: 1}");
+        ASSERT_FALSE(expression::isSubsetOf(lhs.get(), complex.get()));
+    }
+
+    {
+        ParsedMatchExpression lhs("{x: 1, y: 3}");
+        ASSERT_FALSE(expression::isSubsetOf(lhs.get(), complex.get()));
     }
 }
 
