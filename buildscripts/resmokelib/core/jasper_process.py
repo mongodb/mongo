@@ -75,13 +75,19 @@ class Process(_process.Process):
                                       mode.value)
 
         signal_process = self.pb.SignalProcess(ProcessID=self._id, signal=signal)
-        val = self._stub.Signal(signal_process)
-        JASPER_PIDS.discard(self.pid)
-        if not val.success \
-                and "cannot signal a process that has terminated" not in val.text \
-                and "os: process already finished" not in val.text:
-            raise OSError("Failed to signal Jasper process with pid {}: {}".format(
-                self.pid, val.text))
+        try:
+            val = self._stub.Signal(signal_process)
+        except grpc.RpcError as err:
+            err.details = err.details()
+            if "cannot signal a process that has terminated" not in err.details \
+                    and "os: process already finished" not in err.details:
+                raise
+        else:
+            if not val.success:
+                raise OSError("Failed to signal Jasper process with pid {}: {}".format(
+                    self.pid, val.text))
+        finally:
+            JASPER_PIDS.discard(self.pid)
 
     def poll(self):
         """Poll."""
