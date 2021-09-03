@@ -837,7 +837,7 @@ void ShardingCatalogManager::withTransaction(
     AuthorizationSession::get(client)->grantInternalAuthorization(client);
     TxnNumber txnNumber = 0;
 
-    auto guard = makeGuard([opCtx = asr.opCtx(), &txnNumber] {
+    ScopeGuard guard([opCtx = asr.opCtx(), &txnNumber] {
         try {
             abortTransaction(opCtx, txnNumber);
         } catch (DBException& e) {

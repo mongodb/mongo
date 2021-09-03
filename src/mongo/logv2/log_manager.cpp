@@ -55,7 +55,7 @@ LogManager::LogManager() {
 
     boost::log::core::get()->set_exception_handler([]() {
         thread_local uint32_t depth = 0;
-        auto depthGuard = makeGuard([]() { --depth; });
+        ScopeGuard depthGuard([]() { --depth; });
         ++depth;
         // Try and log that we failed to log
         if (depth == 1) {

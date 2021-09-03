@@ -61,7 +61,7 @@ auto scenario(bool debugLogEnabled, bool slowOp, bool forceSample) {
     auto loggedSeverityGuard = unittest::MinimumLoggedSeverityGuard(
         component, debugLogEnabled ? logv2::LogSeverity::Debug(1) : logv2::LogSeverity::Info());
 
-    auto sampleRateGuard = makeGuard(
+    ScopeGuard sampleRateGuard(
         [savedRate = serverGlobalParams.sampleRate] { serverGlobalParams.sampleRate = savedRate; });
     serverGlobalParams.sampleRate = forceSample ? 1.0 : 0.0;
 

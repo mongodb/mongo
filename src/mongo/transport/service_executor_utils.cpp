@@ -75,7 +75,7 @@ Status launchServiceWorkerThread(unique_function<void()> task) noexcept {
 #else
         pthread_attr_t attrs;
         pthread_attr_init(&attrs);
-        auto attrsGuard = makeGuard([&attrs] { pthread_attr_destroy(&attrs); });
+        ScopeGuard attrsGuard([&attrs] { pthread_attr_destroy(&attrs); });
         pthread_attr_setdetachstate(&attrs, PTHREAD_CREATE_DETACHED);
 
         static const rlim_t kStackSize =

@@ -1444,9 +1444,9 @@ Status OptionsParser::readConfigFile(const std::string& filename,
 #ifdef _WIN32
     // The checks below are only performed on POSIX systems
     // due to differing permission models.
-    auto fdguard = makeGuard([&fd] { ::_close(fd); });
+    ScopeGuard fdguard([&fd] { ::_close(fd); });
 #else
-    auto fdguard = makeGuard([&fd] { ::close(fd); });
+    ScopeGuard fdguard([&fd] { ::close(fd); });
 
     if (configExpand.rest) {
         auto status = checkFileOwnershipAndMode(fd, S_IRGRP | S_IROTH, "readable"_sd);

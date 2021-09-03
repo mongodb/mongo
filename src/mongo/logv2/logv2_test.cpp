@@ -198,7 +198,7 @@ public:
         sink->set_formatter(PlainFormatter());
         boost::log::core::get()->add_sink(sink);
 
-        auto enabledGuard = makeGuard([this] { enabled = false; });
+        ScopeGuard enabledGuard([this] { enabled = false; });
         LOGV2(20001, "log during init");
         ASSERT_EQUALS(lines.back(), "log during init");
     }

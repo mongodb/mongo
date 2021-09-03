@@ -367,7 +367,7 @@ bool LockerImpl::_acquireTicket(OperationContext* opCtx, LockMode mode, Date_t d
         _clientState.store(reader ? kQueuedReader : kQueuedWriter);
 
         // If the ticket wait is interrupted, restore the state of the client.
-        auto restoreStateOnErrorGuard = makeGuard([&] { _clientState.store(kInactive); });
+        ScopeGuard restoreStateOnErrorGuard([&] { _clientState.store(kInactive); });
 
         // Acquiring a ticket is a potentially blocking operation. This must not be called after a
         // transaction timestamp has been set, indicating this transaction has created an oplog
@@ -937,7 +937,7 @@ void LockerImpl::_lockComplete(OperationContext* opCtx,
     }
 
     // Clean up the state on any failed lock attempts.
-    auto unlockOnErrorGuard = makeGuard([&] {
+    ScopeGuard unlockOnErrorGuard([&] {
         LockRequestsMap::Iterator it = _requests.find(resId);
         invariant(it);
         _unlockImpl(&it);
@@ -1037,7 +1037,7 @@ void LockerImpl::getFlowControlTicket(OperationContext* opCtx, LockMode lockMode
         // method must not exit with a side-effect on the clientState. That value is also used for
         // tracking whether other resources need to be released.
         _clientState.store(kQueuedWriter);
-        auto restoreState = makeGuard([&] { _clientState.store(kInactive); });
+        ScopeGuard restoreState([&] { _clientState.store(kInactive); });
         // Acquiring a ticket is a potentially blocking operation. This must not be called after a
         // transaction timestamp has been set, indicating this transaction has created an oplog
         // hole.

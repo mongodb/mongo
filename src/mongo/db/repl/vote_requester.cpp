@@ -117,7 +117,7 @@ void VoteRequester::Algorithm::processResponse(const RemoteCommandRequest& reque
     // All local variables captured in logAttrs needs to be above the guard that logs.
     logv2::DynamicAttributes logAttrs;
     auto logAtExit =
-        makeGuard([&logAttrs]() { LOGV2(51799, "VoteRequester processResponse", logAttrs); });
+        ScopeGuard([&logAttrs]() { LOGV2(51799, "VoteRequester processResponse", logAttrs); });
     logAttrs.add("term", _term);
     logAttrs.add("dryRun", _dryRun);
 

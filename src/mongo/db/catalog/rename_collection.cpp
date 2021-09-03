@@ -573,7 +573,7 @@ Status renameBetweenDBs(OperationContext* opCtx,
     }
 
     // Dismissed on success
-    auto tmpCollectionDropper = makeGuard([&] {
+    ScopeGuard tmpCollectionDropper([&] {
         Status status = Status::OK();
         try {
             status = dropCollectionForApplyOps(

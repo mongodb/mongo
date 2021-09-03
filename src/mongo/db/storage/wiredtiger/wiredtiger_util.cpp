@@ -227,8 +227,9 @@ StatusWith<std::string> WiredTigerUtil::getMetadataCreate(OperationContext* opCt
         LOGV2_FATAL_NOTRACE(51257, "Cursor not found", "error"_attr = ex);
     }
     invariant(cursor);
-    auto releaser = makeGuard(
-        [&] { session->releaseCursor(WiredTigerSession::kMetadataCreateTableId, cursor, ""); });
+    ScopeGuard releaser = [&] {
+        session->releaseCursor(WiredTigerSession::kMetadataCreateTableId, cursor, "");
+    };
 
     return _getMetadata(cursor, uri);
 }
@@ -257,8 +258,9 @@ StatusWith<std::string> WiredTigerUtil::getMetadata(OperationContext* opCtx, Str
         LOGV2_FATAL_NOTRACE(31293, "Cursor not found", "error"_attr = ex);
     }
     invariant(cursor);
-    auto releaser =
-        makeGuard([&] { session->releaseCursor(WiredTigerSession::kMetadataTableId, cursor, ""); });
+    ScopeGuard releaser = [&] {
+        session->releaseCursor(WiredTigerSession::kMetadataTableId, cursor, "");
+    };
 
     return _getMetadata(cursor, uri);
 }

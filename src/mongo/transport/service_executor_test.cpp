@@ -277,7 +277,7 @@ TEST_F(ServiceExecutorFixedTest, ScheduleSucceedsBeforeShutdown) {
         handle.start();
 
         stdx::thread scheduleClient;
-        auto joinGuard = makeGuard([&] { scheduleClient.join(); });
+        ScopeGuard joinGuard([&] { scheduleClient.join(); });
 
         {
             FailPointEnableBlock failpoint("hangBeforeSchedulingServiceExecutorFixedTask");

@@ -214,7 +214,7 @@ NamespaceString MigrationSourceManager::getNss() const {
 Status MigrationSourceManager::startClone() {
     invariant(!_opCtx->lockState()->isLocked());
     invariant(_state == kCreated);
-    auto scopedGuard = makeGuard([&] { cleanupOnError(); });
+    ScopeGuard scopedGuard([&] { cleanupOnError(); });
     _stats.countDonorMoveChunkStarted.addAndFetch(1);
 
     const Status logStatus = ShardingLogging::get(_opCtx)->logChangeChecked(
@@ -297,7 +297,7 @@ Status MigrationSourceManager::startClone() {
 Status MigrationSourceManager::awaitToCatchUp() {
     invariant(!_opCtx->lockState()->isLocked());
     invariant(_state == kCloning);
-    auto scopedGuard = makeGuard([&] { cleanupOnError(); });
+    ScopeGuard scopedGuard([&] { cleanupOnError(); });
     _stats.totalDonorChunkCloneTimeMillis.addAndFetch(_cloneAndCommitTimer.millis());
     _cloneAndCommitTimer.reset();
 
@@ -316,7 +316,7 @@ Status MigrationSourceManager::awaitToCatchUp() {
 Status MigrationSourceManager::enterCriticalSection() {
     invariant(!_opCtx->lockState()->isLocked());
     invariant(_state == kCloneCaughtUp);
-    auto scopedGuard = makeGuard([&] { cleanupOnError(); });
+    ScopeGuard scopedGuard([&] { cleanupOnError(); });
     _stats.totalDonorChunkCloneTimeMillis.addAndFetch(_cloneAndCommitTimer.millis());
     _cloneAndCommitTimer.reset();
 
@@ -371,7 +371,7 @@ Status MigrationSourceManager::enterCriticalSection() {
 Status MigrationSourceManager::commitChunkOnRecipient() {
     invariant(!_opCtx->lockState()->isLocked());
     invariant(_state == kCriticalSection);
-    auto scopedGuard = makeGuard([&] { cleanupOnError(); });
+    ScopeGuard scopedGuard([&] { cleanupOnError(); });
 
     // Tell the recipient shard to fetch the latest changes.
     auto commitCloneStatus = _cloneDriver->commitClone(_opCtx);
@@ -395,7 +395,7 @@ Status MigrationSourceManager::commitChunkOnRecipient() {
 Status MigrationSourceManager::commitChunkMetadataOnConfig() {
     invariant(!_opCtx->lockState()->isLocked());
     invariant(_state == kCloneCompleted);
-    auto scopedGuard = makeGuard([&] { cleanupOnError(); });
+    ScopeGuard scopedGuard([&] { cleanupOnError(); });
 
     // If we have chunks left on the FROM shard, bump the version of one of them as well. This will
     // change the local collection major version, which indicates to other processes that the chunk

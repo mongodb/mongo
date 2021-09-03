@@ -514,7 +514,7 @@ public:
             _stepDownCmdsWithForceExecuted.increment();
         }
 
-        auto onExitGuard = makeGuard([&] {
+        ScopeGuard onExitGuard([&] {
             if (force) {
                 _stepDownCmdsWithForceFailed.increment();
             }

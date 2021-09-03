@@ -1221,7 +1221,7 @@ BSONObj TransactionRouter::Router::abortTransaction(OperationContext* opCtx) {
 
     // Update stats on scope exit so the transaction is considered "active" while waiting on abort
     // responses.
-    auto updateStatsGuard = makeGuard([&] { _onExplicitAbort(opCtx); });
+    ScopeGuard updateStatsGuard([&] { _onExplicitAbort(opCtx); });
 
     // The router has yet to send any commands to a remote shard for this transaction.
     // Return the same error that would have been returned by a shard.
@@ -1297,7 +1297,7 @@ void TransactionRouter::Router::implicitlyAbortTransaction(OperationContext* opC
 
     // Update stats on scope exit so the transaction is considered "active" while waiting on abort
     // responses.
-    auto updateStatsGuard = makeGuard([&] { _onImplicitAbort(opCtx, status); });
+    ScopeGuard updateStatsGuard([&] { _onImplicitAbort(opCtx, status); });
 
     if (o().participants.empty()) {
         return;

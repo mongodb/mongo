@@ -826,7 +826,7 @@ TransactionParticipant::TxnResources::~TxnResources() {
 
 void TransactionParticipant::TxnResources::release(OperationContext* opCtx) {
     // Perform operations that can fail the release before marking the TxnResources as released.
-    auto onError = makeGuard([&] {
+    ScopeGuard onError([&] {
         // Release any locks acquired as part of lock restoration.
         if (_lockSnapshot) {
             // WUOW should be released before unlocking.
@@ -1002,7 +1002,7 @@ void TransactionParticipant::Participant::_releaseTransactionResourcesToOpCtx(
     }
     ();
 
-    auto releaseOnError = makeGuard([&] {
+    ScopeGuard releaseOnError([&] {
         // Restore the lock resources back to transaction participant.
         using std::swap;
         stdx::lock_guard<Client> lk(*opCtx->getClient());
@@ -1165,7 +1165,7 @@ void TransactionParticipant::Participant::refreshLocksForPreparedTransaction(
 Timestamp TransactionParticipant::Participant::prepareTransaction(
     OperationContext* opCtx, boost::optional<repl::OpTime> prepareOptime) {
 
-    auto abortGuard = makeGuard([&] {
+    ScopeGuard abortGuard([&] {
         // Prepare transaction on secondaries should always succeed.
         invariant(!prepareOptime);
 
@@ -1415,7 +1415,7 @@ void TransactionParticipant::Participant::commitPreparedTransaction(
     // Prepared transactions cannot hold the RSTL, or else they will deadlock with state
     // transitions. If we do not commit the transaction we must unlock the RSTL explicitly so two
     // phase locking doesn't hold onto it.
-    auto unlockGuard = makeGuard([&] { invariant(opCtx->lockState()->unlockRSTLforPrepare()); });
+    ScopeGuard unlockGuard([&] { invariant(opCtx->lockState()->unlockRSTLforPrepare()); });
 
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
 

@@ -898,7 +898,7 @@ void CheckoutSessionAndInvokeCommand::_checkOutSession() {
         // transactions on failure to unstash the transaction resources to opCtx. We don't want to
         // have this error guard for beginOrContinue as it can abort the transaction for any
         // accidental invalid statements in the transaction.
-        auto abortOnError = makeGuard([&] {
+        ScopeGuard abortOnError([&] {
             if (_txnParticipant->transactionIsInProgress()) {
                 _txnParticipant->abortTransaction(opCtx);
             }

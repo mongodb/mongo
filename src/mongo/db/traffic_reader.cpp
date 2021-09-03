@@ -217,7 +217,7 @@ BSONArray trafficRecordingFileToBSONArr(const std::string& inputFile) {
             str::stream() << "Specified file does not exist (" << inputFile << ")",
             inputFd > 0);
 
-    const auto guard = makeGuard([&] { ::close(inputFd); });
+    const ScopeGuard guard([&] { ::close(inputFd); });
 
     auto buf = SharedBuffer::allocate(MaxMessageSizeBytes);
     while (auto packet = readPacket(buf.get(), inputFd)) {

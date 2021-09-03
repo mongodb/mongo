@@ -129,7 +129,7 @@ void TopologyVersionObserver::_cacheHelloResponse(
     LOGV2_DEBUG(4794600, 3, "Waiting for a topology change");
 
     {
-        auto cacheGuard = makeGuard([&] {
+        ScopeGuard cacheGuard([&] {
             // If we're not dismissed, reset the _cache.
             stdx::lock_guard lk(_mutex);
             _cache.reset();

@@ -615,7 +615,7 @@ void State::printToEmitter(AbstractEmitter& emitter) {
 }
 
 void State::action(siginfo_t* si) {
-    const auto errnoGuard = makeGuard([e = errno] { errno = e; });
+    const ScopeGuard errnoGuard([e = errno] { errno = e; });
     switch (si->si_code) {
         case SI_USER:
         case SI_QUEUE:

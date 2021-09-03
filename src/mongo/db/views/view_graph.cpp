@@ -65,7 +65,7 @@ Status ViewGraph::insertAndValidate(const ViewDefinition& view,
 
     // If the graph fails validation for any reason, the insert is automatically rolled back on
     // exiting this method.
-    auto guard = makeGuard([&] { remove(viewNss); });
+    ScopeGuard guard([&] { remove(viewNss); });
 
     // Check for cycles and get the height of the children.
     StatsMap statsMap;

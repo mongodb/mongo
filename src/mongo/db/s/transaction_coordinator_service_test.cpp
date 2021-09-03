@@ -213,7 +213,7 @@ TEST_F(TransactionCoordinatorServiceStepUpStepDownTest, OperationsFailBeforeStep
 
 TEST_F(TransactionCoordinatorServiceStepUpStepDownTest, OperationsBlockBeforeStepUpCompletes) {
     service()->onStepUp(operationContext(), Milliseconds(1));
-    auto stepDownGuard = makeGuard([&] { service()->onStepDown(); });
+    ScopeGuard stepDownGuard([&] { service()->onStepDown(); });
 
     ASSERT_THROWS_CODE(operationContext()->runWithDeadline(
                            Date_t::now() + Milliseconds{5},
@@ -246,7 +246,7 @@ TEST_F(TransactionCoordinatorServiceStepUpStepDownTest, StepUpFailsDueToBadCoord
     ASSERT_EQ(1, response["n"].Int());
 
     service()->onStepUp(operationContext());
-    auto stepDownGuard = makeGuard([&] { service()->onStepDown(); });
+    ScopeGuard stepDownGuard([&] { service()->onStepDown(); });
 
     ASSERT_THROWS_CODE(service()->coordinateCommit(
                            operationContext(), makeLogicalSessionIdForTest(), 0, kTwoShardIdSet),

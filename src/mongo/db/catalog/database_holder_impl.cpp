@@ -137,7 +137,7 @@ Database* DatabaseHolderImpl::openDb(OperationContext* opCtx, StringData ns, boo
         return db;
 
     // We've inserted a nullptr entry for dbname: make sure to remove it on unsuccessful exit.
-    auto removeDbGuard = makeGuard([this, &lk, dbname] {
+    ScopeGuard removeDbGuard([this, &lk, dbname] {
         if (!lk.owns_lock())
             lk.lock();
         _dbs.erase(dbname);

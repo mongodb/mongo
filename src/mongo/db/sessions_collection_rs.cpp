@@ -107,7 +107,7 @@ auto SessionsCollectionRS::_dispatch(const NamespaceString& ns,
 
     auto conn = _makePrimaryConnection(opCtx);
     DBClientBase* client = conn->get();
-    auto guard = makeGuard([&] { conn->done(); });
+    ScopeGuard guard([&] { conn->done(); });
     try {
         return std::forward<RemoteCallback>(remoteCallback)(client);
     } catch (...) {

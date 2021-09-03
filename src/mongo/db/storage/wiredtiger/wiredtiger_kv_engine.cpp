@@ -1210,7 +1210,7 @@ WiredTigerKVEngine::beginNonBlockingBackup(OperationContext* opCtx,
     // Oplog truncation thread won't remove oplog since the checkpoint pinned by the backup cursor.
     stdx::lock_guard<Latch> lock(_oplogPinnedByBackupMutex);
     _oplogPinnedByBackup = Timestamp(_oplogNeededForCrashRecovery.load());
-    auto pinOplogGuard = makeGuard([&] { _oplogPinnedByBackup = boost::none; });
+    ScopeGuard pinOplogGuard([&] { _oplogPinnedByBackup = boost::none; });
 
     // Persist the sizeStorer information to disk before opening the backup cursor. We aren't
     // guaranteed to have the most up-to-date size information after the backup as writes can still

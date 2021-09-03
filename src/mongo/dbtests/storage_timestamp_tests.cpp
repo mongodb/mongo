@@ -275,7 +275,7 @@ public:
 
         // Build an index.
         MultiIndexBlock indexer;
-        auto abortOnExit = makeGuard(
+        ScopeGuard abortOnExit(
             [&] { indexer.abortIndexBuild(_opCtx, coll, MultiIndexBlock::kNoopOnCleanUpFn); });
 
         BSONObj indexInfoObj;
@@ -2108,7 +2108,7 @@ public:
 
         // Build an index on `{a: 1}`. This index will be multikey.
         MultiIndexBlock indexer;
-        auto abortOnExit = makeGuard(
+        ScopeGuard abortOnExit(
             [&] { indexer.abortIndexBuild(_opCtx, coll, MultiIndexBlock::kNoopOnCleanUpFn); });
         const LogicalTime beforeIndexBuild = _clock->tickClusterTime(2);
         BSONObj indexInfoObj;
@@ -2222,7 +2222,7 @@ public:
 
         // Build an index on `{a: 1}`.
         MultiIndexBlock indexer;
-        auto abortOnExit = makeGuard([&] {
+        ScopeGuard abortOnExit([&] {
             indexer.abortIndexBuild(_opCtx, collection, MultiIndexBlock::kNoopOnCleanUpFn);
         });
         const LogicalTime beforeIndexBuild = _clock->tickClusterTime(2);
@@ -2963,7 +2963,7 @@ public:
 
         const IndexCatalogEntry* buildingIndex = nullptr;
         MultiIndexBlock indexer;
-        auto abortOnExit = makeGuard([&] {
+        ScopeGuard abortOnExit([&] {
             indexer.abortIndexBuild(_opCtx, collection, MultiIndexBlock::kNoopOnCleanUpFn);
         });
 
@@ -3114,7 +3114,7 @@ public:
         auto taskFuture = task.get_future();
         stdx::thread taskThread{std::move(task)};
 
-        auto joinGuard = makeGuard([&] {
+        ScopeGuard joinGuard([&] {
             batchInProgress.promise.emplaceValue(false);
             taskThread.join();
         });

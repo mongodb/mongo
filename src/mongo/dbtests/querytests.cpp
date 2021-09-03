@@ -104,7 +104,7 @@ protected:
 
         CollectionWriter collection(&_opCtx, _collection->ns());
         MultiIndexBlock indexer;
-        auto abortOnExit = makeGuard([&] {
+        ScopeGuard abortOnExit([&] {
             indexer.abortIndexBuild(&_opCtx, collection, MultiIndexBlock::kNoopOnCleanUpFn);
         });
         {

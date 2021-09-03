@@ -127,7 +127,7 @@ DistLockManager::ScopedLock DistLockManager::lockDirectLocally(OperationContext*
     } else {
         auto nsLock = iter->second;
         nsLock->numWaiting++;
-        auto guard = makeGuard([&] { nsLock->numWaiting--; });
+        ScopeGuard guard([&] { nsLock->numWaiting--; });
         if (!opCtx->waitForConditionOrInterruptFor(
                 nsLock->cvLocked, lock, waitFor, [nsLock]() { return !nsLock->isInProgress; })) {
             uasserted(ErrorCodes::LockBusy,

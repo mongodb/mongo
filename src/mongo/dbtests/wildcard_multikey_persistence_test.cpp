@@ -206,7 +206,7 @@ protected:
         CollectionWriter coll(autoColl);
 
         MultiIndexBlock indexer;
-        auto abortOnExit = makeGuard(
+        ScopeGuard abortOnExit(
             [&] { indexer.abortIndexBuild(opCtx(), coll, MultiIndexBlock::kNoopOnCleanUpFn); });
 
         // Initialize the index builder and add all documents currently in the collection.

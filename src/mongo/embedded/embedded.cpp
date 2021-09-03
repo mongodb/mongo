@@ -195,12 +195,12 @@ ServiceContext* initialize(const char* yaml_config) {
 
     Status status = mongo::runGlobalInitializers(std::vector<std::string>{});
     uassertStatusOKWithContext(status, "Global initilization failed");
-    auto giGuard = makeGuard([] { mongo::runGlobalDeinitializers().ignore(); });
+    ScopeGuard giGuard([] { mongo::runGlobalDeinitializers().ignore(); });
     setGlobalServiceContext(ServiceContext::make());
 
     Client::initThread("initandlisten");
     // Make sure current thread have no client set in thread_local when we leave this function
-    auto clientGuard = makeGuard([] { Client::releaseCurrent(); });
+    ScopeGuard clientGuard([] { Client::releaseCurrent(); });
 
     auto serviceContext = getGlobalServiceContext();
     serviceContext->setServiceEntryPoint(std::make_unique<ServiceEntryPointEmbedded>());

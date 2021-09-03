@@ -269,7 +269,7 @@ Future<DbResponse> ServiceEntryPointBridge::handleRequest(OperationContext* opCt
 
     // If the bridge decides to return something else other than a response from an active exhaust
     // stream, make sure we close the exhaust stream properly.
-    auto earlyExhaustExitGuard = makeGuard([&] {
+    ScopeGuard earlyExhaustExitGuard([&] {
         if (dest.inExhaust()) {
             LOGV2(4622301, "mongobridge shutting down exhaust stream", "remote"_attr = dest);
             dest.setInExhaust(false);

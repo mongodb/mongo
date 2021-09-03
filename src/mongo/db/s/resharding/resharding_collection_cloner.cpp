@@ -305,7 +305,7 @@ SemiFuture<void> ReshardingCollectionCloner::run(
                }
 
                auto opCtx = factory.makeOperationContext(&cc());
-               auto guard = makeGuard([&] {
+               ScopeGuard guard([&] {
                    chainCtx->pipeline->dispose(opCtx.get());
                    chainCtx->pipeline.reset();
                });

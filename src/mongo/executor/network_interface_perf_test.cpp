@@ -60,7 +60,7 @@ const std::size_t numOperations = 16384;
 
 int timeNetworkTestMillis(std::size_t operations, NetworkInterface* net) {
     net->startup();
-    auto guard = makeGuard([&] { net->shutdown(); });
+    ScopeGuard guard([&] { net->shutdown(); });
 
     auto fixture = unittest::getFixtureConnectionString();
     auto server = fixture.getServers()[0];

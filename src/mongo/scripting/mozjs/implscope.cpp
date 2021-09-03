@@ -201,7 +201,7 @@ bool MozJSImplScope::_interruptCallback(JSContext* cx) {
     auto scope = getScope(cx);
 
     JS_DisableInterruptCallback(scope->_context);
-    auto guard = makeGuard([&]() { JS_ResetInterruptCallback(scope->_context, false); });
+    ScopeGuard guard([&]() { JS_ResetInterruptCallback(scope->_context, false); });
 
     if (scope->_pendingGC.load() || closeToMaxMemory()) {
         scope->_pendingGC.store(false);
@@ -712,7 +712,7 @@ int MozJSImplScope::invoke(ScriptingFunction func,
 
         JS::RootedValue out(_context);
         {
-            auto guard = makeGuard([&] { _engine->getDeadlineMonitor().stopDeadline(this); });
+            ScopeGuard guard([&] { _engine->getDeadlineMonitor().stopDeadline(this); });
 
             JS::RootedObject obj(_context, smrecv.toObjectOrNull());
 
@@ -766,7 +766,7 @@ bool MozJSImplScope::exec(StringData code,
 
         JS::RootedValue out(_context);
         {
-            auto guard = makeGuard([&] { _engine->getDeadlineMonitor().stopDeadline(this); });
+            ScopeGuard guard([&] { _engine->getDeadlineMonitor().stopDeadline(this); });
 
             success = JS_ExecuteScript(_context, script, &out);
 

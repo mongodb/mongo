@@ -660,7 +660,7 @@ void validateTxnNumber(OperationContext* opCtx,
 void validateOperationSessionInfo(OperationContext* opCtx,
                                   int64_t cursorId,
                                   ClusterCursorManager::PinnedCursor* cursor) {
-    auto returnCursorGuard = makeGuard(
+    ScopeGuard returnCursorGuard(
         [cursor] { cursor->returnCursor(ClusterCursorManager::CursorState::NotExhausted); });
     validateLSID(opCtx, cursorId, *cursor);
     validateTxnNumber(opCtx, cursorId, *cursor);

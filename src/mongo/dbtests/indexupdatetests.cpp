@@ -92,7 +92,7 @@ protected:
         try {
             MultiIndexBlock indexer;
 
-            auto abortOnExit = makeGuard([&] {
+            ScopeGuard abortOnExit([&] {
                 indexer.abortIndexBuild(_opCtx, collection(), MultiIndexBlock::kNoopOnCleanUpFn);
             });
 
@@ -160,7 +160,7 @@ public:
                                   << static_cast<int>(kIndexVersion) << "unique" << true
                                   << "background" << background);
 
-        auto abortOnExit = makeGuard([&] {
+        ScopeGuard abortOnExit([&] {
             indexer.abortIndexBuild(_opCtx, collection(), MultiIndexBlock::kNoopOnCleanUpFn);
         });
 
@@ -215,7 +215,7 @@ public:
                                       << "key" << BSON("a" << 1) << "v"
                                       << static_cast<int>(kIndexVersion) << "unique" << true
                                       << "background" << background);
-            auto abortOnExit = makeGuard([&] {
+            ScopeGuard abortOnExit([&] {
                 indexer.abortIndexBuild(_opCtx, collection(), MultiIndexBlock::kNoopOnCleanUpFn);
             });
 
@@ -331,7 +331,7 @@ Status IndexBuildBase::createIndex(const BSONObj& indexSpec) {
     Lock::CollectionLock collLk(_opCtx, _nss, MODE_X);
 
     MultiIndexBlock indexer;
-    auto abortOnExit = makeGuard(
+    ScopeGuard abortOnExit(
         [&] { indexer.abortIndexBuild(_opCtx, collection(), MultiIndexBlock::kNoopOnCleanUpFn); });
     Status status =
         indexer.init(_opCtx, collection(), indexSpec, MultiIndexBlock::kNoopOnInitFn).getStatus();

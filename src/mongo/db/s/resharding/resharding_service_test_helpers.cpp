@@ -67,7 +67,7 @@ template <class StateEnum>
 void StateTransitionController<StateEnum>::_notifyNewStateAndWaitUntilUnpaused(
     OperationContext* opCtx, StateEnum newState) {
     stdx::unique_lock lk(_mutex);
-    auto guard = makeGuard([this, prevState = _state] { _state = prevState; });
+    ScopeGuard guard([this, prevState = _state] { _state = prevState; });
     _state = newState;
     _waitUntilUnpausedCond.notify_all();
     opCtx->waitForConditionOrInterrupt(_pauseDuringTransitionCond, lk, [this, newState] {

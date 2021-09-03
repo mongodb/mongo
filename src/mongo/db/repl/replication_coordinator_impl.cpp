@@ -2583,7 +2583,7 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
         _waitingForRSTLAtStepDown++;
         _fulfillTopologyChangePromise(lk);
     }
-    auto clearStepDownFlag = makeGuard([&] {
+    ScopeGuard clearStepDownFlag([&] {
         stdx::lock_guard lk(_mutex);
         _waitingForRSTLAtStepDown--;
         _fulfillTopologyChangePromise(lk);
@@ -2651,7 +2651,7 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
 
         _performPostMemberStateUpdateAction(action);
     };
-    auto onExitGuard = makeGuard([&] {
+    ScopeGuard onExitGuard([&] {
         abortFn();
         updateMemberState();
     });
@@ -3492,7 +3492,7 @@ Status ReplicationCoordinatorImpl::_doReplSetReconfig(OperationContext* opCtx,
 
     _setConfigState_inlock(kConfigReconfiguring);
     auto configStateGuard =
-        makeGuard([&] { lockAndCall(&lk, [=] { _setConfigState_inlock(kConfigSteady); }); });
+        ScopeGuard([&] { lockAndCall(&lk, [=] { _setConfigState_inlock(kConfigSteady); }); });
 
     ReplSetConfig oldConfig = _rsConfig;
     int myIndex = _selfIndex;
@@ -3933,8 +3933,9 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* opCt
     invariant(!_rsConfig.isInitialized());
     _setConfigState_inlock(kConfigInitiating);
 
-    auto configStateGuard =
-        makeGuard([&] { lockAndCall(&lk, [=] { _setConfigState_inlock(kConfigUninitialized); }); });
+    ScopeGuard configStateGuard = [&] {
+        lockAndCall(&lk, [=] { _setConfigState_inlock(kConfigUninitialized); });
+    };
 
     // When writing our first oplog entry below, disable advancement of the stable timestamp so that
     // we don't set it before setting our initial data timestamp. We will set it after we set our

@@ -64,7 +64,7 @@ JsFunction::JsFunction(OperationContext* opCtx,
 
     const auto userToken = getAuthenticatedUserNamesToken(opCtx->getClient());
     _scope = getGlobalScriptEngine()->getPooledScope(opCtx, dbName, "where" + userToken);
-    const auto guard = makeGuard([&] { _scope->unregisterOperation(); });
+    const ScopeGuard guard([&] { _scope->unregisterOperation(); });
 
     _func = _scope->createFunction(code.c_str());
     uassert(ErrorCodes::BadValue, "$where compile error", _func);
@@ -72,7 +72,7 @@ JsFunction::JsFunction(OperationContext* opCtx,
 
 bool JsFunction::runAsPredicate(const BSONObj& obj) const {
     _scope->registerOperation(Client::getCurrent()->getOperationContext());
-    const auto scopeOpCtxGuard = makeGuard([&] { _scope->unregisterOperation(); });
+    const ScopeGuard scopeOpCtxGuard([&] { _scope->unregisterOperation(); });
 
     _scope->advanceGeneration();
     _scope->setObject("obj", obj);

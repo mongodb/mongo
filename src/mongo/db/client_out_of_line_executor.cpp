@@ -113,7 +113,7 @@ void ClientOutOfLineExecutor::consumeAllTasks() noexcept {
 }
 
 void ClientOutOfLineExecutor::QueueHandle::schedule(Task&& task) {
-    auto guard = makeGuard(
+    ScopeGuard guard(
         [&task] { task(Status(ErrorCodes::CallbackCanceled, "Client no longer exists")); });
 
     if (auto queue = _weakQueue.lock()) {

@@ -205,7 +205,7 @@ ExecutorFuture<std::vector<repl::OplogEntry>> ReshardingDonorOplogIterator::getN
 
     auto batch = [&] {
         auto opCtx = factory.makeOperationContext(&cc());
-        auto guard = makeGuard([&] { dispose(opCtx.get()); });
+        ScopeGuard guard([&] { dispose(opCtx.get()); });
 
         // A primary which steps down may briefly continue running the ReshardingDonorOplogIterator
         // as a secondary. AutoGetCollectionForReadBase forbids reads on a secondary from using the

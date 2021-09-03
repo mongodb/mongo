@@ -512,7 +512,7 @@ public:
             }
 
             // On early return, get rid of the cursor.
-            auto cursorFreer = makeGuard([&] { cursorPin.deleteUnderlying(); });
+            ScopeGuard cursorFreer([&] { cursorPin.deleteUnderlying(); });
 
             // If the 'waitAfterPinningCursorBeforeGetMoreBatch' fail point is enabled, set the
             // 'msg' field of this operation's CurOp to signal that we've hit this point and then

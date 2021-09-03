@@ -252,7 +252,7 @@ bool MockDBClientConnection::call(mongo::Message& toSend,
         }
     }
 
-    auto killSessionOnDisconnect = makeGuard([this] { shutdown(); });
+    ScopeGuard killSessionOnDisconnect([this] { shutdown(); });
 
     stdx::unique_lock lk(_netMutex);
     checkConnection();
@@ -279,7 +279,7 @@ bool MockDBClientConnection::call(mongo::Message& toSend,
 }
 
 Status MockDBClientConnection::recv(mongo::Message& m, int lastRequestId) {
-    auto killSessionOnDisconnect = makeGuard([this] { shutdown(); });
+    ScopeGuard killSessionOnDisconnect([this] { shutdown(); });
 
     stdx::unique_lock lk(_netMutex);
     if (!isStillConnected() || !_remoteServer->isRunning()) {

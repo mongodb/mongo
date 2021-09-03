@@ -1836,7 +1836,7 @@ void CmdUMCTyped<DropRoleCommand>::Invocation::typedRun(OperationContext* opCtx)
     uassertStatusOK(authzManager->rolesExist(opCtx, {roleName}));
 
     // From here on, we always want to invalidate the user cache before returning.
-    auto invalidateGuard = makeGuard([&] {
+    ScopeGuard invalidateGuard([&] {
         try {
             authzManager->invalidateUserCache(opCtx);
         } catch (const AssertionException& ex) {
@@ -1896,7 +1896,7 @@ DropAllRolesFromDatabaseReply CmdUMCTyped<DropAllRolesFromDatabaseCommand>::Invo
     auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx, authzManager));
 
     // From here on, we always want to invalidate the user cache before returning.
-    auto invalidateGuard = makeGuard([opCtx, authzManager] {
+    ScopeGuard invalidateGuard([opCtx, authzManager] {
         try {
             authzManager->invalidateUserCache(opCtx);
         } catch (const AssertionException& ex) {
@@ -2394,7 +2394,7 @@ void CmdMergeAuthzCollections::Invocation::typedRun(OperationContext* opCtx) {
     auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx, authzManager));
 
     // From here on, we always want to invalidate the user cache before returning.
-    auto invalidateGuard = makeGuard([&] { authzManager->invalidateUserCache(opCtx); });
+    ScopeGuard invalidateGuard([&] { authzManager->invalidateUserCache(opCtx); });
     const auto db = cmd.getDb();
     const bool drop = cmd.getDrop();
 

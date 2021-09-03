@@ -548,7 +548,7 @@ FieldParser::FieldState FieldParser::extract(BSONObj doc,
     }
 
     auto tempVector = std::make_unique<std::vector<T*>>();
-    auto guard = makeGuard([&tempVector] {
+    ScopeGuard guard([&tempVector] {
         if (tempVector) {
             for (T*& raw : *tempVector) {
                 delete raw;

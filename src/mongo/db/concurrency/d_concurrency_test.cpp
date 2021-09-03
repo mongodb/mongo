@@ -113,7 +113,7 @@ public:
         auto result = task.get_future();
         stdx::thread taskThread{std::move(task)};
 
-        auto taskThreadJoiner = makeGuard([&] { taskThread.join(); });
+        ScopeGuard taskThreadJoiner([&] { taskThread.join(); });
 
         {
             stdx::lock_guard<Client> clientLock(*opCtx->getClient());

@@ -1560,7 +1560,7 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientStartsCloner
     stopFailPointEnableBlock fp("fpAfterCollectionClonerDone");
 
     auto taskFp = globalFailPointRegistry().find("hangBeforeTaskCompletion");
-    auto taskFpGuard = makeGuard([&taskFp] { taskFp->setMode(FailPoint::off); });
+    ScopeGuard taskFpGuard([&taskFp] { taskFp->setMode(FailPoint::off); });
 
     auto initialTimesEntered = taskFp->setMode(FailPoint::alwaysOn);
 

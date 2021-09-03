@@ -101,7 +101,7 @@ StatusWith<EventHandle> ScatterGatherRunner::RunnerImpl::start(
         return evh;
     }
     _sufficientResponsesReceived = evh.getValue();
-    auto earlyReturnGuard = makeGuard([this] { _signalSufficientResponsesReceived(); });
+    ScopeGuard earlyReturnGuard([this] { _signalSufficientResponsesReceived(); });
 
     std::vector<RemoteCommandRequest> requests = _algorithm->getRequests();
     for (size_t i = 0; i < requests.size(); ++i) {

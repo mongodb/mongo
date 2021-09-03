@@ -100,7 +100,7 @@ boost::optional<Timestamp> _calculatePin(OperationContext* opCtx) {
 
     // If the RecoveryUnit already had an open snapshot, keep the snapshot open. Otherwise abandon
     // the snapshot when exitting the function.
-    auto scopeGuard = makeGuard([&] { opCtx->recoveryUnit()->abandonSnapshot(); });
+    ScopeGuard scopeGuard([&] { opCtx->recoveryUnit()->abandonSnapshot(); });
     if (opCtx->recoveryUnit()->isActive()) {
         scopeGuard.dismiss();
     }

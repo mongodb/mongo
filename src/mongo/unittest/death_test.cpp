@@ -119,16 +119,16 @@ void DeathTestBase::_doTest() {
         FILE* pf = 0;
         if ((pf = fdopen(pipes[0], "r")) == NULL)
             logAndThrowWithErrno("fdopen(pipe[0], \"r\")");
-        auto pfGuard = makeGuard([&] {
+        ScopeGuard pfGuard([&] {
             if (fclose(pf) != 0)
                 logAndThrowWithErrno("fclose(pf)");
         });
         LOGV2(5042601, "Death test starting");
-        auto alwaysLogExit = makeGuard([] { LOGV2(5042602, "Death test finishing"); });
+        ScopeGuard alwaysLogExit([] { LOGV2(5042602, "Death test finishing"); });
 
         char* lineBuf = nullptr;
         size_t lineBufSize = 0;
-        auto lineBufGuard = makeGuard([&] { free(lineBuf); });
+        ScopeGuard lineBufGuard([&] { free(lineBuf); });
         while (true) {
             errno = 0;  // Needed as getline can return -1 without setting errno.
             ssize_t bytesRead = getline(&lineBuf, &lineBufSize, pf);

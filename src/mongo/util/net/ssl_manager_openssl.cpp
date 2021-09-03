@@ -693,7 +693,7 @@ StatusWith<std::vector<std::string>> addOCSPUrlToMap(
     for (int i = 0; i < sk_OPENSSL_STRING_num(aiaOCSP.get()); i++) {
         int useSSL = 0;
         char *host, *port, *path;
-        auto OCSPStrGuard = makeGuard([&] {
+        ScopeGuard OCSPStrGuard([&] {
             if (host) {
                 OPENSSL_free(host);
             }
@@ -2820,7 +2820,7 @@ bool SSLManagerOpenSSL::_setupPEMFromBIO(SSL_CTX* context,
         LOGV2_ERROR(23251, "Cannot read PEM key", errorAttrs);
         return false;
     }
-    const auto privateKeyGuard = makeGuard([&privateKey]() { EVP_PKEY_free(privateKey); });
+    const ScopeGuard privateKeyGuard([&privateKey]() { EVP_PKEY_free(privateKey); });
 
     if (SSL_CTX_use_PrivateKey(context, privateKey) != 1) {
         CaptureSSLErrorInAttrs capture(errorAttrs);

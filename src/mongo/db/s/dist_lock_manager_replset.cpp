@@ -689,7 +689,7 @@ long long ReplSetDistLockManager::_waitForRecovery(OperationContext* opCtx) {
 
         LOGV2(570181, "Recovering dist lock manager", "term"_attr = term);
 
-        auto anotherThreadMustRecoverGuard = makeGuard([&] {
+        ScopeGuard anotherThreadMustRecoverGuard([&] {
             lk.lock();
             if (term == _recoveryTerm) {
                 _recoveryState = kMustRecover;

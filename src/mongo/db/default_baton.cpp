@@ -107,7 +107,7 @@ Waitable::TimeoutState DefaultBaton::run_until(ClockSource* clkSource,
     stdx::unique_lock<Latch> lk(_mutex);
 
     // We'll fulfill promises and run jobs on the way out, ensuring we don't hold any locks
-    const auto guard = makeGuard([&] {
+    const ScopeGuard guard([&] {
         // While we have scheduled work, keep running jobs
         while (_scheduled.size()) {
             auto toRun = std::exchange(_scheduled, {});

@@ -1400,7 +1400,7 @@ void ShardingCatalogManager::ensureChunkVersionIsGreaterThan(OperationContext* o
                                                              const BSONObj& minKey,
                                                              const BSONObj& maxKey,
                                                              const ChunkVersion& version) {
-    auto earlyReturnBeforeDoingWriteGuard = makeGuard([&] {
+    ScopeGuard earlyReturnBeforeDoingWriteGuard([&] {
         // Ensure waiting for writeConcern of the data read.
         repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
     });

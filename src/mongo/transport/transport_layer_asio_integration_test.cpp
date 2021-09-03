@@ -110,7 +110,7 @@ TEST(TransportLayerASIO, ShortReadsAndWritesWork) {
     auto reactor = sc->getTransportLayer()->getReactor(transport::TransportLayer::kNewReactor);
 
     stdx::thread thread([&] { reactor->run(); });
-    const auto threadGuard = makeGuard([&] {
+    const ScopeGuard threadGuard([&] {
         reactor->stop();
         thread.join();
     });
@@ -143,7 +143,7 @@ TEST(TransportLayerASIO, asyncConnectTimeoutCleansUpSocket) {
 
     stdx::thread thread([&] { reactor->run(); });
 
-    const auto threadGuard = makeGuard([&] {
+    const ScopeGuard threadGuard([&] {
         reactor->stop();
         thread.join();
     });
@@ -163,7 +163,7 @@ TEST(TransportLayerASIO, exhaustIsMasterShouldReceiveMultipleReplies) {
     auto reactor = sc->getTransportLayer()->getReactor(transport::TransportLayer::kNewReactor);
 
     stdx::thread thread([&] { reactor->run(); });
-    const auto threadGuard = makeGuard([&] {
+    const ScopeGuard threadGuard([&] {
         reactor->stop();
         thread.join();
     });
@@ -245,7 +245,7 @@ TEST(TransportLayerASIO, exhaustIsMasterShouldStopOnFailure) {
     auto reactor = sc->getTransportLayer()->getReactor(transport::TransportLayer::kNewReactor);
 
     stdx::thread thread([&] { reactor->run(); });
-    const auto threadGuard = makeGuard([&] {
+    const ScopeGuard threadGuard([&] {
         reactor->stop();
         thread.join();
     });

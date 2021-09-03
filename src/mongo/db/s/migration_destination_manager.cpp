@@ -471,7 +471,7 @@ repl::OpTime MigrationDestinationManager::fetchAndApplyBatch(
         auto applicationOpCtx = CancelableOperationContext(
             cc().makeOperationContext(), opCtx->getCancellationToken(), executor);
 
-        auto consumerGuard = makeGuard([&] {
+        ScopeGuard consumerGuard([&] {
             batches.closeConsumerEnd();
             lastOpApplied =
                 repl::ReplClientInfo::forClient(applicationOpCtx->getClient()).getLastOp();
@@ -496,7 +496,7 @@ repl::OpTime MigrationDestinationManager::fetchAndApplyBatch(
 
 
     {
-        auto applicationThreadJoinGuard = makeGuard([&] {
+        ScopeGuard applicationThreadJoinGuard([&] {
             batches.closeProducerEnd();
             applicationThread.join();
         });

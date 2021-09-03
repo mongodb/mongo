@@ -79,7 +79,7 @@ NamespaceString MovePrimarySourceManager::getNss() const {
 Status MovePrimarySourceManager::clone(OperationContext* opCtx) {
     invariant(!opCtx->lockState()->isLocked());
     invariant(_state == kCreated);
-    auto scopedGuard = makeGuard([&] { cleanupOnError(opCtx); });
+    ScopeGuard scopedGuard([&] { cleanupOnError(opCtx); });
 
     LOGV2(22042,
           "Moving {db} primary from: {fromShard} to: {toShard}",
@@ -155,7 +155,7 @@ Status MovePrimarySourceManager::clone(OperationContext* opCtx) {
 Status MovePrimarySourceManager::enterCriticalSection(OperationContext* opCtx) {
     invariant(!opCtx->lockState()->isLocked());
     invariant(_state == kCloneCaughtUp);
-    auto scopedGuard = makeGuard([&] { cleanupOnError(opCtx); });
+    ScopeGuard scopedGuard([&] { cleanupOnError(opCtx); });
 
     // Mark the shard as running a critical operation that requires recovery on crash.
     auto startMetadataOpStatus = ShardingStateRecovery::startMetadataOp(opCtx);
@@ -213,7 +213,7 @@ Status MovePrimarySourceManager::enterCriticalSection(OperationContext* opCtx) {
 Status MovePrimarySourceManager::commitOnConfig(OperationContext* opCtx) {
     invariant(!opCtx->lockState()->isLocked());
     invariant(_state == kCriticalSection);
-    auto scopedGuard = makeGuard([&] { cleanupOnError(opCtx); });
+    ScopeGuard scopedGuard([&] { cleanupOnError(opCtx); });
 
     {
         AutoGetDb autoDb(opCtx, getNss().toString(), MODE_X);

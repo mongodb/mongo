@@ -232,7 +232,7 @@ public:
         });
 
         // The 'indexer' can throw, so ensure build cleanup occurs.
-        auto abortOnExit = makeGuard([&] {
+        ScopeGuard abortOnExit([&] {
             indexer->abortIndexBuild(opCtx, collection, MultiIndexBlock::kNoopOnCleanUpFn);
         });
 

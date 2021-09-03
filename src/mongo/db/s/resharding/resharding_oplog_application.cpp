@@ -76,7 +76,7 @@ void runWithTransaction(OperationContext* opCtx, unique_function<void(OperationC
     MongoDOperationContextSession ocs(asr.opCtx());
     auto txnParticipant = TransactionParticipant::get(asr.opCtx());
 
-    auto guard = makeGuard([opCtx = asr.opCtx(), &txnParticipant] {
+    ScopeGuard guard([opCtx = asr.opCtx(), &txnParticipant] {
         try {
             txnParticipant.abortTransaction(opCtx);
         } catch (DBException& e) {

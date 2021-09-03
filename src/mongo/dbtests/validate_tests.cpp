@@ -145,7 +145,7 @@ protected:
     void ensureValidateWorked() {
         ValidateResults results = runValidate();
 
-        auto dumpOnErrorGuard = makeGuard([&] {
+        ScopeGuard dumpOnErrorGuard([&] {
             StorageDebugUtil::printValidateResults(results);
             StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, _nss);
         });
@@ -158,7 +158,7 @@ protected:
     void ensureValidateFailed() {
         ValidateResults results = runValidate();
 
-        auto dumpOnErrorGuard = makeGuard([&] {
+        ScopeGuard dumpOnErrorGuard([&] {
             StorageDebugUtil::printValidateResults(results);
             StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, _nss);
         });
@@ -1180,7 +1180,7 @@ public:
                                                &output,
                                                kTurnOnExtraLoggingForTest));
 
-            auto dumpOnErrorGuard = makeGuard([&] {
+            ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
             });
@@ -1298,7 +1298,7 @@ public:
                                                &output,
                                                kTurnOnExtraLoggingForTest));
 
-            auto dumpOnErrorGuard = makeGuard([&] {
+            ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
             });
@@ -1387,7 +1387,7 @@ public:
                                                &output,
                                                kTurnOnExtraLoggingForTest));
 
-            auto dumpOnErrorGuard = makeGuard([&] {
+            ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
             });
@@ -1499,7 +1499,7 @@ public:
                                                &output,
                                                kTurnOnExtraLoggingForTest));
 
-            auto dumpOnErrorGuard = makeGuard([&] {
+            ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
             });
@@ -1528,7 +1528,7 @@ public:
                                                &output,
                                                kTurnOnExtraLoggingForTest));
 
-            auto dumpOnErrorGuard = makeGuard([&] {
+            ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
             });
@@ -1564,7 +1564,7 @@ public:
                                                &output,
                                                kTurnOnExtraLoggingForTest));
 
-            auto dumpOnErrorGuard = makeGuard([&] {
+            ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
             });
@@ -1683,7 +1683,7 @@ public:
                                                &output,
                                                kTurnOnExtraLoggingForTest));
 
-            auto dumpOnErrorGuard = makeGuard([&] {
+            ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
             });
@@ -1714,7 +1714,7 @@ public:
                                                &output,
                                                kTurnOnExtraLoggingForTest));
 
-            auto dumpOnErrorGuard = makeGuard([&] {
+            ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
             });
@@ -1746,7 +1746,7 @@ public:
                                                &output,
                                                kTurnOnExtraLoggingForTest));
 
-            auto dumpOnErrorGuard = makeGuard([&] {
+            ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
             });
@@ -1836,7 +1836,7 @@ public:
                                                &output,
                                                kTurnOnExtraLoggingForTest));
 
-            auto dumpOnErrorGuard = makeGuard([&] {
+            ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
             });
@@ -1867,7 +1867,7 @@ public:
                                                &output,
                                                kTurnOnExtraLoggingForTest));
 
-            auto dumpOnErrorGuard = makeGuard([&] {
+            ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
             });
@@ -1898,7 +1898,7 @@ public:
                                                &output,
                                                kTurnOnExtraLoggingForTest));
 
-            auto dumpOnErrorGuard = makeGuard([&] {
+            ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
             });
@@ -2089,7 +2089,7 @@ public:
                                                &output,
                                                kTurnOnExtraLoggingForTest));
 
-            auto dumpOnErrorGuard = makeGuard([&] {
+            ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
             });
@@ -2119,7 +2119,7 @@ public:
                                                &output,
                                                kTurnOnExtraLoggingForTest));
 
-            auto dumpOnErrorGuard = makeGuard([&] {
+            ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
             });
@@ -2240,7 +2240,7 @@ public:
                                                &output,
                                                kTurnOnExtraLoggingForTest));
 
-            auto dumpOnErrorGuard = makeGuard([&] {
+            ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
             });
@@ -2271,7 +2271,7 @@ public:
                                                &output,
                                                kTurnOnExtraLoggingForTest));
 
-            auto dumpOnErrorGuard = makeGuard([&] {
+            ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
             });
@@ -2303,7 +2303,7 @@ public:
                                                &output,
                                                kTurnOnExtraLoggingForTest));
 
-            auto dumpOnErrorGuard = makeGuard([&] {
+            ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
             });
@@ -2656,7 +2656,7 @@ public:
 
         ValidateResults results = runValidate();
 
-        auto dumpOnErrorGuard = makeGuard([&] {
+        ScopeGuard dumpOnErrorGuard([&] {
             StorageDebugUtil::printValidateResults(results);
             StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
         });
@@ -2721,7 +2721,7 @@ public:
                                                      &output,
                                                      kTurnOnExtraLoggingForTest));
 
-            auto dumpOnErrorGuard = makeGuard([&] {
+            ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
             });
@@ -2789,7 +2789,7 @@ public:
                                                &output,
                                                kTurnOnExtraLoggingForTest));
 
-            auto dumpOnErrorGuard = makeGuard([&] {
+            ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
             });
@@ -2820,7 +2820,7 @@ public:
                                                &output,
                                                kTurnOnExtraLoggingForTest));
 
-            auto dumpOnErrorGuard = makeGuard([&] {
+            ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
             });
@@ -2855,7 +2855,7 @@ public:
                                                &output,
                                                kTurnOnExtraLoggingForTest));
 
-            auto dumpOnErrorGuard = makeGuard([&] {
+            ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
             });
@@ -2886,7 +2886,7 @@ public:
                                                &output,
                                                kTurnOnExtraLoggingForTest));
 
-            auto dumpOnErrorGuard = makeGuard([&] {
+            ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
             });
@@ -3055,7 +3055,7 @@ public:
                                                &output,
                                                kTurnOnExtraLoggingForTest));
 
-            auto dumpOnErrorGuard = makeGuard([&] {
+            ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
             });
@@ -3084,7 +3084,7 @@ public:
                                                &output,
                                                kTurnOnExtraLoggingForTest));
 
-            auto dumpOnErrorGuard = makeGuard([&] {
+            ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
             });
@@ -3114,7 +3114,7 @@ public:
                                                &output,
                                                kTurnOnExtraLoggingForTest));
 
-            auto dumpOnErrorGuard = makeGuard([&] {
+            ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
             });
@@ -3262,7 +3262,7 @@ public:
                                                &output,
                                                kTurnOnExtraLoggingForTest));
 
-            auto dumpOnErrorGuard = makeGuard([&] {
+            ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
             });
@@ -3291,7 +3291,7 @@ public:
                                                &output,
                                                kTurnOnExtraLoggingForTest));
 
-            auto dumpOnErrorGuard = makeGuard([&] {
+            ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
             });
@@ -3320,7 +3320,7 @@ public:
                                                &output,
                                                kTurnOnExtraLoggingForTest));
 
-            auto dumpOnErrorGuard = makeGuard([&] {
+            ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
             });
@@ -3425,7 +3425,7 @@ public:
                                                &output,
                                                kTurnOnExtraLoggingForTest));
 
-            auto dumpOnErrorGuard = makeGuard([&] {
+            ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
             });
@@ -3458,7 +3458,7 @@ public:
                                                &output,
                                                kTurnOnExtraLoggingForTest));
 
-            auto dumpOnErrorGuard = makeGuard([&] {
+            ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
             });
@@ -3522,7 +3522,7 @@ public:
                                                      &output,
                                                      kTurnOnExtraLoggingForTest));
 
-            auto dumpOnErrorGuard = makeGuard([&] {
+            ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
             });
@@ -3622,7 +3622,7 @@ public:
                                                      &output,
                                                      kTurnOnExtraLoggingForTest));
 
-            auto dumpOnErrorGuard = makeGuard([&] {
+            ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
             });
@@ -3719,7 +3719,7 @@ public:
                                                      &output,
                                                      kTurnOnExtraLoggingForTest));
 
-            auto dumpOnErrorGuard = makeGuard([&] {
+            ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
             });
@@ -3748,7 +3748,7 @@ public:
                                                &output,
                                                kTurnOnExtraLoggingForTest));
 
-            auto dumpOnErrorGuard = makeGuard([&] {
+            ScopeGuard dumpOnErrorGuard([&] {
                 StorageDebugUtil::printValidateResults(results);
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
             });

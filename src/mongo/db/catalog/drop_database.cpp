@@ -93,7 +93,7 @@ void _finishDropDatabase(OperationContext* opCtx,
     invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_X));
 
     // If DatabaseHolder::dropDb() fails, we should reset the drop-pending state on Database.
-    auto dropPendingGuard = makeGuard([db, opCtx] { db->setDropPending(opCtx, false); });
+    ScopeGuard dropPendingGuard([db, opCtx] { db->setDropPending(opCtx, false); });
 
     if (!abortIndexBuilds) {
         IndexBuildsCoordinator::get(opCtx)->assertNoBgOpInProgForDb(dbName);
@@ -170,7 +170,7 @@ Status _dropDatabase(OperationContext* opCtx, const std::string& dbName, bool ab
 
         // If Database::dropCollectionEventIfSystem() fails, we should reset the drop-pending state
         // on Database.
-        auto dropPendingGuard = makeGuard([&db, opCtx] { db->setDropPending(opCtx, false); });
+        ScopeGuard dropPendingGuard([&db, opCtx] { db->setDropPending(opCtx, false); });
         auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
 
         if (abortIndexBuilds) {
@@ -180,7 +180,7 @@ Status _dropDatabase(OperationContext* opCtx, const std::string& dbName, bool ab
                 // Create a scope guard to reset the drop-pending state on the database to false if
                 // there is a replica state change that kills this operation while the locks were
                 // yielded.
-                auto dropPendingGuardWhileUnlocked = makeGuard([dbName, opCtx, &dropPendingGuard] {
+                ScopeGuard dropPendingGuardWhileUnlocked([dbName, opCtx, &dropPendingGuard] {
                     UninterruptibleLockGuard noInterrupt(opCtx->lockState());
                     AutoGetDb autoDB(opCtx, dbName, MODE_IX);
                     if (auto db = autoDB.getDb()) {
@@ -296,7 +296,7 @@ Status _dropDatabase(OperationContext* opCtx, const std::string& dbName, bool ab
     // Create a scope guard to reset the drop-pending state on the Database to false if there are
     // any errors while we await the replication of any collection drops and then reacquire the
     // locks (which can throw) needed to finish the drop database.
-    auto dropPendingGuardWhileUnlocked = makeGuard([dbName, opCtx] {
+    ScopeGuard dropPendingGuardWhileUnlocked([dbName, opCtx] {
         UninterruptibleLockGuard noInterrupt(opCtx->lockState());
         AutoGetDb autoDB(opCtx, dbName, MODE_IX);
         if (auto db = autoDB.getDb()) {

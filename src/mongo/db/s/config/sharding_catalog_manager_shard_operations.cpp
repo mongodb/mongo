@@ -595,7 +595,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
     const std::shared_ptr<Shard> shard{shardRegistry->createConnection(shardConnectionString)};
     auto targeter = shard->getTargeter();
 
-    auto stopMonitoringGuard = makeGuard([&] {
+    ScopeGuard stopMonitoringGuard([&] {
         if (shardConnectionString.type() == ConnectionString::ConnectionType::kReplicaSet) {
             // This is a workaround for the case were we could have some bad shard being
             // requested to be added and we put that bad connection string on the global replica set

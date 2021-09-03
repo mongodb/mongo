@@ -433,7 +433,7 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
 
         // Release the WUOW, transaction lock resources and abort storage transaction so that the
         // writeConflictRetry loop will be able to retry applying transactional ops on WCE error.
-        auto abortOnError = makeGuard([&txnParticipant, opCtx] {
+        ScopeGuard abortOnError([&txnParticipant, opCtx] {
             // Abort the transaction and invalidate the session it is associated with.
             txnParticipant.abortTransaction(opCtx);
             txnParticipant.invalidate(opCtx);

@@ -799,7 +799,7 @@ Status StorageEngineImpl::_dropCollectionsNoTimestamp(OperationContext* opCtx,
     }
 
     // Ensure the method exits with the same "commit timestamp" state that it was called with.
-    auto addCommitTimestamp = makeGuard([&opCtx, commitTs] {
+    ScopeGuard addCommitTimestamp([&opCtx, commitTs] {
         if (!commitTs.isNull()) {
             opCtx->recoveryUnit()->setCommitTimestamp(commitTs);
         }

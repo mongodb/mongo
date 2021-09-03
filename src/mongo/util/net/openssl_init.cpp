@@ -77,7 +77,7 @@ public:
 
         // The `guard` callback will cause an invocation of `getID`, so it must be destroyed first.
         static thread_local ManagedId managedId;
-        static thread_local auto guard = makeGuard([] { ERR_remove_state(0); });
+        static thread_local ScopeGuard guard([] { ERR_remove_state(0); });
 
         return managedId.id;
     }

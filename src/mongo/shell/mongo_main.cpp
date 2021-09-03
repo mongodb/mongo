@@ -837,7 +837,7 @@ int mongo_main(int argc, char* argv[]) {
         mongo::getGlobalScriptEngine()->enableJavaScriptProtection(
             shellGlobalParams.javascriptProtection);
 
-        auto poolGuard = makeGuard([] { ScriptEngine::dropScopeCache(); });
+        ScopeGuard poolGuard([] { ScriptEngine::dropScopeCache(); });
 
         std::unique_ptr<mongo::Scope> scope(mongo::getGlobalScriptEngine()->newScope());
         shellMainScope = scope.get();

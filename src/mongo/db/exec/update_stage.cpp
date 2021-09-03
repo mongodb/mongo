@@ -402,7 +402,7 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
 
         // We want to free this member when we return, unless we need to retry updating or returning
         // it.
-        auto memberFreer = makeGuard([&] { _ws->free(id); });
+        ScopeGuard memberFreer([&] { _ws->free(id); });
 
         invariant(member->hasRecordId());
         recordId = member->recordId;

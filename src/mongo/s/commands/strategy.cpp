@@ -914,7 +914,7 @@ void ParseAndRunCommand::RunAndRetry::_checkRetryForTransaction(Status& status) 
     if (!txnRouter)
         return;
 
-    auto abortGuard = makeGuard([&] { txnRouter.implicitlyAbortTransaction(opCtx, status); });
+    ScopeGuard abortGuard([&] { txnRouter.implicitlyAbortTransaction(opCtx, status); });
 
     if (!_canRetry()) {
         addContextForTransactionAbortingError(

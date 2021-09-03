@@ -1578,7 +1578,7 @@ void IndexBuildsCoordinator::createIndex(OperationContext* opCtx,
         throw;
     }
 
-    auto abortOnExit = makeGuard([&] {
+    ScopeGuard abortOnExit([&] {
         _indexBuildsManager.abortIndexBuild(
             opCtx, collection, buildUUID, MultiIndexBlock::kNoopOnCleanUpFn);
     });
@@ -2329,7 +2329,7 @@ void IndexBuildsCoordinator::_scanCollectionAndInsertSortedKeysIntoIndex(
     // Collection scan and insert into index.
     {
 
-        auto scopeGuard = makeGuard([&] {
+        ScopeGuard scopeGuard([&] {
             opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
         });
 
@@ -2504,7 +2504,7 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
 
     // While we are still holding the RSTL and before returning, ensure the metrics collected for
     // this index build are attributed to the primary that commits or aborts the index build.
-    auto metricsGuard = makeGuard([&]() {
+    ScopeGuard metricsGuard([&]() {
         auto& collector = ResourceConsumption::MetricsCollector::get(opCtx);
         bool wasCollecting = collector.endScopedCollecting();
         if (!isPrimary || !wasCollecting || !ResourceConsumption::isMetricsAggregationEnabled()) {

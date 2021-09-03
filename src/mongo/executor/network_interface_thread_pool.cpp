@@ -149,7 +149,7 @@ void NetworkInterfaceThreadPool::_consumeTasks(stdx::unique_lock<Latch> lk) {
 
 void NetworkInterfaceThreadPool::_consumeTasksInline(stdx::unique_lock<Latch> lk) noexcept {
     _consumeState = ConsumeState::kConsuming;
-    const auto consumingTasksGuard = makeGuard([&] { _consumeState = ConsumeState::kNeutral; });
+    const ScopeGuard consumingTasksGuard([&] { _consumeState = ConsumeState::kNeutral; });
 
     decltype(_tasks) tasks;
 
@@ -158,7 +158,7 @@ void NetworkInterfaceThreadPool::_consumeTasksInline(stdx::unique_lock<Latch> lk
         swap(tasks, _tasks);
 
         lk.unlock();
-        const auto lkGuard = makeGuard([&] { lk.lock(); });
+        const ScopeGuard lkGuard([&] { lk.lock(); });
 
         for (auto&& task : tasks) {
             task(Status::OK());

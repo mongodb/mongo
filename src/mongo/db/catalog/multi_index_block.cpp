@@ -365,7 +365,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
     // Refrain from persisting any multikey updates as a result from building the index. Instead,
     // accumulate them in the `MultikeyPathTracker` and do the write as part of the update that
     // commits the index.
-    auto stopTracker = makeGuard(
+    ScopeGuard stopTracker(
         [this, opCtx] { MultikeyPathTracker::get(opCtx).stopTrackingMultikeyPathInfo(); });
     if (MultikeyPathTracker::get(opCtx).isTrackingMultikeyPathInfo()) {
         stopTracker.dismiss();
@@ -846,7 +846,7 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
     }
 
     // Do not interfere with writing multikey information when committing index builds.
-    auto restartTracker = makeGuard(
+    ScopeGuard restartTracker(
         [this, opCtx] { MultikeyPathTracker::get(opCtx).startTrackingMultikeyPathInfo(); });
     if (!MultikeyPathTracker::get(opCtx).isTrackingMultikeyPathInfo()) {
         restartTracker.dismiss();

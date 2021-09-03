@@ -80,7 +80,7 @@ IndexBuildInterceptor::IndexBuildInterceptor(OperationContext* opCtx,
       _skippedRecordTracker(opCtx, entry, skippedRecordTrackerIdent),
       _skipNumAppliedCheck(true) {
 
-    auto finalizeTableOnFailure = makeGuard([&] {
+    ScopeGuard finalizeTableOnFailure([&] {
         _sideWritesTable->finalizeTemporaryTable(opCtx,
                                                  TemporaryRecordStore::FinalizationAction::kDelete);
     });

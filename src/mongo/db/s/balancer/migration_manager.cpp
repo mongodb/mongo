@@ -223,7 +223,7 @@ void MigrationManager::startRecoveryAndAcquireDistLocks(OperationContext* opCtx)
         _state = State::kRecovering;
     }
 
-    auto scopedGuard = makeGuard([&] {
+    ScopeGuard scopedGuard([&] {
         _migrationRecoveryMap.clear();
         _abandonActiveMigrationsAndEnableManager(opCtx);
     });
@@ -313,7 +313,7 @@ void MigrationManager::finishRecovery(OperationContext* opCtx,
         invariant(_state == State::kRecovering);
     }
 
-    auto scopedGuard = makeGuard([&] {
+    ScopeGuard scopedGuard([&] {
         _migrationRecoveryMap.clear();
         _abandonActiveMigrationsAndEnableManager(opCtx);
     });

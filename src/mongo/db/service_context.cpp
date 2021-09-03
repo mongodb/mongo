@@ -242,14 +242,14 @@ ServiceContext::UniqueOperationContext ServiceContext::makeOperationContext(Clie
         _numCurrentOps.addAndFetch(1);
     }
 
-    auto numOpsGuard = makeGuard([&] {
+    ScopeGuard numOpsGuard([&] {
         if (client->session()) {
             _numCurrentOps.subtractAndFetch(1);
         }
     });
 
     onCreate(opCtx.get(), _clientObservers);
-    auto onCreateGuard = makeGuard([&] { onDestroy(opCtx.get(), _clientObservers); });
+    ScopeGuard onCreateGuard([&] { onDestroy(opCtx.get(), _clientObservers); });
 
     if (!opCtx->lockState()) {
         opCtx->setLockState(std::make_unique<LockerNoop>());
@@ -265,7 +265,7 @@ ServiceContext::UniqueOperationContext ServiceContext::makeOperationContext(Clie
         makeBaton(opCtx.get());
     }
 
-    auto batonGuard = makeGuard([&] { opCtx->getBaton()->detach(); });
+    ScopeGuard batonGuard([&] { opCtx->getBaton()->detach(); });
 
     {
         stdx::lock_guard<Client> lk(*client);

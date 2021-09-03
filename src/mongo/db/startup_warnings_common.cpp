@@ -63,7 +63,7 @@ bool CheckPrivilegeEnabled(const wchar_t* name) {
         return false;
     }
 
-    const auto accessTokenGuard = makeGuard([&] { CloseHandle(accessToken); });
+    const ScopeGuard accessTokenGuard([&] { CloseHandle(accessToken); });
 
     BOOL ret;
     PRIVILEGE_SET privileges;

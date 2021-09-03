@@ -428,7 +428,7 @@ OpTime logOp(OperationContext* opCtx, MutableOplogEntry* oplogEntry) {
     // again. For example, if the WUOW gets aborted within a writeConflictRetry loop, we need to
     // reset the OpTime to null so a new OpTime will be assigned on retry.
     OplogSlot slot = oplogEntry->getOpTime();
-    auto resetOpTimeGuard = makeGuard([&, resetOpTimeOnExit = bool(slot.isNull())] {
+    ScopeGuard resetOpTimeGuard([&, resetOpTimeOnExit = bool(slot.isNull())] {
         if (resetOpTimeOnExit)
             oplogEntry->setOpTime(OplogSlot());
     });

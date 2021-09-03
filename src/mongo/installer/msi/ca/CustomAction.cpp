@@ -294,7 +294,7 @@ extern "C" UINT __stdcall UpdateMongoYAML(MSIHANDLE hInstall) {
             CHECKGLE_AND_LOG("Failed to open yaml file");
         }
 
-        const auto handleGuard = mongo::makeGuard([&] { CloseHandle(hFile); });
+        const mongo::ScopeGuard handleGuard = [&] { CloseHandle(hFile); };
 
         LARGE_INTEGER fileSize;
         if (GetFileSizeEx(hFile, &fileSize) == 0) {

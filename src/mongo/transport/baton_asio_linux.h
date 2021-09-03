@@ -289,7 +289,7 @@ public:
         std::vector<Promise<void>> toFulfill;
 
         // We'll fulfill promises and run jobs on the way out, ensuring we don't hold any locks
-        const auto guard = makeGuard([&] {
+        const ScopeGuard guard([&] {
             for (auto& promise : toFulfill) {
                 promise.emplaceValue();
             }

@@ -723,10 +723,10 @@ TEST(SetupOptions, DeepCwd) {
     sb << "/tmp/deepcwd-" << getpid();
     boost::filesystem::path deepBaseDir = sb.str();
 
-    auto cleanup = ::mongo::makeGuard([&] {
+    ::mongo::ScopeGuard cleanup = [&] {
         boost::filesystem::current_path(cwd, ec);
         boost::filesystem::remove_all(deepBaseDir, ec);
-    });
+    };
 
     // Clear out any old base dir, and create an empty dir.
     boost::filesystem::remove_all(deepBaseDir, ec);
@@ -780,12 +780,12 @@ TEST(SetupOptions, UnlinkedCwd) {
 
     std::string unlinkDir;
 
-    auto cleanup = ::mongo::makeGuard([&] {
+    ::mongo::ScopeGuard cleanup = [&] {
         boost::filesystem::current_path(cwd, ec);
         if (!unlinkDir.empty()) {
             boost::filesystem::remove(cwd / unlinkDir, ec);
         }
-    });
+    };
 
     // mkdir our own unlink dir
     unsigned int i = 0;

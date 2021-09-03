@@ -120,7 +120,7 @@ BSONObj EncryptedDBClientBase::encryptDecryptCommand(const BSONObj& object,
     // decrypt payload throw an exception, the stack's destructor will fire. Because a stack's
     // variables are not guaranteed to be destroyed in any order, we need to add a guard
     // to ensure the stack is destroyed in order.
-    const auto frameStackGuard = makeGuard([&] {
+    const ScopeGuard frameStackGuard([&] {
         while (!frameStack.empty()) {
             frameStack.pop();
         }

@@ -116,7 +116,7 @@ Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj
     }
     MultiIndexBlock indexer;
     CollectionWriter collection(coll);
-    auto abortOnExit = makeGuard(
+    ScopeGuard abortOnExit(
         [&] { indexer.abortIndexBuild(opCtx, collection, MultiIndexBlock::kNoopOnCleanUpFn); });
     Status status = indexer
                         .init(opCtx,

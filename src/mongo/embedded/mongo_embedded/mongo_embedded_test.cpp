@@ -387,7 +387,7 @@ TEST_F(MongodbCAPITest, KillOp) {
             ASSERT(outputBSON.getField("ok").numberDouble() == 1.0);
         });
 
-        auto guard = mongo::makeGuard([&] { killOpThread.join(); });
+        mongo::ScopeGuard guard = [&] { killOpThread.join(); };
 
         mongo::BSONObj sleepObj = mongo::fromjson("{'sleep': {'secs': 1000}}");
         auto sleepOpMsg = mongo::OpMsgRequest::fromDBAndBody("admin", sleepObj);

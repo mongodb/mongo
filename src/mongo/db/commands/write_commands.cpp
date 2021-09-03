@@ -667,7 +667,7 @@ public:
                 return;
             }
             // Now that the batch is prepared, make sure we clean up if we throw.
-            auto batchGuard = makeGuard([&] { bucketCatalog.abort(batch); });
+            ScopeGuard batchGuard([&] { bucketCatalog.abort(batch); });
 
             hangTimeseriesInsertBeforeWrite.pauseWhileSet();
 

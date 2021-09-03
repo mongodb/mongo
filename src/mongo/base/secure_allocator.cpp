@@ -86,7 +86,7 @@ void EnablePrivilege(const wchar_t* name) {
         return;
     }
 
-    const auto accessTokenGuard = makeGuard([&] { CloseHandle(accessToken); });
+    const ScopeGuard accessTokenGuard([&] { CloseHandle(accessToken); });
 
     TOKEN_PRIVILEGES privileges = {0};
 

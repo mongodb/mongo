@@ -1310,7 +1310,7 @@ TEST_F(TxnParticipantTest, CannotStartNewTransactionWhilePreparedTransactionInPr
     txnParticipant.stashTransactionResources(opCtx());
     OperationContextSession::checkIn(opCtx());
     {
-        auto guard = makeGuard([&]() { OperationContextSession::checkOut(opCtx()); });
+        ScopeGuard guard([&]() { OperationContextSession::checkOut(opCtx()); });
         // Try to start a new transaction while there is already a prepared transaction on the
         // session. This should fail with a PreparedTransactionInProgress error.
         runFunctionFromDifferentOpCtx([lsid = *opCtx()->getLogicalSessionId(),

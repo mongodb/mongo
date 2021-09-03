@@ -124,7 +124,7 @@ public:
                           });
         };
 
-        auto cleanup = makeGuard(std::move(cleanupFunction));
+        ScopeGuard cleanup(std::move(cleanupFunction));
 
         using std::cend;
 
@@ -157,7 +157,7 @@ public:
                           });
         };
 
-        auto cleanup = makeGuard(std::move(cleanupFunction));
+        ScopeGuard cleanup(std::move(cleanupFunction));
 
         using std::cend;
 

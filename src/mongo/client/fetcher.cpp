@@ -339,7 +339,7 @@ Status Fetcher::_scheduleGetMore(const BSONObj& cmdObj) {
 
 void Fetcher::_callback(const RemoteCommandCallbackArgs& rcbd, const char* batchFieldName) {
     QueryResponse batchData;
-    auto finishCallbackGuard = makeGuard([this, &batchData] {
+    ScopeGuard finishCallbackGuard([this, &batchData] {
         if (batchData.cursorId && !batchData.nss.isEmpty()) {
             _sendKillCursors(batchData.cursorId, batchData.nss);
         }

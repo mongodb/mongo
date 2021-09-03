@@ -154,7 +154,7 @@ Lock::GlobalLock::GlobalLock(OperationContext* opCtx,
         if (_opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {
             _pbwm.lock(opCtx, MODE_IS, deadline);
         }
-        auto unlockPBWM = makeGuard([this] {
+        ScopeGuard unlockPBWM([this] {
             if (_opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {
                 _pbwm.unlock();
             }
@@ -184,7 +184,7 @@ void Lock::GlobalLock::_takeGlobalLockOnly(LockMode lockMode, Date_t deadline) {
 
 void Lock::GlobalLock::_takeGlobalAndRSTLLocks(LockMode lockMode, Date_t deadline) {
     _opCtx->lockState()->lock(_opCtx, resourceIdReplicationStateTransitionLock, MODE_IX, deadline);
-    auto unlockRSTL = makeGuard(
+    ScopeGuard unlockRSTL(
         [this] { _opCtx->lockState()->unlock(resourceIdReplicationStateTransitionLock); });
 
     _opCtx->lockState()->lockGlobal(_opCtx, lockMode, deadline);

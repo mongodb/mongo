@@ -65,7 +65,7 @@ public:
     template <typename F>
     stdx::thread spawnController(F&& f) {
         return spawn([this, f = std::move(f)]() mutable {
-            auto notifyDoneGuard = makeGuard([this] { notifyDone(); });
+            ScopeGuard notifyDoneGuard([this] { notifyDone(); });
             exec(std::move(f));
         });
     }

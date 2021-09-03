@@ -844,7 +844,7 @@ Status runAggregate(OperationContext* opCtx,
     std::vector<ClientCursorPin> pins;
     std::vector<ClientCursor*> cursors;
 
-    auto cursorFreer = makeGuard([&] {
+    ScopeGuard cursorFreer([&] {
         for (auto& p : pins) {
             p.deleteUnderlying();
         }

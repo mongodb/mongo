@@ -82,7 +82,7 @@ MinVisibleTimestampMap closeCatalog(OperationContext* opCtx) {
     }
 
     // Need to mark the CollectionCatalog as open if we our closeAll fails, dismissed if successful.
-    auto reopenOnFailure = makeGuard([opCtx] {
+    ScopeGuard reopenOnFailure([opCtx] {
         CollectionCatalog::write(opCtx,
                                  [&](CollectionCatalog& catalog) { catalog.onOpenCatalog(opCtx); });
     });

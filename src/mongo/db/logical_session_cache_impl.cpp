@@ -258,7 +258,7 @@ void LogicalSessionCacheImpl::_refresh(Client* client) {
     }
 
     // This will finish timing _refresh for our stats no matter when we return.
-    const auto timeRefreshJob = makeGuard([this] {
+    const ScopeGuard timeRefreshJob([this] {
         stdx::lock_guard<Latch> lk(_mutex);
         auto millis = _service->now() - _stats.getLastSessionsCollectionJobTimestamp();
         _stats.setLastSessionsCollectionJobDurationMillis(millis.count());
@@ -299,9 +299,9 @@ void LogicalSessionCacheImpl::_refresh(Client* client) {
             member.emplace(it);
         }
     };
-    auto activeSessionsBackSwapper = makeGuard([&] { backSwap(_activeSessions, activeSessions); });
+    ScopeGuard activeSessionsBackSwapper([&] { backSwap(_activeSessions, activeSessions); });
     auto explicitlyEndingBackSwaper =
-        makeGuard([&] { backSwap(_endingSessions, explicitlyEndingSessions); });
+        ScopeGuard([&] { backSwap(_endingSessions, explicitlyEndingSessions); });
 
     // remove all explicitlyEndingSessions from activeSessions
     for (const auto& lsid : explicitlyEndingSessions) {

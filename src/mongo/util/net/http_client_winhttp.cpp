@@ -188,7 +188,7 @@ public:
 
         // Cleanup handled in a guard rather than UniquePtrs to ensure order.
         HINTERNET session = nullptr, connect = nullptr, request = nullptr;
-        auto guard = makeGuard([&] {
+        ScopeGuard guard([&] {
             if (request) {
                 WinHttpCloseHandle(request);
             }

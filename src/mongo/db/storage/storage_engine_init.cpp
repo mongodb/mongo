@@ -149,7 +149,7 @@ StorageEngine::LastShutdownState initializeStorageEngine(OperationContext* opCtx
         uassertStatusOK(factory->validateMetadata(*metadata, storageGlobalParams));
     }
 
-    auto guard = makeGuard([&] {
+    ScopeGuard guard([&] {
         auto& lockFile = StorageEngineLockFile::get(service);
         if (lockFile) {
             lockFile->close();

@@ -41,7 +41,6 @@
 
 namespace {
 
-using mongo::makeGuard;
 using mongo::ScopeGuard;
 
 class StitchSupportTest : public mongo::unittest::Test {

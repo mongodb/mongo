@@ -148,7 +148,7 @@ void WiredTigerOplogManager::waitForAllEarlierOplogWritesToBeVisible(
     // this wait excessively.
     ++_opsWaitingForOplogVisibilityUpdate;
     invariant(_opsWaitingForOplogVisibilityUpdate > 0);
-    auto exitGuard = makeGuard([&] { --_opsWaitingForOplogVisibilityUpdate; });
+    ScopeGuard exitGuard([&] { --_opsWaitingForOplogVisibilityUpdate; });
 
     // Out of order writes to the oplog always call triggerOplogVisibilityUpdate() on commit to
     // prompt the OplogVisibilityThread to run and update the oplog visibility. We simply need to

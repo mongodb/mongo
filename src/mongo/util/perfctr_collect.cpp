@@ -81,7 +81,7 @@ std::string errnoWithPdhDescription(PDH_STATUS status) {
         return str::stream() << "Format message failed with " << gle << " for status " << status;
     }
 
-    auto errorTextGuard = makeGuard([errorText] { LocalFree(errorText); });
+    ScopeGuard errorTextGuard([errorText] { LocalFree(errorText); });
     std::string utf8ErrorText = toUtf8String(errorText);
 
     auto size = utf8ErrorText.find_first_of("\r\n");

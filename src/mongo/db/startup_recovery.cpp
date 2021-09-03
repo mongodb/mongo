@@ -160,7 +160,7 @@ bool checkIdIndexExists(OperationContext* opCtx, const CollectionPtr& coll) {
 Status buildMissingIdIndex(OperationContext* opCtx, Collection* collection) {
     LOGV2(4805002, "Building missing _id index", logAttrs(*collection));
     MultiIndexBlock indexer;
-    auto abortOnExit = makeGuard([&] {
+    ScopeGuard abortOnExit([&] {
         CollectionWriter collWriter(collection);
         indexer.abortIndexBuild(opCtx, collWriter, MultiIndexBlock::kNoopOnCleanUpFn);
     });
@@ -465,7 +465,7 @@ void startupRepair(OperationContext* opCtx, StorageEngine* storageEngine) {
     // document.
     // If we fail to load the FCV document due to upgrade problems, we need to abort the repair in
     // order to allow downgrading to older binary versions.
-    auto abortRepairOnFCVErrors = makeGuard(
+    ScopeGuard abortRepairOnFCVErrors(
         [&] { StorageRepairObserver::get(opCtx->getServiceContext())->onRepairDone(opCtx); });
     if (auto fcvColl = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
             opCtx, NamespaceString::kServerConfigurationNamespace)) {

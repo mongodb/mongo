@@ -209,13 +209,13 @@ TEST(FailPoint, Stress) {
             FailPoint fp("testFP");
             fp.setMode(FailPoint::alwaysOn, 0, BSON("a" << 44));
             auto fpGuard =
-                mongo::makeGuard([&] { fp.setMode(FailPoint::off, 0, BSON("a" << 66)); });
+                mongo::ScopeGuard([&] { fp.setMode(FailPoint::off, 0, BSON("a" << 66)); });
             std::vector<stdx::thread> tasks;
-            auto joinGuard = mongo::makeGuard([&] {
+            mongo::ScopeGuard joinGuard = [&] {
                 for (auto&& t : tasks)
                     if (t.joinable())
                         t.join();
-            });
+            };
             auto launchLoop = [&](auto&& f) {
                 tasks.push_back(monitor.spawn([&, f] {
                     while (!done.load())

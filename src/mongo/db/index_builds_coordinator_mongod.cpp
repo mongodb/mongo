@@ -218,7 +218,7 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
         }
     }
 
-    auto onScopeExitGuard = makeGuard([&] {
+    ScopeGuard onScopeExitGuard([&] {
         stdx::unique_lock<Latch> lk(_throttlingMutex);
         _numActiveIndexBuilds--;
         _indexBuildFinished.notify_one();
@@ -328,7 +328,7 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
         resumeInfo,
         impersonatedClientAttrs = std::move(impersonatedClientAttrs)
     ](auto status) mutable noexcept {
-        auto onScopeExitGuard = makeGuard([&] {
+        ScopeGuard onScopeExitGuard([&] {
             stdx::unique_lock<Latch> lk(_throttlingMutex);
             _numActiveIndexBuilds--;
             _indexBuildFinished.notify_one();
