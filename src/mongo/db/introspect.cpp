@@ -119,20 +119,26 @@ void profile(OperationContext* opCtx, NetworkOp op) {
     bool acquireDbXLock = false;
 
     try {
-        // Even if the operation we are profiling was interrupted, we still want to output the
-        // profiler entry.  This lock guard will prevent lock acquisitions from throwing exceptions
-        // before we finish writing the entry. However, our maximum lock timeout overrides
-        // uninterruptibility.
-        boost::optional<UninterruptibleLockGuard> noInterrupt;
+        // Set the opCtx to be only interruptible for replication state changes. This is needed
+        // because for some operations that are already marked as killed due to errors such as
+        // operation time exceeding maxTimeMS, we still want to output the profiler entry. Thus
+        // in these cases we do not interrupt lock acquisition even though the opCtx has already
+        // been killed. In the meantime we need to make sure replication state changes can still
+        // interrupt lock acquisition, otherwise there could be deadlocks when the state change
+        // thread is waiting for the session checked out by this opCtx while holding RSTL lock.
+        // However when maxLockTimeout is set, we want it to be always interruptible.
         if (!opCtx->lockState()->hasMaxLockTimeout()) {
-            noInterrupt.emplace(opCtx->lockState());
+            opCtx->setIgnoreInterruptsExceptForReplStateChange(true);
         }
+
+        // IX lock acquisitions beyond this block will not be related to writes to system.profile.
+        ON_BLOCK_EXIT([opCtx] { opCtx->setIgnoreInterruptsExceptForReplStateChange(false); });
 
         while (true) {
             std::unique_ptr<AutoGetDb> autoGetDb;
             if (acquireDbXLock) {
-                // We should not attempt to acquire an X lock while in "noInterrupt" scope.
-                noInterrupt.reset();
+                // We should not attempt to acquire an X lock while opCtx ignores interrupts.
+                opCtx->setIgnoreInterruptsExceptForReplStateChange(false);
 
                 autoGetDb.reset(new AutoGetDb(opCtx, dbName, MODE_X));
                 if (autoGetDb->getDb()) {
