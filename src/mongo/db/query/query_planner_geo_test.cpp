@@ -1766,6 +1766,41 @@ TEST_F(QueryPlannerTest, 2dsphereNonNearWithInternalExprEqOverTrailingFieldMulti
         "b: [['MinKey','MaxKey',true,true]]}}}}}");
 }
 
+TEST_F(QueryPlannerTest, 2dsphereBucketWithInternalBucketGeoWithin) {
+    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    addIndex(BSON("data.a"
+                  << "2dsphere_bucket"),
+             false);
+
+    runQuery(
+        fromjson("{$_internalBucketGeoWithin: {withinRegion: {$centerSphere: [[0, 0], 10]}, field: "
+                 "\"a\"}}"));
+
+    // This query will generate complex bounds, so we relax the checks to make the test readable.
+    relaxBoundsCheckingToSubsetOnly();
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: {$_internalBucketGeoWithin: {withinRegion: {$centerSphere: [[0,0],10]}, "
+        "field: 'a'}},"
+        "node: {ixscan: {pattern: {'data.a' : '2dsphere_bucket'}, filter: null, bounds:"
+        "{'data.a': []"  // Complex, so leaving empty.
+        "}}}}}");
+}
+
+TEST_F(QueryPlannerTest, 2dsphereBucketWithInternalBucketGeoWithin2dGeneratesCollScan) {
+    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    addIndex(BSON("data.a"
+                  << "2dsphere_bucket"),
+             false);
+
+    // This query should not produce bounds.
+    runInvalidQuery(
+        fromjson("{$_internalBucketGeoWithin: {withinRegion: {$center: [[0, 0], 10]}, field: "
+                 "\"a\"}}"));
+    ASSERT_EQUALS(plannerStatus.code(), ErrorCodes::NoQueryExecutionPlans);
+}
+
 TEST_F(QueryPlannerTest, 2dWithinPredicateOverTrailingFieldElemMatchMultikey) {
     params.options = QueryPlannerParams::NO_TABLE_SCAN;
 

@@ -41,6 +41,7 @@
 #include "mongo/db/index/expression_params.h"
 #include "mongo/db/index/s2_common.h"
 #include "mongo/db/matcher/expression_geo.h"
+#include "mongo/db/matcher/expression_internal_bucket_geo_within.h"
 #include "mongo/db/matcher/expression_internal_expr_comparison.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_interface.h"
@@ -1014,6 +1015,24 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
                           "Planner error trying to build geo bounds for an index element",
                           "element"_attr = elt.toString());
             verify(0);
+        }
+    } else if (MatchExpression::INTERNAL_BUCKET_GEO_WITHIN == expr->matchType()) {
+        const InternalBucketGeoWithinMatchExpression* ibgwme =
+            static_cast<const InternalBucketGeoWithinMatchExpression*>(expr);
+        if ("2dsphere_bucket"_sd == elt.valueStringDataSafe()) {
+            tassert(5837101,
+                    "A geo query on a sphere must have an S2 region",
+                    ibgwme->getGeoContainer()->hasS2Region());
+            const S2Region& region = ibgwme->getGeoContainer()->getS2Region();
+            S2IndexingParams indexParams;
+            ExpressionParams::initialize2dsphereParams(index.infoObj, index.collator, &indexParams);
+            ExpressionMapping::cover2dsphere(region, indexParams, oilOut);
+            *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
+        } else {
+            LOGV2_WARNING(5837102,
+                          "Planner error trying to build bucketed geo bounds for an index element",
+                          "element"_attr = elt.toString());
+            MONGO_UNREACHABLE_TASSERT(5837103);
         }
     } else {
         LOGV2_WARNING(20935,

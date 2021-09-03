@@ -40,6 +40,7 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_geo.h"
+#include "mongo/db/matcher/expression_internal_bucket_geo_within.h"
 #include "mongo/db/matcher/expression_internal_expr_comparison.h"
 #include "mongo/db/matcher/expression_text.h"
 #include "mongo/db/query/canonical_query_encoder.h"
@@ -397,7 +398,8 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
         }
 
         // We can't use a btree-indexed field for geo expressions.
-        if (exprtype == MatchExpression::GEO || exprtype == MatchExpression::GEO_NEAR) {
+        if (exprtype == MatchExpression::GEO || exprtype == MatchExpression::GEO_NEAR ||
+            exprtype == MatchExpression::INTERNAL_BUCKET_GEO_WITHIN) {
             return false;
         }
 
@@ -549,6 +551,14 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
             GeoNearMatchExpression* gnme = static_cast<GeoNearMatchExpression*>(node);
             // Make sure the near query is compatible with 2dsphere.
             return gnme->getData().centroid->crs == SPHERE;
+        }
+        return false;
+    } else if (IndexNames::GEO_2DSPHERE_BUCKET == indexedFieldType) {
+        if (exprtype == MatchExpression::INTERNAL_BUCKET_GEO_WITHIN) {
+            const InternalBucketGeoWithinMatchExpression* ibgwme =
+                static_cast<InternalBucketGeoWithinMatchExpression*>(node);
+            auto gc = ibgwme->getGeoContainer();
+            return gc->hasS2Region();
         }
         return false;
     } else if (IndexNames::GEO_2D == indexedFieldType) {

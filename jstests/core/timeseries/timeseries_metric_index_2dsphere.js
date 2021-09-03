@@ -115,10 +115,29 @@ TimeseriesTest.run((insert) => {
                                                   ErrorCodes.BadValue);
     }
 
-    /* TODO (SERVER-58371): Enable this test once query planner can use 'GEO_2DSPHERE_BUCKET' index
+    // Assert that geoWithin queries use the index.
+    const geoWithinPlan =
+        timeseriescoll.find({location: {$geoWithin: {$centerSphere: [[40, -70], 0.0025]}}})
+            .explain();
+    assert.neq(null, getAggPlanStage(geoWithinPlan, "IXSCAN"), geoWithinPlan);
+    // And that their results are correct.
     assert.eq(2,
-              bucketscoll
-                  .aggregate([{
+              timeseriescoll.find({location: {$geoWithin: {$centerSphere: [[40, -70], 0.0025]}}})
+                  .toArray()
+                  .length,
+              geoWithinPlan);
+    // Assert 2d queries don't use the 2dsphere index.
+    const geoWithinPlan2d =
+        timeseriescoll.find({location: {$geoWithin: {$center: [[40, -70], .15]}}}).explain();
+    assert.neq(null, getAggPlanStage(geoWithinPlan2d, "COLLSCAN"), geoWithinPlan2d);
+    // And that their results are correct.
+    assert.eq(
+        2,
+        timeseriescoll.find({location: {$geoWithin: {$center: [[40, -70], .15]}}}).toArray().length,
+        geoWithinPlan2d);
+
+    /* TODO (SERVER-58602): Enable this test once query planner can use 'GEO_2DSPHERE_BUCKET' index
+    with $geoNear by translating to a $geoWithin + $sort assert.eq(2, bucketscoll .aggregate([{
                       $geoNear: {
                           near: {type: "Point", coordinates: [40.4, -70.4]},
                           distanceField: "dist",

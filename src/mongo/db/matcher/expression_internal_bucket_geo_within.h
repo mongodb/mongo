@@ -69,7 +69,8 @@ public:
                                            clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : MatchExpression(MatchExpression::INTERNAL_BUCKET_GEO_WITHIN, std::move(annotation)),
           _geoContainer(container),
-          _field(field) {}
+          _indexField("data." + field),
+          _field(std::move(field)) {}
 
     void debugString(StringBuilder& debug, int indentationLevel) const final;
 
@@ -116,6 +117,15 @@ public:
         return _geoContainer;
     }
 
+    const StringData path() const final {
+        return _indexField;
+    }
+
+    const FieldRef* fieldRef() const final {
+        MONGO_UNREACHABLE_TASSERT(5837104);
+        return nullptr;
+    }
+
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
         visitor->visit(this);
     }
@@ -139,6 +149,7 @@ private:
     }
 
     std::shared_ptr<GeometryContainer> _geoContainer;
+    std::string _indexField;
     std::string _field;
 };
 
