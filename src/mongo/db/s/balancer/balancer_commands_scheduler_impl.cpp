@@ -37,8 +37,11 @@
 #include "mongo/s/request_types/migration_secondary_throttle_options.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/s/shard_key_pattern.h"
+#include "mongo/util/fail_point.h"
 
 namespace mongo {
+
+MONGO_FAIL_POINT_DEFINE(pauseBalancerWorkerThread);
 
 const std::string MergeChunksCommandInfo::kCommandName = "mergeChunks";
 const std::string MergeChunksCommandInfo::kBounds = "bounds";
@@ -96,6 +99,8 @@ void BalancerCommandsSchedulerImpl::stop() {
         stdx::lock_guard<Latch> lgss(_startStopMutex);
         {
             stdx::lock_guard<Latch> lg(_mutex);
+            if (_state == SchedulerState::Stopped)
+                return;
             invariant(_workerThreadHandle.joinable());
             _setState(SchedulerState::Stopping);
             _workerThreadHandle.detach();
@@ -350,7 +355,8 @@ void BalancerCommandsSchedulerImpl::_workerThread() {
             _stateUpdatedCV.wait(ul, [this] {
                 return (_state != SchedulerState::Running ||
                         (!_pendingRequestIds.empty() && _numRunningRequests < _maxRunningRequests &&
-                         _newInfoOnSubmittableRequests));
+                         _newInfoOnSubmittableRequests &&
+                         MONGO_likely(!pauseBalancerWorkerThread.shouldFail())));
             });
 
             if (_state != SchedulerState::Running) {

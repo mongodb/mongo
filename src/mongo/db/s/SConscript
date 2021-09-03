@@ -461,6 +461,7 @@ env.CppUnitTest(
         'active_migrations_registry_test.cpp',
         'auto_split_vector_test.cpp',
         'balancer/balance_stats_test.cpp',
+        'balancer/balancer_commands_scheduler_test.cpp',
         'chunk_split_state_driver_test.cpp',
         'collection_metadata_filtering_test.cpp',
         'collection_metadata_test.cpp',
