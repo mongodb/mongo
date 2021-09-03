@@ -506,7 +506,6 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::handleNeedGenExplic
         }
         case ValComparedToRange::kAbove: {
             _current = addValues(stdx::get<Value>(*_current), _range.getStep());
-            _current = stdx::get<Value>(*_current), _range.getStep();
             if (compareValues(stdx::get<Value>(*_current) > bounds.second)) {
                 _densifyState = DensifyState::kDensifyDone;
                 return currentDoc;
