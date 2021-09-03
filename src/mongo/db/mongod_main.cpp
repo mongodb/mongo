@@ -1477,6 +1477,7 @@ int mongod_main(int argc, char* argv[]) {
 
     // There is no single-threaded guarantee beyond this point.
     ThreadSafetyContext::getThreadSafetyContext()->allowMultiThreading();
+    LOGV2(5945603, "Multi threading initialized");
 
     // Per SERVER-7434, startSignalProcessingThread must run after any forks (i.e.
     // initializeServerGlobalState) and before the creation of any other threads
