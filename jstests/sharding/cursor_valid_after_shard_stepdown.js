@@ -43,6 +43,8 @@ assert.eq(0, getMoreCursor.id);
 assert.eq(2, getMoreCursor.nextBatch[0].x);
 
 // After stepdown, the shard version will be reset
+// This assumes that the secondary doesn't have updated metadata, so this test cannot be run in the
+// sharding_max_mirroring suite
 var shardVersionAfterStepdown =
     assert.commandWorked(st.rs0.getPrimary().adminCommand({getShardVersion: 'TestDB.TestColl'}))
         .global;
