@@ -488,9 +488,7 @@ TEST_F(DocumentSourceMatchTest, MultipleMatchStagesShouldCombineIntoOne) {
     container.push_back(match3);
     match1->optimizeAt(container.begin(), &container);
     ASSERT_EQUALS(container.size(), 1U);
-    ASSERT_BSONOBJ_EQ(match1->getQuery(),
-                      fromjson("{'$and': [{'$and': [{a:1}, {b:1}]},"
-                               "{c:1}]}"));
+    ASSERT_BSONOBJ_EQ(match1->getQuery(), fromjson("{'$and': [{a:1}, {b:1}, {c:1}]}"));
 }
 
 TEST_F(DocumentSourceMatchTest, DoesNotPushProjectBeforeSelf) {
@@ -558,6 +556,35 @@ TEST_F(DocumentSourceMatchTest, ShouldCorrectlyJoinWithSubsequentMatch) {
     ASSERT_TRUE(match->getNext().isEOF());
     ASSERT_TRUE(match->getNext().isEOF());
     ASSERT_TRUE(match->getNext().isEOF());
+}
+
+TEST_F(DocumentSourceMatchTest, RepeatedJoinWithShouldNotNestAnds) {
+    auto match1 = DocumentSourceMatch::create(fromjson("{}"), getExpCtx());
+    Pipeline::SourceContainer container{
+        match1,
+        DocumentSourceMatch::create(fromjson("{}"), getExpCtx()),
+        DocumentSourceMatch::create(fromjson("{a: 1}"), getExpCtx()),
+        DocumentSourceMatch::create(fromjson("{b: 1}"), getExpCtx()),
+        DocumentSourceMatch::create(fromjson("{$and: [{c: 1}, {d: 1}]}"), getExpCtx()),
+        DocumentSourceMatch::create(fromjson("{$or: [{e: 1}, {f: 1}]}"), getExpCtx()),
+        DocumentSourceMatch::create(fromjson("{}"), getExpCtx()),
+        DocumentSourceMatch::create(
+            fromjson("{$and: [{g: 1}, {h: 1}], $or: [{i: 1}, {j: 1}], $and: [{k: 1}, {l: 1}]}"),
+            getExpCtx()),
+        DocumentSourceMatch::create(fromjson("{$and: [{m: 1}, {$and: [{n: 1}, {o: 1}]}]}"),
+                                    getExpCtx())};
+
+    // Call optimizeAt() repeatedly to trigger joinWith() behavior
+    for (size_t i = 0; i < 8; i++) {
+        match1->optimizeAt(container.begin(), &container);
+    }
+
+    ASSERT_EQUALS(container.size(), 1U);
+    ASSERT_BSONOBJ_EQ(
+        match1->getQuery(),
+        fromjson("{'$and': [{}, {}, {a: 1}, {b: 1}, {c: 1}, {d: 1}, {$or: [{e: 1}, {f: 1}]}, {}, "
+                 "{g: 1}, {h: 1}, {$or: [{i: 1}, {j: 1}]}, {k: 1}, {l: 1}, {m: 1}, {$and: [{n: 1}, "
+                 "{o: 1}]}]}"));
 }
 
 DEATH_TEST_REGEX_F(DocumentSourceMatchTest,

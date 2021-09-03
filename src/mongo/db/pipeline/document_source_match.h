@@ -130,7 +130,7 @@ public:
 
     /**
      * Attempts to combine with any subsequent $match stages, joining the query objects with a
-     * $and.
+     * $and and flattening top-level $and's in the process.
      */
     Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
                                                      Pipeline::SourceContainer* container) override;

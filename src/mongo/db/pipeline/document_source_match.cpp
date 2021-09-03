@@ -34,6 +34,8 @@
 #include <algorithm>
 #include <memory>
 
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_algo.h"
@@ -378,7 +380,33 @@ bool DocumentSourceMatch::isTextQuery(const BSONObj& query) {
 }
 
 void DocumentSourceMatch::joinMatchWith(intrusive_ptr<DocumentSourceMatch> other) {
-    rebuild(BSON("$and" << BSON_ARRAY(_predicate << other->getQuery())));
+    BSONObjBuilder bob;
+    BSONArrayBuilder arrBob(bob.subarrayStart("$and"));
+
+    auto addPredicates = [&](const auto& predicates) {
+        if (predicates.isEmpty()) {
+            arrBob.append(predicates);
+        }
+
+        for (auto&& pred : predicates) {
+            // If 'pred' is an $and, add its children directly to the new top-level $and to avoid
+            // nesting $and's. Otherwise, add 'pred' itself as a child.
+            if (pred.fieldNameStringData() == "$and") {
+                for (auto& child : pred.Array()) {
+                    arrBob.append(child);
+                }
+            } else {
+                BSONObjBuilder childBob(arrBob.subobjStart());
+                childBob.append(pred);
+            }
+        }
+    };
+
+    addPredicates(_predicate);
+    addPredicates(other->_predicate);
+
+    arrBob.doneFast();
+    rebuild(bob.obj());
 }
 
 pair<intrusive_ptr<DocumentSourceMatch>, intrusive_ptr<DocumentSourceMatch>>
