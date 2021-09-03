@@ -362,7 +362,7 @@ class SetupMultiversionPlugin(PluginInterface):
         parser.add_argument(
             "-p", "--platform", dest="platform", required=True,
             help="Platform to download [REQUIRED]. "
-            f"Available platforms can be found in {config.SETUP_MULTIVERSION_CONFIG}.")
+            f"Available platform values can be found in {config.SETUP_MULTIVERSION_CONFIG}.")
         parser.add_argument(
             "-a", "--architecture", dest="architecture", default="x86_64",
             help="Architecture to download, [default: %(default)s]. Examples include: "
