@@ -2174,7 +2174,7 @@ TEST(TruncateDate, ErrorHandling) {
     ASSERT_THROWS_CODE(
         truncateDate(dateBeforeReferencePoint, TimeUnit::year, 1'000'000'000ULL, *timezone),
         AssertionException,
-        5166406);
+        5976500);
 
     // Verify computation with large bin size when the result is in the long past succeeds.
     ASSERT_EQ(timezone->createFromDateParts(-200'000'000LL, 1, 1, 0, 0, 0, 0),
@@ -2205,6 +2205,90 @@ TEST(DateAdd, DateAddYear) {
                       -4,
                       kDefaultTimeZone),
               kDefaultTimeZone.createFromDateParts(2012, 2, 29, 0, 0, 0, 0));
+}
+
+TEST(DateAdd, LargeAmountValues) {
+    const auto anyDate = kDefaultTimeZone.createFromDateParts(2016, 1, 1, 0, 0, 0, 0);
+    const auto smallDate = kDefaultTimeZone.createFromDateParts(-291'000'000, 3, 31, 0, 0, 0, 0);
+    struct TestCase {
+        TimeUnit unit;
+        long long invalidAmount;   // Amount value rejected in initial validation.
+        long long overflowAmount;  // Amount to add to date -200'000'000-2-29 00:00:00.000 so the
+                                   // result cannot be represented as Date_t.
+        long long largeAmount;     // Large amount to add to 'smallDate' so the result is equal to
+                                   // 'largeAmountExpectedDate'.
+        Date_t largeAmountExpectedDate;
+    };
+    const auto maxValidYearAmountPlus1{584'942'417LL + 1};
+    const auto maxValidDayAmountPlus1{213'503'982'334LL + 1};
+    const std::vector<TestCase> testCases{
+        {TimeUnit::year,
+         maxValidYearAmountPlus1,      // Invalid amount.
+         maxValidYearAmountPlus1 - 1,  // Overflow amount.
+         550'000'000LL,                // Large amount.
+         kDefaultTimeZone.createFromDateParts(-291'000'000 + 550'000'000, 3, 31, 0, 0, 0, 0)},
+        {TimeUnit::quarter,
+         maxValidYearAmountPlus1 * 4,      // Invalid amount.
+         maxValidYearAmountPlus1 * 4 - 1,  // Overflow amount.
+         550'000'000LL * 4,                // Large amount.
+         kDefaultTimeZone.createFromDateParts(-291'000'000 + 550'000'000, 3, 31, 0, 0, 0, 0)},
+        {TimeUnit::month,
+         maxValidYearAmountPlus1 * 12,      // Invalid amount.
+         maxValidYearAmountPlus1 * 12 - 1,  // Overflow amount.
+         550'000'000LL * 12,                // Large amount.
+         kDefaultTimeZone.createFromDateParts(-291'000'000 + 550'000'000, 3, 31, 0, 0, 0, 0)},
+        {TimeUnit::day,
+         maxValidDayAmountPlus1,      // Invalid amount.
+         maxValidDayAmountPlus1 - 1,  // Overflow amount.
+         250'000'000LL * 365,         // Large amount.
+         smallDate + Days(250'000'000LL * 365)},
+        {TimeUnit::hour,
+         maxValidDayAmountPlus1 * 24,      // Invalid amount.
+         maxValidDayAmountPlus1 * 24 - 1,  // Overflow amount.
+         250'000'000LL * 365 * 24,         // Large amount.
+         smallDate + Days(250'000'000LL * 365)},
+        {TimeUnit::minute,
+         maxValidDayAmountPlus1 * 24 * 60,      // Invalid amount.
+         maxValidDayAmountPlus1 * 24 * 60 - 1,  // Overflow amount.
+         250'000'000LL * 365 * 24 * 60,         // Large amount.
+         smallDate + Days(250'000'000LL * 365)},
+        {TimeUnit::second,
+         maxValidDayAmountPlus1 * 24 * 60 * 60,      // Invalid amount.
+         maxValidDayAmountPlus1 * 24 * 60 * 60 - 1,  // Overflow amount.
+         250'000'000LL * 365 * 24 * 60 * 60,         // Large amount.
+         smallDate + Days(250'000'000LL * 365)},
+    };
+    int testCaseIdx{0};
+    for (auto&& testCase : testCases) {
+        // Verify that out-of-range amount values are rejected.
+        ASSERT_THROWS_CODE(
+            dateAdd(anyDate, testCase.unit, testCase.invalidAmount, kDefaultTimeZone),
+            AssertionException,
+            5976500)
+            << " test case# " << testCaseIdx;
+        ASSERT_THROWS_CODE(
+            dateAdd(anyDate, testCase.unit, -testCase.invalidAmount, kDefaultTimeZone),
+            AssertionException,
+            5976500)
+            << " test case# " << testCaseIdx;
+
+        // Verify that overflow is detected when the result cannot be represented as Date_t.
+        ASSERT_THROWS_CODE(
+            dateAdd(kDefaultTimeZone.createFromDateParts(-200'000'000, 2, 29, 0, 0, 0, 0),
+                    testCase.unit,
+                    testCase.overflowAmount,
+                    kDefaultTimeZone),
+            AssertionException,
+            5166406)
+            << " test case# " << testCaseIdx;
+
+        // Verify that adding large values works correctly.
+        ASSERT_EQ(dateAdd(smallDate, testCase.unit, testCase.largeAmount, kDefaultTimeZone),
+                  testCase.largeAmountExpectedDate)
+            << " test case# " << testCaseIdx;
+
+        ++testCaseIdx;
+    }
 }
 
 TEST(DateAdd, DateAddQuarter) {
@@ -2850,6 +2934,14 @@ TEST(DateAdd, DateAddMillisecond) {
 
     ASSERT_EQ(dateAdd(startDate, TimeUnit::millisecond, -1501, kDefaultTimeZone),
               kDefaultTimeZone.createFromDateParts(2020, 12, 31, 23, 59, 13, 500));
+
+    // Verify that an overflow is detected.
+    ASSERT_THROWS_CODE(dateAdd(startDate,
+                               TimeUnit::millisecond,
+                               std::numeric_limits<long long>::max(),
+                               kDefaultTimeZone),
+                       AssertionException,
+                       ErrorCodes::Error::DurationOverflow);
 }
 
 TEST(IsValidDayOfWeek, Basic) {
