@@ -63,6 +63,7 @@
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/client/shard.h"
+#include "mongo/s/client/shard_remote_gen.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/set_shard_version_request.h"
@@ -648,6 +649,12 @@ std::pair<CollectionType, std::vector<ChunkType>> ShardingCatalogClientImpl::get
     }();
 
     aggRequest.setUnwrappedReadPref(readPref.toContainingBSON());
+
+    if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
+        const Milliseconds maxTimeMS = std::min(opCtx->getRemainingMaxTimeMillis(),
+                                                Milliseconds(gFindChunksOnConfigTimeoutMS.load()));
+        aggRequest.setMaxTimeMS(durationCount<Milliseconds>(maxTimeMS));
+    }
 
     // Run the aggregation
     std::vector<BSONObj> aggResult;
