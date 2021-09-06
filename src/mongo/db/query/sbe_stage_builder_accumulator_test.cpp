@@ -971,7 +971,9 @@ TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationLongAndDoubleDoNotTri
         BSON_ARRAY(BSON("a" << 1 << "b" << Value(std::numeric_limits<long long>::max()))),
         BSON_ARRAY(BSON("a" << 1 << "b" << 1.0))};
     runAggregationWithNoGroupByTest(
-        "{x: {$sum: '$b'}}", docs, BSON_ARRAY(Value(std::numeric_limits<long long>::max() + 1.0)));
+        "{x: {$sum: '$b'}}",
+        docs,
+        BSON_ARRAY(Value(static_cast<double>(std::numeric_limits<long long>::max()))));
 }
 
 TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationTwoDoublesOverflowToInfinity) {
