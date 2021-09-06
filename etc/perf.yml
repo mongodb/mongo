@@ -86,8 +86,7 @@ modules:
   - name: YCSB
     repo: git@github.com:mongodb-labs/YCSB.git
     prefix: ../../src
-    branch: master
-    ref: 03515f78fc460836886604ff8fbee89e5853fbbc
+    branch: production
   - name: benchmarks
     repo: git@github.com:mongodb-labs/benchmarks.git
     prefix: ../../src
