@@ -52,28 +52,31 @@ typedef struct {
 } COOKIE;
 
 typedef struct {
-    char *home;                    /* Home directory */
-    const char *checkpoint_name;   /* Checkpoint name */
-    WT_CONNECTION *conn;           /* WiredTiger connection */
-    bool debug_mode;               /* History store stress test */
-    u_int nkeys;                   /* Keys to load */
-    u_int nops;                    /* Operations per thread */
-    FILE *logfp;                   /* Message log file. */
-    int nworkers;                  /* Number workers configured */
-    int ntables;                   /* Number tables configured */
-    int ntables_created;           /* Number tables opened */
-    volatile int running;          /* Whether to stop */
-    int status;                    /* Exit status */
-    bool sweep_stress;             /* Sweep stress test */
-    u_int ts_oldest;               /* Current oldest timestamp */
-    u_int ts_stable;               /* Current stable timestamp */
-    bool use_timestamps;           /* Use txn timestamps */
-    bool race_timetamps;           /* Async update to oldest timestamp */
-    bool prepare;                  /* Use prepare transactions */
-    COOKIE *cookies;               /* Per-thread info */
-    WT_RWLOCK clock_lock;          /* Clock synchronization */
-    wt_thread_t checkpoint_thread; /* Checkpoint thread */
-    wt_thread_t clock_thread;      /* Clock thread */
+    char *home;                           /* Home directory */
+    const char *checkpoint_name;          /* Checkpoint name */
+    WT_CONNECTION *conn;                  /* WiredTiger connection */
+    bool debug_mode;                      /* History store stress test */
+    u_int nkeys;                          /* Keys to load */
+    u_int nops;                           /* Operations per thread */
+    FILE *logfp;                          /* Message log file. */
+    int nworkers;                         /* Number workers configured */
+    int ntables;                          /* Number tables configured */
+    int ntables_created;                  /* Number tables opened */
+    volatile int running;                 /* Whether to stop */
+    int status;                           /* Exit status */
+    bool sweep_stress;                    /* Sweep stress test */
+    bool failpoint_hs_delete_key_from_ts; /* Failpoint for hs key deletion. */
+    bool failpoint_hs_insert_1;           /* Failpoint for hs insertion. */
+    bool failpoint_hs_insert_2;           /* Failpoint for hs insertion. */
+    u_int ts_oldest;                      /* Current oldest timestamp */
+    u_int ts_stable;                      /* Current stable timestamp */
+    bool use_timestamps;                  /* Use txn timestamps */
+    bool race_timetamps;                  /* Async update to oldest timestamp */
+    bool prepare;                         /* Use prepare transactions */
+    COOKIE *cookies;                      /* Per-thread info */
+    WT_RWLOCK clock_lock;                 /* Clock synchronization */
+    wt_thread_t checkpoint_thread;        /* Checkpoint thread */
+    wt_thread_t clock_thread;             /* Clock thread */
 } GLOBAL;
 extern GLOBAL g;
 

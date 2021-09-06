@@ -64,10 +64,11 @@ main(int argc, char *argv[])
     g.ntables = 3;
     g.nworkers = 1;
     g.sweep_stress = g.use_timestamps = false;
+    g.failpoint_hs_delete_key_from_ts = g.failpoint_hs_insert_1 = g.failpoint_hs_insert_2 = false;
     runs = 1;
     verify_only = false;
 
-    while ((ch = __wt_getopt(progname, argc, argv, "C:c:Dh:k:l:n:pr:sT:t:vW:xX")) != EOF)
+    while ((ch = __wt_getopt(progname, argc, argv, "C:c:Dh:k:l:n:pr:s:T:t:vW:xX")) != EOF)
         switch (ch) {
         case 'c':
             g.checkpoint_name = __wt_optarg;
@@ -100,7 +101,22 @@ main(int argc, char *argv[])
             runs = atoi(__wt_optarg);
             break;
         case 's':
-            g.sweep_stress = true;
+            switch (__wt_optarg[0]) {
+            case '1':
+                g.sweep_stress = true;
+                break;
+            case '2':
+                g.failpoint_hs_delete_key_from_ts = true;
+                break;
+            case '3':
+                g.failpoint_hs_insert_1 = true;
+                break;
+            case '4':
+                g.failpoint_hs_insert_2 = true;
+                break;
+            default:
+                return (usage());
+            }
             break;
         case 't':
             switch (__wt_optarg[0]) {
@@ -231,6 +247,9 @@ wt_connect(const char *config_open)
     };
     int ret;
     char config[512];
+    const char *failpoint_config;
+
+    failpoint_config = "";
 
     /*
      * If we want to stress sweep, we have a lot of additional configuration settings to set.
@@ -242,13 +261,21 @@ wt_connect(const char *config_open)
           "log=(enabled),cache_size=1GB,timing_stress_for_test=(aggressive_sweep)%s%s%s",
           progname, g.debug_mode ? DEBUG_MODE_CFG : "", config_open == NULL ? "" : ",",
           config_open == NULL ? "" : config_open));
-    else
+    else {
+        if (g.failpoint_hs_delete_key_from_ts)
+            failpoint_config =
+              ",timing_stress_for_test=(failpoint_history_store_delete_key_from_ts)";
+        if (g.failpoint_hs_insert_1)
+            failpoint_config = ",timing_stress_for_test=(failpoint_history_store_insert_1)";
+        if (g.failpoint_hs_insert_2)
+            failpoint_config = ",timing_stress_for_test=(failpoint_history_store_insert_2)";
+
         testutil_check(__wt_snprintf(config, sizeof(config),
           "create,cache_cursors=false,statistics=(fast),statistics_log=(json,wait=1),error_prefix="
-          "\"%s\"%s%s%s",
+          "\"%s\"%s%s%s%s",
           progname, g.debug_mode ? DEBUG_MODE_CFG : "", config_open == NULL ? "" : ",",
-          config_open == NULL ? "" : config_open));
-
+          config_open == NULL ? "" : config_open, failpoint_config));
+    }
     if ((ret = wiredtiger_open(g.home, &event_handler, config, &g.conn)) != 0)
         return (log_print_err("wiredtiger_open", ret, 1));
     return (0);
@@ -370,7 +397,7 @@ usage(void)
 {
     fprintf(stderr,
       "usage: %s [-C wiredtiger-config] [-c checkpoint] [-h home] [-k keys]\n\t[-l log] [-n ops] "
-      "[-r runs] [-T table-config] [-t f|r|v]\n\t[-W workers]\n",
+      "[-r runs] [-s 1|2|3|4] [-T table-config] [-t f|r|v]\n\t[-W workers]\n",
       progname);
     fprintf(stderr, "%s",
       "\t-C specify wiredtiger_open configuration arguments\n"
@@ -381,6 +408,7 @@ usage(void)
       "\t-n set number of operations each thread does\n"
       "\t-p use prepare\n"
       "\t-r set number of runs (0 for continuous)\n"
+      "\t-s specify which timing stress configuration to use\n"
       "\t-T specify a table configuration\n"
       "\t-t set a file type ( col | mix | row | lsm )\n"
       "\t-v verify only\n"

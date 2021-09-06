@@ -589,9 +589,6 @@ __rec_init(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags, WT_SALVAGE_COO
     r->supd_next = 0;
     r->supd_memsize = 0;
 
-    /* The list of updates we're going to write to the data store. */
-    TAILQ_INIT(&r->datastore_updqh);
-
     /* The list of pages we've written. */
     r->multi = NULL;
     r->multi_next = 0;
@@ -672,26 +669,6 @@ err:
 }
 
 /*
- * __rec_clear_datastore_update_list --
- *     Clear the update cache stored on the reconciliation structure, if called from the error path
- *     then clear the update datastore flag.
- */
-static void
-__rec_clear_datastore_update_list(WT_SESSION_IMPL *session, WT_RECONCILE *r, bool error)
-{
-    WT_UPDATE_CACHE *update_cache;
-
-    update_cache = NULL;
-
-    while ((update_cache = TAILQ_FIRST(&r->datastore_updqh)) != NULL) {
-        TAILQ_REMOVE(&r->datastore_updqh, update_cache, q);
-        if (error)
-            F_CLR(update_cache->upd, WT_UPDATE_DS);
-        __wt_free(session, update_cache);
-    }
-}
-
-/*
  * __rec_cleanup --
  *     Clean up after a reconciliation run, except for structures cached across runs.
  */
@@ -714,8 +691,6 @@ __rec_cleanup(WT_SESSION_IMPL *session, WT_RECONCILE *r)
     }
     __wt_free(session, r->multi);
 
-    /* Clear the update list held on the reconciliation structure. */
-    __rec_clear_datastore_update_list(session, r, false);
     /* Reconciliation is not re-entrant, make sure that doesn't happen. */
     r->ref = NULL;
 }
@@ -1094,7 +1069,7 @@ __rec_split_row_promote(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_ITEM *key,
         for (i = r->supd_next; i > 0; --i) {
             supd = &r->supd[i - 1];
             if (supd->ins == NULL)
-                WT_ERR(__wt_row_leaf_key(session, r->page, supd->ripcip, update, false));
+                WT_ERR(__wt_row_leaf_key(session, r->page, supd->rip, update, false));
             else {
                 update->data = WT_INSERT_KEY(supd->ins);
                 update->size = WT_INSERT_KEY_SIZE(supd->ins);
@@ -1503,7 +1478,7 @@ __rec_split_write_supd(
 
         for (i = 0, supd = r->supd; i < r->supd_next; ++i, ++supd) {
             if (supd->ins == NULL)
-                WT_ERR(__wt_row_leaf_key(session, page, supd->ripcip, key, false));
+                WT_ERR(__wt_row_leaf_key(session, page, supd->rip, key, false));
             else {
                 key->data = WT_INSERT_KEY(supd->ins);
                 key->size = WT_INSERT_KEY_SIZE(supd->ins);
@@ -1529,9 +1504,8 @@ __rec_split_write_supd(
         for (j = 0; i < r->supd_next; ++j, ++i) {
             /* Account for the remaining update memory. */
             if (r->supd[i].ins == NULL)
-                upd = page->modify->mod_row_update[page->type == WT_PAGE_ROW_LEAF ?
-                    WT_ROW_SLOT(page, r->supd[i].ripcip) :
-                    WT_COL_SLOT(page, r->supd[i].ripcip)];
+                /* Note: ins is never NULL for column-store */
+                upd = page->modify->mod_row_update[WT_ROW_SLOT(page, r->supd[i].rip)];
             else
                 upd = r->supd[i].ins->upd;
             r->supd_memsize += __wt_update_list_memsize(upd);
@@ -2315,8 +2289,6 @@ __rec_write_wrapup_err(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
                 WT_TRET(__wt_btree_block_free(session, multi->addr.addr, multi->addr.size));
         }
 
-    __rec_clear_datastore_update_list(session, r, true);
-
     WT_TRET(__wt_ovfl_track_wrapup_err(session, page));
 
     return (ret);
@@ -2353,8 +2325,7 @@ __rec_hs_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 
     for (multi = r->multi, i = 0; i < r->multi_next; ++multi, ++i)
         if (multi->supd != NULL) {
-            WT_ERR(__wt_hs_insert_updates(
-              session, r->page, multi, &r->cache_write_hs, F_ISSET(r, WT_REC_CHECKPOINT_RUNNING)));
+            WT_ERR(__wt_hs_insert_updates(session, r, multi));
             if (!multi->supd_restore) {
                 __wt_free(session, multi->supd);
                 multi->supd_entries = 0;

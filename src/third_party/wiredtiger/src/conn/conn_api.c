@@ -2124,11 +2124,17 @@ __wt_timing_stress_config(WT_SESSION_IMPL *session, const char *cfg[])
      * Each split race delay is controlled using a different flag to allow more effective race
      * condition detection, since enabling all delays at once can lead to an overall slowdown to the
      * point where race conditions aren't encountered.
+     *
+     * Fail points are also defined in this list and will occur randomly when enabled.
      */
     static const WT_NAME_FLAG stress_types[] = {
       {"aggressive_sweep", WT_TIMING_STRESS_AGGRESSIVE_SWEEP},
       {"backup_rename", WT_TIMING_STRESS_BACKUP_RENAME},
       {"checkpoint_slow", WT_TIMING_STRESS_CHECKPOINT_SLOW},
+      {"failpoint_history_delete_key_from_ts",
+        WT_TIMING_STRESS_FAILPOINT_HISTORY_STORE_DELETE_KEY_FROM_TS},
+      {"failpoint_history_store_insert_1", WT_TIMING_STRESS_FAILPOINT_HISTORY_STORE_INSERT_1},
+      {"failpoint_history_store_insert_2", WT_TIMING_STRESS_FAILPOINT_HISTORY_STORE_INSERT_2},
       {"history_store_checkpoint_delay", WT_TIMING_STRESS_HS_CHECKPOINT_DELAY},
       {"history_store_search", WT_TIMING_STRESS_HS_SEARCH},
       {"history_store_sweep_race", WT_TIMING_STRESS_HS_SWEEP},

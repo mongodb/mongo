@@ -218,9 +218,9 @@ functions:
 
           # Check if specific branches are provided to the function through the expansion variable
           # defined in the documentation-update build variant. If none are specified, use the
-          # built-in Evergreen expansion ${branch_name}.
+          # current branch.
           if [ -z ${doc_update_branches} ]; then
-            branches=${branch_name}
+            branches=$(git rev-parse --abbrev-ref HEAD)
           else
             branches=${doc_update_branches}
           fi
@@ -3051,7 +3051,7 @@ buildvariants:
   display_name: "~ Little-endian (x86)"
   run_on:
   - ubuntu1804-test
-  batchtime: 10080 # 7 days
+  batchtime: 4320 # 3 days
   expansions:
     python_binary: '/opt/mongodbtoolchain/v3/bin/python3'
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
@@ -3068,7 +3068,7 @@ buildvariants:
   - enterprise
   run_on:
   - ubuntu1804-zseries-build
-  batchtime: 10080 # 7 days
+  batchtime: 4320 # 3 days
   expansions:
     python_binary: '/opt/mongodbtoolchain/v3/bin/python3'
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)

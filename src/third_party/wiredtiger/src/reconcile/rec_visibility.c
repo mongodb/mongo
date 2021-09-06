@@ -25,7 +25,7 @@ __rec_update_stable(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_UPDATE *upd)
  *     Save a WT_UPDATE list for later restoration.
  */
 static inline int
-__rec_update_save(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, void *ripcip,
+__rec_update_save(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, WT_ROW *rip,
   WT_UPDATE *onpage_upd, bool supd_restore, size_t upd_memsize)
 {
     WT_SAVE_UPD *supd;
@@ -36,11 +36,13 @@ __rec_update_save(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, voi
     WT_ASSERT(session,
       onpage_upd == NULL || onpage_upd->type == WT_UPDATE_STANDARD ||
         onpage_upd->type == WT_UPDATE_MODIFY);
+    /* For columns, ins is never null, so rip == NULL implies ins != NULL. */
+    WT_ASSERT(session, rip != NULL || ins != NULL);
 
     WT_RET(__wt_realloc_def(session, &r->supd_allocated, r->supd_next + 1, &r->supd));
     supd = &r->supd[r->supd_next];
     supd->ins = ins;
-    supd->ripcip = ripcip;
+    supd->rip = rip;
     supd->onpage_upd = onpage_upd;
     supd->restore = supd_restore;
     ++r->supd_next;
@@ -232,7 +234,7 @@ __rec_need_save_upd(
  *     equal to the start time point. While unusual, it is permitted for a single transaction to
  *     insert and then remove a record. We don't want to generate a warning in that case.
  */
-static inline bool
+static inline void
 __timestamp_out_of_order_fix(WT_SESSION_IMPL *session, WT_TIME_WINDOW *select_tw)
 {
     char time_string[WT_TIME_STRING_SIZE];
@@ -245,32 +247,7 @@ __timestamp_out_of_order_fix(WT_SESSION_IMPL *session, WT_TIME_WINDOW *select_tw
 
         select_tw->durable_start_ts = select_tw->durable_stop_ts;
         select_tw->start_ts = select_tw->stop_ts;
-        return (true);
     }
-    return (false);
-}
-
-/*
- * __rec_add_datastore_update --
- *     Add an update to the list of update destined for the data store.
- */
-static int
-__rec_add_datastore_update(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_UPDATE *upd)
-{
-    WT_UPDATE_CACHE *update_cache;
-
-    WT_ASSERT(session, !F_ISSET(upd, WT_UPDATE_DS));
-
-    /* Allocate an update cache entry. */
-    WT_RET(__wt_calloc_one(session, &update_cache));
-
-    /* Flag the update as destined for the data store. */
-    F_SET(upd, WT_UPDATE_DS);
-    update_cache->upd = upd;
-
-    /* Insert the update into our list. */
-    TAILQ_INSERT_HEAD(&r->datastore_updqh, update_cache, q);
-    return (0);
 }
 
 /*
@@ -278,7 +255,7 @@ __rec_add_datastore_update(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_UPDATE 
  *     Return the update in a list that should be written (or NULL if none can be written).
  */
 int
-__wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, void *ripcip,
+__wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, WT_ROW *rip,
   WT_CELL_UNPACK_KV *vpack, WT_UPDATE_SELECT *upd_select)
 {
     WT_DECL_ITEM(tmp);
@@ -316,8 +293,12 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
      */
     if (ins != NULL)
         first_upd = ins->upd;
-    else if ((first_upd = WT_ROW_UPDATE(page, ripcip)) == NULL)
-        return (0);
+    else {
+        /* Note: ins is never null for columns. */
+        WT_ASSERT(session, rip != NULL && page->type == WT_PAGE_ROW_LEAF);
+        if ((first_upd = WT_ROW_UPDATE(page, rip)) == NULL)
+            return (0);
+    }
 
     for (upd = first_upd; upd != NULL; upd = upd->next) {
         if ((txnid = upd->txnid) == WT_TXN_ABORTED)
@@ -564,13 +545,7 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
         }
     }
 
-    /*
-     * Fixup any out of order timestamps, if we're evicting and a checkpoint is running return EBUSY
-     * and fail the eviction as it could result in an inconsistent checkpoint.
-     */
-    if (__timestamp_out_of_order_fix(session, select_tw) && F_ISSET(r, WT_REC_EVICT) &&
-      F_ISSET(r, WT_REC_CHECKPOINT_RUNNING))
-        return (EBUSY);
+    __timestamp_out_of_order_fix(session, select_tw);
 
     /*
      * Track the most recent transaction in the page. We store this in the tree at the end of
@@ -604,7 +579,7 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
         supd_restore = F_ISSET(r, WT_REC_EVICT) &&
           (has_newer_updates || F_ISSET(S2C(session), WT_CONN_IN_MEMORY) ||
             page->type == WT_PAGE_COL_FIX);
-        WT_ERR(__rec_update_save(session, r, ins, ripcip,
+        WT_ERR(__rec_update_save(session, r, ins, rip,
           upd_select->upd != NULL && upd_select->upd->type == WT_UPDATE_TOMBSTONE ? NULL :
                                                                                     upd_select->upd,
           supd_restore, upd_memsize));
@@ -613,10 +588,10 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
          * for the data store. Subsequent reconciliations should know that they can select this
          * update regardless of visibility.
          */
-        if (upd_select->upd != NULL && !F_ISSET(upd_select->upd, WT_UPDATE_DS))
-            WT_ERR(__rec_add_datastore_update(session, r, upd_select->upd));
-        if (tombstone != NULL && !F_ISSET(tombstone, WT_UPDATE_DS))
-            WT_ERR(__rec_add_datastore_update(session, r, tombstone));
+        if (upd_select->upd != NULL)
+            F_SET(upd_select->upd, WT_UPDATE_DS);
+        if (tombstone != NULL)
+            F_SET(tombstone, WT_UPDATE_DS);
         upd_saved = upd_select->upd_saved = true;
     }
 

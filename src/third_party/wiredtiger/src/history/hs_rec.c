@@ -267,8 +267,7 @@ __hs_next_upd_full_value(WT_SESSION_IMPL *session, WT_UPDATE_VECTOR *updates,
  *     fails or succeeds, if there is a successful write to history, cache_write_hs is set to true.
  */
 int
-__wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *multi,
-  bool *cache_write_hs, bool checkpoint_running)
+__wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_MULTI *multi)
 {
     WT_BTREE *btree, *hs_btree;
     WT_CURSOR *hs_cursor;
@@ -294,9 +293,10 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *multi,
     uint32_t i;
     uint8_t *p;
     int nentries;
-    bool enable_reverse_modify, hs_inserted, squashed;
+    bool checkpoint_running, enable_reverse_modify, hs_inserted, squashed;
 
-    *cache_write_hs = false;
+    checkpoint_running = F_ISSET(r, WT_REC_CHECKPOINT_RUNNING);
+    r->cache_write_hs = false;
     btree = S2BT(session);
     prev_upd = NULL;
     insert_cnt = 0;
@@ -347,7 +347,7 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *multi,
             continue;
 
         /* History store table key component: source key. */
-        switch (page->type) {
+        switch (r->page->type) {
         case WT_PAGE_COL_FIX:
         case WT_PAGE_COL_VAR:
             p = key->mem;
@@ -357,7 +357,7 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *multi,
         case WT_PAGE_ROW_LEAF:
             if (list->ins == NULL) {
                 WT_WITH_BTREE(
-                  session, btree, ret = __wt_row_leaf_key(session, page, list->ripcip, key, false));
+                  session, btree, ret = __wt_row_leaf_key(session, r->page, list->rip, key, false));
                 WT_ERR(ret);
             } else {
                 key->data = WT_INSERT_KEY(list->ins);
@@ -365,7 +365,7 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *multi,
             }
             break;
         default:
-            WT_ERR(__wt_illegal_value(session, page->type));
+            WT_ERR(__wt_illegal_value(session, r->page->type));
         }
 
         first_globally_visible_upd = min_ts_upd = out_of_order_ts_upd = NULL;
@@ -626,6 +626,11 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *multi,
             /* Clear out the insert success flag prior to our insert attempt. */
             __wt_curhs_clear_insert_success(hs_cursor);
 
+            /* Fail here 0.05% of the time if we are in the eviction path. */
+            if (F_ISSET(r, WT_REC_EVICT) &&
+              __wt_failpoint(session, WT_TIMING_STRESS_FAILPOINT_HISTORY_STORE_INSERT_1, 0.05))
+                WT_ERR(EBUSY);
+
             /*
              * Calculate reverse modify and clear the history store records with timestamps when
              * inserting the first update. Always write on-disk data store updates to the history
@@ -698,6 +703,11 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *multi,
         __wt_update_vector_clear(&updates);
     }
 
+    /* Fail here 0.5% of the time if we are an eviction thread. */
+    if (F_ISSET(r, WT_REC_EVICT) &&
+      __wt_failpoint(session, WT_TIMING_STRESS_FAILPOINT_HISTORY_STORE_INSERT_2, 0.05))
+        WT_ERR(EBUSY);
+
     WT_ERR(__wt_block_manager_named_size(session, WT_HS_FILE, &hs_size));
     hs_btree = __wt_curhs_get_btree(hs_cursor);
     max_hs_size = hs_btree->file_max;
@@ -712,7 +722,7 @@ err:
 
     /* cache_write_hs is set to true as there was at least one successful write to history. */
     if (insert_cnt > 0)
-        *cache_write_hs = true;
+        r->cache_write_hs = true;
 
     __wt_scr_free(session, &key);
     /* modify_value is allocated in __wt_modify_pack. Free it if it is allocated. */

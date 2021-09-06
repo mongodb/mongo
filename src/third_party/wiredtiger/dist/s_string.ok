@@ -103,7 +103,6 @@ DIRECTIO
 DNE
 DOI
 DONTNEED
-DS
 DSK
 DUPLICATEV
 DataSet
@@ -152,6 +151,7 @@ FTRUNCATE
 FULLFSYNC
 FUNCSIG
 Facebook
+Failpoint
 FindClose
 FindFirstFile
 FindNextFileW
@@ -785,6 +785,7 @@ extern
 extlist
 fadvise
 fahrenheit
+failpoint
 fallocate
 fallthrough
 fblocks
