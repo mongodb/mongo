@@ -116,6 +116,25 @@ err:
 }
 
 /*
+ * worker_mm_delete --
+ *     Delete a key with a mixed mode timestamp.
+ */
+static inline int
+worker_mm_delete(WT_CURSOR *cursor, uint64_t keyno)
+{
+    int ret;
+
+    cursor->set_key(cursor, keyno);
+    ret = cursor->search(cursor);
+    if (ret == 0)
+        ret = cursor->remove(cursor);
+    else if (ret == WT_NOTFOUND)
+        ret = 0;
+
+    return (ret);
+}
+
+/*
  * worker_op --
  *     Write operation.
  */
@@ -213,11 +232,12 @@ real_worker(void)
     int j, ret, t_ret;
     char buf[128];
     const char *begin_cfg;
-    bool reopen_cursors, start_txn;
+    bool reopen_cursors, start_txn, new_txn;
 
     ret = t_ret = 0;
     reopen_cursors = false;
     start_txn = true;
+    new_txn = false;
 
     if ((cursors = calloc((size_t)(g.ntables), sizeof(WT_CURSOR *))) == NULL)
         return (log_print_err("malloc", ENOMEM, 1));
@@ -246,9 +266,27 @@ real_worker(void)
                 (void)log_print_err("real_worker:begin_transaction", ret, 1);
                 goto err;
             }
+            new_txn = true;
             start_txn = false;
         }
         keyno = __wt_random(&rnd) % g.nkeys + 1;
+        /* If we have specified to run with mix mode deletes we need to do it in it's own txn. */
+        if (g.use_timestamps && g.mixed_mode_deletes && new_txn && __wt_random(&rnd) % 72 == 0) {
+            new_txn = false;
+            for (j = 0; ret == 0 && j < g.ntables; j++) {
+                ret = worker_mm_delete(cursors[j], keyno);
+                if (ret != 0)
+                    goto err;
+            }
+            if ((ret = session->commit_transaction(session, NULL)) != 0) {
+                (void)log_print_err("real_worker:commit_mm_transaction", ret, 1);
+                goto err;
+            }
+            start_txn = true;
+            continue;
+        } else
+            new_txn = false;
+
         for (j = 0; ret == 0 && j < g.ntables; j++)
             ret = worker_op(cursors[j], keyno, i);
         if (ret != 0 && ret != WT_ROLLBACK) {

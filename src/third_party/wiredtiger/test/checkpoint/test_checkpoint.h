@@ -70,6 +70,7 @@ typedef struct {
     bool failpoint_hs_insert_2;           /* Failpoint for hs insertion. */
     u_int ts_oldest;                      /* Current oldest timestamp */
     u_int ts_stable;                      /* Current stable timestamp */
+    bool mixed_mode_deletes;              /* Run with mixed mode deletes */
     bool use_timestamps;                  /* Use txn timestamps */
     bool race_timetamps;                  /* Async update to oldest timestamp */
     bool prepare;                         /* Use prepare transactions */
