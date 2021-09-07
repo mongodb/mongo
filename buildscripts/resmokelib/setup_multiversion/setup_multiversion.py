@@ -7,12 +7,14 @@ enterprise builds.
 """
 import logging
 import os
+import platform
 import re
 import subprocess
 import sys
 import time
 from typing import Optional, Dict, Any
 
+import distro
 import structlog
 import yaml
 
@@ -40,6 +42,27 @@ def setup_logging(debug=False):
     logging.getLogger("evergreen").setLevel(logging.WARNING)
     logging.getLogger("github").setLevel(logging.WARNING)
     structlog.configure(logger_factory=structlog.stdlib.LoggerFactory())
+
+
+def infer_platform(edition=None, version=None):
+    """Infer platform for popular OS."""
+    syst = platform.system()
+    pltf = None
+    if syst == 'Darwin':
+        pltf = 'osx'
+    elif syst == 'Windows':
+        pltf = 'windows'
+        if edition == 'base' and version == "4.2":
+            pltf += '_x86_64-2012plus'
+    elif syst == 'Linux':
+        id_name = distro.id()
+        if id_name in ('ubuntu', 'rhel'):
+            pltf = id_name + distro.major_version() + distro.minor_version()
+    if pltf is None:
+        raise ValueError("Platform cannot be inferred. Please specify platform explicitly with -p. "
+                         f"Available platforms can be found in {config.SETUP_MULTIVERSION_CONFIG}.")
+    else:
+        return pltf
 
 
 def get_merge_base_commit(version: str) -> str:
@@ -70,6 +93,7 @@ class SetupMultiversion(Subcommand):
 
         self.edition = edition.lower() if edition else None
         self.platform = mv_platform.lower() if mv_platform else None
+        self.inferred_platform = bool(self.platform is None)
         self.architecture = architecture.lower() if architecture else None
         self.use_latest = use_latest
         self.versions = versions
@@ -113,6 +137,8 @@ class SetupMultiversion(Subcommand):
             LOGGER.info("Fetching download URL from Evergreen.")
 
             try:
+                self.platform = infer_platform(self.edition,
+                                               version) if self.inferred_platform else self.platform
                 urls = {}
                 if self.use_latest:
                     urls = self.get_latest_urls(version)
@@ -215,7 +241,7 @@ class SetupMultiversion(Subcommand):
 
             if hasattr(evg_version, "build_variants_map"):
                 if buildvariant_name not in evg_version.build_variants_map:
-                    buildvariant_name = self.fallback_to_generic_buildvariant(major_minor_version)
+                    continue
 
                 curr_urls = evergreen_conn.get_compile_artifact_urls(
                     self.evg_api, evg_version, buildvariant_name,
@@ -254,7 +280,9 @@ class SetupMultiversion(Subcommand):
 
         LOGGER.debug("Found buildvariant.", buildvariant_name=buildvariant_name)
         if buildvariant_name not in evg_version.build_variants_map:
-            buildvariant_name = self.fallback_to_generic_buildvariant(major_minor_version)
+            raise ValueError(
+                f"Buildvariant {buildvariant_name} not found in evergreen. "
+                f"Available buildvariants can be found in {config.SETUP_MULTIVERSION_CONFIG}.")
 
         urls = evergreen_conn.get_compile_artifact_urls(self.evg_api, evg_version,
                                                         buildvariant_name,
@@ -307,15 +335,6 @@ class SetupMultiversion(Subcommand):
             config=self.config, edition=self.edition, platform=self.platform,
             architecture=self.architecture, major_minor_version=major_minor_version)
 
-    def fallback_to_generic_buildvariant(self, major_minor_version):
-        """Return generic buildvariant name.
-
-        Wrapper around evergreen_conn.get_generic_buildvariant_name().
-        """
-
-        return evergreen_conn.get_generic_buildvariant_name(config=self.config,
-                                                            major_minor_version=major_minor_version)
-
 
 class _DownloadOptions(object):
     def __init__(self, db, ds, da, dv):
@@ -360,9 +379,8 @@ class SetupMultiversionPlugin(PluginInterface):
                             default="enterprise",
                             help="Edition of the build to download, [default: %(default)s].")
         parser.add_argument(
-            "-p", "--platform", dest="platform", required=True,
-            help="Platform to download [REQUIRED]. "
-            f"Available platform values can be found in {config.SETUP_MULTIVERSION_CONFIG}.")
+            "-p", "--platform", dest="platform", help="Platform to download. "
+            f"Available platforms can be found in {config.SETUP_MULTIVERSION_CONFIG}.")
         parser.add_argument(
             "-a", "--architecture", dest="architecture", default="x86_64",
             help="Architecture to download, [default: %(default)s]. Examples include: "
