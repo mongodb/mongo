@@ -69,7 +69,7 @@ namespace mongo {
 REGISTER_DOCUMENT_SOURCE(_internalUnpackBucket,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceInternalUnpackBucket::createFromBsonInternal,
-                         AllowedWithApiStrict::kInternal);
+                         AllowedWithApiStrict::kAlways);
 
 /*
  * $_unpackBucket is an alias of $_internalUnpackBucket. It only exposes the "timeField" and the
@@ -79,7 +79,7 @@ REGISTER_DOCUMENT_SOURCE(_internalUnpackBucket,
 REGISTER_DOCUMENT_SOURCE(_unpackBucket,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceInternalUnpackBucket::createFromBsonExternal,
-                         AllowedWithApiStrict::kInternal);
+                         AllowedWithApiStrict::kAlways);
 
 namespace {
 /**

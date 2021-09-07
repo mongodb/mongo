@@ -142,4 +142,29 @@ result = testDB.runCommand({
     apiStrict: true
 });
 assert.commandWorked(result);
+
+// Tests that time-series collection can be queried (invoking $_internalUnpackBucket stage)
+// from an external client with 'apiStrict'.
+(function testInternalUnpackBucketAllowance() {
+    const collName = 'timeseriesColl';
+    const timeField = 'tm';
+    assert.commandWorked(testDB.createCollection(collName, {timeseries: {timeField: timeField}}));
+    const coll = testDB[collName];
+    assert.commandWorked(coll.insert({[timeField]: ISODate('2021-01-01')}));
+    assert.commandWorked(testDB.runCommand({
+        find: collName,
+        apiVersion: "1",
+        apiStrict: true,
+    }));
+    assert.commandWorked(testDB.runCommand({
+        aggregate: collName,
+        pipeline: [{$match: {}}],
+        cursor: {},
+        apiVersion: "1",
+        apiStrict: true,
+    }));
+    const plans = [coll.find().explain(), coll.explain().aggregate([{$match: {}}])];
+    assert(plans.every(
+        plan => plan.stages.map(x => Object.keys(x)[0]).includes("$_internalUnpackBucket")));
+})();
 })();
