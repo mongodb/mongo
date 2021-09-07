@@ -1139,6 +1139,25 @@ private:
     bool _shutdown{false};
 };
 
+/**
+ * OCSPRefreshBackoff implements a backoff counter that is used by the OCSPFetcher in determining
+ * how long to wait until the next fetch retry if it encounters transient errors while communicating
+ * with an OCSP responder.
+ */
+struct OCSPRefreshBackoff {
+    static constexpr auto kOCSPRefreshBackoffMinimum = Milliseconds(500);
+    OCSPRefreshBackoff(Milliseconds limit = kOCSPUnknownStatusRefreshRate)
+        : _backoff(kOCSPRefreshBackoffMinimum), _limit(limit) {}
+
+    Milliseconds getNextRefreshDuration() {
+        auto prev = _backoff;
+        _backoff = std::min(_limit, _backoff * 2);
+        return prev;
+    }
+    Milliseconds _backoff;
+    Milliseconds _limit;
+};
+
 class SSLManagerOpenSSL : public SSLManagerInterface,
                           public std::enable_shared_from_this<SSLManagerOpenSSL> {
 public:
@@ -1235,6 +1254,7 @@ private:
     std::shared_ptr<OCSPStaplingContext> _ocspStaplingContext;
 
     OCSPFetcher _fetcher;
+    OCSPRefreshBackoff _fetcherBackoff;
 
     /** Password caching helper class.
      * Objects of this type will remember the config provided password they had access to at
@@ -2268,17 +2288,21 @@ Milliseconds SSLManagerOpenSSL::updateOcspStaplingContextWithResponse(
     if (!swResponse.isOK()) {
         LOGV2_WARNING(23233, "Could not staple OCSP response to outgoing certificate.");
 
+        Milliseconds nextRefreshDuration = _fetcherBackoff.getNextRefreshDuration();
+
         if (_ocspStaplingContext && _ocspStaplingContext->sharedResponseForServer &&
             _ocspStaplingContext->sharedResponseNextUpdate <
-                (Date_t::now() + kOCSPUnknownStatusRefreshRate)) {
+                (Date_t::now() + nextRefreshDuration)) {
 
             _ocspStaplingContext = std::make_shared<OCSPStaplingContext>();
 
             LOGV2_WARNING(4633601, "Server will remove and not staple the expiring OCSP Response.");
         }
 
-        return kOCSPUnknownStatusRefreshRate;
+        return nextRefreshDuration;
     }
+
+    _fetcherBackoff = OCSPRefreshBackoff();
 
     _ocspStaplingContext = std::make_shared<OCSPStaplingContext>(
         std::move(swResponse.getValue().response), swResponse.getValue().nextStapleRefresh());
