@@ -66,8 +66,8 @@ void _extractAllElementsAlongBucketPath(const BSONObj& obj,
                                         bool expandArrayOnTrailingField,
                                         BSONDepthIndex depth,
                                         MultikeyComponents* arrayComponents) {
-    auto handleElement = [&](BSONElement e, StringData path) -> void {
-        if (e.eoo()) {
+    auto handleElement = [&](BSONElement elem, StringData path) -> void {
+        if (elem.eoo()) {
             size_t idx = path.find('.');
             if (idx != std::string::npos) {
                 invariant(depth != std::numeric_limits<BSONDepthIndex>::max());
@@ -119,8 +119,8 @@ void _extractAllElementsAlongBucketPath(const BSONObj& obj,
                 }
             }
         } else {
-            if (e.type() == Array && expandArrayOnTrailingField) {
-                BSONObjIterator i(e.embeddedObject());
+            if (elem.type() == Array && expandArrayOnTrailingField) {
+                BSONObjIterator i(elem.embeddedObject());
                 while (i.more()) {
                     elements.insert(i.next());
                 }
@@ -128,7 +128,7 @@ void _extractAllElementsAlongBucketPath(const BSONObj& obj,
                     arrayComponents->insert(depth);
                 }
             } else {
-                elements.insert(e);
+                elements.insert(elem);
             }
         }
     };
