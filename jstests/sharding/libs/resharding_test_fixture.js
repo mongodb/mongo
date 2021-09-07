@@ -762,7 +762,22 @@ var ReshardingTest = class {
             const newPrimaryIdx = Random.randInt(secondaries.length);
             const newPrimary = secondaries[newPrimaryIdx];
 
-            const res = newPrimary.adminCommand({replSetStepUp: 1});
+            let res;
+            try {
+                res = newPrimary.adminCommand({replSetStepUp: 1});
+            } catch (e) {
+                if (!isNetworkError(e)) {
+                    throw e;
+                }
+
+                jsTest.log(
+                    `ReshardingTestFixture got a network error ${tojson(e)} while` +
+                    ` attempting to step up secondary ${newPrimary.host}. This is likely due to` +
+                    ` the secondary previously having transitioned through ROLLBACK and closing` +
+                    ` its user connections. Will retry stepping up the same secondary again`);
+                res = newPrimary.adminCommand({replSetStepUp: 1});
+            }
+
             if (res.ok === 1) {
                 replSet.awaitNodesAgreeOnPrimary();
                 assert.eq(newPrimary, replSet.getPrimary());
@@ -771,7 +786,7 @@ var ReshardingTest = class {
 
             jsTest.log(`ReshardingTestFixture failed to step up secondary ${newPrimary.host} and` +
                        ` got error ${tojson(res)}. Will retry on another secondary until all` +
-                       ` secondaries have been exhaused`);
+                       ` secondaries have been exhausted`);
             secondaries.splice(newPrimaryIdx, 1);
         }
 
