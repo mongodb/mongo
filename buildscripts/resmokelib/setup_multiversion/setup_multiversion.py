@@ -128,7 +128,7 @@ class SetupMultiversion(Subcommand):
                                    " version.")
                     urls = self.get_urls(version)
 
-                bin_suffix = self._get_bin_suffix(version, urls["project_id"])
+                bin_suffix = self._get_bin_suffix(version, urls["project_identifier"])
                 # Give each version a unique install dir
                 install_dir = os.path.join(self.install_dir, version)
 

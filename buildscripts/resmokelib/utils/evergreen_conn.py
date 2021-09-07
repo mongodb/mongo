@@ -193,7 +193,7 @@ def _get_multiversion_urls(tasks_wrapper):
                            archive_symbols_task=f"{EVERGREEN_HOST}/task/{symbols.task_id}")
 
         # Tack on the project id for generating a friendly decompressed name for the artifacts.
-        compile_artifact_urls["project_id"] = binary.project_id
+        compile_artifact_urls["project_identifier"] = binary.project_identifier
 
     elif all(task for task in required_tasks):
         LOGGER.warning("Required Evergreen task(s) were not successful.",
