@@ -3,7 +3,7 @@
  * feature compatibility version is older than the latest version.
  *
  * We restart mongod during the test and expect it to have the same data after restarting.
- * @tags: [requires_persistence, disabled_due_to_server_58295]
+ * @tags: [requires_persistence]
  */
 
 (function() {
@@ -27,9 +27,7 @@ const testCasesLastContinuousWithFeatureFlags = [];
 // stable release.
 const testCasesLastStable = testCasesLastContinuous.concat([]);
 
-const testCasesLastStableWithFeatureFlags = testCasesLastContinuousWithFeatureFlags.concat([
-    [{$setWindowFields: {sortBy: {_id: 1}, output: {sum: {$sum: {input: "$val"}}}}}],
-]);
+const testCasesLastStableWithFeatureFlags = testCasesLastContinuousWithFeatureFlags.concat([]);
 
 // Tests Feature Compatibility Version behavior of view creation while using aggregation pipelines
 // 'testCases' and using a previous stable version 'lastVersion' of mongod.

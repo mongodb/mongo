@@ -6,7 +6,6 @@
 //   requires_non_retryable_commands,
 //   requires_non_retryable_writes,
 //   requires_fastcount,
-//   disabled_due_to_server_58295
 // ]
 
 // Test basic inserts and updates with document validation.

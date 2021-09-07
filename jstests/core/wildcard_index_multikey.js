@@ -2,7 +2,6 @@
  * Tests that queries using a multikey $** index, return correct results.
  * @tags: [
  *   assumes_balancer_off,
- *   disabled_due_to_server_58295
  * ]
  */
 (function() {
