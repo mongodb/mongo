@@ -14,6 +14,8 @@ EVERGREEN_CONFIG_LOCATIONS = (
     # Common for local machines
     os.path.expanduser(os.path.join("~", ".evergreen.yml")),
 )
+if "EVERGREEN_WORKDIR" in os.environ:
+    EVERGREEN_CONFIG_LOCATIONS = EVERGREEN_CONFIG_LOCATIONS + (os.environ["EVERGREEN_WORKDIR"])
 
 GENERIC_EDITION = "base"
 GENERIC_PLATFORM = "linux_x86_64"
