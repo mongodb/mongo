@@ -13,6 +13,12 @@
 
 (function() {
 'use strict';
+load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+
+if (checkSBEEnabled(db, ["featureFlagSbePlanCache"])) {
+    jsTest.log("Skipping test because SBE and SBE plan cache are both enabled.");
+    return;
+}
 
 const collName = 'introspect_hidden_index_plan_cache_entries';
 const collNotAffectedName = 'introspect_hidden_index_plan_cache_entries_unaffected';

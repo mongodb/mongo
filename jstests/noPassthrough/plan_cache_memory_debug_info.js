@@ -4,6 +4,7 @@
  */
 (function() {
 "use strict";
+load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 
 /**
  * Creates two indexes for the given collection. In order for plans to be cached, there need to be
@@ -75,6 +76,12 @@ const conn = MongoRunner.runMongod({});
 assert.neq(conn, null, "mongod failed to start");
 const db = conn.getDB("test");
 const coll = db.plan_cache_memory_debug_info;
+
+if (checkSBEEnabled(db, ["featureFlagSbePlanCache"])) {
+    jsTest.log("Skipping test because SBE and SBE plan cache are both enabled.");
+    MongoRunner.stopMongod(conn);
+    return;
+}
 coll.drop();
 createIndexesForColl(coll);
 

@@ -34,6 +34,7 @@
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/plan_cache_key_factory.h"
 #include "mongo/db/query/plan_explainer_factory.h"
+#include "mongo/db/query/sbe_plan_cache.h"
 #include "mongo/db/query/sbe_plan_ranker.h"
 
 namespace mongo {
@@ -181,7 +182,7 @@ void updatePlanCache(
             }
         }
 
-        if (validSolutions) {
+        auto cacheClassicPlan = [&]() {
             // The caller of this constructor is responsible for ensuring that the QuerySolution
             // has valid cacheData. If there's no data to cache you shouldn't be trying to
             // construct a PlanCacheEntry.
@@ -202,6 +203,34 @@ void updatePlanCache(
                                       opCtx->getServiceContext()->getPreciseClockSource()->now(),
                                       boost::none, /* worksGrowthCoefficient */
                                       &callbacks));
+        };
+
+        if (validSolutions) {
+            if constexpr (std::is_same_v<PlanStageType, std::unique_ptr<sbe::PlanStage>>) {
+                if (feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
+                    // Clone the winning SBE plan and its auxiliary data.
+                    auto cachedPlan = std::make_unique<sbe::CachedSbePlan>(
+                        candidates[winnerIdx].root->clone(), candidates[winnerIdx].data);
+
+                    PlanCacheLoggingCallbacks<sbe::PlanCacheKey, sbe::CachedSbePlan> callbacks{
+                        query};
+                    uassertStatusOK(sbe::getPlanCache(opCtx).set(
+                        plan_cache_key_factory::make<sbe::PlanCacheKey>(query, collection),
+                        std::move(cachedPlan),
+                        solutions,
+                        std::move(ranking),
+                        opCtx->getServiceContext()->getPreciseClockSource()->now(),
+                        boost::none, /* worksGrowthCoefficient */
+                        &callbacks));
+                } else {
+                    // Fall back to use the classic plan cache. Remove this branch after
+                    // "gFeatureFlagSbePlanCache" is removed.
+                    cacheClassicPlan();
+                }
+            } else {
+                static_assert(std::is_same_v<PlanStageType, PlanStage*>);
+                cacheClassicPlan();
+            }
         }
     }
 }

@@ -13,6 +13,12 @@ assert.neq(null, conn, "mongod failed to start up");
 const testDb = conn.getDB("test");
 const coll = testDb.plan_cache_stats_agg_source;
 
+if (checkSBEEnabled(testDb, ["featureFlagSbePlanCache"])) {
+    jsTest.log("Skipping test because SBE and SBE plan cache are both enabled.");
+    MongoRunner.stopMongod(conn);
+    return;
+}
+
 // Note that the "getParameter" command is expected to fail in versions of mongod that do not yet
 // include the slot-based execution engine. When that happens, however, 'isSBEEnabled' still
 // correctly evaluates to false.

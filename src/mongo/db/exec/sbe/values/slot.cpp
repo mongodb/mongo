@@ -466,6 +466,18 @@ int getApproximateSize(TypeTags tag, Value val) {
             // including the 'length' field itself.
             result += ConstDataView(getRawPointerView(val)).read<LittleEndian<uint32_t>>();
             break;
+        // These types are currently unsupported. Temporarily break in these cases because
+        // calculating the estimated size of a cached SBE plan requires a size value.
+        // TODO: SERVER-60273 Calculate the estimated size for missing types.
+        case TypeTags::LocalLambda:
+        case TypeTags::pcreRegex:
+        case TypeTags::timeZoneDB:
+        case TypeTags::jsFunction:
+        case TypeTags::shardFilterer:
+        case TypeTags::collator:
+        case TypeTags::ftsMatcher:
+        case TypeTags::sortSpec:
+            break;
         default:
             MONGO_UNREACHABLE;
     }

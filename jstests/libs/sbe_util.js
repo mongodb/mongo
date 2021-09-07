@@ -8,8 +8,9 @@ load("jstests/libs/fixture_helpers.js");    // For 'isMongos'
 /**
  * Returns whether or not SBE is enabled for the given connection. Assumes that for repl sets and
  * sharded clusters, SBE is either enabled on each node, or disabled on each node.
+ * If 'featureFlags' is non-empty, checks if SBE and all the feature flags are enabled.
  */
-function checkSBEEnabled(theDB) {
+function checkSBEEnabled(theDB, featureFlags = []) {
     let checkResult = true;
 
     assert.soon(() => {
@@ -31,6 +32,12 @@ function checkSBEEnabled(theDB) {
                 if (FixtureHelpers.isMongos(conn.getDB("admin"))) {
                     continue;
                 }
+
+                featureFlags.forEach(function(featureFlag) {
+                    const featureFlagParam = conn.adminCommand({getParameter: 1, [featureFlag]: 1});
+                    checkResult = checkResult && featureFlagParam.hasOwnProperty(featureFlag) &&
+                        featureFlagParam[featureFlag]["value"];
+                });
 
                 const getParam =
                     conn.adminCommand({getParameter: 1, internalQueryForceClassicEngine: 1});

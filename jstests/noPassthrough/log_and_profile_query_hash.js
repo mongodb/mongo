@@ -7,6 +7,7 @@
 // For getLatestProfilerEntry().
 load("jstests/libs/profiler.js");
 load("jstests/libs/logv2_helpers.js");
+load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 
 // Prevent the mongo shell from gossiping its cluster time, since this will increase the amount
 // of data logged for each op. For some of the testcases below, including the cluster time would
@@ -18,6 +19,12 @@ const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up");
 const testDB = conn.getDB("jstests_query_shape_hash");
 const coll = testDB.test;
+
+if (checkSBEEnabled(testDB, ["featureFlagSbePlanCache"])) {
+    jsTest.log("Skipping test because SBE and SBE plan cache are both enabled.");
+    MongoRunner.stopMongod(conn);
+    return;
+}
 
 const profileEntryFilter = {
     op: "query"

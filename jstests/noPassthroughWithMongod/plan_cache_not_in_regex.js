@@ -6,6 +6,12 @@
 "use strict";
 
 load('jstests/libs/analyze_plan.js');  // For isCollScan.
+load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
+
+if (checkSBEEnabled(db, ["featureFlagSbePlanCache"])) {
+    jsTest.log("Skipping test because SBE and SBE plan cache are both enabled.");
+    return;
+}
 
 const coll = db.plan_cache_not_in_regex;
 coll.drop();

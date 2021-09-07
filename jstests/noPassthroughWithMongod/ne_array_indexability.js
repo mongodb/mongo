@@ -2,8 +2,15 @@
  * Test that $ne: [] queries are cached correctly. See SERVER-39764.
  */
 (function() {
+load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+
 const coll = db.ne_array_indexability;
 coll.drop();
+
+if (checkSBEEnabled(db, ["featureFlagSbePlanCache"])) {
+    jsTest.log("Skipping test because SBE and SBE plan cache are both enabled.");
+    return;
+}
 
 coll.createIndex({"obj": 1});
 coll.createIndex({"obj": 1, "abc": 1});

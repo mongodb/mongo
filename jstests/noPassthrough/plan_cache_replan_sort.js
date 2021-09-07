@@ -10,11 +10,18 @@
 
 load("jstests/libs/analyze_plan.js");
 load("jstests/libs/profiler.js");
+load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 
 const conn = MongoRunner.runMongod();
 const db = conn.getDB("test");
 const coll = db.plan_cache_replan_sort;
 coll.drop();
+
+if (checkSBEEnabled(db, ["featureFlagSbePlanCache"])) {
+    jsTest.log("Skipping test because SBE and SBE plan cache are both enabled.");
+    MongoRunner.stopMongod(conn);
+    return;
+}
 
 // Ensure a plan with a sort stage gets cached.
 assert.commandWorked(coll.createIndex({x: 1}));

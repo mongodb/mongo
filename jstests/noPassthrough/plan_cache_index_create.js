@@ -9,6 +9,7 @@
 "use strict";
 
 load('jstests/libs/analyze_plan.js');  // For getCachedPlan().
+load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
 
 const dbName = "test";
 const collName = "coll";
@@ -176,6 +177,12 @@ rst.startSet();
 rst.initiate();
 const primaryDB = rst.getPrimary().getDB(dbName);
 const secondaryDB = rst.getSecondary().getDB(dbName);
+
+if (checkSBEEnabled(primaryDB, ["featureFlagSbePlanCache"])) {
+    jsTest.log("Skipping test because SBE and SBE plan cache are both enabled.");
+    rst.stopSet();
+    return;
+}
 
 runTest({rst: rst, readDB: primaryDB, writeDB: primaryDB});
 runTest({rst: rst, readDB: secondaryDB, writeDB: primaryDB});

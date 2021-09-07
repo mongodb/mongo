@@ -11,6 +11,12 @@
 
 // For getLatestProfilerEntry
 load("jstests/libs/profiler.js");
+load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+
+if (checkSBEEnabled(db, ["featureFlagSbePlanCache"])) {
+    jsTest.log("Skipping test because SBE and SBE plan cache are both enabled.");
+    return;
+}
 
 const testDB = db.getSiblingDB("query_hash");
 assert.commandWorked(testDB.dropDatabase());

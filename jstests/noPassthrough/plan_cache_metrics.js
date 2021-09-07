@@ -4,12 +4,20 @@
  */
 (function() {
 "use strict";
+load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+
 const conn = MongoRunner.runMongod({});
 const db = conn.getDB('test');
 const coll1 = db.query_metrics1;
 const coll2 = db.query_metrics2;
 coll1.drop();
 coll2.drop();
+
+if (checkSBEEnabled(db, ["featureFlagSbePlanCache"])) {
+    jsTest.log("Skipping test because SBE and SBE plan cache are both enabled.");
+    MongoRunner.stopMongod(conn);
+    return;
+}
 
 const queryObj = {
     a: {$gte: 99},

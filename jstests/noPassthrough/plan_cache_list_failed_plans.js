@@ -10,6 +10,12 @@ const testDB = conn.getDB("jstests_plan_cache_list_failed_plans");
 const coll = testDB.test;
 const isSBEEnabled = checkSBEEnabled(testDB);
 
+if (checkSBEEnabled(testDB, ["featureFlagSbePlanCache"])) {
+    jsTest.log("Skipping test because SBE and SBE plan cache are both enabled.");
+    MongoRunner.stopMongod(conn);
+    return;
+}
+
 coll.drop();
 
 // Setup the database such that it will generate a failing plan and a succeeding plan.

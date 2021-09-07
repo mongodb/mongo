@@ -12,6 +12,14 @@
 //   does_not_support_stepdowns,
 // ]
 (function() {
+'use strict';
+load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+
+if (checkSBEEnabled(db, ["featureFlagSbePlanCache"])) {
+    jsTest.log("Skipping test because SBE and SBE plan cache are both enabled.");
+    return;
+}
+
 var coll = db.jstests_plan_cache_shell_helpers;
 coll.drop();
 

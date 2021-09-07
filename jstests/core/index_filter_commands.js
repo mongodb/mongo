@@ -39,6 +39,10 @@ load("jstests/libs/fixture_helpers.js");      // For 'FixtureHelpers'.
 load("jstests/libs/sbe_explain_helpers.js");  // For 'assertIdHackPlan()'.
 load("jstests/libs/sbe_util.js");             // For checkSBEEnabled.
 
+if (checkSBEEnabled(db, ["featureFlagSbePlanCache"])) {
+    jsTest.log("Skipping test because SBE and SBE plan cache are both enabled.");
+    return;
+}
 const coll = db.jstests_index_filter_commands;
 
 coll.drop();

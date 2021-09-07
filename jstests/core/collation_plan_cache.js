@@ -11,6 +11,12 @@
 // ]
 (function() {
 'use strict';
+load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+
+if (checkSBEEnabled(db, ["featureFlagSbePlanCache"])) {
+    jsTest.log("Skipping test because SBE and SBE plan cache are both enabled.");
+    return;
+}
 
 var coll = db.collation_plan_cache;
 coll.drop();
