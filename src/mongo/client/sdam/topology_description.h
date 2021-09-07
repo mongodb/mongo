@@ -59,9 +59,11 @@ public:
 
     /**
      * Copy the given TopologyDescription and set the topologyDescription of all contained server
-     * descriptions to point to this instance.
+     * descriptions to point to this instance. The copy construction won't work in this scenario
+     * because shared_from_this cannot be used from within a constructor. Making it simple to
+     * associated the serverDescriptino with the topologyDescription.
      */
-    static TopologyDescriptionPtr clone(TopologyDescriptionPtr source);
+    static TopologyDescriptionPtr clone(const TopologyDescription& source);
 
     const UUID& getId() const;
     TopologyType getType() const;

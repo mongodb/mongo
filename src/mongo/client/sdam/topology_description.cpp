@@ -28,9 +28,14 @@
  */
 #include "mongo/client/sdam/topology_description.h"
 
+#include "mongo/client/sdam/sdam_datatypes.h"
 #include "mongo/client/sdam/server_description.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/util/fail_point.h"
+#include <algorithm>
+#include <cstring>
+#include <iterator>
+#include <memory>
 
 namespace mongo::sdam {
 MONGO_FAIL_POINT_DEFINE(topologyDescriptionInstallServerDescription);
@@ -54,10 +59,18 @@ TopologyDescriptionPtr TopologyDescription::create(SdamConfiguration config) {
     return result;
 }
 
-TopologyDescriptionPtr TopologyDescription::clone(TopologyDescriptionPtr source) {
-    invariant(source);
-    auto result = std::make_shared<TopologyDescription>(*source);
-    TopologyDescription::associateServerDescriptions(result);
+TopologyDescriptionPtr TopologyDescription::clone(const TopologyDescription& source) {
+    auto result = std::make_shared<TopologyDescription>(source);
+    std::vector<ServerDescriptionPtr> newServers;
+    const auto sourceServers = source._servers;
+    std::transform(sourceServers.begin(),
+                   sourceServers.end(),
+                   std::back_inserter(newServers),
+                   [](const auto& serverDescription) {
+                       return std::make_shared<ServerDescription>(*serverDescription);
+                   });
+    associateServerDescriptions(result);
+
     return result;
 }
 

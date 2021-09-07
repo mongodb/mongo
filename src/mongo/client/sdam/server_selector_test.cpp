@@ -229,7 +229,7 @@ TEST_F(ServerSelectorTestFixture, ShouldBeAbleToSelectWithMaxStalenessFromCloned
                        .withMaxWireVersion(WireVersion::LATEST_WIRE_VERSION)
                        .instance();
     stateMachine.onServerDescription(*topologyDescription, primary);
-    topologyDescription = TopologyDescription::clone(topologyDescription);
+    topologyDescription = TopologyDescription::clone(*topologyDescription);
 
     const auto ninetySeconds = Seconds(90);
     const auto readPref =
