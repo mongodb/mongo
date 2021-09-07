@@ -234,7 +234,7 @@ __rec_need_save_upd(
  *     equal to the start time point. While unusual, it is permitted for a single transaction to
  *     insert and then remove a record. We don't want to generate a warning in that case.
  */
-static inline void
+static inline bool
 __timestamp_out_of_order_fix(WT_SESSION_IMPL *session, WT_TIME_WINDOW *select_tw)
 {
     char time_string[WT_TIME_STRING_SIZE];
@@ -247,7 +247,9 @@ __timestamp_out_of_order_fix(WT_SESSION_IMPL *session, WT_TIME_WINDOW *select_tw
 
         select_tw->durable_start_ts = select_tw->durable_stop_ts;
         select_tw->start_ts = select_tw->stop_ts;
+        return (true);
     }
+    return (false);
 }
 
 /*
@@ -545,7 +547,13 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, W
         }
     }
 
-    __timestamp_out_of_order_fix(session, select_tw);
+    /*
+     * Fixup any out of order timestamps, if we're evicting and a checkpoint is running return EBUSY
+     * and fail the eviction as it could result in an inconsistent checkpoint.
+     */
+    if (__timestamp_out_of_order_fix(session, select_tw) && F_ISSET(r, WT_REC_EVICT) &&
+      F_ISSET(r, WT_REC_CHECKPOINT_RUNNING))
+        return (EBUSY);
 
     /*
      * Track the most recent transaction in the page. We store this in the tree at the end of
