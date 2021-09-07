@@ -54,16 +54,6 @@ namespace {
 
 const Seconds kRefreshPeriod(30);
 
-/**
- * Whether or not the actual topologyTime should be used.  When this is false, the
- * topologyTime part of the cache's Time will stay fixed and not advance.
- */
-bool useActualTopologyTime() {
-    return serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
-            multiversion::FeatureCompatibilityVersion::kVersion_4_7);
-}
-
 }  // namespace
 
 using CallbackArgs = executor::TaskExecutor::CallbackArgs;
@@ -146,13 +136,6 @@ ShardRegistry::Cache::LookupResult ShardRegistry::_lookup(OperationContext* opCt
             timeInStore.forceReloadIncrement > cachedData.getTime().forceReloadIncrement) {
             auto [reloadedData, maxTopologyTime] =
                 ShardRegistryData::createFromCatalogClient(opCtx, _shardFactory.get());
-            if (!useActualTopologyTime()) {
-                // If not using the actual topology time, then just use the topologyTime currently
-                // in the cache, instead of the maximum topologyTime value from config.shards.  This
-                // is necessary during upgrade/downgrade when topologyTime might not be gossiped by
-                // all nodes (and so isn't being used).
-                maxTopologyTime = cachedData.getTime().topologyTime;
-            }
 
             auto [mergedData, removedShards] =
                 ShardRegistryData::mergeExisting(*cachedData, reloadedData);
@@ -528,12 +511,8 @@ SharedSemiFuture<ShardRegistry::Cache::ValueHandle> ShardRegistry::_getDataAsync
 
     // Update the time the cache should be aiming for.
     auto now = VectorClock::get(_service)->getTime();
-    // The topologyTime should be advanced to either the actual topologyTime (if it is being
-    // gossiped), or else the previously cached topologyTime value (so that this part of the cache's
-    // time doesn't advance, if topologyTime isn't being gossiped).
-    Timestamp topologyTime = useActualTopologyTime()
-        ? now.topologyTime().asTimestamp()
-        : _cache->peekLatestCached(_kSingleton).getTime().topologyTime;
+    // The topologyTime should be advanced to the gossiped topologyTime.
+    Timestamp topologyTime = now.topologyTime().asTimestamp();
     _cache->advanceTimeInStore(
         _kSingleton, Time(topologyTime, _rsmIncrement.load(), _forceReloadIncrement.load()));
 

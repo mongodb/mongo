@@ -114,14 +114,6 @@ public:
         boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 
     /**
-     * This function utilizes both pipeline and field syntax; this implementation should replace the
-     * one in serializeToArray() when this combined syntax is enabled by default.
-     */
-    void serializeToArrayWithBothSyntaxes(
-        std::vector<Value>& array,
-        boost::optional<ExplainOptions::Verbosity> explain = boost::none) const;
-
-    /**
      * Returns the 'as' path, and possibly fields modified by an absorbed $unwind.
      */
     GetModPathsReturn getModifiedPaths() const final;

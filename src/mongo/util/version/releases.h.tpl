@@ -86,18 +86,16 @@ last_lts, last_continuous, latest = self.getVar('last_lts'), self.getVar('last_c
 generic_fcvs = self.getVar('generic_fcvs')
 
 # The 'latest' version must be one of the versions listed in releases.yml.
-assert (latest in fcvs)
+assert(latest in fcvs)
 
 # The transition when used as a cpp variable.
 down = 'DowngradingFrom'
 up = 'UpgradingFrom'
 
-# TODO (SERVER-58333): Clean up this file to remove the generation and handling of FCV 4.x.
+# A list of (FCV enum name, FCV string) tuples, for FCVs of the form 'X.Y'.
 # The ordering of the FCV enums matters; the FCVs must appear in ascending order, ordered by version
 # number, with the transition FCVs appearing interwoven between the version FCVs.
-# A list of (FCV enum name, FCV string) tuples, for FCVs of the form 'X.Y'. Initialize with FCVs
-# before the last_lts.
-fcv_list = [(self.fcv_cpp_name(fcv), fcv) for fcv in fcvs[:bisect_left(fcvs, last_lts)]]
+fcv_list = []
 
 # A list of (FCV enum name, FCV string) tuples for all the transitioning FCV values.
 transition_fcvs = []

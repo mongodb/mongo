@@ -1002,7 +1002,7 @@ void DocumentSourceLookUp::appendSpecificExecStats(MutableDocument& doc) const {
     doc["indexesUsed"] = Value{std::move(indexesUsedVec)};
 }
 
-void DocumentSourceLookUp::serializeToArrayWithBothSyntaxes(
+void DocumentSourceLookUp::serializeToArray(
     std::vector<Value>& array, boost::optional<ExplainOptions::Verbosity> explain) const {
 
     // Support alternative $lookup from config.cache.chunks* namespaces.
@@ -1058,87 +1058,6 @@ void DocumentSourceLookUp::serializeToArrayWithBothSyntaxes(
 
         if (_unwindSrc) {
             _unwindSrc->serializeToArray(array);
-        }
-    }
-}
-
-void DocumentSourceLookUp::serializeToArray(
-    std::vector<Value>& array, boost::optional<ExplainOptions::Verbosity> explain) const {
-    if (serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
-            multiversion::FeatureCompatibilityVersion::kVersion_4_9)) {
-        return serializeToArrayWithBothSyntaxes(array, explain);
-    }
-
-    Document doc;
-
-    // Support alternative $lookup from config.cache.chunks* namespaces.
-    auto fromValue = (pExpCtx->ns.db() == _fromNs.db())
-        ? Value(_fromNs.coll())
-        : Value(Document{{"db", _fromNs.db()}, {"coll", _fromNs.coll()}});
-
-    if (!hasLocalFieldForeignFieldJoin()) {
-        MutableDocument exprList;
-        for (auto letVar : _letVariables) {
-            exprList.addField(letVar.name,
-                              letVar.expression->serialize(static_cast<bool>(explain)));
-        }
-
-        auto pipeline = _userPipeline;
-        // With pipeline syntax, any '_additionalFilter' should be added to the user pipeline. With
-        // only field syntax, we add '_additionalFilter' or '_matchSrc' to the output below.
-        if (_additionalFilter) {
-            pipeline.emplace_back(BSON("$match" << *_additionalFilter));
-        }
-
-        doc = Document{{getSourceName(),
-                        Document{{"from", fromValue},
-                                 {"as", _as.fullPath()},
-                                 {"let", exprList.freeze()},
-                                 {"pipeline", pipeline}}}};
-    } else {
-        doc = Document{{getSourceName(),
-                        Document{{"from", fromValue},
-                                 {"as", _as.fullPath()},
-                                 {"localField", _localField->fullPath()},
-                                 {"foreignField", _foreignField->fullPath()}}}};
-    }
-
-    MutableDocument output(std::move(doc));
-
-    if (_hasExplicitCollation) {
-        output[getSourceName()]["_internalCollation"] = Value(_fromExpCtx->getCollatorBSON());
-    }
-
-    if (explain) {
-        if (_unwindSrc) {
-            const boost::optional<FieldPath> indexPath = _unwindSrc->indexPath();
-            output[getSourceName()]["unwinding"] =
-                Value(DOC("preserveNullAndEmptyArrays"
-                          << _unwindSrc->preserveNullAndEmptyArrays() << "includeArrayIndex"
-                          << (indexPath ? Value(indexPath->fullPath()) : Value())));
-        }
-
-        // Add '_additionalFilter' for explain when $lookup was constructed without pipeline syntax.
-        if (hasLocalFieldForeignFieldJoin() && _additionalFilter) {
-            // Our output does not have to be parseable, so include a "matching" field with the
-            // descended match expression.
-            output[getSourceName()]["matching"] = Value(*_additionalFilter);
-        }
-
-        array.push_back(Value(output.freeze()));
-    } else {
-        array.push_back(Value(output.freeze()));
-
-        if (_unwindSrc) {
-            _unwindSrc->serializeToArray(array);
-        }
-
-        if (hasLocalFieldForeignFieldJoin() && _matchSrc) {
-            // '_matchSrc' tracks the originally specified $match, before it is descended (modified
-            // so it can be moved into '_resolvedPipeline'). It is set in the first call to
-            // getNext(), at which point we are confident that we no longer need to serialize the
-            // $lookup again.
-            _matchSrc->serializeToArray(array);
         }
     }
 }
@@ -1301,12 +1220,6 @@ intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(
     uassert(ErrorCodes::FailedToParse, "must specify 'as' field for a $lookup", !as.empty());
 
     if (hasPipeline) {
-        uassert(ErrorCodes::FailedToParse,
-                "$lookup with 'pipeline' may not specify 'localField' or 'foreignField'",
-                (localField.empty() && foreignField.empty()) ||
-                    serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
-                        multiversion::FeatureCompatibilityVersion::kVersion_4_9));
-
         if (localField.empty() && foreignField.empty()) {
             // $lookup specified with only pipeline syntax.
             return new DocumentSourceLookUp(std::move(fromNs),

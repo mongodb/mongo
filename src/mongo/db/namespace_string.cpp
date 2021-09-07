@@ -171,11 +171,7 @@ bool NamespaceString::isLegalClientSystemNS(
         return true;
     if (coll() == kSystemDotViewsCollectionName)
         return true;
-    if (currentFCV.isGreaterThanOrEqualTo(
-            multiversion::FeatureCompatibilityVersion::kVersion_4_7) &&
-        // While this FCV check is being added in 4.9, the namespace was allowed in 4.7 binaries
-        // without an FCV check.
-        isTemporaryReshardingCollection()) {
+    if (isTemporaryReshardingCollection()) {
         return true;
     }
     if (isTimeseriesBucketsCollection()) {

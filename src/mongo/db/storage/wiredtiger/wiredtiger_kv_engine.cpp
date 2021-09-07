@@ -150,10 +150,9 @@ bool WiredTigerFileVersion::shouldDowngrade(bool readOnly,
             _startupVersion == StartupVersion::IS_42;
     }
 
-    if (serverGlobalParams.featureCompatibility.isGreaterThan(
-            multiversion::FeatureCompatibilityVersion::kVersion_4_4)) {
-        // Only consider downgrading when FCV is set to kFullyDowngraded.
-        // (This FCV gate must remain across binary version releases.)
+    // (Generic FCV reference): Only consider downgrading when FCV is set to the last LTS
+    // release. This FCV gate must remain across binary version releases.
+    if (serverGlobalParams.featureCompatibility.isGreaterThan(multiversion::GenericFCV::kLastLTS)) {
         return false;
     }
 

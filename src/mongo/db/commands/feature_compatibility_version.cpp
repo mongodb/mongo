@@ -334,13 +334,7 @@ void FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
     FeatureCompatibilityVersionDocument fcvDoc =
         fcvTransitions.getFCVDocument(transitioningVersion);
 
-    // The timestamp must be removed when downgrading to version 4.9 or 4.4. This is necessary to
-    // avoid the presence of an unknown field that old binaries are unable to deserialize.
-    if (transitioningVersion == FCV::kVersion_4_9 || transitioningVersion == FCV::kVersion_4_4) {
-        fcvDoc.setChangeTimestamp(boost::none);
-    } else {
-        fcvDoc.setChangeTimestamp(changeTimestamp);
-    }
+    fcvDoc.setChangeTimestamp(changeTimestamp);
 
     runUpdateCommand(opCtx, fcvDoc);
 }

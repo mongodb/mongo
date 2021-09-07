@@ -132,29 +132,8 @@ BSONObj genericTransformForShards(MutableDocument&& cmdForShards,
                                   boost::optional<ExplainOptions::Verbosity> explainVerbosity,
                                   BSONObj collationObj,
                                   boost::optional<BSONObj> readConcern) {
-    // Serialize the variables.
-    // Check whether we are in a mixed-version cluster and so must use the old serialization format.
-    // This is only tricky in the case we are sending an aggregate from shard to shard. For this
-    // scenario we can rely on feature compatibility version to detect when this is safe. Feature
-    // compatibility version is not generally accurate on mongos since it was intended to guard
-    // changes to data format and mongos has no persisted state. However, mongos is upgraded last
-    // after all the shards, so any recipient will understand the 'let' parameter.
-    // TODO SERVER-52900 This code can be remove when we branch for the next LTS release.
-    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
-        !serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
-            multiversion::FeatureCompatibilityVersion::kVersion_4_9)) {
-        // A mixed version cluster. Use the old format to be sure it is understood.
-        auto [legacyRuntimeConstants, unusedSerializedVariables] =
-            expCtx->variablesParseState.transitionalCompatibilitySerialize(expCtx->variables);
-
-        cmdForShards[AggregateCommandRequest::kLegacyRuntimeConstantsFieldName] =
-            Value(legacyRuntimeConstants.toBSON());
-    } else {
-        // Either this is a "modern" cluster or we are a mongos and can assume the shards are
-        // "modern" and will understand the 'let' parameter.
-        cmdForShards[AggregateCommandRequest::kLetFieldName] =
-            Value(expCtx->variablesParseState.serialize(expCtx->variables));
-    }
+    cmdForShards[AggregateCommandRequest::kLetFieldName] =
+        Value(expCtx->variablesParseState.serialize(expCtx->variables));
 
     cmdForShards[AggregateCommandRequest::kFromMongosFieldName] = Value(expCtx->inMongos);
 
