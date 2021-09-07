@@ -7,5 +7,7 @@ set -o verbose
 set -o errexit
 if [ "${is_commit_queue}" = "true" ]; then
   activate_venv
-  $python buildscripts/validate_commit_message.py ${version_id}
+  $python buildscripts/validate_commit_message.py \
+    --evg-config-file ./.evergreen.yml \
+    ${version_id}
 fi

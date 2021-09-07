@@ -28,13 +28,27 @@
 #
 """Validate that the commit message is ok."""
 import argparse
+import os
 import re
 import sys
 import logging
-from evergreen import RetryingEvergreenApi
+from evergreen import RetryingEvergreenApi, EvergreenApi
 
-EVG_CONFIG_FILE = "./.evergreen.yml"
+EVG_CONFIG_FILE = "~/.evergreen.yml"
 LOGGER = logging.getLogger(__name__)
+
+ERROR_MSG = """
+################################################################################
+Encountered an invalid commit message. Please correct to the commit message to
+continue. 
+
+Commit message should start with a Public Jira ticket, an "Import" for wiredtiger
+or tools, or a "Revert" message.
+
+{error_msg} on '{branch}':
+'{commit_message}'
+################################################################################
+"""
 
 COMMON_PUBLIC_PATTERN = r'''
     ((?P<revert>Revert)\s+[\"\']?)?                         # Revert (optional)
@@ -122,6 +136,34 @@ PRIVATE_PATTERNS = [
 """private patterns."""
 
 
+def validate_commit_messages(version_id: str, evg_api: EvergreenApi) -> int:
+    """
+    Validate the commit messages for the given build.
+
+    :param version_id: ID of version to validate.
+    :param evg_api: Evergreen API client.
+    :return: True if all commit messages were valid.
+    """
+    found_error = False
+    code_changes = evg_api.patch_by_id(version_id).module_code_changes
+    for change in code_changes:
+        for message in change.commit_messages:
+            if any(valid_pattern.match(message) for valid_pattern in VALID_PATTERNS):
+                continue
+            elif any(private_pattern.match(message) for private_pattern in PRIVATE_PATTERNS):
+                print(
+                    ERROR_MSG.format(error_msg="Reference to a private project",
+                                     branch=change.branch_name, commit_message=message))
+                found_error = True
+            else:
+                print(
+                    ERROR_MSG.format(error_msg="Commit without a ticket", branch=change.branch_name,
+                                     commit_message=message))
+                found_error = True
+
+    return STATUS_ERROR if found_error else STATUS_OK
+
+
 def main(argv=None):
     """Execute Main function to validate commit messages."""
     parser = argparse.ArgumentParser(
@@ -132,24 +174,12 @@ def main(argv=None):
         metavar="version id",
         help="The id of the version to validate",
     )
+    parser.add_argument("--evg-config-file", default=EVG_CONFIG_FILE,
+                        help="Path to evergreen configuration file containing auth information.")
     args = parser.parse_args(argv)
-    evg_api = RetryingEvergreenApi.get_api(config_file=EVG_CONFIG_FILE)
+    evg_api = RetryingEvergreenApi.get_api(config_file=os.path.expanduser(args.evg_config_file))
 
-    code_changes = evg_api.patch_by_id(args.version_id).module_code_changes
-
-    for change in code_changes:
-        for message in change.commit_messages:
-            if any(valid_pattern.match(message) for valid_pattern in VALID_PATTERNS):
-                continue
-            elif any(private_pattern.match(message) for private_pattern in PRIVATE_PATTERNS):
-                error_type = "Found a reference to a private project"
-            else:
-                error_type = "Found a commit without a ticket"
-            if error_type:
-                LOGGER.error(f"{error_type}\n{message}")  # pylint: disable=logging-fstring-interpolation
-                return STATUS_ERROR
-
-    return STATUS_OK
+    return validate_commit_messages(args.version_id, evg_api)
 
 
 if __name__ == "__main__":

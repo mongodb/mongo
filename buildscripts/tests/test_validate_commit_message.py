@@ -2,11 +2,11 @@
 import itertools
 import unittest
 from typing import List
-from mock import MagicMock, patch
+from unittest.mock import MagicMock
 
-import evergreen
+from evergreen import EvergreenApi
 
-from buildscripts.validate_commit_message import main, STATUS_OK, STATUS_ERROR
+import buildscripts.validate_commit_message as under_test
 
 # pylint: disable=missing-docstring,no-self-use
 
@@ -18,13 +18,6 @@ INVALID_MESSAGES = [
     "Fix Lint",  # Fix lint is strict in terms of caps
 ]
 
-NS = "buildscripts.validate_commit_message"
-
-
-def ns(relative_name):  # pylint: disable=invalid-name
-    """Return a full name from a name relative to the test module"s name space."""
-    return NS + "." + relative_name
-
 
 def create_mock_evg_client(code_change_messages: List[str]) -> MagicMock:
     mock_code_change = MagicMock()
@@ -33,7 +26,7 @@ def create_mock_evg_client(code_change_messages: List[str]) -> MagicMock:
     mock_patch = MagicMock()
     mock_patch.module_code_changes = [mock_code_change]
 
-    mock_evg_client = MagicMock()
+    mock_evg_client = MagicMock(spec_set=EvergreenApi)
     mock_evg_client.patch_by_id.return_value = mock_patch
     return mock_evg_client
 
@@ -48,8 +41,7 @@ def interleave_new_format(older):
 
 
 class ValidateCommitMessageTest(unittest.TestCase):
-    @patch.object(evergreen.RetryingEvergreenApi, "get_api")
-    def test_valid_commits(self, get_api_mock):
+    def test_valid_commits(self):
         messages = [
             "Fix lint",
             "EVG-1",  # Test valid projects with various number lengths
@@ -65,28 +57,29 @@ class ValidateCommitMessageTest(unittest.TestCase):
             "Import tools: 58115abb6fbb3c1cc7bfd087d41a47347bce9a69 from branch mongodb-4.4",
             'Revert "Import wiredtiger: 58115abb6fbb3c1cc7bfd087d41a47347bce9a69 from branch mongodb-4.4"',
         ]
-        api_mock = create_mock_evg_client(interleave_new_format(messages))
+        mock_evg_api = create_mock_evg_client(interleave_new_format(messages))
 
-        get_api_mock.return_value = api_mock
-        self.assertTrue(main(["fake_version"]) == STATUS_OK)
+        is_valid = under_test.validate_commit_messages("version_id", mock_evg_api)
 
-    @patch.object(evergreen.RetryingEvergreenApi, "get_api")
-    def test_private(self, get_api_mock):
+        self.assertEqual(is_valid, under_test.STATUS_OK)
+
+    def test_private(self):
         messages = ["XYZ-1"]
-        api_mock = create_mock_evg_client(interleave_new_format(messages))
+        mock_evg_api = create_mock_evg_client(interleave_new_format(messages))
 
-        get_api_mock.return_value = api_mock
-        self.assertTrue(main(["fake_version"]) == STATUS_ERROR)
+        is_valid = under_test.validate_commit_messages("version_id", mock_evg_api)
 
-    @patch.object(evergreen.RetryingEvergreenApi, "get_api")
-    def test_private_with_public(self, get_api_mock):
+        self.assertEqual(is_valid, under_test.STATUS_ERROR)
+
+    def test_private_with_public(self):
         messages = [
             "Fix lint",
             "EVG-1",  # Test valid projects with various number lengths
             "SERVER-20",
             "XYZ-1"
         ]
-        api_mock = create_mock_evg_client(interleave_new_format(messages))
+        mock_evg_api = create_mock_evg_client(interleave_new_format(messages))
 
-        get_api_mock.return_value = api_mock
-        self.assertTrue(main(["fake_version"]) == STATUS_ERROR)
+        is_valid = under_test.validate_commit_messages("version_id", mock_evg_api)
+
+        self.assertEqual(is_valid, under_test.STATUS_ERROR)
