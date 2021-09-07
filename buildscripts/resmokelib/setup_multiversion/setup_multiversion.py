@@ -359,12 +359,12 @@ class SetupMultiversionPlugin(PluginInterface):
                                             da=args.download_artifacts,
                                             dv=args.download_python_venv)
 
-        return SetupMultiversion(install_dir=args.install_dir, link_dir=args.link_dir,
-                                 mv_platform=args.platform, edition=args.edition,
-                                 architecture=args.architecture, use_latest=args.use_latest,
-                                 versions=args.versions, download_options=download_options,
-                                 evergreen_config=args.evergreen_config,
-                                 github_oauth_token=args.github_oauth_token, debug=args.debug)
+        return SetupMultiversion(
+            install_dir=args.install_dir, link_dir=args.link_dir, mv_platform=args.platform,
+            edition=args.edition, architecture=args.architecture, use_latest=args.use_latest,
+            versions=args.versions, download_options=download_options,
+            evergreen_config=args.evergreen_config, github_oauth_token=args.github_oauth_token,
+            ignore_failed_push=(not args.require_push), debug=args.debug)
 
     @classmethod
     def _add_args_to_parser(cls, parser):
@@ -420,6 +420,9 @@ class SetupMultiversionPlugin(PluginInterface):
             "https://developer.github.com/v3/#rate-limiting")
         parser.add_argument("-d", "--debug", dest="debug", action="store_true", default=False,
                             help="Set DEBUG logging level.")
+        parser.add_argument(
+            "-rp", "--require-push", dest="require_push", action="store_true", default=False,
+            help="Require the push task to be successful for assets to be downloaded")
 
     def add_subcommand(self, subparsers):
         """Create and add the parser for the subcommand."""
