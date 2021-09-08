@@ -99,6 +99,7 @@
 #include "mongo/db/write_concern.h"
 #include "mongo/executor/async_request_executor.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/grid.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
@@ -629,6 +630,23 @@ public:
             uassert(5846901,
                     "BSON field 'changeStreamPreAndPostImages' is an unknown field.",
                     !cmd->getChangeStreamPreAndPostImages().has_value());
+        }
+
+        // Updating granularity on sharded time-series collections is not allowed.
+        if (Grid::get(opCtx)->catalogClient() && cmd->getTimeseries() &&
+            cmd->getTimeseries()->getGranularity()) {
+            auto& nss = cmd->getNamespace();
+            auto bucketNss =
+                nss.isTimeseriesBucketsCollection() ? nss : nss.makeTimeseriesBucketsNamespace();
+            try {
+                auto coll = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, bucketNss);
+                uassert(ErrorCodes::NotImplemented,
+                        str::stream()
+                            << "Cannot update granularity of a sharded time-series collection.",
+                        !coll.getTimeseriesFields());
+            } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                // Collection is not sharded, skip check.
+            }
         }
 
         // If the target namespace refers to a time-series collection, we will redirect the
