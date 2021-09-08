@@ -1,7 +1,8 @@
 /**
  * Tests the insertions into sharded time-series collection during a chunk migration. To ensure the
  * correctness, the test does the same inserts into an unsharded collection and verified that the
- * number of documents remain the same at the end.
+ * number of documents remain the same at the end. This test also checks that indexes on the
+ * time-series buckets collection remain consistent after the test run.
  * @tags: [
  *  requires_sharding,
  *  assumes_balancer_off,
@@ -12,6 +13,7 @@
 
 load('jstests/concurrency/fsm_workload_helpers/chunks.js');  // for chunk helpers
 load("jstests/core/timeseries/libs/timeseries.js");          // For 'TimeseriesTest' helpers.
+load("jstests/libs/analyze_plan.js");                        // for 'getPlanStages'
 load('jstests/concurrency/fsm_workloads/sharded_moveChunk_partitioned.js');
 
 var $config = extendWorkload($config, function($config, $super) {
@@ -26,6 +28,7 @@ var $config = extendWorkload($config, function($config, $super) {
 
     // This should generate documents for a span of one month.
     $config.data.numInitialDocs = 60 * 24 * 30;
+    $config.data.numMetaCount = 30;
 
     $config.data.featureFlagDisabled = true;
 
@@ -43,7 +46,11 @@ var $config = extendWorkload($config, function($config, $super) {
         for (let i = 0; i < 10; i++) {
             // Generate a random timestamp between 'startTime' and largest timestamp we inserted.
             const timer = this.startTime + Random.rand() * this.numInitialDocs * this.increment;
-            const doc = {_id: new ObjectId(), t: new Date(timer)};
+            const doc = {
+                _id: new ObjectId(),
+                t: new Date(timer),
+                m: Math.floor(Random.rand() * this.numMetaCount)
+            };
             assertAlways.commandWorked(db[collName].insert(doc));
             assertAlways.commandWorked(db[this.nonShardCollName].insert(doc));
         }
@@ -103,13 +110,32 @@ var $config = extendWorkload($config, function($config, $super) {
         jsTestLog("NumBuckets " + numBuckets + " and numDocs " + numInitialDocs);
         assert.eq(numInitialDocs, db[this.nonShardCollName].find({}).itcount());
 
-        const pipeline = [{$project: {_id: "$_id", t: "$t"}}, {$sort: {t: 1}}];
+        const pipeline = [{$project: {_id: "$_id", m: "$m", t: "$t"}}, {$sort: {m: 1, t: 1}}];
         const diff = DataConsistencyChecker.getDiff(db[collName].aggregate(pipeline),
                                                     db[this.nonShardCollName].aggregate(pipeline));
         assertAlways.eq(
             diff,
             {docsWithDifferentContents: [], docsMissingOnFirst: [], docsMissingOnSecond: []},
             diff);
+
+        // Make sure that queries using various indexes on time-series buckets collection return
+        // buckets with all documents.
+        const verifyBucketIndex = (bucketIndex) => {
+            const bucketColl = db.getCollection(`system.buckets.${collName}`);
+            const buckets = bucketColl.aggregate([{$sort: bucketIndex}]).toArray();
+            const numDocsInBuckets =
+                buckets.map(b => Object.keys(b.data._id).length).reduce((x, y) => x + y, 0);
+            assert.eq(numInitialDocs, numDocsInBuckets);
+            const plan = bucketColl.explain().aggregate([{$sort: bucketIndex}]);
+            const stages = getPlanStages(plan, 'IXSCAN');
+            assert(stages.length > 0);
+            for (let ixScan of stages) {
+                assert.eq(bucketIndex, ixScan.keyPattern, ixScan);
+            }
+        };
+        verifyBucketIndex({"control.min.t": 1});
+        verifyBucketIndex({meta: 1});
+        verifyBucketIndex({meta: 1, "control.min.t": 1, "control.max.t": 1});
     };
 
     $config.setup = function setup(db, collName, cluster) {
@@ -122,9 +148,15 @@ var $config = extendWorkload($config, function($config, $super) {
 
         db[collName].drop();
         db[this.nonShardCollName].drop();
-        assertAlways.commandWorked(db.createCollection(collName, {timeseries: {timeField: "t"}}));
+        assertAlways.commandWorked(
+            db.createCollection(collName, {timeseries: {timeField: "t", metaField: "m"}}));
+        // Create indexes to verify index integrity during the teardown state.
         cluster.shardCollection(db[collName], {t: 1}, false);
-        db[this.nonShardCollName].createIndex({t: 1});
+        assert.commandWorked(db[this.nonShardCollName].createIndex({t: 1}));
+        assert.commandWorked(db[collName].createIndex({m: 1}));
+        assert.commandWorked(db[this.nonShardCollName].createIndex({m: 1}));
+        assert.commandWorked(db[collName].createIndex({m: 1, t: 1}));
+        assert.commandWorked(db[this.nonShardCollName].createIndex({m: 1, t: 1}));
 
         const bulk = db[collName].initializeUnorderedBulkOp();
         const bulkUnsharded = db[this.nonShardCollName].initializeUnorderedBulkOp();
@@ -133,7 +165,11 @@ var $config = extendWorkload($config, function($config, $super) {
         for (let i = 0; i < this.numInitialDocs; ++i) {
             currentTimeStamp += this.increment;
 
-            const doc = {_id: new ObjectId(), t: new Date(currentTimeStamp)};
+            const doc = {
+                _id: new ObjectId(),
+                t: new Date(currentTimeStamp),
+                m: i % this.numMetaCount
+            };
             bulk.insert(doc);
             bulkUnsharded.insert(doc);
         }
