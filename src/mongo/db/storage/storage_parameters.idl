@@ -79,6 +79,23 @@ server_parameters:
         validator:
             gte: 1
 
+    storageGlobalParams.dbpath:
+        description: 'Read-only view of storage database path'
+        # Actually, never.  TODO(SERVER-59813): Use correct IDL for this once support is added.
+        set_at: startup
+        cpp_class:
+            name: StorageDbpathParameter
+            override_ctor: true
+
+    storageGlobalParams.directoryperdb:
+        description: 'Read-only view of directory per db config parameter'
+        # Actually, never.  TODO(SERVER-59813): Use correct IDL for this once support is added.
+        set_at: startup
+        cpp_class:
+            name: StorageDirectoryPerDbParameter
+            override_ctor: true
+        
+
 feature_flags:
     featureFlagTimeseriesCollection:
         description: "When enabled, support for time-series collections"

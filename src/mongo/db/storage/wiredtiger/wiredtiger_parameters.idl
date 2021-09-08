@@ -156,3 +156,11 @@ server_parameters:
       default: 10
       validator:
         gte: 1
+
+    wiredTigerDirectoryForIndexes:
+       description: 'Read-only view of DirectoryForIndexes config parameter'
+       # Actually, never.  TODO(SERVER-59813): Use correct IDL for this once support is added.
+       set_at: startup
+       cpp_class:
+           name: WiredTigerDirectoryForIndexesParameter
+           override_ctor: true

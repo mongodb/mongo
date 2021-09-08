@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_parameters_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/str.h"
@@ -75,6 +76,25 @@ Status WiredTigerEngineRuntimeConfigParameter::setFromString(const std::string& 
 
     _data.first = str;
     return Status::OK();
+}
+
+// WiredTiger parameter exported read-only via the getParameter mechanism.
+// The IDL has no ability to specify 'none' as set_at type,
+// so use 'startup' in the IDL file, then override to none here.
+WiredTigerDirectoryForIndexesParameter::WiredTigerDirectoryForIndexesParameter(StringData name,
+                                                                               ServerParameterType)
+    : ServerParameter(
+          ServerParameterSet::getGlobal(), name, false /* allowedToChangeAtStartup */, false
+          /* allowedToChangeAtRuntime */) {}
+
+Status WiredTigerDirectoryForIndexesParameter::setFromString(const std::string&) {
+    return {ErrorCodes::IllegalOperation,
+            str::stream() << name() << " cannot be set via setParameter"};
+};
+void WiredTigerDirectoryForIndexesParameter::append(OperationContext* opCtx,
+                                                    BSONObjBuilder& builder,
+                                                    const std::string& name) {
+    builder.append(name, wiredTigerGlobalOptions.directoryForIndexes);
 }
 
 }  // namespace mongo
