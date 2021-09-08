@@ -121,6 +121,20 @@ TEST(RecordId, NullTest) {
     ASSERT_NE(rid0, nullRid);
 }
 
+TEST(RecordId, RidTestCompare) {
+    RecordId ridNull;
+    RecordId rid1(1);
+
+    ASSERT_GT(rid1, ridNull);
+    ASSERT_LT(ridNull, rid1);
+    ASSERT_NE(ridNull, rid1);
+
+    RecordId rid0(0);
+    ASSERT_GT(rid0, ridNull);
+    ASSERT_LT(ridNull, rid0);
+    ASSERT_NE(ridNull, rid0);
+}
+
 TEST(RecordId, OidTestCompare) {
     RecordId ridNull;
     RecordId rid0 = record_id_helpers::keyForOID(OID::createFromString("000000000000000000000000"));
@@ -217,12 +231,57 @@ TEST(RecordId, RoundTripSerialize) {
     }
 
     {
+        char buf[1024] = {'x'};
+        RecordId id(buf, sizeof(buf));
+        BSONObjBuilder builder;
+        id.serializeToken("rid", &builder);
+        BSONObj obj = builder.done();
+        ASSERT_EQ(id, RecordId::deserializeToken(obj["rid"]));
+    }
+
+    {
         BSONObjBuilder builder;
         builder.append("rid", OID::gen());
         BSONObj obj = builder.done();
         ASSERT_THROWS_CODE(
             RecordId::deserializeToken(obj["rid"]), DBException, ErrorCodes::BadValue);
     }
+}
+
+TEST(RecordId, RecordIdBigStr) {
+    char buf[1024] = {'x'};
+
+    // This string should be just enough to qualify for the small string optimization.
+    RecordId smallId(buf, RecordId::kSmallStrMaxSize);
+    ASSERT_FALSE(smallId.sharedBuffer().isShared());
+    ASSERT_EQ(smallId.getStr().size(), RecordId::kSmallStrMaxSize);
+    ASSERT_EQ(sizeof(RecordId), smallId.memUsage());
+
+    // At a certain size RecordId strings should expand beyond the size of the struct and start
+    // using a shared buffer.
+    RecordId bigId(buf, RecordId::kSmallStrMaxSize + 1);
+    ASSERT_FALSE(bigId.sharedBuffer().isShared());
+    ASSERT_EQ(bigId.getStr().size(), RecordId::kSmallStrMaxSize + 1);
+    ASSERT_EQ(sizeof(RecordId) + bigId.getStr().size(), bigId.memUsage());
+    ASSERT_GT(bigId, smallId);
+    ASSERT_LT(smallId, bigId);
+
+    // Once copied, this RecordId should be sharing its contents.
+    RecordId bigCopy = bigId;
+    ASSERT_TRUE(bigId.sharedBuffer().isShared());
+    ASSERT_TRUE(bigCopy.sharedBuffer().isShared());
+    ASSERT_EQ(bigId.getStr().rawData(), bigCopy.getStr().rawData());
+    ASSERT_EQ(bigId.getStr().size(), bigCopy.getStr().size());
+    ASSERT_EQ(sizeof(RecordId) + bigId.getStr().size(), bigCopy.memUsage());
+
+    ASSERT_EQ(bigCopy, bigId);
+    ASSERT_EQ(bigCopy.toString(), bigId.toString());
+    ASSERT_EQ(bigCopy.isValid(), bigId.isValid());
+    ASSERT_EQ(bigCopy.isStr(), bigId.isStr());
+
+    // Ensure there is a limit and it is enforced.
+    std::string huge(RecordId::kBigStrMaxSize + 1, 'x');
+    ASSERT_THROWS_CODE(RecordId(huge.c_str(), huge.size()), AssertionException, 5894900);
 }
 
 // RecordIds of different formats may not be compared.

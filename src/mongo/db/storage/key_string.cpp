@@ -522,7 +522,10 @@ void BuilderBase<BufferT>::_appendRecordIdStr(const char* str, int size) {
     // the middle of a KeyString and also be binary-comparable.
 
     // The current maximum string length is 127. The high bit is reserved for future usage.
-    invariant(size <= kMaxRecordIdStrLen);
+    keyStringAssert(5994901,
+                    fmt::format("cannot generate key for RecordId longer than maximum of {} bytes",
+                                kMaxRecordIdStrLen),
+                    size <= kMaxRecordIdStrLen);
     invariant(size > 0);
 
     const bool invert = false;

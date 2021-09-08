@@ -46,8 +46,34 @@ void BM_RecordIdCopyLong(benchmark::State& state) {
     }
 }
 
-void BM_RecordIdCopyString(benchmark::State& state) {
+void BM_RecordIdCopyOID(benchmark::State& state) {
     RecordId rid = record_id_helpers::keyForOID(OID::gen());
+    for (auto _ : state) {
+        RecordId tmp;
+        benchmark::ClobberMemory();
+        benchmark::DoNotOptimize(tmp = rid);
+    }
+}
+
+void BM_RecordIdCopyMedString(benchmark::State& state) {
+    constexpr int bufLen = 128;
+    char buf[bufLen];
+    memset(buf, 'x', bufLen);
+
+    RecordId rid = RecordId(buf, bufLen);
+    for (auto _ : state) {
+        RecordId tmp;
+        benchmark::ClobberMemory();
+        benchmark::DoNotOptimize(tmp = rid);
+    }
+}
+
+void BM_RecordIdCopyBigString(benchmark::State& state) {
+    constexpr int bufLen = 2048;
+    char buf[bufLen];
+    memset(buf, 'x', bufLen);
+
+    RecordId rid = RecordId(buf, bufLen);
     for (auto _ : state) {
         RecordId tmp;
         benchmark::ClobberMemory();
@@ -76,7 +102,9 @@ void BM_RecordIdFormatString(benchmark::State& state) {
 }
 
 BENCHMARK(BM_RecordIdCopyLong);
-BENCHMARK(BM_RecordIdCopyString);
+BENCHMARK(BM_RecordIdCopyOID);
+BENCHMARK(BM_RecordIdCopyMedString);
+BENCHMARK(BM_RecordIdCopyBigString);
 
 BENCHMARK(BM_RecordIdFormatLong);
 BENCHMARK(BM_RecordIdFormatString);

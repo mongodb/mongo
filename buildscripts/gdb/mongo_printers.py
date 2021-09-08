@@ -224,21 +224,30 @@ class RecordIdPrinter(object):
 
     def to_string(self):
         """Return RecordId for printing."""
-        buf_size = 16
-        rid_format = self.val["_buffer"][buf_size - 1]
+        rid_format = int(self.val["_format"])
         if rid_format == 0:
-            return "null"
+            return "null RecordId"
         elif rid_format == 1:
             hex_bytes = [int(self.val['_buffer'][i]) for i in range(8)]
             raw_bytes = bytes(hex_bytes)
-            return struct.unpack('l', raw_bytes)[0]
+            return "RecordId long: %s" % struct.unpack('l', raw_bytes)[0]
         elif rid_format == 2:
             str_len = int(self.val["_buffer"][0])
             raw_bytes = [int(self.val['_buffer'][i]) for i in range(1, str_len + 1)]
             hex_bytes = [hex(b & 0xFF)[2:].zfill(2) for b in raw_bytes]
-            return str("".join(hex_bytes))
+            return "RecordId small string %d hex bytes: %s" % (str_len, str("".join(hex_bytes)))
+        elif rid_format == 3:
+            holder_ptr = self.val["_ownedBuffer"]["_buffer"]["_holder"]["px"]
+            holder = holder_ptr.dereference()
+            str_len = int(holder["_capacity"])
+            # Start of data is immediately after pointer for holder
+            start_ptr = (holder_ptr + 1).dereference().cast(gdb.lookup_type("char")).address
+            raw_bytes = [int(start_ptr[i]) for i in range(1, str_len + 1)]
+            hex_bytes = [hex(b & 0xFF)[2:].zfill(2) for b in raw_bytes]
+            return "RecordId big string %d hex bytes @ %s: %s" % (str_len, holder_ptr + 1,
+                                                                  str("".join(hex_bytes)))
         else:
-            return "invalid RecordId format"
+            return "unknown RecordId format: %d" % rid_format
 
 
 class DecorablePrinter(object):

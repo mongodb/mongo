@@ -195,7 +195,7 @@ size_t WorkingSetMember::getMemUsage() const {
     size_t memUsage = 0;
 
     if (hasRecordId()) {
-        memUsage += sizeof(RecordId);
+        memUsage += recordId.memUsage();
     }
 
     if (hasObj()) {

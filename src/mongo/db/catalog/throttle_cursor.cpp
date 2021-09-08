@@ -54,7 +54,7 @@ boost::optional<Record> SeekableRecordThrottleCursor::seekExact(OperationContext
                                                                 const RecordId& id) {
     boost::optional<Record> record = _cursor->seekExact(id);
     if (record) {
-        const int64_t dataSize = record->data.size() + sizeof(record->id);
+        const int64_t dataSize = record->data.size() + record->id.memUsage();
         _dataThrottle->awaitIfNeeded(opCtx, dataSize);
     }
 
@@ -64,7 +64,7 @@ boost::optional<Record> SeekableRecordThrottleCursor::seekExact(OperationContext
 boost::optional<Record> SeekableRecordThrottleCursor::next(OperationContext* opCtx) {
     boost::optional<Record> record = _cursor->next();
     if (record) {
-        const int64_t dataSize = record->data.size() + sizeof(record->id);
+        const int64_t dataSize = record->data.size() + record->id.memUsage();
         _dataThrottle->awaitIfNeeded(opCtx, dataSize);
     }
 

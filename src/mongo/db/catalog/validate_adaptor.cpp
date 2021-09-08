@@ -528,7 +528,7 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                     results->valid = false;
                 }
 
-                numCorruptRecordsSizeBytes += sizeof(record->id);
+                numCorruptRecordsSizeBytes += record->id.memUsage();
                 if (numCorruptRecordsSizeBytes <= kMaxErrorSizeBytes) {
                     results->corruptRecords.push_back(record->id);
                 } else if (!corruptRecordsSizeLimitWarning) {
