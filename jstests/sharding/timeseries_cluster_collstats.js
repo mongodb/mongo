@@ -22,6 +22,7 @@
  *
  * @tags: [
  *   requires_fcv_50,
+ *   requires_find_command,
  * ]
  */
 

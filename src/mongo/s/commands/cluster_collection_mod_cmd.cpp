@@ -37,6 +37,7 @@
 #include "mongo/db/coll_mod_reply_validation.h"
 #include "mongo/db/commands.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/chunk_manager_targeter.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 
@@ -91,12 +92,12 @@ public:
                     "namespace"_attr = nss,
                     "command"_attr = redact(cmdObj));
 
-        auto routingInfo =
-            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+        const auto targeter = ChunkManagerTargeter(opCtx, nss);
+        const auto& routingInfo = targeter.getRoutingInfo();
         auto shardResponses = scatterGatherVersionedTargetByRoutingTable(
             opCtx,
             cmd.getDbName(),
-            nss,
+            targeter.getNS(),
             routingInfo,
             applyReadWriteConcern(
                 opCtx,
