@@ -287,10 +287,14 @@ Status _dropCollectionForApplyOps(OperationContext* opCtx,
 }
 
 Status _dropCollection(OperationContext* opCtx,
-                       const NamespaceString& collectionName,
+                       const NamespaceString& nss,
                        DropReply* reply,
                        DropCollectionSystemCollectionMode systemCollectionMode,
                        boost::optional<UUID> dropIfUUIDNotMatching = boost::none) {
+    // We rewrite drop of time-series buckets collection to drop of time-series view collection.
+    // This ensures that such drop will delete both collections.
+    const auto collectionName =
+        nss.isTimeseriesBucketsCollection() ? nss.getTimeseriesViewNamespace() : nss;
 
     try {
         return writeConflictRetry(opCtx, "drop", collectionName.ns(), [&] {

@@ -36,13 +36,13 @@ const bucketNss = `${dbName}.system.buckets.${collName}`;
 const controlTimeField = `control.min.${timeField}`;
 const numDocsInserted = 20;
 const zone = 'Z';
+assert.commandWorked(mongo.s0.adminCommand({enableSharding: dbName}));
 assert.commandWorked(mongo.s0.adminCommand({addShardToZone: mongo.shard0.shardName, zone: zone}));
 
 function createTimeSeriesColl({index, shardKey}) {
     const db = mongo.s0.getDB(dbName);
     assert.commandWorked(
         db.createCollection(collName, {timeseries: {timeField: timeField, metaField: metaField}}));
-    assert.commandWorked(mongo.s0.adminCommand({enableSharding: dbName}));
     assert.commandWorked(db[collName].createIndex(index));
     for (let i = 0; i < numDocsInserted; i++) {
         assert.commandWorked(db[collName].insert({[metaField]: i, [timeField]: ISODate()}));
@@ -58,10 +58,8 @@ function createTimeSeriesColl({index, shardKey}) {
 
 function dropTimeSeriesColl() {
     const db = mongo.s0.getDB(dbName);
-    // Time-series collection dropping is not implemented yet so we drop the database instead.
-    // Call dropDatabase twice according to the documentation.
-    db.dropDatabase();
-    db.dropDatabase();
+    const coll = db.getCollection(collName);
+    assert(coll.drop());
 }
 
 // Check the zone range against the extended range saved in config.tags collection.

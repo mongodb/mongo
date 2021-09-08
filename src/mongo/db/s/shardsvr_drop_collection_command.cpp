@@ -41,6 +41,7 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
+#include "mongo/s/chunk_manager_targeter.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 
@@ -104,14 +105,20 @@ public:
             LOGV2_DEBUG(
                 5280952, 1, "Running new drop collection procedure", "namespace"_attr = ns());
 
+            // If 'ns()' is a sharded time-series view collection, 'targetNs' is a namespace
+            // for time-series buckets collection. For all other collections, 'targetNs' is equal
+            // to 'ns()'.
+            const auto targeter = ChunkManagerTargeter(opCtx, ns());
+            const auto targetNs = targeter.getNS();
+
             // Since this operation is not directly writing locally we need to force its db
             // profile level increase in order to be logged in "<db>.system.profile"
             CurOp::get(opCtx)->raiseDbProfileLevel(
-                CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(ns().db()));
+                CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(targetNs.db()));
 
             auto coordinatorDoc = DropCollectionCoordinatorDocument();
             coordinatorDoc.setShardingDDLCoordinatorMetadata(
-                {{ns(), DDLCoordinatorTypeEnum::kDropCollection}});
+                {{targetNs, DDLCoordinatorTypeEnum::kDropCollection}});
             auto service = ShardingDDLCoordinatorService::getService(opCtx);
             auto dropCollCoordinator = checked_pointer_cast<DropCollectionCoordinator>(
                 service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));

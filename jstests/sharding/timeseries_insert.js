@@ -36,7 +36,8 @@ if (!TimeseriesTest.shardedtimeseriesCollectionsEnabled(st.shard0)) {
     return;
 }
 
-// Databases.
+// Databases and collections.
+assert.commandWorked(mongos.adminCommand({enableSharding: dbName}));
 const mainDB = mongos.getDB(dbName);
 
 // Helpers.
@@ -78,11 +79,6 @@ function verifyBucketsOnShard(shard, expectedBuckets) {
 }
 
 function runTest(getShardKey, insert) {
-    mainDB.dropDatabase();
-
-    assert.commandWorked(mongos.adminCommand({enableSharding: dbName}));
-
-    // Create timeseries collection.
     assert.commandWorked(mainDB.createCollection(
         collName, {timeseries: {timeField: timeField, metaField: metaField}}));
     const coll = mainDB.getCollection(collName);
@@ -198,6 +194,8 @@ function runTest(getShardKey, insert) {
                 .toArray();
         assert.docEq(expectedDocuments, actualDocuments);
     }
+
+    assert(coll.drop());
 }
 
 try {

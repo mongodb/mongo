@@ -22,6 +22,7 @@ const metaField = 'hostid';
 
 const st = new ShardingTest({shards: 2, rs: {nodes: 2}});
 const sDB = st.s.getDB(dbName);
+assert.commandWorked(sDB.adminCommand({enableSharding: dbName}));
 const shard0DB = st.shard0.getDB(dbName);
 const shard1DB = st.shard1.getDB(dbName);
 
@@ -136,7 +137,6 @@ function runQuery(
 
 // Shard key on just the time field.
 (function timeShardKey() {
-    assert.commandWorked(sDB.adminCommand({enableSharding: dbName}));
     st.ensurePrimaryShard(dbName, st.shard0.shardName);
 
     // Shard time-series collection.
@@ -307,12 +307,11 @@ function runQuery(
         expectCollScan: true,
     });
 
-    sDB.dropDatabase();
+    assert(coll.drop());
 })();
 
 // Shard key on the metadata field and time fields.
 (function metaAndTimeShardKey() {
-    assert.commandWorked(sDB.adminCommand({enableSharding: dbName}));
     st.ensurePrimaryShard(dbName, st.shard0.shardName);
 
     assert.commandWorked(sDB.adminCommand({
@@ -467,12 +466,11 @@ function runQuery(
         expectedShards: [otherShard.shardName]
     });
 
-    sDB.dropDatabase();
+    assert(coll.drop());
 })();
 
 // Shard key on the metadata fields.
 (function metaFieldShardKey() {
-    assert.commandWorked(sDB.adminCommand({enableSharding: dbName}));
     st.ensurePrimaryShard(dbName, st.shard0.shardName);
 
     // Shard timeseries collection.
@@ -532,7 +530,7 @@ function runQuery(
         expectedShards: [primaryShard.shardName, otherShard.shardName]
     });
 
-    sDB.dropDatabase();
+    assert(coll.drop());
 })();
 
 st.stop();
