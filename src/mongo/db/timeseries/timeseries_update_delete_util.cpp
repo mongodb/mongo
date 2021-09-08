@@ -243,8 +243,7 @@ write_ops::UpdateModification translateUpdate(const write_ops::UpdateModificatio
 
 std::function<size_t(const BSONObj&)> numMeasurementsForBucketCounter(StringData timeField) {
     return [timeField = timeField.toString()](const BSONObj& bucket) {
-        return BucketUnpacker::computeMeasurementCount(
-            bucket.getObjectField("data")[timeField].objsize());
+        return BucketUnpacker::computeMeasurementCount(bucket, timeField);
     };
 }
 }  // namespace mongo::timeseries

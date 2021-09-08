@@ -29,10 +29,275 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/bson/util/bsoncolumn.h"
 #include "mongo/db/exec/bucket_unpacker.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 
 namespace mongo {
+class BucketUnpacker::UnpackingImpl {
+public:
+    UnpackingImpl() = default;
+    virtual ~UnpackingImpl() = default;
+
+    virtual void addField(const BSONElement& field) = 0;
+    virtual int measurementCount(const BSONElement& timeField) const = 0;
+    virtual bool getNext(MutableDocument& measurement,
+                         const BucketSpec& spec,
+                         const BSONElement& metaValue,
+                         bool includeTimeField,
+                         bool includeMetaField) = 0;
+    virtual void extractSingleMeasurement(MutableDocument& measurement,
+                                          int j,
+                                          const BucketSpec& spec,
+                                          BucketUnpacker::Behavior behavior,
+                                          const BSONObj& bucket,
+                                          const BSONElement& metaValue,
+                                          bool includeTimeField,
+                                          bool includeMetaField) = 0;
+};
+
+namespace {
+
+
+// Unpacker for V1 uncompressed buckets
+class BucketUnpackerV1 : public BucketUnpacker::UnpackingImpl {
+public:
+    // A table that is useful for interpolations between the number of measurements in a bucket and
+    // the byte size of a bucket's data section timestamp column. Each table entry is a pair (b_i,
+    // S_i), where b_i is the number of measurements in the bucket and S_i is the byte size of the
+    // timestamp BSONObj. The table is bounded by 16 MB (2 << 23 bytes) where the table entries are
+    // pairs of b_i and S_i for the lower bounds of the row key digit intervals [0, 9], [10, 99],
+    // [100, 999], [1000, 9999] and so on. The last entry in the table, S7, is the first entry to
+    // exceed the server BSON object limit of 16 MB.
+    static constexpr std::array<std::pair<int32_t, int32_t>, 8> kTimestampObjSizeTable{
+        {{0, BSONObj::kMinBSONLength},
+         {10, 115},
+         {100, 1195},
+         {1000, 12895},
+         {10000, 138895},
+         {100000, 1488895},
+         {1000000, 15888895},
+         {10000000, 168888895}}};
+
+    static int computeElementCountFromTimestampObjSize(int targetTimestampObjSize);
+
+    BucketUnpackerV1(const BSONElement& timeField);
+
+    void addField(const BSONElement& field) override;
+    int measurementCount(const BSONElement& timeField) const override;
+    bool getNext(MutableDocument& measurement,
+                 const BucketSpec& spec,
+                 const BSONElement& metaValue,
+                 bool includeTimeField,
+                 bool includeMetaField) override;
+    void extractSingleMeasurement(MutableDocument& measurement,
+                                  int j,
+                                  const BucketSpec& spec,
+                                  BucketUnpacker::Behavior behavior,
+                                  const BSONObj& bucket,
+                                  const BSONElement& metaValue,
+                                  bool includeTimeField,
+                                  bool includeMetaField) override;
+
+private:
+    // Iterates the timestamp section of the bucket to drive the unpacking iteration.
+    BSONObjIterator _timeFieldIter;
+
+    // Iterators used to unpack the columns of the above bucket that are populated during the reset
+    // phase according to the provided 'Behavior' and 'BucketSpec'.
+    std::vector<std::pair<std::string, BSONObjIterator>> _fieldIters;
+};
+
+// Calculates the number of measurements in a bucket given the 'targetTimestampObjSize' using the
+// 'BucketUnpacker::kTimestampObjSizeTable' table. If the 'targetTimestampObjSize' hits a record in
+// the table, this helper returns the measurement count corresponding to the table record.
+// Otherwise, the 'targetTimestampObjSize' is used to probe the table for the smallest {b_i, S_i}
+// pair such that 'targetTimestampObjSize' < S_i. Once the interval is found, the upper bound of the
+// pair for the interval is computed and then linear interpolation is used to compute the
+// measurement count corresponding to the 'targetTimestampObjSize' provided.
+int BucketUnpackerV1::computeElementCountFromTimestampObjSize(int targetTimestampObjSize) {
+    auto currentInterval =
+        std::find_if(std::begin(BucketUnpackerV1::kTimestampObjSizeTable),
+                     std::end(BucketUnpackerV1::kTimestampObjSizeTable),
+                     [&](const auto& entry) { return targetTimestampObjSize <= entry.second; });
+
+    if (currentInterval->second == targetTimestampObjSize) {
+        return currentInterval->first;
+    }
+    // This points to the first interval larger than the target 'targetTimestampObjSize', the actual
+    // interval that will cover the object size is the interval before the current one.
+    tassert(5422104,
+            "currentInterval should not point to the first table entry",
+            currentInterval > BucketUnpackerV1::kTimestampObjSizeTable.begin());
+    --currentInterval;
+
+    auto nDigitsInRowKey = 1 + (currentInterval - BucketUnpackerV1::kTimestampObjSizeTable.begin());
+
+    return currentInterval->first +
+        ((targetTimestampObjSize - currentInterval->second) / (10 + nDigitsInRowKey));
+}
+
+BucketUnpackerV1::BucketUnpackerV1(const BSONElement& timeField)
+    : _timeFieldIter(BSONObjIterator{timeField.Obj()}) {}
+
+void BucketUnpackerV1::addField(const BSONElement& field) {
+    _fieldIters.emplace_back(field.fieldNameStringData(), BSONObjIterator{field.Obj()});
+}
+
+int BucketUnpackerV1::measurementCount(const BSONElement& timeField) const {
+    return computeElementCountFromTimestampObjSize(timeField.objsize());
+}
+
+bool BucketUnpackerV1::getNext(MutableDocument& measurement,
+                               const BucketSpec& spec,
+                               const BSONElement& metaValue,
+                               bool includeTimeField,
+                               bool includeMetaField) {
+    auto&& timeElem = _timeFieldIter.next();
+    if (includeTimeField) {
+        measurement.addField(spec.timeField, Value{timeElem});
+    }
+
+    // Includes metaField when we're instructed to do so and metaField value exists.
+    if (includeMetaField && metaValue) {
+        measurement.addField(*spec.metaField, Value{metaValue});
+    }
+
+    auto& currentIdx = timeElem.fieldNameStringData();
+    for (auto&& [colName, colIter] : _fieldIters) {
+        if (auto&& elem = *colIter; colIter.more() && elem.fieldNameStringData() == currentIdx) {
+            measurement.addField(colName, Value{elem});
+            colIter.advance(elem);
+        }
+    }
+
+    return _timeFieldIter.more();
+}
+
+void BucketUnpackerV1::extractSingleMeasurement(MutableDocument& measurement,
+                                                int j,
+                                                const BucketSpec& spec,
+                                                BucketUnpacker::Behavior behavior,
+                                                const BSONObj& bucket,
+                                                const BSONElement& metaValue,
+                                                bool includeTimeField,
+                                                bool includeMetaField) {
+    auto rowKey = std::to_string(j);
+    auto targetIdx = StringData{rowKey};
+    auto&& dataRegion = bucket.getField(timeseries::kBucketDataFieldName).Obj();
+
+    if (includeMetaField && !metaValue.isNull()) {
+        measurement.addField(*spec.metaField, Value{metaValue});
+    }
+
+    for (auto&& dataElem : dataRegion) {
+        auto colName = dataElem.fieldNameStringData();
+        if (!determineIncludeField(colName, behavior, spec)) {
+            continue;
+        }
+        auto value = dataElem[targetIdx];
+        if (value) {
+            measurement.addField(dataElem.fieldNameStringData(), Value{value});
+        }
+    }
+}
+
+// Unpacker for V2 compressed buckets
+class BucketUnpackerV2 : public BucketUnpacker::UnpackingImpl {
+public:
+    BucketUnpackerV2(const BSONElement& timeField);
+
+    void addField(const BSONElement& field) override;
+    int measurementCount(const BSONElement& timeField) const override;
+    bool getNext(MutableDocument& measurement,
+                 const BucketSpec& spec,
+                 const BSONElement& metaValue,
+                 bool includeTimeField,
+                 bool includeMetaField) override;
+    void extractSingleMeasurement(MutableDocument& measurement,
+                                  int j,
+                                  const BucketSpec& spec,
+                                  BucketUnpacker::Behavior behavior,
+                                  const BSONObj& bucket,
+                                  const BSONElement& metaValue,
+                                  bool includeTimeField,
+                                  bool includeMetaField) override;
+
+private:
+    struct ColumnStore {
+        ColumnStore(BSONElement elem) : column(elem), it(column.begin()) {}
+        ColumnStore(ColumnStore&& other)
+            : column(std::move(other.column)), it(other.it.moveTo(column)) {}
+
+        BSONColumn column;
+        BSONColumn::Iterator it;
+    };
+
+    // Iterates the timestamp section of the bucket to drive the unpacking iteration.
+    ColumnStore _timeColumn;
+
+    // Iterators used to unpack the columns of the above bucket that are populated during the reset
+    // phase according to the provided 'Behavior' and 'BucketSpec'.
+    std::vector<ColumnStore> _fieldColumns;
+};
+
+BucketUnpackerV2::BucketUnpackerV2(const BSONElement& timeField) : _timeColumn(timeField) {}
+
+void BucketUnpackerV2::addField(const BSONElement& field) {
+    _fieldColumns.emplace_back(field);
+}
+
+int BucketUnpackerV2::measurementCount(const BSONElement& timeField) const {
+    return _timeColumn.column.size();
+}
+
+bool BucketUnpackerV2::getNext(MutableDocument& measurement,
+                               const BucketSpec& spec,
+                               const BSONElement& metaValue,
+                               bool includeTimeField,
+                               bool includeMetaField) {
+    // Get element and increment iterator
+    const auto& timeElem = *(_timeColumn.it++);
+
+    if (includeTimeField) {
+        measurement.addField(spec.timeField, Value{timeElem});
+    }
+
+    // Includes metaField when we're instructed to do so and metaField value exists.
+    if (includeMetaField && metaValue) {
+        measurement.addField(*spec.metaField, Value{metaValue});
+    }
+
+    for (auto& fieldColumn : _fieldColumns) {
+        const BSONElement& elem = *(fieldColumn.it++);
+        // EOO represents missing field
+        if (!elem.eoo()) {
+            measurement.addField(fieldColumn.column.name(), Value{elem});
+        }
+    }
+
+    return _timeColumn.it != _timeColumn.column.end();
+}
+
+void BucketUnpackerV2::extractSingleMeasurement(MutableDocument& measurement,
+                                                int j,
+                                                const BucketSpec& spec,
+                                                BucketUnpacker::Behavior behavior,
+                                                const BSONObj& bucket,
+                                                const BSONElement& metaValue,
+                                                bool includeTimeField,
+                                                bool includeMetaField) {
+    if (includeMetaField && !metaValue.isNull()) {
+        measurement.addField(*spec.metaField, Value{metaValue});
+    }
+
+    if (includeTimeField) {
+        measurement.addField(_timeColumn.column.name(), Value{_timeColumn.column[j]});
+        for (auto& fieldColumn : _fieldColumns) {
+            measurement.addField(fieldColumn.column.name(), Value{fieldColumn.column[j]});
+        }
+    }
+}
 
 /**
  * Erase computed meta projection fields if they are present in the exclusion field set.
@@ -52,43 +317,71 @@ void eraseExcludedComputedMetaProjFields(BucketUnpacker::Behavior unpackerBehavi
     }
 }
 
+}  // namespace
+
+BucketUnpacker::BucketUnpacker() = default;
+BucketUnpacker::BucketUnpacker(BucketUnpacker&& other) = default;
+BucketUnpacker::~BucketUnpacker() = default;
+BucketUnpacker& BucketUnpacker::operator=(BucketUnpacker&& rhs) = default;
+
 BucketUnpacker::BucketUnpacker(BucketSpec spec, Behavior unpackerBehavior) {
     setBucketSpecAndBehavior(std::move(spec), unpackerBehavior);
 }
 
-// Calculates the number of measurements in a bucket given the 'targetTimestampObjSize' using the
-// 'BucketUnpacker::kTimestampObjSizeTable' table. If the 'targetTimestampObjSize' hits a record in
-// the table, this helper returns the measurement count corresponding to the table record.
-// Otherwise, the 'targetTimestampObjSize' is used to probe the table for the smallest {b_i, S_i}
-// pair such that 'targetTimestampObjSize' < S_i. Once the interval is found, the upper bound of the
-// pair for the interval is computed and then linear interpolation is used to compute the
-// measurement count corresponding to the 'targetTimestampObjSize' provided.
-int BucketUnpacker::computeMeasurementCount(int targetTimestampObjSize) {
-    auto currentInterval =
-        std::find_if(std::begin(BucketUnpacker::kTimestampObjSizeTable),
-                     std::end(BucketUnpacker::kTimestampObjSizeTable),
-                     [&](const auto& entry) { return targetTimestampObjSize <= entry.second; });
+void BucketUnpacker::addComputedMetaProjFields(const std::vector<StringData>& computedFieldNames) {
+    for (auto&& field : computedFieldNames) {
+        _spec.computedMetaProjFields.emplace_back(field.toString());
 
-    if (currentInterval->second == targetTimestampObjSize) {
-        return currentInterval->first;
+        // If we're already specifically including fields, we need to add the computed fields to
+        // the included field set to ensure they are unpacked.
+        if (_unpackerBehavior == BucketUnpacker::Behavior::kInclude) {
+            _spec.fieldSet.emplace(field);
+        }
     }
-    // This points to the first interval larger than the target 'targetTimestampObjSize', the actual
-    // interval that will cover the object size is the interval before the current one.
-    tassert(5422104,
-            "currentInterval should not point to the first table entry",
-            currentInterval > BucketUnpacker::kTimestampObjSizeTable.begin());
-    --currentInterval;
+}
 
-    auto nDigitsInRowKey = 1 + (currentInterval - BucketUnpacker::kTimestampObjSizeTable.begin());
+Document BucketUnpacker::getNext() {
+    tassert(5521503, "'getNext()' requires the bucket to be owned", _bucket.isOwned());
+    tassert(5422100, "'getNext()' was called after the bucket has been exhausted", hasNext());
 
-    return currentInterval->first +
-        ((targetTimestampObjSize - currentInterval->second) / (10 + nDigitsInRowKey));
+    auto measurement = MutableDocument{};
+    _hasNext = _unpackingImpl->getNext(
+        measurement, _spec, _metaValue, _includeTimeField, _includeMetaField);
+
+    // Add computed meta projections.
+    for (auto&& name : _spec.computedMetaProjFields) {
+        measurement.addField(name, Value{_computedMetaProjections[name]});
+    }
+
+    return measurement.freeze();
+}
+
+Document BucketUnpacker::extractSingleMeasurement(int j) {
+    tassert(5422101,
+            "'extractSingleMeasurment' expects j to be greater than or equal to zero and less than "
+            "or equal to the number of measurements in a bucket",
+            j >= 0 && j < _numberOfMeasurements);
+
+    auto measurement = MutableDocument{};
+    _unpackingImpl->extractSingleMeasurement(measurement,
+                                             j,
+                                             _spec,
+                                             _unpackerBehavior,
+                                             _bucket,
+                                             _metaValue,
+                                             _includeTimeField,
+                                             _includeMetaField);
+
+    // Add computed meta projections.
+    for (auto&& name : _spec.computedMetaProjFields) {
+        measurement.addField(name, Value{_computedMetaProjections[name]});
+    }
+
+    return measurement.freeze();
 }
 
 void BucketUnpacker::reset(BSONObj&& bucket) {
-    _fieldIters.clear();
-    _timeFieldIter = boost::none;
-
+    _unpackingImpl.reset();
     _bucket = std::move(bucket);
     uassert(5346510, "An empty bucket cannot be unpacked", !_bucket.isEmpty());
 
@@ -103,8 +396,6 @@ void BucketUnpacker::reset(BSONObj&& bucket) {
     uassert(5346700,
             "The $_internalUnpackBucket stage requires the data region to have a timeField object",
             timeFieldElem);
-
-    _timeFieldIter = BSONObjIterator{timeFieldElem.Obj()};
 
     _metaValue = _bucket[timeseries::kBucketMetaFieldName];
     if (_spec.metaField) {
@@ -124,6 +415,26 @@ void BucketUnpacker::reset(BSONObj&& bucket) {
                 !_metaValue);
     }
 
+
+    auto&& controlField = _bucket[timeseries::kBucketControlFieldName];
+    uassert(5857902,
+            "The $_internalUnpackBucket stage requires 'control' object to be present",
+            controlField && controlField.type() == BSONType::Object);
+
+    auto&& versionField = controlField.Obj()[timeseries::kBucketControlVersionFieldName];
+    uassert(5857903,
+            "The $_internalUnpackBucket stage requires 'control.version' field to be present",
+            versionField && isNumericBSONType(versionField.type()));
+    auto version = versionField.Number();
+
+    if (version == 1) {
+        _unpackingImpl = std::make_unique<BucketUnpackerV1>(timeFieldElem);
+    } else if (version == 2) {
+        _unpackingImpl = std::make_unique<BucketUnpackerV2>(timeFieldElem);
+    } else {
+        uasserted(5857900, "Invalid bucket version");
+    }
+
     // Walk the data region of the bucket, and decide if an iterator should be set up based on the
     // include or exclude case.
     for (auto&& elem : dataRegion) {
@@ -137,7 +448,7 @@ void BucketUnpacker::reset(BSONObj&& bucket) {
         // Includes a field when '_unpackerBehavior' is 'kInclude' and it's found in 'fieldSet' or
         // _unpackerBehavior is 'kExclude' and it's not found in 'fieldSet'.
         if (determineIncludeField(colName, _unpackerBehavior, _spec)) {
-            _fieldIters.emplace_back(colName.toString(), BSONObjIterator{elem.Obj()});
+            _unpackingImpl->addField(elem);
         }
     }
 
@@ -149,13 +460,45 @@ void BucketUnpacker::reset(BSONObj&& bucket) {
     }
 
     // Save the measurement count for the bucket.
-    _numberOfMeasurements = computeMeasurementCount(timeFieldElem.objsize());
+    _numberOfMeasurements = _unpackingImpl->measurementCount(timeFieldElem);
+    _hasNext = _numberOfMeasurements > 0;
+}
+
+int BucketUnpacker::computeMeasurementCount(const BSONObj& bucket, StringData timeField) {
+    auto&& controlField = bucket[timeseries::kBucketControlFieldName];
+    uassert(5857904,
+            "The $_internalUnpackBucket stage requires 'control' object to be present",
+            controlField && controlField.type() == BSONType::Object);
+
+    auto&& versionField = controlField.Obj()[timeseries::kBucketControlVersionFieldName];
+    uassert(5857905,
+            "The $_internalUnpackBucket stage requires 'control.version' field to be present",
+            versionField && isNumericBSONType(versionField.type()));
+
+    auto&& dataField = bucket[timeseries::kBucketDataFieldName];
+    if (!dataField || dataField.type() != BSONType::Object)
+        return 0;
+
+    auto&& time = dataField.Obj()[timeField];
+    if (!time) {
+        return 0;
+    }
+
+    auto version = versionField.Number();
+    if (version == 1) {
+        return BucketUnpackerV1::computeElementCountFromTimestampObjSize(time.objsize());
+    } else if (version == 2) {
+        return BSONColumn(time).size();
+    } else {
+        uasserted(5857901, "Invalid bucket version");
+    }
 }
 
 void BucketUnpacker::setBucketSpecAndBehavior(BucketSpec&& bucketSpec, Behavior behavior) {
     _includeMetaField = eraseMetaFromFieldSetAndDetermineIncludeMeta(behavior, &bucketSpec);
     _includeTimeField = determineIncludeTimeField(behavior, &bucketSpec);
     _unpackerBehavior = behavior;
+
     eraseExcludedComputedMetaProjFields(behavior, &bucketSpec);
     _spec = std::move(bucketSpec);
 }
@@ -166,81 +509,4 @@ const std::set<StringData> BucketUnpacker::reservedBucketFieldNames = {
     timeseries::kBucketMetaFieldName,
     timeseries::kBucketControlFieldName};
 
-void BucketUnpacker::addComputedMetaProjFields(const std::vector<StringData>& computedFieldNames) {
-    for (auto&& field : computedFieldNames) {
-        _spec.computedMetaProjFields.emplace_back(field.toString());
-
-        // If we're already specifically including fields, we need to add the computed fields to
-        // the included field set to ensure they are unpacked.
-        if (_unpackerBehavior == BucketUnpacker::Behavior::kInclude) {
-            _spec.fieldSet.emplace(field);
-        }
-    }
-}
-
-Document BucketUnpacker::getNext() {
-    tassert(5521503, "'getNext()' requires the bucket to be owned", _bucket.isOwned());
-    tassert(5422100, "'getNext()' was called after the bucket has been exhausted", hasNext());
-
-    auto measurement = MutableDocument{};
-    auto&& timeElem = _timeFieldIter->next();
-    if (_includeTimeField) {
-        measurement.addField(_spec.timeField, Value{timeElem});
-    }
-
-    // Includes metaField when we're instructed to do so and metaField value exists.
-    if (_includeMetaField && _metaValue) {
-        measurement.addField(*_spec.metaField, Value{_metaValue});
-    }
-
-    auto& currentIdx = timeElem.fieldNameStringData();
-    for (auto&& [colName, colIter] : _fieldIters) {
-        if (auto&& elem = *colIter; colIter.more() && elem.fieldNameStringData() == currentIdx) {
-            measurement.addField(colName, Value{elem});
-            colIter.advance(elem);
-        }
-    }
-
-    // Add computed meta projections.
-    for (auto&& name : _spec.computedMetaProjFields) {
-        measurement.addField(name, Value{_computedMetaProjections[name]});
-    }
-
-    return measurement.freeze();
-}
-
-Document BucketUnpacker::extractSingleMeasurement(int j) {
-    tassert(5422101,
-            "'extractSingleMeasurment' expects j to be greater than or equal to zero and less than "
-            "or equal to the number of measurements in a bucket",
-            j >= 0 && j < _numberOfMeasurements);
-
-    auto measurement = MutableDocument{};
-
-    auto rowKey = std::to_string(j);
-    auto targetIdx = StringData{rowKey};
-    auto&& dataRegion = _bucket.getField(timeseries::kBucketDataFieldName).Obj();
-
-    if (_includeMetaField && !_metaValue.isNull()) {
-        measurement.addField(*_spec.metaField, Value{_metaValue});
-    }
-
-    for (auto&& dataElem : dataRegion) {
-        auto colName = dataElem.fieldNameStringData();
-        if (!determineIncludeField(colName, _unpackerBehavior, _spec)) {
-            continue;
-        }
-        auto value = dataElem[targetIdx];
-        if (value) {
-            measurement.addField(dataElem.fieldNameStringData(), Value{value});
-        }
-    }
-
-    // Add computed meta projections.
-    for (auto&& name : _spec.computedMetaProjFields) {
-        measurement.addField(name, Value{_computedMetaProjections[name]});
-    }
-
-    return measurement.freeze();
-}
 }  // namespace mongo

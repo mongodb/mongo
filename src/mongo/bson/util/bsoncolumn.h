@@ -50,6 +50,8 @@ namespace mongo {
  * deltas, they use additional storage owned by the BSONColumn for this. As all iterators will
  * create new delta's in the same order, they share a single ElementStore, with a worst-case memory
  * usage bounded to a total size on the order of that of the size of the expanded BSONColumn.
+ *
+ * All iterators are invalidated when moving the BSONColumn.
  */
 class BSONColumn {
 public:
@@ -74,7 +76,7 @@ public:
         using reference = const BSONElement&;
 
         reference operator*() const {
-            return _column._decompressed.at(_index);
+            return _column->_decompressed.at(_index);
         }
         pointer operator->() const {
             return &operator*();
@@ -88,6 +90,11 @@ public:
 
         bool operator==(const Iterator& rhs) const;
         bool operator!=(const Iterator& rhs) const;
+
+        // Move this Iterator to a new BSONColumn instance. Should only be used when moving
+        // BSONColumn instances and we want to re-attach the iterator to the new instance without
+        // losing position
+        Iterator moveTo(BSONColumn& column);
 
     private:
         Iterator(BSONColumn& column, const char* pos, const char* end);
@@ -113,8 +120,9 @@ public:
             return (control & 0x0F) + 1;
         }
 
-        // Reference to BSONColumn this Iterator is created from
-        BSONColumn& _column;
+        // Pointer to BSONColumn this Iterator is created from, this will be stale when moving the
+        // BSONColumn. All iterators are invalidated on move!
+        BSONColumn* _column;
 
         // Current iterator position
         size_t _index = 0;
@@ -188,6 +196,15 @@ public:
         return _elementCount;
     }
 
+    /**
+     * Field name that this BSONColumn represents.
+     *
+     * O(1) time complexity
+     */
+    StringData name() const {
+        return _name;
+    }
+
 private:
     /**
      * BSONElement storage, owns materialised BSONElement returned by BSONColumn.
@@ -250,5 +267,7 @@ private:
     const char* _controlLastLiteral;
     size_t _indexLastLiteral = 0;
     bool _fullyDecompressed = false;
+
+    std::string _name;
 };
 }  // namespace mongo

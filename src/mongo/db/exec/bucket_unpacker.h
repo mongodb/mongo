@@ -61,38 +61,25 @@ struct BucketSpec {
  */
 class BucketUnpacker {
 public:
-    // A table that is useful for interpolations between the number of measurements in a bucket and
-    // the byte size of a bucket's data section timestamp column. Each table entry is a pair (b_i,
-    // S_i), where b_i is the number of measurements in the bucket and S_i is the byte size of the
-    // timestamp BSONObj. The table is bounded by 16 MB (2 << 23 bytes) where the table entries are
-    // pairs of b_i and S_i for the lower bounds of the row key digit intervals [0, 9], [10, 99],
-    // [100, 999], [1000, 9999] and so on. The last entry in the table, S7, is the first entry to
-    // exceed the server BSON object limit of 16 MB.
-    static constexpr std::array<std::pair<int32_t, int32_t>, 8> kTimestampObjSizeTable{
-        {{0, BSONObj::kMinBSONLength},
-         {10, 115},
-         {100, 1195},
-         {1000, 12895},
-         {10000, 138895},
-         {100000, 1488895},
-         {1000000, 15888895},
-         {10000000, 168888895}}};
-
-    /**
-     * Given the size of a BSONObj timestamp column, formatted as it would be in a time-series
-     * system.buckets.X collection, returns the number of measurements in the bucket in O(1) time.
-     */
-    static int computeMeasurementCount(int targetTimestampObjSize);
-
-    // Set of field names reserved for time-series buckets.
-    static const std::set<StringData> reservedBucketFieldNames;
-
     // When BucketUnpacker is created with kInclude it must produce measurements that contain the
     // set of fields. Otherwise, if the kExclude option is used, the measurements will include the
     // set difference between all fields in the bucket and the provided fields.
     enum class Behavior { kInclude, kExclude };
+    /**
+     * Returns the number of measurements in the bucket in O(1) time.
+     */
+    static int computeMeasurementCount(const BSONObj& bucket, StringData timeField);
 
+    // Set of field names reserved for time-series buckets.
+    static const std::set<StringData> reservedBucketFieldNames;
+
+    BucketUnpacker();
     BucketUnpacker(BucketSpec spec, Behavior unpackerBehavior);
+    BucketUnpacker(const BucketUnpacker& other) = delete;
+    BucketUnpacker(BucketUnpacker&& other);
+    ~BucketUnpacker();
+    BucketUnpacker& operator=(const BucketUnpacker& rhs) = delete;
+    BucketUnpacker& operator=(BucketUnpacker&& rhs);
 
     /**
      * This method will continue to materialize Documents until the bucket is exhausted. A
@@ -106,8 +93,19 @@ public:
      */
     Document extractSingleMeasurement(int j);
 
+    /**
+     * Returns true if there is more data to fetch, is the precondition for 'getNext'.
+     */
     bool hasNext() const {
-        return _timeFieldIter && _timeFieldIter->more();
+        return _hasNext;
+    }
+
+    /**
+     * Makes a copy of this BucketUnpacker that is detached from current bucket. The new copy needs
+     * to be reset to a new bucket object to perform unpacking.
+     */
+    BucketUnpacker copy() const {
+        return {bucketSpec(), behavior()};
     }
 
     /**
@@ -144,12 +142,15 @@ public:
     // Add computed meta projection names to the bucket specification.
     void addComputedMetaProjFields(const std::vector<StringData>& computedFieldNames);
 
+    class UnpackingImpl;
+
 private:
     BucketSpec _spec;
     Behavior _unpackerBehavior;
 
-    // Iterates the timestamp section of the bucket to drive the unpacking iteration.
-    boost::optional<BSONObjIterator> _timeFieldIter;
+    std::unique_ptr<UnpackingImpl> _unpackingImpl;
+
+    bool _hasNext = false;
 
     // A flag used to mark that the timestamp value should be materialized in measurements.
     bool _includeTimeField;
@@ -165,9 +166,6 @@ private:
     // measurement.
     BSONElement _metaValue;
 
-    // Iterators used to unpack the columns of the above bucket that are populated during the reset
-    // phase according to the provided 'Behavior' and 'BucketSpec'.
-    std::vector<std::pair<std::string, BSONObjIterator>> _fieldIters;
 
     // Map <name, BSONElement> for the computed meta field projections. Updated for
     // every bucket upon reset().

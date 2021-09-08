@@ -45,6 +45,7 @@ namespace mongo {
 class BSONColumnBuilder {
 public:
     BSONColumnBuilder(StringData fieldName);
+    BSONColumnBuilder(BSONColumnBuilder&&) = delete;
 
     /**
      * Appends a BSONElement to this BSONColumnBuilder.
@@ -65,6 +66,13 @@ public:
      */
     StringData fieldName() const {
         return _fieldName;
+    }
+
+    /**
+     * Returns the number of BSONElements added or skipped so far.
+     */
+    size_t size() const {
+        return _elementCount;
     }
 
     /**
