@@ -102,8 +102,8 @@ const docToUpdateTo = {
 const docToRemove = docToUpdateTo;
 
 let testCRUDOps = (collConn) => {
-    // TODO: SERVER-40167 Having an extra document in the collection is necessary to avoid
-    // prepare conflicts when deleting documents.
+    // Having an extra document in the collection is necessary to avoid prepare conflicts when
+    // deleting adjacent documents. See SERVER-40167.
     assert.commandWorked(collConn.insert({num: 1}));
 
     assert.commandWorked(collConn.insert(docToInsert));
