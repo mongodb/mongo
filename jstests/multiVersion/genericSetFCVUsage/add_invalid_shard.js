@@ -1,7 +1,6 @@
 /**
  * Test that adding invalid or duplicate shards will fail.
  *
- * @tags: [disabled_due_to_server_58295]
  */
 (function() {
 
