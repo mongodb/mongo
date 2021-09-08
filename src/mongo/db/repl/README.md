@@ -1923,7 +1923,8 @@ written to the oplog.
 
 Feature compatibility version (FCV) is the versioning mechanism for a MongoDB cluster that provides
 safety guarantees when upgrading and downgrading between versions. The FCV determines the version of
-the feature set exposed by the cluster.
+the feature set exposed by the cluster and is often set in lockstep with the binary version as a
+part of [upgrading or downgrading the cluster's binary version](https://docs.mongodb.com/v5.0/release-notes/5.0-upgrade-replica-set/#upgrade-a-replica-set-to-5.0).
 
 FCV is used to disable features that may be problematic when active in a mixed version cluster.
 For example, incompatibility issues can arise if a newer version node accepts an instance of a new
@@ -1931,9 +1932,9 @@ feature *f* while there are still older version nodes in the cluster that are un
 *f*.
 
 FCV is persisted as a document in the `admin.system.version` collection. It will look something like
-the following if a node were to be in FCV 4.4:
+the following if a node were to be in FCV 5.0:
 <pre><code>
-   { "_id" : "featureCompatibilityVersion", "version" : "4.4" }</code></pre>
+   { "_id" : "featureCompatibilityVersion", "version" : "5.0" }</code></pre>
 
 This document is present in every mongod in the cluster and is replicated to other members of the
 replica set whenever it is updated via writes to the `admin.system.version` collection. The FCV
@@ -1949,16 +1950,16 @@ shard server, then the server will set its FCV to the latest version by default.
 As part of a startup with an existing FCV document, the server caches an in-memory value of the FCV
 from disk. The `FcvOpObserver` keeps this in-memory value in sync with the on-disk FCV document
 whenever an update to the document is made. In the period of time during startup where the in-memory
-value has yet to be loaded from disk, the FCV is set to `kUnsetDefault{Last-LTS}Behavior`. This 
+value has yet to be loaded from disk, the FCV is set to `kUnsetDefaultLastLTSBehavior`. This
 indicates that the server will be using the last-LTS feature set as to ensure compatibility with
 other nodes in the replica set.
 
 As part of initial sync, the in-memory FCV value is always initially set to be 
-`kUnsetDefault{Last-LTS}Behavior`. This is to ensure compatibility between the sync source and sync
+`kUnsetDefaultLastLTSBehavior`. This is to ensure compatibility between the sync source and sync
 target. If the sync source is actually in a different feature compatibility version, we will find
 out when we clone the `admin.system.version` collection.
 
-A node that starts with `--replSet` will also have an FCV value of `kUnsetDefault{Last-LTS}Behavior`
+A node that starts with `--replSet` will also have an FCV value of `kUnsetDefaultLastLTSBehavior`
 if it has not yet received the `replSetInitiate` command.
 
 ## setFeatureCompatibilityVersion
@@ -1979,36 +1980,39 @@ non-data bearing, they do not have an FCV.
 Each `mongod` release will support the following upgrade/downgrade paths:
 * Last-Continuous ←→ Latest
 * Last-LTS ←→ Latest
+* Last-LTS → Last-Continuous
+  * This upgrade-only transition is only possible when requested by the [config server](https://docs.mongodb.com/manual/core/sharded-cluster-config-servers/).
+Additionally, the last LTS must not be equal to the last continuous release.
 
 As part of an upgrade/downgrade, the FCV will transition through three states:
 <pre><code>
 Upgrade:
-   kVersionX → kUpgradingFromXToY → kVersionY
+   kVersion_X → kUpgradingFrom_X_To_Y → kVersion_Y
 
 Downgrade:
-   kVersionX → kDowngradingFromXToY → kVersionY
+   kVersion_X → kDowngradingFrom_X_To_Y → kVersion_Y
 </code></pre>
 In above, X will be the source version that we are upgrading/downgrading from while Y is the target
 version that we are upgrading/downgrading to.
 
-Transitioning to one of the `kUpgradingFromXToY`/`kDowngradingFromXToY` states updates
+Transitioning to one of the `kUpgradingFrom_X_To_Y`/`kDowngradingFrom_X_To_Y` states updates
 the FCV document in `admin.system.version` with a new `targetVersion` field. Transitioning to a
-`kDowngradingFromXtoY` state in particular will also add a `previousVersion` field along with the
+`kDowngradingFrom_X_to_Y` state in particular will also add a `previousVersion` field along with the
 `targetVersion` field. These updates are done with `writeConcern: majority`.
 
 Some examples of on-disk representations of the upgrading and downgrading states:
 <pre><code>
-kUpgradingFrom44To47:
+kUpgradingFrom_5_0_To_5_1:
 {
-    version: 4.4,
-    targetVersion: 4.7
+    version: 5.0,
+    targetVersion: 5.1
 }
 
-kDowngradingFrom47To44:
+kDowngradingFrom_5_1_To_5_0:
 { 
-    version: 4.4, 
-    targetVersion: 4.4,
-    previousVersion: 4.7
+    version: 5.0, 
+    targetVersion: 5.0,
+    previousVersion: 5.1
 }
 </code></pre>
 
@@ -2019,15 +2023,19 @@ and acquire the global lock prior to the FCV change, they will proceed in the co
 FCV, and will guarantee to finish before the FCV change takes place. For the operations that begin
 after the FCV change, they will see the updated FCV and behave accordingly.
 
-Transitioning to one of the `kUpgradingFromXToY`/`kDowngradingFromXtoY`/`kVersionY`(on upgrade)
-states sets the `minWireVersion` to `WireVersion::LATEST_WIRE_VERSION` and also closes all incoming
-connections from internal clients with lower binary versions.
+Transitioning to one of the `kUpgradingFrom_X_To_Y`/`kDowngradingFrom_X_to_Y`/`kVersion_Y`(on
+upgrade) states sets the `minWireVersion` to `WireVersion::LATEST_WIRE_VERSION` and also closes all
+incoming connections from internal clients with lower binary versions.
 
-Finally, as part of transitioning to the `kVersionY` state, the `targetVersion` and the
+Finally, as part of transitioning to the `kVersion_Y` state, the `targetVersion` and the
 `previousVersion` (if applicable) fields of the FCV document are deleted while the `version` field
 is updated to reflect the new upgraded or downgraded state. This update is also done using
 `writeConcern: majority`. The new in-memory FCV value will be updated to reflect the on-disk
 changes.
+
+_Code spelunking starting points:_
+* [The template file used to generate the FCV constants](https://github.com/mongodb/mongo/blob/c4d2ed3292b0e113135dd85185c27a8235ea1814/src/mongo/util/version/releases.h.tpl#L1)
+* [The `FCVTransitions` class, that determines valid FCV transitions](https://github.com/mongodb/mongo/blob/c4d2ed3292b0e113135dd85185c27a8235ea1814/src/mongo/db/commands/feature_compatibility_version.cpp#L75)
 
 # System Collections
 
