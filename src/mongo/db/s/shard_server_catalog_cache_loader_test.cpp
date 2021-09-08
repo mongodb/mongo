@@ -461,17 +461,42 @@ TEST_F(ShardServerCatalogCacheLoaderTest, TimeseriesFieldsAreProperlyPropagatedO
     ChunkVersion collectionVersion(1, 0, OID::gen(), boost::none /* timestamp */);
 
     CollectionType collectionType = makeCollectionType(collectionVersion);
-    TypeCollectionTimeseriesFields tsFields;
-    tsFields.setTimeseriesOptions(TimeseriesOptions("fieldName"));
-    collectionType.setTimeseriesFields(tsFields);
-
     vector<ChunkType> chunks = makeFiveChunks(collectionVersion);
+    auto timeseriesOptions = TimeseriesOptions("fieldName");
 
-    _remoteLoaderMock->setCollectionRefreshReturnValue(collectionType);
-    _remoteLoaderMock->setChunkRefreshReturnValue(chunks);
+    {
+        TypeCollectionTimeseriesFields tsFields;
+        tsFields.setTimeseriesOptions(timeseriesOptions);
+        collectionType.setTimeseriesFields(tsFields);
 
-    auto collAndChunksRes = _shardLoader->getChunksSince(kNss, ChunkVersion::UNSHARDED()).get();
-    ASSERT(collAndChunksRes.timeseriesFields.is_initialized());
+        _remoteLoaderMock->setCollectionRefreshReturnValue(collectionType);
+        _remoteLoaderMock->setChunkRefreshReturnValue(chunks);
+
+        auto collAndChunksRes = _shardLoader->getChunksSince(kNss, ChunkVersion::UNSHARDED()).get();
+        ASSERT(collAndChunksRes.timeseriesFields.is_initialized());
+        ASSERT(collAndChunksRes.timeseriesFields->getGranularity() ==
+               BucketGranularityEnum::Seconds);
+    }
+
+    {
+        auto& lastChunk = chunks.back();
+        const auto maxLoaderVersion = lastChunk.getVersion();
+        ChunkVersion newCollectionVersion = maxLoaderVersion;
+        newCollectionVersion.incMinor();
+        lastChunk.setVersion(newCollectionVersion);
+
+        TypeCollectionTimeseriesFields tsFields;
+        timeseriesOptions.setGranularity(BucketGranularityEnum::Hours);
+        tsFields.setTimeseriesOptions(timeseriesOptions);
+        collectionType.setTimeseriesFields(tsFields);
+
+        _remoteLoaderMock->setCollectionRefreshReturnValue(collectionType);
+        _remoteLoaderMock->setChunkRefreshReturnValue(std::vector{lastChunk});
+
+        auto collAndChunksRes = _shardLoader->getChunksSince(kNss, maxLoaderVersion).get();
+        ASSERT(collAndChunksRes.timeseriesFields.is_initialized());
+        ASSERT(collAndChunksRes.timeseriesFields->getGranularity() == BucketGranularityEnum::Hours);
+    }
 }
 
 void ShardServerCatalogCacheLoaderTest::refreshCollectionEpochOnRemoteLoader() {

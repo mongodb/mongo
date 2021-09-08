@@ -1019,6 +1019,7 @@ StatusWith<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_getLoader
 
         // The collection info in enqueued metadata may be more recent than the persisted metadata
         persisted.creationTime = enqueued.creationTime;
+        persisted.timeseriesFields = std::move(enqueued.timeseriesFields);
         persisted.reshardingFields = std::move(enqueued.reshardingFields);
         persisted.maxChunkSizeBytes = enqueued.maxChunkSizeBytes;
         persisted.allowAutoSplit = enqueued.allowAutoSplit;
@@ -1615,6 +1616,7 @@ ShardServerCatalogCacheLoader::CollAndChunkTaskList::getEnqueuedMetadataForTerm(
             collAndChunks.maxChunkSizeBytes = task.collectionAndChangedChunks->maxChunkSizeBytes;
             collAndChunks.allowAutoSplit = task.collectionAndChangedChunks->allowAutoSplit;
             collAndChunks.reshardingFields = task.collectionAndChangedChunks->reshardingFields;
+            collAndChunks.timeseriesFields = task.collectionAndChangedChunks->timeseriesFields;
         }
     }
     return enqueuedMetadata;
