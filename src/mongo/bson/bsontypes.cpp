@@ -187,6 +187,8 @@ const char* typeName(BinDataType type) {
             return "MD5";
         case Encrypt:
             return "encrypt";
+        case Column:
+            return "column";
         case bdtCustom:
             return "Custom";
         default:

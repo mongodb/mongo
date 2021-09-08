@@ -13,6 +13,7 @@ env.CppUnitTest(
         'atomic_word_test.cpp',
         'bits_test.cpp',
         'endian_test.cpp',
+        'int128_test.cpp',
         'mutex_test.cpp',
         'process_id_test.cpp',
         'random_test.cpp',

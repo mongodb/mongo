@@ -382,7 +382,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::createRan
             expCtx.get(),
             ws.get(),
             std::move(root),
-            *bucketUnpacker,
+            bucketUnpacker->copy(),
             std::move(maybeShardFilter),
             // By using a quantity slightly higher than 'kMaxPresampleSize', we ensure that the
             // 'SampleFromTimeseriesBucket' stage won't fail due to too many consecutive sampling
@@ -404,7 +404,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::createRan
         }
 
         auto topkSortPlan = std::make_unique<UnpackTimeseriesBucket>(
-            expCtx.get(), ws.get(), std::move(collScanPlan), *bucketUnpacker);
+            expCtx.get(), ws.get(), std::move(collScanPlan), bucketUnpacker->copy());
 
         // In a sharded collection we need to preserve the $sample source in order to provide the
         // AsyncResultsMerger with $sortKeys it can use to merge samples from multiple shards.

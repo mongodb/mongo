@@ -5,6 +5,13 @@ env = env.Clone()
 env.InjectThirdParty(libraries=['abseil-cpp'])
 
 env.Library(
+    target="absl_numeric",
+    source = [
+      "abseil-cpp/absl/numeric/int128.cc",
+    ]
+)
+
+env.Library(
     target="absl_hash",
     source=[
         "abseil-cpp/absl/hash/internal/city.cc",
