@@ -1209,23 +1209,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
 // Find
 //
 
-namespace {
-
-StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> _getExecutorFind(
-    OperationContext* opCtx,
-    const CollectionPtr* collection,
-    std::unique_ptr<CanonicalQuery> canonicalQuery,
-    PlanYieldPolicy::YieldPolicy yieldPolicy,
-    size_t plannerOptions) {
-
-    if (OperationShardingState::isOperationVersioned(opCtx)) {
-        plannerOptions |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
-    }
-    return getExecutor(opCtx, collection, std::move(canonicalQuery), yieldPolicy, plannerOptions);
-}
-
-}  // namespace
-
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind(
     OperationContext* opCtx,
     const CollectionPtr* collection,
@@ -1235,8 +1218,11 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
     auto yieldPolicy = (permitYield && !opCtx->inMultiDocumentTransaction())
         ? PlanYieldPolicy::YieldPolicy::YIELD_AUTO
         : PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY;
-    return _getExecutorFind(
-        opCtx, collection, std::move(canonicalQuery), yieldPolicy, plannerOptions);
+
+    if (OperationShardingState::isOperationVersioned(opCtx)) {
+        plannerOptions |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
+    }
+    return getExecutor(opCtx, collection, std::move(canonicalQuery), yieldPolicy, plannerOptions);
 }
 
 namespace {
