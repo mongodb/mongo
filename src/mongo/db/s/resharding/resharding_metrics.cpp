@@ -506,8 +506,8 @@ static bool checkState(T state, std::initializer_list<T> validStates) {
 
     std::stringstream ss;
     StringData sep = "";
-    for (auto state : validStates) {
-        ss << sep << serializeState(state);
+    for (auto s : validStates) {
+        ss << sep << serializeState(s);
         sep = ", "_sd;
     }
 
