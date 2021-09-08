@@ -325,12 +325,13 @@ __rollback_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip, 
     WT_PAGE *page;
     WT_TIME_WINDOW *hs_tw;
     WT_UPDATE *tombstone, *upd;
-    wt_timestamp_t hs_durable_ts, hs_start_ts, hs_stop_durable_ts, newer_hs_durable_ts;
+    wt_timestamp_t hs_durable_ts, hs_start_ts, hs_stop_durable_ts, newer_hs_durable_ts, pinned_ts;
     uint64_t hs_counter, type_full;
     uint32_t hs_btree_id;
     uint8_t *memp;
     uint8_t type;
     char ts_string[4][WT_TS_INT_STRING_SIZE];
+    char tw_string[WT_TIME_STRING_SIZE];
     bool valid_update_found;
 #ifdef HAVE_DIAGNOSTIC
     bool first_record;
@@ -372,6 +373,8 @@ __rollback_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip, 
     WT_ERR(__wt_buf_set(session, full_value, full_value->data, full_value->size));
     newer_hs_durable_ts = unpack->tw.durable_start_ts;
 
+    __wt_txn_pinned_timestamp(session, &pinned_ts);
+
     /* Open a history store table cursor. */
     WT_ERR(__wt_curhs_open(session, NULL, &hs_cursor));
     /*
@@ -397,6 +400,26 @@ __rollback_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip, 
         WT_ERR(hs_cursor->get_value(
           hs_cursor, &hs_stop_durable_ts, &hs_durable_ts, &type_full, hs_value));
         type = (uint8_t)type_full;
+
+        /* Retrieve the time window from the history cursor. */
+        __wt_hs_upd_time_window(hs_cursor, &hs_tw);
+
+        /*
+         * We have a tombstone on the history update and it is obsolete according to the timestamp
+         * and txnid, so no need to restore it. These obsolete updates are written to the disk when
+         * they are not obsolete at the time of reconciliation by an eviction thread and later they
+         * become obsolete according to the checkpoint.
+         */
+        if (__rollback_txn_visible_id(session, hs_tw->stop_txn) &&
+          hs_stop_durable_ts <= pinned_ts) {
+            __wt_verbose(session, WT_VERB_RECOVERY_RTS(session),
+              "history store stop is obsolete with time window: %s and pinned timestamp: %s",
+              __wt_time_window_to_string(hs_tw, tw_string),
+              __wt_timestamp_to_string(pinned_ts, ts_string[0]));
+            WT_ERR(hs_cursor->remove(hs_cursor));
+            WT_STAT_CONN_DATA_INCR(session, txn_rts_hs_removed);
+            continue;
+        }
 
         /*
          * Do not include history store updates greater than on-disk data store version to construct
@@ -448,9 +471,6 @@ __rollback_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip, 
 
         if (hs_stop_durable_ts < newer_hs_durable_ts)
             WT_STAT_CONN_DATA_INCR(session, txn_rts_hs_stop_older_than_newer_start);
-
-        /* Retrieve the time window from the history cursor. */
-        __wt_hs_upd_time_window(hs_cursor, &hs_tw);
 
         /*
          * Stop processing when we find a stable update according to the given timestamp and

@@ -151,6 +151,10 @@ test_wt6616_checkpoint_oldest_ts_SOURCES = wt6616_checkpoint_oldest_ts/main.c
 noinst_PROGRAMS += test_wt6616_checkpoint_oldest_ts
 all_TESTS += wt6616_checkpoint_oldest_ts/smoke.sh
 
+test_wt7989_compact_checkpoint_SOURCES = wt7989_compact_checkpoint/main.c
+noinst_PROGRAMS += test_wt7989_compact_checkpoint
+all_TESTS += test_wt7989_compact_checkpoint
+
 # Run this during a "make check" smoke test.
 TESTS = $(all_TESTS)
 LOG_COMPILER = env top_builddir=$(top_builddir) top_srcdir=$(top_srcdir) $(TEST_WRAPPER)

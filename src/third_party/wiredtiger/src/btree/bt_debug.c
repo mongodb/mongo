@@ -1115,7 +1115,8 @@ __debug_page_metadata(WT_DBG *ds, WT_REF *ref)
       "disk %p",
       (void *)page->dsk));
     if (page->dsk != NULL)
-        WT_RET(ds->f(ds, ", dsk_mem_size %" PRIu32, page->dsk->mem_size));
+        WT_RET(ds->f(ds, ", dsk_mem_size %" PRIu32 ", write_gen: %" PRIu64, page->dsk->mem_size,
+          page->dsk->write_gen));
     WT_RET(ds->f(ds, ", entries %" PRIu32, entries));
     WT_RET(ds->f(ds, ", %s", __wt_page_is_modified(page) ? "dirty" : "clean"));
 
