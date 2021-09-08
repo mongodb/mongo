@@ -8383,6 +8383,7 @@ buildvariants:
     test_flags: >-
         --runAllFeatureFlagTests
         --excludeWithAnyTags=incompatible_with_windows_tls
+        --mongodSetParameters="{internalQueryEnableSlotBasedExecutionEngine: true}"
   tasks:
     - name: compile_and_archive_dist_test_then_package_TG
       distros:
@@ -8492,6 +8493,7 @@ buildvariants:
     test_flags: >-
         --runAllFeatureFlagTests
         --excludeWithAnyTags=incompatible_with_windows_tls
+        --mongodSetParameters="{internalQueryEnableSlotBasedExecutionEngine: true}"
   tasks:
     - name: compile_and_archive_dist_test_then_package_TG
       distros:
@@ -9560,6 +9562,7 @@ buildvariants:
     test_flags: >-
       --excludeWithAnyTags=requires_fcv_51,multiversion_incompatible,disabled_due_to_server_58295
       --runAllFeatureFlagTests
+      --mongodSetParameters="{internalQueryEnableSlotBasedExecutionEngine: true}"
 
 - name: rhel-80-64-bit-nossl
   display_name: "RHEL 8.0 Shared Library (No SSL)"
@@ -10351,6 +10354,7 @@ buildvariants:
     # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
     test_flags: >-
         --runAllFeatureFlagTests
+        --mongodSetParameters="{internalQueryEnableSlotBasedExecutionEngine: true}"
   tasks:
   - name: compile_and_archive_dist_test_then_package_TG
     distros:
@@ -11069,6 +11073,7 @@ buildvariants:
     # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
     test_flags: >-
         --runAllFeatureFlagTests
+        --mongodSetParameters="{internalQueryEnableSlotBasedExecutionEngine: true}"
     separate_debug: off
   tasks:
   - name: compile_and_archive_dist_test_then_package_TG
@@ -11303,6 +11308,7 @@ buildvariants:
     test_flags: >-
         --excludeWithAnyTags=requires_ocsp_stapling
         --runAllFeatureFlagTests
+        --mongodSetParameters="{internalQueryEnableSlotBasedExecutionEngine: true}"
     multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under UBSAN build.
@@ -11476,6 +11482,7 @@ buildvariants:
     test_flags: >-
         --excludeWithAnyTags=requires_ocsp_stapling
         --runAllFeatureFlagTests
+        --mongodSetParameters="{internalQueryEnableSlotBasedExecutionEngine: true}"
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
     hang_analyzer_dump_core: false
     scons_cache_scope: shared
