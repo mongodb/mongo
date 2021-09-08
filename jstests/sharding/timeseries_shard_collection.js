@@ -14,6 +14,7 @@ Random.setRandomSeed();
 const st = new ShardingTest({shards: 2, rs: {nodes: 2}});
 
 const dbName = 'test';
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 const sDB = st.s.getDB(dbName);
 const timeseries = {
     timeField: 'time',
@@ -54,8 +55,6 @@ if (TimeseriesTest.shardedtimeseriesCollectionsEnabled(st.shard0)) {
 
     // Simple shard key on the metadata field.
     function metaShardKey(implicit) {
-        assert.commandWorked(st.s.adminCommand({enableSharding: 'test'}));
-
         // Command should fail since the 'timeseries' specification does not match that existing
         // collection.
         if (!implicit) {
@@ -92,7 +91,7 @@ if (TimeseriesTest.shardedtimeseriesCollectionsEnabled(st.shard0)) {
         assert.eq(1, counts[st.shard0.shardName]);
         assert.eq(1, counts[st.shard1.shardName]);
 
-        sDB.dropDatabase();
+        assert(sDB.ts.drop());
     }
 
     // Sharding an existing timeseries collection.
@@ -139,7 +138,7 @@ if (TimeseriesTest.shardedtimeseriesCollectionsEnabled(st.shard0)) {
         assert.eq(1, counts[st.shard0.shardName]);
         assert.eq(1, counts[st.shard1.shardName]);
 
-        sDB.dropDatabase();
+        assert(sDB.ts.drop());
     }
 
     // Sharding an existing timeseries collection.
@@ -150,8 +149,6 @@ if (TimeseriesTest.shardedtimeseriesCollectionsEnabled(st.shard0)) {
 
 } else {
     (function timeseriesCollectionsCannotBeSharded() {
-        assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-
         assert.commandFailedWithCode(
             st.s.adminCommand({shardCollection: 'test.ts', key: {meta: 1}, timeseries}), 5731502);
 
@@ -185,7 +182,7 @@ if (TimeseriesTest.shardedtimeseriesCollectionsEnabled(st.shard0)) {
             st.s.adminCommand({shardCollection: 'test.system.buckets.ts', key: {meta: 1}}),
             5731501);
 
-        assert.commandWorked(sDB.dropDatabase());
+        assert(tsColl.drop());
     })();
 }
 

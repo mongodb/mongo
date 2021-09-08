@@ -282,17 +282,22 @@ Status _dropCollection(OperationContext* opCtx,
 }
 
 Status dropCollection(OperationContext* opCtx,
-                      const NamespaceString& collectionName,
+                      const NamespaceString& nss,
                       DropReply* reply,
                       DropCollectionSystemCollectionMode systemCollectionMode) {
     if (!serverGlobalParams.quiet.load()) {
-        LOGV2(518070, "CMD: drop", logAttrs(collectionName));
+        LOGV2(518070, "CMD: drop", logAttrs(nss));
     }
 
     if (MONGO_unlikely(hangDropCollectionBeforeLockAcquisition.shouldFail())) {
         LOGV2(518080, "Hanging drop collection before lock acquisition while fail point is set");
         hangDropCollectionBeforeLockAcquisition.pauseWhileSet();
     }
+
+    // We rewrite drop of time-series buckets collection to drop of time-series view collection.
+    // This ensures that such drop will delete both collections.
+    const auto collectionName =
+        nss.isTimeseriesBucketsCollection() ? nss.getTimeseriesViewNamespace() : nss;
 
     try {
         return writeConflictRetry(opCtx, "drop", collectionName.ns(), [&] {

@@ -130,7 +130,7 @@ function generateDoc(time, metaValue) {
     indexKeys = bucketsColl.getIndexes().map(x => x.key);
     assert.sameMembers([{'control.min.time': 1}, {'meta.subField2': 1}], indexKeys);
 
-    mongosDB.dropDatabase();
+    assert(coll.drop());
 })();
 
 st.stop();
