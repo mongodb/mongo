@@ -142,6 +142,17 @@ AccumulationExpression genericParseSingleExpressionAccumulator(ExpressionContext
 }
 
 /**
+ * A parser for any SBE unsupported accumulator that only takes a single expression as an argument.
+ * Returns the expression to be evaluated by the accumulator and an AccumulatorState::Factory.
+ */
+template <class AccName>
+AccumulationExpression genericParseSBEUnsupportedSingleExpressionAccumulator(
+    ExpressionContext* const expCtx, BSONElement elem, VariablesParseState vps) {
+    expCtx->sbeGroupCompatible = false;
+    return genericParseSingleExpressionAccumulator<AccName>(expCtx, elem, vps);
+}
+
+/**
  * A parser that desugars { $count: {} } to { $sum: 1 }.
  */
 inline AccumulationExpression parseCountAccumulator(ExpressionContext* const expCtx,

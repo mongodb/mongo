@@ -44,6 +44,7 @@ AccumulationExpression AccumulatorInternalJsReduce::parseInternalJsReduce(
             elem.type() == BSONType::Object);
     BSONObj obj = elem.embeddedObject();
 
+    expCtx->sbeGroupCompatible = false;
     std::string funcSource;
     boost::intrusive_ptr<Expression> argument;
 
@@ -265,6 +266,7 @@ AccumulationExpression AccumulatorJs::parse(ExpressionContext* const expCtx,
             elem.type() == BSONType::Object);
     BSONObj obj = elem.embeddedObject();
 
+    expCtx->sbeGroupCompatible = false;
     std::string init, accumulate, merge;
     boost::optional<std::string> finalize;
     boost::intrusive_ptr<Expression> initArgs, accumulateArgs;

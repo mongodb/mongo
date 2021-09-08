@@ -189,6 +189,11 @@ public:
      */
     size_t getMaxMemoryUsageBytes() const;
 
+    // True if this $group can be pushed down to SBE.
+    bool sbeCompatible() const {
+        return _sbeCompatible;
+    }
+
 protected:
     GetNextResult doGetNext() final;
     void doDispose() final;
@@ -289,6 +294,8 @@ private:
     std::unique_ptr<Sorter<Value, Value>::Iterator> _sorterIterator;
 
     std::pair<Value, Value> _firstPartOfNextGroup;
+
+    bool _sbeCompatible;
 };
 
 }  // namespace mongo

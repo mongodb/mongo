@@ -470,6 +470,7 @@ intrusive_ptr<DocumentSource> DocumentSourceGroup::createFromBson(
     BSONObj groupObj(elem.Obj());
     BSONObjIterator groupIterator(groupObj);
     VariablesParseState vps = expCtx->variablesParseState;
+    expCtx->sbeGroupCompatible = true;
     while (groupIterator.more()) {
         BSONElement groupField(groupIterator.next());
         StringData pFieldName = groupField.fieldNameStringData();
@@ -490,6 +491,7 @@ intrusive_ptr<DocumentSource> DocumentSourceGroup::createFromBson(
             groupStage->_memoryTracker.set(pFieldName, 0);
         }
     }
+    groupStage->_sbeCompatible = expCtx->sbeGroupCompatible;
 
     uassert(
         15955, "a group specification must include an _id", !groupStage->_idExpressions.empty());

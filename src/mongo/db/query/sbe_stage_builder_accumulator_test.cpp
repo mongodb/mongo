@@ -27,7 +27,10 @@
  *    it in the license file.
  */
 
+#include <fmt/printf.h>
+
 #include "mongo/db/exec/sbe/util/debug_print.h"
+#include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
@@ -310,6 +313,42 @@ protected:
         }
         ASSERT(areEqual) << "expected set: " << std::make_pair(expectedTag, expectedSet)
                          << " but got set: " << std::make_pair(aggregatedTag, aggregatedSet);
+    }
+
+    void runSbeGroupCompatibleFlagTest(const std::vector<BSONObj>& rawPipeline,
+                                       boost::intrusive_ptr<ExpressionContext>& expCtx) {
+        // When we parse the AccumulationExpressions to build the DocumentSourceGroup, those
+        // AccumulationExpressions that are not supported by SBE will flip the sbeGroupCompatible
+        // flag in the expCtx to false.
+        auto pipeline = Pipeline::parse(rawPipeline, expCtx);
+
+        sbe::RuntimeEnvironment env;
+        auto state = makeStageBuilderState(&env);
+        for (const auto& source : pipeline->getSources()) {
+            // We try to figure out the expected sbeGroupCompatible value here. The
+            // sbeGroupCompatible flag should be false if any accumulator being tested does not have
+            // a registered SBE accumulator builder function.
+            auto groupStage = dynamic_cast<DocumentSourceGroup*>(source.get());
+            ASSERT_TRUE(groupStage);
+
+            auto sbeGroupCompatible = true;
+            for (const AccumulationStatement& accStmt : groupStage->getAccumulatedFields()) {
+                stage_builder::EvalStage evalStage;
+                auto [argExpr, argStage] = stage_builder::buildArgument(
+                    state, accStmt, std::move(evalStage), 0, kEmptyPlanNodeId);
+                try {
+                    auto [aggExprs, accStage] = stage_builder::buildAccumulator(
+                        state, accStmt, std::move(argStage), std::move(argExpr), kEmptyPlanNodeId);
+                } catch (const DBException& e) {
+                    // The accumulator is unsupported in SBE, so we expect that the sbeCompatible
+                    // flag should be false.
+                    ASSERT_EQ(5754701, e.code());
+                    sbeGroupCompatible = false;
+                    break;
+                }
+            }
+            ASSERT_EQ(sbeGroupCompatible, groupStage->sbeCompatible());
+        }
     }
 
 private:
@@ -1026,6 +1065,7 @@ TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationTwoGroupByTest) {
     };
     runAggregationWithGroupByTest("{x: {$sum: '$b'}}", docs, {"$a", "$c"}, BSON_ARRAY(20));
 }
+
 TEST_F(SbeAccumulatorBuilderTest, AddToSetAccumulatorTranslationSingleDoc) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 1))};
     runAddToSetTest("{x: {$addToSet: '$b'}}", docs, BSON_ARRAY(1));
@@ -1149,6 +1189,63 @@ TEST_F(SbeAccumulatorBuilderTest, PushAccumulatorTranslationVariousTypes) {
         "{x: {$push: '$b'}}",
         docs,
         BSON_ARRAY(BSON_ARRAY(42 << 4.2 << true << strVal << bsonObj << bsonArr)));
+}
+
+class AccumulatorSBEIncompatible final : public AccumulatorState {
+public:
+    static constexpr auto kName = "$incompatible"_sd;
+    const char* getOpName() const final {
+        return kName.rawData();
+    }
+    explicit AccumulatorSBEIncompatible(ExpressionContext* expCtx) : AccumulatorState(expCtx) {}
+    void processInternal(const Value& input, bool merging) final {}
+    Value getValue(bool toBeMerged) final {
+        return Value(true);
+    }
+    void reset() final {}
+    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx) {
+        return new AccumulatorSBEIncompatible(expCtx);
+    }
+};
+REGISTER_ACCUMULATOR(
+    incompatible,
+    genericParseSBEUnsupportedSingleExpressionAccumulator<AccumulatorSBEIncompatible>);
+
+TEST_F(SbeAccumulatorBuilderTest, SbeGroupCompatibleFlag) {
+    std::vector<BSONArray> docs;
+    std::vector<std::string> testCases = {
+        "agg: {$addToSet: \"$item\"}",
+        "agg: {$avg: \"$quantity\"}",
+        "agg: {$first: \"$item\"}",
+        "agg: {$last: \"$item\"}",
+        // TODO (SERVER-51541): Uncomment the following two test cases when $object supported is
+        // added to SBE.
+        // "agg: {$_internalJsReduce: {data: {k: \"$word\", v: \"$val\"}, eval: \"null\"}}",
+        //
+        // R"'(agg: {$accumulator: {init: "a", accumulate: "b", accumulateArgs: ["$copies"], merge:
+        // "c", lang: "js"}})'",
+        "agg: {$mergeObjects: \"$item\"}",
+        "agg: {$min: \"$item\"}",
+        "agg: {$max: \"$item\"}",
+        "agg: {$push: \"$item\"}",
+        "agg: {$stdDevPop: \"$item\"}",
+        "agg: {$stdDevSamp: \"$item\"}",
+        "agg: {$sum: \"$item\"}",
+        // All supported case.
+        "agg1: {$sum: \"$item\"}, agg2: {$max: \"$item\"}, agg3: {$avg: \"$quantity\"}",
+        // Mix of supported/unsupported accumulators.
+        "agg1: {$sum: \"$item\"}, agg2: {$incompatible: \"$item\"}, agg3: {$avg: \"$a\"}",
+        "agg1: {$incompatible: \"$item\"}, agg2: {$min: \"$item\"}, agg3: {$avg: \"$quantity\"}",
+    };
+    boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContextForTest());
+    std::vector<BSONObj> rawPipelines;
+    rawPipelines.reserve(testCases.size());
+    for (auto testCase : testCases) {
+        auto groupObj = fromjson(fmt::sprintf("{$group: {%s, _id: null}}", testCase));
+        rawPipelines.push_back(groupObj);
+        runSbeGroupCompatibleFlagTest(makeVector(groupObj), expCtx);
+    }
+    runSbeGroupCompatibleFlagTest(rawPipelines, expCtx);
 }
 
 }  // namespace mongo

@@ -410,6 +410,11 @@ public:
     // SBE expressions.
     bool sbeCompatible = true;
 
+    // True if all accumulators in the $group stage currently being parsed using this expression
+    // context can be translated into equivalent SBE expressions. This value is transient and gets
+    // reset for every $group stage we parse. Each $group stage has their per-stage flag.
+    bool sbeGroupCompatible = true;
+
     // These fields can be used in a context when API version validations were not enforced during
     // parse time (Example creating a view or validator), but needs to be enforce while querying
     // later.

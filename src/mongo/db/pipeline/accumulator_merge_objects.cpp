@@ -41,8 +41,8 @@ using boost::intrusive_ptr;
 
 /* ------------------------- AccumulatorMergeObjects ----------------------------- */
 
-REGISTER_ACCUMULATOR(mergeObjects,
-                     genericParseSingleExpressionAccumulator<AccumulatorMergeObjects>);
+REGISTER_ACCUMULATOR(
+    mergeObjects, genericParseSBEUnsupportedSingleExpressionAccumulator<AccumulatorMergeObjects>);
 REGISTER_STABLE_EXPRESSION(mergeObjects, ExpressionFromAccumulator<AccumulatorMergeObjects>::parse);
 
 intrusive_ptr<AccumulatorState> AccumulatorMergeObjects::create(ExpressionContext* const expCtx) {
