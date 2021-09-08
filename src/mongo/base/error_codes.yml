@@ -453,6 +453,8 @@ error_codes:
 
     - {code: 356, name: TxnRetryCounterTooOld, extra: TxnRetryCounterTooOldInfo}
 
+    - {code: 357, name: InvalidBSONType}
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)

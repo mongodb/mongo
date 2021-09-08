@@ -90,6 +90,20 @@ public:
         return _createElement(b);
     }
 
+    BSONElement createElementMinKey() {
+        BSONObjBuilder ob;
+        ob.appendMinKey("0"_sd);
+        _elementMemory.emplace_front(ob.obj());
+        return _elementMemory.front().firstElement();
+    }
+
+    BSONElement createElementMaxKey() {
+        BSONObjBuilder ob;
+        ob.appendMaxKey("0"_sd);
+        _elementMemory.emplace_front(ob.obj());
+        return _elementMemory.front().firstElement();
+    }
+
     BSONElement createNull() {
         BSONObjBuilder ob;
         ob.appendNull("0"_sd);
@@ -2392,6 +2406,28 @@ TEST_F(BSONColumnTest, NoLiteralStart) {
     BSONColumn col(createBSONColumn(expected.buf(), expected.len()));
     for (auto it = col.begin(), e = col.end(); it != e; ++it) {
     }
+}
+
+TEST_F(BSONColumnTest, AppendMinKey) {
+    BSONColumnBuilder cb("test");
+    ASSERT_THROWS_CODE(cb.append(createElementMinKey()), DBException, ErrorCodes::InvalidBSONType);
+
+    BufBuilder expected;
+    appendElementCount(expected, 0);
+    appendEOO(expected);
+
+    verifyBinary(cb.finalize(), expected);
+}
+
+TEST_F(BSONColumnTest, AppendMaxKey) {
+    BSONColumnBuilder cb("test");
+    ASSERT_THROWS_CODE(cb.append(createElementMaxKey()), DBException, ErrorCodes::InvalidBSONType);
+
+    BufBuilder expected;
+    appendElementCount(expected, 0);
+    appendEOO(expected);
+
+    verifyBinary(cb.finalize(), expected);
 }
 
 

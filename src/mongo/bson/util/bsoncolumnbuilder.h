@@ -53,6 +53,8 @@ public:
      * Value will be stored delta compressed if possible and uncompressed otherwise.
      *
      * The field name will be ignored.
+     *
+     * Throws InvalidBSONType if MinKey or MaxKey is appended.
      */
     BSONColumnBuilder& append(BSONElement elem);
 

@@ -78,6 +78,10 @@ BSONElement BSONColumnBuilder::_previous() const {
 
 BSONColumnBuilder& BSONColumnBuilder::append(BSONElement elem) {
     auto type = elem.type();
+    uassert(ErrorCodes::InvalidBSONType,
+            "MinKey or MaxKey is not supported by BSON Column (subtype 7)",
+            type != MinKey && type != MaxKey);
+
     auto previous = _previous();
     ++_elementCount;
 
