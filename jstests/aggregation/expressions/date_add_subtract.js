@@ -204,13 +204,9 @@ function runAndAssertErrorCode(dateArithmeticsSpec, expectedErrorCode) {
     runAndAssertErrorCode({$dateSubtract: {startDate: "$date", unit: "year", amount: 1.001}},
                           5166405);
 
-    // Overflow error of dateAdd operation due to large amount.
-    runAndAssertErrorCode(
-        {$dateSubtract: {startDate: "$date", unit: "month", amount: 12 * 300000000}}, 5166406);
-
-    // Invalid 'amount' parameter error of dateAdd operation due to large amount.
-    runAndAssertErrorCode(
-        {$dateSubtract: {startDate: "$date", unit: "month", amount: -30000000000}}, 5976500);
+    // Overflow error of dateAdd operation due to high amount.
+    runAndAssertErrorCode({$dateSubtract: {startDate: "$date", unit: "month", amount: 30000000000}},
+                          5166406);
 
     // Invalid value of timezone argument.
     runAndAssertErrorCode(

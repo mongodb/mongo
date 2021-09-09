@@ -635,8 +635,7 @@ inline long leapYearsSinceReferencePoint(long year) {
 
 /**
  * Sums the number of days in the Gregorian calendar in years: 'startYear',
- * 'startYear'+1, .., 'endYear'-1. 'startYear' and 'endYear' are expected to be from the range
- * (-1000'000'000; +1000'000'000).
+ * 'startYear'+1, .., 'endYear'-1.
  */
 inline long long daysBetweenYears(long startYear, long endYear) {
     return leapYearsSinceReferencePoint(endYear - 1) - leapYearsSinceReferencePoint(startYear - 1) +
@@ -1135,59 +1134,12 @@ std::pair<Date_t, Date> defaultReferencePointForDateTrunc(const TimeZone& timezo
     }
     return {Date_t::fromMillisSinceEpoch(referencePointMillis), referencePoint};
 }
-
-/**
- * Determines if function 'dateAdd()' parameter 'amount' and 'unit' values are valid - the
- * amount roughly fits the range of Date_t type.
- */
-bool isDateAddAmountValid(long long amount, TimeUnit unit) {
-    constexpr long long maxDays{
-        std::numeric_limits<unsigned long long>::max() / kMillisecondsPerDay + 1};
-    constexpr auto maxYears = maxDays / 365 /* minimum number of days per year*/ + 1;
-    constexpr auto maxQuarters = maxYears * kQuartersPerYear;
-    constexpr auto maxMonths = maxYears * kMonthsInOneYear;
-    constexpr auto maxWeeks = maxDays / kDaysPerWeek;
-    constexpr auto maxHours = maxDays * kHoursPerDay;
-    constexpr auto maxMinutes = maxHours * kMinutesPerHour;
-    constexpr auto maxSeconds = maxMinutes * kSecondsPerMinute;
-    const auto maxAbsoluteAmountValue = [](TimeUnit unit) {
-        switch (unit) {
-            case TimeUnit::year:
-                return maxYears;
-            case TimeUnit::quarter:
-                return maxQuarters;
-            case TimeUnit::month:
-                return maxMonths;
-            case TimeUnit::week:
-                return maxWeeks;
-            case TimeUnit::day:
-                return maxDays;
-            case TimeUnit::hour:
-                return maxHours;
-            case TimeUnit::minute:
-                return maxMinutes;
-            case TimeUnit::second:
-                return maxSeconds;
-            default:
-                MONGO_UNREACHABLE_TASSERT(5976501);
-        }
-    }(unit);
-    return -maxAbsoluteAmountValue < amount && amount < maxAbsoluteAmountValue;
-}
 }  // namespace
 
 Date_t dateAdd(Date_t date, TimeUnit unit, long long amount, const TimeZone& timezone) {
     if (unit == TimeUnit::millisecond) {
         return date + Milliseconds(amount);
     }
-
-    // Check that 'amount' value is within an acceptable range. If the value is within acceptable
-    // range, then the addition algorithm is expected to not overflow. The final determination if
-    // the result can be represented as Date_t is done after the addition result is computed.
-    uassert(5976500,
-            str::stream() << "invalid dateAdd 'amount' parameter value: " << amount << " "
-                          << serializeTimeUnit(unit),
-            isDateAddAmountValid(amount, unit));
 
     auto localTime = timezone.getTimelibTime(date);
     auto microSec = durationCount<Microseconds>(Milliseconds(date.toMillisSinceEpoch() % 1000));
