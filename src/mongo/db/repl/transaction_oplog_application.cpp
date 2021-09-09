@@ -440,6 +440,10 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
 
         auto txnParticipant = TransactionParticipant::get(opCtx);
 
+        // We reset the recovery unit on retries, so make sure that we ignore prepare conflicts.
+        opCtx->recoveryUnit()->setPrepareConflictBehavior(
+            PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
+
         // Release the WUOW, transaction lock resources and abort storage transaction so that the
         // writeConflictRetry loop will be able to retry applying transactional ops on WCE error.
         ScopeGuard abortOnError([&txnParticipant, opCtx] {
