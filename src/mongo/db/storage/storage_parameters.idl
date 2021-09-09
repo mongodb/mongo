@@ -94,9 +94,12 @@ server_parameters:
         cpp_class:
             name: StorageDirectoryPerDbParameter
             override_ctor: true
-        
 
 feature_flags:
+    featureFlagClusteredIndexes:
+        description: "When enabled, support non time-series collections with clustered indexes"
+        cpp_varname: feature_flags::gClusteredIndexes
+        default: false
     featureFlagTimeseriesCollection:
         description: "When enabled, support for time-series collections"
         cpp_varname: feature_flags::gTimeseriesCollection
