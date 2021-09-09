@@ -556,6 +556,8 @@ conn_stats = [
     TxnStat('txn_prepare_active', 'prepared transactions currently active'),
     TxnStat('txn_prepare_commit', 'prepared transactions committed'),
     TxnStat('txn_prepare_rollback', 'prepared transactions rolled back'),
+    TxnStat('txn_prepare_rollback_do_not_remove_hs_update', 'prepared transactions rolled back and do not remove the history store entry'),
+    TxnStat('txn_prepare_rollback_fix_hs_update_with_ckpt_reserved_txnid', 'prepared transactions rolled back and fix the history store entry with checkpoint reserved transaction id'),
     TxnStat('txn_prepared_updates_committed', 'Number of prepared updates committed'),
     TxnStat('txn_prepared_updates', 'Number of prepared updates'),
     TxnStat('txn_prepared_updates_key_repeated', 'Number of prepared updates repeated on the same key'),

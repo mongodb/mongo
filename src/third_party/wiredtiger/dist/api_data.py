@@ -793,7 +793,7 @@ connection_runtime_config = [
         intended for use with internal stress testing of WiredTiger.''',
         type='list', undoc=True,
         choices=[
-        'aggressive_sweep', 'backup_rename', 'checkpoint_slow',
+        'aggressive_sweep', 'backup_rename', 'checkpoint_reserved_txnid_delay', 'checkpoint_slow',
         'failpoint_history_store_delete_key_from_ts', 'failpoint_history_store_insert_1',
         'failpoint_history_store_insert_2', 'history_store_checkpoint_delay',
         'history_store_search', 'history_store_sweep_race', 'prepare_checkpoint_delay', 'split_1',

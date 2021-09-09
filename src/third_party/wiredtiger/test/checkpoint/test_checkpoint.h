@@ -68,6 +68,9 @@ typedef struct {
     bool failpoint_hs_delete_key_from_ts; /* Failpoint for hs key deletion. */
     bool failpoint_hs_insert_1;           /* Failpoint for hs insertion. */
     bool failpoint_hs_insert_2;           /* Failpoint for hs insertion. */
+    bool hs_checkpoint_timing_stress;     /* History store checkpoint timing stress */
+    bool reserved_txnid_timing_stress;    /* Reserved transaction id timing stress */
+    bool checkpoint_slow_timing_stress;   /* Checkpoint slow timing stress */
     u_int ts_oldest;                      /* Current oldest timestamp */
     u_int ts_stable;                      /* Current stable timestamp */
     bool mixed_mode_deletes;              /* Run with mixed mode deletes */
@@ -86,4 +89,4 @@ int log_print_err(const char *, int, int);
 void start_checkpoints(void);
 int start_workers(void);
 const char *type_to_string(table_type);
-int verify_consistency(WT_SESSION *, char *);
+int verify_consistency(WT_SESSION *, wt_timestamp_t);

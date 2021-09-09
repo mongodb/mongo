@@ -138,7 +138,7 @@ static const WT_CONFIG_CHECK confchk_WT_CONNECTION_reconfigure[] = {
     confchk_WT_CONNECTION_reconfigure_tiered_storage_subconfigs, 2},
   {"timing_stress_for_test", "list", NULL,
     "choices=[\"aggressive_sweep\",\"backup_rename\","
-    "\"checkpoint_slow\","
+    "\"checkpoint_reserved_txnid_delay\",\"checkpoint_slow\","
     "\"failpoint_history_store_delete_key_from_ts\","
     "\"failpoint_history_store_insert_1\","
     "\"failpoint_history_store_insert_2\","
@@ -867,7 +867,7 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open[] = {
   {"tiered_storage", "category", NULL, NULL, confchk_tiered_storage_subconfigs, 6},
   {"timing_stress_for_test", "list", NULL,
     "choices=[\"aggressive_sweep\",\"backup_rename\","
-    "\"checkpoint_slow\","
+    "\"checkpoint_reserved_txnid_delay\",\"checkpoint_slow\","
     "\"failpoint_history_store_delete_key_from_ts\","
     "\"failpoint_history_store_insert_1\","
     "\"failpoint_history_store_insert_2\","
@@ -949,7 +949,7 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_all[] = {
   {"tiered_storage", "category", NULL, NULL, confchk_tiered_storage_subconfigs, 6},
   {"timing_stress_for_test", "list", NULL,
     "choices=[\"aggressive_sweep\",\"backup_rename\","
-    "\"checkpoint_slow\","
+    "\"checkpoint_reserved_txnid_delay\",\"checkpoint_slow\","
     "\"failpoint_history_store_delete_key_from_ts\","
     "\"failpoint_history_store_insert_1\","
     "\"failpoint_history_store_insert_2\","
@@ -1028,7 +1028,7 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_basecfg[] = {
   {"tiered_storage", "category", NULL, NULL, confchk_tiered_storage_subconfigs, 6},
   {"timing_stress_for_test", "list", NULL,
     "choices=[\"aggressive_sweep\",\"backup_rename\","
-    "\"checkpoint_slow\","
+    "\"checkpoint_reserved_txnid_delay\",\"checkpoint_slow\","
     "\"failpoint_history_store_delete_key_from_ts\","
     "\"failpoint_history_store_insert_1\","
     "\"failpoint_history_store_insert_2\","
@@ -1105,7 +1105,7 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_usercfg[] = {
   {"tiered_storage", "category", NULL, NULL, confchk_tiered_storage_subconfigs, 6},
   {"timing_stress_for_test", "list", NULL,
     "choices=[\"aggressive_sweep\",\"backup_rename\","
-    "\"checkpoint_slow\","
+    "\"checkpoint_reserved_txnid_delay\",\"checkpoint_slow\","
     "\"failpoint_history_store_delete_key_from_ts\","
     "\"failpoint_history_store_insert_1\","
     "\"failpoint_history_store_insert_2\","

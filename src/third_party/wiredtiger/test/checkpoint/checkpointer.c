@@ -157,6 +157,7 @@ real_checkpointer(void)
 {
     WT_RAND_STATE rnd;
     WT_SESSION *session;
+    wt_timestamp_t stable_ts, oldest_ts, verify_ts;
     uint64_t delay;
     int ret;
     char buf[128], timestamp_buf[64];
@@ -164,6 +165,7 @@ real_checkpointer(void)
 
     checkpoint_config = "use_timestamp=false";
     g.ts_oldest = 0;
+    verify_ts = WT_TS_NONE;
 
     if (g.running == 0)
         return (log_print_err("Checkpoint thread started stopped\n", EINVAL, 1));
@@ -189,12 +191,18 @@ real_checkpointer(void)
          * Check for consistency of online data, here we don't expect to see the version at the
          * checkpoint just a consistent view across all tables.
          */
-        if ((ret = verify_consistency(session, NULL)) != 0)
+        if ((ret = verify_consistency(session, WT_TS_NONE)) != 0)
             return (log_print_err("verify_consistency (online)", ret, 1));
 
         if (g.use_timestamps) {
-            WT_ORDERED_READ(g.ts_oldest, g.ts_stable);
             testutil_check(g.conn->query_timestamp(g.conn, timestamp_buf, "get=stable"));
+            testutil_timestamp_parse(timestamp_buf, &stable_ts);
+            oldest_ts = g.ts_oldest;
+            if (stable_ts <= oldest_ts)
+                verify_ts = stable_ts;
+            else
+                verify_ts = __wt_random(&rnd) % (stable_ts - oldest_ts + 1) + oldest_ts;
+            WT_ORDERED_READ(g.ts_oldest, g.ts_stable);
         }
 
         /* Execute a checkpoint */
@@ -211,7 +219,7 @@ real_checkpointer(void)
          * without timestamps as such we don't perform a verification here in the non-timestamped
          * scenario.
          */
-        if (g.use_timestamps && (ret = verify_consistency(session, timestamp_buf)) != 0)
+        if (g.use_timestamps && (ret = verify_consistency(session, verify_ts)) != 0)
             return (log_print_err("verify_consistency (timestamps)", ret, 1));
 
         /* Advance the oldest timestamp to the most recently set stable timestamp. */
@@ -240,7 +248,7 @@ done:
  *     The key/values should match across all tables.
  */
 int
-verify_consistency(WT_SESSION *session, char *stable_timestamp)
+verify_consistency(WT_SESSION *session, wt_timestamp_t verify_ts)
 {
     WT_CURSOR **cursors;
     uint64_t key_count;
@@ -254,12 +262,11 @@ verify_consistency(WT_SESSION *session, char *stable_timestamp)
     if (cursors == NULL)
         return (log_print_err("verify_consistency", ENOMEM, 1));
 
-    if (stable_timestamp != NULL) {
+    if (verify_ts != WT_TS_NONE)
         testutil_check(__wt_snprintf(cfg_buf, sizeof(cfg_buf),
-          "isolation=snapshot,read_timestamp=%s,roundup_timestamps=read", stable_timestamp));
-    } else {
+          "isolation=snapshot,read_timestamp=%" PRIx64 ",roundup_timestamps=read", verify_ts));
+    else
         testutil_check(__wt_snprintf(cfg_buf, sizeof(cfg_buf), "isolation=snapshot"));
-    }
     testutil_check(session->begin_transaction(session, cfg_buf));
 
     for (i = 0; i < g.ntables; i++) {
@@ -326,8 +333,8 @@ verify_consistency(WT_SESSION *session, char *stable_timestamp)
             }
         }
     }
-    printf("Finished verifying a %s with %d tables and %" PRIu64 " keys\n",
-      stable_timestamp != NULL ? "checkpoint" : "snapshot", g.ntables, key_count);
+    printf("Finished verifying with %d tables and %" PRIu64 " keys at timestamp %" PRIu64 "\n",
+      g.ntables, key_count, verify_ts);
     fflush(stdout);
 
 err:

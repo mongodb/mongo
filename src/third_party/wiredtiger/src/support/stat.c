@@ -1418,6 +1418,9 @@ static const char *const __stats_connection_desc[] = {
   "transaction: prepared transactions committed",
   "transaction: prepared transactions currently active",
   "transaction: prepared transactions rolled back",
+  "transaction: prepared transactions rolled back and do not remove the history store entry",
+  "transaction: prepared transactions rolled back and fix the history store entry with checkpoint "
+  "reserved transaction id",
   "transaction: query timestamp calls",
   "transaction: race to read prepared update retry",
   "transaction: rollback to stable calls",
@@ -1946,6 +1949,8 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->txn_prepare_commit = 0;
     stats->txn_prepare_active = 0;
     stats->txn_prepare_rollback = 0;
+    stats->txn_prepare_rollback_do_not_remove_hs_update = 0;
+    stats->txn_prepare_rollback_fix_hs_update_with_ckpt_reserved_txnid = 0;
     stats->txn_query_ts = 0;
     stats->txn_read_race_prepare_update = 0;
     stats->txn_rts = 0;
@@ -2484,6 +2489,10 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->txn_prepare_commit += WT_STAT_READ(from, txn_prepare_commit);
     to->txn_prepare_active += WT_STAT_READ(from, txn_prepare_active);
     to->txn_prepare_rollback += WT_STAT_READ(from, txn_prepare_rollback);
+    to->txn_prepare_rollback_do_not_remove_hs_update +=
+      WT_STAT_READ(from, txn_prepare_rollback_do_not_remove_hs_update);
+    to->txn_prepare_rollback_fix_hs_update_with_ckpt_reserved_txnid +=
+      WT_STAT_READ(from, txn_prepare_rollback_fix_hs_update_with_ckpt_reserved_txnid);
     to->txn_query_ts += WT_STAT_READ(from, txn_query_ts);
     to->txn_read_race_prepare_update += WT_STAT_READ(from, txn_read_race_prepare_update);
     to->txn_rts += WT_STAT_READ(from, txn_rts);
