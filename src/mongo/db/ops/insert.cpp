@@ -61,7 +61,10 @@ Status validateDepth(const BSONObj& obj) {
     while (!frames.empty()) {
         const auto elem = frames.back().next();
         if (elem.type() == BSONType::Object || elem.type() == BSONType::Array) {
-            if (MONGO_unlikely(frames.size() == BSONDepth::getMaxDepthForUserStorage())) {
+            auto subObj = elem.embeddedObject();
+            // Empty subdocuments do not count toward the depth of a document.
+            if (MONGO_unlikely(frames.size() == BSONDepth::getMaxDepthForUserStorage() &&
+                               !subObj.isEmpty())) {
                 // We're exactly at the limit, so descending to the next level would exceed
                 // the maximum depth.
                 return {ErrorCodes::Overflow,
@@ -69,7 +72,7 @@ Status validateDepth(const BSONObj& obj) {
                             << "cannot insert document because it exceeds "
                             << BSONDepth::getMaxDepthForUserStorage() << " levels of nesting"};
             }
-            frames.emplace_back(elem.embeddedObject());
+            frames.emplace_back(subObj);
         }
 
         if (!frames.back().more()) {
