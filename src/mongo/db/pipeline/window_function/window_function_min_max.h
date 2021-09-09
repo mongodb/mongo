@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/pipeline/accumulator.h"
+#include "mongo/db/pipeline/accumulator_multi.h"
 #include "mongo/db/pipeline/window_function/window_function.h"
 
 namespace mongo {
@@ -106,6 +107,21 @@ public:
                                                        long long n) {
         return std::make_unique<WindowFunctionMinMaxN<sense>>(expCtx, n);
     }
+
+    static AccumulationExpression parse(ExpressionContext* const expCtx,
+                                        BSONElement elem,
+                                        VariablesParseState vps) {
+        return AccumulatorMinMaxN::parseMinMaxN<sense>(expCtx, elem, vps);
+    }
+
+    static const char* getName() {
+        if constexpr (sense == AccumulatorMinMax::Sense::kMin) {
+            return AccumulatorMinN::getName();
+        } else {
+            return AccumulatorMaxN::getName();
+        }
+    }
+
     explicit WindowFunctionMinMaxN(ExpressionContext* const expCtx, long long n)
         : WindowFunctionMinMaxCommon<sense>(expCtx), _n(n) {
         _memUsageBytes = sizeof(*this);

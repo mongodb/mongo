@@ -92,7 +92,6 @@ REGISTER_EXPRESSION_CONDITIONALLY(
     AllowedWithClientType::kAny,
     boost::none,
     feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
-// TODO SERVER-57884 Add $firstN/$lastN as window functions.
 
 AccumulatorN::AccumulatorN(ExpressionContext* const expCtx)
     : AccumulatorState(expCtx), _maxMemUsageBytes(internalQueryMaxNAccumulatorBytes.load()) {}

@@ -737,27 +737,32 @@ public:
     }
 };
 
-template <AccumulatorMinMax::Sense S>
-class ExpressionMinMaxN : public Expression {
+/**
+ * Describes a window function expression that accepts 'n' as a parameter. Templated by
+ * 'WindowFunctionN', which corresponds to the 'WindowFunctionState' removable type associated
+ * with this expression.
+ */
+template <typename WindowFunctionN>
+class ExpressionN : public Expression {
 public:
-    ExpressionMinMaxN(ExpressionContext* expCtx,
-                      boost::intrusive_ptr<::mongo::Expression> input,
-                      std::string name,
-                      WindowBounds bounds,
-                      boost::intrusive_ptr<::mongo::Expression> nExpr)
-        : Expression(expCtx, std::move(name), std::move(input), std::move(bounds)),
-          _nExpr(std::move(nExpr)) {}
     static boost::intrusive_ptr<Expression> parse(BSONObj obj,
                                                   const boost::optional<SortPattern>& sortBy,
                                                   ExpressionContext* expCtx);
+
+    ExpressionN(ExpressionContext* expCtx,
+                boost::intrusive_ptr<::mongo::Expression> input,
+                std::string name,
+                WindowBounds bounds,
+                boost::intrusive_ptr<::mongo::Expression> nExpr)
+        : Expression(expCtx, std::move(name), std::move(input), std::move(bounds)),
+          nExpr(std::move(nExpr)) {}
+
+    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final;
 
     boost::intrusive_ptr<AccumulatorState> buildAccumulatorOnly() const final;
 
     std::unique_ptr<WindowFunctionState> buildRemovable() const final;
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final;
-
-private:
-    boost::intrusive_ptr<::mongo::Expression> _nExpr;
+    boost::intrusive_ptr<::mongo::Expression> nExpr;
 };
 }  // namespace mongo::window_function

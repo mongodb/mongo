@@ -29,13 +29,13 @@
 
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/pipeline/window_function/window_function_first_last_n.h"
 #include "mongo/db/pipeline/window_function/window_function_min_max.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {
-// TODO SERVER-57884: Add test cases for $firstN/$lastN window functions.
 // TODO SERVER-57886: Add test cases for $top/$bottom/$topN/$bottomN window functions.
 class WindowFunctionMinMaxNTest : public AggregationContextFixture {
 public:
@@ -219,6 +219,209 @@ TEST_F(WindowFunctionMinMaxNTest, TracksMemoryUsageOnAddAndRemove) {
     minThree.remove(largeStr);
     trackingSize -= largeStr.getApproximateSize();
     ASSERT_EQ(minThree.getApproximateSize(), trackingSize);
+}
+
+class WindowFunctionFirstLastNTest : public AggregationContextFixture {
+public:
+    static constexpr auto kNarg = 3LL;
+    WindowFunctionFirstLastNTest()
+        : expCtx(getExpCtx()), firstThree(expCtx.get(), kNarg), lastThree(expCtx.get(), kNarg) {
+        auto collator = std::make_unique<CollatorInterfaceMock>(
+            CollatorInterfaceMock::MockType::kToLowerString);
+        expCtx->setCollator(std::move(collator));
+    }
+
+    boost::intrusive_ptr<ExpressionContext> expCtx;
+    WindowFunctionFirstLastN<FirstLastSense::kFirst> firstThree;
+    WindowFunctionFirstLastN<FirstLastSense::kLast> lastThree;
+};
+
+TEST_F(WindowFunctionFirstLastNTest, BasicCorrectnessTest) {
+    firstThree.add(Value{5});
+    firstThree.add(Value{10});
+    firstThree.add(Value{6});
+    firstThree.add(Value{12});
+    firstThree.add(Value{7});
+    firstThree.add(Value{3});
+
+    ASSERT_VALUE_EQ(firstThree.getValue(), Value(std::vector{Value(5), Value(10), Value(6)}));
+
+    firstThree.remove(Value{5});
+    firstThree.remove(Value{10});
+
+    ASSERT_VALUE_EQ(firstThree.getValue(), Value(std::vector{Value(6), Value(12), Value(7)}));
+
+    firstThree.remove(Value{6});
+    ASSERT_VALUE_EQ(firstThree.getValue(), Value(std::vector{Value(12), Value(7), Value(3)}));
+
+    firstThree.remove(Value{12});
+    firstThree.remove(Value{7});
+    firstThree.remove(Value{3});
+    ASSERT_VALUE_EQ(firstThree.getValue(), Value{BSONArray()});
+
+    lastThree.add(Value{5});
+    lastThree.add(Value{9});
+    lastThree.add(Value{12});
+    lastThree.add(Value{11});
+    lastThree.add(Value{3});
+    lastThree.add(Value{7});
+    ASSERT_VALUE_EQ(lastThree.getValue(), Value(std::vector{Value(11), Value(3), Value(7)}));
+
+    lastThree.remove(Value{5});
+    lastThree.remove(Value{9});
+    lastThree.remove(Value{12});
+    ASSERT_VALUE_EQ(lastThree.getValue(), Value(std::vector{Value(11), Value(3), Value(7)}));
+
+    lastThree.remove(Value{11});
+    lastThree.remove(Value{3});
+    lastThree.remove(Value{7});
+    ASSERT_VALUE_EQ(lastThree.getValue(), Value{BSONArray()});
+}
+
+TEST_F(WindowFunctionFirstLastNTest, NullMissingValuesInWindowIncludedInResult) {
+    ASSERT_VALUE_EQ(firstThree.getValue(), Value{BSONArray()});
+
+    firstThree.add(Value());
+    firstThree.add(Value(BSONNULL));
+    firstThree.add(Value());
+    firstThree.add(Value(BSONNULL));
+    ASSERT_VALUE_EQ(firstThree.getValue(),
+                    (Value{std::vector<Value>{Value(), Value{BSONNULL}, Value()}}));
+
+    firstThree.add(Value(3));
+    ASSERT_VALUE_EQ(firstThree.getValue(),
+                    (Value{std::vector<Value>{Value(), Value{BSONNULL}, Value()}}));
+
+    firstThree.remove(Value());
+    firstThree.remove(Value(BSONNULL));
+    firstThree.remove(Value());
+    firstThree.remove(Value(BSONNULL));
+    ASSERT_VALUE_EQ(firstThree.getValue(), Value{std::vector{Value(3)}});
+
+    ASSERT_VALUE_EQ(lastThree.getValue(), Value{BSONArray()});
+    lastThree.add(Value());
+    lastThree.add(Value(BSONNULL));
+    lastThree.add(Value());
+    lastThree.add(Value(BSONNULL));
+    ASSERT_VALUE_EQ(lastThree.getValue(),
+                    (Value{std::vector<Value>{Value(BSONNULL), Value(), Value(BSONNULL)}}));
+
+    lastThree.add(Value(3));
+    ASSERT_VALUE_EQ(lastThree.getValue(),
+                    (Value{std::vector<Value>{Value(), Value(BSONNULL), Value(3)}}));
+
+    lastThree.remove(Value());
+    lastThree.remove(Value(BSONNULL));
+    lastThree.remove(Value());
+    lastThree.remove(Value(BSONNULL));
+    ASSERT_VALUE_EQ(lastThree.getValue(), Value{std::vector{Value(3)}});
+}
+
+TEST_F(WindowFunctionFirstLastNTest, WindowSmallerThanN) {
+    firstThree.add(Value{5});
+    firstThree.add(Value{7});
+
+    ASSERT_VALUE_EQ(firstThree.getValue(), Value(std::vector{Value(5), Value(7)}));
+
+    lastThree.add(Value{5});
+    lastThree.add(Value{7});
+    ASSERT_VALUE_EQ(lastThree.getValue(), Value(std::vector{Value(5), Value(7)}));
+}
+
+TEST_F(WindowFunctionFirstLastNTest, WindowContainsDuplicates) {
+    firstThree.add(Value{5});
+    firstThree.add(Value{7});
+    firstThree.add(Value{7});
+    firstThree.add(Value{7});
+    firstThree.add(Value{7});
+
+    ASSERT_VALUE_EQ(firstThree.getValue(), Value(std::vector{Value(5), Value(7), Value(7)}));
+
+    lastThree.add(Value{5});
+    lastThree.add(Value{5});
+    lastThree.add(Value{5});
+    lastThree.add(Value{5});
+    lastThree.add(Value{5});
+    lastThree.add(Value{7});
+    ASSERT_VALUE_EQ(lastThree.getValue(), Value(std::vector{Value(5), Value(5), Value(7)}));
+}
+
+TEST_F(WindowFunctionFirstLastNTest, MixNullsAndNonNulls) {
+    // Add four values, half of which are null/missing.
+    firstThree.add(Value{4});
+    firstThree.add(Value());
+    firstThree.add(Value(BSONNULL));
+    firstThree.add(Value{1});
+    ASSERT_VALUE_EQ(firstThree.getValue(),
+                    (Value(std::vector<Value>{Value(4), Value(), Value(BSONNULL)})));
+
+    // Add a couple more values. The result shouldn't change.
+    firstThree.add(Value{3});
+    firstThree.add(Value());
+    firstThree.add(Value(BSONNULL));
+    firstThree.add(Value{2});
+    ASSERT_VALUE_EQ(firstThree.getValue(),
+                    (Value(std::vector<Value>{Value(4), Value(), Value(BSONNULL)})));
+
+    // Add four values, half of which are null/missing.
+    lastThree.add(Value{4});
+    lastThree.add(Value());
+    lastThree.add(Value(BSONNULL));
+    lastThree.add(Value{1});
+    ASSERT_VALUE_EQ(lastThree.getValue(),
+                    (Value(std::vector<Value>{Value(), Value(BSONNULL), Value(1)})));
+
+    // Add a couple more values. We should get the latest 3.
+    lastThree.add(Value{3});
+    lastThree.add(Value(BSONNULL));
+    lastThree.add(Value());
+    lastThree.add(Value{2});
+    ASSERT_VALUE_EQ(lastThree.getValue(),
+                    (Value(std::vector<Value>{Value(BSONNULL), Value(), Value(2)})));
+}
+
+TEST_F(WindowFunctionFirstLastNTest, Ties) {
+    // When two elements tie (compare equal), remove() can't pick an arbitrary one,
+    // because that would break the invariant that 'add(x); add(y); remove(x)' is equivalent to
+    // 'add(y)'.
+
+    auto x = Value{"foo"_sd};
+    auto y = Value{"FOO"_sd};
+    // x and y are distinguishable,
+    ASSERT_VALUE_NE(x, y);
+    // but they compare equal according to the ordering.
+    ASSERT(expCtx->getValueComparator().evaluate(x == y));
+
+    firstThree.add(x);
+    firstThree.add(y);
+    firstThree.remove(x);
+    ASSERT_VALUE_EQ(firstThree.getValue(), Value(std::vector{y}));
+
+    firstThree.add(x);
+    firstThree.add(y);
+    firstThree.remove(x);
+
+    // Here, we expect ["foo","FOO"] because we remove the first added entry that compares equal
+    // to 'x', which is the first instance of 'y'.
+    ASSERT_VALUE_EQ(firstThree.getValue(), Value(std::vector{x, y}));
+}
+
+TEST_F(WindowFunctionFirstLastNTest, TracksMemoryUsageOnAddAndRemove) {
+    size_t trackingSize = sizeof(WindowFunctionFirstLastN<FirstLastSense::kFirst>);
+    ASSERT_EQ(firstThree.getApproximateSize(), trackingSize);
+
+    auto largeStr = Value{"$firstN/lastN are suberb window functions"_sd};
+    firstThree.add(largeStr);
+    trackingSize += largeStr.getApproximateSize();
+    ASSERT_EQ(firstThree.getApproximateSize(), trackingSize);
+
+    firstThree.add(largeStr);
+    trackingSize += largeStr.getApproximateSize();
+    ASSERT_EQ(firstThree.getApproximateSize(), trackingSize);
+
+    firstThree.remove(largeStr);
+    trackingSize -= largeStr.getApproximateSize();
+    ASSERT_EQ(firstThree.getApproximateSize(), trackingSize);
 }
 }  // namespace
 }  // namespace mongo
