@@ -50,14 +50,12 @@ env.Library(
         'timeseries_commands_conversion_helper.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/commands',
-        '$BUILD_DIR/mongo/db/index/index_descriptor',
         '$BUILD_DIR/mongo/db/index_commands_idl',
         '$BUILD_DIR/mongo/db/index_names',
         '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/db/storage/storage_options',
-        'timeseries_idl',
         'timeseries_index_schema_conversion_functions'
+
     ],
 )
 
