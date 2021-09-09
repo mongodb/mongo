@@ -2,7 +2,6 @@
  * Tests that a time-series collection created with the 'expireAfterSeconds' option will remove
  * buckets older than 'expireAfterSeconds' based on the bucket creation time.
  * @tags: [
- *   assumes_no_implicit_collection_creation_after_drop,
  *   does_not_support_stepdowns,
  *   does_not_support_transactions,
  *   requires_getmore,

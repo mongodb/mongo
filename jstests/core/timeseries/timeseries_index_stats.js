@@ -2,7 +2,6 @@
  * Tests $indexStats on a time-series collection.
  *
  * @tags: [
- *   assumes_no_implicit_collection_creation_after_drop,
  *   # This test attempts to perform write operations and get index usage statistics using the
  *   # $indexStats stage. The former operation must be routed to the primary in a replica set,
  *   # whereas the latter may be routed to a secondary.

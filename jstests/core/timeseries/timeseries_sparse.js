@@ -2,7 +2,6 @@
  * Typically, time-series collections use measurements that always contain data for every field.
  * This test provides coverage for when this is not the case.
  * @tags: [
- *   assumes_no_implicit_collection_creation_after_drop,
  *   does_not_support_stepdowns,
  *   does_not_support_transactions,
  *   requires_getmore,

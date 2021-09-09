@@ -3,7 +3,9 @@
  * range scan using a combination of minRecord and maxRecord.
  *
  * @tags: [
- *   assumes_no_implicit_collection_creation_after_drop,
+ *   # The test assumes no index exists on the time field. shardCollection implicitly creates an
+ *   # index.
+ *   assumes_unsharded_collection,
  *   does_not_support_transactions,
  *   requires_getmore,
  * ]
@@ -61,7 +63,8 @@ TimeseriesTest.run((insert) => {
         assert.eq(0, res.length);
 
         let expl = coll.explain("executionStats").aggregate(pipeline);
-        assert(getAggPlanStage(expl, "COLLSCAN").hasOwnProperty("maxRecord"));
+        assert(getAggPlanStage(expl, "COLLSCAN"), expl);
+        assert(getAggPlanStage(expl, "COLLSCAN").hasOwnProperty("maxRecord"), expl);
         assert.eq(0, expl.stages[0].$cursor.executionStats.executionStages.nReturned);
 
         for (let i = 0; i < 10; i++) {

@@ -3,12 +3,12 @@
  * $_internalUnpackBucket when used on a non-metadata field on a time-series collection.
  *
  * @tags: [
+ *   assumes_unsharded_collection,
  *   requires_fcv_51,
  *   requires_pipeline_optimization,
  *   requires_timeseries,
  *   does_not_support_stepdowns,
  *   does_not_support_transactions,
- *   assumes_no_implicit_collection_creation_after_drop,
  * ]
  */
 
@@ -50,7 +50,8 @@ for (let collScanStage of collScanStages) {
             "field": "loc"
         }
     },
-                 collScanStage.filter);
+                 collScanStage.filter,
+                 collScanStages);
 }
 
 // Test that $geoWithin still gives the correct result, when the events are in the same bucket.

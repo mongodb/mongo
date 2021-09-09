@@ -1,5 +1,8 @@
 /**
  * Inserts time-series data based on the TSBS document-per-event format.
+ * * @tags: [
+ *   does_not_support_transactions,
+ * ]
  */
 (function() {
 "use strict";
@@ -8,6 +11,9 @@ load("jstests/core/timeseries/libs/timeseries.js");
 
 const coll = db.timeseries_insert;
 coll.drop();
+
+assert.commandWorked(db.createCollection(
+    coll.getName(), {timeseries: {timeField: "time", metaField: "measurement"}}));
 
 Random.setRandomSeed();
 

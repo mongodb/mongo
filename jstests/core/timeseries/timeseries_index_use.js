@@ -2,7 +2,8 @@
  * Tests index usage on meta and time fields for timeseries collections.
  *
  * @tags: [
- *   assumes_no_implicit_collection_creation_after_drop,
+ *   # The shardCollection implicitly creates an index on time field.
+ *   assumes_unsharded_collection,
  *   does_not_support_stepdowns,
  *   does_not_support_transactions,
  *   requires_fcv_51,

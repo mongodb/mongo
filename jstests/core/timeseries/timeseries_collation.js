@@ -2,7 +2,6 @@
  * Tests that time-series collections respect collations for metadata and min/max.
  *
  * @tags: [
- *   assumes_no_implicit_collection_creation_after_drop,
  *   does_not_support_stepdowns,
  *   does_not_support_transactions,
  *   requires_getmore,
