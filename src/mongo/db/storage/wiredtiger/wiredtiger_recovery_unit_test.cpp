@@ -30,6 +30,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 
 #include "mongo/base/checked_cast.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context.h"
@@ -823,23 +824,33 @@ DEATH_TEST_REGEX_F(WiredTigerRecoveryUnitTestFixture,
     OperationContext* opCtx = clientAndCtx1.second.get();
     ru1->beginUnitOfWork(opCtx);
 
-    // Perform an non timestamped write.
-    WT_CURSOR* cursor;
-    getCursor(ru1, &cursor);
-    cursor->set_key(cursor, "key");
-    cursor->set_value(cursor, "value");
-    invariantWTOK(wiredTigerCursorInsert(opCtx, cursor));
+    auto writeTest = [&]() {
+        // Perform an non timestamped write.
+        WT_CURSOR* cursor;
+        getCursor(ru1, &cursor);
+        cursor->set_key(cursor, "key");
+        cursor->set_value(cursor, "value");
+        invariantWTOK(wiredTigerCursorInsert(opCtx, cursor));
 
-    // Perform a write at ts1.
-    cursor->set_key(cursor, "key2");
-    cursor->set_value(cursor, "value");
-    ASSERT_OK(ru1->setTimestamp(ts1));
-    invariantWTOK(wiredTigerCursorInsert(opCtx, cursor));
+        // Perform a write at ts1.
+        cursor->set_key(cursor, "key2");
+        cursor->set_value(cursor, "value");
+        ASSERT_OK(ru1->setTimestamp(ts1));
+        invariantWTOK(wiredTigerCursorInsert(opCtx, cursor));
 
-    // Setting the timestamp again to a different value should detect that we're trying to set
-    // multiple timestamps with the first write being non timestamped.
-    ASSERT_OK(ru1->setTimestamp(ts2));
-    ru1->commitUnitOfWork();
+        // Setting the timestamp again to a different value should detect that we're trying to set
+        // multiple timestamps with the first write being non timestamped.
+        ASSERT_OK(ru1->setTimestamp(ts2));
+        ru1->commitUnitOfWork();
+    };
+
+    try {
+        writeTest();
+    } catch (WriteConflictException const&) {
+        // It's expected to get a WCE the first time we try this, due to the multi-timestamp
+        // constraint. We'll try again and it will fassert and print out extra debug info.
+    }
+    writeTest();
 }
 
 DEATH_TEST_F(WiredTigerRecoveryUnitTestFixture,

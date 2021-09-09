@@ -32,13 +32,36 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor_helpers.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
+#include "mongo/util/stacktrace.h"
+#include "mongo/util/testing_proctor.h"
 
 namespace mongo {
+
+namespace {
+void handleWriteContextForDebugging(OperationContext* opCtx, WT_CURSOR* cursor) {
+    auto* ru = WiredTigerRecoveryUnit::get(opCtx);
+    if (ru->gatherWriteContextForDebugging()) {
+        BSONObjBuilder builder;
+
+        std::string s;
+        StringStackTraceSink sink{s};
+        printStackTrace(sink);
+        builder.append("stacktrace", s);
+
+        builder.append("uri", cursor->uri);
+
+        ru->storeWriteContextForDebugging(builder.obj());
+    }
+}
+}  // namespace
 
 int wiredTigerCursorInsert(OperationContext* opCtx, WT_CURSOR* cursor) {
     int ret = cursor->insert(cursor);
     if (MONGO_likely(ret == 0)) {
         WiredTigerRecoveryUnit::get(opCtx)->setTxnModified();
+    }
+    if (TestingProctor::instance().isEnabled()) {
+        handleWriteContextForDebugging(opCtx, cursor);
     }
     return ret;
 }
@@ -51,6 +74,9 @@ int wiredTigerCursorModify(OperationContext* opCtx,
     if (MONGO_likely(ret == 0)) {
         WiredTigerRecoveryUnit::get(opCtx)->setTxnModified();
     }
+    if (TestingProctor::instance().isEnabled()) {
+        handleWriteContextForDebugging(opCtx, cursor);
+    }
     return ret;
 }
 
@@ -59,6 +85,9 @@ int wiredTigerCursorUpdate(OperationContext* opCtx, WT_CURSOR* cursor) {
     if (MONGO_likely(ret == 0)) {
         WiredTigerRecoveryUnit::get(opCtx)->setTxnModified();
     }
+    if (TestingProctor::instance().isEnabled()) {
+        handleWriteContextForDebugging(opCtx, cursor);
+    }
     return ret;
 }
 
@@ -66,6 +95,9 @@ int wiredTigerCursorRemove(OperationContext* opCtx, WT_CURSOR* cursor) {
     int ret = cursor->remove(cursor);
     if (MONGO_likely(ret == 0)) {
         WiredTigerRecoveryUnit::get(opCtx)->setTxnModified();
+    }
+    if (TestingProctor::instance().isEnabled()) {
+        handleWriteContextForDebugging(opCtx, cursor);
     }
     return ret;
 }

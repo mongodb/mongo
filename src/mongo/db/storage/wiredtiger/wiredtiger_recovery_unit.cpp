@@ -42,6 +42,8 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/hex.h"
+#include "mongo/util/stacktrace.h"
+#include "mongo/util/testing_proctor.h"
 
 namespace mongo {
 namespace {
@@ -56,6 +58,20 @@ logv2::LogSeverity kSlowTransactionSeverity = logv2::LogSeverity::Debug(1);
 
 MONGO_FAIL_POINT_DEFINE(doUntimestampedWritesForIdempotencyTests);
 
+void handleWriteContextForDebugging(WiredTigerRecoveryUnit& ru, Timestamp& ts) {
+    if (ru.gatherWriteContextForDebugging()) {
+        BSONObjBuilder builder;
+
+        std::string s;
+        StringStackTraceSink sink{s};
+        printStackTrace(sink);
+        builder.append("stacktrace", s);
+
+        builder.append("timestamp", ts);
+
+        ru.storeWriteContextForDebugging(builder.obj());
+    }
+}
 }  // namespace
 
 AtomicWord<std::int64_t> snapshotTooOldErrorCount{0};
@@ -389,6 +405,25 @@ void WiredTigerRecoveryUnit::refreshSnapshot() {
 void WiredTigerRecoveryUnit::_txnClose(bool commit) {
     invariant(_isActive(), toString(_getState()));
 
+    if (TestingProctor::instance().isEnabled() && _gatherWriteContextForDebugging && commit) {
+        LOGV2(5703402,
+              "Closing transaction with write context for debugging",
+              "count"_attr = _writeContextForDebugging.size());
+        for (auto const& ctx : _writeContextForDebugging) {
+            LOGV2_OPTIONS(5703403,
+                          {logv2::LogTruncation::Disabled},
+                          "Write context for debugging",
+                          "context"_attr = ctx);
+        }
+
+        _writeContextForDebugging.clear();
+        // We clear the context here, but we don't unset the flag. We need it still set to prevent a
+        // WCE loop in the multi-timestamp constraint code below. We are also expecting to hit the
+        // LOGV2_FATAL below, and don't really need to worry about re-using this recovery unit. If
+        // this changes in the future, we might need to unset _gatherWriteContextForDebugging under
+        // some conditions.
+    }
+
     if (!_multiTimestampConstraintTracker.ignoreAllMultiTimestampConstraints &&
         _multiTimestampConstraintTracker.txnHasNonTimestampedWrite &&
         _multiTimestampConstraintTracker.timestampOrder.size() >= 2) {
@@ -397,12 +432,21 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
         // transaction sets multiple timestamps, the first timestamp must be set prior to any
         // writes. Vice-versa, if a transaction writes a document before setting a timestamp, it
         // must not set multiple timestamps.
-        LOGV2_FATAL(
-            4877100,
-            "Multi timestamp constraint violated. Transactions setting multiple timestamps "
-            "must set the first timestamp prior to any writes.",
-            "numTimestampsUsed"_attr = _multiTimestampConstraintTracker.timestampOrder.size(),
-            "lastSetTimestamp"_attr = _multiTimestampConstraintTracker.timestampOrder.top());
+        if (TestingProctor::instance().isEnabled() && !_gatherWriteContextForDebugging) {
+            _gatherWriteContextForDebugging = true;
+            LOGV2_ERROR(5703401,
+                        "Found a violation of multi-timestamp constraint. Retrying operation to "
+                        "collect extra debugging context for the involved writes.");
+            throw WriteConflictException();
+        }
+        if (commit) {
+            LOGV2_FATAL(
+                4877100,
+                "Multi timestamp constraint violated. Transactions setting multiple timestamps "
+                "must set the first timestamp prior to any writes.",
+                "numTimestampsUsed"_attr = _multiTimestampConstraintTracker.timestampOrder.size(),
+                "lastSetTimestamp"_attr = _multiTimestampConstraintTracker.timestampOrder.top());
+        }
     }
 
     WT_SESSION* s = _session->getSession();
@@ -789,6 +833,10 @@ Status WiredTigerRecoveryUnit::setTimestamp(Timestamp timestamp) {
     _updateMultiTimestampConstraint(timestamp);
     _lastTimestampSet = timestamp;
 
+    if (TestingProctor::instance().isEnabled()) {
+        handleWriteContextForDebugging(*this, timestamp);
+    }
+
     // Starts the WT transaction associated with this session.
     getSession();
 
@@ -967,6 +1015,14 @@ void WiredTigerRecoveryUnit::setCatalogConflictingTimestamp(Timestamp timestamp)
 
 Timestamp WiredTigerRecoveryUnit::getCatalogConflictingTimestamp() const {
     return _catalogConflictTimestamp;
+}
+
+bool WiredTigerRecoveryUnit::gatherWriteContextForDebugging() const {
+    return _gatherWriteContextForDebugging;
+}
+
+void WiredTigerRecoveryUnit::storeWriteContextForDebugging(const BSONObj& info) {
+    _writeContextForDebugging.push_back(info);
 }
 
 }  // namespace mongo

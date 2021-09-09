@@ -222,6 +222,9 @@ public:
 
     static void appendGlobalStats(BSONObjBuilder& b);
 
+    bool gatherWriteContextForDebugging() const;
+    void storeWriteContextForDebugging(const BSONObj& info);
+
 private:
     void doCommitUnitOfWork() override;
     void doAbortUnitOfWork() override;
@@ -302,6 +305,8 @@ private:
     std::unique_ptr<Timer> _timer;
     bool _isOplogReader = false;
     boost::optional<int64_t> _oplogVisibleTs = boost::none;
+    bool _gatherWriteContextForDebugging = false;
+    std::vector<BSONObj> _writeContextForDebugging;
 };
 
 }  // namespace mongo
