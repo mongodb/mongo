@@ -49,15 +49,21 @@ ServiceContext* setupServiceContext() {
 }
 
 void createCollectionsAndLocker(OperationContext* opCtx, int numCollections) {
+    {
+        stdx::lock_guard<Client> lk(cc());
+        opCtx->swapLockState(std::make_unique<LockerImpl>(), lk);
+    }
+
+    // Register new collections under the exclusive global lock to avoid the copy-on-write mechanism
+    // during the benchmark setup.
+    Lock::GlobalLock globalLk(opCtx, MODE_X);
+
     for (auto i = 0; i < numCollections; i++) {
         const NamespaceString nss("collection_catalog_bm", std::to_string(i));
         CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
             catalog.registerCollection(opCtx, UUID::gen(), std::make_shared<CollectionMock>(nss));
         });
     }
-
-    stdx::lock_guard<Client> lk(cc());
-    opCtx->swapLockState(std::make_unique<LockerImpl>(), lk);
 }
 
 }  // namespace
