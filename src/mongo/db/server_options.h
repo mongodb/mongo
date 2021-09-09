@@ -143,43 +143,6 @@ struct ServerGlobalParams {
         using FCV = multiversion::FeatureCompatibilityVersion;
 
         /**
-         * The combination of the fields (version, targetVersion, previousVersion) in the
-         * featureCompatibilityVersion document in the server configuration collection
-         * (admin.system.version) are represented by this enum and determine this node's behavior.
-         *
-         * Features can be gated for specific versions, or ranges of versions above or below some
-         * minimum or maximum version, respectively.
-         *
-         * While upgrading from version X to Y or downgrading from Y to X, the server supports the
-         * features of the older of the two versions.
-         *
-         * For versions X and Y, the legal enums and featureCompatibilityVersion documents are:
-         *
-         * kFullyDowngradedToX
-         * (X, Unset, Unset): Only version X features are available, and new and existing storage
-         *                    engine entries use the X format
-         *
-         * kUpgradingFromXToY
-         * (X, Y, Unset): Only version X features are available, but new storage engine entries
-         *                use the Y format, and existing entries may have either the X or
-         *                Y format
-         *
-         * kVersionX
-         * (X, Unset, Unset): X features are available, and new and existing storage engine
-         *                    entries use the X format
-         *
-         * kDowngradingFromXToY
-         * (Y, Y, X): Only Y features are available and new storage engine entries use the
-         *            Y format, but existing entries may have either the Y or X format
-         *
-         * kUnsetDefault{LTS}Behavior
-         * (Unset, Unset, Unset): This is the case on startup before the fCV document is loaded into
-         *                        memory. isVersionInitialized() will return false, and getVersion()
-         *                        will return the default (kUnsetDefault{LTS}Behavior).
-         *
-         */
-
-        /**
          * On startup, the featureCompatibilityVersion may not have been explicitly set yet. This
          * exposes the actual state of the featureCompatibilityVersion if it is uninitialized.
          */

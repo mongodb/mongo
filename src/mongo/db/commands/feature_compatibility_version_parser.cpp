@@ -81,19 +81,12 @@ StringData FeatureCompatibilityVersionParser::serializeVersion(
 
 StringData FeatureCompatibilityVersionParser::serializeVersionForFeatureFlags(
     multiversion::FeatureCompatibilityVersion version) {
-    switch (version) {
-        case multiversion::FeatureCompatibilityVersion::kVersion_4_4:
-        case multiversion::FeatureCompatibilityVersion::kVersion_4_7:
-        case multiversion::FeatureCompatibilityVersion::kVersion_4_8:
-        case multiversion::FeatureCompatibilityVersion::kVersion_4_9:
-        case multiversion::FeatureCompatibilityVersion::kFullyDowngradedTo_5_0:
-        case multiversion::FeatureCompatibilityVersion::kVersion_5_1:
-            return multiversion::toString(version);
-        default:
-            invariant(false, "Invalid version value for feature flag.");
+    if (multiversion::isStandardFCV(version)) {
+        return multiversion::toString(version);
     }
 
-    MONGO_UNREACHABLE;
+    uasserted(ErrorCodes::BadValue,
+              fmt::format("Invalid FCV version {} for feature flag.", version));
 }
 
 Status FeatureCompatibilityVersionParser::validatePreviousVersionField(
