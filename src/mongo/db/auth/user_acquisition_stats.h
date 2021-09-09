@@ -213,21 +213,23 @@ public:
                                TickSource* tickSource,
                                UserAcquisitionOpType type)
         : _stats(statsParam), _tickSource(tickSource), _type(type) {
-        switch (_type) {
-            case kCache:
-                _stats->_recordCacheAccessStart(_tickSource);
-                break;
-            case kBind:
-                _stats->_recordBindStart(_tickSource);
-                break;
-            case kSearch:
-                _stats->_recordSearchStart(_tickSource);
-                break;
-            case kUnbind:
-                _stats->_recordUnbindStart(_tickSource);
-                break;
-            case kIncrementReferrals:
-                break;
+        if (_stats) {
+            switch (_type) {
+                case kCache:
+                    _stats->_recordCacheAccessStart(_tickSource);
+                    break;
+                case kBind:
+                    _stats->_recordBindStart(_tickSource);
+                    break;
+                case kSearch:
+                    _stats->_recordSearchStart(_tickSource);
+                    break;
+                case kUnbind:
+                    _stats->_recordUnbindStart(_tickSource);
+                    break;
+                case kIncrementReferrals:
+                    break;
+            }
         }
     }
 
