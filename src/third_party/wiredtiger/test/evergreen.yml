@@ -2098,20 +2098,22 @@ tasks:
         vars:
           # Don't use diagnostic - this test looks for timing problems that are more likely to occur without it
           posix_configure_flags: --enable-strict
-      # Temporarily disable mix and column file type
-      # FIXME after WT-6608
-      #- func: "checkpoint test"
-      #  vars:
-      #    checkpoint_args: -t m -n 1000000 -k 5000000 -C cache_size=100MB
-      #- func: "checkpoint test"
-      #  vars:
-      #    checkpoint_args: -t c -n 1000000 -k 5000000 -C cache_size=100MB
+      - func: "checkpoint test"
+        vars:
+          checkpoint_args: -t m -n 1000000 -k 5000000 -C cache_size=100MB
+      - func: "checkpoint test"
+        vars:
+          checkpoint_args: -t c -n 1000000 -k 5000000 -C cache_size=100MB
       - func: "checkpoint test"
         vars:
           checkpoint_args: -t r -n 1000000 -k 5000000 -C cache_size=100MB
 
   - name: coverage-report
     commands:
+      - command: timeout.update
+        params:
+          exec_timeout_secs: 36000 # 10 hrs
+          timeout_secs: 1800 # 30 mins
       - func: "get project"
       - func: "compile wiredtiger"
         vars:
@@ -2123,37 +2125,45 @@ tasks:
           unit_test_args: -v 2 --long
       - func: "format test"
         vars:
-          extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=row compression=snappy logging=1 logging_compression=snappy logging_prealloc=1
+          config: ../../../test/format/CONFIG.coverage
+          extra_args: file_type=row compression=snappy logging=1 logging_compression=snappy logging_prealloc=1
       - func: "format test"
         vars:
-          extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=row alter=1 backups=1 compaction=1 data_extend=1 prepare=1 salvage=1 statistics=1 statistics_server=1 verify=1
+          config: ../../../test/format/CONFIG.coverage
+          extra_args: file_type=row alter=1 backups=1 compaction=1 data_extend=1 prepare=1 salvage=1 statistics=1 statistics_server=1 verify=1
       - func: "format test"
         vars:
-          extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=row firstfit=1 internal_key_truncation=1
+          config: ../../../test/format/CONFIG.coverage
+          extra_args: file_type=row firstfit=1 internal_key_truncation=1
       - func: "format test"
         vars:
-          extra_args: leak_memory=0 mmap=1 file_type=row checkpoints=0 in_memory=1 reverse=1 truncate=1
+          config: ../../../test/format/CONFIG.coverage
+          extra_args: file_type=row checkpoints=0 in_memory=1 reverse=1 truncate=1
       - func: "format test"
         vars:
-          extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=row compression=zlib huffman_value=1
+          config: ../../../test/format/CONFIG.coverage
+          extra_args: file_type=row compression=zlib huffman_value=1
       - func: "format test"
         vars:
-          extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=row data_source=lsm bloom=1
-      # FIXME-WT-6669: temporarily disable column store test
+          config: ../../../test/format/CONFIG.coverage
+          extra_args: file_type=row data_source=lsm bloom=1
+      - func: "format test"
+        vars:
+          config: ../../../test/format/CONFIG.coverage
+          extra_args: file_type=row compression=lz4 prefix_compression=1 leaf_page_max=9 internal_page_max=9 key_min=256 value_min=256
+      - func: "format test"
+        vars:
+          config: ../../../test/format/CONFIG.coverage
+          extra_args: file_type=var compression=snappy checksum=uncompressed dictionary=1 repeat_data_pct=10
+      - func: "format test"
+        vars:
+          config: ../../../test/format/CONFIG.coverage
+          extra_args: file_type=var leaf_page_max=9 internal_page_max=9 value_min=256
+      # FIXME-WT-8016: temporarily disable FLCS
       # - func: "format test"
       #   vars:
-      #     extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=var compression=snappy checksum=uncompressed dictionary=1 repeat_data_pct=10
-      - func: "format test"
-        vars:
-          extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=row compression=lz4 prefix_compression=1 leaf_page_max=9 internal_page_max=9 key_min=256 value_min=256
-      # FIXME-WT-6669: temporarily disable column store test
-      # - func: "format test"
-      #   vars:
-      #     extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=var leaf_page_max=9 internal_page_max=9 value_min=256
-      # FIXME-WT-6669: temporarily disable column store test
-      # - func: "format test"
-      #   vars:
-      #     extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=fix
+      #     config: ../../../test/format/CONFIG.coverage
+      #     extra_args: file_type=fix
       - command: shell.exec
         params:
           shell: bash
