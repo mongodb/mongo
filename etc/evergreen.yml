@@ -10605,8 +10605,10 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-suse15
     compile_flags: --ssl MONGO_DISTMOD=suse15 --use-libunwind=off -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    multiversion_platform: suse15
-    multiversion_edition: targeted
+    multiversion_platform: linux_x86_64
+    multiversion_edition: base
+    multiversion_platform_42_or_later: suse15
+    multiversion_edition_42_or_later: targeted
     has_packages: true
     packager_script: packager.py
     packager_arch: x86_64
@@ -10801,8 +10803,10 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-debian10
     compile_flags: --ssl MONGO_DISTMOD=debian10 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    multiversion_platform: debian10
-    multiversion_edition: targeted
+    multiversion_platform: linux_x86_64
+    multiversion_edition: base
+    multiversion_platform_42_or_later: debian10
+    multiversion_edition_42_or_later: targeted
     has_packages: true
     packager_script: packager.py
     packager_arch: x86_64
