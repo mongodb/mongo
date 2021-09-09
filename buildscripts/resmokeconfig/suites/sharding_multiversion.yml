@@ -10,6 +10,7 @@ selector:
   - requires_fcv_51
   - backport_required_multiversion
   - replica_sets_multiversion_backport_required_multiversion
+  - disabled_due_to_server_58295
   exclude_files:
   # Enable when 4.6 becomes last stable
   - jstests/sharding/query/merge_command_options.js

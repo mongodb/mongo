@@ -2,6 +2,7 @@
 // Testing migrations between latest and last-lts mongod versions, where the
 // donor is the latest version and the recipient the last-lts, and vice versa.
 // Migrations should be successful.
+// @tags: [disabled_due_to_server_58295]
 //
 
 // Checking UUID consistency involves talking to a shard node, which in this test is shutdown
