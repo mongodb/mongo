@@ -183,7 +183,7 @@ struct ServerGlobalParams {
          * On startup, the featureCompatibilityVersion may not have been explicitly set yet. This
          * exposes the actual state of the featureCompatibilityVersion if it is uninitialized.
          */
-        const bool isVersionInitialized() const {
+        bool isVersionInitialized() const {
             return _version.load() != FCV::kUnsetDefaultLastLTSBehavior;
         }
 
@@ -191,7 +191,7 @@ struct ServerGlobalParams {
          * This safe getter for the featureCompatibilityVersion parameter ensures the parameter has
          * been initialized with a meaningful value.
          */
-        const FCV getVersion() const {
+        FCV getVersion() const {
             invariant(isVersionInitialized());
             return _version.load();
         }
