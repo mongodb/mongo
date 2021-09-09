@@ -6,6 +6,8 @@
  *   assumes_no_implicit_collection_creation_after_drop,
  *   does_not_support_stepdowns,
  *   requires_fcv_51,
+ *   # TODO: (SERVER-59199) Support appending large RecordIds to KeyStrings
+ *   requires_wiredtiger,
  * ]
  */
 
