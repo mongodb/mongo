@@ -607,7 +607,7 @@ env.Library(
         'auth/auth',
         'commands/server_status_core',
         'commands/test_commands_enabled',
-        'create_indexes_idl',
+        'index_commands_idl',
         'namespace_string',
     ],
 )
@@ -1450,7 +1450,7 @@ env.Library(
 )
 
 env.Library(
-    target='create_indexes_idl',
+    target='index_commands_idl',
     source=[
         'create_indexes.idl',
     ],
@@ -1474,7 +1474,7 @@ env.Library(
         'logical_session_id_helpers',
     ],
     LIBDEPS_PRIVATE=[
-        'create_indexes_idl',
+        'index_commands_idl',
     ],
 )
 
