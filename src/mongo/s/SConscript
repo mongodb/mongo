@@ -224,11 +224,13 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/query_request',
         '$BUILD_DIR/mongo/db/repl/optime',
         '$BUILD_DIR/mongo/db/server_options',
-        '$BUILD_DIR/mongo/db/timeseries/timeseries_idl',
         '$BUILD_DIR/mongo/idl/feature_flag',
         '$BUILD_DIR/mongo/idl/idl_parser',
         "load_balancer_feature_flag",
-    ]
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/timeseries/timeseries_idl',
+    ],
 )
 
 env.Library(
@@ -634,10 +636,13 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/ops/write_ops_parsers_test_helpers',
         '$BUILD_DIR/mongo/db/pipeline/process_interface/mongos_process_interface_factory',
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
+        '$BUILD_DIR/mongo/db/timeseries/timeseries_idl',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_index_schema_conversion_functions',
         '$BUILD_DIR/mongo/dbtests/mocklib',
+        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_mock',
+        '$BUILD_DIR/mongo/s/write_ops/batch_write_types',
+        '$BUILD_DIR/mongo/s/write_ops/cluster_write_ops',
         '$BUILD_DIR/mongo/util/net/network',
-        'catalog/sharding_catalog_client_mock',
         'chunk_writes_tracker',
         'coreshard',
         'load_balancer_support',
@@ -647,7 +652,5 @@ env.CppUnitTest(
         'sharding_router_test_fixture',
         'sharding_task_executor',
         'vector_clock_mongos',
-        'write_ops/batch_write_types',
-        'write_ops/cluster_write_ops',
     ],
 )
