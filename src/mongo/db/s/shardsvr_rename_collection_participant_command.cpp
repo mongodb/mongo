@@ -51,6 +51,11 @@ public:
         return false;
     }
 
+    bool skipApiVersionCheck() const override {
+        // Internal command (server to server).
+        return true;
+    }
+
     std::string help() const override {
         return "Internal command. Do not call directly. Locally renames a collection.";
     }
@@ -121,6 +126,11 @@ public:
 
     bool adminOnly() const override {
         return false;
+    }
+
+    bool skipApiVersionCheck() const override {
+        // Internal command (server to server).
+        return true;
     }
 
     std::string help() const override {

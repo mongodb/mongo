@@ -66,6 +66,11 @@ class ConfigSvrMergeChunkCommand : public TypedCommand<ConfigSvrMergeChunkComman
 public:
     using Request = ConfigSvrMergeChunk;
 
+    bool skipApiVersionCheck() const override {
+        // Internal command (server to server).
+        return true;
+    }
+
     std::string help() const override {
         return "Internal command, which is sent by a shard to the sharding config server. Do "
                "not call directly. Receives, validates, and processes a ConfigSvrMergeChunk";

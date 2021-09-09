@@ -50,6 +50,11 @@ class ConfigsvrRenameCollectionMetadataCommand final
 public:
     using Request = ConfigsvrRenameCollectionMetadata;
 
+    bool skipApiVersionCheck() const override {
+        // Internal command (server to server).
+        return true;
+    }
+
     std::string help() const override {
         return "Internal command. Do not call directly. Renames a collection.";
     }

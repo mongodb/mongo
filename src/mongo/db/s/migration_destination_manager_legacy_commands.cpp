@@ -57,6 +57,11 @@ class RecvChunkStartCommand : public ErrmsgCommandDeprecated {
 public:
     RecvChunkStartCommand() : ErrmsgCommandDeprecated("_recvChunkStart") {}
 
+    bool skipApiVersionCheck() const override {
+        // Internal command (server to server).
+        return true;
+    }
+
     std::string help() const override {
         return "internal";
     }
@@ -141,6 +146,11 @@ class RecvChunkStatusCommand : public BasicCommand {
 public:
     RecvChunkStatusCommand() : BasicCommand("_recvChunkStatus") {}
 
+    bool skipApiVersionCheck() const override {
+        // Internal command (server to server).
+        return true;
+    }
+
     std::string help() const override {
         return "internal";
     }
@@ -179,6 +189,11 @@ public:
 class RecvChunkCommitCommand : public BasicCommand {
 public:
     RecvChunkCommitCommand() : BasicCommand("_recvChunkCommit") {}
+
+    bool skipApiVersionCheck() const override {
+        // Internal command (server to server).
+        return true;
+    }
 
     std::string help() const override {
         return "internal";
@@ -228,6 +243,11 @@ public:
 class RecvChunkAbortCommand : public BasicCommand {
 public:
     RecvChunkAbortCommand() : BasicCommand("_recvChunkAbort") {}
+
+    bool skipApiVersionCheck() const override {
+        // Internal command (server to server).
+        return true;
+    }
 
     std::string help() const override {
         return "internal";

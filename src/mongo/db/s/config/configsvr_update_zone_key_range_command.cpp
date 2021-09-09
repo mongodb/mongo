@@ -63,6 +63,11 @@ class ConfigsvrUpdateZoneKeyRangeCommand : public BasicCommand {
 public:
     ConfigsvrUpdateZoneKeyRangeCommand() : BasicCommand("_configsvrUpdateZoneKeyRange") {}
 
+    bool skipApiVersionCheck() const override {
+        // Internal command (server to server).
+        return true;
+    }
+
     std::string help() const override {
         return "Internal command, which is exported by the sharding config server. Do not call "
                "directly. Validates and assigns a new range to a zone.";

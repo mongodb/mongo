@@ -59,6 +59,11 @@ class ConfigSvrAddShardCommand : public BasicCommand {
 public:
     ConfigSvrAddShardCommand() : BasicCommand("_configsvrAddShard") {}
 
+    bool skipApiVersionCheck() const override {
+        // Internal command (server to server).
+        return true;
+    }
+
     std::string help() const override {
         return "Internal command, which is exported by the sharding config server. Do not call "
                "directly. Validates and adds a new shard to the cluster.";

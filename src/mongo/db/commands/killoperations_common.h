@@ -108,6 +108,11 @@ private:
         return true;
     }
 
+    bool skipApiVersionCheck() const override {
+        // Internal command (server to server).
+        return true;
+    }
+
     std::string help() const override {
         return "Internal command -- Kill operations on the target server by OperationKey.";
     }

@@ -918,6 +918,7 @@ struct UMCStdParams {
     static constexpr bool adminOnly = false;
     static constexpr bool supportsWriteConcern = true;
     static constexpr auto allowedOnSecondary = BasicCommand::AllowedOnSecondary::kNever;
+    static constexpr bool skipApiVersionCheck = false;
 };
 
 // Used by {usersInfo:...} and {rolesInfo:...}
@@ -925,14 +926,25 @@ struct UMCInfoParams {
     static constexpr bool adminOnly = false;
     static constexpr bool supportsWriteConcern = false;
     static constexpr auto allowedOnSecondary = BasicCommand::AllowedOnSecondary::kOptIn;
+    static constexpr bool skipApiVersionCheck = false;
 };
 
-// Used by {invalidateUserCache:...} and {_getUserCacheGeneration:...}
-struct UMCCacheParams {
+// Used by {invalidateUserCache:...}
+struct UMCInvalidateUserCacheParams {
+    static constexpr bool adminOnly = false;
+    static constexpr bool supportsWriteConcern = false;
+    static constexpr auto allowedOnSecondary = BasicCommand::AllowedOnSecondary::kAlways;
+    static constexpr bool skipApiVersionCheck = false;
+};
+
+// Used by {_getUserCacheGeneration:...}
+struct UMCGetUserCacheGenParams {
     static constexpr bool adminOnly = true;
     static constexpr bool supportsWriteConcern = false;
     static constexpr auto allowedOnSecondary = BasicCommand::AllowedOnSecondary::kAlways;
+    static constexpr bool skipApiVersionCheck = true;
 };
+
 
 template <typename RequestT, typename Params = UMCStdParams>
 class CmdUMCTyped : public TypedCommand<CmdUMCTyped<RequestT, Params>> {
@@ -962,6 +974,10 @@ public:
         }
     };
 
+    bool skipApiVersionCheck() const final {
+        return Params::skipApiVersionCheck;
+    }
+
     bool adminOnly() const final {
         return Params::adminOnly;
     }
@@ -970,6 +986,7 @@ public:
         return Params::allowedOnSecondary;
     }
 };
+
 
 class CmdCreateUser : public CmdUMCTyped<CreateUserCommand> {
 public:
@@ -2027,24 +2044,26 @@ RolesInfoReply CmdUMCTyped<RolesInfoCommand, UMCInfoParams>::Invocation::typedRu
     return reply;
 }
 
-CmdUMCTyped<InvalidateUserCacheCommand, UMCCacheParams> cmdInvalidateUserCache;
+CmdUMCTyped<InvalidateUserCacheCommand, UMCInvalidateUserCacheParams> cmdInvalidateUserCache;
 template <>
-void CmdUMCTyped<InvalidateUserCacheCommand, UMCCacheParams>::Invocation::typedRun(
+void CmdUMCTyped<InvalidateUserCacheCommand, UMCInvalidateUserCacheParams>::Invocation::typedRun(
     OperationContext* opCtx) {
     auto* authzManager = AuthorizationManager::get(opCtx->getServiceContext());
     auto lk = requireReadableAuthSchema26Upgrade(opCtx, authzManager);
     authzManager->invalidateUserCache(opCtx);
 }
 
-CmdUMCTyped<GetUserCacheGenerationCommand, UMCCacheParams> cmdGetUserCacheGeneration;
+CmdUMCTyped<GetUserCacheGenerationCommand, UMCGetUserCacheGenParams> cmdGetUserCacheGeneration;
+
 template <>
 GetUserCacheGenerationReply
-CmdUMCTyped<GetUserCacheGenerationCommand, UMCCacheParams>::Invocation::typedRun(
+CmdUMCTyped<GetUserCacheGenerationCommand, UMCGetUserCacheGenParams>::Invocation::typedRun(
     OperationContext* opCtx) {
     uassert(ErrorCodes::IllegalOperation,
             "_getUserCacheGeneration can only be run on config servers",
             serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
 
+    cmdGetUserCacheGeneration.skipApiVersionCheck();
     GetUserCacheGenerationReply reply;
     auto* authzManager = AuthorizationManager::get(opCtx->getServiceContext());
     reply.setCacheGeneration(authzManager->getCacheGeneration());

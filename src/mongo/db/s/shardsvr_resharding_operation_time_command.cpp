@@ -64,6 +64,11 @@ public:
     using Request = _shardsvrReshardingOperationTime;
     using Response = OperationTime;
 
+    bool skipApiVersionCheck() const override {
+        // Internal command (server to server).
+        return true;
+    }
+
     std::string help() const override {
         return "Internal command used by the resharding coordinator to query the elapsed and "
                "remaining time for the active resharding operation on participant shards.";

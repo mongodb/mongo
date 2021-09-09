@@ -47,6 +47,11 @@ public:
     using Request = ShardsvrCreateCollection;
     using Response = CreateCollectionResponse;
 
+    bool skipApiVersionCheck() const override {
+        // Internal command (server to server).
+        return true;
+    }
+
     std::string help() const override {
         return "Internal command. Do not call directly. Creates a collection.";
     }

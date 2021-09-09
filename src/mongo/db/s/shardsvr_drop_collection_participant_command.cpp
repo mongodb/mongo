@@ -47,7 +47,7 @@ class ShardsvrDropCollectionParticipantCommand final
     : public TypedCommand<ShardsvrDropCollectionParticipantCommand> {
 public:
     bool skipApiVersionCheck() const override {
-        /* Internal command (server to server) */
+        // Internal command (server to server).
         return true;
     }
 

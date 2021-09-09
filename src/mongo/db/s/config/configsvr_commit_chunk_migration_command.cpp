@@ -81,6 +81,11 @@ class ConfigSvrCommitChunkMigrationCommand : public BasicCommand {
 public:
     ConfigSvrCommitChunkMigrationCommand() : BasicCommand("_configsvrCommitChunkMigration") {}
 
+    bool skipApiVersionCheck() const override {
+        // Internal command (server to server).
+        return true;
+    }
+
     std::string help() const override {
         return "should not be calling this directly";
     }

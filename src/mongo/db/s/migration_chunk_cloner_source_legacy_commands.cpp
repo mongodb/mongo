@@ -130,6 +130,11 @@ class InitialCloneCommand : public BasicCommand {
 public:
     InitialCloneCommand() : BasicCommand("_migrateClone") {}
 
+    bool skipApiVersionCheck() const override {
+        // Internal command (server to server).
+        return true;
+    }
+
     std::string help() const override {
         return "internal";
     }
@@ -192,6 +197,11 @@ class TransferModsCommand : public BasicCommand {
 public:
     TransferModsCommand() : BasicCommand("_transferMods") {}
 
+    bool skipApiVersionCheck() const override {
+        // Internal command (server to server).
+        return true;
+    }
+
     std::string help() const override {
         return "internal";
     }
@@ -240,6 +250,11 @@ public:
 class MigrateSessionCommand : public BasicCommand {
 public:
     MigrateSessionCommand() : BasicCommand("_getNextSessionMods") {}
+
+    bool skipApiVersionCheck() const override {
+        // Internal command (server to server).
+        return true;
+    }
 
     std::string help() const override {
         return "internal";

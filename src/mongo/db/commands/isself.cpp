@@ -47,6 +47,10 @@ public:
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
+    bool skipApiVersionCheck() const override {
+        // Internal command (server to server).
+        return true;
+    }
     std::string help() const override {
         return "{ _isSelf : 1 } INTERNAL ONLY";
     }

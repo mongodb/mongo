@@ -52,7 +52,7 @@ MONGO_FAIL_POINT_DEFINE(participantReturnNetworkErrorForPrepareAfterExecutingPre
 class PrepareTransactionCmd : public TypedCommand<PrepareTransactionCmd> {
 public:
     bool skipApiVersionCheck() const override {
-        /* Internal command (server to server) */
+        // Internal command (server to server).
         return true;
     }
 
@@ -230,7 +230,7 @@ public:
     using Request = CoordinateCommitTransaction;
 
     bool skipApiVersionCheck() const override {
-        /* Internal command (server to server) */
+        // Internal command (server to server).
         return true;
     }
 

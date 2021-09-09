@@ -78,6 +78,11 @@ class FlushReshardingStateChangeCmd final : public TypedCommand<FlushReshardingS
 public:
     using Request = _flushReshardingStateChange;
 
+    bool skipApiVersionCheck() const override {
+        // Internal command (server to server).
+        return true;
+    }
+
     std::string help() const override {
         return "Internal command used by the resharding coordinator to flush state changes to the "
                "participant shards while the critical section is active.";

@@ -87,6 +87,11 @@ public:
         }
     };
 
+    bool skipApiVersionCheck() const override {
+        // Internal command (server to server).
+        return true;
+    }
+
     std::string help() const override {
         return "Internal command, which is exported by the shard server. Do not call directly. "
                "Aborts and cleans up any in-progress resharding operations for this collection.";

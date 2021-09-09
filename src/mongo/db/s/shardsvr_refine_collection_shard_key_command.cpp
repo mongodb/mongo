@@ -41,13 +41,13 @@ namespace {
 class ShardsvrRefineCollectionShardKeyCommand final
     : public TypedCommand<ShardsvrRefineCollectionShardKeyCommand> {
 public:
-    bool skipApiVersionCheck() const override {
-        /* Internal command (server to server) */
-        return true;
-    }
-
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return Command::AllowedOnSecondary::kNever;
+    }
+
+    bool skipApiVersionCheck() const override {
+        // Internal command (server to server).
+        return true;
     }
 
     std::string help() const override {

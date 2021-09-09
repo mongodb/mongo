@@ -56,6 +56,11 @@ namespace {
 template <typename Derived>
 class FlushRoutingTableCacheUpdatesCmdBase : public TypedCommand<Derived> {
 public:
+    bool skipApiVersionCheck() const override {
+        // Internal command (server to server).
+        return true;
+    }
+
     std::string help() const override {
         return "Internal command which waits for any pending routing table cache updates for a "
                "particular namespace to be written locally. The operationTime returned in the "

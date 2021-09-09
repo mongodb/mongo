@@ -100,6 +100,11 @@ public:
         }
     };
 
+    bool skipApiVersionCheck() const override {
+        // Internal command (server to server).
+        return true;
+    }
+
     std::string help() const override {
         return "Internal command, which is exported by the sharding config server. Do not call "
                "directly.";

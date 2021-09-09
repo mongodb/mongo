@@ -45,6 +45,11 @@ class MovePrimaryCommand : public BasicCommand {
 public:
     MovePrimaryCommand() : BasicCommand("_shardsvrMovePrimary") {}
 
+    bool skipApiVersionCheck() const override {
+        // Internal command (server to server).
+        return true;
+    }
+
     std::string help() const override {
         return "should not be calling this directly";
     }

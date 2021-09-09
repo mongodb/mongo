@@ -84,6 +84,11 @@ public:
         }
     };
 
+    bool skipApiVersionCheck() const override {
+        // Internal command (server to server).
+        return true;
+    }
+
     std::string help() const override {
         return "Internal command, do not call directly. Creates a collection on a shard with UUID"
                " existing on primary.";

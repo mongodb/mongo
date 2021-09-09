@@ -48,6 +48,10 @@ public:
     virtual bool isWriteCommandForConfigServer() const {
         return false;
     }
+    bool skipApiVersionCheck() const override {
+        // Internal command (server to server).
+        return true;
+    }
     std::string help() const override {
         return "internal. for testing only."
                "{ cpuload : 1, cpuFactor : 1 } Runs a straight CPU load. Length of execution "

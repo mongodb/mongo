@@ -105,6 +105,11 @@ public:
         }
     };
 
+    bool skipApiVersionCheck() const override {
+        // Internal command (server to server).
+        return true;
+    }
+
     std::string help() const override {
         return "Internal command, which is exported by shards. Do not call "
                "directly. Adds a new shard to a cluster.";
