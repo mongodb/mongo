@@ -343,14 +343,16 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_finishR
 
 ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_runMandatoryCleanup(
     Status status, const CancellationToken& stepdownToken) {
-    if (stepdownToken.isCanceled()) {
-        // Interrupt occured, ensure the metrics get shut down.
-        _metrics()->onStepDown(ReshardingMetrics::Role::kRecipient);
-    }
 
     return _dataReplicationQuiesced.thenRunOn(_recipientService->getInstanceCleanupExecutor())
-        .onCompletion([this, self = shared_from_this(), outerStatus = status](
-                          Status dataReplicationHaltStatus) {
+        .onCompletion([this,
+                       self = shared_from_this(),
+                       outerStatus = status,
+                       isCanceled = stepdownToken.isCanceled()](Status dataReplicationHaltStatus) {
+            if (isCanceled) {
+                // Interrupt occurred, ensure the metrics get shut down.
+                _metrics()->onStepDown(ReshardingMetrics::Role::kRecipient);
+            }
             // Wait for all of the data replication components to halt. We ignore any data
             // replication errors because resharding is known to have failed already.
             stdx::lock_guard<Latch> lk(_mutex);
