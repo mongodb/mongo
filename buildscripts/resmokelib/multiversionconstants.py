@@ -154,7 +154,7 @@ print(REQUIRES_FCV_TAG_LATEST)
 
 # Generate tags for all FCVS in (lastLTS, latest].
 # All multiversion tests should be run with these tags excluded.
-REQUIRES_FCV_TAG = [tag_str(fcv) for fcv in fcv_constants.requires_fcv_tag_list]
+REQUIRES_FCV_TAG = ",".join([tag_str(fcv) for fcv in fcv_constants.requires_fcv_tag_list])
 print("All tags:")
 print(REQUIRES_FCV_TAG)
 

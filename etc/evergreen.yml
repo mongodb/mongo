@@ -9609,6 +9609,8 @@ buildvariants:
   expansions:
     <<: *enterprise-rhel-80-64-bit-multiversion-expansions-template
     test_flags: >-
+      # TODO (SERVER-55857): Remove this hardcoded tag once tests are filtered out using the
+      # 'REQUIRES_FCV_TAG' list in 'multiversion_constants.py'.
       --excludeWithAnyTags=requires_fcv_51,multiversion_incompatible,disabled_due_to_server_58295
       --runAllFeatureFlagTests
       --mongodSetParameters="{internalQueryEnableSlotBasedExecutionEngine: true}"

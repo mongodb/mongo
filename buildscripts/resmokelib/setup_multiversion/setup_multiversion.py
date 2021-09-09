@@ -73,9 +73,9 @@ def get_merge_base_commit(version: str) -> str:
     cmd = ["git", "merge-base", "origin/master", f"origin/v{version}"]
     result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
     if result.returncode:
-        LOGGER.error("Git merge-base command failed.", cmd=cmd,
+        LOGGER.error("Git merge-base command failed. Falling back to latest master", cmd=cmd,
                      error=result.stderr.decode("utf-8").strip())
-        exit(result.returncode)
+        return None
     commit_hash = result.stdout.decode("utf-8").strip()
     LOGGER.info("Found merge-base commit.", cmd=cmd, commit=commit_hash)
     return commit_hash
