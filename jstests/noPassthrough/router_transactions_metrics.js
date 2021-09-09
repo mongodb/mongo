@@ -146,6 +146,7 @@ function verifyServerStatusValues(st, expectedStats) {
               "unexpected totalRequestsTargeted, res: " + tojson(stats));
 
     const commitTypes = res.transactions.commitTypes;
+    const noShardsCommit = "noShards";
     Object.keys(commitTypes).forEach((commitType) => {
         assert.eq(
             expectedStats.commitTypes[commitType].initiated,
@@ -163,7 +164,7 @@ function verifyServerStatusValues(st, expectedStats) {
         expectedStats.commitTypes[commitType].successfulDurationMicros =
             commitTypes[commitType].successfulDurationMicros;
 
-        if (commitTypes[commitType].successful != 0) {
+        if (commitTypes[commitType].successful != 0 && commitType !== noShardsCommit) {
             assert.gt(commitTypes[commitType].successfulDurationMicros,
                       0,
                       "unexpected successfulDurationMicros for " + commitType +
