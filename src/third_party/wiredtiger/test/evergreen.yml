@@ -385,6 +385,14 @@ functions:
         set -o errexit
         set -o verbose
         ${test_env_vars|} ./test_random_abort ${random_abort_args|} 2>&1
+  "tiered abort test":
+    command: shell.exec
+    params:
+      working_dir: "wiredtiger/build_posix/test/csuite"
+      script: |
+        set -o errexit
+        set -o verbose
+        ${test_env_vars|} ./test_tiered_abort ${tiered_abort_args|} 2>&1
   "timestamp abort test":
     command: shell.exec
     params:
@@ -1050,6 +1058,21 @@ tasks:
             set -o verbose
 
             ${test_env_vars|} $(pwd)/../test/csuite/schema_abort/smoke.sh 2>&1
+
+  - name: csuite-tiered-abort-test
+    tags: ["pull_request"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/build_posix"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} $(pwd)/../test/csuite/tiered_abort/smoke.sh 2>&1
 
   - name: csuite-timestamp-abort-test
     tags: ["pull_request"]

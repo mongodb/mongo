@@ -31,6 +31,10 @@ test_scope_SOURCES = scope/main.c
 noinst_PROGRAMS += test_scope
 all_TESTS += test_scope
 
+test_tiered_abort_SOURCES = tiered_abort/main.c
+noinst_PROGRAMS += test_tiered_abort
+all_TESTS += tiered_abort/smoke.sh
+
 test_timestamp_abort_SOURCES = timestamp_abort/main.c
 noinst_PROGRAMS += test_timestamp_abort
 all_TESTS += timestamp_abort/smoke.sh

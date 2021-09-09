@@ -1486,6 +1486,7 @@ vsnprintf
 vtype
 vunpack
 vxr
+vz
 waitpid
 waker
 wakeup
