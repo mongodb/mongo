@@ -377,6 +377,343 @@ std::unique_ptr<MatchExpression> matchRewriteFullDocument(
     return rewrittenPredicate;
 }
 
+// Helper to rewrite predicates on any change stream namespace field of the form {db: "dbName",
+// coll: "collName"} into the oplog.
+
+// - By default, the rewrite is performed onto the given 'nsField' which specifies an oplog field
+//   containing a complete namespace string, e.g. {ns: "dbName.collName"}.
+// - If 'nsFieldIsCmdNs' is true, then 'nsField' only contains the command-namespace of the
+//   database, i.e. "dbName.$cmd".
+// - With 'nsFieldIsCmdNs set to true, the caller can also optionally provide 'collNameField' which
+//   is the field containing the collection name. The 'collNameField' may be absent, which means
+//   that the operation being rewritten has a 'db' field in the change stream event, but no 'coll'
+//   field.
+std::unique_ptr<MatchExpression> matchRewriteGenericNamespace(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const PathMatchExpression* predicate,
+    StringData nsField,
+    bool nsFieldIsCmdNs = false,
+    boost::optional<StringData> collNameField = boost::none) {
+    // A collection name can only be specified with 'nsFieldIsCmdNs' set to true.
+    tassert(5554100,
+            "Cannot specify 'collNameField' with 'nsFieldIsCmdNs' set to false",
+            !(!nsFieldIsCmdNs && collNameField));
+
+    // Performs a rewrite based on the type of argument specified in the MatchExpression.
+    auto getRewrittenNamespace = [&](auto&& nsElem) -> std::unique_ptr<MatchExpression> {
+        switch (nsElem.type()) {
+            case BSONType::Object: {
+                // Handles case with full namespace object, like '{ns: {db: "db", coll: "coll"}}'.
+                // There must be a single part to the field path, ie. 'ns'.
+                if (predicate->fieldRef()->numParts() > 1) {
+                    return std::make_unique<AlwaysFalseMatchExpression>();
+                }
+
+                // Extract the object from the RHS of the predicate.
+                auto nsObj = nsElem.embeddedObject();
+
+                // If a full namespace, or a collNameField were specified, there must be 2 fields in
+                // the object, i.e. db and coll.
+                if ((!nsFieldIsCmdNs || collNameField) && nsObj.nFields() != 2) {
+                    return std::make_unique<AlwaysFalseMatchExpression>();
+                }
+                //  Otherwise, there can only be 1 field in the object, i.e. db.
+                if (nsFieldIsCmdNs && !collNameField && nsObj.nFields() != 1) {
+                    return std::make_unique<AlwaysFalseMatchExpression>();
+                }
+
+                // Extract the db and collection from the 'ns' object. The 'collElem' will point to
+                // the eoo, if it is not present.
+                BSONObjIterator iter{nsObj};
+                auto dbElem = iter.next();
+                auto collElem = iter.next();
+
+                // Verify that the first field is 'db' and is of type string. We should always have
+                // a db entry no matter what oplog fields we are operating on.
+                if (dbElem.fieldNameStringData() != "db" || dbElem.type() != BSONType::String) {
+                    return std::make_unique<AlwaysFalseMatchExpression>();
+                }
+                // Verify that the second field is 'coll' and is of type string, if it exists.
+                if (collElem &&
+                    (collElem.fieldNameStringData() != "coll" ||
+                     collElem.type() != BSONType::String)) {
+                    return std::make_unique<AlwaysFalseMatchExpression>();
+                }
+
+                if (nsFieldIsCmdNs) {
+                    auto rewrittenPred = std::make_unique<AndMatchExpression>();
+                    rewrittenPred->add(std::make_unique<EqualityMatchExpression>(
+                        nsField, Value(dbElem.str() + ".$cmd")));
+
+                    if (collNameField) {
+                        // If we are rewriting to a combination of cmdNs and collName, we match on
+                        // both.
+                        rewrittenPred->add(std::make_unique<EqualityMatchExpression>(
+                            *collNameField, Value(collElem.str())));
+                    }
+                    return rewrittenPred;
+                }
+
+                // Otherwise, we are rewriting to a full namespace field. Convert the object's
+                // subfields into an exact match on the oplog field.
+                return std::make_unique<EqualityMatchExpression>(
+                    nsField, Value(dbElem.str() + "." + collElem.str()));
+            }
+            case BSONType::String: {
+                // Handles case with field path, like '{"ns.coll": "coll"}'. There must be 2 parts
+                // to the field path, ie. 'ns' and '[db | coll]'.
+                if (predicate->fieldRef()->numParts() != 2) {
+                    return std::make_unique<AlwaysFalseMatchExpression>();
+                }
+
+                // Extract the second field and verify that it is either 'db' or 'coll'.
+                auto fieldName = predicate->fieldRef()->getPart(1);
+                if (fieldName != "db" && fieldName != "coll") {
+                    return std::make_unique<AlwaysFalseMatchExpression>();
+                }
+
+                // If the predicate is on 'coll' but we only have a db, we will never match.
+                if (fieldName == "coll" && nsFieldIsCmdNs && !collNameField) {
+                    return std::make_unique<AlwaysFalseMatchExpression>();
+                }
+
+                // If the predicate is on 'db' and 'nsFieldIsCmdNs' is set to true, match the $cmd
+                // namespace.
+                if (nsFieldIsCmdNs && fieldName == "db") {
+                    return std::make_unique<EqualityMatchExpression>(nsField,
+                                                                     Value(nsElem.str() + ".$cmd"));
+                }
+                // If the predicate is on 'coll', match the 'collNameField' if we have one.
+                if (collNameField && fieldName == "coll") {
+                    return std::make_unique<EqualityMatchExpression>(*collNameField,
+                                                                     Value(nsElem.str()));
+                }
+
+                // Otherwise, we are rewriting this predicate to operate on a field containing the
+                // full namespace. If the predicate is on 'db', match all collections in that DB. If
+                // the predicate is on 'coll', match that collection in all DBs.
+                auto nsRegex = [&]() {
+                    if (fieldName == "db") {
+                        return "^" +
+                            DocumentSourceChangeStream::regexEscapeNsForChangeStream(nsElem.str()) +
+                            "\\." + DocumentSourceChangeStream::kRegexAllCollections;
+                    }
+                    return DocumentSourceChangeStream::kRegexAllDBs + "\\." +
+                        DocumentSourceChangeStream::regexEscapeNsForChangeStream(nsElem.str()) +
+                        "$";
+                }();
+
+                return std::make_unique<RegexMatchExpression>(nsField, nsRegex, "");
+            }
+            case BSONType::RegEx: {
+                // Handles case with field path having regex, like '{"ns.db": /^db$/}'. There must
+                // be 2 parts to the field path, ie. 'ns' and '[db | coll]'.
+                if (predicate->fieldRef()->numParts() != 2) {
+                    return std::make_unique<AlwaysFalseMatchExpression>();
+                }
+
+                // Extract the second field and verify that it either 'db' or 'coll'.
+                auto fieldName = predicate->fieldRef()->getPart(1);
+                if (fieldName != "db" && fieldName != "coll") {
+                    return std::make_unique<AlwaysFalseMatchExpression>();
+                }
+
+                // If the predicate is on 'coll' but we only have a db, we will never match.
+                if (fieldName == "coll" && nsFieldIsCmdNs && !collNameField) {
+                    return std::make_unique<AlwaysFalseMatchExpression>();
+                }
+
+                // Rather than attempting to rewrite the regex to apply to the oplog field, we will
+                // instead write an $expr to extract the dbName or collName from the oplog field,
+                // and apply the unmodified regex directly to it. First get a reference to the
+                // relevant field in the oplog entry.
+                std::string exprFieldRef = "'$" +
+                    (fieldName == "db" ? nsField : (!nsFieldIsCmdNs ? nsField : *collNameField)) +
+                    "'";
+
+                // Wrap the field in an expression to return MISSING if the field is not a string,
+                // since this expression may execute on CRUD oplog entries with clashing fieldnames.
+                // We will make this available to other expressions as the variable '$$oplogField'.
+                std::string exprOplogField = str::stream()
+                    << "{$cond: {if: {$eq: [{$type: " << exprFieldRef
+                    << "}, 'string']}, then: " << exprFieldRef << ", else: '$$REMOVE'}}";
+
+                // Now create an expression to extract the db or coll name from the oplog entry.
+                std::string exprDbOrCollName = [&]() -> std::string {
+                    // If the query is on 'coll' and we have a collName field, use it as-is.
+                    if (fieldName == "coll" && collNameField) {
+                        return "'$$oplogField'";
+                    }
+
+                    // Otherwise, we need to split apart a full ns string. Find the separator.
+                    // Return 0 if input is null in order to prevent throwing in $substrBytes.
+                    std::string exprDotPos =
+                        "{$ifNull: [{$indexOfBytes: ['$$oplogField', '.']}, 0]}";
+
+                    // If the query is on 'db', return everything up to the separator.
+                    if (fieldName == "db") {
+                        return "{$substrBytes: ['$$oplogField', 0, " + exprDotPos + "]}";
+                    }
+
+                    // Otherwise, the query is on 'coll'. Return everything from (separator + 1)
+                    // to the end of the string.
+                    return str::stream() << "{$substrBytes: ['$$oplogField', {$add: [1, "
+                                         << exprDotPos << "]}, -1]}";
+                }();
+
+                // Convert the MatchExpression $regex into a $regexMatch on the corresponding field.
+                std::string exprRegexMatch = str::stream()
+                    << "{$regexMatch: {input: " << exprDbOrCollName << ", regex: '"
+                    << nsElem.regex() << "', options: '" << nsElem.regexFlags() << "'}}";
+
+                // Finally, wrap the regex in a $let which defines the '$$oplogField' variable.
+                std::string exprRewrittenPredicate = str::stream()
+                    << "{$let: {vars: {oplogField: " << exprOplogField
+                    << "}, in: " << exprRegexMatch << "}}";
+
+                // Return a new ExprMatchExpression with the rewritten $regexMatch.
+                return std::make_unique<ExprMatchExpression>(
+                    BSON("" << fromjson(exprRewrittenPredicate)).firstElement(), expCtx);
+            }
+            default:
+                break;
+        }
+        return nullptr;
+    };
+
+    // It is only feasible to attempt to rewrite a limited set of predicates here.
+    switch (predicate->matchType()) {
+        case MatchExpression::EQ:
+        case MatchExpression::INTERNAL_EXPR_EQ: {
+            auto eqME = static_cast<const ComparisonMatchExpressionBase*>(predicate);
+            return getRewrittenNamespace(eqME->getData());
+        }
+        case MatchExpression::REGEX: {
+            // Create the BSON element from the regex match expression and return a rewritten match
+            // expression, if possible.
+            auto regME = static_cast<const RegexMatchExpression*>(predicate);
+            BSONObjBuilder regexBob;
+            regME->serializeToBSONTypeRegex(&regexBob);
+            return getRewrittenNamespace(regexBob.obj().firstElement());
+        }
+        case MatchExpression::MATCH_IN: {
+            auto inME = static_cast<const InMatchExpression*>(predicate);
+
+            // An empty '$in' should not match anything.
+            if (inME->getEqualities().empty() && inME->getRegexes().empty()) {
+                return std::make_unique<AlwaysFalseMatchExpression>();
+            }
+
+            auto rewrittenOr = std::make_unique<OrMatchExpression>();
+
+            // For each equality expression, add the rewritten sub-expression to the '$or'
+            // expression. Abandon the entire rewrite, if any of the rewrite fails.
+            for (const auto& elem : inME->getEqualities()) {
+                if (auto rewrittenExpr = getRewrittenNamespace(elem)) {
+                    rewrittenOr->add(std::move(rewrittenExpr));
+                    continue;
+                }
+                return nullptr;
+            }
+
+            // For each regex expression, add the rewritten sub-expression to the '$or' expression.
+            // Abandon the entire rewrite, if any of the rewrite fails.
+            for (const auto& regME : inME->getRegexes()) {
+                BSONObjBuilder regexBob;
+                regME->serializeToBSONTypeRegex(&regexBob);
+                if (auto rewrittenExpr = getRewrittenNamespace(regexBob.obj().firstElement())) {
+                    rewrittenOr->add(std::move(rewrittenExpr));
+                    continue;
+                }
+                return nullptr;
+            }
+            return rewrittenOr;
+        }
+        default:
+            break;
+    }
+
+    // If we have reached here, this is a predicate which we cannot rewrite.
+    return nullptr;
+}
+
+/**
+ * Rewrites filters on 'ns' in a format that can be applied directly to the oplog.
+ * Returns nullptr if the predicate cannot be rewritten.
+ */
+std::unique_ptr<MatchExpression> matchRewriteNs(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const PathMatchExpression* predicate,
+    bool allowInexact) {
+    // We should only ever see predicates on the 'ns' field.
+    tassert(5554101, "Unexpected empty path", !predicate->path().empty());
+    tassert(5554102,
+            str::stream() << "Unexpected predicate on " << predicate->path(),
+            predicate->fieldRef()->getPart(0) == DocumentSourceChangeStream::kNamespaceField);
+
+    //
+    // CRUD events
+    //
+
+    // CRUD ops are rewritten to the 'ns' field that contains a full namespace string.
+    auto crudNsRewrite = matchRewriteGenericNamespace(expCtx, predicate, "ns"_sd);
+
+    // If we can't rewrite this predicate for CRUD operations, then we don't expect to be able to
+    // rewrite it for any other operations either.
+    if (!crudNsRewrite) {
+        return nullptr;
+    }
+
+    // Create the final namespace filter for CRUD operations, i.e. {op: {$ne: 'c'}}.
+    auto crudNsFilter = std::make_unique<AndMatchExpression>();
+    crudNsFilter->add(
+        MatchExpressionParser::parseAndNormalize(fromjson("{op: {$ne: 'c'}}"), expCtx));
+    crudNsFilter->add(std::move(crudNsRewrite));
+
+    //
+    // Command events
+    //
+
+    // Group together all command event cases.
+    auto cmdCases = std::make_unique<OrMatchExpression>();
+
+    // The 'rename' event is rewritten to a field that contains the full namespace string.
+    auto renameNsRewrite = matchRewriteGenericNamespace(expCtx, predicate, "o.renameCollection"_sd);
+    tassert(5554103, "Unexpected rewrite failure", renameNsRewrite);
+    cmdCases->add(std::move(renameNsRewrite));
+
+    // The 'drop' event is rewritten to the cmdNs in 'ns' and the collection name in 'o.drop'.
+    auto dropNsRewrite = matchRewriteGenericNamespace(
+        expCtx, predicate, "ns"_sd, true /* nsFieldIsCmdNs */, "o.drop"_sd);
+    tassert(5554104, "Unexpected rewrite failure", dropNsRewrite);
+    cmdCases->add(std::move(dropNsRewrite));
+
+    // The 'dropDatabase' event is rewritten to the cmdNs in 'ns'. It does not have a collection
+    // field.
+    auto dropDbNsRewrite =
+        matchRewriteGenericNamespace(expCtx, predicate, "ns"_sd, true /* nsFieldIsCmdNs */);
+    tassert(5554105, "Unexpected rewrite failure", dropDbNsRewrite);
+    auto andDropDbNsRewrite = std::make_unique<AndMatchExpression>(std::move(dropDbNsRewrite));
+    andDropDbNsRewrite->add(std::make_unique<EqualityMatchExpression>("o.dropDatabase", Value(1)));
+    cmdCases->add(std::move(andDropDbNsRewrite));
+
+    // Create the final namespace filter for {op: 'c'} operations.
+    auto cmdNsFilter = std::make_unique<AndMatchExpression>();
+    cmdNsFilter->add(MatchExpressionParser::parseAndNormalize(fromjson("{op: 'c'}"), expCtx));
+    cmdNsFilter->add(std::move(cmdCases));
+
+    //
+    // Build final 'ns' filter
+    //
+
+    // Construct the final rewritten predicate from each of the rewrite categories.
+    auto rewrittenPredicate = std::make_unique<OrMatchExpression>();
+    rewrittenPredicate->add(std::move(crudNsFilter));
+    rewrittenPredicate->add(std::move(cmdNsFilter));
+
+    return rewrittenPredicate;
+}
+
 // Map of fields names for which a simple rename is sufficient when rewriting.
 StringMap<std::string> renameRegistry = {
     {"clusterTime", "ts"}, {"lsid", "lsid"}, {"txnNumber", "txnNumber"}};
@@ -385,7 +722,8 @@ StringMap<std::string> renameRegistry = {
 StringMap<MatchExpressionRewrite> matchRewriteRegistry = {
     {"operationType", matchRewriteOperationType},
     {"documentKey", matchRewriteDocumentKey},
-    {"fullDocument", matchRewriteFullDocument}};
+    {"fullDocument", matchRewriteFullDocument},
+    {"ns", matchRewriteNs}};
 
 // Map of field names to corresponding agg Expression rewrite functions.
 StringMap<AggExpressionRewrite> exprRewriteRegistry = {{"operationType", exprRewriteOperationType}};

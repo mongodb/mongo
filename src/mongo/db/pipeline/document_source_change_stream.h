@@ -184,6 +184,8 @@ public:
     static std::string getCollRegexForChangeStream(const NamespaceString& nss);
     static std::string getCmdNsRegexForChangeStream(const NamespaceString& nss);
 
+    static std::string regexEscapeNsForChangeStream(StringData source);
+
     /**
      * Parses a $changeStream stage from 'elem' and produces the $match and transformation
      * stages required.
