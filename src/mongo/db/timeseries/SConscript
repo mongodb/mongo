@@ -54,8 +54,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/index_names',
         '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/db/storage/storage_options',
-        'timeseries_index_schema_conversion_functions'
-
+        'timeseries_index_schema_conversion_functions',
     ],
 )
 
