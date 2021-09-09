@@ -156,4 +156,7 @@ assert.commandWorked(testDB.runCommand({drop: "validatorColl"}));
         testDB.createCollection(coll, {timeseries: {timeField: "time", metaField: "meta"}}));
     validate({apiStrict: true});
 }());
+
+// Clean up all the data for next run.
+assert.commandWorked(testDB.dropDatabase());
 }());

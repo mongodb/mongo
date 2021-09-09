@@ -41,6 +41,7 @@ load("jstests/libs/override_methods/override_helpers.js");  // For 'OverrideHelp
 // Save a reference to the original methods in the IIFE's scope.
 // This scoping allows the original methods to be called by the overrides below.
 var originalGetCollection = DB.prototype.getCollection;
+var originalCreateCollection = DB.prototype.createCollection;
 var originalDBCollectionDrop = DBCollection.prototype.drop;
 var originalStartParallelShell = startParallelShell;
 var originalRunCommand = Mongo.prototype.runCommand;
@@ -58,9 +59,13 @@ var denylistedNamespaces = [
 const kZoneName = 'moveToHereForMigrationPassthrough';
 
 function shardCollection(collection) {
-    var db = collection.getDB();
+    return shardCollectionWithSpec(
+        {db: collection.getDB(), collName: collection.getName(), shardKey: {_id: 'hashed'}});
+}
+
+function shardCollectionWithSpec({db, collName, shardKey, timeseriesSpec}) {
     var dbName = db.getName();
-    var fullName = collection.getFullName();
+    var fullName = dbName + "." + collName;
 
     for (var ns of denylistedNamespaces) {
         if (fullName.match(ns)) {
@@ -75,8 +80,11 @@ function shardCollection(collection) {
         assert.commandWorked(res, "enabling sharding on the '" + dbName + "' db failed");
     }
 
-    res = db.adminCommand(
-        {shardCollection: fullName, key: {_id: 'hashed'}, collation: {locale: "simple"}});
+    let shardCollCmd = {shardCollection: fullName, key: shardKey, collation: {locale: "simple"}};
+    if (timeseriesSpec) {
+        shardCollCmd["timeseries"] = timeseriesSpec;
+    }
+    res = db.adminCommand(shardCollCmd);
 
     let checkResult = function(res, opDescription) {
         if (res.ok === 0 && testMayRunDropInParallel) {
@@ -119,6 +127,32 @@ function shardCollection(collection) {
     }
 }
 
+DB.prototype.createCollection = function() {
+    const createCollResult = originalCreateCollection.apply(this, arguments);
+
+    if (!createCollResult.ok || arguments.length < 2 || arguments[1] == null ||
+        !isObject(arguments[1]) || !arguments[1].timeseries || !arguments[1].timeseries.timeField) {
+        return createCollResult;
+    }
+
+    const parameterResult = this.adminCommand({getParameter: 1, featureFlagShardedTimeSeries: 1});
+    const isTimeseriesShardingEnabled =
+        parameterResult.ok && parameterResult.featureFlagShardedTimeSeries.value;
+    if (!isTimeseriesShardingEnabled) {
+        return createCollResult;
+    }
+
+    const timeField = arguments[1]["timeseries"]["timeField"];
+    shardCollectionWithSpec({
+        db: this,
+        collName: arguments[0],
+        shardKey: {[timeField]: 1},
+        timeseriesSpec: arguments[1]["timeseries"]
+    });
+
+    return createCollResult;
+};
+
 DB.prototype.getCollection = function() {
     var collection = originalGetCollection.apply(this, arguments);
 
@@ -147,7 +181,9 @@ DB.prototype.getCollection = function() {
     }
 
     // Attempt to enable sharding on database and collection if not already done.
-    shardCollection(collection);
+    if (!TestData.implicitlyShardOnCreateCollectionOnly) {
+        shardCollection(collection);
+    }
 
     return collection;
 };
@@ -156,7 +192,9 @@ DBCollection.prototype.drop = function() {
     var dropResult = originalDBCollectionDrop.apply(this, arguments);
 
     // Attempt to enable sharding on database and collection if not already done.
-    shardCollection(this);
+    if (!TestData.implicitlyShardOnCreateCollectionOnly) {
+        shardCollection(this);
+    }
 
     return dropResult;
 };
