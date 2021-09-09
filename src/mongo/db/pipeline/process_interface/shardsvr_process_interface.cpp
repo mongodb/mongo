@@ -128,10 +128,15 @@ boost::optional<Document> ShardServerProcessInterface::lookupSingleDocument(
     UUID collectionUUID,
     const Document& documentKey,
     boost::optional<BSONObj> readConcern) {
-    // We only want to retrieve the one document that corresponds to 'documentKey', so we
-    // ignore collation when computing which shard to target.
     MakePipelineOptions opts;
-    opts.shardTargetingPolicy = ShardTargetingPolicy::kForceTargetingWithSimpleCollation;
+
+    // alwayUnsharded in this case means that the collection is local, so don't try to perform
+    // lookup on the primary shard.
+    opts.shardTargetingPolicy = nss.isNamespaceAlwaysUnsharded()
+        ? ShardTargetingPolicy::kNotAllowed
+        // We only want to retrieve the one document that corresponds to 'documentKey', so we
+        // ignore collation when computing which shard to target.
+        : ShardTargetingPolicy::kForceTargetingWithSimpleCollation;
     opts.readConcern = std::move(readConcern);
 
     return doLookupSingleDocument(expCtx, nss, collectionUUID, documentKey, std::move(opts));
@@ -235,6 +240,10 @@ void ShardServerProcessInterface::renameIfOptionsAndIndexesHaveNotChanged(
 
 BSONObj ShardServerProcessInterface::getCollectionOptions(OperationContext* opCtx,
                                                           const NamespaceString& nss) {
+    if (nss.isNamespaceAlwaysUnsharded()) {
+        return getCollectionOptionsLocally(opCtx, nss);
+    }
+
     auto cachedDbInfo =
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, nss.db()));
     auto shard = uassertStatusOK(

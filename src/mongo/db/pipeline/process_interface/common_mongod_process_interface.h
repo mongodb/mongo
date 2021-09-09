@@ -124,6 +124,8 @@ public:
                                     std::unique_ptr<TemporaryRecordStore> rs) const final;
 
 protected:
+    BSONObj getCollectionOptionsLocally(OperationContext* opCtx, const NamespaceString& nss);
+
     boost::optional<Document> doLookupSingleDocument(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const NamespaceString& nss,
