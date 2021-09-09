@@ -9385,69 +9385,106 @@ buildvariants:
     target_resmoke_time: 10
     max_sub_suites: 5
     large_distro_name: rhel80-medium
+    burn_in_tag_buildvariants: enterprise-rhel-80-64-bit-inmem linux-64-duroff enterprise-rhel-80-64-bit-multiversion
     num_scons_link_jobs_available: 0.99
     test_flags: >-
       --mongodSetParameters="{internalQueryEnableSlotBasedExecutionEngine: true}"
       --additionalFeatureFlags=featureFlagTimeseriesCollection,featureFlagSbePlanCache
   tasks:
-  - name: compile_and_archive_dist_test_TG
-    distros:
-      - rhel80-large
-# Disable the following tests as they are not aware of feature flags.
-#  - name: compile_test_and_package_parallel_unittest_stream_TG
-#    distros:
-#      - rhel80-large
-#  - name: compile_test_and_package_parallel_dbtest_stream_TG
-#    distros:
-#    - rhel80-medium
-  - name: build_variant_gen
   - name: .aggfuzzer
-  - name: .aggregation !.no_async !.secondary_reads !.sharded !.unwind !aggregation_disabled_optimization
-  - name: .change_streams
+  - name: .aggregation
+  - name: .auth
+  - name: .causally_consistent !.sharding
   - name: .change_stream_fuzzer
-  - name: .concurrency !.large !.ubsan !.debug_only
-  - name: .lint
-  - name: .jscore !.sharding !.decimal !cst_jscore_passthrough
-  - name: .jstestfuzz !.flow_control
-  - name: .query_fuzzer
-  - name: .read_write_concern
-  - name: .replica_sets
-  - name: .rollbackfuzzer
-  - name: causally_consistent_hedged_reads_jscore_passthrough_gen
-  - name: causally_consistent_jscore_passthrough_auth_gen
-  - name: causally_consistent_jscore_passthrough_gen
-  - name: causally_consistent_read_concern_snapshot_passthrough_gen
-  - name: initial_sync_fuzzer_gen
-  - name: multi_shard_multi_stmt_txn_jscore_passthrough_gen
-  - name: multi_shard_multi_stmt_txn_kill_primary_jscore_passthrough_gen
-  - name: multi_shard_multi_stmt_txn_stepdown_primary_jscore_passthrough_gen
-  - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
-  - name: noPassthrough_gen
-  - name: noPassthroughWithMongod_gen
-  - name: replica_sets_api_version_jscore_passthrough_gen
-  - name: replica_sets_multiversion_gen
-  - name: replica_sets_reconfig_jscore_passthrough_gen
-  - name: retryable_writes_jscore_passthrough_gen
-  - name: retryable_writes_jscore_stepdown_passthrough
-  - name: session_jscore_passthrough
-  - name: sharded_causally_consistent_jscore_passthrough_gen
-  - name: sharded_collections_jscore_passthrough
-  - name: sharding_auth_gen
-  - name: sharding_auth_audit_gen
-  - name: sharding_csrs_continuous_config_stepdown_gen
-  - name: sharding_ese_gcm_gen
-  - name: sharding_ese_gen
-  - name: sharding_gen
-  - name: sharding_jscore_passthrough
-  - name: sharding_api_version_jscore_passthrough_gen
-  - name: sharding_update_v1_oplog_jscore_passthrough
-  - name: sharding_last_lts_mongos_and_mixed_shards_gen
-  - name: sharding_max_mirroring_gen
-  - name: sharding_multiversion_gen
-  - name: sharding_update_v1_oplog_gen
-  - name: ese
+  - name: .change_streams
+  - name: .concurrency !.large !.ubsan !.no_txns !.debug_only
+  - name: .concurrency .large !.ubsan !.no_txns !.debug_only
     distros:
     - rhel80-medium
+  - name: .encrypt
+  - name: .integration
+    distros:
+    - rhel80-medium
+  - name: .jscore .common !jsCore
+  - name: .jstestfuzz !.flow_control
+  - name: .lint
+  - name: .misc_js
+  - name: .multi_shard
+  - name: .query_fuzzer
+  - name: .random_multiversion_ds
+  - name: .read_only
+  - name: .read_write_concern !.large
+  - name: .read_write_concern .large
+    distros:
+    - rhel80-medium
+  - name: .replica_sets !.encrypt !.auth
+    distros:
+    - rhel80-xlarge
+  - name: .rollbackfuzzer
+  - name: .sharding .common
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: .sharding .txns
+  - name: .stitch
+  - name: .tenant_migration
+    distros:
+      - rhel80-xlarge
+  - name: .updatefuzzer
+  - name: audit
+  - name: build_variant_gen
+  - name: burn_in_tags_gen
+  - name: burn_in_tests_gen
+  - name: burn_in_tests_multiversion_gen
+  - name: check_feature_flag_tags
+  - name: check_for_todos
+  - name: compile_test_and_package_parallel_core_stream_TG
+    distros:
+      - rhel80-xlarge
+  - name: compile_test_and_package_parallel_dbtest_stream_TG
+    distros:
+    - rhel80-xlarge
+  - name: compile_test_and_package_parallel_unittest_stream_TG
+    distros:
+      - rhel80-xlarge
+  - name: compile_test_and_package_parallel_unittest_stream_with_recording_TG
+    distros:
+      - rhel80-xlarge
+  - name: disk_wiredtiger
+  - name: initial_sync_fuzzer_gen
+  - name: jsCore
+    distros:
+    - rhel80-xlarge
+  - name: jsCore_minimum_batch_size
+  - name: jsCore_txns_large_txns_format
+  - name: jsonSchema
+  - name: lint_fuzzer_sanity_patch
+  - name: mqlrun
+  - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
+  - name: multiversion_gen
+  - name: multiversion_sanity_check_passthrough_gen
+  - name: replica_sets_api_version_jscore_passthrough_gen
+  - name: replica_sets_reconfig_jscore_passthrough_gen
+  - name: replica_sets_reconfig_jscore_stepdown_passthrough_gen
+    distros:
+    - rhel80-xlarge
+  - name: replica_sets_reconfig_kill_primary_jscore_passthrough
+    distros:
+    - rhel80-xlarge
+  - name: retryable_writes_jscore_passthrough_gen
+  - name: retryable_writes_jscore_stepdown_passthrough
+  - name: sasl
+  - name: search
+  - name: search_auth
+  - name: search_ssl
+  - name: secondary_reads_passthrough_gen
+  - name: server_discovery_and_monitoring_json_test_TG
+  - name: server_selection_json_test_TG
+    distros:
+      - rhel80-xlarge
+  - name: session_jscore_passthrough
+  - name: sharding_api_version_jscore_passthrough_gen
+  - name: snmp
+  - name: test_api_version_compatibility
+  - name: unittest_shell_hang_analyzer_gen
 
 - name: enterprise-rhel-80-64-bit-large-txns-format
   display_name: "Enterprise RHEL 8.0 (large transactions format)"
