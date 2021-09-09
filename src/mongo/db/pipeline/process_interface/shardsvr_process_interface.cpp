@@ -220,6 +220,10 @@ void ShardServerProcessInterface::renameIfOptionsAndIndexesHaveNotChanged(
 
 BSONObj ShardServerProcessInterface::getCollectionOptions(OperationContext* opCtx,
                                                           const NamespaceString& nss) {
+    if (nss.isNamespaceAlwaysUnsharded()) {
+        return getCollectionOptionsLocally(opCtx, nss);
+    }
+
     auto cachedDbInfo =
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, nss.db()));
     auto shard = uassertStatusOK(

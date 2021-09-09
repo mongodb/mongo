@@ -131,6 +131,8 @@ public:
                                     std::unique_ptr<TemporaryRecordStore> rs) const final;
 
 protected:
+    BSONObj getCollectionOptionsLocally(OperationContext* opCtx, const NamespaceString& nss);
+
     /**
      * Builds an ordered insert op on namespace 'nss' and documents to be written 'objs'.
      */

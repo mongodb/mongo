@@ -273,8 +273,8 @@ Status CommonMongodProcessInterface::appendQueryExecStats(OperationContext* opCt
     return Status::OK();
 }
 
-BSONObj CommonMongodProcessInterface::getCollectionOptions(OperationContext* opCtx,
-                                                           const NamespaceString& nss) {
+BSONObj CommonMongodProcessInterface::getCollectionOptionsLocally(OperationContext* opCtx,
+                                                                  const NamespaceString& nss) {
     AutoGetCollectionForReadCommand collection(opCtx, nss);
     BSONObj collectionOptions = {};
     if (!collection.getDb()) {
@@ -286,6 +286,11 @@ BSONObj CommonMongodProcessInterface::getCollectionOptions(OperationContext* opC
 
     collectionOptions = collection->getCollectionOptions().toBSON();
     return collectionOptions;
+}
+
+BSONObj CommonMongodProcessInterface::getCollectionOptions(OperationContext* opCtx,
+                                                           const NamespaceString& nss) {
+    return getCollectionOptionsLocally(opCtx, nss);
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter>
