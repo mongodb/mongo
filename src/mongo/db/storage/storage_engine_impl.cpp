@@ -607,9 +607,6 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
             // timestamp when restarting an index build for startup recovery. Then, if we experience
             // an unclean shutdown before a checkpoint is taken, the subsequent startup recovery can
             // see the now-dropped ident referenced by the old index catalog entry.
-            //
-            // TODO (SERVER-56639): Remove this relaxation once index ident drops for startup
-            // recovery are timestamped.
             invariant(engineIdents.find(indexIdent) != engineIdents.end() ||
                           lastShutdownState == LastShutdownState::kUnclean,
                       str::stream() << "Failed to find an index data table matching " << indexIdent
