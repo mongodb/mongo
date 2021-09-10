@@ -714,6 +714,29 @@ std::unique_ptr<MatchExpression> matchRewriteNs(
     return rewrittenPredicate;
 }
 
+/**
+ * Rewrites filters on 'to' in a format that can be applied directly to the oplog.
+ * Returns nullptr if the predicate cannot be rewritten.
+ */
+std::unique_ptr<MatchExpression> matchRewriteTo(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const PathMatchExpression* predicate,
+    bool allowInexact) {
+    // We should only ever see predicates on the 'to' field.
+    tassert(5554400, "Unexpected empty path", !predicate->path().empty());
+    tassert(5554401,
+            str::stream() << "Unexpected predicate on " << predicate->path(),
+            predicate->fieldRef()->getPart(0) == DocumentSourceChangeStream::kRenameTargetNssField);
+
+    if (auto rewriteTo = matchRewriteGenericNamespace(expCtx, predicate, "o.to"_sd)) {
+        auto andRewriteTo = std::make_unique<AndMatchExpression>(
+            MatchExpressionParser::parseAndNormalize(fromjson("{op: 'c'}"), expCtx));
+        andRewriteTo->add(std::move(rewriteTo));
+        return andRewriteTo;
+    }
+    return nullptr;
+}
+
 // Map of fields names for which a simple rename is sufficient when rewriting.
 StringMap<std::string> renameRegistry = {
     {"clusterTime", "ts"}, {"lsid", "lsid"}, {"txnNumber", "txnNumber"}};
@@ -723,7 +746,8 @@ StringMap<MatchExpressionRewrite> matchRewriteRegistry = {
     {"operationType", matchRewriteOperationType},
     {"documentKey", matchRewriteDocumentKey},
     {"fullDocument", matchRewriteFullDocument},
-    {"ns", matchRewriteNs}};
+    {"ns", matchRewriteNs},
+    {"to", matchRewriteTo}};
 
 // Map of field names to corresponding agg Expression rewrite functions.
 StringMap<AggExpressionRewrite> exprRewriteRegistry = {{"operationType", exprRewriteOperationType}};

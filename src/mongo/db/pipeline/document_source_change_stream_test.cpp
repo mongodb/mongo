@@ -5547,5 +5547,570 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceWithEmptyNinExpression) {
                                               fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))))));
 }
 
+TEST_F(ChangeStreamRewriteTest, CanRewriteFullToObject) {
+    auto expCtx = getExpCtx();
+    auto statusWithMatchExpression = MatchExpressionParser::parse(
+        BSON("to" << BSON("db" << expCtx->ns.db() << "coll" << expCtx->ns.coll())), expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
+    ASSERT(rewrittenMatchExpression);
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    const std::string ns = expCtx->ns.db().toString() + "." + expCtx->ns.coll().toString();
+
+    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
+                      BSON(AND(fromjson("{op: {$eq: 'c'}}"), BSON("o.to" << BSON("$eq" << ns)))));
+}
+
+TEST_F(ChangeStreamRewriteTest, CanRewriteToObjectWithSwappedField) {
+    auto expCtx = getExpCtx();
+    auto statusWithMatchExpression = MatchExpressionParser::parse(
+        BSON("to" << BSON("coll" << expCtx->ns.coll() << "db" << expCtx->ns.db())), expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
+    ASSERT(rewrittenMatchExpression);
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
+                      BSON(AND(fromjson("{op: {$eq: 'c'}}"), fromjson("{$alwaysFalse: 1 }"))));
+}
+
+TEST_F(ChangeStreamRewriteTest, CanRewriteToObjectWithOnlyDbField) {
+    auto expCtx = getExpCtx();
+    auto statusWithMatchExpression =
+        MatchExpressionParser::parse(BSON("to" << BSON("db" << expCtx->ns.db())), expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
+    ASSERT(rewrittenMatchExpression);
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
+                      BSON(AND(fromjson("{op: {$eq: 'c'}}"), fromjson("{$alwaysFalse: 1 }"))));
+}
+
+TEST_F(ChangeStreamRewriteTest, CanRewriteToObjectWithOnlyCollectionField) {
+    auto expCtx = getExpCtx();
+    auto statusWithMatchExpression =
+        MatchExpressionParser::parse(BSON("to" << BSON("coll" << expCtx->ns.coll())), expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
+    ASSERT(rewrittenMatchExpression);
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
+                      BSON(AND(fromjson("{op: {$eq: 'c'}}"), fromjson("{$alwaysFalse: 1 }"))));
+}
+
+TEST_F(ChangeStreamRewriteTest, CanRewriteToObjectWithInvalidDbField) {
+    auto expCtx = getExpCtx();
+    auto statusWithMatchExpression = MatchExpressionParser::parse(
+        BSON("to" << BSON("db" << 1 << "coll" << expCtx->ns.coll())), expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
+    ASSERT(rewrittenMatchExpression);
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
+                      BSON(AND(fromjson("{op: {$eq: 'c'}}"), fromjson("{$alwaysFalse: 1 }"))));
+}
+
+TEST_F(ChangeStreamRewriteTest, CanRewriteToObjectWithInvalidCollField) {
+    auto expCtx = getExpCtx();
+    auto statusWithMatchExpression = MatchExpressionParser::parse(
+        BSON("to" << BSON("db" << expCtx->ns.db() << "coll" << 1)), expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
+    ASSERT(rewrittenMatchExpression);
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
+                      BSON(AND(fromjson("{op: {$eq: 'c'}}"), fromjson("{$alwaysFalse: 1 }"))));
+}
+
+TEST_F(ChangeStreamRewriteTest, CanRewriteToObjectWithExtraField) {
+    auto expCtx = getExpCtx();
+    auto statusWithMatchExpression = MatchExpressionParser::parse(
+        fromjson("{to: {db: 'db', coll: 'coll', extra: 'extra'}}"), expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
+    ASSERT(rewrittenMatchExpression);
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
+                      BSON(AND(fromjson("{op: {$eq: 'c'}}"), fromjson("{$alwaysFalse: 1 }"))));
+}
+
+TEST_F(ChangeStreamRewriteTest, CanRewriteToWithStringDbFieldPath) {
+    auto expCtx = getExpCtx();
+    auto statusWithMatchExpression =
+        MatchExpressionParser::parse(BSON("to.db" << expCtx->ns.db()), expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
+    ASSERT(rewrittenMatchExpression);
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    const std::string regexNs = "^" + expCtx->ns.db().toString() + "\\." +
+        DocumentSourceChangeStream::kRegexAllCollections.toString();
+
+    ASSERT_BSONOBJ_EQ(
+        rewrittenPredicate,
+        BSON(AND(fromjson("{op: {$eq: 'c'}}"), BSON("o.to" << BSON("$regex" << regexNs)))));
+}
+
+TEST_F(ChangeStreamRewriteTest, CanRewriteToWithCollectionFieldPath) {
+    auto expCtx = getExpCtx();
+    auto statusWithMatchExpression =
+        MatchExpressionParser::parse(BSON("to.coll" << expCtx->ns.coll()), expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
+    ASSERT(rewrittenMatchExpression);
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    const std::string regexNs = DocumentSourceChangeStream::kRegexAllDBs.toString() + "\\." +
+        expCtx->ns.coll().toString() + "$";
+
+    ASSERT_BSONOBJ_EQ(
+        rewrittenPredicate,
+        BSON(AND(fromjson("{op: {$eq: 'c'}}"), BSON("o.to" << BSON("$regex" << regexNs)))));
+}
+
+TEST_F(ChangeStreamRewriteTest, CanRewriteToWithRegexDbFieldPath) {
+    auto expCtx = getExpCtx();
+    auto statusWithMatchExpression =
+        MatchExpressionParser::parse(BSON("to.db" << BSONRegEx(R"(^unit.*$)")), expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
+    ASSERT(rewrittenMatchExpression);
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
+                      BSON(AND(fromjson("{op: {$eq: 'c'}}"),
+                               fromjson(getNsDbRegexMatchExpr("$o.to", R"(^unit.*$)")))));
+}
+
+TEST_F(ChangeStreamRewriteTest, CanRewriteToWithRegexCollectionFieldPath) {
+    auto expCtx = getExpCtx();
+    auto statusWithMatchExpression =
+        MatchExpressionParser::parse(BSON("to.coll" << BSONRegEx(R"(^pipeline.*$)")), expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
+    ASSERT(rewrittenMatchExpression);
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
+                      BSON(AND(fromjson("{op: {$eq: 'c'}}"),
+                               fromjson(getNsCollRegexMatchExpr("$o.to", R"(^pipeline.*$)")))));
+}
+
+TEST_F(ChangeStreamRewriteTest, CannotRewriteToWithInvalidDbFieldPath) {
+    auto expCtx = getExpCtx();
+    auto statusWithMatchExpression = MatchExpressionParser::parse(BSON("to.db" << 1), expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
+    ASSERT_FALSE(rewrittenMatchExpression);
+}
+
+TEST_F(ChangeStreamRewriteTest, CannotRewriteToWithInvalidCollectionFieldPath) {
+    auto expCtx = getExpCtx();
+    auto statusWithMatchExpression = MatchExpressionParser::parse(BSON("to.coll" << 1), expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        getExpCtx(), statusWithMatchExpression.getValue().get(), {"to"});
+    ASSERT_FALSE(rewrittenMatchExpression);
+}
+
+TEST_F(ChangeStreamRewriteTest, CanRewriteToWithExtraDbFieldPath) {
+    auto expCtx = getExpCtx();
+    auto statusWithMatchExpression = MatchExpressionParser::parse(BSON("to.to.subField"
+                                                                       << "subDb"),
+                                                                  expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
+    ASSERT(rewrittenMatchExpression);
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
+                      BSON(AND(fromjson("{op: {$eq: 'c'}}"), fromjson("{$alwaysFalse: 1 }"))));
+}
+
+TEST_F(ChangeStreamRewriteTest, CanRewriteToWithExtraCollectionFieldPath) {
+    auto expCtx = getExpCtx();
+    auto statusWithMatchExpression = MatchExpressionParser::parse(BSON("to.coll.subField"
+                                                                       << "subColl"),
+                                                                  expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        getExpCtx(), statusWithMatchExpression.getValue().get(), {"to"});
+    ASSERT(rewrittenMatchExpression);
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
+                      BSON(AND(fromjson("{op: {$eq: 'c'}}"), fromjson("{$alwaysFalse: 1 }"))));
+}
+
+TEST_F(ChangeStreamRewriteTest, CanRewriteToWithInvalidFieldPath) {
+    auto expCtx = getExpCtx();
+    auto statusWithMatchExpression = MatchExpressionParser::parse(BSON("to.unknown"
+                                                                       << "test"),
+                                                                  expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        getExpCtx(), statusWithMatchExpression.getValue().get(), {"to"});
+    ASSERT(rewrittenMatchExpression);
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
+                      BSON(AND(fromjson("{op: {$eq: 'c'}}"), fromjson("{$alwaysFalse: 1 }"))));
+}
+
+TEST_F(ChangeStreamRewriteTest, CanRewriteToWithInExpressionOnDb) {
+    auto expCtx = getExpCtx();
+    auto expr = fromjson("{'to.db': {$in: ['test', 'news']}}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
+    ASSERT(rewrittenMatchExpression);
+
+    const std::string firstRegexNs = std::string("^") + "news" + "\\." +
+        DocumentSourceChangeStream::kRegexAllCollections.toString();
+    const std::string secondRegexNs = std::string("^") + "test" + "\\." +
+        DocumentSourceChangeStream::kRegexAllCollections.toString();
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
+                      BSON(AND(fromjson("{op: {$eq: 'c'}}"),
+                               BSON(OR(BSON("o.to" << BSON("$regex" << firstRegexNs)),
+                                       BSON("o.to" << BSON("$regex" << secondRegexNs)))))));
+}
+
+TEST_F(ChangeStreamRewriteTest, CanRewriteToWithNinExpressionOnDb) {
+    auto expCtx = getExpCtx();
+    auto expr = BSON("to.db" << BSON("$nin" << BSON_ARRAY("test"
+                                                          << "news")));
+    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
+    ASSERT(rewrittenMatchExpression);
+
+    const std::string firstRegexNs = std::string("^") + "test" + "\\." +
+        DocumentSourceChangeStream::kRegexAllCollections.toString();
+    const std::string secondRegexNs = std::string("^") + "news" + "\\." +
+        DocumentSourceChangeStream::kRegexAllCollections.toString();
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(
+        rewrittenPredicate,
+        BSON(NOR(BSON(AND(fromjson("{op: {$eq: 'c'}}"),
+                          BSON(OR(BSON("o.to" << BSON("$regex" << secondRegexNs)),
+                                  BSON("o.to" << BSON("$regex" << firstRegexNs)))))))));
+}
+
+TEST_F(ChangeStreamRewriteTest, CanRewriteToWithInExpressionOnCollection) {
+    auto expCtx = getExpCtx();
+    auto expr = fromjson("{'to.coll': {$in: ['test', 'news']}}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
+    ASSERT(rewrittenMatchExpression);
+
+    const std::string firstRegexNs =
+        DocumentSourceChangeStream::kRegexAllDBs.toString() + "\\." + "news" + "$";
+    const std::string secondRegexNs =
+        DocumentSourceChangeStream::kRegexAllDBs.toString() + "\\." + "test" + "$";
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
+                      BSON(AND(fromjson("{op: {$eq: 'c'}}"),
+                               BSON(OR(BSON("o.to" << BSON("$regex" << firstRegexNs)),
+                                       BSON("o.to" << BSON("$regex" << secondRegexNs)))))));
+}
+
+TEST_F(ChangeStreamRewriteTest, CanRewriteToWithNinExpressionOnCollection) {
+    auto expCtx = getExpCtx();
+    auto expr = BSON("to.coll" << BSON("$nin" << BSON_ARRAY("test"
+                                                            << "news")));
+    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
+    ASSERT(rewrittenMatchExpression);
+
+    const std::string firstRegexNs =
+        DocumentSourceChangeStream::kRegexAllDBs.toString() + "\\." + "test" + "$";
+    const std::string secondRegexNs =
+        DocumentSourceChangeStream::kRegexAllDBs.toString() + "\\." + "news" + "$";
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(
+        rewrittenPredicate,
+        BSON(NOR(BSON(AND(fromjson("{op: {$eq: 'c'}}"),
+                          BSON(OR(BSON("o.to" << BSON("$regex" << secondRegexNs)),
+                                  BSON("o.to" << BSON("$regex" << firstRegexNs)))))))));
+}
+
+TEST_F(ChangeStreamRewriteTest, CanRewriteToWithInRegexExpressionOnDb) {
+    auto expCtx = getExpCtx();
+    auto expr = fromjson("{'to.db': {$in: [/^test.*$/, /^news$/]}}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
+    ASSERT(rewrittenMatchExpression);
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
+                      BSON(AND(fromjson("{op: {$eq: 'c'}}"),
+                               BSON(OR(fromjson(getNsDbRegexMatchExpr("$o.to", R"(^test.*$)")),
+                                       fromjson(getNsDbRegexMatchExpr("$o.to", R"(^news$)")))))));
+}
+
+TEST_F(ChangeStreamRewriteTest, CanRewriteToWithNinRegexExpressionOnDb) {
+    auto expCtx = getExpCtx();
+    auto expr = fromjson("{'to.db': {$nin: [/^test.*$/, /^news$/]}}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
+    ASSERT(rewrittenMatchExpression);
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(
+        rewrittenPredicate,
+        BSON(NOR(BSON(AND(fromjson("{op: {$eq: 'c'}}"),
+                          BSON(OR(fromjson(getNsDbRegexMatchExpr("$o.to", R"(^test.*$)")),
+                                  fromjson(getNsDbRegexMatchExpr("$o.to", R"(^news$)")))))))));
+}
+
+TEST_F(ChangeStreamRewriteTest, CanRewriteToWithInRegexExpressionOnCollection) {
+    auto expCtx = getExpCtx();
+    auto expr = fromjson("{'to.coll': {$in: [/^test.*$/, /^news$/]}}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
+    ASSERT(rewrittenMatchExpression);
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
+                      BSON(AND(fromjson("{op: {$eq: 'c'}}"),
+                               BSON(OR(fromjson(getNsCollRegexMatchExpr("$o.to", R"(^test.*$)")),
+                                       fromjson(getNsCollRegexMatchExpr("$o.to", R"(^news$)")))))));
+}
+
+TEST_F(ChangeStreamRewriteTest, CanRewriteToWithNinRegexExpressionOnCollection) {
+    auto expCtx = getExpCtx();
+    auto expr = fromjson("{'to.coll': {$nin: [/^test.*$/, /^news$/]}}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
+    ASSERT(rewrittenMatchExpression);
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(
+        rewrittenPredicate,
+        BSON(NOR(BSON(AND(fromjson("{op: {$eq: 'c'}}"),
+                          BSON(OR(fromjson(getNsCollRegexMatchExpr("$o.to", R"(^test.*$)")),
+                                  fromjson(getNsCollRegexMatchExpr("$o.to", R"(^news$)")))))))));
+}
+
+TEST_F(ChangeStreamRewriteTest, CanRewriteToWithInExpressionOnDbWithRegexAndString) {
+    auto expCtx = getExpCtx();
+    auto expr = fromjson("{'to.db': {$in: [/^test.*$/, 'news']}}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
+    ASSERT(rewrittenMatchExpression);
+
+    const std::string secondRegexNs = std::string("^") + "news" + "\\." +
+        DocumentSourceChangeStream::kRegexAllCollections.toString();
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
+                      BSON(AND(fromjson("{op: {$eq: 'c'}}"),
+                               BSON(OR(BSON("o.to" << BSON("$regex" << secondRegexNs)),
+                                       fromjson(getNsDbRegexMatchExpr("$o.to", R"(^test.*$)")))))));
+}
+
+TEST_F(ChangeStreamRewriteTest, CanRewriteToWithNinExpressionOnDbWithRegexAndString) {
+    auto expCtx = getExpCtx();
+    auto expr = fromjson("{'to.db': {$nin: [/^test.*$/, 'news']}}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
+    ASSERT(rewrittenMatchExpression);
+
+    const std::string secondRegexNs = std::string("^") + "news" + "\\." +
+        DocumentSourceChangeStream::kRegexAllCollections.toString();
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(
+        rewrittenPredicate,
+        BSON(NOR(BSON(AND(fromjson("{op: {$eq: 'c'}}"),
+                          BSON(OR(BSON("o.to" << BSON("$regex" << secondRegexNs)),
+                                  fromjson(getNsDbRegexMatchExpr("$o.to", R"(^test.*$)")))))))));
+}
+
+TEST_F(ChangeStreamRewriteTest, CanRewriteToWithInExpressionOnCollectionWithRegexAndString) {
+    auto expCtx = getExpCtx();
+    auto expr = fromjson("{'to.coll': {$in: [/^test.*$/, 'news']}}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
+    ASSERT(rewrittenMatchExpression);
+
+    const std::string secondRegexNs =
+        DocumentSourceChangeStream::kRegexAllDBs + "\\." + "news" + "$";
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(
+        rewrittenPredicate,
+        BSON(AND(fromjson("{op: {$eq: 'c'}}"),
+                 BSON(OR(BSON("o.to" << BSON("$regex" << secondRegexNs)),
+                         fromjson(getNsCollRegexMatchExpr("$o.to", R"(^test.*$)")))))));
+}
+
+TEST_F(ChangeStreamRewriteTest, CanRewriteToWithNinExpressionOnCollectionWithRegexAndString) {
+    auto expCtx = getExpCtx();
+    auto expr = fromjson("{'to.coll': {$nin: [/^test.*$/, 'news']}}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
+    ASSERT(rewrittenMatchExpression);
+
+    const std::string secondRegexNs =
+        DocumentSourceChangeStream::kRegexAllDBs + "\\." + "news" + "$";
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(
+        rewrittenPredicate,
+        BSON(NOR(BSON(AND(fromjson("{op: {$eq: 'c'}}"),
+                          BSON(OR(BSON("o.to" << BSON("$regex" << secondRegexNs)),
+                                  fromjson(getNsCollRegexMatchExpr("$o.to", R"(^test.*$)")))))))));
+}
+
+TEST_F(ChangeStreamRewriteTest, CannotRewriteToWithInExpressionOnInvalidDb) {
+    auto expCtx = getExpCtx();
+    auto expr = fromjson("{'to.db': {$in: ['test', 1]}}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
+    ASSERT_FALSE(rewrittenMatchExpression);
+}
+
+TEST_F(ChangeStreamRewriteTest, CannotRewriteToWithNinExpressionOnInvalidDb) {
+    auto expCtx = getExpCtx();
+    auto expr = fromjson("{'to.db': {$nin: ['test', 1]}}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
+    ASSERT_FALSE(rewrittenMatchExpression);
+}
+
+TEST_F(ChangeStreamRewriteTest, CannotRewriteToWithInExpressionOnInvalidCollection) {
+    auto expCtx = getExpCtx();
+    auto expr = fromjson("{'to.coll': {$in: ['coll', 1]}}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
+    ASSERT_FALSE(rewrittenMatchExpression);
+}
+
+TEST_F(ChangeStreamRewriteTest, CannotRewriteToWithNinExpressionOnInvalidCollection) {
+    auto expCtx = getExpCtx();
+    auto expr = fromjson("{'to.coll': {$nin: ['coll', 1]}}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
+    ASSERT_FALSE(rewrittenMatchExpression);
+}
+
+TEST_F(ChangeStreamRewriteTest, CanRewriteToWithEmptyInExpression) {
+    auto expCtx = getExpCtx();
+    auto expr = fromjson("{'to.db': {$in: []}}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
+    ASSERT(rewrittenMatchExpression);
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
+                      BSON(AND(fromjson("{op: {$eq: 'c'}}"), fromjson("{$alwaysFalse: 1 }"))));
+}
+
+TEST_F(ChangeStreamRewriteTest, CanRewriteToWithEmptyNinExpression) {
+    auto expCtx = getExpCtx();
+    auto expr = fromjson("{'to.db': {$nin: []}}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        expCtx, statusWithMatchExpression.getValue().get(), {"to"});
+    ASSERT(rewrittenMatchExpression);
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(
+        rewrittenPredicate,
+        BSON(NOR(BSON(AND(fromjson("{op: {$eq: 'c'}}"), fromjson("{$alwaysFalse: 1 }"))))));
+}
+
 }  // namespace
 }  // namespace mongo
