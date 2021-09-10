@@ -363,6 +363,13 @@ public:
     }
 
     /**
+     * Extends the solution's tree by attaching it to the tree rooted at 'extensionRoot'. The
+     * extension tree must contain exactly one 'SentinelNode' node that denotes the attachment
+     * point. The sentinel node will be replaces with the '_root' node.
+     */
+    void extendWith(std::unique_ptr<QuerySolutionNode> extensionRoot);
+
+    /**
      * Assigns the QuerySolutionNode rooted at 'root' to this QuerySolution. Also assigns a unique
      * identifying integer to each node in the tree, which can subsequently be displayed in debug
      * output (e.g. explain).

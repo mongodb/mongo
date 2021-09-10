@@ -157,6 +157,36 @@ void QuerySolution::assignNodeIds(QsnIdGenerator& idGenerator, QuerySolutionNode
     node._nodeId = idGenerator.generate();
 }
 
+void QuerySolution::extendWith(std::unique_ptr<QuerySolutionNode> extensionRoot) {
+    auto current = extensionRoot.get();
+    if (current == nullptr || current->getType() == StageType::STAGE_SENTINEL) {
+        // Nothing to do for a trivial extension.
+        return;
+    }
+
+    QuerySolutionNode* parentOfSentinel = nullptr;
+    while (current->getType() != StageType::STAGE_SENTINEL) {
+        parentOfSentinel = current;
+        tassert(5842801,
+                "Cannot find the sentinel node in the extension tree",
+                !parentOfSentinel->children.empty());
+
+        // At the moment, we only extend a solution plan with a tree for $group stage(s), which have
+        // exactly one child. We'll replace the left-most branch descent with a full tree traversal,
+        // if/when it becomes necessary.
+        tassert(5842800,
+                "Only chain extension trees are supported",
+                parentOfSentinel->children.size() == 1);
+        current = parentOfSentinel->children[0];
+    }
+    parentOfSentinel->children[0] = _root.release();
+    delete current;  // The sentinel node itself isn't used anymore.
+
+    // TODO.irinayat: Should any other members of the solution be updated/reset? Is it OK that
+    // nodeIds will be changed by `setRoot()`?
+    setRoot(std::move(extensionRoot));
+}
+
 void QuerySolution::setRoot(std::unique_ptr<QuerySolutionNode> root) {
     _root = std::move(root);
     if (_root) {

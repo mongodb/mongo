@@ -389,68 +389,29 @@ bool shouldWaitForOplogVisibility(OperationContext* opCtx,
 
 namespace {
 /**
- * A base class to hold the result returned by PrepareExecutionHelper::prepare call.
- */
-template <typename PlanStageType>
-class BasePrepareExecutionResult {
-public:
-    BasePrepareExecutionResult() = default;
-    virtual ~BasePrepareExecutionResult() = default;
-
-    /**
-     * Saves the provided PlanStage 'root' and the 'solution' object within this instance.
-     *
-     * The exact semantics of this method is defined by a specific subclass. For example, this
-     * result object can store a single execution tree for the canonical query, even though it may
-     * have multiple solutions. In this the case the execution tree itself would encapsulate the
-     * multi planner logic to choose the best plan in runtime.
-     *
-     * Or, alternatively, this object can store multiple execution trees (and solutions). In this
-     * case each 'root' and 'solution' objects passed to this method would have to be stored in an
-     * internal vector to be later returned to the user of this class, in case runtime planning is
-     * implemented outside of the execution tree.
-     */
-    virtual void emplace(PlanStageType root, std::unique_ptr<QuerySolution> solution) = 0;
-
-    /**
-     * Returns a short plan summary describing the shape of the query plan.
-     *
-     * Should only be called when this result contains a single execution tree and a query solution.
-     */
-    virtual std::string getPlanSummary() const = 0;
-};
-
-/**
  * A class to hold the result of preparation of the query to be executed using classic engine. This
  * result stores and provides the following information:
  *     - A QuerySolutions for the query. May be null in certain circumstances, where the constructed
  *       execution tree does not have an associated query solution.
  *     - A root PlanStage of the constructed execution tree.
  */
-class ClassicPrepareExecutionResult final
-    : public BasePrepareExecutionResult<std::unique_ptr<PlanStage>> {
+class ClassicPrepareExecutionResult {
 public:
-    using BasePrepareExecutionResult::BasePrepareExecutionResult;
-
-    void emplace(std::unique_ptr<PlanStage> root, std::unique_ptr<QuerySolution> solution) final {
+    void emplace(std::unique_ptr<PlanStage> root, std::unique_ptr<QuerySolution> solution) {
         invariant(!_root);
         invariant(!_solution);
         _root = std::move(root);
         _solution = std::move(solution);
     }
 
-    std::string getPlanSummary() const final {
+    std::string getPlanSummary() const {
         invariant(_root);
         auto explainer = plan_explainer_factory::make(_root.get());
         return explainer->getPlanSummary();
     }
 
-    std::unique_ptr<PlanStage> root() {
-        return std::move(_root);
-    }
-
-    std::unique_ptr<QuerySolution> solution() {
-        return std::move(_solution);
+    std::tuple<std::unique_ptr<PlanStage>, std::unique_ptr<QuerySolution>> extractResultData() {
+        return std::make_tuple(std::move(_root), std::move(_solution));
     }
 
 private:
@@ -467,6 +428,8 @@ private:
  *       case when the query has multiple solutions, we may construct an execution tree for each
  *       solution and pick the best plan after multi-planning). Elements of this vector can never be
  *       null. The size of this vector must always match the size of 'querySolutions' vector.
+ *     - A root node of the extension plan. The plan can be combined with a solution to create a
+ *       larger plan after the winning solution is found. Can be null, meaning "no extension".
  *     - An optional decisionWorks value, which is populated when a solution was reconstructed from
  *       the PlanCache, and will hold the number of work cycles taken to decide on a winning plan
  *       when the plan was first cached. It used to decided whether cached solution runtime planning
@@ -474,23 +437,19 @@ private:
  *     - A 'needSubplanning' flag indicating that the query contains rooted $or predicate and is
  *       eligible for runtime sub-planning.
  */
-class SlotBasedPrepareExecutionResult final
-    : public BasePrepareExecutionResult<
-          std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData>> {
+class SlotBasedPrepareExecutionResult {
 public:
     using QuerySolutionVector = std::vector<std::unique_ptr<QuerySolution>>;
     using PlanStageVector =
         std::vector<std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData>>;
 
-    using BasePrepareExecutionResult::BasePrepareExecutionResult;
-
     void emplace(std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> root,
-                 std::unique_ptr<QuerySolution> solution) final {
+                 std::unique_ptr<QuerySolution> solution) {
         _roots.push_back(std::move(root));
         _solutions.push_back(std::move(solution));
     }
 
-    std::string getPlanSummary() const final {
+    std::string getPlanSummary() const {
         // We can report plan summary only if this result contains a single solution.
         invariant(_roots.size() == 1);
         invariant(_solutions.size() == 1);
@@ -500,12 +459,8 @@ public:
         return explainer->getPlanSummary();
     }
 
-    PlanStageVector roots() {
-        return std::move(_roots);
-    }
-
-    QuerySolutionVector solutions() {
-        return std::move(_solutions);
+    std::tuple<PlanStageVector, QuerySolutionVector> extractResultData() {
+        return std::make_tuple(std::move(_roots), std::move(_solutions));
     }
 
     boost::optional<size_t> decisionWorks() const {
@@ -652,14 +607,21 @@ public:
             return buildSubPlan(plannerParams);
         }
 
-        // We discard the post-multi-planned solution, but it will eventually be used to support
-        // '$group' pushdown.
-        auto&& [statusWithMultiPlanSolns, _] = QueryPlanner::plan(*_cq, plannerParams);
+        // 'postMultiPlan' might be necessary, if the query contains parts of a pipeline, pushed
+        // into the find subsystem. Currently, we only support this for SBE when a single solution
+        // is found.
+        auto&& [statusWithMultiPlanSolns, postMultiPlan] = QueryPlanner::plan(*_cq, plannerParams);
+        tassert(5842803,
+                "Extending multi-planned solutions is only supported in SBE",
+                (std::is_same<ResultType, SlotBasedPrepareExecutionResult>::value ||
+                 postMultiPlan == nullptr));
+
         if (!statusWithMultiPlanSolns.isOK()) {
             return statusWithMultiPlanSolns.getStatus().withContext(
                 str::stream() << "error processing query: " << _cq->toString()
                               << " planner returned error");
         }
+
         auto solutions = std::move(statusWithMultiPlanSolns.getValue());
         // The planner should have returned an error status if there are no solutions.
         invariant(solutions.size() > 0);
@@ -685,6 +647,7 @@ public:
         if (1 == solutions.size()) {
             auto result = makeResult();
             // Only one possible plan. Run it. Build the stages from the solution.
+            solutions[0]->extendWith(std::move(postMultiPlan));
             auto root = buildExecutableTree(*solutions[0]);
             result->emplace(std::move(root), std::move(solutions[0]));
 
@@ -843,7 +806,7 @@ protected:
             }
         }
 
-        result->emplace(std::move(stage), nullptr);
+        result->emplace(std::move(stage), nullptr /* solution */);
         return result;
     }
 
@@ -874,7 +837,7 @@ protected:
         auto result = makeResult();
         result->emplace(std::make_unique<SubplanStage>(
                             _cq->getExpCtxRaw(), _collection, _ws, plannerParams, _cq),
-                        nullptr);
+                        nullptr /* solution */);
         return result;
     }
 
@@ -898,7 +861,7 @@ protected:
         }
 
         auto result = makeResult();
-        result->emplace(std::move(multiPlanStage), nullptr);
+        result->emplace(std::move(multiPlanStage), nullptr /* solution */);
         return result;
     }
 
@@ -998,7 +961,7 @@ protected:
 
     std::unique_ptr<SlotBasedPrepareExecutionResult> buildSubPlan(
         const QueryPlannerParams& plannerParams) final {
-        // Nothing do be done here, all planning and stage building will be done by a SubPlanner.
+        // Nothing to be done here, all planning and stage building will be done by a SubPlanner.
         auto result = makeResult();
         result->setNeedsSubplanning(true);
         return result;
@@ -1034,7 +997,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getClassicExecu
         return executionResult.getStatus();
     }
     auto&& result = executionResult.getValue();
-    auto&& root = result->root();
+    auto&& [root, solution] = result->extractResultData();
     invariant(root);
     // We must have a tree of stages in order to have a valid plan executor, but the query
     // solution may be null.
@@ -1045,7 +1008,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getClassicExecu
                                        yieldPolicy,
                                        plannerOptions,
                                        {},
-                                       result->solution());
+                                       std::move(solution));
 }
 
 /**
@@ -1133,8 +1096,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
     }
 
     auto&& result = executionResult.getValue();
-    auto&& roots = result->roots();
-    auto&& solutions = result->solutions();
+    auto&& [roots, solutions] = result->extractResultData();
 
     if (auto planner = makeRuntimePlannerIfNeeded(opCtx,
                                                   *collection,
@@ -1156,6 +1118,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
     }
     // No need for runtime planning, just use the constructed plan stage tree.
     invariant(roots.size() == 1);
+
     return plan_executor_factory::make(opCtx,
                                        std::move(cq),
                                        std::move(solutions[0]),
@@ -1185,6 +1148,7 @@ inline bool isQuerySbeCompatible(OperationContext* opCtx,
 
     // Queries against a time-series collection are not currently supported by SBE.
     const bool isQueryNotAgainstTimeseriesCollection = !(cq->nss().isTimeseriesBucketsCollection());
+
     return allExpressionsSupported && isNotCount && doesNotContainMetadataRequirements &&
         isQueryNotAgainstTimeseriesCollection && doesNotSortOnMetaOrPathWithNumericComponents &&
         isNotOplog;
@@ -1418,12 +1382,10 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
     if (!executionResult.isOK()) {
         return executionResult.getStatus();
     }
-    auto querySolution = executionResult.getValue()->solution();
-    auto root = executionResult.getValue()->root();
+    auto [root, querySolution] = executionResult.getValue()->extractResultData();
+    invariant(root);
 
     deleteStageParams->canonicalQuery = cq.get();
-
-    invariant(root);
     root = std::make_unique<DeleteStage>(
         cq->getExpCtxRaw(), std::move(deleteStageParams), ws.get(), collection, root.release());
 
@@ -1588,12 +1550,10 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
     if (!executionResult.isOK()) {
         return executionResult.getStatus();
     }
-    auto querySolution = executionResult.getValue()->solution();
-    auto root = executionResult.getValue()->root();
-
+    auto [root, querySolution] = executionResult.getValue()->extractResultData();
     invariant(root);
-    updateStageParams.canonicalQuery = cq.get();
 
+    updateStageParams.canonicalQuery = cq.get();
     const bool isUpsert = updateStageParams.request->isUpsert();
     root = (isUpsert
                 ? std::make_unique<UpsertStage>(
@@ -1916,9 +1876,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
     if (!executionResult.isOK()) {
         return executionResult.getStatus();
     }
-    auto querySolution = executionResult.getValue()->solution();
-    auto root = executionResult.getValue()->root();
-
+    auto [root, querySolution] = executionResult.getValue()->extractResultData();
     invariant(root);
 
     // Make a CountStage to be the new root.
