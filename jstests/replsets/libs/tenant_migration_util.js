@@ -19,6 +19,19 @@ var TenantMigrationUtil = (function() {
     }
 
     /**
+     * Construct a donorStartMigration command object with protocol: "slice merge" if the feature
+     * flag is enabled.
+     */
+    function donorStartMigrationWithProtocol(cmd, db) {
+        // If we don't pass "protocol", the server uses "multitenant migrations" by default.
+        if (isSliceMergeEnabled(db)) {
+            return Object.assign(Object.assign({}, cmd), {protocol: "slice merge"});
+        }
+
+        return cmd;
+    }
+
+    /**
      * Returns the external keys for the given migration id.
      */
     function getExternalKeys(conn, migrationId) {
@@ -166,10 +179,14 @@ var TenantMigrationUtil = (function() {
      */
     function runTenantMigrationCommand(cmdObj, rst, retryOnRetryableErrors, shouldStopFunc) {
         let primary = rst.getPrimary();
+        let localCmdObj = cmdObj;
+        if (Object.keys(cmdObj)[0] === "donorStartMigration") {
+            localCmdObj = donorStartMigrationWithProtocol(cmdObj, primary.getDB("admin"));
+        }
         let res;
         assert.soon(() => {
             try {
-                res = primary.adminCommand(cmdObj);
+                res = primary.adminCommand(localCmdObj);
 
                 if (!res.ok) {
                     // If retry is enabled and the command failed with a NotPrimary error, continue
@@ -470,6 +487,7 @@ var TenantMigrationUtil = (function() {
     return {
         kExternalKeysNs,
         isSliceMergeEnabled,
+        donorStartMigrationWithProtocol,
         getExternalKeys,
         runMigrationAsync,
         forgetMigrationAsync,

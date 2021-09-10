@@ -27,13 +27,14 @@ const tenantMigrationTest =
 // Run tenant migration commands on shards.
 let donorPrimary = donorRstShard.getPrimary();
 
-let cmdObj = {
+let cmdObj = TenantMigrationUtil.donorStartMigrationWithProtocol({
     donorStartMigration: 1,
     tenantId: "kTenantTest",
     migrationId: UUID(),
     recipientConnectionString: tenantMigrationTest.getRecipientConnString(),
     readPreference: {mode: "primary"}
-};
+},
+                                                                 donorPrimary.getDB("admin"));
 assert.commandFailedWithCode(donorPrimary.adminCommand(cmdObj), ErrorCodes.IllegalOperation);
 
 cmdObj = {
@@ -70,13 +71,14 @@ assert.commandFailedWithCode(donorPrimary.adminCommand(cmdObj), ErrorCodes.Illeg
 // Run tenant migration commands on config servers.
 donorPrimary = donorRstConfig.getPrimary();
 
-cmdObj = {
+cmdObj = TenantMigrationUtil.donorStartMigrationWithProtocol({
     donorStartMigration: 1,
     tenantId: "kTenantTest",
     migrationId: UUID(),
     recipientConnectionString: tenantMigrationTest.getRecipientConnString(),
     readPreference: {mode: "primary"}
-};
+},
+                                                             donorPrimary.getDB("admin"));
 assert.commandFailedWithCode(donorPrimary.adminCommand(cmdObj), ErrorCodes.IllegalOperation);
 
 cmdObj = {

@@ -40,27 +40,35 @@ const kExpiredMigrationCertificates = {
 
     jsTest.log("Test that donorStartMigration requires 'donorCertificateForRecipient' when  " +
                "tenantMigrationDisableX509Auth=false");
-    assert.commandFailedWithCode(donorPrimary.adminCommand({
-        donorStartMigration: 1,
-        migrationId: UUID(),
-        recipientConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
-        tenantId: kTenantId,
-        readPreference: kReadPreference,
-        recipientCertificateForDonor: kValidMigrationCertificates.recipientCertificateForDonor,
-    }),
-                                 ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(
+        donorPrimary.adminCommand(
+            TenantMigrationUtil.donorStartMigrationWithProtocol({
+                donorStartMigration: 1,
+                migrationId: UUID(),
+                recipientConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
+                tenantId: kTenantId,
+                readPreference: kReadPreference,
+                recipientCertificateForDonor:
+                    kValidMigrationCertificates.recipientCertificateForDonor,
+            },
+                                                                donorPrimary.getDB("admin"))),
+        ErrorCodes.InvalidOptions);
 
     jsTest.log("Test that donorStartMigration requires 'recipientCertificateForDonor' when  " +
                "tenantMigrationDisableX509Auth=false");
-    assert.commandFailedWithCode(donorPrimary.adminCommand({
-        donorStartMigration: 1,
-        migrationId: UUID(),
-        recipientConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
-        tenantId: kTenantId,
-        readPreference: kReadPreference,
-        donorCertificateForRecipient: kValidMigrationCertificates.donorCertificateForRecipient,
-    }),
-                                 ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(
+        donorPrimary.adminCommand(
+            TenantMigrationUtil.donorStartMigrationWithProtocol({
+                donorStartMigration: 1,
+                migrationId: UUID(),
+                recipientConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
+                tenantId: kTenantId,
+                readPreference: kReadPreference,
+                donorCertificateForRecipient:
+                    kValidMigrationCertificates.donorCertificateForRecipient,
+            },
+                                                                donorPrimary.getDB("admin"))),
+        ErrorCodes.InvalidOptions);
 
     jsTest.log("Test that recipientSyncData requires 'recipientCertificateForDonor' when " +
                "tenantMigrationDisableX509Auth=false");
@@ -99,16 +107,21 @@ const kExpiredMigrationCertificates = {
 
     const donorPrimary = tenantMigrationTest.getDonorPrimary();
 
-    assert.commandFailedWithCode(donorPrimary.adminCommand({
-        donorStartMigration: 1,
-        migrationId: UUID(),
-        recipientConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
-        tenantId: kTenantId,
-        readPreference: kReadPreference,
-        donorCertificateForRecipient: kValidMigrationCertificates.donorCertificateForRecipient,
-        recipientCertificateForDonor: kValidMigrationCertificates.recipientCertificateForDonor,
-    }),
-                                 ErrorCodes.IllegalOperation);
+    assert.commandFailedWithCode(
+        donorPrimary.adminCommand(
+            TenantMigrationUtil.donorStartMigrationWithProtocol({
+                donorStartMigration: 1,
+                migrationId: UUID(),
+                recipientConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
+                tenantId: kTenantId,
+                readPreference: kReadPreference,
+                donorCertificateForRecipient:
+                    kValidMigrationCertificates.donorCertificateForRecipient,
+                recipientCertificateForDonor:
+                    kValidMigrationCertificates.recipientCertificateForDonor,
+            },
+                                                                donorPrimary.getDB("admin"))),
+        ErrorCodes.IllegalOperation);
 
     donorRst.stopSet();
     tenantMigrationTest.stop();
