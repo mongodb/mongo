@@ -229,7 +229,7 @@ env.Library(
         "load_balancer_feature_flag",
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/timeseries/timeseries_idl',
+        '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
     ],
 )
 
@@ -636,8 +636,8 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/ops/write_ops_parsers_test_helpers',
         '$BUILD_DIR/mongo/db/pipeline/process_interface/mongos_process_interface_factory',
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
-        '$BUILD_DIR/mongo/db/timeseries/timeseries_idl',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_index_schema_conversion_functions',
+        '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
         '$BUILD_DIR/mongo/dbtests/mocklib',
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_mock',
         '$BUILD_DIR/mongo/s/write_ops/batch_write_types',

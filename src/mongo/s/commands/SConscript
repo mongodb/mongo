@@ -147,7 +147,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/stats/api_version_metrics',
         '$BUILD_DIR/mongo/db/stats/counters',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_commands_conversion_helper',
-        '$BUILD_DIR/mongo/db/timeseries/timeseries_idl',
+        '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
         '$BUILD_DIR/mongo/db/views/views',
         '$BUILD_DIR/mongo/executor/async_multicaster',
         '$BUILD_DIR/mongo/executor/async_request_executor',
