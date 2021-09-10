@@ -31,7 +31,9 @@
 
 #include "mongo/db/timeseries/timeseries_options.h"
 
-#include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/timeseries/timeseries_gen.h"
 
 namespace mongo {
 
@@ -75,17 +77,6 @@ bool isValidTimeseriesGranularityTransition(BucketGranularityEnum current,
 }
 
 }  // namespace
-
-boost::optional<TimeseriesOptions> getTimeseriesOptions(OperationContext* opCtx,
-                                                        const NamespaceString& nss) {
-    auto bucketsNs = nss.makeTimeseriesBucketsNamespace();
-    auto bucketsColl =
-        CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForRead(opCtx, bucketsNs);
-    if (!bucketsColl) {
-        return boost::none;
-    }
-    return bucketsColl->getTimeseriesOptions();
-}
 
 int getMaxSpanSecondsFromGranularity(BucketGranularityEnum granularity) {
     switch (granularity) {
