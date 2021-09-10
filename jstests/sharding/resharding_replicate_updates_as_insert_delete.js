@@ -78,8 +78,11 @@ reshardingTest.withReshardingInBackground(  //
                     return true;
                 }
 
-                assert.commandFailedWithCode(
-                    res, [ErrorCodes.StaleConfig, ErrorCodes.NoSuchTransaction]);
+                assert.commandFailedWithCode(res, [
+                    ErrorCodes.StaleConfig,
+                    ErrorCodes.NoSuchTransaction,
+                    ErrorCodes.ShardCannotRefreshDueToLocksHeld
+                ]);
                 return false;
             },
             () => `was unable to update value under new shard key as retryable write: ${
