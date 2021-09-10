@@ -128,16 +128,15 @@ rst.start(restoreNode,
               })
           },
           true /* restart */);
-
-let fpMatchIndex;
 assert.soon(() => {  // Can't use checklog because we can't connect to the mongo in startup mode.
-    fpMatchIndex = rawMongoProgramOutput().search("hangAfterCollectionInserts fail point enabled");
-    return fpMatchIndex !== -1;
+    return rawMongoProgramOutput().search("hangAfterCollectionInserts fail point enabled") !== -1;
 });
+// We need to make sure we get a checkpoint after the failpoint is hit, so we clear the output after
+// hitting it.  Occasionally we'll miss a checkpoint as a result of clearing the output, but we'll
+// get another one a second later.
+clearRawMongoProgramOutput();
 assert.soon(() => {
-    // Specifically wait for an unstable checkpoint to be taken after we hit the
-    // 'hangAfterCollectionInserts' failpoint.
-    return rawMongoProgramOutput().search("Completed unstable checkpoint.") > fpMatchIndex;
+    return rawMongoProgramOutput().search("Completed unstable checkpoint.") !== -1;
 });
 
 jsTestLog("Restarting restore node uncleanly");
