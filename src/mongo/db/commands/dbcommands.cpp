@@ -89,6 +89,7 @@
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/stats/storage_stats.h"
 #include "mongo/db/storage/storage_engine_init.h"
+#include "mongo/db/timeseries/catalog_helper.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/views/view_catalog.h"

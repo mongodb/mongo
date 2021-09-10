@@ -45,6 +45,19 @@ env.Library(
 )
 
 env.Library(
+    target='catalog_helper',
+    source=[
+        'catalog_helper.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/catalog/collection_catalog',
+        '$BUILD_DIR/mongo/db/namespace_string',
+        'timeseries_idl',
+    ],
+)
+
+env.Library(
     target='timeseries_commands_conversion_helper',
     source=[
         'timeseries_commands_conversion_helper.cpp',
@@ -65,8 +78,6 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/catalog/collection_catalog',
-        '$BUILD_DIR/mongo/db/namespace_string',
         'timeseries_idl',
     ],
 )

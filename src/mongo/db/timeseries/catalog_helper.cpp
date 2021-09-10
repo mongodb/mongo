@@ -27,32 +27,26 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/db/timeseries/catalog_helper.h"
+
+#include "mongo/db/catalog/collection_catalog.h"
 
 namespace mongo {
 
-/**
- * Namespace for helper functions related to time-series collections.
- */
 namespace timeseries {
 
-/**
- * Returns the default bucket timespan associated with the given granularity.
- */
-int getMaxSpanSecondsFromGranularity(BucketGranularityEnum granularity);
+boost::optional<TimeseriesOptions> getTimeseriesOptions(OperationContext* opCtx,
+                                                        const NamespaceString& nss) {
+    auto bucketsNs = nss.makeTimeseriesBucketsNamespace();
+    auto bucketsColl =
+        CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForRead(opCtx, bucketsNs);
+    if (!bucketsColl) {
+        return boost::none;
+    }
+    return bucketsColl->getTimeseriesOptions();
+}
 
-StatusWith<std::pair<TimeseriesOptions, bool>> applyTimeseriesOptionsModifications(
-    const TimeseriesOptions& current, const BSONObj& mod);
-
-BSONObj generateViewPipeline(const TimeseriesOptions& options, bool asArray);
-
-bool optionsAreEqual(const TimeseriesOptions& option1, const TimeseriesOptions& option2);
-
-/**
- * Rounds down timestamp to the specified granularity.
- */
-Date_t roundTimestampToGranularity(const Date_t& time, BucketGranularityEnum granularity);
 }  // namespace timeseries
 }  // namespace mongo

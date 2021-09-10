@@ -385,6 +385,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/repl/primary_only_service',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/db/repl/replica_set_messages',
+        '$BUILD_DIR/mongo/db/timeseries/catalog_helper',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_idl',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_index_schema_conversion_functions',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_options',

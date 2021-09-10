@@ -360,6 +360,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/storage/storage_engine_common',
         "$BUILD_DIR/mongo/db/storage/two_phase_index_build_knobs_idl",
         '$BUILD_DIR/mongo/db/timeseries/bucket_catalog',
+        '$BUILD_DIR/mongo/db/timeseries/catalog_helper',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_commands_conversion_helper',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_index_schema_conversion_functions',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
