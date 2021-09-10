@@ -42,8 +42,8 @@ EncryptSchemaKeyId EncryptSchemaKeyId::parseFromBSON(const BSONElement& element)
         for (auto&& arrayElement : element.embeddedObject()) {
             if (arrayElement.type() != BSONType::BinData) {
                 uasserted(51088,
-                          str::stream() << "Array elements must have type BinData, found "
-                                        << arrayElement.type());
+                          str::stream() << "Encryption schema 'keyId' array elements must "
+                                        << "have type BinData, found " << arrayElement.type());
             }
             if (arrayElement.binDataType() == BinDataType::newUUID) {
                 const auto uuid = uassertStatusOK(UUID::parse(arrayElement));
@@ -51,8 +51,9 @@ EncryptSchemaKeyId EncryptSchemaKeyId::parseFromBSON(const BSONElement& element)
                 keys.emplace_back(uuid);
             } else {
                 uasserted(51084,
-                          str::stream() << "Array elements must have bindata type UUID, found "
-                                        << arrayElement.binDataType());
+                          str::stream()
+                              << "Encryption schema 'keyId' array elements must "
+                              << "have BinData type UUID, found " << arrayElement.binDataType());
             }
         }
         return EncryptSchemaKeyId(keys);
