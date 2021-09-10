@@ -552,21 +552,22 @@ QuerySolutionNode* QueryPlannerAnalysis::analyzeSort(const CanonicalQuery& query
 
     // And build the full sort stage. The sort stage has to have a sort key generating stage
     // as its child, supplying it with the appropriate sort keys.
-    SortKeyGeneratorNode* keyGenNode = new SortKeyGeneratorNode();
+    auto keyGenNode = std::make_unique<SortKeyGeneratorNode>();
     keyGenNode->sortSpec = sortObj;
     keyGenNode->children.push_back(solnRoot);
-    solnRoot = keyGenNode;
+    solnRoot = keyGenNode.release();
 
-    SortNode* sort = new SortNode();
+    auto sort = std::make_unique<SortNode>();
     sort->pattern = sortObj;
     sort->children.push_back(solnRoot);
-    solnRoot = sort;
+    solnRoot = sort.release();
+    auto sortNodeRaw = static_cast<SortNode*>(solnRoot);
     // When setting the limit on the sort, we need to consider both
     // the limit N and skip count M. The sort should return an ordered list
     // N + M items so that the skip stage can discard the first M results.
     if (qr.getLimit()) {
         // We have a true limit. The limit can be combined with the SORT stage.
-        sort->limit =
+        sortNodeRaw->limit =
             static_cast<size_t>(*qr.getLimit()) + static_cast<size_t>(qr.getSkip().value_or(0));
     } else if (qr.getNToReturn()) {
         // We have an ntoreturn specified by an OP_QUERY style find. This is used
@@ -575,7 +576,7 @@ QuerySolutionNode* QueryPlannerAnalysis::analyzeSort(const CanonicalQuery& query
         // Overflow here would be bad and could cause a nonsense limit. Cast
         // skip and limit values to unsigned ints to make sure that the
         // sum is never stored as signed. (See SERVER-13537).
-        sort->limit =
+        sortNodeRaw->limit =
             static_cast<size_t>(*qr.getNToReturn()) + static_cast<size_t>(qr.getSkip().value_or(0));
 
         // This is a SORT with a limit. The wire protocol has a single quantity
@@ -610,20 +611,20 @@ QuerySolutionNode* QueryPlannerAnalysis::analyzeSort(const CanonicalQuery& query
             //
             // Not allowed for geo or text, because we assume elsewhere that those
             // stages appear just once.
-            OrNode* orn = new OrNode();
-            orn->children.push_back(sort);
-            SortNode* sortClone = static_cast<SortNode*>(sort->clone());
+            auto orn = std::make_unique<OrNode>();
+            orn->children.push_back(solnRoot);
+            SortNode* sortClone = static_cast<SortNode*>(sortNodeRaw->clone());
             sortClone->limit = 0;
             orn->children.push_back(sortClone);
 
             // Add ENSURE_SORTED above the OR.
-            EnsureSortedNode* esn = new EnsureSortedNode();
-            esn->pattern = sort->pattern;
-            esn->children.push_back(orn);
-            solnRoot = esn;
+            auto esn = std::make_unique<EnsureSortedNode>();
+            esn->pattern = sortNodeRaw->pattern;
+            esn->children.push_back(orn.release());
+            solnRoot = esn.release();
         }
     } else {
-        sort->limit = 0;
+        sortNodeRaw->limit = 0;
     }
 
     *blockingSortOut = true;

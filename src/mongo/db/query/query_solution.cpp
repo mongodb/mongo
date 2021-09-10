@@ -923,14 +923,14 @@ void SortNode::appendToString(mongoutils::str::stream* ss, int indent) const {
 }
 
 QuerySolutionNode* SortNode::clone() const {
-    SortNode* copy = new SortNode();
-    cloneBaseData(copy);
+    auto copy = std::make_unique<SortNode>();
+    cloneBaseData(copy.get());
 
     copy->_sorts = this->_sorts;
     copy->pattern = this->pattern;
     copy->limit = this->limit;
 
-    return copy;
+    return copy.release();
 }
 
 //
