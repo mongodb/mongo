@@ -1,9 +1,5 @@
 /*
  * Run the kill_sessions tests against a sharded cluster.
- *
- * TODO SERVER-45385: These tests can be enabled in multiversion once the logging of session cursor
- * cleanup has been backported and released in last-stable.
- * @tags: [multiversion_incompatible]
  */
 
 load("jstests/libs/kill_sessions.js");
