@@ -441,7 +441,9 @@ BSONObj TransactionRouter::Participant::attachTxnFieldsIfNeeded(
     bool mustStartTransaction = isFirstStatementInThisParticipant && !isTransactionCommand(cmdName);
 
     if (!mustStartTransaction) {
-        dassert(!cmd.hasField(repl::ReadConcernArgs::kReadConcernFieldName));
+        auto readConcernFieldName = repl::ReadConcernArgs::kReadConcernFieldName;
+        dassert(!cmd.hasField(readConcernFieldName) ||
+                cmd.getObjectField(readConcernFieldName).isEmpty());
     }
 
     BSONObjBuilder newCmd = mustStartTransaction
