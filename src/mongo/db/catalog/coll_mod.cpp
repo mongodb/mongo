@@ -513,6 +513,10 @@ Status _collModInternal(OperationContext* opCtx,
     auto idx = cmrNew.idx;
     auto ts = cmrNew.timeseries;
 
+    if (!serverGlobalParams.quiet.load()) {
+        LOGV2(5324200, "CMD: collMod", "cmdObj"_attr = cmdObj);
+    }
+
     return writeConflictRetry(opCtx, "collMod", nss.ns(), [&] {
         WriteUnitOfWork wunit(opCtx);
 
