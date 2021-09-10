@@ -147,7 +147,12 @@ replTest.start(
 
 checkLogs();
 
-// Startup recovery will rebuild the index to completion.
+// Startup recovery will rebuild the index in the background. Wait for the index build to finish.
+checkLog.containsJson(primary(), 20663, {
+    namespace: coll().getFullName(),
+    indexesBuilt: ["a_1"],
+    numIndexesAfter: 2,
+});
 IndexBuildTest.assertIndexes(coll(), 2, ["_id_", "a_1"]);
 
 // We can't use the index at earlier times than the index builds commit timestamp.
