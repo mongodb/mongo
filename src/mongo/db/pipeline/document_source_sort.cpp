@@ -92,6 +92,13 @@ DocumentSource::GetNextResult DocumentSourceSort::doGetNext() {
     return GetNextResult{_sortExecutor->getNext().second};
 }
 
+boost::intrusive_ptr<DocumentSource> DocumentSourceSort::clone() const {
+    return create(pExpCtx,
+                  getSortKeyPattern(),
+                  _sortExecutor->getLimit(),
+                  _sortExecutor->getMaxMemoryBytes());
+}
+
 void DocumentSourceSort::serializeToArray(
     std::vector<Value>& array, boost::optional<ExplainOptions::Verbosity> explain) const {
     uint64_t limit = _sortExecutor->getLimit();

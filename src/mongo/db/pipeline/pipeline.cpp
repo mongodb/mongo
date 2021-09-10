@@ -144,15 +144,11 @@ Pipeline::~Pipeline() {
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::clone() const {
-    const auto& serialized = serializeToBson();
-    try {
-        return parse(serialized, getContext());
-    } catch (DBException& ex) {
-        ex.addContext(str::stream()
-                      << "Failed to copy pipeline. Could not parse serialized version: "
-                      << Value(serialized).toString());
-        throw;
+    SourceContainer clonedStages;
+    for (auto&& stage : _sources) {
+        clonedStages.push_back(stage->clone());
     }
+    return create(clonedStages, getContext());
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::parse(
@@ -683,13 +679,13 @@ Pipeline::SourceContainer::iterator Pipeline::optimizeEndOfPipeline(
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::makePipelineFromViewDefinition(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const boost::intrusive_ptr<ExpressionContext>& subPipelineExpCtx,
     ExpressionContext::ResolvedNamespace resolvedNs,
     std::vector<BSONObj> currentPipeline,
     MakePipelineOptions opts) {
 
-    // Copy the ExpressionContext of the base aggregation, using the inner namespace instead.
-    auto subPipelineExpCtx = expCtx->copyForSubPipeline(resolvedNs.ns);
+    // Update subpipeline's ExpressionContext with the resolved namespace.
+    subPipelineExpCtx->ns = resolvedNs.ns;
 
     if (resolvedNs.pipeline.empty()) {
         return Pipeline::makePipeline(std::move(currentPipeline), subPipelineExpCtx, opts);

@@ -103,6 +103,11 @@ public:
         bool _hasInternalCollation = false;
     };
 
+    /**
+     * Copy constructor used for clone().
+     */
+    DocumentSourceLookUp(const DocumentSourceLookUp&);
+
     const char* getSourceName() const final;
     void serializeToArray(
         std::vector<Value>& array,
@@ -218,6 +223,8 @@ public:
         return buildPipeline(inputDoc);
     }
 
+    boost::intrusive_ptr<DocumentSource> clone() const final;
+
 protected:
     GetNextResult doGetNext() final;
     void doDispose() final;
@@ -238,7 +245,6 @@ private:
                          std::string as,
                          boost::optional<std::unique_ptr<CollatorInterface>> fromCollator,
                          const boost::intrusive_ptr<ExpressionContext>& expCtx);
-
     /**
      * Constructor used for a $lookup stage specified using the {from: ..., localField: ...,
      * foreignField: ..., as: ...} syntax.
@@ -313,6 +319,12 @@ private:
      * Method to accumulate the plan summary stats from all stages of the pipeline.
      */
     void recordPlanSummaryStats(const Pipeline& pipeline);
+
+    /**
+     * Method to add a DocumentSourceSequentialDocumentCache stage and optimize the pipeline to
+     * move the cache to its final position.
+     */
+    void addCacheStageAndOptimize(Pipeline& pipeline);
 
     /**
      * Given a mutable document, appends execution stats such as 'totalDocsExamined',

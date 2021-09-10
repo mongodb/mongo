@@ -52,6 +52,8 @@ public:
         std::vector<Value>& array,
         boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 
+    boost::intrusive_ptr<DocumentSource> clone() const final;
+
     GetModPathsReturn getModifiedPaths() const final {
         // A $sort does not modify any paths.
         return {GetModPathsReturn::Type::kFiniteSet, std::set<std::string>{}, {}};

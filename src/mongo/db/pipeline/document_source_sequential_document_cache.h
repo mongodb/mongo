@@ -83,6 +83,19 @@ public:
         _cache->abandon();
     }
 
+    /**
+     * The newly created DocumentSource will share a backing cache with the original DocumentSource
+     * that is being cloned. It is expected that only one of the DocumentSourceSequentialCache
+     * copies will be used, and therefore only one will actively be using the cache.
+     */
+    boost::intrusive_ptr<DocumentSource> clone() const final {
+        auto newStage = create(pExpCtx, _cache);
+        // Keep the position flag so in case the containing pipeline is cloned post-optimization.
+        newStage->_hasOptimizedPos = _hasOptimizedPos;
+        newStage->_cacheIsEOF = _cacheIsEOF;
+        return newStage;
+    }
+
 protected:
     GetNextResult doGetNext() final;
     Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,

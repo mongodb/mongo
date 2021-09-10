@@ -162,7 +162,7 @@ public:
         Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container);
 
     static std::unique_ptr<Pipeline, PipelineDeleter> makePipelineFromViewDefinition(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const boost::intrusive_ptr<ExpressionContext>& subPipelineExpCtx,
         ExpressionContext::ResolvedNamespace resolvedNs,
         std::vector<BSONObj> currentPipeline,
         MakePipelineOptions opts);

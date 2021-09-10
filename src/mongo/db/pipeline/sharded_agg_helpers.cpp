@@ -1297,24 +1297,17 @@ std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(
     invariant(pipeline->getSources().empty() ||
               !dynamic_cast<DocumentSourceMergeCursors*>(pipeline->getSources().front().get()));
 
-    if (expCtx->ns.isConfigDotCacheDotChunks()) {
-        // We take special care to attach the local cursor stage to 'ownedPipeline' here rather than
-        // attaching it to a serialized and re-parsed copy of the pipeline to avoid optimizations
-        // such as the $sequentialCache stage from being lost. This is safe because each shard has
-        // its own complete copy of any "config.cache.chunks.*" namespace.
-        return expCtx->mongoProcessInterface->attachCursorSourceToPipelineForLocalRead(
-            pipeline.release());
-    }
-
     auto catalogCache = Grid::get(expCtx->opCtx)->catalogCache();
     return shardVersionRetry(
         expCtx->opCtx, catalogCache, expCtx->ns, "targeting pipeline to attach cursors"_sd, [&]() {
             auto pipelineToTarget = pipeline->clone();
             if (shardTargetingPolicy == ShardTargetingPolicy::kNotAllowed ||
-                expCtx->ns.db() == "local" || expCtx->ns.isReshardingLocalOplogBufferCollection()) {
+                expCtx->ns.isConfigDotCacheDotChunks() || expCtx->ns.db() == "local" ||
+                expCtx->ns.isReshardingLocalOplogBufferCollection()) {
                 // If the db is local, this may be a change stream examining the oplog. We know the
                 // oplog, other local collections, and collections that store the local resharding
-                // oplog buffer won't be sharded.
+                // oplog buffer won't be sharded. Additionally, each shard has its own complete
+                // copy of any "config.cache.chunks.*" namespace.
                 return expCtx->mongoProcessInterface->attachCursorSourceToPipelineForLocalRead(
                     pipelineToTarget.release());
             }

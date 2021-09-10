@@ -53,7 +53,7 @@ public:
     DocumentSourceListSessions(const DocumentSourceListSessions& other)
         : DocumentSourceMatch(other), _allUsers(other._allUsers), _users(other._users) {}
 
-    virtual boost::intrusive_ptr<DocumentSourceMatch> clone() const {
+    virtual boost::intrusive_ptr<DocumentSource> clone() const {
         return make_intrusive<std::decay_t<decltype(*this)>>(*this);
     }
 

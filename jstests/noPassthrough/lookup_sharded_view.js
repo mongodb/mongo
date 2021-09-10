@@ -5,6 +5,7 @@
 
 load("jstests/aggregation/extras/utils.js");  // For assertArrayEq.
 load("jstests/libs/log.js");                  // For findMatchingLogLines.
+load("jstests/libs/profiler.js");             // For profilerHasSingleMatchingEntryOrThrow.
 
 const sharded = new ShardingTest({
     mongos: 1,
@@ -548,6 +549,58 @@ testLookupView({
         },
     ],
     expectedExceptions: {"test.local": 1, "test.foreign": 1, "test.otherForeign": 0}
+});
+
+// Test that $lookup with a subpipeline containing a non-correlated pipeline prefix can still use
+// the cache after sharded view resolution.
+const shard1DB = sharded.shard1.getDB(testDBName);
+const shard2DB = sharded.shard2.getDB(testDBName);
+
+assert.commandWorked(shard1DB.setProfilingLevel(2));
+assert.commandWorked(shard2DB.setProfilingLevel(2));
+
+// Add a chunk of the 'foreign' collection to shard1 (the rest is on shard2) to force a merge.
+assert.commandWorked(foreign.insert({_id: 9, shard_key: "shard1", f: "d"}));
+assert.commandWorked(
+    testDB.adminCommand({split: foreign.getFullName(), find: {shard_key: "shard1"}}));
+moveChunksByShardKey(foreign, "shard1");
+
+testLookupView({
+    pipeline: [{$lookup: {
+        from: "emptyViewOnForeign",
+        let: {localId: "$_id"},
+        pipeline: [{$group: {_id: {oddId: {$mod: ["$_id", 2]}}, f: {$addToSet: "$f"}}}, {$match: {$expr: {$eq: ["$_id.oddId", {$mod: ["$$localId", 2]}]}}}],
+        as: "foreign",
+    }}],
+    expectedResults: [
+        {_id: 1, shard_key: "shard1", f: 1, foreign: [{_id: {oddId: 1}, f: ["b", "d"]}]},
+        {_id: 2, shard_key: "shard1", f: 2, foreign: [{_id: {oddId: 0}, f: ["a", "c"]}]},
+        {_id: 3, shard_key: "shard1", f: 3, foreign: [{_id: {oddId: 1}, f: ["b", "d"]}]},
+    ],
+    expectedExceptions: {"test.local": 0, "test.foreign": 1, "test.otherForeign": 0}
+});
+
+const comment = "test " + (testCount - 1);
+
+// The subpipeline only executes once on each of the shards containing the 'foreign' collection.
+profilerHasSingleMatchingEntryOrThrow({
+    profileDB: shard1DB,
+    filter: {
+        "command.aggregate": foreign.getName(),
+        "command.comment": comment,
+        "command.fromMongos": false,
+        "errMsg": {$exists: false}  // For the StaleConfig error that resulted from moveChunk.
+    }
+});
+
+profilerHasSingleMatchingEntryOrThrow({
+    profileDB: shard2DB,
+    filter: {
+        "command.aggregate": foreign.getName(),
+        "command.comment": comment,
+        "command.fromMongos": false,
+        "errMsg": {$exists: false}  // For the StaleConfig error that resulted from moveChunk.
+    }
 });
 
 sharded.stop();

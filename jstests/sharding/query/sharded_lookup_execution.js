@@ -51,7 +51,9 @@ function assertLookupExecution(pipeline, opts, expected) {
         {_id: 2, original_review_id: 3, product_id: "bowl", updated_stars: 5},
     ]));
 
-    assert(arrayEq(expected.results, ordersColl.aggregate(pipeline, opts).toArray()));
+    let actual = ordersColl.aggregate(pipeline, opts).toArray();
+    assert(resultsEq(expected.results, actual),
+           "Expected to see results: " + tojson(expected.results) + " but got: " + tojson(actual));
 
     // If the primary delegates the merging functionality to a randomly chosen shard, confirm the
     // expected behavior here.
@@ -536,6 +538,7 @@ expectedRes = [
     {reviews: {_id: 1}, updates: [{updated_stars: 1}]},
     {reviews: {_id: 2}, updates: []},
 ];
+
 assertLookupExecution(pipeline, {comment: "multiple_lookups"}, {
     results: expectedRes,
     // The 'orders' collection is sharded, so the $lookup stage is executed in parallel on every
@@ -549,6 +552,129 @@ assertLookupExecution(pipeline, {comment: "multiple_lookups"}, {
     // shards to execute the subpipeline.
     multipleLookups: {toplevelExec: [1, 1], subpipelineExec: [1, 2]}
 });
+
+// Test that a $lookup with a subpipeline containing a non-correlated pipeline prefix is properly
+// cached in sharded environments.
+
+// Test unsharded local collection and sharded foreign collection.
+st.shardColl(reviewsColl, {_id: 1}, {_id: 0}, {_id: 1}, mongosDB.getName());
+
+pipeline = [
+    {$match: {customer: "Alice"}},
+    {$unwind: "$products"},
+    // To make sure that there is a non-correlated pipeline prefix, we will match on "name" instead
+    // of _id to prevent the $match stage from being optimized before the $group.
+    {$lookup: {
+        from: "reviews", 
+        let: {customer_product_name: "$products._id"}, 
+        pipeline: [
+            {$group: 
+                {_id: "$product_id", avg_stars: {$avg: "$stars"}, name: {$first: "$product_id"}}
+            },
+            {$match: {$expr: {$eq: ["$name", "$$customer_product_name"]}}},
+        ],
+        as: "avg_review"}},
+    {$unwind: {path: "$avg_review", preserveNullAndEmptyArrays: true}},
+    {$group: 
+        {
+            _id: "$_id", 
+            products: {$push: {_id: "$products._id", avg_review: "$avg_review.avg_stars"}}
+        }
+    }
+];
+
+expectedRes = [{_id: 0, products: [{_id: "hat", avg_review: 4.25}, {_id: "shirt", avg_review: 3}]}];
+
+assertLookupExecution(pipeline, {comment: "unsharded_to_sharded_cache"}, {
+    results: expectedRes,
+    // Because the local collection is unsharded, the $lookup stage is executed on the primary
+    // shard of the database.
+    toplevelExec: [1, 0],
+    // The node executing the $lookup will open a cursor on
+    // every shard that contains the foreign collection for the first iteration of $lookup. The
+    // $group stage in the subpipeline is non-correlated so the $lookup will only need to send the
+    // subpipeline to each shard once to populate the cache, and will perform local queries against
+    // the cache in subsequent iterations.
+    subpipelineExec: [1, 1]
+});
+
+// Test sharded local collection and sharded foreign collection.
+st.shardColl(ordersColl, {_id: 1}, {_id: 1}, {_id: 1}, mongosDB.getName());
+st.shardColl(reviewsColl, {_id: 1}, {_id: 0}, {_id: 1}, mongosDB.getName());
+
+pipeline = [
+    {$unwind: "$products"},
+    // To make sure that there is a non-correlated pipeline prefix, we will match on "name" instead
+    // of _id to prevent the $match stage from being optimized before the $group.
+    {$lookup: {
+        from: "reviews", 
+        let: {customer_product_name: "$products._id"}, 
+        pipeline: [
+            {$group: 
+                {_id: "$product_id", avg_stars: {$avg: "$stars"}, name: {$first: "$product_id"}}}, 
+            {$match: {$expr: {$eq: ["$name", "$$customer_product_name"]}}},
+        ],
+        as: "avg_review"}},
+    {$unwind: {path: "$avg_review", preserveNullAndEmptyArrays: true}},
+    {$group: 
+        {
+            _id: "$_id", 
+            products: {$push: {_id: "$products._id", avg_review: "$avg_review.avg_stars"}}
+        }
+    }
+];
+
+expectedRes = [
+    {_id: 0, products: [{_id: "hat", avg_review: 4.25}, {_id: "shirt", avg_review: 3}]},
+    {_id: 1, products: [{_id: "shirt", avg_review: 3}, {_id: "bowl", avg_review: 4}]}
+];
+
+assertLookupExecution(pipeline, {comment: "sharded_to_sharded_cache"}, {
+    results: expectedRes,
+    // The 'orders' collection is sharded, so the top-level stage $lookup is executed in parallel on
+    // every shard that contains the local collection.
+    toplevelExec: [1, 1],
+    // Each node that executes the $lookup will open a cursor on every shard that contains the
+    // foreign collection for the first iteration of $lookup. The $group stage in the subpipeline
+    // is non-correlated so the $lookup will only need to send the subpipeline to each shard once
+    // to populate the cache, and will perform local queries against the cache in subsequent
+    // iterations.
+    subpipelineExec: [2, 2]
+});
+
+// TODO SERVER-58376: Enable tests once cacheing works with unsharded 'from' collections in sharded
+// environments.
+/*
+// Test unsharded local collection and unsharded foreign collection.
+assertLookupExecution(pipeline, {comment: "sharded_to_sharded_cache"}, {
+    results: expectedRes,
+    // Because the local collection is unsharded, the $lookup stage is executed on the primary
+    // shard of the database.
+    toplevelExec: [1, 0],
+    // Because the foreign collection is unsharded, the node executing the $lookup will open a
+    // cursor on the primary shard for the first iteration of $lookup. The $group stage in the
+    // subpipeline is non-correlated so the $lookup will only need to send the subpipeline to each
+    // shard once to populate the cache, and will perform local queries against the cache in
+    // subsequent iterations.
+    subpipelineExec: [1, 0]
+});
+
+// Test sharded local collection and unsharded foreign collection.
+st.shardColl(ordersColl, {_id: 1}, {_id: 1}, {_id: 1}, mongosDB.getName());
+
+assertLookupExecution(pipeline, {comment: "sharded_to_sharded_cache"}, {
+    results: expectedRes,
+    // The 'orders' collection is sharded, so the top-level stage $lookup is executed in parallel on
+    // every shard that contains the local collection.
+    toplevelExec: [1, 1],
+    // Because the foreign collection is unsharded, the node executing the $lookup will open a
+    // cursor on the primary shard for the first iteration of $lookup. The $group stage in the
+    // subpipeline is non-correlated so the $lookup will only need to send the subpipeline to each
+    // shard once to populate the cache, and will perform local queries against the cache in
+    // subsequent iterations.
+    subpipelineExec: [1, 0]
+});
+*/
 
 st.stop();
 }());

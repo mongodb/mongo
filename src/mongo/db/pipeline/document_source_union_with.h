@@ -70,6 +70,10 @@ public:
         }
     }
 
+    DocumentSourceUnionWith(const DocumentSourceUnionWith& original)
+        : DocumentSource(kStageName, original.pExpCtx->copyWith(original.pExpCtx->ns)),
+          _pipeline(original._pipeline->clone()) {}
+
     ~DocumentSourceUnionWith();
 
     const char* getSourceName() const final {
@@ -129,6 +133,8 @@ public:
     const SpecificStats* getSpecificStats() const final {
         return &_stats;
     }
+
+    boost::intrusive_ptr<DocumentSource> clone() const final;
 
 protected:
     GetNextResult doGetNext() final;

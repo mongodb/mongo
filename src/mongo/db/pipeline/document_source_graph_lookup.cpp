@@ -591,6 +591,28 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
     _fromPipeline.push_back(BSON("$match" << BSONObj()));
 }
 
+DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(const DocumentSourceGraphLookUp& original)
+    : DocumentSource(kStageName, original.pExpCtx->copyWith(original.pExpCtx->ns)),
+      _from(original._from),
+      _as(original._as),
+      _connectFromField(original._connectFromField),
+      _connectToField(original._connectToField),
+      _startWith(original._startWith),
+      _additionalFilter(original._additionalFilter),
+      _depthField(original._depthField),
+      _maxDepth(original._maxDepth),
+      _fromExpCtx(original._fromExpCtx->copyWith(original.pExpCtx->getResolvedNamespace(_from).ns)),
+      _fromPipeline(original._fromPipeline),
+      _frontier(pExpCtx->getValueComparator().makeUnorderedValueSet()),
+      _visited(ValueComparator::kInstance.makeUnorderedValueMap<Document>()),
+      _cache(pExpCtx->getValueComparator()),
+      _variables(original._variables),
+      _variablesParseState(original._variablesParseState.copyWith(_variables.useIdGenerator())) {
+    if (original._unwind) {
+        _unwind = static_cast<DocumentSourceUnwind*>(original._unwind.get()->clone().get());
+    }
+}
+
 intrusive_ptr<DocumentSourceGraphLookUp> DocumentSourceGraphLookUp::create(
     const intrusive_ptr<ExpressionContext>& expCtx,
     NamespaceString fromNs,
@@ -716,6 +738,10 @@ intrusive_ptr<DocumentSource> DocumentSourceGraphLookUp::createFromBson(
                                       boost::none));
 
     return newSource;
+}
+
+boost::intrusive_ptr<DocumentSource> DocumentSourceGraphLookUp::clone() const {
+    return make_intrusive<DocumentSourceGraphLookUp>(*this);
 }
 
 void DocumentSourceGraphLookUp::addInvolvedCollections(

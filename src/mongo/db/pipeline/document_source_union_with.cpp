@@ -70,7 +70,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> buildPipelineFromViewDefinition(
     opts.optimize = !resolvedNs.pipeline.empty();
     opts.validator = validatorCallback;
 
-    return Pipeline::makePipelineFromViewDefinition(expCtx, resolvedNs, currentPipeline, opts);
+    return Pipeline::makePipelineFromViewDefinition(
+        expCtx->copyForSubPipeline(expCtx->ns), resolvedNs, currentPipeline, opts);
 }
 
 }  // namespace
@@ -90,6 +91,12 @@ void validateUnionWithCollectionlessPipeline(
             pipeline && pipeline->size() > 0 &&
                 // TODO SERVER-59628 replace with constraints check
                 !(*pipeline)[0].getField(DocumentSourceDocuments::kStageName).eoo());
+}
+
+boost::intrusive_ptr<DocumentSource> DocumentSourceUnionWith::clone() const {
+    // At this point the ExpressionContext already has info about any resolved namespaces, so there
+    // is no need to resolve them again when creating the clone.
+    return make_intrusive<DocumentSourceUnionWith>(*this);
 }
 
 std::unique_ptr<DocumentSourceUnionWith::LiteParsed> DocumentSourceUnionWith::LiteParsed::parse(
@@ -221,6 +228,11 @@ DocumentSource::GetNextResult DocumentSourceUnionWith::doGetNext() {
         }
     }
 
+    // The $unionWith stage takes responsibility for disposing of its Pipeline. When the outer
+    // Pipeline that contains the $unionWith is disposed of, it will propagate dispose() to its
+    // subpipeline.
+    _pipeline.get_deleter().dismissDisposal();
+
     auto res = _pipeline->getNext();
     if (res)
         return std::move(*res);
@@ -289,6 +301,7 @@ bool DocumentSourceUnionWith::usedDisk() {
 
 void DocumentSourceUnionWith::doDispose() {
     if (_pipeline) {
+        _pipeline.get_deleter().dismissDisposal();
         _stats.planSummaryStats.usedDisk =
             _stats.planSummaryStats.usedDisk || _pipeline->usedDisk();
         recordPlanSummaryStats(*_pipeline);

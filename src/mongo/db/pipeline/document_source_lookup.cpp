@@ -253,6 +253,38 @@ DocumentSourceLookUp::DocumentSourceLookUp(
     initializeResolvedIntrospectionPipeline();
 }
 
+DocumentSourceLookUp::DocumentSourceLookUp(const DocumentSourceLookUp& original)
+    : DocumentSource(kStageName, original.pExpCtx->copyWith(original.pExpCtx->ns)),
+      _fromNs(original._fromNs),
+      _resolvedNs(original._resolvedNs),
+      _as(original._as),
+      _additionalFilter(original._additionalFilter),
+      _localField(original._localField),
+      _foreignField(original._foreignField),
+      _fieldMatchPipelineIdx(original._fieldMatchPipelineIdx),
+      _variables(original._variables),
+      _variablesParseState(original._variablesParseState.copyWith(_variables.useIdGenerator())),
+      _fromExpCtx(original._fromExpCtx->copyWith(_resolvedNs)),
+      _hasExplicitCollation(original._hasExplicitCollation),
+      _resolvedPipeline(original._resolvedPipeline),
+      _userPipeline(original._userPipeline),
+      _resolvedIntrospectionPipeline(original._resolvedIntrospectionPipeline->clone()),
+      _letVariables(original._letVariables) {
+    if (!_localField && !_foreignField) {
+        _cache.emplace(internalDocumentSourceCursorBatchSizeBytes.load());
+    }
+    if (original._matchSrc) {
+        _matchSrc = static_cast<DocumentSourceMatch*>(original._matchSrc->clone().get());
+    }
+    if (original._unwindSrc) {
+        _unwindSrc = static_cast<DocumentSourceUnwind*>(original._unwindSrc->clone().get());
+    }
+}
+
+boost::intrusive_ptr<DocumentSource> DocumentSourceLookUp::clone() const {
+    return make_intrusive<DocumentSourceLookUp>(*this);
+}
+
 void validateLookupCollectionlessPipeline(const vector<BSONObj>& pipeline) {
     uassert(ErrorCodes::FailedToParse,
             "$lookup stage without explicit collection must have a pipeline with $documents as "
@@ -544,24 +576,12 @@ std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceLookUp::buildPipeline(
     pipelineOpts.validator = lookupPipeValidator;
     auto pipeline = Pipeline::makePipeline(_resolvedPipeline, _fromExpCtx, pipelineOpts);
 
-    // Add the cache stage at the end and optimize. During the optimization process, the cache will
-    // either move itself to the correct position in the pipeline, or will abandon itself if no
-    // suitable cache position exists. Do it only if pipeline optimization is enabled, otherwise
-    // Pipeline::optimizePipeline() will exit early and correct placement of the cache will not
-    // occur.
-    if (auto fp = globalFailPointRegistry().find("disablePipelineOptimization");
-        fp && fp->shouldFail()) {
-        _cache->abandon();
-    } else {
-        pipeline->addFinalSource(
-            DocumentSourceSequentialDocumentCache::create(_fromExpCtx, _cache.get_ptr()));
-    }
-
     // We can store the unoptimized serialization of the pipeline so that if we need to resolve
     // a sharded view later on, and we have a local-foreign field join, we will need to update
     // metadata tracking the position of this join in the _resolvedPipeline.
     auto serializedPipeline = pipeline->serializeToBson();
-    pipeline->optimizePipeline();
+
+    addCacheStageAndOptimize(*pipeline);
 
     if (!_cache->isServing()) {
         // The cache has either been abandoned or has not yet been built. Attach a cursor.
@@ -576,6 +596,12 @@ std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceLookUp::buildPipeline(
             pipeline = buildPipelineFromViewDefinition(
                 serializedPipeline,
                 ExpressionContext::ResolvedNamespace{e->getNamespace(), e->getPipeline()});
+
+            // The serialized pipeline does not have a cache stage, so we will add it back to the
+            // pipeline here if the cache has not been abandoned.
+            if (_cache && !_cache->isAbandoned()) {
+                addCacheStageAndOptimize(*pipeline);
+            }
 
             LOGV2_DEBUG(3254801,
                         3,
@@ -598,6 +624,23 @@ std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceLookUp::buildPipeline(
 
     invariant(pipeline);
     return pipeline;
+}
+
+void DocumentSourceLookUp::addCacheStageAndOptimize(Pipeline& pipeline) {
+    // Add the cache stage at the end and optimize. During the optimization process, the cache will
+    // either move itself to the correct position in the pipeline, or will abandon itself if no
+    // suitable cache position exists. Do it only if pipeline optimization is enabled, otherwise
+    // Pipeline::optimizePipeline() will exit early and correct placement of the cache will not
+    // occur.
+    if (auto fp = globalFailPointRegistry().find("disablePipelineOptimization");
+        fp && fp->shouldFail()) {
+        _cache->abandon();
+    } else {
+        pipeline.addFinalSource(
+            DocumentSourceSequentialDocumentCache::create(_fromExpCtx, _cache.get_ptr()));
+    }
+
+    pipeline.optimizePipeline();
 }
 
 DocumentSource::GetModPathsReturn DocumentSourceLookUp::getModifiedPaths() const {

@@ -82,6 +82,8 @@ TEST_F(ShardedUnionTest, RetriesSubPipelineOnNetworkError) {
     });
 
     future.default_timed_get();
+
+    unionWith.dispose();
 }
 
 TEST_F(ShardedUnionTest, ForwardsMaxTimeMSToRemotes) {
@@ -128,6 +130,8 @@ TEST_F(ShardedUnionTest, ForwardsMaxTimeMSToRemotes) {
     onCommand(assertHasExpectedMaxTimeMSAndReturnResult);
 
     future.default_timed_get();
+
+    unionWith.dispose();
 }
 
 TEST_F(ShardedUnionTest, RetriesSubPipelineOnStaleConfigError) {
@@ -192,6 +196,8 @@ TEST_F(ShardedUnionTest, RetriesSubPipelineOnStaleConfigError) {
     });
 
     future.default_timed_get();
+
+    unionWith.dispose();
 }
 
 TEST_F(ShardedUnionTest, CorrectlySplitsSubPipelineIfRefreshedDistributionRequiresIt) {
@@ -278,6 +284,8 @@ TEST_F(ShardedUnionTest, CorrectlySplitsSubPipelineIfRefreshedDistributionRequir
     });
 
     future.default_timed_get();
+
+    unionWith.dispose();
 }
 
 TEST_F(ShardedUnionTest, AvoidsSplittingSubPipelineIfRefreshedDistributionDoesNotRequire) {
@@ -346,6 +354,8 @@ TEST_F(ShardedUnionTest, AvoidsSplittingSubPipelineIfRefreshedDistributionDoesNo
     });
 
     future.default_timed_get();
+
+    unionWith.dispose();
 }
 
 TEST_F(ShardedUnionTest, IncorporatesViewDefinitionAndRetriesWhenViewErrorReceived) {
@@ -409,6 +419,8 @@ TEST_F(ShardedUnionTest, IncorporatesViewDefinitionAndRetriesWhenViewErrorReceiv
     });
 
     future.default_timed_get();
+
+    unionWith->dispose();
 }
 
 TEST_F(ShardedUnionTest, ForwardsReadConcernToRemotes) {
@@ -461,6 +473,8 @@ TEST_F(ShardedUnionTest, ForwardsReadConcernToRemotes) {
     onCommand(assertHasExpectedReadConcernAndReturnResult);
 
     future.default_timed_get();
+
+    unionWith.dispose();
 }
 }  // namespace
 }  // namespace mongo

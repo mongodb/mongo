@@ -66,6 +66,8 @@ public:
         }
     };
 
+    DocumentSourceGraphLookUp(const DocumentSourceGraphLookUp&);
+
     const char* getSourceName() const final;
 
     const FieldPath& getConnectFromField() const {
@@ -148,6 +150,8 @@ public:
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+
+    boost::intrusive_ptr<DocumentSource> clone() const final;
 
 protected:
     GetNextResult doGetNext() final;

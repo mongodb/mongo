@@ -6,9 +6,11 @@
 (function() {
 "use strict";
 
+load("jstests/libs/fixture_helpers.js");
+
 function testLimits(testDB, lengthLimit) {
-    const maxLength = lengthLimit;
-    const tooLarge = lengthLimit + 1;
+    let maxLength = lengthLimit;
+    let tooLarge = lengthLimit + 1;
 
     assert.commandWorked(testDB.runCommand({
         aggregate: "test",
@@ -22,24 +24,6 @@ function testLimits(testDB, lengthLimit) {
     }),
                                  ErrorCodes.FailedToParse);
     testDB.setLogLevel(1);
-
-    assert.commandWorked(testDB.runCommand({
-        aggregate: "test",
-        cursor: {},
-        pipeline: [{
-            $lookup:
-                {from: "test", as: "as", pipeline: new Array(maxLength).fill({$project: {_id: 1}})}
-        }]
-    }));
-    assert.commandFailedWithCode(testDB.runCommand({
-        aggregate: "test",
-        cursor: {},
-        pipeline: [{
-            $lookup:
-                {from: "test", as: "as", pipeline: new Array(tooLarge).fill({$project: {_id: 1}})}
-        }]
-    }),
-                                 ErrorCodes.FailedToParse);
 
     assert.commandWorked(testDB.runCommand({
         aggregate: "test",
@@ -133,6 +117,33 @@ function testLimits(testDB, lengthLimit) {
             cursor: {},
             pipeline: new Array(parseInt(maxLength / 2)).fill(stage)
         })));
+
+    // $lookup inserts a DocumentSourceSequentialDocumentCache stage in the subpipeline to perform
+    // cacheing optimizations, so the subpipeline can have at most 'maxLength - 1' user-specified
+    // stages. When we connect directly to a shard without mongos, it is treated as a standalone
+    // and will not perform pipeline length validation after the cache stage is added.
+    if (FixtureHelpers.isMongos(testDB)) {
+        maxLength = maxLength - 1;
+        tooLarge = tooLarge - 1;
+    }
+
+    assert.commandWorked(testDB.runCommand({
+        aggregate: "test",
+        cursor: {},
+        pipeline: [{
+            $lookup:
+                {from: "test", as: "as", pipeline: new Array(maxLength).fill({$project: {_id: 1}})}
+        }]
+    }));
+    assert.commandFailedWithCode(testDB.runCommand({
+        aggregate: "test",
+        cursor: {},
+        pipeline: [{
+            $lookup:
+                {from: "test", as: "as", pipeline: new Array(tooLarge).fill({$project: {_id: 1}})}
+        }]
+    }),
+                                 ErrorCodes.FailedToParse);
 }
 
 function runTest(lengthLimit, mongosConfig = {}, mongodConfig = {}) {

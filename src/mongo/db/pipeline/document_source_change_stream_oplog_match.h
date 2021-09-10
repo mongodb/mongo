@@ -58,7 +58,7 @@ public:
         _optimizedEndOfPipeline = other._optimizedEndOfPipeline;
     }
 
-    boost::intrusive_ptr<DocumentSourceMatch> clone() const final {
+    boost::intrusive_ptr<DocumentSource> clone() const final {
         return new auto(*this);
     }
 

@@ -171,6 +171,10 @@ public:
         return _output->next();
     }
 
+    uint64_t getMaxMemoryBytes() const {
+        return _stats.maxMemoryUsageBytes;
+    }
+
 private:
     SortOptions makeSortOptions() const {
         SortOptions opts;

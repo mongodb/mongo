@@ -43,7 +43,7 @@ namespace mongo {
 
 class DocumentSourceMatch : public DocumentSource {
 public:
-    virtual boost::intrusive_ptr<DocumentSourceMatch> clone() const {
+    virtual boost::intrusive_ptr<DocumentSource> clone() const {
         // Raw new is needed to access non-public constructors.
         return new auto(*this);
     }
