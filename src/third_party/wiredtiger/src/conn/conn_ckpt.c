@@ -240,3 +240,40 @@ __wt_checkpoint_signal(WT_SESSION_IMPL *session, wt_off_t logsize)
         conn->ckpt_signalled = true;
     }
 }
+
+/*
+ * __wt_checkpoint_reserved_session_init --
+ *     Initialize checkpoint reserved session.
+ */
+int
+__wt_checkpoint_reserved_session_init(WT_SESSION_IMPL *session)
+{
+    WT_CONNECTION_IMPL *conn;
+
+    conn = S2C(session);
+
+    WT_ASSERT(session, conn->ckpt_reserved_session == NULL);
+
+    return (__wt_open_internal_session(
+      conn, "ckpt-reserved", false, WT_SESSION_NO_RECONCILE, 0, &conn->ckpt_reserved_session));
+}
+
+/*
+ * __wt_checkpoint_reserved_session_destroy --
+ *     Release resources allocated for checkpoint reserved session.
+ */
+int
+__wt_checkpoint_reserved_session_destroy(WT_SESSION_IMPL *session)
+{
+    WT_CONNECTION_IMPL *conn;
+    WT_DECL_RET;
+
+    conn = S2C(session);
+
+    if (conn->ckpt_reserved_session != NULL) {
+        WT_TRET(__wt_session_close_internal(conn->ckpt_reserved_session));
+        conn->ckpt_reserved_session = NULL;
+    }
+
+    return (ret);
+}

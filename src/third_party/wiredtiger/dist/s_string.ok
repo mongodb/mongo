@@ -113,6 +113,7 @@ Decrement
 Decrypt
 DeleteFileW
 Destructor
+Deterministically
 EACCES
 EAGAIN
 EB
@@ -151,6 +152,7 @@ FTRUNCATE
 FULLFSYNC
 FUNCSIG
 Facebook
+Failpoint
 FindClose
 FindFirstFile
 FindNextFileW
@@ -784,6 +786,7 @@ extern
 extlist
 fadvise
 fahrenheit
+failpoint
 fallocate
 fallthrough
 fblocks
