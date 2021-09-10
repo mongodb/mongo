@@ -1020,6 +1020,29 @@ __cursor_config_debug(WT_CURSOR *cursor, const char *cfg[])
 }
 
 /*
+ * __check_prefix_format --
+ *     Check if the schema format is a fixed-length string, variable string or byte array.
+ */
+static int
+__check_prefix_format(const char *format)
+{
+    size_t len;
+    const char *p;
+
+    /* Early exit if prefix format is S or u. */
+    if (WT_STREQ(format, "S") || WT_STREQ(format, "u"))
+        return (0);
+    /*
+     * Now check for fixed-length string format through looking at the characters before the nul
+     * character.
+     */
+    for (p = format, len = strlen(format); len > 1; --len, p++)
+        if (!__wt_isdigit((u_char)*p))
+            break;
+    return ((len > 1 || *p != 's') ? EINVAL : 0);
+}
+
+/*
  * __wt_cursor_reconfigure --
  *     Set runtime-configurable settings.
  */
@@ -1067,6 +1090,14 @@ __wt_cursor_reconfigure(WT_CURSOR *cursor, const char *config)
             if (WT_CURSOR_RECNO(cursor))
                 WT_ERR_MSG(
                   session, EINVAL, "cannot use prefix key search near for column store formats");
+            /*
+             * Prefix search near configuration can only be used for string or raw byte array
+             * formats.
+             */
+            if ((ret = __check_prefix_format(cursor->key_format)) != 0)
+                WT_ERR_MSG(session, ret,
+                  "prefix key search near can only be used with string, fixed-length string or raw "
+                  "byte array format types");
             if (CUR2BT(cursor)->collator != NULL)
                 WT_ERR_MSG(
                   session, EINVAL, "cannot use prefix key search near with a custom collator");
