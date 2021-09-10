@@ -696,6 +696,11 @@ stopReplicationAndEnforceNewPrimaryToCatchUp = function(rst, node) {
     const oldSecondaries = rst.getSecondaries();
     const oldPrimary = rst.getPrimary();
 
+    // In the case that the old primary has just stepped up and is running internal writes from
+    // PrimaryOnlyService, wait for those to be replicated. This is because there could be a race
+    // between stopping one of the secondaries, while the other secondary is still able to replicate
+    // the internal writes from PrimaryOnlyService before stopping replication.
+    rst.awaitReplication();
     stopServerReplication(oldSecondaries);
     for (let i = 0; i < 3; i++) {
         assert.commandWorked(oldPrimary.getDB("test").foo.insert({x: i}));
