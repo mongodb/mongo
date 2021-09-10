@@ -33,6 +33,7 @@
 #include <memory>
 #include <vector>
 
+#include "mongo/base/compare_numbers.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/datetime.h"
@@ -70,8 +71,22 @@ std::pair<value::TypeTags, value::Value> genericCompare(
                 return {value::TypeTags::Boolean, value::bitcastFrom<bool>(result)};
             }
             case value::TypeTags::NumberDecimal: {
-                auto result = op(value::numericCast<Decimal128>(lhsTag, lhsValue),
-                                 value::numericCast<Decimal128>(rhsTag, rhsValue));
+                auto result = [&]() {
+                    if (lhsTag == value::TypeTags::NumberDouble) {
+                        return op(compareDoubleToDecimal(
+                                      value::numericCast<double>(lhsTag, lhsValue),
+                                      value::numericCast<Decimal128>(rhsTag, rhsValue)),
+                                  0);
+                    } else if (rhsTag == value::TypeTags::NumberDouble) {
+                        return op(
+                            compareDecimalToDouble(value::numericCast<Decimal128>(lhsTag, lhsValue),
+                                                   value::numericCast<double>(rhsTag, rhsValue)),
+                            0);
+                    } else {
+                        return op(value::numericCast<Decimal128>(lhsTag, lhsValue),
+                                  value::numericCast<Decimal128>(rhsTag, rhsValue));
+                    }
+                }();
                 return {value::TypeTags::Boolean, value::bitcastFrom<bool>(result)};
             }
             default:

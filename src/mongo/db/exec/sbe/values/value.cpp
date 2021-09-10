@@ -992,8 +992,18 @@ std::pair<TypeTags, Value> compareValue(TypeTags lhsTag,
                 return {TypeTags::NumberInt32, bitcastFrom<int32_t>(result)};
             }
             case TypeTags::NumberDecimal: {
-                auto result = compareDecimals(numericCast<Decimal128>(lhsTag, lhsValue),
-                                              numericCast<Decimal128>(rhsTag, rhsValue));
+                auto result = [&]() {
+                    if (lhsTag == TypeTags::NumberDouble) {
+                        return compareDoubleToDecimal(numericCast<double>(lhsTag, lhsValue),
+                                                      numericCast<Decimal128>(rhsTag, rhsValue));
+                    } else if (rhsTag == TypeTags::NumberDouble) {
+                        return compareDecimalToDouble(numericCast<Decimal128>(lhsTag, lhsValue),
+                                                      numericCast<double>(rhsTag, rhsValue));
+                    } else {
+                        return compareDecimals(numericCast<Decimal128>(lhsTag, lhsValue),
+                                               numericCast<Decimal128>(rhsTag, rhsValue));
+                    }
+                }();
                 return {TypeTags::NumberInt32, bitcastFrom<int32_t>(result)};
             }
             default:
