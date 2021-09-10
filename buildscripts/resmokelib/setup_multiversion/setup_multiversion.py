@@ -168,6 +168,9 @@ class SetupMultiversion(Subcommand):
                 LOGGER.info("Setup version completed.", version=version)
                 LOGGER.info("-" * 50)
 
+        if self._is_windows:
+            self._write_windows_install_paths(self._windows_bin_install_dirs)
+
     def download_and_extract_from_urls(self, urls, bin_suffix, install_dir):
         """Download and extract values indicated in `urls`."""
         artifacts_url = urls.get("Artifacts", "") if self.download_artifacts else None
@@ -198,12 +201,11 @@ class SetupMultiversion(Subcommand):
                            install_dir, bin_suffix, link_dir=self.link_dir,
                            install_dir_list=self._windows_bin_install_dirs)
 
-        if self._is_windows:
-            self._write_windows_install_paths(self._windows_bin_install_dirs)
-
     @staticmethod
     def _write_windows_install_paths(paths):
-        with open(config.WINDOWS_BIN_PATHS_FILE, "w") as out:
+        with open(config.WINDOWS_BIN_PATHS_FILE, "a") as out:
+            if os.stat(config.WINDOWS_BIN_PATHS_FILE).st_size > 0:
+                out.write(os.pathsep)
             out.write(os.pathsep.join(paths))
 
         LOGGER.info(f"Finished writing binary paths on Windows to {config.WINDOWS_BIN_PATHS_FILE}")
