@@ -131,6 +131,10 @@ rst.start(restoreNode,
 assert.soon(() => {  // Can't use checklog because we can't connect to the mongo in startup mode.
     return rawMongoProgramOutput().search("hangAfterCollectionInserts fail point enabled") !== -1;
 });
+// We need to make sure we get a checkpoint after the failpoint is hit, so we clear the output after
+// hitting it.  Occasionally we'll miss a checkpoint as a result of clearing the output, but we'll
+// get another one a second later.
+clearRawMongoProgramOutput();
 assert.soon(() => {
     return rawMongoProgramOutput().search("Completed unstable checkpoint.") !== -1;
 });
