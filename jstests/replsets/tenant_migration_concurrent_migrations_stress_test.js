@@ -70,6 +70,7 @@ let runningMigrations = 0;
 let setOfCompleteMigrations = new Set();
 let didFirstLoopSleep = false;
 const regexId = /testTenantId-([0-9]+)/;
+let loggedAbortedMigration = false;  // Reduce spam by logging the aborted migration once.
 
 while (setOfCompleteMigrations.size < kMigrationsCount) {
     while (runningMigrations < kConcurrentMigrationsCount && nextMigration < kMigrationsCount) {
@@ -101,14 +102,19 @@ while (setOfCompleteMigrations.size < kMigrationsCount) {
             let id = parseInt(idPatternFound[1]);
             assert(!isNaN(id));
             assert(id >= 0, `${id}`);
+            assert(id <= kMigrationsCount, `${id}`);
 
             if (op.lastDurableState === migrationStates.kCommitted) {
-                assert(id <= kMigrationsCount, `${id}`);
                 // Check if this migration completed after previous check.
                 if (!setOfCompleteMigrations.has(id)) {
                     setOfCompleteMigrations.add(id);
                     --runningMigrations;
                 }
+            }
+
+            if (op.lastDurableState === migrationStates.kAborted && !loggedAbortedMigration) {
+                loggedAbortedMigration = true;
+                jsTestLog(`Found an aborted migration in ${tojson(currentOp)}`);
             }
 
             if (!(op.lastDurableState in migrationsByState)) {
@@ -127,7 +133,7 @@ while (setOfCompleteMigrations.size < kMigrationsCount) {
         let ids = migrationsByState[state];
         if (ids.size > 0 && ids.size <= 10) {
             // We only log the small collections to know which ones were stuck.
-            jsTestLog(`Migrations in state ${state}: ${tojson(new Array(...ids).join(' '))}`);
+            jsTestLog(`Migrations in state ${state}: ${JSON.stringify([...ids])}`);
         }
     }
 }
