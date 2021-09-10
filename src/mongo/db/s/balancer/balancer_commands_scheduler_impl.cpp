@@ -233,6 +233,44 @@ ResponseHandle BalancerCommandsSchedulerImpl::_enqueueNewRequest(
     return deferredResponseHandle;
 }
 
+Status BalancerCommandsSchedulerImpl::_acquireDistLock(OperationContext* opCtx,
+                                                       NamespaceString nss) {
+    auto it = _migrationLocks.find(nss);
+    if (it != _migrationLocks.end()) {
+        ++it->second.numMigrations;
+        return Status::OK();
+    } else {
+        boost::optional<DistLockManager::ScopedLock> scopedLock;
+        try {
+            scopedLock.emplace(DistLockManager::get(opCtx)->lockDirectLocally(
+                opCtx, nss.ns(), DistLockManager::kSingleLockAttemptTimeout));
+
+            const std::string whyMessage(str::stream()
+                                         << "Migrating chunk(s) in collection " << nss.ns());
+            uassertStatusOK(DistLockManager::get(opCtx)->lockDirect(
+                opCtx, nss.ns(), whyMessage, DistLockManager::kSingleLockAttemptTimeout));
+        } catch (const DBException& ex) {
+            return ex.toStatus(str::stream() << "Could not acquire collection lock for " << nss.ns()
+                                             << " to migrate chunks");
+        }
+        Migrations migrationData(std::move(*scopedLock));
+        _migrationLocks.insert(std::make_pair(nss, std::move(migrationData)));
+    }
+    return Status::OK();
+}
+
+void BalancerCommandsSchedulerImpl::_releaseDistLock(OperationContext* opCtx, NamespaceString nss) {
+    auto it = _migrationLocks.find(nss);
+    if (it == _migrationLocks.end()) {
+        return;
+    } else if (it->second.numMigrations == 1) {
+        DistLockManager::get(opCtx)->unlock(opCtx, nss.ns());
+        _migrationLocks.erase(it);
+    } else {
+        --it->second.numMigrations;
+    }
+}
+
 CommandSubmissionResult BalancerCommandsSchedulerImpl::_submit(
     OperationContext* opCtx, const CommandSubmissionHandle& handle) {
     LOGV2(5847203,
@@ -244,13 +282,13 @@ CommandSubmissionResult BalancerCommandsSchedulerImpl::_submit(
     const auto shardWithStatus =
         Grid::get(opCtx)->shardRegistry()->getShard(opCtx, handle.commandInfo->getTarget());
     if (!shardWithStatus.isOK()) {
-        return CommandSubmissionResult(handle.id, shardWithStatus.getStatus());
+        return CommandSubmissionResult(handle.id, false, shardWithStatus.getStatus());
     }
 
     const auto shardHostWithStatus = shardWithStatus.getValue()->getTargeter()->findHost(
         opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly});
     if (!shardHostWithStatus.isOK()) {
-        return CommandSubmissionResult(handle.id, shardHostWithStatus.getStatus());
+        return CommandSubmissionResult(handle.id, false, shardHostWithStatus.getStatus());
     }
 
     const executor::RemoteCommandRequest remoteCommand(shardHostWithStatus.getValue(),
@@ -259,20 +297,29 @@ CommandSubmissionResult BalancerCommandsSchedulerImpl::_submit(
                                                        opCtx);
 
     auto onRemoteResponseReceived =
-        [this,
-         requestId = handle.id](const executor::TaskExecutor::RemoteCommandCallbackArgs& args) {
-            _applyCommandResponse(requestId, args.response);
+        [this, opCtx, requestId = handle.id](
+            const executor::TaskExecutor::RemoteCommandCallbackArgs& args) {
+            _applyCommandResponse(opCtx, requestId, args.response);
         };
+
+    if (handle.commandInfo->getType() == CommandInfo::Type::kMoveChunk) {
+        Status lockAcquisitionResponse =
+            _acquireDistLock(opCtx, handle.commandInfo->getNameSpace());
+        if (!lockAcquisitionResponse.isOK()) {
+            return CommandSubmissionResult(handle.id, false, lockAcquisitionResponse);
+        }
+    }
 
     auto remoteCommandHandleWithStatus =
         executor->scheduleRemoteCommand(remoteCommand, onRemoteResponseReceived);
-    return (remoteCommandHandleWithStatus.isOK()
-                ? CommandSubmissionResult(handle.id, remoteCommandHandleWithStatus.getValue())
-                : CommandSubmissionResult(handle.id, remoteCommandHandleWithStatus.getStatus()));
+    return (
+        remoteCommandHandleWithStatus.isOK()
+            ? CommandSubmissionResult(handle.id, true, remoteCommandHandleWithStatus.getValue())
+            : CommandSubmissionResult(handle.id, true, remoteCommandHandleWithStatus.getStatus()));
 }
 
 void BalancerCommandsSchedulerImpl::_applySubmissionResult(
-    WithLock, CommandSubmissionResult&& submissionResult) {
+    WithLock, OperationContext* opCtx, CommandSubmissionResult&& submissionResult) {
     auto requestToUpdateIt = _incompleteRequests.find(submissionResult.id);
     if (requestToUpdateIt == _incompleteRequests.end()) {
         return;
@@ -297,13 +344,18 @@ void BalancerCommandsSchedulerImpl::_applySubmissionResult(
                 _shardsPerformingMigrations.erase(involvedShard);
             }
         }
+        if (submissionResult.acquiredDistLock) {
+            _releaseDistLock(opCtx, submittedCommandInfo.getNameSpace());
+        }
         requestToUpdate.setOutcome(submissionResult.context.getStatus());
         _incompleteRequests.erase(requestToUpdateIt);
     }
 }
 
 void BalancerCommandsSchedulerImpl::_applyCommandResponse(
-    uint32_t requestId, const executor::TaskExecutor::ResponseStatus& response) {
+    OperationContext* opCtx,
+    uint32_t requestId,
+    const executor::TaskExecutor::ResponseStatus& response) {
     {
         stdx::lock_guard<Latch> lg(_mutex);
         auto requestToCompleteIt = _incompleteRequests.find(requestId);
@@ -319,6 +371,7 @@ void BalancerCommandsSchedulerImpl::_applyCommandResponse(
             for (const auto& shard : commandInfo.getInvolvedShards()) {
                 _shardsPerformingMigrations.erase(shard);
             }
+            _releaseDistLock(opCtx, commandInfo.getNameSpace());
         }
         _incompleteRequests.erase(requestToCompleteIt);
         _newInfoOnSubmittableRequests = true;
@@ -336,6 +389,8 @@ void BalancerCommandsSchedulerImpl::_applyCommandResponse(
 
 void BalancerCommandsSchedulerImpl::_workerThread() {
     ON_BLOCK_EXIT([this] {
+        invariant(_migrationLocks.empty(),
+                  "BalancerCommandsScheduler worker thread failed to release all locks on exit");
         stdx::lock_guard<Latch> lg(_mutex);
 
         _setState(SchedulerState::Stopped);
@@ -427,7 +482,7 @@ void BalancerCommandsSchedulerImpl::_workerThread() {
         {
             stdx::lock_guard<Latch> lg(_mutex);
             for (auto& submissionResult : submissionResults) {
-                _applySubmissionResult(lg, std::move(submissionResult));
+                _applySubmissionResult(lg, opCtxHolder.get(), std::move(submissionResult));
             }
         }
         LOGV2(5847207, "Ending balancer command scheduler round");
@@ -442,6 +497,7 @@ void BalancerCommandsSchedulerImpl::_workerThread() {
         if (cancelHandle) {
             executor->cancel(*cancelHandle);
         }
+        _releaseDistLock(opCtxHolder.get(), idAndRequest.second.getCommandInfo().getNameSpace());
     }
 }
 

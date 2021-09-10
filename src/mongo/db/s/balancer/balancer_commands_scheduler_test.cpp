@@ -115,6 +115,15 @@ TEST_F(BalancerCommandsSchedulerTest, SuccessfulMoveChunkCommand) {
         kNss, moveChunk, ShardId("shard1"), getDefaultMoveChunkSettings());
     ASSERT_OK(resp->getOutcome());
     networkResponseFuture.default_timed_get();
+    // Ensure DistLock is released correctly
+    {
+        auto opCtx = Client::getCurrent()->getOperationContext();
+        const std::string whyMessage(str::stream()
+                                     << "Test acquisition of distLock for " << kNss.ns());
+        auto scopedDistLock = DistLockManager::get(opCtx)->lock(
+            opCtx, kNss.ns(), whyMessage, DistLockManager::kSingleLockAttemptTimeout);
+        ASSERT_OK(scopedDistLock.getStatus());
+    }
     _scheduler.stop();
 }
 
@@ -214,6 +223,15 @@ TEST_F(BalancerCommandsSchedulerTest, CommandFailsWhenNetworkReturnsError) {
         kNss, moveChunk, ShardId("shard1"), getDefaultMoveChunkSettings());
     ASSERT_EQUALS(resp->getOutcome(), timeoutError);
     networkResponseFuture.default_timed_get();
+    // Ensure DistLock is released correctly
+    {
+        auto opCtx = Client::getCurrent()->getOperationContext();
+        const std::string whyMessage(str::stream()
+                                     << "Test acquisition of distLock for " << kNss.ns());
+        auto scopedDistLock = DistLockManager::get(opCtx)->lock(
+            opCtx, kNss.ns(), whyMessage, DistLockManager::kSingleLockAttemptTimeout);
+        ASSERT_OK(scopedDistLock.getStatus());
+    }
     _scheduler.stop();
 }
 
@@ -224,6 +242,15 @@ TEST_F(BalancerCommandsSchedulerTest, CommandFailsWhenSchedulerIsStopped) {
     ASSERT_EQUALS(
         resp->getOutcome(),
         Status(ErrorCodes::CallbackCanceled, "Request rejected - balancer scheduler is stopped"));
+    // Ensure DistLock is not taken
+    {
+        auto opCtx = Client::getCurrent()->getOperationContext();
+        const std::string whyMessage(str::stream()
+                                     << "Test acquisition of distLock for " << kNss.ns());
+        auto scopedDistLock = DistLockManager::get(opCtx)->lock(
+            opCtx, kNss.ns(), whyMessage, DistLockManager::kSingleLockAttemptTimeout);
+        ASSERT_OK(scopedDistLock.getStatus());
+    }
 }
 
 TEST_F(BalancerCommandsSchedulerTest, CommandCanceledIfBalancerStops) {
@@ -239,6 +266,38 @@ TEST_F(BalancerCommandsSchedulerTest, CommandCanceledIfBalancerStops) {
     ASSERT_EQUALS(
         resp->getOutcome(),
         Status(ErrorCodes::CallbackCanceled, "Request cancelled - balancer scheduler is stopping"));
+    // Ensure DistLock is released correctly
+    {
+        auto opCtx = Client::getCurrent()->getOperationContext();
+        const std::string whyMessage(str::stream()
+                                     << "Test acquisition of distLock for " << kNss.ns());
+        auto scopedDistLock = DistLockManager::get(opCtx)->lock(
+            opCtx, kNss.ns(), whyMessage, DistLockManager::kSingleLockAttemptTimeout);
+        ASSERT_OK(scopedDistLock.getStatus());
+    }
+}
+
+TEST_F(BalancerCommandsSchedulerTest, DistLockPreventsMoveChunkWithConcurrentDDL) {
+    OperationContext* opCtx;
+    FailPoint* failpoint = globalFailPointRegistry().find("pauseBalancerWorkerThread");
+    failpoint->setMode(FailPoint::Mode::alwaysOn);
+    {
+        _scheduler.start();
+        opCtx = Client::getCurrent()->getOperationContext();
+        const std::string whyMessage(str::stream()
+                                     << "Test acquisition of distLock for " << kNss.ns());
+        auto scopedDistLock = DistLockManager::get(opCtx)->lock(
+            opCtx, kNss.ns(), whyMessage, DistLockManager::kSingleLockAttemptTimeout);
+        ASSERT_OK(scopedDistLock.getStatus());
+        failpoint->setMode(FailPoint::Mode::off);
+        ChunkType moveChunk = makeChunk(0, "shard0");
+        auto resp = _scheduler.requestMoveChunk(
+            kNss, moveChunk, ShardId("shard1"), getDefaultMoveChunkSettings());
+        ASSERT_EQ(
+            resp->getOutcome(),
+            Status(ErrorCodes::LockBusy, "Failed to acquire dist lock testDb.testColl locally"));
+    }
+    _scheduler.stop();
 }
 
 }  // namespace

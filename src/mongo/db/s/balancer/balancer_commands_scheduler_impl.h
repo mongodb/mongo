@@ -33,6 +33,7 @@
 #include <unordered_map>
 
 #include "mongo/db/s/balancer/balancer_commands_scheduler.h"
+#include "mongo/db/s/dist_lock_manager.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
@@ -517,12 +518,15 @@ using ExecutionContext = executor::TaskExecutor::CallbackHandle;
  * Helper data structure for storing the outcome of a Command submission.
  */
 struct CommandSubmissionResult {
-    CommandSubmissionResult(uint32_t id, StatusWith<ExecutionContext>&& context)
-        : id(id), context(std::move(context)) {}
+    CommandSubmissionResult(uint32_t id,
+                            bool acquiredDistLock,
+                            StatusWith<ExecutionContext>&& context)
+        : id(id), acquiredDistLock(acquiredDistLock), context(std::move(context)) {}
     CommandSubmissionResult(CommandSubmissionResult&& rhs)
-        : id(rhs.id), context(std::move(rhs.context)) {}
+        : id(rhs.id), acquiredDistLock(rhs.acquiredDistLock), context(std::move(rhs.context)) {}
     CommandSubmissionResult(const CommandSubmissionResult& rhs) = delete;
     uint32_t id;
+    bool acquiredDistLock;
     StatusWith<ExecutionContext> context;
 };
 
@@ -668,6 +672,17 @@ private:
     std::set<ShardId> _shardsPerformingMigrations;
 
     /**
+     * State to acquire and release DistLocks on a per namespace basis
+     */
+    struct Migrations {
+        Migrations(DistLockManager::ScopedLock lock) : lock(std::move(lock)), numMigrations(1) {}
+
+        DistLockManager::ScopedLock lock;
+        int numMigrations;
+    };
+    stdx::unordered_map<NamespaceString, Migrations> _migrationLocks;
+
+    /**
      * Counter of requests that are currently running (submitted, but not yet completed)
      */
     int32_t _numRunningRequests{0};
@@ -676,11 +691,18 @@ private:
 
     ResponseHandle _enqueueNewRequest(std::shared_ptr<CommandInfo>&& commandInfo);
 
+    Status _acquireDistLock(OperationContext* opCtx, NamespaceString nss);
+
+    void _releaseDistLock(OperationContext* opCtx, NamespaceString nss);
+
     CommandSubmissionResult _submit(OperationContext* opCtx, const CommandSubmissionHandle& data);
 
-    void _applySubmissionResult(WithLock, CommandSubmissionResult&& submissionResult);
+    void _applySubmissionResult(WithLock,
+                                OperationContext* opCtx,
+                                CommandSubmissionResult&& submissionResult);
 
-    void _applyCommandResponse(uint32_t requestId,
+    void _applyCommandResponse(OperationContext* opCtx,
+                               uint32_t requestId,
                                const executor::TaskExecutor::ResponseStatus& response);
 
     void _workerThread();
