@@ -8115,7 +8115,7 @@ buildvariants:
     push_name: linux
     push_arch: aarch64-enterprise-amazon2
     compile_flags: --ssl MONGO_DISTMOD=amazon2 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux
+    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: aarch64
