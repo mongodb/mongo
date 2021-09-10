@@ -8,6 +8,8 @@ load("jstests/libs/fixture_helpers.js");  // For isSharded.
  * Creates views which may include $lookup and $graphlookup stages and continually remaps those
  * views against other eachother and the underlying collection. We are looking to expose situations
  * where a $lookup or $graphLookup view that forms a cycle is created successfully.
+ *
+ * @tags: [requires_fcv_51]
  */
 
 var $config = (function() {
@@ -17,6 +19,10 @@ var $config = (function() {
 
     // Track if the test is not allowed to run on sharded collections.
     var isShardedAndShardedLookupDisabled = false;
+
+    // Store the default value of the max sub pipeline view depth so it can be reset at the end of
+    // the test.
+    var oldMaxSubPipelineViewDepth;
 
     var data = {
         viewList: ['viewA', 'viewB', 'viewC', 'viewD', 'viewE'].map(viewName => prefix + viewName),
@@ -171,10 +177,29 @@ var $config = (function() {
         // resolution of views with pipelines containing $lookups on other views can result in deep
         // nesting of subpipelines. For the purposes of this test, the limit needs to be higher than
         // the default.
-        cluster.executeOnMongodNodes(function increaseInternalMaxSubPipelineViewDepth(db) {
+        cluster.executeOnMongodNodes((db) => {
+            // Store the old value of the max subpipeline view depth so we can restore it at the end
+            // of the test.
+            const maxSubPipelineViewDepthParam =
+                db.adminCommand({getParameter: 1, internalMaxSubPipelineViewDepth: 1});
+            assert(maxSubPipelineViewDepthParam.hasOwnProperty("internalMaxSubPipelineViewDepth"));
+            this.oldMaxSubPipelineViewDepth =
+                maxSubPipelineViewDepthParam.internalMaxSubPipelineViewDepth;
             assertAlways.commandWorked(
                 db.adminCommand({setParameter: 1, internalMaxSubPipelineViewDepth: 100}));
         });
+    }
+
+    function teardown(db, collName, cluster) {
+        // Restore the old max subpipeline view depth.
+        if (this.oldMaxSubPipelineViewDepth) {
+            cluster.executeOnMongodNodes((db) => {
+                assertAlways.commandWorked(db.adminCommand({
+                    setParameter: 1,
+                    internalMaxSubPipelineViewDepth: this.oldMaxSubPipelineViewDepth
+                }));
+            });
+        }
     }
 
     return {
@@ -185,5 +210,6 @@ var $config = (function() {
         startState: 'readFromView',
         transitions: transitions,
         setup: setup,
+        teardown: teardown,
     };
 })();
