@@ -420,6 +420,10 @@ Status _collModInternal(OperationContext* opCtx,
             return Status(ErrorCodes::BadValue, "can't hide _id index");
     }
 
+    if (!serverGlobalParams.quiet.load()) {
+        LOGV2(5324200, "CMD: collMod", "cmdObj"_attr = cmdObj);
+    }
+
     return writeConflictRetry(opCtx, "collMod", nss.ns(), [&] {
         WriteUnitOfWork wunit(opCtx);
 
