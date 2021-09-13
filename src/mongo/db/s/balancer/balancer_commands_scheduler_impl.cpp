@@ -77,7 +77,7 @@ BalancerCommandsSchedulerImpl::~BalancerCommandsSchedulerImpl() {
     stop();
 }
 
-void BalancerCommandsSchedulerImpl::_setState(SchedulerState state) {
+void BalancerCommandsSchedulerImpl::_setState(WithLock, SchedulerState state) {
     _state = state;
     _stateUpdatedCV.notify_all();
 }
@@ -86,6 +86,10 @@ void BalancerCommandsSchedulerImpl::start() {
     LOGV2(5847200, "Balancer command scheduler start requested");
     stdx::lock_guard<Latch> lgss(_startStopMutex);
     stdx::lock_guard<Latch> lg(_mutex);
+    if (_state == SchedulerState::Running) {
+        return;
+    }
+
     // TODO init _requestIdCounter here based on the stored running requests from a past invocation?
     invariant(!_workerThreadHandle.joinable());
     _incompleteRequests.reserve(_maxRunningRequests * 10);
@@ -94,20 +98,18 @@ void BalancerCommandsSchedulerImpl::start() {
 }
 
 void BalancerCommandsSchedulerImpl::stop() {
+    LOGV2(5847201, "Balancer command scheduler stop requested");
+    stdx::lock_guard<Latch> lgss(_startStopMutex);
     {
-        LOGV2(5847201, "Balancer command scheduler stop requested");
-        stdx::lock_guard<Latch> lgss(_startStopMutex);
-        {
-            stdx::lock_guard<Latch> lg(_mutex);
-            if (_state == SchedulerState::Stopped)
-                return;
-            invariant(_workerThreadHandle.joinable());
-            _setState(SchedulerState::Stopping);
-            _workerThreadHandle.detach();
+        stdx::lock_guard<Latch> lg(_mutex);
+        if (_state == SchedulerState::Stopped) {
+            return;
         }
-        stdx::unique_lock<Latch> ul(_mutex);
-        _stateUpdatedCV.wait(ul, [this] { return _state == SchedulerState::Stopped; });
+
+        invariant(_workerThreadHandle.joinable());
+        _setState(lg, SchedulerState::Stopping);
     }
+    _workerThreadHandle.join();
 }
 
 std::unique_ptr<MoveChunkResponse> BalancerCommandsSchedulerImpl::requestMoveChunk(
@@ -391,11 +393,9 @@ void BalancerCommandsSchedulerImpl::_workerThread() {
     ON_BLOCK_EXIT([this] {
         invariant(_migrationLocks.empty(),
                   "BalancerCommandsScheduler worker thread failed to release all locks on exit");
-        stdx::lock_guard<Latch> lg(_mutex);
-
-        _setState(SchedulerState::Stopped);
-
         LOGV2(5847208, "Leaving balancer command scheduler thread");
+        stdx::lock_guard<Latch> lg(_mutex);
+        _setState(lg, SchedulerState::Stopped);
     });
 
     Client::initThread("BalancerCommandsScheduler");

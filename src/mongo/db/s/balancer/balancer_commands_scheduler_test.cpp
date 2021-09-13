@@ -104,6 +104,11 @@ TEST_F(BalancerCommandsSchedulerTest, StartAndStopScheduler) {
     _scheduler.stop();
 }
 
+TEST_F(BalancerCommandsSchedulerTest, ResilientToMultipleStarts) {
+    _scheduler.start();
+    _scheduler.start();
+}
+
 TEST_F(BalancerCommandsSchedulerTest, SuccessfulMoveChunkCommand) {
     _scheduler.start();
     ChunkType moveChunk = makeChunk(0, "shard0");

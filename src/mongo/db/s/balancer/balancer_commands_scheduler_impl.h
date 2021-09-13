@@ -687,7 +687,7 @@ private:
      */
     int32_t _numRunningRequests{0};
 
-    void _setState(SchedulerState state);
+    void _setState(WithLock, SchedulerState state);
 
     ResponseHandle _enqueueNewRequest(std::shared_ptr<CommandInfo>&& commandInfo);
 
