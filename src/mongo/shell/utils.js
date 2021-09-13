@@ -1447,9 +1447,10 @@ rs.help = function() {
         "\trs.reconfigForPSASet(memberIndex, cfg, opts)    updates the configuration of a Primary-Secondary-Arbiter (PSA) replica set while preserving majority writes");
     print(
         "\t                                                    memberIndex: index of the node being updated; cfg: the desired new config; opts: options passed in with the reconfig");
-    // TODO (SERVER-56801): Add placeholder link.
     print(
         "\t                                                    Not to be used with every configuration");
+    print(
+        "\t                                                    For more information, visit: https://docs.mongodb.com/manual/reference/method/rs.reconfigForPSASet/");
     print(
         "\trs.add(hostportstr)                             add a new member to the set with default attributes (disconnects)");
     print(

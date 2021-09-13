@@ -291,10 +291,11 @@ Status validateOldAndNewConfigsCompatible(const ReplSetConfig& oldConfig,
         numElectableNodesNewConfig > 1) {
         return Status(
             ErrorCodes::NewReplicaSetConfigurationIncompatible,
-            // TODO (SERVER-56801): Add placeholder link.
             str::stream()
                 << "Rejecting reconfig where the new config has a PSA topology and the secondary "
-                   "is electable, but the old config contains only one writable node");
+                << "is electable, but the old config contains only one writable node. Refer to "
+                << "https://docs.mongodb.com/manual/reference/method/rs.reconfigForPSASet/"
+                << " for next steps on reconfiguring a PSA set.");
     }
 
     return Status::OK();
