@@ -22,7 +22,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
     const st = new ShardingTest({
         shards: 2,
-        rs: {nodes: 2, setParameter: {periodicNoopIntervalSecs: 1, writePeriodicNoops: true}}
+        rs: {nodes: 3, setParameter: {periodicNoopIntervalSecs: 1, writePeriodicNoops: true}}
     });
 
     const sDB = st.s.getDB("test");
