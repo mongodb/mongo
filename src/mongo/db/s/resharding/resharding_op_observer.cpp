@@ -70,17 +70,15 @@ void assertCanExtractShardKeyFromDocs(OperationContext* opCtx,
                                       const NamespaceString& nss,
                                       std::vector<InsertStatement>::const_iterator begin,
                                       std::vector<InsertStatement>::const_iterator end) {
-    const auto metadata = CollectionShardingRuntime::get(opCtx, nss)->getCurrentMetadataIfKnown();
+    const auto collDesc = CollectionShardingState::get(opCtx, nss)->getCollectionDescription(opCtx);
     // A user can manually create a 'db.system.resharding.' collection that isn't guaranteed to be
     // sharded outside of running reshardCollection.
     uassert(ErrorCodes::NamespaceNotSharded,
             str::stream() << "Temporary resharding collection " << nss.toString()
                           << " is not sharded",
-            metadata && metadata->isSharded());
+            collDesc.isSharded());
 
-    auto chunkManager = *metadata->getChunkManager();
-    const auto& shardKeyPattern = chunkManager.getShardKeyPattern();
-
+    const ShardKeyPattern shardKeyPattern(collDesc.getKeyPattern());
     for (auto it = begin; it != end; ++it) {
         shardKeyPattern.extractShardKeyFromDocThrows(it->doc);
     }

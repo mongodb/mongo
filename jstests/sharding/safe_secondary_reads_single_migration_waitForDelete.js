@@ -21,6 +21,7 @@
 
 load('jstests/libs/profiler.js');
 load('jstests/sharding/libs/last_lts_mongos_commands.js');
+load('jstests/sharding/libs/shard_versioning_util.js');
 
 let db = "test";
 let coll = "foo";
@@ -474,8 +475,8 @@ for (let command of commands) {
             profileDB: recipientShardSecondary.getDB(db),
             filter: Object.extend({
                 "command.shardVersion": {"$exists": true},
-                "command.shardVersion.0": {$ne: Timestamp(0, 0)},
-                "command.shardVersion.1": {$ne: ObjectId("00000000ffffffffffffffff")},
+                "command.shardVersion.0": {$ne: ShardVersioningUtil.kIgnoredShardVersion[0]},
+                "command.shardVersion.1": {$ne: ShardVersioningUtil.kIgnoredShardVersion[1]},
                 "command.$readPreference": {"mode": "secondary"},
                 "command.readConcern": {"level": "local"},
                 "errCode": {"$ne": ErrorCodes.StaleConfig},
