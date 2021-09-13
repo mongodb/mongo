@@ -1,8 +1,9 @@
 /**
- * Tests the behavior of a $lookup on a sharded 'from' collection in various situations. These
- * include when the local collection is sharded and unsharded, when the $lookup subpipeline can
- * target certain shards or is scatter-gather, and when the $lookup subpipeline contains a nested
- * $lookup stage.
+ * Tests the behavior of a $lookup in a sharded environment. These include tests where the 'from'
+ * collection is sharded when the local collection is sharded and unsharded, when the $lookup
+ * subpipeline can target certain shards or is scatter-gather, and when the $lookup subpipeline
+ * contains a nested $lookup stage. This also includes tests when the mongos has stale information
+ * about the foreign collection.
  *
  * @tags: [requires_fcv_51, featureFlagShardedLookup]
  */
@@ -13,7 +14,7 @@
 load("jstests/aggregation/extras/utils.js");  // For arrayEq.
 load("jstests/libs/profiler.js");             // For profilerHas*OrThrow helper functions.
 
-const st = new ShardingTest({shards: 2, mongos: 1});
+const st = new ShardingTest({shards: 2, mongos: 2});
 const testName = "sharded_lookup";
 
 const mongosDB = st.s0.getDB(testName);
@@ -30,6 +31,12 @@ const ordersColl = mongosDB.orders;
 const reviewsColl = mongosDB.reviews;
 const updatesColl = mongosDB.updates;
 
+// 'freshMongos' and 'freshReviews' are used later to shard/drop the 'reviews' collection. Note that
+// we insert into the reviews collection only through 'freshReviews' so that 'freshMongos' has up to
+// date information about its sharding state, but 'mongosDB' may have stale information.
+const freshMongos = st.s1;
+const freshReviews = freshMongos.getDB(testName)[reviewsColl.getName()];
+
 function assertLookupExecution(pipeline, opts, expected) {
     assert.commandWorked(ordersColl.insert([
         {_id: 0, customer: "Alice", products: [{_id: "hat", price: 20}, {_id: "shirt", price: 30}]},
@@ -39,7 +46,9 @@ function assertLookupExecution(pipeline, opts, expected) {
             products: [{_id: "shirt", price: 30}, {_id: "bowl", price: 6}]
         }
     ]));
-    assert.commandWorked(reviewsColl.insert([
+    // This insert lets 'freshMongos' know about the latest state of 'freshReviews', but 'mongosDB'
+    // may have a stale view.
+    assert.commandWorked(freshReviews.insert([
         {_id: 0, product_id: "hat", stars: 4.5, comment: "super!"},
         {_id: 1, product_id: "hat", stars: 4, comment: "good"},
         {_id: 2, product_id: "shirt", stars: 3, comment: "meh"},
@@ -51,6 +60,8 @@ function assertLookupExecution(pipeline, opts, expected) {
         {_id: 2, original_review_id: 3, product_id: "bowl", updated_stars: 5},
     ]));
 
+    // Here we perform the query through 'mongosDB', which may still have a stale view of the
+    // 'reviews' collection.
     let actual = ordersColl.aggregate(pipeline, opts).toArray();
     assert(resultsEq(expected.results, actual),
            "Expected to see results: " + tojson(expected.results) + " but got: " + tojson(actual));
@@ -408,11 +419,12 @@ pipeline = [
 
 assertLookupExecution(pipeline, {comment: "sharded_to_sharded_view_to_sharded"}, {
     results: expectedRes,
-    // The 'orders' collection is sharded, so the top-level stage $lookup is executed in parallel on
-    // every shard that contains the local collection.
-    toplevelExec: [1, 1],
-    // For every document that flows through the $lookup stage, the node executing the $lookup will
-    // target the shard(s) that holds the relevant data for the sharded foreign view.
+    // The 'orders' collection is sharded, but mongos does not know that the foreign namespace is
+    // a view on a sharded collection. It is instead treated as an unsharded collection, and the
+    // top-level $lookup is only on the primary.
+    toplevelExec: [1, 0],
+    // For every document that flows through the $lookup stage, the primary will target the shard(s)
+    // that holds the relevant data for the sharded foreign view.
     subpipelineExec: [0, 2],
     // When executing the subpipeline, the "nested" $lookup stage contained in the view pipeline
     // will stay on the merging half of the pipeline and execute on the merging node, targeting
@@ -675,6 +687,78 @@ assertLookupExecution(pipeline, {comment: "sharded_to_sharded_cache"}, {
     subpipelineExec: [1, 0]
 });
 */
+
+// Test sharded local collection and unsharded foreign collection is directed to the primary only.
+st.shardColl(ordersColl, {_id: 1}, {_id: 1}, {_id: 1}, mongosDB.getName());
+
+pipeline = [
+    {$unwind: "$products"},
+    {
+        $lookup:
+            {from: "reviews", localField: "products._id", foreignField: "product_id", as: 'reviews'}
+    },
+    {$project: {'item': '$products._id', 'reviews.stars': 1}},
+];
+
+expectedRes = [
+    {_id: 0, item: 'hat', reviews: [{stars: 4.5}, {stars: 4}]},
+    {_id: 0, item: 'shirt', reviews: [{stars: 3}]},
+    {_id: 1, item: 'shirt', reviews: [{stars: 3}]},
+    {_id: 1, item: 'bowl', reviews: [{stars: 4}]},
+];
+
+assertLookupExecution(pipeline, {comment: "sharded_to_unsharded"}, {
+    results: expectedRes,
+    // The 'orders' collection is sharded, but the foreign collection is unsharded, so the $lookup
+    // will stay on the merging part of the split pipeline and be sent to the primary only.
+    toplevelExec: [1, 0],
+    // For every document that flows through the $lookup stage, the primary will issue subpipeline
+    // queries only to itself, since the foreign collection exists only on the primary.
+    subpipelineExec: [4, 0]
+});
+
+// Test sharded local collection and sharded foreign collection that becomes unsharded.
+st.shardColl(ordersColl, {_id: 1}, {_id: 1}, {_id: 1}, mongosDB.getName());
+
+// Shard the collection through the stale mongos, setting it up to believe the collection is
+// sharded by {product_id: 1}. Perform a query through that mongos to ensure the cache is populated.
+// Then, drop the collection from the other mongos.
+st.shardColl(reviewsColl, {_id: 1}, {_id: 1}, {_id: 1}, mongosDB.getName());
+assert.eq(0, mongosDB[reviewsColl.getName()].find().itcount());
+freshReviews.drop();
+
+// Now 'mongosDB' believes the collection is sharded, but it is actually unsharded. Test that the
+// stale mongos still returns correct results.
+assertLookupExecution(pipeline, {comment: "foreign_becomes_unsharded", batchSize: 1}, {
+    results: expectedRes,
+    // The stale mongos will believe that the foreign collection is sharded and will parallelize
+    // the $lookup.
+    toplevelExec: [1, 1],
+    // For every document that flows through the $lookup stage, each node will send the subpipelines
+    // to execute on the primary shard, since the foreign collection exists only on the primary.
+    subpipelineExec: [4, 0]
+});
+
+// Test sharded local collection and unsharded foreign collection that becomes sharded.
+st.shardColl(ordersColl, {_id: 1}, {_id: 1}, {_id: 1}, mongosDB.getName());
+
+// Perform a query through the stale mongos to ensure the cache is populated and indicates that
+// the foreign collection is unsharded. Then, shard the collection from the other mongos.
+assert.eq(0, mongosDB[reviewsColl.getName()].find().itcount());
+assert.commandWorked(
+    freshMongos.adminCommand({shardCollection: freshReviews.getFullName(), key: {_id: "hashed"}}));
+
+// Test that the stale mongos still returns correct results.
+assertLookupExecution(pipeline, {comment: "foreign_becomes_sharded", batchSize: 1}, {
+    results: expectedRes,
+    // The stale mongos will believe that the foreign collection is unsharded and will send the
+    // $lookup to the primary only.
+    toplevelExec: [1, 0],
+    // For every document that flows through the $lookup stage, the node executing the $lookup will
+    // perform a scatter-gather query and open a cursor on every shard that contains the foreign
+    // collection.
+    subpipelineExec: [4, 4]
+});
 
 st.stop();
 }());

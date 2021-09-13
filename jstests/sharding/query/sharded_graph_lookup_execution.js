@@ -450,9 +450,10 @@ pipeline = [
 assertGraphLookupExecution(
     pipeline, {comment: "sharded_lookup_to_sharded_view_to_sharded"}, expectedRes, [
         {
-            // The 'travelers' collection is sharded, so the $lookup stage is executed in parallel
-            // on every shard that contains the local collection.
-            toplevelExec: [1, 1],
+            // The 'travelers' collection is sharded, but mongos does not know that the foreign
+            // namespace is a view on a sharded collection. It is instead treated as an unsharded
+            // collection, and the top-level $lookup is only on the primary.
+            toplevelExec: [1, 0],
             // Each node executing the $lookup will, for every document that flows through the stage
             // target the shard(s) that holds the relevant data for the sharded foreign view.
             subpipelineExec: [0, 3],

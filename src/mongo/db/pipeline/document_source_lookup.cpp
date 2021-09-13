@@ -1182,9 +1182,13 @@ DepsTracker::State DocumentSourceLookUp::getDependencies(DepsTracker* deps) cons
 }
 
 boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceLookUp::distributedPlanLogic() {
-    // If $lookup into a sharded foreign collection is allowed, top-level $lookup stages can run in
-    // parallel on the shards.
-    if (foreignShardedLookupAllowed() && pExpCtx->subPipelineDepth == 0) {
+    // If $lookup into a sharded foreign collection is allowed and the foreign namespace is sharded,
+    // top-level $lookup stages can run in parallel on the shards.
+    //
+    // Note that this decision is inherently racy and subject to become stale. This is okay because
+    // either choice will work correctly; we are simply applying a heuristic optimization.
+    if (foreignShardedLookupAllowed() && pExpCtx->subPipelineDepth == 0 &&
+        pExpCtx->mongoProcessInterface->isSharded(_fromExpCtx->opCtx, _fromNs)) {
         return boost::none;
     }
 
