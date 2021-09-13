@@ -1,7 +1,12 @@
 /*
  * Utilities for shard versioning testing.
  */
-let ShardVersioningUtil = (function() {
+var ShardVersioningUtil = (function() {
+    /*
+     * Shard version indicating that shard version checking must be skipped.
+     */
+    const kIgnoredShardVersion = [Timestamp(0, 0), ObjectId("00000000ffffffffffffffff")];
+
     /*
      * Returns the metadata for the collection in the shard's catalog cache.
      */
@@ -50,6 +55,7 @@ let ShardVersioningUtil = (function() {
     };
 
     return {
+        kIgnoredShardVersion,
         getMetadataOnShard,
         assertCollectionVersionEquals,
         assertCollectionVersionOlderThan,
