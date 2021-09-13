@@ -156,13 +156,12 @@ boost::optional<Document> DocumentSourceFindAndModifyImageLookup::_forgeNoopImag
     // Extract the UUID from the collection information. We should always have a valid uuid
     // here.
     auto imageCollUUID = invariantStatusOK(UUID::parse(localImageCollInfo["uuid"]));
-    const auto& readConcernBson = repl::ReadConcernArgs::get(opCtx).toBSON();
     auto imageDoc = pExpCtx->mongoProcessInterface->lookupSingleDocument(
         pExpCtx,
         NamespaceString::kConfigImagesNamespace,
         imageCollUUID,
         Document{BSON("_id" << sessionIdBson)},
-        std::move(readConcernBson));
+        boost::none /* readConcern not allowed in v5.0 for local lookup */);
 
     if (!imageDoc) {
         // If no image document with the corresponding 'sessionId' is found, we skip forging the

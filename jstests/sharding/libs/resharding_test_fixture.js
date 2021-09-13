@@ -93,7 +93,7 @@ var ReshardingTest = class {
     setup() {
         const mongosOptions = {setParameter: {}};
         const configOptions = {setParameter: {}};
-        const rsOptions = {setParameter: {}};
+        const rsOptions = {setParameter: {storeFindAndModifyImagesInSideCollection: true}};
         const configReplSetTestOptions = {};
 
         let nodesPerShard = 2;

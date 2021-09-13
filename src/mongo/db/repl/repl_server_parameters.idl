@@ -555,7 +555,8 @@ feature_flags:
             When enabled, storeFindAndModifyImagesInOplog=false will change the location of any
             document images for retryable find and modifies.
         cpp_varname: feature_flags::gFeatureFlagRetryableFindAndModify
-        default: false
+        version: 5.0
+        default: true
 
     featureFlagDefaultReadConcernLocal:
         description: >-
