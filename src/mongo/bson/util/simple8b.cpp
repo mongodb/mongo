@@ -410,7 +410,7 @@ void Simple8bBuilder<T>::skip() {
     }
 
     _handleRleTermination();
-    _appendSkip();
+    _appendSkip(true /* tryRle */);
 }
 
 template <typename T>
@@ -535,7 +535,7 @@ bool Simple8bBuilder<T>::_appendValue(T value, bool tryRle) {
 }
 
 template <typename T>
-void Simple8bBuilder<T>::_appendSkip() {
+void Simple8bBuilder<T>::_appendSkip(bool tryRle) {
     if (!_pendingValues.empty()) {
         bool isLastValueSkip = _pendingValues.back().isSkip();
 
@@ -549,7 +549,7 @@ void Simple8bBuilder<T>::_appendSkip() {
             _lastValidExtensionType = kBaseSelector;
         }
 
-        if (_pendingValues.empty() && isLastValueSkip) {
+        if (_pendingValues.empty() && isLastValueSkip && tryRle) {
             // It is possible to start rle
             _rleCount = 1;
             _lastValueInPrevWord = {boost::none, {0, 0, 0, 0}, {0, 0, 0, 0}};
@@ -571,7 +571,7 @@ void Simple8bBuilder<T>::_handleRleTermination() {
     // Add any values that could not be encoded in RLE.
     while (_rleCount > 0) {
         if (_lastValueInPrevWord.isSkip()) {
-            _appendSkip();
+            _appendSkip(false /* tryRle */);
         } else {
             _appendValue(_lastValueInPrevWord.value(), false);
         }

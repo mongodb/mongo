@@ -177,13 +177,19 @@ private:
     /**
      * Appends a value to the Simple8b chain of words.
      * Return true if successfully appended and false otherwise.
+     *
+     * 'tryRle' indicates if we are allowed to put this skip in RLE count or not. Should only be set
+     * to true when terminating RLE and we are flushing excess values.
      */
     bool _appendValue(T value, bool tryRle);
 
     /**
      * Appends a skip to _pendingValues and forms a new Simple8b word if there is no space.
+     *
+     * 'tryRle' indicates if we are allowed to put this value in RLE count or not. Should only be
+     * set to true when terminating RLE and we are flushing excess values.
      */
-    void _appendSkip();
+    void _appendSkip(bool tryRle);
 
     /**
      * When an RLE ends because of inconsecutive values, check if there are enough

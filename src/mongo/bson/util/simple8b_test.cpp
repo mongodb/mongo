@@ -910,6 +910,44 @@ TEST(Simple8b, RleSkip) {
     testSimple8b(expectedInts, expectedBinary);
 }
 
+TEST(Simple8b, FlushSkipRLE) {
+    // Make sure that flushing skips does not re-enable RLE when it fits a full Simple8b. We need at
+    // least 121 skips to verify this (60+60+1)
+    std::vector<boost::optional<uint64_t>> expectedInts(121, boost::none);
+
+    std::vector<uint8_t> expectedBinary{
+        // The selector is 1 and there are 60 bucket with skip.
+        0xF1,
+        0xFF,
+        0xFF,
+        0xFF,
+        0xFF,
+        0xFF,
+        0xFF,
+        0xFF,  // 1st word.
+        // The selector is 1 and there are 60 bucket with skip.
+        0xF1,
+        0xFF,
+        0xFF,
+        0xFF,
+        0xFF,
+        0xFF,
+        0xFF,
+        0xFF,  // 2nd word.
+        // The selector is 14 and there are 1 bucket with skip.
+        0xFE,
+        0xFF,
+        0xFF,
+        0xFF,
+        0xFF,
+        0xFF,
+        0xFF,
+        0xFF,  // 3rd word.
+    };
+
+    testSimple8b(expectedInts, expectedBinary);
+}
+
 TEST(Simple8b, RleChangeOfValue) {
     std::vector<boost::optional<uint64_t>> expectedInts(300, 1);
     expectedInts.push_back(7);
