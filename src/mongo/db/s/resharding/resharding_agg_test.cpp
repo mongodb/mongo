@@ -29,19 +29,28 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/repl/image_collection_entry_gen.h"
+#include "mongo/db/repl/mock_repl_coord_server_fixture.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/s/resharding/resharding_donor_oplog_iterator.h"
 #include "mongo/db/s/resharding_util.h"
+#include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/transaction_history_iterator.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace {
 
 using namespace fmt::literals;
+
+const NamespaceString kRemoteOplogNss{"local.oplog.rs"};
+const NamespaceString kLocalOplogBufferNss{"{}.{}xxx.yyy"_format(
+    NamespaceString::kConfigDb, NamespaceString::kReshardingLocalOplogBufferPrefix)};
 
 // A mock TransactionHistoryIterator to support DSReshardingIterateTransaction.
 class MockTransactionHistoryIterator : public TransactionHistoryIteratorBase {
@@ -130,8 +139,36 @@ public:
             new MockTransactionHistoryIterator(_mockResults, time));
     }
 
+    BSONObj getCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) override {
+        auto optionIter = _collectionOptions.find(nss);
+        invariant(optionIter != _collectionOptions.end(),
+                  str::stream() << nss.ns() << " was not registered");
+
+        return optionIter->second;
+    }
+
+    boost::optional<Document> lookupSingleDocument(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const NamespaceString& nss,
+        UUID collectionUUID,
+        const Document& documentKey,
+        boost::optional<BSONObj> readConcern) {
+        DBDirectClient client(expCtx->opCtx);
+        auto result = client.findOne(nss.ns(), documentKey.toBson());
+        if (result.isEmpty()) {
+            return boost::none;
+        }
+
+        return Document(result.getOwned());
+    }
+
+    void setCollectionOptions(const NamespaceString& nss, const BSONObj option) {
+        _collectionOptions[nss] = option;
+    }
+
 private:
     std::deque<DocumentSource::GetNextResult> _mockResults;
+    std::map<NamespaceString, BSONObj> _collectionOptions;
 };
 
 repl::MutableOplogEntry makeOplog(const NamespaceString& nss,
@@ -182,18 +219,22 @@ bool validateOplogId(const Timestamp& clusterTime,
     return oplogIdExpected == oplogId;
 }
 
+boost::intrusive_ptr<ExpressionContextForTest> createExpressionContext(OperationContext* opCtx) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(
+        new ExpressionContextForTest(opCtx, kLocalOplogBufferNss));
+    expCtx->setResolvedNamespace(kLocalOplogBufferNss, {kLocalOplogBufferNss, {}});
+    expCtx->setResolvedNamespace(kRemoteOplogNss, {kRemoteOplogNss, {}});
+    return expCtx;
+}
+
 class ReshardingAggTest : public AggregationContextFixture {
 protected:
     const NamespaceString& localOplogBufferNss() {
-        return _localOplogBufferNss;
+        return kLocalOplogBufferNss;
     }
 
     boost::intrusive_ptr<ExpressionContextForTest> createExpressionContext() {
-        boost::intrusive_ptr<ExpressionContextForTest> expCtx(
-            new ExpressionContextForTest(getOpCtx(), _localOplogBufferNss));
-        expCtx->setResolvedNamespace(_localOplogBufferNss, {_localOplogBufferNss, {}});
-        expCtx->setResolvedNamespace(_remoteOplogNss, {_remoteOplogNss, {}});
-        return expCtx;
+        return ::mongo::createExpressionContext(getOpCtx());
     }
 
     auto makePipelineForReshardingDonorOplogIterator(
@@ -331,7 +372,7 @@ protected:
         std::deque<DocumentSource::GetNextResult> pipelineSource) {
         // Set up the oplog collection state for $lookup and $graphLookup calls.
         auto expCtx = createExpressionContext();
-        expCtx->ns = _remoteOplogNss;
+        expCtx->ns = kRemoteOplogNss;
         expCtx->mongoProcessInterface = std::make_shared<MockMongoInterface>(pipelineSource);
 
         auto pipeline = createOplogFetchingPipelineForResharding(
@@ -345,9 +386,6 @@ protected:
         return pipeline;
     }
 
-    const NamespaceString _remoteOplogNss{"local.oplog.rs"};
-    const NamespaceString _localOplogBufferNss{"{}.{}xxx.yyy"_format(
-        NamespaceString::kConfigDb, NamespaceString::kReshardingLocalOplogBufferPrefix)};
     const NamespaceString _crudNss{"test.foo"};
     // Use a constant value so unittests can store oplog entries as extended json strings in code.
     const UUID _reshardingCollUUID =
@@ -674,7 +712,7 @@ TEST_F(ReshardingAggTest, VerifyPipelineOutputHasOplogSchema) {
                                                                 Document(deleteOplog.toBSON())};
 
     boost::intrusive_ptr<ExpressionContext> expCtx = createExpressionContext();
-    expCtx->ns = _remoteOplogNss;
+    expCtx->ns = kRemoteOplogNss;
     expCtx->mongoProcessInterface = std::make_shared<MockMongoInterface>(pipelineSource);
 
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline = createOplogFetchingPipelineForResharding(
@@ -774,7 +812,7 @@ TEST_F(ReshardingAggTest, VerifyPipelinePreparedTxn) {
 
     boost::intrusive_ptr<ExpressionContext> expCtx = createExpressionContext();
     // Set up the oplog collection state for $lookup and $graphLookup calls.
-    expCtx->ns = _remoteOplogNss;
+    expCtx->ns = kRemoteOplogNss;
     expCtx->mongoProcessInterface = std::make_shared<MockMongoInterface>(pipelineSource);
 
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline = createOplogFetchingPipelineForResharding(
@@ -1565,6 +1603,105 @@ TEST_F(ReshardingAggTest, VerifyPipelineLargeTxnIncomplete) {
 
     auto doc = pipeline->getNext();
     ASSERT(!doc);
+}
+
+using ReshardingAggWithStorageTest = MockReplCoordServerFixture;
+
+// Tests that find and modify oplog with image lookup gets converted to the old style oplog pairs
+// with no-op pre/post image oplog.
+TEST_F(ReshardingAggWithStorageTest, RetryableFindAndModifyWithImageLookup) {
+    repl::OpTime opTime(Timestamp(43, 56), 1);
+    const NamespaceString kCrudNs("foo", "bar");
+    const UUID kCrudUUID = UUID::gen();
+    const ShardId kMyShardId{"shard1"};
+    ReshardingDonorOplogId id(opTime.getTimestamp(), opTime.getTimestamp());
+
+    const auto lsid = makeLogicalSessionIdForTest();
+    const TxnNumber txnNum(45);
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(lsid);
+    sessionInfo.setTxnNumber(txnNum);
+
+    const BSONObj preImage(BSON("_id" << 2 << "post" << 1));
+
+    repl::ImageEntry imageEntry;
+    imageEntry.set_id(lsid);
+    imageEntry.setTxnNumber(txnNum);
+    imageEntry.setTs(opTime.getTimestamp());
+    imageEntry.setImageKind(repl::RetryImageEnum::kPreImage);
+    imageEntry.setImage(preImage);
+
+    DBDirectClient client(opCtx());
+    client.insert(NamespaceString::kConfigImagesNamespace.ns(), imageEntry.toBSON());
+
+    repl::DurableOplogEntry oplog(opTime,
+                                  boost::none /* hash */,
+                                  repl::OpTypeEnum::kUpdate,
+                                  kCrudNs,
+                                  kCrudUUID,
+                                  false /* fromMigrate */,
+                                  0 /* version */,
+                                  BSON("$set" << BSON("y" << 1)), /* o1 */
+                                  BSON("_id" << 2),               /* o2 */
+                                  sessionInfo,
+                                  boost::none /* upsert */,
+                                  {} /* date */,
+                                  {1}, /* statementIds */
+                                  boost::none /* prevWrite */,
+                                  boost::none /* preImage */,
+                                  boost::none /* postImage */,
+                                  kMyShardId,
+                                  Value(id.toBSON()),
+                                  repl::RetryImageEnum::kPreImage);
+
+    std::deque<DocumentSource::GetNextResult> pipelineSource{Document(oplog.toBSON())};
+    auto expCtx = createExpressionContext(opCtx());
+    expCtx->ns = NamespaceString::kRsOplogNamespace;
+
+    {
+        auto mockMongoInterface = std::make_shared<MockMongoInterface>(pipelineSource);
+        // Register a dummy uuid just to not make test crash. The stub for findSingleDoc ignores
+        // the UUID so it doesn't matter what the value here is.
+        mockMongoInterface->setCollectionOptions(NamespaceString::kConfigImagesNamespace,
+                                                 BSON("uuid" << UUID::gen()));
+        expCtx->mongoProcessInterface = std::move(mockMongoInterface);
+    }
+
+    auto pipeline = createOplogFetchingPipelineForResharding(
+        expCtx, ReshardingDonorOplogId(Timestamp::min(), Timestamp::min()), kCrudUUID, kMyShardId);
+
+    pipeline->addInitialSource(DocumentSourceMock::createForTest(pipelineSource, expCtx));
+
+    auto preImageOplogDoc = pipeline->getNext();
+    ASSERT_TRUE(preImageOplogDoc);
+    auto preImageOplogStatus = repl::DurableOplogEntry::parse(preImageOplogDoc->toBson());
+    ASSERT_OK(preImageOplogStatus);
+
+    auto preImageOplog = preImageOplogStatus.getValue();
+    ASSERT_BSONOBJ_EQ(preImage, preImageOplog.getObject());
+    ASSERT_EQ(OpType_serializer(repl::OpTypeEnum::kNoop),
+              OpType_serializer(preImageOplog.getOpType()));
+
+    auto updateOplogDoc = pipeline->getNext();
+    ASSERT_TRUE(updateOplogDoc);
+    auto updateOplogStatus = repl::DurableOplogEntry::parse(updateOplogDoc->toBson());
+
+    auto updateOplog = updateOplogStatus.getValue();
+    ASSERT_LT(preImageOplog.getOpTime(), updateOplog.getOpTime());
+    ASSERT_TRUE(updateOplog.getPreImageOpTime());
+    ASSERT_EQ(preImageOplog.getOpTime(), *updateOplog.getPreImageOpTime());
+    ASSERT_EQ(OpType_serializer(repl::OpTypeEnum::kUpdate),
+              OpType_serializer(updateOplog.getOpType()));
+    ASSERT_BSONOBJ_EQ(oplog.getObject(), updateOplog.getObject());
+    ASSERT_TRUE(updateOplog.getObject2());
+    ASSERT_BSONOBJ_EQ(*oplog.getObject2(), *updateOplog.getObject2());
+    ASSERT_EQ(oplog.getNss(), updateOplog.getNss());
+    ASSERT_TRUE(updateOplog.getUuid());
+    ASSERT_EQ(*oplog.getUuid(), *updateOplog.getUuid());
+    ASSERT_BSONOBJ_EQ(oplog.getOperationSessionInfo().toBSON(),
+                      updateOplog.getOperationSessionInfo().toBSON());
+
+    ASSERT_FALSE(pipeline->getNext());
 }
 
 }  // namespace

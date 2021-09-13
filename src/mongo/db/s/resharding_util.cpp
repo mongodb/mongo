@@ -43,6 +43,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/document_source_add_fields.h"
+#include "mongo/db/pipeline/document_source_find_and_modify_image_lookup.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/resharding/document_source_resharding_iterate_transaction.h"
@@ -285,6 +286,10 @@ std::unique_ptr<Pipeline, PipelineDeleter> createOplogFetchingPipelineForReshard
                  V{Doc{{"op", "c"_sd}, {"ui", collUUID}}}}}}
             .toBson(),
         expCtx));
+
+    // Converts oplog entries with kNeedsRetryImageFieldName into the old style pair of
+    // update/delete oplog and pre/post image no-op oplog.
+    stages.emplace_back(DocumentSourceFindAndModifyImageLookup::create(expCtx));
 
     // Emits transaction entries chronologically, and adds _id to all events in the stream.
     stages.emplace_back(DocumentSourceReshardingIterateTransaction::create(expCtx));
