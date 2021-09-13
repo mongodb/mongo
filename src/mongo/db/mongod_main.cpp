@@ -479,7 +479,13 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         uassert(10296, ss.str().c_str(), boost::filesystem::exists(storageGlobalParams.dbpath));
     }
 
+    initializeSNMP();
+
     startWatchdog(serviceContext);
+
+    if (mongodGlobalParams.scriptingEnabled) {
+        ScriptEngine::setup();
+    }
 
     try {
         startup_recovery::repairAndRecoverDatabases(startupOpCtx.get(), lastShutdownState);
@@ -509,14 +515,6 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     // Notify the storage engine that startup is completed before repair exits below, as repair sets
     // the upgrade flag to true.
     serviceContext->getStorageEngine()->notifyStartupComplete();
-
-    startMongoDFTDC();
-
-    initializeSNMP();
-
-    if (mongodGlobalParams.scriptingEnabled) {
-        ScriptEngine::setup();
-    }
 
     if (storageGlobalParams.upgrade) {
         LOGV2(20537, "Finished checking dbs");
@@ -653,6 +651,8 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
                 !replCoord->isReplEnabled());
         replCoord->startup(startupOpCtx.get(), lastShutdownState);
     }
+
+    startMongoDFTDC();
 
     if (!storageGlobalParams.readOnly) {
 
