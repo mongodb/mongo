@@ -882,6 +882,9 @@ BucketCatalog::BucketAccess::BucketAccess(BucketCatalog* catalog,
                                           Bucket* bucket,
                                           boost::optional<BucketState> targetState)
     : _catalog(catalog) {
+    invariant(!targetState || targetState == BucketState::kNormal ||
+              targetState == BucketState::kPrepared);
+
     {
         auto lk = _catalog->_lockShared();
         auto bucketIt = _catalog->_allBuckets.find(bucket);
@@ -893,17 +896,8 @@ BucketCatalog::BucketAccess::BucketAccess(BucketCatalog* catalog,
         _acquire();
     }
 
-    boost::optional<BucketState> state{BucketState::kCleared};
-    if (targetState) {
-        invariant(*targetState == BucketState::kNormal || *targetState == BucketState::kPrepared);
-        state = _catalog->_setBucketState(_bucket->_id, *targetState);
-    } else {
-        stdx::lock_guard statesLk{_catalog->_statesMutex};
-        auto statesIt = _catalog->_bucketStates.find(_bucket->_id);
-        if (statesIt != _catalog->_bucketStates.end()) {
-            state = statesIt->second;
-        }
-    }
+    auto state =
+        targetState ? _catalog->_setBucketState(_bucket->_id, *targetState) : _getBucketState();
     if (!state || state == BucketState::kCleared || state == BucketState::kPreparedAndCleared) {
         release();
     }
@@ -913,6 +907,12 @@ BucketCatalog::BucketAccess::~BucketAccess() {
     if (isLocked()) {
         release();
     }
+}
+
+boost::optional<BucketCatalog::BucketState> BucketCatalog::BucketAccess::_getBucketState() const {
+    stdx::lock_guard lk{_catalog->_statesMutex};
+    auto it = _catalog->_bucketStates.find(_bucket->_id);
+    return it != _catalog->_bucketStates.end() ? boost::make_optional(it->second) : boost::none;
 }
 
 BucketCatalog::BucketState BucketCatalog::BucketAccess::_findOpenBucketThenLock(
@@ -966,10 +966,7 @@ BucketCatalog::BucketState BucketCatalog::BucketAccess::_findOpenBucketThenLockA
 }
 
 BucketCatalog::BucketState BucketCatalog::BucketAccess::_confirmStateForAcquiredBucket() {
-    stdx::lock_guard statesLk{_catalog->_statesMutex};
-    auto statesIt = _catalog->_bucketStates.find(_bucket->_id);
-    invariant(statesIt != _catalog->_bucketStates.end());
-    auto& [_, state] = *statesIt;
+    auto state = *_getBucketState();
     if (state == BucketState::kCleared || state == BucketState::kPreparedAndCleared) {
         release();
     } else {
@@ -991,15 +988,10 @@ void BucketCatalog::BucketAccess::_findOrCreateOpenBucketThenLock(
     _bucket = it->second;
     _acquire();
 
-    {
-        stdx::lock_guard statesLk{_catalog->_statesMutex};
-        auto statesIt = _catalog->_bucketStates.find(_bucket->_id);
-        invariant(statesIt != _catalog->_bucketStates.end());
-        auto& [_, state] = *statesIt;
-        if (state == BucketState::kNormal || state == BucketState::kPrepared) {
-            _catalog->_markBucketNotIdle(_bucket, false /* locked */);
-            return;
-        }
+    auto state = *_getBucketState();
+    if (state == BucketState::kNormal || state == BucketState::kPrepared) {
+        _catalog->_markBucketNotIdle(_bucket, false /* locked */);
+        return;
     }
 
     _catalog->_abort(_guard, _bucket, nullptr, boost::none);

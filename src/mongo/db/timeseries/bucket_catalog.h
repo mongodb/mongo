@@ -576,6 +576,11 @@ private:
 
     private:
         /**
+         * Returns the state of the bucket, or boost::none if there is no state for the bucket.
+         */
+        boost::optional<BucketState> _getBucketState() const;
+
+        /**
          * Helper to find and lock an open bucket for the given metadata if it exists. Takes a
          * shared lock on the catalog. Returns the state of the bucket if it is locked and usable.
          * In case the bucket does not exist or was previously cleared and thus is not usable, the
@@ -721,11 +726,13 @@ private:
     stdx::unordered_map<BucketKey, Bucket*, BucketHasher, BucketEq> _openBuckets;
 
     // Bucket state
-    mutable Mutex _statesMutex = MONGO_MAKE_LATCH("BucketCatalog::_statesMutex");
+    mutable Mutex _statesMutex =
+        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "BucketCatalog::_statesMutex");
     stdx::unordered_map<OID, BucketState, OID::Hasher> _bucketStates;
 
     // This mutex protects access to _idleBuckets
-    mutable Mutex _idleMutex = MONGO_MAKE_LATCH("BucketCatalog::_idleMutex");
+    mutable Mutex _idleMutex =
+        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(1), "BucketCatalog::_idleMutex");
 
     // Buckets that do not have any writers.
     IdleList _idleBuckets;
