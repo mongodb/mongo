@@ -349,13 +349,12 @@ void recoverTenantMigrationAccessBlockers(OperationContext* opCtx) {
         NamespaceString::kTenantMigrationRecipientsNamespace);
 
     recipientStore.forEach(opCtx, {}, [&](const TenantMigrationRecipientDocument& doc) {
-        // Skip creating a TenantMigrationRecipientAccessBlocker for aborted migrations that have
-        // been marked as garbage collected.
-        if (doc.getExpireAt() && doc.getState() == TenantMigrationRecipientStateEnum::kStarted) {
-            return true;
-        }
-
-        if (!doc.getDataConsistentStopDonorOpTime()) {
+        // Do not create the mtab when:
+        // 1) the migration was forgotten before receiving a 'recipientSyncData' with a
+        //    'returnAfterReachingDonorTimestamp'.
+        // 2) a delayed 'recipientForgetMigration' was received after the state doc was deleted.
+        if (doc.getState() == TenantMigrationRecipientStateEnum::kDone &&
+            !doc.getRejectReadsBeforeTimestamp()) {
             return true;
         }
 
@@ -369,10 +368,11 @@ void recoverTenantMigrationAccessBlockers(OperationContext* opCtx) {
             .add(doc.getTenantId(), mtab);
 
         switch (doc.getState()) {
-            case TenantMigrationRecipientStateEnum::kDone:
             case TenantMigrationRecipientStateEnum::kStarted:
+                invariant(!doc.getRejectReadsBeforeTimestamp());
                 break;
             case TenantMigrationRecipientStateEnum::kConsistent:
+            case TenantMigrationRecipientStateEnum::kDone:
                 if (doc.getRejectReadsBeforeTimestamp()) {
                     mtab->startRejectingReadsBefore(doc.getRejectReadsBeforeTimestamp().get());
                 }
