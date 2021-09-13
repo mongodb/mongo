@@ -153,7 +153,7 @@ bool requiresTimestampForCatalogWrite(OperationContext* opCtx, const NamespaceSt
         return false;
     }
 
-    if (replCoord->canAcceptWritesFor(opCtx, nss)) {
+    if (!opCtx->writesAreReplicated()) {
         return false;
     }
 

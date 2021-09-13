@@ -262,6 +262,7 @@ protected:
                 coll = db->createCollection(&_opCtx, nss);
             }
 
+            repl::UnreplicatedWritesBlock uwb(&_opCtx);
             ASSERT_OK(coll->truncate(&_opCtx));
             wunit.commit();
         });

@@ -145,6 +145,9 @@ void dropIndex(OperationContext* opCtx, const NamespaceString& nss, const std::s
     ASSERT_OK(collection.getWritableCollection()->getIndexCatalog()->dropIndex(
         opCtx, collection.getWritableCollection(), indexDescriptor));
 
+    ASSERT_OK(opCtx->recoveryUnit()->setTimestamp(
+        repl::ReplicationCoordinator::get(opCtx)->getMyLastAppliedOpTime().getTimestamp() + 1));
+
     wuow.commit();
 }
 
