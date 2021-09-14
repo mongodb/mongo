@@ -150,7 +150,7 @@ protected:
         auto [expectedTag, expectedVal] = stage_builder::makeValue(expectedValue);
         sbe::value::ValueGuard expectedGuard{expectedTag, expectedVal};
         ASSERT_TRUE(valueEquals(resultsTag, resultsVal, expectedTag, expectedVal))
-            << "expected: " << std::make_pair(expectedTag, expectedVal)
+            << "expected: " << expectedTag << std::make_pair(expectedTag, expectedVal)
             << " but got: " << std::make_pair(resultsTag, resultsVal);
     }
 
@@ -563,237 +563,6 @@ TEST_F(SbeAccumulatorBuilderTest, LastAccumulatorTranslationOneGroupBy) {
     runAggregationWithGroupByTest("{x: {$last: '$b'}}", docs, {"$a"}, BSON_ARRAY(2.5 << 100));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, AvgAccumulatorTranslation) {
-    // Parse the test $avg accumulator into an AccumulationStatement.
-    auto expCtx = ExpressionContextForTest{};
-    auto sumStmt = fromjson("{x: {$avg: '$b'}}");
-    auto accStmt = makeAccumulator(&expCtx, sumStmt.firstElement());
-
-    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 2)),
-                                       BSON_ARRAY(BSON("a" << 2 << "b" << Decimal128(4.0))),
-                                       BSON_ARRAY(BSON("a" << 3 << "b" << 6ll))};
-
-    // Build the a VirtualScan input sub-tree to feed test docs into the argument expression.
-    auto querySolution = makeQuerySolution(makeVirtualScanTree(docs));
-    auto [resultSlots, stage, data] = buildPlanStage(std::move(querySolution), false, nullptr);
-
-    stage_builder::EvalStage evalStage;
-    evalStage.stage = std::move(stage);
-
-    auto state = makeStageBuilderState(data.env);
-    auto [argExpr, argStage] =
-        stage_builder::buildArgument(state,
-                                     accStmt,
-                                     std::move(evalStage),
-                                     resultSlots.front() /* See comment for buildPlanStage */,
-                                     kEmptyPlanNodeId);
-
-    // The accumulator expression for translation of $avg will have two agg expressions, a
-    // sum(..) and a count which is implemented as sum(1).
-    auto [aggExprs, accStage] = stage_builder::buildAccumulator(
-        state, accStmt, std::move(argStage), std::move(argExpr), kEmptyPlanNodeId);
-
-    // Build a HashAgg stage to implement a group-by with two agg expressions.
-    sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> aggs;
-    sbe::value::SlotVector aggSlots;
-    for (auto& expr : aggExprs) {
-        auto slot = state.slotId();
-        aggSlots.push_back(slot);
-        aggs[slot] = std::move(expr);
-    }
-    auto groupStage = makeHashAgg(
-        std::move(accStage), sbe::makeSV(), std::move(aggs), boost::none, kEmptyPlanNodeId);
-
-    // The finalization step for $avg translation will produce a divide expression that takes
-    // the two group-by slots as input and binds an 'outSlot' that will hold the result of the
-    // final result of $avg.
-    auto [finalExpr, finalStage] = stage_builder::buildFinalize(
-        state, accStmt, aggSlots, std::move(groupStage), kEmptyPlanNodeId);
-
-    auto outSlot = state.slotId();
-    auto outStage =
-        makeProject(std::move(finalStage), kEmptyPlanNodeId, outSlot, std::move(finalExpr));
-
-    // Prepare the sbe::PlanStage for execution and collect all results in order to assert that
-    // sum(2, 4, 6) / 3 == 4.
-    auto resultAccessors = prepareTree(&data.ctx, outStage.stage.get(), outSlot);
-    auto [resultsTag, resultsVal] = getAllResults(outStage.stage.get(), &resultAccessors[0]);
-    sbe::value::ValueGuard resultGuard{resultsTag, resultsVal};
-
-    auto [expectedTag, expectedVal] = stage_builder::makeValue(BSON_ARRAY(4));
-    sbe::value::ValueGuard expectedGuard{expectedTag, expectedVal};
-    ASSERT_TRUE(valueEquals(resultsTag, resultsVal, expectedTag, expectedVal));
-}
-
-TEST_F(SbeAccumulatorBuilderTest, TwoAvgAccumulatorTranslation) {
-    // This test simulates translation a $group with two accumulator statements.
-    auto expCtx = ExpressionContextForTest{};
-    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 10 << "b" << 1ll)),
-                                       BSON_ARRAY(BSON("a" << 20 << "b" << Decimal128(2.0))),
-                                       BSON_ARRAY(BSON("a" << 30 << "b" << 3))};
-
-    // Build the a VirtualScan input sub-tree to feed test docs into the argument expression.
-    auto querySolution = makeQuerySolution(makeVirtualScanTree(docs));
-    auto [resultSlots, stage, data] = buildPlanStage(std::move(querySolution), false, nullptr);
-    stage_builder::EvalStage evalStage;
-    evalStage.stage = std::move(stage);
-
-    auto accs =
-        std::vector<BSONObj>{{fromjson("{x: {$avg: '$a'}}")}, {fromjson("{y: {$avg: '$b'}}")}};
-
-    // Translate the two argument Expressions.
-    std::unique_ptr<sbe::EExpression> argExpr;
-    std::vector<std::unique_ptr<sbe::EExpression>> accExprs;
-    sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> aggs;
-    std::vector<sbe::value::SlotVector> accAggSlots;
-    std::vector<AccumulationStatement> accStmts;
-    auto state = makeStageBuilderState(data.env);
-    for (auto& acc : accs) {
-        auto accStmt = makeAccumulator(&expCtx, acc.firstElement());
-        accStmts.push_back(accStmt);
-
-        std::tie(argExpr, evalStage) =
-            stage_builder::buildArgument(state,
-                                         accStmt,
-                                         std::move(evalStage),  // NOLINT(bugprone-use-after-move)
-                                         resultSlots.front() /* See comment for buildPlanStage */,
-                                         kEmptyPlanNodeId);
-
-        // The accumulator expression for translation of $avg will have two agg expressions, a
-        // sum(..) and a count which is implemented as sum(1).
-        std::tie(accExprs, evalStage) = stage_builder::buildAccumulator(
-            state,
-            accStmt,
-            std::move(evalStage),  // NOLINT(bugprone-use-after-move)
-            std::move(argExpr),
-            kEmptyPlanNodeId);
-
-        sbe::value::SlotVector aggSlots;
-        for (auto& expr : accExprs) {
-            auto slot = state.slotId();
-            aggSlots.push_back(slot);
-            aggs[slot] = std::move(expr);
-        }
-        accAggSlots.emplace_back(std::move(aggSlots));
-    }
-
-    auto groupStage = makeHashAgg(
-        std::move(evalStage), sbe::makeSV(), std::move(aggs), boost::none, kEmptyPlanNodeId);
-
-    // Build the finalize stage over the collected accumulators.
-    sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> projects;
-    sbe::value::SlotVector finalSlots;
-    std::unique_ptr<sbe::EExpression> finalExpr;
-    for (size_t i = 0; i < accs.size(); ++i) {
-        std::tie(finalExpr, groupStage) =
-            stage_builder::buildFinalize(state,
-                                         accStmts[i],
-                                         accAggSlots[i],
-                                         std::move(groupStage),  // NOLINT(bugprone-use-after-move)
-                                         kEmptyPlanNodeId);
-
-        auto outSlot = state.slotId();
-        finalSlots.push_back(outSlot);
-        projects[outSlot] = std::move(finalExpr);
-    }
-
-    auto finalStage = makeProject(std::move(groupStage), std::move(projects), kEmptyPlanNodeId);
-
-    // Prepare the sbe::PlanStage for execution and collect all results in order to assert that
-    // the avg of the 'a' fields is 20 and the avg of 'b' fields is 2.
-    auto resultAccessors = prepareTree(&data.ctx, finalStage.stage.get(), finalSlots);
-    auto [resultsTag, resultsVal] = getAllResultsMulti(finalStage.stage.get(), resultAccessors);
-    sbe::value::ValueGuard resultGuard{resultsTag, resultsVal};
-
-    auto [expectedTag, expectedVal] = stage_builder::makeValue(BSON_ARRAY(BSON_ARRAY(20 << 2)));
-    sbe::value::ValueGuard expectedGuard{expectedTag, expectedVal};
-
-    ASSERT_TRUE(valueEquals(resultsTag, resultsVal, expectedTag, expectedVal));
-}
-
-TEST_F(SbeAccumulatorBuilderTest, AvgAccumulatorOneGroupByTranslation) {
-    // This test simulates translation a $group with a group-by statement on '$a'.
-    auto expCtx = ExpressionContextForTest{};
-    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 1.0)),
-                                       BSON_ARRAY(BSON("a" << 1 << "b" << 2ll)),
-                                       BSON_ARRAY(BSON("a" << 1 << "b" << Decimal128(3.0))),
-                                       BSON_ARRAY(BSON("a" << 2 << "b" << 4ll)),
-                                       BSON_ARRAY(BSON("a" << 2 << "b" << 5)),
-                                       BSON_ARRAY(BSON("a" << 2 << "b" << 6.0))};
-
-    // Build the a VirtualScan input sub-tree to feed test docs into the argument expression.
-    auto querySolution = makeQuerySolution(makeVirtualScanTree(docs));
-    auto [resultSlots, stage, data] = buildPlanStage(std::move(querySolution), false, nullptr);
-    stage_builder::EvalStage evalStage;
-    evalStage.stage = std::move(stage);
-
-    auto state = makeStageBuilderState(data.env);
-    auto acc = fromjson("{x: {$avg: '$b'}}");
-    auto accStmt = makeAccumulator(&expCtx, acc.firstElement());
-
-    // Translate the the group-by field path and bind it to a slot in a project stage.
-    auto vps = expCtx.variablesParseState;
-    auto groupByExpression = ExpressionFieldPath::parse(&expCtx, "$a", vps);
-    auto [groupByExpr, groupByStage] =
-        stage_builder::generateExpression(state,
-                                          groupByExpression.get(),
-                                          std::move(evalStage),
-                                          resultSlots.front() /* See comment for buildPlanStage */,
-                                          kEmptyPlanNodeId);
-
-    auto [groupBySlot, projectGroupByStage] = projectEvalExpr(
-        std::move(groupByExpr), std::move(groupByStage), kEmptyPlanNodeId, state.slotIdGenerator);
-
-    auto [argExpr, argStage] =
-        stage_builder::buildArgument(state,
-                                     accStmt,
-                                     std::move(projectGroupByStage),
-                                     resultSlots.front() /* See comment for buildPlanStage */,
-                                     kEmptyPlanNodeId);
-
-    // The accumulator expression for translation of $avg will have two agg expressions, a
-    // sum(..) and a count which is implemented as sum(1).
-    auto [aggExprs, accStage] = stage_builder::buildAccumulator(
-        state, accStmt, std::move(argStage), std::move(argExpr), kEmptyPlanNodeId);
-
-    sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> aggs;
-    sbe::value::SlotVector aggSlots;
-    for (auto& expr : aggExprs) {
-        auto slot = state.slotId();
-        aggSlots.push_back(slot);
-        aggs[slot] = std::move(expr);
-    }
-    auto groupStage = makeHashAgg(std::move(accStage),
-                                  sbe::makeSV(groupBySlot),
-                                  std::move(aggs),
-                                  boost::none,
-                                  kEmptyPlanNodeId);
-
-
-    // Build the finalize stage over the collected accumulators.
-    auto [finalExpr, finalStage] = stage_builder::buildFinalize(
-        state, accStmt, aggSlots, std::move(groupStage), kEmptyPlanNodeId);
-
-    auto outSlot = state.slotId();
-    auto outStage =
-        makeProject(std::move(finalStage), kEmptyPlanNodeId, outSlot, std::move(finalExpr));
-
-    // Prepare the sbe::PlanStage for execution and collect all results in order to assert that The
-    // expected averages for each '$a' group are a:1 == 2 and a:2 == 5.
-    auto resultAccessors = prepareTree(&data.ctx, outStage.stage.get(), outSlot);
-    auto [resultsTag, resultsVal] = getAllResults(outStage.stage.get(), &resultAccessors[0]);
-    sbe::value::ValueGuard resultGuard{resultsTag, resultsVal};
-
-    // Sort results for stable compare, since the averages could come out in any order
-    auto [sortedResultsTag, sortedResultsVal] = sortResults(resultsTag, resultsVal);
-    sbe::value::ValueGuard sortedResultGuard{sortedResultsTag, sortedResultsVal};
-
-    auto [expectedTag, expectedVal] = stage_builder::makeValue(BSON_ARRAY(2.0 << 5));
-    sbe::value::ValueGuard expectedGuard{expectedTag, expectedVal};
-
-    ASSERT_TRUE(valueEquals(sortedResultsTag, sortedResultsVal, expectedTag, expectedVal));
-}
-
 TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationBasic) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 2)),
                                        BSON_ARRAY(BSON("a" << 1 << "b" << 4)),
@@ -1064,6 +833,85 @@ TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationTwoGroupByTest) {
                             << "c" << 1)),
     };
     runAggregationWithGroupByTest("{x: {$sum: '$b'}}", docs, {"$a", "$c"}, BSON_ARRAY(20));
+}
+
+TEST_F(SbeAccumulatorBuilderTest, AvgAccumulatorTranslationSmallIntegers) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 2)),
+                                       BSON_ARRAY(BSON("a" << 2 << "b" << 4)),
+                                       BSON_ARRAY(BSON("a" << 3 << "b" << 6))};
+    runAggregationWithNoGroupByTest(
+        "{x: {$avg: '$b'}}", docs, BSON_ARRAY(Value(static_cast<double>(2 + 4 + 6) / 3)));
+}
+
+TEST_F(SbeAccumulatorBuilderTest, AvgAccumulatorTranslationIntegerInputsNonIntegerAverage) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 1)),
+                                       BSON_ARRAY(BSON("a" << 2 << "b" << 2))};
+    runAggregationWithNoGroupByTest(
+        "{x: {$avg: '$b'}}", docs, BSON_ARRAY(Value(static_cast<double>(1 + 2) / 2)));
+}
+
+TEST_F(SbeAccumulatorBuilderTest, AvgAccumulatorTranslationVariousNumberTypes) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 1.0)),
+                                       BSON_ARRAY(BSON("a" << 2 << "b" << 2ll)),
+                                       BSON_ARRAY(BSON("a" << 3 << "b" << Decimal128(3.0))),
+                                       BSON_ARRAY(BSON("a" << 4 << "b" << 4))};
+    runAggregationWithNoGroupByTest(
+        "{x: {$avg: '$b'}}",
+        docs,
+        BSON_ARRAY(Value(Decimal128(static_cast<double>(1 + 2 + 3 + 4) / 4))));
+}
+
+TEST_F(SbeAccumulatorBuilderTest, AvgAccumulatorTranslationNonNumericFields) {
+    auto docs = std::vector<BSONArray>{
+        BSON_ARRAY(BSON("a" << 1 << "b" << 1)),
+        BSON_ARRAY(BSON("a" << 2 << "b"
+                            << "hello")),
+        BSON_ARRAY(BSON("a" << 3 << "b" << BSONNULL)),
+        BSON_ARRAY(BSON("a" << 4 << "b" << BSON("x" << 42))),
+        BSON_ARRAY(BSON("a" << 5 << "b" << 6)),
+    };
+    runAggregationWithNoGroupByTest(
+        "{x: {$avg: '$b'}}", docs, BSON_ARRAY(Value(static_cast<double>(1 + 6) / 2)));
+}
+
+// NaN is a numeric value, so the average of NaN is NaN and not null.
+TEST_F(SbeAccumulatorBuilderTest, AvgAccumulatorTranslationNan) {
+    auto docs = std::vector<BSONArray>{
+        BSON_ARRAY(BSON("a" << 5 << "b" << std::numeric_limits<double>::quiet_NaN())),
+    };
+    runAggregationWithNoGroupByTest(
+        "{x: {$avg: '$b'}}", docs, BSON_ARRAY(Value(std::numeric_limits<double>::quiet_NaN())));
+}
+
+TEST_F(SbeAccumulatorBuilderTest, AvgAccumulatorTranslationMissingSomeFields) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 1)),
+                                       BSON_ARRAY(BSON("a" << 2)),
+                                       BSON_ARRAY(BSON("a" << 3 << "b" << 3))};
+    runAggregationWithNoGroupByTest(
+        "{x: {$avg: '$b'}}", docs, BSON_ARRAY(Value(static_cast<double>(1 + 3) / 2)));
+}
+
+// Notice, that $sum in the following two cases returns zero, but $avg is undefined and should
+// return null.
+TEST_F(SbeAccumulatorBuilderTest, AvgAccumulatorTranslationMissingAllFields) {
+    auto docs = std::vector<BSONArray>{
+        BSON_ARRAY(BSON("a" << 1)), BSON_ARRAY(BSON("a" << 2)), BSON_ARRAY(BSON("a" << 3))};
+    runAggregationWithNoGroupByTest("{x: {$avg: '$b'}}", docs, BSON_ARRAY(BSONNULL));
+}
+
+TEST_F(SbeAccumulatorBuilderTest, AvgAccumulatorTranslationMissingOrNonNumericFields) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1)),
+                                       BSON_ARRAY(BSON("b" << BSON("x" << 42)))};
+    runAggregationWithNoGroupByTest("{x: {$avg: '$b'}}", docs, BSON_ARRAY(BSONNULL));
+}
+
+TEST_F(SbeAccumulatorBuilderTest, AvgAccumulatorTranslationWithGrouping) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 2)),
+                                       BSON_ARRAY(BSON("a" << 1 << "b" << 4)),
+                                       BSON_ARRAY(BSON("a" << 3 << "b" << 6)),
+                                       BSON_ARRAY(BSON("a" << 3 << "b" << 8))};
+    runAggregationWithGroupByTest(
+        "{x: {$avg: '$b'}}", docs, {"$a"}, BSON_ARRAY((2 + 4) / 2 << (6 + 8) / 2));
 }
 
 TEST_F(SbeAccumulatorBuilderTest, AddToSetAccumulatorTranslationSingleDoc) {

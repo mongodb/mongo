@@ -148,9 +148,23 @@ std::pair<std::vector<std::unique_ptr<sbe::EExpression>>, EvalStage> buildAccumu
     PlanNodeId planNodeId) {
     std::vector<std::unique_ptr<sbe::EExpression>> aggs;
 
-    // $avg is translated into a sum(..) expression and a count expression.
-    aggs.push_back(makeFunction("sum", std::move(arg)));
-    aggs.push_back(makeFunction("sum", makeConstant(sbe::value::TypeTags::NumberInt64, 1)));
+    // 'aggDoubleDoubleSum' will ignore non-numeric values automatically.
+    aggs.push_back(makeFunction("aggDoubleDoubleSum", arg->clone()));
+
+    // For the counter we need to skip non-numeric values ourselves.
+    auto addend = makeLocalBind(state.frameIdGenerator,
+                                [](sbe::EVariable input) {
+                                    return sbe::makeE<sbe::EIf>(
+                                        makeBinaryOp(sbe::EPrimBinary::logicOr,
+                                                     generateNullOrMissing(input),
+                                                     generateNonNumericCheck(input)),
+                                        makeConstant(sbe::value::TypeTags::Nothing, 0),
+                                        makeConstant(sbe::value::TypeTags::NumberInt64, 1));
+                                },
+                                std::move(arg));
+    auto counterExpr = makeFunction("sum", std::move(addend));
+    aggs.push_back(std::move(counterExpr));
+
     return {std::move(aggs), std::move(inputStage)};
 }
 
@@ -160,15 +174,21 @@ std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> buildFinalizeAvg(
     const sbe::value::SlotVector& aggSlots,
     EvalStage inputStage,
     PlanNodeId planNodeId) {
+    // Slot 0 contains the accumulated sum, and slot 1 contains the count of summed items.
     tassert(5754703,
             str::stream() << "Expected two slots to finalize avg, got: " << aggSlots.size(),
             aggSlots.size() == 2);
 
-    // Takes the two input slots carried in 'aggSlots' where the first slot is a sum expression
-    // and the second is a count expression to compute a final division expression.
-    return {
-        makeBinaryOp(sbe::EPrimBinary::div, makeVariable(aggSlots[0]), makeVariable(aggSlots[1])),
-        std::move(inputStage)};
+    // If we've encountered any numeric input, the counter would contain a positive integer. Unlike
+    // $sum, when there is no numeric input, $avg should return null.
+    auto finalizingExpression = sbe::makeE<sbe::EIf>(
+        generateNullOrMissing(aggSlots[1]),
+        makeConstant(sbe::value::TypeTags::Null, 0),
+        makeBinaryOp(sbe::EPrimBinary::div,
+                     makeFunction("doubleDoubleSumFinalize", makeVariable(aggSlots[0])),
+                     makeVariable(aggSlots[1])));
+
+    return {std::move(finalizingExpression), std::move(inputStage)};
 }
 
 std::pair<std::vector<std::unique_ptr<sbe::EExpression>>, EvalStage> buildAccumulatorSum(
