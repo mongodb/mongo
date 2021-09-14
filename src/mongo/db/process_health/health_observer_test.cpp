@@ -44,14 +44,26 @@ using test::FaultManagerTest;
 
 namespace {
 
-TEST_F(FaultManagerTest, Registration) {
+class FaultManagerTestWithObserversReset : public FaultManagerTest {
+public:
+    void setUp() override {
+        HealthObserverRegistration::resetObserverFactoriesForTest();
+        FaultManagerTest::setUp();
+    }
+};
+
+// Tests that the mock observer is registered properly.
+// This test requires that actual production health observers (e.g. Ldap)
+// are not linked with this test, otherwise the count of observers returned
+// by the instantiate method below will be greater than expected.
+TEST_F(FaultManagerTestWithObserversReset, Registration) {
     registerMockHealthObserver(FaultFacetType::kMock1, [] { return 0; });
-    auto allObservers = healthObserverRegistration().instantiateAllObservers();
+    auto allObservers = HealthObserverRegistration::instantiateAllObservers(&clockSource());
     ASSERT_EQ(1, allObservers.size());
     ASSERT_EQ(FaultFacetType::kMock1, allObservers[0]->getType());
 }
 
-TEST_F(FaultManagerTest, HealthCheckCreatesObservers) {
+TEST_F(FaultManagerTestWithObserversReset, HealthCheckCreatesObservers) {
     registerMockHealthObserver(FaultFacetType::kMock1, [] { return 0.1; });
     ASSERT_EQ(0, manager().getHealthObserversTest().size());
 
@@ -60,7 +72,7 @@ TEST_F(FaultManagerTest, HealthCheckCreatesObservers) {
     ASSERT_EQ(1, manager().getHealthObserversTest().size());
 }
 
-TEST_F(FaultManagerTest, HealthCheckCreatesFacetOnHealthCheckFoundFault) {
+TEST_F(FaultManagerTestWithObserversReset, HealthCheckCreatesFacetOnHealthCheckFoundFault) {
     registerMockHealthObserver(FaultFacetType::kMock1, [] { return 0.1; });
     auto activeFault = manager().activeFault();
     ASSERT_TRUE(!activeFault);  // Not created yet.
@@ -70,7 +82,7 @@ TEST_F(FaultManagerTest, HealthCheckCreatesFacetOnHealthCheckFoundFault) {
     ASSERT_TRUE(activeFault);  // Is created.
 }
 
-TEST_F(FaultManagerTest, StateTransitionOnHealthCheckFoundFault) {
+TEST_F(FaultManagerTestWithObserversReset, StateTransitionOnHealthCheckFoundFault) {
     registerMockHealthObserver(FaultFacetType::kMock1, [] { return 0.1; });
     ASSERT_EQ(FaultState::kStartupCheck, manager().getFaultState());
 
@@ -78,7 +90,7 @@ TEST_F(FaultManagerTest, StateTransitionOnHealthCheckFoundFault) {
     ASSERT_EQ(FaultState::kTransientFault, manager().getFaultState());
 }
 
-TEST_F(FaultManagerTest, HealthCheckCreatesCorrectFacetOnHealthCheckFoundFault) {
+TEST_F(FaultManagerTestWithObserversReset, HealthCheckCreatesCorrectFacetOnHealthCheckFoundFault) {
     registerMockHealthObserver(FaultFacetType::kMock1, [] { return 0.1; });
     registerMockHealthObserver(FaultFacetType::kMock2, [] { return 0.0; });
     manager().healthCheckTest();
@@ -90,7 +102,7 @@ TEST_F(FaultManagerTest, HealthCheckCreatesCorrectFacetOnHealthCheckFoundFault) 
     ASSERT_FALSE(internalFault.getFaultFacet(FaultFacetType::kMock2));
 }
 
-TEST_F(FaultManagerTest, SeverityIsMaxFromAllFacetsSeverity) {
+TEST_F(FaultManagerTestWithObserversReset, SeverityIsMaxFromAllFacetsSeverity) {
     registerMockHealthObserver(FaultFacetType::kMock1, [] { return 0.8; });
     registerMockHealthObserver(FaultFacetType::kMock2, [] { return 0.5; });
     manager().healthCheckTest();
@@ -99,7 +111,7 @@ TEST_F(FaultManagerTest, SeverityIsMaxFromAllFacetsSeverity) {
     ASSERT_APPROX_EQUAL(0.8, activeFault->getSeverity(), 0.001);
 }
 
-TEST_F(FaultManagerTest, HealthCheckCreatesFacetThenIsGarbageCollected) {
+TEST_F(FaultManagerTestWithObserversReset, HealthCheckCreatesFacetThenIsGarbageCollected) {
     AtomicDouble severity{0.1};
     registerMockHealthObserver(FaultFacetType::kMock1, [&severity] { return severity.load(); });
     manager().healthCheckTest();
@@ -111,7 +123,7 @@ TEST_F(FaultManagerTest, HealthCheckCreatesFacetThenIsGarbageCollected) {
     ASSERT_FALSE(manager().activeFault());
 }
 
-TEST_F(FaultManagerTest, StateTransitionOnGarbageCollection) {
+TEST_F(FaultManagerTestWithObserversReset, StateTransitionOnGarbageCollection) {
     AtomicDouble severity{0.1};
     registerMockHealthObserver(FaultFacetType::kMock1, [&severity] { return severity.load(); });
     manager().healthCheckTest();
@@ -123,7 +135,7 @@ TEST_F(FaultManagerTest, StateTransitionOnGarbageCollection) {
     ASSERT_EQ(FaultState::kOk, manager().getFaultState());
 }
 
-TEST_F(FaultManagerTest, HealthCheckCreates2FacetsThenIsGarbageCollected) {
+TEST_F(FaultManagerTestWithObserversReset, HealthCheckCreates2FacetsThenIsGarbageCollected) {
     AtomicDouble severity1{0.1};
     AtomicDouble severity2{0.1};
     registerMockHealthObserver(FaultFacetType::kMock1, [&severity1] { return severity1.load(); });

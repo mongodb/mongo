@@ -41,33 +41,30 @@ namespace process_health {
 
 /**
  * Registration mechanism for all health observers.
+ * This is static class not requiring an instance to work.
  */
 class HealthObserverRegistration {
 public:
-    static HealthObserverRegistration* get(ServiceContext* svcCtx);
-
-    explicit HealthObserverRegistration(ServiceContext* svcCtx);
-
     /**
      * Registers a factory method, which will be invoked later to instantiate the observer.
+     * This must be invoked by static initializers, the code is not internally synchronized.
      *
      * @param factoryCallback creates observer instance when invoked.
      */
-    void registerObserverFactory(
-        std::function<std::unique_ptr<HealthObserver>(ServiceContext* svcCtx)> factoryCallback);
+    static void registerObserverFactory(
+        std::function<std::unique_ptr<HealthObserver>(ClockSource* clockSource)> factoryCallback);
 
     /**
      * Invokes all registered factories and returns new instances.
      * The ownership of all observers is transferred to the invoker.
      */
-    std::vector<std::unique_ptr<HealthObserver>> instantiateAllObservers() const;
+    static std::vector<std::unique_ptr<HealthObserver>> instantiateAllObservers(
+        ClockSource* clockSource);
 
-private:
-    ServiceContext* const _svcCtx;
-
-    mutable Mutex _mutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "HealthObserverRegistration::_mutex");
-    std::vector<std::function<std::unique_ptr<HealthObserver>(ServiceContext* svcCtx)>> _factories;
+    /**
+     * Test-only method to cleanup the list of registered factories.
+     */
+    static void resetObserverFactoriesForTest();
 };
 
 }  // namespace process_health

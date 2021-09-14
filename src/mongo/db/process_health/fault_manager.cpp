@@ -249,8 +249,7 @@ void FaultManager::_initHealthObserversIfNeeded() {
     }
     _initializedAllHealthObservers.store(true);
 
-    HealthObserverRegistration& registration = *HealthObserverRegistration::get(_svcCtx);
-    _observers = registration.instantiateAllObservers();
+    _observers = HealthObserverRegistration::instantiateAllObservers(_svcCtx->getFastClockSource());
 
     // Verify that all observer types are unique.
     std::set<FaultFacetType> allTypes;

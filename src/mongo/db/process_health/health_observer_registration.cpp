@@ -34,38 +34,36 @@ namespace process_health {
 
 namespace {
 
-const auto sRegistration =
-    ServiceContext::declareDecoration<std::unique_ptr<HealthObserverRegistration>>();
+using HealthObserverFactoryCallback =
+    std::function<std::unique_ptr<HealthObserver>(ClockSource* clockSource)>;
 
-ServiceContext::ConstructorActionRegisterer healthObserverRegisterer{
-    "healthObserverRegisterer", [](ServiceContext* svcCtx) {
-        auto healthObserver = std::make_unique<HealthObserverRegistration>(svcCtx);
-        auto& instance = sRegistration(svcCtx);
-        instance = std::move(healthObserver);
-    }};
+// Returns static vector of all registrations.
+// No synchronization is required as all the factories are registered during
+// static initialization.
+std::vector<HealthObserverFactoryCallback>* getObserverFactories() {
+    static std::vector<HealthObserverFactoryCallback>* factories =
+        new std::vector<HealthObserverFactoryCallback>();
+    return factories;
+}
 
 }  // namespace
 
-HealthObserverRegistration* HealthObserverRegistration::get(ServiceContext* svcCtx) {
-    return sRegistration(svcCtx).get();
-}
-
-HealthObserverRegistration::HealthObserverRegistration(ServiceContext* svcCtx) : _svcCtx(svcCtx) {}
-
 void HealthObserverRegistration::registerObserverFactory(
-    std::function<std::unique_ptr<HealthObserver>(ServiceContext* svcCtx)> factoryCallback) {
-    auto lk = stdx::lock_guard(_mutex);
-    _factories.push_back(std::move(factoryCallback));
+    std::function<std::unique_ptr<HealthObserver>(ClockSource* clockSource)> factoryCallback) {
+    getObserverFactories()->push_back(std::move(factoryCallback));
 }
 
-std::vector<std::unique_ptr<HealthObserver>> HealthObserverRegistration::instantiateAllObservers()
-    const {
+std::vector<std::unique_ptr<HealthObserver>> HealthObserverRegistration::instantiateAllObservers(
+    ClockSource* clockSource) {
     std::vector<std::unique_ptr<HealthObserver>> result;
-    auto lk = stdx::lock_guard(_mutex);
-    for (auto& cb : _factories) {
-        result.push_back(cb(_svcCtx));
+    for (auto& cb : *getObserverFactories()) {
+        result.push_back(cb(clockSource));
     }
     return result;
+}
+
+void HealthObserverRegistration::resetObserverFactoriesForTest() {
+    getObserverFactories()->clear();
 }
 
 }  // namespace process_health
