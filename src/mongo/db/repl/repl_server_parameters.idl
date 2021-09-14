@@ -535,6 +535,45 @@ server_parameters:
         cpp_varname: initialSyncMethod
         default: "logical"
 
+    fileBasedInitialSyncMaxLagSec:
+        description: >-
+            Specifies the max lag in seconds between the syncing node and the sync source to mark
+            the file copy based initial sync done successfully.
+        set_at: startup
+        cpp_vartype: int
+        cpp_varname: fileBasedInitialSyncMaxLagSec
+        # TODO (SERVER-59729): determine the best default value.
+        default: 
+                expr: 5 * 60 * 60
+        validator:
+            gte: 0
+    
+    fileBasedInitialSyncMaxCyclesWithoutProgress:
+        description: >-
+            Specifies the max number of cycles that file copy based initial sync runs trying to
+            clone updates while the lag between the syncing node and the sync source is higher than 
+            fileBasedInitialSyncMaxLagSec.
+        set_at: startup
+        cpp_vartype: int
+        cpp_varname: fileBasedInitialSyncMaxCyclesWithoutProgress
+        # TODO (SERVER-59729): determine the best default value.
+        default: 5
+        validator:
+            gte: 1
+    
+    fileBasedInitialSyncExtendCursorTimeoutMS:
+        description: >-
+            Period of time, in milliseconds, syncing node may wait for the sync source to have the
+            full oplog history up to the backup point in time.
+        set_at: startup
+        cpp_vartype: int
+        cpp_varname: fileBasedInitialSyncExtendCursorTimeoutMS
+        default:
+            expr: 180 * 1000
+        validator:
+            gte: 1
+
+
 feature_flags:
     featureFlagRetryableFindAndModify:
         description: >-

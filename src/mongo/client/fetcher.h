@@ -80,7 +80,12 @@ public:
     /**
      * Represents next steps of fetcher.
      */
-    enum class NextAction : int { kInvalid = 0, kNoAction = 1, kGetMore = 2 };
+    enum class NextAction : int {
+        kInvalid = 0,
+        kNoAction = 1,
+        kGetMore = 2,
+        kExitAndKeepCursorAlive = 3
+    };
 
     /**
      * Type of a fetcher callback function.

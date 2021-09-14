@@ -339,8 +339,11 @@ Status Fetcher::_scheduleGetMore(const BSONObj& cmdObj) {
 
 void Fetcher::_callback(const RemoteCommandCallbackArgs& rcbd, const char* batchFieldName) {
     QueryResponse batchData;
-    ScopeGuard finishCallbackGuard([this, &batchData] {
-        if (batchData.cursorId && !batchData.nss.isEmpty()) {
+    NextAction nextAction = NextAction::kNoAction;
+
+    ScopeGuard finishCallbackGuard([this, &batchData, &nextAction] {
+        if (batchData.cursorId && !batchData.nss.isEmpty() &&
+            nextAction != NextAction::kExitAndKeepCursorAlive) {
             _sendKillCursors(batchData.cursorId, batchData.nss);
         }
         _finishCallback();
@@ -376,8 +379,6 @@ void Fetcher::_callback(const RemoteCommandCallbackArgs& rcbd, const char* batch
         batchData.first = _first;
         _first = false;
     }
-
-    NextAction nextAction = NextAction::kNoAction;
 
     if (!batchData.cursorId) {
         _work(StatusWith<QueryResponse>(batchData), &nextAction, nullptr);
