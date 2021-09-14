@@ -103,9 +103,10 @@ typedef struct {
     /* This is WiredTiger's file system, it is used in implementing the local file system. */
     WT_FILE_SYSTEM *wt_fs;
 
-    char *auth_token; /* Identifier for key management system */
-    char *bucket_dir; /* Directory that stands in for cloud storage bucket */
-    char *cache_dir;  /* Directory for pre-flushed objects and cached objects */
+    char *auth_token;     /* Identifier for key management system */
+    char *bucket_dir;     /* Directory that stands in for cloud storage bucket */
+    char *cache_dir;      /* Directory for cached objects */
+    const char *home_dir; /* Owned by the connection */
 } LOCAL_FILE_SYSTEM;
 
 typedef struct local_file_handle {
@@ -128,7 +129,7 @@ static int local_delay(LOCAL_STORAGE *);
 static int local_err(LOCAL_STORAGE *, WT_SESSION *, int, const char *, ...);
 static int local_file_copy(
   LOCAL_STORAGE *, WT_SESSION *, const char *, const char *, WT_FS_OPEN_FILE_TYPE);
-static int local_get_directory(const char *, ssize_t len, char **);
+static int local_get_directory(const char *, const char *, ssize_t len, bool, char **);
 static int local_path(WT_FILE_SYSTEM *, const char *, const char *, char **);
 static int local_stat(
   WT_FILE_SYSTEM *, WT_SESSION *, const char *, const char *, bool, struct stat *);
@@ -299,18 +300,34 @@ local_err(LOCAL_STORAGE *local, WT_SESSION *session, int ret, const char *format
  *     Return a copy of a directory name after verifying that it is a directory.
  */
 static int
-local_get_directory(const char *s, ssize_t len, char **copy)
+local_get_directory(const char *home, const char *s, ssize_t len, bool create, char **copy)
 {
     struct stat sb;
+    size_t buflen;
     int ret;
     char *dirname;
 
+    *copy = NULL;
+
     if (len == -1)
         len = (ssize_t)strlen(s);
-    dirname = strndup(s, (size_t)len + 1); /* Room for null */
+
+    /* For relative pathnames, the path is considered to be relative to the home directory. */
+    if (*s == '/')
+        dirname = strndup(s, (size_t)len + 1); /* Room for null */
+    else {
+        buflen = (size_t)len + strlen(home) + 2; /* Room for slash, null */
+        if ((dirname = malloc(buflen)) != NULL)
+            snprintf(dirname, buflen, "%s/%.*s", home, (int)len, s);
+    }
     if (dirname == NULL)
         return (ENOMEM);
+
     ret = stat(dirname, &sb);
+    if (ret != 0 && errno == ENOENT && create) {
+        (void)mkdir(dirname, 0777);
+        ret = stat(dirname, &sb);
+    }
     if (ret != 0)
         ret = errno;
     else if ((sb.st_mode & S_IFMT) != S_IFDIR)
@@ -485,10 +502,18 @@ local_customize_file_system(WT_STORAGE_SOURCE *storage_source, WT_SESSION *sessi
         ret = local_err(local, session, ENOMEM, "local_file_system.auth_token");
         goto err;
     }
+
+    /*
+     * The home directory owned by the connection will not change, and will be valid memory, for as
+     * long as the connection is open. That is longer than this file system will be open, so we can
+     * use the string without copying.
+     */
+    fs->home_dir = session->connection->get_home(session->connection);
+
     /*
      * Get the bucket directory and the cache directory.
      */
-    if ((ret = local_get_directory(bucket_name, -1, &fs->bucket_dir)) != 0) {
+    if ((ret = local_get_directory(fs->home_dir, bucket_name, -1, false, &fs->bucket_dir)) != 0) {
         ret = local_err(local, session, ret, "%s: bucket directory", bucket_name);
         goto err;
     }
@@ -505,9 +530,9 @@ local_customize_file_system(WT_STORAGE_SOURCE *storage_source, WT_SESSION *sessi
         snprintf(buf, sizeof(buf), "cache-%s", p);
         cachedir.str = buf;
         cachedir.len = strlen(buf);
-        (void)mkdir(buf, 0777);
     }
-    if ((ret = local_get_directory(cachedir.str, (ssize_t)cachedir.len, &fs->cache_dir)) != 0) {
+    if ((ret = local_get_directory(
+           fs->home_dir, cachedir.str, (ssize_t)cachedir.len, true, &fs->cache_dir)) != 0) {
         ret =
           local_err(local, session, ret, "%*s: cache directory", (int)cachedir.len, cachedir.str);
         goto err;

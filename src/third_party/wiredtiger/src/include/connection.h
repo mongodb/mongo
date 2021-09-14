@@ -38,6 +38,7 @@ extern WT_PROCESS __wt_process;
 struct __wt_bucket_storage {
     const char *bucket;                /* Bucket name */
     const char *bucket_prefix;         /* Bucket prefix */
+    const char *cache_directory;       /* Locally cached file location */
     int owned;                         /* Storage needs to be terminated */
     uint64_t object_size;              /* Tiered object size */
     uint64_t retain_secs;              /* Tiered period */

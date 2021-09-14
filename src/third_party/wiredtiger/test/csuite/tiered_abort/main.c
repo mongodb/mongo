@@ -420,7 +420,7 @@ rollback:
  */
 static void run_workload(uint32_t, const char *) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 static void
-run_workload(uint32_t nth, const char *buf)
+run_workload(uint32_t nth, const char *build_dir)
 {
     WT_CONNECTION *conn;
     WT_SESSION *session;
@@ -446,8 +446,8 @@ run_workload(uint32_t nth, const char *buf)
     testutil_check(
       __wt_snprintf(envconf, sizeof(envconf), ENV_CONFIG_TXNSYNC, cache_mb, SESSION_MAX, BUCKET));
 
-    testutil_check(__wt_snprintf(
-      extconf, sizeof(extconf), ",extensions=(%s/%s=(early_load=true))", buf, WT_STORAGE_LIB));
+    testutil_check(__wt_snprintf(extconf, sizeof(extconf), ",extensions=(%s/%s=(early_load=true))",
+      build_dir, WT_STORAGE_LIB));
 
     strcat(envconf, extconf);
     printf("wiredtiger_open configuration: %s\n", envconf);
@@ -573,7 +573,7 @@ main(int argc, char *argv[])
     uint32_t i, nth, timeout;
     int ch, status, ret;
     const char *working_dir;
-    char buf[512], bucket[512], fname[64], kname[64];
+    char buf[512], bucket_dir[512], build_dir[512], fname[64], kname[64];
     char envconf[1024], extconf[512];
     char ts_string[WT_TS_HEX_STRING_SIZE];
     bool fatal, rand_th, rand_time, verify_only;
@@ -629,7 +629,7 @@ main(int argc, char *argv[])
     opts = &_opts;
     memset(opts, 0, sizeof(*opts));
     testutil_check(testutil_parse_opts(argc, argv, opts));
-    testutil_build_dir(opts, buf, 512);
+    testutil_build_dir(opts, build_dir, 512);
 
     testutil_check(pthread_rwlock_init(&flush_lock, NULL));
     testutil_check(pthread_rwlock_init(&ts_lock, NULL));
@@ -646,8 +646,8 @@ main(int argc, char *argv[])
     if (!verify_only) {
         /* Make both the home directory and the bucket directory under the home. */
         testutil_make_work_dir(home);
-        testutil_check(__wt_snprintf(bucket, sizeof(bucket), "%s/%s", working_dir, BUCKET));
-        testutil_make_work_dir(bucket);
+        testutil_check(__wt_snprintf(bucket_dir, sizeof(bucket_dir), "%s/%s", working_dir, BUCKET));
+        testutil_make_work_dir(bucket_dir);
 
         __wt_random_init_seed(NULL, &rnd);
         if (rand_time) {
@@ -674,9 +674,8 @@ main(int argc, char *argv[])
         testutil_checksys(sigaction(SIGCHLD, &sa, NULL));
         testutil_checksys((pid = fork()) < 0);
 
-        strcpy(bucket, buf);
         if (pid == 0) { /* child */
-            run_workload(nth, bucket);
+            run_workload(nth, build_dir);
             return (EXIT_SUCCESS);
         }
 
@@ -720,8 +719,8 @@ main(int argc, char *argv[])
     /* Open the connection which forces recovery to be run. */
     testutil_check(__wt_snprintf(envconf, sizeof(envconf), ENV_CONFIG_REC));
 
-    testutil_check(__wt_snprintf(
-      extconf, sizeof(extconf), ",extensions=(%s/%s=(early_load=true))", bucket, WT_STORAGE_LIB));
+    testutil_check(__wt_snprintf(extconf, sizeof(extconf), ",extensions=(%s/%s=(early_load=true))",
+      build_dir, WT_STORAGE_LIB));
 
     strcat(envconf, extconf);
     testutil_check(wiredtiger_open(NULL, NULL, envconf, &conn));

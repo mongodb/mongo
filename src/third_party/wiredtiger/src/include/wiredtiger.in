@@ -1281,11 +1281,15 @@ struct __wt_session {
 	 * table., a string; default empty.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;bucket_prefix, the
 	 * unique bucket prefix for this table., a string; default empty.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;local_retention, time in seconds to retain data on tiered
-	 * storage on the local tier for faster read access., an integer between 0 and 10000;
-	 * default \c 300.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;name, permitted values are \c "none" or
-	 * custom storage source name created with WT_CONNECTION::add_storage_source.  See @ref
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;cache_directory, a directory to store locally cached
+	 * versions of files in the storage source.  By default\, it is named with \c "-cache"
+	 * appended to the bucket name.  A relative directory name is relative to the home
+	 * directory., a string; default empty.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;local_retention,
+	 * time in seconds to retain data on tiered storage on the local tier for faster read
+	 * access., an integer between 0 and 10000; default \c 300.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;name, permitted values are \c "none" or custom storage
+	 * source name created with WT_CONNECTION::add_storage_source.  See @ref
 	 * custom_storage_sources for more information., a string; default \c none.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;object_target_size, the approximate size of objects
 	 * before creating them on the tiered storage tier., an integer between 100K and 10TB;

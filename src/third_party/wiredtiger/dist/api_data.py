@@ -218,6 +218,10 @@ tiered_config = [
             the bucket indicating the location for this table'''),
         Config('bucket_prefix', '', r'''
             the unique bucket prefix for this table'''),
+        Config('cache_directory', '', r'''
+            a directory to store locally cached versions of files in the storage source.  By
+            default, it is named with \c "-cache" appended to the bucket name.  A relative
+            directory name is relative to the home directory'''),
         Config('local_retention', '300', r'''
             time in seconds to retain data on tiered storage on the local tier
             for faster read access''',
@@ -234,6 +238,10 @@ tiered_tree_config = [
         the bucket indicating the location for this table'''),
     Config('bucket_prefix', '', r'''
         the unique bucket prefix for this table'''),
+    Config('cache_directory', '', r'''
+        a directory to store locally cached versions of files in the storage source.  By
+        default, it is named with \c "-cache" appended to the bucket name.  A relative
+        directory name is relative to the home directory'''),
 ]
 
 file_runtime_config = common_runtime_config + [
@@ -996,6 +1004,10 @@ wiredtiger_open_tiered_storage_configuration = [
             unique string prefix to identify our objects in the bucket.
             Multiple instances can share the storage bucket and this
             identifier is used in naming objects'''),
+        Config('cache_directory', '', r'''
+            a directory to store locally cached versions of files in the storage source.  By
+            default, it is named with \c "-cache" appended to the bucket name.  A relative
+            directory name is relative to the home directory'''),
         Config('name', 'none', r'''
             Permitted values are \c "none"
             or custom storage name created with

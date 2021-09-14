@@ -263,7 +263,7 @@ class test_tiered06(wttest.WiredTigerTestCase):
         os.mkdir(self.cachedir2)
         config1 = "cache_directory=" + self.cachedir1
         config2 = "cache_directory=" + self.cachedir2
-        bad_config = "cache_directory=BAD"
+        bad_config = "cache_directory=/BAD"
 
         # Create file system objects. First try some error cases.
         errmsg = '/No such file or directory/'
