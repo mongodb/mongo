@@ -76,18 +76,17 @@ known as the implicit default write concern (IDWC). For most cases, the IDWC wil
 
 The IDWC is calculated on startup using the **Default Write Concern Formula (DWCF)**:
 
-`implicitDefaultWriteConcern = if [(#arbiters > 0) AND (#arbiters >= ½(#voting nodes) - 1)] then {w:1} else {w:majority}`
+`implicitDefaultWriteConcern = if ((#arbiters > 0) AND (#non-arbiters <= majority(#voting nodes)) then {w:1} else {w:majority}`
 
-In replica sets with arbiters, there are cases where the set can lose a majority of data-bearing
-nodes, but the primary would stay primary due to arbiters' votes. The primary is unable to fulfill
-majority writes, as it cannot reach a majority of data-bearing nodes. To prevent the primary from
-hanging while trying to acknowledge majority writes, the server will set the implicit default to
-`{w: 1}`.
+This formula specifies that for replica sets with arbiters, we want to ensure that we set the
+implicit default to a value that the set can satisfy in the event of one data-bearing node
+going down. That is, the number of data-bearing nodes must be strictly greater than the majority
+of voting nodes for the set to set `{w: "majority"}`.
 
-As an example, if we have a PSA replica set, and the secondary goes down, the primary cannot
-successfully acknowledge a majority write. However, the primary will remain primary with the
-arbiter's vote. In this case, the DWCF will have preemptively set the IDWC to `{w: 1}`
-so the user can still perform writes to the replica set.
+For example, if we have a PSA replica set, and the secondary goes down, the primary cannot
+successfully acknowledge a majority write as the majority for the set is two nodes. However, the
+primary will remain primary with the arbiter's vote. In this case, the DWCF will have preemptively
+set the IDWC to `{w: 1}` so the user can still perform writes to the replica set.
 
  #### Implicit Default Write Concern and Sharded Clusters
 
