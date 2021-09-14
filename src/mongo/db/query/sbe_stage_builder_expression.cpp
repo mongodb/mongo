@@ -849,7 +849,40 @@ public:
         visitMultiBranchLogicExpression(expr, sbe::EPrimBinary::logicAnd);
     }
     void visit(const ExpressionAnyElementTrue* expr) final {
-        unsupportedExpression(expr->getOpName());
+        auto [inputSlot, stage] = projectEvalExpr(_context->popEvalExpr(),
+                                                  _context->extractCurrentEvalStage(),
+                                                  _context->planNodeId,
+                                                  _context->state.slotIdGenerator);
+
+        auto fromBranch = makeFilter<false>(
+            std::move(stage),
+            makeBinaryOp(sbe::EPrimBinary::logicOr,
+                         makeFillEmptyFalse(makeFunction("isArray", makeVariable(inputSlot))),
+                         makeFail(5159200, "$anyElementTrue's argument must be an array")),
+            _context->planNodeId);
+
+        auto innerOutputSlot = _context->state.slotId();
+        auto innerBranch = makeProject(makeLimitCoScanStage(_context->planNodeId),
+                                       _context->planNodeId,
+                                       innerOutputSlot,
+                                       generateCoerceToBoolExpression(inputSlot));
+
+        auto traverseSlot = _context->state.slotId();
+        auto traverseStage = makeTraverse(std::move(fromBranch),
+                                          std::move(innerBranch),
+                                          inputSlot,
+                                          traverseSlot,
+                                          innerOutputSlot,
+                                          makeBinaryOp(sbe::EPrimBinary::logicOr,
+                                                       makeVariable(traverseSlot),
+                                                       makeVariable(innerOutputSlot)),
+                                          makeVariable(traverseSlot),
+                                          _context->planNodeId,
+                                          1,
+                                          _context->getLexicalEnvironment());
+
+        _context->pushExpr(makeFillEmptyFalse(makeVariable(traverseSlot)),
+                           std::move(traverseStage));
     }
     void visit(const ExpressionArray* expr) final {
         unsupportedExpression(expr->getOpName());
