@@ -120,6 +120,8 @@ public:
     }
 
 private:
+    friend class LDAPCumulativeOperationStats;
+
     /**
      * Struct Stats is used to contain information about the bind, search, and unbind stats
      * of the LDAP Operations.

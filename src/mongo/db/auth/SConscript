@@ -199,6 +199,7 @@ env.Library(
         'builtin_roles',
         'sasl_options',
         'user',
+        'user_acquisition_stats',
         'user_document_parser',
     ],
     LIBDEPS_PRIVATE=[
@@ -506,6 +507,7 @@ env.Library(
     target='user_acquisition_stats',
     source=[
         'ldap_operation_stats.cpp',
+        'ldap_cumulative_operation_stats.cpp',
         'user_cache_acquisition_stats.cpp'
     ],
     LIBDEPS_PRIVATE=[

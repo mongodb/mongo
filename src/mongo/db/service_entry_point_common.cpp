@@ -43,6 +43,7 @@
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/impersonation_session.h"
+#include "mongo/db/auth/ldap_cumulative_operation_stats.h"
 #include "mongo/db/client.h"
 #include "mongo/db/command_can_run_here.h"
 #include "mongo/db/commands.h"
@@ -2081,6 +2082,15 @@ void HandleRequest::completeOperation(DbResponse& response) {
     }
 
     recordCurOpMetrics(opCtx);
+
+    const auto& stats =
+        CurOp::get(opCtx)->getReadOnlyUserAcquisitionStats()->getLdapOperationStats();
+    if (stats.shouldReport()) {
+        auto ldapCumulativeOperationsStats = LDAPCumulativeOperationStats::get();
+        if (nullptr != ldapCumulativeOperationsStats) {
+            ldapCumulativeOperationsStats->recordOpStats(stats, false);
+        }
+    }
 }
 
 }  // namespace

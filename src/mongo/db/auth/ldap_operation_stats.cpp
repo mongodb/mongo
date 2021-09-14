@@ -50,7 +50,7 @@ constexpr auto kUnbindStats = "unbindStats"_sd;
  * Fields of the Stats struct
  */
 constexpr auto kLDAPMetricNumOp = "numOp"_sd;
-constexpr auto kLDAPMetricDuration = "opDuration"_sd;
+constexpr auto kLDAPMetricDuration = "opDurationMicros"_sd;
 
 }  // namespace
 
