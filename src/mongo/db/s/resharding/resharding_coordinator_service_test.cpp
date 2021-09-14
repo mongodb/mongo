@@ -722,8 +722,7 @@ TEST_F(ReshardingCoordinatorServiceTest, StepDownStepUpEachTransition) {
         CoordinatorStateEnum::kCloning,
         CoordinatorStateEnum::kApplying,
         CoordinatorStateEnum::kBlockingWrites,
-        CoordinatorStateEnum::kCommitting,
-        CoordinatorStateEnum::kDone};
+        CoordinatorStateEnum::kCommitting};
     PauseDuringStateTransitions stateTransitionsGuard{controller(), coordinatorStates};
 
     auto doc = insertStateAndCatalogEntries(CoordinatorStateEnum::kUnused, _originalEpoch);
@@ -774,20 +773,12 @@ TEST_F(ReshardingCoordinatorServiceTest, StepDownStepUpEachTransition) {
                 break;
             }
 
-            case CoordinatorStateEnum::kDone: {
-                makeDonorsProceedToDone(opCtx);
-                makeRecipientsProceedToDone(opCtx);
-                break;
-            }
-
             default:
                 break;
         }
 
-        if (state != CoordinatorStateEnum::kDone) {
-            // 'done' state is never written to storage so don't wait for it
-            stateTransitionsGuard.wait(state);
-        }
+        stateTransitionsGuard.wait(state);
+
 
         stepDown(opCtx);
 
@@ -815,18 +806,18 @@ TEST_F(ReshardingCoordinatorServiceTest, StepDownStepUpEachTransition) {
             coordinator->onOkayToEnterCritical();
         }
 
-        if (state != CoordinatorStateEnum::kDone) {
-            // 'done' state is never written to storage so don't wait for it.
-            waitUntilCommittedCoordinatorDocReach(opCtx, state);
+        // 'done' state is never written to storage so don't wait for it.
+        waitUntilCommittedCoordinatorDocReach(opCtx, state);
 
-            // Metrics should not be empty after step up.
-            auto metrics = ReshardingMetrics::get(opCtx->getServiceContext());
-            BSONObjBuilder metricsBuilder;
-            metrics->serializeCurrentOpMetrics(&metricsBuilder,
-                                               ReshardingMetrics::Role::kCoordinator);
-            ASSERT_BSONOBJ_NE(BSONObj(), metricsBuilder.done());
-        }
+        // Metrics should not be empty after step up.
+        auto metrics = ReshardingMetrics::get(opCtx->getServiceContext());
+        BSONObjBuilder metricsBuilder;
+        metrics->serializeCurrentOpMetrics(&metricsBuilder, ReshardingMetrics::Role::kCoordinator);
+        ASSERT_BSONOBJ_NE(BSONObj(), metricsBuilder.done());
     }
+
+    makeDonorsProceedToDone(opCtx);
+    makeRecipientsProceedToDone(opCtx);
 
     // Join the coordinator if it has not yet been cleaned up.
     if (auto coordinator = getCoordinatorIfExists(opCtx, instanceId)) {
