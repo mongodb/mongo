@@ -290,18 +290,6 @@ public:
         return _uuid && *_uuid == uuid;
     }
 
-    bool sameAllowMigrations(const RoutingTableHistory& other) const {
-        return _allowMigrations == other._allowMigrations;
-    }
-
-    bool sameReshardingFields(const RoutingTableHistory& other) const {
-        if (_reshardingFields && other._reshardingFields) {
-            return _reshardingFields->toBSON().woCompare(other._reshardingFields->toBSON()) == 0;
-        } else {
-            return !_reshardingFields && !other._reshardingFields;
-        }
-    }
-
     boost::optional<UUID> getUUID() const {
         return _uuid;
     }
@@ -484,10 +472,10 @@ struct OptionalRoutingTableHistory {
     OptionalRoutingTableHistory() = default;
 
     // SHARDED collection constructor
-    OptionalRoutingTableHistory(RoutingTableHistory&& rt) : optRt(std::move(rt)) {}
+    OptionalRoutingTableHistory(std::shared_ptr<RoutingTableHistory> rt) : optRt(std::move(rt)) {}
 
-    // If boost::none, the collection is UNSHARDED, otherwise it is SHARDED
-    boost::optional<RoutingTableHistory> optRt;
+    // If nullptr, the collection is UNSHARDED, otherwise it is SHARDED
+    std::shared_ptr<RoutingTableHistory> optRt;
 };
 
 using RoutingTableHistoryCache =
