@@ -100,8 +100,12 @@ associated Futures exactly one time, and must do so before being destroyed (othe
 will be set with the `ErrorCodes::BrokenPromise` error, which is considered a programmer error and
 may crash debug builds of the server in the future).
 
-To get a linked promise-future pair, the function [makePromiseFuture<T>][mpf] can be used, which
-returns a `std::pair` of a promise and its corresponding future. As was previously alluded to, it's
+To create a `Promise` that has a Future, you may use the [`PromiseAndFuture<T>`][pf]
+utility type. Upon construction, it contains a created `Promise<T>` and its
+corresponding `Future<T>`. The perhaps-familiar `makePromiseFuture<T>` factory
+function now simply returns a value-initialized `PromiseAndFuture<T>{}`.
+
+As was previously alluded to, it's
 also possible to make a "ready future" - one that has no associated promise and is already filled
 with a value or error. These might be useful in cases where the code that produces values in a way
 that's normally asynchronous happens to have one available already when a request comes in, and
@@ -146,8 +150,8 @@ using the member function `Future<T>::semi()`. Let's look at a quick example to 
 ```c++
 // Code producing a `SemiFuture`
 SemiFuture<Work> SomeAsyncService::requestWork() {
-  auto [promise, future] = makePromiseFuture<Work>();
-  _privateExecutor->schedule([promise = std::move(promise)](Status s) {
+  PromiseFuture<Work> pf;
+  _privateExecutor->schedule([promise = std::move(pf.promise)](Status s) {
       if (s.isOK()) {
         auto w = produceWork();
         promise.emplaceValue(w);
@@ -155,7 +159,7 @@ SemiFuture<Work> SomeAsyncService::requestWork() {
         // handle error case
       }
   });
-  return future.semi();
+  return std::move(pf.future).semi();
 }
 
 // Code consuming a `SemiFuture`
@@ -307,9 +311,9 @@ very helpful.
 [future_util.h]: ../src/mongo/util/future_util.h
 [executor]: ../src/mongo/util/out_of_line_executor.h
 [thenRunOn]: ../src/mongo/util/future.h#L250
-[promise]: ../src/mongo/util/future.h#L768
-[mpf]: ../src/mongo/util/future.h#L1156
-[mrfw]: ../src/mongo/util/future.h#L1206
+[promise]: ../src/mongo/util/future.h#L769
+[pf]: ../src/mongo/util/future.h#L1156
+[mrfw]: ../src/mongo/util/future.h#L1216
 [cancelationArch]: ../src/mongo/util/README.md
 [utilUnitTests]: ../src/mongo/util/future_util_test.cpp
 [fb]: https://engineering.fb.com/2015/06/19/developer-tools/futures-for-c-11-at-facebook/

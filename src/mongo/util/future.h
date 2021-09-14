@@ -717,11 +717,11 @@ private:
         using Sig = std::conditional_t<std::is_void_v<RawArg>,  //
                                        Result(),
                                        Result(DummyArg)>;
-        return wrapCBHelper(unique_function<Sig>(std::forward<Func>(func)));
+        return _wrapCBHelper(_exec, unique_function<Sig>(std::forward<Func>(func)));
     }
 
-    template <typename Sig>
-    MONGO_COMPILER_NOINLINE auto wrapCBHelper(unique_function<Sig>&& func);
+    template <typename UniqueFunc>
+    MONGO_COMPILER_NOINLINE static auto _wrapCBHelper(ExecutorPtr exec, UniqueFunc&& func);
 
     template <typename>
     friend class ExecutorFuture;
@@ -745,6 +745,8 @@ template <typename T>
 ExecutorFuture(ExecutorPtr, StatusWith<T>)->ExecutorFuture<T>;
 ExecutorFuture(ExecutorPtr)->ExecutorFuture<void>;
 
+/** Constructor tag (see the corresponding `Promise` constructor). */
+struct NonNullPromiseTag {};
 
 /**
  * This class represents the producer side of a Future.
@@ -776,6 +778,9 @@ public:
      * Creates a null `Promise`.
      */
     Promise() = default;
+
+    /** Makes a `Promise` that has a `Future`. */
+    explicit Promise(NonNullPromiseTag) : Promise{make_intrusive<SharedStateT>()} {}
 
     ~Promise() {
         breakPromiseIfNeeded();
@@ -862,26 +867,24 @@ public:
         });
     }
 
-    static auto makePromiseFutureImpl() {
-        struct PromiseAndFuture {
-            Promise<T> promise = Promise(make_intrusive<SharedStateT>());
-            Future<T> future = promise.getFuture();
-        };
-        return PromiseAndFuture();
+    /**
+     * Calling `getFuture` is only valid before the promise is completed,
+     * because a Promise is nullified upon completion.
+     *
+     * The PromiseAndFuture helper avoids this data race by eagerly calling
+     * `getFuture`, returning the Promise together with its Future.
+     */
+    Future<T> getFuture() noexcept {
+        // Copy `_sharedState` into a SharedStateHolder to make a Future,
+        // exploiting the knowledge that this Promise is its sole owner.
+        _sharedState->threadUnsafeIncRefCountTo(2);
+        return Future<T>(future_details::SharedStateHolder<future_details::VoidToFakeVoid<T>>(
+            boost::intrusive_ptr<SharedStateT>(_sharedState.get(), false)));
     }
 
 private:
     explicit Promise(boost::intrusive_ptr<SharedStateT>&& sharedState)
         : _sharedState(std::move(sharedState)) {}
-
-    // This is not public because we found it frequently was involved in races.  The
-    // `makePromiseFuture<T>` API avoids those races entirely.
-    Future<T> getFuture() noexcept {
-        using namespace future_details;
-        _sharedState->threadUnsafeIncRefCountTo(2);
-        return Future<T>(SharedStateHolder<VoidToFakeVoid<T>>(
-            boost::intrusive_ptr<SharedState<T>>(_sharedState.get(), /*add ref*/ false)));
-    }
 
     friend class Future<void>;
 
@@ -1148,13 +1151,20 @@ private:
     const boost::intrusive_ptr<SharedStateT> _sharedState = make_intrusive<SharedStateT>();
 };
 
-/**
- * Returns a bound Promise and Future in a struct with friendly names (promise and future) that also
- * works well with C++17 structured bindings.
- */
+/** Holds a Promise and its corresponding Future. */
 template <typename T>
-inline auto makePromiseFuture() {
-    return Promise<T>::makePromiseFutureImpl();
+struct PromiseAndFuture {
+    /** Initialize with a new Promise and its Future. */
+    PromiseAndFuture() = default;
+
+    Promise<T> promise{NonNullPromiseTag{}};
+    Future<T> future{promise.getFuture()};
+};
+
+/** Another way to write `PromiseAndFuture<T>{}`. */
+template <typename T>
+PromiseAndFuture<T> makePromiseFuture() {
+    return {};
 }
 
 /**
@@ -1219,44 +1229,36 @@ auto makeReadyFutureWith(Func&& func) -> Future<FutureContinuationResult<Func&&>
 //
 
 template <typename T>
-template <typename Sig>
-MONGO_COMPILER_NOINLINE auto ExecutorFuture<T>::wrapCBHelper(unique_function<Sig>&& func) {
-    using namespace future_details;
-    return [
-        func = std::move(func),
-        exec = _exec  // can't move this!
-    ](auto&&... args) mutable noexcept
-        ->Future<UnwrappedType<decltype(func(std::forward<decltype(args)>(args)...))>> {
-        auto [promise, future] = makePromiseFuture<
-            UnwrappedType<decltype(func(std::forward<decltype(args)>(args)...))>>();
+template <typename UniqueFunc>
+auto ExecutorFuture<T>::_wrapCBHelper(ExecutorPtr exec, UniqueFunc&& func) {
+    return [ exec = std::move(exec), func = std::move(func) ](auto&&... args) mutable noexcept {
+        using FuncR = typename UniqueFunc::result_type;
+        using BoundArgs = std::tuple<std::decay_t<decltype(args)>...>;
+        Promise<future_details::UnwrappedType<FuncR>> promise{NonNullPromiseTag{}};
+        auto future = promise.getFuture();
 
         exec->schedule([
             promise = std::move(promise),
             func = std::move(func),
-            argsT =
-                std::tuple<std::decay_t<decltype(args)>...>(std::forward<decltype(args)>(args)...)
+            boundArgs = BoundArgs{std::forward<decltype(args)>(args)...}
         ](Status execStatus) mutable noexcept {
-            if (execStatus.isOK()) {
-                promise.setWith([&] {
-                    return [&](auto nullary) {
-                        // Using a lambda taking a nullary lambda here to work around an MSVC2017
-                        // bug that caused it to not ignore the other side of the constexpr-if.
-                        // TODO Make this less silly once we upgrade to 2019.
-                        if constexpr (!isFutureLike<decltype(nullary())>) {
-                            return nullary();
-                        } else {
-                            // Cheat and convert to an inline Future since we know we will schedule
-                            // further user callbacks onto an executor.
-                            return nullary().unsafeToInlineFuture();
-                        }
-                    }([&] { return std::apply(func, std::move(argsT)); });
-                });
-            } else {
+            if (!execStatus.isOK()) {
                 promise.setError(std::move(execStatus));
+                return;
             }
+            promise.setWith([&] {
+                auto closure = [&] { return std::apply(func, std::move(boundArgs)); };
+                if constexpr (future_details::isFutureLike<FuncR>) {
+                    // Cheat and convert to an inline Future since we know we will schedule
+                    // further user callbacks onto an executor.
+                    return closure().unsafeToInlineFuture();
+                } else {
+                    return closure();
+                }
+            });
         });
 
-        return std::move(future);
+        return future;
     };
 }
 
