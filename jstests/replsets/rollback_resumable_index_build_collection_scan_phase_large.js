@@ -55,9 +55,7 @@ const runRollbackTo = function(rollbackEndFailPointName, rollbackEndFailPointLog
         // to locks needing to be yielded before the rollback can occur. Thus, we subtract 1 from
         // the difference.
         [{numScannedAfterResume: numDocuments - maxIndexBuildMemoryUsageMB - 1}],
-        [{a: 1}, {a: 2}],
-        [],
-        {skipDataConsistencyChecks: true});
+        [{a: 1}, {a: 2}]);
 };
 
 // Rollback to before the index begins to be built.

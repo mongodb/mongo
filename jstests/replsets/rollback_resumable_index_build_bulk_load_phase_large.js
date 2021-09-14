@@ -47,9 +47,7 @@ const runRollbackTo = function(rollbackEndFailPoint) {
         ["hangDuringIndexBuildBulkLoadYield"],
         ["bulk load"],
         [{skippedPhaseLogID: 20391}],
-        [{a: 1}, {a: 2}],
-        [],
-        {skipDataConsistencyChecks: true});
+        [{a: 1}, {a: 2}]);
 };
 
 // Rollback to before the indexes begin to be built.
