@@ -216,6 +216,10 @@ std::unique_ptr<sbe::EExpression> makeVariable(sbe::value::SlotId slotId);
 
 std::unique_ptr<sbe::EExpression> makeVariable(sbe::FrameId frameId, sbe::value::SlotId slotId);
 
+inline auto makeFail(int code, StringData errorMessage) {
+    return sbe::makeE<sbe::EFail>(ErrorCodes::Error{code}, errorMessage);
+}
+
 /**
  * Check if expression returns Nothing and return null if so. Otherwise, return the expression.
  */
