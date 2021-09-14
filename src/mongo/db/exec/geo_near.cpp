@@ -77,7 +77,9 @@ static double computeGeoNearDistance(const GeoNearParams& nearParams, WorkingSet
 
     CRS queryCRS = nearParams.nearQuery->centroid->crs;
 
-    // Extract all the geometries out of this document for the near query
+    // Extract all the geometries out of this document for the near query. Note that the NearStage
+    // stage can only be run with an existing index. Therefore, it is always safe to skip geometry
+    // validation.
     std::vector<std::unique_ptr<StoredGeometry>> geometries;
     StoredGeometry::extractGeometries(
         member->doc.value().toBson(), nearParams.nearQuery->field, &geometries, true);

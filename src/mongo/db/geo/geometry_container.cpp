@@ -1339,9 +1339,6 @@ StoredGeometry* StoredGeometry::parseFrom(const BSONElement& element, bool skipV
         return nullptr;
 
     std::unique_ptr<StoredGeometry> stored(new StoredGeometry);
-
-    // GeoNear stage can only be run with an existing index
-    // Therefore, it is always safe to skip geometry validation
     if (!stored->geometry.parseFromStorage(element, skipValidation).isOK())
         return nullptr;
     stored->element = element;
