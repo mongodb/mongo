@@ -191,3 +191,11 @@ server_parameters:
        cpp_class:
            name: WiredTigerDirectoryForIndexesParameter
            override_ctor: true
+
+    wiredTigerSkipTableLoggingChecksOnStartup:
+      description: >-
+        Skips table logging setting checks and modifications on startup.
+      set_at: startup
+      cpp_vartype: 'bool'
+      cpp_varname: gWiredTigerSkipTableLoggingChecksOnStartup
+      default: false
