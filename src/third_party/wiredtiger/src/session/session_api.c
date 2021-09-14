@@ -142,7 +142,7 @@ __wt_session_copy_values(WT_SESSION_IMPL *session)
             WT_TXN_SHARED *txn_shared = WT_SESSION_TXN_SHARED(session);
             WT_ASSERT(session,
               txn_shared->pinned_id != WT_TXN_NONE ||
-                (WT_PREFIX_MATCH(cursor->uri, "file:") &&
+                (WT_BTREE_PREFIX(cursor->uri) &&
                   F_ISSET((WT_CURSOR_BTREE *)cursor, WT_CBT_NO_TXN)));
 #endif
             WT_RET(__cursor_localvalue(cursor));
@@ -1323,7 +1323,7 @@ __wt_session_range_truncate(
 
     local_start = false;
     if (uri != NULL) {
-        WT_ASSERT(session, WT_PREFIX_MATCH(uri, "file:"));
+        WT_ASSERT(session, WT_BTREE_PREFIX(uri));
         /*
          * A URI file truncate becomes a range truncate where we set a start cursor at the
          * beginning. We already know the NULL stop goes to the end of the range.
@@ -1471,7 +1471,7 @@ __session_truncate(
                 WT_ERR_MSG(session, EINVAL,
                   "the truncate method should not specify any target after the log: URI prefix");
             WT_ERR(__wt_log_truncate_files(session, start, false));
-        } else if (WT_PREFIX_MATCH(uri, "file:"))
+        } else if (WT_BTREE_PREFIX(uri))
             WT_ERR(__wt_session_range_truncate(session, uri, start, stop));
         else
             /* Wait for checkpoints to avoid EBUSY errors. */

@@ -46,6 +46,9 @@
 #define WT_SYSTEM_BASE_WRITE_GEN_URI "system:checkpoint_base_write_gen" /* Base write gen URI */
 #define WT_SYSTEM_BASE_WRITE_GEN "base_write_gen"                       /* Base write gen name */
 
+/* Check whether a string is a legal URI for a btree object */
+#define WT_BTREE_PREFIX(str) (WT_PREFIX_MATCH(str, "file:") || WT_PREFIX_MATCH(str, "tiered:"))
+
 /*
  * Optimize comparisons against the metafile URI, flag handles that reference the metadata file.
  */

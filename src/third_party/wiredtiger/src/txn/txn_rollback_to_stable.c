@@ -1400,9 +1400,8 @@ __rollback_to_stable_btree_apply(
     bool dhandle_allocated, durable_ts_found, has_txn_updates_gt_than_ckpt_snap, perform_rts;
     bool prepared_updates;
 
-    /* Ignore non-file objects as well as the metadata and history store files. */
-    if (!WT_PREFIX_MATCH(uri, "file:") || strcmp(uri, WT_HS_URI) == 0 ||
-      strcmp(uri, WT_METAFILE_URI) == 0)
+    /* Ignore non-btree objects as well as the metadata and history store files. */
+    if (!WT_BTREE_PREFIX(uri) || strcmp(uri, WT_HS_URI) == 0 || strcmp(uri, WT_METAFILE_URI) == 0)
         return (0);
 
     txn_global = &S2C(session)->txn_global;
@@ -1554,7 +1553,7 @@ __wt_rollback_to_stable_one(WT_SESSION_IMPL *session, const char *uri, bool *ski
      * may contain, so set the caller's skip argument to true on all file objects, else set the
      * caller's skip argument to false so our caller continues down the tree of objects.
      */
-    *skipp = WT_PREFIX_MATCH(uri, "file:");
+    *skipp = WT_BTREE_PREFIX(uri);
     if (!*skipp)
         return (0);
 

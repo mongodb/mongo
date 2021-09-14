@@ -30,10 +30,10 @@ __curfile_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
     CURSOR_API_CALL(a, session, compare, CUR2BT(cbt));
 
     /*
-     * Check both cursors are a "file:" type then call the underlying function, it can handle
-     * cursors pointing to different objects.
+     * Check both cursors are a btree type then call the underlying function, it can handle cursors
+     * pointing to different objects.
      */
-    if (!WT_PREFIX_MATCH(a->internal_uri, "file:") || !WT_PREFIX_MATCH(b->internal_uri, "file:"))
+    if (!WT_BTREE_PREFIX(a->internal_uri) || !WT_BTREE_PREFIX(b->internal_uri))
         WT_ERR_MSG(session, EINVAL, "Cursors must reference the same object");
 
     WT_ERR(__cursor_checkkey(a));
@@ -60,10 +60,10 @@ __curfile_equals(WT_CURSOR *a, WT_CURSOR *b, int *equalp)
     CURSOR_API_CALL(a, session, equals, CUR2BT(cbt));
 
     /*
-     * Check both cursors are a "file:" type then call the underlying function, it can handle
-     * cursors pointing to different objects.
+     * Check both cursors are a btree type then call the underlying function, it can handle cursors
+     * pointing to different objects.
      */
-    if (!WT_PREFIX_MATCH(a->internal_uri, "file:") || !WT_PREFIX_MATCH(b->internal_uri, "file:"))
+    if (!WT_BTREE_PREFIX(a->internal_uri) || !WT_BTREE_PREFIX(b->internal_uri))
         WT_ERR_MSG(session, EINVAL, "Cursors must reference the same object");
 
     WT_ERR(__cursor_checkkey(a));
@@ -821,7 +821,7 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, c
     if (bulk)
         LF_SET(WT_BTREE_BULK | WT_DHANDLE_EXCLUSIVE);
 
-    WT_ASSERT(session, WT_PREFIX_MATCH(uri, "file:") || WT_PREFIX_MATCH(uri, "tiered:"));
+    WT_ASSERT(session, WT_BTREE_PREFIX(uri));
 
     /* Get the handle and lock it while the cursor is using it. */
     /*
