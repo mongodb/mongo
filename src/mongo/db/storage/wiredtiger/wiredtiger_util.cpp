@@ -44,6 +44,7 @@
 #include "mongo/db/snapshot_window_options.h"
 #include "mongo/db/storage/storage_file_util.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_parameters_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/util/assert_util.h"
@@ -667,6 +668,25 @@ Status WiredTigerUtil::setTableLogging(WT_SESSION* session, const std::string& u
     // for all tables as a safety precaution, or if repair mode is running.
     if (_tableLoggingInfo.isFirstTable && hasPreviouslyIncompleteTableChecks()) {
         _tableLoggingInfo.hasPreviouslyIncompleteTableChecks = true;
+    }
+
+    if (gWiredTigerSkipTableLoggingChecksOnStartup) {
+        if (_tableLoggingInfo.hasPreviouslyIncompleteTableChecks) {
+            log() << "Cannot use the 'wiredTigerSkipTableLoggingChecksOnStartup' startup parameter "
+                     "when there are previously incomplete table checks";
+            fassertFailedNoTrace(5548300);
+        }
+
+        // Only log this warning once.
+        if (_tableLoggingInfo.isFirstTable) {
+            _tableLoggingInfo.isFirstTable = false;
+            log() << "Skipping table logging checks for all existing WiredTiger tables on startup. "
+                     "wiredTigerSkipTableLoggingChecksOnStartup="
+                  << gWiredTigerSkipTableLoggingChecksOnStartup;
+        }
+
+        LOG(1) << "Skipping table logging check for " << uri;
+        return Status::OK();
     }
 
     if (storageGlobalParams.repair || _tableLoggingInfo.hasPreviouslyIncompleteTableChecks) {

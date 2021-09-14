@@ -145,3 +145,11 @@ server_parameters:
       default: 10
       validator:
         gte: 1
+
+    wiredTigerSkipTableLoggingChecksOnStartup:
+      description: >-
+        Skips table logging setting checks and modifications on startup.
+      set_at: startup
+      cpp_vartype: 'bool'
+      cpp_varname: gWiredTigerSkipTableLoggingChecksOnStartup
+      default: false
