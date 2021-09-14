@@ -61,7 +61,7 @@ TEST_F(SbeStageBuilderTest, TestVirtualScan) {
 
     // Translate the QuerySolution tree to an sbe::PlanStage.
     auto shardFiltererInterface = makeAlwaysPassShardFiltererInterface();
-    auto [resultSlots, stage, data] =
+    auto [resultSlots, stage, data, _] =
         buildPlanStage(std::move(querySolution), true, std::move(shardFiltererInterface));
     auto resultAccessors = prepareTree(&data.ctx, stage.get(), resultSlots);
 
@@ -99,7 +99,7 @@ TEST_F(SbeStageBuilderTest, TestLimitOneVirtualScan) {
 
     // Translate the QuerySolution tree to an sbe::PlanStage.
     auto shardFiltererInterface = makeAlwaysPassShardFiltererInterface();
-    auto [resultSlots, stage, data] =
+    auto [resultSlots, stage, data, _] =
         buildPlanStage(std::move(querySolution), true, std::move(shardFiltererInterface));
 
     // Prepare the sbe::PlanStage for execution.
@@ -135,7 +135,7 @@ TEST_F(SbeStageBuilderTest, VirtualCollScanWithoutRecordId) {
 
     // Translate the QuerySolution tree to an sbe::PlanStage.
     auto shardFiltererInterface = makeAlwaysPassShardFiltererInterface();
-    auto [resultSlots, stage, data] =
+    auto [resultSlots, stage, data, _] =
         buildPlanStage(std::move(querySolution), false, std::move(shardFiltererInterface));
 
     // Prepare the sbe::PlanStage for execution.
@@ -167,7 +167,7 @@ TEST_F(SbeStageBuilderTest, VirtualIndexScan) {
 
     // Translate the QuerySolution tree to an sbe::PlanStage.
     auto shardFiltererInterface = makeAlwaysPassShardFiltererInterface();
-    auto [resultSlots, stage, data] =
+    auto [resultSlots, stage, data, _] =
         buildPlanStage(std::move(querySolution), true, std::move(shardFiltererInterface));
     auto resultAccessors = prepareTree(&data.ctx, stage.get(), resultSlots);
     ASSERT_EQ(resultAccessors.size(), 2u);
@@ -201,7 +201,7 @@ TEST_F(SbeStageBuilderTest, VirtualIndexScanWithoutRecordId) {
 
     // Translate the QuerySolution tree to an sbe::PlanStage.
     auto shardFiltererInterface = makeAlwaysPassShardFiltererInterface();
-    auto [resultSlots, stage, data] =
+    auto [resultSlots, stage, data, _] =
         buildPlanStage(std::move(querySolution), false, std::move(shardFiltererInterface));
     auto resultAccessors = prepareTree(&data.ctx, stage.get(), resultSlots);
     ASSERT_EQ(resultAccessors.size(), 1u);

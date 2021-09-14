@@ -33,6 +33,7 @@
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/shard_filterer_factory_interface.h"
 #include "mongo/unittest/unittest.h"
@@ -73,10 +74,12 @@ public:
      */
     std::tuple<sbe::value::SlotVector,
                std::unique_ptr<sbe::PlanStage>,
-               stage_builder::PlanStageData>
+               stage_builder::PlanStageData,
+               boost::intrusive_ptr<ExpressionContext>>
     buildPlanStage(std::unique_ptr<QuerySolution> querySolution,
                    bool hasRecordId,
-                   std::unique_ptr<ShardFiltererFactoryInterface> shardFiltererFactoryInterface);
+                   std::unique_ptr<ShardFiltererFactoryInterface> shardFiltererFactoryInterface,
+                   std::unique_ptr<CollatorInterface> collator = nullptr);
 
 private:
     const NamespaceString _nss = NamespaceString{"testdb.sbe_stage_builder"};

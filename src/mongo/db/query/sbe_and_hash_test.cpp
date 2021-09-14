@@ -63,7 +63,8 @@ protected:
         auto querySolution = makeQuerySolution(makeHashAndTree(docsVec));
 
         // Translate the QuerySolution to a PlanStage tree.
-        auto [resultSlots, stage, data] = buildPlanStage(std::move(querySolution), false, nullptr);
+        auto [resultSlots, stage, data, _] =
+            buildPlanStage(std::move(querySolution), false, nullptr);
 
         // Prepare the sbe::PlanStage for execution and collect all results.
         auto resultAccessors = prepareTree(&data.ctx, stage.get(), resultSlots);

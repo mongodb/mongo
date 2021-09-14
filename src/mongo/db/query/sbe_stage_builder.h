@@ -401,6 +401,9 @@ private:
         const QuerySolutionNode* child,
         PlanStageReqs childReqs);
 
+    std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildGroup(
+        const QuerySolutionNode* root, const PlanStageReqs& reqs);
+
     sbe::value::SlotIdGenerator _slotIdGenerator;
     sbe::value::FrameIdGenerator _frameIdGenerator;
     sbe::value::SpoolIdGenerator _spoolIdGenerator;

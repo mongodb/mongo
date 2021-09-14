@@ -106,7 +106,7 @@ protected:
         auto querySolution = makeQuerySolution(std::move(qsn));
 
         // Translate the QuerySolution to an sbe::PlanStage.
-        auto [resultSlots, stage, data] =
+        auto [resultSlots, stage, data, _] =
             buildPlanStage(std::move(querySolution), false, std::move(shardFiltererFactory));
 
         // Prepare the sbe::PlanStage for execution and collect all results.

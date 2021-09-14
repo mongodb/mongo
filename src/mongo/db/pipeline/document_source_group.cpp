@@ -445,6 +445,9 @@ intrusive_ptr<Expression> parseIdExpression(const intrusive_ptr<ExpressionContex
 void DocumentSourceGroup::setIdExpression(const boost::intrusive_ptr<Expression> idExpression) {
 
     if (auto object = dynamic_cast<ExpressionObject*>(idExpression.get())) {
+        // We don't support document _id spec yet.
+        pExpCtx->sbeGroupCompatible = false;
+
         auto& childExpressions = object->getChildExpressions();
         invariant(!childExpressions.empty());  // We expect to have converted an empty object into a
                                                // constant expression.

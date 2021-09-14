@@ -27,211 +27,28 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include <fmt/printf.h>
 
-#include "mongo/db/exec/sbe/util/debug_print.h"
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
-#include "mongo/db/query/sbe_stage_builder_accumulator.h"
-#include "mongo/db/query/sbe_stage_builder_eval_frame.h"
-#include "mongo/db/query/sbe_stage_builder_expression.h"
-#include "mongo/db/query/sbe_stage_builder_helpers.h"
+#include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/sbe_stage_builder_test_fixture.h"
-#include "mongo/platform/basic.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 
-const NamespaceString kTestNss("TestDB", "TestColl");
-
-class SbeAccumulatorBuilderTest : public SbeStageBuilderTestFixture {
+class SbeStageBuilderGroupTest : public SbeStageBuilderTestFixture {
 protected:
-    std::unique_ptr<CollatorInterface> _collator;
+    boost::intrusive_ptr<DocumentSource> createDocumentSourceGroup(
+        boost::intrusive_ptr<ExpressionContext> expCtx, const BSONObj& groupSpec) {
+        ASSERT(expCtx) << "expCtx must not be null";
+        BSONObj namedSpec = BSON("$group" << groupSpec);
+        BSONElement specElement = namedSpec.firstElement();
 
-    std::unique_ptr<QuerySolutionNode> makeVirtualScanTree(std::vector<BSONArray> docs) {
-        return std::make_unique<VirtualScanNode>(docs, VirtualScanNode::ScanType::kCollScan, false);
-    }
-
-    AccumulationStatement makeAccumulator(ExpressionContext* expCtx, BSONElement elem) {
-        auto vps = expCtx->variablesParseState;
-        return AccumulationStatement::parseAccumulationStatement(expCtx, elem, vps);
-    }
-
-    std::unique_ptr<CanonicalQuery> canonicalize(const char* queryStr) {
-        BSONObj queryObj = fromjson(queryStr);
-        auto findCommand = std::make_unique<FindCommandRequest>(kTestNss);
-        findCommand->setFilter(queryObj);
-        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-        auto statusWithCQ =
-            CanonicalQuery::canonicalize(expCtx->opCtx,
-                                         std::move(findCommand),
-                                         false,
-                                         expCtx,
-                                         ExtensionsCallbackNoop(),
-                                         MatchExpressionParser::kAllowAllSpecialFeatures);
-
-        ASSERT_OK(statusWithCQ.getStatus());
-        return std::move(statusWithCQ.getValue());
-    }
-
-    stage_builder::StageBuilderState makeStageBuilderState(sbe::RuntimeEnvironment* env) {
-        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-        _canonicalQuery = canonicalize("{dummy: 'query'}");
-        return stage_builder::StageBuilderState(expCtx->opCtx,
-                                                env,
-                                                _canonicalQuery->getExpCtxRaw()->variables,
-                                                &_slotIdGenerator,
-                                                &_frameIdGenerator,
-                                                &_spoolIdGenerator);
-    }
-
-    std::pair<sbe::value::TypeTags, sbe::value::Value> getResultsForAggregationWithNoGroupByTest(
-        StringData queryStatement, std::vector<BSONArray> docs) {
-        auto expCtx = ExpressionContextForTest{};
-        auto acc = fromjson(queryStatement.rawData());
-        auto accStmt = makeAccumulator(&expCtx, acc.firstElement());
-
-        // Build a VirtualScan input sub-tree to feed test docs into the argument expression.
-        auto querySolution = makeQuerySolution(makeVirtualScanTree(docs));
-        auto [resultSlots, stage, data] =
-            buildPlanStage(std::move(querySolution), false /* hasRecordId */, nullptr);
-
-        stage_builder::EvalStage evalStage;
-        evalStage.stage = std::move(stage);
-
-        auto state = makeStageBuilderState(data.env);
-        if (_collator) {
-            data.env->registerSlot(
-                "collator"_sd,
-                sbe::value::TypeTags::collator,
-                sbe::value::bitcastFrom<const CollatorInterface*>(_collator.get()),
-                false,
-                &_slotIdGenerator);
-        }
-        auto [argExpr, argStage] =
-            stage_builder::buildArgument(state,
-                                         accStmt,
-                                         std::move(evalStage),
-                                         resultSlots.front() /* see comment for buildPlanStage */,
-                                         kEmptyPlanNodeId);
-
-        auto [aggExprs, accStage] = stage_builder::buildAccumulator(
-            state, accStmt, std::move(argStage), std::move(argExpr), kEmptyPlanNodeId);
-
-        sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> aggs;
-        sbe::value::SlotVector aggSlots;
-        for (auto& expr : aggExprs) {
-            auto slot = state.slotId();
-            aggSlots.push_back(slot);
-            aggs[slot] = std::move(expr);
-        }
-        auto groupStage = makeHashAgg(
-            std::move(accStage), sbe::makeSV(), std::move(aggs), boost::none, kEmptyPlanNodeId);
-
-        auto [finalExpr, finalStage] = stage_builder::buildFinalize(
-            state, accStmt, std::move(aggSlots), std::move(groupStage), kEmptyPlanNodeId);
-
-        auto outSlot = state.slotId();
-        auto outStage =
-            makeProject(std::move(finalStage), kEmptyPlanNodeId, outSlot, std::move(finalExpr));
-
-        auto resultAccessors = prepareTree(&data.ctx, outStage.stage.get(), outSlot);
-        return getAllResults(outStage.stage.get(), &resultAccessors[0]);
-    }
-
-    void runAggregationWithNoGroupByTest(StringData queryStatement,
-                                         std::vector<BSONArray> docs,
-                                         const struct mongo::BSONArray& expectedValue) {
-        auto [resultsTag, resultsVal] =
-            getResultsForAggregationWithNoGroupByTest(queryStatement, docs);
-        sbe::value::ValueGuard resultGuard{resultsTag, resultsVal};
-        auto [expectedTag, expectedVal] = stage_builder::makeValue(expectedValue);
-        sbe::value::ValueGuard expectedGuard{expectedTag, expectedVal};
-        ASSERT_TRUE(valueEquals(resultsTag, resultsVal, expectedTag, expectedVal))
-            << "expected: " << expectedTag << std::make_pair(expectedTag, expectedVal)
-            << " but got: " << std::make_pair(resultsTag, resultsVal);
-    }
-
-    void runAggregationWithGroupByTest(StringData queryStatement,
-                                       std::vector<BSONArray> docs,
-                                       std::vector<StringData> groupByFields,
-                                       const struct mongo::BSONArray& expectedValue) {
-        // This test simulates translation a $group with group-by statements on groupByFields.
-        auto expCtx = ExpressionContextForTest{};
-
-        // Build the a VirtualScan input sub-tree to feed test docs into the argument expression.
-        auto querySolution = makeQuerySolution(makeVirtualScanTree(docs));
-        auto [resultSlots, stage, data] = buildPlanStage(std::move(querySolution), false, nullptr);
-        stage_builder::EvalStage groupByStage;
-        groupByStage.stage = std::move(stage);
-
-        auto state = makeStageBuilderState(data.env);
-        auto acc = fromjson(queryStatement.rawData());
-        auto accStmt = makeAccumulator(&expCtx, acc.firstElement());
-
-        // Translate the the group-by field path and bind it to a slot in a project stage.
-        auto vps = expCtx.variablesParseState;
-        stage_builder::EvalExpr groupByExpr;
-        for (auto&& groupByField : groupByFields) {
-            auto groupByExpression =
-                ExpressionFieldPath::parse(&expCtx, groupByField.rawData(), vps);
-            std::tie(groupByExpr, groupByStage) = stage_builder::generateExpression(
-                state,
-                groupByExpression.get(),
-                std::move(groupByStage),  // NOLINT(bugprone-use-after-move)
-                resultSlots.front() /* See comment for buildPlanStage */,
-                kEmptyPlanNodeId);
-        }
-
-        auto [groupBySlot, projectGroupByStage] = projectEvalExpr(std::move(groupByExpr),
-                                                                  std::move(groupByStage),
-                                                                  kEmptyPlanNodeId,
-                                                                  state.slotIdGenerator);
-
-        auto [argExpr, argStage] =
-            stage_builder::buildArgument(state,
-                                         accStmt,
-                                         std::move(projectGroupByStage),
-                                         resultSlots.front(), /* See comment for buildPlanStage*/
-                                         kEmptyPlanNodeId);
-
-        auto [aggExprs, accStage] = stage_builder::buildAccumulator(
-            state, accStmt, std::move(argStage), std::move(argExpr), kEmptyPlanNodeId);
-
-        sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> aggs;
-        sbe::value::SlotVector aggSlots;
-        for (auto& expr : aggExprs) {
-            auto slot = state.slotId();
-            aggSlots.push_back(slot);
-            aggs[slot] = std::move(expr);
-        }
-        auto groupStage = makeHashAgg(std::move(accStage),
-                                      sbe::makeSV(groupBySlot),
-                                      std::move(aggs),
-                                      boost::none,
-                                      kEmptyPlanNodeId);
-
-        // Build the finalize stage over the collected accumulators.
-        auto [finalExpr, finalStage] = stage_builder::buildFinalize(
-            state, accStmt, aggSlots, std::move(groupStage), kEmptyPlanNodeId);
-
-        auto outSlot = state.slotId();
-        auto outStage =
-            makeProject(std::move(finalStage), kEmptyPlanNodeId, outSlot, std::move(finalExpr));
-
-        auto resultAccessors = prepareTree(&data.ctx, outStage.stage.get(), outSlot);
-        auto [resultsTag, resultsVal] = getAllResults(outStage.stage.get(), &resultAccessors[0]);
-        sbe::value::ValueGuard resultGuard{resultsTag, resultsVal};
-
-        auto [sortedResultsTag, sortedResultsVal] = sortResults(resultsTag, resultsVal);
-        sbe::value::ValueGuard sortedResultGuard{sortedResultsTag, sortedResultsVal};
-
-        auto [expectedTag, expectedVal] = stage_builder::makeValue(expectedValue);
-        sbe::value::ValueGuard expectedGuard{expectedTag, expectedVal};
-
-        ASSERT_TRUE(valueEquals(sortedResultsTag, sortedResultsVal, expectedTag, expectedVal));
+        return DocumentSourceGroup::createFromBson(specElement, expCtx);
     }
 
     std::pair<sbe::value::TypeTags, sbe::value::Value> sortResults(sbe::value::TypeTags tag,
@@ -264,19 +81,77 @@ protected:
         return {sortedResultsTag, sortedResultsVal};
     }
 
+    std::pair<std::unique_ptr<QuerySolution>, boost::intrusive_ptr<DocumentSourceGroup>>
+    makeGroupQuerySolution(boost::intrusive_ptr<ExpressionContext> expCtx,
+                           BSONObj groupSpec,
+                           std::vector<BSONArray> inputDocs) {
+        auto docSrc = createDocumentSourceGroup(expCtx, groupSpec);
+        auto docSrcGroup = dynamic_cast<DocumentSourceGroup*>(docSrc.get());
+        ASSERT(docSrcGroup != nullptr);
+
+        // Constructs a QuerySolution consisting of a GroupNode on top of a VirtualScanNode.
+        auto virtScanNode = std::make_unique<VirtualScanNode>(
+            inputDocs, VirtualScanNode::ScanType::kCollScan, false /*hasRecordId*/);
+
+        auto groupNode = std::make_unique<GroupNode>(std::move(virtScanNode),
+                                                     docSrcGroup->getIdFields(),
+                                                     docSrcGroup->getAccumulatedFields(),
+                                                     false /*doingMerge*/);
+
+        // Makes a QuerySolution from the root group node.
+        return {makeQuerySolution(std::move(groupNode)), docSrcGroup};
+    }
+
+    std::pair<sbe::value::TypeTags, sbe::value::Value> getResultsForAggregation(
+        BSONObj groupSpec,
+        std::vector<BSONArray> inputDocs,
+        std::unique_ptr<CollatorInterface> collator = nullptr) {
+        // Makes a QuerySolution for GroupNode over VirtualScanNode.
+        auto [querySolution, groupNode] = makeGroupQuerySolution(
+            make_intrusive<ExpressionContextForTest>(), std::move(groupSpec), std::move(inputDocs));
+
+        // Translates the QuerySolution tree to a sbe::PlanStage tree.
+        auto [resultSlots, stage, data, _] = buildPlanStage(
+            std::move(querySolution), false /*hasRecordId*/, nullptr, std::move(collator));
+        ASSERT_EQ(resultSlots.size(), 1);
+
+        auto resultAccessors = prepareTree(&data.ctx, stage.get(), resultSlots[0]);
+        return getAllResults(stage.get(), &resultAccessors[0]);
+    }
+
+    void runGroupAggregationTest(StringData groupSpec,
+                                 std::vector<BSONArray> inputDocs,
+                                 const mongo::BSONArray& expectedValue,
+                                 std::unique_ptr<CollatorInterface> collator = nullptr) {
+        auto [resultsTag, resultsVal] =
+            getResultsForAggregation(fromjson(groupSpec.rawData()), inputDocs, std::move(collator));
+        sbe::value::ValueGuard resultGuard{resultsTag, resultsVal};
+
+        auto [sortedResultsTag, sortedResultsVal] = sortResults(resultsTag, resultsVal);
+        sbe::value::ValueGuard sortedResultGuard{sortedResultsTag, sortedResultsVal};
+
+        auto [expectedTag, expectedVal] = stage_builder::makeValue(expectedValue);
+        sbe::value::ValueGuard expectedGuard{expectedTag, expectedVal};
+
+        ASSERT_TRUE(valueEquals(sortedResultsTag, sortedResultsVal, expectedTag, expectedVal))
+            << "expected: " << std::make_pair(expectedTag, expectedVal)
+            << " but got: " << std::make_pair(sortedResultsTag, sortedResultsVal);
+    }
+
     /**
      * $addToSet doesn't guarantee any particular order of the accumulated values. To make the
-     * result checking deterministic, we convert the array of the expected values into an arraySet
-     * as well and compare the sets.
+     * result checking deterministic, we convert the array of the expected values and the actual
+     * values into arraySets and compare the sets.
+     *
      * Note: Currently, the order agnostic comparison only works for arraySets with
      * non-pointer-based accumulated values.
      */
-    void runAddToSetTest(StringData queryStatement,
-                         std::vector<BSONArray> docs,
+    void runAddToSetTest(StringData groupSpec,
+                         std::vector<BSONArray> inputDocs,
                          const BSONArray& expectedResult) {
         using namespace mongo::sbe::value;
 
-        // Create ArraySet Value from the expectedResult BSON Array.
+        // Create ArraySet Value from the expectedResult.
         auto [tmpTag, tmpVal] =
             copyValue(TypeTags::bsonArray, bitcastFrom<const char*>(expectedResult.objdata()));
         ValueGuard tmpGuard{tmpTag, tmpVal};
@@ -285,365 +160,466 @@ protected:
 
         // Run the accumulator.
         auto [resultsTag, resultsVal] =
-            getResultsForAggregationWithNoGroupByTest(queryStatement, docs);
+            getResultsForAggregation(fromjson(groupSpec.rawData()), inputDocs);
         ValueGuard resultGuard{resultsTag, resultsVal};
         ASSERT_EQ(resultsTag, TypeTags::Array);
 
         // Extract the accumulated ArraySet from the result and compare it to the expected.
         auto arr = getArrayView(resultsVal);
         ASSERT_EQ(1, arr->size());
+        auto [resObjTag, resObjVal] = arr->getAt(0);
+        ASSERT_EQ(resObjTag, TypeTags::bsonObject)
+            << "Expected a result object but got: " << std::make_pair(resObjTag, resObjVal);
 
-        auto [aggregatedTag, aggregatedSet] = arr->getAt(0);
-        ASSERT_EQ(aggregatedTag, TypeTags::ArraySet);
+        sbe::value::ObjectEnumerator objEnum{resObjTag, resObjVal};
+        ASSERT(!objEnum.atEnd()) << "Expected a result object but got: "
+                                 << std::make_pair(resObjTag, resObjVal);
 
-        // TODO SERVER-59631: replace the lookup loop below with a call to valueEquals on sets.
-        // ASSERT(valueEquals(expectedTag, expectedSet, aggregatedTag, aggregatedSet))
-        //     << "expected set: " << std::make_pair(expectedTag, expectedSet)
-        //     << " but got set: " << std::make_pair(aggregatedTag, aggregatedSet);
-        const auto& lhsSet = getArraySetView(expectedSet)->values();
-        const auto& rhsSet = getArraySetView(aggregatedSet)->values();
-        bool areEqual = (lhsSet.size() == rhsSet.size());
-        if (areEqual) {
-            for (const auto& e : rhsSet) {
-                if (!lhsSet.contains(e)) {
-                    areEqual = false;
-                    break;
+        auto areSetsEqual = [](sbe::value::Value lhsVal, sbe::value::Value rhsVal) -> bool {
+            const auto& lhsSet = getArraySetView(lhsVal)->values();
+            const auto& rhsSet = getArraySetView(rhsVal)->values();
+            if (lhsSet.size() == rhsSet.size()) {
+                for (const auto& e : rhsSet) {
+                    if (!lhsSet.contains(e)) {
+                        return false;
+                    }
                 }
+                return true;
+            } else {
+                return false;
             }
+        };
+
+        while (!objEnum.atEnd()) {
+            if (objEnum.getFieldName() == "x"_sd) {
+                auto [arrTag, arrVal] = objEnum.getViewOfValue();
+                ASSERT_EQ(arrTag, TypeTags::bsonArray)
+                    << "Expected an array for field x but got: " << std::make_pair(arrTag, arrVal);
+
+                auto [tmpTag2, tmpVal2] = copyValue(TypeTags::bsonArray, arrVal);
+                ValueGuard tmpGuard2{tmpTag2, tmpVal2};
+                auto [actualTag, actualSet] = arrayToSet(tmpTag2, tmpVal2);
+                ValueGuard actualValueGuard{actualTag, actualSet};
+
+                // TODO SERVER-59631: replace the call to the compare lambda below with a call to
+                // valueEquals on sets and remove the lambda function above.
+                //
+                // ASSERT(valueEquals(expectedTag, expectedSet, aggregatedTag, aggregatedSet))
+                ASSERT(areSetsEqual(expectedSet, actualSet))
+                    << "expected set: " << std::make_pair(expectedTag, expectedSet)
+                    << " but got set: " << std::make_pair(actualTag, actualSet);
+                return;
+            }
+
+            objEnum.advance();
         }
-        ASSERT(areEqual) << "expected set: " << std::make_pair(expectedTag, expectedSet)
-                         << " but got set: " << std::make_pair(aggregatedTag, aggregatedSet);
+
+        ASSERT(false) << "expected: " << expectedResult
+                      << " but got: " << std::make_pair(resObjTag, resObjVal);
     }
 
-    void runSbeGroupCompatibleFlagTest(const std::vector<BSONObj>& rawPipeline,
+    void runSbeGroupCompatibleFlagTest(const std::vector<BSONObj>& groupSpecs,
                                        boost::intrusive_ptr<ExpressionContext>& expCtx) {
-        // When we parse the AccumulationExpressions to build the DocumentSourceGroup, those
-        // AccumulationExpressions that are not supported by SBE will flip the sbeGroupCompatible
-        // flag in the expCtx to false.
-        auto pipeline = Pipeline::parse(rawPipeline, expCtx);
+        for (const auto& groupSpec : groupSpecs) {
+            // When we parse the groupSpec to build the DocumentSourceGroup, those
+            // AccumulationExpressions or _id expression that are not supported by SBE will flip the
+            // sbeGroupCompatible flag in the expCtx to false.
+            auto [querySolution, groupStage] =
+                makeGroupQuerySolution(expCtx, groupSpec, std::vector<BSONArray>{} /*inputDocs*/);
 
-        sbe::RuntimeEnvironment env;
-        auto state = makeStageBuilderState(&env);
-        for (const auto& source : pipeline->getSources()) {
             // We try to figure out the expected sbeGroupCompatible value here. The
             // sbeGroupCompatible flag should be false if any accumulator being tested does not have
             // a registered SBE accumulator builder function.
-            auto groupStage = dynamic_cast<DocumentSourceGroup*>(source.get());
-            ASSERT_TRUE(groupStage);
-
             auto sbeGroupCompatible = true;
-            for (const AccumulationStatement& accStmt : groupStage->getAccumulatedFields()) {
-                stage_builder::EvalStage evalStage;
-                auto [argExpr, argStage] = stage_builder::buildArgument(
-                    state, accStmt, std::move(evalStage), 0, kEmptyPlanNodeId);
-                try {
-                    auto [aggExprs, accStage] = stage_builder::buildAccumulator(
-                        state, accStmt, std::move(argStage), std::move(argExpr), kEmptyPlanNodeId);
-                } catch (const DBException& e) {
-                    // The accumulator is unsupported in SBE, so we expect that the sbeCompatible
-                    // flag should be false.
-                    ASSERT_EQ(5754701, e.code());
-                    sbeGroupCompatible = false;
-                    break;
-                }
+            try {
+                // Tries to translate the QuerySolution tree to a sbe::PlanStage tree.
+                (void)buildPlanStage(
+                    std::move(querySolution), false /*hasRecordId*/, nullptr, nullptr);
+
+            } catch (const DBException& e) {
+                // The accumulator or the _id expression is unsupported in SBE, so we expect that
+                // the sbeCompatible flag should be false.
+                ASSERT(e.code() == 5754701 || e.code() == 5851603);
+                sbeGroupCompatible = false;
+                break;
             }
             ASSERT_EQ(sbeGroupCompatible, groupStage->sbeCompatible());
         }
     }
-
-private:
-    // The slot id generator should be shared across all stages via the 'SlotBasedStageBuilder' but
-    // for now we will workaround by creating a generator with large enough starting id.
-    sbe::value::SlotIdGenerator _slotIdGenerator{1024 /*starting id*/};
-    sbe::value::FrameIdGenerator _frameIdGenerator;
-    sbe::value::SpoolIdGenerator _spoolIdGenerator;
-    std::unique_ptr<CanonicalQuery> _canonicalQuery;
 };
 
-TEST_F(SbeAccumulatorBuilderTest, MinAccumulatorTranslationBasic) {
+TEST_F(SbeStageBuilderGroupTest, TestGroupMultipleAccumulators) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 1)),
+                                       BSON_ARRAY(BSON("a" << 1 << "b" << 2)),
+                                       BSON_ARRAY(BSON("a" << 2 << "b" << 3))};
+    runGroupAggregationTest(R"({
+                                _id: "$a",
+                                sumb: {$sum: "$b"},
+                                minb: {$min: "$b"},
+                                maxb: {$max: "$b"},
+                                firstb: {$first: "$b"},
+                                lastb: {$last: "$b"}
+                            })",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << 1 << "sumb" << 3 << "minb" << 1 << "maxb" << 2
+                                                  << "firstb" << 1 << "lastb" << 2)
+                                       << BSON("_id" << 2 << "sumb" << 3 << "minb" << 3 << "maxb"
+                                                     << 3 << "firstb" << 3 << "lastb" << 3)));
+}
+
+TEST_F(SbeStageBuilderGroupTest, TestGroupNoAccumulators) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 1)),
+                                       BSON_ARRAY(BSON("a" << 1 << "b" << 2)),
+                                       BSON_ARRAY(BSON("a" << 2 << "b" << 3))};
+    runGroupAggregationTest(
+        R"({_id: "$a"})", docs, BSON_ARRAY(BSON("_id" << 1) << BSON("_id" << 2)));
+}
+
+TEST_F(SbeStageBuilderGroupTest, MinAccumulatorTranslationBasic) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 100ll)),
                                        BSON_ARRAY(BSON("a" << 1 << "b" << Decimal128(10.0))),
                                        BSON_ARRAY(BSON("a" << 1 << "b" << 1.0))};
-    runAggregationWithNoGroupByTest("{x: {$min: '$b'}}", docs, BSON_ARRAY(1.0));
+    runGroupAggregationTest(
+        "{_id: null, x: {$min: '$b'}}", docs, BSON_ARRAY(BSON("_id" << BSONNULL << "x" << 1.0)));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, MinAccumulatorTranslationAllUndefined) {
+TEST_F(SbeStageBuilderGroupTest, MinAccumulatorTranslationAllUndefined) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << BSONUndefined))};
-    runAggregationWithNoGroupByTest("{x: {$min: '$b'}}", docs, BSON_ARRAY(BSONNULL));
+    runGroupAggregationTest("{_id: null, x: {$min: '$b'}}",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << BSONNULL << "x" << BSONNULL)));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, MinAccumulatorTranslationSomeUndefined) {
+TEST_F(SbeStageBuilderGroupTest, MinAccumulatorTranslationSomeUndefined) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << BSONUndefined)),
                                        BSON_ARRAY(BSON("a" << 1 << "b" << 1))};
-    runAggregationWithNoGroupByTest("{x: {$min: '$b'}}", docs, BSON_ARRAY(1));
+    runGroupAggregationTest(
+        "{_id: null, x: {$min: '$b'}}", docs, BSON_ARRAY(BSON("_id" << BSONNULL << "x" << 1)));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, MinAccumulatorTranslationSomeNull) {
+TEST_F(SbeStageBuilderGroupTest, MinAccumulatorTranslationSomeNull) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << BSONNULL)),
                                        BSON_ARRAY(BSON("a" << 1 << "b" << 10)),
                                        BSON_ARRAY(BSON("a" << 1 << "b" << 1)),
                                        BSON_ARRAY(BSON("a" << 1 << "b" << BSONNULL))};
-    runAggregationWithNoGroupByTest("{x: {$min: '$b'}}", docs, BSON_ARRAY(1));
+    runGroupAggregationTest(
+        "{_id: null, x: {$min: '$b'}}", docs, BSON_ARRAY(BSON("_id" << BSONNULL << "x" << 1)));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, MinAccumulatorTranslationAllNull) {
+TEST_F(SbeStageBuilderGroupTest, MinAccumulatorTranslationAllNull) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << BSONNULL)),
                                        BSON_ARRAY(BSON("a" << 1 << "b" << BSONNULL)),
                                        BSON_ARRAY(BSON("a" << 1 << "b" << BSONNULL))};
-    runAggregationWithNoGroupByTest("{x: {$min: '$b'}}", docs, BSON_ARRAY(BSONNULL));
+    runGroupAggregationTest("{_id: null, x: {$min: '$b'}}",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << BSONNULL << "x" << BSONNULL)));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, MinAccumulatorTranslationAllMissingFields) {
+TEST_F(SbeStageBuilderGroupTest, MinAccumulatorTranslationAllMissingFields) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1))};
-    runAggregationWithNoGroupByTest("{x: {$min: '$b'}}", docs, BSON_ARRAY(BSONNULL));
+    runGroupAggregationTest("{_id: null, x: {$min: '$b'}}",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << BSONNULL << "x" << BSONNULL)));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, MinAccumulatorTranslationSomeMissingFields) {
+TEST_F(SbeStageBuilderGroupTest, MinAccumulatorTranslationSomeMissingFields) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1)),
                                        BSON_ARRAY(BSON("a" << 1 << "b" << 1)),
                                        BSON_ARRAY(BSON("a" << 1 << "b" << 100))};
-    runAggregationWithNoGroupByTest("{x: {$min: '$b'}}", docs, BSON_ARRAY(1));
+    runGroupAggregationTest(
+        "{_id: null, x: {$min: '$b'}}", docs, BSON_ARRAY(BSON("_id" << BSONNULL << "x" << 1)));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, MinAccumulatorTranslationMixedTypes) {
+TEST_F(SbeStageBuilderGroupTest, MinAccumulatorTranslationMixedTypes) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << BSON_ARRAY(1 << 2))),
                                        BSON_ARRAY(BSON("a" << 1 << "b" << 1)),
                                        BSON_ARRAY(BSON("a" << 1 << "b" << BSON("c" << 1)))};
-    runAggregationWithNoGroupByTest("{x: {$min: '$b'}}", docs, BSON_ARRAY(1));
+    runGroupAggregationTest(
+        "{_id: null, x: {$min: '$b'}}", docs, BSON_ARRAY(BSON("_id" << BSONNULL << "x" << 1)));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, MinAccumulatorTranslationOneGroupBy) {
+TEST_F(SbeStageBuilderGroupTest, MinAccumulatorTranslationOneGroupBy) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 0)),
                                        BSON_ARRAY(BSON("a" << 1 << "b" << 100)),
                                        BSON_ARRAY(BSON("a" << 2 << "b" << 1))};
-    runAggregationWithGroupByTest("{x: {$min: '$b'}}", docs, {"$a"}, BSON_ARRAY(0 << 1));
+    runGroupAggregationTest(
+        "{_id: '$a', x: {$min: '$b'}}",
+        docs,
+        BSON_ARRAY(BSON("_id" << 1 << "x" << 0) << BSON("_id" << 2 << "x" << 1)));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, MinAccumulatorTranslationStringsDefaultCollator) {
+TEST_F(SbeStageBuilderGroupTest, MinAccumulatorTranslationStringsDefaultCollator) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b"
                                                            << "az")),
                                        BSON_ARRAY(BSON("a" << 1 << "b"
                                                            << "za"))};
-    runAggregationWithNoGroupByTest("{x: {$min: '$b'}}", docs, BSON_ARRAY("az"));
+    runGroupAggregationTest("{_id: null, x: {$min: '$b'}}",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << BSONNULL << "x"
+                                                  << "az")));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, MinAccumulatorTranslationStringsReverseStringCollator) {
-    _collator =
-        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString);
-
+TEST_F(SbeStageBuilderGroupTest, MinAccumulatorTranslationStringsReverseStringCollator) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b"
                                                            << "az")),
                                        BSON_ARRAY(BSON("a" << 1 << "b"
                                                            << "za"))};
-    runAggregationWithNoGroupByTest("{x: {$min: '$b'}}", docs, BSON_ARRAY("za"));
+    runGroupAggregationTest(
+        "{_id: null, x: {$min: '$b'}}",
+        docs,
+        BSON_ARRAY(BSON("_id" << BSONNULL << "x"
+                              << "za")),
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, MaxAccumulatorTranslationBasic) {
+TEST_F(SbeStageBuilderGroupTest, MaxAccumulatorTranslationBasic) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 100ll)),
                                        BSON_ARRAY(BSON("a" << 1 << "b" << Decimal128(10.0))),
                                        BSON_ARRAY(BSON("a" << 1 << "b" << 1.0))};
-    runAggregationWithNoGroupByTest("{x: {$max: '$b'}}", docs, BSON_ARRAY(100));
+    runGroupAggregationTest(
+        "{_id: null, x: {$max: '$b'}}", docs, BSON_ARRAY(BSON("_id" << BSONNULL << "x" << 100)));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, MaxAccumulatorTranslationSomeNull) {
+TEST_F(SbeStageBuilderGroupTest, MaxAccumulatorTranslationSomeNull) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << BSONNULL)),
                                        BSON_ARRAY(BSON("a" << 1 << "b" << 10)),
                                        BSON_ARRAY(BSON("a" << 1 << "b" << 1)),
                                        BSON_ARRAY(BSON("a" << 1 << "b" << BSONNULL))};
-    runAggregationWithNoGroupByTest("{x: {$max: '$b'}}", docs, BSON_ARRAY(10));
+    runGroupAggregationTest(
+        "{_id: null, x: {$max: '$b'}}", docs, BSON_ARRAY(BSON("_id" << BSONNULL << "x" << 10)));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, MaxAccumulatorTranslationAllNull) {
+TEST_F(SbeStageBuilderGroupTest, MaxAccumulatorTranslationAllNull) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << BSONNULL)),
                                        BSON_ARRAY(BSON("a" << 1 << "b" << BSONNULL)),
                                        BSON_ARRAY(BSON("a" << 1 << "b" << BSONNULL))};
-    runAggregationWithNoGroupByTest("{x: {$max: '$b'}}", docs, BSON_ARRAY(BSONNULL));
+    runGroupAggregationTest("{_id: null, x: {$max: '$b'}}",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << BSONNULL << "x" << BSONNULL)));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, MaxAccumulatorTranslationAllMissingFields) {
+TEST_F(SbeStageBuilderGroupTest, MaxAccumulatorTranslationAllMissingFields) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1))};
-    runAggregationWithNoGroupByTest("{x: {$max: '$b'}}", docs, BSON_ARRAY(BSONNULL));
+    runGroupAggregationTest("{_id: null, x: {$max: '$b'}}",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << BSONNULL << "x" << BSONNULL)));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, MaxAccumulatorTranslationSomeMissingFields) {
+TEST_F(SbeStageBuilderGroupTest, MaxAccumulatorTranslationSomeMissingFields) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1)),
                                        BSON_ARRAY(BSON("a" << 1 << "b" << 1)),
                                        BSON_ARRAY(BSON("a" << 1 << "b" << 100))};
-    runAggregationWithNoGroupByTest("{x: {$max: '$b'}}", docs, BSON_ARRAY(100));
+    runGroupAggregationTest(
+        "{_id: null, x: {$max: '$b'}}", docs, BSON_ARRAY(BSON("_id" << BSONNULL << "x" << 100)));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, MaxAccumulatorTranslationMixedTypes) {
+TEST_F(SbeStageBuilderGroupTest, MaxAccumulatorTranslationMixedTypes) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << BSON_ARRAY(1 << 2))),
                                        BSON_ARRAY(BSON("a" << 1 << "b" << 1)),
                                        BSON_ARRAY(BSON("a" << 1 << "b" << BSON("c" << 1)))};
-    runAggregationWithNoGroupByTest("{x: {$max: '$b'}}", docs, BSON_ARRAY(BSON_ARRAY(1 << 2)));
+    runGroupAggregationTest("{_id: null, x: {$max: '$b'}}",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << BSONNULL << "x" << BSON_ARRAY(1 << 2))));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, MaxAccumulatorTranslationOneGroupBy) {
+TEST_F(SbeStageBuilderGroupTest, MaxAccumulatorTranslationOneGroupBy) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 0)),
                                        BSON_ARRAY(BSON("a" << 1 << "b" << 100)),
                                        BSON_ARRAY(BSON("a" << 2 << "b" << 1))};
-    runAggregationWithGroupByTest("{x: {$max: '$b'}}", docs, {"$a"}, BSON_ARRAY(1 << 100));
+    runGroupAggregationTest(
+        "{_id: '$a', x: {$max: '$b'}}",
+        docs,
+        BSON_ARRAY(BSON("_id" << 1 << "x" << 100) << BSON("_id" << 2 << "x" << 1)));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, MaxAccumulatorTranslationStringsDefaultCollator) {
+TEST_F(SbeStageBuilderGroupTest, MaxAccumulatorTranslationStringsDefaultCollator) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b"
                                                            << "az")),
                                        BSON_ARRAY(BSON("a" << 1 << "b"
                                                            << "za"))};
-    runAggregationWithNoGroupByTest("{x: {$max: '$b'}}", docs, BSON_ARRAY("za"));
+    runGroupAggregationTest("{_id: null, x: {$max: '$b'}}",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << BSONNULL << "x"
+                                                  << "za")));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, MaxAccumulatorTranslationStringsReverseStringCollator) {
-    _collator =
-        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString);
-
+TEST_F(SbeStageBuilderGroupTest, MaxAccumulatorTranslationStringsReverseStringCollator) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b"
                                                            << "az")),
                                        BSON_ARRAY(BSON("a" << 1 << "b"
                                                            << "za"))};
-    runAggregationWithNoGroupByTest("{x: {$max: '$b'}}", docs, BSON_ARRAY("az"));
+    runGroupAggregationTest(
+        "{_id: null, x: {$max: '$b'}}",
+        docs,
+        BSON_ARRAY(BSON("_id" << BSONNULL << "x"
+                              << "az")),
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, FirstAccumulatorTranslationOneDoc) {
+TEST_F(SbeStageBuilderGroupTest, FirstAccumulatorTranslationOneDoc) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << BSON_ARRAY(1 << 2)))};
-    runAggregationWithNoGroupByTest("{x: {$first: '$b'}}", docs, BSON_ARRAY(BSON_ARRAY(1 << 2)));
+    runGroupAggregationTest("{_id: null, x: {$first: '$b'}}",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << BSONNULL << "x" << BSON_ARRAY(1 << 2))));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, FirstAccumulatorTranslationMissingField) {
+TEST_F(SbeStageBuilderGroupTest, FirstAccumulatorTranslationMissingField) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1))};
-    runAggregationWithNoGroupByTest("{x: {$first: '$b'}}", docs, BSON_ARRAY(BSONNULL));
+    runGroupAggregationTest("{_id: null, x: {$first: '$b'}}",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << BSONNULL << "x" << BSONNULL)));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, FirstAccumulatorTranslationBasic) {
+TEST_F(SbeStageBuilderGroupTest, FirstAccumulatorTranslationBasic) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 100)),
                                        BSON_ARRAY(BSON("a" << 1 << "b" << 0))};
-    runAggregationWithNoGroupByTest("{x: {$first: '$b'}}", docs, BSON_ARRAY(100));
+    runGroupAggregationTest(
+        "{_id: null, x: {$first: '$b'}}", docs, BSON_ARRAY(BSON("_id" << BSONNULL << "x" << 100)));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, FirstAccumulatorTranslationFirstDocWithMissingField) {
+TEST_F(SbeStageBuilderGroupTest, FirstAccumulatorTranslationFirstDocWithMissingField) {
     auto docs =
         std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1)), BSON_ARRAY(BSON("a" << 1 << "b" << 0))};
-    runAggregationWithNoGroupByTest("{x: {$first: '$b'}}", docs, BSON_ARRAY(BSONNULL));
+    runGroupAggregationTest("{_id: null, x: {$first: '$b'}}",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << BSONNULL << "x" << BSONNULL)));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, FirstAccumulatorTranslationOneGroupBy) {
+TEST_F(SbeStageBuilderGroupTest, FirstAccumulatorTranslationOneGroupBy) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 0)),
                                        BSON_ARRAY(BSON("a" << 1 << "b" << 100)),
                                        BSON_ARRAY(BSON("a" << 2 << "b" << 2.5))};
-    runAggregationWithGroupByTest("{x: {$min: '$b'}}", docs, {"$a"}, BSON_ARRAY(0 << 2.5));
+    runGroupAggregationTest(
+        "{_id: '$a', x: {$first: '$b'}}",
+        docs,
+        BSON_ARRAY(BSON("_id" << 1 << "x" << 0) << BSON("_id" << 2 << "x" << 2.5)));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, LastAccumulatorTranslationOneDoc) {
+TEST_F(SbeStageBuilderGroupTest, LastAccumulatorTranslationOneDoc) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << BSON_ARRAY(1 << 2)))};
-    runAggregationWithNoGroupByTest("{x: {$last: '$b'}}", docs, BSON_ARRAY(BSON_ARRAY(1 << 2)));
+    runGroupAggregationTest("{_id: null, x: {$last: '$b'}}",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << BSONNULL << "x" << BSON_ARRAY(1 << 2))));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, LastAccumulatorTranslationMissingField) {
+TEST_F(SbeStageBuilderGroupTest, LastAccumulatorTranslationMissingField) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1))};
-    runAggregationWithNoGroupByTest("{x: {$last: '$b'}}", docs, BSON_ARRAY(BSONNULL));
+    runGroupAggregationTest("{_id: null, x: {$last: '$b'}}",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << BSONNULL << "x" << BSONNULL)));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, LastAccumulatorTranslationBasic) {
+TEST_F(SbeStageBuilderGroupTest, LastAccumulatorTranslationBasic) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 100)),
                                        BSON_ARRAY(BSON("a" << 1 << "b" << 0))};
-    runAggregationWithNoGroupByTest("{x: {$last: '$b'}}", docs, BSON_ARRAY(0));
+    runGroupAggregationTest(
+        "{_id: null, x: {$last: '$b'}}", docs, BSON_ARRAY(BSON("_id" << BSONNULL << "x" << 0)));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, LastAccumulatorTranslationLastDocWithMissingField) {
+TEST_F(SbeStageBuilderGroupTest, LastAccumulatorTranslationLastDocWithMissingField) {
     auto docs =
         std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 0)), BSON_ARRAY(BSON("a" << 1))};
-    runAggregationWithNoGroupByTest("{x: {$last: '$b'}}", docs, BSON_ARRAY(BSONNULL));
+    runGroupAggregationTest("{_id: null, x: {$last: '$b'}}",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << BSONNULL << "x" << BSONNULL)));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, LastAccumulatorTranslationOneGroupBy) {
+TEST_F(SbeStageBuilderGroupTest, LastAccumulatorTranslationOneGroupBy) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 0)),
                                        BSON_ARRAY(BSON("a" << 1 << "b" << 100)),
                                        BSON_ARRAY(BSON("a" << 2 << "b" << 2.5))};
-    runAggregationWithGroupByTest("{x: {$last: '$b'}}", docs, {"$a"}, BSON_ARRAY(2.5 << 100));
+    runGroupAggregationTest(
+        "{_id: '$a', x: {$last: '$b'}}",
+        docs,
+        BSON_ARRAY(BSON("_id" << 1 << "x" << 100) << BSON("_id" << 2 << "x" << 2.5)));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationBasic) {
+TEST_F(SbeStageBuilderGroupTest, SumAccumulatorTranslationBasic) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 2)),
                                        BSON_ARRAY(BSON("a" << 1 << "b" << 4)),
                                        BSON_ARRAY(BSON("a" << 1 << "b" << 6))};
-    runAggregationWithNoGroupByTest("{x: {$sum: '$b'}}", docs, BSON_ARRAY(12));
+    runGroupAggregationTest(
+        "{_id: null, x: {$sum: '$b'}}", docs, BSON_ARRAY(BSON("_id" << BSONNULL << "x" << 12)));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationOneDocInt) {
-    runAggregationWithNoGroupByTest(
-        "{x: {$sum: '$b'}}", {BSON_ARRAY(BSON("a" << 1 << "b" << 10))}, BSON_ARRAY(Value(10)));
+TEST_F(SbeStageBuilderGroupTest, SumAccumulatorTranslationOneDocInt) {
+    runGroupAggregationTest("{_id: null, x: {$sum: '$b'}}",
+                            {BSON_ARRAY(BSON("a" << 1 << "b" << 10))},
+                            BSON_ARRAY(BSON("_id" << BSONNULL << "x" << 10)));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationOneDocLong) {
-    runAggregationWithNoGroupByTest(
-        "{x: {$sum: '$b'}}",
-        std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 3 << "b" << 10ll))},
-        BSON_ARRAY(10ll));
+TEST_F(SbeStageBuilderGroupTest, SumAccumulatorTranslationOneDocLong) {
+    runGroupAggregationTest("{_id: null, x: {$sum: '$b'}}",
+                            std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 3 << "b" << 10ll))},
+                            BSON_ARRAY(BSON("_id" << BSONNULL << "x" << 10ll)));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationOneDocIntRepresentableDouble) {
-    runAggregationWithNoGroupByTest(
-        "{x: {$sum: '$b'}}",
-        std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 4 << "b" << 10.0))},
-        BSON_ARRAY(10.0));
+TEST_F(SbeStageBuilderGroupTest, SumAccumulatorTranslationOneDocIntRepresentableDouble) {
+    runGroupAggregationTest("{_id: null, x: {$sum: '$b'}}",
+                            std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 4 << "b" << 10.0))},
+                            BSON_ARRAY(BSON("_id" << BSONNULL << "x" << 10.0)));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationOneDocNonIntRepresentableLong) {
-    runAggregationWithNoGroupByTest(
-        "{x: {$sum: '$b'}}",
+TEST_F(SbeStageBuilderGroupTest, SumAccumulatorTranslationOneDocNonIntRepresentableLong) {
+    runGroupAggregationTest(
+        "{_id: null, x: {$sum: '$b'}}",
         std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 5 << "b" << 60000000000ll))},
-        BSON_ARRAY(60000000000ll));
+        BSON_ARRAY(BSON("_id" << BSONNULL << "x" << 60000000000ll)));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationNonIntegerValuedDouble) {
-    runAggregationWithNoGroupByTest(
-        "{x: {$sum: '$b'}}",
-        std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 9.5))},
-        BSON_ARRAY(9.5));
+TEST_F(SbeStageBuilderGroupTest, SumAccumulatorTranslationNonIntegerValuedDouble) {
+    runGroupAggregationTest("{_id: null, x: {$sum: '$b'}}",
+                            std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 9.5))},
+                            BSON_ARRAY(BSON("_id" << BSONNULL << "x" << 9.5)));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationOneDocNanDouble) {
-    runAggregationWithNoGroupByTest(
-        "{x: {$sum: '$b'}}",
+TEST_F(SbeStageBuilderGroupTest, SumAccumulatorTranslationOneDocNanDouble) {
+    runGroupAggregationTest(
+        "{_id: null, x: {$sum: '$b'}}",
         std::vector<BSONArray>{
             BSON_ARRAY(BSON("a" << 6 << "b" << std::numeric_limits<double>::quiet_NaN()))},
-        BSON_ARRAY(Value(std::numeric_limits<double>::quiet_NaN())));
+        BSON_ARRAY(BSON("_id" << BSONNULL << "x" << std::numeric_limits<double>::quiet_NaN())));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationIntAndLong) {
+TEST_F(SbeStageBuilderGroupTest, SumAccumulatorTranslationIntAndLong) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 4)),
                                        BSON_ARRAY(BSON("a" << 1 << "b" << 5ll))};
-    runAggregationWithNoGroupByTest("{x: {$sum: '$b'}}", docs, BSON_ARRAY(Value(9ll)));
+    runGroupAggregationTest(
+        "{_id: null, x: {$sum: '$b'}}", docs, BSON_ARRAY(BSON("_id" << BSONNULL << "x" << 9ll)));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationIntAndDouble) {
+TEST_F(SbeStageBuilderGroupTest, SumAccumulatorTranslationIntAndDouble) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 4)),
                                        BSON_ARRAY(BSON("a" << 1 << "b" << 5.5))};
-    runAggregationWithNoGroupByTest("{x: {$sum: '$b'}}", docs, BSON_ARRAY(9.5));
+    runGroupAggregationTest(
+        "{_id: null, x: {$sum: '$b'}}", docs, BSON_ARRAY(BSON("_id" << BSONNULL << "x" << 9.5)));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationLongAndDouble) {
+TEST_F(SbeStageBuilderGroupTest, SumAccumulatorTranslationLongAndDouble) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 4ll)),
                                        BSON_ARRAY(BSON("a" << 1 << "b" << 5.5))};
-    runAggregationWithNoGroupByTest("{x: {$sum: '$b'}}", docs, BSON_ARRAY(9.5));
+    runGroupAggregationTest(
+        "{_id: null, x: {$sum: '$b'}}", docs, BSON_ARRAY(BSON("_id" << BSONNULL << "x" << 9.5)));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationIntLongDouble) {
+TEST_F(SbeStageBuilderGroupTest, SumAccumulatorTranslationIntLongDouble) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 4)),
                                        BSON_ARRAY(BSON("a" << 1 << "b" << 4ll)),
                                        BSON_ARRAY(BSON("a" << 1 << "b" << 5.5))};
-    runAggregationWithNoGroupByTest("{x: {$sum: '$b'}}", docs, BSON_ARRAY(13.5));
+    runGroupAggregationTest(
+        "{_id: null, x: {$sum: '$b'}}", docs, BSON_ARRAY(BSON("_id" << BSONNULL << "x" << 13.5)));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationLongLongDecimal) {
+TEST_F(SbeStageBuilderGroupTest, SumAccumulatorTranslationLongLongDecimal) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 4ll)),
                                        BSON_ARRAY(BSON("a" << 1 << "b" << 4ll)),
                                        BSON_ARRAY(BSON("a" << 1 << "b" << Decimal128("5.5")))};
-    runAggregationWithNoGroupByTest("{x: {$sum: '$b'}}", docs, BSON_ARRAY(Decimal128("13.5")));
+    runGroupAggregationTest("{_id: null, x: {$sum: '$b'}}",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << BSONNULL << "x" << Decimal128("13.5"))));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationDoubleAndDecimal) {
+TEST_F(SbeStageBuilderGroupTest, SumAccumulatorTranslationDoubleAndDecimal) {
     const auto doubleVal = 4.2;
     DoubleDoubleSummation doubleDoubleSum;
     doubleDoubleSum.addDouble(doubleVal);
@@ -654,16 +630,19 @@ TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationDoubleAndDecimal) {
 
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << doubleVal)),
                                        BSON_ARRAY(BSON("a" << 1 << "b" << decimalVal))};
-    runAggregationWithNoGroupByTest("{x: {$sum: '$b'}}", docs, BSON_ARRAY(expected));
+    runGroupAggregationTest("{_id: null, x: {$sum: '$b'}}",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << BSONNULL << "x" << expected)));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationIntAndMissing) {
+TEST_F(SbeStageBuilderGroupTest, SumAccumulatorTranslationIntAndMissing) {
     auto docs =
         std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 4)), BSON_ARRAY(BSON("a" << 1))};
-    runAggregationWithNoGroupByTest("{x: {$sum: '$b'}}", docs, BSON_ARRAY(4));
+    runGroupAggregationTest(
+        "{_id: null, x: {$sum: '$b'}}", docs, BSON_ARRAY(BSON("_id" << BSONNULL << "x" << 4)));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationMixedTypesWithDecimal128) {
+TEST_F(SbeStageBuilderGroupTest, SumAccumulatorTranslationMixedTypesWithDecimal128) {
     const auto doubleVal1 = 4.8;
     const auto doubleVal2 = -5.0;
     const auto intVal = 6;
@@ -687,132 +666,153 @@ TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationMixedTypesWithDecimal
                                        BSON_ARRAY(BSON("a" << 3 << "b" << doubleVal2)),
                                        BSON_ARRAY(BSON("a" << 3 << "b" << BSONNULL)),
                                        BSON_ARRAY(BSON("a" << 3 << "b" << BSON("c" << 1)))};
-    runAggregationWithNoGroupByTest("{x: {$sum: '$b'}}", docs, BSON_ARRAY(expected));
+    runGroupAggregationTest("{_id: null, x: {$sum: '$b'}}",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << BSONNULL << "x" << expected)));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationDecimalSum) {
+TEST_F(SbeStageBuilderGroupTest, SumAccumulatorTranslationDecimalSum) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << Decimal128("-10.100"))),
                                        BSON_ARRAY(BSON("a" << 1 << "b" << Decimal128("20.200")))};
-    runAggregationWithNoGroupByTest("{x: {$sum: '$b'}}", docs, BSON_ARRAY(Decimal128("10.100")));
+    runGroupAggregationTest("{_id: null, x: {$sum: '$b'}}",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << BSONNULL << "x" << Decimal128("10.100"))));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationAllNull) {
+TEST_F(SbeStageBuilderGroupTest, SumAccumulatorTranslationAllNull) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << BSONNULL)),
                                        BSON_ARRAY(BSON("a" << 3 << "b" << BSONNULL)),
                                        BSON_ARRAY(BSON("a" << 3 << "b" << BSONNULL))};
-    runAggregationWithNoGroupByTest("{x: {$sum: '$b'}}", docs, BSON_ARRAY(0));
+    runGroupAggregationTest(
+        "{_id: null, x: {$sum: '$b'}}", docs, BSON_ARRAY(BSON("_id" << BSONNULL << "x" << 0)));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationAllMissing) {
+TEST_F(SbeStageBuilderGroupTest, SumAccumulatorTranslationAllMissing) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1)), BSON_ARRAY(BSON("a" << 1))};
-    runAggregationWithNoGroupByTest("{x: {$sum: '$b'}}", docs, BSON_ARRAY(0));
+    runGroupAggregationTest(
+        "{_id: null, x: {$sum: '$b'}}", docs, BSON_ARRAY(BSON("_id" << BSONNULL << "x" << 0)));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationSomeNonNumeric) {
+TEST_F(SbeStageBuilderGroupTest, SumAccumulatorTranslationSomeNonNumeric) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b"
                                                            << "c")),
                                        BSON_ARRAY(BSON("a" << 1 << "b" << 3)),
                                        BSON_ARRAY(BSON("a" << 1 << "b"
                                                            << "m")),
                                        BSON_ARRAY(BSON("a" << 1 << "b" << 4))};
-    runAggregationWithNoGroupByTest("{x: {$sum: '$b'}}", docs, BSON_ARRAY(7));
+    runGroupAggregationTest(
+        "{_id: null, x: {$sum: '$b'}}", docs, BSON_ARRAY(BSON("_id" << BSONNULL << "x" << 7)));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationTwoIntsDoNotOverflow) {
-    auto docs = std::vector<BSONArray>{
-        BSON_ARRAY(BSON("a" << 1 << "b" << Value(std::numeric_limits<int>::max()))),
-        BSON_ARRAY(BSON("a" << 1 << "b" << 10))};
-    runAggregationWithNoGroupByTest(
-        "{x: {$sum: '$b'}}", docs, BSON_ARRAY(Value(std::numeric_limits<int>::max() + 10LL)));
-}
-
-TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationTwoNegativeIntsDoNotOverflow) {
-    auto docs = std::vector<BSONArray>{
-        BSON_ARRAY(BSON("a" << 1 << "b" << Value(-std::numeric_limits<int>::max()))),
-        BSON_ARRAY(BSON("a" << 1 << "b" << -10))};
-    runAggregationWithNoGroupByTest(
-        "{x: {$sum: '$b'}}", docs, BSON_ARRAY(Value(-std::numeric_limits<int>::max() - 10LL)));
-}
-
-TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationIntAndLongDoNotTriggerIntOverflow) {
-    auto docs = std::vector<BSONArray>{
-        BSON_ARRAY(BSON("a" << 1 << "b" << Value(std::numeric_limits<int>::max()))),
-        BSON_ARRAY(BSON("a" << 1 << "b" << 1LL))};
-    runAggregationWithNoGroupByTest(
-        "{x: {$sum: '$b'}}",
+TEST_F(SbeStageBuilderGroupTest, SumAccumulatorTranslationTwoIntsDoNotOverflow) {
+    auto docs =
+        std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << std::numeric_limits<int>::max())),
+                               BSON_ARRAY(BSON("a" << 1 << "b" << 10))};
+    runGroupAggregationTest(
+        "{_id: null, x: {$sum: '$b'}}",
         docs,
-        BSON_ARRAY(Value(static_cast<long long>(std::numeric_limits<int>::max()) + 1)));
+        BSON_ARRAY(BSON("_id" << BSONNULL << "x" << std::numeric_limits<int>::max() + 10LL)));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationIntAndDoubleDoNotTriggerOverflow) {
-    auto docs = std::vector<BSONArray>{
-        BSON_ARRAY(BSON("a" << 1 << "b" << Value(std::numeric_limits<int>::max()))),
-        BSON_ARRAY(BSON("a" << 1 << "b" << 1.0))};
-    runAggregationWithNoGroupByTest(
-        "{x: {$sum: '$b'}}",
+TEST_F(SbeStageBuilderGroupTest, SumAccumulatorTranslationTwoNegativeIntsDoNotOverflow) {
+    auto docs =
+        std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << std::numeric_limits<int>::min())),
+                               BSON_ARRAY(BSON("a" << 1 << "b" << -10))};
+    // We need -10LL to cast MIN_INT to a long long. This simulates upconversion when int overflows.
+    runGroupAggregationTest(
+        "{_id: null, x: {$sum: '$b'}}",
         docs,
-        BSON_ARRAY(Value(static_cast<long long>(std::numeric_limits<int>::max()) + 1.0)));
+        BSON_ARRAY(BSON("_id" << BSONNULL << "x" << std::numeric_limits<int>::min() - 10LL)));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationIntAndLongOverflowIntoDouble) {
+TEST_F(SbeStageBuilderGroupTest, SumAccumulatorTranslationIntAndLongDoNotTriggerIntOverflow) {
+    auto docs =
+        std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << std::numeric_limits<int>::max())),
+                               BSON_ARRAY(BSON("a" << 1 << "b" << 1LL))};
+    runGroupAggregationTest(
+        "{_id: null, x: {$sum: '$b'}}",
+        docs,
+        BSON_ARRAY(BSON("_id" << BSONNULL << "x" << std::numeric_limits<int>::max() + 1LL)));
+}
+
+TEST_F(SbeStageBuilderGroupTest, SumAccumulatorTranslationIntAndDoubleDoNotTriggerOverflow) {
+    auto docs =
+        std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << std::numeric_limits<int>::max())),
+                               BSON_ARRAY(BSON("a" << 1 << "b" << 1.0))};
+    runGroupAggregationTest(
+        "{_id: null, x: {$sum: '$b'}}",
+        docs,
+        BSON_ARRAY(BSON("_id" << BSONNULL << "x" << std::numeric_limits<int>::max() + 1.0)));
+}
+
+TEST_F(SbeStageBuilderGroupTest, SumAccumulatorTranslationIntAndLongOverflowIntoDouble) {
     auto docs = std::vector<BSONArray>{
-        BSON_ARRAY(BSON("a" << 1 << "b" << Value(std::numeric_limits<long long>::max()))),
+        BSON_ARRAY(BSON("a" << 1 << "b" << std::numeric_limits<long long>::max())),
         BSON_ARRAY(BSON("a" << 1 << "b" << 1))};
-    runAggregationWithNoGroupByTest(
-        "{x: {$sum: '$b'}}",
+    runGroupAggregationTest(
+        "{_id: null, x: {$sum: '$b'}}",
         docs,
-        BSON_ARRAY(Value(-static_cast<double>(std::numeric_limits<long long>::min()))));
+        BSON_ARRAY(BSON("_id" << BSONNULL << "x"
+                              << static_cast<double>(std::numeric_limits<long long>::max()) + 1)));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationTwoLongsOverflowIntoDouble) {
+TEST_F(SbeStageBuilderGroupTest, SumAccumulatorTranslationTwoLongsOverflowIntoDouble) {
     auto docs = std::vector<BSONArray>{
-        BSON_ARRAY(BSON("a" << 1 << "b" << Value(std::numeric_limits<long long>::max()))),
-        BSON_ARRAY(BSON("a" << 1 << "b" << Value(std::numeric_limits<long long>::max())))};
-    runAggregationWithNoGroupByTest(
-        "{x: {$sum: '$b'}}",
+        BSON_ARRAY(BSON("a" << 1 << "b" << std::numeric_limits<long long>::max())),
+        BSON_ARRAY(BSON("a" << 1 << "b" << std::numeric_limits<long long>::max()))};
+    runGroupAggregationTest(
+        "{_id: null, x: {$sum: '$b'}}",
         docs,
-        BSON_ARRAY(Value(static_cast<double>(std::numeric_limits<long long>::max()) * 2)));
+        BSON_ARRAY(BSON("_id" << BSONNULL << "x"
+                              << static_cast<double>(std::numeric_limits<long long>::max()) * 2)));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationLongAndDoubleDoNotTriggerLongOverflow) {
+TEST_F(SbeStageBuilderGroupTest, SumAccumulatorTranslationLongAndDoubleDoNotTriggerLongOverflow) {
     auto docs = std::vector<BSONArray>{
-        BSON_ARRAY(BSON("a" << 1 << "b" << Value(std::numeric_limits<long long>::max()))),
+        BSON_ARRAY(BSON("a" << 1 << "b" << std::numeric_limits<long long>::max())),
         BSON_ARRAY(BSON("a" << 1 << "b" << 1.0))};
-    runAggregationWithNoGroupByTest(
-        "{x: {$sum: '$b'}}",
+    runGroupAggregationTest(
+        "{_id: null, x: {$sum: '$b'}}",
         docs,
-        BSON_ARRAY(Value(static_cast<double>(std::numeric_limits<long long>::max()))));
+        BSON_ARRAY(
+            BSON("_id" << BSONNULL << "x"
+                       << static_cast<double>(std::numeric_limits<long long>::max()) + 1.0)));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationTwoDoublesOverflowToInfinity) {
+TEST_F(SbeStageBuilderGroupTest, SumAccumulatorTranslationTwoDoublesOverflowToInfinity) {
     auto docs = std::vector<BSONArray>{
-        BSON_ARRAY(BSON("a" << 1 << "b" << Value(std::numeric_limits<double>::max()))),
-        BSON_ARRAY(BSON("a" << 1 << "b" << Value(std::numeric_limits<double>::max())))};
-    runAggregationWithNoGroupByTest(
-        "{x: {$sum: '$b'}}", docs, BSON_ARRAY(Value(std::numeric_limits<double>::infinity())));
+        BSON_ARRAY(BSON("a" << 1 << "b" << std::numeric_limits<double>::max())),
+        BSON_ARRAY(BSON("a" << 1 << "b" << std::numeric_limits<double>::max()))};
+    runGroupAggregationTest(
+        "{_id: null, x: {$sum: '$b'}}",
+        docs,
+        BSON_ARRAY(BSON("_id" << BSONNULL << "x" << std::numeric_limits<double>::infinity())));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationTwoIntegersDoNotOverflowIfDoubleAdded) {
+TEST_F(SbeStageBuilderGroupTest, SumAccumulatorTranslationTwoIntegersDoNotOverflowIfDoubleAdded) {
     auto docs = std::vector<BSONArray>{
-        BSON_ARRAY(BSON("a" << 1 << "b" << Value(std::numeric_limits<long long>::max()))),
-        BSON_ARRAY(BSON("a" << 1 << "b" << Value(std::numeric_limits<long long>::max()))),
+        BSON_ARRAY(BSON("a" << 1 << "b" << std::numeric_limits<long long>::max())),
+        BSON_ARRAY(BSON("a" << 1 << "b" << std::numeric_limits<long long>::max())),
         BSON_ARRAY(BSON("a" << 1 << "b" << 1.0))};
-    runAggregationWithNoGroupByTest(
-        "{x: {$sum: '$b'}}",
+    runGroupAggregationTest(
+        "{_id: null, x: {$sum: '$b'}}",
         docs,
-        BSON_ARRAY(Value(static_cast<double>(std::numeric_limits<long long>::max()) +
-                         static_cast<double>(std::numeric_limits<long long>::max()))));
+        BSON_ARRAY(BSON("_id" << BSONNULL << "x"
+                              << static_cast<double>(std::numeric_limits<long long>::max()) +
+                            static_cast<double>(std::numeric_limits<long long>::max()) + 1.0)));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationIntAndNanDouble) {
+TEST_F(SbeStageBuilderGroupTest, SumAccumulatorTranslationIntAndNanDouble) {
     auto docs = std::vector<BSONArray>{
         BSON_ARRAY(BSON("a" << 1 << "b" << 3)),
-        BSON_ARRAY(BSON("a" << 1 << "b" << Value(std::numeric_limits<double>::quiet_NaN())))};
-    runAggregationWithNoGroupByTest(
-        "{x: {$sum: '$b'}}", docs, BSON_ARRAY(Value(std::numeric_limits<double>::quiet_NaN())));
+        BSON_ARRAY(BSON("a" << 1 << "b" << std::numeric_limits<double>::quiet_NaN()))};
+    runGroupAggregationTest(
+        "{_id: null, x: {$sum: '$b'}}",
+        docs,
+        BSON_ARRAY(BSON("_id" << BSONNULL << "x" << std::numeric_limits<double>::quiet_NaN())));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationGroupByTest) {
+TEST_F(SbeStageBuilderGroupTest, SumAccumulatorTranslationGroupByTest) {
     auto docs = std::vector<BSONArray>{
         BSON_ARRAY(BSON("a" << 1 << "b" << 3)),
         BSON_ARRAY(BSON("a" << 1 << "b" << 4)),
@@ -820,48 +820,44 @@ TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationGroupByTest) {
         BSON_ARRAY(BSON("a" << 2 << "b"
                             << "a")),
     };
-    runAggregationWithGroupByTest("{x: {$sum: '$b'}}", docs, {"$a"}, BSON_ARRAY(7 << 13));
+    runGroupAggregationTest(
+        "{_id: '$a', x: {$sum: '$b'}}",
+        docs,
+        BSON_ARRAY(BSON("_id" << 1 << "x" << 3 + 4) << BSON("_id" << 2 << "x" << 13)));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, SumAccumulatorTranslationTwoGroupByTest) {
-    auto docs = std::vector<BSONArray>{
-        BSON_ARRAY(BSON("a" << 1 << "b" << 3 << "c" << 1)),
-        BSON_ARRAY(BSON("a" << 1 << "b" << 4 << "c" << 1)),
-        BSON_ARRAY(BSON("a" << 2 << "b" << 13 << "c" << 1)),
-        BSON_ARRAY(BSON("a" << 2 << "b"
-                            << "a"
-                            << "c" << 1)),
-    };
-    runAggregationWithGroupByTest("{x: {$sum: '$b'}}", docs, {"$a", "$c"}, BSON_ARRAY(20));
-}
-
-TEST_F(SbeAccumulatorBuilderTest, AvgAccumulatorTranslationSmallIntegers) {
+TEST_F(SbeStageBuilderGroupTest, AvgAccumulatorTranslationSmallIntegers) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 2)),
                                        BSON_ARRAY(BSON("a" << 2 << "b" << 4)),
                                        BSON_ARRAY(BSON("a" << 3 << "b" << 6))};
-    runAggregationWithNoGroupByTest(
-        "{x: {$avg: '$b'}}", docs, BSON_ARRAY(Value(static_cast<double>(2 + 4 + 6) / 3)));
+    runGroupAggregationTest(
+        "{_id: null, x: {$avg: '$b'}}",
+        docs,
+        BSON_ARRAY(BSON("_id" << BSONNULL << "x" << static_cast<double>(2 + 4 + 6) / 3)));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, AvgAccumulatorTranslationIntegerInputsNonIntegerAverage) {
+TEST_F(SbeStageBuilderGroupTest, AvgAccumulatorTranslationIntegerInputsNonIntegerAverage) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 1)),
                                        BSON_ARRAY(BSON("a" << 2 << "b" << 2))};
-    runAggregationWithNoGroupByTest(
-        "{x: {$avg: '$b'}}", docs, BSON_ARRAY(Value(static_cast<double>(1 + 2) / 2)));
+    runGroupAggregationTest(
+        "{_id: null, x: {$avg: '$b'}}",
+        docs,
+        BSON_ARRAY(BSON("_id" << BSONNULL << "x" << static_cast<double>(1 + 2) / 2)));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, AvgAccumulatorTranslationVariousNumberTypes) {
+TEST_F(SbeStageBuilderGroupTest, AvgAccumulatorTranslationVariousNumberTypes) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 1.0)),
                                        BSON_ARRAY(BSON("a" << 2 << "b" << 2ll)),
                                        BSON_ARRAY(BSON("a" << 3 << "b" << Decimal128(3.0))),
                                        BSON_ARRAY(BSON("a" << 4 << "b" << 4))};
-    runAggregationWithNoGroupByTest(
-        "{x: {$avg: '$b'}}",
+    runGroupAggregationTest(
+        "{_id: null, x: {$avg: '$b'}}",
         docs,
-        BSON_ARRAY(Value(Decimal128(static_cast<double>(1 + 2 + 3 + 4) / 4))));
+        BSON_ARRAY(
+            BSON("_id" << BSONNULL << "x" << Decimal128(static_cast<double>(1 + 2 + 3 + 4) / 4))));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, AvgAccumulatorTranslationNonNumericFields) {
+TEST_F(SbeStageBuilderGroupTest, AvgAccumulatorTranslationNonNumericFields) {
     auto docs = std::vector<BSONArray>{
         BSON_ARRAY(BSON("a" << 1 << "b" << 1)),
         BSON_ARRAY(BSON("a" << 2 << "b"
@@ -870,77 +866,89 @@ TEST_F(SbeAccumulatorBuilderTest, AvgAccumulatorTranslationNonNumericFields) {
         BSON_ARRAY(BSON("a" << 4 << "b" << BSON("x" << 42))),
         BSON_ARRAY(BSON("a" << 5 << "b" << 6)),
     };
-    runAggregationWithNoGroupByTest(
-        "{x: {$avg: '$b'}}", docs, BSON_ARRAY(Value(static_cast<double>(1 + 6) / 2)));
+    runGroupAggregationTest(
+        "{_id: null, x: {$avg: '$b'}}",
+        docs,
+        BSON_ARRAY(BSON("_id" << BSONNULL << "x" << static_cast<double>(1 + 6) / 2)));
 }
 
 // NaN is a numeric value, so the average of NaN is NaN and not null.
-TEST_F(SbeAccumulatorBuilderTest, AvgAccumulatorTranslationNan) {
+TEST_F(SbeStageBuilderGroupTest, AvgAccumulatorTranslationNan) {
     auto docs = std::vector<BSONArray>{
         BSON_ARRAY(BSON("a" << 5 << "b" << std::numeric_limits<double>::quiet_NaN())),
     };
-    runAggregationWithNoGroupByTest(
-        "{x: {$avg: '$b'}}", docs, BSON_ARRAY(Value(std::numeric_limits<double>::quiet_NaN())));
+    runGroupAggregationTest(
+        "{_id: null, x: {$avg: '$b'}}",
+        docs,
+        BSON_ARRAY(BSON("_id" << BSONNULL << "x" << std::numeric_limits<double>::quiet_NaN())));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, AvgAccumulatorTranslationMissingSomeFields) {
+TEST_F(SbeStageBuilderGroupTest, AvgAccumulatorTranslationMissingSomeFields) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 1)),
                                        BSON_ARRAY(BSON("a" << 2)),
                                        BSON_ARRAY(BSON("a" << 3 << "b" << 3))};
-    runAggregationWithNoGroupByTest(
-        "{x: {$avg: '$b'}}", docs, BSON_ARRAY(Value(static_cast<double>(1 + 3) / 2)));
+    runGroupAggregationTest(
+        "{_id: null, x: {$avg: '$b'}}",
+        docs,
+        BSON_ARRAY(BSON("_id" << BSONNULL << "x" << static_cast<double>(1 + 3) / 2)));
 }
 
 // Notice, that $sum in the following two cases returns zero, but $avg is undefined and should
 // return null.
-TEST_F(SbeAccumulatorBuilderTest, AvgAccumulatorTranslationMissingAllFields) {
+TEST_F(SbeStageBuilderGroupTest, AvgAccumulatorTranslationMissingAllFields) {
     auto docs = std::vector<BSONArray>{
         BSON_ARRAY(BSON("a" << 1)), BSON_ARRAY(BSON("a" << 2)), BSON_ARRAY(BSON("a" << 3))};
-    runAggregationWithNoGroupByTest("{x: {$avg: '$b'}}", docs, BSON_ARRAY(BSONNULL));
+    runGroupAggregationTest("{_id: null, x: {$avg: '$b'}}",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << BSONNULL << "x" << BSONNULL)));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, AvgAccumulatorTranslationMissingOrNonNumericFields) {
+TEST_F(SbeStageBuilderGroupTest, AvgAccumulatorTranslationMissingOrNonNumericFields) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1)),
                                        BSON_ARRAY(BSON("b" << BSON("x" << 42)))};
-    runAggregationWithNoGroupByTest("{x: {$avg: '$b'}}", docs, BSON_ARRAY(BSONNULL));
+    runGroupAggregationTest("{_id: null, x: {$avg: '$b'}}",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << BSONNULL << "x" << BSONNULL)));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, AvgAccumulatorTranslationWithGrouping) {
+TEST_F(SbeStageBuilderGroupTest, AvgAccumulatorTranslationWithGrouping) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 2)),
                                        BSON_ARRAY(BSON("a" << 1 << "b" << 4)),
                                        BSON_ARRAY(BSON("a" << 3 << "b" << 6)),
                                        BSON_ARRAY(BSON("a" << 3 << "b" << 8))};
-    runAggregationWithGroupByTest(
-        "{x: {$avg: '$b'}}", docs, {"$a"}, BSON_ARRAY((2 + 4) / 2 << (6 + 8) / 2));
+    runGroupAggregationTest("{_id: '$a', x: {$avg: '$b'}}",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << 1 << "x" << (2 + 4) / 2)
+                                       << BSON("_id" << 3 << "x" << (6 + 8) / 2)));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, AddToSetAccumulatorTranslationSingleDoc) {
+TEST_F(SbeStageBuilderGroupTest, AddToSetAccumulatorTranslationSingleDoc) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 1))};
-    runAddToSetTest("{x: {$addToSet: '$b'}}", docs, BSON_ARRAY(1));
+    runAddToSetTest("{_id: null, x: {$addToSet: '$b'}}", docs, BSON_ARRAY(1));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, AddToSetAccumulatorTranslationBasic) {
+TEST_F(SbeStageBuilderGroupTest, AddToSetAccumulatorTranslationBasic) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 3)),
                                        BSON_ARRAY(BSON("a" << 2 << "b" << 1)),
                                        BSON_ARRAY(BSON("a" << 3 << "b" << 2))};
-    runAddToSetTest("{x: {$addToSet: '$b'}}", docs, BSON_ARRAY(1 << 2 << 3));
+    runAddToSetTest("{_id: null, x: {$addToSet: '$b'}}", docs, BSON_ARRAY(1 << 2 << 3));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, AddToSetAccumulatorTranslationSubfield) {
+TEST_F(SbeStageBuilderGroupTest, AddToSetAccumulatorTranslationSubfield) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << BSON("c" << 1))),
                                        BSON_ARRAY(BSON("a" << 2 << "b" << BSON("c" << 2))),
                                        BSON_ARRAY(BSON("a" << 3 << "b" << BSON("c" << 3)))};
-    runAddToSetTest("{x: {$addToSet: '$b.c'}}", docs, BSON_ARRAY(1 << 2 << 3));
+    runAddToSetTest("{_id: null, x: {$addToSet: '$b.c'}}", docs, BSON_ARRAY(1 << 2 << 3));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, AddToSetAccumulatorTranslationRepeatedValue) {
+TEST_F(SbeStageBuilderGroupTest, AddToSetAccumulatorTranslationRepeatedValue) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 2)),
                                        BSON_ARRAY(BSON("a" << 2 << "b" << 1)),
                                        BSON_ARRAY(BSON("a" << 3 << "b" << 2))};
-    runAddToSetTest("{x: {$addToSet: '$b'}}", docs, BSON_ARRAY(1 << 2));
+    runAddToSetTest("{_id: null, x: {$addToSet: '$b'}}", docs, BSON_ARRAY(1 << 2));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, AddToSetAccumulatorTranslationMixedTypes) {
+TEST_F(SbeStageBuilderGroupTest, AddToSetAccumulatorTranslationMixedTypes) {
     const auto bsonArr = BSON_ARRAY(1 << 2 << 3);
     const auto bsonObj = BSON("c" << 1);
     const auto strVal = "hello"_sd;
@@ -951,79 +959,59 @@ TEST_F(SbeAccumulatorBuilderTest, AddToSetAccumulatorTranslationMixedTypes) {
                                        BSON_ARRAY(BSON("a" << 5 << "b" << bsonObj)),
                                        BSON_ARRAY(BSON("a" << 6 << "b" << bsonArr))};
     auto expectedSet = BSON_ARRAY(42 << 4.2 << true << strVal << bsonObj << bsonArr);
-    runAddToSetTest("{x: {$addToSet: '$b'}}", docs, expectedSet);
+    runAddToSetTest("{_id: null, x: {$addToSet: '$b'}}", docs, expectedSet);
 }
 
-TEST_F(SbeAccumulatorBuilderTest, AddToSetAccumulatorTranslationSomeMissingFields) {
+TEST_F(SbeStageBuilderGroupTest, AddToSetAccumulatorTranslationSomeMissingFields) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1)),
                                        BSON_ARRAY(BSON("a" << 2 << "b" << 2)),
                                        BSON_ARRAY(BSON("a" << 3 << "b" << BSONNULL)),
                                        BSON_ARRAY(BSON("a" << 4 << "c" << 1))};
-    runAddToSetTest("{x: {$addToSet: '$b'}}", docs, BSON_ARRAY(BSONNULL << 2));
+    runAddToSetTest("{_id: null, x: {$addToSet: '$b'}}", docs, BSON_ARRAY(BSONNULL << 2));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, AddToSetAccumulatorTranslationAllMissingFields) {
+TEST_F(SbeStageBuilderGroupTest, AddToSetAccumulatorTranslationAllMissingFields) {
     auto docs = std::vector<BSONArray>{
         BSON_ARRAY(BSON("a" << 1)), BSON_ARRAY(BSON("a" << 2)), BSON_ARRAY(BSON("a" << 3))};
-    runAddToSetTest("{x: {$addToSet: '$b'}}", docs, BSONArray{});
+    runAddToSetTest("{_id: null, x: {$addToSet: '$b'}}", docs, BSONArray{});
 }
 
-TEST_F(SbeAccumulatorBuilderTest, PushAccumulatorTranslationNoDocs) {
+TEST_F(SbeStageBuilderGroupTest, PushAccumulatorTranslationNoDocs) {
     auto docs = std::vector<BSONArray>{BSONArray{}};
-    runAggregationWithNoGroupByTest("{x: {$push: '$b'}}", docs, BSON_ARRAY(BSONArray{}));
+    runGroupAggregationTest("{_id: null, x: {$push: '$b'}}",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << BSONNULL << "x" << BSONArray{})));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, PushAccumulatorTranslationBasic) {
+TEST_F(SbeStageBuilderGroupTest, PushAccumulatorTranslationBasic) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 3)),
                                        BSON_ARRAY(BSON("a" << 2 << "b" << 1)),
                                        BSON_ARRAY(BSON("a" << 3 << "b" << 2)),
                                        BSON_ARRAY(BSON("a" << 1 << "b" << 3))};
-    runAggregationWithNoGroupByTest(
-        "{x: {$push: '$b'}}", docs, BSON_ARRAY(BSON_ARRAY(3 << 1 << 2 << 3)));
+    runGroupAggregationTest(
+        "{_id: null, x: {$push: '$b'}}",
+        docs,
+        BSON_ARRAY(BSON("_id" << BSONNULL << "x" << BSON_ARRAY(3 << 1 << 2 << 3))));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, PushAccumulatorTranslationSomeMissing) {
+TEST_F(SbeStageBuilderGroupTest, PushAccumulatorTranslationSomeMissing) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 3)),
                                        BSON_ARRAY(BSON("a" << 2 << "b" << 1)),
                                        BSON_ARRAY(BSON("a" << 3))};
-    runAggregationWithNoGroupByTest("{x: {$push: '$b'}}", docs, BSON_ARRAY(BSON_ARRAY(3 << 1)));
+    runGroupAggregationTest("{_id: null, x: {$push: '$b'}}",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << BSONNULL << "x" << BSON_ARRAY(3 << 1))));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, PushAccumulatorTranslationAllMissing) {
+TEST_F(SbeStageBuilderGroupTest, PushAccumulatorTranslationAllMissing) {
     auto docs = std::vector<BSONArray>{
         BSON_ARRAY(BSON("a" << 1)), BSON_ARRAY(BSON("a" << 2)), BSON_ARRAY(BSON("a" << 3))};
-    runAggregationWithNoGroupByTest("{x: {$push: '$b'}}", docs, BSON_ARRAY(BSONArray{}));
+    runGroupAggregationTest("{_id: null, x: {$push: '$b'}}",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << BSONNULL << "x" << BSONArray{})));
 }
 
-TEST_F(SbeAccumulatorBuilderTest, PushAccumulatorTranslationExpression) {
-    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 3)),
-                                       BSON_ARRAY(BSON("a" << 2 << "b" << 1)),
-                                       BSON_ARRAY(BSON("a" << 3 << "b" << 2))};
-    runAggregationWithNoGroupByTest(
-        "{x: {$push: {$add: ['$a','$b']}}}", docs, BSON_ARRAY(BSON_ARRAY(1 + 3 << 2 + 1 << 3 + 2)));
-}
-
-TEST_F(SbeAccumulatorBuilderTest, PushAccumulatorTranslationExpressionMissingField) {
-    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 3)),
-                                       BSON_ARRAY(BSON("a" << 2 << "b" << 1)),
-                                       BSON_ARRAY(BSON("a" << 3))};
-    runAggregationWithNoGroupByTest(
-        "{x: {$push: {$add: ['$a','$b']}}}",
-        docs,
-        BSON_ARRAY(BSON_ARRAY(1 + 3 << 2 + 1 << BSONNULL /*3 + Nothing*/)));
-}
-
-TEST_F(SbeAccumulatorBuilderTest, PushAccumulatorTranslationExpressionInvalid) {
-    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 3)),
-                                       BSON_ARRAY(BSON("a" << 2 << "b" << 1)),
-                                       BSON_ARRAY(BSON("a" << 3 << "b"
-                                                           << "hello"))};
-    ASSERT_THROWS(
-        runAggregationWithNoGroupByTest("{x: {$push: {$add: ['$a','$b']}}}", docs, BSONArray{}),
-        AssertionException);
-}
-
-TEST_F(SbeAccumulatorBuilderTest, PushAccumulatorTranslationVariousTypes) {
+TEST_F(SbeStageBuilderGroupTest, PushAccumulatorTranslationVariousTypes) {
     const auto bsonArr = BSON_ARRAY(1 << 2 << 3);
     const auto bsonObj = BSON("c" << 1);
     const auto strVal = "hello"_sd;
@@ -1033,10 +1021,42 @@ TEST_F(SbeAccumulatorBuilderTest, PushAccumulatorTranslationVariousTypes) {
                                        BSON_ARRAY(BSON("a" << 4 << "b" << strVal)),
                                        BSON_ARRAY(BSON("a" << 5 << "b" << bsonObj)),
                                        BSON_ARRAY(BSON("a" << 6 << "b" << bsonArr))};
-    runAggregationWithNoGroupByTest(
-        "{x: {$push: '$b'}}",
+    runGroupAggregationTest(
+        "{_id: null, x: {$push: '$b'}}",
         docs,
-        BSON_ARRAY(BSON_ARRAY(42 << 4.2 << true << strVal << bsonObj << bsonArr)));
+        BSON_ARRAY(BSON("_id" << BSONNULL << "x"
+                              << BSON_ARRAY(42 << 4.2 << true << strVal << bsonObj << bsonArr))));
+}
+
+TEST_F(SbeStageBuilderGroupTest, PushAccumulatorTranslationExpression) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 3)),
+                                       BSON_ARRAY(BSON("a" << 2 << "b" << 1)),
+                                       BSON_ARRAY(BSON("a" << 3 << "b" << 2))};
+    runGroupAggregationTest(
+        "{_id: null, x: {$push: {$add: ['$a', '$b']}}}",
+        docs,
+        BSON_ARRAY(BSON("_id" << BSONNULL << "x" << BSON_ARRAY(1 + 3 << 2 + 1 << 3 + 2))));
+}
+
+TEST_F(SbeStageBuilderGroupTest, PushAccumulatorTranslationExpressionMissingField) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 3)),
+                                       BSON_ARRAY(BSON("a" << 2 << "b" << 1)),
+                                       BSON_ARRAY(BSON("a" << 3))};
+    runGroupAggregationTest(
+        "{_id: null, x: {$push: {$add: ['$a', '$b']}}}",
+        docs,
+        BSON_ARRAY(BSON("_id" << BSONNULL << "x"
+                              << BSON_ARRAY(1 + 3 << 2 + 1 << BSONNULL /*3 + Nothing*/))));
+}
+
+TEST_F(SbeStageBuilderGroupTest, PushAccumulatorTranslationExpressionInvalid) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 3)),
+                                       BSON_ARRAY(BSON("a" << 2 << "b" << 1)),
+                                       BSON_ARRAY(BSON("a" << 3 << "b"
+                                                           << "hello"))};
+    ASSERT_THROWS(
+        runGroupAggregationTest("{_id: null, x: {$push: {$add: ['$a', '$b']}}}", docs, BSONArray{}),
+        AssertionException);
 }
 
 class AccumulatorSBEIncompatible final : public AccumulatorState {
@@ -1055,45 +1075,48 @@ public:
         return new AccumulatorSBEIncompatible(expCtx);
     }
 };
+
 REGISTER_ACCUMULATOR(
     incompatible,
     genericParseSBEUnsupportedSingleExpressionAccumulator<AccumulatorSBEIncompatible>);
 
-TEST_F(SbeAccumulatorBuilderTest, SbeGroupCompatibleFlag) {
+TEST_F(SbeStageBuilderGroupTest, SbeGroupCompatibleFlag) {
     std::vector<BSONArray> docs;
     std::vector<std::string> testCases = {
-        "agg: {$addToSet: \"$item\"}",
-        "agg: {$avg: \"$quantity\"}",
-        "agg: {$first: \"$item\"}",
-        "agg: {$last: \"$item\"}",
+        R"(_id: null, agg: {$addToSet: "$item"})",
+        R"(_id: null, agg: {$avg: "$quantity"})",
+        R"(_id: null, agg: {$first: "$item"})",
+        R"(_id: null, agg: {$last: "$item"})",
         // TODO (SERVER-51541): Uncomment the following two test cases when $object supported is
         // added to SBE.
-        // "agg: {$_internalJsReduce: {data: {k: \"$word\", v: \"$val\"}, eval: \"null\"}}",
+        // R"(_id: null, agg: {$_internalJsReduce: {data: {k: "$word", v: "$val"}, eval: "null"}})",
         //
-        // R"'(agg: {$accumulator: {init: "a", accumulate: "b", accumulateArgs: ["$copies"], merge:
-        // "c", lang: "js"}})'",
-        "agg: {$mergeObjects: \"$item\"}",
-        "agg: {$min: \"$item\"}",
-        "agg: {$max: \"$item\"}",
-        "agg: {$push: \"$item\"}",
-        "agg: {$stdDevPop: \"$item\"}",
-        "agg: {$stdDevSamp: \"$item\"}",
-        "agg: {$sum: \"$item\"}",
+        // R"(_id: null, agg: {$accumulator: {init: "a", accumulate: "b", accumulateArgs:
+        // ["$copies"], merge: "c", lang: "js"}})",
+        R"(_id: null, agg: {$mergeObjects: "$item"})",
+        R"(_id: null, agg: {$min: "$item"})",
+        R"(_id: null, agg: {$max: "$item"})",
+        R"(_id: null, agg: {$push: "$item"})",
+        R"(_id: null, agg: {$stdDevPop: "$item"})",
+        R"(_id: null, agg: {$stdDevSamp: "$item"})",
+        R"(_id: null, agg: {$sum: "$item"})",
+        R"(_id: {a: "$a", b: "$b"})",
         // All supported case.
-        "agg1: {$sum: \"$item\"}, agg2: {$max: \"$item\"}, agg3: {$avg: \"$quantity\"}",
+        R"(_id: null, agg1: {$sum: "$item"}, agg2: {$max: "$item"}, agg3: {$avg: "$quantity"})",
         // Mix of supported/unsupported accumulators.
-        "agg1: {$sum: \"$item\"}, agg2: {$incompatible: \"$item\"}, agg3: {$avg: \"$a\"}",
-        "agg1: {$incompatible: \"$item\"}, agg2: {$min: \"$item\"}, agg3: {$avg: \"$quantity\"}",
+        R"(_id: null, agg1: {$sum: "$item"}, agg2: {$incompatible: "$item"}, agg3: {$avg: "$a"})",
+        R"(_id: null, agg1: {$incompatible: "$item"}, agg2: {$min: "$item"}, agg3: {$avg: "$quantity"})",
     };
+
     boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContextForTest());
-    std::vector<BSONObj> rawPipelines;
-    rawPipelines.reserve(testCases.size());
+    std::vector<BSONObj> groupSpecs;
+    groupSpecs.reserve(testCases.size());
     for (auto testCase : testCases) {
-        auto groupObj = fromjson(fmt::sprintf("{$group: {%s, _id: null}}", testCase));
-        rawPipelines.push_back(groupObj);
-        runSbeGroupCompatibleFlagTest(makeVector(groupObj), expCtx);
+        auto groupSpec = fromjson(fmt::sprintf("{%s}", testCase));
+        runSbeGroupCompatibleFlagTest({groupSpec}, expCtx);
+        groupSpecs.push_back(groupSpec);
     }
-    runSbeGroupCompatibleFlagTest(rawPipelines, expCtx);
+    runSbeGroupCompatibleFlagTest(groupSpecs, expCtx);
 }
 
 }  // namespace mongo

@@ -33,6 +33,8 @@
 
 #include "mongo/db/query/sbe_stage_builder.h"
 
+#include <fmt/format.h>
+
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
 #include "mongo/db/exec/sbe/stages/filter.h"
@@ -55,7 +57,9 @@
 #include "mongo/db/fts/fts_query_impl.h"
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/index/fts_access_method.h"
+#include "mongo/db/query/sbe_stage_builder_accumulator.h"
 #include "mongo/db/query/sbe_stage_builder_coll_scan.h"
+#include "mongo/db/query/sbe_stage_builder_expression.h"
 #include "mongo/db/query/sbe_stage_builder_filter.h"
 #include "mongo/db/query/sbe_stage_builder_index_scan.h"
 #include "mongo/db/query/sbe_stage_builder_projection.h"
@@ -2051,6 +2055,217 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     return {std::move(mergeJoinStage), std::move(outputs)};
 }
 
+namespace {
+const auto kGroupBySlots = 1;
+
+std::pair<sbe::value::SlotId, EvalStage> generateGroupByKey(
+    StageBuilderState& state,
+    Expression* expr,
+    std::unique_ptr<sbe::PlanStage> childStage,
+    sbe::value::SlotId rootSlot,
+    PlanNodeId nodeId,
+    sbe::value::SlotIdGenerator* slotIdGenerator) {
+    // TODO SERVER-59951: make object form of the '_id' group-by expression work to handle multiple
+    // group-by keys.
+    auto [groupByEvalExpr, groupByEvalStage] = stage_builder::generateExpression(
+        state, expr, stage_builder::EvalStage{std::move(childStage), {}}, rootSlot, nodeId);
+
+    return projectEvalExpr(
+        std::move(groupByEvalExpr), std::move(groupByEvalStage), nodeId, slotIdGenerator);
+}
+
+std::tuple<sbe::value::SlotVector, EvalStage> generateAccumulator(
+    StageBuilderState& state,
+    const AccumulationStatement& accStmt,
+    EvalStage childEvalStage,
+    sbe::value::SlotId rootSlot,
+    PlanNodeId nodeId,
+    sbe::value::SlotIdGenerator* slotIdGenerator,
+    sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>>& accSlotToExprMap) {
+    // Input fields may need field traversal which ends up being a complex tree.
+    auto [argExpr, accArgEvalStage] =
+        stage_builder::buildArgument(state, accStmt, std::move(childEvalStage), rootSlot, nodeId);
+
+    // One accumulator may be translated to multiple accumulator expressions. For example, The
+    // $avg will have two accumulators expressions, a sum(..) and a count which is implemented
+    // as sum(1).
+    auto [accExprs, accProjEvalStage] = stage_builder::buildAccumulator(
+        state, accStmt, std::move(accArgEvalStage), std::move(argExpr), nodeId);
+
+    sbe::value::SlotVector aggSlots;
+    for (auto& accExpr : accExprs) {
+        auto slot = slotIdGenerator->generate();
+        aggSlots.push_back(slot);
+        accSlotToExprMap.emplace(slot, std::move(accExpr));
+    }
+
+    return {std::move(aggSlots), std::move(accProjEvalStage)};
+}
+
+std::tuple<std::vector<std::string>, sbe::value::SlotVector, EvalStage> generateGroupFinalStage(
+    StageBuilderState& state,
+    EvalStage groupEvalStage,
+    const std::vector<AccumulationStatement>& accStmts,
+    sbe::value::SlotId groupBySlot,
+    const std::vector<sbe::value::SlotVector>& aggSlotsVec,
+    PlanNodeId nodeId,
+    sbe::value::SlotIdGenerator* slotIdGenerator) {
+    // Builds the final stage(s) over the collected accumulators.
+    sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> prjSlotToExprMap;
+    sbe::value::SlotVector groupOutSlots{groupEvalStage.outSlots};
+    // To passthrough the output slots of accumulators with trivial finalizers, we need to find
+    // their slot ids. We can do this by sorting 'groupEvalStage.outSlots' because the slot ids
+    // correspond to the order in which the accumulators were translated (that is, the order in
+    // which they are listed in 'accStmts'). Note, that 'groupEvalStage.outSlots' contains groupBy
+    // slots at the front and the accumulator slots at the back.
+    std::sort(groupOutSlots.begin() + kGroupBySlots, groupOutSlots.end());
+
+    auto finalSlots{sbe::value::SlotVector{groupBySlot}};
+    finalSlots.reserve(kGroupBySlots + accStmts.size());
+    std::vector<std::string> fieldNames{"_id"};
+    fieldNames.reserve(kGroupBySlots + accStmts.size());
+    auto groupFinalEvalStage = std::move(groupEvalStage);
+    for (size_t i = 0; i < accStmts.size(); ++i) {
+        // Gathers field names for the output object from accumulator statements.
+        fieldNames.push_back(accStmts[i].fieldName);
+        auto [finalExpr, tempEvalStage] = stage_builder::buildFinalize(
+            state, accStmts[i], aggSlotsVec[i], std::move(groupFinalEvalStage), nodeId);
+
+        // The final step may not return an expression if it's trivial. For example, $first and
+        // $last's final steps are trivial.
+        if (finalExpr) {
+            auto outSlot = slotIdGenerator->generate();
+            finalSlots.push_back(outSlot);
+            prjSlotToExprMap.emplace(outSlot, std::move(finalExpr));
+        } else {
+            finalSlots.push_back(groupOutSlots[kGroupBySlots + i]);
+        }
+
+        groupFinalEvalStage = std::move(tempEvalStage);
+    }
+
+    // Gathers all accumulator results. If there're no project expressions, does not add a project
+    // stage.
+    groupFinalEvalStage = prjSlotToExprMap.empty()
+        ? std::move(groupFinalEvalStage)
+        : makeProject(std::move(groupFinalEvalStage), std::move(prjSlotToExprMap), nodeId);
+
+    return {std::move(fieldNames), std::move(finalSlots), std::move(groupFinalEvalStage)};
+}
+}  // namespace
+
+/**
+ * Translates a 'GroupNode' QSN into a sbe::PlanStage tree. This translation logic assumes that the
+ * only child of the 'GroupNode' must return an Object (or 'BSONObject') and the translated sub-tree
+ * must return 'BSONObject'. The returned 'BSONObject' will always have an "_id" field for the group
+ * key and zero or more field(s) for accumulators.
+ *
+ * For example, a QSN tree: GroupNode(nodeId=2) over a VirtualScanNode(nodeId=1), we would have the
+ * following translated sbe::PlanStage tree. In this example, we assume that the $group pipeline
+ * spec is {"_id": "$a", "x": {"$min": "$b"}, "y": {"$first": "$b"}}.
+ *
+ * [2] mkbson s14 [_id = s8, x = s13, y = s12] true false
+ * [2] project [s13 = fillEmpty (s11, null)]
+ * [2] group [s8] [s11 = min (if (! exists (s9) || typeMatch (s9, 0x00000440), Nothing, s9)),
+ *                 s12 = first (fillEmpty (s10, null))]
+ * [2] project [s10 = getField (s7, "b")]
+ * [2] project [s9 = getField (s7, "b")]
+ * [2] project [s8 = getField (s7, "a")]
+ * [1] project [s7 = getElement (s5, 0)]
+ * [1] unwind s5 s6 s4 false
+ * [1] project [s4 = [[{"a" : 1, "b" : 1}], [{"a" : 1, "b" : 2}], [{"a" : 2, "b" : 3}]]]
+ * [1] limit 1 [1] coscan
+ */
+std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildGroup(
+    const QuerySolutionNode* root, const PlanStageReqs& reqs) {
+    using namespace fmt::literals;
+
+    auto groupNode = static_cast<const GroupNode*>(root);
+    auto nodeId = groupNode->nodeId();
+    const auto& idExpr = groupNode->groupByExpressions;
+
+    tassert(
+        5851600, "should have one and only one child for GROUP", groupNode->children.size() == 1);
+    tassert(5851601, "{} slot should have been requested"_format(kResult), reqs.has(kResult));
+    tassert(
+        5851602, "{} slot must not have been requested"_format(kRecordId), !reqs.has(kRecordId));
+
+    // If _id expression produces a scalar value, groupByExpressions must have only one element for
+    // "_id" field. Otherwise, _id expression produces a document.
+    //
+    // Supports scalar _id expression only for now.
+    uassert(5851603,
+            "GROUP does not support document _id expression",
+            idExpr.size() == kGroupBySlots && idExpr.contains("_id"));
+
+    // Builds the child and gets the child result slot.
+    auto [childStage, childOutputs] = build(groupNode->children[0], reqs);
+    auto childResult = childOutputs.get(kResult);
+    _shouldProduceRecordIdSlot = false;
+
+    // Translates the group-by expression and binds it to a slot in a project stage.
+    auto [groupBySlot, groupByEvalStage] = generateGroupByKey(_state,
+                                                              idExpr.at("_id").get(),
+                                                              std::move(childStage),
+                                                              childResult,
+                                                              nodeId,
+                                                              &_slotIdGenerator);
+
+    // Translates accumulators which are executed inside the group stage and gets slots for
+    // accumulators.
+    const auto& accStmts = groupNode->accumulators;
+    stage_builder::EvalStage accProjEvalStage = std::move(groupByEvalStage);
+    sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> accSlotToExprMap;
+    std::vector<sbe::value::SlotVector> aggSlotsVec;
+    for (const auto& accStmt : accStmts) {
+        auto [aggSlots, tempEvalStage] = generateAccumulator(_state,
+                                                             accStmt,
+                                                             std::move(accProjEvalStage),
+                                                             childResult,
+                                                             nodeId,
+                                                             &_slotIdGenerator,
+                                                             accSlotToExprMap);
+        aggSlotsVec.emplace_back(std::move(aggSlots));
+        accProjEvalStage = std::move(tempEvalStage);
+    }
+
+    // Builds a group stage with accumulator expressions and a group-by slot.
+    auto groupEvalStage = makeHashAgg(std::move(accProjEvalStage),
+                                      {groupBySlot},
+                                      std::move(accSlotToExprMap),
+                                      boost::none,
+                                      nodeId);
+
+    // Builds the final stage(s) over the collected accumulators.
+    auto [fieldNames, finalSlots, groupFinalEvalStage] =
+        generateGroupFinalStage(_state,
+                                std::move(groupEvalStage),
+                                accStmts,
+                                groupBySlot,
+                                aggSlotsVec,
+                                nodeId,
+                                &_slotIdGenerator);
+
+    // Builds a stage to create a result object out of a group-by slot and gathered accumulator
+    // result slots.
+    PlanStageSlots outputs;
+    outputs.set(kResult, _slotIdGenerator.generate());
+    // This mkbson stage combines 'finalSlots' into a bsonObject result slot which has 'fieldNames'
+    // fields.
+    auto outStage = sbe::makeS<sbe::MakeBsonObjStage>(std::move(groupFinalEvalStage.stage),
+                                                      outputs.get(kResult),        // objSlot
+                                                      boost::none,                 // rootSlot
+                                                      boost::none,                 // fieldBehavior
+                                                      std::vector<std::string>{},  // fields
+                                                      std::move(fieldNames),       // projectFields
+                                                      std::move(finalSlots),       // projectVars
+                                                      true,                        // forceNewObject
+                                                      false,  // returnOldObject
+                                                      nodeId);
+
+    return {std::move(outStage), std::move(outputs)};
+}
+
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots>
 SlotBasedStageBuilder::makeUnionForTailableCollScan(const QuerySolutionNode* root,
                                                     const PlanStageReqs& reqs) {
@@ -2412,6 +2627,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             {STAGE_AND_HASH, &SlotBasedStageBuilder::buildAndHash},
             {STAGE_AND_SORTED, &SlotBasedStageBuilder::buildAndSorted},
             {STAGE_SORT_MERGE, &SlotBasedStageBuilder::buildSortMerge},
+            {STAGE_GROUP, &SlotBasedStageBuilder::buildGroup},
             {STAGE_SHARDING_FILTER, &SlotBasedStageBuilder::buildShardFilter}};
 
     tassert(4822884,

@@ -240,20 +240,6 @@ std::pair<std::vector<std::unique_ptr<sbe::EExpression>>, EvalStage> buildAccumu
     aggs.push_back(makeFunction("addToArray", std::move(arg)));
     return {std::move(aggs), std::move(inputStage)};
 }
-
-std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> buildFinalizePassthrough(
-    StageBuilderState& state,
-    const AccumulationExpression& expr,
-    const sbe::value::SlotVector& aggSlots,
-    EvalStage inputStage,
-    PlanNodeId planNodeId) {
-    tassert(5911101,
-            str::stream() << "Expected one slot in the trivial finalizer but got: "
-                          << aggSlots.size(),
-            aggSlots.size() == 1);
-
-    return {makeVariable(aggSlots[0]), std::move(inputStage)};
-}
 };  // namespace
 
 std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> buildArgument(
@@ -321,12 +307,12 @@ std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> buildFinalize(
     static const StringDataMap<BuildFinalizeFn> kAccumulatorBuilders = {
         {AccumulatorMin::kName, &buildFinalizeMin},
         {AccumulatorMax::kName, &buildFinalizeMax},
-        {AccumulatorFirst::kName, &buildFinalizePassthrough},
-        {AccumulatorLast::kName, &buildFinalizePassthrough},
+        {AccumulatorFirst::kName, nullptr},
+        {AccumulatorLast::kName, nullptr},
         {AccumulatorAvg::kName, &buildFinalizeAvg},
-        {AccumulatorAddToSet::kName, &buildFinalizePassthrough},
+        {AccumulatorAddToSet::kName, nullptr},
         {AccumulatorSum::kName, &buildFinalizeSum},
-        {AccumulatorPush::kName, &buildFinalizePassthrough},
+        {AccumulatorPush::kName, nullptr},
     };
 
     auto accExprName = acc.expr.name;
@@ -334,11 +320,11 @@ std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> buildFinalize(
             str::stream() << "Unsupported Accumulator in SBE accumulator builder: " << accExprName,
             kAccumulatorBuilders.find(accExprName) != kAccumulatorBuilders.end());
 
-    return std::invoke(kAccumulatorBuilders.at(accExprName),
-                       state,
-                       acc.expr,
-                       aggSlots,
-                       std::move(inputStage),
-                       planNodeId);
+    if (auto fn = kAccumulatorBuilders.at(accExprName); fn) {
+        return std::invoke(fn, state, acc.expr, aggSlots, std::move(inputStage), planNodeId);
+    } else {
+        // nullptr for 'EExpression' signifies that no final project is necessary.
+        return {nullptr, std::move(inputStage)};
+    }
 }
 }  // namespace mongo::stage_builder

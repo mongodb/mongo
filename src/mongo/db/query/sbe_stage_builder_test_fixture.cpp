@@ -44,13 +44,18 @@ std::unique_ptr<QuerySolution> SbeStageBuilderTestFixture::makeQuerySolution(
     return querySoln;
 }
 
-std::tuple<sbe::value::SlotVector, std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData>
+std::tuple<sbe::value::SlotVector,
+           std::unique_ptr<sbe::PlanStage>,
+           stage_builder::PlanStageData,
+           boost::intrusive_ptr<ExpressionContext>>
 SbeStageBuilderTestFixture::buildPlanStage(
     std::unique_ptr<QuerySolution> querySolution,
     bool hasRecordId,
-    std::unique_ptr<ShardFiltererFactoryInterface> shardFiltererInterface) {
+    std::unique_ptr<ShardFiltererFactoryInterface> shardFiltererInterface,
+    std::unique_ptr<CollatorInterface> collator) {
     auto findCommand = std::make_unique<FindCommandRequest>(_nss);
-    const boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContextForTest(_nss));
+    const boost::intrusive_ptr<ExpressionContext> expCtx(
+        new ExpressionContextForTest(opCtx(), _nss, std::move(collator)));
     auto statusWithCQ =
         CanonicalQuery::canonicalize(opCtx(), std::move(findCommand), false, expCtx);
     ASSERT_OK(statusWithCQ.getStatus());
@@ -71,7 +76,12 @@ SbeStageBuilderTestFixture::buildPlanStage(
     }
     slots.push_back(data.outputs.get(stage_builder::PlanStageSlots::kResult));
 
-    return {slots, std::move(stage), std::move(data)};
+    // 'expCtx' owns the collator and a collator slot is registered into the runtime environment
+    // while creating 'builder'. So, the caller should retain the 'expCtx' until the execution is
+    // done. Otherwise, the collator slot becomes invalid at runtime because the canonical query
+    // which is created here owns the 'expCtx' which is deleted with the canonical query at the end
+    // of this function.
+    return {slots, std::move(stage), std::move(data), expCtx};
 }
 
 }  // namespace mongo
