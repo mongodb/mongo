@@ -98,19 +98,14 @@ public:
 
     void registerMockHealthObserver(FaultFacetType mockType,
                                     std::function<double()> getSeverityCallback) {
-        HealthObserverRegistration* reg = HealthObserverRegistration::get(_svcCtx.get());
-        reg->registerObserverFactory([mockType, getSeverityCallback](ServiceContext* svcCtx) {
-            return std::make_unique<HealthObserverMock>(
-                mockType, svcCtx->getFastClockSource(), getSeverityCallback);
+        HealthObserverRegistration::registerObserverFactory([mockType, getSeverityCallback](
+                                                                ClockSource* clockSource) {
+            return std::make_unique<HealthObserverMock>(mockType, clockSource, getSeverityCallback);
         });
     }
 
     FaultManagerTestImpl& manager() {
         return *static_cast<FaultManagerTestImpl*>(FaultManager::get(_svcCtx.get()));
-    }
-
-    HealthObserverRegistration& healthObserverRegistration() {
-        return *HealthObserverRegistration::get(_svcCtx.get());
     }
 
     ClockSourceMock& clockSource() {

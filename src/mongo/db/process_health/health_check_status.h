@@ -40,7 +40,7 @@ namespace process_health {
 /**
  * All fault types we support in this package.
  */
-enum class FaultFacetType { kMock1 = 0, kMock2 };
+enum class FaultFacetType { kMock1 = 0, kMock2, kLdap };
 
 /**
  * The immutable class representing current status of an ongoing fault tracked by facet.
