@@ -28,6 +28,8 @@
 
 global:
   cpp_namespace: "mongo"
+  cpp_includes:
+    - "mongo/db/kill_sessions_util.h"
 
 imports:
   - "mongo/crypto/sha256_block.idl"
@@ -69,6 +71,8 @@ structs:
       lsid:
         type: LogicalSessionId
         optional: true
+        validator:
+          callback: "kill_sessions::validateLsid"
       uid:
         type: sha256Block
         optional: true

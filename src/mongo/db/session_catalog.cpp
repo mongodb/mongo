@@ -324,8 +324,6 @@ SessionCatalog::KillToken ObservableSession::kill(ErrorCodes::Error reason) cons
             serviceContext->killOperation(_clientLock, _session->_checkoutOpCtx, reason);
         }
         if (_session->_childSessionCheckoutOpCtx) {
-            // TODO (SERVER-58755): Test killing a session while its child session is being checked
-            // out, and after its child session has been checked out.
             stdx::unique_lock<Client> clientLock{
                 *_session->_childSessionCheckoutOpCtx->getClient()};
             const auto serviceContext = _session->_childSessionCheckoutOpCtx->getServiceContext();

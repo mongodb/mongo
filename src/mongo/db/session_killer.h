@@ -73,6 +73,10 @@ public:
     using Result = StatusWith<std::vector<HostAndPort>>;
     using UniformRandomBitGenerator = std::minstd_rand;
 
+    /**
+     * For regular sessions, the Matcher will directly match an lsid pattern. For internal sessions,
+     * the Matcher will return matches on the child sessions of a parent session as well.
+     */
     class Matcher {
     public:
         Matcher(KillAllSessionsByPatternSet&& patterns);

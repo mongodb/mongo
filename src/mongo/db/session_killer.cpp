@@ -32,6 +32,7 @@
 #include "mongo/db/session_killer.h"
 
 #include "mongo/db/client.h"
+#include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/destructor_guard.h"
@@ -112,15 +113,19 @@ const KillAllSessionsByPattern* SessionKiller::Matcher::match(const LogicalSessi
         return _killAll;
     }
 
+    // Since child and parent sessions are logically related, by default, we will convert any child
+    // lsid to its corresponding parent lsid and match based on the converted lsid.
+    auto parentSessionId = castToParentSessionId(lsid);
+
     {
-        auto iter = _lsids.find(lsid);
+        auto iter = _lsids.find(parentSessionId);
         if (iter != _lsids.end()) {
             return iter->second;
         }
     }
 
     {
-        auto iter = _uids.find(lsid.getUid());
+        auto iter = _uids.find(parentSessionId.getUid());
         if (iter != _uids.end()) {
             return iter->second;
         }

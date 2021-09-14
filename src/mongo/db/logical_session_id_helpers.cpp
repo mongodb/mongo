@@ -82,6 +82,13 @@ boost::optional<LogicalSessionId> getParentSessionId(const LogicalSessionId& ses
     return boost::none;
 }
 
+LogicalSessionId castToParentSessionId(const LogicalSessionId& sessionId) {
+    if (auto parentSessionId = getParentSessionId(sessionId)) {
+        return *parentSessionId;
+    }
+    return sessionId;
+}
+
 LogicalSessionId makeLogicalSessionId(const LogicalSessionFromClient& fromClient,
                                       OperationContext* opCtx,
                                       std::initializer_list<Privilege> allowSpoof) {

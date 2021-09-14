@@ -55,6 +55,12 @@ SHA256Block getLogicalSessionUserDigestFor(StringData user, StringData db);
 boost::optional<LogicalSessionId> getParentSessionId(const LogicalSessionId& sessionId);
 
 /**
+ * Returns the upconverted parent session id for the given session id if there is one.
+ * Otherwise, returns the session id itself.
+ */
+LogicalSessionId castToParentSessionId(const LogicalSessionId& sessionId);
+
+/**
  * Factory functions to generate logical session records.
  */
 LogicalSessionId makeLogicalSessionId(const LogicalSessionFromClient& lsid,
