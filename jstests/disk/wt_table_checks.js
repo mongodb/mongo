@@ -52,6 +52,11 @@ for (f in files) {
 
 writeFile(dbpath + "/_wt_table_checks", "");
 
+// Cannot skip table logging checks on startup when there are previously incomplete table checks.
+conn = startMongodOnExistingPath(dbpath,
+                                 {setParameter: "wiredTigerSkipTableLoggingChecksOnStartup=true"});
+assert.eq(conn, null);
+
 conn = startMongodOnExistingPath(dbpath, {});
 checkLog.containsJson(
     conn, 4366405, {loggingEnabled: true, repair: false, hasPreviouslyIncompleteTableChecks: true});
@@ -93,5 +98,32 @@ jsTest.log("Test 5.");
 
 conn = startMongodOnExistingPath(dbpath, {replSet: "mySet"});
 checkLog.containsJson(conn, 4366406, {loggingEnabled: false});
+MongoRunner.stopMongod(conn);
+
+/**
+ * Test 6. Restart as a standalone and skip table logging checks on startup. Verify that restarting
+ * as a replica set again does not require any table logging modifications.
+ */
+jsTest.log("Test 6.");
+
+conn = startMongodOnExistingPath(dbpath, {
+    setParameter: {
+        wiredTigerSkipTableLoggingChecksOnStartup: true,
+        logComponentVerbosity: tojson({verbosity: 1})
+    }
+});
+
+// Skipping table logging checks for all existing tables.
+checkLog.containsJson(conn, 5548301, {wiredTigerSkipTableLoggingChecksOnStartup: true});
+
+// Log level 1 prints each individual table it skips table logging checks for.
+checkLog.containsJson(conn, 5548302);
+
+MongoRunner.stopMongod(conn);
+
+conn = startMongodOnExistingPath(dbpath, {replSet: "mySet"});
+
+// No table logging settings modifications are required.
+checkLog.containsJson(conn, 4366408);
 MongoRunner.stopMongod(conn);
 }());
