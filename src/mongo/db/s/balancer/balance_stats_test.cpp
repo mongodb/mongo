@@ -66,7 +66,8 @@ public:
 
         return ChunkManager(_shardPrimary,
                             _dbVersion,
-                            RoutingTableHistoryValueHandle(std::move(routingTableHistory)),
+                            RoutingTableHistoryValueHandle(std::make_shared<RoutingTableHistory>(
+                                std::move(routingTableHistory))),
                             boost::none);
     }
 

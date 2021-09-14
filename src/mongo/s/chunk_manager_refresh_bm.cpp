@@ -46,7 +46,8 @@ const NamespaceString kNss("test", "foo");
 RoutingTableHistoryValueHandle makeStandaloneRoutingTableHistory(RoutingTableHistory rt) {
     const auto version = rt.getVersion();
     return RoutingTableHistoryValueHandle(
-        std::move(rt), ComparableChunkVersion::makeComparableChunkVersion(version));
+        std::make_shared<RoutingTableHistory>(std::move(rt)),
+        ComparableChunkVersion::makeComparableChunkVersion(version));
 }
 
 ChunkRange getRangeForChunk(int i, int nChunks) {

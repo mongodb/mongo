@@ -585,6 +585,49 @@ CatalogCache::CollectionCache::LookupResult CatalogCache::CollectionCache::_look
 
         auto collectionAndChunks = _catalogCacheLoader.getChunksSince(nss, lookupVersion).get();
 
+        // If a refresh doesn't find new information -> re-use the existing RoutingTableHistory.
+        // Do not re-use the existing routing table if there was a metadata format change.
+        if (isIncremental && collectionAndChunks.changedChunks.size() == 1 &&
+            collectionAndChunks.changedChunks[0].getVersion() ==
+                existingHistory->optRt->getVersion() &&
+            collectionAndChunks.changedChunks[0].getVersion().getTimestamp().is_initialized() ==
+                existingHistory->optRt->getVersion().getTimestamp().is_initialized()) {
+
+            const auto& newVersion = collectionAndChunks.changedChunks[0].getVersion();
+            tassert(
+                7032310,
+                fmt::format("allowMigrations field of collection '{}' changed without changing the "
+                            "collection version {}. Old value: {}, new value: {}",
+                            nss.toString(),
+                            newVersion.toString(),
+                            existingHistory->optRt->allowMigrations(),
+                            collectionAndChunks.allowMigrations),
+                collectionAndChunks.allowMigrations == existingHistory->optRt->allowMigrations());
+
+            const auto& oldReshardingFields = existingHistory->optRt->getReshardingFields();
+            const auto& newReshardingFields = collectionAndChunks.reshardingFields;
+            tassert(
+                7032311,
+                fmt::format("reshardingFields field of collection '{}' changed without changing "
+                            "the collection version {}. Old value: {}, new value: {}",
+                            nss.toString(),
+                            newVersion.toString(),
+                            oldReshardingFields->toBSON().toString(),
+                            newReshardingFields->toBSON().toString()),
+                [&] {
+                    if (oldReshardingFields && newReshardingFields)
+                        return oldReshardingFields->toBSON().woCompare(
+                                   newReshardingFields->toBSON()) == 0;
+                    else
+                        return !oldReshardingFields && !newReshardingFields;
+                }());
+
+            // Despite we didn't find new info, we must update the time of this entry on the cache
+            newComparableVersion.setChunkVersion(newVersion);
+            return LookupResult(OptionalRoutingTableHistory(existingHistory->optRt),
+                                std::move(newComparableVersion));
+        }
+
         auto newRoutingHistory = [&] {
             // If we have routing info already and it's for the same collection epoch, we're
             // updating. Otherwise, we're making a whole new routing table.
@@ -639,30 +682,7 @@ CatalogCache::CollectionCache::LookupResult CatalogCache::CollectionCache::_look
         }
 
         const ChunkVersion newVersion = newRoutingHistory.getVersion();
-
         newComparableVersion.setChunkVersion(newVersion);
-
-        if (isIncremental && existingHistory->optRt->getVersion() == newVersion) {
-            tassert(
-                7032310,
-                fmt::format("allowMigrations field of collection '{}' changed without changing the "
-                            "collection version {}. Old value: {}, new value: {}",
-                            nss.toString(),
-                            newVersion.toString(),
-                            existingHistory->optRt->allowMigrations(),
-                            newRoutingHistory.allowMigrations()),
-                newRoutingHistory.sameAllowMigrations(*existingHistory->optRt));
-
-            tassert(
-                7032311,
-                fmt::format("reshardingFields field of collection '{}' changed without changing "
-                            "the collection version {}. Old value: {}, new value: {}",
-                            nss.toString(),
-                            newVersion.toString(),
-                            existingHistory->optRt->getReshardingFields()->toBSON().toString(),
-                            newRoutingHistory.getReshardingFields()->toBSON().toString()),
-                newRoutingHistory.sameReshardingFields(*existingHistory->optRt));
-        }
 
         LOGV2_FOR_CATALOG_REFRESH(4619901,
                                   isIncremental || newComparableVersion != previousVersion ? 0 : 1,
@@ -674,7 +694,8 @@ CatalogCache::CollectionCache::LookupResult CatalogCache::CollectionCache::_look
                                   "duration"_attr = Milliseconds(t.millis()));
         _updateRefreshesStats(isIncremental, false);
 
-        return LookupResult(OptionalRoutingTableHistory(std::move(newRoutingHistory)),
+        return LookupResult(OptionalRoutingTableHistory(std::make_shared<RoutingTableHistory>(
+                                std::move(newRoutingHistory))),
                             std::move(newComparableVersion));
     } catch (const DBException& ex) {
         _stats.countFailedRefreshes.addAndFetch(1);
