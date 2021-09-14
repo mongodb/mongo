@@ -59,10 +59,6 @@ const RollbackResumableIndexBuildTest = class {
      *   fixture should be expected to be completed when this function returns. If false, this
      *   function returns the collections, buildUUIDs, and index names of the index builds started
      *   by the test fixture.
-     *
-     * 'skipDataConsistencyChecks' is a boolean which determines whether data consistency checks
-     *   should be skipped by the rollback test fixture when transitioning to steady state
-     *   operations.
      */
     static run(rollbackTest,
                dbName,
@@ -78,7 +74,7 @@ const RollbackResumableIndexBuildTest = class {
                resumeChecks,
                insertsToBeRolledBack,
                sideWrites = [],
-               {shouldComplete = true, skipDataConsistencyChecks = false} = {}) {
+               {shouldComplete = true} = {}) {
         const originalPrimary = rollbackTest.getPrimary();
 
         if (!ResumableIndexBuildTest.resumableIndexBuildsEnabled(originalPrimary)) {
@@ -88,8 +84,8 @@ const RollbackResumableIndexBuildTest = class {
 
         rollbackTest.awaitLastOpCommitted();
 
-        assert.commandWorked(
-            originalPrimary.adminCommand({setParameter: 1, logComponentVerbosity: {index: 1}}));
+        assert.commandWorked(originalPrimary.adminCommand(
+            {setParameter: 1, logComponentVerbosity: {index: 1, replication: {heartbeats: 0}}}));
 
         // Set internalQueryExecYieldIterations to 0 and maxIndexBuildDrainBatchSize to 1 so that
         // the index builds are guaranteed to yield their locks between the rollback end and start
@@ -237,8 +233,7 @@ const RollbackResumableIndexBuildTest = class {
             });
         }
 
-        rollbackTest.transitionToSteadyStateOperations(
-            {skipDataConsistencyChecks: skipDataConsistencyChecks});
+        rollbackTest.transitionToSteadyStateOperations();
 
         if (shouldComplete) {
             // Ensure that the index builds completed after rollback.
