@@ -131,6 +131,13 @@ public:
         return *_planExplainer;
     }
 
+    void enableSaveRecoveryUnitAcrossCommandsIfSupported() override {
+        _isSaveRecoveryUnitAcrossCommandsEnabled = true;
+    }
+    bool isSaveRecoveryUnitAcrossCommandsEnabled() const override {
+        return _isSaveRecoveryUnitAcrossCommandsEnabled;
+    }
+
 private:
     enum class State { kClosed, kOpened };
 
@@ -170,6 +177,8 @@ private:
     std::unique_ptr<PlanExplainer> _planExplainer;
 
     bool _isDisposed{false};
+
+    bool _isSaveRecoveryUnitAcrossCommandsEnabled = false;
 };
 
 /**

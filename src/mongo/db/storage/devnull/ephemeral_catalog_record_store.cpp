@@ -178,6 +178,7 @@ public:
 
     void detachFromOperationContext() final {}
     void reattachToOperationContext(OperationContext* opCtx) final {}
+    void setSaveStorageCursorOnDetachFromOperationContext(bool) override {}
 
 private:
     Records::const_iterator _it;
@@ -259,6 +260,7 @@ public:
 
     void detachFromOperationContext() final {}
     void reattachToOperationContext(OperationContext* opCtx) final {}
+    void setSaveStorageCursorOnDetachFromOperationContext(bool) override {}
 
 private:
     Records::const_reverse_iterator _it;

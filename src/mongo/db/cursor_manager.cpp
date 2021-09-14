@@ -206,9 +206,11 @@ std::size_t CursorManager::timeoutCursors(OperationContext* opCtx, Date_t now) {
     return toDisposeWithoutMutex.size();
 }
 
-StatusWith<ClientCursorPin> CursorManager::pinCursor(OperationContext* opCtx,
-                                                     CursorId id,
-                                                     AuthCheck checkSessionAuth) {
+StatusWith<ClientCursorPin> CursorManager::pinCursor(
+    OperationContext* opCtx,
+    CursorId id,
+    const std::function<void(const ClientCursor&)>& checkPinAllowed,
+    AuthCheck checkSessionAuth) {
     auto lockedPartition = _cursorMap->lockOnePartition(id);
     auto it = lockedPartition->find(id);
     if (it == lockedPartition->end()) {
@@ -235,6 +237,10 @@ StatusWith<ClientCursorPin> CursorManager::pinCursor(OperationContext* opCtx,
         }
     }
 
+    if (checkPinAllowed) {
+        checkPinAllowed(*cursor);
+    }
+
     // Pass along the original queryHash and planCacheKey for slow query logging.
     CurOp::get(opCtx)->debug().queryHash = cursor->_queryHash;
     CurOp::get(opCtx)->debug().planCacheKey = cursor->_planCacheKey;
@@ -251,7 +257,9 @@ StatusWith<ClientCursorPin> CursorManager::pinCursor(OperationContext* opCtx,
         }
     }
 
-    return ClientCursorPin(opCtx, cursor, this);
+    auto pin = ClientCursorPin(opCtx, cursor, this);
+    pin.unstashResourcesOntoOperationContext();
+    return StatusWith(std::move(pin));
 }
 
 void CursorManager::unpin(OperationContext* opCtx,

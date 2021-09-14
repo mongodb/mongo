@@ -431,6 +431,14 @@ std::unique_ptr<RecoveryUnit> OperationContext::releaseRecoveryUnit() {
     return std::move(_recoveryUnit);
 }
 
+std::unique_ptr<RecoveryUnit> OperationContext::releaseAndReplaceRecoveryUnit() {
+    auto ru = releaseRecoveryUnit();
+    setRecoveryUnit(
+        std::unique_ptr<RecoveryUnit>(getServiceContext()->getStorageEngine()->newRecoveryUnit()),
+        WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+    return ru;
+}
+
 WriteUnitOfWork::RecoveryUnitState OperationContext::setRecoveryUnit(
     std::unique_ptr<RecoveryUnit> unit, WriteUnitOfWork::RecoveryUnitState state) {
     _recoveryUnit = std::move(unit);

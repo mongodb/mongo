@@ -149,6 +149,11 @@ public:
         return _pipeline->writeExplainOps(verbosity);
     }
 
+    void enableSaveRecoveryUnitAcrossCommandsIfSupported() override {}
+    bool isSaveRecoveryUnitAcrossCommandsEnabled() const override {
+        return false;
+    }
+
 private:
     /**
      * Obtains the next document from the underlying Pipeline, and does change streams-related

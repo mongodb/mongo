@@ -526,6 +526,9 @@ public:
     virtual void restore() override;
     virtual void detachFromOperationContext() override;
     virtual void reattachToOperationContext(OperationContext* opCtx) override;
+    void setSaveStorageCursorOnDetachFromOperationContext(bool) override {
+        // Noop for EFT, since we always keep the cursor's contents valid across save/restore.
+    }
 
 private:
     // CRTP Interface

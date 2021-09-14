@@ -939,12 +939,19 @@ public:
 
     void detachFromOperationContext() final {
         _opCtx = nullptr;
-        _cursor = boost::none;
+
+        if (!_saveStorageCursorOnDetachFromOperationContext) {
+            _cursor = boost::none;
+        }
     }
 
     void reattachToOperationContext(OperationContext* opCtx) final {
         _opCtx = opCtx;
         // _cursor recreated in restore() to avoid risk of WT_ROLLBACK issues.
+    }
+
+    void setSaveStorageCursorOnDetachFromOperationContext(bool saveCursor) override {
+        _saveStorageCursorOnDetachFromOperationContext = saveCursor;
     }
 
 protected:
@@ -1243,6 +1250,8 @@ protected:
     KeyString::Builder _query;
 
     std::unique_ptr<KeyString::Builder> _endPosition;
+
+    bool _saveStorageCursorOnDetachFromOperationContext = false;
 };
 
 // The Standard Cursor doesn't need anything more than the base has.

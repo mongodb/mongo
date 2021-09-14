@@ -124,6 +124,12 @@ ClientCursor::~ClientCursor() {
     invariant(!_operationUsingCursor);
     invariant(_disposed);
 
+    if (_stashedRecoveryUnit) {
+        // Now that the associated PlanExecutor is being destroyed, the recovery unit no longer
+        // needs to keep data pinned.
+        _stashedRecoveryUnit->setAbandonSnapshotMode(RecoveryUnit::AbandonSnapshotMode::kAbort);
+    }
+
     cursorStatsOpen.decrement();
     if (isNoTimeout()) {
         cursorStatsOpenNoTimeout.decrement();
@@ -178,6 +184,7 @@ ClientCursorPin::ClientCursorPin(OperationContext* opCtx,
     invariant(_cursor);
     invariant(_cursor->_operationUsingCursor);
     invariant(!_cursor->_disposed);
+    _shouldSaveRecoveryUnit = _cursor->getExecutor()->isSaveRecoveryUnitAcrossCommandsEnabled();
 
     // We keep track of the number of cursors currently pinned. The cursor can become unpinned
     // either by being released back to the cursor manager or by being deleted. A cursor may be
@@ -187,7 +194,10 @@ ClientCursorPin::ClientCursorPin(OperationContext* opCtx,
 }
 
 ClientCursorPin::ClientCursorPin(ClientCursorPin&& other)
-    : _opCtx(other._opCtx), _cursor(other._cursor), _cursorManager(other._cursorManager) {
+    : _opCtx(other._opCtx),
+      _cursor(other._cursor),
+      _cursorManager(other._cursorManager),
+      _shouldSaveRecoveryUnit(other._shouldSaveRecoveryUnit) {
     // The pinned cursor is being transferred to us from another pin. The 'other' pin must have a
     // pinned cursor.
     invariant(other._cursor);
@@ -197,6 +207,7 @@ ClientCursorPin::ClientCursorPin(ClientCursorPin&& other)
     other._cursor = nullptr;
     other._opCtx = nullptr;
     other._cursorManager = nullptr;
+    other._shouldSaveRecoveryUnit = false;
 }
 
 ClientCursorPin& ClientCursorPin::operator=(ClientCursorPin&& other) {
@@ -222,6 +233,9 @@ ClientCursorPin& ClientCursorPin::operator=(ClientCursorPin&& other) {
     _cursorManager = other._cursorManager;
     other._cursorManager = nullptr;
 
+    _shouldSaveRecoveryUnit = other._shouldSaveRecoveryUnit;
+    other._shouldSaveRecoveryUnit = false;
+
     return *this;
 }
 
@@ -230,11 +244,18 @@ ClientCursorPin::~ClientCursorPin() {
 }
 
 void ClientCursorPin::release() {
-    if (!_cursor)
+    if (!_cursor) {
+        invariant(!_shouldSaveRecoveryUnit);
         return;
+    }
 
     invariant(_cursor->_operationUsingCursor);
     invariant(_cursorManager);
+
+    if (_shouldSaveRecoveryUnit) {
+        stashResourcesFromOperationContext();
+        _shouldSaveRecoveryUnit = false;
+    }
 
     // Unpin the cursor. This must be done by calling into the cursor manager, since the cursor
     // manager must acquire the appropriate mutex in order to safely perform the unpin operation.
@@ -266,10 +287,30 @@ void ClientCursorPin::deleteUnderlying() {
 
     cursorStatsOpenPinned.decrement();
     _cursor = nullptr;
+    _shouldSaveRecoveryUnit = false;
 }
 
 ClientCursor* ClientCursorPin::getCursor() const {
     return _cursor;
+}
+
+void ClientCursorPin::unstashResourcesOntoOperationContext() {
+    invariant(_cursor);
+    invariant(_cursor->_operationUsingCursor);
+    invariant(_opCtx == _cursor->_operationUsingCursor);
+
+    if (auto& ru = _cursor->_stashedRecoveryUnit) {
+        _shouldSaveRecoveryUnit = true;
+        invariant(!_opCtx->recoveryUnit()->isActive());
+        _opCtx->setRecoveryUnit(std::move(ru),
+                                WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+    }
+}
+
+void ClientCursorPin::stashResourcesFromOperationContext() {
+    // Move the recovery unit from the operation context onto the cursor and create a new RU for
+    // the current OperationContext.
+    _cursor->stashRecoveryUnit(_opCtx->releaseAndReplaceRecoveryUnit());
 }
 
 namespace {

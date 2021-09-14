@@ -146,21 +146,26 @@ public:
     virtual bool restore(bool tolerateCappedRepositioning = true) = 0;
 
     /**
-     * Detaches from the OperationContext and releases any storage-engine state.
-     *
-     * It is only legal to call this when in a "saved" state. While in the "detached" state, it is
-     * only legal to call reattachToOperationContext or the destructor. It is not legal to call
-     * detachFromOperationContext() while already in the detached state.
+     * Detaches from the OperationContext. Releases storage-engine resources, unless
+     * setSaveStorageCursorOnDetachFromOperationContext() has been set to true.
      */
     virtual void detachFromOperationContext() = 0;
 
     /**
-     * Reattaches to the OperationContext and reacquires any storage-engine state.
+     * Reattaches to the OperationContext and reacquires any storage-engine state if necessary.
      *
-     * It is only legal to call this in the "detached" state. On return, the cursor is left in a
-     * "saved" state, so callers must still call restoreState to use this object.
+     * It is only legal to call this in the "detached" state. On return, the cursor may still be a
+     * "saved" state if there was a prior call to save(). In this case, callers must still call
+     * restore() to use this object.
      */
     virtual void reattachToOperationContext(OperationContext* opCtx) = 0;
+
+    /**
+     * Toggles behavior on whether to give up the underlying storage cursor (and any record pointed
+     * to by it) on detachFromOperationContext(). This supports the query layer retaining valid and
+     * positioned cursors across commands.
+     */
+    virtual void setSaveStorageCursorOnDetachFromOperationContext(bool) = 0;
 };
 
 /**

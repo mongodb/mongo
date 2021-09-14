@@ -87,6 +87,7 @@ public:
     }
     void detachFromOperationContext() override {}
     void reattachToOperationContext(OperationContext* opCtx) override {}
+    void setSaveStorageCursorOnDetachFromOperationContext(bool) {}
 
 private:
     std::deque<Record>* _records;

@@ -117,14 +117,36 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
 }
 
 void PlanExecutorSBE::saveState() {
-    _root->saveState(true /* relinquish cursor */);
+    if (_isSaveRecoveryUnitAcrossCommandsEnabled) {
+        _root->saveState(false /* NOT relinquishing cursor */);
+
+        // Put the RU into 'kCommit' mode so that subsequent calls to abandonSnapshot() keep
+        // cursors positioned. This ensures that no pointers into memory owned by the storage
+        // engine held by the SBE PlanStage tree become invalid while the executor is in a saved
+        // state.
+        _opCtx->recoveryUnit()->setAbandonSnapshotMode(RecoveryUnit::AbandonSnapshotMode::kCommit);
+        _opCtx->recoveryUnit()->abandonSnapshot();
+    } else {
+        _root->saveState(true /* relinquish cursor */);
+    }
+
     _yieldPolicy->setYieldable(nullptr);
     _lastGetNext = {};
 }
 
 void PlanExecutorSBE::restoreState(const RestoreContext& context) {
     _yieldPolicy->setYieldable(context.collection());
-    _root->restoreState(true /* relinquish cursor */);
+
+    if (_isSaveRecoveryUnitAcrossCommandsEnabled) {
+        _root->restoreState(false /* NOT relinquishing cursor */);
+
+        // Put the RU back into 'kAbort' mode. Since the executor is now in a restored state, calls
+        // to doAbandonSnapshot() only happen if the query has failed and the executor will not be
+        // used again. In this case, we do not rely on the guarantees provided by 'kCommit' mode.
+        _opCtx->recoveryUnit()->setAbandonSnapshotMode(RecoveryUnit::AbandonSnapshotMode::kAbort);
+    } else {
+        _root->restoreState(true /* relinquish cursor */);
+    }
 }
 
 void PlanExecutorSBE::detachFromOperationContext() {

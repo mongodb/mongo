@@ -301,6 +301,14 @@ public:
         return _opKey;
     }
 
+    std::unique_ptr<RecoveryUnit> releaseStashedRecoveryUnit() {
+        return std::move(_stashedRecoveryUnit);
+    }
+
+    void stashRecoveryUnit(std::unique_ptr<RecoveryUnit> ru) {
+        _stashedRecoveryUnit = std::move(ru);
+    }
+
 private:
     friend class CursorManager;
     friend class ClientCursorPin;
@@ -397,6 +405,12 @@ private:
     // Unused maxTime budget for this cursor.
     Microseconds _leftoverMaxTimeMicros = Microseconds::max();
 
+    // Stashed recovery unit. Maintains valid and positioned cursors across commands, so that data
+    // pointers remain valid and safe to access. May be nullptr. This field MUST come before
+    // '_exec' as we cannot destroy the recovery unit until the plan executor and its resources
+    // (cursors) have been destroyed.
+    std::unique_ptr<RecoveryUnit> _stashedRecoveryUnit;
+
     // The underlying query execution machinery. Must be non-null.
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> _exec;
 
@@ -462,6 +476,10 @@ private:
  *
  *     ClientCursor* cursor = pin.getValue().getCursor();
  *     // Use cursor. Pin automatically released on block exit.
+ *
+ *     // Use the PlanExecutor associated with the cursor.
+ *     auto next = cursor->planExecutor()->getNext();
+ *
  * }
  *
  * Callers need not hold any lock manager locks in order to obtain or release a client cursor pin.
@@ -512,6 +530,18 @@ public:
         return _cursor;
     }
 
+    /*
+     * Unstashes resources in the cursor onto the operation context using the cursor. This _must_
+     * be called before using the plan executor associated with the cursor.
+     */
+    void unstashResourcesOntoOperationContext();
+
+    /**
+     * Inverse of above: Transfers resources which need the same lifetime as the cursor from the
+     * operation context to the cursor itself.
+     */
+    void stashResourcesFromOperationContext();
+
 private:
     friend class CursorManager;
 
@@ -520,6 +550,7 @@ private:
     OperationContext* _opCtx = nullptr;
     ClientCursor* _cursor = nullptr;
     CursorManager* _cursorManager = nullptr;
+    bool _shouldSaveRecoveryUnit = false;
 };
 
 void startClientCursorMonitor();

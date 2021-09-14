@@ -180,6 +180,10 @@ private:
 
     ScanStats _specificStats;
 
+    // Flag set upon restoring the stage that indicates whether the cursor's position in the
+    // collection is still valid. Only relevant to capped collections.
+    bool _needsToCheckCappedPositionLost = false;
+
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
     // Debug-only buffer used to track the last thing returned from the stage. Between
     // saves/restores this is used to check that the storage cursor has not changed position.

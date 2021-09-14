@@ -97,7 +97,7 @@ static const ReadConcernSupportResult kSupportsReadConcernResult{
  * Validates that the lsid of 'opCtx' matches that of 'cursor'. This must be called after
  * authenticating, so that it is safe to report the lsid of 'cursor'.
  */
-void validateLSID(OperationContext* opCtx, int64_t cursorId, ClientCursor* cursor) {
+void validateLSID(OperationContext* opCtx, int64_t cursorId, const ClientCursor* cursor) {
     uassert(50736,
             str::stream() << "Cannot run getMore on cursor " << cursorId
                           << ", which was not created in a session, in session "
@@ -122,7 +122,7 @@ void validateLSID(OperationContext* opCtx, int64_t cursorId, ClientCursor* curso
  * Validates that the txnNumber of 'opCtx' matches that of 'cursor'. This must be called after
  * authenticating, so that it is safe to report the txnNumber of 'cursor'.
  */
-void validateTxnNumber(OperationContext* opCtx, int64_t cursorId, ClientCursor* cursor) {
+void validateTxnNumber(OperationContext* opCtx, int64_t cursorId, const ClientCursor* cursor) {
     uassert(50739,
             str::stream() << "Cannot run getMore on cursor " << cursorId
                           << ", which was not created in a transaction, in transaction "
@@ -428,13 +428,6 @@ public:
             boost::optional<AutoStatsTracker> statsTracker;
             NamespaceString nss(_cmd.getDbName(), _cmd.getCollection());
             int64_t cursorId = _cmd.getCommandParameter();
-
-            // Setup OperationContext state for this operation which will set the correct read
-            // source if needed. Do this before instantiating the AutoGetCollection* object so we
-            // don't attept to override the state that has been setup. Ensure the lsid and txnNumber
-            // of the getMore match that of the originating command.
-            validateLSID(opCtx, cursorId, cursorPin.getCursor());
-            validateTxnNumber(opCtx, cursorId, cursorPin.getCursor());
 
             const bool disableAwaitDataFailpointActive =
                 MONGO_unlikely(disableAwaitDataForGetMoreCmd.shouldFail());
@@ -746,7 +739,14 @@ public:
             }
 
             auto cursorManager = CursorManager::get(opCtx);
-            auto cursorPin = uassertStatusOK(cursorManager->pinCursor(opCtx, cursorId));
+            auto pinCheck = [opCtx, cursorId](const ClientCursor& cc) {
+                // Ensure the lsid and txnNumber of the getMore match that of the
+                // originating command.
+                validateLSID(opCtx, cursorId, &cc);
+                validateTxnNumber(opCtx, cursorId, &cc);
+            };
+
+            auto cursorPin = uassertStatusOK(cursorManager->pinCursor(opCtx, cursorId, pinCheck));
 
             // Get the read concern level here in case the cursor is exhausted while iterating.
             const auto isLinearizableReadConcern = cursorPin->getReadConcernArgs().getLevel() ==

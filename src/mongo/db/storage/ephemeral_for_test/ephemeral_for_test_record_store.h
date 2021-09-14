@@ -191,6 +191,9 @@ private:
         bool restore(bool tolerateCappedRepositioning = true) final;
         void detachFromOperationContext() final;
         void reattachToOperationContext(OperationContext* opCtx) final;
+        void setSaveStorageCursorOnDetachFromOperationContext(bool) override {
+            // Noop for EFT, since we always keep the cursor's contents valid across save/restore.
+        }
 
     private:
         bool inPrefix(const std::string& key_string);
@@ -227,6 +230,9 @@ private:
         bool restore(bool tolerateCappedRepositioning = true) final;
         void detachFromOperationContext() final;
         void reattachToOperationContext(OperationContext* opCtx) final;
+        void setSaveStorageCursorOnDetachFromOperationContext(bool) override {
+            // Noop for EFT, since we always keep the cursor's contents valid across save/restore.
+        }
 
     private:
         bool inPrefix(const std::string& key_string);

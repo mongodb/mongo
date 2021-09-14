@@ -56,6 +56,7 @@ public:
     }
     void detachFromOperationContext() final {}
     void reattachToOperationContext(OperationContext* opCtx) final {}
+    void setSaveStorageCursorOnDetachFromOperationContext(bool) override {}
 };
 
 class DevNullRecordStore : public RecordStore {

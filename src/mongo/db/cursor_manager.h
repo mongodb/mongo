@@ -112,6 +112,11 @@ public:
      * Returns ErrorCodes::CursorNotFound if the cursor does not exist or
      * ErrorCodes::QueryPlanKilled if the cursor was killed in between uses.
      *
+     * 'checkPinAllowed' is a function which gives the caller the option to make checks about the
+     * cursor before it is pinned. If 'checkPinAllowed' throws an exception, pinCursor() will
+     * also throw and the cursor will be left in the cursor manager in the same state as it was
+     * before the unsuccessful call to pinCursor().
+     *
      * If 'checkSessionAuth' is 'kCheckSession' or left unspecified, this function also checks if
      * the current session in the specified 'opCtx' has privilege to access the cursor specified by
      * 'id.' In this case, this function returns a 'mongo::Status' with information regarding the
@@ -124,9 +129,11 @@ public:
      * simultaneously issue two operations against the same cursor id.
      */
     enum AuthCheck { kCheckSession = true, kNoCheckSession = false };
-    StatusWith<ClientCursorPin> pinCursor(OperationContext* opCtx,
-                                          CursorId id,
-                                          AuthCheck checkSessionAuth = kCheckSession);
+    StatusWith<ClientCursorPin> pinCursor(
+        OperationContext* opCtx,
+        CursorId id,
+        const std::function<void(const ClientCursor&)>& checkPinAllowed = {},
+        AuthCheck checkSessionAuth = kCheckSession);
 
     /**
      * Returns an OK status if the cursor was successfully killed, meaning either:

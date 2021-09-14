@@ -201,6 +201,10 @@ void ScanStage::doSaveState(bool relinquishCursor) {
         _cursor->save();
     }
 
+    if (_cursor) {
+        _cursor->setSaveStorageCursorOnDetachFromOperationContext(!relinquishCursor);
+    }
+
     _coll.reset();
 }
 
@@ -216,17 +220,27 @@ void ScanStage::doRestoreState(bool relinquishCursor) {
     tassert(5777408, "Catalog epoch should be initialized", _catalogEpoch);
     _coll = restoreCollection(_opCtx, *_collName, _collUuid, *_catalogEpoch);
 
-    if (_cursor && relinquishCursor) {
-        // Unlike the classic query engine CollectionScan::doSaveStateRequiresCollection(), the SBE
-        // engine does not support clustered collections. As a consequence, capped collection scans
-        // only serve read operations and do not need to relax capped collection constraints like
-        // tolerating cursor repositioning.
-        const auto tolerateCappedCursorRepositioning = false;
-        const bool couldRestore = _cursor->restore(tolerateCappedCursorRepositioning);
-        uassert(ErrorCodes::CappedPositionLost,
+    if (_cursor) {
+        if (relinquishCursor) {
+            const auto tolerateCappedCursorRepositioning = false;
+            const bool couldRestore = _cursor->restore(tolerateCappedCursorRepositioning);
+            uassert(
+                ErrorCodes::CappedPositionLost,
                 str::stream()
                     << "CollectionScan died due to position in capped collection being deleted. ",
                 couldRestore);
+        } else if (_coll->isCapped()) {
+            // We cannot check for capped position lost here, as it requires us to reposition the
+            // cursor, which would free the underlying value and break the contract of
+            // restoreState(fullSave=false). So we defer the capped collection position lost check
+            // to the following getNext() call by setting this flag.
+            //
+            // The intention in this codepath is to retain a valid and positioned cursor across
+            // query yields / getMore commands. However, it is safe to reposition the cursor in
+            // getNext() and we must reset the cursor for capped collections in order to check for
+            // CappedPositionLost errors.
+            _needsToCheckCappedPositionLost = true;
+        }
     }
 
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
@@ -323,6 +337,16 @@ PlanState ScanStage::getNext() {
     // We are about to call next() on a storage cursor so do not bother saving our internal state in
     // case it yields as the state will be completely overwritten after the next() call.
     disableSlotAccess();
+
+    if (_needsToCheckCappedPositionLost) {
+        _cursor->save();
+        if (!_cursor->restore(false /* do not tolerate capped position lost */)) {
+            uasserted(ErrorCodes::CappedPositionLost,
+                      "CollectionScan died due to position in capped collection being deleted. ");
+        }
+
+        _needsToCheckCappedPositionLost = false;
+    }
 
     checkForInterrupt(_opCtx);
 

@@ -278,6 +278,7 @@ public:
     }
     void detachFromOperationContext() final {}
     void reattachToOperationContext(OperationContext* opCtx) final {}
+    void setSaveStorageCursorOnDetachFromOperationContext(bool) final {}
 };
 }  // namespace ephemeral_for_test
 }  // namespace mongo

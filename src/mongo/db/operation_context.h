@@ -124,16 +124,15 @@ public:
     /**
      * Returns the RecoveryUnit (same return value as recoveryUnit()) but the caller takes
      * ownership of the returned RecoveryUnit, and the OperationContext instance relinquishes
-     * ownership.  Sets the RecoveryUnit to NULL.
-     *
-     * Used to transfer ownership of storage engine state from OperationContext
-     * to ClientCursor for getMore-able queries.
-     *
-     * Note that we don't allow the top-level locks to be stored across getMore.
-     * We rely on active cursors being killed when collections or databases are dropped,
-     * or when collection metadata changes.
+     * ownership. Sets the RecoveryUnit to NULL.
      */
     std::unique_ptr<RecoveryUnit> releaseRecoveryUnit();
+
+    /*
+     * Similar to releaseRecoveryUnit(), but sets up a new, inactive RecoveryUnit after releasing
+     * the existing one.
+     */
+    std::unique_ptr<RecoveryUnit> releaseAndReplaceRecoveryUnit();
 
     /**
      * Associates the OperatingContext with a different RecoveryUnit for getMore or

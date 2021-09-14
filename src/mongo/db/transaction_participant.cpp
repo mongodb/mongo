@@ -845,10 +845,7 @@ TransactionParticipant::OplogSlotReserver::OplogSlotReserver(OperationContext* o
     // We must lock the Client to change the Locker on the OperationContext.
     stdx::lock_guard<Client> lk(*opCtx->getClient());
     // Save the RecoveryUnit from the new transaction and replace it with an empty one.
-    _recoveryUnit = opCtx->releaseRecoveryUnit();
-    opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(
-                               opCtx->getServiceContext()->getStorageEngine()->newRecoveryUnit()),
-                           WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+    _recoveryUnit = opCtx->releaseAndReplaceRecoveryUnit();
 
     // End two-phase locking on locker manually since the WUOW has been released.
     _opCtx->lockState()->endWriteUnitOfWork();
@@ -906,10 +903,7 @@ TransactionParticipant::TxnResources::TxnResources(WithLock wl,
     // On secondaries, max lock timeout must not be set.
     invariant(!(stashStyle == StashStyle::kSecondary && opCtx->lockState()->hasMaxLockTimeout()));
 
-    _recoveryUnit = opCtx->releaseRecoveryUnit();
-    opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(
-                               opCtx->getServiceContext()->getStorageEngine()->newRecoveryUnit()),
-                           WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+    _recoveryUnit = opCtx->releaseAndReplaceRecoveryUnit();
 
     _apiParameters = APIParameters::get(opCtx);
     _readConcernArgs = repl::ReadConcernArgs::get(opCtx);
@@ -1021,10 +1015,7 @@ TransactionParticipant::SideTransactionBlock::SideTransactionBlock(OperationCont
 
     // Release recovery unit, saving the recovery unit off to the side, keeping open the storage
     // transaction.
-    _recoveryUnit = opCtx->releaseRecoveryUnit();
-    opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(
-                               opCtx->getServiceContext()->getStorageEngine()->newRecoveryUnit()),
-                           WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+    _recoveryUnit = opCtx->releaseAndReplaceRecoveryUnit();
 }
 
 TransactionParticipant::SideTransactionBlock::~SideTransactionBlock() {

@@ -56,6 +56,7 @@
 #include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/stats/server_read_concern_metrics.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -550,6 +551,17 @@ public:
                                                 nullptr /* extractAndAttachPipelineStages */,
                                                 permitYield));
 
+            // If the executor supports it, find operations will maintain the storage engine state
+            // across commands.
+            if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+                feature_flags::gYieldingSupportForSBE.isEnabled(
+                    serverGlobalParams.featureCompatibility) &&
+                !opCtx->inMultiDocumentTransaction() &&
+                repl::ReadConcernArgs::get(opCtx).getLevel() !=
+                    repl::ReadConcernLevel::kSnapshotReadConcern) {
+                exec->enableSaveRecoveryUnitAcrossCommandsIfSupported();
+            }
+
             {
                 stdx::lock_guard<Client> lk(*opCtx->getClient());
                 CurOp::get(opCtx)->setPlanSummary_inlock(exec->getPlanExplainer().getPlanSummary());
@@ -631,6 +643,8 @@ public:
             // Set up the cursor for getMore.
             CursorId cursorId = 0;
             if (shouldSaveCursor(opCtx, collection, state, exec.get())) {
+                const bool stashResourcesForGetMore =
+                    exec->isSaveRecoveryUnitAcrossCommandsEnabled();
                 ClientCursorPin pinnedCursor = CursorManager::get(opCtx)->registerCursor(
                     opCtx,
                     {std::move(exec),
@@ -663,6 +677,19 @@ public:
 
                 // Fill out curop based on the results.
                 endQueryOp(opCtx, collection, *cursorExec, numResults, cursorId);
+
+                if (stashResourcesForGetMore) {
+                    // Collect storage stats now before we stash the recovery unit. These stats are
+                    // normally collected in the service entry point layer just before a command
+                    // ends, but they must be collected before stashing the
+                    // RecoveryUnit. Otherwise, the service entry point layer will collect the
+                    // stats from the new RecoveryUnit, which wasn't actually used for the query.
+                    //
+                    // The stats collected here will not get overwritten, as the service entry
+                    // point layer will only set these stats when they're not empty.
+                    CurOp::get(opCtx)->debug().storageStats =
+                        opCtx->recoveryUnit()->getOperationStatistics();
+                }
             } else {
                 endQueryOp(opCtx, collection, *exec, numResults, cursorId);
             }

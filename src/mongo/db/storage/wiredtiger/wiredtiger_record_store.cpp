@@ -666,8 +666,12 @@ public:
     }
 
     ~RandomCursor() {
-        if (_cursor)
+        if (_cursor) {
+            // On destruction, we must always handle freeing the underlying raw WT_CURSOR pointer.
+            _saveStorageCursorOnDetachFromOperationContext = false;
+
             detachFromOperationContext();
+        }
     }
 
     boost::optional<Record> next() final {
@@ -732,10 +736,10 @@ public:
     void detachFromOperationContext() final {
         invariant(_opCtx);
         _opCtx = nullptr;
-        if (_cursor) {
+        if (_cursor && !_saveStorageCursorOnDetachFromOperationContext) {
             invariantWTOK(_cursor->close(_cursor));
+            _cursor = nullptr;
         }
-        _cursor = nullptr;
     }
 
     void reattachToOperationContext(OperationContext* opCtx) final {
@@ -743,11 +747,16 @@ public:
         _opCtx = opCtx;
     }
 
+    void setSaveStorageCursorOnDetachFromOperationContext(bool saveCursor) override {
+        _saveStorageCursorOnDetachFromOperationContext = saveCursor;
+    }
+
 private:
     WT_CURSOR* _cursor;
     const WiredTigerRecordStore* _rs;
     OperationContext* _opCtx;
     const std::string _config;
+    bool _saveStorageCursorOnDetachFromOperationContext = false;
 };
 
 
@@ -2287,7 +2296,9 @@ bool WiredTigerRecordStoreCursorBase::restore(bool tolerateCappedRepositioning) 
 
 void WiredTigerRecordStoreCursorBase::detachFromOperationContext() {
     _opCtx = nullptr;
-    _cursor = boost::none;
+    if (!_saveStorageCursorOnDetachFromOperationContext) {
+        _cursor = boost::none;
+    }
 }
 
 void WiredTigerRecordStoreCursorBase::reattachToOperationContext(OperationContext* opCtx) {

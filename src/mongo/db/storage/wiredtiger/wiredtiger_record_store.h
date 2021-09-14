@@ -403,6 +403,10 @@ public:
 
     void reattachToOperationContext(OperationContext* opCtx);
 
+    void setSaveStorageCursorOnDetachFromOperationContext(bool saveCursor) override {
+        _saveStorageCursorOnDetachFromOperationContext = saveCursor;
+    }
+
 protected:
     virtual RecordId getKey(WT_CURSOR* cursor) const = 0;
 
@@ -431,6 +435,7 @@ private:
      * established.
      */
     boost::optional<std::int64_t> _oplogVisibleTs = boost::none;
+    bool _saveStorageCursorOnDetachFromOperationContext = false;
 };
 
 class WiredTigerRecordStoreStandardCursor final : public WiredTigerRecordStoreCursorBase {

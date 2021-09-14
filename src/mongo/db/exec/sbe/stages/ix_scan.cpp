@@ -185,6 +185,10 @@ void IndexScanStage::doSaveState(bool relinquishCursor) {
         }
     }
 
+    if (_cursor) {
+        _cursor->setSaveStorageCursorOnDetachFromOperationContext(!relinquishCursor);
+    }
+
     _coll.reset();
 }
 

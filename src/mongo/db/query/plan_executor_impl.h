@@ -104,6 +104,11 @@ public:
 
     PlanStage* getRootStage() const;
 
+    void enableSaveRecoveryUnitAcrossCommandsIfSupported() override {}
+    bool isSaveRecoveryUnitAcrossCommandsEnabled() const override {
+        return false;
+    }
+
 private:
     /**
      *  Executes the underlying PlanStage tree until it indicates EOF. Throws an exception if the
