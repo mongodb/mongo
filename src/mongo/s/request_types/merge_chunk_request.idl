@@ -26,7 +26,7 @@
 # it in the license file.
 #
 
-# _configsvrCommitChunkMerge / _configsvrCommitChunksMerge IDL File
+# _configsvrCommitChunksMerge IDL File
 
 global:
     cpp_namespace: "mongo"
@@ -60,7 +60,7 @@ types:
 
 structs:
     ConfigSvrMergeResponse:
-        description: "Response of the _configsvrCommitChunkMerge command."
+        description: "Response of the _configsvrCommitChunksMerge command."
         strict: false
         fields:
             shardVersion:
@@ -68,37 +68,6 @@ structs:
                 description: "Latest version of the shard."
 
 commands:
-    _configsvrCommitChunkMerge:
-        command_name: _configsvrCommitChunkMerge
-        cpp_name: "ConfigSvrMergeChunk"
-        description: "The internal _configsvrCommitChunkMerge command on the config server."
-        namespace: type
-        api_version: ""
-        type: namespacestring
-        strict: false
-        reply_type: ConfigSvrMergeResponse
-        fields:
-            shard:
-                type: shard_id
-                description: "String identifier for a shard's name"
-            collEpoch:
-                type: objectid
-                cpp_name: "epoch"
-                description: "Uniquely identifies this instance of the collection, in case of
-                              drop/create or shard key refine."
-            chunkBoundaries:
-                type: array<object_owned>
-                description: "Chunk bounds to merge."
-                validator: { callback: 'chunkBoundsNotEmpty' }
-            validAfter:
-                type: timestamp
-                description: "The time after which this chunk is at this shard."
-                optional: true
-            writeConcern:
-                description: "The level of write concern for the creation operation"
-                type: object
-                optional: true
-
     _configsvrCommitChunksMerge:
         command_name: _configsvrCommitChunksMerge
         cpp_name: ConfigSvrMergeChunks

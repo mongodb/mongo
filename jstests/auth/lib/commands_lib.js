@@ -2949,20 +2949,6 @@ var authCommandsLib = {
           ]
         },
         {
-          testname: "_configsvrCommitChunkMerge",
-          command: {_configsvrCommitChunkMerge: "x.y", shard: "shard0000", collEpoch: ObjectId(), chunkBoundaries:[{a:1}, {a:5}, {a:10}]},
-          skipSharded: true,
-          expectFail: true,
-          testcases: [
-              {
-                runOnDb: adminDbName,
-                roles: {__system: 1},
-                privileges: [{resource: {cluster: true}, actions: ["internal"]}],
-                expectFail: true
-              },
-          ]
-        },
-        {
           testname: "_configsvrCommitChunkMigration",
           command: {_configsvrCommitChunkMigration: "x.y"},
           skipSharded: true,

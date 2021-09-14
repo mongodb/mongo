@@ -83,7 +83,6 @@ let testCases = {
     _configsvrBalancerStop: {skip: "internal command"},
     _configsvrCleanupReshardCollection: {skip: "internal command"},
     _configsvrClearJumboFlag: {skip: "internal command"},
-    _configsvrCommitChunkMerge: {skip: "internal command"},
     _configsvrCommitChunksMerge: {skip: "internal command"},
     _configsvrCommitChunkMigration: {skip: "internal command"},
     _configsvrCommitChunkSplit: {skip: "internal command"},

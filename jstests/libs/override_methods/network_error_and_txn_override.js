@@ -74,7 +74,6 @@ const kNonRetryableCommands = new Set([
     // Commands that take write concern and do not support txnNumbers.
     "_configsvrAddShard",
     "_configsvrAddShardToZone",
-    "_configsvrCommitChunkMerge",
     "_configsvrCommitChunksMerge",
     "_configsvrCommitChunkMigration",
     "_configsvrCommitChunkSplit",

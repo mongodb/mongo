@@ -74,10 +74,10 @@ bool checkMetadataForSuccess(OperationContext* opCtx,
         chunk.getMax().woCompare(chunkRange.getMax()) == 0;
 }
 
-Shard::CommandResponse commitUsingChunkRange(OperationContext* opCtx,
-                                             const NamespaceString& nss,
-                                             const ChunkRange& chunkRange,
-                                             const CollectionMetadata& metadata) {
+Shard::CommandResponse commitMergeOnConfigServer(OperationContext* opCtx,
+                                                 const NamespaceString& nss,
+                                                 const ChunkRange& chunkRange,
+                                                 const CollectionMetadata& metadata) {
     auto const shardingState = ShardingState::get(opCtx);
     const auto currentTime = VectorClock::get(opCtx)->getTime();
     auto collUUID = metadata.getUUID();
@@ -96,123 +96,6 @@ Shard::CommandResponse commitUsingChunkRange(OperationContext* opCtx,
             Shard::RetryPolicy::kIdempotent));
 
     return cmdResponse;
-}
-
-Shard::CommandResponse commitUsingChunksList(OperationContext* opCtx,
-                                             const NamespaceString& nss,
-                                             const BSONObj& minKey,
-                                             const BSONObj& maxKey,
-                                             const CollectionMetadata& metadata) {
-    auto const shardingState = ShardingState::get(opCtx);
-
-    //
-    // Get merged chunk information
-    //
-    std::vector<ChunkType> chunksToMerge;
-    std::vector<BSONObj> chunkBoundaries;
-    chunkBoundaries.push_back(minKey);
-
-    ChunkType itChunk;
-    itChunk.setMin(minKey);
-    itChunk.setMax(minKey);
-
-    while (itChunk.getMax().woCompare(maxKey) < 0 &&
-           metadata.getNextChunk(itChunk.getMax(), &itChunk)) {
-        chunkBoundaries.push_back(itChunk.getMax());
-        chunksToMerge.push_back(itChunk);
-    }
-
-    uassert(ErrorCodes::IllegalOperation,
-            str::stream() << "could not merge chunks, collection " << nss.ns()
-                          << " range starting at " << redact(minKey) << " and ending at "
-                          << redact(maxKey) << " does not belong to shard "
-                          << shardingState->shardId(),
-            !chunksToMerge.empty());
-
-    //
-    // Validate the range starts and ends at chunks and has no holes, error if not valid
-    //
-
-    BSONObj firstDocMin = chunksToMerge.front().getMin();
-    BSONObj firstDocMax = chunksToMerge.front().getMax();
-    // minKey is inclusive
-    bool minKeyInRange = rangeContains(firstDocMin, firstDocMax, minKey);
-
-    uassert(ErrorCodes::IllegalOperation,
-            str::stream() << "could not merge chunks, collection " << nss.ns()
-                          << " range starting at " << redact(minKey) << " does not belong to shard "
-                          << shardingState->shardId(),
-            minKeyInRange);
-
-    BSONObj lastDocMin = chunksToMerge.back().getMin();
-    BSONObj lastDocMax = chunksToMerge.back().getMax();
-    // maxKey is exclusive
-    bool maxKeyInRange = lastDocMin.woCompare(maxKey) < 0 && lastDocMax.woCompare(maxKey) >= 0;
-
-    uassert(ErrorCodes::IllegalOperation,
-            str::stream() << "could not merge chunks, collection " << nss.ns()
-                          << " range ending at " << redact(maxKey) << " does not belong to shard "
-                          << shardingState->shardId(),
-            maxKeyInRange);
-
-    bool validRangeStartKey = firstDocMin.woCompare(minKey) == 0;
-    bool validRangeEndKey = lastDocMax.woCompare(maxKey) == 0;
-
-    uassert(ErrorCodes::IllegalOperation,
-            str::stream() << "could not merge chunks, collection " << nss.ns()
-                          << " does not contain a chunk "
-                          << (!validRangeStartKey ? "starting at " + redact(minKey.toString()) : "")
-                          << (!validRangeStartKey && !validRangeEndKey ? " or " : "")
-                          << (!validRangeEndKey ? "ending at " + redact(maxKey.toString()) : ""),
-            validRangeStartKey && validRangeEndKey);
-
-    uassert(ErrorCodes::IllegalOperation,
-            str::stream() << "could not merge chunks, collection " << nss.ns()
-                          << " already contains chunk for "
-                          << ChunkRange(minKey, maxKey).toString(),
-            chunksToMerge.size() > 1);
-
-    // Look for hole in range
-    for (size_t i = 1; i < chunksToMerge.size(); ++i) {
-        uassert(
-            ErrorCodes::IllegalOperation,
-            str::stream()
-                << "could not merge chunks, collection " << nss.ns() << " has a hole in the range "
-                << ChunkRange(minKey, maxKey).toString() << " at "
-                << ChunkRange(chunksToMerge[i - 1].getMax(), chunksToMerge[i].getMin()).toString(),
-            chunksToMerge[i - 1].getMax().woCompare(chunksToMerge[i].getMin()) == 0);
-    }
-
-    //
-    // Run _configsvrCommitChunkMerge.
-    //
-    const auto currentTime = VectorClock::get(opCtx)->getTime();
-    ConfigSvrMergeChunk request{nss,
-                                shardingState->shardId().toString(),
-                                metadata.getShardVersion().epoch(),
-                                chunkBoundaries};
-    request.setValidAfter(currentTime.clusterTime().asTimestamp());
-    request.setWriteConcern(ShardingCatalogClient::kMajorityWriteConcern.toBSON());
-
-    auto cmdResponse =
-        uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommand(
-            opCtx,
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            NamespaceString::kAdminDb.toString(),
-            request.toBSON(BSONObj()),
-            Shard::RetryPolicy::kIdempotent));
-
-    return cmdResponse;
-}
-
-Shard::CommandResponse commitMergeOnConfigServer(OperationContext* opCtx,
-                                                 const NamespaceString& nss,
-                                                 const ChunkRange& chunkRange,
-                                                 const CollectionMetadata& metadata) {
-    auto commandResponse = commitUsingChunkRange(opCtx, nss, chunkRange, metadata);
-    return commandResponse.commandStatus == ErrorCodes::CommandNotFound
-        ? commitUsingChunksList(opCtx, nss, chunkRange.getMin(), chunkRange.getMax(), metadata)
-        : commandResponse;
 }
 
 void mergeChunks(OperationContext* opCtx,
@@ -271,12 +154,12 @@ void mergeChunks(OperationContext* opCtx,
     }();
 
     // Refresh metadata to pick up new chunk definitions (regardless of the results returned from
-    // running _configsvrCommitChunkMerge).
+    // running _configsvrCommitChunksMerge).
     onShardVersionMismatch(opCtx, nss, std::move(shardVersionReceived));
 
-    // If _configsvrCommitChunkMerge returned an error, look at this shard's metadata to determine
+    // If _configsvrCommitChunksMerge returned an error, look at this shard's metadata to determine
     // if the merge actually did happen. This can happen if there's a network error getting the
-    // response from the first call to _configsvrCommitChunkMerge, but it actually succeeds, thus
+    // response from the first call to _configsvrCommitChunksMerge, but it actually succeeds, thus
     // the automatic retry fails with a precondition violation, for example.
     auto commandStatus = std::move(cmdResponse.commandStatus);
     auto writeConcernStatus = std::move(cmdResponse.writeConcernStatus);
