@@ -211,7 +211,8 @@ static Status parseGeoJSONPolygonCoordinates(const BSONElement& elem,
         loops.push_back(std::make_unique<S2Loop>(points));
         S2Loop* loop = loops.back().get();
 
-        // Check whether this loop is valid.
+        // Check whether this loop is valid if vaildation hasn't been already done on 2dSphere index
+        // insertion which is controlled by the 'skipValidation' flag.
         // 1. At least 3 vertices.
         // 2. All vertices must be unit length. Guaranteed by parsePoints().
         // 3. Loops are not allowed to have any duplicate vertices.
@@ -224,7 +225,7 @@ static Status parseGeoJSONPolygonCoordinates(const BSONElement& elem,
 
         // Check the first loop must be the exterior ring and any others must be
         // interior rings or holes.
-        if (loops.size() > 1 && !loops[0]->Contains(loop)) {
+        if (!skipValidation && loops.size() > 1 && !loops[0]->Contains(loop)) {
             return BAD_VALUE(
                 "Secondary loops not contained by first exterior loop - "
                 "secondary loops must be holes: "
