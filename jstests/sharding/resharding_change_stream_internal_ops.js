@@ -7,7 +7,6 @@
 //   requires_majority_read_concern,
 //   uses_change_streams,
 //   uses_atclustertime,
-//   requires_fcv_51
 //
 // ]
 (function() {
