@@ -29,7 +29,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/commands/feature_compatibility_version_documentation.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/document_source_add_fields.h"
 #include "mongo/db/pipeline/document_source_project.h"
@@ -54,45 +53,26 @@ using MinMaxSense = AccumulatorMinMax::Sense;
 REGISTER_WINDOW_FUNCTION(derivative, ExpressionDerivative::parse);
 REGISTER_WINDOW_FUNCTION(first, ExpressionFirst::parse);
 REGISTER_WINDOW_FUNCTION(last, ExpressionLast::parse);
+REGISTER_WINDOW_FUNCTION(minN, ExpressionMinMaxN<MinMaxSense::kMin>::parse);
+REGISTER_WINDOW_FUNCTION(maxN, ExpressionMinMaxN<MinMaxSense::kMax>::parse);
 
-// TODO SERVER-52247 Replace boost::none with 'gFeatureFlagExactTopNAccumulator.getVersion()' below
-// once 'gFeatureFlagExactTopNAccumulator' is set to true by default and is configured with an FCV.
-REGISTER_WINDOW_FUNCTION_CONDITIONALLY(
-    minN,
-    ExpressionMinMaxN<MinMaxSense::kMin>::parse,
-    boost::none,
-    feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
-REGISTER_WINDOW_FUNCTION_CONDITIONALLY(
-    maxN,
-    ExpressionMinMaxN<MinMaxSense::kMax>::parse,
-    boost::none,
-    feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
-
-StringMap<Expression::ExpressionParserRegistration> Expression::parserMap;
+StringMap<Expression::Parser> Expression::parserMap;
 
 intrusive_ptr<Expression> Expression::parse(BSONObj obj,
                                             const optional<SortPattern>& sortBy,
                                             ExpressionContext* expCtx) {
+
     for (const auto& field : obj) {
         // Check if window function is $-prefixed.
         auto fieldName = field.fieldNameStringData();
 
         if (fieldName.startsWith("$"_sd)) {
-            auto exprName = field.fieldNameStringData();
-            if (auto parserFCV = parserMap.find(exprName); parserFCV != parserMap.end()) {
+
+            if (auto parser = parserMap.find(field.fieldNameStringData());
+                parser != parserMap.end()) {
                 // Found one valid window function. If there are multiple window functions they will
                 // be caught as invalid arguments to the Expression parser later.
-                const auto& parser = parserFCV->second.first;
-                auto fcv = parserFCV->second.second;
-                uassert(ErrorCodes::QueryFeatureNotAllowed,
-                        str::stream()
-                            << exprName
-                            << " is not allowed in the current feature compatibility version. See "
-                            << feature_compatibility_version_documentation::kCompatibilityLink
-                            << " for more information.",
-                        !expCtx->maxFeatureCompatibilityVersion || !fcv ||
-                            (*fcv <= *expCtx->maxFeatureCompatibilityVersion));
-                return parser(obj, sortBy, expCtx);
+                return parser->second(obj, sortBy, expCtx);
             }
             // The window function provided in the window function expression is invalid.
 
@@ -119,13 +99,9 @@ intrusive_ptr<Expression> Expression::parse(BSONObj obj,
                        : ", "s + obj.firstElementFieldNameStringData()));
 }
 
-void Expression::registerParser(
-    std::string functionName,
-    Parser parser,
-    boost::optional<multiversion::FeatureCompatibilityVersion> requiredMinVersion) {
+void Expression::registerParser(std::string functionName, Parser parser) {
     invariant(parserMap.find(functionName) == parserMap.end());
-    ExpressionParserRegistration r(parser, requiredMinVersion);
-    parserMap.emplace(std::move(functionName), std::move(r));
+    parserMap.emplace(std::move(functionName), std::move(parser));
 }
 
 
@@ -253,6 +229,12 @@ boost::intrusive_ptr<Expression> ExpressionMinMaxN<S>::parse(
             return AccumulatorMaxN::getName();
         }
     }();
+    uassert(5788502,
+            str::stream() << "Cannot create " << name
+                          << " accumulator in $setWindowFields"
+                             " if feature flag is disabled",
+            feature_flags::gFeatureFlagExactTopNAccumulator.isEnabled(
+                serverGlobalParams.featureCompatibility));
 
     boost::intrusive_ptr<::mongo::Expression> nExpr;
     boost::intrusive_ptr<::mongo::Expression> outputExpr;

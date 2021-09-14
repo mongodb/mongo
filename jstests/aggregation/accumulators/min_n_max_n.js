@@ -17,7 +17,7 @@ if (!isExactTopNEnabled) {
         pipeline: [{$group: {_id: {'st': '$state'}, minSales: {$minN: {output: '$sales', n: 2}}}}],
         cursor: {}
     }),
-                                 15952);
+                                 5787909);
     return;
 }
 

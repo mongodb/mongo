@@ -20,7 +20,7 @@ if (!isExactTopNEnabled) {
             [{$group: {_id: {'st': '$state'}, firstValues: {$firstN: {output: '$sales', n: 2}}}}],
         cursor: {}
     }),
-                                 15952);
+                                 5787800);
     return;
 }
 

@@ -24,7 +24,7 @@ if (!isExactTopNEnabled) {
         }],
         cursor: {}
     }),
-                                 ErrorCodes.FailedToParse);
+                                 5788502);
     return;
 }
 

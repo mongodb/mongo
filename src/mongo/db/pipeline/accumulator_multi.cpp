@@ -34,64 +34,39 @@ namespace mongo {
 using FirstLastSense = AccumulatorFirstLastN::Sense;
 using MinMaxSense = AccumulatorMinMax::Sense;
 
-// TODO SERVER-52247 Replace boost::none with 'gFeatureFlagExactTopNAccumulator.getVersion()' below
-// once 'gFeatureFlagExactTopNAccumulator' is set to true by default and is configured with an FCV.
-REGISTER_ACCUMULATOR_CONDITIONALLY(
-    maxN,
-    AccumulatorMinMaxN::parseMinMaxN<MinMaxSense::kMax>,
-    AllowedWithApiStrict::kNeverInVersion1,
-    AllowedWithClientType::kAny,
-    boost::none,
-    feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
-REGISTER_ACCUMULATOR_CONDITIONALLY(
-    minN,
-    AccumulatorMinMaxN::parseMinMaxN<MinMaxSense::kMin>,
-    AllowedWithApiStrict::kNeverInVersion1,
-    AllowedWithClientType::kAny,
-    boost::none,
-    feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
-REGISTER_EXPRESSION_CONDITIONALLY(
-    maxN,
-    AccumulatorMinMaxN::parseExpression<MinMaxSense::kMax>,
-    AllowedWithApiStrict::kNeverInVersion1,
-    AllowedWithClientType::kAny,
-    boost::none,
-    feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
-REGISTER_EXPRESSION_CONDITIONALLY(
-    minN,
-    AccumulatorMinMaxN::parseExpression<MinMaxSense::kMin>,
-    AllowedWithApiStrict::kNeverInVersion1,
-    AllowedWithClientType::kAny,
-    boost::none,
-    feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
-REGISTER_ACCUMULATOR_CONDITIONALLY(
+REGISTER_ACCUMULATOR_WITH_MIN_VERSION(maxN,
+                                      AccumulatorMinMaxN::parseMinMaxN<MinMaxSense::kMax>,
+                                      multiversion::FeatureCompatibilityVersion::kVersion_5_1);
+REGISTER_ACCUMULATOR_WITH_MIN_VERSION(minN,
+                                      AccumulatorMinMaxN::parseMinMaxN<MinMaxSense::kMin>,
+                                      multiversion::FeatureCompatibilityVersion::kVersion_5_1);
+REGISTER_EXPRESSION_WITH_MIN_VERSION(maxN,
+                                     AccumulatorMinMaxN::parseExpression<MinMaxSense::kMax>,
+                                     AllowedWithApiStrict::kNeverInVersion1,
+                                     AllowedWithClientType::kAny,
+                                     multiversion::FeatureCompatibilityVersion::kVersion_5_1);
+REGISTER_EXPRESSION_WITH_MIN_VERSION(minN,
+                                     AccumulatorMinMaxN::parseExpression<MinMaxSense::kMin>,
+                                     AllowedWithApiStrict::kNeverInVersion1,
+                                     AllowedWithClientType::kAny,
+                                     multiversion::FeatureCompatibilityVersion::kVersion_5_1);
+REGISTER_ACCUMULATOR_WITH_MIN_VERSION(
     firstN,
     AccumulatorFirstLastN::parseFirstLastN<FirstLastSense::kFirst>,
-    AllowedWithApiStrict::kNeverInVersion1,
-    AllowedWithClientType::kAny,
-    boost::none,
-    feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
-REGISTER_ACCUMULATOR_CONDITIONALLY(
-    lastN,
-    AccumulatorFirstLastN::parseFirstLastN<FirstLastSense::kLast>,
-    AllowedWithApiStrict::kNeverInVersion1,
-    AllowedWithClientType::kAny,
-    boost::none,
-    feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
-REGISTER_EXPRESSION_CONDITIONALLY(
-    firstN,
-    AccumulatorFirstLastN::parseExpression<FirstLastSense::kFirst>,
-    AllowedWithApiStrict::kNeverInVersion1,
-    AllowedWithClientType::kAny,
-    boost::none,
-    feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
-REGISTER_EXPRESSION_CONDITIONALLY(
-    lastN,
-    AccumulatorFirstLastN::parseExpression<FirstLastSense::kLast>,
-    AllowedWithApiStrict::kNeverInVersion1,
-    AllowedWithClientType::kAny,
-    boost::none,
-    feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
+    multiversion::FeatureCompatibilityVersion::kVersion_5_1);
+REGISTER_ACCUMULATOR_WITH_MIN_VERSION(lastN,
+                                      AccumulatorFirstLastN::parseFirstLastN<FirstLastSense::kLast>,
+                                      multiversion::FeatureCompatibilityVersion::kVersion_5_1);
+REGISTER_EXPRESSION_WITH_MIN_VERSION(firstN,
+                                     AccumulatorFirstLastN::parseExpression<FirstLastSense::kFirst>,
+                                     AllowedWithApiStrict::kNeverInVersion1,
+                                     AllowedWithClientType::kAny,
+                                     multiversion::FeatureCompatibilityVersion::kVersion_5_1);
+REGISTER_EXPRESSION_WITH_MIN_VERSION(lastN,
+                                     AccumulatorFirstLastN::parseExpression<FirstLastSense::kLast>,
+                                     AllowedWithApiStrict::kNeverInVersion1,
+                                     AllowedWithClientType::kAny,
+                                     multiversion::FeatureCompatibilityVersion::kVersion_5_1);
 // TODO SERVER-57884 Add $firstN/$lastN as window functions.
 
 AccumulatorN::AccumulatorN(ExpressionContext* const expCtx)
@@ -207,6 +182,12 @@ AccumulationExpression AccumulatorMinMaxN::parseMinMaxN(ExpressionContext* const
         }
     }();
 
+    // TODO SERVER-58379 Remove this uassert once the FCV constants are upgraded and the REGISTER
+    // macros above are updated accordingly.
+    uassert(5787909,
+            str::stream() << "Cannot create " << name << " accumulator if feature flag is disabled",
+            feature_flags::gFeatureFlagExactTopNAccumulator.isEnabled(
+                serverGlobalParams.featureCompatibility));
     uassert(5787900,
             str::stream() << "specification must be an object; found " << elem,
             elem.type() == BSONType::Object);
@@ -298,6 +279,12 @@ AccumulationExpression AccumulatorFirstLastN::parseFirstLastN(ExpressionContext*
         }
     }();
 
+    // TODO SERVER-58379 Remove this uassert once the FCV constants are upgraded and the REGISTER
+    // macros above are updated accordingly.
+    uassert(5787800,
+            str::stream() << "Cannot create " << name << " accumulator if feature flag is disabled",
+            feature_flags::gFeatureFlagExactTopNAccumulator.isEnabled(
+                serverGlobalParams.featureCompatibility));
     uassert(5787801,
             str::stream() << "specification must be an object; found " << elem,
             elem.type() == BSONType::Object);
