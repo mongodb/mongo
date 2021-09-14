@@ -37,17 +37,14 @@ const configPrimary = new Mongo(topology.configsvr.primary);
 const donor0 = new Mongo(topology.shards[donorShardNames[0]].primary);
 const donor1 = new Mongo(topology.shards[donorShardNames[1]].primary);
 
-// TODO SERVER-58950: Remove all calls to isMixedVersionCluster() in this test
 let pauseCoordinatorBeforeRemovingStateDoc;
 let pauseBeforeRemoveDonor0Doc;
 let pauseBeforeRemoveDonor1Doc;
-if (!reshardingTest.isMixedVersionCluster()) {
-    pauseCoordinatorBeforeRemovingStateDoc =
-        configureFailPoint(configPrimary, "reshardingPauseCoordinatorBeforeRemovingStateDoc");
+pauseCoordinatorBeforeRemovingStateDoc =
+    configureFailPoint(configPrimary, "reshardingPauseCoordinatorBeforeRemovingStateDoc");
 
-    pauseBeforeRemoveDonor0Doc = configureFailPoint(donor0, "removeDonorDocFailpoint");
-    pauseBeforeRemoveDonor1Doc = configureFailPoint(donor1, "removeDonorDocFailpoint");
-}
+pauseBeforeRemoveDonor0Doc = configureFailPoint(donor0, "removeDonorDocFailpoint");
+pauseBeforeRemoveDonor1Doc = configureFailPoint(donor1, "removeDonorDocFailpoint");
 
 let awaitAbort;
 reshardingTest.withReshardingInBackground(
@@ -71,40 +68,33 @@ reshardingTest.withReshardingInBackground(
     {
         expectedErrorCode: ErrorCodes.ReshardCollectionAborted,
         postDecisionPersistedFn: () => {
-            if (!reshardingTest.isMixedVersionCluster()) {
-                // Once the coordinator has persisted an abort decision, collMod, createIndexes, and
-                // dropIndexes should be able to succeed. Wait until both donors have heard that the
-                // coordinator has made the decision.
-                assert.soon(() => {
-                    const res0 =
-                        donor0.getCollection("config.cache.collections").findOne({_id: ns});
-                    const res1 =
-                        donor1.getCollection("config.cache.collections").findOne({_id: ns});
-                    return res0 && res0.reshardingFields.state === "aborting" && res1 &&
-                        res1.reshardingFields.state === "aborting";
-                }, () => `timed out waiting for the coordinator to persist decision`);
+            // Once the coordinator has persisted an abort decision, collMod, createIndexes, and
+            // dropIndexes should be able to succeed. Wait until both donors have heard that the
+            // coordinator has made the decision.
+            assert.soon(() => {
+                const res0 = donor0.getCollection("config.cache.collections").findOne({_id: ns});
+                const res1 = donor1.getCollection("config.cache.collections").findOne({_id: ns});
+                return res0 && res0.reshardingFields.state === "aborting" && res1 &&
+                    res1.reshardingFields.state === "aborting";
+            }, () => `timed out waiting for the coordinator to persist decision`);
 
-                const db = mongos.getDB("reshardingDb");
-                assert.commandWorked(db.runCommand({collMod: 'coll'}));
-                assert.commandWorked(db.runCommand({
-                    createIndexes: 'coll',
-                    indexes: [{name: "idx1", key: {newKey: 1, oldKey: 1}}]
-                }));
-                assert.commandWorked(
-                    db.runCommand({dropIndexes: 'coll', index: {newKey: 1, oldKey: 1}}));
+            const db = mongos.getDB("reshardingDb");
+            assert.commandWorked(db.runCommand({collMod: 'coll'}));
+            assert.commandWorked(db.runCommand(
+                {createIndexes: 'coll', indexes: [{name: "idx1", key: {newKey: 1, oldKey: 1}}]}));
+            assert.commandWorked(
+                db.runCommand({dropIndexes: 'coll', index: {newKey: 1, oldKey: 1}}));
 
-                pauseBeforeRemoveDonor0Doc.off();
-                pauseBeforeRemoveDonor1Doc.off();
-                pauseCoordinatorBeforeRemovingStateDoc.off();
-                awaitAbort();
-            }
+            pauseBeforeRemoveDonor0Doc.off();
+            pauseBeforeRemoveDonor1Doc.off();
+            pauseCoordinatorBeforeRemovingStateDoc.off();
+            awaitAbort();
         }
+
     });
 
-if (!reshardingTest.isMixedVersionCluster()) {
-    pauseCoordinatorBeforeRemovingStateDoc =
-        configureFailPoint(configPrimary, "reshardingPauseCoordinatorBeforeRemovingStateDoc");
-}
+pauseCoordinatorBeforeRemovingStateDoc =
+    configureFailPoint(configPrimary, "reshardingPauseCoordinatorBeforeRemovingStateDoc");
 
 let pauseBeforeRemoveRecipientDoc;
 reshardingTest.withReshardingInBackground(
@@ -158,55 +148,44 @@ reshardingTest.withReshardingInBackground(
 
         mongos.getCollection(newNs).drop();
 
-        if (!reshardingTest.isMixedVersionCluster()) {
-            const recipient = new Mongo(topology.shards[recipientShardNames[0]].primary);
-            pauseBeforeRemoveRecipientDoc =
-                configureFailPoint(recipient, "removeRecipientDocFailpoint");
-        }
+        const recipient = new Mongo(topology.shards[recipientShardNames[0]].primary);
+        pauseBeforeRemoveRecipientDoc =
+            configureFailPoint(recipient, "removeRecipientDocFailpoint");
     },
     {
         postDecisionPersistedFn: () => {
-            if (!reshardingTest.isMixedVersionCluster()) {
-                // Once the coordinator has persisted a commit decision, collMod, createIndexes, and
-                // dropIndexes should be able to succeed. Wait until the recipient is aware that the
-                // coordinator has persisted the decision.
-                const recipient = new Mongo(topology.shards[recipientShardNames[0]].primary);
-                assert.soon(
-                    () => {
-                        const res =
-                            recipient.getCollection("config.cache.collections").findOne({_id: ns});
-                        return res && res.reshardingFields.state === "committing";
-                    },
-                    () => `timed out waiting for the coordinator to persist decision: ${
-                        tojson(res)}`);
+            // Once the coordinator has persisted a commit decision, collMod, createIndexes, and
+            // dropIndexes should be able to succeed. Wait until the recipient is aware that the
+            // coordinator has persisted the decision.
+            const recipient = new Mongo(topology.shards[recipientShardNames[0]].primary);
+            assert.soon(() => {
+                const res = recipient.getCollection("config.cache.collections").findOne({_id: ns});
+                return res && res.reshardingFields.state === "committing";
+            }, () => `timed out waiting for the coordinator to persist decision: ${tojson(res)}`);
 
-                const db = mongos.getDB("reshardingDb");
-                assert.commandWorked(db.runCommand({collMod: 'coll'}));
+            const db = mongos.getDB("reshardingDb");
+            assert.commandWorked(db.runCommand({collMod: 'coll'}));
 
-                // Create two indexes - one (idx1) that we will drop right away to ensure that
-                // dropIndexes succeeds, and the other (idx2) we will check still exists after the
-                // collection has been renamed.
-                assert.commandWorked(db.runCommand({
-                    createIndexes: 'coll',
-                    indexes: [{name: "idx1", key: {newKey: 1, oldKey: 1}}]
-                }));
-                assert.commandWorked(db.runCommand(
-                    {createIndexes: 'coll', indexes: [{name: "idx2", key: {newKey: 1, x: 1}}]}));
+            // Create two indexes - one (idx1) that we will drop right away to ensure that
+            // dropIndexes succeeds, and the other (idx2) we will check still exists after the
+            // collection has been renamed.
+            assert.commandWorked(db.runCommand(
+                {createIndexes: 'coll', indexes: [{name: "idx1", key: {newKey: 1, oldKey: 1}}]}));
+            assert.commandWorked(db.runCommand(
+                {createIndexes: 'coll', indexes: [{name: "idx2", key: {newKey: 1, x: 1}}]}));
 
-                assert.commandWorked(
-                    db.runCommand({dropIndexes: 'coll', index: {newKey: 1, oldKey: 1}}));
+            assert.commandWorked(
+                db.runCommand({dropIndexes: 'coll', index: {newKey: 1, oldKey: 1}}));
 
-                pauseBeforeRemoveRecipientDoc.off();
-                pauseCoordinatorBeforeRemovingStateDoc.off();
-            }
+            pauseBeforeRemoveRecipientDoc.off();
+            pauseCoordinatorBeforeRemovingStateDoc.off();
         }
+
     });
 
 // Assert that 'idx2' still exists after we've renamed the collection and resharding is finished.
-if (!reshardingTest.isMixedVersionCluster()) {
-    let indexes = mongos.getDB("reshardingDb").runCommand({listIndexes: 'coll'});
-    assert(indexes.cursor.firstBatch.some((index) => index.name === 'idx2'));
-}
+let indexes = mongos.getDB("reshardingDb").runCommand({listIndexes: 'coll'});
+assert(indexes.cursor.firstBatch.some((index) => index.name === 'idx2'));
 
 awaitAbort();
 reshardingTest.teardown();
