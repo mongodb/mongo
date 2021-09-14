@@ -81,7 +81,8 @@ ChunkRange getRangeForChunk(int i, int nChunks) {
 RoutingTableHistoryValueHandle makeStandaloneRoutingTableHistory(RoutingTableHistory rt) {
     const auto version = rt.getVersion();
     return RoutingTableHistoryValueHandle(
-        std::move(rt), ComparableChunkVersion::makeComparableChunkVersion(version));
+        std::make_shared<RoutingTableHistory>(std::move(rt)),
+        ComparableChunkVersion::makeComparableChunkVersion(version));
 }
 
 std::pair<std::vector<mongo::ChunkType>, mongo::ChunkManager> createChunks(
