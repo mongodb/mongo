@@ -39,16 +39,17 @@
 #include "mongo/logv2/log_domain_internal.h"
 #include "mongo/logv2/log_options.h"
 #include "mongo/logv2/log_source.h"
+#include "mongo/util/static_immortal.h"
 #include "mongo/util/testing_proctor.h"
 
 namespace mongo::logv2::detail {
 namespace {
 GetTenantIDFn& getTenantID() {
     // Ensure that we avoid undefined initialization ordering
-    // when logging occurs during process init.
+    // when logging occurs during process init and shutdown.
     // See logv2_test.cpp
-    static GetTenantIDFn fn;
-    return fn;
+    static StaticImmortal<GetTenantIDFn> fn;
+    return *fn;
 }
 }  // namespace
 
