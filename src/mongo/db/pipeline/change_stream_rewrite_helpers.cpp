@@ -307,16 +307,6 @@ std::unique_ptr<MatchExpression> matchRewriteDocumentKey(
     return rewrittenPredicate;
 }
 
-const CollatorInterface* getMatchExpressionCollator(const MatchExpression* me) {
-    if (auto cme = dynamic_cast<const ComparisonMatchExpressionBase*>(me); cme != nullptr) {
-        return cme->getCollator();
-    } else if (auto ime = dynamic_cast<const InMatchExpression*>(me); ime != nullptr) {
-        return ime->getCollator();
-    } else {
-        return nullptr;
-    }
-}
-
 /**
  * Attempt to rewrite a reference to the 'documentKey' field such that, when evaluated over an oplog
  * document, it produces the expected change stream value for the field.
@@ -394,14 +384,6 @@ std::unique_ptr<MatchExpression> matchRewriteFullDocument(
     tassert(5851401,
             str::stream() << "Unexpected predicate path: " << predicate->path(),
             predicate->fieldRef()->getPart(0) == DocumentSourceChangeStream::kFullDocumentField);
-
-    // Any rewritten predicate returned from here will get serialized and deserialized later by the
-    // DocumentSourceChangeStreamOplogMatch::doOptimizeAt() method. Unfortunately, the serialization
-    // process doesn't preserve the '_collator' field, so we can't safely rewrite 'predicate' if it
-    // has a collator.
-    if (getMatchExpressionCollator(predicate) != nullptr) {
-        return nullptr;
-    }
 
     // Because the 'fullDocument' field can be populated later in the pipeline for update events
     // (via the '{fullDocument: "updateLookup"}' option), it's impractical to try to generate a

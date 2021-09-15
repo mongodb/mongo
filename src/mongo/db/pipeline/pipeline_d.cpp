@@ -876,7 +876,9 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
     // Any data returned from the inner executor must be owned.
     size_t plannerOpts = QueryPlannerParams::DEFAULT;
 
-    if (pipeline->peekFront() && pipeline->peekFront()->constraints().isChangeStreamStage()) {
+    bool isChangeStream =
+        pipeline->peekFront() && pipeline->peekFront()->constraints().isChangeStreamStage();
+    if (isChangeStream) {
         invariant(expCtx->tailableMode == TailableModeEnum::kTailableAndAwaitData);
         plannerOpts |= (QueryPlannerParams::TRACK_LATEST_OPLOG_TS |
                         QueryPlannerParams::ASSERT_MIN_TS_HAS_NOT_FALLEN_OFF_OPLOG);
@@ -988,6 +990,14 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
                 "DISTINCT_SCAN grouping");
         }
     }
+
+    // If this pipeline is a change stream, then the cursor must use the simple collation, so we
+    // temporarily switch the collator on the ExpressionContext to nullptr. We do this here because
+    // by this point, all the necessary pipeline analyses and optimizations have already been
+    // performed. Note that 'collatorStash' restores the original collator when it leaves scope.
+    std::unique_ptr<CollatorInterface> collatorForCursor = nullptr;
+    auto collatorStash =
+        isChangeStream ? expCtx->temporarilyChangeCollator(std::move(collatorForCursor)) : nullptr;
 
     return attemptToGetExecutor(expCtx,
                                 collection,

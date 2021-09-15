@@ -773,20 +773,8 @@ Status runAggregate(OperationContext* opCtx,
             dynamic_cast<DocumentSourceGeoNear*>(pipeline->peekFront());
 
         // Prepare a PlanExecutor to provide input into the pipeline, if needed.
-        std::pair<PipelineD::AttachExecutorCallback,
-                  std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
-            attachExecutorCallback;
-        if (liteParsedPipeline.hasChangeStream()) {
-            // If we are using a change stream, the cursor stage should have a simple collation,
-            // regardless of what the user's collation was.
-            std::unique_ptr<CollatorInterface> collatorForCursor = nullptr;
-            auto collatorStash = expCtx->temporarilyChangeCollator(std::move(collatorForCursor));
-            attachExecutorCallback =
-                PipelineD::buildInnerQueryExecutor(collection, nss, &request, pipeline.get());
-        } else {
-            attachExecutorCallback =
-                PipelineD::buildInnerQueryExecutor(collection, nss, &request, pipeline.get());
-        }
+        auto attachExecutorCallback =
+            PipelineD::buildInnerQueryExecutor(collection, nss, &request, pipeline.get());
 
         if (canOptimizeAwayPipeline(pipeline.get(),
                                     attachExecutorCallback.second.get(),
