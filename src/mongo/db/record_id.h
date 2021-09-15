@@ -352,8 +352,11 @@ private:
     }
 
     Format _format = Format::kNull;
-    // An extra byte of space is required to store the size for the kSmallStr Format.
-    char _buffer[kSmallStrMaxSize + 1];
+    // An extra byte of space is required to store the size for the
+    // kSmallStr Format. Zero the buffer so we don't need to write
+    // explicit lifecycle methods that avoid copying from
+    // uninitialized portions of the buffer.
+    char _buffer[kSmallStrMaxSize + 1] = {};
     // Used only for the kBigStr Format.
     ConstSharedBuffer _sharedBuffer;
 };
