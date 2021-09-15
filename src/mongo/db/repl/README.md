@@ -136,7 +136,8 @@ satisfy write concerns.
 
 A secondary keeps its data synchronized with its sync source by fetching oplog entries from its sync
 source. This is done via the
-[`OplogFetcher`](https://github.com/mongodb/mongo/blob/929cd5af6623bb72f05d3364942e84d053ddea0d/src/mongo/db/repl/oplog_fetcher.h).
+[`OplogFetcher`](https://github.com/mongodb/mongo/blob/929cd5af6623bb72f05d3364942e84d053ddea0d/src/mongo/db/repl/oplog_fetcher.h) which
+runs in its own separate thread, communicating via [a dedicated connection (DBClientConnection)](https://github.com/mongodb/mongo/blob/90e4270e9b22071c7d0367195c56bf2c5b50e56f/src/mongo/db/repl/oplog_fetcher.cpp#L190) with that instance.
 
 The `OplogFetcher` does not directly apply the operations it retrieves from the sync source.
 Rather, it puts them into a buffer (the **`OplogBuffer`**) and another thread is in charge of
@@ -457,8 +458,9 @@ change sync sources.
 
 At a default of every 2 seconds, the `HeartbeatInterval`, every node sends a heartbeat to every
 other node with the `replSetHeartbeat` command. This means that the number of heartbeats increases
-quadratically with the number of nodes and is the reasoning behind the 50 member limit in a replica
-set. The data, `ReplSetHeartbeatArgsV1` that accompanies every heartbeat is:
+quadratically with the number of nodes and is the reasoning behind the
+[50 member limit](https://github.com/mongodb/mongo/blob/r4.4.0-rc6/src/mongo/db/repl/repl_set_config.h#L133)
+in a replica set. The data, `ReplSetHeartbeatArgsV1` that accompanies every heartbeat is:
 
 1. `ReplicaSetConfig` version
 2. `ReplicaSetConfig` term
@@ -472,11 +474,11 @@ response back. First, the remote node makes sure the heartbeat is compatible wit
 name. Otherwise it sends an error.
 
 The receiving node's `TopologyCoordinator` updates the last time it received a heartbeat from the
-sending node for liveness checking in its `MemberHeartbeatData` list.
+sending node for liveness checking in its `MemberData` list.
 
 If the sending node's config is newer than the receiving node's, then the receiving node schedules a
-heartbeat to get the config. The receiving node's `ReplicationCoordinator` also updates its
-`SlaveInfo` with the last update from the sending node and marks it as being up. See more details on
+heartbeat to get the config. The receiving node's `TopologyCoordinator` also updates its
+`MemberData` with the last update from the sending node and marks it as being up. See more details on
 config propagation via heartbeats in the [Reconfiguration](#Reconfiguration) section.
 
 It then creates a `ReplSetHeartbeatResponse` object. This includes:
@@ -490,18 +492,19 @@ It then creates a `ReplSetHeartbeatResponse` object. This includes:
 7. The receiving node's sync source
 8. The receiving node's `ReplicaSetConfig` version and term
 9. Whether the receiving node is primary
+10. Whether the receiving node is electable
 
 When the sending node receives the response to the heartbeat, it first processes its
 `ReplSetMetadata` like before.
 
 The sending node postpones its election timeout if it sees a primary.
 
-The `TopologyCoordinator` updates its `HeartbeatData`. It marks if the receiving node is up or down.
+The `TopologyCoordinator` updates its `MemberData`. It marks if the receiving node is up or down.
 
 The sending node's `TopologyCoordinator` then looks at the response and decides the next action to
 take: no action, priority takeover, or reconfig,
 
-The `ReplicationCoordinator` then updates the `SlaveInfo` for the receiving node with its most
+The `TopologyCoordinator` then updates the `MemberData` for the receiving node with its most
 recently acquired OpTimes.
 
 The next heartbeat is scheduled and then the next action set by the `TopologyCoordinator` is
@@ -511,6 +514,12 @@ If the action was a priority takeover, then the node ranks all of the priorities
 assigns itself a priority takeover timeout proportional to its rank. After that timeout expires the
 node will check if it's eligible to run for election and if so will begin an election. The timeout
 is simply: `(election timeout) * (priority rank + 1)`.
+
+Heartbeat threads belong to the 
+[`ReplCoordThreadPool`](https://github.com/mongodb/mongo/blob/674d57fc70d80dedbfd634ce00ca4b967ea89646/src/mongo/db/mongod_main.cpp#L944)
+connection pool started by the
+[`ReplicationCoordinator`](https://github.com/mongodb/mongo/blob/674d57fc70d80dedbfd634ce00ca4b967ea89646/src/mongo/db/mongod_main.cpp#L986).
+Note that this connection pool is separate from the dedicated connection used by the [Oplog fetcher](#oplog-fetching).
 
 ### Commit Point Propagation
 
@@ -559,7 +568,7 @@ nodes, it will still stay primary.
 The `replSetUpdatePosition` command contains the following information:
 
 1. An `optimes` array containing an object for each live replica set member. This information is
-   filled in by the `ReplicationCoordinator` with information from its `SlaveInfo`. Nodes that are
+   filled in by the `TopologyCoordinator` with information from its `MemberData`. Nodes that are
    believed to be down are not included. Each node contains:
 
     1. last durable OpTime

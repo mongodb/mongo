@@ -83,8 +83,8 @@ public:
     /**
      * Determines if a new sync source should be chosen, if a better candidate sync source is
      * available.  If the current sync source's last optime (visibleOpTime or appliedOpTime of
-     * metadata under protocolVersion 1, but pulled from the MemberHeartbeatData in protocolVersion
-     * 0) is more than _maxSyncSourceLagSecs behind any syncable source, this function returns true.
+     * metadata under protocolVersion 1, but pulled from the MemberData in protocolVersion 0)
+     * is more than _maxSyncSourceLagSecs behind any syncable source, this function returns true.
      * If we are running in ProtocolVersion 1, our current sync source is not primary, has no sync
      * source and only has data up to "myLastOpTime", returns true.
      *
