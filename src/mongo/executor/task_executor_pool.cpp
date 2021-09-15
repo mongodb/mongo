@@ -40,9 +40,8 @@ namespace mongo {
 namespace executor {
 
 size_t TaskExecutorPool::getSuggestedPoolSize() {
-    auto poolSize = taskExecutorPoolSize.load();
-    if (poolSize > 0) {
-        return poolSize;
+    if (taskExecutorPoolSize > 0) {
+        return taskExecutorPoolSize;
     }
 
     ProcessInfo p;

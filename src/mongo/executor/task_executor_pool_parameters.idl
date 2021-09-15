@@ -34,7 +34,7 @@ server_parameters:
     description: >-
         If set to less than or equal to 0, then the suggested pool size will be determined by the
         number of cores. If set to greater than 0, that value will be used as the pool size.
-    set_at: [ startup, runtime ]
-    cpp_vartype: "AtomicWord<int>"
-    cpp_varname: "taskExecutorPoolSize"
+    set_at: startup
+    cpp_vartype: int
+    cpp_varname: taskExecutorPoolSize
     default: 1
