@@ -46,6 +46,7 @@ static constexpr StringData kBucketControlMinFieldName = "min"_sd;
 static constexpr StringData kBucketControlMaxFieldName = "max"_sd;
 static constexpr StringData kControlMaxFieldNamePrefix = "control.max."_sd;
 static constexpr StringData kControlMinFieldNamePrefix = "control.min."_sd;
+static constexpr StringData kDataFieldNamePrefix = "data."_sd;
 
 // These are hard-coded field names in create collection for time-series collections.
 static constexpr StringData kTimeFieldName = "timeField"_sd;

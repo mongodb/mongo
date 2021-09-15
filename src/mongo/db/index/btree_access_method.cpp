@@ -34,6 +34,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/db/index/expression_keys_private.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"
 
@@ -63,6 +64,12 @@ BtreeAccessMethod::BtreeAccessMethod(IndexCatalogEntry* btreeState,
                                             btreeState->getCollator(),
                                             getSortedDataInterface()->getKeyStringVersion(),
                                             getSortedDataInterface()->getOrdering());
+}
+
+void BtreeAccessMethod::validateDocument(const CollectionPtr& collection,
+                                         const BSONObj& obj,
+                                         const BSONObj& keyPattern) const {
+    ExpressionKeysPrivate::validateDocumentCommon(collection, obj, keyPattern);
 }
 
 void BtreeAccessMethod::doGetKeys(OperationContext* opCtx,

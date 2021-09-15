@@ -109,6 +109,12 @@ StatusWith<BSONObj> S2BucketAccessMethod::fixSpec(const BSONObj& specObj) {
     return specObj;
 }
 
+void S2BucketAccessMethod::validateDocument(const CollectionPtr& collection,
+                                            const BSONObj& obj,
+                                            const BSONObj& keyPattern) const {
+    ExpressionKeysPrivate::validateDocumentCommon(collection, obj, keyPattern);
+}
+
 void S2BucketAccessMethod::doGetKeys(OperationContext* opCtx,
                                      const CollectionPtr& collection,
                                      SharedBufferFragmentBuilder& pooledBufferBuilder,

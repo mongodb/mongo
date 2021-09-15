@@ -47,6 +47,7 @@ TimeseriesTest.run((insert) => {
             _id: 2,
             [timeFieldName]: ISODate(),
             [metaFieldName]: {tag: "c", "r.s": "val", loc: {type: "Point", coordinates: [3, 2]}},
+            a: [1, 2],
             "x.y": 3,
             z: true
         },
@@ -182,5 +183,22 @@ TimeseriesTest.run((insert) => {
     testBadIndex({x: 1, z: "abc"});
     testBadIndex({x: 1, z: {y: 1}});
     testBadIndex({x: true, z: 1});
+
+    // Check that array-valued measurements aren't accepted.
+    const testBadIndexForData = function(keysForCreate) {
+        const coll = db.getCollection(collName);
+        coll.drop();
+
+        assert.commandWorked(db.createCollection(
+            coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+        assert.commandWorked(coll.createIndex(keysForCreate));
+
+        assert.commandFailedWithCode(coll.insert(docs), 5930501);
+    };
+
+    testBadIndexForData({x: 1, a: 1});
+    testBadIndexForData({[metaFieldName + ".loc"]: "2dsphere", a: 1});
+    testBadIndexForData({[metaFieldName + ".loc2"]: "2d", a: 1});
+    testBadIndexForData({[metaFieldName + ".r"]: "hashed", a: 1});
 });
 }());

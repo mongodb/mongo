@@ -99,6 +99,7 @@ env.CppUnitTest(
     source=[
         'bucket_catalog_test.cpp',
         'minmax_test.cpp',
+        'timeseries_dotted_path_support_test.cpp',
         'timeseries_index_schema_conversion_functions_test.cpp',
         'timeseries_options_test.cpp',
         'timeseries_update_delete_util_test.cpp',
@@ -106,6 +107,7 @@ env.CppUnitTest(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/catalog/catalog_test_fixture',
         'bucket_catalog',
+        'timeseries_dotted_path_support',
         'timeseries_index_schema_conversion_functions',
         'timeseries_options',
         'timeseries_update_delete_util',

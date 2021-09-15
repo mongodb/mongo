@@ -127,6 +127,16 @@ TimeseriesTest.run((insert) => {
     assert.commandFailedWithCode(coll.createIndex({x: {y: 1}}), ErrorCodes.CannotCreateIndex);
     assert.commandFailedWithCode(coll.createIndex({x: true}), ErrorCodes.CannotCreateIndex);
 
+    // Test bad data.
+    assert.commandWorked(coll.createIndex({"x.y": 1}));
+    const docsWithArrays = [
+        {_id: 4, [timeFieldName]: ISODate(), [metaFieldName]: {tag: "d"}, x: {y: [true]}},
+        {_id: 5, [timeFieldName]: ISODate(), [metaFieldName]: {tag: "d"}, x: [{y: false}]}
+    ];
+    assert.commandFailedWithCode(coll.insert(docsWithArrays[0]), 5930501);
+    assert.commandFailedWithCode(coll.insert(docsWithArrays[1]), 5930501);
+    assert.commandWorked(coll.dropIndex({"x.y": 1}));
+
     // Create indexes on the buckets collection that do not map to any user indexes. The server must
     // not crash when handling the reverse mapping of these.
     assert.commandWorked(bucketsColl.createIndex({"control.min.x.y": 1}));

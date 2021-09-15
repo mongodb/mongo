@@ -48,6 +48,10 @@ public:
     BtreeAccessMethod(IndexCatalogEntry* btreeState, std::unique_ptr<SortedDataInterface> btree);
 
 private:
+    void validateDocument(const CollectionPtr& collection,
+                          const BSONObj& obj,
+                          const BSONObj& keyPattern) const override;
+
     void doGetKeys(OperationContext* opCtx,
                    const CollectionPtr& collection,
                    SharedBufferFragmentBuilder& pooledBufferBuilder,

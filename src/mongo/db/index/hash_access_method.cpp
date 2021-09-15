@@ -49,6 +49,12 @@ HashAccessMethod::HashAccessMethod(IndexCatalogEntry* btreeState,
     _collator = btreeState->getCollator();
 }
 
+void HashAccessMethod::validateDocument(const CollectionPtr& collection,
+                                        const BSONObj& obj,
+                                        const BSONObj& keyPattern) const {
+    ExpressionKeysPrivate::validateDocumentCommon(collection, obj, keyPattern);
+}
+
 void HashAccessMethod::doGetKeys(OperationContext* opCtx,
                                  const CollectionPtr& collection,
                                  SharedBufferFragmentBuilder& pooledBufferBuilder,

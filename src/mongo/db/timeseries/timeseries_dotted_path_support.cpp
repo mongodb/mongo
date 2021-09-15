@@ -37,9 +37,8 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/util/ctype.h"
-
 #include "mongo/db/timeseries/timeseries_constants.h"
+#include "mongo/util/ctype.h"
 
 namespace mongo {
 namespace timeseries {
@@ -180,6 +179,83 @@ void _extractAllElementsAlongBucketPath(const BSONObj& obj,
     }
 }
 
+
+bool _haveArrayAlongBucketDataPath(const BSONObj& obj, StringData path, BSONDepthIndex depth);
+
+bool _handleElementForHaveArrayAlongBucketDataPath(const BSONObj& obj,
+                                                   BSONElement elem,
+                                                   StringData path,
+                                                   BSONDepthIndex depth) {
+    if (elem.eoo()) {
+        size_t idx = path.find('.');
+        if (idx != std::string::npos) {
+            tassert(5930502,
+                    "BSON depth too great",
+                    depth != std::numeric_limits<BSONDepthIndex>::max());
+            StringData left = path.substr(0, idx);
+            StringData next = path.substr(idx + 1, path.size());
+
+            BSONElement e = obj.getField(left);
+
+            if (e.type() == Object) {
+                return _haveArrayAlongBucketDataPath(e.embeddedObject(), next, depth + 1);
+            } else if (e.type() == Array) {
+                return true;
+            } else {
+                // do nothing: no match
+            }
+        }
+    } else {
+        if (elem.type() == Array) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool _haveArrayAlongBucketDataPath(const BSONObj& obj, StringData path, BSONDepthIndex depth) {
+    switch (depth) {
+        case 0:
+        case 1: {
+            if (auto res = _splitPath(path)) {
+                auto& [left, next] = *res;
+                BSONElement e = obj.getField(left);
+                if (e.type() == Object && (depth > 0 || left == timeseries::kBucketDataFieldName)) {
+                    return _haveArrayAlongBucketDataPath(e.embeddedObject(), next, depth + 1);
+                }
+            } else {
+                BSONElement e = obj.getField(path);
+                if (Object == e.type()) {
+                    return _haveArrayAlongBucketDataPath(
+                        e.embeddedObject(), StringData(), depth + 1);
+                }
+            }
+            return false;
+        }
+        case 2: {
+            // Unbucketing magic happens here.
+            for (const BSONElement& e : obj) {
+                std::string subPath = e.fieldName();
+                if (!path.empty()) {
+                    subPath.append("." + path);
+                }
+                BSONElement sub = obj.getField(subPath);
+                const bool foundArray =
+                    _handleElementForHaveArrayAlongBucketDataPath(obj, sub, subPath, depth);
+                if (foundArray) {
+                    return foundArray;
+                }
+            }
+            return false;
+        }
+        default: {
+            BSONElement e = obj.getField(path);
+            return _handleElementForHaveArrayAlongBucketDataPath(obj, e, path, depth);
+        }
+    }
+}
+
 }  // namespace
 
 void extractAllElementsAlongBucketPath(const BSONObj& obj,
@@ -200,6 +276,16 @@ void extractAllElementsAlongBucketPath(const BSONObj& obj,
     constexpr BSONDepthIndex initialDepth = 0;
     _extractAllElementsAlongBucketPath(
         obj, path, elements, expandArrayOnTrailingField, initialDepth, arrayComponents);
+}
+
+bool haveArrayAlongBucketDataPath(const BSONObj& bucketObj, StringData path) {
+    // Shortcut: if we aren't checking a `data.` path, then we don't care.
+    if (!path.startsWith(timeseries::kDataFieldNamePrefix)) {
+        return false;
+    }
+
+    constexpr BSONDepthIndex initialDepth = 0;
+    return _haveArrayAlongBucketDataPath(bucketObj, path, initialDepth);
 }
 
 }  // namespace dotted_path_support

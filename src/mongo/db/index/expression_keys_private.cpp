@@ -36,6 +36,7 @@
 #include "mongo/bson/bsonelement_comparator_interface.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/bson/dotted_path_support.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/fts/fts_index_format.h"
 #include "mongo/db/geo/geoconstants.h"
@@ -46,6 +47,8 @@
 #include "mongo/db/index/s2_common.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/query/collation/collation_index_key.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_dotted_path_support.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
@@ -350,6 +353,37 @@ namespace mongo {
 using std::pair;
 using std::string;
 using std::vector;
+
+// static
+void ExpressionKeysPrivate::validateDocumentCommon(const CollectionPtr& collection,
+                                                   const BSONObj& obj,
+                                                   const BSONObj& keyPattern) {
+    // If we have a timeseries collection, check that indexed metric fields do not have array values
+    if (feature_flags::gTimeseriesMetricIndexes.isEnabledAndIgnoreFCV() &&
+        collection->getTimeseriesOptions()) {
+        for (const auto& keyElem : keyPattern) {
+            if (keyElem.isNumber()) {
+                StringData field = keyElem.fieldName();
+                StringData dataField;
+                if (field.startsWith(timeseries::kControlMaxFieldNamePrefix)) {
+                    dataField = field.substr(timeseries::kControlMaxFieldNamePrefix.size());
+                } else if (field.startsWith(timeseries::kControlMinFieldNamePrefix)) {
+                    dataField = field.substr(timeseries::kControlMinFieldNamePrefix.size());
+                }
+
+                if (!dataField.empty()) {
+                    // We are in fact dealing with a metric field. Go ahead and examine individual
+                    // values to check for array values.
+                    uassert(5930501,
+                            str::stream() << "Indexed measurement field contains an array value: "
+                                          << redact(obj),
+                            !timeseries::dotted_path_support::haveArrayAlongBucketDataPath(
+                                obj, std::string(timeseries::kDataFieldNamePrefix) + dataField));
+                }
+            }
+        }
+    }
+}
 
 // static
 void ExpressionKeysPrivate::get2DKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,

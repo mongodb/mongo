@@ -39,6 +39,7 @@
 
 namespace mongo {
 
+class CollectionPtr;
 class CollatorInterface;
 struct TwoDIndexingParams;
 struct S2IndexingParams;
@@ -56,6 +57,14 @@ class FTSSpec;
  */
 class ExpressionKeysPrivate {
 public:
+    //
+    // Common
+    //
+
+    static void validateDocumentCommon(const CollectionPtr& collection,
+                                       const BSONObj& obj,
+                                       const BSONObj& keyPattern);
+
     //
     // 2d
     //

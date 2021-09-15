@@ -49,6 +49,12 @@ TwoDAccessMethod::TwoDAccessMethod(IndexCatalogEntry* btreeState,
     ExpressionParams::parseTwoDParams(descriptor->infoObj(), &_params);
 }
 
+void TwoDAccessMethod::validateDocument(const CollectionPtr& collection,
+                                        const BSONObj& obj,
+                                        const BSONObj& keyPattern) const {
+    ExpressionKeysPrivate::validateDocumentCommon(collection, obj, keyPattern);
+}
+
 /** Finds the key objects to put in an index */
 void TwoDAccessMethod::doGetKeys(OperationContext* opCtx,
                                  const CollectionPtr& collection,

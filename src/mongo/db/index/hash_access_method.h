@@ -49,6 +49,10 @@ public:
     HashAccessMethod(IndexCatalogEntry* btreeState, std::unique_ptr<SortedDataInterface> btree);
 
 private:
+    void validateDocument(const CollectionPtr& collection,
+                          const BSONObj& obj,
+                          const BSONObj& keyPattern) const override;
+
     /**
      * Fills 'keys' with the keys that should be generated for 'obj' on this index.
      *

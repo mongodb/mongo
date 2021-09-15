@@ -585,6 +585,14 @@ public:
 
 protected:
     /**
+     * Perform some initial validation on the document to ensure it can be indexed before calling
+     * the implementation-specific 'doGetKeys' method.
+     */
+    virtual void validateDocument(const CollectionPtr& collection,
+                                  const BSONObj& obj,
+                                  const BSONObj& keyPattern) const;
+
+    /**
      * Fills 'keys' with the keys that should be generated for 'obj' on this index.
      *
      * If the 'multikeyPaths' pointer is non-null, then it must point to an empty vector. If this

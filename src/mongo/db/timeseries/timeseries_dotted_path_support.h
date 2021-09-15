@@ -69,6 +69,22 @@ void extractAllElementsAlongBucketPath(const BSONObj& obj,
                                        bool expandArrayOnTrailingField = true,
                                        MultikeyComponents* arrayComponents = nullptr);
 
+/**
+ * Finds arrays in individual metrics along the specified data path.
+ *
+ * The 'path' can be specified using a dotted notation in order to traverse through embedded objects
+ * and array elements. It must point to path like 'data.a.b', referring to the data that would be
+ * stored at 'a.b' in each of the documents resulting from calling $_internalUnpackBucket on the
+ * original document. Note that the caller should include the 'data' prefix, but omit the depth-2
+ * numeric path entry that results from pivoting the data into the bucketed format. That is, if the
+ * caller is interested in the field `a.b` in the original user-facing document, they should specify
+ * `data.a.b`, and not worry about the fact that the bucket actually contains entries like
+ * `data.a.0.b` and `data.a.3.b`.
+ *
+ * In the example above, with 'data.a.b', the function will return true if any individual
+ * measurement contained in the bucket has an array value for 'a' or for 'a.b', and false otherwise.
+ */
+bool haveArrayAlongBucketDataPath(const BSONObj& bucketObj, StringData path);
 
 }  // namespace dotted_path_support
 }  // namespace timeseries

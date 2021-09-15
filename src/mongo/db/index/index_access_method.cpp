@@ -901,6 +901,7 @@ void AbstractIndexAccessMethod::getKeys(OperationContext* opCtx,
                           id->toString()));
 
     try {
+        validateDocument(collection, obj, _descriptor->keyPattern());
         doGetKeys(opCtx,
                   collection,
                   pooledBufferBuilder,
@@ -943,6 +944,10 @@ bool AbstractIndexAccessMethod::shouldMarkIndexAsMultikey(
     const MultikeyPaths& multikeyPaths) const {
     return numberOfKeys > 1 || isMultikeyFromPaths(multikeyPaths);
 }
+
+void AbstractIndexAccessMethod::validateDocument(const CollectionPtr& collection,
+                                                 const BSONObj& obj,
+                                                 const BSONObj& keyPattern) const {}
 
 SortedDataInterface* AbstractIndexAccessMethod::getSortedDataInterface() const {
     return _newInterface.get();
