@@ -111,4 +111,26 @@ TEST_F(TenantMigrationAccessBlockerUtilTest, HasActiveTenantMigrationFalseForUnr
     ASSERT_FALSE(tenant_migration_access_blocker::hasActiveTenantMigration(opCtx(), "otherDb"_sd));
 }
 
+TEST_F(TenantMigrationAccessBlockerUtilTest, HasActiveTenantMigrationFalseAfterRemoveWithBoth) {
+    auto recipientMtab = std::make_shared<TenantMigrationRecipientAccessBlocker>(
+        getServiceContext(), UUID::gen(), kTenantId, kConnString);
+    TenantMigrationAccessBlockerRegistry::get(getServiceContext()).add(kTenantId, recipientMtab);
+
+    auto donorMtab = std::make_shared<TenantMigrationDonorAccessBlocker>(
+        getServiceContext(), kTenantId, kConnString);
+    TenantMigrationAccessBlockerRegistry::get(getServiceContext()).add(kTenantId, donorMtab);
+
+    ASSERT(tenant_migration_access_blocker::hasActiveTenantMigration(opCtx(), kTenantDB));
+
+    // Remove donor, should still be a migration.
+    TenantMigrationAccessBlockerRegistry::get(getServiceContext())
+        .remove(kTenantId, TenantMigrationAccessBlocker::BlockerType::kDonor);
+    ASSERT(tenant_migration_access_blocker::hasActiveTenantMigration(opCtx(), kTenantDB));
+
+    // Remove recipient, there should be no migration.
+    TenantMigrationAccessBlockerRegistry::get(getServiceContext())
+        .remove(kTenantId, TenantMigrationAccessBlocker::BlockerType::kRecipient);
+    ASSERT_FALSE(tenant_migration_access_blocker::hasActiveTenantMigration(opCtx(), kTenantDB));
+}
+
 }  // namespace mongo
