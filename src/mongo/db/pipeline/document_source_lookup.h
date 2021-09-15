@@ -173,7 +173,7 @@ public:
     }
 
     bool hasPipeline() const {
-        return _userPipeline.size() > 0;
+        return _userPipeline != boost::none;
     }
 
     boost::optional<FieldPath> getForeignField() const {
@@ -368,8 +368,8 @@ private:
     // namespaces have been resolved.
     std::vector<BSONObj> _resolvedPipeline;
     // The aggregation pipeline defined with the user request, prior to optimization and view
-    // resolution.
-    std::vector<BSONObj> _userPipeline;
+    // resolution. If the user did not define a pipeline this will be 'boost::none'.
+    boost::optional<std::vector<BSONObj>> _userPipeline;
     // A pipeline parsed from _resolvedPipeline at creation time, intended to support introspective
     // functions. If sub-$lookup stages are present, their pipelines are constructed recursively.
     std::unique_ptr<Pipeline, PipelineDeleter> _resolvedIntrospectionPipeline;

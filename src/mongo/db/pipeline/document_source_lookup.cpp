@@ -1020,7 +1020,7 @@ void DocumentSourceLookUp::serializeToArray(
 
     // Add a pipeline field if only-pipeline syntax was used (to ensure the output is valid $lookup
     // syntax) or if a $match was absorbed.
-    auto pipeline = _userPipeline;
+    auto pipeline = _userPipeline.get_value_or(std::vector<BSONObj>());
     if (_additionalFilter) {
         pipeline.emplace_back(BSON("$match" << *_additionalFilter));
     }

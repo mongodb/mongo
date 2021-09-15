@@ -423,6 +423,16 @@ expectedResults = [
 ];
 testPipeline(pipeline, expectedResults, coll);
 
+// Test that empty subpipeline optimizes correctly with following $match.
+pipeline = [
+    {$match: {_id: 1}},
+    {$lookup: {from: "from", pipeline: [], as: "as"}},
+    {$unwind: "$as"},
+    {$match: {"as._id": {$gt: 2}}}
+];
+expectedResults = [{_id: 1, x: 1, as: {_id: 3}}];
+testPipeline(pipeline, expectedResults, coll);
+
 // Comparison where a 'let' variable references an array.
 coll.drop();
 assert.commandWorked(coll.insert({x: [1, 2, 3]}));
