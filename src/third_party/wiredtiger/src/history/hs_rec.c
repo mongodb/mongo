@@ -9,7 +9,7 @@
 #include "wt_internal.h"
 
 static int __hs_delete_reinsert_from_pos(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor,
-  uint32_t btree_id, const WT_ITEM *key, wt_timestamp_t ts, bool reinsert, bool checkpoint_running,
+  uint32_t btree_id, const WT_ITEM *key, wt_timestamp_t ts, bool reinsert, bool error_on_ooo_ts,
   uint64_t *hs_counter);
 
 /*
@@ -64,7 +64,7 @@ __hs_verbose_cache_stats(WT_SESSION_IMPL *session, WT_BTREE *btree)
  */
 static int
 __hs_insert_record(WT_SESSION_IMPL *session, WT_CURSOR *cursor, WT_BTREE *btree, const WT_ITEM *key,
-  const uint8_t type, const WT_ITEM *hs_value, WT_TIME_WINDOW *tw, bool checkpoint_running)
+  const uint8_t type, const WT_ITEM *hs_value, WT_TIME_WINDOW *tw, bool error_on_ooo_ts)
 {
 #ifdef HAVE_DIAGNOSTIC
     WT_CURSOR_BTREE *hs_cbt;
@@ -191,7 +191,7 @@ __hs_insert_record(WT_SESSION_IMPL *session, WT_CURSOR *cursor, WT_BTREE *btree,
     }
     if (ret == 0)
         WT_ERR(__hs_delete_reinsert_from_pos(
-          session, cursor, btree->id, key, tw->start_ts + 1, true, checkpoint_running, &counter));
+          session, cursor, btree->id, key, tw->start_ts + 1, true, error_on_ooo_ts, &counter));
 
 #ifdef HAVE_DIAGNOSTIC
     /*
@@ -293,9 +293,9 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_MULTI *mult
     uint32_t i;
     uint8_t *p;
     int nentries;
-    bool checkpoint_running, enable_reverse_modify, hs_inserted, squashed;
+    bool enable_reverse_modify, error_on_ooo_ts, hs_inserted, squashed;
 
-    checkpoint_running = F_ISSET(r, WT_REC_CHECKPOINT_RUNNING);
+    error_on_ooo_ts = F_ISSET(r, WT_REC_CHECKPOINT_RUNNING);
     r->cache_write_hs = false;
     btree = S2BT(session);
     prev_upd = NULL;
@@ -415,11 +415,11 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_MULTI *mult
             if (min_ts_upd != NULL && min_ts_upd->start_ts < upd->start_ts &&
               out_of_order_ts_upd != min_ts_upd) {
                 /*
-                 * Fail the eviction if we detect out of order timestamp when checkpoint is running.
+                 * Fail the eviction if we detect out of order timestamps and the error flag is set.
                  * We cannot modify the history store to fix the out of order timestamp updates as
                  * it may make the history store checkpoint inconsistent.
                  */
-                if (checkpoint_running) {
+                if (error_on_ooo_ts) {
                     ret = EBUSY;
                     WT_STAT_CONN_INCR(session, cache_eviction_fail_checkpoint_out_of_order_ts);
                     goto err;
@@ -494,7 +494,7 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_MULTI *mult
             if (!F_ISSET(fix_ts_upd, WT_UPDATE_FIXED_HS)) {
                 /* Delete and reinsert any update of the key with a higher timestamp. */
                 WT_ERR(__wt_hs_delete_key_from_ts(session, hs_cursor, btree->id, key,
-                  fix_ts_upd->start_ts + 1, true, checkpoint_running));
+                  fix_ts_upd->start_ts + 1, true, error_on_ooo_ts));
                 F_SET(fix_ts_upd, WT_UPDATE_FIXED_HS);
             }
         }
@@ -651,13 +651,13 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_MULTI *mult
                 entries, &nentries) == 0) {
                 WT_ERR(__wt_modify_pack(hs_cursor, entries, nentries, &modify_value));
                 ret = __hs_insert_record(session, hs_cursor, btree, key, WT_UPDATE_MODIFY,
-                  modify_value, &tw, checkpoint_running);
+                  modify_value, &tw, error_on_ooo_ts);
                 __wt_scr_free(session, &modify_value);
                 ++modify_cnt;
             } else {
                 modify_cnt = 0;
                 ret = __hs_insert_record(session, hs_cursor, btree, key, WT_UPDATE_STANDARD,
-                  full_value, &tw, checkpoint_running);
+                  full_value, &tw, error_on_ooo_ts);
             }
 
             /*
@@ -744,7 +744,7 @@ err:
  */
 int
 __wt_hs_delete_key_from_ts(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, uint32_t btree_id,
-  const WT_ITEM *key, wt_timestamp_t ts, bool reinsert, bool checkpoint_running)
+  const WT_ITEM *key, wt_timestamp_t ts, bool reinsert, bool error_on_ooo_ts)
 {
     WT_DECL_RET;
     WT_ITEM hs_key;
@@ -778,7 +778,7 @@ __wt_hs_delete_key_from_ts(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, uint3
     }
 
     WT_ERR(__hs_delete_reinsert_from_pos(
-      session, hs_cursor, btree_id, key, ts, reinsert, checkpoint_running, &hs_counter));
+      session, hs_cursor, btree_id, key, ts, reinsert, error_on_ooo_ts, &hs_counter));
 
 done:
 err:
@@ -796,7 +796,7 @@ err:
  */
 static int
 __hs_delete_reinsert_from_pos(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, uint32_t btree_id,
-  const WT_ITEM *key, wt_timestamp_t ts, bool reinsert, bool checkpoint_running, uint64_t *counter)
+  const WT_ITEM *key, wt_timestamp_t ts, bool reinsert, bool error_on_ooo_ts, uint64_t *counter)
 {
     WT_CURSOR *hs_insert_cursor;
     WT_CURSOR_BTREE *hs_cbt;
@@ -846,11 +846,11 @@ __hs_delete_reinsert_from_pos(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, ui
     WT_ERR(ret);
 
     /*
-     * Fail the eviction if we detect out of order timestamp when checkpoint is running. We cannot
-     * modify the history store to fix the out of order timestamp updates as it may make the history
-     * store checkpoint inconsistent.
+     * Fail the eviction if we detect out of order timestamps when we've passed the error return
+     * flag. We cannot modify the history store to fix the out of order timestamp updates as it may
+     * make the history store checkpoint inconsistent.
      */
-    if (checkpoint_running) {
+    if (error_on_ooo_ts) {
         ret = EBUSY;
         WT_STAT_CONN_INCR(session, cache_eviction_fail_checkpoint_out_of_order_ts);
         goto err;

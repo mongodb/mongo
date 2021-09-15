@@ -33,17 +33,24 @@ from wtscenario import make_scenarios
 # test_hs24.py
 # Test that out of order timestamp fix racing with checkpointing the history store doesn't create inconsistent checkpoint.
 class test_hs24(wttest.WiredTigerTestCase):
-    conn_config = 'cache_size=50MB,timing_stress_for_test=(history_store_checkpoint_delay)'
-    session_config = 'isolation=snapshot'
-    uri = 'table:test_hs24'
-    numrows = 2000
-
     key_format_values = [
         ('column', dict(key_format='r')),
         ('integer_row', dict(key_format='i')),
     ]
 
-    scenarios = make_scenarios(key_format_values)
+    checkpoint_stress_scenarios = [
+        ('checkpoint_slow_stress', dict(checkpoint_stress='checkpoint_slow')),
+        ('history_store_checkpoint_delay_stress', dict(checkpoint_stress='history_store_checkpoint_delay')),
+    ]
+
+    scenarios = make_scenarios(key_format_values, checkpoint_stress_scenarios)
+
+    def conn_config(self):
+        return 'timing_stress_for_test=({})'.format(self.checkpoint_stress)
+
+    session_config = 'isolation=snapshot'
+    uri = 'table:test_hs24'
+    numrows = 2000
 
     value1 = 'a' * 500
     value2 = 'b' * 500
