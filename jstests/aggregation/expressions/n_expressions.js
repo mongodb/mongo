@@ -21,7 +21,7 @@ if (!isExactTopNEnabled) {
         pipeline: [{$project: {output: {'$minN': {n: 3, output: [3, 1, 2, 3]}}}}],
         cursor: {}
     }),
-                                 5787909);
+                                 31325);
     return;
 }
 

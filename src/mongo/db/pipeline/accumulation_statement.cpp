@@ -37,6 +37,7 @@
 #include "mongo/db/commands/feature_compatibility_version_documentation.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/accumulator.h"
+#include "mongo/db/query/allowed_contexts.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
@@ -46,39 +47,29 @@ namespace mongo {
 using std::string;
 
 namespace {
-// Used to keep track of which Accumulators are registered under which name.
-using ParserRegistration = std::pair<AccumulationStatement::Parser,
-                                     boost::optional<multiversion::FeatureCompatibilityVersion>>;
-static StringMap<ParserRegistration> parserMap;
+// Used to keep track of which Accumulators are registered under which name and in which contexts
+// they can be used in.
+static StringMap<AccumulationStatement::ParserRegistration> parserMap;
 }  // namespace
 
 void AccumulationStatement::registerAccumulator(
     std::string name,
     AccumulationStatement::Parser parser,
+    AllowedWithApiStrict allowedWithApiStrict,
+    AllowedWithClientType allowedWithClientType,
     boost::optional<multiversion::FeatureCompatibilityVersion> requiredMinVersion) {
     auto it = parserMap.find(name);
     massert(28722,
             str::stream() << "Duplicate accumulator (" << name << ") registered.",
             it == parserMap.end());
-    parserMap[name] = {parser, requiredMinVersion};
+    parserMap[name] = {parser, allowedWithApiStrict, allowedWithClientType, requiredMinVersion};
 }
 
-AccumulationStatement::Parser& AccumulationStatement::getParser(
-    StringData name, boost::optional<multiversion::FeatureCompatibilityVersion> allowedMaxVersion) {
+AccumulationStatement::ParserRegistration& AccumulationStatement::getParser(StringData name) {
     auto it = parserMap.find(name);
     uassert(
         15952, str::stream() << "unknown group operator '" << name << "'", it != parserMap.end());
-    auto& [parser, requiredMinVersion] = it->second;
-    uassert(ErrorCodes::QueryFeatureNotAllowed,
-            // We would like to include the current version and the required minimum version in this
-            // error message, but using FeatureCompatibilityVersion::toString() would introduce a
-            // dependency cycle (see SERVER-31968).
-            str::stream() << name
-                          << " is not allowed in the current feature compatibility version. See "
-                          << feature_compatibility_version_documentation::kCompatibilityLink
-                          << " for more information.",
-            !requiredMinVersion || !allowedMaxVersion || *requiredMinVersion <= *allowedMaxVersion);
-    return parser;
+    return it->second;
 }
 
 boost::intrusive_ptr<AccumulatorState> AccumulationStatement::makeAccumulator() const {
@@ -111,8 +102,22 @@ AccumulationStatement AccumulationStatement::parseAccumulationStatement(
             str::stream() << "The " << accName << " accumulator is a unary operator",
             specElem.type() != BSONType::Array);
 
-    auto&& parser =
-        AccumulationStatement::getParser(accName, expCtx->maxFeatureCompatibilityVersion);
+    auto&& [parser, allowedWithApiStrict, allowedWithClientType, requiredMinVersion] =
+        AccumulationStatement::getParser(accName);
+    auto allowedMaxVersion = expCtx->maxFeatureCompatibilityVersion;
+    uassert(ErrorCodes::QueryFeatureNotAllowed,
+            // We would like to include the current version and the required minimum version in this
+            // error message, but using FeatureCompatibilityVersion::toString() would introduce a
+            // dependency cycle (see SERVER-31968).
+            str::stream() << accName
+                          << " is not allowed in the current feature compatibility version. See "
+                          << feature_compatibility_version_documentation::kCompatibilityLink
+                          << " for more information.",
+            !requiredMinVersion || !allowedMaxVersion || *requiredMinVersion <= *allowedMaxVersion);
+
+    tassert(5837900, "Accumulators should only appear in a user operation", expCtx->opCtx);
+    assertLanguageFeatureIsAllowed(
+        expCtx->opCtx, accName.toString(), allowedWithApiStrict, allowedWithClientType);
     auto accExpr = parser(expCtx, specElem, vps);
 
     return AccumulationStatement(fieldName.toString(), std::move(accExpr));
