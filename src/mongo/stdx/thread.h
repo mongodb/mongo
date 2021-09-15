@@ -76,11 +76,19 @@ public:
     }
 
 private:
+    static size_t _getStackSize() {
+        // It would be nice for this to be a constexpr, but
+        // MINSIGSTKSZ became a macro that invoked `sysconf` in glibc
+        // 2.34.
+        static const std::size_t kMinSigStkSz = MINSIGSTKSZ;
+        return std::max(kMongoMinSignalStackSize, kMinSigStkSz);
+    }
+
     void _install() const {
         stack_t ss = {};
         ss.ss_sp = _stackStorage.get();
         ss.ss_flags = 0;
-        ss.ss_size = kStackSize;
+        ss.ss_size = _getStackSize();
         if (sigaltstack(&ss, nullptr)) {
             abort();
         }
@@ -107,9 +115,7 @@ private:
     //   ( https://jira.mongodb.org/secure/attachment/233569/233569_stacktrace-writeup.txt )
     static constexpr std::size_t kMongoMinSignalStackSize = std::size_t{64} << 10;
 
-    static constexpr std::size_t kStackSize =
-        std::max(kMongoMinSignalStackSize, std::size_t{MINSIGSTKSZ});
-    std::unique_ptr<std::byte[]> _stackStorage = std::make_unique<std::byte[]>(kStackSize);
+    std::unique_ptr<std::byte[]> _stackStorage = std::make_unique<std::byte[]>(_getStackSize());
 
 #else   // !MONGO_HAS_SIGALTSTACK
     auto makeInstallGuard() const {
