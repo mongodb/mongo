@@ -361,22 +361,22 @@ private:
     ConstSharedBuffer _sharedBuffer;
 };
 
-inline bool operator==(RecordId lhs, RecordId rhs) {
+inline bool operator==(const RecordId& lhs, const RecordId& rhs) {
     return lhs.compare(rhs) == 0;
 }
-inline bool operator!=(RecordId lhs, RecordId rhs) {
+inline bool operator!=(const RecordId& lhs, const RecordId& rhs) {
     return lhs.compare(rhs);
 }
-inline bool operator<(RecordId lhs, RecordId rhs) {
+inline bool operator<(const RecordId& lhs, const RecordId& rhs) {
     return lhs.compare(rhs) < 0;
 }
-inline bool operator<=(RecordId lhs, RecordId rhs) {
+inline bool operator<=(const RecordId& lhs, const RecordId& rhs) {
     return lhs.compare(rhs) <= 0;
 }
-inline bool operator>(RecordId lhs, RecordId rhs) {
+inline bool operator>(const RecordId& lhs, const RecordId& rhs) {
     return lhs.compare(rhs) > 0;
 }
-inline bool operator>=(RecordId lhs, RecordId rhs) {
+inline bool operator>=(const RecordId& lhs, const RecordId& rhs) {
     return lhs.compare(rhs) >= 0;
 }
 
