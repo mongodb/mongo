@@ -450,8 +450,8 @@ bool getCSRewriteFeatureFlagValue() {
     return feature_flags::gFeatureFlagChangeStreamsRewrite.isEnabledAndIgnoreFCV();
 }
 
-bool isChangeStreamsPreAndPostImagesEnabled() {
-    return feature_flags::gFeatureFlagChangeStreamsPreAndPostImages.isEnabledAndIgnoreFCV();
+bool isChangeStreamPreAndPostImagesEnabled() {
+    return feature_flags::gFeatureFlagChangeStreamPreAndPostImages.isEnabledAndIgnoreFCV();
 }
 
 /**
@@ -589,8 +589,8 @@ TEST_F(ChangeStreamStageTest, ShouldRejectUnsupportedFullDocumentOption) {
         // TODO SERVER-58584: remove the feature flag.
         {
             RAIIServerParameterControllerForTest controller(
-                "featureFlagChangeStreamsPreAndPostImages", false);
-            ASSERT_FALSE(isChangeStreamsPreAndPostImagesEnabled());
+                "featureFlagChangeStreamPreAndPostImages", false);
+            ASSERT_FALSE(isChangeStreamPreAndPostImagesEnabled());
 
             // 'DSChangeStream' is not allowed to be instantiated with new document modes when
             // pre-/post-images feature flag is disabled.
@@ -600,8 +600,8 @@ TEST_F(ChangeStreamStageTest, ShouldRejectUnsupportedFullDocumentOption) {
         }
         {
             RAIIServerParameterControllerForTest controller(
-                "featureFlagChangeStreamsPreAndPostImages", true);
-            ASSERT(isChangeStreamsPreAndPostImagesEnabled());
+                "featureFlagChangeStreamPreAndPostImages", true);
+            ASSERT(isChangeStreamPreAndPostImagesEnabled());
 
             // 'DSChangeStream' is allowed to be instantiated with new document modes when
             // pre-/post-images feature flag is enabled.

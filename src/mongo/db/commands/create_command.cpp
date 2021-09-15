@@ -36,7 +36,9 @@
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/create_gen.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
@@ -62,6 +64,7 @@ constexpr auto kCreateCommandHelp =
     "  viewOn: <string: name of source collection or view>,\n"
     "  pipeline: <array<object>: aggregation pipeline stage>,\n"
     "  collation: <document: default collation for the collection or view>,\n"
+    "  changeStreamPreAndPostImages: <bool: pre- and post-images for change streams enabled>,\n"
     "  writeConcern: <document: write concern expression for the operation>]\n"
     "}"_sd;
 
@@ -256,6 +259,19 @@ public:
                 }
 
                 cmd.setIdIndex(idIndexSpec);
+            }
+
+            if (feature_flags::gFeatureFlagChangeStreamPreAndPostImages.isEnabled(
+                    serverGlobalParams.featureCompatibility)) {
+                const auto isRecordPreImagesEnabled = cmd.getRecordPreImages().get_value_or(false);
+                uassert(ErrorCodes::InvalidOptions,
+                        "recordPreImages and changeStreamPreAndPostImages can not be set to true "
+                        "simultaneously",
+                        !(cmd.getChangeStreamPreAndPostImages() && isRecordPreImagesEnabled));
+            } else {
+                uassert(5846900,
+                        "BSON field 'changeStreamPreAndPostImages' is an unknown field.",
+                        !cmd.getChangeStreamPreAndPostImages().has_value());
             }
 
             OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE

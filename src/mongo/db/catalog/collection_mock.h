@@ -258,6 +258,14 @@ public:
         std::abort();
     }
 
+    bool isChangeStreamPreAndPostImagesEnabled() const {
+        std::abort();
+    }
+
+    void setChangeStreamPreAndPostImages(OperationContext* opCtx, bool val) {
+        std::abort();
+    }
+
     bool isCapped() const {
         return false;
     }

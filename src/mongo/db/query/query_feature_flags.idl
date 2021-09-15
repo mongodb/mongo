@@ -71,9 +71,9 @@ feature_flags:
       cpp_varname: gFeatureFlagShardedLookup 
       default: false
 
-    featureFlagChangeStreamsPreAndPostImages:
+    featureFlagChangeStreamPreAndPostImages:
       description: "Feature flag for allowing usage of point-in-time pre- and post-images of documents in change streams"
-      cpp_varname: gFeatureFlagChangeStreamsPreAndPostImages
+      cpp_varname: gFeatureFlagChangeStreamPreAndPostImages
       default: false
 
     featureFlagSearchMeta:

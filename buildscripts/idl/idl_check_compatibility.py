@@ -97,6 +97,8 @@ ALLOW_ANY_TYPE_LIST: List[str] = [
     'saslStart-reply-payload',
     'saslContinue-param-payload',
     'saslContinue-reply-payload',
+    "create-param-changeStreamPreAndPostImages",
+    "collMod-param-changeStreamPreAndPostImages",
 
     # These commands (aggregate, find, update, delete, findAndModify, explain) might contain some
     # fields with type `any`. Currently, it's not possible to avoid the `any` type in those cases.

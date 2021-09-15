@@ -159,6 +159,10 @@ commands:
                 type: safeBool
                 optional: true
                 unstable: true
+            changeStreamPreAndPostImages:
+                description: "Determines whether point-in-time pre- and post-images are available for change streams opened on this collection."
+                type: optionalBool
+                unstable: true
             timeseries:
                 description: "The options to create the time-series collection with."
                 type: TimeseriesOptions

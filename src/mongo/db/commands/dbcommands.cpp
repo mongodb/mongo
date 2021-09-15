@@ -56,6 +56,7 @@
 #include "mongo/db/coll_mod_gen.h"
 #include "mongo/db/coll_mod_reply_validation.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
@@ -78,6 +79,7 @@
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/read_concern.h"
 #include "mongo/db/repl/optime.h"
@@ -143,6 +145,7 @@ std::unique_ptr<CollMod> makeTimeseriesBucketsCollModCommand(OperationContext* o
     cmd->setViewOn(origCmd.getViewOn());
     cmd->setPipeline(origCmd.getPipeline());
     cmd->setRecordPreImages(origCmd.getRecordPreImages());
+    cmd->setChangeStreamPreAndPostImages(origCmd.getChangeStreamPreAndPostImages());
     cmd->setExpireAfterSeconds(origCmd.getExpireAfterSeconds());
     cmd->setTimeseries(origCmd.getTimeseries());
 
@@ -607,6 +610,19 @@ public:
                               const RequestParser& requestParser,
                               BSONObjBuilder& result) final {
         const auto* cmd = &requestParser.request();
+
+        if (feature_flags::gFeatureFlagChangeStreamPreAndPostImages.isEnabled(
+                serverGlobalParams.featureCompatibility)) {
+            const auto isRecordPreImagesEnabled = cmd->getRecordPreImages().get_value_or(false);
+            uassert(ErrorCodes::InvalidOptions,
+                    "recordPreImages and changeStreamPreAndPostImages can not be set to true "
+                    "simultaneously",
+                    !(cmd->getChangeStreamPreAndPostImages() && isRecordPreImagesEnabled));
+        } else {
+            uassert(5846901,
+                    "BSON field 'changeStreamPreAndPostImages' is an unknown field.",
+                    !cmd->getChangeStreamPreAndPostImages().has_value());
+        }
 
         // If the target namespace refers to a time-series collection, we will redirect the
         // collection modification request to the underlying bucket collection.

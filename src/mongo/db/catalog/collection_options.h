@@ -131,6 +131,11 @@ struct CollectionOptions {
     bool temp = false;
     bool recordPreImages = false;
 
+    // If set to true, stores the pre-images of the documents affected by update and delete
+    // operations in a dedicated collection, that will be used for reading data via changeStreams.
+    // Can not be set to true together with 'recordPreImages' (mutually exclusive).
+    bool changeStreamPreAndPostImagesEnabled = false;
+
     // Storage engine collection options. Always owned or empty.
     BSONObj storageEngine;
 

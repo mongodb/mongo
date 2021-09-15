@@ -360,7 +360,7 @@ void DocumentSourceChangeStream::assertIsLegalSpecification(
             !(shouldAddPreImage && (expCtx->inMongos || expCtx->needsMerge)));
 
     // TODO SERVER-58584: remove the feature flag.
-    if (!feature_flags::gFeatureFlagChangeStreamsPreAndPostImages.isEnabled(
+    if (!feature_flags::gFeatureFlagChangeStreamPreAndPostImages.isEnabled(
             serverGlobalParams.featureCompatibility)) {
         uassert(ErrorCodes::BadValue,
                 str::stream() << "Specified value '"

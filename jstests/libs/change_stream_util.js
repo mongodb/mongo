@@ -24,14 +24,13 @@ function isChangeStreamsOptimizationEnabled(db) {
 }
 
 /**
- * Returns true if feature flag 'featureFlagChangeStreamsPreAndPostImages' is enabled, false
+ * Returns true if feature flag 'featureFlagChangeStreamPreAndPostImages' is enabled, false
  * otherwise.
  */
 function isChangeStreamPreAndPostImagesEnabled(db) {
-    const getParam =
-        db.adminCommand({getParameter: 1, featureFlagChangeStreamsPreAndPostImages: 1});
-    return getParam.hasOwnProperty("featureFlagChangeStreamsPreAndPostImages") &&
-        getParam.featureFlagChangeStreamsPreAndPostImages.value;
+    const getParam = db.adminCommand({getParameter: 1, featureFlagChangeStreamPreAndPostImages: 1});
+    return getParam.hasOwnProperty("featureFlagChangeStreamPreAndPostImages") &&
+        getParam.featureFlagChangeStreamPreAndPostImages.value;
 }
 
 /**

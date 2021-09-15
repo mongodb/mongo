@@ -515,6 +515,9 @@ public:
     virtual bool getRecordPreImages() const = 0;
     virtual void setRecordPreImages(OperationContext* opCtx, bool val) = 0;
 
+    virtual bool isChangeStreamPreAndPostImagesEnabled() const = 0;
+    virtual void setChangeStreamPreAndPostImages(OperationContext* opCtx, bool val) = 0;
+
     /**
      * Returns true if this is a temporary collection.
      */

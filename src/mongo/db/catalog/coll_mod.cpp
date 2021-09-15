@@ -112,6 +112,7 @@ struct CollModRequest {
     boost::optional<ValidationActionEnum> collValidationAction;
     boost::optional<ValidationLevelEnum> collValidationLevel;
     bool recordPreImages = false;
+    OptionalBool changeStreamPreAndPostImagesEnabled;
 };
 
 StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
@@ -317,6 +318,24 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
             }
 
             cmr.recordPreImages = e.trueValue();
+        } else if (fieldName == "changeStreamPreAndPostImages") {
+            if (nss.isTimeseriesBucketsCollection()) {
+                return {ErrorCodes::InvalidOptions,
+                        str::stream()
+                            << "option not supported on a timeseries collection: " << fieldName};
+            }
+
+            if (isView) {
+                return {ErrorCodes::InvalidOptions,
+                        str::stream() << "option not supported on a view: " << fieldName};
+            }
+
+            if (e.type() != mongo::Bool) {
+                return {ErrorCodes::InvalidOptions,
+                        "'changeStreamPreAndPostImages' option must be a boolean"};
+            }
+
+            cmr.changeStreamPreAndPostImagesEnabled = e.trueValue();
         } else if (fieldName == "expireAfterSeconds") {
             if (coll->getRecordStore()->keyFormat() != KeyFormat::String) {
                 return Status(ErrorCodes::InvalidOptions,
@@ -550,6 +569,20 @@ Status _collModInternal(OperationContext* opCtx,
 
         const CollectionOptions& oldCollOptions = coll->getCollectionOptions();
 
+        // TODO SERVER-58584: remove the feature flag.
+        if (feature_flags::gFeatureFlagChangeStreamPreAndPostImages.isEnabledAndIgnoreFCV()) {
+            // If 'changeStreamPreAndPostImagesEnabled' is set to true, 'recordPreImages' must be
+            // set to false. If 'recordPreImages' is set to true,
+            // 'changeStreamPreAndPostImagesEnabled' must be set to false.
+            if (cmrNew.changeStreamPreAndPostImagesEnabled) {
+                cmrNew.recordPreImages = false;
+            }
+
+            if (cmrNew.recordPreImages) {
+                cmrNew.changeStreamPreAndPostImagesEnabled = false;
+            }
+        }
+
         boost::optional<IndexCollModInfo> indexCollModInfo;
 
         // Handle collMod operation type appropriately.
@@ -636,6 +669,15 @@ Status _collModInternal(OperationContext* opCtx,
 
         if (cmrNew.recordPreImages != oldCollOptions.recordPreImages) {
             coll.getWritableCollection()->setRecordPreImages(opCtx, cmrNew.recordPreImages);
+        }
+
+        // TODO SERVER-58584: remove the feature flag.
+        if (feature_flags::gFeatureFlagChangeStreamPreAndPostImages.isEnabledAndIgnoreFCV() &&
+            cmrNew.changeStreamPreAndPostImagesEnabled.has_value() &&
+            cmrNew.changeStreamPreAndPostImagesEnabled !=
+                oldCollOptions.changeStreamPreAndPostImagesEnabled) {
+            coll.getWritableCollection()->setChangeStreamPreAndPostImages(
+                opCtx, cmrNew.changeStreamPreAndPostImagesEnabled);
         }
 
         if (ts.isABSONObj()) {

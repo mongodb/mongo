@@ -93,6 +93,11 @@ Status _createView(OperationContext* opCtx,
                           str::stream() << "Not primary while creating collection " << nss);
         }
 
+        if (collectionOptions.changeStreamPreAndPostImagesEnabled) {
+            return Status(ErrorCodes::InvalidOptions,
+                          "option not supported on a view: changeStreamPreAndPostImages");
+        }
+
         _createSystemDotViewsIfNecessary(opCtx, db);
 
         WriteUnitOfWork wunit(opCtx);

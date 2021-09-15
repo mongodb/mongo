@@ -17,7 +17,7 @@ if (!isChangeStreamPreAndPostImagesEnabled(db)) {
     assert.throwsWithCode(() => coll.watch([], {fullDocument: 'required'}), ErrorCodes.BadValue);
 
     jsTestLog(
-        'Skipping test because featureFlagChangeStreamsPreAndPostImages feature flag is not enabled');
+        'Skipping test because featureFlagChangeStreamPreAndPostImages feature flag is not enabled');
     return;
 }
 

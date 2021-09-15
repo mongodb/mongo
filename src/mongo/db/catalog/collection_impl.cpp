@@ -203,11 +203,27 @@ Status checkValidatorCanBeUsedOnNs(const BSONObj& validator,
     return Status::OK();
 }
 
-Status validatePreImageRecording(OperationContext* opCtx, const NamespaceString& ns) {
-    if (ns.db() == NamespaceString::kAdminDb || ns.db() == NamespaceString::kLocalDb) {
+Status validateIsNotInDbs(OperationContext* opCtx,
+                          const NamespaceString& ns,
+                          const std::vector<StringData>& disallowedDbs,
+                          StringData optionName) {
+    if (std::find(disallowedDbs.begin(), disallowedDbs.end(), ns.db()) != disallowedDbs.end()) {
         return {ErrorCodes::InvalidOptions,
-                str::stream() << "recordPreImages collection option is not supported on the "
+                str::stream() << optionName << " collection option is not supported on the "
                               << ns.db() << " database"};
+    }
+
+    return Status::OK();
+}
+
+// Validates that the option is not used on admin or local db as well as not being used on shards
+// or config servers.
+Status validateRecordPreImagesOptionIsPermitted(OperationContext* opCtx,
+                                                const NamespaceString& ns) {
+    const auto validationStatus = validateIsNotInDbs(
+        opCtx, ns, {NamespaceString::kAdminDb, NamespaceString::kLocalDb}, "recordPreImages");
+    if (validationStatus != Status::OK()) {
+        return validationStatus;
     }
 
     if (serverGlobalParams.clusterRole != ClusterRole::None) {
@@ -218,6 +234,28 @@ Status validatePreImageRecording(OperationContext* opCtx, const NamespaceString&
                 << " has the recordPreImages option set, this is not supported on a "
                    "sharded cluster. Consider restarting without --shardsvr and --configsvr and "
                    "disabling recordPreImages via collMod"};
+    }
+
+    return Status::OK();
+}
+
+// Validates that the option is not used on admin or local db as well as not being used on config
+// servers.
+Status validateChangeStreamPreAndPostImagesOptionIsPermitted(OperationContext* opCtx,
+                                                             const NamespaceString& ns) {
+    const auto validationStatus = validateIsNotInDbs(
+        opCtx,
+        ns,
+        {NamespaceString::kAdminDb, NamespaceString::kLocalDb, NamespaceString::kConfigDb},
+        "changeStreamPreAndPostImages");
+    if (validationStatus != Status::OK()) {
+        return validationStatus;
+    }
+
+    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+        return {
+            ErrorCodes::InvalidOptions,
+            "changeStreamPreAndPostImages collection option is not supported on config servers"};
     }
 
     return Status::OK();
@@ -397,7 +435,11 @@ void CollectionImpl::init(OperationContext* opCtx) {
     // Make sure to copy the action and level before parsing MatchExpression, since certain features
     // are not supported with certain combinations of action and level.
     if (collectionOptions.recordPreImages) {
-        uassertStatusOK(validatePreImageRecording(opCtx, _ns));
+        uassertStatusOK(validateRecordPreImagesOptionIsPermitted(opCtx, _ns));
+    }
+
+    if (collectionOptions.changeStreamPreAndPostImagesEnabled) {
+        uassertStatusOK(validateChangeStreamPreAndPostImagesOptionIsPermitted(opCtx, _ns));
     }
 
     // Store the result (OK / error) of parsing the validator, but do not enforce that the result is
@@ -1350,11 +1392,25 @@ bool CollectionImpl::getRecordPreImages() const {
 
 void CollectionImpl::setRecordPreImages(OperationContext* opCtx, bool val) {
     if (val) {
-        uassertStatusOK(validatePreImageRecording(opCtx, _ns));
+        uassertStatusOK(validateRecordPreImagesOptionIsPermitted(opCtx, _ns));
     }
 
     _writeMetadata(
         opCtx, [&](BSONCollectionCatalogEntry::MetaData& md) { md.options.recordPreImages = val; });
+}
+
+bool CollectionImpl::isChangeStreamPreAndPostImagesEnabled() const {
+    return _metadata->options.changeStreamPreAndPostImagesEnabled;
+}
+
+void CollectionImpl::setChangeStreamPreAndPostImages(OperationContext* opCtx, bool val) {
+    if (val) {
+        uassertStatusOK(validateChangeStreamPreAndPostImagesOptionIsPermitted(opCtx, _ns));
+    }
+
+    _writeMetadata(opCtx, [&](BSONCollectionCatalogEntry::MetaData& md) {
+        md.options.changeStreamPreAndPostImagesEnabled = val;
+    });
 }
 
 bool CollectionImpl::isCapped() const {

@@ -39,6 +39,7 @@
 #include "mongo/db/commands/create_gen.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/idl/command_generic_argument.h"
 #include "mongo/util/str.h"
 
@@ -133,6 +134,8 @@ StatusWith<CollectionOptions> CollectionOptions::parse(const BSONObj& options, P
             collectionOptions.temp = e.trueValue();
         } else if (fieldName == "recordPreImages") {
             collectionOptions.recordPreImages = e.trueValue();
+        } else if (fieldName == "changeStreamPreAndPostImages") {
+            collectionOptions.changeStreamPreAndPostImagesEnabled = e.trueValue();
         } else if (fieldName == "storageEngine") {
             if (e.type() != mongo::Object) {
                 return {ErrorCodes::TypeMismatch, "'storageEngine' must be a document"};
@@ -300,6 +303,9 @@ CollectionOptions CollectionOptions::fromCreateCommand(const CreateCommand& cmd)
     if (auto recordPreImages = cmd.getRecordPreImages()) {
         options.recordPreImages = *recordPreImages;
     }
+    if (cmd.getChangeStreamPreAndPostImages().has_value()) {
+        options.changeStreamPreAndPostImagesEnabled = cmd.getChangeStreamPreAndPostImages();
+    }
     if (auto timeseries = cmd.getTimeseries()) {
         options.timeseries = std::move(*timeseries);
     }
@@ -349,6 +355,13 @@ void CollectionOptions::appendBSON(BSONObjBuilder* builder,
 
     if (recordPreImages && shouldAppend(CreateCommand::kRecordPreImagesFieldName)) {
         builder->appendBool(CreateCommand::kRecordPreImagesFieldName, true);
+    }
+
+    // TODO SERVER-58584: remove the feature flag.
+    if (feature_flags::gFeatureFlagChangeStreamPreAndPostImages.isEnabledAndIgnoreFCV() &&
+        changeStreamPreAndPostImagesEnabled &&
+        shouldAppend(CreateCommand::kChangeStreamPreAndPostImagesFieldName)) {
+        builder->appendBool(CreateCommand::kChangeStreamPreAndPostImagesFieldName, true);
     }
 
     if (!storageEngine.isEmpty() && shouldAppend(CreateCommand::kStorageEngineFieldName)) {
@@ -422,6 +435,10 @@ bool CollectionOptions::matchesStorageOptions(const CollectionOptions& other,
     }
 
     if (recordPreImages != other.recordPreImages) {
+        return false;
+    }
+
+    if (changeStreamPreAndPostImagesEnabled != other.changeStreamPreAndPostImagesEnabled) {
         return false;
     }
 

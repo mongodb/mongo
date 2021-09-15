@@ -315,6 +315,9 @@ public:
     bool getRecordPreImages() const final;
     void setRecordPreImages(OperationContext* opCtx, bool val) final;
 
+    bool isChangeStreamPreAndPostImagesEnabled() const final;
+    void setChangeStreamPreAndPostImages(OperationContext* opCtx, bool val) final;
+
     bool isTemporary() const final;
 
     bool isClustered() const final;
