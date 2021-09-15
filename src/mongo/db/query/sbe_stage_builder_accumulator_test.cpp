@@ -175,21 +175,6 @@ protected:
         ASSERT(!objEnum.atEnd()) << "Expected a result object but got: "
                                  << std::make_pair(resObjTag, resObjVal);
 
-        auto areSetsEqual = [](sbe::value::Value lhsVal, sbe::value::Value rhsVal) -> bool {
-            const auto& lhsSet = getArraySetView(lhsVal)->values();
-            const auto& rhsSet = getArraySetView(rhsVal)->values();
-            if (lhsSet.size() == rhsSet.size()) {
-                for (const auto& e : rhsSet) {
-                    if (!lhsSet.contains(e)) {
-                        return false;
-                    }
-                }
-                return true;
-            } else {
-                return false;
-            }
-        };
-
         while (!objEnum.atEnd()) {
             if (objEnum.getFieldName() == "x"_sd) {
                 auto [arrTag, arrVal] = objEnum.getViewOfValue();
@@ -201,11 +186,7 @@ protected:
                 auto [actualTag, actualSet] = arrayToSet(tmpTag2, tmpVal2);
                 ValueGuard actualValueGuard{actualTag, actualSet};
 
-                // TODO SERVER-59631: replace the call to the compare lambda below with a call to
-                // valueEquals on sets and remove the lambda function above.
-                //
-                // ASSERT(valueEquals(expectedTag, expectedSet, aggregatedTag, aggregatedSet))
-                ASSERT(areSetsEqual(expectedSet, actualSet))
+                ASSERT(valueEquals(expectedTag, expectedSet, actualTag, actualSet))
                     << "expected set: " << std::make_pair(expectedTag, expectedSet)
                     << " but got set: " << std::make_pair(actualTag, actualSet);
                 return;

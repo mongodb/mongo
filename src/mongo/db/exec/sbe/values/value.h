@@ -415,9 +415,225 @@ private:
     const CollatorInterface* _collator;
 };
 
+/**
+ * 'DeepEqualityHashSet' is a wrapper around 'absl::flat_hash_set' that provides a "truly" deep
+ * equality comparison function between its instances. The equality operator in the underlying
+ * 'absl::flat_hash_set' type doesn't use the provided equality functor. Instead, it relies on the
+ * default comparison function for the key type, which is not preferrable in our usage scenarios.
+ * This is the main reason for having the 'DeepEqualityHashSet' wrapper type.
+ */
+template <class T,
+          class Hash = absl::container_internal::hash_default_hash<T>,
+          class Eq = absl::container_internal::hash_default_eq<T>,
+          class Allocator = std::allocator<T>>
+class DeepEqualityHashSet {
+public:
+    using SetType = absl::flat_hash_set<T, Hash, Eq, Allocator>;
+    using iterator = typename SetType::iterator;
+    using const_iterator = typename SetType::const_iterator;
+
+    explicit DeepEqualityHashSet(size_t bucket_count, const Hash& hash, const Eq& eq)
+        : _values(bucket_count, hash, eq) {}
+
+    Hash hash_function() const {
+        return _values.hash_function();
+    }
+    Eq key_eq() const {
+        return _values.key_eq();
+    }
+
+    size_t size() const {
+        return _values.size();
+    }
+
+    void reserve(size_t n) {
+        _values.reserve(n);
+    }
+
+    std::pair<iterator, bool> insert(const T& value) {
+        return _values.insert(value);
+    }
+
+    bool contains(const T& key) const {
+        return _values.contains(key);
+    }
+
+    iterator find(const T& key) {
+        return _values.find(key);
+    }
+
+    const_iterator find(const T& key) const {
+        return _values.find(key);
+    }
+
+    size_t count(const T& key) const {
+        return _values.count(key);
+    }
+
+    iterator begin() {
+        return _values.begin();
+    }
+    iterator end() {
+        return _values.end();
+    }
+
+    const_iterator begin() const {
+        return _values.begin();
+    }
+    const_iterator end() const {
+        return _values.end();
+    }
+
+    template <class T1, class Hash1, class Eq1, class Allocator1>
+    friend bool operator==(const DeepEqualityHashSet<T1, Hash1, Eq1, Allocator1>& lhs,
+                           const DeepEqualityHashSet<T1, Hash1, Eq1, Allocator1>& rhs) {
+        using SetTp = typename DeepEqualityHashSet<T1, Hash1, Eq1, Allocator1>::SetType;
+        const SetTp* inner = &lhs._values;
+        const SetTp* outer = &rhs._values;
+        if (outer->size() != inner->size()) {
+            return false;
+        }
+
+        if (outer->capacity() > inner->capacity()) {
+            std::swap(inner, outer);
+        }
+
+        for (const auto& e : *outer) {
+            // The equality check in the 'absl::flat_hash_set' type doesn't use the provided
+            // equality functor. Instead, it relies on the default comparison function for the key
+            // type, which is not preferrable in our usage scenarios. This is the main reason for
+            // having the 'DeepEqualityHashSet' wrapper type.
+            if (!inner->contains(e)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    template <class T1, class Hash1, class Eq1, class Allocator1>
+    friend bool operator!=(const DeepEqualityHashSet<T1, Hash1, Eq1, Allocator1>& lhs,
+                           const DeepEqualityHashSet<T1, Hash1, Eq1, Allocator1>& rhs) {
+        return !(lhs == rhs);
+    }
+
+private:
+    SetType _values;
+};
+
+/**
+ * 'DeepEqualityHashMap' is a wrapper around 'absl::flat_hash_map' that provides a "truly" deep
+ * equality comparison function between its instances. The equality operator in the underlying
+ * 'absl::flat_hash_map' type doesn't use the provided equality functor. Instead, it relies on the
+ * default comparison function for the key type, which is not preferrable in our usage scenarios.
+ * This is the main reason for having the 'DeepEqualityHashMap' wrapper type.
+ */
+template <class K,
+          class V,
+          class Hash = absl::container_internal::hash_default_hash<K>,
+          class Eq = absl::container_internal::hash_default_eq<K>,
+          class Allocator = std::allocator<std::pair<const K, V>>>
+class DeepEqualityHashMap {
+public:
+    using MapType = absl::flat_hash_map<K, V, ValueHash, ValueEq, Allocator>;
+    using iterator = typename MapType::iterator;
+    using const_iterator = typename MapType::const_iterator;
+
+    explicit DeepEqualityHashMap(size_t bucket_count, const Hash& hash, const Eq& eq)
+        : _values(bucket_count, hash, eq) {}
+
+    Hash hash_function() const {
+        return _values.hash_function();
+    }
+    Eq key_eq() const {
+        return _values.key_eq();
+    }
+
+    size_t size() const {
+        return _values.size();
+    }
+
+    void reserve(size_t n) {
+        _values.reserve(n);
+    }
+
+    std::pair<iterator, bool> insert(const K& key, const V& val) {
+        return _values.insert({key, val});
+    }
+
+    auto& operator[](const K& key) {
+        return _values[key];
+    }
+
+    bool contains(const K& key) const {
+        return _values.contains(key);
+    }
+
+    iterator find(const K& key) {
+        return _values.find(key);
+    }
+
+    const_iterator find(const K& key) const {
+        return _values.find(key);
+    }
+
+    size_t count(const K& key) const {
+        return _values.count(key);
+    }
+
+    iterator begin() {
+        return _values.begin();
+    }
+    iterator end() {
+        return _values.end();
+    }
+
+    const_iterator begin() const {
+        return _values.begin();
+    }
+    const_iterator end() const {
+        return _values.end();
+    }
+
+    template <class K1, class V1, class Hash1, class Eq1, class Allocator1>
+    friend bool operator==(const DeepEqualityHashMap<K1, V1, Hash1, Eq1, Allocator1>& lhs,
+                           const DeepEqualityHashMap<K1, V1, Hash1, Eq1, Allocator1>& rhs) {
+        using MapTp = typename DeepEqualityHashMap<K1, V1, Hash1, Eq1, Allocator1>::MapType;
+        const MapTp* inner = &lhs._values;
+        const MapTp* outer = &rhs._values;
+        if (outer->size() != inner->size()) {
+            return false;
+        }
+
+        if (outer->capacity() > inner->capacity()) {
+            std::swap(inner, outer);
+        }
+
+        for (const auto& e : *outer) {
+            // The equality check in the 'absl::flat_hash_map' type doesn't use the provided
+            // equality functor. Instead, it relies on the default comparison function for the key
+            // type, which is not preferrable in our usage scenarios. This is the main reason for
+            // having the 'DeepEqualityHashMap' wrapper type.
+            auto it = inner->find(e.first);
+            if (it == inner->end() || it->second != e.second) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    template <class K1, class V1, class Hash1, class Eq1, class Allocator1>
+    friend bool operator!=(const DeepEqualityHashMap<K1, V1, Hash1, Eq1, Allocator1>& lhs,
+                           const DeepEqualityHashMap<K1, V1, Hash1, Eq1, Allocator1>& rhs) {
+        return !(lhs == rhs);
+    }
+
+private:
+    MapType _values;
+};
+
 template <typename T>
-using ValueMapType = absl::flat_hash_map<std::pair<TypeTags, Value>, T, ValueHash, ValueEq>;
-using ValueSetType = absl::flat_hash_set<std::pair<TypeTags, Value>, ValueHash, ValueEq>;
+using ValueMapType = DeepEqualityHashMap<std::pair<TypeTags, Value>, T, ValueHash, ValueEq>;
+using ValueSetType = DeepEqualityHashSet<std::pair<TypeTags, Value>, ValueHash, ValueEq>;
 
 /**
  * This is the SBE representation of objects/documents. It is a relatively simple structure of
@@ -577,6 +793,7 @@ private:
 class ArraySet {
 public:
     using iterator = ValueSetType::iterator;
+    using const_iterator = ValueSetType::const_iterator;
 
     explicit ArraySet(const CollatorInterface* collator = nullptr)
         : _values(0, ValueHash(collator), ValueEq(collator)) {}
@@ -602,7 +819,7 @@ public:
 
     void push_back(TypeTags tag, Value val);
 
-    auto& values() noexcept {
+    auto& values() const noexcept {
         return _values;
     }
 
@@ -622,6 +839,9 @@ public:
 private:
     ValueSetType _values;
 };
+
+bool operator==(const ArraySet& lhs, const ArraySet& rhs);
+bool operator!=(const ArraySet& lhs, const ArraySet& rhs);
 
 /**
  * Implements a wrapper of PCRE regular expression.
@@ -1383,7 +1603,7 @@ private:
 
     // ArraySet
     ArraySet* _arraySet{nullptr};
-    ArraySet::iterator _iter;
+    ArraySet::const_iterator _iter;
 
     // bsonArray
     const char* _arrayCurrent{nullptr};

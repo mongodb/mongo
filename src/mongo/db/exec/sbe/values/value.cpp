@@ -1041,7 +1041,7 @@ std::pair<TypeTags, Value> compareValue(TypeTags lhsTag,
         if (lhsTag == TypeTags::ArraySet && rhsTag == TypeTags::ArraySet) {
             auto lhsArr = getArraySetView(lhsValue);
             auto rhsArr = getArraySetView(rhsValue);
-            if (lhsArr->values() == rhsArr->values()) {
+            if (*lhsArr == *rhsArr) {
                 return {TypeTags::NumberInt32, bitcastFrom<int32_t>(0)};
             }
             return {TypeTags::Nothing, 0};
@@ -1342,6 +1342,14 @@ std::pair<TypeTags, Value> arrayToSet(TypeTags tag, Value val, CollatorInterface
     }
     guard.reset();
     return {setTag, setVal};
+}
+
+bool operator==(const ArraySet& lhs, const ArraySet& rhs) {
+    return lhs.values() == rhs.values();
+}
+
+bool operator!=(const ArraySet& lhs, const ArraySet& rhs) {
+    return !(lhs == rhs);
 }
 }  // namespace value
 }  // namespace sbe
