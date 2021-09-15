@@ -29,6 +29,9 @@
 
 #pragma once
 
+#include <functional>
+#include <vector>
+
 #include "mongo/db/repl/data_replicator_external_state.h"
 #include "mongo/db/repl/initial_syncer_interface.h"
 #include "mongo/db/repl/replication_process.h"
@@ -69,6 +72,8 @@ public:
         ReplicationProcess* replicationProcess,
         const InitialSyncerInterface::OnCompletionFn& onCompletion)>;
 
+    using InitialSyncCrashRecoveryFunction = std::function<void()>;
+
     /**
      * Make an InitialSyncer if the initialSyncMethod is "logical", or a FileCopyBasedInitialSyncer
      * if the initialSyncMethod is "fileCopyBased".
@@ -83,14 +88,22 @@ public:
         const InitialSyncerInterface::OnCompletionFn& onCompletion);
 
     /**
+     * Runs crash recovery for every registered initial syncer type that requires it.
+     */
+    void runCrashRecovery();
+
+    /**
      * Add a function that creates an initial syncer using the given initialSyncMethod to the
      * _createInitialSyncerFunctionMap.
      */
     void registerInitialSyncer(const std::string& initialSyncMethod,
-                               CreateInitialSyncerFunction createInitialSyncerFunction);
+                               CreateInitialSyncerFunction createInitialSyncerFunction,
+                               InitialSyncCrashRecoveryFunction crashRecoveryFunction =
+                                   InitialSyncCrashRecoveryFunction());
 
 private:
     StringMap<CreateInitialSyncerFunction> _createInitialSyncerFunctionMap;
+    std::vector<InitialSyncCrashRecoveryFunction> _crashRecoveryFunctions;
 };
 }  // namespace repl
 }  // namespace mongo

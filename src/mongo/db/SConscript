@@ -2244,6 +2244,7 @@ env.Library(
         'periodic_runner_job_abort_expired_transactions',
         'pipeline/process_interface/mongod_process_interface_factory',
         'repl/drop_pending_collection_reaper',
+        'repl/initial_syncer',
         'repl/repl_coordinator_impl',
         'repl/replication_recovery',
         'repl/serveronly_repl',

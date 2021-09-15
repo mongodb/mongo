@@ -111,6 +111,7 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mongod.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
+#include "mongo/db/repl/initial_syncer_factory.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/repl/primary_only_service_op_observer.h"
@@ -399,6 +400,9 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     FlowControl::set(serviceContext,
                      std::make_unique<FlowControl>(
                          serviceContext, repl::ReplicationCoordinator::get(serviceContext)));
+
+    // If a crash occurred during file-copy based initial sync, we may need to finish or clean up.
+    repl::InitialSyncerFactory::get(serviceContext)->runCrashRecovery();
 
     // Creating the operation context before initializing the storage engine allows the storage
     // engine initialization to make use of the lock manager. As the storage engine is not yet
