@@ -386,9 +386,9 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
     }
 
     if (kDebugBuild) {
-        // Enable debug write-ahead logging for all tables under debug build. Do not abort the
-        // process when corruption is found in debug builds, which supports increased test coverage.
-        ss << "debug_mode=(table_logging=true,corruption_abort=false,";
+        // Do not abort the process when corruption is found in debug builds, which supports
+        // increased test coverage.
+        ss << "debug_mode=(corruption_abort=false,";
         // For select debug builds, support enabling WiredTiger eviction debug mode. This uses
         // more aggressive eviction tactics, but may have a negative performance impact.
         if (gWiredTigerEvictionDebugMode) {
@@ -413,10 +413,12 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
         ss << "debug_mode=(cursor_copy=true),";
     }
     if (TestingProctor::instance().isEnabled()) {
+        // Enable debug write-ahead logging for all tables when testing is enabled.
+        //
         // If MongoDB startup fails, there may be clues from the previous run still left in the WT
         // log files that can provide some insight into how the system got into a bad state. When
         // testing is enabled, keep around some of these files for investigative purposes.
-        ss << "debug_mode=(checkpoint_retention=4),";
+        ss << "debug_mode=(table_logging=true,checkpoint_retention=4),";
     }
 
     ss << WiredTigerCustomizationHooks::get(getGlobalServiceContext())
