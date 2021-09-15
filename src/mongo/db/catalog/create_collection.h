@@ -55,6 +55,8 @@ Status createCollection(OperationContext* opCtx,
                         const NamespaceString& ns,
                         const CreateCommand& cmd);
 
+void createChangeStreamPreImagesCollection(OperationContext* opCtx);
+
 /**
  * As above, but only used by replication to apply operations. This allows recreating collections
  * with specific UUIDs (if ui is given). If ui is given and and a collection exists with the same

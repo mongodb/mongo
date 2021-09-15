@@ -7,8 +7,10 @@
 (function() {
 'use strict';
 
-load("jstests/libs/collection_options.js");  // For assertCollectionOptionIsEnabled,
-                                             // assertCollectionOptionIsAbsent.
+load("jstests/libs/collection_options.js");        // For assertCollectionOptionIsEnabled,
+                                                   // assertCollectionOptionIsAbsent.
+load("jstests/libs/collection_drop_recreate.js");  // For assertDropCollection.
+load("jstests/libs/fail_point_util.js");           // For configureFailPoint, off.
 
 const rsTest = new ReplSetTest({name: jsTestName(), nodes: 1});
 rsTest.startSet();
@@ -19,7 +21,9 @@ const collName = 'changeStreamPreAndPostImages';
 const collName2 = 'changeStreamPreAndPostImages2';
 const collName3 = 'changeStreamPreAndPostImages3';
 const collName4 = 'changeStreamPreAndPostImages4';
+const collName5 = 'changeStreamPreAndPostImages5';
 const viewName = "view";
+const preimagesCollName = "system.preimages";
 const createTimeseriesOptions = {
     timeField: "a"
 };
@@ -29,6 +33,16 @@ const adminDB = primary.getDB("admin");
 const localDB = primary.getDB("local");
 const configDB = primary.getDB("config");
 const testDB = primary.getDB(dbName);
+
+function assertPreimagesCollectionIsAbsent() {
+    const result = localDB.runCommand("listCollections", {filter: {name: preimagesCollName}});
+    assert.eq(result.cursor.firstBatch.length, 0);
+}
+
+function assertPreimagesCollectionExists() {
+    const result = localDB.runCommand("listCollections", {filter: {name: preimagesCollName}});
+    assert.eq(result.cursor.firstBatch[0].name, preimagesCollName);
+}
 
 // Check that we cannot set 'changeStreamPreAndPostImages' on the local or admin databases.
 for (const db of [localDB, adminDB, configDB]) {
@@ -42,22 +56,36 @@ for (const db of [localDB, adminDB, configDB]) {
         ErrorCodes.InvalidOptions);
 }
 
+// Drop the pre-images collection.
+assertDropCollection(localDB, preimagesCollName);
+assertPreimagesCollectionIsAbsent();
+
 // Should be able to set the 'changeStreamPreAndPostImages' via create or collMod.
 assert.commandWorked(testDB.runCommand({create: collName, changeStreamPreAndPostImages: true}));
 assertCollectionOptionIsEnabled(testDB, collName, "changeStreamPreAndPostImages");
+assertPreimagesCollectionExists();
+
+// Drop the pre-images collection.
+assertDropCollection(localDB, preimagesCollName);
+assertPreimagesCollectionIsAbsent();
 
 assert.commandWorked(testDB.runCommand({create: collName2}));
 assert.commandWorked(testDB.runCommand({collMod: collName2, changeStreamPreAndPostImages: true}));
 assertCollectionOptionIsEnabled(testDB, collName2, "changeStreamPreAndPostImages");
+assertPreimagesCollectionExists();
 
 // Verify that setting collection options with 'collMod' command does not affect
 // 'changeStreamPreAndPostImages' option.
 assert.commandWorked(testDB.runCommand({"collMod": collName2, validationLevel: "off"}));
 assertCollectionOptionIsEnabled(testDB, collName2, "changeStreamPreAndPostImages");
+assertPreimagesCollectionExists();
 
 // Should successfully unset 'changeStreamPreAndPostImages' using the 'collMod' command.
 assert.commandWorked(testDB.runCommand({collMod: collName2, changeStreamPreAndPostImages: false}));
 assertCollectionOptionIsAbsent(testDB, collName2, "changeStreamPreAndPostImages");
+
+// Should not remove the pre-images collection on 'changeStreamPreAndPostImages' being set to false.
+assertPreimagesCollectionExists();
 
 // Both 'recordPreImages' and 'changeStreamPreAndPostImages' may not be set to true at the same
 // time.
@@ -124,6 +152,15 @@ assert.commandWorked(testDB.runCommand({create: viewName, viewOn: collName}));
 assert.commandFailedWithCode(
     testDB.runCommand({collMod: viewName, changeStreamPreAndPostImages: true}),
     ErrorCodes.InvalidOptions);
+
+// Should fail to run 'create' and 'collMod' commands if creating preimages collection fails.
+const failpoint = configureFailPoint(primary, "failPreimagesCollectionCreation");
+assert.commandFailedWithCode(
+    testDB.runCommand({create: collName5, changeStreamPreAndPostImages: true}), 5868501);
+assert.commandWorked(testDB.runCommand({create: collName5}));
+assert.commandFailedWithCode(
+    testDB.runCommand({collMod: collName5, changeStreamPreAndPostImages: true}), 5868501);
+failpoint.off();
 
 rsTest.stopSet();
 }());

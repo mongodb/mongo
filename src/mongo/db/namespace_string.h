@@ -136,6 +136,9 @@ public:
     // Namespace for replica set configuration settings.
     static const NamespaceString kSystemReplSetNamespace;
 
+    // Namespace for change stream pre-images collection.
+    static const NamespaceString kChangeStreamPreImagesNamespace;
+
     // Namespace for index build entries.
     static const NamespaceString kIndexBuildEntryNamespace;
 
@@ -360,6 +363,11 @@ public:
      * Returns whether the specified namespace is <database>.system.buckets.<>.
      */
     bool isTimeseriesBucketsCollection() const;
+
+    /**
+     * Returns whether the specified namespace is local.system.preimages.
+     */
+    bool isChangeStreamPreImagesCollection() const;
 
     /**
      * Returns the time-series buckets namespace for this view.

@@ -89,6 +89,8 @@ const NamespaceString NamespaceString::kExternalKeysCollectionNamespace(Namespac
 const NamespaceString NamespaceString::kRsOplogNamespace(NamespaceString::kLocalDb, "oplog.rs");
 const NamespaceString NamespaceString::kSystemReplSetNamespace(NamespaceString::kLocalDb,
                                                                "system.replset");
+const NamespaceString NamespaceString::kChangeStreamPreImagesNamespace(NamespaceString::kLocalDb,
+                                                                       "system.preimages");
 const NamespaceString NamespaceString::kIndexBuildEntryNamespace(NamespaceString::kConfigDb,
                                                                  "system.indexBuilds");
 const NamespaceString NamespaceString::kRangeDeletionNamespace(NamespaceString::kConfigDb,
@@ -175,6 +177,9 @@ bool NamespaceString::isLegalClientSystemNS(
         return true;
     }
     if (isTimeseriesBucketsCollection()) {
+        return true;
+    }
+    if (isChangeStreamPreImagesCollection()) {
         return true;
     }
 
@@ -321,6 +326,10 @@ bool NamespaceString::isTemporaryReshardingCollection() const {
 
 bool NamespaceString::isTimeseriesBucketsCollection() const {
     return coll().startsWith(kTimeseriesBucketsCollectionPrefix);
+}
+
+bool NamespaceString::isChangeStreamPreImagesCollection() const {
+    return ns() == kChangeStreamPreImagesNamespace.ns();
 }
 
 NamespaceString NamespaceString::makeTimeseriesBucketsNamespace() const {

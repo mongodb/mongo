@@ -41,6 +41,7 @@
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/index_catalog_impl.h"
 #include "mongo/db/catalog/index_consistency.h"
@@ -203,8 +204,7 @@ Status checkValidatorCanBeUsedOnNs(const BSONObj& validator,
     return Status::OK();
 }
 
-Status validateIsNotInDbs(OperationContext* opCtx,
-                          const NamespaceString& ns,
+Status validateIsNotInDbs(const NamespaceString& ns,
                           const std::vector<StringData>& disallowedDbs,
                           StringData optionName) {
     if (std::find(disallowedDbs.begin(), disallowedDbs.end(), ns.db()) != disallowedDbs.end()) {
@@ -218,10 +218,9 @@ Status validateIsNotInDbs(OperationContext* opCtx,
 
 // Validates that the option is not used on admin or local db as well as not being used on shards
 // or config servers.
-Status validateRecordPreImagesOptionIsPermitted(OperationContext* opCtx,
-                                                const NamespaceString& ns) {
+Status validateRecordPreImagesOptionIsPermitted(const NamespaceString& ns) {
     const auto validationStatus = validateIsNotInDbs(
-        opCtx, ns, {NamespaceString::kAdminDb, NamespaceString::kLocalDb}, "recordPreImages");
+        ns, {NamespaceString::kAdminDb, NamespaceString::kLocalDb}, "recordPreImages");
     if (validationStatus != Status::OK()) {
         return validationStatus;
     }
@@ -239,12 +238,10 @@ Status validateRecordPreImagesOptionIsPermitted(OperationContext* opCtx,
     return Status::OK();
 }
 
-// Validates that the option is not used on admin or local db as well as not being used on config
-// servers.
-Status validateChangeStreamPreAndPostImagesOptionIsPermitted(OperationContext* opCtx,
-                                                             const NamespaceString& ns) {
+// Validates that the option is not used on admin, local or config db as well as not being used on
+// config servers.
+Status validateChangeStreamPreAndPostImagesOptionIsPermitted(const NamespaceString& ns) {
     const auto validationStatus = validateIsNotInDbs(
-        opCtx,
         ns,
         {NamespaceString::kAdminDb, NamespaceString::kLocalDb, NamespaceString::kConfigDb},
         "changeStreamPreAndPostImages");
@@ -435,11 +432,11 @@ void CollectionImpl::init(OperationContext* opCtx) {
     // Make sure to copy the action and level before parsing MatchExpression, since certain features
     // are not supported with certain combinations of action and level.
     if (collectionOptions.recordPreImages) {
-        uassertStatusOK(validateRecordPreImagesOptionIsPermitted(opCtx, _ns));
+        uassertStatusOK(validateRecordPreImagesOptionIsPermitted(_ns));
     }
 
     if (collectionOptions.changeStreamPreAndPostImagesEnabled) {
-        uassertStatusOK(validateChangeStreamPreAndPostImagesOptionIsPermitted(opCtx, _ns));
+        uassertStatusOK(validateChangeStreamPreAndPostImagesOptionIsPermitted(_ns));
     }
 
     // Store the result (OK / error) of parsing the validator, but do not enforce that the result is
@@ -1392,7 +1389,7 @@ bool CollectionImpl::getRecordPreImages() const {
 
 void CollectionImpl::setRecordPreImages(OperationContext* opCtx, bool val) {
     if (val) {
-        uassertStatusOK(validateRecordPreImagesOptionIsPermitted(opCtx, _ns));
+        uassertStatusOK(validateRecordPreImagesOptionIsPermitted(_ns));
     }
 
     _writeMetadata(
@@ -1405,7 +1402,10 @@ bool CollectionImpl::isChangeStreamPreAndPostImagesEnabled() const {
 
 void CollectionImpl::setChangeStreamPreAndPostImages(OperationContext* opCtx, bool val) {
     if (val) {
-        uassertStatusOK(validateChangeStreamPreAndPostImagesOptionIsPermitted(opCtx, _ns));
+        uassertStatusOK(validateChangeStreamPreAndPostImagesOptionIsPermitted(_ns));
+
+        // Create preimages collection if it doesn't already exist.
+        createChangeStreamPreImagesCollection(opCtx);
     }
 
     _writeMetadata(opCtx, [&](BSONCollectionCatalogEntry::MetaData& md) {

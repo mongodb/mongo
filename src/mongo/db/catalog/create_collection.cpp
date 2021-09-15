@@ -62,6 +62,7 @@ namespace mongo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(failTimeseriesViewCreation);
+MONGO_FAIL_POINT_DEFINE(failPreimagesCollectionCreation);
 
 void _createSystemDotViewsIfNecessary(OperationContext* opCtx, const Database* db) {
     // Create 'system.views' in a separate WUOW if it does not exist.
@@ -469,6 +470,16 @@ Status createCollection(OperationContext* opCtx,
                 str::stream() << "Cannot create system collection " << ns
                               << " within a transaction.",
                 !opCtx->inMultiDocumentTransaction() || !ns.isSystem());
+        if (options.changeStreamPreAndPostImagesEnabled) {
+            tassert(5868500,
+                    "ChangeStreamPreAndPostImages feature flag must be enabled",
+                    feature_flags::gFeatureFlagChangeStreamPreAndPostImages.isEnabled(
+                        serverGlobalParams.featureCompatibility));
+
+            // Create preimages collection if it doesn't already exist.
+            createChangeStreamPreImagesCollection(opCtx);
+        }
+
         return _createCollection(opCtx, ns, std::move(options), idIndex);
     }
 }
@@ -536,6 +547,18 @@ Status createCollection(OperationContext* opCtx,
     auto options = CollectionOptions::fromCreateCommand(cmd);
     auto idIndex = std::exchange(options.idIndex, {});
     return createCollection(opCtx, ns, std::move(options), idIndex);
+}
+
+void createChangeStreamPreImagesCollection(OperationContext* opCtx) {
+    uassert(5868501,
+            "Failpoint failPreimagesCollectionCreation enabled. Throwing exception",
+            !MONGO_unlikely(failPreimagesCollectionCreation.shouldFail()));
+
+    const auto nss = NamespaceString::kChangeStreamPreImagesNamespace;
+    const auto status = _createCollection(opCtx, nss, CollectionOptions(), BSONObj());
+    uassert(status.code(),
+            str::stream() << "Failed to create the pre-images collection: " << nss.coll(),
+            status.isOK() || status.code() == ErrorCodes::NamespaceExists);
 }
 
 Status createCollectionForApplyOps(OperationContext* opCtx,

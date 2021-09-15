@@ -698,7 +698,15 @@ bool WiredTigerUtil::useTableLogging(NamespaceString ns, bool replEnabled) {
         return false;
     }
 
-    // The remainder of local gets logged. In particular, the oplog and user created collections.
+    // Change stream pre-image collections are not logged.
+    // TODO SERVER-59607: remove this line when the preimages collection move to the config
+    // database.
+    if (ns.isChangeStreamPreImagesCollection()) {
+        return false;
+    }
+
+    // The remainder of local gets logged. In particular, the oplog and user created
+    // collections.
     return true;
 }
 
