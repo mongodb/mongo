@@ -840,7 +840,7 @@ void DocumentSourceLookUp::serializeToArrayWithBothSyntaxes(
 
     // Add a pipeline field if only-pipeline syntax was used (to ensure the output is valid $lookup
     // syntax) or if a $match was absorbed.
-    auto pipeline = _userPipeline;
+    auto pipeline = _userPipeline.get_value_or(std::vector<BSONObj>());
     if (_additionalFilter) {
         pipeline.emplace_back(BSON("$match" << *_additionalFilter));
     }
@@ -903,7 +903,7 @@ void DocumentSourceLookUp::serializeToArray(
                               letVar.expression->serialize(static_cast<bool>(explain)));
         }
 
-        auto pipeline = _userPipeline;
+        auto pipeline = _userPipeline.get_value_or(std::vector<BSONObj>());
         // With pipeline syntax, any '_additionalFilter' should be added to the user pipeline. With
         // only field syntax, we add '_additionalFilter' or '_matchSrc' to the output below.
         if (_additionalFilter) {
