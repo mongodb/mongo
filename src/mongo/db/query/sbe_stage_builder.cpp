@@ -2187,14 +2187,12 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     tassert(
         5851600, "should have one and only one child for GROUP", groupNode->children.size() == 1);
     tassert(5851601, "{} slot should have been requested"_format(kResult), reqs.has(kResult));
-    tassert(
-        5851602, "{} slot must not have been requested"_format(kRecordId), !reqs.has(kRecordId));
 
     // If _id expression produces a scalar value, groupByExpressions must have only one element for
     // "_id" field. Otherwise, _id expression produces a document.
     //
     // Supports scalar _id expression only for now.
-    uassert(5851603,
+    uassert(5851602,
             "GROUP does not support document _id expression",
             idExpr.size() == kGroupBySlots && idExpr.contains("_id"));
 

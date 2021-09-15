@@ -239,7 +239,7 @@ protected:
             } catch (const DBException& e) {
                 // The accumulator or the _id expression is unsupported in SBE, so we expect that
                 // the sbeCompatible flag should be false.
-                ASSERT(e.code() == 5754701 || e.code() == 5851603);
+                ASSERT(e.code() == 5754701 || e.code() == 5851602);
                 sbeGroupCompatible = false;
                 break;
             }
