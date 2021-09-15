@@ -824,9 +824,15 @@ record_loop:
                         if (hs_cursor == NULL)
                             WT_ERR(__wt_curhs_open(session, NULL, &hs_cursor));
 
-                        /* From WT_TS_NONE to delete all the history store content of the key. */
-                        WT_ERR(__wt_hs_delete_key_from_ts(session, hs_cursor, btree->id,
-                          &hs_recno_key, WT_TS_NONE, false, F_ISSET(r, WT_REC_CHECKPOINT_RUNNING)));
+                        /*
+                         * From WT_TS_NONE delete all the history store content of the key. This
+                         * path will never be taken for a mixed-mode deletion being evicted and with
+                         * a checkpoint that started prior to the eviction starting its
+                         * reconciliation as previous checks done while selecting an update will
+                         * detect that.
+                         */
+                        WT_ERR(__wt_hs_delete_key_from_ts(
+                          session, hs_cursor, btree->id, &hs_recno_key, WT_TS_NONE, false, false));
 
                         WT_STAT_CONN_INCR(session, cache_hs_key_truncate_onpage_removal);
                         WT_STAT_DATA_INCR(session, cache_hs_key_truncate_onpage_removal);
