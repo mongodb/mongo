@@ -200,9 +200,8 @@ boost::optional<int128_t> Simple8bTypeUtil::encodeBinary(const char* val, size_t
     if (size > 16)
         return boost::none;
 
-    char arr[16];
+    char arr[16] = {};
     memcpy(arr, val, size);
-    memset(arr + size, 0, sizeof(arr) - size);
     return encodeCharArray(arr);
 }
 
