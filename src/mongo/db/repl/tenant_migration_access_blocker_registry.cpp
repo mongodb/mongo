@@ -69,7 +69,7 @@ void TenantMigrationAccessBlockerRegistry::_remove(WithLock, StringData tenantId
         return;
     }
 
-    auto mtabPair = it->second;
+    auto& mtabPair = it->second;
     mtabPair.clearAccessBlocker(type);
     if (!mtabPair.getAccessBlocker(MtabType::kDonor) &&
         !mtabPair.getAccessBlocker(MtabType::kRecipient)) {
