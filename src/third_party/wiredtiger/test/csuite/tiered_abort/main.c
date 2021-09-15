@@ -285,7 +285,7 @@ thread_run(void *arg)
     uint64_t i, active_ts;
     char cbuf[MAX_VAL], lbuf[MAX_VAL], obuf[MAX_VAL];
     char kname[64], tscfg[64], uri[128];
-    bool durable_ahead_commit, locked;
+    bool locked;
 
     __wt_random_init(&rnd);
     memset(cbuf, 0, sizeof(cbuf));
@@ -306,8 +306,6 @@ thread_run(void *arg)
      * up with partial lines.
      */
     __wt_stream_set_line_buffer(fp);
-
-    durable_ahead_commit = false;
 
     testutil_check(td->conn->open_session(td->conn, NULL, "isolation=snapshot", &session));
     /*
@@ -398,8 +396,7 @@ thread_run(void *arg)
         locked = false;
 
         /* Save the timestamps and key separately for checking later. */
-        if (fprintf(fp, "%" PRIu64 " %" PRIu64 " %" PRIu64 "\n", active_ts,
-              durable_ahead_commit ? active_ts + 4 : active_ts, i) < 0)
+        if (fprintf(fp, "%" PRIu64 " %" PRIu64 " %" PRIu64 "\n", active_ts, active_ts, i) < 0)
             testutil_die(EIO, "fprintf");
 
         if (0) {
