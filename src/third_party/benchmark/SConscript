@@ -12,7 +12,14 @@ if env.TargetOSIs('windows'):
 
     env.Append(LIBS=["ShLwApi"])
 
-env.Append(CPPDEFINES=["HAVE_STD_REGEX"])
+env.Append(
+    CPPDEFINES=["HAVE_STD_REGEX"],
+    CXXFLAGS=[
+        # TODO(SERVER-59996): Fix warnings with -Wstringop-truncation when possible
+        '-Wno-unknown-warning-option',
+        '-Wno-stringop-truncation',
+    ],
+)
 
 src_dir=env.Dir('dist/src')
 

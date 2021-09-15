@@ -53,6 +53,15 @@ env.Library(
 
 if usemozjs:
     scriptingEnv = env.Clone()
+
+    scriptingEnv.Append(
+        CXXFLAGS=[
+            # TODO(SERVER-59992): Remove -Wno-class-memacces where possible.
+            '-Wno-unknown-warning-option',
+            '-Wno-class-memaccess',
+        ],
+    )
+
     scriptingEnv.InjectMozJS()
 
     scriptingEnv.JSHeader(

@@ -7867,7 +7867,7 @@ buildvariants:
   display_name: "~ Shared Library Enterprise Ubuntu 21.04 clang12 DEBUG"
   expansions:
     <<: *enterprise-ubuntu2104-dynamic-gcc11-debug-experimental-expansions
-    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --link-model=dynamic CC=/usr/bin/clang-12 CXX=/usr/bin/clang++-12 --disable-warnings-as-errors
+    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --link-model=dynamic CC=/usr/bin/clang-12 CXX=/usr/bin/clang++-12
 
 - <<: *enterprise-ubuntu2104-dynamic-gcc11-debug-experimental-template
   name: enterprise-ubuntu2104-dynamic-gcc11-cxx20-debug-experimental
