@@ -82,7 +82,7 @@ SemiFuture<void> ReshardingOplogBatchApplier::applyBatch(
                        } else {
                            // ReshardingOpObserver depends on the collection metadata being known
                            // when processing writes to the temporary resharding collection. We
-                           // attach shard version IGNORED to the insert operations and retry once
+                           // attach shard version IGNORED to the write operations and retry once
                            // on a StaleConfig exception to allow the collection metadata
                            // information to be recovered.
                            auto& oss = OperationShardingState::get(opCtx.get());
