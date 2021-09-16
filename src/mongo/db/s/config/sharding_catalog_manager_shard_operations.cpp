@@ -395,20 +395,6 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
                               << " as a shard since it is a config server"};
     }
 
-    if (resIsMaster.hasField(HelloCommandReply::kIsImplicitDefaultMajorityWCFieldName) &&
-        !resIsMaster.getBoolField(HelloCommandReply::kIsImplicitDefaultMajorityWCFieldName) &&
-        !ReadWriteConcernDefaults::get(opCtx).isCWWCSet(opCtx)) {
-        return {
-            ErrorCodes::OperationFailed,
-            str::stream()
-                << "Cannot add " << connectionString.toString()
-                << " as a shard since the implicit default write concern on this shard is set to "
-                   "{w : 1}, because number of arbiters in the shard's configuration caused the "
-                   "number of writable voting members not to be strictly more than the voting "
-                   "majority. Change the shard configuration or set the cluster-wide write concern "
-                   "using the setDefaultRWConcern command and try again."};
-    }
-
     if (resIsMaster.hasField(HelloCommandReply::kCwwcFieldName)) {
         auto cwwcOnShard = WriteConcernOptions::parse(
                                resIsMaster.getObjectField(HelloCommandReply::kCwwcFieldName))

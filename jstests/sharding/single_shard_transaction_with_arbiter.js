@@ -17,9 +17,7 @@ const shardingTest = new ShardingTest({
         nodes: [
             {/* primary */},
             {/* secondary */ rsConfig: {priority: 0}},
-            {/* arbiter */ rsConfig: {arbiterOnly: true}},
-            {/* secondary */ rsConfig: {priority: 0}},
-            {/* secondary */ rsConfig: {priority: 0}},
+            {/* arbiter */ rsConfig: {arbiterOnly: true}}
         ]
     }
 });

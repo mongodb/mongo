@@ -53,9 +53,6 @@ primary = r.getPrimary();
 
 print("adding shard addshard42");
 
-// Setting CWWC for addShard to work, as implicitDefaultWC is set to w:1.
-assert.commandWorked(s.s.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
 result = s.adminCommand({"addshard": "addshard42/" + config.members[2].host});
 
 printjson(result);

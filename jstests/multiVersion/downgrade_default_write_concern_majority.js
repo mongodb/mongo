@@ -52,37 +52,21 @@ function testReplSet(CWWCSet, isPSASet) {
 }
 
 function testSharding(CWWCSet, isPSASet) {
-    if (!CWWCSet && isPSASet) {
-        // Cluster will fail to add the shard server if DWCF=w:1 and no CWWC set.
-        return;
-    }
-
     jsTestLog("Running sharding test with CWWCSet: " + tojson(CWWCSet) +
               ", isPSASet: " + tojson(isPSASet));
     let replSetNodes = 2;
     if (isPSASet) {
         replSetNodes = [{}, {}, {arbiter: true}];
     }
-
-    let shardServer = new ReplSetTest(
-        {name: "shardServer", nodes: replSetNodes, nodeOptions: {shardsvr: ""}, useHostName: true});
-    shardServer.startSet();
-    shardServer.initiate();
-
     const st = new ShardingTest({
-        shards: 0,
-        mongos: 1,
+        shards: {rs0: {nodes: replSetNodes}, rs1: {nodes: replSetNodes}},
+        mongos: {nodes: replSetNodes}
     });
-    var admin = st.getDB('admin');
 
     if (CWWCSet) {
         assert.commandWorked(st.s.adminCommand(
             {setDefaultRWConcern: 1, defaultWriteConcern: {w: "majority", wtimeout: 0}}));
     }
-
-    jsTestLog("Adding shard to the cluster should succeed.");
-    assert.commandWorked(admin.runCommand({addshard: shardServer.getURL()}));
-
     let res = st.s.adminCommand({getDefaultRWConcern: 1});
     assert.eq(res.defaultWriteConcern, {w: "majority", wtimeout: 0});
     const defaultWriteConcernSource = CWWCSet ? "global" : "implicit";
@@ -100,7 +84,6 @@ function testSharding(CWWCSet, isPSASet) {
     }
     assert(!res.defaultWriteConcernSource);
     st.stop();
-    shardServer.stopSet();
 }
 
 for (const CWWCSet of [true, false]) {
