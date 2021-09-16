@@ -38,9 +38,11 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/s/auto_split_vector.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/request_types/auto_split_vector_gen.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/str.h"
 
@@ -93,28 +95,38 @@ StatusWith<std::vector<BSONObj>> selectChunkSplitPoints(OperationContext* opCtx,
                                                         const NamespaceString& nss,
                                                         const ShardKeyPattern& shardKeyPattern,
                                                         const ChunkRange& chunkRange,
-                                                        long long chunkSizeBytes,
-                                                        boost::optional<int> maxObjs) {
-    BSONObjBuilder cmd;
-    cmd.append("splitVector", nss.ns());
-    cmd.append("keyPattern", shardKeyPattern.toBSON());
-    chunkRange.append(&cmd);
-    cmd.append("maxChunkSizeBytes", chunkSizeBytes);
-    if (maxObjs) {
-        cmd.append("maxChunkObjects", *maxObjs);
-    }
-
+                                                        long long chunkSizeBytes) {
     auto shardStatus = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId);
     if (!shardStatus.isOK()) {
         return shardStatus.getStatus();
     }
 
-    auto cmdStatus = shardStatus.getValue()->runCommandWithFixedRetryAttempts(
-        opCtx,
-        ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
-        "admin",
-        cmd.obj(),
-        Shard::RetryPolicy::kIdempotent);
+    auto invokeSplitCommand = [&](const BSONObj& command, const StringData db) {
+        return shardStatus.getValue()->runCommandWithFixedRetryAttempts(
+            opCtx,
+            ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
+            db.toString(),
+            command,
+            Shard::RetryPolicy::kIdempotent);
+    };
+
+    const AutoSplitVectorRequest req(
+        nss, shardKeyPattern.toBSON(), chunkRange.getMin(), chunkRange.getMax(), chunkSizeBytes);
+
+    auto cmdStatus = invokeSplitCommand(req.toBSON({}), nss.db());
+
+    // Fallback to splitVector command in case of mixed binaries not supporting autoSplitVector
+    // TODO SERVER-xyz remove fallback logic once 6.0 branches out
+    bool fallback =
+        !cmdStatus.isOK() && cmdStatus.getStatus().code() == ErrorCodes::CommandNotFound;
+    if (fallback) {
+        BSONObjBuilder cmd;
+        cmd.append("splitVector", nss.ns());
+        cmd.append("keyPattern", shardKeyPattern.toBSON());
+        cmd.append("maxChunkSizeBytes", chunkSizeBytes);
+        cmdStatus = invokeSplitCommand(cmd.obj(), NamespaceString::kAdminDb);
+    }
+
     if (!cmdStatus.isOK()) {
         return std::move(cmdStatus.getStatus());
     }
@@ -122,16 +134,21 @@ StatusWith<std::vector<BSONObj>> selectChunkSplitPoints(OperationContext* opCtx,
         return std::move(cmdStatus.getValue().commandStatus);
     }
 
-    const auto response = std::move(cmdStatus.getValue().response);
+    // TODO SERVER-xyz remove fallback logic once 6.0 branches out
+    if (fallback) {
+        const auto response = std::move(cmdStatus.getValue().response);
+        std::vector<BSONObj> splitPoints;
 
-    std::vector<BSONObj> splitPoints;
-
-    BSONObjIterator it(response.getObjectField("splitKeys"));
-    while (it.more()) {
-        splitPoints.push_back(it.next().Obj().getOwned());
+        BSONObjIterator it(response.getObjectField("splitKeys"));
+        while (it.more()) {
+            splitPoints.push_back(it.next().Obj().getOwned());
+        }
+        return std::move(splitPoints);
     }
 
-    return std::move(splitPoints);
+    const auto response = AutoSplitVectorResponse::parse(
+        IDLParserErrorContext("AutoSplitVectorResponse"), std::move(cmdStatus.getValue().response));
+    return response.getSplitKeys();
 }
 
 StatusWith<boost::optional<ChunkRange>> splitChunkAtMultiplePoints(

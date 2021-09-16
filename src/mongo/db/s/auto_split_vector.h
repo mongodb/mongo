@@ -80,4 +80,23 @@ std::vector<BSONObj> autoSplitVector(OperationContext* opCtx,
                                      const BSONObj& max,
                                      long long maxChunkSizeBytes);
 
+/*
+ * Utility function for deserializing autoSplitVector/splitVector responses.
+ */
+static std::vector<BSONObj> parseSplitKeys(const BSONElement& splitKeysArray) {
+    uassert(ErrorCodes::TypeMismatch,
+            "The split keys vector must be represented as a BSON array",
+            !splitKeysArray.eoo() && splitKeysArray.type() == BSONType::Array);
+
+    std::vector<BSONObj> splitKeys;
+    for (const auto& elem : splitKeysArray.Obj()) {
+        uassert(ErrorCodes::TypeMismatch,
+                "Each element of the split keys array must be an object",
+                elem.type() == BSONType::Object);
+        splitKeys.push_back(elem.embeddedObject().getOwned());
+    }
+
+    return splitKeys;
+}
+
 }  // namespace mongo
