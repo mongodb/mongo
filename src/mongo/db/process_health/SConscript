@@ -15,8 +15,13 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/executor/network_interface',
+        '$BUILD_DIR/mongo/executor/network_interface_factory',
+        '$BUILD_DIR/mongo/executor/network_interface_thread_pool',
+        '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/process_health_feature_flag',
     ],
 )
 
@@ -31,6 +36,9 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/executor/network_interface_mock',
+        '$BUILD_DIR/mongo/executor/task_executor_test_fixture',
+        '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
         '$BUILD_DIR/mongo/util/clock_source_mock',
         'fault_manager',
     ],

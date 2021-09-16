@@ -37,6 +37,10 @@ namespace process_health {
 HealthObserverBase::HealthObserverBase(ClockSource* clockSource) : _clockSource(clockSource) {}
 
 void HealthObserverBase::periodicCheck(FaultFacetsContainerFactory& factory) {
+    if (getIntensity() == HealthObserverIntensity::kOff) {
+        return;
+    }
+
     // Before invoking the implementation callback, we need to find out if
     // there is an ongoing fault of this kind.
     FaultFacetPtr optionalExistingFacet;
@@ -63,6 +67,10 @@ void HealthObserverBase::periodicCheck(FaultFacetsContainerFactory& factory) {
     invariant(optionalExistingContainer);
 
     optionalExistingContainer->updateWithSuppliedFacet(getType(), optionalExistingFacet);
+}
+
+HealthObserverIntensity HealthObserverBase::getIntensity() {
+    return _intensity;
 }
 
 }  // namespace process_health

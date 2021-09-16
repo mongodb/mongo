@@ -34,9 +34,14 @@
 
 #include "mongo/db/process_health/health_observer_mock.h"
 #include "mongo/db/process_health/health_observer_registration.h"
+#include "mongo/executor/thread_pool_task_executor_test_fixture.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+
+using executor::TaskExecutor;
+using executor::ThreadPoolExecutorTest;
 
 namespace process_health {
 
@@ -48,7 +53,9 @@ namespace test {
  */
 class FaultManagerTestImpl : public FaultManager {
 public:
-    FaultManagerTestImpl(ServiceContext* svcCtx) : FaultManager(svcCtx) {}
+    FaultManagerTestImpl(ServiceContext* svcCtx,
+                         std::shared_ptr<executor::TaskExecutor> taskExecutor)
+        : FaultManager(svcCtx, taskExecutor) {}
 
     Status transitionStateTest(FaultState newState) {
         return transitionToState(newState);
@@ -79,6 +86,10 @@ public:
         invariant(fault);
         return *(static_cast<FaultInternal*>(fault.get()));
     }
+
+    void schedulePeriodicHealthCheckThreadTest() {
+        schedulePeriodicHealthCheckThread();
+    }
 };
 
 /**
@@ -87,13 +98,25 @@ public:
 class FaultManagerTest : public unittest::Test {
 public:
     void setUp() override {
+        RAIIServerParameterControllerForTest _controller{"featureFlagHealthMonitoring", true};
+        init();
+    }
+
+    void init() {
         _svcCtx = ServiceContext::make();
         _svcCtx->setFastClockSource(std::make_unique<ClockSourceMock>());
         resetManager();
     }
 
     void resetManager() {
-        FaultManager::set(_svcCtx.get(), std::make_unique<FaultManagerTestImpl>(_svcCtx.get()));
+        // Construct task executor
+        auto network = std::make_unique<executor::NetworkInterfaceMock>();
+        _net = network.get();
+        auto executor = makeSharedThreadPoolTestExecutor(std::move(network));
+        executor->startup();
+
+        FaultManager::set(_svcCtx.get(),
+                          std::make_unique<FaultManagerTestImpl>(_svcCtx.get(), executor));
     }
 
     void registerMockHealthObserver(FaultFacetType mockType,
@@ -112,8 +135,28 @@ public:
         return *static_cast<ClockSourceMock*>(_svcCtx->getFastClockSource());
     }
 
+    template <typename Duration>
+    void advanceTime(Duration d) {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(_net);
+        _net->advanceTime(_net->now() + d);
+    }
+
 private:
     ServiceContext::UniqueServiceContext _svcCtx;
+    executor::NetworkInterfaceMock* _net;
+};
+
+class FaultManagerTestNoPeriodicThread : public FaultManagerTest {
+public:
+    void setUp() override {
+        init();
+    }
+
+    void startHealthCheckThread() {
+        RAIIServerParameterControllerForTest _controller{"featureFlagHealthMonitoring", true};
+        manager().schedulePeriodicHealthCheckThreadTest();
+        advanceTime(Milliseconds(60));
+    }
 };
 
 }  // namespace test

@@ -41,14 +41,15 @@ namespace process_health {
 
 // Using the common fault manager test suite.
 using test::FaultManagerTest;
+using test::FaultManagerTestNoPeriodicThread;
 
 namespace {
 
-class FaultManagerTestWithObserversReset : public FaultManagerTest {
+class FaultManagerTestWithObserversReset : public FaultManagerTestNoPeriodicThread {
 public:
     void setUp() override {
         HealthObserverRegistration::resetObserverFactoriesForTest();
-        FaultManagerTest::setUp();
+        FaultManagerTestNoPeriodicThread::setUp();
     }
 };
 
@@ -68,34 +69,33 @@ TEST_F(FaultManagerTestWithObserversReset, HealthCheckCreatesObservers) {
     ASSERT_EQ(0, manager().getHealthObserversTest().size());
 
     // Trigger periodic health check.
-    manager().healthCheckTest();
+    startHealthCheckThread();
     ASSERT_EQ(1, manager().getHealthObserversTest().size());
 }
 
 TEST_F(FaultManagerTestWithObserversReset, HealthCheckCreatesFacetOnHealthCheckFoundFault) {
     registerMockHealthObserver(FaultFacetType::kMock1, [] { return 0.1; });
-    auto activeFault = manager().activeFault();
-    ASSERT_TRUE(!activeFault);  // Not created yet.
+    startHealthCheckThread();
 
-    manager().healthCheckTest();
-    activeFault = manager().activeFault();
-    ASSERT_TRUE(activeFault);  // Is created.
+    auto currentFault = manager().currentFault();
+    ASSERT_TRUE(currentFault);  // Is created.
 }
+
 
 TEST_F(FaultManagerTestWithObserversReset, StateTransitionOnHealthCheckFoundFault) {
     registerMockHealthObserver(FaultFacetType::kMock1, [] { return 0.1; });
     ASSERT_EQ(FaultState::kStartupCheck, manager().getFaultState());
 
-    manager().healthCheckTest();
+    startHealthCheckThread();
     ASSERT_EQ(FaultState::kTransientFault, manager().getFaultState());
 }
 
 TEST_F(FaultManagerTestWithObserversReset, HealthCheckCreatesCorrectFacetOnHealthCheckFoundFault) {
     registerMockHealthObserver(FaultFacetType::kMock1, [] { return 0.1; });
     registerMockHealthObserver(FaultFacetType::kMock2, [] { return 0.0; });
-    manager().healthCheckTest();
-    auto activeFault = manager().activeFault();
-    ASSERT_TRUE(activeFault);  // Is created.
+    startHealthCheckThread();
+    auto currentFault = manager().currentFault();
+    ASSERT_TRUE(currentFault);  // Is created.
 
     FaultInternal& internalFault = manager().getFault();
     ASSERT_TRUE(internalFault.getFaultFacet(FaultFacetType::kMock1));
@@ -105,33 +105,33 @@ TEST_F(FaultManagerTestWithObserversReset, HealthCheckCreatesCorrectFacetOnHealt
 TEST_F(FaultManagerTestWithObserversReset, SeverityIsMaxFromAllFacetsSeverity) {
     registerMockHealthObserver(FaultFacetType::kMock1, [] { return 0.8; });
     registerMockHealthObserver(FaultFacetType::kMock2, [] { return 0.5; });
-    manager().healthCheckTest();
-    auto activeFault = manager().activeFault();
+    startHealthCheckThread();
+    auto currentFault = manager().currentFault();
 
-    ASSERT_APPROX_EQUAL(0.8, activeFault->getSeverity(), 0.001);
+    ASSERT_APPROX_EQUAL(0.8, currentFault->getSeverity(), 0.001);
 }
 
 TEST_F(FaultManagerTestWithObserversReset, HealthCheckCreatesFacetThenIsGarbageCollected) {
     AtomicDouble severity{0.1};
     registerMockHealthObserver(FaultFacetType::kMock1, [&severity] { return severity.load(); });
-    manager().healthCheckTest();
-    ASSERT_TRUE(manager().activeFault());  // Is created.
+    startHealthCheckThread();
+    ASSERT_TRUE(manager().currentFault());  // Is created.
 
     // Resolve and it should be garbage collected.
     severity.store(0.0);
-    manager().healthCheckTest();
-    ASSERT_FALSE(manager().activeFault());
+    advanceTime(Milliseconds(60));
+    ASSERT_FALSE(manager().currentFault());
 }
 
 TEST_F(FaultManagerTestWithObserversReset, StateTransitionOnGarbageCollection) {
     AtomicDouble severity{0.1};
     registerMockHealthObserver(FaultFacetType::kMock1, [&severity] { return severity.load(); });
-    manager().healthCheckTest();
+    startHealthCheckThread();
     ASSERT_EQ(FaultState::kTransientFault, manager().getFaultState());
 
     // Resolve, it should be garbage collected and the state should change.
     severity.store(0.0);
-    manager().healthCheckTest();
+    advanceTime(Milliseconds(60));
     ASSERT_EQ(FaultState::kOk, manager().getFaultState());
 }
 
@@ -140,7 +140,7 @@ TEST_F(FaultManagerTestWithObserversReset, HealthCheckCreates2FacetsThenIsGarbag
     AtomicDouble severity2{0.1};
     registerMockHealthObserver(FaultFacetType::kMock1, [&severity1] { return severity1.load(); });
     registerMockHealthObserver(FaultFacetType::kMock2, [&severity2] { return severity2.load(); });
-    manager().healthCheckTest();
+    startHealthCheckThread();
 
     FaultInternal& internalFault = manager().getFault();
     ASSERT_TRUE(internalFault.getFaultFacet(FaultFacetType::kMock1));
@@ -148,9 +148,30 @@ TEST_F(FaultManagerTestWithObserversReset, HealthCheckCreates2FacetsThenIsGarbag
 
     // Resolve one facet and it should be garbage collected.
     severity1.store(0.0);
-    manager().healthCheckTest();
+    advanceTime(Milliseconds(60));
     ASSERT_FALSE(internalFault.getFaultFacet(FaultFacetType::kMock1));
     ASSERT_TRUE(internalFault.getFaultFacet(FaultFacetType::kMock2));
+}
+
+TEST_F(FaultManagerTestWithObserversReset, HealthCheckWithOffFacetCreatesNoFault) {
+    registerMockHealthObserver(FaultFacetType::kMock1, [] { return 0.0; });
+    startHealthCheckThread();
+    auto currentFault = manager().currentFault();
+    ASSERT_TRUE(!currentFault);  // Is not created.
+}
+
+TEST_F(FaultManagerTestWithObserversReset, HealthCheckWithNonCriticalFacetCreatesFault) {
+    registerMockHealthObserver(FaultFacetType::kMock1, [] { return 0.1; });
+    startHealthCheckThread();
+    auto currentFault = manager().currentFault();
+    ASSERT_TRUE(currentFault);
+}
+
+TEST_F(FaultManagerTestWithObserversReset, HealthCheckWithCriticalFacetCreatesFault) {
+    registerMockHealthObserver(FaultFacetType::kMock1, [] { return 1.1; });
+    startHealthCheckThread();
+    auto currentFault = manager().currentFault();
+    ASSERT_TRUE(currentFault);
 }
 
 }  // namespace

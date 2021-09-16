@@ -29,10 +29,18 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kProcessHealth
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/process_health/fault_manager.h"
 
 #include "mongo/db/process_health/fault_impl.h"
+#include "mongo/db/process_health/health_monitoring_gen.h"
 #include "mongo/db/process_health/health_observer_registration.h"
+#include "mongo/executor/network_interface_factory.h"
+#include "mongo/executor/network_interface_thread_pool.h"
+#include "mongo/executor/task_executor.h"
+#include "mongo/executor/task_executor_pool.h"
+#include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
@@ -45,12 +53,21 @@ const auto sFaultManager = ServiceContext::declareDecoration<std::unique_ptr<Fau
 
 ServiceContext::ConstructorActionRegisterer faultManagerRegisterer{
     "FaultManagerRegisterer", [](ServiceContext* svcCtx) {
-        auto faultManager = std::make_unique<FaultManager>(svcCtx);
+        // construct task executor
+        std::shared_ptr<executor::NetworkInterface> networkInterface =
+            executor::makeNetworkInterface("FaultManager-TaskExecutor");
+        auto pool = std::make_unique<executor::NetworkInterfaceThreadPool>(networkInterface.get());
+        auto taskExecutor =
+            std::make_shared<executor::ThreadPoolTaskExecutor>(std::move(pool), networkInterface);
+        taskExecutor->startup();
+
+        auto faultManager = std::make_unique<FaultManager>(svcCtx, taskExecutor);
         FaultManager::set(svcCtx, std::move(faultManager));
     }};
 
 }  // namespace
 
+static constexpr auto kPeriodicHealthCheckInterval{Milliseconds(50)};
 
 FaultManager* FaultManager::get(ServiceContext* svcCtx) {
     return sFaultManager(svcCtx).get();
@@ -62,16 +79,48 @@ void FaultManager::set(ServiceContext* svcCtx, std::unique_ptr<FaultManager> new
     faultManager = std::move(newFaultManager);
 }
 
-FaultManager::FaultManager(ServiceContext* svcCtx) : _svcCtx(svcCtx) {}
+FaultManager::FaultManager(ServiceContext* svcCtx,
+                           std::shared_ptr<executor::TaskExecutor> taskExecutor)
+    : _svcCtx(svcCtx), _taskExecutor(taskExecutor) {
+    schedulePeriodicHealthCheckThread();
+}
 
-FaultManager::~FaultManager() {}
+void FaultManager::schedulePeriodicHealthCheckThread() {
+    if (!feature_flags::gFeatureFlagHealthMonitoring.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        return;
+    }
+
+    auto lk = stdx::lock_guard(_mutex);
+
+    auto periodicThreadCbHandleStatus = _taskExecutor->scheduleWorkAt(
+        _taskExecutor->now() + kPeriodicHealthCheckInterval,
+        [=](const mongo::executor::TaskExecutor::CallbackArgs& cbData) {
+            if (!cbData.status.isOK()) {
+                return;
+            }
+
+            healthCheck();
+        });
+
+    uassert(5936101,
+            "Failed to initialize periodic health check work.",
+            periodicThreadCbHandleStatus.isOK());
+    _periodicHealthCheckCbHandle = periodicThreadCbHandleStatus.getValue();
+}
+
+FaultManager::~FaultManager() {
+    if (_periodicHealthCheckCbHandle) {
+        _taskExecutor->cancel(*_periodicHealthCheckCbHandle);
+    }
+}
 
 FaultState FaultManager::getFaultState() const {
     stdx::lock_guard<Latch> lk(_stateMutex);
     return _currentState;
 }
 
-FaultConstPtr FaultManager::activeFault() const {
+FaultConstPtr FaultManager::currentFault() const {
     auto lk = stdx::lock_guard(_mutex);
     return std::static_pointer_cast<const Fault>(_fault);
 }
@@ -93,6 +142,8 @@ FaultFacetsContainerPtr FaultManager::getOrCreateFaultFacetsContainer() {
 void FaultManager::healthCheck() {
     // One time init.
     _initHealthObserversIfNeeded();
+
+    ON_BLOCK_EXIT([this] { schedulePeriodicHealthCheckThread(); });
 
     std::vector<HealthObserver*> observers = FaultManager::getHealthObservers();
 
@@ -123,7 +174,7 @@ void FaultManager::healthCheck() {
 
 void FaultManager::checkForStateTransition() {
     Status status = Status::OK();
-    FaultConstPtr fault = activeFault();
+    FaultConstPtr fault = currentFault();
     if (fault && !HealthCheckStatus::isResolved(fault->getSeverity())) {
         status = processFaultExistsEvent();
     } else if (!fault || HealthCheckStatus::isResolved(fault->getSeverity())) {

@@ -70,6 +70,16 @@ protected:
         return optionalExistingFacet;
     }
 
+    HealthObserverIntensity getIntensity() override {
+        if (_getSeverityCallback() >= 1.0) {
+            return HealthObserverIntensity::kCritical;
+        } else if (_getSeverityCallback() > 0.0) {
+            return HealthObserverIntensity::kNonCritical;
+        }
+
+        return HealthObserverIntensity::kOff;
+    }
+
 private:
     const FaultFacetType _mockType;
     std::function<double()> _getSeverityCallback;
