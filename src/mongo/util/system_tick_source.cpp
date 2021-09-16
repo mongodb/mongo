@@ -72,8 +72,6 @@ TickSource::Tick _timerNowGeneric() {
 // Overridden in initTickSource() with better implementation where available.
 TickSource::Tick (*_timerNow)() = &_timerNowGeneric;
 
-SystemTickSource globalSystemTickSource;
-
 #if defined(_WIN32)
 
 /**

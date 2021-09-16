@@ -164,7 +164,7 @@ void BinDataInfo::Functions::toString::call(JSContext* cx, JS::CallArgs args) {
     auto str = getEncoded(args.thisv());
 
     str::stream ss;
-    auto binType = o.getNumber(InternedString::type);
+    auto binType = o.getNumberInt(InternedString::type);
 
     if (binType == newUUID) {
         auto decoded = mongo::base64::decode(*str);

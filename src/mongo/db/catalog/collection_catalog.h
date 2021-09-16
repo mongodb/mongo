@@ -89,8 +89,8 @@ public:
          * Equality operators == and != do not attempt to reposition the iterators being compared.
          * The behavior for comparing invalid iterators is undefined.
          */
-        bool operator==(const iterator& other);
-        bool operator!=(const iterator& other);
+        bool operator==(const iterator& other) const;
+        bool operator!=(const iterator& other) const;
 
     private:
         bool _exhausted();
@@ -118,7 +118,7 @@ public:
 
         ProfileSettings() = default;
 
-        bool operator==(const ProfileSettings& other) {
+        bool operator==(const ProfileSettings& other) const {
             return level == other.level && filter == other.filter;
         }
     };

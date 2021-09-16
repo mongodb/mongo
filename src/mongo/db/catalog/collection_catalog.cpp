@@ -376,7 +376,7 @@ CollectionCatalog::iterator CollectionCatalog::iterator::operator++(int) {
     return oldPosition;
 }
 
-bool CollectionCatalog::iterator::operator==(const iterator& other) {
+bool CollectionCatalog::iterator::operator==(const iterator& other) const {
     invariant(_catalog == other._catalog);
     if (other._mapIter == _catalog->_orderedCollections.end()) {
         return _uuid == boost::none;
@@ -385,7 +385,7 @@ bool CollectionCatalog::iterator::operator==(const iterator& other) {
     return _uuid == other._uuid;
 }
 
-bool CollectionCatalog::iterator::operator!=(const iterator& other) {
+bool CollectionCatalog::iterator::operator!=(const iterator& other) const {
     return !(*this == other);
 }
 

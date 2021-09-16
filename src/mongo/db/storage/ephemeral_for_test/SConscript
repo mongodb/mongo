@@ -4,6 +4,16 @@ Import("env")
 
 env = env.Clone()
 
+env.Append(
+    # TODO(SERVER-60031): Remove these warning suppressions once
+    # RadixStore::radix_iterator declares its [in]equality methods as
+    # const.
+    CXXFLAGS=[] if not env.ToolchainIs('clang') else [
+        '-Wno-unknown-warning-option',
+        '-Wno-ambiguous-reversed-operator',
+    ],
+)
+
 env.Library(
     target='storage_ephemeral_for_test_core',
     source=[
