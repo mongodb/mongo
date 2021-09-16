@@ -535,6 +535,32 @@ public:
         }
     }
 
+    /**
+     * Returns a vector of ValueHandles for all of the entries that satisfy matchPredicate.
+     */
+    template <typename Pred>
+    std::vector<ValueHandle> getEntriesIf(Pred matchPredicate) {
+        std::vector<ValueHandle> entries;
+        entries.reserve(_cache.size() + _evictedCheckedOutValues.size());
+        {
+            stdx::lock_guard lg(_mutex);
+            for (const auto& entry : _cache) {
+                if (matchPredicate(entry.first, &entry.second->value)) {
+                    entries.push_back(ValueHandle(entry.second));
+                }
+            }
+
+            for (const auto& entry : _evictedCheckedOutValues) {
+                if (auto storedValue = entry.second.lock()) {
+                    if (matchPredicate(entry.first, &storedValue->value)) {
+                        entries.push_back(ValueHandle(std::move(storedValue)));
+                    }
+                }
+            }
+        }
+        return entries;
+    }
+
     struct CachedItemInfo {
         Key key;            // The key of the item in the cache
         long int useCount;  // The number of callers of 'get', which still have the item checked-out

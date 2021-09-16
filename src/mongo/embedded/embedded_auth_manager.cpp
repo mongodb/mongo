@@ -124,6 +124,10 @@ public:
         UASSERT_NOT_IMPLEMENTED;
     }
 
+    Status refreshExternalUsers(OperationContext* opCtx) override {
+        UASSERT_NOT_IMPLEMENTED;
+    }
+
     Status initialize(OperationContext* opCtx) override {
         UASSERT_NOT_IMPLEMENTED;
     }

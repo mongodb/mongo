@@ -245,6 +245,8 @@ public:
      */
     Status validateRestrictions(OperationContext* opCtx) const;
 
+    bool hasDifferentRoles(const User& otherUser) const;
+
 private:
     // Unique ID (often UUID) for this user. May be empty for legacy users.
     UserId _id;
