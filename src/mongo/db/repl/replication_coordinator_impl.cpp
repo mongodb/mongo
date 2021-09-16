@@ -4554,7 +4554,6 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig(WithLock lk,
     if (!oldConfig.isInitialized()) {
         // We allow the IDWC to be set only once after initial configuration is loaded.
         _setImplicitDefaultWriteConcern(opCtx, lk);
-        _validateDefaultWriteConcernOnShardStartup(lk);
     } else {
         // If 'enableDefaultWriteConcernUpdatesForInitiate' is enabled, we allow the IDWC to be
         // recalculated after a reconfig. However, this logic is only relevant for testing,

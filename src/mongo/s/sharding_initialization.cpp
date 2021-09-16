@@ -230,8 +230,6 @@ Status waitForShardRegistryReload(OperationContext* opCtx) {
         try {
             uassertStatusOK(ClusterIdentityLoader::get(opCtx)->loadClusterId(
                 opCtx, repl::ReadConcernLevel::kMajorityReadConcern));
-            // Assert will be raised on failure to talk to config server.
-            loadCWWCFromConfigServerForReplication(opCtx);
             if (Grid::get(opCtx)->shardRegistry()->isUp()) {
                 return Status::OK();
             }
