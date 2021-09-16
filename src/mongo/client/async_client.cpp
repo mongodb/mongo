@@ -98,7 +98,7 @@ BSONObj AsyncDBClient::_buildIsMasterRequest(const std::string& appName,
     }
 
     if (hook) {
-        return hook->augmentIsMasterRequest(bob.obj());
+        return hook->augmentIsMasterRequest(remote(), bob.obj());
     } else {
         return bob.obj();
     }
@@ -192,6 +192,7 @@ Future<void> AsyncDBClient::authenticateInternal(
 #endif
 
     return auth::authenticateInternalClient(clientName,
+                                            remote(),
                                             mechanismHint,
                                             auth::StepDownBehavior::kKillConnection,
                                             _makeAuthRunCommandHook(),

@@ -147,6 +147,7 @@ Future<void> authenticateClient(const BSONObj& params,
  */
 Future<void> authenticateInternalClient(
     const std::string& clientSubjectName,
+    const HostAndPort& remote,
     boost::optional<std::string> mechanismHint,
     StepDownBehavior stepDownBehavior,
     RunCommandHook runCommand,
@@ -205,7 +206,8 @@ SpeculativeAuthType speculateAuth(BSONObjBuilder* isMasterRequest,
  * Constructs a "speculativeAuthenticate" or "speculativeSaslStart"
  * payload for an isMaster request using internal (intracluster) authentication.
  */
-SpeculativeAuthType speculateInternalAuth(BSONObjBuilder* isMasterRequest,
+SpeculativeAuthType speculateInternalAuth(const HostAndPort& remoteHost,
+                                          BSONObjBuilder* isMasterRequest,
                                           std::shared_ptr<SaslClientSession>* saslClientSession);
 
 }  // namespace auth

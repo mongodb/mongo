@@ -428,10 +428,13 @@ Status DBClientBase::authenticateInternalUser(auth::StepDownBehavior stepDownBeh
 #endif
 
     auto authProvider = auth::createDefaultInternalAuthProvider();
-    auto status =
-        auth::authenticateInternalClient(
-            clientName, boost::none, stepDownBehavior, _makeAuthRunCommandHook(), authProvider)
-            .getNoThrow();
+    auto status = auth::authenticateInternalClient(clientName,
+                                                   HostAndPort(getServerAddress()),
+                                                   boost::none,
+                                                   stepDownBehavior,
+                                                   _makeAuthRunCommandHook(),
+                                                   authProvider)
+                      .getNoThrow();
     if (status.isOK()) {
         return status;
     }

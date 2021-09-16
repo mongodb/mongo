@@ -1289,11 +1289,11 @@ env.Library(
         "tenant_migration_server_status_section.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/commands/server_status',
         "repl_server_parameters",
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/base",
+        '$BUILD_DIR/mongo/db/commands/server_status_core',
     ],
 )
 

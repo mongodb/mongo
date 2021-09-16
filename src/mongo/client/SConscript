@@ -128,6 +128,7 @@ saslClientEnv.Library(
         "sasl_aws_client" if get_option('ssl') == 'on' else '',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/util/net/http_client',
     ],
     SYSLIBDEPS=saslLibs,
