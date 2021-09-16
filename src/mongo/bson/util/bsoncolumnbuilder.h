@@ -45,6 +45,7 @@ namespace mongo {
 class BSONColumnBuilder {
 public:
     BSONColumnBuilder(StringData fieldName);
+    BSONColumnBuilder(StringData fieldName, BufBuilder&& builder);
     BSONColumnBuilder(BSONColumnBuilder&&) = delete;
 
     /**
@@ -83,6 +84,12 @@ public:
      * The BSONColumnBuilder must remain in scope for the pointer to be valid.
      */
     BSONBinData finalize();
+
+    /**
+     * Detaches the buffer associated with this BSONColumnBuilder. Allows the memory to be reused
+     * for building another BSONColumn.
+     */
+    BufBuilder detach();
 
 private:
     BSONElement _previous() const;

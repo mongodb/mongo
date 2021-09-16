@@ -79,7 +79,8 @@ repl::OpTime opTimeParser(BSONElement elem);
 
 class UpdateModification {
 public:
-    enum class Type { kClassic, kPipeline, kDelta };
+    enum class Type { kClassic, kPipeline, kDelta, kTransform };
+    using TransformFunc = std::function<boost::optional<BSONObj>(const BSONObj&)>;
 
     /**
      * Used to indicate that a certain type of update is being passed to the constructor.
@@ -105,6 +106,8 @@ public:
     UpdateModification(BSONElement update);
     UpdateModification(std::vector<BSONObj> pipeline);
     UpdateModification(doc_diff::Diff, DiffOptions);
+    // Creates an transform-style update. The transform function MUST preserve the _id element.
+    UpdateModification(TransformFunc transform);
     // This constructor exists only to provide a fast-path for constructing classic-style updates.
     UpdateModification(const BSONObj& update, ClassicTag);
 
@@ -141,6 +144,11 @@ public:
         return stdx::get<DeltaUpdate>(_update).diff;
     }
 
+    const TransformFunc& getTransform() const {
+        invariant(type() == Type::kTransform);
+        return stdx::get<TransformUpdate>(_update).transform;
+    }
+
     bool mustCheckExistenceForInsertOperations() const {
         invariant(type() == Type::kDelta);
         return stdx::get<DeltaUpdate>(_update).options.mustCheckExistenceForInsertOperations;
@@ -149,19 +157,19 @@ public:
     std::string toString() const {
         StringBuilder sb;
 
-        stdx::visit(visit_helper::Overloaded{[&sb](const ClassicUpdate& classic) {
-                                                 sb << "{type: Classic, update: " << classic.bson
-                                                    << "}";
-                                             },
-                                             [&sb](const PipelineUpdate& pipeline) {
-                                                 sb << "{type: Pipeline, update: "
-                                                    << Value(pipeline).toString() << "}";
-                                             },
-                                             [&sb](const DeltaUpdate& delta) {
-                                                 sb << "{type: Delta, update: " << delta.diff
-                                                    << "}";
-                                             }},
-                    _update);
+        stdx::visit(
+            visit_helper::Overloaded{
+                [&sb](const ClassicUpdate& classic) {
+                    sb << "{type: Classic, update: " << classic.bson << "}";
+                },
+                [&sb](const PipelineUpdate& pipeline) {
+                    sb << "{type: Pipeline, update: " << Value(pipeline).toString() << "}";
+                },
+                [&sb](const DeltaUpdate& delta) {
+                    sb << "{type: Delta, update: " << delta.diff << "}";
+                },
+                [&sb](const TransformUpdate& transform) { sb << "{type: Transform}"; }},
+            _update);
 
         return sb.str();
     }
@@ -176,7 +184,10 @@ private:
         doc_diff::Diff diff;
         DiffOptions options;
     };
-    stdx::variant<ClassicUpdate, PipelineUpdate, DeltaUpdate> _update;
+    struct TransformUpdate {
+        TransformFunc transform;
+    };
+    stdx::variant<ClassicUpdate, PipelineUpdate, DeltaUpdate, TransformUpdate> _update;
 };
 
 }  // namespace write_ops

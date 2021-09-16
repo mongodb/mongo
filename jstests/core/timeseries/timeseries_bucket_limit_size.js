@@ -13,17 +13,21 @@
 load("jstests/core/timeseries/libs/timeseries.js");
 
 TimeseriesTest.run((insert) => {
+    const isTimeseriesBucketCompressionEnabled =
+        TimeseriesTest.timeseriesBucketCompressionEnabled(db);
+
     const collNamePrefix = 'timeseries_bucket_limit_size_';
 
     const timeFieldName = 'time';
 
     // Assumes each bucket has a limit of 125kB on the measurements stored in the 'data' field.
     const bucketMaxSizeKB = 125;
-    const numDocs = 2;
+    const numDocs = 3;
 
-    // The measurement data should not take up all of the 'bucketMaxSizeKB' limit because we need
-    // to leave a little room for the _id and the time fields.
-    const largeValue = 'x'.repeat((bucketMaxSizeKB - 1) * 1024);
+    // The measurement data should not take up all of the 'bucketMaxSizeKB' limit because we need to
+    // leave a little room for the _id and the time fields. We need to fit two measurements within
+    // this limit to trigger compression if enabled.
+    const largeValue = 'x'.repeat(((bucketMaxSizeKB - 1) / 2) * 1024);
 
     const runTest = function(numDocsPerInsert) {
         const coll = db.getCollection(collNamePrefix + numDocsPerInsert);
@@ -58,7 +62,7 @@ TimeseriesTest.run((insert) => {
         assert.eq(2, bucketDocs.length, bucketDocs);
 
         // Check both buckets.
-        // First bucket should be full with one document since we spill the second document over
+        // First bucket should be full with two documents since we spill the third document over
         // into the second bucket due to size constraints on 'data'.
         assert.eq(0,
                   bucketDocs[0].control.min._id,
@@ -66,12 +70,15 @@ TimeseriesTest.run((insert) => {
         assert.eq(largeValue,
                   bucketDocs[0].control.min.x,
                   'invalid control.min for x in first bucket: ' + tojson(bucketDocs[0].control));
-        assert.eq(0,
+        assert.eq(1,
                   bucketDocs[0].control.max._id,
                   'invalid control.max for _id in first bucket: ' + tojson(bucketDocs[0].control));
         assert.eq(largeValue,
                   bucketDocs[0].control.max.x,
                   'invalid control.max for x in first bucket: ' + tojson(bucketDocs[0].control));
+        assert.eq(isTimeseriesBucketCompressionEnabled ? 2 : 1,
+                  bucketDocs[0].control.version,
+                  'unexpected control.version in first bucket: ' + tojson(bucketDocs));
 
         // Second bucket should contain the remaining document.
         assert.eq(numDocs - 1,
@@ -86,6 +93,9 @@ TimeseriesTest.run((insert) => {
         assert.eq(largeValue,
                   bucketDocs[1].control.max.x,
                   'invalid control.max for x in second bucket: ' + tojson(bucketDocs[1].control));
+        assert.eq(1,
+                  bucketDocs[1].control.version,
+                  'unexpected control.version in first bucket: ' + tojson(bucketDocs));
     };
 
     runTest(1);

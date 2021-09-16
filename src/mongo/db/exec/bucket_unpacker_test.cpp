@@ -30,9 +30,9 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/bson/json.h"
-#include "mongo/bson/util/bsoncolumnbuilder.h"
 #include "mongo/db/exec/bucket_unpacker.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
+#include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -102,65 +102,6 @@ public:
         BSONObj obj = root.obj();
         return {obj, "time"_sd};
     }
-
-    // Simple bucket compressor. Does not handle data fields out of order and does not sort fields
-    // on time.
-    // TODO (SERVER-58578): Replace with real bucket compressor
-    BSONObj compress(BSONObj uncompressed, StringData timeField) {
-        // Rewrite data fields as columns.
-        BSONObjBuilder builder;
-        for (auto& elem : uncompressed) {
-            if (elem.fieldNameStringData() == "control") {
-                BSONObjBuilder control(builder.subobjStart("control"));
-
-                // Set right version, leave other control fields unchanged
-                for (const auto& controlField : elem.Obj()) {
-                    if (controlField.fieldNameStringData() == "version") {
-                        control.append("version", 2);
-                    } else {
-                        control.append(controlField);
-                    }
-                }
-
-                continue;
-            }
-            if (elem.fieldNameStringData() != "data") {
-                // Non-data fields can be unchanged.
-                builder.append(elem);
-                continue;
-            }
-
-            BSONObjBuilder dataBuilder = builder.subobjStart("data");
-            std::list<BSONColumnBuilder> columnBuilders;
-            size_t numTimeFields = 0;
-            for (auto& column : elem.Obj()) {
-                // Compress all data fields
-                columnBuilders.emplace_back(column.fieldNameStringData());
-                auto& columnBuilder = columnBuilders.back();
-
-                for (auto& measurement : column.Obj()) {
-                    int index = std::atoi(measurement.fieldName());
-                    for (int i = columnBuilder.size(); i < index; ++i) {
-                        columnBuilder.skip();
-                    }
-                    columnBuilder.append(measurement);
-                }
-                if (columnBuilder.fieldName() == timeField) {
-                    numTimeFields = columnBuilder.size();
-                }
-            }
-
-            for (auto& builder : columnBuilders) {
-                for (size_t i = builder.size(); i < numTimeFields; ++i) {
-                    builder.skip();
-                }
-
-                BSONBinData binData = builder.finalize();
-                dataBuilder.append(builder.fieldName(), binData);
-            }
-        }
-        return builder.obj();
-    }
 };
 
 TEST_F(BucketUnpackerTest, UnpackBasicIncludeAllMeasurementFields) {
@@ -212,7 +153,7 @@ TEST_F(BucketUnpackerTest, ExcludeASingleField) {
     };
 
     test(bucket);
-    test(compress(bucket, "time"_sd));
+    test(*timeseries::compressBucket(bucket, "time"_sd));
 }
 
 TEST_F(BucketUnpackerTest, EmptyIncludeGetsEmptyMeasurements) {
@@ -238,7 +179,7 @@ TEST_F(BucketUnpackerTest, EmptyIncludeGetsEmptyMeasurements) {
     };
 
     test(bucket);
-    test(compress(bucket, "time"_sd));
+    test(*timeseries::compressBucket(bucket, "time"_sd));
 }
 
 TEST_F(BucketUnpackerTest, EmptyExcludeMaterializesAllFields) {
@@ -266,7 +207,7 @@ TEST_F(BucketUnpackerTest, EmptyExcludeMaterializesAllFields) {
     };
 
     test(bucket);
-    test(compress(bucket, "time"_sd));
+    test(*timeseries::compressBucket(bucket, "time"_sd));
 }
 
 TEST_F(BucketUnpackerTest, SparseColumnsWhereOneColumnIsExhaustedBeforeTheOther) {
@@ -292,7 +233,7 @@ TEST_F(BucketUnpackerTest, SparseColumnsWhereOneColumnIsExhaustedBeforeTheOther)
     };
 
     test(bucket);
-    test(compress(bucket, "time"_sd));
+    test(*timeseries::compressBucket(bucket, "time"_sd));
 }
 
 TEST_F(BucketUnpackerTest, UnpackBasicIncludeWithDollarPrefix) {
@@ -321,7 +262,7 @@ TEST_F(BucketUnpackerTest, UnpackBasicIncludeWithDollarPrefix) {
     };
 
     test(bucket);
-    test(compress(bucket, "time"_sd));
+    test(*timeseries::compressBucket(bucket, "time"_sd));
 }
 
 TEST_F(BucketUnpackerTest, BucketsWithMetadataOnly) {
@@ -346,7 +287,7 @@ TEST_F(BucketUnpackerTest, BucketsWithMetadataOnly) {
     };
 
     test(bucket);
-    test(compress(bucket, "time"_sd));
+    test(*timeseries::compressBucket(bucket, "time"_sd));
 }
 
 TEST_F(BucketUnpackerTest, UnorderedRowKeysDoesntAffectMaterialization) {
@@ -404,7 +345,7 @@ TEST_F(BucketUnpackerTest, MissingMetaFieldDoesntMaterializeMetadata) {
     };
 
     test(bucket);
-    test(compress(bucket, "time"_sd));
+    test(*timeseries::compressBucket(bucket, "time"_sd));
 }
 
 TEST_F(BucketUnpackerTest, MissingMetaFieldDoesntMaterializeMetadataUnorderedKeys) {
@@ -459,7 +400,7 @@ TEST_F(BucketUnpackerTest, ExcludedMetaFieldDoesntMaterializeMetadataWhenBucketH
     };
 
     test(bucket);
-    test(compress(bucket, "time"_sd));
+    test(*timeseries::compressBucket(bucket, "time"_sd));
 }
 
 TEST_F(BucketUnpackerTest, UnpackerResetThrowsOnUndefinedMeta) {
@@ -478,7 +419,7 @@ TEST_F(BucketUnpackerTest, UnpackerResetThrowsOnUndefinedMeta) {
     };
 
     test(bucket);
-    test(compress(bucket, "time"_sd));
+    test(*timeseries::compressBucket(bucket, "time"_sd));
 }
 
 TEST_F(BucketUnpackerTest, UnpackerResetThrowsOnUnexpectedMeta) {
@@ -498,7 +439,7 @@ TEST_F(BucketUnpackerTest, UnpackerResetThrowsOnUnexpectedMeta) {
     };
 
     test(bucket);
-    test(compress(bucket, "time"_sd));
+    test(*timeseries::compressBucket(bucket, "time"_sd));
 }
 
 TEST_F(BucketUnpackerTest, NullMetaInBucketMaterializesAsNull) {
@@ -525,7 +466,7 @@ TEST_F(BucketUnpackerTest, NullMetaInBucketMaterializesAsNull) {
     };
 
     test(bucket);
-    test(compress(bucket, "time"_sd));
+    test(*timeseries::compressBucket(bucket, "time"_sd));
 }
 
 TEST_F(BucketUnpackerTest, GetNextHandlesMissingMetaInBucket) {
@@ -557,7 +498,7 @@ TEST_F(BucketUnpackerTest, GetNextHandlesMissingMetaInBucket) {
     };
 
     test(bucket);
-    test(compress(bucket, "time"_sd));
+    test(*timeseries::compressBucket(bucket, "time"_sd));
 }
 
 TEST_F(BucketUnpackerTest, EmptyDataRegionInBucketIsTolerated) {
@@ -576,7 +517,6 @@ TEST_F(BucketUnpackerTest, EmptyDataRegionInBucketIsTolerated) {
     };
 
     test(bucket);
-    test(compress(bucket, "time"_sd));
 }
 
 TEST_F(BucketUnpackerTest, UnpackerResetThrowsOnEmptyBucket) {

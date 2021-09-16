@@ -43,6 +43,7 @@
 #include "mongo/db/update/delta_executor.h"
 #include "mongo/db/update/modifier_table.h"
 #include "mongo/db/update/object_replace_executor.h"
+#include "mongo/db/update/object_transform_executor.h"
 #include "mongo/db/update/path_support.h"
 #include "mongo/db/update/storage_validation.h"
 #include "mongo/db/update/update_oplog_entry_version.h"
@@ -162,6 +163,18 @@ void UpdateDriver::parse(
 
         // Register the fact that this driver will only do full object replacements.
         _updateType = UpdateType::kReplacement;
+        return;
+    }
+
+    if (updateMod.type() == write_ops::UpdateModification::Type::kTransform) {
+        uassert(5857811, "multi update is not supported for transform-style update", !multi);
+
+        uassert(5857812,
+                "arrayFilters may not be specified for transform-syle updates",
+                arrayFilters.empty());
+
+        _updateType = UpdateType::kTransform;
+        _updateExecutor = std::make_unique<ObjectTransformExecutor>(updateMod.getTransform());
         return;
     }
 

@@ -66,6 +66,16 @@ public:
     };
 
     /**
+     * Information of a Bucket that got closed when performing an operation on this BucketCatalog.
+     */
+    struct ClosedBucket {
+        OID bucketId;
+        std::string timeField;
+        uint32_t numMeasurements;
+    };
+    using ClosedBuckets = std::vector<ClosedBucket>;
+
+    /**
      * The basic unit of work for a bucket. Each insert will return a shared_ptr to a WriteBatch.
      * When a writer is finished with all their insertions, they should then take steps to ensure
      * each batch they wrote into is committed. To ensure a batch is committed, a writer should
@@ -164,6 +174,15 @@ public:
         SharedPromise<CommitInfo> _promise;
     };
 
+    /**
+     * Return type for the insert function.
+     * See comment above insert() for more information.
+     */
+    struct InsertResult {
+        std::shared_ptr<WriteBatch> batch;
+        ClosedBuckets closedBuckets;
+    };
+
     static BucketCatalog& get(ServiceContext* svcCtx);
     static BucketCatalog& get(OperationContext* opCtx);
 
@@ -183,17 +202,16 @@ public:
     BSONObj getMetadata(Bucket* bucket) const;
 
     /**
-     * Returns the WriteBatch into which the document was inserted. Any caller who receives the same
-     * batch may commit or abort the batch after claiming commit rights. See WriteBatch for more
-     * details.
+     * Returns the WriteBatch into which the document was inserted and optional information about a
+     * bucket if one was closed. Any caller who receives the same batch may commit or abort the
+     * batch after claiming commit rights. See WriteBatch for more details.
      */
-    StatusWith<std::shared_ptr<WriteBatch>> insert(
-        OperationContext* opCtx,
-        const NamespaceString& ns,
-        const StringData::ComparatorInterface* comparator,
-        const TimeseriesOptions& options,
-        const BSONObj& doc,
-        CombineWithInsertsFromOtherClients combine);
+    StatusWith<InsertResult> insert(OperationContext* opCtx,
+                                    const NamespaceString& ns,
+                                    const StringData::ComparatorInterface* comparator,
+                                    const TimeseriesOptions& options,
+                                    const BSONObj& doc,
+                                    CombineWithInsertsFromOtherClients combine);
 
     /**
      * Prepares a batch for commit, transitioning it to an inactive state. Caller must already have
@@ -205,8 +223,10 @@ public:
     /**
      * Records the result of a batch commit. Caller must already have commit rights on batch, and
      * batch must have been previously prepared.
+     *
+     * Returns bucket information of a bucket if one was closed.
      */
-    void finish(std::shared_ptr<WriteBatch> batch, const CommitInfo& info);
+    boost::optional<ClosedBucket> finish(std::shared_ptr<WriteBatch> batch, const CommitInfo& info);
 
     /**
      * Aborts the given write batch and any other outstanding batches on the same bucket. Caller
@@ -342,9 +362,19 @@ public:
         const OID& id() const;
 
         /**
+         * Returns the timefield for the underlying bucket.
+         */
+        StringData getTimeField();
+
+        /**
          * Returns whether all measurements have been committed.
          */
         bool allCommitted() const;
+
+        /**
+         * Returns total number of measurements in the bucket.
+         */
+        uint32_t numMeasurements() const;
 
     private:
         /**
@@ -388,6 +418,9 @@ public:
 
         // Top-level field names of the measurements that have been inserted into the bucket.
         StringSet _fieldNames;
+
+        // Time field for the measurements that have been inserted into the bucket.
+        std::string _timeField;
 
         // The minimum and maximum values for each field in the bucket.
         timeseries::MinMax _minmax;
@@ -549,6 +582,7 @@ private:
                      BucketKey& key,
                      const TimeseriesOptions& options,
                      ExecutionStats* stats,
+                     ClosedBuckets* closedBuckets,
                      const Date_t& time);
         BucketAccess(BucketCatalog* catalog,
                      Bucket* bucket,
@@ -568,8 +602,11 @@ private:
          * Parameter is a function which should check that the bucket is indeed still full after
          * reacquiring the necessary locks. The first parameter will give the function access to
          * this BucketAccess instance, with the bucket locked.
+         *
+         * Returns bucket information of a bucket if one was closed.
          */
-        void rollover(const std::function<bool(BucketAccess*)>& isBucketFull);
+        void rollover(const std::function<bool(BucketAccess*)>& isBucketFull,
+                      ClosedBuckets* closedBuckets);
 
         // Retrieve the time associated with the bucket (id)
         Date_t getTime() const;
@@ -607,7 +644,8 @@ private:
         // Helper to find an open bucket for the given metadata if it exists, create it if it
         // doesn't, and lock it. Requires an exclusive lock on the catalog.
         void _findOrCreateOpenBucketThenLock(const HashedBucketKey& normalizedKey,
-                                             const HashedBucketKey& key);
+                                             const HashedBucketKey& key,
+                                             ClosedBuckets* closedBuckets);
 
         // Lock _bucket.
         void _acquire();
@@ -616,6 +654,7 @@ private:
         // a lock on it.
         void _create(const HashedBucketKey& normalizedKey,
                      const HashedBucketKey& key,
+                     ClosedBuckets* closedBuckets,
                      bool openedDuetoMetadata = true);
 
         BucketCatalog* _catalog;
@@ -675,7 +714,7 @@ private:
     /**
      * Expires idle buckets until the bucket catalog's memory usage is below the expiry threshold.
      */
-    void _expireIdleBuckets(ExecutionStats* stats);
+    void _expireIdleBuckets(ExecutionStats* stats, ClosedBuckets* closedBuckets);
 
     std::size_t _numberOfIdleBuckets() const;
 
@@ -684,6 +723,7 @@ private:
                             const Date_t& time,
                             const TimeseriesOptions& options,
                             ExecutionStats* stats,
+                            ClosedBuckets* closedBuckets,
                             bool openedDuetoMetadata);
 
     std::shared_ptr<ExecutionStats> _getExecutionStats(const NamespaceString& ns);

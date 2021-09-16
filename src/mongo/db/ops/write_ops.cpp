@@ -247,6 +247,9 @@ write_ops::UpdateModification write_ops::UpdateModification::parseFromOplogEntry
 write_ops::UpdateModification::UpdateModification(doc_diff::Diff diff, DiffOptions options)
     : _update(DeltaUpdate{std::move(diff), options}) {}
 
+write_ops::UpdateModification::UpdateModification(TransformFunc transform)
+    : _update(TransformUpdate{std::move(transform)}) {}
+
 write_ops::UpdateModification::UpdateModification(BSONElement update) {
     const auto type = update.type();
     if (type == BSONType::Object) {
@@ -297,7 +300,8 @@ int write_ops::UpdateModification::objsize() const {
 
                 return size + kWriteCommandBSONArrayPerElementOverheadBytes;
             },
-            [](const DeltaUpdate& delta) -> int { return delta.diff.objsize(); }},
+            [](const DeltaUpdate& delta) -> int { return delta.diff.objsize(); },
+            [](const TransformUpdate& transform) -> int { return 0; }},
         _update);
 }
 
@@ -307,7 +311,8 @@ write_ops::UpdateModification::Type write_ops::UpdateModification::type() const 
         visit_helper::Overloaded{
             [](const ClassicUpdate& classic) { return Type::kClassic; },
             [](const PipelineUpdate& pipelineUpdate) { return Type::kPipeline; },
-            [](const DeltaUpdate& delta) { return Type::kDelta; }},
+            [](const DeltaUpdate& delta) { return Type::kDelta; },
+            [](const TransformUpdate& transform) { return Type::kTransform; }},
         _update);
 }
 
@@ -328,7 +333,8 @@ void write_ops::UpdateModification::serializeToBSON(StringData fieldName,
                 }
                 arrayBuilder.doneFast();
             },
-            [fieldName, bob](const DeltaUpdate& delta) { *bob << fieldName << delta.diff; }},
+            [fieldName, bob](const DeltaUpdate& delta) { *bob << fieldName << delta.diff; },
+            [](const TransformUpdate& transform) {}},
         _update);
 }
 

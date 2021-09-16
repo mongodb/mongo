@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
 #include "mongo/base/checked_cast.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/mutable/document.h"
@@ -65,12 +67,14 @@
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/bucket_catalog.h"
+#include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/timeseries/timeseries_update_delete_util.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/db/write_concern.h"
+#include "mongo/logv2/log.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/fail_point.h"
@@ -205,6 +209,20 @@ write_ops::UpdateOpEntry makeTimeseriesUpdateOpEntry(
     write_ops::UpdateOpEntry update(BSON("_id" << batch->bucket()->id()), std::move(u));
     invariant(!update.getMulti(), batch->bucket()->id().toString());
     invariant(!update.getUpsert(), batch->bucket()->id().toString());
+    return update;
+}
+
+/**
+ * Transforms a single time-series insert to an update request on an existing bucket.
+ */
+write_ops::UpdateOpEntry makeTimeseriesCompressionOpEntry(
+    OperationContext* opCtx,
+    const OID& bucketId,
+    write_ops::UpdateModification::TransformFunc compressionFunc) {
+    write_ops::UpdateModification u(std::move(compressionFunc));
+    write_ops::UpdateOpEntry update(BSON("_id" << bucketId), std::move(u));
+    invariant(!update.getMulti(), bucketId.toString());
+    invariant(!update.getUpsert(), bucketId.toString());
     return update;
 }
 
@@ -611,6 +629,27 @@ public:
             return op;
         }
 
+        write_ops::UpdateCommandRequest _makeTimeseriesCompressionOp(
+            OperationContext* opCtx,
+            const OID& bucketId,
+            write_ops::UpdateModification::TransformFunc compressionFunc) const {
+            write_ops::UpdateCommandRequest op(
+                makeTimeseriesBucketsNamespace(ns()),
+                {makeTimeseriesCompressionOpEntry(opCtx, bucketId, std::move(compressionFunc))});
+
+            write_ops::WriteCommandRequestBase base;
+            // The schema validation configured in the bucket collection is intended for direct
+            // operations by end users and is not applicable here.
+            base.setBypassDocumentValidation(true);
+
+            // Timeseries compression operation is not a user operation and should not use a
+            // statement id from any user op. Set to Uninitialized to bypass.
+            base.setStmtIds(std::vector<StmtId>{kUninitializedStmtId});
+
+            op.setWriteCommandRequestBase(std::move(base));
+            return op;
+        }
+
         StatusWith<SingleWriteResult> _performTimeseriesInsert(
             OperationContext* opCtx,
             std::shared_ptr<BucketCatalog::WriteBatch> batch,
@@ -639,6 +678,40 @@ public:
                 opCtx,
                 _makeTimeseriesUpdateOp(opCtx, batch, metadata, std::move(stmtIds)),
                 OperationSource::kTimeseriesInsert));
+        }
+
+        StatusWith<SingleWriteResult> _performTimeseriesBucketCompression(
+            OperationContext* opCtx, const BucketCatalog::ClosedBucket& closedBucket) const {
+            if (!feature_flags::gTimeseriesBucketCompression.isEnabled(
+                    serverGlobalParams.featureCompatibility)) {
+                return SingleWriteResult();
+            }
+
+            // Buckets with just a single measurement is not worth compressing.
+            if (closedBucket.numMeasurements <= 1) {
+                return SingleWriteResult();
+            }
+
+            auto bucketCompressionFunc =
+                [&closedBucket](const BSONObj& bucketDoc) -> boost::optional<BSONObj> {
+                auto compressed = timeseries::compressBucket(bucketDoc, closedBucket.timeField);
+                // If compressed object size is larger than uncompressed, skip compression update.
+                if (compressed && compressed->objsize() > bucketDoc.objsize()) {
+                    LOGV2_DEBUG(5857802,
+                                1,
+                                "Skipping time-series bucket compression, compressed object is "
+                                "larger than original",
+                                "originalSize"_attr = bucketDoc.objsize(),
+                                "compressedSize"_attr = compressed->objsize());
+                    return boost::none;
+                }
+                return compressed;
+            };
+
+            return _getTimeseriesSingleWriteResult(write_ops_exec::performUpdates(
+                opCtx,
+                _makeTimeseriesCompressionOp(opCtx, closedBucket.bucketId, bucketCompressionFunc),
+                OperationSource::kStandard));
         }
 
         void _commitTimeseriesBucket(OperationContext* opCtx,
@@ -705,8 +778,19 @@ public:
 
             getOpTimeAndElectionId(opCtx, opTime, electionId);
 
-            bucketCatalog.finish(batch, BucketCatalog::CommitInfo{*opTime, *electionId});
+            auto closedBucket =
+                bucketCatalog.finish(batch, BucketCatalog::CommitInfo{*opTime, *electionId});
+
             batchGuard.dismiss();
+
+            if (closedBucket) {
+                // If this write closed a bucket, compress the bucket
+                auto result = _performTimeseriesBucketCompression(opCtx, *closedBucket);
+                if (auto error = generateError(opCtx, result, start + index, errors->size())) {
+                    errors->push_back(*error);
+                    return;
+                }
+            }
         }
 
         bool _commitTimeseriesBucketsAtomically(OperationContext* opCtx,
@@ -769,21 +853,38 @@ public:
 
             getOpTimeAndElectionId(opCtx, opTime, electionId);
 
+            bool compressClosedBuckets = true;
             for (auto batch : batchesToCommit) {
-                bucketCatalog.finish(batch, BucketCatalog::CommitInfo{*opTime, *electionId});
+                auto closedBucket =
+                    bucketCatalog.finish(batch, BucketCatalog::CommitInfo{*opTime, *electionId});
                 batch.get().reset();
+
+                if (!closedBucket || !compressClosedBuckets) {
+                    continue;
+                }
+
+                // If this write closed a bucket, compress the bucket
+                auto ret = _performTimeseriesBucketCompression(opCtx, *closedBucket);
+                if (!ret.isOK()) {
+                    // Don't try to compress any other buckets if we fail. We're not allowed to do
+                    // more write operations.
+                    compressClosedBuckets = false;
+                }
             }
 
             return true;
         }
 
-        std::tuple<TimeseriesBatches, TimeseriesStmtIds, size_t> _insertIntoBucketCatalog(
-            OperationContext* opCtx,
-            size_t start,
-            size_t numDocs,
-            const std::vector<size_t>& indices,
-            std::vector<BSONObj>* errors,
-            bool* containsRetry) const {
+        std::tuple<TimeseriesBatches,
+                   TimeseriesStmtIds,
+                   size_t /* numInserted */,
+                   bool /* canContinue */>
+        _insertIntoBucketCatalog(OperationContext* opCtx,
+                                 size_t start,
+                                 size_t numDocs,
+                                 const std::vector<size_t>& indices,
+                                 std::vector<BSONObj>* errors,
+                                 bool* containsRetry) const {
             auto& bucketCatalog = BucketCatalog::get(opCtx);
 
             auto bucketsNs = makeTimeseriesBucketsNamespace(ns());
@@ -800,6 +901,7 @@ public:
 
             TimeseriesBatches batches;
             TimeseriesStmtIds stmtIds;
+            bool canContinue = true;
 
             auto insert = [&](size_t index) {
                 invariant(start + index < request().getDocuments().size());
@@ -828,10 +930,29 @@ public:
                     errors->push_back(*error);
                     return false;
                 } else {
-                    const auto& batch = result.getValue();
+                    const auto& batch = result.getValue().batch;
                     batches.emplace_back(batch, index);
                     if (isTimeseriesWriteRetryable(opCtx)) {
                         stmtIds[batch->bucket()].push_back(stmtId);
+                    }
+                }
+
+                // If this insert closed buckets, rewrite to be a compressed column. If we cannot
+                // perform write operations at this point the bucket will be left uncompressed.
+                for (const auto& closedBucket : result.getValue().closedBuckets) {
+                    if (!canContinue) {
+                        break;
+                    }
+
+                    // If this write closed a bucket, compress the bucket
+                    auto ret = _performTimeseriesBucketCompression(opCtx, closedBucket);
+                    if (auto error = generateError(opCtx, ret, start + index, errors->size())) {
+                        // Bucket compression only fail when we may not try to perform any other
+                        // write operation. When handleError() inside write_ops_exec.cpp return
+                        // false.
+                        errors->push_back(*error);
+                        canContinue = false;
+                        return false;
                     }
                 }
 
@@ -843,12 +964,15 @@ public:
             } else {
                 for (size_t i = 0; i < numDocs; i++) {
                     if (!insert(i) && request().getOrdered()) {
-                        return {std::move(batches), std::move(stmtIds), i};
+                        return {std::move(batches), std::move(stmtIds), i, canContinue};
                     }
                 }
             }
 
-            return {std::move(batches), std::move(stmtIds), request().getDocuments().size()};
+            return {std::move(batches),
+                    std::move(stmtIds),
+                    request().getDocuments().size(),
+                    canContinue};
         }
 
         void _getTimeseriesBatchResults(OperationContext* opCtx,
@@ -889,8 +1013,13 @@ public:
                                                        boost::optional<repl::OpTime>* opTime,
                                                        boost::optional<OID>* electionId,
                                                        bool* containsRetry) const {
-            auto [batches, stmtIds, numInserted] = _insertIntoBucketCatalog(
+            auto [batches, stmtIds, numInserted, canContinue] = _insertIntoBucketCatalog(
                 opCtx, 0, request().getDocuments().size(), {}, errors, containsRetry);
+            if (!canContinue) {
+                // If we are not allowed to continue with any write operation return true here to
+                // prevent the ordered inserts from being retried one by one.
+                return true;
+            }
 
             hangTimeseriesInsertBeforeCommit.pauseWhileSet();
 
@@ -942,12 +1071,16 @@ public:
                                                               boost::optional<repl::OpTime>* opTime,
                                                               boost::optional<OID>* electionId,
                                                               bool* containsRetry) const {
-            auto [batches, bucketStmtIds, _] =
+            auto [batches, bucketStmtIds, _, canContinue] =
                 _insertIntoBucketCatalog(opCtx, start, numDocs, indices, errors, containsRetry);
 
             hangTimeseriesInsertBeforeCommit.pauseWhileSet();
 
             std::vector<size_t> docsToRetry;
+
+            if (!canContinue) {
+                return docsToRetry;
+            }
 
             for (auto& [batch, index] : batches) {
                 if (batch->claimCommitRights()) {

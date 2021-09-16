@@ -59,6 +59,7 @@ env.Library(
     source=[
         'delta_executor.cpp',
         'object_replace_executor.cpp',
+        'object_transform_executor.cpp',
         'pipeline_executor.cpp',
     ],
     LIBDEPS=[
@@ -125,6 +126,7 @@ env.CppUnitTest(
         'field_checker_test.cpp',
         'modifier_table_test.cpp',
         'object_replace_executor_test.cpp',
+        'object_transform_executor_test.cpp',
         'path_support_test.cpp',
         'pipeline_executor_test.cpp',
         'pop_node_test.cpp',

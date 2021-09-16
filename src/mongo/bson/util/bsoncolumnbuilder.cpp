@@ -60,13 +60,18 @@ std::pair<int64_t, uint8_t> scaleAndEncodeDouble(double value, uint8_t minScaleI
 }  // namespace
 
 BSONColumnBuilder::BSONColumnBuilder(StringData fieldName)
+    : BSONColumnBuilder(fieldName, BufBuilder()) {}
+
+BSONColumnBuilder::BSONColumnBuilder(StringData fieldName, BufBuilder&& builder)
     : _simple8bBuilder64(_createBufferWriter()),
       _simple8bBuilder128(_createBufferWriter()),
       _scaleIndex(Simple8bTypeUtil::kMemoryAsInteger),
+      _bufBuilder(std::move(builder)),
       _fieldName(fieldName) {
     // Leave space for element count at the beginning
     static_assert(sizeof(_elementCount) == kElementCountBytes,
                   "Element count for BSONColumn should be 4 bytes");
+    _bufBuilder.reset();
     _bufBuilder.skip(kElementCountBytes);
     // Store EOO type with empty field name as previous.
     _storePrevious(BSONElement());
@@ -369,6 +374,11 @@ BSONBinData BSONColumnBuilder::finalize() {
 
     return {_bufBuilder.buf(), _bufBuilder.len(), BinDataType::Column};
 }
+
+BufBuilder BSONColumnBuilder::detach() {
+    return std::move(_bufBuilder);
+}
+
 
 void BSONColumnBuilder::_storePrevious(BSONElement elem) {
     auto valuesize = elem.valuesize();

@@ -11,6 +11,16 @@ var TimeseriesTest = class {
     }
 
     /**
+     * Returns whether time-series bucket compression are supported.
+     */
+    static timeseriesBucketCompressionEnabled(conn) {
+        return assert
+            .commandWorked(
+                conn.adminCommand({getParameter: 1, featureFlagTimeseriesBucketCompression: 1}))
+            .featureFlagTimeseriesBucketCompression.value;
+    }
+
+    /**
      * Returns whether time-series updates and deletes are supported.
      */
     static timeseriesUpdatesAndDeletesEnabled(conn) {

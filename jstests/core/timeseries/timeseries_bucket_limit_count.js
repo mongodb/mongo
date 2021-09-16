@@ -13,6 +13,9 @@
 load("jstests/core/timeseries/libs/timeseries.js");
 
 TimeseriesTest.run((insert) => {
+    const isTimeseriesBucketCompressionEnabled =
+        TimeseriesTest.timeseriesBucketCompressionEnabled(db);
+
     const collNamePrefix = 'timeseries_bucket_limit_count_';
 
     // Assumes each bucket has a limit of 1000 measurements.
@@ -68,6 +71,9 @@ TimeseriesTest.run((insert) => {
         assert.eq(bucketMaxCount - 1,
                   bucketDocs[0].control.max.x,
                   'invalid control.max for x in first bucket: ' + tojson(bucketDocs));
+        assert.eq(isTimeseriesBucketCompressionEnabled ? 2 : 1,
+                  bucketDocs[0].control.version,
+                  'unexpected control.version in first bucket: ' + tojson(bucketDocs));
 
         // Second bucket should contain the remaining documents.
         assert.eq(bucketMaxCount,
@@ -82,6 +88,9 @@ TimeseriesTest.run((insert) => {
         assert.eq(numDocs - 1,
                   bucketDocs[1].control.max.x,
                   'invalid control.max for x in second bucket: ' + tojson(bucketDocs));
+        assert.eq(1,
+                  bucketDocs[1].control.version,
+                  'unexpected control.version in first bucket: ' + tojson(bucketDocs));
     };
 
     runTest(1);

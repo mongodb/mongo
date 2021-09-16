@@ -1193,6 +1193,9 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                             // Delta updates are only executed on secondaries as part of oplog
                             // application.
                             MONGO_UNREACHABLE;
+                        case write_ops::UpdateModification::Type::kTransform:
+                            // It is not possible to run a transform update directly from a client.
+                            MONGO_UNREACHABLE;
                     }
                     singleUpdate.append("multi", this->multi);
                     singleUpdate.append("upsert", this->upsert);
