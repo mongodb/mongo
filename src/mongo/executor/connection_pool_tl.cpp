@@ -171,7 +171,7 @@ public:
     explicit TLConnectionSetupHook(executor::NetworkConnectionHook* hookToWrap, bool x509AuthOnly)
         : _wrappedHook(hookToWrap), _x509AuthOnly(x509AuthOnly) {}
 
-    BSONObj augmentIsMasterRequest(BSONObj cmdObj) override {
+    BSONObj augmentIsMasterRequest(const HostAndPort& remoteHost, BSONObj cmdObj) override {
         BSONObjBuilder bob(std::move(cmdObj));
         bob.append("hangUpOnStepDown", false);
         if (internalSecurity.user) {
@@ -181,7 +181,7 @@ public:
         if (_x509AuthOnly) {
             _speculativeAuthType = auth::SpeculativeAuthType::kAuthenticate;
         } else {
-            _speculativeAuthType = auth::speculateInternalAuth(&bob, &_session);
+            _speculativeAuthType = auth::speculateInternalAuth(remoteHost, &bob, &_session);
         }
 
         return bob.obj();

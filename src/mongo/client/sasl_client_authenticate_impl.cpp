@@ -117,6 +117,10 @@ Status saslConfigureSession(SaslClientSession* session,
                             const HostAndPort& hostname,
                             StringData targetDatabase,
                             const BSONObj& saslParameters) {
+    // SERVER-59876 Ensure hostname is never empty. If it is empty, the client-side SCRAM cache will
+    // not be used which creates performance problems.
+    dassert(!hostname.empty());
+
     std::string mechanism;
     Status status =
         bsonExtractStringField(saslParameters, saslCommandMechanismFieldName, &mechanism);

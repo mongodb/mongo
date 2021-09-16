@@ -32,6 +32,7 @@
 #include "mongo/client/native_sasl_client_session.h"
 
 #include "mongo/base/init.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/sasl_client_conversation.h"
 #include "mongo/client/sasl_plain_client_conversation.h"
 #include "mongo/client/sasl_scram_client_conversation.h"
@@ -39,6 +40,7 @@
 #include "mongo/config.h"
 #include "mongo/crypto/sha1_block.h"
 #include "mongo/crypto/sha256_block.h"
+#include "mongo/db/commands/server_status.h"
 #include "mongo/util/str.h"
 
 #ifdef MONGO_CONFIG_SSL
@@ -59,6 +61,37 @@ MONGO_INITIALIZER(NativeSaslClientContext)(InitializerContext* context) {
 // Global cache for SCRAM-SHA-1/256 credentials
 auto* scramsha1ClientCache = new SCRAMClientCache<SHA1Block>;
 auto* scramsha256ClientCache = new SCRAMClientCache<SHA256Block>;
+
+template <typename HashBlock>
+void cacheToBSON(SCRAMClientCache<HashBlock>* cache, StringData name, BSONObjBuilder* builder) {
+    auto stats = cache->getStats();
+
+    BSONObjBuilder sub(builder->subobjStart(name));
+    sub.append("count", stats.count);
+    sub.append("hits", stats.hits);
+    sub.append("misses", stats.misses);
+}
+
+/**
+ * Output stats about the SCRAM client cache to server status.
+ */
+class ScramCacheStatsStatusSection : ServerStatusSection {
+public:
+    ScramCacheStatsStatusSection() : ServerStatusSection("scramCache") {}
+
+    bool includeByDefault() const override {
+        return true;
+    }
+
+    BSONObj generateSection(OperationContext* opCtx,
+                            const BSONElement& configElement) const override {
+        BSONObjBuilder builder;
+        cacheToBSON(scramsha1ClientCache, "SCRAM-SHA-1", &builder);
+        cacheToBSON(scramsha256ClientCache, "SCRAM-SHA-256", &builder);
+        return builder.obj();
+    };
+
+} scramCacheStatusSection;
 
 }  // namespace
 

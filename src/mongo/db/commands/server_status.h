@@ -107,6 +107,30 @@ private:
     const std::string _sectionName;
 };
 
+/**
+ * Class the keeps a map of all registered status sections
+ */
+class ServerStatusSectionRegistry {
+public:
+    using SectionMap = std::map<std::string, ServerStatusSection*>;
+
+    static ServerStatusSectionRegistry* get();
+
+    /**
+     * Add a status section to the map. Called by ServerStatusSection constructor
+     */
+    void addSection(ServerStatusSection* section);
+
+    SectionMap::const_iterator begin();
+
+    SectionMap::const_iterator end();
+
+private:
+    AtomicWord<bool> _runCalled{false};
+
+    SectionMap _sections;
+};
+
 class OpCounterServerStatusSection : public ServerStatusSection {
 public:
     OpCounterServerStatusSection(const std::string& sectionName, OpCounters* counters);
