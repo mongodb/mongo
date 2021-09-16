@@ -116,12 +116,21 @@ const upconvertedCursors = new Set();
 const db = null;
 
 const passthroughRunCommandImpl = function(dbName, cmdObj, options) {
-    // Check whether this command is an upconvertable $changeStream request.
+    // Check whether this command is an upconvertable $changeStream request. If the command is an
+    // explain, we check the wrapped command object.
+    let csCmdObj = (cmdObj.explain ? cmdObj.explain : cmdObj);
     const upconvertCursor =
-        ChangeStreamPassthroughHelpers.isUpconvertableChangeStreamRequest(this, cmdObj);
+        ChangeStreamPassthroughHelpers.isUpconvertableChangeStreamRequest(this, csCmdObj);
     if (upconvertCursor) {
-        [dbName, cmdObj] =
-            ChangeStreamPassthroughHelpers.upconvertChangeStreamRequest(this, cmdObj);
+        [dbName, csCmdObj] =
+            ChangeStreamPassthroughHelpers.upconvertChangeStreamRequest(this, csCmdObj);
+    }
+
+    // If this is an explain, put the upconverted agg back into the explain command.
+    if (cmdObj.explain) {
+        cmdObj.explain = csCmdObj;
+    } else {
+        cmdObj = csCmdObj;
     }
 
     // If the command is a getMore, it may be a $changeStream that we upconverted to run

@@ -7,11 +7,14 @@
 //   requires_pipeline_optimization,
 //   requires_sharding,
 //   uses_change_streams,
+//   change_stream_does_not_expect_txns,
+//   assumes_unsharded_collection,
+//   assumes_read_preference_unchanged
 // ]
 (function() {
 "use strict";
 
-load("jstests/libs/collection_drop_recreate.js");  // For assertDropAndRecreateCollection.
+load("jstests/libs/change_stream_rewrite_util.js");  // For rewrite helpers.
 
 const dbName = "change_stream_match_pushdown_fullDocument_rewrite";
 const collName = "change_stream_match_pushdown_fullDocument_rewrite";
@@ -21,57 +24,8 @@ const st = new ShardingTest({
     rs: {nodes: 1, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}}
 });
 
-const mongosConn = st.s;
-const db = mongosConn.getDB(dbName);
-
-// Verifies the number of change streams events returned from a particular shard.
-function assertNumChangeStreamDocsReturnedFromShard(shardReplSet, comment, expectedTotalReturned) {
-    let result = null;
-    assert.soon(() => {
-        result = shardReplSet.getPrimary()
-                     .getDB(dbName)
-                     .getCollection("system.profile")
-                     .aggregate([
-                         {$match: {op: "getmore", "originatingCommand.comment": comment}},
-                         {$group: {_id: null, totalReturned: {$sum: "$nreturned"}}}
-                     ])
-                     .toArray();
-        return result.length == 1;
-    });
-    assert.eq(result[0].totalReturned, expectedTotalReturned, result[0]);
-}
-
-// Helper to extract the 'executionStats' from the $cursor pipeline stage.
-function getOplogExecutionStatsForShard(stats, shardName) {
-    assert(stats.shards.hasOwnProperty(shardName), stats);
-    assert.eq(Object.keys(stats.shards[shardName].stages[0])[0], "$cursor", stats);
-    return stats.shards[shardName].stages[0].$cursor.executionStats;
-}
-
-// Create a sharded collection where the shard key is 'shard'.
-assertDropAndRecreateCollection(db, collName);
-
-const coll = db.getCollection(collName);
-assert.commandWorked(coll.createIndex({shard: 1}));
-
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
-
-// Shard the test collection and split it into two chunks: one that contains all {shard: 0}
-// documents and one that contains all {shard: 1} documents.
-st.shardColl(collName,
-             {shard: 1} /* shard key */,
-             {shard: 1} /* split at */,
-             {shard: 1} /* move the chunk containing {shard: 1} to its own shard */,
-             dbName,
-             true);
-
-// Enable profiling on all nodes.
-st.rs0.nodes.forEach(function(node) {
-    assert(node.getDB(dbName).setProfilingLevel(2));
-});
-st.rs1.nodes.forEach(function(node) {
-    assert(node.getDB(dbName).setProfilingLevel(2));
-});
+// Create a sharded collection where shard key is 'shard'.
+const coll = createShardedCollection(st, "shard" /* shardKey */, dbName, collName, 1 /* splitAt */);
 
 // A helper that opens a change stream with the user supplied match expression 'userMatchExpr' and
 // validates that:
@@ -82,16 +36,13 @@ st.rs1.nodes.forEach(function(node) {
 //     specified in 'expectedOplogCursorReturnedDocs'.
 function verifyOps(resumeAfterToken,
                    userMatchExpr,
-                   aggregateComment,
                    expectedOps,
                    expectedChangeStreamDocsReturned,
                    expectedOplogCursorReturnedDocs) {
-    const cursor = coll.aggregate(
-        [
-            {$changeStream: {resumeAfter: resumeAfterToken, fullDocument: "updateLookup"}},
-            userMatchExpr
-        ],
-        {comment: aggregateComment});
+    const cursor = coll.aggregate([
+        {$changeStream: {resumeAfter: resumeAfterToken, fullDocument: "updateLookup"}},
+        userMatchExpr
+    ]);
 
     for (const [op, id, shardId] of expectedOps) {
         assert.soon(() => cursor.hasNext());
@@ -106,23 +57,19 @@ function verifyOps(resumeAfterToken,
     }
 
     assert(!cursor.hasNext());
-    assertNumChangeStreamDocsReturnedFromShard(
-        st.rs0, aggregateComment, expectedChangeStreamDocsReturned[0]);
-    assertNumChangeStreamDocsReturnedFromShard(
-        st.rs1, aggregateComment, expectedChangeStreamDocsReturned[1]);
 
     // An 'executionStats' could only be captured for a non-invalidating stream.
-    const stats = coll.explain("executionStats")
-                      .aggregate([{$changeStream: {resumeAfter: resumeAfterToken}}, userMatchExpr],
-                                 {comment: aggregateComment});
+    const stats = coll.explain("executionStats").aggregate([
+        {$changeStream: {resumeAfter: resumeAfterToken, fullDocument: "updateLookup"}},
+        userMatchExpr
+    ]);
 
-    const execStats = [
-        getOplogExecutionStatsForShard(stats, st.rs0.name),
-        getOplogExecutionStatsForShard(stats, st.rs1.name)
-    ];
-
-    assert.eq(execStats[0].nReturned, expectedOplogCursorReturnedDocs[0], execStats[0]);
-    assert.eq(execStats[1].nReturned, expectedOplogCursorReturnedDocs[1], execStats[1]);
+    assertNumChangeStreamDocsReturnedFromShard(
+        stats, st.rs0.name, expectedChangeStreamDocsReturned[0]);
+    assertNumChangeStreamDocsReturnedFromShard(
+        stats, st.rs1.name, expectedChangeStreamDocsReturned[1]);
+    assertNumMatchingOplogEventsForShard(stats, st.rs0.name, expectedOplogCursorReturnedDocs[0]);
+    assertNumMatchingOplogEventsForShard(stats, st.rs1.name, expectedOplogCursorReturnedDocs[1]);
 }
 
 // Open a change stream and store the resume token. This resume token will be used to replay the
@@ -162,7 +109,6 @@ const runVerifyOpsTestcases = (op) => {
         // Test out the '{$exists: true}' predicate on the full 'fullDocument' field.
         verifyOps(resumeAfterToken,
                   {$match: {operationType: op, fullDocument: {$exists: true}}},
-                  "rewritten_" + op + "_with_exists_true_predicate_on_fullDocument",
                   [],
                   [0, 0] /* expectedChangeStreamDocsReturned */,
                   [0, 0] /* expectedOplogCursorReturnedDocs */);
@@ -170,7 +116,6 @@ const runVerifyOpsTestcases = (op) => {
         // Test out the '{$exists: false}' predicate on the full 'fullDocument' field.
         verifyOps(resumeAfterToken,
                   {$match: {operationType: op, fullDocument: {$exists: false}}},
-                  "rewritten_" + op + "_with_exists_false_predicate_on_fullDocument",
                   [[op], [op], [op], [op]],
                   [2, 2] /* expectedChangeStreamDocsReturned */,
                   [2, 2] /* expectedOplogCursorReturnedDocs */);
@@ -194,7 +139,6 @@ const runVerifyOpsTestcases = (op) => {
     // Test out a predicate on the full 'fullDocument' field.
     verifyOps(resumeAfterToken,
               {$match: {operationType: op, fullDocument: doc}},
-              "rewritten_" + op + "_with_eq_predicate_on_fullDocument",
               [[op, 2, 0]],
               [1, 0] /* expectedChangeStreamDocsReturned */,
               op != "update" ? [1, 0] : [2, 2] /* expectedOplogCursorReturnedDocs */);
@@ -202,7 +146,6 @@ const runVerifyOpsTestcases = (op) => {
     // Test out a predicate on 'fullDocument._id'.
     verifyOps(resumeAfterToken,
               {$match: {operationType: op, "fullDocument._id": {$lt: 3}}},
-              "rewritten_" + op + "_with_lt_predicate_on_fullDocument_id",
               [[op, 2, 0], [op, 2, 1]],
               [1, 1] /* expectedChangeStreamDocsReturned */,
               op != "update" ? [1, 1] : [2, 2] /* expectedOplogCursorReturnedDocs */);
@@ -210,7 +153,6 @@ const runVerifyOpsTestcases = (op) => {
     // Test out a predicate on 'fullDocument.shard'.
     verifyOps(resumeAfterToken,
               {$match: {operationType: op, "fullDocument.shard": {$gt: 0}}},
-              "rewritten_" + op + "_with_gt_predicate_on_fullDocument_shard",
               [[op, 2, 1], [op, 3, 1]],
               [0, 2] /* expectedChangeStreamDocsReturned */,
               op != "update" ? [0, 2] : [2, 2] /* expectedOplogCursorReturnedDocs */);
@@ -218,7 +160,6 @@ const runVerifyOpsTestcases = (op) => {
     // Test out a negated predicate on the full 'fullDocument' field.
     verifyOps(resumeAfterToken,
               {$match: {operationType: op, fullDocument: {$not: {$eq: doc}}}},
-              "rewritten_" + op + "_with_negated_eq_predicate_on_fullDocument",
               [[op, 3, 0], [op, 2, 1], [op, 3, 1]],
               [1, 2] /* expectedChangeStreamDocsReturned */,
               [2, 2] /* expectedOplogCursorReturnedDocs */);
@@ -226,7 +167,6 @@ const runVerifyOpsTestcases = (op) => {
     // Test out a negated predicate on 'fullDocument._id'.
     verifyOps(resumeAfterToken,
               {$match: {operationType: op, "fullDocument._id": {$not: {$lt: 3}}}},
-              "rewritten_" + op + "_with_negated_lt_predicate_on_fullDocument_id",
               [[op, 3, 0], [op, 3, 1]],
               [1, 1] /* expectedChangeStreamDocsReturned */,
               [2, 2] /* expectedOplogCursorReturnedDocs */);
@@ -234,7 +174,6 @@ const runVerifyOpsTestcases = (op) => {
     // Test out a negated predicate on 'fullDocument.shard'.
     verifyOps(resumeAfterToken,
               {$match: {operationType: op, "fullDocument.shard": {$not: {$gt: 0}}}},
-              "rewritten_" + op + "_with_negated_gt_predicate_on_fullDocument_shard",
               [[op, 2, 0], [op, 3, 0]],
               [2, 0] /* expectedChangeStreamDocsReturned */,
               [2, 2] /* expectedOplogCursorReturnedDocs */);
@@ -242,7 +181,6 @@ const runVerifyOpsTestcases = (op) => {
     // Test out the '{$exists: true}' predicate on the full 'fullDocument' field.
     verifyOps(resumeAfterToken,
               {$match: {operationType: op, fullDocument: {$exists: true}}},
-              "rewritten_" + op + "_with_exists_true_predicate_on_fullDocument",
               [[op, 2, 0], [op, 3, 0], [op, 2, 1], [op, 3, 1]],
               [2, 2] /* expectedChangeStreamDocsReturned */,
               [2, 2] /* expectedOplogCursorReturnedDocs */);
@@ -250,7 +188,6 @@ const runVerifyOpsTestcases = (op) => {
     // Test out the '{$exists: false}' predicate on the full 'fullDocument' field.
     verifyOps(resumeAfterToken,
               {$match: {operationType: op, fullDocument: {$exists: false}}},
-              "rewritten_" + op + "_with_exists_false_predicate_on_fullDocument",
               [],
               [0, 0] /* expectedChangeStreamDocsReturned */,
               [2, 2] /* expectedOplogCursorReturnedDocs */);

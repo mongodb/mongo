@@ -344,6 +344,11 @@ boost::optional<Document> CommonMongodProcessInterface::doLookupSingleDocument(
             collectionUUID,
             _getCollectionDefaultCollator(expCtx->opCtx, nss.db(), collectionUUID));
 
+        // If we are here, we are either executing the pipeline normally or running in one of the
+        // execution stat explain verbosities. In either case, we disable explain on the foreign
+        // context so that we actually retrieve the document.
+        foreignExpCtx->explain = boost::none;
+
         pipeline = Pipeline::makePipeline({BSON("$match" << documentKey)}, foreignExpCtx, opts);
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
         return boost::none;
