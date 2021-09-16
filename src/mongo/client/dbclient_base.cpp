@@ -476,7 +476,8 @@ Status DBClientBase::authenticateInternalUser() {
 #endif
 
     auto status =
-        auth::authenticateInternalClient(clientName, boost::none, _makeAuthRunCommandHook())
+        auth::authenticateInternalClient(
+            clientName, HostAndPort(getServerAddress()), boost::none, _makeAuthRunCommandHook())
             .getNoThrow();
     if (status.isOK()) {
         return status;

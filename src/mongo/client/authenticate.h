@@ -110,6 +110,7 @@ Future<void> authenticateClient(const BSONObj& params,
  * than once, but will only call the AuthCompletionHandler once.
  */
 Future<void> authenticateInternalClient(const std::string& clientSubjectName,
+                                        const HostAndPort& remote,
                                         boost::optional<std::string> mechanismHint,
                                         RunCommandHook runCommand);
 

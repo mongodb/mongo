@@ -168,7 +168,8 @@ Future<void> AsyncDBClient::authenticateInternal(boost::optional<std::string> me
     }
 #endif
 
-    return auth::authenticateInternalClient(clientName, mechanismHint, _makeAuthRunCommandHook());
+    return auth::authenticateInternalClient(
+        clientName, remote(), mechanismHint, _makeAuthRunCommandHook());
 }
 
 Future<void> AsyncDBClient::initWireVersion(const std::string& appName,
