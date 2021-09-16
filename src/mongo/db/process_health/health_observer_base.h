@@ -61,6 +61,10 @@ protected:
     virtual FaultFacetPtr periodicCheckImpl(FaultFacetPtr optionalExistingFacet) = 0;
 
     ClockSource* const _clockSource;
+
+    HealthObserverIntensity _intensity = HealthObserverIntensity::kNonCritical;
+
+    HealthObserverIntensity getIntensity();
 };
 
 }  // namespace process_health

@@ -34,6 +34,14 @@
 namespace mongo {
 namespace process_health {
 
+enum class HealthObserverIntensity {
+    kCritical = 0,
+
+    kNonCritical,
+
+    kOff
+};
+
 /**
  * Interface to conduct periodic health checks.
  * Every instance of health observer is wired internally to update the state of the FaultManager
@@ -61,6 +69,11 @@ public:
      * @param factory Interface to get or create the factory of facets container.
      */
     virtual void periodicCheck(FaultFacetsContainerFactory& factory) = 0;
+
+    /**
+     * @return HealthObserverIntensity
+     */
+    virtual HealthObserverIntensity getIntensity() = 0;
 };
 
 }  // namespace process_health

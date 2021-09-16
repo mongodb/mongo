@@ -35,6 +35,7 @@
 #include "mongo/db/process_health/fault_facet_container.h"
 #include "mongo/db/process_health/health_observer.h"
 #include "mongo/db/service_context.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
 
@@ -78,7 +79,8 @@ class FaultManager : protected FaultFacetsContainerFactory {
     FaultManager& operator=(const FaultManager&) = delete;
 
 public:
-    explicit FaultManager(ServiceContext* svcCtx);
+    explicit FaultManager(ServiceContext* svcCtx,
+                          std::shared_ptr<executor::TaskExecutor> taskExecutor);
     virtual ~FaultManager();
 
     static FaultManager* get(ServiceContext* svcCtx);
@@ -89,7 +91,7 @@ public:
     virtual FaultState getFaultState() const;
 
     // Returns the current fault, if any. Otherwise returns an empty pointer.
-    virtual FaultConstPtr activeFault() const;
+    virtual FaultConstPtr currentFault() const;
 
 protected:
     // Starts the health check sequence and updates the internal state on completion.
@@ -119,6 +121,8 @@ protected:
     // State transition should be triggered by events above.
     Status transitionToState(FaultState newState);
 
+    void schedulePeriodicHealthCheckThread();
+
 private:
     // State machine related.
     Status _transitionToKOk();
@@ -137,7 +141,10 @@ private:
     AtomicWord<bool> _initializedAllHealthObservers{false};
     // Manager owns all observer instances.
     std::vector<std::unique_ptr<HealthObserver>> _observers;
+    std::shared_ptr<executor::TaskExecutor> _taskExecutor;
+    boost::optional<executor::TaskExecutor::CallbackHandle> _periodicHealthCheckCbHandle;
 
+    // Protects the current state of fault manager.
     mutable Mutex _stateMutex =
         MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "FaultManager::_stateMutex");
     FaultState _currentState = FaultState::kStartupCheck;

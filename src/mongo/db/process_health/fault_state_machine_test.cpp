@@ -30,6 +30,7 @@
 #include "mongo/db/process_health/fault_manager.h"
 
 #include "mongo/db/process_health/fault_manager_test_suite.h"
+#include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -41,6 +42,13 @@ using test::FaultManagerTestImpl;
 
 namespace {
 
+std::shared_ptr<executor::ThreadPoolTaskExecutor> constructTaskExecutor() {
+    auto network = std::make_unique<executor::NetworkInterfaceMock>();
+    auto executor = makeSharedThreadPoolTestExecutor(std::move(network));
+    executor->startup();
+    return executor;
+}
+
 // State machine tests.
 TEST(FaultManagerForTest, StateTransitionsFromOk) {
     auto serviceCtx = ServiceContext::make();
@@ -51,7 +59,7 @@ TEST(FaultManagerForTest, StateTransitionsFromOk) {
         {FaultState::kActiveFault, false}};
 
     for (auto& pair : transitionValidPairs) {
-        FaultManagerTestImpl faultManager(serviceCtx.get());
+        FaultManagerTestImpl faultManager(serviceCtx.get(), constructTaskExecutor());
         ASSERT_OK(faultManager.transitionStateTest(FaultState::kOk));
 
         if (pair.second) {
@@ -71,7 +79,7 @@ TEST(FaultManagerForTest, StateTransitionsFromStartupCheck) {
         {FaultState::kActiveFault, false}};
 
     for (auto& pair : transitionValidPairs) {
-        FaultManagerTestImpl faultManager(serviceCtx.get());
+        FaultManagerTestImpl faultManager(serviceCtx.get(), constructTaskExecutor());
 
         if (pair.second) {
             ASSERT_OK(faultManager.transitionStateTest(pair.first));
@@ -90,7 +98,7 @@ TEST(FaultManagerForTest, StateTransitionsFromTransientFault) {
         {FaultState::kActiveFault, true}};
 
     for (auto& pair : transitionValidPairs) {
-        FaultManagerTestImpl faultManager(serviceCtx.get());
+        FaultManagerTestImpl faultManager(serviceCtx.get(), constructTaskExecutor());
         ASSERT_OK(faultManager.transitionStateTest(FaultState::kTransientFault));
 
         if (pair.second) {
@@ -110,7 +118,7 @@ TEST(FaultManagerForTest, StateTransitionsFromActiveFault) {
         {FaultState::kActiveFault, false}};
 
     for (auto& pair : transitionValidPairs) {
-        FaultManagerTestImpl faultManager(serviceCtx.get());
+        FaultManagerTestImpl faultManager(serviceCtx.get(), constructTaskExecutor());
         ASSERT_OK(faultManager.transitionStateTest(FaultState::kTransientFault));
         ASSERT_OK(faultManager.transitionStateTest(FaultState::kActiveFault));
 
