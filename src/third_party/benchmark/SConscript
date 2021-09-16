@@ -14,7 +14,7 @@ if env.TargetOSIs('windows'):
 
 env.Append(
     CPPDEFINES=["HAVE_STD_REGEX"],
-    CXXFLAGS=[
+    CXXFLAGS=[] if env.TargetOSIs('windows') else [
         # TODO(SERVER-59996): Fix warnings with -Wstringop-truncation when possible
         '-Wno-unknown-warning-option',
         '-Wno-stringop-truncation',

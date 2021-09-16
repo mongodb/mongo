@@ -184,7 +184,7 @@ if get_option('ssl') == 'on':
         scriptingEnv = env.Clone()
 
         scriptingEnv.Append(
-            CXXFLAGS=[
+            CXXFLAGS=[] if scriptingEnv.TargetOSIs('windows') else [
                 # TODO(SERVER-59992): Remove -Wno-class-memacces where possible.
                 '-Wno-unknown-warning-option',
                 '-Wno-class-memaccess',
