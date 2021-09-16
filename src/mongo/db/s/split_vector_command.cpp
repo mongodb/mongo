@@ -121,17 +121,35 @@ public:
         BSONElement maxChunkObjectsElem = jsobj["maxChunkObjects"];
         if (maxChunkObjectsElem.isNumber()) {
             maxChunkObjects = maxChunkObjectsElem.safeNumberLong();
+            uassert(ErrorCodes::InvalidOptions,
+                    "maxChunkObjects must be greater than 0",
+                    *maxChunkObjects > 0);
         }
 
-        boost::optional<long long> maxChunkSizeBytes;
-        BSONElement maxSizeElem = jsobj["maxChunkSize"];
-        BSONElement maxSizeBytesElem = jsobj["maxChunkSizeBytes"];
-        // Use maxChunkSize if present otherwise maxChunkSizeBytes
-        if (maxSizeElem.isNumber()) {
-            maxChunkSizeBytes = maxSizeElem.safeNumberLong() * 1 << 20;
-        } else if (maxSizeBytesElem.isNumber()) {
-            maxChunkSizeBytes = maxSizeBytesElem.safeNumberLong();
-        }
+        const auto maxChunkSizeBytes = [&]() {
+            BSONElement maxSizeElem = jsobj["maxChunkSize"];
+            BSONElement maxSizeBytesElem = jsobj["maxChunkSizeBytes"];
+
+            boost::optional<long long> ret = boost::none;
+            // Use maxChunkSize if present otherwise maxChunkSizeBytes
+            if (maxSizeElem.isNumber()) {
+                long long maxChunkSizeMB = maxSizeElem.safeNumberLong();
+                // Prevent maxChunkSizeBytes overflow. Check aimed to avoid fuzzer failures
+                // since users are definitely not expected to specify maxChunkSize in exabytes.
+                uassert(ErrorCodes::InvalidOptions,
+                        str::stream()
+                            << "The specified maxChunkSize in MB is too big: " << maxChunkSizeMB,
+                        maxChunkSizeMB <= (LLONG_MAX >> 20));
+                ret = maxChunkSizeMB << 20;
+            } else if (maxSizeBytesElem.isNumber()) {
+                ret = maxSizeBytesElem.safeNumberLong();
+            }
+
+            uassert(ErrorCodes::InvalidOptions,
+                    "The specified max chunk size must be greater than 0",
+                    ret == boost::none || *ret > 0);
+            return ret;
+        }();
 
         auto splitKeys = splitVector(opCtx,
                                      nss,

@@ -355,7 +355,7 @@ InitialSplitPolicy::ShardCollectionConfig UnoptimizedSplitPolicy::createFirstChu
                                           ChunkRange(shardKeyPattern.getKeyPattern().globalMin(),
                                                      shardKeyPattern.getKeyPattern().globalMax()),
                                           balancerConfig->getMaxChunkSizeBytes(),
-                                          0));
+                                          boost::none));
 
     const auto currentTime = VectorClock::get(opCtx)->getTime();
     return generateShardCollectionInitialChunks(params,
