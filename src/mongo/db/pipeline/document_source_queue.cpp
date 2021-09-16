@@ -49,7 +49,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceQueue::createFromBson(
         uassert(5858202,
                 "literal documents specification must be an array of objects",
                 elem.type() == BSONType::Object);
-        queue->emplace_back(Document{elem.Obj()});
+        queue->emplace_back(Document{elem.Obj()}.getOwned());
     }
     return queue;
 }
