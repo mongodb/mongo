@@ -69,8 +69,6 @@
 #include "mongo/db/timeseries/bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
-#include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
-#include "mongo/db/timeseries/timeseries_update_delete_util.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/db/write_concern.h"
