@@ -430,6 +430,29 @@ public:
     }
 
     /**
+     * Returns a vector of ValueHandles for all of the keys that satisfy matchPredicate.
+     */
+    template <typename Pred>
+    std::vector<ValueHandle> getValueHandlesIfKey(const Pred& matchPredicate) {
+        auto invalidatingCacheValues = [&]() {
+            stdx::lock_guard lg(_mutex);
+            return _cache.getEntriesIf(
+                [&](const Key& key, const StoredValue*) { return matchPredicate(key); });
+        }();
+
+        std::vector<ValueHandle> valueHandles;
+        valueHandles.reserve(invalidatingCacheValues.size());
+        std::transform(invalidatingCacheValues.begin(),
+                       invalidatingCacheValues.end(),
+                       std::back_inserter(valueHandles),
+                       [](auto& invalidatingCacheValue) {
+                           return ValueHandle(std::move(invalidatingCacheValue));
+                       });
+
+        return valueHandles;
+    }
+
+    /**
      * Returns statistics information about the cache for reporting purposes.
      */
     std::vector<typename Cache::CachedItemInfo> getCacheInfo() const {

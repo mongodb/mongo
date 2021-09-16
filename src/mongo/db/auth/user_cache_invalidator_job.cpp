@@ -184,6 +184,24 @@ void UserCacheInvalidator::run() {
             LOGV2_WARNING(20268, "Error invalidating user cache", "error"_attr = e.toStatus());
         }
         _previousGeneration = swCurrentGeneration.getValue();
+    } else {
+        // If LDAP authorization is enabled and the authz cache generation has not changed, the
+        // external users should be refreshed to ensure that any cached users evicted on the config
+        // server are appropriately refreshed here.
+        auto refreshStatus = _authzManager->refreshExternalUsers(opCtx.get());
+        if (!refreshStatus.isOK()) {
+            LOGV2_WARNING(5914803,
+                          "Error refreshing external users in user cache, so invalidating external "
+                          "users in cache",
+                          "error"_attr = refreshStatus);
+            try {
+                _authzManager->invalidateUsersFromDB(opCtx.get(), "$external"_sd);
+            } catch (const DBException& e) {
+                LOGV2_WARNING(5914805,
+                              "Error invalidating $external users from user cache",
+                              "error"_attr = e.toStatus());
+            }
+        }
     }
 }
 

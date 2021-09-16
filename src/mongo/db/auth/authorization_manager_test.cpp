@@ -258,5 +258,139 @@ TEST_F(AuthorizationManagerTest, testAcquireV2UserWithUnrecognizedActions) {
     ASSERT(actions.empty());
 }
 
+TEST_F(AuthorizationManagerTest, testRefreshExternalV2User) {
+    constexpr auto kUserFieldName = "user"_sd;
+    constexpr auto kDbFieldName = "db"_sd;
+    constexpr auto kRoleFieldName = "role"_sd;
+
+    // Insert one user on db test and two users on db $external.
+    BSONObj externalCredentials = BSON("external" << true);
+    std::vector<BSONObj> userDocs{BSON("_id"
+                                       << "admin.v2read"
+                                       << "user"
+                                       << "v2read"
+                                       << "db"
+                                       << "test"
+                                       << "credentials" << credentials << "roles"
+                                       << BSON_ARRAY(BSON("role"
+                                                          << "read"
+                                                          << "db"
+                                                          << "test"))),
+                                  BSON("_id"
+                                       << "admin.v2externalOne"
+                                       << "user"
+                                       << "v2externalOne"
+                                       << "db"
+                                       << "$external"
+                                       << "credentials" << externalCredentials << "roles"
+                                       << BSON_ARRAY(BSON("role"
+                                                          << "read"
+                                                          << "db"
+                                                          << "test"))),
+                                  BSON("_id"
+                                       << "admin.v2externalTwo"
+                                       << "user"
+                                       << "v2externalTwo"
+                                       << "db"
+                                       << "$external"
+                                       << "credentials" << externalCredentials << "roles"
+                                       << BSON_ARRAY(BSON("role"
+                                                          << "read"
+                                                          << "db"
+                                                          << "test")))};
+
+    std::vector<BSONObj> initialRoles{BSON("role"
+                                           << "read"
+                                           << "db"
+                                           << "test")};
+    std::vector<BSONObj> updatedRoles{BSON("role"
+                                           << "readWrite"
+                                           << "db"
+                                           << "test")};
+
+    for (const auto& userDoc : userDocs) {
+        ASSERT_OK(externalState->insertPrivilegeDocument(opCtx.get(), userDoc, BSONObj()));
+    }
+
+    // Acquire these users to force the AuthorizationManager to load these users into the user
+    // cache. Store the users into a vector so that they are checked out.
+    std::vector<UserHandle> checkedOutUsers;
+    checkedOutUsers.reserve(userDocs.size());
+    for (const auto& userDoc : userDocs) {
+        auto swUser = authzManager->acquireUser(
+            opCtx.get(),
+            UserName(userDoc.getStringField(kUserFieldName), userDoc.getStringField(kDbFieldName)));
+        ASSERT_OK(swUser.getStatus());
+        auto user = std::move(swUser.getValue());
+        ASSERT_EQUALS(
+            UserName(userDoc.getStringField(kUserFieldName), userDoc.getStringField(kDbFieldName)),
+            user->getName());
+        ASSERT(user.isValid());
+
+        RoleNameIterator cachedUserRoles = user->getRoles();
+        for (const auto& userDocRole : initialRoles) {
+            ASSERT_EQUALS(cachedUserRoles.next(),
+                          RoleName(userDocRole.getStringField(kRoleFieldName),
+                                   userDocRole.getStringField(kDbFieldName)));
+        }
+        ASSERT_FALSE(cachedUserRoles.more());
+        checkedOutUsers.push_back(std::move(user));
+    }
+
+    // Update each of the users added into the external state so that they gain the readWrite role.
+    for (const auto& userDoc : userDocs) {
+        BSONObj updateQuery = BSON("user" << userDoc.getStringField(kUserFieldName));
+        ASSERT_OK(
+            externalState->updateOne(opCtx.get(),
+                                     AuthorizationManager::usersCollectionNamespace,
+                                     updateQuery,
+                                     BSON("$set" << BSON("roles" << BSON_ARRAY(updatedRoles[0]))),
+                                     true,
+                                     BSONObj()));
+    }
+
+    // Refresh all external entries in the authorization manager's cache.
+    ASSERT_OK(authzManager->refreshExternalUsers(opCtx.get()));
+
+    // Assert that all checked-out $external users are now marked invalid.
+    for (const auto& checkedOutUser : checkedOutUsers) {
+        if (checkedOutUser->getName().getDB() == "$external"_sd) {
+            ASSERT(!checkedOutUser.isValid());
+        } else {
+            ASSERT(checkedOutUser.isValid());
+        }
+    }
+
+    // Retrieve all users from the cache and verify that only the external ones contain the newly
+    // added role.
+    for (const auto& userDoc : userDocs) {
+        auto swUser = authzManager->acquireUser(
+            opCtx.get(),
+            UserName(userDoc.getStringField(kUserFieldName), userDoc.getStringField(kDbFieldName)));
+        ASSERT_OK(swUser.getStatus());
+        auto user = std::move(swUser.getValue());
+        ASSERT_EQUALS(
+            UserName(userDoc.getStringField(kUserFieldName), userDoc.getStringField(kDbFieldName)),
+            user->getName());
+        ASSERT(user.isValid());
+
+        RoleNameIterator cachedUserRolesIt = user->getRoles();
+        if (userDoc.getStringField(kDbFieldName) == "$external"_sd) {
+            for (const auto& userDocRole : updatedRoles) {
+                ASSERT_EQUALS(cachedUserRolesIt.next(),
+                              RoleName(userDocRole.getStringField(kRoleFieldName),
+                                       userDocRole.getStringField(kDbFieldName)));
+            }
+        } else {
+            for (const auto& userDocRole : initialRoles) {
+                ASSERT_EQUALS(cachedUserRolesIt.next(),
+                              RoleName(userDocRole.getStringField(kRoleFieldName),
+                                       userDocRole.getStringField(kDbFieldName)));
+            }
+        }
+        ASSERT_FALSE(cachedUserRolesIt.more());
+    }
+}
+
 }  // namespace
 }  // namespace mongo

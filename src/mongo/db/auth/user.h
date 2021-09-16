@@ -302,6 +302,12 @@ public:
                             bool showPrivileges,
                             bool showAuthenticationRestrictions) const;
 
+    /**
+     * Returns true if the User object has at least one different direct or indirect role from the
+     * otherUser.
+     */
+    bool hasDifferentRoles(const User& otherUser) const;
+
 private:
     // Unique ID (often UUID) for this user. May be empty for legacy users.
     UserId _id;

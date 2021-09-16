@@ -107,6 +107,12 @@ public:
 
     void invalidateUsersFromDB(OperationContext* opCtx, StringData dbname) override;
 
+    /**
+     * Verify role information for users in the $external database and insert updated information
+     * into the cache if necessary. Currently, this is only used to refresh LDAP users.
+     */
+    Status refreshExternalUsers(OperationContext* opCtx) override;
+
     Status initialize(OperationContext* opCtx) override;
 
     /**
