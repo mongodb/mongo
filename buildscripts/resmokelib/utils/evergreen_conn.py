@@ -1,11 +1,14 @@
 """Helper functions to interact with evergreen."""
 import os
+from typing import Optional
 
 import requests
 import structlog
 from requests import HTTPError
 
-from evergreen import RetryingEvergreenApi, Patch
+from evergreen import RetryingEvergreenApi, Patch, Version
+
+from buildscripts.resmokelib.setup_multiversion.config import SetupMultiversionConfig
 
 EVERGREEN_HOST = "https://evergreen.mongodb.com"
 EVERGREEN_CONFIG_LOCATIONS = (
@@ -111,37 +114,25 @@ def get_generic_buildvariant_name(config, major_minor_version):
     return generic_buildvariant_name
 
 
-def get_evergreen_project_and_version(config, evg_api, commit_hash):
-    """Return evergreen project and version by commit hash."""
+def get_evergreen_version(config: SetupMultiversionConfig, evg_api: RetryingEvergreenApi,
+                          evg_ref: str) -> Optional[Version]:
+    """Return evergreen version by reference (commit_hash or evergreen_version_id)."""
+    # Evergreen reference as evergreen_version_id
+    evg_refs = [evg_ref]
+    # Evergreen reference as {project_name}_{commit_hash}
+    evg_refs.extend(f"{proj.replace('-', '_')}_{evg_ref}" for proj in config.evergreen_projects)
 
-    for evg_project in config.evergreen_projects:
+    for ref in evg_refs:
         try:
-            version_id = evg_project.replace("-", "_") + "_" + commit_hash
-            evg_version = evg_api.version_by_id(version_id)
+            evg_version = evg_api.version_by_id(ref)
         except HTTPError:
             continue
         else:
             LOGGER.debug("Found evergreen version.",
                          evergreen_version=f"{EVERGREEN_HOST}/version/{evg_version.version_id}")
-            return evg_project, evg_version
+            return evg_version
 
-    raise EvergreenConnError(f"Evergreen version for commit hash {commit_hash} not found.")
-
-
-def get_evergreen_project(config, evg_api, evergreen_version_id):
-    """Return evergreen project for a given Evergreen version."""
-
-    for evg_project in config.evergreen_projects:
-        try:
-            evg_version = evg_api.version_by_id(evergreen_version_id)
-        except HTTPError:
-            continue
-        else:
-            LOGGER.debug("Found evergreen version.",
-                         evergreen_version=f"{EVERGREEN_HOST}/version/{evg_version.version_id}")
-            return evg_project, evg_version
-
-    raise EvergreenConnError(f"Evergreen version {evergreen_version_id} not found.")
+    return None
 
 
 def get_evergreen_versions(evg_api, evg_project):

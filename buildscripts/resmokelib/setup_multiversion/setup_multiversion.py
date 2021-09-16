@@ -153,6 +153,9 @@ class SetupMultiversion(Subcommand):
                                    " falling back to getting the URL for a specific"
                                    " version.")
                     urls = self.get_urls(version)
+                if not urls:
+                    LOGGER.error("URL is not available for the version.", version=version)
+                    exit(1)
 
                 bin_suffix = self._get_bin_suffix(version, urls["project_identifier"])
                 # Give each version a unique install dir
@@ -254,33 +257,31 @@ class SetupMultiversion(Subcommand):
 
         return urls
 
-    def get_urls(self, binary_version=None, evergreen_version=None, buildvariant_name=None):
-        """Return multiversion urls for a given binary version or (Evergreen version + variant)."""
-        if (binary_version and evergreen_version) or not (binary_version or evergreen_version):
-            raise ValueError("Must specify exactly one of `version` and `evergreen_version`")
+    def get_urls(self, version: str, buildvariant_name: Optional[str] = None) -> Dict[str, Any]:
+        """Return multiversion urls for a given version (as binary version or commit hash or evergreen_version_id)."""
 
-        if binary_version:
+        evg_version = evergreen_conn.get_evergreen_version(self.config, self.evg_api, version)
+        if evg_version is None:
             git_tag, commit_hash = github_conn.get_git_tag_and_commit(self.github_oauth_token,
-                                                                      binary_version)
+                                                                      version)
             LOGGER.info("Found git attributes.", git_tag=git_tag, commit_hash=commit_hash)
-
-            evg_project, evg_version = evergreen_conn.get_evergreen_project_and_version(
-                self.config, self.evg_api, commit_hash)
-        else:
-            evg_project, evg_version = evergreen_conn.get_evergreen_project(
-                self.config, self.evg_api, evergreen_version)
-
-        LOGGER.debug("Found evergreen project.", evergreen_project=evg_project)
-
-        try:
-            major_minor_version = re.findall(r"\d+\.\d+", evg_project)[-1]
-        except IndexError:
-            major_minor_version = "master"
+            evg_version = evergreen_conn.get_evergreen_version(self.config, self.evg_api,
+                                                               commit_hash)
+        if evg_version is None:
+            return {}
 
         if not buildvariant_name:
-            buildvariant_name = self.get_buildvariant_name(major_minor_version)
+            evg_project = evg_version.project_identifier
+            LOGGER.debug("Found evergreen project.", evergreen_project=evg_project)
 
-        LOGGER.debug("Found buildvariant.", buildvariant_name=buildvariant_name)
+            try:
+                major_minor_version = re.findall(r"\d+\.\d+", evg_project)[-1]
+            except IndexError:
+                major_minor_version = "master"
+
+            buildvariant_name = self.get_buildvariant_name(major_minor_version)
+            LOGGER.debug("Found buildvariant.", buildvariant_name=buildvariant_name)
+
         if buildvariant_name not in evg_version.build_variants_map:
             raise ValueError(
                 f"Buildvariant {buildvariant_name} not found in evergreen. "
@@ -394,10 +395,11 @@ class SetupMultiversionPlugin(PluginInterface):
             "version from `mongodb-mongo-v4.4` Evergreen project will be downloaded. Otherwise the latest "
             "by git tag version will be downloaded.")
         parser.add_argument(
-            "versions", nargs="*", help=
-            "Examples: 4.0, 4.0.1, 4.0.0-rc0. If 'rc' is included in the version name, we'll use the exact rc, "
-            "otherwise we'll pull the highest non-rc version compatible with the version specified."
-        )
+            "versions", nargs="*",
+            help="Accepts binary versions, full git commit hashes, evergreen version ids. "
+            "Binary version examples: 4.0, 4.0.1, 4.0.0-rc0. If 'rc' is included in the version name, "
+            "we'll use the exact rc, otherwise we'll pull the highest non-rc version compatible with the "
+            "version specified.")
 
         parser.add_argument("-db", "--downloadBinaries", dest="download_binaries",
                             action="store_true", default=True,

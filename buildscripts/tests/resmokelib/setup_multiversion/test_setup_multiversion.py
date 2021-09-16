@@ -265,34 +265,67 @@ class TestSetupMultiversionGetLatestUrls(TestSetupMultiversionBase):
 
 class TestSetupMultiversionGetUrls(TestSetupMultiversionBase):
     @patch("evergreen.version.Version")
-    @patch("buildscripts.resmokelib.utils.evergreen_conn.get_evergreen_project_and_version")
+    @patch("buildscripts.resmokelib.utils.evergreen_conn.get_evergreen_version")
     @patch("buildscripts.resmokelib.setup_multiversion.github_conn.get_git_tag_and_commit")
     @patch("buildscripts.resmokelib.utils.evergreen_conn.get_compile_artifact_urls")
-    def test_urls_found(self, mock_get_compile_artifact_urls, mock_get_git_tag_and_commit,
-                        mock_get_evergreen_project_and_version, mock_version):
+    def test_urls_by_binary_version_found(self, mock_get_compile_artifact_urls,
+                                          mock_get_git_tag_and_commit, mock_get_evergreen_version,
+                                          mock_version):
         expected_urls = {
             "Binaries":
                 "https://mciuploads.s3.amazonaws.com/mongodb-mongo-master/ubuntu1804/90f767adbb1901d007ee4dd8714f53402d893669/binaries/mongo-mongodb_mongo_master_ubuntu1804_90f767adbb1901d007ee4dd8714f53402d893669_20_11_30_03_14_30.tgz"
         }
 
-        mock_get_git_tag_and_commit.return_value = ("git_tag", "commit_hash")
+        mock_get_git_tag_and_commit.return_value = ("r4.4.1",
+                                                    "90f767adbb1901d007ee4dd8714f53402d893669")
         mock_version.build_variants_map = {self.buildvariant_name: "build_id"}
-        mock_get_evergreen_project_and_version.return_value = ("mongodb-mongo-v4.4", mock_version)
+        mock_version.project_identifier = "mongodb-mongo-v4.4"
+        mock_get_evergreen_version.return_value = mock_version
         mock_get_compile_artifact_urls.return_value = expected_urls
 
         urls = self.setup_multiversion.get_urls("4.4.1")
         self.assertEqual(urls, expected_urls)
 
     @patch("evergreen.version.Version")
-    @patch("buildscripts.resmokelib.utils.evergreen_conn.get_evergreen_project_and_version")
+    @patch("buildscripts.resmokelib.utils.evergreen_conn.get_evergreen_version")
+    @patch("buildscripts.resmokelib.utils.evergreen_conn.get_compile_artifact_urls")
+    def test_urls_by_commit_hash_found(self, mock_get_compile_artifact_urls,
+                                       mock_get_evergreen_version, mock_version):
+        expected_urls = {
+            "Binaries":
+                "https://mciuploads.s3.amazonaws.com/mongodb-mongo-master/ubuntu1804/90f767adbb1901d007ee4dd8714f53402d893669/binaries/mongo-mongodb_mongo_master_ubuntu1804_90f767adbb1901d007ee4dd8714f53402d893669_20_11_30_03_14_30.tgz"
+        }
+
+        mock_version.build_variants_map = {self.buildvariant_name: "build_id"}
+        mock_version.project_identifier = "mongodb-mongo-v4.4"
+        mock_get_evergreen_version.return_value = mock_version
+        mock_get_compile_artifact_urls.return_value = expected_urls
+
+        urls = self.setup_multiversion.get_urls("90f767adbb1901d007ee4dd8714f53402d893669")
+        self.assertEqual(urls, expected_urls)
+
+    @patch("evergreen.version.Version")
+    @patch("buildscripts.resmokelib.utils.evergreen_conn.get_evergreen_version")
     @patch("buildscripts.resmokelib.setup_multiversion.github_conn.get_git_tag_and_commit")
     @patch("buildscripts.resmokelib.utils.evergreen_conn.get_compile_artifact_urls")
     def test_urls_not_found(self, mock_get_compile_artifact_urls, mock_get_git_tag_and_commit,
-                            mock_get_evergreen_project_and_version, mock_version):
-        mock_get_git_tag_and_commit.return_value = ("git_tag", "commit_hash")
+                            mock_get_evergreen_version, mock_version):
+        mock_get_git_tag_and_commit.return_value = ("r4.4.1",
+                                                    "90f767adbb1901d007ee4dd8714f53402d893669")
         mock_version.build_variants_map = {self.buildvariant_name: "build_id"}
-        mock_get_evergreen_project_and_version.return_value = ("mongodb-mongo-v4.4", mock_version)
+        mock_version.project_identifier = "mongodb-mongo-v4.4"
+        mock_get_evergreen_version.return_value = mock_version
         mock_get_compile_artifact_urls.return_value = {}
+
+        urls = self.setup_multiversion.get_urls("4.4.1")
+        self.assertEqual(urls, {})
+
+    @patch("buildscripts.resmokelib.utils.evergreen_conn.get_evergreen_version")
+    @patch("buildscripts.resmokelib.setup_multiversion.github_conn.get_git_tag_and_commit")
+    def test_evg_version_not_found(self, mock_get_git_tag_and_commit, mock_get_evergreen_version):
+        mock_get_git_tag_and_commit.return_value = ("r4.4.1",
+                                                    "90f767adbb1901d007ee4dd8714f53402d893669")
+        mock_get_evergreen_version.return_value = None
 
         urls = self.setup_multiversion.get_urls("4.4.1")
         self.assertEqual(urls, {})
