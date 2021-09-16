@@ -151,13 +151,13 @@ public:
     explicit TLConnectionSetupHook(executor::NetworkConnectionHook* hookToWrap)
         : _wrappedHook(hookToWrap) {}
 
-    BSONObj augmentIsMasterRequest(BSONObj cmdObj) override {
+    BSONObj augmentIsMasterRequest(const HostAndPort& remoteHost, BSONObj cmdObj) override {
         BSONObjBuilder bob(std::move(cmdObj));
         bob.append("hangUpOnStepDown", false);
         if (internalSecurity.user) {
             bob.append("saslSupportedMechs", internalSecurity.user->getName().getUnambiguousName());
         }
-        _speculativeAuthType = auth::speculateInternalAuth(&bob, &_session);
+        _speculativeAuthType = auth::speculateInternalAuth(remoteHost, &bob, &_session);
 
         return bob.obj();
     }

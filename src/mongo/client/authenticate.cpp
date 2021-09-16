@@ -291,24 +291,26 @@ Future<std::string> negotiateSaslMechanism(RunCommandHook runCommand,
 }
 
 Future<void> authenticateInternalClient(const std::string& clientSubjectName,
+                                        const HostAndPort& remote,
                                         boost::optional<std::string> mechanismHint,
                                         StepDownBehavior stepDownBehavior,
                                         RunCommandHook runCommand) {
     return negotiateSaslMechanism(
                runCommand, internalSecurity.user->getName(), mechanismHint, stepDownBehavior)
-        .then([runCommand, clientSubjectName](std::string mechanism) -> Future<void> {
+        .then([runCommand, clientSubjectName, remote](std::string mechanism) -> Future<void> {
             auto params = getInternalAuthParams(0, mechanism);
             if (params.isEmpty()) {
                 return Status(ErrorCodes::BadValue,
                               "Missing authentication parameters for internal user auth");
             }
-            return authenticateClient(params, HostAndPort(), clientSubjectName, runCommand)
+            return authenticateClient(params, remote, clientSubjectName, runCommand)
                 .onError<ErrorCodes::AuthenticationFailed>(
-                    [runCommand, clientSubjectName, mechanism](Status status) -> Future<void> {
+                    [runCommand, clientSubjectName, remote, mechanism](
+                        Status status) -> Future<void> {
                         auto altCreds = getInternalAuthParams(1, mechanism);
                         if (!altCreds.isEmpty()) {
                             return authenticateClient(
-                                altCreds, HostAndPort(), clientSubjectName, runCommand);
+                                altCreds, remote, clientSubjectName, runCommand);
                         }
                         return status;
                     });
@@ -431,7 +433,9 @@ SpeculativeAuthType speculateAuth(BSONObjBuilder* isMasterRequest,
 }
 
 SpeculativeAuthType speculateInternalAuth(
-    BSONObjBuilder* isMasterRequest, std::shared_ptr<SaslClientSession>* saslClientSession) try {
+    const HostAndPort& remoteHost,
+    BSONObjBuilder* isMasterRequest,
+    std::shared_ptr<SaslClientSession>* saslClientSession) try {
     auto params = getInternalAuthParams(0, kMechanismScramSha256.toString());
     if (params.isEmpty()) {
         return SpeculativeAuthType::kNone;
@@ -440,8 +444,8 @@ SpeculativeAuthType speculateInternalAuth(
     auto mechanism = getBSONString(params, saslCommandMechanismFieldName);
     auto authDB = getBSONString(params, saslCommandUserDBFieldName);
 
-    auto ret = _speculateAuth(
-        isMasterRequest, mechanism, HostAndPort(), authDB, params, saslClientSession);
+    auto ret =
+        _speculateAuth(isMasterRequest, mechanism, remoteHost, authDB, params, saslClientSession);
     if (!ret.isOK()) {
         return SpeculativeAuthType::kNone;
     }

@@ -58,7 +58,7 @@ public:
      *
      * By default this will just return the cmdObj passed in unaltered.
      */
-    virtual BSONObj augmentIsMasterRequest(BSONObj cmdObj) {
+    virtual BSONObj augmentIsMasterRequest(const HostAndPort& remoteHost, BSONObj cmdObj) {
         return cmdObj;
     }
 

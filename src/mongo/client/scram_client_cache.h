@@ -68,6 +68,15 @@ private:
     using HostToSecretsMap = stdx::unordered_map<HostAndPort, HostToSecretsPair>;
 
 public:
+    struct Stats {
+        // Count of cache entries
+        int64_t count{0};
+        // Number of cache hits
+        int64_t hits{0};
+        // Number of cache misses
+        int64_t misses{0};
+    };
+
     /**
      * Returns precomputed SCRAMSecrets, if one has already been
      * stored for the specified hostname and the provided presecrets
@@ -81,6 +90,7 @@ public:
         // Search the cache for a record associated with the host we're trying to connect to.
         auto foundSecret = _hostToSecrets.find(target);
         if (foundSecret == _hostToSecrets.end()) {
+            ++_stats.misses;
             return {};
         }
 
@@ -89,8 +99,10 @@ public:
         // stale cached secrets. We'll need to rerun the SCRAM computation.
         const auto& foundPresecrets = foundSecret->second.first;
         if (foundPresecrets == presecrets) {
+            ++_stats.hits;
             return foundSecret->second.second;
         } else {
+            ++_stats.misses;
             return {};
         }
     }
@@ -116,9 +128,20 @@ public:
         }
     }
 
+    /**
+     * Return metrics about the cache
+     */
+    Stats getStats() const {
+        const stdx::lock_guard<Latch> lock(_hostToSecretsMutex);
+        Stats stats = _stats;
+        stats.count = _hostToSecrets.size();
+        return stats;
+    }
+
 private:
     mutable Mutex _hostToSecretsMutex = MONGO_MAKE_LATCH("SCRAMClientCache::_hostToSecretsMutex");
     HostToSecretsMap _hostToSecrets;
+    mutable Stats _stats;
 };
 
 }  // namespace mongo
