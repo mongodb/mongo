@@ -131,8 +131,7 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
     _coll = catalog->lookupCollectionByNamespace(opCtx, _resolvedNss);
     invariant(!nsOrUUID.uuid() || _coll,
               str::stream() << "Collection for " << _resolvedNss.ns()
-                            << " disappeared after successufully resolving "
-                            << nsOrUUID.toString());
+                            << " disappeared after successfully resolving " << nsOrUUID.toString());
 
     if (_coll) {
         // If we are in a transaction, we cannot yield and wait when there are pending catalog

@@ -45,11 +45,13 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_impl.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/op_observer_sharding_impl.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_oplog_application.h"
 #include "mongo/db/s/resharding_util.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -64,11 +66,11 @@ public:
     void setUp() override {
         ServiceContextMongoDTest::setUp();
 
-        auto serviceContext = getServiceContext();
-
         // Initialize sharding components as a shard server.
         serverGlobalParams.clusterRole = ClusterRole::ShardServer;
 
+        auto serviceContext = getServiceContext();
+        ShardingState::get(serviceContext)->setInitialized(_myDonorId.toString(), OID::gen());
         {
             auto opCtx = makeOperationContext();
             auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(serviceContext);
@@ -98,6 +100,14 @@ public:
             for (const auto& nss : {_outputNss, _myStashNss, _otherStashNss}) {
                 resharding::data_copy::ensureCollectionExists(
                     opCtx.get(), nss, CollectionOptions{});
+            }
+
+            {
+                AutoGetCollection autoColl(opCtx.get(), _outputNss, MODE_X);
+                CollectionShardingRuntime::get(opCtx.get(), _outputNss)
+                    ->setFilteringMetadata(
+                        opCtx.get(),
+                        CollectionMetadata(makeChunkManagerForOutputCollection(), _myDonorId));
             }
 
             _metrics = std::make_unique<ReshardingMetrics>(getServiceContext());
@@ -235,6 +245,30 @@ public:
     }
 
 private:
+    ChunkManager makeChunkManager(const OID& epoch,
+                                  const ShardId& shardId,
+                                  const NamespaceString& nss,
+                                  const UUID& uuid,
+                                  const BSONObj& shardKey,
+                                  const std::vector<ChunkType>& chunks) {
+        auto rt = RoutingTableHistory::makeNew(nss,
+                                               uuid,
+                                               shardKey,
+                                               nullptr /* defaultCollator */,
+                                               false /* unique */,
+                                               epoch,
+                                               Timestamp(),
+                                               boost::none /* timeseriesFields */,
+                                               boost::none /* reshardingFields */,
+                                               boost::none /* chunkSizeBytes */,
+                                               true /* allowMigrations */,
+                                               chunks);
+        return ChunkManager(shardId,
+                            DatabaseVersion(UUID::gen(), Timestamp()),
+                            makeStandaloneRoutingTableHistory(std::move(rt)),
+                            boost::none /* clusterTime */);
+    }
+
     ChunkManager makeChunkManagerForSourceCollection() {
         // Create three chunks, two that are owned by this donor shard and one owned by some other
         // shard. The chunk for {sk: null} is owned by this donor shard to allow test cases to omit
@@ -257,23 +291,21 @@ private:
                       ChunkVersion(100, 2, epoch, Timestamp()),
                       _myDonorId}};
 
-        auto rt = RoutingTableHistory::makeNew(_sourceNss,
-                                               _sourceUUID,
-                                               BSON(_currentShardKey << 1),
-                                               nullptr /* defaultCollator */,
-                                               false /* unique */,
-                                               std::move(epoch),
-                                               Timestamp(),
-                                               boost::none /* timeseriesFields */,
-                                               boost::none /* reshardingFields */,
-                                               boost::none /* chunkSizeBytes */,
-                                               true /* allowMigrations */,
-                                               chunks);
+        return makeChunkManager(
+            epoch, _myDonorId, _sourceNss, _sourceUUID, BSON(_currentShardKey << 1), chunks);
+    }
 
-        return ChunkManager(_myDonorId,
-                            DatabaseVersion(UUID::gen(), Timestamp()),
-                            makeStandaloneRoutingTableHistory(std::move(rt)),
-                            boost::none /* clusterTime */);
+    ChunkManager makeChunkManagerForOutputCollection() {
+        const OID epoch = OID::gen();
+        const CollectionUUID outputUuid = UUID::gen();
+        std::vector<ChunkType> chunks = {
+            ChunkType{outputUuid,
+                      ChunkRange{BSON(_newShardKey << MINKEY), BSON(_newShardKey << MAXKEY)},
+                      ChunkVersion(100, 0, epoch, Timestamp()),
+                      _myDonorId}};
+
+        return makeChunkManager(
+            epoch, _myDonorId, _outputNss, outputUuid, BSON(_newShardKey << 1), chunks);
     }
 
     RoutingTableHistoryValueHandle makeStandaloneRoutingTableHistory(RoutingTableHistory rt) {
@@ -283,6 +315,7 @@ private:
     }
 
     const StringData _currentShardKey = "sk";
+    const StringData _newShardKey = "new_sk";
 
     const NamespaceString _sourceNss{"test_crud", "collection_being_resharded"};
     const CollectionUUID _sourceUUID = UUID::gen();
