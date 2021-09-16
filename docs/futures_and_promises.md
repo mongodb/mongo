@@ -103,7 +103,7 @@ may crash debug builds of the server in the future).
 To create a `Promise` that has a Future, you may use the [`PromiseAndFuture<T>`][pf]
 utility type. Upon construction, it contains a created `Promise<T>` and its
 corresponding `Future<T>`. The perhaps-familiar `makePromiseFuture<T>` factory
-function now simply returns a value-initialized `PromiseAndFuture<T>{}`.
+function now simply returns `PromiseAndFuture<T>{}`.
 
 As was previously alluded to, it's
 also possible to make a "ready future" - one that has no associated promise and is already filled
@@ -150,7 +150,7 @@ using the member function `Future<T>::semi()`. Let's look at a quick example to 
 ```c++
 // Code producing a `SemiFuture`
 SemiFuture<Work> SomeAsyncService::requestWork() {
-  PromiseFuture<Work> pf;
+  PromiseAndFuture<Work> pf;
   _privateExecutor->schedule([promise = std::move(pf.promise)](Status s) {
       if (s.isOK()) {
         auto w = produceWork();

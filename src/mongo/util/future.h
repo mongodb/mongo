@@ -868,10 +868,14 @@ public:
     }
 
     /**
-     * Calling `getFuture` is only valid before the promise is completed,
-     * because a Promise is nullified upon completion.
+     * Create and return the Future corresponding to this Promise. Cannot be
+     * called more than once (but see `SharedPromise` which supports multiple
+     * `getFuture` calls).
      *
-     * The PromiseAndFuture helper avoids this data race by eagerly calling
+     * Caution: calling `getFuture` is only valid before the promise is
+     * completed, because a Promise is nullified upon completion. This Promise
+     * behavior is different from the semantics of other future libraries. The
+     * PromiseAndFuture helper avoids a potential data race by eagerly calling
      * `getFuture`, returning the Promise together with its Future.
      */
     Future<T> getFuture() noexcept {
@@ -1151,12 +1155,12 @@ private:
     const boost::intrusive_ptr<SharedStateT> _sharedState = make_intrusive<SharedStateT>();
 };
 
-/** Holds a Promise and its corresponding Future. */
+/**
+ * Holds a Promise and its corresponding Future.
+ * Upon construction, contains a new Promise and its Future.
+ */
 template <typename T>
 struct PromiseAndFuture {
-    /** Initialize with a new Promise and its Future. */
-    PromiseAndFuture() = default;
-
     Promise<T> promise{NonNullPromiseTag{}};
     Future<T> future{promise.getFuture()};
 };
