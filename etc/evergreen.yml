@@ -9032,7 +9032,6 @@ buildvariants:
     target_resmoke_time: 10
     max_sub_suites: 3
     large_distro_name: rhel80-medium
-    spawn_resmoke_using: jasper
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
@@ -9139,7 +9138,6 @@ buildvariants:
     large_distro_name: rhel80-medium
     burn_in_tag_buildvariants: enterprise-rhel-80-64-bit-inmem linux-64-duroff enterprise-rhel-80-64-bit-multiversion
     num_scons_link_jobs_available: 0.99
-    spawn_resmoke_using: jasper
   tasks:
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:

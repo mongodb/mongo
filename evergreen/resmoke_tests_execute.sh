@@ -104,11 +104,6 @@ if [[ ${disable_unit_tests} = "false" && ! -f ${skip_tests} ]]; then
     extra_args="$extra_args --mongodSetParameter \"{'jsHeapLimitMB':10}\""
   fi
 
-  spawn_using=${spawn_resmoke_using}
-  if [[ -z "$spawn_using" ]]; then
-    spawn_using="python"
-  fi
-
   path_value="$PATH:/data/multiversion"
 
   # The "resmoke_wrapper" expansion is used by the 'burn_in_tests' task to wrap the resmoke.py
@@ -141,7 +136,6 @@ if [[ ${disable_unit_tests} = "false" && ! -f ${skip_tests} ]]; then
     --taskName=${task_name} \
     --variantName=${build_variant} \
     --versionId=${version_id} \
-    --spawnUsing=$spawn_using \
     --reportFile=report.json \
     --perfReportFile=perf.json
   resmoke_exit_code=$?
