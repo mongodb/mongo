@@ -182,6 +182,8 @@ selector:
   - jstests/sharding/pipeline_length_limit.js
   # Remove once SERVER-55648 is backported to v4.0
   - jstests/sharding/retryable_mongos_write_errors.js
+  - jstests/sharding/warm_up_connection_pool.js
+
 executor:
   config:
     shell_options:

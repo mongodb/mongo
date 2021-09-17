@@ -31,9 +31,25 @@ global:
   cpp_namespace: "mongo"
   cpp_includes:
     - "mongo/s/mongos_options.h"
+    - "mongo/s/pre_warm_connection_pool_impl.h"
   configs:
     section: "Sharding options"
     source: [ yaml, cli, ini ]
+
+server_parameters: 
+  warmMinConnectionsInShardingTaskExecutorPoolOnStartup:
+    description: <-
+        Enables prewarming of the connection pool.
+    set_at: [ startup ]
+    cpp_varname: "gWarmMinConnectionsInShardingTaskExecutorPoolOnStartup"
+    default: true
+
+  warmMinConnectionsInShardingTaskExecutorPoolOnStartupWaitMS:
+    description: <-
+        How long to wait for all hosts to have at least one connection.
+    set_at: [ startup ]
+    cpp_varname: "gWarmMinConnectionsInShardingTaskExecutorPoolOnStartupWaitMS"
+    default: 2000 # 2secs
 
 configs:
   "sharding.configDB":

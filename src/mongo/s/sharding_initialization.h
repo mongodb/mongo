@@ -89,4 +89,10 @@ Status initializeGlobalShardingState(OperationContext* opCtx,
 
 Status waitForShardRegistryReload(OperationContext* opCtx);
 
+/**
+ * Warms up connections to shards with best effort strategy.
+ */
+
+Status preWarmConnectionPool(OperationContext* opCtx);
+
 }  // namespace mongo
