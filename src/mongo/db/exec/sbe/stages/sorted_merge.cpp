@@ -32,6 +32,7 @@
 #include "mongo/db/exec/sbe/stages/sorted_merge.h"
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/size_estimator.h"
 
 namespace mongo {
 namespace sbe {
@@ -231,6 +232,16 @@ std::vector<DebugPrinter::Block> SortedMergeStage::debugPrint() const {
     ret.emplace_back(DebugPrinter::Block("`]"));
 
     return ret;
+}
+
+size_t SortedMergeStage::estimateCompileTimeSize() const {
+    size_t size = sizeof(*this);
+    size += size_estimator::estimate(_children);
+    size += size_estimator::estimate(_inputKeys);
+    size += size_estimator::estimate(_dirs);
+    size += size_estimator::estimate(_inputVals);
+    size += size_estimator::estimate(_outputVals);
+    return size;
 }
 }  // namespace sbe
 }  // namespace mongo

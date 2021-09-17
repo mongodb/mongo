@@ -32,6 +32,7 @@
 #include "mongo/db/exec/sbe/stages/hash_join.h"
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -289,6 +290,16 @@ std::vector<DebugPrinter::Block> HashJoinStage::debugPrint() const {
     ret.emplace_back(DebugPrinter::Block::cmdDecIndent);
 
     return ret;
+}
+
+size_t HashJoinStage::estimateCompileTimeSize() const {
+    size_t size = sizeof(*this);
+    size += size_estimator::estimate(_children);
+    size += size_estimator::estimate(_outerCond);
+    size += size_estimator::estimate(_outerProjects);
+    size += size_estimator::estimate(_innerCond);
+    size += size_estimator::estimate(_innerProjects);
+    return size;
 }
 }  // namespace sbe
 }  // namespace mongo

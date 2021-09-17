@@ -35,6 +35,7 @@ sbeEnv.Library(
     target='query_sbe',
     source=[
         'expressions/expression.cpp',
+        'size_estimator.cpp',
         'stages/branch.cpp',
         'stages/bson_scan.cpp',
         'stages/check_bounds.cpp',
@@ -155,6 +156,7 @@ env.CppUnitTest(
         'sbe_merge_join_test.cpp',
         'sbe_mkobj_test.cpp',
         'sbe_numeric_convert_test.cpp',
+        'sbe_plan_size_test.cpp',
         'sbe_sort_test.cpp',
         'sbe_sorted_merge_test.cpp',
         'sbe_spool_test.cpp',

@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 
 namespace mongo::sbe {
@@ -68,6 +69,7 @@ public:
     std::unique_ptr<PlanStageStats> getStats(bool includeDebugInfo) const final;
     const SpecificStats* getSpecificStats() const final;
     std::vector<DebugPrinter::Block> debugPrint() const final;
+    size_t estimateCompileTimeSize() const final;
 
 private:
     std::shared_ptr<SpoolBuffer> _buffer{nullptr};
@@ -120,6 +122,7 @@ public:
     std::unique_ptr<PlanStageStats> getStats(bool includeDebugInfo) const final;
     const SpecificStats* getSpecificStats() const final;
     std::vector<DebugPrinter::Block> debugPrint() const final;
+    size_t estimateCompileTimeSize() const final;
 
 protected:
     void doSaveState() final;
@@ -269,6 +272,12 @@ public:
         ret.emplace_back("`]");
 
         return ret;
+    }
+
+    size_t estimateCompileTimeSize() const {
+        size_t size = sizeof(*this);
+        size += size_estimator::estimate(_vals);
+        return size;
     }
 
 private:

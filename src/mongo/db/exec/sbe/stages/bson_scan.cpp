@@ -32,6 +32,7 @@
 #include "mongo/db/exec/sbe/stages/bson_scan.h"
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -181,5 +182,13 @@ std::vector<DebugPrinter::Block> BSONScanStage::debugPrint() const {
 
     return ret;
 }
+
+size_t BSONScanStage::estimateCompileTimeSize() const {
+    size_t size = sizeof(*this);
+    size += size_estimator::estimate(_fields);
+    size += size_estimator::estimate(_vars);
+    return size;
+}
+
 }  // namespace sbe
 }  // namespace mongo

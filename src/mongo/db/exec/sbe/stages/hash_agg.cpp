@@ -33,6 +33,8 @@
 
 #include "mongo/util/str.h"
 
+#include "mongo/db/exec/sbe/size_estimator.h"
+
 namespace mongo {
 namespace sbe {
 HashAggStage::HashAggStage(std::unique_ptr<PlanStage> input,
@@ -322,5 +324,15 @@ std::vector<DebugPrinter::Block> HashAggStage::debugPrint() const {
 
     return ret;
 }
+
+size_t HashAggStage::estimateCompileTimeSize() const {
+    size_t size = sizeof(*this);
+    size += size_estimator::estimate(_children);
+    size += size_estimator::estimate(_gbs);
+    size += size_estimator::estimate(_aggs);
+    size += size_estimator::estimate(_seekKeysSlots);
+    return size;
+}
+
 }  // namespace sbe
 }  // namespace mongo

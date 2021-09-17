@@ -31,6 +31,8 @@
 
 #include "mongo/db/exec/sbe/stages/unique.h"
 
+#include "mongo/db/exec/sbe/size_estimator.h"
+
 namespace mongo {
 namespace sbe {
 UniqueStage::UniqueStage(std::unique_ptr<PlanStage> input,
@@ -132,5 +134,14 @@ std::vector<DebugPrinter::Block> UniqueStage::debugPrint() const {
 
     return ret;
 }
+
+size_t UniqueStage::estimateCompileTimeSize() const {
+    size_t size = sizeof(*this);
+    size += size_estimator::estimate(_children);
+    size_estimator::estimate(_keySlots);
+    size += size_estimator::estimate(_specificStats);
+    return size;
+}
+
 }  // namespace sbe
 }  // namespace mongo

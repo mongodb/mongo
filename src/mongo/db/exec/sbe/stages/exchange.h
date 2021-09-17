@@ -222,6 +222,8 @@ public:
 
     ExchangePipe* pipe(size_t consumerTid, size_t producerTid);
 
+    size_t estimateCompileTimeSize() const;
+
 private:
     const ExchangePolicy _policy;
     const size_t _numOfProducers;
@@ -276,6 +278,7 @@ public:
     std::vector<DebugPrinter::Block> debugPrint() const final;
 
     ExchangePipe* pipe(size_t producerTid);
+    size_t estimateCompileTimeSize() const final;
 
 private:
     ExchangeBuffer* getBuffer(size_t producerId);
@@ -324,6 +327,12 @@ public:
 
     std::unique_ptr<PlanStageStats> getStats(bool includeDebugInfo) const final;
     const SpecificStats* getSpecificStats() const final;
+
+    // This function should never be executed
+    // since ExchangeProducer is not created in compile time.
+    size_t estimateCompileTimeSize() const final {
+        MONGO_UNREACHABLE;
+    }
 
 private:
     ExchangeBuffer* getBuffer(size_t consumerId);

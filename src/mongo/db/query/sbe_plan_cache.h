@@ -89,8 +89,7 @@ struct CachedSbePlan {
     }
 
     uint64_t estimateObjectSizeInBytes() const {
-        // TODO SERVER-59331: handle size estimation.
-        return 0;
+        return root->estimateCompileTimeSize();
     }
 
     std::unique_ptr<sbe::PlanStage> root;

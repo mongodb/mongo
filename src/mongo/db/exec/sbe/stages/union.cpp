@@ -32,6 +32,7 @@
 #include "mongo/db/exec/sbe/stages/union.h"
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/size_estimator.h"
 
 namespace mongo::sbe {
 UnionStage::UnionStage(PlanStage::Vector inputStages,
@@ -215,6 +216,14 @@ std::vector<DebugPrinter::Block> UnionStage::debugPrint() const {
     ret.emplace_back(DebugPrinter::Block("`]"));
 
     return ret;
+}
+
+size_t UnionStage::estimateCompileTimeSize() const {
+    size_t size = sizeof(*this);
+    size += size_estimator::estimate(_children);
+    size += size_estimator::estimate(_inputVals);
+    size += size_estimator::estimate(_outputVals);
+    return size;
 }
 
 void UnionStage::clearBranches() {

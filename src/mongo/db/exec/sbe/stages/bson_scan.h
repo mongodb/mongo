@@ -65,6 +65,7 @@ public:
     const SpecificStats* getSpecificStats() const final;
 
     std::vector<DebugPrinter::Block> debugPrint() const final;
+    size_t estimateCompileTimeSize() const final;
 
 private:
     const char* const _bsonBegin;

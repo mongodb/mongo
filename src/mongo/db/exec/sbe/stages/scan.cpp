@@ -32,6 +32,7 @@
 #include "mongo/db/exec/sbe/stages/scan.h"
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/db/exec/trial_run_tracker.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/repl/optime.h"
@@ -483,6 +484,14 @@ std::vector<DebugPrinter::Block> ScanStage::debugPrint() const {
     return ret;
 }
 
+size_t ScanStage::estimateCompileTimeSize() const {
+    size_t size = sizeof(*this);
+    size += size_estimator::estimate(_fields);
+    size += size_estimator::estimate(_vars);
+    size += size_estimator::estimate(_specificStats);
+    return size;
+}
+
 ParallelScanStage::ParallelScanStage(CollectionUUID collectionUuid,
                                      boost::optional<value::SlotId> recordSlot,
                                      boost::optional<value::SlotId> recordIdSlot,
@@ -895,5 +904,13 @@ std::vector<DebugPrinter::Block> ParallelScanStage::debugPrint() const {
 
     return ret;
 }
+
+size_t ParallelScanStage::estimateCompileTimeSize() const {
+    size_t size = sizeof(*this);
+    size += size_estimator::estimate(_fields);
+    size += size_estimator::estimate(_vars);
+    return size;
+}
+
 }  // namespace sbe
 }  // namespace mongo

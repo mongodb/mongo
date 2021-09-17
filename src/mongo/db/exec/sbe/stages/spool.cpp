@@ -160,6 +160,13 @@ std::vector<DebugPrinter::Block> SpoolEagerProducerStage::debugPrint() const {
     return ret;
 }
 
+size_t SpoolEagerProducerStage::estimateCompileTimeSize() const {
+    size_t size = sizeof(*this);
+    size += size_estimator::estimate(_children);
+    size += size_estimator::estimate(_vals);
+    return size;
+}
+
 SpoolLazyProducerStage::SpoolLazyProducerStage(std::unique_ptr<PlanStage> input,
                                                SpoolId spoolId,
                                                value::SlotVector vals,
@@ -330,5 +337,13 @@ std::vector<DebugPrinter::Block> SpoolLazyProducerStage::debugPrint() const {
     DebugPrinter::addNewLine(ret);
     DebugPrinter::addBlocks(ret, _children[0]->debugPrint());
     return ret;
+}
+
+size_t SpoolLazyProducerStage::estimateCompileTimeSize() const {
+    size_t size = sizeof(*this);
+    size += size_estimator::estimate(_children);
+    size += size_estimator::estimate(_vals);
+    size += _predicate ? _predicate->estimateSize() : 0;
+    return size;
 }
 }  // namespace mongo::sbe

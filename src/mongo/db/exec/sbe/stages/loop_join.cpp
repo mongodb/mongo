@@ -31,6 +31,7 @@
 
 #include "mongo/db/exec/sbe/stages/loop_join.h"
 
+#include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/util/str.h"
 
 namespace mongo::sbe {
@@ -240,5 +241,15 @@ std::vector<DebugPrinter::Block> LoopJoinStage::debugPrint() const {
     ret.emplace_back(DebugPrinter::Block::cmdDecIndent);
 
     return ret;
+}
+
+size_t LoopJoinStage::estimateCompileTimeSize() const {
+    size_t size = sizeof(*this);
+    size += size_estimator::estimate(_children);
+    size += size_estimator::estimate(_outerProjects);
+    size += size_estimator::estimate(_outerCorrelated);
+    size += _predicate ? _predicate->estimateSize() : 0;
+    size += size_estimator::estimate(_specificStats);
+    return size;
 }
 }  // namespace mongo::sbe

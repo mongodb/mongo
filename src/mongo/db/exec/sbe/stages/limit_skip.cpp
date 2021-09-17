@@ -31,6 +31,8 @@
 
 #include "mongo/db/exec/sbe/stages/limit_skip.h"
 
+#include "mongo/db/exec/sbe/size_estimator.h"
+
 namespace mongo::sbe {
 LimitSkipStage::LimitSkipStage(std::unique_ptr<PlanStage> input,
                                boost::optional<long long> limit,
@@ -126,5 +128,12 @@ std::vector<DebugPrinter::Block> LimitSkipStage::debugPrint() const {
     DebugPrinter::addBlocks(ret, _children[0]->debugPrint());
 
     return ret;
+}
+
+size_t LimitSkipStage::estimateCompileTimeSize() const {
+    size_t size = sizeof(*this);
+    size += size_estimator::estimate(_children);
+    size += size_estimator::estimate(_specificStats);
+    return size;
 }
 }  // namespace mongo::sbe

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2019-present MongoDB, Inc.
+ *    Copyright (C) 2021-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,33 +27,41 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/db/exec/sbe/size_estimator.h"
 
-#include "mongo/db/exec/sbe/stages/stages.h"
+namespace mongo::sbe::size_estimator {
 
-namespace mongo::sbe {
-/**
- * Delivers an infinite stream of getNext() calls, always returning 'ADVANCED'. Also, it does not
- * define any slots; i.e. it does not produce any results.
- *
- * On its face value this does not seem to be very useful but it is handy when we have to construct
- * a data stream when there is not any physical source (i.e. no collection to read from).  Typical
- * use cases are: inner side of traverse stage, the outer side of nested loops, constants, etc.
- */
-class CoScanStage final : public PlanStage {
-public:
-    explicit CoScanStage(PlanNodeId, PlanYieldPolicy* yieldPolicy = nullptr);
+size_t estimate(const IndexBounds& indexBounds) {
+    size_t size = estimate(indexBounds.startKey);
+    size += estimate(indexBounds.endKey);
+    size += estimate(indexBounds.fields);
+    return size;
+}
 
-    std::unique_ptr<PlanStage> clone() const final;
+size_t estimate(const OrderedIntervalList& list) {
+    size_t size = estimate(list.name);
+    size += estimate(list.intervals);
+    return size;
+}
 
-    void prepare(CompileCtx& ctx) final;
-    value::SlotAccessor* getAccessor(CompileCtx& ctx, value::SlotId slot) final;
-    void open(bool reOpen) final;
-    PlanState getNext() final;
-    void close() final;
+size_t estimate(const Interval& interval) {
+    size_t size = estimate(interval._intervalData);
+    size += estimate(interval.start);
+    size += estimate(interval.end);
+    return size;
+}
 
-    std::unique_ptr<PlanStageStats> getStats(bool includeDebugInfo) const final;
-    const SpecificStats* getSpecificStats() const final;
-    size_t estimateCompileTimeSize() const final;
-};
-}  // namespace mongo::sbe
+size_t estimate(const IndexSeekPoint& indexSeekPoint) {
+    size_t size = estimate(indexSeekPoint.keyPrefix);
+    size += estimate(indexSeekPoint.keySuffix);
+    size += estimate(indexSeekPoint.suffixInclusive);
+    return size;
+}
+
+size_t estimate(const IndexBoundsChecker& checker) {
+    size_t size = sbe::size_estimator::estimate(checker._curInterval);
+    size += sbe::size_estimator::estimate(checker._expectedDirection);
+    size += sbe::size_estimator::estimate(checker._keyValues);
+    return size;
+}
+}  // namespace mongo::sbe::size_estimator

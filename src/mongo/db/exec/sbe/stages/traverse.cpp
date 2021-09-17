@@ -29,6 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/db/exec/sbe/stages/traverse.h"
 
 namespace mongo::sbe {
@@ -380,5 +381,15 @@ std::vector<DebugPrinter::Block> TraverseStage::debugPrint() const {
     ret.emplace_back(DebugPrinter::Block::cmdDecIndent);
 
     return ret;
+}
+
+size_t TraverseStage::estimateCompileTimeSize() const {
+    size_t size = sizeof(*this);
+    size += size_estimator::estimate(_children);
+    size += size_estimator::estimate(_correlatedSlots);
+    size += _fold ? _fold->estimateSize() : 0;
+    size += _final ? _final->estimateSize() : 0;
+    size += size_estimator::estimate(_specificStats);
+    return size;
 }
 }  // namespace mongo::sbe

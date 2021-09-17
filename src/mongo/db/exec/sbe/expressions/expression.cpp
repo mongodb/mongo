@@ -34,6 +34,7 @@
 #include <iomanip>
 #include <sstream>
 
+#include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/db/exec/sbe/stages/spool.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/util/str.h"
@@ -81,6 +82,13 @@ std::vector<DebugPrinter::Block> EConstant::debugPrint() const {
     ret.emplace_back(ss.str());
 
     return ret;
+}
+
+size_t EConstant::estimateSize() const {
+    size_t size = sizeof(*this);
+    size += size_estimator::estimate(_tag, _val);
+    size += size_estimator::estimate(_nodes);
+    return size;
 }
 
 std::unique_ptr<EExpression> EVariable::clone() const {
@@ -282,6 +290,11 @@ std::vector<DebugPrinter::Block> EPrimBinary::debugPrint() const {
     return ret;
 }
 
+size_t EPrimBinary::estimateSize() const {
+    return sizeof(*this) + size_estimator::estimate(_nodes);
+}
+
+
 std::unique_ptr<EExpression> EPrimUnary::clone() const {
     return std::make_unique<EPrimUnary>(_op, _nodes[0]->clone());
 }
@@ -319,6 +332,10 @@ std::vector<DebugPrinter::Block> EPrimUnary::debugPrint() const {
     DebugPrinter::addBlocks(ret, _nodes[0]->debugPrint());
 
     return ret;
+}
+
+size_t EPrimUnary::estimateSize() const {
+    return sizeof(*this) + size_estimator::estimate(_nodes);
 }
 
 std::unique_ptr<EExpression> EFunction::clone() const {
@@ -611,6 +628,10 @@ std::vector<DebugPrinter::Block> EFunction::debugPrint() const {
     return ret;
 }
 
+size_t EFunction::estimateSize() const {
+    return sizeof(*this) + size_estimator::estimate(_name) + size_estimator::estimate(_nodes);
+}
+
 std::unique_ptr<EExpression> EIf::clone() const {
     return std::make_unique<EIf>(_nodes[0]->clone(), _nodes[1]->clone(), _nodes[2]->clone());
 }
@@ -657,6 +678,10 @@ std::vector<DebugPrinter::Block> EIf::debugPrint() const {
     ret.emplace_back("`)");
 
     return ret;
+}
+
+size_t EIf::estimateSize() const {
+    return sizeof(*this) + size_estimator::estimate(_nodes);
 }
 
 std::unique_ptr<EExpression> ELocalBind::clone() const {
@@ -712,6 +737,10 @@ std::vector<DebugPrinter::Block> ELocalBind::debugPrint() const {
     return ret;
 }
 
+size_t ELocalBind::estimateSize() const {
+    return sizeof(*this) + size_estimator::estimate(_nodes);
+}
+
 std::unique_ptr<EExpression> ELocalLambda::clone() const {
     return std::make_unique<ELocalLambda>(_frameId, _nodes.back()->clone());
 }
@@ -751,6 +780,10 @@ std::vector<DebugPrinter::Block> ELocalLambda::debugPrint() const {
     return ret;
 }
 
+size_t ELocalLambda::estimateSize() const {
+    return sizeof(*this) + size_estimator::estimate(_nodes);
+}
+
 
 std::unique_ptr<EExpression> EFail::clone() const {
     return std::make_unique<EFail>(_code, getStringView(_messageTag, _messageVal));
@@ -782,6 +815,11 @@ std::vector<DebugPrinter::Block> EFail::debugPrint() const {
     ret.emplace_back("`)");
 
     return ret;
+}
+
+size_t EFail::estimateSize() const {
+    return sizeof(*this) + size_estimator::estimate(_messageTag, _messageVal) +
+        size_estimator::estimate(_nodes);
 }
 
 std::unique_ptr<EExpression> ENumericConvert::clone() const {
@@ -827,6 +865,10 @@ std::vector<DebugPrinter::Block> ENumericConvert::debugPrint() const {
     return ret;
 }
 
+size_t ENumericConvert::estimateSize() const {
+    return sizeof(*this) + size_estimator::estimate(_nodes);
+}
+
 std::unique_ptr<EExpression> ETypeMatch::clone() const {
     return std::make_unique<ETypeMatch>(_nodes[0]->clone(), _typeMask);
 }
@@ -855,6 +897,11 @@ std::vector<DebugPrinter::Block> ETypeMatch::debugPrint() const {
 
     return ret;
 }
+
+size_t ETypeMatch::estimateSize() const {
+    return sizeof(*this) + size_estimator::estimate(_nodes);
+}
+
 
 RuntimeEnvironment::RuntimeEnvironment(const RuntimeEnvironment& other)
     : _state{other._state}, _isSmp{other._isSmp} {

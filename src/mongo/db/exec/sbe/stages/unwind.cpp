@@ -31,6 +31,7 @@
 
 #include "mongo/db/exec/sbe/stages/unwind.h"
 
+#include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/util/str.h"
 
 namespace mongo::sbe {
@@ -219,5 +220,11 @@ void UnwindStage::doRestoreState() {
     }
 
     _inArrayAccessor.refresh();
+}
+
+size_t UnwindStage::estimateCompileTimeSize() const {
+    size_t size = sizeof(*this);
+    size += size_estimator::estimate(_children);
+    return size;
 }
 }  // namespace mongo::sbe

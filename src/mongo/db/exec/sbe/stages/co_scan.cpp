@@ -75,4 +75,8 @@ void CoScanStage::close() {
     trackClose();
 }
 
+size_t CoScanStage::estimateCompileTimeSize() const {
+    return sizeof(*this);
+}
+
 }  // namespace mongo::sbe

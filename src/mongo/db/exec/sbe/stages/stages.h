@@ -413,6 +413,13 @@ public:
         return {DebugPrinter::Block(str)};
     }
 
+    /**
+     * Estimates the compile-time size of the current plan stage and its children (SBE Plan
+     * subtree). The compile-time size is the size of the SBE subtree before it has been prepared or
+     * executed.
+     */
+    virtual size_t estimateCompileTimeSize() const = 0;
+
     friend class CanSwitchOperationContext<PlanStage>;
     friend class CanChangeState<PlanStage>;
     friend class CanTrackStats<PlanStage>;

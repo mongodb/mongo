@@ -31,6 +31,7 @@
 
 #include "mongo/db/exec/sbe/stages/makeobj.h"
 
+#include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/util/str.h"
 
@@ -406,6 +407,16 @@ std::vector<DebugPrinter::Block> MakeObjStageBase<O>::debugPrint() const {
     DebugPrinter::addBlocks(ret, _children[0]->debugPrint());
 
     return ret;
+}
+
+template <MakeObjOutputType O>
+size_t MakeObjStageBase<O>::estimateCompileTimeSize() const {
+    size_t size = sizeof(*this);
+    size += size_estimator::estimate(_children);
+    size += size_estimator::estimate(_fields);
+    size += size_estimator::estimate(_projectFields);
+    size += size_estimator::estimate(_projectVars);
+    return size;
 }
 
 template <MakeObjOutputType O>

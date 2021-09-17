@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 
@@ -174,6 +175,14 @@ public:
         DebugPrinter::addBlocks(ret, _children[0]->debugPrint());
 
         return ret;
+    }
+
+    size_t estimateCompileTimeSize() const final {
+        size_t size = sizeof(*this);
+        size += size_estimator::estimate(_children);
+        size += _filter->estimateSize();
+        size += size_estimator::estimate(_specificStats);
+        return size;
     }
 
 private:

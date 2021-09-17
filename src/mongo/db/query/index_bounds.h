@@ -176,6 +176,11 @@ struct IndexBounds {
     BoundInclusion boundInclusion;
 };
 
+class IndexBoundsChecker;
+namespace sbe::size_estimator {
+size_t estimate(const IndexBoundsChecker&);
+}  // namespace sbe::size_estimator
+
 /**
  * A helper used by IndexScan to navigate an index.
  */
@@ -301,6 +306,8 @@ private:
     std::vector<int> _expectedDirection;
 
     std::vector<BSONElement> _keyValues;
+
+    friend size_t sbe::size_estimator::estimate(const IndexBoundsChecker&);
 };
 
 }  // namespace mongo

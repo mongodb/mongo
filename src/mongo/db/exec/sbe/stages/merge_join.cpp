@@ -32,6 +32,7 @@
 #include "mongo/db/exec/sbe/stages/merge_join.h"
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -422,6 +423,17 @@ std::vector<DebugPrinter::Block> MergeJoinStage::debugPrint() const {
     ret.emplace_back(DebugPrinter::Block::cmdDecIndent);
 
     return ret;
+}
+
+size_t MergeJoinStage::estimateCompileTimeSize() const {
+    size_t size = sizeof(*this);
+    size += size_estimator::estimate(_children);
+    size += size_estimator::estimate(_outerKeys);
+    size += size_estimator::estimate(_outerProjects);
+    size += size_estimator::estimate(_innerKeys);
+    size += size_estimator::estimate(_innerProjects);
+    size += size_estimator::estimate(_dirs);
+    return size;
 }
 }  // namespace sbe
 }  // namespace mongo

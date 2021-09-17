@@ -33,6 +33,7 @@
 
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/trial_run_tracker.h"
 #include "mongo/db/index/index_access_method.h"
@@ -494,4 +495,14 @@ std::vector<DebugPrinter::Block> IndexScanStage::debugPrint() const {
 
     return ret;
 }
+
+size_t IndexScanStage::estimateCompileTimeSize() const {
+    size_t size = sizeof(*this);
+    size += size_estimator::estimate(_vars);
+    size += size_estimator::estimate(_indexName);
+    size += size_estimator::estimate(_valuesBuffer);
+    size += size_estimator::estimate(_specificStats);
+    return size;
+}
+
 }  // namespace mongo::sbe

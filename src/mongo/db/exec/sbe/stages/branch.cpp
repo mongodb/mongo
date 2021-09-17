@@ -32,6 +32,7 @@
 #include "mongo/db/exec/sbe/stages/branch.h"
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/size_estimator.h"
 
 namespace mongo {
 namespace sbe {
@@ -240,6 +241,17 @@ std::vector<DebugPrinter::Block> BranchStage::debugPrint() const {
 
     DebugPrinter::addBlocks(ret, _children[1]->debugPrint());
     return ret;
+}
+
+size_t BranchStage::estimateCompileTimeSize() const {
+    size_t size = sizeof(*this);
+    size += size_estimator::estimate(_children);
+    size += _filter->estimateSize();
+    size += size_estimator::estimate(_inputThenVals);
+    size += size_estimator::estimate(_inputElseVals);
+    size += size_estimator::estimate(_outputVals);
+    size += size_estimator::estimate(_specificStats);
+    return size;
 }
 
 }  // namespace sbe

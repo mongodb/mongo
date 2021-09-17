@@ -286,6 +286,11 @@ public:
 
     virtual std::vector<DebugPrinter::Block> debugPrint() const = 0;
 
+    /**
+     * Estimates the size of the current expression node and its children.
+     */
+    virtual size_t estimateSize() const = 0;
+
 protected:
     Vector _nodes;
 
@@ -370,6 +375,8 @@ public:
     vm::CodeFragment compileDirect(CompileCtx& ctx) const override;
 
     std::vector<DebugPrinter::Block> debugPrint() const override;
+    size_t estimateSize() const final;
+
 
 private:
     value::TypeTags _tag;
@@ -392,6 +399,9 @@ public:
     vm::CodeFragment compileDirect(CompileCtx& ctx) const override;
 
     std::vector<DebugPrinter::Block> debugPrint() const override;
+    size_t estimateSize() const final {
+        return sizeof(*this);
+    }
 
 private:
     value::SlotId _var;
@@ -457,6 +467,8 @@ public:
 
     std::vector<DebugPrinter::Block> debugPrint() const override;
 
+    size_t estimateSize() const final;
+
 private:
     Op _op;
 };
@@ -482,6 +494,8 @@ public:
 
     std::vector<DebugPrinter::Block> debugPrint() const override;
 
+    size_t estimateSize() const final;
+
 private:
     Op _op;
 };
@@ -503,6 +517,8 @@ public:
     vm::CodeFragment compileDirect(CompileCtx& ctx) const override;
 
     std::vector<DebugPrinter::Block> debugPrint() const override;
+
+    size_t estimateSize() const final;
 
 private:
     std::string _name;
@@ -527,6 +543,8 @@ public:
     vm::CodeFragment compileDirect(CompileCtx& ctx) const override;
 
     std::vector<DebugPrinter::Block> debugPrint() const override;
+
+    size_t estimateSize() const final;
 };
 
 /**
@@ -547,6 +565,8 @@ public:
 
     std::vector<DebugPrinter::Block> debugPrint() const override;
 
+    size_t estimateSize() const final;
+
 private:
     FrameId _frameId;
 };
@@ -566,6 +586,8 @@ public:
     vm::CodeFragment compileDirect(CompileCtx& ctx) const override;
 
     std::vector<DebugPrinter::Block> debugPrint() const override;
+
+    size_t estimateSize() const final;
 
 private:
     FrameId _frameId;
@@ -589,6 +611,8 @@ public:
     vm::CodeFragment compileDirect(CompileCtx& ctx) const override;
 
     std::vector<DebugPrinter::Block> debugPrint() const override;
+
+    size_t estimateSize() const final;
 
 private:
     ErrorCodes::Error _code;
@@ -622,6 +646,8 @@ public:
 
     std::vector<DebugPrinter::Block> debugPrint() const override;
 
+    size_t estimateSize() const final;
+
 private:
     value::TypeTags _target;
 };
@@ -643,6 +669,8 @@ public:
     vm::CodeFragment compileDirect(CompileCtx& ctx) const override;
 
     std::vector<DebugPrinter::Block> debugPrint() const override;
+
+    size_t estimateSize() const final;
 
 private:
     uint32_t _typeMask;
