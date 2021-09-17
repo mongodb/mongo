@@ -116,13 +116,14 @@ StatusWith<std::vector<BSONObj>> selectChunkSplitPoints(OperationContext* opCtx,
     auto cmdStatus = invokeSplitCommand(req.toBSON({}), nss.db());
 
     // Fallback to splitVector command in case of mixed binaries not supporting autoSplitVector
-    // TODO SERVER-xyz remove fallback logic once 6.0 branches out
+    // TODO SERVER-60039 remove fallback logic once 6.0 branches out
     bool fallback =
         !cmdStatus.isOK() && cmdStatus.getStatus().code() == ErrorCodes::CommandNotFound;
     if (fallback) {
         BSONObjBuilder cmd;
         cmd.append("splitVector", nss.ns());
         cmd.append("keyPattern", shardKeyPattern.toBSON());
+        chunkRange.append(&cmd);
         cmd.append("maxChunkSizeBytes", chunkSizeBytes);
         cmdStatus = invokeSplitCommand(cmd.obj(), NamespaceString::kAdminDb);
     }
@@ -134,7 +135,7 @@ StatusWith<std::vector<BSONObj>> selectChunkSplitPoints(OperationContext* opCtx,
         return std::move(cmdStatus.getValue().commandStatus);
     }
 
-    // TODO SERVER-xyz remove fallback logic once 6.0 branches out
+    // TODO SERVER-60039 remove fallback logic once 6.0 branches out
     if (fallback) {
         const auto response = std::move(cmdStatus.getValue().response);
         std::vector<BSONObj> splitPoints;
