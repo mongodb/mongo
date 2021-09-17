@@ -901,5 +901,6 @@ main(int argc, char *argv[])
     if (fatal)
         return (EXIT_FAILURE);
     printf("%" PRIu64 " records verified\n", count);
+    testutil_cleanup(opts);
     return (EXIT_SUCCESS);
 }

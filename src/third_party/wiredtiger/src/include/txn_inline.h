@@ -13,6 +13,8 @@
 static inline int
 __wt_txn_context_prepare_check(WT_SESSION_IMPL *session)
 {
+    if (F_ISSET(session->txn, WT_TXN_PREPARE_IGNORE_API_CHECK))
+        return (0);
     if (F_ISSET(session->txn, WT_TXN_PREPARE))
         WT_RET_MSG(session, EINVAL, "not permitted in a prepared transaction");
     return (0);

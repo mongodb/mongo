@@ -159,6 +159,10 @@ test_wt7989_compact_checkpoint_SOURCES = wt7989_compact_checkpoint/main.c
 noinst_PROGRAMS += test_wt7989_compact_checkpoint
 all_TESTS += test_wt7989_compact_checkpoint
 
+test_wt8057_compact_stress_SOURCES = wt8057_compact_stress/main.c
+noinst_PROGRAMS += test_wt8057_compact_stress
+all_TESTS += test_wt8057_compact_stress
+
 # Run this during a "make check" smoke test.
 TESTS = $(all_TESTS)
 LOG_COMPILER = env top_builddir=$(top_builddir) top_srcdir=$(top_srcdir) $(TEST_WRAPPER)
