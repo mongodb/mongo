@@ -88,6 +88,8 @@ last-continuous:
       test_file: jstests/replsets/tenant_migration_recipient_access_blocker_rollback.js
     - ticket: SERVER-59023
       test_file: jstests/sharding/resharding_secondary_recovers_temp_ns_metadata.js
+    - ticket: SERVER-57772
+      test_file: jstests/sharding/rewrite_state_change_errors.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
