@@ -134,6 +134,8 @@ selector:
   - jstests/sharding/time_zone_info_mongos.js
   # Requires behavior that does not and will never exist in 3.6.
   - jstests/sharding/retryable_mongos_write_errors.js
+  # Requires the fix for SERVER-58104 which was not backported to 3.6.
+  - jstests/sharding/balancing_sessions_collection_reshard.js
 executor:
   config:
     shell_options:
