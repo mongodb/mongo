@@ -14,16 +14,22 @@ TestData.skipCheckOrphans = true;
 
 (function() {
 
-/* On the config server the lastApplied optime can go past the atClusterTime timestamp due to pings
- * made on collection config.mongos by sharding uptime reporter thread.
- * Hence, it will not write the no-op oplog entry on the config server as part of waiting for read
- * concern. For more deterministic testing of no-op writes to the oplog, disable uptime reporter
- * threads from reaching out to the config server.
+/**
+ * On the config server the lastApplied optime can go past the atClusterTime timestamp due to pings
+ * made on collection config.mongos or config.lockping by the distributed lock pinger thread and
+ * sharding uptime reporter thread. This can cause the insert into test.TestConfigColl to time out.
+ * To prevent this, disable the pinger threads to prevent them reaching out to the config server.
  */
+const failpointParams = {
+    setParameter: {"failpoint.disableReplSetDistLockManager": "{mode: 'alwaysOn'}"}
+};
+
 var st = new ShardingTest({
     shards: 1,
     configReplSetTestOptions: {settings: {chainingAllowed: false}},
     other: {
+        configOptions: failpointParams,
+        rsOptions: failpointParams,
         mongosOptions:
             {setParameter: {["failpoint.disableShardingUptimeReporting"]: "{mode: 'alwaysOn'}"}}
     }
