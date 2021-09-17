@@ -69,7 +69,10 @@ private:
         return !replicationCoordinator ||
             (replicationCoordinator->getReplicationMode() ==
                  repl::ReplicationCoordinator::modeReplSet &&
-             replicationCoordinator->getMemberState().readable());
+             // Check repl status without locks to prevent deadlocks. This is a best effort check
+             // as the repl state can change right after this check even when inspected under a
+             // lock or mutex.
+             replicationCoordinator->isInPrimaryOrSecondaryState_UNSAFE());
     }
 
     bool _permitRefreshDuringGossipOut() const override {
