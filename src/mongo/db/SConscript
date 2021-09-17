@@ -2377,6 +2377,7 @@ if wiredtiger:
             'dbdirectclient_test.cpp',
             'dbmessage_test.cpp',
             'db_raii_test.cpp',
+            'db_raii_multi_collection_test.cpp',
             "explain_test.cpp",
             'field_parser_test.cpp',
             'field_ref_set_test.cpp',

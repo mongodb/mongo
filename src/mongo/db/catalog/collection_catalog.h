@@ -218,8 +218,17 @@ public:
 
     /**
      * This function gets the Collection pointer that corresponds to the CollectionUUID.
+     *
      * The required locks must be obtained prior to calling this function, or else the found
      * Collection pointer might no longer be valid when the call returns.
+     *
+     * 'lookupCollectionByUUIDForMetadataWrite' requires a MODE_X collection lock, returns a copy to
+     * the caller because catalog updates are copy-on-write.
+     *
+     * 'lookupCollectionByUUID' requires a MODE_IS collection lock.
+     *
+     * 'lookupCollectionByUUIDForRead' does not require locks and should only be used in the context
+     * of a lock-free read wherein we also have a consistent storage snapshot.
      *
      * Returns nullptr if the 'uuid' is not known.
      */
@@ -237,9 +246,18 @@ public:
     bool isCollectionAwaitingVisibility(CollectionUUID uuid) const;
 
     /**
-     * This function gets the Collection pointer that corresponds to the NamespaceString.
+     * These functions fetch a Collection pointer that corresponds to the NamespaceString.
+     *
      * The required locks must be obtained prior to calling this function, or else the found
      * Collection pointer may no longer be valid when the call returns.
+     *
+     * 'lookupCollectionByNamespaceForMetadataWrite' requires a MODE_X collection lock, returns a
+     * copy to the caller because catalog updates are copy-on-write.
+     *
+     * 'lookupCollectionByNamespace' requires a MODE_IS collection lock.
+     *
+     * 'lookupCollectionByNamespaceForRead' does not require locks and should only be used in the
+     * context of a lock-free read wherein we also have a consistent storage snapshot.
      *
      * Returns nullptr if the namespace is unknown.
      */

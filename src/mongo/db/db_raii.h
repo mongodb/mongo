@@ -123,6 +123,19 @@ public:
     }
 
 protected:
+    // So that AutoGetCollectionForReadLockFree & AutoGetCollectionForReadCommandBase can access a
+    // non-const CollectionPtr from this class. AutoGetCollectionForRead inherits the access.
+    friend class AutoGetCollectionForReadLockFree;
+    template <typename AutoGetCollectionForReadType>
+    friend class AutoGetCollectionForReadCommandBase;
+
+    /**
+     * Allow access to the CollectionPtr as non-const, for friend classes.
+     */
+    CollectionPtr& _getCollectionPtrForModify() {
+        return _autoColl->_getCollectionPtrForModify();
+    }
+
     // If this field is set, the reader will not take the ParallelBatchWriterMode lock and conflict
     // with secondary batch application. This stays in scope with the _autoColl so that locks are
     // taken and released in the right order.
@@ -219,6 +232,18 @@ public:
     }
 
 private:
+    // So that AutoGetCollectionForReadCommandBase can access a non-const CollectionPtr from this
+    // class.
+    template <typename AutoGetCollectionForReadType>
+    friend class AutoGetCollectionForReadCommandBase;
+
+    /**
+     * Allow access to the CollectionPtr as non-const, for friend classes.
+     */
+    CollectionPtr& _getCollectionPtrForModify() {
+        return _autoGetCollectionForReadBase->_getCollectionPtrForModify();
+    }
+
     /**
      * Helper for how AutoGetCollectionForReadBase instantiates its owned AutoGetCollectionLockFree.
      */
@@ -318,6 +343,13 @@ public:
     }
 
 protected:
+    /**
+     * Allow access to the CollectionPtr as non-const, for friend classes of inheriting classes.
+     */
+    CollectionPtr& _getCollectionPtrForModify() {
+        return _autoCollForRead._getCollectionPtrForModify();
+    }
+
     AutoGetCollectionForReadCommandBase(
         OperationContext* opCtx,
         const NamespaceStringOrUUID& nsOrUUID,
@@ -362,6 +394,83 @@ public:
         Date_t deadline = Date_t::max(),
         AutoStatsTracker::LogMode logMode = AutoStatsTracker::LogMode::kUpdateTopAndCurOp)
         : AutoGetCollectionForReadCommandBase(opCtx, nsOrUUID, viewMode, deadline, logMode) {}
+
+private:
+    // So that AutoGetCollectionMultiForReadCommandLockFree can access a non-const CollectionPtr
+    // from this class.
+    friend class AutoGetCollectionMultiForReadCommandLockFree;
+};
+
+/**
+ * Creates an AutoGetCollectionForReadCommandLockFree instance for the 'primary' collection and
+ * verifies 'secondary' collections are safe to use for the read. Secondary collections are checked
+ * for existence and that their minimum visible timestamp supports read concern, throwing a
+ * NamespaceNotFound or SnapshotUnavailable on error. Secondaries must be unsharded: this is an
+ * invariant.
+ *
+ * Acquires only the Global IS lock, and sets up consistent in-memory and on-disk state.
+ */
+class AutoGetCollectionMultiForReadCommandLockFree {
+public:
+    /**
+     * 'primaryNssOrUUID' specifies the collection that can be sharded and on which sharding checks
+     * will be made. 'secondaryNsOrUUIDs' specifies the additional collections that are not expected
+     * to be sharded and on which 'not sharded' checks will be made.
+     */
+    AutoGetCollectionMultiForReadCommandLockFree(
+        OperationContext* opCtx,
+        const NamespaceStringOrUUID& primaryNssOrUUID,
+        std::vector<NamespaceStringOrUUID>& secondaryNsOrUUIDs,
+        AutoGetCollectionViewMode viewMode = AutoGetCollectionViewMode::kViewsForbidden,
+        Date_t deadline = Date_t::max(),
+        AutoStatsTracker::LogMode logMode = AutoStatsTracker::LogMode::kUpdateTopAndCurOp);
+
+    explicit operator bool() const {
+        return static_cast<bool>(getCollection());
+    }
+
+    const Collection* operator->() const {
+        return getCollection().get();
+    }
+
+    const CollectionPtr& operator*() const {
+        return getCollection();
+    }
+
+    const CollectionPtr& getCollection() const {
+        return _autoCollForReadCommandLockFree.getCollection();
+    }
+
+    const ViewDefinition* getView() const {
+        return _autoCollForReadCommandLockFree.getView();
+    }
+
+    /**
+     * Returns the namespace for the 'primary' collection.
+     */
+    const NamespaceString& getNss() const {
+        return _autoCollForReadCommandLockFree.getNss();
+    }
+
+private:
+    /**
+     * Runs on restore from a query yield. The 'primary' CollectionPtr's restore function is
+     * extended to run this logic.
+     *
+     * Fetches the collections identified by '_secondaryCollectionUUIDs' and verifies they're still
+     * safe to use.
+     */
+    void _secondaryCollectionsRestoreFn(OperationContext* opCtx);
+
+    // Runs all the usual check on the 'primary' collection.
+    AutoGetCollectionForReadCommandLockFree _autoCollForReadCommandLockFree;
+
+    // Save a reference to the 'primary' CollectionPtr's original restore lambda so that the new one
+    // can reference it.
+    std::function<const Collection*(OperationContext*, CollectionUUID)> _primaryCollectionRestoreFn;
+
+    // Used on query yield restore to identify the 'secondary' collections to check.
+    std::vector<CollectionUUID> _secondaryCollectionUUIDs;
 };
 
 /**

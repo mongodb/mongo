@@ -183,6 +183,16 @@ public:
     }
 
 protected:
+    template <typename AutoGetCollectionType, typename EmplaceAutoGetCollectionFunc>
+    friend class AutoGetCollectionForReadBase;
+
+    /**
+     * Allow access to the CollectionPtr as non-const, for friend classes.
+     */
+    CollectionPtr& _getCollectionPtrForModify() {
+        return _coll;
+    }
+
     OperationContext* _opCtx = nullptr;
     AutoGetDb _autoDb;
     boost::optional<Lock::CollectionLock> _collLock;
@@ -273,6 +283,16 @@ public:
     }
 
 private:
+    template <typename AutoGetCollectionType, typename EmplaceAutoGetCollectionFunc>
+    friend class AutoGetCollectionForReadBase;
+
+    /**
+     * Allow access to the CollectionPtr as non-const, for friend classes.
+     */
+    CollectionPtr& _getCollectionPtrForModify() {
+        return _collectionPtr;
+    }
+
     // Indicate that we are lock-free on code paths that can run either lock-free or locked for
     // different kinds of operations. Note: this class member is currently declared first so that it
     // destructs last, as a safety measure, but not because it is currently depended upon behavior.

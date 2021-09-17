@@ -186,6 +186,51 @@ auto acquireCollectionAndConsistentSnapshot(
     return collection;
 }
 
+/**
+ * Checks that the 'collection' is not null, that the 'collection' is not sharded and that the
+ * minimum visible timestamp of 'collection' is compatible with 'readTimestamp', if 'readTimestamp;
+ * is set.
+ *
+ * Returns OK, or either SnapshotUnavailable or NamespaceNotFound.
+ * Invariants that the collection is not sharded.
+ */
+Status checkSecondaryCollection(OperationContext* opCtx,
+                                boost::optional<NamespaceString> nss,
+                                boost::optional<CollectionUUID> uuid,
+                                const std::shared_ptr<const Collection>& collection,
+                                boost::optional<Timestamp> readTimestamp) {
+    invariant(nss || uuid);
+
+    // Check that the collection exists.
+    if (!collection) {
+        return Status(ErrorCodes::NamespaceNotFound,
+                      str::stream() << "Could not find collection '"
+                                    << (nss ? nss->toString() : uuid->toString()) << "'");
+    }
+
+    // Secondary collections of a query are not allowed to be sharded.
+    auto collDesc = CollectionShardingState::getSharedForLockFreeReads(opCtx, collection->ns())
+                        ->getCollectionDescription(opCtx);
+    invariant(!collDesc.isSharded());
+
+    // Ensure the readTimestamp is not older than the collection's minimum visible timestamp.
+    auto minSnapshot = collection->getMinimumVisibleSnapshot();
+    if (SnapshotHelper::collectionChangesConflictWithRead(minSnapshot, readTimestamp)) {
+        // Note: SnapshotHelper::collectionChangesConflictWithRead returns false if either
+        // minSnapshot or readTimestamp is not set, so it's safe to print them below.
+        return Status(ErrorCodes::SnapshotUnavailable,
+                      str::stream()
+                          << "Unable to read from a snapshot due to pending collection catalog "
+                             "changes to collection '"
+                          << collection->ns()
+                          << "'; please retry the operation. Snapshot timestamp is "
+                          << readTimestamp->toString() << ". Collection minimum timestamp is "
+                          << minSnapshot->toString());
+    }
+
+    return Status::OK();
+}
+
 }  // namespace
 
 AutoStatsTracker::AutoStatsTracker(OperationContext* opCtx,
@@ -590,6 +635,71 @@ AutoGetCollectionForReadCommandBase<AutoGetCollectionForReadType>::
             CollectionShardingState::getSharedForLockFreeReads(opCtx, _autoCollForRead.getNss());
         css->checkShardVersionOrThrow(opCtx);
     }
+}
+
+void AutoGetCollectionMultiForReadCommandLockFree::_secondaryCollectionsRestoreFn(
+    OperationContext* opCtx) {
+    const auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
+    auto catalog = CollectionCatalog::get(opCtx);
+
+    // Fetch secondary collections from the catalog and check they're valid to use.
+    for (auto& secondaryUUID : _secondaryCollectionUUIDs) {
+        auto sharedCollPtr = catalog->lookupCollectionByUUIDForRead(opCtx, secondaryUUID);
+        uassertStatusOK(checkSecondaryCollection(
+            opCtx, /*nss*/ boost::none, secondaryUUID, sharedCollPtr, readTimestamp));
+    }
+};
+
+AutoGetCollectionMultiForReadCommandLockFree::AutoGetCollectionMultiForReadCommandLockFree(
+    OperationContext* opCtx,
+    const NamespaceStringOrUUID& primaryNssOrUUID,
+    std::vector<NamespaceStringOrUUID>& secondaryNsOrUUIDs,
+    AutoGetCollectionViewMode viewMode,
+    Date_t deadline,
+    AutoStatsTracker::LogMode logMode)
+    // Set up state regularly for a single collection access. This will handle setting up a
+    // consistent storage snapshot and a PIT in-memory catalog. We can then use the catalog to fetch
+    // and verify secondary collection state.
+    : _autoCollForReadCommandLockFree(opCtx, primaryNssOrUUID, viewMode, deadline, logMode) {
+    if (!_autoCollForReadCommandLockFree) {
+        return;
+    }
+
+    // Fetch secondary collection and verify they're valid for use.
+    {
+        auto catalog = CollectionCatalog::get(opCtx);
+        const auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
+        for (auto& secondaryNssOrUUID : secondaryNsOrUUIDs) {
+            auto nss = catalog->resolveNamespaceStringOrUUID(opCtx, secondaryNssOrUUID);
+            auto sharedCollPtr = catalog->lookupCollectionByNamespaceForRead(opCtx, nss);
+
+            // Check that 'sharedCollPtr' exists and is safe to use.
+            uassertStatusOK(checkSecondaryCollection(
+                opCtx, nss, /*uuid*/ boost::none, sharedCollPtr, readTimestamp));
+
+            // Duplicate collection names should not be provided via 'secondaryNsOrUUIDs'.
+            invariant(std::find(_secondaryCollectionUUIDs.begin(),
+                                _secondaryCollectionUUIDs.end(),
+                                sharedCollPtr->uuid()) == _secondaryCollectionUUIDs.end());
+            _secondaryCollectionUUIDs.push_back(sharedCollPtr->uuid());
+        }
+    }
+
+    // Create a new restore from yield function to pass into all of the 'primary' CollectionPtr
+    // instance. It should encapsulate the logic _autoCollForReadCommandLockFree's CollectionPtr
+    // currently has and then add logic to check the secondary collections' state.
+
+    // Save the 'primary' CollectionPtr's original restore function so that the new restore function
+    // can reference it.
+    _primaryCollectionRestoreFn =
+        _autoCollForReadCommandLockFree._getCollectionPtrForModify().detachRestoreFn();
+
+    _autoCollForReadCommandLockFree._getCollectionPtrForModify().attachRestoreFn(
+        [&](OperationContext* opCtx, CollectionUUID collUUID) {
+            const Collection* primaryCollection = _primaryCollectionRestoreFn(opCtx, collUUID);
+            _secondaryCollectionsRestoreFn(opCtx);
+            return primaryCollection;
+        });
 }
 
 OldClientContext::OldClientContext(OperationContext* opCtx, const std::string& ns, bool doVersion)
