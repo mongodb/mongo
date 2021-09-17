@@ -4990,7 +4990,7 @@ tasks:
 
 - <<: *task_template
   name: concurrency_replication_metrics
-  tags: ["concurrency", "repl"]
+  tags: ["concurrency", "repl", "disabled_on_code_coverage"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -9638,7 +9638,7 @@ buildvariants:
     - name: causally_consistent_jscore_txns_passthrough
     - name: .change_streams
     - name: .misc_js
-    - name: .concurrency !.ubsan !.no_txns !.stepdowns !.kill_terminate
+    - name: .concurrency !.ubsan !.no_txns !.stepdowns !.kill_terminate !.disabled_on_code_coverage
     - name: disk_wiredtiger
     - name: .encrypt
     - name: initial_sync_fuzzer_gen
