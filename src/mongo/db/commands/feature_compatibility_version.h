@@ -104,6 +104,14 @@ public:
      */
     static void onReplicationRollback(OperationContext* opCtx);
 
+    /**
+     * Used at rollback time.  The rollback FCV is always in the majority snapshot, so it is safe to
+     * clear the lastFCVUpdateTimestamp then.
+     *
+     * Also used in rare cases when the replication coordinator majority snapshot is cleared.
+     */
+    static void clearLastFCVUpdateTimestamp();
+
 private:
     /**
      * Validate version. Uasserts if invalid.

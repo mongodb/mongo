@@ -265,8 +265,7 @@ void FeatureCompatibilityVersion::onReplicationRollback(OperationContext* opCtx)
                   "oldVersion"_attr = FeatureCompatibilityVersionParser::toString(memoryFcv));
             _setVersion(opCtx, diskFcv, boost::none);
             // The rollback FCV is already in the stable snapshot.
-            stdx::lock_guard lk(lastFCVUpdateTimestampMutex);
-            lastFCVUpdateTimestamp = Timestamp();
+            clearLastFCVUpdateTimestamp();
         }
     }
 }
@@ -314,6 +313,11 @@ void FeatureCompatibilityVersion::_runUpdateCommand(OperationContext* opCtx,
     BSONObj updateResult;
     client.runCommand(nss.db().toString(), updateCmd.obj(), updateResult);
     uassertStatusOK(getStatusFromWriteCommandReply(updateResult));
+}
+
+void FeatureCompatibilityVersion::clearLastFCVUpdateTimestamp() {
+    stdx::lock_guard lk(lastFCVUpdateTimestampMutex);
+    lastFCVUpdateTimestamp = Timestamp();
 }
 
 /**

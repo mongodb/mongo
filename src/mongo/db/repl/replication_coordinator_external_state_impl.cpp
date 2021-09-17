@@ -967,6 +967,7 @@ void ReplicationCoordinatorExternalStateImpl::_dropAllTempCollections(OperationC
 void ReplicationCoordinatorExternalStateImpl::dropAllSnapshots() {
     if (auto manager = _service->getStorageEngine()->getSnapshotManager())
         manager->dropAllSnapshots();
+    FeatureCompatibilityVersion::clearLastFCVUpdateTimestamp();
 }
 
 void ReplicationCoordinatorExternalStateImpl::updateCommittedSnapshot(
