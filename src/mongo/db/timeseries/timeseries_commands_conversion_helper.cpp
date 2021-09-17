@@ -73,6 +73,28 @@ CreateIndexesCommand makeTimeseriesCreateIndexesCommand(OperationContext* opCtx,
                           "Partial indexes are not supported on time-series collections");
             }
 
+            if (elem.fieldNameStringData() == IndexDescriptor::kSparseFieldName) {
+                // Sparse indexes are only allowed on the time and meta fields.
+                auto timeField = options.getTimeField();
+                auto metaField = options.getMetaField();
+
+                BSONObj keyPattern = origIndex.getField(NewIndexSpec::kKeyFieldName).Obj();
+                for (const auto& keyElem : keyPattern) {
+                    if (keyElem.fieldNameStringData() == timeField) {
+                        continue;
+                    }
+
+                    if (metaField &&
+                        (keyElem.fieldNameStringData() == *metaField ||
+                         keyElem.fieldNameStringData().startsWith(*metaField + "."))) {
+                        continue;
+                    }
+
+                    uasserted(ErrorCodes::InvalidOptions,
+                              "Sparse indexes are not supported on time-series measurements");
+                }
+            }
+
             if (elem.fieldNameStringData() == IndexDescriptor::kExpireAfterSecondsFieldName) {
                 uasserted(ErrorCodes::InvalidOptions,
                           "TTL indexes are not supported on time-series collections");

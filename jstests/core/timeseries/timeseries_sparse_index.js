@@ -1,5 +1,5 @@
 /**
- * Tests creating and using a sparse index on a time-series measurement field.
+ * Tests that sparse indexes are not allowed on a time-series measurement field.
  *
  * @tags: [
  *     assumes_no_implicit_collection_creation_after_drop,
@@ -39,10 +39,11 @@ TimeseriesTest.run((insert) => {
         {_id: 2, [timeFieldName]: ISODate(), [metaFieldName]: {tag: "c"}, x: 1, y: 1}
     ];
 
-    const setup = function(keyForCreate, options) {
+    const setup = function(keyForCreate, shouldSucceed) {
         const coll = db.getCollection(collName);
         coll.drop();
 
+        const options = {sparse: true};
         jsTestLog("Setting up collection: " + coll.getFullName() +
                   " with index: " + tojson(keyForCreate) + " and options: " + tojson(options));
 
@@ -51,9 +52,15 @@ TimeseriesTest.run((insert) => {
 
         // Insert data on the time-series collection and index it.
         assert.commandWorked(insert(coll, docs), "failed to insert docs: " + tojson(docs));
-        assert.commandWorked(coll.createIndex(keyForCreate, options),
-                             "failed to create index: " + tojson(keyForCreate) +
-                                 " with options: " + tojson(options));
+
+        const res = coll.createIndex(keyForCreate, options);
+        if (shouldSucceed) {
+            assert.commandWorked(res,
+                                 "failed to create index: " + tojson(keyForCreate) +
+                                     " with options: " + tojson(options));
+        } else {
+            assert.commandFailedWithCode(res, ErrorCodes.InvalidOptions);
+        }
     };
 
     const testHint = function(indexName, numDocsExpected) {
@@ -77,8 +84,7 @@ TimeseriesTest.run((insert) => {
         const coll = db.getCollection(collName);
         const bucketsColl = db.getCollection("system.buckets." + collName);
 
-        // Indexes are created with the sparse option.
-        setup(viewDefinition, {sparse: true});
+        setup(viewDefinition, /*shouldSucceed=*/true);
 
         // Check definition on view
         let userIndexes = coll.getIndexes();
@@ -98,33 +104,32 @@ TimeseriesTest.run((insert) => {
         assert.eq(0, bucketIndexes.length);
     };
 
-    // Test metadata-only indexes.
+    // Test metadata-only sparse indexes.
     testIndex({[`${metaFieldName}.tag`]: 1, [`${metaFieldName}.loc`]: "2dsphere"},
               {"meta.tag": 1, "meta.loc": "2dsphere"},
               1);
     testIndex({[`${metaFieldName}.tag`]: 1}, {"meta.tag": 1}, 3);
     testIndex({[`${metaFieldName}.abc`]: 1}, {"meta.abc": 1}, 0);
 
-    // Test measurement-only indexes.
-    testIndex({x: 1}, {"control.min.x": 1, "control.max.x": 1}, 2);
-    testIndex({x: -1}, {"control.max.x": -1, "control.min.x": -1}, 2);
-    testIndex({y: 1}, {"control.min.y": 1, "control.max.y": 1}, 2);
-    testIndex({y: -1}, {"control.max.y": -1, "control.min.y": -1}, 2);
-    testIndex({x: 1, y: 1},
-              {"control.min.x": 1, "control.max.x": 1, "control.min.y": 1, "control.max.y": 1},
-              3);
-    testIndex({y: -1, x: 1},
-              {"control.max.y": -1, "control.min.y": -1, "control.min.x": 1, "control.max.x": 1},
-              3);
-    testIndex({z: 1}, {"control.min.z": 1, "control.max.z": 1}, 0);
+    // Cannot create sparse indexes on time-series measurements.
+    setup({x: 1}, /*shouldSucceed=*/false);
+    setup({y: -1}, /*shouldSucceed=*/false);
+    setup({x: 1, y: 1}, /*shouldSucceed=*/false);
+    setup({z: 1}, /*shouldSucceed=*/false);
 
-    // Test mixed metadata and measurement indexes.
-    testIndex({x: 1, [`${metaFieldName}.loc`]: "2dsphere"},
-              {
-                  "control.min.x": 1,
-                  "control.max.x": 1,
-                  "meta.loc": "2dsphere",
-              },
-              1);
+    // Compound sparse indexes are not allowed if measurements are involved.
+    setup({x: 1, [`${metaFieldName}.loc`]: "2dsphere"}, /*shouldSucceed=*/false);
+    setup({[`${timeFieldName}`]: 1, x: 1}, /*shouldSucceed=*/false);
+
+    // Test compound time and metadata sparse indexes.
+    testIndex({[`${timeFieldName}`]: 1, [`${metaFieldName}.tag`]: 1},
+              {"control.min.tm": 1, "control.max.tm": 1, "meta.tag": 1},
+              3);
+    testIndex({
+        [`${metaFieldName}.abc`]: 1,
+        [`${timeFieldName}`]: -1,
+    },
+              {"meta.abc": 1, "control.max.tm": -1, "control.min.tm": -1},
+              3);
 });
 }());
