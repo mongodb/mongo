@@ -33,7 +33,9 @@
 
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/commands/create_gen.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
@@ -88,6 +90,22 @@ OptionsAndIndexes getCollectionOptionsAndIndexes(OperationContext* opCtx,
     return {optionsBob.obj(),
             std::vector<BSONObj>(std::begin(indexSpecsList), std::end(indexSpecsList)),
             idIndex};
+}
+
+/**
+ * Constructs the BSON specification document for the create collections command using the given
+ * namespace, collation, and timeseries options.
+ */
+BSONObj makeCreateCommand(const NamespaceString& nss,
+                          const boost::optional<Collation>& collation,
+                          const TimeseriesOptions& tsOpts) {
+    CreateCommand create(nss);
+    create.setTimeseries(tsOpts);
+    if (collation) {
+        create.setCollation(*collation);
+    }
+    BSONObj commandPassthroughFields;
+    return create.toBSON(commandPassthroughFields);
 }
 
 /**
@@ -185,9 +203,10 @@ int getNumShards(OperationContext* opCtx) {
     return shardRegistry->getNumShards(opCtx);
 }
 
-BSONObj getCollation(OperationContext* opCtx,
-                     const NamespaceString& nss,
-                     const boost::optional<BSONObj>& collation) {
+std::pair<boost::optional<Collation>, BSONObj> getCollation(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const boost::optional<BSONObj>& collation) {
     // Ensure the collation is valid. Currently we only allow the simple collation.
     std::unique_ptr<CollatorInterface> requestedCollator = nullptr;
     if (collation) {
@@ -214,9 +233,10 @@ BSONObj getCollation(OperationContext* opCtx,
     }();
 
     if (!requestedCollator && !actualCollator)
-        return BSONObj();
+        return {boost::none, BSONObj()};
 
-    auto actualCollatorBSON = actualCollator->getSpec().toBSON();
+    auto actualCollation = actualCollator->getSpec();
+    auto actualCollatorBSON = actualCollation.toBSON();
 
     if (!collation) {
         auto actualCollatorFilter =
@@ -229,7 +249,7 @@ BSONObj getCollation(OperationContext* opCtx,
                 !actualCollatorFilter);
     }
 
-    return actualCollatorBSON;
+    return {actualCollation, actualCollatorBSON};
 }
 
 void cleanupPartialChunksFromPreviousAttempt(OperationContext* opCtx,
@@ -450,7 +470,7 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                             opCtx,
                             nss(),
                             _shardKeyPattern->getKeyPattern().toBSON(),
-                            getCollation(opCtx, nss(), _doc.getCollation()),
+                            getCollation(opCtx, nss(), _doc.getCollation()).second,
                             _doc.getUnique().value_or(false))) {
                     _result = createCollectionResponseOpt;
                     // The collection was already created and commited but there was a
@@ -597,10 +617,14 @@ void CreateCollectionCoordinator::_checkCommandArguments(OperationContext* opCtx
             "the hashed field by declaring an additional (non-hashed) unique index on the field.",
             !_shardKeyPattern->isHashedPattern() || !_doc.getUnique().value_or(false));
 
-    // Ensure that a time-series collection cannot be sharded
-    uassert(ErrorCodes::IllegalOperation,
-            str::stream() << "can't shard time-series collection " << nss(),
-            !timeseries::getTimeseriesOptions(opCtx, nss()));
+    // Ensure that a time-series collection cannot be sharded unless the feature flag is enabled.
+    if (nss().isTimeseriesBucketsCollection()) {
+        uassert(ErrorCodes::IllegalOperation,
+                str::stream() << "can't shard time-series collection " << nss(),
+                feature_flags::gFeatureFlagShardedTimeSeries.isEnabled(
+                    serverGlobalParams.featureCompatibility) ||
+                    !timeseries::getTimeseriesOptions(opCtx, nss().getTimeseriesViewNamespace()));
+    }
 
     // Ensure the namespace is valid.
     uassert(ErrorCodes::IllegalOperation,
@@ -651,13 +675,34 @@ void CreateCollectionCoordinator::_createCollectionAndIndexes(OperationContext* 
     LOGV2_DEBUG(
         5277903, 2, "Create collection _createCollectionAndIndexes", "namespace"_attr = nss());
 
-    _collation = getCollation(opCtx, nss(), _doc.getCollation());
+    boost::optional<Collation> collation;
+    std::tie(collation, _collationBSON) = getCollation(opCtx, nss(), _doc.getCollation());
+
+    // We need to implicitly create a timeseries view and underlying bucket collection.
+    if (_collectionEmpty && _doc.getTimeseries()) {
+        const auto viewName = nss().getTimeseriesViewNamespace();
+        auto createCmd = makeCreateCommand(viewName, collation, _doc.getTimeseries().get());
+
+        BSONObj createRes;
+        DBDirectClient localClient(opCtx);
+        localClient.runCommand(nss().db().toString(), createCmd, createRes);
+        auto createStatus = getStatusFromCommandResult(createRes);
+
+        if (!createStatus.isOK() && createStatus.code() == ErrorCodes::NamespaceExists) {
+            LOGV2_DEBUG(5909400,
+                        3,
+                        "Timeseries namespace already exists",
+                        "namespace"_attr = viewName.toString());
+        } else {
+            uassertStatusOK(createStatus);
+        }
+    }
 
     const auto indexCreated = shardkeyutil::validateShardKeyIndexExistsOrCreateIfPossible(
         opCtx,
         nss(),
         *_shardKeyPattern,
-        _collation,
+        _collationBSON,
         _doc.getUnique().value_or(false),
         shardkeyutil::ValidationBehaviorsShardCollection(opCtx));
 
@@ -797,8 +842,8 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx) {
         coll.setTimeseriesFields(std::move(timeseriesFields));
     }
 
-    if (_collation) {
-        coll.setDefaultCollation(_collation.value());
+    if (_collationBSON) {
+        coll.setDefaultCollation(_collationBSON.value());
     }
 
     if (_doc.getUnique()) {

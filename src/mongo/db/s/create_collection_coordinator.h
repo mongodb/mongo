@@ -145,7 +145,7 @@ private:
 
     // Objects generated on each execution.
     boost::optional<ShardKeyPattern> _shardKeyPattern;
-    boost::optional<BSONObj> _collation;
+    boost::optional<BSONObj> _collationBSON;
     boost::optional<UUID> _collectionUUID;
     std::unique_ptr<InitialSplitPolicy> _splitPolicy;
     InitialSplitPolicy::ShardCollectionConfig _initialChunks;
