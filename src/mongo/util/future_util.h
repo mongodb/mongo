@@ -178,7 +178,8 @@ private:
             if (cancelToken.isCanceled())
                 return ExecutorFuture<ReturnType>(executor, asyncTryCanceledStatus());
 
-            auto [promise, future] = makePromiseFuture<ReturnType>();
+            Promise<ReturnType> promise{NonNullPromiseTag{}};
+            auto future = promise.getFuture();
             auto wrappedPromise = std::make_unique<PromiseWithCustomBrokenStatus<ReturnType>>(
                 std::move(promise),
                 Status(ErrorCodes::ShutdownInProgress, "Terminated loop due to executor shutdown"));
@@ -359,7 +360,8 @@ private:
             if (cancelToken.isCanceled())
                 return ExecutorFuture<ReturnType>(executor, asyncTryCanceledStatus());
 
-            auto [promise, future] = makePromiseFuture<ReturnType>();
+            Promise<ReturnType> promise{NonNullPromiseTag{}};
+            auto future = promise.getFuture();
             auto wrappedPromise = std::make_unique<PromiseWithCustomBrokenStatus<ReturnType>>(
                 std::move(promise),
                 Status(ErrorCodes::ShutdownInProgress, "Terminated loop due to executor shutdown"));
@@ -509,7 +511,8 @@ SemiFuture<ResultVector> whenAllSucceed(std::vector<FutureLike>&& futures) {
         ResultVector intermediateResult;
     };
 
-    auto [promise, future] = makePromiseFuture<ResultVector>();
+    Promise<ResultVector> promise{NonNullPromiseTag{}};
+    auto future = promise.getFuture();
     auto sharedBlock = std::make_shared<SharedBlock>(futures.size(), std::move(promise));
 
     for (size_t i = 0; i < futures.size(); ++i) {
@@ -566,7 +569,8 @@ SemiFuture<void> whenAllSucceed(std::vector<FutureLike>&& futures) {
         Promise<void> resultPromise;
     };
 
-    auto [promise, future] = makePromiseFuture<void>();
+    Promise<void> promise{NonNullPromiseTag{}};
+    auto future = promise.getFuture();
     auto sharedBlock = std::make_shared<SharedBlock>(futures.size(), std::move(promise));
 
     for (size_t i = 0; i < futures.size(); ++i) {
@@ -626,7 +630,8 @@ SemiFuture<ResultVector> whenAll(std::vector<FutureT>&& futures) {
         Promise<ResultVector> resultPromise;
     };
 
-    auto [promise, future] = makePromiseFuture<ResultVector>();
+    Promise<ResultVector> promise{NonNullPromiseTag{}};
+    auto future = promise.getFuture();
     auto sharedBlock = std::make_shared<SharedBlock>(futures.size(), std::move(promise));
 
     for (size_t i = 0; i < futures.size(); ++i) {
@@ -678,7 +683,8 @@ SemiFuture<Result> whenAny(std::vector<FutureT>&& futures) {
         Promise<Result> resultPromise;
     };
 
-    auto [promise, future] = makePromiseFuture<Result>();
+    Promise<Result> promise{NonNullPromiseTag{}};
+    auto future = promise.getFuture();
     auto sharedBlock = std::make_shared<SharedBlock>(std::move(promise));
 
     for (size_t i = 0; i < futures.size(); ++i) {
@@ -747,7 +753,8 @@ SemiFuture<Value> withCancellation(FutureT&& inputFuture, const CancellationToke
         Promise<Value> resultPromise;
     };
 
-    auto [promise, future] = makePromiseFuture<Value>();
+    Promise<Value> promise{NonNullPromiseTag{}};
+    auto future = promise.getFuture();
     auto sharedBlock = std::make_shared<SharedBlock>(std::move(promise));
 
     std::move(inputFuture)
