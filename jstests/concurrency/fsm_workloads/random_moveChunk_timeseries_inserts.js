@@ -122,10 +122,11 @@ var $config = extendWorkload($config, function($config, $super) {
         // buckets with all documents.
         const verifyBucketIndex = (bucketIndex) => {
             const bucketColl = db.getCollection(`system.buckets.${collName}`);
-            const buckets = bucketColl.aggregate([{$sort: bucketIndex}]).toArray();
-            const numDocsInBuckets =
-                buckets.map(b => Object.keys(b.data._id).length).reduce((x, y) => x + y, 0);
-            assert.eq(numInitialDocs, numDocsInBuckets);
+            // TODO SERVER-60033: We need an implementation of this that handle compressed buckets
+            // const buckets = bucketColl.aggregate([{$sort: bucketIndex}]).toArray();
+            // const numDocsInBuckets =
+            //     buckets.map(b => Object.keys(b.data._id).length).reduce((x, y) => x + y, 0);
+            // assert.eq(numInitialDocs, numDocsInBuckets);
             const plan = bucketColl.explain().aggregate([{$sort: bucketIndex}]);
             const stages = getPlanStages(plan, 'IXSCAN');
             assert(stages.length > 0);
