@@ -2067,6 +2067,7 @@ tasks:
     - func: "scons compile"
       vars:
         generating_for_ninja: true
+        separate_debug: off
         task_install_action:
           default
         task_compile_flags: >-
@@ -2086,6 +2087,7 @@ tasks:
     - func: "scons compile"
       vars:
         generating_for_ninja: true
+        separate_debug: off
         task_install_action:
           default
         task_compile_flags: >-
