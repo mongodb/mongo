@@ -36,6 +36,7 @@
 #include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_kv_engine.h"
 #include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_recovery_unit.h"
 #include "mongo/db/storage/recovery_unit_test_harness.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace ephemeral_for_test {
@@ -70,6 +71,54 @@ MONGO_INITIALIZER(RegisterRecoveryUnitHarnessFactory)(InitializerContext* const)
     mongo::registerRecoveryUnitHarnessHelperFactory(makeRecoveryUnitHarnessHelper);
 }
 
+class EphemeralForTestRecoveryUnitTestHarness : public unittest::Test {
+public:
+    void setUp() override {
+        harnessHelper = makeRecoveryUnitHarnessHelper();
+        opCtx = harnessHelper->newOperationContext();
+        ru = opCtx->recoveryUnit();
+    }
+
+    std::unique_ptr<mongo::RecoveryUnitHarnessHelper> harnessHelper;
+    ServiceContext::UniqueOperationContext opCtx;
+    mongo::RecoveryUnit* ru;
+};
+
+TEST_F(EphemeralForTestRecoveryUnitTestHarness, AbandonSnapshotAbortMode) {
+    Lock::GlobalLock globalLk(opCtx.get(), MODE_IX);
+
+    ru->setAbandonSnapshotMode(RecoveryUnit::AbandonSnapshotMode::kAbort);
+
+    const auto rs = harnessHelper->createRecordStore(opCtx.get(), "table1");
+    opCtx->lockState()->beginWriteUnitOfWork();
+    ru->beginUnitOfWork(opCtx.get());
+    StatusWith<RecordId> rid1 = rs->insertRecord(opCtx.get(), "ABC", 3, Timestamp());
+    StatusWith<RecordId> rid2 = rs->insertRecord(opCtx.get(), "123", 3, Timestamp());
+    ASSERT_TRUE(rid1.isOK());
+    ASSERT_TRUE(rid2.isOK());
+    ASSERT_EQUALS(2, rs->numRecords(opCtx.get()));
+    ru->commitUnitOfWork();
+    opCtx->lockState()->endWriteUnitOfWork();
+
+    auto snapshotIdBefore = ru->getSnapshotId();
+
+    // Now create a cursor.
+    auto cursor = rs->getCursor(opCtx.get());
+
+    auto record = cursor->next();
+    ASSERT(record);
+    ASSERT_EQ(record->id, rid1.getValue());
+
+    // Abandon the snapshot.
+    ru->abandonSnapshot();
+    ASSERT_NE(snapshotIdBefore, ru->getSnapshotId());
+
+    // After the snapshot is abandoned, calls to next() will simply use a newer snapshot.
+    // This behavior is specific to EFT, and other engines may behave differently.
+    auto record2 = cursor->next();
+    ASSERT(record2);
+    ASSERT_EQ(record2->id, rid2.getValue());
+}
 }  // namespace
 }  // namespace ephemeral_for_test
 }  // namespace mongo

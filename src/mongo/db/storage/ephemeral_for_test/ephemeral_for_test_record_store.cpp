@@ -353,23 +353,35 @@ RecordStore::Cursor::Cursor(OperationContext* opCtx,
     }
 }
 
+void RecordStore::Cursor::advanceSnapshotIfNeeded() {
+    if (auto newWorkingCopy = RecoveryUnit::get(opCtx)->getHeadShared();
+        newWorkingCopy != _workingCopy) {
+        if (_savedPosition) {
+            it = newWorkingCopy->lower_bound(_savedPosition.value());
+        }
+        _workingCopy = std::move(newWorkingCopy);
+    }
+}
+
 boost::optional<Record> RecordStore::Cursor::next() {
+    advanceSnapshotIfNeeded();
     // Capped iterators die on invalidation rather than advancing.
     if (_rs._isCapped && _lastMoveWasRestore) {
         return boost::none;
     }
 
-    _savedPosition = boost::none;
-    StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
     if (_needFirstSeek) {
         _needFirstSeek = false;
-        it = workingCopy->lower_bound(_rs._prefix);
-    } else if (it != workingCopy->end() && !_lastMoveWasRestore) {
+        it = _workingCopy->lower_bound(_rs._prefix);
+    } else if (it != _workingCopy->end() && !_lastMoveWasRestore) {
         ++it;
     }
+
+    _savedPosition = boost::none;
     _lastMoveWasRestore = false;
-    if (it != workingCopy->end() && inPrefix(it->first)) {
+    if (it != _workingCopy->end() && inPrefix(it->first)) {
         _savedPosition = it->first;
+
         Record nextRecord;
         nextRecord.id = RecordId(extractRecordId(it->first, _rs._keyFormat));
         nextRecord.data = RecordData(it->second.c_str(), it->second.length());
@@ -384,13 +396,13 @@ boost::optional<Record> RecordStore::Cursor::next() {
 }
 
 boost::optional<Record> RecordStore::Cursor::seekExact(const RecordId& id) {
+    advanceSnapshotIfNeeded();
     _savedPosition = boost::none;
     _lastMoveWasRestore = false;
-    StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
     std::string key = createKey(_rs._ident, id);
-    it = workingCopy->find(key);
+    it = _workingCopy->find(key);
 
-    if (it == workingCopy->end() || !inPrefix(it->first))
+    if (it == _workingCopy->end() || !inPrefix(it->first))
         return boost::none;
 
     if (_rs._isOplog && id > _oplogVisibility) {
@@ -403,6 +415,7 @@ boost::optional<Record> RecordStore::Cursor::seekExact(const RecordId& id) {
 }
 
 boost::optional<Record> RecordStore::Cursor::seekNear(const RecordId& id) {
+    advanceSnapshotIfNeeded();
     _savedPosition = boost::none;
     _lastMoveWasRestore = false;
 
@@ -415,19 +428,18 @@ boost::optional<Record> RecordStore::Cursor::seekNear(const RecordId& id) {
     if (numRecords == 0)
         return boost::none;
 
-    StringStore* workingCopy{RecoveryUnit::get(opCtx)->getHead()};
     std::string key = createKey(_rs._ident, search);
     // We may land higher and that is fine per the API contract.
-    it = workingCopy->lower_bound(key);
+    it = _workingCopy->lower_bound(key);
 
     // If we're at the end of this record store, we didn't find anything >= id. Position on the
     // immediately previous record, which must exist.
-    if (it == workingCopy->end() || !inPrefix(it->first)) {
+    if (it == _workingCopy->end() || !inPrefix(it->first)) {
         // The reverse iterator constructor positions on the next record automatically.
         StringStore::const_reverse_iterator revIt(it);
-        invariant(revIt != workingCopy->rend());
-        it = workingCopy->lower_bound(revIt->first);
-        invariant(it != workingCopy->end());
+        invariant(revIt != _workingCopy->rend());
+        it = _workingCopy->lower_bound(revIt->first);
+        invariant(it != _workingCopy->end());
         invariant(inPrefix(it->first));
     }
 
@@ -436,8 +448,8 @@ boost::optional<Record> RecordStore::Cursor::seekNear(const RecordId& id) {
     if (rid > search) {
         StringStore::const_reverse_iterator revIt(it);
         // The reverse iterator constructor positions on the next record automatically.
-        if (revIt != workingCopy->rend() && inPrefix(revIt->first)) {
-            it = workingCopy->lower_bound(revIt->first);
+        if (revIt != _workingCopy->rend() && inPrefix(revIt->first)) {
+            it = _workingCopy->lower_bound(revIt->first);
             rid = RecordId(extractRecordId(it->first, _rs._keyFormat));
         }
         // Otherwise, we hit the beginning of this record store, then there is only one record and
@@ -456,8 +468,11 @@ boost::optional<Record> RecordStore::Cursor::seekNear(const RecordId& id) {
 }
 
 // Positions are saved as we go.
-void RecordStore::Cursor::save() {}
+void RecordStore::Cursor::save() {
+    _workingCopy = nullptr;
+}
 void RecordStore::Cursor::saveUnpositioned() {
+    _workingCopy = nullptr;
     _savedPosition = boost::none;
 }
 
@@ -471,9 +486,9 @@ bool RecordStore::Cursor::restore() {
         _oplogVisibility = _visibilityManager->getAllCommittedRecord();
     }
 
-    StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
-    it = workingCopy->lower_bound(_savedPosition.value());
-    _lastMoveWasRestore = it == workingCopy->end() || it->first != _savedPosition.value();
+    _workingCopy = RecoveryUnit::get(opCtx)->getHeadShared();
+    it = _workingCopy->lower_bound(_savedPosition.value());
+    _lastMoveWasRestore = it == _workingCopy->end() || it->first != _savedPosition.value();
 
     // Capped iterators die on invalidation rather than advancing.
     return !(_rs._isCapped && _lastMoveWasRestore);
@@ -500,23 +515,35 @@ RecordStore::ReverseCursor::ReverseCursor(OperationContext* opCtx,
     _savedPosition = boost::none;
 }
 
+void RecordStore::ReverseCursor::advanceSnapshotIfNeeded() {
+    if (auto newWorkingCopy = RecoveryUnit::get(opCtx)->getHeadShared();
+        newWorkingCopy != _workingCopy) {
+        if (_savedPosition) {
+            it = StringStore::const_reverse_iterator(
+                newWorkingCopy->upper_bound(_savedPosition.value()));
+        }
+        _workingCopy = std::move(newWorkingCopy);
+    }
+}
+
 boost::optional<Record> RecordStore::ReverseCursor::next() {
+    advanceSnapshotIfNeeded();
+
     // Capped iterators die on invalidation rather than advancing.
     if (_rs._isCapped && _lastMoveWasRestore) {
         return boost::none;
     }
 
-    _savedPosition = boost::none;
-    StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
     if (_needFirstSeek) {
         _needFirstSeek = false;
-        it = StringStore::const_reverse_iterator(workingCopy->upper_bound(_rs._postfix));
-    } else if (it != workingCopy->rend() && !_lastMoveWasRestore) {
+        it = StringStore::const_reverse_iterator(_workingCopy->upper_bound(_rs._postfix));
+    } else if (it != _workingCopy->rend() && !_lastMoveWasRestore) {
         ++it;
     }
+    _savedPosition = boost::none;
     _lastMoveWasRestore = false;
 
-    if (it != workingCopy->rend() && inPrefix(it->first)) {
+    if (it != _workingCopy->rend() && inPrefix(it->first)) {
         _savedPosition = it->first;
         Record nextRecord;
         nextRecord.id = RecordId(extractRecordId(it->first, _rs._keyFormat));
@@ -528,13 +555,13 @@ boost::optional<Record> RecordStore::ReverseCursor::next() {
 }
 
 boost::optional<Record> RecordStore::ReverseCursor::seekExact(const RecordId& id) {
+    advanceSnapshotIfNeeded();
     _needFirstSeek = false;
     _savedPosition = boost::none;
-    StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
     std::string key = createKey(_rs._ident, id);
-    StringStore::const_iterator canFind = workingCopy->find(key);
-    if (canFind == workingCopy->end() || !inPrefix(canFind->first)) {
-        it = workingCopy->rend();
+    StringStore::const_iterator canFind = _workingCopy->find(key);
+    if (canFind == _workingCopy->end() || !inPrefix(canFind->first)) {
+        it = _workingCopy->rend();
         return boost::none;
     }
 
@@ -544,6 +571,7 @@ boost::optional<Record> RecordStore::ReverseCursor::seekExact(const RecordId& id
 }
 
 boost::optional<Record> RecordStore::ReverseCursor::seekNear(const RecordId& id) {
+    advanceSnapshotIfNeeded();
     _savedPosition = boost::none;
     _lastMoveWasRestore = false;
 
@@ -551,17 +579,16 @@ boost::optional<Record> RecordStore::ReverseCursor::seekNear(const RecordId& id)
     if (numRecords == 0)
         return boost::none;
 
-    StringStore* workingCopy{RecoveryUnit::get(opCtx)->getHead()};
     std::string key = createKey(_rs._ident, id);
-    it = StringStore::const_reverse_iterator(workingCopy->upper_bound(key));
+    it = StringStore::const_reverse_iterator(_workingCopy->upper_bound(key));
 
     // Since there is at least 1 record, if we hit the beginning we need to return the only record.
-    if (it == workingCopy->rend() || !inPrefix(it->first)) {
+    if (it == _workingCopy->rend() || !inPrefix(it->first)) {
         // This lands on the next key.
-        auto fwdIt = workingCopy->upper_bound(key);
+        auto fwdIt = _workingCopy->upper_bound(key);
         // reverse iterator increments one item before
         it = StringStore::const_reverse_iterator(++fwdIt);
-        invariant(it != workingCopy->end());
+        invariant(it != _workingCopy->end());
         invariant(inPrefix(it->first));
     }
 
@@ -569,8 +596,8 @@ boost::optional<Record> RecordStore::ReverseCursor::seekNear(const RecordId& id)
     RecordId rid = extractRecordId(it->first, _rs._keyFormat);
     if (rid < id) {
         // This lands on the next key.
-        auto fwdIt = workingCopy->upper_bound(key);
-        if (fwdIt != workingCopy->end() && inPrefix(fwdIt->first)) {
+        auto fwdIt = _workingCopy->upper_bound(key);
+        if (fwdIt != _workingCopy->end() && inPrefix(fwdIt->first)) {
             it = StringStore::const_reverse_iterator(++fwdIt);
         }
         // Otherwise, we hit the beginning of this record store, then there is only one record and
@@ -583,8 +610,11 @@ boost::optional<Record> RecordStore::ReverseCursor::seekNear(const RecordId& id)
     return Record{rid, RecordData(it->second.c_str(), it->second.length())};
 }
 
-void RecordStore::ReverseCursor::save() {}
+void RecordStore::ReverseCursor::save() {
+    _workingCopy = nullptr;
+}
 void RecordStore::ReverseCursor::saveUnpositioned() {
+    _workingCopy = nullptr;
     _savedPosition = boost::none;
 }
 
@@ -592,9 +622,9 @@ bool RecordStore::ReverseCursor::restore() {
     if (!_savedPosition)
         return true;
 
-    StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
-    it = StringStore::const_reverse_iterator(workingCopy->upper_bound(_savedPosition.value()));
-    _lastMoveWasRestore = (it == workingCopy->rend() || it->first != _savedPosition.value());
+    _workingCopy = RecoveryUnit::get(opCtx)->getHeadShared();
+    it = StringStore::const_reverse_iterator(_workingCopy->upper_bound(_savedPosition.value()));
+    _lastMoveWasRestore = (it == _workingCopy->rend() || it->first != _savedPosition.value());
 
     // Capped iterators die on invalidation rather than advancing.
     return !(_rs._isCapped && _lastMoveWasRestore);

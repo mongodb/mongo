@@ -815,6 +815,44 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, MultiTimestampConstraintsInternalState
     ru1->commitUnitOfWork();
 }
 
+TEST_F(WiredTigerRecoveryUnitTestFixture, AbandonSnapshotAbortMode) {
+    ru1->setAbandonSnapshotMode(RecoveryUnit::AbandonSnapshotMode::kAbort);
+
+    OperationContext* opCtx = clientAndCtx1.second.get();
+    const char* const key = "key";
+
+    {
+        ru1->beginUnitOfWork(opCtx);
+
+        WT_CURSOR* cursor;
+        getCursor(ru1, &cursor);
+        cursor->set_key(cursor, key);
+        cursor->set_value(cursor, "value");
+        invariantWTOK(wiredTigerCursorInsert(opCtx, cursor));
+
+        ru1->commitUnitOfWork();
+    }
+
+    // Create a cursor. We will check that once positioned, the cursor is reset by a call to
+    // abandonSnapshot() on the associated RecoveryUnit.
+    WT_CURSOR* cursor;
+    getCursor(ru1, &cursor);
+    cursor->set_key(cursor, key);
+    ASSERT_EQ(0, cursor->search(cursor));
+
+    ru1->abandonSnapshot();
+
+    // The WT transaction should have been aborted and the cursor reset.
+
+    // Advancing to the "next" record now that the cursor has been reset should give us the first
+    // record again.
+    ASSERT_EQ(0, cursor->next(cursor));
+
+    const char* returnedKey = nullptr;
+    ASSERT_EQ(0, cursor->get_key(cursor, &returnedKey));
+    ASSERT_EQ(0, strncmp(key, returnedKey, strlen(key)));
+}
+
 DEATH_TEST_REGEX_F(WiredTigerRecoveryUnitTestFixture,
                    MultiTimestampConstraints,
                    "Fatal assertion.*4877100") {

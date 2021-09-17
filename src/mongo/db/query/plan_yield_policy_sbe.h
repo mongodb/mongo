@@ -41,9 +41,11 @@ public:
                        int yieldFrequency,
                        Milliseconds yieldPeriod,
                        const Yieldable* yieldable,
-                       std::unique_ptr<YieldPolicyCallbacks> callbacks)
+                       std::unique_ptr<YieldPolicyCallbacks> callbacks,
+                       bool useExperimentalCommitTxnBehavior)
         : PlanYieldPolicy(
-              policy, clockSource, yieldFrequency, yieldPeriod, yieldable, std::move(callbacks)) {
+              policy, clockSource, yieldFrequency, yieldPeriod, yieldable, std::move(callbacks)),
+          _useExperimentalCommitTxnBehavior(useExperimentalCommitTxnBehavior) {
         uassert(4822879,
                 "WRITE_CONFLICT_RETRY_ONLY yield policy is not supported in SBE",
                 policy != YieldPolicy::WRITE_CONFLICT_RETRY_ONLY);
@@ -69,8 +71,17 @@ private:
 
     void restoreState(OperationContext* opCtx, const Yieldable* yieldable) override;
 
+    // TODO SERVER-59620: Remove this.
+    bool useExperimentalCommitTxnBehavior() const override {
+        return _useExperimentalCommitTxnBehavior;
+    }
+
     // The list of plans registered to yield when the configured policy triggers a yield.
     std::vector<sbe::PlanStage*> _yieldingPlans;
+
+    // Whether the experimental behavior which commits transactions across yields instead of
+    // aborting them, should be used.
+    bool _useExperimentalCommitTxnBehavior;
 };
 
 }  // namespace mongo

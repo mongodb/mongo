@@ -114,6 +114,12 @@ class RecoveryUnit {
     RecoveryUnit& operator=(const RecoveryUnit&) = delete;
 
 public:
+    // Behavior for abandonSnapshot().
+    enum class AbandonSnapshotMode {
+        kAbort,  // default
+        kCommit
+    };
+
     void commitRegisteredChanges(boost::optional<Timestamp> commitTimestamp);
     void abortRegisteredChanges();
     virtual ~RecoveryUnit() {}
@@ -213,12 +219,24 @@ public:
     }
 
     /**
-     * If there is an open transaction, it is closed. On return no transaction is active. This
-     * cannot be called inside of a WriteUnitOfWork, and should fail if it is.
+     * If there is an open transaction, it is closed. If the current AbandonSnapshotMode is
+     * 'kAbort', the transaction is aborted. If the mode is 'kCommit' the transaction is committed,
+     * and all data currently pointed to by cursors remains pinned until the cursors are
+     * repositioned.
+
+     * On return no transaction is active. It is a programming error to call this inside of a
+     * WriteUnitOfWork, even if the AbandonSnapshotMode is 'kCommit'.
      */
     void abandonSnapshot() {
         doAbandonSnapshot();
         assignNextSnapshotId();
+    }
+
+    void setAbandonSnapshotMode(AbandonSnapshotMode mode) {
+        _abandonSnapshotMode = mode;
+    }
+    AbandonSnapshotMode abandonSnapshotMode() const {
+        return _abandonSnapshotMode;
     }
 
     /**
@@ -754,6 +772,8 @@ protected:
     bool _mustBeTimestamped = false;
 
     bool _noEvictionAfterRollback = false;
+
+    AbandonSnapshotMode _abandonSnapshotMode = AbandonSnapshotMode::kAbort;
 
 private:
     // Sets the snapshot associated with this RecoveryUnit to a new globally unique id number.

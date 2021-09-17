@@ -2048,7 +2048,7 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
                     "last"_attr = _lastReturnedId);
 
         // Crash when testing diagnostics are enabled.
-        invariant(!TestingProctor::instance().isEnabled());
+        invariant(!TestingProctor::instance().isEnabled(), "next was not greater than last");
 
         // Force a retry of the operation from our last known position by acting as-if
         // we received a WT_ROLLBACK error.

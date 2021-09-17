@@ -189,6 +189,17 @@ public:
             _current = store.lower_bound(key)._current;
         }
 
+        /*
+         * Returns a reference to the current key without checking whether the current position has
+         * been erased.
+         */
+        pointer currentRaw() const {
+            if (!_current) {
+                return nullptr;
+            }
+            return &(*_current->_data);
+        }
+
     private:
         radix_iterator(const head_ptr& root) : _root(root), _current(nullptr) {}
 
@@ -420,6 +431,17 @@ public:
                 if (_current->_data->first > key)
                     _findNextReverse();
             }
+        }
+
+        /*
+         * Returns a reference to the current key without checking whether the current position has
+         * been erased.
+         */
+        pointer currentRaw() const {
+            if (!_current) {
+                return nullptr;
+            }
+            return &(*_current->_data);
         }
 
     private:

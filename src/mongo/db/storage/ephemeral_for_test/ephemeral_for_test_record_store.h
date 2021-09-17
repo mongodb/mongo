@@ -172,6 +172,12 @@ private:
         VisibilityManager* _visibilityManager;
         RecordId _oplogVisibility;
 
+        // Each cursor holds a strong reference to the recovery unit's working copy at the time of
+        // the last next()/seek() on the cursor. This ensures that in between calls to
+        // next()/seek(), the data pointed to by the cursor remains valid, even if the client
+        // finishes a transaction and advances the snapshot.
+        std::shared_ptr<StringStore> _workingCopy;
+
     public:
         Cursor(OperationContext* opCtx,
                const RecordStore& rs,
@@ -187,6 +193,10 @@ private:
 
     private:
         bool inPrefix(const std::string& key_string);
+
+        // Updates '_workingCopy' and 'it' to use the snapshot associated with the recovery unit,
+        // if it has changed.
+        void advanceSnapshotIfNeeded();
     };
 
     class ReverseCursor final : public SeekableRecordCursor {
@@ -197,6 +207,12 @@ private:
         bool _needFirstSeek = true;
         bool _lastMoveWasRestore = false;
         VisibilityManager* _visibilityManager;
+
+        // Each cursor holds a strong reference to the recovery unit's working copy at the time of
+        // the last next()/seek() on the cursor. This ensures that in between calls to
+        // next()/seek(), the data pointed to by the cursor remains valid, even if the client
+        // finishes a transaction and advances the snapshot.
+        std::shared_ptr<StringStore> _workingCopy;
 
     public:
         ReverseCursor(OperationContext* opCtx,
@@ -213,6 +229,10 @@ private:
 
     private:
         bool inPrefix(const std::string& key_string);
+
+        // Updates '_workingCopy' and 'it' to use the snapshot associated with the recovery unit,
+        // if it has changed.
+        void advanceSnapshotIfNeeded();
     };
 };
 

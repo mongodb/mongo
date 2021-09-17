@@ -186,6 +186,51 @@ TEST_F(RecoveryUnitTestHarness, AbortUnitOfWorkIncrementsSnapshotId) {
     ASSERT_NE(snapshotIdBefore, ru->getSnapshotId());
 }
 
+// Note that corresponding tests for calling abandonSnapshot() in AbandonSnapshotMode::kAbort are
+// storage-engine specific.
+TEST_F(RecoveryUnitTestHarness, AbandonSnapshotCommitMode) {
+    Lock::GlobalLock globalLk(opCtx.get(), MODE_IX);
+
+    ru->setAbandonSnapshotMode(RecoveryUnit::AbandonSnapshotMode::kCommit);
+
+    const auto rs = harnessHelper->createRecordStore(opCtx.get(), "table1");
+    opCtx->lockState()->beginWriteUnitOfWork();
+    ru->beginUnitOfWork(opCtx.get());
+    StatusWith<RecordId> rid1 = rs->insertRecord(opCtx.get(), "ABC", 3, Timestamp());
+    StatusWith<RecordId> rid2 = rs->insertRecord(opCtx.get(), "123", 3, Timestamp());
+    ASSERT_TRUE(rid1.isOK());
+    ASSERT_TRUE(rid2.isOK());
+    ASSERT_EQUALS(2, rs->numRecords(opCtx.get()));
+    ru->commitUnitOfWork();
+    opCtx->lockState()->endWriteUnitOfWork();
+
+    auto snapshotIdBefore = ru->getSnapshotId();
+
+    // Now create a cursor. We will check that the cursor is still positioned after a call to
+    // abandonSnapshot().
+    auto cursor = rs->getCursor(opCtx.get());
+
+    auto record = cursor->next();
+    ASSERT(record);
+    ASSERT_EQ(record->id, rid1.getValue());
+    ASSERT_EQ(strncmp(record->data.data(), "ABC", 3), 0);
+
+    // Abandon the snapshot.
+    ru->abandonSnapshot();
+
+    // Snapshot ID should have changed.
+    ASSERT_NE(snapshotIdBefore, ru->getSnapshotId());
+
+    // The data held by the cursor should still be valid.
+    ASSERT_EQ(strncmp(record->data.data(), "ABC", 3), 0);
+
+    // Advancing the cursor should return the next record.
+    auto recordAfterAbandon = cursor->next();
+    ASSERT(recordAfterAbandon);
+    ASSERT_EQ(recordAfterAbandon->id, rid2.getValue());
+    ASSERT_EQ(strncmp(recordAfterAbandon->data.data(), "123", 3), 0);
+}
+
 DEATH_TEST_F(RecoveryUnitTestHarness, RegisterChangeMustBeInUnitOfWork, "invariant") {
     int count = 0;
     opCtx->recoveryUnit()->registerChange(std::make_unique<TestChange>(&count));

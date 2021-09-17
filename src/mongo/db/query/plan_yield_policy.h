@@ -286,6 +286,16 @@ private:
     virtual void restoreState(OperationContext* opCtx, const Yieldable* yieldable) = 0;
 
     /**
+     * TODO SERVER-59620: Remove this.
+     *
+     * Indicates whether we should use the feature-flag-guarded behavior for
+     * keeping data pinned across yields.
+     */
+    virtual bool useExperimentalCommitTxnBehavior() const {
+        return false;
+    }
+
+    /**
      * Relinquishes and reacquires lock manager locks and catalog state. Also responsible for
      * checking interrupt during yield and calling 'abandonSnapshot()' to relinquish the query's
      * storage engine snapshot.

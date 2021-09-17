@@ -99,6 +99,22 @@ Status PlanYieldPolicy::yieldOrInterrupt(OperationContext* opCtx,
                 MONGO_UNREACHABLE;
             }
 
+            boost::optional<ScopeGuard<std::function<void()>>> exitGuard;
+            if (useExperimentalCommitTxnBehavior()) {
+                // All data pointed to by cursors must remain valid across the yield. Setting this
+                // flag for the duration of yield will force any calls to abandonSnapshot() to
+                // commit the transaction, rather than abort it, in order to leave the cursors
+                // valid.
+                opCtx->recoveryUnit()->setAbandonSnapshotMode(
+                    RecoveryUnit::AbandonSnapshotMode::kCommit);
+                exitGuard.emplace([&] {
+                    invariant(opCtx->recoveryUnit()->abandonSnapshotMode() ==
+                              RecoveryUnit::AbandonSnapshotMode::kCommit);
+                    opCtx->recoveryUnit()->setAbandonSnapshotMode(
+                        RecoveryUnit::AbandonSnapshotMode::kAbort);
+                });
+            }
+
             if (getPolicy() == PlanYieldPolicy::YieldPolicy::WRITE_CONFLICT_RETRY_ONLY) {
                 // This yield policy doesn't release locks, but it does relinquish our storage
                 // snapshot.

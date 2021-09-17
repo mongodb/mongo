@@ -508,7 +508,7 @@ public:
                std::string _prefix,
                // This is a string immediately after the ident and before other idents.
                std::string _identEnd,
-               StringStore* workingCopy,
+               std::shared_ptr<StringStore> workingCopy,
                Ordering order,
                KeyFormat keyFormat,
                std::string prefixBSON,
@@ -555,6 +555,11 @@ private:
     }
 
 protected:
+    // Helper function which changes the cursor to point to data in the latest snapshot from the
+    // recovery unit.  If no transaction was committed or aborted since the last call, this is a
+    // noop.
+    void advanceSnapshotIfChanged();
+
     bool advanceNext();
     // This is a helper function to check if the cursor was explicitly set by the user or not.
     bool endPosSet();
@@ -563,7 +568,9 @@ protected:
     boost::optional<KeyStringEntry> seekAfterProcessing(const KeyString::Value& keyString);
     OperationContext* _opCtx;
     // This is the "working copy" of the master "branch" in the git analogy.
-    StringStore* _workingCopy;
+    // Its ownership is split across the RecoveryUnit and associated cursors. It is not
+    // shared _between_ recovery units.
+    std::shared_ptr<StringStore> _workingCopy;
     // These store the end positions.
     boost::optional<StringStore::const_iterator> _endPos;
     boost::optional<StringStore::const_reverse_iterator> _endPosReverse;
@@ -601,13 +608,13 @@ CursorBase<CursorImpl>::CursorBase(OperationContext* opCtx,
                                    bool isForward,
                                    std::string _prefix,
                                    std::string _identEnd,
-                                   StringStore* workingCopy,
+                                   std::shared_ptr<StringStore> workingCopy,
                                    Ordering order,
                                    KeyFormat keyFormat,
                                    std::string _KSForIdentStart,
                                    std::string identEndBSON)
     : _opCtx(opCtx),
-      _workingCopy(workingCopy),
+      _workingCopy(std::move(workingCopy)),
       _endPos(boost::none),
       _endPosReverse(boost::none),
       _forward(isForward),
@@ -615,13 +622,21 @@ CursorBase<CursorImpl>::CursorBase(OperationContext* opCtx,
       _lastMoveWasRestore(false),
       _prefix(_prefix),
       _identEnd(_identEnd),
-      _forwardIt(workingCopy->begin()),
-      _reverseIt(workingCopy->rbegin()),
+      _forwardIt(_workingCopy->begin()),
+      _reverseIt(_workingCopy->rbegin()),
       _order(order),
       _keyFormat(keyFormat),
       _endPosIncl(false),
       _KSForIdentStart(_KSForIdentStart),
       _KSForIdentEnd(identEndBSON) {}
+
+template <class CursorImpl>
+void CursorBase<CursorImpl>::advanceSnapshotIfChanged() {
+    if (_workingCopy.get() != RecoveryUnit::get(_opCtx)->getHead()) {
+        save();
+        restore();
+    }
+}
 
 template <class CursorImpl>
 bool CursorBase<CursorImpl>::advanceNext() {
@@ -770,6 +785,8 @@ boost::optional<IndexKeyEntry> CursorBase<CursorImpl>::seek(const KeyString::Val
 template <class CursorImpl>
 boost::optional<KeyStringEntry> CursorBase<CursorImpl>::seekForKeyString(
     const KeyString::Value& keyStringValue) {
+    advanceSnapshotIfChanged();
+
     _lastMoveWasRestore = false;
     _atEOF = false;
     return seekAfterProcessing(keyStringValue);
@@ -778,6 +795,8 @@ boost::optional<KeyStringEntry> CursorBase<CursorImpl>::seekForKeyString(
 template <class CursorImpl>
 boost::optional<KeyStringEntry> CursorBase<CursorImpl>::seekExactForKeyString(
     const KeyString::Value& keyStringValue) {
+    advanceSnapshotIfChanged();
+
     dassert(KeyString::decodeDiscriminator(keyStringValue.getBuffer(),
                                            keyStringValue.getSize(),
                                            _order,
@@ -824,23 +843,31 @@ void CursorBase<CursorImpl>::save() {
     _atEOF = false;
     if (_lastMoveWasRestore) {
         return;
-    } else if (_forward && checkCursorValid()) {
-        _saveKey = _forwardIt->first;
+    }
+
+    // Any dereference of the _forwardIt and _reverseIt may result in them getting repositioned if
+    // the key they were pointing at was removed in our snapshot. Before accessing them
+    // (checking for validity, dereferencing etc) we save the current key they are pointing at.
+    if (_forward && _forwardIt.currentRaw()) {
+        _saveKey = _forwardIt.currentRaw()->first;
+    } else if (_reverseIt.currentRaw()) {
+        _saveKey = _reverseIt.currentRaw()->first;
+    }
+
+    if (_forward && checkCursorValid()) {
         saveForward();
     } else if (!_forward && checkCursorValid()) {  // reverse
-        _saveKey = _reverseIt->first;
         saveReverse();
     } else {
         _saveKey = "";
         _saveLoc = RecordId();
     }
+    _workingCopy = nullptr;
 }
 
 template <class CursorImpl>
 void CursorBase<CursorImpl>::restore() {
-    StringStore* workingCopy(RecoveryUnit::get(_opCtx)->getHead());
-
-    this->_workingCopy = workingCopy;
+    _workingCopy = RecoveryUnit::get(_opCtx)->getHeadShared();
 
     // Here, we have to reset the end position if one was set earlier.
     if (endPosSet()) {
@@ -852,17 +879,17 @@ void CursorBase<CursorImpl>::restore() {
     // next().
     if (_forward) {
         if (_saveKey.length() == 0) {
-            _forwardIt = workingCopy->end();
+            _forwardIt = _workingCopy->end();
         } else {
-            _forwardIt = workingCopy->lower_bound(_saveKey);
+            _forwardIt = _workingCopy->lower_bound(_saveKey);
         }
         restoreForward();
     } else {
         // Now we are dealing with reverse cursors, and use similar logic.
         if (_saveKey.length() == 0) {
-            _reverseIt = workingCopy->rend();
+            _reverseIt = _workingCopy->rend();
         } else {
-            _reverseIt = StringStore::const_reverse_iterator(workingCopy->upper_bound(_saveKey));
+            _reverseIt = StringStore::const_reverse_iterator(_workingCopy->upper_bound(_saveKey));
         }
         restoreReverse();
     }
@@ -1010,6 +1037,8 @@ void CursorUnique::initReverseDataIterators() {
 }
 
 boost::optional<IndexKeyEntry> CursorUnique::next(RequestedInfo parts) {
+    advanceSnapshotIfChanged();
+
     if (!advanceNext()) {
         return {};
     }
@@ -1023,6 +1052,8 @@ boost::optional<IndexKeyEntry> CursorUnique::next(RequestedInfo parts) {
 }
 
 boost::optional<KeyStringEntry> CursorUnique::nextKeyString() {
+    advanceSnapshotIfChanged();
+
     if (!advanceNext()) {
         return {};
     }
@@ -1150,6 +1181,7 @@ private:
 // if it was set, and 3) whether the cursor is still in the ident.
 bool CursorStandard::checkCursorValid() {
     if (_forward) {
+        invariant(_workingCopy);
         if (_forwardIt == _workingCopy->end()) {
             return false;
         }
@@ -1173,6 +1205,8 @@ bool CursorStandard::checkCursorValid() {
 
 
 boost::optional<IndexKeyEntry> CursorStandard::next(RequestedInfo parts) {
+    advanceSnapshotIfChanged();
+
     if (!advanceNext()) {
         return {};
     }
@@ -1186,6 +1220,8 @@ boost::optional<IndexKeyEntry> CursorStandard::next(RequestedInfo parts) {
 }
 
 boost::optional<KeyStringEntry> CursorStandard::nextKeyString() {
+    advanceSnapshotIfChanged();
+
     if (!advanceNext()) {
         return {};
     }
@@ -1489,13 +1525,11 @@ bool SortedDataInterfaceBase::isEmpty(OperationContext* opCtx) {
 
 std::unique_ptr<mongo::SortedDataInterface::Cursor> SortedDataInterfaceUnique::newCursor(
     OperationContext* opCtx, bool isForward) const {
-    StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
-
     return std::make_unique<CursorUnique>(opCtx,
                                           isForward,
                                           _prefix,
                                           _identEnd,
-                                          workingCopy,
+                                          RecoveryUnit::get(opCtx)->getHeadShared(),
                                           _ordering,
                                           _rsKeyFormat,
                                           _KSForIdentStart,
@@ -1604,13 +1638,11 @@ void SortedDataInterfaceStandard::fullValidate(OperationContext* opCtx,
 
 std::unique_ptr<mongo::SortedDataInterface::Cursor> SortedDataInterfaceStandard::newCursor(
     OperationContext* opCtx, bool isForward) const {
-    StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
-
     return std::make_unique<CursorStandard>(opCtx,
                                             isForward,
                                             _prefix,
                                             _identEnd,
-                                            workingCopy,
+                                            RecoveryUnit::get(opCtx)->getHeadShared(),
                                             _ordering,
                                             _rsKeyFormat,
                                             _KSForIdentStart,

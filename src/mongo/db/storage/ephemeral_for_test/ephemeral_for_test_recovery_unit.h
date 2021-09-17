@@ -89,7 +89,13 @@ public:
     // Ephemeral for test specific function declarations below.
     StringStore* getHead() {
         forkIfNeeded();
-        return &_workingCopy;
+        return _workingCopy.get();
+    }
+
+    std::shared_ptr<StringStore> getHeadShared() {
+        forkIfNeeded();
+        invariant(_workingCopy.get());
+        return _workingCopy;
     }
 
     void makeDirty();
@@ -119,8 +125,10 @@ private:
     // We need _mergeBase to be a shared_ptr to hold references in KVEngine::_availableHistory.
     // _mergeBase will be initialized in forkIfNeeded().
     std::shared_ptr<StringStore> _mergeBase;
-    // We need _workingCopy to be a unique copy, not a shared_ptr.
-    StringStore _workingCopy;
+
+    // '_workingCopy' is a separate copy of the entire tree, owned by this recovery unit and
+    // cursors associated with it. It is not shared between recovery units.
+    std::shared_ptr<StringStore> _workingCopy;
 
     bool _forked = false;
     bool _dirty = false;  // Whether or not we have written to this _workingCopy.

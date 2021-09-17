@@ -66,12 +66,12 @@ void RecoveryUnit::doCommitUnitOfWork() {
             auto masterInfo = _KVEngine->getMasterInfo(_readAtTimestamp);
             try {
                 invariant(_mergeBase);
-                _workingCopy.merge3(*_mergeBase, *masterInfo.second);
+                _workingCopy->merge3(*_mergeBase, *masterInfo.second);
             } catch (const merge_conflict_exception&) {
                 throw WriteConflictException();
             }
 
-            if (_KVEngine->trySwapMaster(_workingCopy, masterInfo.first)) {
+            if (_KVEngine->trySwapMaster(*_workingCopy, masterInfo.first)) {
                 // Merged successfully
                 break;
             } else {
@@ -84,7 +84,7 @@ void RecoveryUnit::doCommitUnitOfWork() {
         _isTimestamped = false;
     } else if (_forked) {
         if (kDebugBuild)
-            invariant(*_mergeBase == _workingCopy);
+            invariant(*_mergeBase == *_workingCopy);
     }
 
     _setState(State::kCommitting);
@@ -113,11 +113,16 @@ void RecoveryUnit::prepareUnitOfWork() {
 
 void RecoveryUnit::doAbandonSnapshot() {
     invariant(!_inUnitOfWork(), toString(_getState()));
+    if (_abandonSnapshotMode == RecoveryUnit::AbandonSnapshotMode::kCommit) {
+        invariant(!_dirty);  // Cannot commit written data outside WUOW.
+    }
+
     _forked = false;
     _dirty = false;
     _isTimestamped = false;
     _setMergeNull();
     _setState(State::kInactive);
+    _workingCopy = nullptr;
 }
 
 void RecoveryUnit::makeDirty() {
@@ -151,7 +156,7 @@ bool RecoveryUnit::forkIfNeeded() {
     // Update the copies of the trees when not in a WUOW so cursors can retrieve the latest data.
     auto masterInfo = _KVEngine->getMasterInfo(readFrom);
     _mergeBase = masterInfo.second;
-    _workingCopy = *masterInfo.second;
+    _workingCopy = std::make_shared<StringStore>(*masterInfo.second);
     invariant(_mergeBase);
 
     // Call cleanHistory in case _mergeBase was holding a shared_ptr to an older tree.
