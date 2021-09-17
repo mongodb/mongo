@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <fmt/format.h>
 #include <list>
 #include <memory>
 
@@ -39,9 +40,52 @@
 namespace mongo {
 
 /**
+ * This class tracks a size of entries in 'LRUKeyValue'.
+ * The size can be understood as a number of the entries, an amount of memory they occupied,
+ * or any other value defined by the template parameter 'Estimator'.
+ * The 'Estimator' must be deterministic and always return the same value for the same entry.
+ */
+template <typename V, typename Estimator>
+class LRUBudgetTracker {
+public:
+    LRUBudgetTracker(size_t maxBudget) : _max(maxBudget), _current(0) {}
+
+    void onAdd(const V& v) {
+        _current += _estimator(v);
+    }
+
+    void onRemove(const V& v) {
+        using namespace fmt::literals;
+        size_t budget = _estimator(v);
+        tassert(5968300,
+                "LRU budget underflow: current={}, budget={} "_format(_current, budget),
+                _current >= budget);
+        _current -= budget;
+    }
+
+    void onClear() {
+        _current = 0;
+    }
+
+    // Returns true if the cache runs over budget.
+    bool isOverBudget() const {
+        return _current > _max;
+    }
+
+    size_t currentBudget() const {
+        return _current;
+    }
+
+private:
+    const size_t _max;
+    size_t _current;
+    Estimator _estimator;
+};
+
+/**
  * A key-value store structure with a least recently used (LRU) replacement
- * policy. The number of entries allowed in the kv-store is set as a constant
- * upon construction.
+ * policy. The size allowed in the kv-store is controlled by 'LRUBudgetTracker'
+ * set in the constructor.
  *
  * Caveat:
  * This kv-store is NOT thread safe! The client to this utility is responsible
@@ -57,10 +101,12 @@ namespace mongo {
  * TODO: We could move this into the util/ directory and do any cleanup necessary to make it
  * fully general.
  */
-template <class K, class V, class KeyHasher = std::hash<K>>
+template <class K, class V, class BudgetEstimator, class KeyHasher = std::hash<K>>
 class LRUKeyValue {
 public:
-    LRUKeyValue(size_t maxSize) : _maxSize(maxSize), _currentSize(0){};
+    using BudgetTracker = LRUBudgetTracker<V, BudgetEstimator>;
+
+    LRUKeyValue(BudgetTracker&& bt) : _budgetTracker{std::move(bt)} {}
 
     ~LRUKeyValue() {
         clear();
@@ -95,26 +141,26 @@ public:
         KVMapConstIt i = _kvMap.find(key);
         if (i != _kvMap.end()) {
             KVListIt found = i->second;
+            _budgetTracker.onRemove(*found->second);
             delete found->second;
             _kvMap.erase(i);
             _kvList.erase(found);
-            _currentSize--;
         }
 
         _kvList.push_front(std::make_pair(key, entry));
         _kvMap[key] = _kvList.begin();
-        _currentSize++;
+        _budgetTracker.onAdd(*entry);
 
         // If the store has grown beyond its allowed size,
-        // evict the least recently used entry.
-        if (_currentSize > _maxSize) {
+        // evict the least recently used entries.
+        while (_budgetTracker.isOverBudget()) {
+            invariant(!_kvList.empty());
             V* evictedEntry = _kvList.back().second;
             invariant(evictedEntry);
 
+            _budgetTracker.onRemove(*evictedEntry);
             _kvMap.erase(_kvList.back().first);
             _kvList.pop_back();
-            _currentSize--;
-            invariant(_currentSize == _maxSize);
 
             // Pass ownership of evicted entry to caller.
             // If caller chooses to ignore this unique_ptr,
@@ -163,10 +209,10 @@ public:
             return Status(ErrorCodes::NoSuchKey, "no such key in LRU key-value store");
         }
         KVListIt found = i->second;
+        _budgetTracker.onRemove(*i->second->second);
         delete found->second;
         _kvMap.erase(i);
         _kvList.erase(found);
-        _currentSize--;
         return Status::OK();
     }
 
@@ -177,9 +223,10 @@ public:
         for (KVListIt i = _kvList.begin(); i != _kvList.end(); i++) {
             delete i->second;
         }
+
+        _budgetTracker.onClear();
         _kvList.clear();
         _kvMap.clear();
-        _currentSize = 0;
     }
 
     /**
@@ -190,10 +237,10 @@ public:
     }
 
     /**
-     * Returns the number of entries currently in the kv-store.
+     * Returns the size (current budget) of the kv-store.
      */
     size_t size() const {
-        return _currentSize;
+        return _budgetTracker.currentBudget();
     }
 
     /**
@@ -210,11 +257,7 @@ public:
     }
 
 private:
-    // The maximum allowable number of entries in the kv-store.
-    const size_t _maxSize;
-
-    // The number of entries currently in the kv-store.
-    size_t _currentSize;
+    BudgetTracker _budgetTracker;
 
     // (K, V*) pairs are stored in this std::list. They are sorted in order
     // of use, where the front is the most recently used and the back is the

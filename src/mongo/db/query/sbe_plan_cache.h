@@ -96,7 +96,16 @@ struct CachedSbePlan {
     stage_builder::PlanStageData planStageData;
 };
 
-using PlanCache = PlanCacheBase<sbe::PlanCacheKey, CachedSbePlan, sbe::PlanCacheKeyHasher>;
+using PlanCacheEntry = PlanCacheEntryBase<CachedSbePlan>;
+
+struct BudgetEstimator {
+    size_t operator()(const PlanCacheEntry& entry) {
+        return entry.estimatedEntrySizeBytes;
+    }
+};
+
+using PlanCache =
+    PlanCacheBase<sbe::PlanCacheKey, CachedSbePlan, BudgetEstimator, sbe::PlanCacheKeyHasher>;
 
 /**
  * A helper method to get the global SBE plan cache decorated in 'serviceCtx'.

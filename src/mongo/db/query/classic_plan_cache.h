@@ -263,6 +263,13 @@ using PlanCacheEntry = PlanCacheEntryBase<SolutionCacheData>;
 
 using CachedSolution = CachedPlanHolder<SolutionCacheData>;
 
-using PlanCache = PlanCacheBase<PlanCacheKey, SolutionCacheData, PlanCacheKeyHasher>;
+struct BudgetEstimator {
+    size_t operator()(const PlanCacheEntry&) {
+        return 1;
+    }
+};
+
+using PlanCache =
+    PlanCacheBase<PlanCacheKey, SolutionCacheData, BudgetEstimator, PlanCacheKeyHasher>;
 
 }  // namespace mongo

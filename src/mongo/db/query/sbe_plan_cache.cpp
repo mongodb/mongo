@@ -39,9 +39,11 @@ const auto sbePlanCacheDecoration =
 
 ServiceContext::ConstructorActionRegisterer planCacheRegisterer{
     "PlanCacheRegisterer", [](ServiceContext* serviceCtx) {
+        // Max memory size in bytes of the PlanCache.
+        constexpr size_t kQueryCacheMaxSizeInBytes = 100 * 1024 * 1024;
         if (feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
             auto& globalPlanCache = sbePlanCacheDecoration(serviceCtx);
-            globalPlanCache = std::make_unique<sbe::PlanCache>();
+            globalPlanCache = std::make_unique<sbe::PlanCache>(kQueryCacheMaxSizeInBytes);
         }
     }};
 

@@ -523,7 +523,7 @@ TEST(PlanCacheTest, ShouldNotCacheQueryExplain) {
 
 // Adding an empty vector of query solutions should fail.
 TEST(PlanCacheTest, AddEmptySolutions) {
-    PlanCache planCache;
+    PlanCache planCache(5000);
     unique_ptr<CanonicalQuery> cq(canonicalize("{a: 1}"));
     std::vector<QuerySolution*> solns;
     unique_ptr<plan_ranker::PlanRankingDecision> decision(createDecision(1U));
@@ -545,7 +545,7 @@ TEST(PlanCacheTest, InactiveEntriesDisabled) {
     internalQueryCacheDisableInactiveEntries.store(true);
     ON_BLOCK_EXIT([] { internalQueryCacheDisableInactiveEntries.store(false); });
 
-    PlanCache planCache;
+    PlanCache planCache(5000);
     unique_ptr<CanonicalQuery> cq(canonicalize("{a: 1}"));
     auto qs = getQuerySolutionForCaching();
     std::vector<QuerySolution*> solns = {qs.get()};
@@ -605,7 +605,7 @@ TEST(PlanCacheTest, PlanCacheLRUPolicyRemovesInactiveEntries) {
 }
 
 TEST(PlanCacheTest, PlanCacheRemoveDeletesInactiveEntries) {
-    PlanCache planCache;
+    PlanCache planCache(5000);
     unique_ptr<CanonicalQuery> cq(canonicalize("{a: 1}"));
     auto qs = getQuerySolutionForCaching();
     std::vector<QuerySolution*> solns = {qs.get()};
@@ -624,7 +624,7 @@ TEST(PlanCacheTest, PlanCacheRemoveDeletesInactiveEntries) {
 }
 
 TEST(PlanCacheTest, PlanCacheFlushDeletesInactiveEntries) {
-    PlanCache planCache;
+    PlanCache planCache(5000);
     unique_ptr<CanonicalQuery> cq(canonicalize("{a: 1}"));
     auto qs = getQuerySolutionForCaching();
     std::vector<QuerySolution*> solns = {qs.get()};
@@ -643,7 +643,7 @@ TEST(PlanCacheTest, PlanCacheFlushDeletesInactiveEntries) {
 }
 
 TEST(PlanCacheTest, AddActiveCacheEntry) {
-    PlanCache planCache;
+    PlanCache planCache(5000);
     unique_ptr<CanonicalQuery> cq(canonicalize("{a: 1}"));
     auto qs = getQuerySolutionForCaching();
     std::vector<QuerySolution*> solns = {qs.get()};
@@ -669,7 +669,7 @@ TEST(PlanCacheTest, AddActiveCacheEntry) {
 }
 
 TEST(PlanCacheTest, WorksValueIncreases) {
-    PlanCache planCache;
+    PlanCache planCache(5000);
     unique_ptr<CanonicalQuery> cq(canonicalize("{a: 1}"));
     auto qs = getQuerySolutionForCaching();
     std::vector<QuerySolution*> solns = {qs.get()};
@@ -732,7 +732,7 @@ TEST(PlanCacheTest, WorksValueIncreasesByAtLeastOne) {
     // Will use a very small growth coefficient.
     const double kWorksCoeff = 1.10;
 
-    PlanCache planCache;
+    PlanCache planCache(5000);
     unique_ptr<CanonicalQuery> cq(canonicalize("{a: 1}"));
     auto qs = getQuerySolutionForCaching();
     std::vector<QuerySolution*> solns = {qs.get()};
@@ -767,7 +767,7 @@ TEST(PlanCacheTest, WorksValueIncreasesByAtLeastOne) {
 }
 
 TEST(PlanCacheTest, SetIsNoopWhenNewEntryIsWorse) {
-    PlanCache planCache;
+    PlanCache planCache(5000);
     unique_ptr<CanonicalQuery> cq(canonicalize("{a: 1}"));
     auto qs = getQuerySolutionForCaching();
     std::vector<QuerySolution*> solns = {qs.get()};
@@ -800,7 +800,7 @@ TEST(PlanCacheTest, SetIsNoopWhenNewEntryIsWorse) {
 }
 
 TEST(PlanCacheTest, SetOverwritesWhenNewEntryIsBetter) {
-    PlanCache planCache;
+    PlanCache planCache(5000);
     unique_ptr<CanonicalQuery> cq(canonicalize("{a: 1}"));
     auto qs = getQuerySolutionForCaching();
     std::vector<QuerySolution*> solns = {qs.get()};
@@ -832,7 +832,7 @@ TEST(PlanCacheTest, SetOverwritesWhenNewEntryIsBetter) {
 }
 
 TEST(PlanCacheTest, DeactivateCacheEntry) {
-    PlanCache planCache;
+    PlanCache planCache(5000);
     unique_ptr<CanonicalQuery> cq(canonicalize("{a: 1}"));
     auto qs = getQuerySolutionForCaching();
     std::vector<QuerySolution*> solns = {qs.get()};
@@ -864,7 +864,7 @@ TEST(PlanCacheTest, DeactivateCacheEntry) {
 }
 
 TEST(PlanCacheTest, GetMatchingStatsMatchesAndSerializesCorrectly) {
-    PlanCache planCache;
+    PlanCache planCache(5000);
 
     // Create a cache entry with 5 works.
     {
@@ -1871,7 +1871,7 @@ TEST_F(CachePlanSelectionTest, ContainedOrAndIntersection) {
 // When a sparse index is present, computeKey() should generate different keys depending on
 // whether or not the predicates in the given query can use the index.
 TEST(PlanCacheTest, ComputeKeySparseIndex) {
-    PlanCache planCache;
+    PlanCache planCache(5000);
     const auto keyPattern = BSON("a" << 1);
     planCache.notifyOfIndexUpdates(
         {CoreIndexInfo(keyPattern,
@@ -1904,7 +1904,7 @@ TEST(PlanCacheTest, ComputeKeyPartialIndex) {
     BSONObj filterObj = BSON("f" << BSON("$gt" << 0));
     unique_ptr<MatchExpression> filterExpr(parseMatchExpression(filterObj));
 
-    PlanCache planCache;
+    PlanCache planCache(5000);
     const auto keyPattern = BSON("a" << 1);
     planCache.notifyOfIndexUpdates(
         {CoreIndexInfo(keyPattern,
@@ -1929,7 +1929,7 @@ TEST(PlanCacheTest, ComputeKeyPartialIndex) {
 TEST(PlanCacheTest, ComputeKeyCollationIndex) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
 
-    PlanCache planCache;
+    PlanCache planCache(5000);
     const auto keyPattern = BSON("a" << 1);
     planCache.notifyOfIndexUpdates(
         {CoreIndexInfo(keyPattern,
@@ -1996,11 +1996,11 @@ TEST(PlanCacheTest, ComputeKeyCollationIndex) {
 TEST(PlanCacheTest, ComputeKeyWildcardIndex) {
     auto entryProjUpdatePair = makeWildcardUpdate(BSON("a.$**" << 1));
 
-    PlanCache planCache;
+    PlanCache planCache(5000);
     planCache.notifyOfIndexUpdates({entryProjUpdatePair.first});
 
     // Used to check that two queries have the same shape when no indexes are present.
-    PlanCache planCacheWithNoIndexes;
+    PlanCache planCacheWithNoIndexes(5000);
 
     // Compatible with index.
     unique_ptr<CanonicalQuery> usesPathWithScalar(canonicalize("{a: 'abcdef'}"));
@@ -2061,7 +2061,7 @@ TEST(PlanCacheTest, ComputeKeyWildcardIndex) {
 TEST(PlanCacheTest, ComputeKeyWildcardIndexDiscriminatesEqualityToEmptyObj) {
     auto entryProjUpdatePair = makeWildcardUpdate(BSON("a.$**" << 1));
 
-    PlanCache planCache;
+    PlanCache planCache(5000);
     planCache.notifyOfIndexUpdates({entryProjUpdatePair.first});
 
     // Equality to empty obj and equality to non-empty obj have different plan cache keys.
@@ -2089,7 +2089,7 @@ TEST(PlanCacheTest, ComputeKeyWildcardDiscriminatesCorrectlyBasedOnPartialFilter
     auto indexInfo = std::move(entryProjUpdatePair.first);
     indexInfo.filterExpr = filterExpr.get();
 
-    PlanCache planCache;
+    PlanCache planCache(5000);
     planCache.notifyOfIndexUpdates({indexInfo});
 
     // Test that queries on field 'x' are discriminated based on their relationship with the partial
@@ -2159,7 +2159,7 @@ TEST(PlanCacheTest, ComputeKeyWildcardDiscriminatesCorrectlyWithPartialFilterAnd
     auto indexInfo = std::move(entryProjUpdatePair.first);
     indexInfo.filterExpr = filterExpr.get();
 
-    PlanCache planCache;
+    PlanCache planCache(5000);
     planCache.notifyOfIndexUpdates({indexInfo});
 
     {
@@ -2187,7 +2187,7 @@ TEST(PlanCacheTest, ComputeKeyWildcardDiscriminatesCorrectlyWithPartialFilterOnN
     auto indexInfo = std::move(entryProjUpdatePair.first);
     indexInfo.filterExpr = filterExpr.get();
 
-    PlanCache planCache;
+    PlanCache planCache(5000);
     planCache.notifyOfIndexUpdates({indexInfo});
 
     {
@@ -2213,7 +2213,7 @@ TEST(PlanCacheTest, ComputeKeyDiscriminatesCorrectlyWithPartialFilterAndWildcard
     auto indexInfo = std::move(entryProjUpdatePair.first);
     indexInfo.filterExpr = filterExpr.get();
 
-    PlanCache planCache;
+    PlanCache planCache(5000);
     planCache.notifyOfIndexUpdates({indexInfo});
 
     {
@@ -2240,7 +2240,7 @@ TEST(PlanCacheTest, ComputeKeyDiscriminatesCorrectlyWithPartialFilterAndWildcard
 }
 
 TEST(PlanCacheTest, StableKeyDoesNotChangeAcrossIndexCreation) {
-    PlanCache planCache;
+    PlanCache planCache(5000);
     unique_ptr<CanonicalQuery> cq(canonicalize("{a: 0}}"));
     const PlanCacheKey preIndexKey = planCache.computeKey(*cq);
     const auto preIndexStableKey = preIndexKey.getStableKey();
@@ -2262,7 +2262,7 @@ TEST(PlanCacheTest, StableKeyDoesNotChangeAcrossIndexCreation) {
 }
 
 TEST(PlanCacheTest, ComputeKeyNotEqualsArray) {
-    PlanCache planCache;
+    PlanCache planCache(5000);
     unique_ptr<CanonicalQuery> cqNeArray(canonicalize("{a: {$ne: [1]}}"));
     unique_ptr<CanonicalQuery> cqNeScalar(canonicalize("{a: {$ne: 123}}"));
 
@@ -2296,7 +2296,7 @@ TEST(PlanCacheTest, ComputeKeyNotEqualsArray) {
 }
 
 TEST(PlanCacheTest, ComputeKeyNinArray) {
-    PlanCache planCache;
+    PlanCache planCache(5000);
     unique_ptr<CanonicalQuery> cqNinArray(canonicalize("{a: {$nin: [123, [1]]}}"));
     unique_ptr<CanonicalQuery> cqNinScalar(canonicalize("{a: {$nin: [123, 456]}}"));
 
@@ -2337,7 +2337,7 @@ TEST(PlanCacheTest, ComputeKeyNinArray) {
 // ambiguous. This would make it possible for two queries with different shapes (and different
 // plans) to get the same plan cache key. We test that this does not happen for a simple example.
 TEST(PlanCacheTest, PlanCacheKeyCollision) {
-    PlanCache planCache;
+    PlanCache planCache(5000);
     unique_ptr<CanonicalQuery> cqNeA(canonicalize("{$or: [{a: {$ne: 5}}, {a: {$ne: [12]}}]}"));
     unique_ptr<CanonicalQuery> cqNeB(canonicalize("{$or: [{a: {$ne: [12]}}, {a: {$ne: 5}}]}"));
 
@@ -2362,7 +2362,7 @@ TEST(PlanCacheTest, PlanCacheKeyCollision) {
 }
 
 TEST(PlanCacheTest, PlanCacheSizeWithCRUDOperations) {
-    PlanCache planCache;
+    PlanCache planCache(5000);
     unique_ptr<CanonicalQuery> cq(canonicalize("{a: 1, b: 1}"));
     auto qs = getQuerySolutionForCaching();
     std::vector<QuerySolution*> solns = {qs.get()};
@@ -2490,8 +2490,8 @@ TEST(PlanCacheTest, PlanCacheSizeWithEviction) {
 }
 
 TEST(PlanCacheTest, PlanCacheSizeWithMultiplePlanCaches) {
-    PlanCache planCache1;
-    PlanCache planCache2;
+    PlanCache planCache1(5000);
+    PlanCache planCache2(5000);
     unique_ptr<CanonicalQuery> cq(canonicalize("{a: 1, b: 1}"));
     auto qs = getQuerySolutionForCaching();
     std::vector<QuerySolution*> solns = {qs.get()};
@@ -2527,7 +2527,7 @@ TEST(PlanCacheTest, PlanCacheSizeWithMultiplePlanCaches) {
     // Verify for scoped PlanCache object.
     long long sizeBeforeScopedPlanCache = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
     {
-        PlanCache planCache;
+        PlanCache planCache(5000);
         previousSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
         ASSERT_OK(planCache.set(*cq, qs->cacheData->clone(), solns, createDecision(1U), Date_t{}));
         ASSERT_GT(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), previousSize);
@@ -2557,7 +2557,7 @@ TEST(PlanCacheTest, DifferentQueryEngines) {
         return pc.computeKey(*cq);
     };
 
-    PlanCache planCache;
+    PlanCache planCache(5000);
     const auto keyPattern = BSON("a" << 1);
 
     // Create a normal btree index. It will have a discriminator.

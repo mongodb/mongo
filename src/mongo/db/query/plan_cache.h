@@ -379,13 +379,19 @@ private:
  * mapping, the cache contains information on why that mapping was made and statistics on the
  * cache entry's actual performance on subsequent runs.
  */
-template <class KeyType, class CachedPlanType, class KeyHasher = std::hash<KeyType>>
+template <class KeyType,
+          class CachedPlanType,
+          class BudgetEstimator,
+          class KeyHasher = std::hash<KeyType>>
 class PlanCacheBase {
 private:
     PlanCacheBase(const PlanCacheBase&) = delete;
     PlanCacheBase& operator=(const PlanCacheBase&) = delete;
 
 public:
+    using Entry = PlanCacheEntryBase<CachedPlanType>;
+    using BudgetTracker = LRUBudgetTracker<Entry, BudgetEstimator>;
+
     // We have three states for a cache entry to be in. Rather than just 'present' or 'not
     // present', we use a notion of 'inactive entries' as a way of remembering how performant our
     // original solution to the query was. This information is useful to prevent much slower
@@ -462,12 +468,9 @@ public:
         return true;
     }
 
-    /**
-     * If omitted, namespace set to empty string.
-     */
-    PlanCacheBase() : PlanCacheBase(internalQueryCacheMaxEntriesPerCollection.load()) {}
+    PlanCacheBase(size_t size) : PlanCacheBase(BudgetTracker(size)) {}
 
-    PlanCacheBase(size_t size) : _cache(size) {}
+    PlanCacheBase(BudgetTracker&& budgetTracker) : _cache{std::move(budgetTracker)} {}
 
     ~PlanCacheBase() = default;
 
@@ -536,7 +539,7 @@ public:
             planCacheKey = key.planCacheKeyHash();
             queryHash = key.queryHash();
         } else {
-            PlanCacheEntryBase<CachedPlanType>* oldEntry = nullptr;
+            Entry* oldEntry = nullptr;
             Status cacheStatus = _cache.get(key, &oldEntry);
             invariant(cacheStatus.isOK() || cacheStatus == ErrorCodes::NoSuchKey);
             if (oldEntry) {
@@ -561,15 +564,15 @@ public:
             isNewEntryActive = newState.shouldBeActive;
         }
 
-        auto newEntry(PlanCacheEntryBase<CachedPlanType>::create(solns,
-                                                                 std::move(why),
-                                                                 query,
-                                                                 std::move(cachedPlan),
-                                                                 queryHash,
-                                                                 planCacheKey,
-                                                                 now,
-                                                                 isNewEntryActive,
-                                                                 newWorks));
+        auto newEntry(Entry::create(solns,
+                                    std::move(why),
+                                    query,
+                                    std::move(cachedPlan),
+                                    queryHash,
+                                    planCacheKey,
+                                    now,
+                                    isNewEntryActive,
+                                    newWorks));
 
         auto evictedEntry = _cache.add(key, newEntry.release());
 
@@ -593,7 +596,7 @@ public:
 
         KeyType key = computeKey(query);
         stdx::lock_guard<Latch> cacheLock(_cacheMutex);
-        PlanCacheEntryBase<CachedPlanType>* entry = nullptr;
+        Entry* entry = nullptr;
         Status cacheStatus = _cache.get(key, &entry);
         if (!cacheStatus.isOK()) {
             invariant(cacheStatus == ErrorCodes::NoSuchKey);
@@ -624,7 +627,7 @@ public:
      */
     GetResult get(const KeyType& key) const {
         stdx::lock_guard<Latch> cacheLock(_cacheMutex);
-        PlanCacheEntryBase<CachedPlanType>* entry = nullptr;
+        Entry* entry = nullptr;
         Status cacheStatus = _cache.get(key, &entry);
         if (!cacheStatus.isOK()) {
             invariant(cacheStatus == ErrorCodes::NoSuchKey);
@@ -694,39 +697,38 @@ public:
      *
      * If there is no entry in the cache for the 'query', returns an error Status.
      */
-    StatusWith<std::unique_ptr<PlanCacheEntryBase<CachedPlanType>>> getEntry(
-        const CanonicalQuery& cq) const {
+    StatusWith<std::unique_ptr<Entry>> getEntry(const CanonicalQuery& cq) const {
         KeyType key = computeKey(cq);
 
         stdx::lock_guard<Latch> cacheLock(_cacheMutex);
-        PlanCacheEntryBase<CachedPlanType>* entry;
+        Entry* entry;
         Status cacheStatus = _cache.get(key, &entry);
         if (!cacheStatus.isOK()) {
             return cacheStatus;
         }
         invariant(entry);
 
-        return std::unique_ptr<PlanCacheEntryBase<CachedPlanType>>(entry->clone());
+        return std::unique_ptr<Entry>(entry->clone());
     }
 
     /**
      * Returns a vector of all cache entries.
      * Used by planCacheListQueryShapes and index_filter_commands_test.cpp.
      */
-    std::vector<std::unique_ptr<PlanCacheEntryBase<CachedPlanType>>> getAllEntries() const {
+    std::vector<std::unique_ptr<Entry>> getAllEntries() const {
         stdx::lock_guard<Latch> cacheLock(_cacheMutex);
-        std::vector<std::unique_ptr<PlanCacheEntryBase<CachedPlanType>>> entries;
+        std::vector<std::unique_ptr<Entry>> entries;
 
         for (auto&& cacheEntry : _cache) {
             auto entry = cacheEntry.second;
-            entries.push_back(std::unique_ptr<PlanCacheEntryBase<CachedPlanType>>(entry->clone()));
+            entries.push_back(std::unique_ptr<Entry>(entry->clone()));
         }
 
         return entries;
     }
 
     /**
-     * Returns number of entries in cache. Includes inactive entries.
+     * Returns the size of the cache.
      * Used for testing.
      */
     size_t size() const {
@@ -749,7 +751,7 @@ public:
      * 'serializationFunc'. Returns a vector of all serialized entries which match 'filterFunc'.
      */
     std::vector<BSONObj> getMatchingStats(
-        const std::function<BSONObj(const PlanCacheEntryBase<CachedPlanType>&)>& serializationFunc,
+        const std::function<BSONObj(const Entry&)>& serializationFunc,
         const std::function<bool(const BSONObj&)>& filterFunc) const {
         std::vector<BSONObj> results;
         stdx::lock_guard<Latch> cacheLock(_cacheMutex);
@@ -780,7 +782,7 @@ private:
     NewEntryState getNewEntryState(const CanonicalQuery& query,
                                    uint32_t queryHash,
                                    uint32_t planCacheKey,
-                                   PlanCacheEntryBase<CachedPlanType>* oldEntry,
+                                   Entry* oldEntry,
                                    size_t newWorks,
                                    double growthCoefficient) {
         NewEntryState res;
@@ -851,7 +853,7 @@ private:
         return res;
     }
 
-    LRUKeyValue<KeyType, PlanCacheEntryBase<CachedPlanType>, KeyHasher> _cache;
+    LRUKeyValue<KeyType, PlanCacheEntryBase<CachedPlanType>, BudgetEstimator, KeyHasher> _cache;
 
     // Protects _cache.
     mutable Mutex _cacheMutex = MONGO_MAKE_LATCH("PlanCache::_cacheMutex");

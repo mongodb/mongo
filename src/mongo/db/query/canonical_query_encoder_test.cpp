@@ -212,7 +212,7 @@ TEST(CanonicalQueryEncoderTest, ComputeKeyEscaped) {
 // Cache keys for $geoWithin queries with legacy and GeoJSON coordinates should
 // not be the same.
 TEST(CanonicalQueryEncoderTest, ComputeKeyGeoWithin) {
-    PlanCache planCache;
+    PlanCache planCache(5000);
 
     // Legacy coordinates.
     unique_ptr<CanonicalQuery> cqLegacy(

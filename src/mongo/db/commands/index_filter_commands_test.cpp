@@ -214,7 +214,7 @@ TEST(IndexFilterCommandsTest, ListFiltersEmpty) {
 
 TEST(IndexFilterCommandsTest, ClearFiltersInvalidParameter) {
     QuerySettings empty;
-    PlanCache planCache;
+    PlanCache planCache(5000);
     OperationContextNoop opCtx;
 
     // If present, query has to be an object.
@@ -239,7 +239,7 @@ TEST(IndexFilterCommandsTest, ClearFiltersInvalidParameter) {
 
 TEST(IndexFilterCommandsTest, ClearNonexistentHint) {
     QuerySettings querySettings;
-    PlanCache planCache;
+    PlanCache planCache(5000);
     OperationContextNoop opCtx;
 
     ASSERT_OK(SetFilter::set(&opCtx,
@@ -264,7 +264,7 @@ TEST(IndexFilterCommandsTest, ClearNonexistentHint) {
 
 TEST(IndexFilterCommandsTest, SetFilterInvalidParameter) {
     QuerySettings empty;
-    PlanCache planCache;
+    PlanCache planCache(5000);
     OperationContextNoop opCtx;
 
     ASSERT_NOT_OK(SetFilter::set(&opCtx, &empty, &planCache, nss.ns(), fromjson("{}")));
@@ -324,7 +324,7 @@ TEST(IndexFilterCommandsTest, SetFilterInvalidParameter) {
 
 TEST(IndexFilterCommandsTest, SetAndClearFilters) {
     QuerySettings querySettings;
-    PlanCache planCache;
+    PlanCache planCache(5000);
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
 
@@ -432,7 +432,7 @@ TEST(IndexFilterCommandsTest, SetAndClearFiltersCollation) {
     QuerySettings querySettings;
 
     // Create a plan cache. Add an index so that indexability is included in the plan cache keys.
-    PlanCache planCache;
+    PlanCache planCache(5000);
     const auto keyPattern = fromjson("{a: 1}");
     planCache.notifyOfIndexUpdates(
         {CoreIndexInfo(keyPattern,
@@ -506,7 +506,7 @@ TEST(IndexFilterCommandsTest, SetAndClearFiltersCollation) {
 
 TEST(IndexFilterCommandsTest, SetFilterAcceptsIndexNames) {
     CollatorInterfaceMock reverseCollator(CollatorInterfaceMock::MockType::kReverseString);
-    PlanCache planCache;
+    PlanCache planCache(5000);
     const auto keyPattern = fromjson("{a: 1}");
     CoreIndexInfo collatedIndex(keyPattern,
                                 IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),

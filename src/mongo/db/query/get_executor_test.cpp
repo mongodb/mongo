@@ -104,7 +104,7 @@ void testAllowedIndices(std::vector<IndexEntry> indexes,
                         BSONObjSet keyPatterns,
                         stdx::unordered_set<std::string> indexNames,
                         stdx::unordered_set<std::string> expectedFilteredNames) {
-    PlanCache planCache;
+    PlanCache planCache(5000);
     QuerySettings querySettings;
 
     // getAllowedIndices should return false when query shape is not yet in query settings.

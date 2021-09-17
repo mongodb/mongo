@@ -99,6 +99,7 @@ public:
                        const PlanSummaryStats& summaryStats) const;
 
 private:
+    static std::shared_ptr<PlanCache> makePlanCache();
     void computeIndexKeys(OperationContext* opCtx, const CollectionPtr& coll);
     void updatePlanCacheIndexEntries(OperationContext* opCtx, const CollectionPtr& coll);
 

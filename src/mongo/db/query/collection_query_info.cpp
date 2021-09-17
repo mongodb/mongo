@@ -79,12 +79,16 @@ CoreIndexInfo indexInfoFromIndexCatalogEntry(const IndexCatalogEntry& ice) {
 
 }  // namespace
 
-CollectionQueryInfo::CollectionQueryInfo()
-    : _keysComputed(false), _planCache(std::make_shared<PlanCache>()) {}
+CollectionQueryInfo::CollectionQueryInfo() : _keysComputed(false), _planCache(makePlanCache()) {}
 
 const UpdateIndexData& CollectionQueryInfo::getIndexKeys(OperationContext* opCtx) const {
     invariant(_keysComputed);
     return _indexedPaths;
+}
+
+std::shared_ptr<PlanCache> CollectionQueryInfo::makePlanCache() {
+    return std::make_shared<PlanCache>(
+        PlanCache::BudgetTracker(internalQueryCacheMaxEntriesPerCollection.load()));
 }
 
 void CollectionQueryInfo::computeIndexKeys(OperationContext* opCtx, const CollectionPtr& coll) {
@@ -193,7 +197,7 @@ void CollectionQueryInfo::clearQueryCache(OperationContext* opCtx, const Collect
                     "Clearing plan cache - collection info cache reinstantiated",
                     "namespace"_attr = coll->ns());
 
-        _planCache = std::make_shared<PlanCache>();
+        _planCache = makePlanCache();
         updatePlanCacheIndexEntries(opCtx, coll);
     }
 }
@@ -241,7 +245,7 @@ void CollectionQueryInfo::init(OperationContext* opCtx, const CollectionPtr& col
 }
 
 void CollectionQueryInfo::rebuildIndexData(OperationContext* opCtx, const CollectionPtr& coll) {
-    _planCache = std::make_shared<PlanCache>();
+    _planCache = makePlanCache();
 
     _keysComputed = false;
     computeIndexKeys(opCtx, coll);

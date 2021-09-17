@@ -85,7 +85,7 @@ TEST(PlanCacheCommandsTest, CannotCanonicalizeWhenSortObjectIsMalformed) {
 }
 
 TEST(PlanCacheCommandsTest, CanCanonicalizeWithValidQuery) {
-    PlanCache planCache;
+    PlanCache planCache(5000);
 
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
@@ -103,7 +103,7 @@ TEST(PlanCacheCommandsTest, CanCanonicalizeWithValidQuery) {
 }
 
 TEST(PlanCacheCommandsTest, SortQueryResultsInDifferentPlanCacheKeyFromUnsorted) {
-    PlanCache planCache;
+    PlanCache planCache(5000);
 
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
@@ -122,7 +122,7 @@ TEST(PlanCacheCommandsTest, SortQueryResultsInDifferentPlanCacheKeyFromUnsorted)
 
 // Regression test for SERVER-17158.
 TEST(PlanCacheCommandsTest, SortsAreProperlyDelimitedInPlanCacheKey) {
-    PlanCache planCache;
+    PlanCache planCache(5000);
 
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
@@ -140,7 +140,7 @@ TEST(PlanCacheCommandsTest, SortsAreProperlyDelimitedInPlanCacheKey) {
 }
 
 TEST(PlanCacheCommandsTest, ProjectQueryResultsInDifferentPlanCacheKeyFromUnprojected) {
-    PlanCache planCache;
+    PlanCache planCache(5000);
 
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
