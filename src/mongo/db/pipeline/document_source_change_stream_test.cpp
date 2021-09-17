@@ -6534,5 +6534,208 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteToWithExprOnInvalidCollSubFieldPath) {
                       fromjson("{$expr: {$eq: ['$$REMOVE', {$const: 'pipeline_test'}]}}"));
 }
 
+TEST_F(ChangeStreamRewriteTest, CannotRewritePredicateOnFieldUpdateDescription) {
+    auto expCtx = getExpCtx();
+    auto expr = fromjson(
+        "{updateDescription: {updatedFields: {}, removedFields: [], truncatedArrays: []}}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        expCtx, statusWithMatchExpression.getValue().get(), {"updateDescription"});
+
+    ASSERT(rewrittenMatchExpression == nullptr);
+}
+
+TEST_F(ChangeStreamRewriteTest, CannotRewritePredicateOnFieldUpdateDescriptionUpdatedFields) {
+    auto expCtx = getExpCtx();
+    auto expr = fromjson("{'updateDescription.updatedFields': {}}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        expCtx, statusWithMatchExpression.getValue().get(), {"updateDescription"});
+
+    ASSERT(rewrittenMatchExpression == nullptr);
+}
+
+TEST_F(ChangeStreamRewriteTest,
+       CanRewriteArbitraryPredicateOnFieldUpdateDescriptionUpdatedFieldsFoo) {
+    auto expCtx = getExpCtx();
+    auto expr = fromjson("{'updateDescription.updatedFields.foo': {$lt: 'b'}}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        expCtx, statusWithMatchExpression.getValue().get(), {"updateDescription"});
+    ASSERT(rewrittenMatchExpression);
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
+                      fromjson("{$and: ["
+                               "  {op: {$eq: 'u'}},"
+                               "  {'o._id': {$not: {$exists: true}}},"
+                               "  {$or: ["
+                               "    {'o.diff.i.foo': {$lt: 'b'}},"
+                               "    {'o.diff.u.foo': {$lt: 'b'}},"
+                               "    {'o.$set.foo': {$lt: 'b'}}"
+                               "  ]}"
+                               "]}"));
+}
+
+TEST_F(ChangeStreamRewriteTest,
+       CannotRewriteEqPredicateOnFieldUpdateDescriptionUpdatedFieldsFooBar) {
+    auto expCtx = getExpCtx();
+    auto expr = fromjson("{'updateDescription.updatedFields.foo.bar': 'b'}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        expCtx, statusWithMatchExpression.getValue().get(), {"updateDescription"});
+
+    ASSERT(rewrittenMatchExpression == nullptr);
+}
+
+TEST_F(ChangeStreamRewriteTest, CanRewriteStringEqPredicateOnFieldUpdateDescriptionRemovedFields) {
+    auto expCtx = getExpCtx();
+    auto expr = fromjson("{'updateDescription.removedFields': 'z'}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        expCtx, statusWithMatchExpression.getValue().get(), {"updateDescription"});
+    ASSERT(rewrittenMatchExpression);
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
+                      fromjson("{$and: ["
+                               "  {op: {$eq: 'u'}},"
+                               "  {'o._id': {$not: {$exists: true}}},"
+                               "  {$or: ["
+                               "    {'o.diff.d.z': {$exists: true}},"
+                               "    {'o.$unset.z': {$exists: true}}"
+                               "  ]}"
+                               "]}"));
+}
+
+TEST_F(ChangeStreamRewriteTest,
+       CannotRewriteDottedStringEqPredicateOnFieldUpdateDescriptionRemovedFields) {
+    auto expCtx = getExpCtx();
+    auto expr = fromjson("{'updateDescription.removedFields': 'u.v'}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        expCtx, statusWithMatchExpression.getValue().get(), {"updateDescription"});
+
+    ASSERT(rewrittenMatchExpression == nullptr);
+}
+
+TEST_F(ChangeStreamRewriteTest,
+       CannotRewriteNonStringEqPredicateOnFieldUpdateDescriptionRemovedFields) {
+    auto expCtx = getExpCtx();
+    auto expr = fromjson("{'updateDescription.removedFields': ['z']}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        expCtx, statusWithMatchExpression.getValue().get(), {"updateDescription"});
+
+    ASSERT(rewrittenMatchExpression == nullptr);
+}
+
+TEST_F(ChangeStreamRewriteTest, CanRewriteStringInPredicateOnFieldUpdateDescriptionRemovedFields) {
+    auto expCtx = getExpCtx();
+    auto expr = fromjson("{'updateDescription.removedFields': {$in: ['w', 'y']}}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        expCtx, statusWithMatchExpression.getValue().get(), {"updateDescription"});
+    ASSERT(rewrittenMatchExpression);
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
+                      fromjson("{$and: ["
+                               "  {op: {$eq: 'u'}},"
+                               "  {'o._id': {$not: {$exists: true}}},"
+                               "  {$or: ["
+                               "    {$or: ["
+                               "        {'o.diff.d.w': {$exists: true}},"
+                               "        {'o.$unset.w': {$exists: true}}"
+                               "    ]},"
+                               "    {$or: ["
+                               "        {'o.diff.d.y': {$exists: true}},"
+                               "        {'o.$unset.y': {$exists: true}}"
+                               "    ]}"
+                               "  ]}"
+                               "]}"));
+}
+
+TEST_F(ChangeStreamRewriteTest, CanRewriteEmptyInPredicateOnFieldUpdateDescriptionRemovedFields) {
+    auto expCtx = getExpCtx();
+    auto expr = fromjson("{'updateDescription.removedFields': {$in: []}}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        expCtx, statusWithMatchExpression.getValue().get(), {"updateDescription"});
+    ASSERT(rewrittenMatchExpression);
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(rewrittenPredicate, fromjson("{$alwaysFalse: 1}"));
+}
+
+TEST_F(ChangeStreamRewriteTest,
+       CannotRewriteNonStringInPredicateOnFieldUpdateDescriptionRemovedFields) {
+    auto expCtx = getExpCtx();
+    auto expr = fromjson("{'updateDescription.removedFields': {$in: ['w', ['y']]}}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        expCtx, statusWithMatchExpression.getValue().get(), {"updateDescription"});
+
+    ASSERT(rewrittenMatchExpression == nullptr);
+}
+
+TEST_F(ChangeStreamRewriteTest,
+       CannotRewriteRegexInPredicateOnFieldUpdateDescriptionRemovedFields) {
+    auto expCtx = getExpCtx();
+    auto expr = fromjson("{'updateDescription.removedFields': {$in: [/ab*c/, /de*f/]}}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        expCtx, statusWithMatchExpression.getValue().get(), {"updateDescription"});
+
+    ASSERT(rewrittenMatchExpression == nullptr);
+}
+
+TEST_F(ChangeStreamRewriteTest,
+       CannotRewriteArbitraryPredicateOnFieldUpdateDescriptionRemovedFields) {
+    auto expCtx = getExpCtx();
+    auto expr = fromjson("{'updateDescription.removedFields': {$lt: 'z'}}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        expCtx, statusWithMatchExpression.getValue().get(), {"updateDescription"});
+
+    ASSERT(rewrittenMatchExpression == nullptr);
+}
+
+TEST_F(ChangeStreamRewriteTest, CannotRewritePredicateOnFieldUpdateDescriptionTruncatedArrays) {
+    auto expCtx = getExpCtx();
+    auto expr = fromjson("{'updateDescription.truncatedArrays': []}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        expCtx, statusWithMatchExpression.getValue().get(), {"updateDescription"});
+
+    ASSERT(rewrittenMatchExpression == nullptr);
+}
+
 }  // namespace
 }  // namespace mongo
