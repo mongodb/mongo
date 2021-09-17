@@ -160,6 +160,10 @@ private:
 
     void addViewDefinition(NamespaceString nss, std::vector<BSONObj> viewPipeline);
 
+    void logStartingSubPipeline(const std::vector<BSONObj>& serializedPipeline);
+    void logShardedViewFound(
+        const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e);
+
     std::unique_ptr<Pipeline, PipelineDeleter> _pipeline;
     Pipeline::SourceContainer _cachedPipeline;
     bool _usedDisk = false;

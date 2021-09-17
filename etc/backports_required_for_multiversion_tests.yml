@@ -167,6 +167,8 @@ all:
     test_file: jstests/replsets/sessions_collection_reaping.js
   - ticket: SERVER-57262
     test_file: jstests/replsets/catchup_takeover_with_higher_config.js
+  - ticket: SERVER-58203
+    test_file: jstests/sharding/query/pipeline_length_limit.js
 
 suites:
 
@@ -203,3 +205,5 @@ suites:
     test_file: jstests/core/apply_ops_system_dot_views.js
 
   sharding_multiversion:
+  - ticket: SERVER-58203
+    test_file: jstests/sharding/query/pipeline_length_limit.js

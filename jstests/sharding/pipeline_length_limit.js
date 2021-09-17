@@ -74,6 +74,63 @@ function testLimits(testDB, lengthLimit) {
         updates: [{q: {}, u: new Array(tooLarge).fill({$project: {_id: 1}})}]
     }),
                                  ErrorCodes.FailedToParse);
+
+    const collname = "test";
+
+    [  // Long pipelines with many unions.
+        new Array(maxLength).fill({$unionWith: collname}),
+        // maxLength * 2 total unions.
+        new Array(maxLength).fill(
+            {$unionWith: {coll: collname, pipeline: [{$unionWith: collname}]}}),
+        // maxLength in subPipeline.
+        [{
+            $unionWith:
+                {coll: collname, pipeline: new Array(maxLength).fill({$unionWith: collname})}
+        }],
+        // maxLength * 50 total unions, should be within max doc size.
+        new Array(maxLength).fill(
+            {$unionWith: {coll: collname, pipeline: new Array(50).fill({$unionWith: collname})}})]
+        .forEach((pipeline) => {
+            assert.commandWorked(testDB.runCommand({
+                aggregate: collname,
+                cursor: {},
+                pipeline,
+            }));
+        });
+
+    // Long pipelines filled with the same stage over and over.
+    [{$addFields: {foo: 1}},
+     {$bucketAuto: {groupBy: "$nonExistentField", buckets: 1}},
+     {
+         $graphLookup:
+         {from: collname, startWith: "$_id", connectFromField: "_id", connectToField: "_id", as: "foo"}
+     },
+     {$group: {_id: "$_id"}},
+     {$limit: 1},
+     {$lookup: {from: collname, localField: "_id", foreignField: "_id", as: "foo"}},
+     {$project: {_id: 1}},
+     {$redact: "$$KEEP"},
+     {$replaceWith: "$$ROOT"},
+     {$skip: 1},
+     {$sort: {_id: 1}},
+     // unionWith already covered.
+     {$unwind: "$_id"}]
+        .forEach((stage) => {
+            assert.commandWorked(testDB.runCommand({
+                aggregate: collname,
+                cursor: {},
+                pipeline: new Array(maxLength).fill(stage)
+            }));
+        });
+
+    // Same test, but these to stages get replaced by 2 stages under the hood.
+    [{$bucket: {groupBy: "$nonExistentField", boundaries: [0, 1], default: 2}},
+     {$sortByCount: "$_id"}]
+        .forEach((stage) => assert.commandWorked(testDB.runCommand({
+            aggregate: collname,
+            cursor: {},
+            pipeline: new Array(parseInt(maxLength / 2)).fill(stage)
+        })));
 }
 
 function runTest(lengthLimit, mongosConfig = {}, mongodConfig = {}) {
@@ -96,6 +153,7 @@ function runTest(lengthLimit, mongosConfig = {}, mongodConfig = {}) {
     st.stop();
 }
 
+// Test with modified pipeline length limit.
 runTest(50,
         {setParameter: {internalPipelineLengthLimit: 50}},
         {setParameter: {internalPipelineLengthLimit: 50}});
