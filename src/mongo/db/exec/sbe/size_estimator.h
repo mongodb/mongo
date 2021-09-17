@@ -120,6 +120,13 @@ size_t estimate(const std::vector<T, A>& vector) {
     return size;
 }
 
+// Overload of 'estimate' function for std::vector<bool> since
+// the latter is often an optimized specialization of std::vector for bool
+// and it might fail to match against ordinary 'size_t estimate(const std::vector<T, A>&)'.
+inline size_t estimate(const std::vector<bool>& vec) {
+    return vec.capacity() * sizeof(bool);
+}
+
 template <typename T, typename A>
 size_t estimateContainerOnly(const std::vector<T, A>& vector) {
     return vector.capacity() * sizeof(T);
