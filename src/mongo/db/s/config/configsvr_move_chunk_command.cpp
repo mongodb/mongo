@@ -88,6 +88,8 @@ public:
                 "_configsvrMoveChunk can only be run on config servers",
                 serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
 
+        opCtx->setAlwaysInterruptAtStepDownOrUp();
+
         // Set the operation context read concern level to local for reads into the config database.
         repl::ReadConcernArgs::get(opCtx) =
             repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
