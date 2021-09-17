@@ -3001,8 +3001,7 @@ tasks:
 ## Standalone generational fuzzer for multiversion aggregation pipelines ##
 - <<: *jstestfuzz_template
   name: aggregation_multiversion_fuzzer_gen
-  # TODO SERVER-58718: Re-enable this suite by un-commenting the 'tags' line.
-  # tags: ["aggfuzzer", "common", "multiversion"]
+  tags: ["aggfuzzer", "common", "multiversion"]
   commands:
   - func: "generate resmoke tasks"
     vars:
