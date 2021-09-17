@@ -57,12 +57,10 @@ function generateDoc(time, metaValue) {
 
     // Shard time-series collection.
     const shardKey = {[timeField]: 1};
-    assert.commandWorked(mongosDB.createCollection(
-        collName,
-        {timeseries: {timeField: timeField, metaField: metaField, granularity: "hours"}}));
     assert.commandWorked(mongosDB.adminCommand({
         shardCollection: `${dbName}.${collName}`,
         key: shardKey,
+        timeseries: {timeField, metaField, granularity: "hours"},
     }));
 
     // Split the chunks such that primary shard has chunk: [MinKey, 2020-01-01) and other shard has
@@ -78,7 +76,7 @@ function generateDoc(time, metaValue) {
         movechunk: `${dbName}.system.buckets.${collName}`,
         find: splitPoint,
         to: otherShard.name,
-        _waitForDelete: true
+        _waitForDelete: true,
     }));
 
     // Ensure that each shard owns one chunk.

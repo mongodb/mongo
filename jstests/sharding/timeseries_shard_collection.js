@@ -15,6 +15,10 @@ const st = new ShardingTest({shards: 2, rs: {nodes: 2}});
 
 const dbName = 'test';
 const sDB = st.s.getDB(dbName);
+const timeseries = {
+    timeField: 'time',
+    metaField: 'hostId',
+};
 
 if (!TimeseriesTest.timeseriesCollectionsEnabled(st.shard0)) {
     jsTestLog("Skipping test because the time-series collection feature flag is disabled");
@@ -23,48 +27,55 @@ if (!TimeseriesTest.timeseriesCollectionsEnabled(st.shard0)) {
 }
 
 if (TimeseriesTest.shardedtimeseriesCollectionsEnabled(st.shard0)) {
-    function validateBucketsCollectionSharded({collName, shardKey, timeSeriesParams}) {
+    function validateBucketsCollectionSharded({collName, shardKey}) {
         const configColls = st.s.getDB('config').collections;
         const output = configColls
                            .find({
                                _id: 'test.system.buckets.' + collName,
                                key: shardKey,
-                               timeseriesFields: {$exists: true}
+                               timeseriesFields: {$exists: true},
                            })
                            .toArray();
         assert.eq(output.length, 1, configColls.find().toArray());
-        assert.eq(output[0].timeseriesFields.timeField, timeSeriesParams.timeField, output[0]);
-        assert.eq(output[0].timeseriesFields.metaField, timeSeriesParams.metaField, output[0]);
+        assert.eq(output[0].timeseriesFields.timeField, timeseries.timeField, output[0]);
+        assert.eq(output[0].timeseriesFields.metaField, timeseries.metaField, output[0]);
+    }
+
+    function validateViewCreated(viewName) {
+        const views =
+            sDB.runCommand({listCollections: 1, filter: {type: 'timeseries', name: viewName}})
+                .cursor.firstBatch;
+        assert.eq(views.length, 1, views);
+
+        const tsOpts = views[0].options.timeseries;
+        assert.eq(tsOpts.timeField, timeseries.timeField, tsOpts);
+        assert.eq(tsOpts.metaField, timeseries.metaField, tsOpts);
     }
 
     // Simple shard key on the metadata field.
-    (function metaShardKey() {
-        assert.commandWorked(
-            sDB.createCollection('ts', {timeseries: {timeField: 'time', metaField: 'hostId'}}));
-
+    function metaShardKey(implicit) {
         assert.commandWorked(st.s.adminCommand({enableSharding: 'test'}));
-
-        // This index gets created as {meta: 1} on the buckets collection.
-        assert.commandWorked(sDB.ts.createIndex({hostId: 1}));
 
         // Command should fail since the 'timeseries' specification does not match that existing
         // collection.
-        assert.commandFailedWithCode(
-            st.s.adminCommand(
-                {shardCollection: 'test.ts', key: {'hostId': 1}, timeseries: {timeField: 'time'}}),
-            5731500);
+        if (!implicit) {
+            assert.commandWorked(sDB.createCollection('ts', {timeseries}));
+            // This index gets created as {meta: 1} on the buckets collection.
+            assert.commandWorked(sDB.ts.createIndex({hostId: 1}));
+            assert.commandFailedWithCode(st.s.adminCommand({
+                shardCollection: 'test.ts',
+                key: {'hostId': 1},
+                timeseries: {timeField: 'time'},
+            }),
+                                         5731500);
+        }
 
-        assert.commandWorked(st.s.adminCommand({
-            shardCollection: 'test.ts',
-            key: {'hostId': 1},
-            timeseries: {timeField: 'time', metaField: 'hostId'}
-        }));
+        assert.commandWorked(
+            st.s.adminCommand({shardCollection: 'test.ts', key: {'hostId': 1}, timeseries}));
 
-        validateBucketsCollectionSharded({
-            collName: 'ts',
-            shardKey: {meta: 1},
-            timeSeriesParams: {timeField: 'time', metaField: 'hostId'}
-        });
+        validateBucketsCollectionSharded({collName: 'ts', shardKey: {meta: 1}, timeseries});
+
+        validateViewCreated("ts");
 
         assert.commandWorked(
             st.s.adminCommand({split: 'test.system.buckets.ts', middle: {meta: 10}}));
@@ -74,7 +85,7 @@ if (TimeseriesTest.shardedtimeseriesCollectionsEnabled(st.shard0)) {
             movechunk: 'test.system.buckets.ts',
             find: {meta: 10},
             to: st.getOther(primaryShard).shardName,
-            _waitForDelete: true
+            _waitForDelete: true,
         }));
 
         let counts = st.chunkCounts('system.buckets.ts', 'test');
@@ -82,22 +93,35 @@ if (TimeseriesTest.shardedtimeseriesCollectionsEnabled(st.shard0)) {
         assert.eq(1, counts[st.shard1.shardName]);
 
         sDB.dropDatabase();
-    })();
+    }
+
+    // Sharding an existing timeseries collection.
+    metaShardKey(false);
+
+    // Sharding a new timeseries collection.
+    metaShardKey(true);
 
     // Shard key on the metadata field and time fields.
-    function metaAndTimeShardKey() {
+    function metaAndTimeShardKey(implicit) {
         assert.commandWorked(st.s.adminCommand({enableSharding: 'test'}));
+
+        if (!implicit) {
+            assert.commandWorked(sDB.createCollection('ts', {timeseries}));
+        }
+
         assert.commandWorked(st.s.adminCommand({
             shardCollection: 'test.ts',
             key: {'hostId': 1, 'time': 1},
-            timeseries: {timeField: 'time', metaField: 'hostId'},
+            timeseries,
         }));
+
+        validateViewCreated("ts");
 
         validateBucketsCollectionSharded({
             collName: 'ts',
             // The 'time' field should be translated to 'control.min.time' on buckets collection.
             shardKey: {meta: 1, 'control.min.time': 1},
-            timeSeriesParams: {timeField: 'time', metaField: 'hostId'}
+            timeseries,
         });
 
         assert.commandWorked(st.s.adminCommand(
@@ -108,7 +132,7 @@ if (TimeseriesTest.shardedtimeseriesCollectionsEnabled(st.shard0)) {
             movechunk: 'test.system.buckets.ts',
             find: {meta: 10, 'control.min.time': MinKey},
             to: st.getOther(primaryShard).shardName,
-            _waitForDelete: true
+            _waitForDelete: true,
         }));
 
         let counts = st.chunkCounts('system.buckets.ts', 'test');
@@ -118,27 +142,20 @@ if (TimeseriesTest.shardedtimeseriesCollectionsEnabled(st.shard0)) {
         sDB.dropDatabase();
     }
 
-    // Sharding a collection with an existing timeseries collection.
-    assert.commandWorked(
-        sDB.createCollection('ts', {timeseries: {timeField: 'time', metaField: 'hostId'}}));
-    metaAndTimeShardKey();
+    // Sharding an existing timeseries collection.
+    metaAndTimeShardKey(false);
 
-    // Sharding a collection with a new timeseries collection.
-    metaAndTimeShardKey();
+    // Sharding a new timeseries collection.
+    metaAndTimeShardKey(true);
 
 } else {
     (function timeseriesCollectionsCannotBeSharded() {
         assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 
-        assert.commandFailedWithCode(st.s.adminCommand({
-            shardCollection: 'test.ts',
-            key: {meta: 1},
-            timeseries: {timeField: 'time', metaField: 'hostId'}
-        }),
-                                     5731502);
+        assert.commandFailedWithCode(
+            st.s.adminCommand({shardCollection: 'test.ts', key: {meta: 1}, timeseries}), 5731502);
 
-        assert.commandWorked(
-            sDB.createCollection('ts', {timeseries: {timeField: 'time', metaField: 'hostId'}}));
+        assert.commandWorked(sDB.createCollection('ts', {timeseries}));
 
         assert.commandFailedWithCode(
             st.s.adminCommand({shardCollection: 'test.ts', key: {meta: 1}}), 5731502);

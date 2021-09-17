@@ -141,11 +141,10 @@ function runQuery(
 
     // Shard time-series collection.
     const shardKey = {[timeField]: 1};
-    assert.commandWorked(
-        sDB.createCollection(collName, {timeseries: {timeField: timeField, granularity: "hours"}}));
     assert.commandWorked(sDB.adminCommand({
         shardCollection: `${dbName}.${collName}`,
         key: shardKey,
+        timeseries: {timeField, granularity: "hours"}
     }));
 
     // Split the chunks such that primary shard has chunk: [MinKey, 2020-01-01) and other shard has
@@ -316,11 +315,11 @@ function runQuery(
     assert.commandWorked(sDB.adminCommand({enableSharding: dbName}));
     st.ensurePrimaryShard(dbName, st.shard0.shardName);
 
-    assert.commandWorked(sDB.createCollection(
-        collName,
-        {timeseries: {timeField: timeField, metaField: metaField, granularity: "hours"}}));
-    assert.commandWorked(st.s.adminCommand(
-        {shardCollection: `${dbName}.${collName}`, key: {[metaField]: 1, 'time': 1}}));
+    assert.commandWorked(sDB.adminCommand({
+        shardCollection: `${dbName}.${collName}`,
+        key: {[metaField]: 1, 'time': 1},
+        timeseries: {timeField, metaField, granularity: "hours"}
+    }));
 
     // Split the chunks such that primary shard has chunk: [{MinKey, MinKey}, {0, 2020-01-01}) and
     // other shard has chunk [{0, 2020-01-01}, {MaxKey, MaxKey}].
@@ -480,11 +479,10 @@ function runQuery(
     const metaPrefix = `${metaField}.prefix`;
     const metaSuffix = `${metaField}.suffix`;
     const shardKey = {[metaPrefix]: 1, [metaSuffix]: 1};
-    assert.commandWorked(
-        sDB.createCollection(collName, {timeseries: {timeField: timeField, metaField: metaField}}));
     assert.commandWorked(sDB.adminCommand({
         shardCollection: `${dbName}.${collName}`,
         key: shardKey,
+        timeseries: {timeField, metaField}
     }));
 
     splitPoint = {'meta.prefix': 0, 'meta.suffix': 0};

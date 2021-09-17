@@ -68,19 +68,14 @@ function runTest() {
 
     assert.commandWorked(mongos.adminCommand({enableSharding: dbName}));
 
-    // Create timeseries collection.
-    assert.commandWorked(mainDB.createCollection(
-        collName,
-        {timeseries: {timeField: timeField, metaField: metaField, granularity: "hours"}}));
-    const coll = mainDB.getCollection(collName);
-
-    // Shard timeseries collection.
+    // Create and shard timeseries collection.
     const shardKey = {[timeField]: 1};
-    assert.commandWorked(coll.createIndex(shardKey));
     assert.commandWorked(mongos.adminCommand({
         shardCollection: `${dbName}.${collName}`,
         key: shardKey,
+        timeseries: {timeField, metaField, granularity: "hours"}
     }));
+    const coll = mainDB.getCollection(collName);
 
     // Insert initial set of documents.
     const timeValues = [
