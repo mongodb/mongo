@@ -234,6 +234,13 @@ void getSplitCandidatesToEnforceTagRanges(const ChunkManager* cm,
 void getSplitCandidatesForSessionsCollection(OperationContext* opCtx,
                                              const ChunkManager* cm,
                                              SplitCandidatesBuffer* splitCandidates) {
+    // Do not compute split points if shard key is not _id,
+    // since the split points depend on _id.id.
+    const auto& keyPattern = cm->getShardKeyPattern().getKeyPattern();
+    if (!KeyPattern::isIdKeyPattern(keyPattern.toBSON())) {
+        return;
+    }
+
     const auto minNumChunks = minNumChunksForSessionsCollection.load();
 
     if (cm->numChunks() >= minNumChunks) {
