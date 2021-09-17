@@ -2834,13 +2834,6 @@ tasks:
 
   - command: archive.targz_pack
     params:
-      target: src/burn_in_tests_multiversion_gen.tgz
-      source_dir: src/generated_resmoke_config
-      include:
-        - burn_in_tests_multiversion_gen.json
-
-  - command: archive.targz_pack
-    params:
       target: src/generate_tasks_config.tgz
       source_dir: src/generated_resmoke_config
       include:
@@ -2851,23 +2844,11 @@ tasks:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
       local_file: src/generate_tasks_config.tgz
-      remote_file: ${project}/${build_variant}/${revision}/generate_tasks/burn_in_tests_multiversion_gen-${build_id}.tgz
-      bucket: mciuploads
-      permissions: public-read
-      content_type: application/gzip
-      optional: true
-      display_name: Generated Multiversion Resmoke.py Suite Config - Execution ${execution}
-
-  - command: s3.put
-    params:
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      local_file: src/burn_in_tests_multiversion_gen.tgz
       remote_file: ${project}/${build_variant}/${revision}/generate_tasks/burn_in_tests_multiversion_gen_config-${build_id}.tgz
       bucket: mciuploads
       permissions: public-read
       content_type: application/gzip
-      display_name: Burn_in_tests Task Config - Execution ${execution}
+      display_name: Generated Multiversion Resmoke.py Suite Config - Execution ${execution}
 
   - command: generate.tasks
     params:

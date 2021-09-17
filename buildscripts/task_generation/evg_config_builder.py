@@ -118,7 +118,7 @@ class EvgConfigBuilder:
             build_variant = self.get_build_variant(generated_suite.build_variant)
             tasks = self.evg_config_gen_service.generate_multiversion_burnin_task(
                 generated_suite, gen_params, build_variant)
-        self.generated_files.extend(self._generate_suites_config(generated_suite))
+        self.generated_files.extend(self._generate_suites_config(generated_suite, True))
         return tasks
 
     def generate_fuzzer(self, fuzzer_params: FuzzerGenTaskParams) -> FuzzerTask:

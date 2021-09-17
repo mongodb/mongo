@@ -61,7 +61,7 @@ class BurnInConfig(NamedTuple):
 
     def build_config_location(self) -> str:
         """Build the configuration location for the generated configuration."""
-        return f"{self.build_variant}/{self.revision}/generate_tasks/burn_in_tests_multiversion_gen-{self.build_id}.tgz"
+        return f"{self.build_variant}/{self.revision}/generate_tasks/burn_in_tests_multiversion_gen_config-{self.build_id}.tgz"
 
 
 class MultiversionBurnInOrchestrator:
