@@ -5,10 +5,12 @@
 (function() {
 "use strict";
 
+const collNamePrefix = 'geo_polygon3_';
+
 const numTests = 31;
 
 for (let n = 0; n < numTests; n++) {
-    let t = db.geo_polygon3;
+    let t = db.getCollection(collNamePrefix + n);
     t.drop();
 
     let num = 0;
