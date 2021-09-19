@@ -406,7 +406,8 @@ DocumentSourceGroup::DocumentSourceGroup(const intrusive_ptr<ExpressionContext>&
               : nullptr),
       _initialized(false),
       _groups(expCtx->getValueComparator().makeUnorderedValueMap<Accumulators>()),
-      _spilled(false) {}
+      _spilled(false),
+      _sbeCompatible(false) {}
 
 void DocumentSourceGroup::addAccumulator(AccumulationStatement accumulationStatement) {
     _accumulatedFields.push_back(accumulationStatement);
