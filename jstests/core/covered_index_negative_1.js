@@ -6,6 +6,7 @@
 // Include helpers for analyzing explain output.
 // @tags: [
 //   assumes_balancer_off,
+//   does_not_support_stepdowns,
 // ]
 load("jstests/libs/analyze_plan.js");
 
