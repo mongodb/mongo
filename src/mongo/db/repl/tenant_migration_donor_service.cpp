@@ -927,28 +927,29 @@ TenantMigrationDonorService::Instance::_fetchAndStoreRecipientClusterTimeKeyDocs
                            return request.toBSON(BSONObj());
                        }();
 
-                       std::vector<ExternalKeysCollectionDocument> keyDocs;
-                       boost::optional<Status> fetchStatus;
+                       auto keyDocs =
+                           std::make_shared<std::vector<ExternalKeysCollectionDocument>>();
+                       auto fetchStatus = std::make_shared<boost::optional<Status>>();
 
                        auto fetcherCallback =
-                           [this, self = shared_from_this(), &keyDocs, &fetchStatus](
+                           [this, self = shared_from_this(), fetchStatus, keyDocs](
                                const Fetcher::QueryResponseStatus& dataStatus,
                                Fetcher::NextAction* nextAction,
                                BSONObjBuilder* getMoreBob) {
                                // Throw out any accumulated results on error
                                if (!dataStatus.isOK()) {
-                                   fetchStatus = dataStatus.getStatus();
-                                   keyDocs.clear();
+                                   *fetchStatus = dataStatus.getStatus();
+                                   keyDocs->clear();
                                    return;
                                }
 
                                const auto& data = dataStatus.getValue();
                                for (const BSONObj& doc : data.documents) {
-                                   keyDocs.push_back(
+                                   keyDocs->push_back(
                                        tenant_migration_util::makeExternalClusterTimeKeyDoc(
                                            _migrationUuid, doc.getOwned()));
                                }
-                               fetchStatus = Status::OK();
+                               *fetchStatus = Status::OK();
 
                                if (!getMoreBob) {
                                    return;
@@ -982,20 +983,30 @@ TenantMigrationDonorService::Instance::_fetchAndStoreRecipientClusterTimeKeyDocs
                        }
 
                        uassertStatusOK(fetcher->schedule());
-                       fetcher->join();
 
-                       {
-                           stdx::lock_guard<Latch> lg(_mutex);
-                           _recipientKeysFetcher.reset();
-                       }
+                       // We use the instance cleanup executor instead of the scoped task executor
+                       // here in order to avoid a self-deadlock situation in the Fetcher during
+                       // failovers.
+                       return fetcher->onCompletion()
+                           .thenRunOn(_donorService->getInstanceCleanupExecutor())
+                           .then(
+                               [this, self = shared_from_this(), fetchStatus, keyDocs, fetcher]() {
+                                   {
+                                       stdx::lock_guard<Latch> lg(_mutex);
+                                       _recipientKeysFetcher.reset();
+                                   }
 
-                       if (!fetchStatus) {
-                           // The callback never got invoked.
-                           uasserted(5340400, "Internal error running cursor callback in command");
-                       }
-                       uassertStatusOK(fetchStatus.get());
+                                   if (!*fetchStatus) {
+                                       // The callback never got invoked.
+                                       uasserted(
+                                           5340400,
+                                           "Internal error running cursor callback in command");
+                                   }
 
-                       return keyDocs;
+                                   uassertStatusOK(fetchStatus->get());
+
+                                   return *keyDocs;
+                               });
                    })
                    .then([this, self = shared_from_this(), executor, token](auto keyDocs) {
                        checkForTokenInterrupt(token);

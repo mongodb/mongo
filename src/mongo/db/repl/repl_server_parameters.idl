@@ -453,12 +453,7 @@ server_parameters:
         set_at: startup
         cpp_vartype: int
         cpp_varname: maxTenantMigrationDonorServiceThreadPoolSize
-        # Currently, the donor service blocks a service thread when loading cluster time keys from
-        # the recipient. The number of keys to copy is small so the blocking should be short, but
-        # to guarantee 50 concurrent migrations are supported, we set the thread pool size to 50.
-        #
-        # TODO SERVER-54208: Lower this value when loading keys is asynchronous.
-        default: 50
+        default: 8
         validator:
             gte: 1
 

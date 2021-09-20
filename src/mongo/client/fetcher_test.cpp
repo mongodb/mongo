@@ -248,6 +248,95 @@ TEST_F(FetcherTest, InvalidConstruction) {
         "retry policy cannot be null");
 }
 
+TEST_F(FetcherTest, FetcherCompletionFutureBecomesReadyAfterCompletingWork) {
+    // Used to check that the future continuation was run.
+    int i = 0;
+
+    ASSERT_FALSE(fetcher->onCompletion().isReady());
+
+    ASSERT_OK(fetcher->schedule());
+
+    ASSERT_TRUE(fetcher->isActive());
+    ASSERT_FALSE(fetcher->onCompletion().isReady());
+
+    const BSONObj doc = BSON("_id" << 1);
+    processNetworkResponse(BSON("cursor" << BSON("id" << 0LL << "ns"
+                                                      << "db.coll"
+                                                      << "firstBatch" << BSON_ARRAY(doc))
+                                         << "ok" << 1),
+                           ReadyQueueState::kEmpty,
+                           FetcherState::kInactive);
+    ASSERT_OK(status);
+    ASSERT_EQUALS(0, cursorId);
+    ASSERT_EQUALS("db.coll", nss.ns());
+    ASSERT_EQUALS(1U, documents.size());
+    ASSERT_BSONOBJ_EQ(doc, documents.front());
+
+    auto fut = fetcher->onCompletion().thenRunOn(getExecutorPtr()).then([&, this] {
+        ASSERT_EQUALS(Fetcher::State::kComplete, fetcher->getState_forTest());
+        i++;
+    });
+
+    fut.wait();
+    ASSERT_EQUALS(i, 1);
+}
+
+TEST_F(FetcherTest, FetcherCompletionFutureBecomesReadyEvenWhenWorkIsInterruptedByShutdown) {
+    // Used to check that the future continuation was run.
+    int i = 0;
+
+    ASSERT_FALSE(fetcher->onCompletion().isReady());
+
+    ASSERT_OK(fetcher->schedule());
+
+    ASSERT_TRUE(fetcher->isActive());
+    ASSERT_FALSE(fetcher->onCompletion().isReady());
+
+    const BSONObj doc = BSON("_id" << 1);
+    processNetworkResponse(BSON("cursor" << BSON("id" << 0LL << "ns"
+                                                      << "db.coll"
+                                                      << "firstBatch" << BSON_ARRAY(doc))
+                                         << "ok" << 1),
+                           ReadyQueueState::kEmpty,
+                           FetcherState::kInactive);
+    ASSERT_OK(status);
+    ASSERT_EQUALS(0, cursorId);
+    ASSERT_EQUALS("db.coll", nss.ns());
+    ASSERT_EQUALS(1U, documents.size());
+    ASSERT_BSONOBJ_EQ(doc, documents.front());
+
+    fetcher->shutdown();
+
+    // On shutdown, we expect that the async fetcher will not be stuck waiting.
+    auto fut = fetcher->onCompletion().thenRunOn(getExecutorPtr()).then([&, this] {
+        ASSERT_EQUALS(Fetcher::State::kComplete, fetcher->getState_forTest());
+        i++;
+    });
+
+    fut.wait();
+    ASSERT_EQUALS(i, 1);
+}
+
+TEST_F(FetcherTest, FetcherCompletionFutureBecomesReadyWhenFetcherIsShutdownBeforeSchedulingWork) {
+    // Used to check that the future continuation was run.
+    int i = 0;
+
+    ASSERT_EQUALS(Fetcher::State::kPreStart, fetcher->getState_forTest());
+    ASSERT_FALSE(fetcher->onCompletion().isReady());
+    ASSERT_FALSE(fetcher->isActive());
+
+    fetcher->shutdown();
+
+    // On shutdown, we expect that the async fetcher will not be stuck waiting.
+    auto fut = fetcher->onCompletion().thenRunOn(getExecutorPtr()).then([&, this] {
+        ASSERT_EQUALS(Fetcher::State::kComplete, fetcher->getState_forTest());
+        i++;
+    });
+
+    fut.wait();
+    ASSERT_EQUALS(i, 1);
+}
+
 // Command object can refer to any command that returns a cursor. This
 // includes listIndexes and listCollections.
 TEST_F(FetcherTest, NonFindCommand) {

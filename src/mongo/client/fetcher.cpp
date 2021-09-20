@@ -262,6 +262,7 @@ void Fetcher::shutdown() {
         case State::kPreStart:
             // Transition directly from PreStart to Complete if not started yet.
             _state = State::kComplete;
+            _completionPromise.emplaceValue();
             return;
         case State::kRunning:
             _state = State::kShuttingDown;
@@ -442,6 +443,8 @@ void Fetcher::_finishCallback() {
     _state = State::kComplete;
     _first = false;
     _condition.notify_all();
+
+    _completionPromise.emplaceValue();
 
     invariant(_work);
     std::swap(_work, tempWork);
