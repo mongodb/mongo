@@ -234,10 +234,6 @@ public:
 
     virtual BSONObj serialise() const = 0;
 
-    virtual std::vector<ShardId> getInvolvedShards() const {
-        return {_targetShardId};
-    }
-
     Type getType() const {
         return _type;
     }
@@ -294,11 +290,6 @@ public:
                                           _forceJumbo);
         return commandBuilder.obj();
     }
-
-    std::vector<ShardId> getInvolvedShards() const override {
-        return {getTarget(), _recipient};
-    }
-
 
 private:
     ChunkRange _chunkBoundaries;
@@ -667,9 +658,10 @@ private:
      */
     std::list<uint32_t> _pendingRequestIds;
 
-    bool _newInfoOnSubmittableRequests{false};
-
-    std::set<ShardId> _shardsPerformingMigrations;
+    /**
+     * List of request IDs that are currently running (submitted, but not yet completed).
+     */
+    stdx::unordered_set<uint32_t> _runningRequestIds;
 
     /**
      * State to acquire and release DistLocks on a per namespace basis
@@ -681,11 +673,6 @@ private:
         int numMigrations;
     };
     stdx::unordered_map<NamespaceString, Migrations> _migrationLocks;
-
-    /**
-     * Counter of requests that are currently running (submitted, but not yet completed)
-     */
-    int32_t _numRunningRequests{0};
 
     void _setState(WithLock, SchedulerState state);
 

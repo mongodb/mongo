@@ -93,6 +93,7 @@ void BalancerCommandsSchedulerImpl::start() {
     // TODO init _requestIdCounter here based on the stored running requests from a past invocation?
     invariant(!_workerThreadHandle.joinable());
     _incompleteRequests.reserve(_maxRunningRequests * 10);
+    _runningRequestIds.reserve(_maxRunningRequests);
     _state = SchedulerState::Running;
     _workerThreadHandle = stdx::thread([this] { _workerThread(); });
 }
@@ -225,7 +226,6 @@ ResponseHandle BalancerCommandsSchedulerImpl::_enqueueNewRequest(
             invariant(_workerThreadHandle.joinable());
             _incompleteRequests.emplace(std::make_pair(newRequestId, std::move(pendingRequest)));
             _pendingRequestIds.push_back(newRequestId);
-            _newInfoOnSubmittableRequests = true;
             _stateUpdatedCV.notify_all();
         } else {
             deferredResponseHandle.handle->set(Status(
@@ -324,6 +324,10 @@ void BalancerCommandsSchedulerImpl::_applySubmissionResult(
     WithLock, OperationContext* opCtx, CommandSubmissionResult&& submissionResult) {
     auto requestToUpdateIt = _incompleteRequests.find(submissionResult.id);
     if (requestToUpdateIt == _incompleteRequests.end()) {
+        LOGV2(5847209,
+              "Skipping _applySubmissionResult: reqId {reqId} already completed/canceled",
+              "Skipping _applySubmissionResult: reqId already completed/canceled",
+              "reqId"_attr = submissionResult.id);
         return;
     }
     /*
@@ -338,15 +342,10 @@ void BalancerCommandsSchedulerImpl::_applySubmissionResult(
     auto& requestToUpdate = requestToUpdateIt->second;
     if (submissionResult.context.isOK()) {
         requestToUpdate.addExecutionContext(std::move(submissionResult.context.getValue()));
-        ++_numRunningRequests;
+        _runningRequestIds.insert(submissionResult.id);
     } else {
-        const auto& submittedCommandInfo = requestToUpdate.getCommandInfo();
-        if (submittedCommandInfo.getType() == CommandInfo::Type::kMoveChunk) {
-            for (const auto& involvedShard : submittedCommandInfo.getInvolvedShards()) {
-                _shardsPerformingMigrations.erase(involvedShard);
-            }
-        }
         if (submissionResult.acquiredDistLock) {
+            const auto& submittedCommandInfo = requestToUpdate.getCommandInfo();
             _releaseDistLock(opCtx, submittedCommandInfo.getNameSpace());
         }
         requestToUpdate.setOutcome(submissionResult.context.getStatus());
@@ -370,15 +369,10 @@ void BalancerCommandsSchedulerImpl::_applyCommandResponse(
         requestToComplete.setOutcome(response);
         auto& commandInfo = requestToComplete.getCommandInfo();
         if (commandInfo.getType() == CommandInfo::Type::kMoveChunk) {
-            for (const auto& shard : commandInfo.getInvolvedShards()) {
-                _shardsPerformingMigrations.erase(shard);
-            }
             _releaseDistLock(opCtx, commandInfo.getNameSpace());
         }
+        _runningRequestIds.erase(requestId);
         _incompleteRequests.erase(requestToCompleteIt);
-        _newInfoOnSubmittableRequests = true;
-        --_numRunningRequests;
-        invariant(_numRunningRequests >= 0);
         _stateUpdatedCV.notify_all();
     }
     LOGV2(5847204,
@@ -409,59 +403,26 @@ void BalancerCommandsSchedulerImpl::_workerThread() {
             stdx::unique_lock<Latch> ul(_mutex);
             _stateUpdatedCV.wait(ul, [this] {
                 return (_state != SchedulerState::Running ||
-                        (!_pendingRequestIds.empty() && _numRunningRequests < _maxRunningRequests &&
-                         _newInfoOnSubmittableRequests &&
+                        (!_pendingRequestIds.empty() &&
+                         _runningRequestIds.size() < _maxRunningRequests &&
                          MONGO_likely(!pauseBalancerWorkerThread.shouldFail())));
             });
 
             if (_state != SchedulerState::Running) {
-                _numRunningRequests = 0;
+                _runningRequestIds.clear();
                 _pendingRequestIds.clear();
-                _newInfoOnSubmittableRequests = false;
-                _shardsPerformingMigrations.clear();
                 _incompleteRequests.swap(requestsToCleanUpOnExit);
                 break;
             }
 
             // 1. Pick up new requests to be submitted from the pending list, if possible.
             const auto availableSubmissionSlots =
-                static_cast<size_t>(_maxRunningRequests - _numRunningRequests);
-            for (auto it = _pendingRequestIds.cbegin(); it != _pendingRequestIds.end() &&
-                 commandsToSubmit.size() < availableSubmissionSlots;) {
-                const auto& requestData = _incompleteRequests.at(*it);
-                const auto& commandInfo = requestData.getCommandInfo();
-                bool canBeSubmitted = true;
-                if (commandInfo.getType() == CommandInfo::Type::kMoveChunk) {
-                    // Extra check - a shard can only be involved in one running moveChunk command.
-                    auto shardsInCommand = commandInfo.getInvolvedShards();
-                    canBeSubmitted = [this, &shardsInCommand] {
-                        for (const auto& shard : shardsInCommand) {
-                            if (_shardsPerformingMigrations.find(shard) !=
-                                _shardsPerformingMigrations.end()) {
-                                return false;
-                            }
-                        }
-                        return true;
-                    }();
-
-                    if (canBeSubmitted) {
-                        for (const auto& shard : shardsInCommand) {
-                            _shardsPerformingMigrations.insert(shard);
-                        }
-                    }
-                }
-
-                if (canBeSubmitted) {
-                    commandsToSubmit.push_back(requestData.getSubmissionInfo());
-                    it = _pendingRequestIds.erase(it);
-                } else {
-                    ++it;
-                }
-            }
-
-            if (commandsToSubmit.empty()) {
-                _newInfoOnSubmittableRequests = false;
-                continue;
+                static_cast<size_t>(_maxRunningRequests - _runningRequestIds.size());
+            while (!_pendingRequestIds.empty() &&
+                   commandsToSubmit.size() < availableSubmissionSlots) {
+                const auto& requestData = _incompleteRequests.at(_pendingRequestIds.front());
+                commandsToSubmit.push_back(requestData.getSubmissionInfo());
+                _pendingRequestIds.pop_front();
             }
         }
 
