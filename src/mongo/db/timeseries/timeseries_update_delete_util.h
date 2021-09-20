@@ -29,12 +29,13 @@
 
 #pragma once
 
+#include <set>
+
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops_gen.h"
 
 namespace mongo::timeseries {
-
 
 /**
  * Returns true if the given query only modifies the time-series collection's given metaField, false
@@ -46,6 +47,13 @@ bool queryOnlyDependsOnMetaField(OperationContext* opCtx,
                                  boost::optional<StringData> metaField,
                                  const LegacyRuntimeConstants& runtimeConstants,
                                  const boost::optional<BSONObj>& letParams);
+
+/**
+ * Returns true if the given query, represented by its dependent fields, only modifies the
+ * time-series collection's given metaField, false otherwise.
+ */
+bool queryOnlyDependsOnMetaField(boost::optional<StringData> metaField,
+                                 const std::set<std::string>& dependencyFieldNames);
 
 /**
  * Returns true if the given update modification only modifies the time-series collection's given

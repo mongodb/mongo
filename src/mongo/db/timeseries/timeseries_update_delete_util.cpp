@@ -147,16 +147,21 @@ bool queryOnlyDependsOnMetaField(OperationContext* opCtx,
         new ExpressionContext(opCtx, nullptr, ns, runtimeConstants, letParams));
     std::vector<BSONObj> rawPipeline{BSON("$match" << query)};
     DepsTracker dependencies = Pipeline::parse(rawPipeline, expCtx)->getDependencies({});
+    return queryOnlyDependsOnMetaField(metaField, dependencies.fields);
+}
+
+bool queryOnlyDependsOnMetaField(boost::optional<StringData> metaField,
+                                 const std::set<std::string>& dependencyFieldNames) {
     return metaField
-        ? std::all_of(dependencies.fields.begin(),
-                      dependencies.fields.end(),
+        ? std::all_of(dependencyFieldNames.begin(),
+                      dependencyFieldNames.end(),
                       [metaField](const auto& dependency) {
                           StringData queryField(dependency);
                           return isMetaFieldFirstElementOfDottedPathField(queryField, *metaField) ||
                               isMetaFieldFirstElementOfDottedPathField(queryField,
                                                                        "$" + *metaField);
                       })
-        : dependencies.fields.empty();
+        : dependencyFieldNames.empty();
 }
 
 bool updateOnlyModifiesMetaField(OperationContext* opCtx,
