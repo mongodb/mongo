@@ -141,11 +141,15 @@ class thread_context {
     bool update(scoped_cursor &cursor, uint64_t collection_id, const std::string &key);
 
     /*
-     * Generic insert function, takes a collection_id and key_id, will generate the value.
+     * Generic insert function, takes a collection_id and key_id, will generate the value. If a
+     * timestamp is not specified, the timestamp manager will generate one.
      *
      * Returns true if a rollback is required.
      */
-    bool insert(scoped_cursor &cursor, uint64_t collection_id, uint64_t key_id);
+    bool insert(
+      scoped_cursor &cursor, uint64_t collection_id, uint64_t key_id, wt_timestamp_t ts = 0);
+    bool insert(
+      scoped_cursor &cursor, uint64_t collection_id, const std::string &key, wt_timestamp_t ts = 0);
 
     void sleep();
     bool running() const;

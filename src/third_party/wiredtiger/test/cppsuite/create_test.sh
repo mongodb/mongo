@@ -52,14 +52,14 @@ VALUE="#include \"$1.cxx\""
 sed -i "/$SEARCH/a $VALUE" $FILE
 
 # Add the new test to the run_test() method
-SEARCH="example_test(test_harness::test_args{config, test_name, wt_open_config}).run();"
+SEARCH="example_test("
 LINE_1="\else if (test_name == \"$1\")\n"
-LINE_2="\\$1(test_harness::test_args{config, test_name, wt_open_config}).run();"
+LINE_2="\ $1(test_harness::test_args{config, test_name, wt_open_config}).run();"
 sed -i "/$SEARCH/a $LINE_1$LINE_2" $FILE
 
 # Add the new test to all existing tests.
-SEARCH="all_tests = {\"example_test\""
-REPLACE="$SEARCH, \"$1\""
+SEARCH="all_tests = {"
+REPLACE="$SEARCH\"$1\", "
 sed -i "s/$SEARCH/$REPLACE/" $FILE
 echo "Updated $FILE."
 

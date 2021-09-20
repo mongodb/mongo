@@ -27,6 +27,11 @@
  */
 
 #include "random_generator.h"
+#include <algorithm>
+
+extern "C" {
+#include "test_util.h"
+}
 
 namespace test_harness {
 random_generator &
@@ -37,25 +42,28 @@ random_generator::instance()
 }
 
 std::string
-random_generator::generate_string(std::size_t length)
+random_generator::generate_random_string(std::size_t length, characters_type type)
 {
-    std::string random_string;
+    std::string str;
 
-    for (std::size_t i = 0; i < length; ++i)
-        random_string += _characters[_distribution(_generator)];
+    while (str.size() < length)
+        str += get_characters(type);
 
-    return (random_string);
+    std::shuffle(str.begin(), str.end(), _generator);
+    return (str.substr(0, length));
 }
 
 std::string
-random_generator::generate_pseudo_random_string(std::size_t length)
+random_generator::generate_pseudo_random_string(std::size_t length, characters_type type)
 {
     std::string random_string;
-    std::size_t start_location = _distribution(_generator);
+    std::uniform_int_distribution<> &distribution = get_distribution(type);
+    std::size_t start_location = distribution(_generator);
+    const std::string &characters = get_characters(type);
 
     for (std::size_t i = 0; i < length; ++i) {
-        random_string += _characters[start_location];
-        if (start_location == _characters.size() - 1)
+        random_string += characters[start_location];
+        if (start_location == characters.size() - 1)
             start_location = 0;
         else
             start_location++;
@@ -66,6 +74,40 @@ random_generator::generate_pseudo_random_string(std::size_t length)
 random_generator::random_generator()
 {
     _generator = std::mt19937(std::random_device{}());
-    _distribution = std::uniform_int_distribution<>(0, _characters.size() - 1);
+    _alphanum_distrib = std::uniform_int_distribution<>(0, _pseudo_alphanum.size() - 1);
+    _alpha_distrib = std::uniform_int_distribution<>(0, _alphabet.size() - 1);
 }
+
+std::uniform_int_distribution<> &
+random_generator::get_distribution(characters_type type)
+{
+    switch (type) {
+    case characters_type::ALPHABET:
+        return (_alpha_distrib);
+        break;
+    case characters_type::PSEUDO_ALPHANUMERIC:
+        return (_alphanum_distrib);
+        break;
+    default:
+        testutil_die(type, "Unexpected characters_type");
+        break;
+    }
+}
+
+const std::string &
+random_generator::get_characters(characters_type type)
+{
+    switch (type) {
+    case characters_type::ALPHABET:
+        return (_alphabet);
+        break;
+    case characters_type::PSEUDO_ALPHANUMERIC:
+        return (_pseudo_alphanum);
+        break;
+    default:
+        testutil_die(type, "Unexpected characters_type");
+        break;
+    }
+}
+
 } // namespace test_harness
