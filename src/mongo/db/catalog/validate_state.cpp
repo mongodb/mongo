@@ -115,6 +115,18 @@ bool ValidateState::shouldEnforceFastCount() const {
             // Do not enforce fast count on the 'config.system.indexBuilds' collection. This is an
             // internal collection that should not be queried and is empty most of the time.
             return false;
+        } else if (_nss == NamespaceString::kSessionTransactionsTableNamespace) {
+            // The 'config.transactions' collection is an implicitly replicated collection used for
+            // internal bookkeeping for retryable writes and multi-statement transactions.
+            // Replication rollback won't adjust the size storer counts for the
+            // 'config.transactions' collection. We therefore do not enforce fast count on it.
+            return false;
+        } else if (_nss == NamespaceString::kConfigImagesNamespace) {
+            // The 'config.image_collection' collection is an implicitly replicated collection used
+            // for internal bookkeeping for retryable writes. Replication rollback won't adjust the
+            // size storer counts for the 'config.image_collection' collection. We therefore do not
+            // enforce fast count on it.
+            return false;
         }
 
         return true;

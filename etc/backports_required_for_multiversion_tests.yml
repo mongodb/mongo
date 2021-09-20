@@ -42,6 +42,8 @@ last-continuous:
       test_file: jstests/replsets/tenant_migration_retryable_write_retry_on_recipient.js
     - ticket: SERVER-57617
       test_file: jstests/replsets/tenant_migration_find_and_modify_retry.js
+    - ticket: SERVER-59057
+      test_file: jstests/replsets/rollback_transaction_table.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -234,6 +236,8 @@ last-lts:
       test_file: jstests/replsets/tenant_migration_find_and_modify_retry.js
     - ticket: SERVER-57321
       test_file: jstests/core/mod_special_values.js
+    - ticket: SERVER-59057
+      test_file: jstests/replsets/rollback_transaction_table.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
