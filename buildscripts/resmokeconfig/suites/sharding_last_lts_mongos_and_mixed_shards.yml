@@ -13,7 +13,6 @@ selector:
   - requires_fcv_51
   - backport_required_multiversion
   - sharding_last_lts_mongos_and_mixed_shards_backport_required_multiversion
-  - disabled_due_to_server_58295
   exclude_files:
   # SERVER-33683: We added a restriction on using an aggregation within a transaction against
   # mongos. This should be removed and the test can be adjusted and re-added to this passthrough.

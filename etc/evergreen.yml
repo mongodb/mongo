@@ -9560,7 +9560,7 @@ buildvariants:
     # TODO (SERVER-55857): Remove 'requires_fcv_51' once tests are filtered out using the
     # 'REQUIRES_FCV_TAG' list in 'multiversion_constants.py'.
     test_flags: >-
-      --excludeWithAnyTags=requires_fcv_51,multiversion_incompatible,disabled_due_to_server_58295
+      --excludeWithAnyTags=requires_fcv_51,multiversion_incompatible
     compile_flags: >-
       -j$(grep -c ^processor /proc/cpuinfo)
       --ssl
@@ -9591,7 +9591,7 @@ buildvariants:
     # TODO (SERVER-55857): Remove 'requires_fcv_51' once tests are filtered out using the
     # 'REQUIRES_FCV_TAG' list in 'multiversion_constants.py'.
     test_flags: >-
-      --excludeWithAnyTags=requires_fcv_51,multiversion_incompatible,disabled_due_to_server_58295
+      --excludeWithAnyTags=requires_fcv_51,multiversion_incompatible
       --runAllFeatureFlagTests
       --mongodSetParameters="{internalQueryEnableSlotBasedExecutionEngine: true}"
 
