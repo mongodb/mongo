@@ -101,6 +101,13 @@ public:
     /**
      * Setup the config.chunks collection to contain the given chunks.
      */
+    void setupCollection(const NamespaceString& nss,
+                         const boost::optional<mongo::UUID>& uuid,
+                         const KeyPattern& shardKey,
+                         const std::vector<ChunkType>& chunks);
+    /**
+     * Setup the config.chunks collection to contain the given chunks.
+     */
     void setupChunks(const std::vector<ChunkType>& chunks);
 
     /**
