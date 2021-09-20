@@ -749,8 +749,8 @@ class GenerateSubSuites(object):
 
     def calculate_fallback_suites(self):
         """Divide tests into a fixed number of suites."""
-        num_suites = self.config_options.fallback_num_sub_suites
         self.test_list = self.list_tests()
+        num_suites = min(self.config_options.fallback_num_sub_suites, len(self.test_list))
         suites = [Suite() for _ in range(num_suites)]
         for idx, test_file in enumerate(self.test_list):
             suites[idx % num_suites].add_test(test_file, 0)

@@ -724,6 +724,26 @@ class GenerateSubSuitesTest(unittest.TestCase):
 
         self.assertEqual(n_tests, len(gen_sub_suites.test_list))
 
+    def test_calculate_suites_fallback_with_fewer_tests_than_max(self):
+        n_tests = 2
+        response = Mock()
+        response.status_code = requests.codes.SERVICE_UNAVAILABLE
+        evg = Mock()
+        evg.test_stats_by_project.side_effect = requests.HTTPError(response=response)
+        config_options = self.get_mock_options()
+        config_options.fallback_num_sub_suites = 5
+
+        gen_sub_suites = under_test.GenerateSubSuites(evg, config_options)
+        gen_sub_suites.list_tests = MagicMock(return_value=self.get_test_list(n_tests))
+
+        suites = gen_sub_suites.calculate_suites(_DATE, _DATE)
+
+        self.assertEqual(n_tests, len(suites))
+        for suite in suites:
+            self.assertEqual(1, len(suite.tests))
+
+        self.assertEqual(n_tests, len(gen_sub_suites.test_list))
+
     def test_calculate_suites_uses_fallback_for_no_results(self):
         n_tests = 100
         evg = Mock()
