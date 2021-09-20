@@ -55,7 +55,7 @@ struct SSLConnectionContext {
     std::shared_ptr<SSLManagerInterface> manager;
     // If this Context was created from transient SSL params this contains the URI of the target
     // cluster. It can also be used to determine if the context is indeed transient.
-    std::optional<std::string> targetClusterURI;
+    boost::optional<std::string> targetClusterURI;
 
     ~SSLConnectionContext();
 };

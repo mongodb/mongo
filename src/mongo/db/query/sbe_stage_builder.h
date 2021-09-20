@@ -261,7 +261,7 @@ struct PlanStageData {
 
     // If this execution tree was built as a result of replanning of the cached plan, this string
     // will include the reason for replanning.
-    std::optional<std::string> replanReason;
+    boost::optional<std::string> replanReason;
 
     // If this candidate plan has completed the trial run early by achieving one of the trial run
     // metrics, the stats are cached in here.

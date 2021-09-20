@@ -242,7 +242,7 @@ public:
     bool fromMultiPlanner{false};
 
     // True if a replan was triggered during the execution of this operation.
-    std::optional<std::string> replanReason;
+    boost::optional<std::string> replanReason;
 
     bool cursorExhausted{
         false};  // true if the cursor has been closed at end a find/getMore operation

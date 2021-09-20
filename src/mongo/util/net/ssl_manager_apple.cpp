@@ -1872,7 +1872,7 @@ extern SSLManagerCoordinator* theSSLManagerCoordinator;
 
 std::shared_ptr<SSLManagerInterface> SSLManagerInterface::create(
     const SSLParams& params,
-    const std::optional<TransientSSLParams>& transientSSLParams,
+    const boost::optional<TransientSSLParams>& transientSSLParams,
     bool isServer) {
     return std::make_shared<SSLManagerApple>(params, isServer);
 }

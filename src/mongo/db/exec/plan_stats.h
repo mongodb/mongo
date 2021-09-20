@@ -223,7 +223,7 @@ struct CachedPlanStats : public SpecificStats {
         return sizeof(*this);
     }
 
-    std::optional<std::string> replanReason;
+    boost::optional<std::string> replanReason;
 };
 
 struct CollectionScanStats : public SpecificStats {

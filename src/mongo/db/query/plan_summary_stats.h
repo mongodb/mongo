@@ -111,7 +111,7 @@ struct PlanSummaryStats {
     bool fromMultiPlanner = false;
 
     // Was a replan triggered during the execution of this query?
-    std::optional<std::string> replanReason;
+    boost::optional<std::string> replanReason;
 
     // Score calculated for the plan by PlanRanker. Only set if there were multiple candidate plans
     // and allPlansExecution verbosity mode is selected.

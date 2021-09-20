@@ -58,6 +58,7 @@ _RE_VOLATILE = re.compile('[^_]volatile')
 _RE_MUTEX = re.compile('[ ({,]stdx?::mutex[ ({]')
 _RE_ASSERT = re.compile(r'\bassert\s*\(')
 _RE_UNSTRUCTURED_LOG = re.compile(r'\blogd\s*\(')
+_RE_STD_OPTIONAL = re.compile(r'\bstd::optional\b')
 
 _RE_GENERIC_FCV_COMMENT = re.compile(r'\(Generic FCV reference\):')
 GENERIC_FCV = [
@@ -143,6 +144,7 @@ class Linter:
             self._check_for_mongo_unstructured_log(linenum)
             self._check_for_mongo_config_header(linenum)
             self._check_for_ctype(linenum)
+            self._check_for_std_optional(linenum)
 
             # Relax the rule of commenting generic FCV references for files directly related to FCV
             # implementations.
@@ -245,6 +247,12 @@ class Linter:
         if 'include <cctype>' in line or 'include <ctype.h>' in line:
             self._error(linenum, 'mongodb/ctype',
                         'Use of prohibited <ctype.h> or <cctype> header, use "mongo/util/ctype.h"')
+
+    def _check_for_std_optional(self, linenum):
+        line = self.clean_lines[linenum]
+        if _RE_STD_OPTIONAL.search(line):
+            self._error(linenum, 'mongodb/stdoptional',
+                        'Use of std::optional, use boost::optional instead.')
 
     def _license_error(self, linenum, msg, category='legal/license'):
         style_url = 'https://github.com/mongodb/mongo/wiki/Server-Code-Style'

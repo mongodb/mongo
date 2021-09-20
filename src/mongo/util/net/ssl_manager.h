@@ -174,10 +174,10 @@ struct CertInformationToLog {
     Date_t validityNotAfter;
     // If the certificate was loaded from file, this is the file name. If empty,
     // it means the certificate came from memory payload.
-    std::optional<std::string> keyFile;
+    boost::optional<std::string> keyFile;
     // If the certificate targets a particular cluster, this is cluster URI. If empty,
     // it means the certificate is the default one for the local cluster.
-    std::optional<std::string> targetClusterURI;
+    boost::optional<std::string> targetClusterURI;
 
     logv2::DynamicAttributes getDynamicAttributes() const {
         logv2::DynamicAttributes attrs;
@@ -217,7 +217,7 @@ public:
      */
     static std::shared_ptr<SSLManagerInterface> create(
         const SSLParams& params,
-        const std::optional<TransientSSLParams>& transientSSLParams,
+        const boost::optional<TransientSSLParams>& transientSSLParams,
         bool isServer);
 
     /**

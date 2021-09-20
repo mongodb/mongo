@@ -1162,7 +1162,7 @@ class SSLManagerOpenSSL : public SSLManagerInterface,
                           public std::enable_shared_from_this<SSLManagerOpenSSL> {
 public:
     explicit SSLManagerOpenSSL(const SSLParams& params,
-                               const std::optional<TransientSSLParams>& transientSSLParams,
+                               const boost::optional<TransientSSLParams>& transientSSLParams,
                                bool isServer);
     ~SSLManagerOpenSSL() {
         stopJobs();
@@ -1245,7 +1245,7 @@ private:
     SSLConfiguration _sslConfiguration;
     // If set, this manager is an instance providing authentication with remote server specified
     // with TransientSSLParams::targetedClusterConnectionString.
-    const std::optional<TransientSSLParams> _transientSSLParams;
+    const boost::optional<TransientSSLParams> _transientSSLParams;
 
     // Weak pointer to verify that this manager is still owned by this context.
     synchronized_value<std::weak_ptr<const SSLConnectionContext>> _ownedByContext;
@@ -1384,8 +1384,8 @@ private:
      */
     static void _getX509CertInfo(UniqueX509& x509,
                                  CertInformationToLog* info,
-                                 std::optional<StringData> keyFile,
-                                 std::optional<StringData> targetClusterURI);
+                                 boost::optional<StringData> keyFile,
+                                 boost::optional<StringData> targetClusterURI);
 
     /*
      * Retrieve and store CRL information from the provided CRL filename.
@@ -1428,8 +1428,8 @@ private:
     bool _setupPEMFromBIO(SSL_CTX* context,
                           UniqueBIO inBio,
                           PasswordFetcher* password,
-                          std::optional<StringData> keyFile,
-                          std::optional<StringData> targetClusterURI) const;
+                          boost::optional<StringData> keyFile,
+                          boost::optional<StringData> targetClusterURI) const;
 
     /**
      * Loads a certificate chain from memory into context.
@@ -1440,7 +1440,7 @@ private:
     static bool _readCertificateChainFromMemory(SSL_CTX* context,
                                                 const std::string& payload,
                                                 PasswordFetcher* password,
-                                                std::optional<StringData> targetClusterURI);
+                                                boost::optional<StringData> targetClusterURI);
 
     /*
      * Set up an SSL context for certificate validation by loading a CA
@@ -1513,7 +1513,7 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManager, ("SetupOpenSSL", "EndStartupOpt
 
 std::shared_ptr<SSLManagerInterface> SSLManagerInterface::create(
     const SSLParams& params,
-    const std::optional<TransientSSLParams>& transientSSLParams,
+    const boost::optional<TransientSSLParams>& transientSSLParams,
     bool isServer) {
     return std::make_shared<SSLManagerOpenSSL>(params, transientSSLParams, isServer);
 }
@@ -1521,7 +1521,7 @@ std::shared_ptr<SSLManagerInterface> SSLManagerInterface::create(
 std::shared_ptr<SSLManagerInterface> SSLManagerInterface::create(const SSLParams& params,
                                                                  bool isServer) {
     return std::make_shared<SSLManagerOpenSSL>(
-        params, std::optional<TransientSSLParams>{}, isServer);
+        params, boost::optional<TransientSSLParams>{}, isServer);
 }
 
 SSLX509Name getCertificateSubjectX509Name(X509* cert) {
@@ -1613,7 +1613,7 @@ SSLConnectionOpenSSL::~SSLConnectionOpenSSL() {
 }
 
 SSLManagerOpenSSL::SSLManagerOpenSSL(const SSLParams& params,
-                                     const std::optional<TransientSSLParams>& transientSSLParams,
+                                     const boost::optional<TransientSSLParams>& transientSSLParams,
                                      bool isServer)
     : _serverContext(nullptr),
       _clientContext(nullptr),
@@ -2662,7 +2662,7 @@ bool SSLManagerOpenSSL::_readCertificateChainFromMemory(
     SSL_CTX* context,
     const std::string& payload,
     PasswordFetcher* password,
-    std::optional<StringData> targetClusterURI) {
+    boost::optional<StringData> targetClusterURI) {
 
     logv2::DynamicAttributes errorAttrs;
     if (targetClusterURI) {
@@ -2696,7 +2696,7 @@ bool SSLManagerOpenSSL::_readCertificateChainFromMemory(
     }
 
     CertInformationToLog debugInfo;
-    _getX509CertInfo(x509cert, &debugInfo, std::nullopt, targetClusterURI);
+    _getX509CertInfo(x509cert, &debugInfo, boost::none, targetClusterURI);
     logCert(debugInfo, "", 5159903);
 
     // SSL_CTX_use_certificate increments the refcount on cert.
@@ -2724,7 +2724,7 @@ bool SSLManagerOpenSSL::_readCertificateChainFromMemory(
                 5159908, "Failed to use the CA X509 certificate loaded from memory", errorAttrs);
             return false;
         }
-        _getX509CertInfo(ca, &debugInfo, std::nullopt, targetClusterURI);
+        _getX509CertInfo(ca, &debugInfo, boost::none, targetClusterURI);
         logCert(debugInfo, "", 5159902);
 #if OPENSSL_VERSION_NUMBER < 0x100010fFL
         ca.release();  // Older version add_extra_chain_cert takes over the pointer without
@@ -2770,7 +2770,7 @@ bool SSLManagerOpenSSL::_setupPEM(SSL_CTX* context,
         LOGV2_ERROR(23250, "Cannot read PEM key file", errorAttrs);
         return false;
     }
-    return _setupPEMFromBIO(context, std::move(inBio), password, keyFile, std::nullopt);
+    return _setupPEMFromBIO(context, std::move(inBio), password, StringData{keyFile}, boost::none);
 }
 
 bool SSLManagerOpenSSL::_setupPEMFromMemoryPayload(SSL_CTX* context,
@@ -2795,14 +2795,14 @@ bool SSLManagerOpenSSL::_setupPEMFromMemoryPayload(SSL_CTX* context,
         return false;
     }
 
-    return _setupPEMFromBIO(context, std::move(inBio), password, std::nullopt, targetClusterURI);
+    return _setupPEMFromBIO(context, std::move(inBio), password, boost::none, targetClusterURI);
 }
 
 bool SSLManagerOpenSSL::_setupPEMFromBIO(SSL_CTX* context,
                                          UniqueBIO inBio,
                                          PasswordFetcher* password,
-                                         std::optional<StringData> keyFile,
-                                         std::optional<StringData> targetClusterURI) const {
+                                         boost::optional<StringData> keyFile,
+                                         boost::optional<StringData> targetClusterURI) const {
     logv2::DynamicAttributes errorAttrs;
     if (keyFile) {
         errorAttrs.add("keyFile", *keyFile);
@@ -3499,8 +3499,8 @@ constexpr size_t kSHA1HashBytes = 20;
 // static
 void SSLManagerOpenSSL::_getX509CertInfo(UniqueX509& x509,
                                          CertInformationToLog* info,
-                                         std::optional<StringData> keyFile,
-                                         std::optional<StringData> targetClusterURI) {
+                                         boost::optional<StringData> keyFile,
+                                         boost::optional<StringData> targetClusterURI) {
     if (!x509) {
         return;
     }
@@ -3579,7 +3579,8 @@ SSLInformationToLog SSLManagerOpenSSL::getSSLInformationToLog() const {
     if (!(sslGlobalParams.sslPEMKeyFile.empty())) {
         UniqueX509 serverX509Cert =
             _getX509Object(sslGlobalParams.sslPEMKeyFile, &_serverPEMPassword);
-        _getX509CertInfo(serverX509Cert, &info.server, sslGlobalParams.sslPEMKeyFile, std::nullopt);
+        _getX509CertInfo(
+            serverX509Cert, &info.server, StringData{sslGlobalParams.sslPEMKeyFile}, boost::none);
     }
 
     if (!(sslGlobalParams.sslClusterFile.empty())) {
@@ -3587,7 +3588,7 @@ SSLInformationToLog SSLManagerOpenSSL::getSSLInformationToLog() const {
         UniqueX509 clusterX509Cert =
             _getX509Object(sslGlobalParams.sslClusterFile, &_clusterPEMPassword);
         _getX509CertInfo(
-            clusterX509Cert, &clusterInfo, sslGlobalParams.sslClusterFile, std::nullopt);
+            clusterX509Cert, &clusterInfo, StringData{sslGlobalParams.sslClusterFile}, boost::none);
         info.cluster = clusterInfo;
     } else {
         info.cluster = boost::none;
