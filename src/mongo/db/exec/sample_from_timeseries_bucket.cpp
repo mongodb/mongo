@@ -27,22 +27,30 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
 #include "mongo/db/exec/sample_from_timeseries_bucket.h"
+#include "mongo/db/exec/shard_filterer.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
+
+#include "mongo/logv2/log.h"
 
 namespace mongo {
 const char* SampleFromTimeseriesBucket::kStageType = "SAMPLE_FROM_TIMESERIES_BUCKET";
 
-SampleFromTimeseriesBucket::SampleFromTimeseriesBucket(ExpressionContext* expCtx,
-                                                       WorkingSet* ws,
-                                                       std::unique_ptr<PlanStage> child,
-                                                       BucketUnpacker bucketUnpacker,
-                                                       int maxConsecutiveAttempts,
-                                                       long long sampleSize,
-                                                       int bucketMaxCount)
+SampleFromTimeseriesBucket::SampleFromTimeseriesBucket(
+    ExpressionContext* expCtx,
+    WorkingSet* ws,
+    std::unique_ptr<PlanStage> child,
+    BucketUnpacker bucketUnpacker,
+    boost::optional<std::unique_ptr<ShardFilterer>> shardFilterer,
+    int maxConsecutiveAttempts,
+    long long sampleSize,
+    int bucketMaxCount)
     : PlanStage{kStageType, expCtx},
       _ws{*ws},
       _bucketUnpacker{std::move(bucketUnpacker)},
+      _shardFilterer{std::move(shardFilterer)},
       _maxConsecutiveAttempts{maxConsecutiveAttempts},
       _sampleSize{sampleSize},
       _bucketMaxCount{bucketMaxCount} {
@@ -82,6 +90,22 @@ PlanStage::StageState SampleFromTimeseriesBucket::doWork(WorkingSetID* out) {
         auto member = _ws.get(id);
 
         auto bucket = member->doc.value().toBson();
+        if (_shardFilterer) {
+            const auto belongs = (*_shardFilterer)->documentBelongsToMe(bucket);
+            if (belongs == ShardFilterer::DocumentBelongsResult::kNoShardKey) {
+                LOGV2_WARNING(
+                    5757300,
+                    "no shard key found in document {bucket} for shard key "
+                    "pattern {shardFilterer_getKeyPattern}, document may have been inserted "
+                    "manually into shard",
+                    "bucket"_attr = redact(bucket),
+                    "shardFilterer_getKeyPattern"_attr = (*_shardFilterer)->getKeyPattern());
+            } else if (belongs != ShardFilterer::DocumentBelongsResult::kBelongs) {
+                _ws.free(id);
+                return PlanStage::NEED_TIME;
+            }
+        }
+
         _bucketUnpacker.reset(std::move(bucket));
 
         auto& prng = expCtx()->opCtx->getClient()->getPrng();

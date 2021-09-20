@@ -31,6 +31,7 @@
 
 #include "mongo/db/exec/bucket_unpacker.h"
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/shard_filterer.h"
 
 namespace mongo {
 /**
@@ -59,6 +60,7 @@ public:
                                WorkingSet* ws,
                                std::unique_ptr<PlanStage> child,
                                BucketUnpacker bucketUnpacker,
+                               boost::optional<std::unique_ptr<ShardFilterer>> shardFilterer,
                                int maxConsecutiveAttempts,
                                long long sampleSize,
                                int bucketMaxCount);
@@ -114,6 +116,7 @@ private:
 
     WorkingSet& _ws;
     BucketUnpacker _bucketUnpacker;
+    boost::optional<std::unique_ptr<ShardFilterer>> _shardFilterer;
     SampleFromTimeseriesBucketStats _specificStats;
 
     const int _maxConsecutiveAttempts;
