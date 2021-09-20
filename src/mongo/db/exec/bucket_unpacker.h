@@ -105,7 +105,12 @@ public:
      * to be reset to a new bucket object to perform unpacking.
      */
     BucketUnpacker copy() const {
-        return {bucketSpec(), behavior()};
+        BucketUnpacker unpackerCopy;
+        unpackerCopy._unpackerBehavior = _unpackerBehavior;
+        unpackerCopy._spec = _spec;
+        unpackerCopy._includeMetaField = _includeMetaField;
+        unpackerCopy._includeTimeField = _includeTimeField;
+        return unpackerCopy;
     }
 
     /**

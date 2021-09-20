@@ -220,6 +220,26 @@ private:
         const AggregateCommandRequest* aggRequest,
         const MatchExpressionParser::AllowedFeatureSet& matcherFeatures,
         bool* hasNoRequirements);
+
+    /**
+     * Returns a 'PlanExecutor' which uses a random cursor to sample documents if successful as
+     * determined by the boolean. Returns {} if the storage engine doesn't support random cursors,
+     * or if 'sampleSize' is a large enough percentage of the collection.
+     *
+     * Note: this function may mutate the input 'pipeline' sources in the case of timeseries
+     * collections. It always pushes down the $_internalUnpackBucket source to the PlanStage layer.
+     * If the chosen execution plan is ARHASH and we are in an unsharded environment, the $sample
+     * stage will also be erased and pushed down. In the sharded case, we still need a separate
+     * $sample stage to preserve sorting metadata for the AsyncResultsMerger to merge samples
+     * returned by multiple shards.
+     */
+    static StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
+    createRandomCursorExecutor(const CollectionPtr& coll,
+                               const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                               Pipeline* pipeline,
+                               long long sampleSize,
+                               long long numRecords,
+                               boost::optional<BucketUnpacker> bucketUnpacker);
 };
 
 }  // namespace mongo

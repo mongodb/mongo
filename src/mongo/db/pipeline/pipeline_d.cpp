@@ -48,6 +48,7 @@
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/sample_from_timeseries_bucket.h"
 #include "mongo/db/exec/shard_filter.h"
+#include "mongo/db/exec/shard_filterer_impl.h"
 #include "mongo/db/exec/trial_stage.h"
 #include "mongo/db/exec/unpack_timeseries_bucket.h"
 #include "mongo/db/exec/working_set.h"
@@ -95,184 +96,6 @@ using std::unique_ptr;
 using write_ops::InsertCommandRequest;
 
 namespace {
-/**
- * Returns a 'PlanExecutor' which uses a random cursor to sample documents if successful as
- * determined by the boolean. Returns {} if the storage engine doesn't support random cursors, or if
- * 'sampleSize' is a large enough percentage of the collection.
- */
-StatusWith<std::pair<unique_ptr<PlanExecutor, PlanExecutor::Deleter>, bool>>
-createRandomCursorExecutor(const CollectionPtr& coll,
-                           const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                           long long sampleSize,
-                           long long numRecords,
-                           boost::optional<BucketUnpacker> bucketUnpacker) {
-    OperationContext* opCtx = expCtx->opCtx;
-
-    // Verify that we are already under a collection lock. We avoid taking locks ourselves in this
-    // function because double-locking forces any PlanExecutor we create to adopt a NO_YIELD policy.
-    invariant(opCtx->lockState()->isCollectionLockedForMode(coll->ns(), MODE_IS));
-
-    static const double kMaxSampleRatioForRandCursor = 0.05;
-    if (!expCtx->ns.isTimeseriesBucketsCollection()) {
-        if (sampleSize > numRecords * kMaxSampleRatioForRandCursor || numRecords <= 100) {
-            return std::pair{nullptr, false};
-        }
-    } else {
-        // Suppose that a time-series bucket collection is observed to contain 200 buckets, and the
-        // 'gTimeseriesBucketMaxCount' parameter is set to 1000. If all buckets are full, then the
-        // maximum possible measurment count would be 200 * 1000 = 200,000. While the
-        // 'SampleFromTimeseriesBucket' plan is more efficient when the sample size is small
-        // relative to the total number of measurements in the time-series collection, for larger
-        // sample sizes the top-k sort based sample is faster. Experiments have approximated that
-        // the tipping point is roughly when the requested sample size is greater than 1% of the
-        // maximum possible number of measurements in the collection (i.e. numBuckets *
-        // maxMeasurementsPerBucket).
-        static const double kCoefficient = 0.01;
-        if (sampleSize > kCoefficient * numRecords * gTimeseriesBucketMaxCount) {
-            return std::pair{nullptr, false};
-        }
-    }
-
-    // Attempt to get a random cursor from the RecordStore.
-    auto rsRandCursor = coll->getRecordStore()->getRandomCursor(opCtx);
-    if (!rsRandCursor) {
-        // The storage engine has no random cursor support.
-        return std::pair{nullptr, false};
-    }
-
-    // Build a MultiIteratorStage and pass it the random-sampling RecordCursor.
-    auto ws = std::make_unique<WorkingSet>();
-    std::unique_ptr<PlanStage> root =
-        std::make_unique<MultiIteratorStage>(expCtx.get(), ws.get(), coll);
-    static_cast<MultiIteratorStage*>(root.get())->addIterator(std::move(rsRandCursor));
-
-    TrialStage* trialStage = nullptr;
-
-    // Because 'numRecords' includes orphan documents, our initial decision to optimize the $sample
-    // cursor may have been mistaken. For sharded collections, build a TRIAL plan that will switch
-    // to a collection scan if the ratio of orphaned to owned documents encountered over the first
-    // 100 works() is such that we would have chosen not to optimize.
-    static const size_t kMaxPresampleSize = 100;
-    if (auto css = CollectionShardingState::get(opCtx, coll->ns());
-        css->getCollectionDescription(opCtx).isSharded() &&
-        !expCtx->ns.isTimeseriesBucketsCollection()) {
-        // The ratio of owned to orphaned documents must be at least equal to the ratio between the
-        // requested sampleSize and the maximum permitted sampleSize for the original constraints to
-        // be satisfied. For instance, if there are 200 documents and the sampleSize is 5, then at
-        // least (5 / (200*0.05)) = (5/10) = 50% of those documents must be owned. If less than 5%
-        // of the documents in the collection are owned, we default to the backup plan.
-        const auto minAdvancedToWorkRatio = std::max(
-            sampleSize / (numRecords * kMaxSampleRatioForRandCursor), kMaxSampleRatioForRandCursor);
-        // Since the incoming operation is sharded, use the CSS to infer the filtering metadata for
-        // the collection. We get the shard ownership filter after checking to see if the collection
-        // is sharded to avoid an invariant from being fired in this call.
-        auto collectionFilter = css->getOwnershipFilter(
-            opCtx, CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup);
-        // The trial plan is SHARDING_FILTER-MULTI_ITERATOR.
-        auto randomCursorPlan = std::make_unique<ShardFilterStage>(
-            expCtx.get(), collectionFilter, ws.get(), std::move(root));
-        // The backup plan is SHARDING_FILTER-COLLSCAN.
-        std::unique_ptr<PlanStage> collScanPlan = std::make_unique<CollectionScan>(
-            expCtx.get(), coll, CollectionScanParams{}, ws.get(), nullptr);
-        collScanPlan = std::make_unique<ShardFilterStage>(
-            expCtx.get(), collectionFilter, ws.get(), std::move(collScanPlan));
-        // Place a TRIAL stage at the root of the plan tree, and pass it the trial and backup plans.
-        root = std::make_unique<TrialStage>(expCtx.get(),
-                                            ws.get(),
-                                            std::move(randomCursorPlan),
-                                            std::move(collScanPlan),
-                                            kMaxPresampleSize,
-                                            minAdvancedToWorkRatio);
-        trialStage = static_cast<TrialStage*>(root.get());
-    } else if (expCtx->ns.isTimeseriesBucketsCollection()) {
-        // We can't take ARHASH optimization path for a direct $sample on the system.buckets
-        // collection because data is in compressed form. If we did have a direct $sample on the
-        // system.buckets collection, then the 'bucketUnpacker' would not be set up properly. We
-        // also should bail out early if a $sample is made against a time series collection that is
-        // empty. If we don't the 'minAdvancedToWorkRatio' can be nan/-nan depending on the
-        // architecture.
-        if (!(bucketUnpacker && numRecords)) {
-            return std::pair{nullptr, false};
-        }
-
-        // Use a 'TrialStage' to run a trial between 'SampleFromTimeseriesBucket' and
-        // 'UnpackTimeseriesBucket' with $sample left in the pipeline in-place. If the buckets are
-        // not sufficiently full, or the 'SampleFromTimeseriesBucket' plan draws too many
-        // duplicates, then we will fall back to the 'TrialStage' backup plan. This backup plan uses
-        // the top-k sort sampling approach.
-        //
-        // Suppose the 'gTimeseriesBucketMaxCount' is 1000, but each bucket only contains 500
-        // documents on average. The observed trial advanced/work ratio approximates the average
-        // bucket fullness, noted here as "abf". In this example, abf = 500 / 1000 = 0.5.
-        // Experiments have shown that the optimized 'SampleFromTimeseriesBucket' algorithm performs
-        // better than backup plan when
-        //
-        //     sampleSize < 0.02 * abf * numRecords * gTimeseriesBucketMaxCount
-        //
-        //  This inequality can be rewritten as
-        //
-        //     abf > sampleSize / (0.02 * numRecords * gTimeseriesBucketMaxCount)
-        //
-        // Therefore, if the advanced/work ratio exceeds this threshold, we will use the
-        // 'SampleFromTimeseriesBucket' plan. Note that as the sample size requested by the user
-        // becomes larger with respect to the number of buckets, we require a higher advanced/work
-        // ratio in order to justify using 'SampleFromTimeseriesBucket'.
-        //
-        // Additionally, we require the 'TrialStage' to approximate the abf as at least 0.25. When
-        // buckets are mostly empty, the 'SampleFromTimeseriesBucket' will be inefficient due to a
-        // lot of sampling "misses".
-        static const auto kCoefficient = 0.02;
-        static const auto kMinBucketFullness = 0.25;
-        const auto minAdvancedToWorkRatio = std::max(
-            std::min(sampleSize / (kCoefficient * numRecords * gTimeseriesBucketMaxCount), 1.0),
-            kMinBucketFullness);
-
-        auto arhashPlan = std::make_unique<SampleFromTimeseriesBucket>(
-            expCtx.get(),
-            ws.get(),
-            std::move(root),
-            bucketUnpacker->copy(),
-            // By using a quantity slightly higher than 'kMaxPresampleSize', we ensure that the
-            // 'SampleFromTimeseriesBucket' stage won't fail due to too many consecutive sampling
-            // attempts during the 'TrialStage's trial period.
-            kMaxPresampleSize + 5,
-            sampleSize,
-            gTimeseriesBucketMaxCount);
-
-        std::unique_ptr<PlanStage> collScanPlan = std::make_unique<CollectionScan>(
-            expCtx.get(), coll, CollectionScanParams{}, ws.get(), nullptr);
-
-        auto topkSortPlan = std::make_unique<UnpackTimeseriesBucket>(
-            expCtx.get(), ws.get(), std::move(collScanPlan), bucketUnpacker->copy());
-
-        root = std::make_unique<TrialStage>(expCtx.get(),
-                                            ws.get(),
-                                            std::move(arhashPlan),
-                                            std::move(topkSortPlan),
-                                            kMaxPresampleSize,
-                                            minAdvancedToWorkRatio);
-        trialStage = static_cast<TrialStage*>(root.get());
-    }
-
-    auto execStatus = plan_executor_factory::make(expCtx,
-                                                  std::move(ws),
-                                                  std::move(root),
-                                                  &coll,
-                                                  opCtx->inMultiDocumentTransaction()
-                                                      ? PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY
-                                                      : PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                                                  QueryPlannerParams::RETURN_OWNED_DATA);
-    if (!execStatus.isOK()) {
-        return execStatus.getStatus();
-    }
-
-    // For sharded collections, the root of the plan tree is a TrialStage that may have chosen
-    // either a random-sampling cursor trial plan or a COLLSCAN backup plan. We can only optimize
-    // the $sample aggregation stage if the trial plan was chosen.
-    return std::pair{std::move(execStatus.getValue()),
-                     !trialStage || !trialStage->pickedBackupPlan()};
-}
-
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExecutor(
     const intrusive_ptr<ExpressionContext>& expCtx,
     const CollectionPtr& collection,
@@ -447,6 +270,239 @@ std::pair<DocumentSourceSample*, DocumentSourceInternalUnpackBucket*> extractSam
 }
 }  // namespace
 
+StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::createRandomCursorExecutor(
+    const CollectionPtr& coll,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    Pipeline* pipeline,
+    long long sampleSize,
+    long long numRecords,
+    boost::optional<BucketUnpacker> bucketUnpacker) {
+    OperationContext* opCtx = expCtx->opCtx;
+
+    // Verify that we are already under a collection lock. We avoid taking locks ourselves in this
+    // function because double-locking forces any PlanExecutor we create to adopt a NO_YIELD policy.
+    invariant(opCtx->lockState()->isCollectionLockedForMode(coll->ns(), MODE_IS));
+
+    static const double kMaxSampleRatioForRandCursor = 0.05;
+    if (!expCtx->ns.isTimeseriesBucketsCollection()) {
+        if (sampleSize > numRecords * kMaxSampleRatioForRandCursor || numRecords <= 100) {
+            return nullptr;
+        }
+    } else {
+        // Suppose that a time-series bucket collection is observed to contain 200 buckets, and the
+        // 'gTimeseriesBucketMaxCount' parameter is set to 1000. If all buckets are full, then the
+        // maximum possible measurment count would be 200 * 1000 = 200,000. While the
+        // 'SampleFromTimeseriesBucket' plan is more efficient when the sample size is small
+        // relative to the total number of measurements in the time-series collection, for larger
+        // sample sizes the top-k sort based sample is faster. Experiments have approximated that
+        // the tipping point is roughly when the requested sample size is greater than 1% of the
+        // maximum possible number of measurements in the collection (i.e. numBuckets *
+        // maxMeasurementsPerBucket).
+        static const double kCoefficient = 0.01;
+        if (sampleSize > kCoefficient * numRecords * gTimeseriesBucketMaxCount) {
+            return nullptr;
+        }
+    }
+
+    // Attempt to get a random cursor from the RecordStore.
+    auto rsRandCursor = coll->getRecordStore()->getRandomCursor(opCtx);
+    if (!rsRandCursor) {
+        // The storage engine has no random cursor support.
+        return nullptr;
+    }
+
+    // Build a MultiIteratorStage and pass it the random-sampling RecordCursor.
+    auto ws = std::make_unique<WorkingSet>();
+    std::unique_ptr<PlanStage> root =
+        std::make_unique<MultiIteratorStage>(expCtx.get(), ws.get(), coll);
+    static_cast<MultiIteratorStage*>(root.get())->addIterator(std::move(rsRandCursor));
+
+    TrialStage* trialStage = nullptr;
+
+    auto css = CollectionShardingState::get(opCtx, coll->ns());
+    const auto isSharded = css->getCollectionDescription(opCtx).isSharded();
+
+    // Because 'numRecords' includes orphan documents, our initial decision to optimize the $sample
+    // cursor may have been mistaken. For sharded collections, build a TRIAL plan that will switch
+    // to a collection scan if the ratio of orphaned to owned documents encountered over the first
+    // 100 works() is such that we would have chosen not to optimize.
+    static const size_t kMaxPresampleSize = 100;
+    if (expCtx->ns.isTimeseriesBucketsCollection()) {
+        // We can't take ARHASH optimization path for a direct $sample on the system.buckets
+        // collection because data is in compressed form. If we did have a direct $sample on the
+        // system.buckets collection, then the 'bucketUnpacker' would not be set up properly. We
+        // also should bail out early if a $sample is made against a time series collection that is
+        // empty. If we don't the 'minAdvancedToWorkRatio' can be nan/-nan depending on the
+        // architecture.
+        if (!(bucketUnpacker && numRecords)) {
+            return nullptr;
+        }
+
+        // Use a 'TrialStage' to run a trial between 'SampleFromTimeseriesBucket' and
+        // 'UnpackTimeseriesBucket' with $sample left in the pipeline in-place. If the buckets are
+        // not sufficiently full, or the 'SampleFromTimeseriesBucket' plan draws too many
+        // duplicates, then we will fall back to the 'TrialStage' backup plan. This backup plan uses
+        // the top-k sort sampling approach.
+        //
+        // Suppose the 'gTimeseriesBucketMaxCount' is 1000, but each bucket only contains 500
+        // documents on average. The observed trial advanced/work ratio approximates the average
+        // bucket fullness, noted here as "abf". In this example, abf = 500 / 1000 = 0.5.
+        // Experiments have shown that the optimized 'SampleFromTimeseriesBucket' algorithm performs
+        // better than backup plan when
+        //
+        //     sampleSize < 0.02 * abf * numRecords * gTimeseriesBucketMaxCount
+        //
+        //  This inequality can be rewritten as
+        //
+        //     abf > sampleSize / (0.02 * numRecords * gTimeseriesBucketMaxCount)
+        //
+        // Therefore, if the advanced/work ratio exceeds this threshold, we will use the
+        // 'SampleFromTimeseriesBucket' plan. Note that as the sample size requested by the user
+        // becomes larger with respect to the number of buckets, we require a higher advanced/work
+        // ratio in order to justify using 'SampleFromTimeseriesBucket'.
+        //
+        // Additionally, we require the 'TrialStage' to approximate the abf as at least 0.25. When
+        // buckets are mostly empty, the 'SampleFromTimeseriesBucket' will be inefficient due to a
+        // lot of sampling "misses".
+        static const auto kCoefficient = 0.02;
+        static const auto kMinBucketFullness = 0.25;
+        const auto minAdvancedToWorkRatio = std::max(
+            std::min(sampleSize / (kCoefficient * numRecords * gTimeseriesBucketMaxCount), 1.0),
+            kMinBucketFullness);
+
+        boost::optional<std::unique_ptr<ShardFilterer>> maybeShardFilter;
+        if (isSharded) {
+            // In the sharded case, we need to use a ShardFilterer within the ARHASH plan to
+            // eliminate orphans from the working set, since the stage owns the cursor.
+            maybeShardFilter = std::make_unique<ShardFiltererImpl>(css->getOwnershipFilter(
+                opCtx, CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup));
+        }
+
+        auto arhashPlan = std::make_unique<SampleFromTimeseriesBucket>(
+            expCtx.get(),
+            ws.get(),
+            std::move(root),
+            bucketUnpacker->copy(),
+            std::move(maybeShardFilter),
+            // By using a quantity slightly higher than 'kMaxPresampleSize', we ensure that the
+            // 'SampleFromTimeseriesBucket' stage won't fail due to too many consecutive sampling
+            // attempts during the 'TrialStage's trial period.
+            kMaxPresampleSize + 5,
+            sampleSize,
+            gTimeseriesBucketMaxCount);
+
+        std::unique_ptr<PlanStage> collScanPlan = std::make_unique<CollectionScan>(
+            expCtx.get(), coll, CollectionScanParams{}, ws.get(), nullptr);
+
+        if (isSharded) {
+            // In the sharded case, we need to add a shard-filterer stage to the backup plan to
+            // eliminate orphans. The trial plan is thus SHARDING_FILTER-COLLSCAN.
+            auto collectionFilter = css->getOwnershipFilter(
+                opCtx, CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup);
+            collScanPlan = std::make_unique<ShardFilterStage>(
+                expCtx.get(), std::move(collectionFilter), ws.get(), std::move(collScanPlan));
+        }
+
+        auto topkSortPlan = std::make_unique<UnpackTimeseriesBucket>(
+            expCtx.get(), ws.get(), std::move(collScanPlan), bucketUnpacker->copy());
+
+        // In a sharded collection we need to preserve the $sample source in order to provide the
+        // AsyncResultsMerger with $sortKeys it can use to merge samples from multiple shards.
+        // However, this means we need to perform a sort on the results of ARHASH. This work is not
+        // counted by the TrialStage, so we impose an arbitrary upper limit on the sample size
+        // before defaulting to a Top-K sort, in order to bound the cost of sorting the sample
+        // returned by ARHASH.
+        static const auto kMaxSortSizeForShardedARHASHSample = 1000;
+        if (isSharded && (sampleSize > kMaxSortSizeForShardedARHASHSample)) {
+            root = std::move(topkSortPlan);
+        } else {
+            // We need to use a TrialStage approach to handle a problem where ARHASH sampling can
+            // fail due to small measurement counts. We can push sampling and bucket unpacking down
+            // to the PlanStage layer and erase $_internalUnpackBucket and $sample.
+            root = std::make_unique<TrialStage>(expCtx.get(),
+                                                ws.get(),
+                                                std::move(arhashPlan),
+                                                std::move(topkSortPlan),
+                                                kMaxPresampleSize,
+                                                minAdvancedToWorkRatio);
+            trialStage = static_cast<TrialStage*>(root.get());
+        }
+
+    } else if (isSharded) {
+        // The ratio of owned to orphaned documents must be at least equal to the ratio between the
+        // requested sampleSize and the maximum permitted sampleSize for the original constraints to
+        // be satisfied. For instance, if there are 200 documents and the sampleSize is 5, then at
+        // least (5 / (200*0.05)) = (5/10) = 50% of those documents must be owned. If less than 5%
+        // of the documents in the collection are owned, we default to the backup plan.
+        const auto minAdvancedToWorkRatio = std::max(
+            sampleSize / (numRecords * kMaxSampleRatioForRandCursor), kMaxSampleRatioForRandCursor);
+        // Since the incoming operation is sharded, use the CSS to infer the filtering metadata for
+        // the collection. We get the shard ownership filter after checking to see if the collection
+        // is sharded to avoid an invariant from being fired in this call.
+        auto collectionFilter = css->getOwnershipFilter(
+            opCtx, CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup);
+        // The trial plan is SHARDING_FILTER-MULTI_ITERATOR.
+        auto randomCursorPlan = std::make_unique<ShardFilterStage>(
+            expCtx.get(), collectionFilter, ws.get(), std::move(root));
+        // The backup plan is SHARDING_FILTER-COLLSCAN.
+        std::unique_ptr<PlanStage> collScanPlan = std::make_unique<CollectionScan>(
+            expCtx.get(), coll, CollectionScanParams{}, ws.get(), nullptr);
+        collScanPlan = std::make_unique<ShardFilterStage>(
+            expCtx.get(), collectionFilter, ws.get(), std::move(collScanPlan));
+        // Place a TRIAL stage at the root of the plan tree, and pass it the trial and backup plans.
+        root = std::make_unique<TrialStage>(expCtx.get(),
+                                            ws.get(),
+                                            std::move(randomCursorPlan),
+                                            std::move(collScanPlan),
+                                            kMaxPresampleSize,
+                                            minAdvancedToWorkRatio);
+        trialStage = static_cast<TrialStage*>(root.get());
+    }
+
+    auto execStatus = plan_executor_factory::make(expCtx,
+                                                  std::move(ws),
+                                                  std::move(root),
+                                                  &coll,
+                                                  opCtx->inMultiDocumentTransaction()
+                                                      ? PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY
+                                                      : PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                                  QueryPlannerParams::RETURN_OWNED_DATA);
+    if (!execStatus.isOK()) {
+        return execStatus.getStatus();
+    }
+
+    // For sharded collections, the root of the plan tree is a TrialStage that may have chosen
+    // either a random-sampling cursor trial plan or a COLLSCAN backup plan. We can only optimize
+    // the $sample aggregation stage if the trial plan was chosen.
+    const auto isStorageOptimizedSample = !trialStage || !trialStage->pickedBackupPlan();
+    if (!bucketUnpacker) {
+        if (isStorageOptimizedSample) {
+            // Replace $sample stage with $sampleFromRandomCursor stage.
+            pipeline->popFront();
+            std::string idString = coll->ns().isOplog() ? "ts" : "_id";
+            pipeline->addInitialSource(DocumentSourceSampleFromRandomCursor::create(
+                expCtx, sampleSize, idString, numRecords));
+        }
+    } else {
+        // For timeseries collections, we should remove the $_internalUnpackBucket stage which is at
+        // the front of the pipeline, regardless of which plan the TrialStage has chosen. The
+        // unpacking will be done by the 'UnpackTimeseriesBucket' PlanStage if the backup plan
+        // (Top-K sort plan) was chosen, and by the 'SampleFromTimeseriesBucket' PlanStage if the
+        // ARHASH plan was chosen.
+        Pipeline::SourceContainer& sources = pipeline->_sources;
+        sources.erase(sources.begin());
+        // We can push down the $sample source into the PlanStage layer if the chosen strategy uses
+        // ARHASH sampling on unsharded collections. For sharded collections, we cannot erase
+        // $sample because we need to preserve the sort metadata (the $sortKey field) for the merge
+        // cursor on mongos.
+        if (isStorageOptimizedSample && !isSharded) {
+            sources.erase(sources.begin());
+        }
+    }
+
+    return std::move(execStatus.getValue());
+}
+
 std::pair<PipelineD::AttachExecutorCallback, std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
 PipelineD::buildInnerQueryExecutorSample(DocumentSourceSample* sampleStage,
                                          DocumentSourceInternalUnpackBucket* unpackBucketStage,
@@ -456,8 +512,6 @@ PipelineD::buildInnerQueryExecutorSample(DocumentSourceSample* sampleStage,
 
     auto expCtx = pipeline->getContext();
 
-    Pipeline::SourceContainer& sources = pipeline->_sources;
-
     const long long sampleSize = sampleStage->getSampleSize();
     const long long numRecords = collection->getRecordStore()->numRecords(expCtx->opCtx);
 
@@ -465,36 +519,11 @@ PipelineD::buildInnerQueryExecutorSample(DocumentSourceSample* sampleStage,
     if (unpackBucketStage) {
         bucketUnpacker = unpackBucketStage->bucketUnpacker();
     }
-    auto&& [exec, isStorageOptimizedSample] = uassertStatusOK(createRandomCursorExecutor(
-        collection, expCtx, sampleSize, numRecords, std::move(bucketUnpacker)));
+    auto exec = uassertStatusOK(createRandomCursorExecutor(
+        collection, expCtx, pipeline, sampleSize, numRecords, std::move(bucketUnpacker)));
 
     AttachExecutorCallback attachExecutorCallback;
     if (exec) {
-        if (!unpackBucketStage) {
-            if (isStorageOptimizedSample) {
-                // Replace $sample stage with $sampleFromRandomCursor stage.
-                pipeline->popFront();
-                std::string idString = collection->ns().isOplog() ? "ts" : "_id";
-                pipeline->addInitialSource(DocumentSourceSampleFromRandomCursor::create(
-                    expCtx, sampleSize, idString, numRecords));
-            }
-        } else {
-            if (isStorageOptimizedSample) {
-                // If there are non-nullptrs for 'sampleStage' and 'unpackBucketStage', then
-                // 'unpackBucketStage' is at the front of the pipeline immediately followed by a
-                // 'sampleStage'. We need to use a TrialStage approach to handle a problem where
-                // ARHASH sampling can fail due to small measurement counts. We can push sampling
-                // and bucket unpacking down to the PlanStage layer and erase $_internalUnpackBucket
-                // and $sample.
-                sources.erase(sources.begin());
-                sources.erase(sources.begin());
-            } else {
-                // The TrialStage chose the backup plan and we need to erase just the
-                // $_internalUnpackBucket stage and leave $sample where it is.
-                sources.erase(sources.begin());
-            }
-        }
-
         // The order in which we evaluate these arguments is significant. We'd like to be
         // sure that the DocumentSourceCursor is created _last_, because if we run into a
         // case where a DocumentSourceCursor has been created (yet hasn't been put into a
