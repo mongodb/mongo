@@ -1112,7 +1112,9 @@ var ReplSetTest = function(opts) {
                 [
                     ErrorCodes.NodeNotFound,
                     ErrorCodes.NewReplicaSetConfigurationIncompatible,
-                    ErrorCodes.InterruptedDueToReplStateChange
+                    ErrorCodes.InterruptedDueToReplStateChange,
+                    ErrorCodes.ConfigurationInProgress,
+                    ErrorCodes.CurrentConfigNotCommittedYet
                 ],
                 errorMsg);
             return result.ok;
