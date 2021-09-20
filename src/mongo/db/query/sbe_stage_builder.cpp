@@ -2056,7 +2056,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 }
 
 namespace {
-const auto kGroupBySlots = 1;
+const size_t kGroupBySlots = 1;
 
 std::pair<sbe::value::SlotId, EvalStage> generateGroupByKey(
     StageBuilderState& state,
@@ -2110,7 +2110,6 @@ std::tuple<std::vector<std::string>, sbe::value::SlotVector, EvalStage> generate
     const std::vector<sbe::value::SlotVector>& aggSlotsVec,
     PlanNodeId nodeId,
     sbe::value::SlotIdGenerator* slotIdGenerator) {
-    // Builds the final stage(s) over the collected accumulators.
     sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> prjSlotToExprMap;
     sbe::value::SlotVector groupOutSlots{groupEvalStage.outSlots};
     // To passthrough the output slots of accumulators with trivial finalizers, we need to find
@@ -2120,16 +2119,24 @@ std::tuple<std::vector<std::string>, sbe::value::SlotVector, EvalStage> generate
     // slots at the front and the accumulator slots at the back.
     std::sort(groupOutSlots.begin() + kGroupBySlots, groupOutSlots.end());
 
-    auto finalSlots{sbe::value::SlotVector{groupBySlot}};
+    // The group-by slot may end up being 'Nothing' and in that case _id: null will be returned.
+    // Calling 'makeFillEmptyNull' for 'groupBySlot' takes care of that. Adds the final group-by
+    // slot and the associated expression to the 'prjSlotToExprMap' for the final project stage
+    // which is generated at the end of this function.
+    auto finalGroupBySlot = slotIdGenerator->generate();
+    prjSlotToExprMap.emplace(finalGroupBySlot, makeFillEmptyNull(makeVariable(groupBySlot)));
+
+    auto finalSlots{sbe::value::SlotVector{finalGroupBySlot}};
     finalSlots.reserve(kGroupBySlots + accStmts.size());
     std::vector<std::string> fieldNames{"_id"};
     fieldNames.reserve(kGroupBySlots + accStmts.size());
     auto groupFinalEvalStage = std::move(groupEvalStage);
-    for (size_t i = 0; i < accStmts.size(); ++i) {
+    size_t idxAccFirstSlot = kGroupBySlots;
+    for (size_t idxAcc = 0; idxAcc < accStmts.size(); ++idxAcc) {
         // Gathers field names for the output object from accumulator statements.
-        fieldNames.push_back(accStmts[i].fieldName);
+        fieldNames.push_back(accStmts[idxAcc].fieldName);
         auto [finalExpr, tempEvalStage] = stage_builder::buildFinalize(
-            state, accStmts[i], aggSlotsVec[i], std::move(groupFinalEvalStage), nodeId);
+            state, accStmts[idxAcc], aggSlotsVec[idxAcc], std::move(groupFinalEvalStage), nodeId);
 
         // The final step may not return an expression if it's trivial. For example, $first and
         // $last's final steps are trivial.
@@ -2138,19 +2145,21 @@ std::tuple<std::vector<std::string>, sbe::value::SlotVector, EvalStage> generate
             finalSlots.push_back(outSlot);
             prjSlotToExprMap.emplace(outSlot, std::move(finalExpr));
         } else {
-            finalSlots.push_back(groupOutSlots[kGroupBySlots + i]);
+            finalSlots.push_back(groupOutSlots[idxAccFirstSlot]);
         }
+
+        // Some accumulator(s) like $avg generate multiple expressions and slots. So, need to
+        // advance this index by the number of those slots for each accumulator.
+        idxAccFirstSlot += aggSlotsVec[idxAcc].size();
 
         groupFinalEvalStage = std::move(tempEvalStage);
     }
 
-    // Gathers all accumulator results. If there're no project expressions, does not add a project
-    // stage.
-    groupFinalEvalStage = prjSlotToExprMap.empty()
-        ? std::move(groupFinalEvalStage)
-        : makeProject(std::move(groupFinalEvalStage), std::move(prjSlotToExprMap), nodeId);
-
-    return {std::move(fieldNames), std::move(finalSlots), std::move(groupFinalEvalStage)};
+    // Lastly, makes a final project stage with the gathered group-by slot(s) and accumulator result
+    // slots.
+    return {std::move(fieldNames),
+            std::move(finalSlots),
+            makeProject(std::move(groupFinalEvalStage), std::move(prjSlotToExprMap), nodeId)};
 }
 }  // namespace
 
@@ -2164,8 +2173,8 @@ std::tuple<std::vector<std::string>, sbe::value::SlotVector, EvalStage> generate
  * following translated sbe::PlanStage tree. In this example, we assume that the $group pipeline
  * spec is {"_id": "$a", "x": {"$min": "$b"}, "y": {"$first": "$b"}}.
  *
- * [2] mkbson s14 [_id = s8, x = s13, y = s12] true false
- * [2] project [s13 = fillEmpty (s11, null)]
+ * [2] mkbson s14 [_id = s13, x = s14, y = s12] true false
+ * [2] project [s13 = fillEmpty (s8, null), s14 = fillEmpty (s11, null)]
  * [2] group [s8] [s11 = min (if (! exists (s9) || typeMatch (s9, 0x00000440), Nothing, s9)),
  *                 s12 = first (fillEmpty (s10, null))]
  * [2] project [s10 = getField (s7, "b")]
@@ -2234,6 +2243,19 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                       boost::none,
                                       nodeId);
 
+    tassert(
+        5851603,
+        "Group stage's output slots must include slots for group-by keys and slots for all "
+        "accumulators",
+        groupEvalStage.outSlots.size() ==
+            std::accumulate(aggSlotsVec.begin(),
+                            aggSlotsVec.end(),
+                            kGroupBySlots,
+                            [](int sum, const auto& aggSlots) { return sum + aggSlots.size(); }));
+    tassert(5851604,
+            "Group stage's output slots must contain the groupBySlot at the front",
+            groupEvalStage.outSlots[0] == groupBySlot);
+
     // Builds the final stage(s) over the collected accumulators.
     auto [fieldNames, finalSlots, groupFinalEvalStage] =
         generateGroupFinalStage(_state,
@@ -2243,6 +2265,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                 aggSlotsVec,
                                 nodeId,
                                 &_slotIdGenerator);
+
+    tassert(5851605,
+            "The number of final slots must be as the number of group-by slots + the number of acc "
+            "slots",
+            finalSlots.size() == kGroupBySlots + accStmts.size());
 
     // Builds a stage to create a result object out of a group-by slot and gathered accumulator
     // result slots.

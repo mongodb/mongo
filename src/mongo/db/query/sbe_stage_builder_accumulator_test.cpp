@@ -248,6 +248,28 @@ TEST_F(SbeStageBuilderGroupTest, TestGroupMultipleAccumulators) {
                                                      << 3 << "firstb" << 3 << "lastb" << 3)));
 }
 
+TEST_F(SbeStageBuilderGroupTest, AccSkippingFinalStepAfterAvg) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 1)),
+                                       BSON_ARRAY(BSON("a" << 1 << "b" << 2)),
+                                       BSON_ARRAY(BSON("a" << 2 << "b" << 3))};
+    runGroupAggregationTest(R"({_id: null, x: {$avg: "$b"}, y: {$last: "$b"}})",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << BSONNULL << "x" << 6 / 3.0 << "y" << 3)));
+    // An accumulator skipping the final step after multiple $avg.
+    runGroupAggregationTest(
+        R"({_id: null, x: {$avg: "$b"}, y: {$avg: "$b"}, z: {$last: "$b"}})",
+        docs,
+        BSON_ARRAY(BSON("_id" << BSONNULL << "x" << 6 / 3.0 << "y" << 6 / 3.0 << "z" << 3)));
+}
+
+TEST_F(SbeStageBuilderGroupTest, NullForMissingGroupBySlot) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 1)),
+                                       BSON_ARRAY(BSON("a" << 2 << "b" << 3))};
+    // _id: null is returned if the group-by field is missing.
+    runGroupAggregationTest(
+        R"({_id: "$z", x: {$first: "$b"}})", docs, BSON_ARRAY(BSON("_id" << BSONNULL << "x" << 1)));
+}
+
 TEST_F(SbeStageBuilderGroupTest, TestGroupNoAccumulators) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 1)),
                                        BSON_ARRAY(BSON("a" << 1 << "b" << 2)),
