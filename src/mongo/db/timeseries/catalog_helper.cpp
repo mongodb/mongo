@@ -38,8 +38,9 @@ namespace mongo {
 namespace timeseries {
 
 boost::optional<TimeseriesOptions> getTimeseriesOptions(OperationContext* opCtx,
-                                                        const NamespaceString& nss) {
-    auto bucketsNs = nss.makeTimeseriesBucketsNamespace();
+                                                        const NamespaceString& nss,
+                                                        bool convertToBucketsNamespace) {
+    auto bucketsNs = convertToBucketsNamespace ? nss.makeTimeseriesBucketsNamespace() : nss;
     auto bucketsColl =
         CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForRead(opCtx, bucketsNs);
     if (!bucketsColl) {

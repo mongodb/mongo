@@ -146,4 +146,10 @@ commands:
                 description: "Adjusts parameters for timeseries collections"
                 optional: true
                 type: CollModTimeseries
+            isTimeseriesNamespace:
+                description: "This flag is set to true when the command was originally sent to
+                              mongos on the time-series view, but got rewritten to target
+                              time-series buckets namespace before being sent to shards."
+                optional: true
+                type: bool
         reply_type: CollModReply

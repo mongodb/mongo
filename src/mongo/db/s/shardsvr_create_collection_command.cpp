@@ -127,7 +127,7 @@ CreateCollectionResponse createCollectionLegacy(OperationContext* opCtx,
     // Ensure that a time-series collection cannot be sharded
     uassert(ErrorCodes::IllegalOperation,
             str::stream() << "can't shard time-series collection " << nss,
-            !timeseries::getTimeseriesOptions(opCtx, nss));
+            !timeseries::getTimeseriesOptions(opCtx, nss, true));
 
     // Ensure the namespace is valid.
     uassert(ErrorCodes::IllegalOperation,

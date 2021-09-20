@@ -546,7 +546,8 @@ BatchedCommandRequest BatchWriteOp::buildBatchRequest(const TargetedWriteBatch& 
             _clientRequest.getWriteCommandRequestBase().getBypassDocumentValidation());
         wcb.setOrdered(_clientRequest.getWriteCommandRequestBase().getOrdered());
 
-        if (targeter.isShardedTimeSeriesBucketsNamespace()) {
+        if (targeter.isShardedTimeSeriesBucketsNamespace() &&
+            !_clientRequest.getNS().isTimeseriesBucketsCollection()) {
             wcb.setIsTimeseriesNamespace(true);
         }
 

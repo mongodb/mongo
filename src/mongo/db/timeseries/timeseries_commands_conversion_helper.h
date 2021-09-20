@@ -43,7 +43,8 @@ namespace mongo::timeseries {
  */
 BSONObj makeTimeseriesCommand(const BSONObj& origCmd,
                               const NamespaceString& ns,
-                              StringData nsFieldName);
+                              StringData nsFieldName,
+                              boost::optional<StringData> appendTimeSeriesFlag);
 
 /*
  * Returns a CreateIndexesCommand for creating indexes on the bucket collection.

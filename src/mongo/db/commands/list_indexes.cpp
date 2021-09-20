@@ -74,8 +74,13 @@ IndexSpecsWithNamespaceString getIndexSpecsWithNamespaceString(OperationContext*
     // Since time-series collections don't have UUIDs, we skip the time-series lookup
     // if the target collection is specified as a UUID.
     if (const auto& origNss = origNssOrUUID.nss()) {
-        if (auto timeseriesOptions = timeseries::getTimeseriesOptions(opCtx, *origNss)) {
-            auto bucketsNss = origNss->makeTimeseriesBucketsNamespace();
+        auto isCommandOnTimeseriesBucketNamespace =
+            cmd.getIsTimeseriesNamespace() && *cmd.getIsTimeseriesNamespace();
+        if (auto timeseriesOptions = timeseries::getTimeseriesOptions(
+                opCtx, *origNss, !isCommandOnTimeseriesBucketNamespace)) {
+            auto bucketsNss = isCommandOnTimeseriesBucketNamespace
+                ? *origNss
+                : origNss->makeTimeseriesBucketsNamespace();
             AutoGetCollectionForReadCommandMaybeLockFree autoColl(opCtx, bucketsNss);
 
             const CollectionPtr& coll = autoColl.getCollection();

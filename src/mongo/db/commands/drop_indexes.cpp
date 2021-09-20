@@ -96,7 +96,10 @@ public:
         Reply typedRun(OperationContext* opCtx) final {
             // If the request namespace refers to a time-series collection, transform the user
             // time-series index request to one on the underlying bucket.
-            if (auto options = timeseries::getTimeseriesOptions(opCtx, request().getNamespace())) {
+            auto isCommandOnTimeseriesBucketNamespace =
+                request().getIsTimeseriesNamespace() && *request().getIsTimeseriesNamespace();
+            if (auto options = timeseries::getTimeseriesOptions(
+                    opCtx, request().getNamespace(), !isCommandOnTimeseriesBucketNamespace)) {
                 auto timeseriesCmd =
                     timeseries::makeTimeseriesDropIndexesCommand(opCtx, request(), *options);
                 return dropIndexes(opCtx, timeseriesCmd.getNamespace(), timeseriesCmd.getIndex());

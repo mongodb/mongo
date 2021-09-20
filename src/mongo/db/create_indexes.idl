@@ -183,3 +183,9 @@ commands:
                 description: 'Commit Quorum options'
                 type: CommitQuorum
                 optional: true
+            isTimeseriesNamespace:
+                description: "This flag is set to true when the command was originally sent to
+                              mongos on the time-series view, but got rewritten to target
+                              time-series buckets namespace before being sent to shards."
+                type: bool
+                optional: true

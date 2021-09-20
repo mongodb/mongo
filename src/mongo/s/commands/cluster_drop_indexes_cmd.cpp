@@ -146,16 +146,11 @@ public:
         // chunks for the collection.
         auto targeter = ChunkManagerTargeter(opCtx, nss);
         auto routingInfo = targeter.getRoutingInfo();
+
         auto cmdToBeSent = cmdObj;
         if (targeter.timeseriesNamespaceNeedsRewrite(nss)) {
-            auto timeseriesCmd = timeseries::makeTimeseriesDropIndexesCommand(
-                opCtx,
-                DropIndexes::parse(
-                    IDLParserErrorContext("dropIndexes",
-                                          APIParameters::get(opCtx).getAPIStrict().value_or(false)),
-                    cmdObj),
-                routingInfo.getTimeseriesFields()->getTimeseriesOptions());
-            cmdToBeSent = timeseriesCmd.toBSON(cmdObj);
+            cmdToBeSent = timeseries::makeTimeseriesCommand(
+                cmdToBeSent, nss, getName(), DropIndexes::kIsTimeseriesNamespaceFieldName);
         }
 
         auto shardResponses =

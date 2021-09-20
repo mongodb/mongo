@@ -216,7 +216,8 @@ public:
 
         // Translate command collection namespace for time-series collection.
         if (targeter.timeseriesNamespaceNeedsRewrite(nss)) {
-            cmdObjToSend = timeseries::makeTimeseriesCommand(cmdObjToSend, nss, getName());
+            cmdObjToSend =
+                timeseries::makeTimeseriesCommand(cmdObjToSend, nss, getName(), boost::none);
         }
 
         // Unscaled individual shard results. This is required to apply scaling after summing the
