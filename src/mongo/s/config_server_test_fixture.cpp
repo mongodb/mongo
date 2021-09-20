@@ -306,6 +306,41 @@ StatusWith<ShardType> ConfigServerTestFixture::getShardDoc(OperationContext* opC
     return ShardType::fromBSON(doc.getValue());
 }
 
+
+void ConfigServerTestFixture::setupCollection(const NamespaceString& nss,
+                                              const boost::optional<mongo::UUID>& uuid,
+                                              const KeyPattern& shardKey,
+                                              const std::vector<ChunkType>& chunks) {
+    auto dbDoc = findOneOnConfigCollection(
+        operationContext(), DatabaseType::ConfigNS, BSON(DatabaseType::name(nss.db().toString())));
+    if (!dbDoc.isOK()) {
+        // If the database is not setup, choose the first available shard as primary to implicitly
+        // create the db
+        auto swShardDoc =
+            findOneOnConfigCollection(operationContext(), ShardType::ConfigNS, BSONObj());
+        invariant(swShardDoc.isOK(),
+                  "At least one shard should be setup when initializing a collection");
+        auto shard = uassertStatusOK(ShardType::fromBSON(swShardDoc.getValue()));
+        setupDatabase(nss.db().toString(), ShardId(shard.getName()), true /* sharded */);
+    }
+
+    CollectionType coll;
+    coll.setNs(nss);
+    coll.setEpoch(chunks[0].getVersion().epoch());
+    coll.setUpdatedAt(Date_t::now());
+    if (uuid) {
+        coll.setUUID(uuid.get());
+    }
+    coll.setKeyPattern(shardKey);
+    ASSERT_OK(
+        insertToConfigCollection(operationContext(), CollectionType::ConfigNS, coll.toBSON()));
+
+    for (const auto& chunk : chunks) {
+        ASSERT_OK(insertToConfigCollection(
+            operationContext(), ChunkType::ConfigNS, chunk.toConfigBSON()));
+    }
+}
+
 void ConfigServerTestFixture::setupChunks(const std::vector<ChunkType>& chunks) {
     const NamespaceString chunkNS(ChunkType::ConfigNS);
     for (const auto& chunk : chunks) {
