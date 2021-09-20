@@ -30,9 +30,11 @@
 #pragma once
 
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_densify_gen.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/util/time_support.h"
@@ -140,23 +142,8 @@ public:
         : DocumentSource(kStageName, pExpCtx),
           _field(std::move(field)),
           _partitions(std::move(partitions)),
-          _range(std::move(range)) {
-        _current = stdx::visit(
-            visit_helper::Overloaded{
-                [&](RangeStatement::Full full) -> boost::optional<DensifyValueType> {
-                    return boost::none;
-                },
-                [&](RangeStatement::Partition partition) -> boost::optional<DensifyValueType> {
-                    return boost::none;
-                },
-                [&](RangeStatement::DateBounds bounds) -> boost::optional<DensifyValueType> {
-                    return DensifyValueType(bounds.first);
-                },
-                [&](RangeStatement::NumericBounds bounds) -> boost::optional<DensifyValueType> {
-                    return DensifyValueType(bounds.first);
-                }},
-            _range.getBounds());
-    };
+          _range(std::move(range)),
+          _partitionTable(pExpCtx->getValueComparator().makeUnorderedValueMap<Value>()){};
 
     class DocGenerator {
     public:
@@ -241,19 +228,40 @@ private:
         kAbove,
     };
 
+    Value getDensifyValue(const Document& doc) {
+        Value val = doc.getNestedField(_field);
+        uassert(5733201, "Densify field type must be numeric", val.numeric());
+        return val;
+    }
+
+    Value getDensifyPartition(const Document& doc) {
+        auto part = _partitionExpr->evaluate(doc, &pExpCtx->variables);
+        return part;
+    }
+
+    /**
+     * Returns <0 for below step, 0 for equal to step, >0 for greater than step.
+     */
+    int compareToNextStep(const Value& val);
+
     bool compareValues(Value::DeferredComparison deferredComparison) {
         return pExpCtx->getValueComparator().evaluate(deferredComparison);
     }
 
+    /**
+     * Returns <0 if 'lhs' is less than 'rhs', 0 if 'lhs' is equal to 'rhs', and >0 if 'lhs' is
+     * greater than 'rhs'.
+     */
     int compareValues(const Value& lhs, const Value& rhs) {
         return pExpCtx->getValueComparator().compare(lhs, rhs);
     }
 
     /**
      * Decides whether or not to build a DocGen and return the first document generated or return
-     * the current doc if the rangeMin + step is greater than rangeMax.
+     * the current doc if the rangeMin + step is greater than rangeMax. Used for both 'full' and
+     * 'partition' bounds.
      */
-    DocumentSource::GetNextResult handleNeedGenFull(Document currentDoc, Value max);
+    DocumentSource::GetNextResult handleNeedGen(Document currentDoc, Value max);
 
     /**
      * Checks where the current doc's value lies compared to the range and creates the correct
@@ -267,9 +275,16 @@ private:
      * Takes care of when an EOF has been hit for the explicit case. It checks if we have finished
      * densifying over the range, and if so changes the state to be kDensify done. Otherwise it
      * builds a new generator that will finish densifying over the range and changes the state to
-     * kHaveGen.
+     * kHaveGen. Only used if the input is not partitioned.
      */
     DocumentSource::GetNextResult densifyAfterEOF(RangeStatement::NumericBounds);
+
+    /**
+     * Decide what to do for the first document in a given partition for explicit range. Either
+     * generate documents between the minimum and the value, or just return it.
+     */
+    DocumentSource::GetNextResult processFirstDocForExplicitRange(
+        Value val, RangeStatement::NumericBounds bounds, Document doc);
 
     /**
      * Creates a document generator based on the value passed in, the current _current, and the
@@ -295,6 +310,15 @@ private:
     DocumentSource::GetNextResult handleSourceExhausted();
 
     /**
+     * Handles building a document generator once we've seen an EOF for partitioned input. Min will
+     * be the last seen value in the partition unless it is less than the optional 'minOverride'.
+     * Helper is to share code between visit functions.
+     */
+    DocumentSource::GetNextResult finishDensifyingPartitionedInput();
+    DocumentSource::GetNextResult finishDensifyingPartitionedInputHelper(
+        Value max, boost::optional<Value> minOverride = boost::none);
+
+    /**
      * Checks if the current document generator is done. If it is and we have finished densifying,
      * it changes the state to be kDensifyDone. If there is more to densify, the state becomes
      * kNeedGen. The generator is also deleted.
@@ -305,17 +329,43 @@ private:
         Value diff = uassertStatusOK(ExpressionSubtract::apply(val, sub));
         return uassertStatusOK(ExpressionMod::apply(diff, step));
     }
+
+    /**
+     * Set up the state for densifying over partitions.
+     */
+    void initializePartitionState(Document initialDoc);
+
+    /**
+     * Helper to set the value in the partition table.
+     */
+    void setPartitionValue(Document doc) {
+        if (_partitionExpr) {
+            _partitionTable[getDensifyPartition(doc)] = getDensifyValue(doc);
+        }
+    }
     boost::optional<DocGenerator> _docGenerator = boost::none;
 
     /**
-     * The minimum value that the document generator will create, therefore the next generated
-     * document will have this value. This is also used as last seen value by the explicit case.
+     * The last value seen or generated by the stage that is also in line with the step.
      */
     boost::optional<DensifyValueType> _current = boost::none;
 
+    // Used to keep track of the bounds for densification in the full case.
+    boost::optional<DensifyValueType> _globalMin = boost::none;
+    boost::optional<DensifyValueType> _globalMax = boost::none;
+
+    // Expression to be used to compare partitions.
+    boost::intrusive_ptr<ExpressionObject> _partitionExpr;
+
     bool _eof = false;
 
-    enum class DensifyState { kUninitializedOrBelowRange, kNeedGen, kHaveGenerator, kDensifyDone };
+    enum class DensifyState {
+        kUninitializedOrBelowRange,
+        kNeedGen,
+        kHaveGenerator,
+        kFinishingDensify,
+        kDensifyDone
+    };
 
     enum class TypeOfDensify {
         kFull,
@@ -328,5 +378,7 @@ private:
     FieldPath _field;
     std::list<FieldPath> _partitions;
     RangeStatement _range;
+    // Store of the value we've seen for each partition.
+    ValueUnorderedMap<Value> _partitionTable;
 };
 }  // namespace mongo

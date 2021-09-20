@@ -188,21 +188,19 @@ let parseUtil = (function(db, coll, stageName, options = {}) {
          *         range: {step: 1.0, bounds: "full", unit: "second"}
          *     }
          * })); */
-        // TODO SERVER-57344: Enable this parsing test.
-        /* assert.commandWorked(run({
-         *     [stageName]:
-         *         {field: "a", partitionByFields: ["b", "c"], range: {step: 1.0, bounds: "full"}}
-         * })); */
-        // TODO SERVER-57344: Enable this parsing test.
-        /* assert.commandWorked(run({
+        assert.commandWorked(run({
+            [stageName]:
+                {field: "a", partitionByFields: ["b", "c"], range: {step: 1.0, bounds: "full"}}
+        }));
+        assert.commandWorked(run({
             [stageName]: {
                 field: "a",
                 partitionByFields: [
                     "b",
                 ],
-                range: { step: 1.0, bounds: "partition" }
+                range: {step: 1.0, bounds: "partition"}
             }
-           })); */
+        }));
         assert.commandWorked(run({[stageName]: {field: "a", range: {step: 1.0, bounds: "full"}}}));
     }
 

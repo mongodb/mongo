@@ -47,6 +47,7 @@ using Full = RangeStatement::Full;
 using GenClass = DocumentSourceInternalDensify::DocGenerator;
 using DensifyFullNumericTest = AggregationContextFixture;
 using DensifyExplicitNumericTest = AggregationContextFixture;
+using DensifyPartitionNumericTest = AggregationContextFixture;
 using DensifyCloneTest = AggregationContextFixture;
 
 MONGO_INITIALIZER_GENERAL(turnOnDensifyFlag,
@@ -1173,6 +1174,42 @@ TEST_F(DensifyExplicitNumericTest, DensificationForNumericValuesErrorsIfFieldIsN
     ASSERT_THROWS_CODE(densify.getNext(), AssertionException, 5733201);
 }
 
+TEST_F(DensifyExplicitNumericTest, DensifiesOnImmediateEOF) {
+    auto densify = DocumentSourceInternalDensify(
+        getExpCtx(),
+        "a",
+        std::list<FieldPath>(),
+        RangeStatement(Value(1), NumericBounds(Value(0), Value(1)), boost::none));
+    auto source = DocumentSourceMock::createForTest({}, getExpCtx());
+    densify.setSource(source.get());
+    auto next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(0, next.getDocument().getField("a").getDouble());
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(1, next.getDocument().getField("a").getDouble());
+    next = densify.getNext();
+    ASSERT_FALSE(next.isAdvanced());
+}
+
+TEST_F(DensifyFullNumericTest, DensifiesOnImmediateEOF) {
+    auto densify = DocumentSourceInternalDensify(
+        getExpCtx(), "a", std::list<FieldPath>(), RangeStatement(Value(3), Full(), boost::none));
+    auto source = DocumentSourceMock::createForTest({}, getExpCtx());
+    densify.setSource(source.get());
+    auto next = densify.getNext();
+    ASSERT_FALSE(next.isAdvanced());
+}
+
+TEST_F(DensifyPartitionNumericTest, DensifiesOnImmediateEOF) {
+    auto densify = DocumentSourceInternalDensify(
+        getExpCtx(), "a", std::list<FieldPath>(), RangeStatement(Value(3), Full(), boost::none));
+    auto source = DocumentSourceMock::createForTest({}, getExpCtx());
+    densify.setSource(source.get());
+    auto next = densify.getNext();
+    ASSERT_FALSE(next.isAdvanced());
+}
+
 TEST_F(DensifyCloneTest, InternalDesnifyCanBeCloned) {
 
     std::list<boost::intrusive_ptr<DocumentSource>> sources;
@@ -1184,5 +1221,6 @@ TEST_F(DensifyCloneTest, InternalDesnifyCanBeCloned) {
     auto pipe = Pipeline::create(sources, getExpCtx());
     auto clonedPipe = pipe->clone();
 }
+
 }  // namespace
 }  // namespace mongo
