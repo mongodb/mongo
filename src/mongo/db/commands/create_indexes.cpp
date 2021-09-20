@@ -652,7 +652,10 @@ public:
             // If the request namespace refers to a time-series collection, transforms the user
             // time-series index request to one on the underlying bucket.
             boost::optional<CreateIndexesCommand> timeseriesCmdOwnership;
-            if (auto options = timeseries::getTimeseriesOptions(opCtx, origCmd.getNamespace())) {
+            auto isCommandOnTimeseriesBucketNamespace =
+                origCmd.getIsTimeseriesNamespace() && *origCmd.getIsTimeseriesNamespace();
+            if (auto options = timeseries::getTimeseriesOptions(
+                    opCtx, origCmd.getNamespace(), !isCommandOnTimeseriesBucketNamespace)) {
                 timeseriesCmdOwnership =
                     timeseries::makeTimeseriesCreateIndexesCommand(opCtx, origCmd, *options);
                 cmd = &timeseriesCmdOwnership.get();

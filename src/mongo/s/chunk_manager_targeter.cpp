@@ -235,29 +235,60 @@ bool isMetadataDifferent(const ChunkManager& managerA, const ChunkManager& manag
 ChunkManagerTargeter::ChunkManagerTargeter(OperationContext* opCtx,
                                            const NamespaceString& nss,
                                            boost::optional<OID> targetEpoch)
-    : _nss(nss), _targetEpoch(std::move(targetEpoch)), _cm(_init(opCtx)) {}
+    : _nss(nss), _targetEpoch(std::move(targetEpoch)), _cm(_init(opCtx, false)) {}
 
-ChunkManager ChunkManagerTargeter::_init(OperationContext* opCtx) {
+/**
+ * Initializes and returns the ChunkManger which needs to be used for targeting.
+ * If 'refresh' is true, additionally fetches the latest routing info from the config servers.
+ *
+ * Note: For sharded time-series collections, we use the buckets collection for targeting. If the
+ * user request is on the view namespace, we implicity tranform the request to the buckets namepace.
+ */
+ChunkManager ChunkManagerTargeter::_init(OperationContext* opCtx, bool refresh) {
     cluster::createDatabase(opCtx, _nss.db());
 
-    // Check if we target sharded time-series collection. For such collections we target write
-    // operations to the underlying buckets collection.
-    //
-    // A sharded time-series collection by definition is a view, which has underlying sharded
-    // buckets collection. We know that 'ChunkManager::isSharded()' is false for all views. Checking
-    // this condition first can potentially save us extra cache lookup. After that, we lookup
-    // routing info for the underlying buckets collection. The absense of this routing info means
-    // that this collection does not exist. Finally, we check if this underlying collection is
-    // sharded. If all these conditions pass, we are targeting sharded time-series collection.
+    if (refresh) {
+        uassertStatusOK(
+            Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx, _nss));
+    }
     auto cm = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, _nss));
-    if (!cm.isSharded()) {
+
+    // For a sharded time-series collection, only the underlying buckets collection is stored on the
+    // config servers. If the user operation is on the time-series view namespace, we should check
+    // if the buckets namespace is sharded. There are a few cases that we need to take care of,
+    // 1. The request is on the view namespace. We check if the buckets collection is sharded. If
+    //    it is, we use the buckets collection namespace for the purpose of trageting. Additionally,
+    //    we set the '_isRequestOnTimeseriesViewNamespace' to true for this case.
+    // 2. If request is on the buckets namespace, we don't need to execute any additional
+    //    time-series logic. We can treat the request as though it was a request on a regular
+    //    collection.
+    // 3. During a cache refresh a the buckets collection changes from sharded to unsharded. In this
+    //    case, if the original request is on the view namespace, then we should reset the namespace
+    //    back to the view namespace and reset '_isRequestOnTimeseriesViewNamespace'.
+    if (!cm.isSharded() && !_nss.isTimeseriesBucketsCollection()) {
         auto bucketsNs = _nss.makeTimeseriesBucketsNamespace();
+        if (refresh) {
+            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(
+                opCtx, bucketsNs));
+        }
         auto bucketsRoutingInfo =
             uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, bucketsNs));
         if (bucketsRoutingInfo.isSharded()) {
             _nss = bucketsNs;
             cm = std::move(bucketsRoutingInfo);
+            _isRequestOnTimeseriesViewNamespace = true;
         }
+    } else if (!cm.isSharded() && _isRequestOnTimeseriesViewNamespace) {
+        // This can happen if a sharded time-series collection is dropped and re-created. Then we
+        // need to reset the namepace to the original namespace.
+        _nss = _nss.getTimeseriesViewNamespace();
+
+        if (refresh) {
+            uassertStatusOK(
+                Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx, _nss));
+        }
+        cm = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, _nss));
+        _isRequestOnTimeseriesViewNamespace = false;
     }
 
     if (_targetEpoch) {
@@ -312,7 +343,7 @@ ShardEndpoint ChunkManagerTargeter::targetInsert(OperationContext* opCtx,
 
     if (_cm.isSharded()) {
         const auto& shardKeyPattern = _cm.getShardKeyPattern();
-        if (_nss.isTimeseriesBucketsCollection()) {
+        if (_isRequestOnTimeseriesViewNamespace) {
             auto tsFields = _cm.getTimeseriesFields();
             tassert(5743701, "Missing timeseriesFields on buckets collection", tsFields);
             shardKey = extractBucketsShardKeyFromTimeseriesDoc(
@@ -559,7 +590,16 @@ void ChunkManagerTargeter::noteStaleShardResponse(OperationContext* opCtx,
                                                   const StaleConfigInfo& staleInfo) {
     dassert(!_lastError || _lastError.get() == LastErrorType::kStaleShardVersion);
     Grid::get(opCtx)->catalogCache()->invalidateShardOrEntireCollectionEntryForShardedCollection(
-        _nss, staleInfo.getVersionWanted(), endpoint.shardName);
+        staleInfo.getNss(), staleInfo.getVersionWanted(), endpoint.shardName);
+
+    if (staleInfo.getNss() != _nss) {
+        // This can happen when a time-series collection becomes sharded.
+        Grid::get(opCtx)
+            ->catalogCache()
+            ->invalidateShardOrEntireCollectionEntryForShardedCollection(
+                _nss, staleInfo.getVersionWanted(), endpoint.shardName);
+    }
+
     _lastError = LastErrorType::kStaleShardVersion;
 }
 
@@ -590,14 +630,12 @@ bool ChunkManagerTargeter::refreshIfNeeded(OperationContext* opCtx) {
 
     // Get the latest metadata information from the cache if there were issues
     auto lastManager = _cm;
-    _cm = _init(opCtx);
+    _cm = _init(opCtx, false);
     auto metadataChanged = isMetadataDifferent(lastManager, _cm);
 
     if (_lastError.get() == LastErrorType::kCouldNotTarget && !metadataChanged) {
         // If we couldn't target and we dind't already update the metadata we must force a refresh
-        uassertStatusOK(
-            Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx, _nss));
-        _cm = _init(opCtx);
+        _cm = _init(opCtx, true);
         metadataChanged = isMetadataDifferent(lastManager, _cm);
     }
 

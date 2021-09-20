@@ -34,6 +34,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/list_indexes_gen.h"
+#include "mongo/db/timeseries/timeseries_commands_conversion_helper.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/chunk_manager_targeter.h"
 #include "mongo/s/cluster_commands_helpers.h"
@@ -115,14 +116,22 @@ public:
 
             // The command's IDL definition permits namespace or UUID, but mongos requires a
             // namespace.
-            auto targetter = ChunkManagerTargeter(opCtx, ns());
-            auto cm = targetter.getRoutingInfo();
+            auto targeter = ChunkManagerTargeter(opCtx, ns());
+            auto cm = targeter.getRoutingInfo();
+            auto cmdToBeSent = request().toBSON({});
+            if (targeter.timeseriesNamespaceNeedsRewrite(ns())) {
+                cmdToBeSent =
+                    timeseries::makeTimeseriesCommand(cmdToBeSent,
+                                                      ns(),
+                                                      ListIndexes::kCommandName,
+                                                      ListIndexes::kIsTimeseriesNamespaceFieldName);
+            }
 
             return cursorCommandPassthroughShardWithMinKeyChunk(
                 opCtx,
-                targetter.getNS(),
+                targeter.getNS(),
                 cm,
-                applyReadWriteConcern(opCtx, this, request().toBSON({})),
+                applyReadWriteConcern(opCtx, this, cmdToBeSent),
                 {Privilege(ResourcePattern::forExactNamespace(ns()), ActionType::listIndexes)});
         }
     };

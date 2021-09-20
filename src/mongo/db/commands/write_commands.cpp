@@ -121,6 +121,9 @@ bool isTimeseries(OperationContext* opCtx, const Request& request) {
             "system.buckets namespace",
             !request.getIsTimeseriesNamespace() ||
                 request.getNamespace().isTimeseriesBucketsCollection());
+    const auto bucketNss = request.getIsTimeseriesNamespace()
+        ? request.getNamespace()
+        : request.getNamespace().makeTimeseriesBucketsNamespace();
 
     // If the buckets collection exists now, the time-series insert path will check for the
     // existence of the buckets collection later on with a lock.
@@ -128,11 +131,9 @@ bool isTimeseries(OperationContext* opCtx, const Request& request) {
     // collection does not yet exist, this check may return false unnecessarily. As a result, an
     // insert attempt into the time-series namespace will either succeed or fail, depending on who
     // wins the race.
-    return request.getIsTimeseriesNamespace() ||
-        CollectionCatalog::get(opCtx)
-            ->lookupCollectionByNamespaceForRead(
-                opCtx, request.getNamespace().makeTimeseriesBucketsNamespace())
-            .get();
+    return CollectionCatalog::get(opCtx)
+        ->lookupCollectionByNamespaceForRead(opCtx, bucketNss)
+        .get();
 }
 
 NamespaceString makeTimeseriesBucketsNamespace(const NamespaceString& nss) {

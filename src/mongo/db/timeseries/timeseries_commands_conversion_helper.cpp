@@ -41,9 +41,17 @@
 
 namespace mongo::timeseries {
 
+namespace {
+NamespaceString makeTimeseriesBucketsNamespace(const NamespaceString& nss) {
+    return nss.isTimeseriesBucketsCollection() ? nss : nss.makeTimeseriesBucketsNamespace();
+}
+}  // namespace
+
+
 BSONObj makeTimeseriesCommand(const BSONObj& origCmd,
                               const NamespaceString& ns,
-                              const StringData nsFieldName) {
+                              const StringData nsFieldName,
+                              boost::optional<StringData> appendTimeSeriesFlag) {
     // Translate time-series collection view namespace to bucket namespace.
     const auto bucketNs = ns.makeTimeseriesBucketsNamespace();
     BSONObjBuilder builder;
@@ -53,6 +61,10 @@ BSONObj makeTimeseriesCommand(const BSONObj& origCmd,
         } else {
             builder.append(entry);
         }
+    }
+
+    if (appendTimeSeriesFlag) {
+        builder.append(*appendTimeSeriesFlag, true);
     }
     return builder.obj();
 }
@@ -137,7 +149,7 @@ CreateIndexesCommand makeTimeseriesCreateIndexesCommand(OperationContext* opCtx,
         indexes.push_back(builder.obj());
     }
 
-    auto ns = origNs.makeTimeseriesBucketsNamespace();
+    auto ns = makeTimeseriesBucketsNamespace(origNs);
     auto cmd = CreateIndexesCommand(ns, std::move(indexes));
     cmd.setV(origCmd.getV());
     cmd.setIgnoreUnknownIndexOptions(origCmd.getIgnoreUnknownIndexOptions());
@@ -150,7 +162,7 @@ DropIndexes makeTimeseriesDropIndexesCommand(OperationContext* opCtx,
                                              const DropIndexes& origCmd,
                                              const TimeseriesOptions& options) {
     const auto& origNs = origCmd.getNamespace();
-    auto ns = origNs.makeTimeseriesBucketsNamespace();
+    auto ns = makeTimeseriesBucketsNamespace(origNs);
 
     const auto& origIndex = origCmd.getIndex();
     if (auto keyPtr = stdx::get_if<BSONObj>(&origIndex)) {

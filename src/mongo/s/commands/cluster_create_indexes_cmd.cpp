@@ -95,14 +95,8 @@ public:
         auto routingInfo = targeter.getRoutingInfo();
         auto cmdToBeSent = cmdObj;
         if (targeter.timeseriesNamespaceNeedsRewrite(nss)) {
-            auto timeseriesCmd = timeseries::makeTimeseriesCreateIndexesCommand(
-                opCtx,
-                CreateIndexesCommand::parse(
-                    IDLParserErrorContext("createIndexes",
-                                          APIParameters::get(opCtx).getAPIStrict().value_or(false)),
-                    cmdObj),
-                routingInfo.getTimeseriesFields()->getTimeseriesOptions());
-            cmdToBeSent = timeseriesCmd.toBSON(cmdObj);
+            cmdToBeSent = timeseries::makeTimeseriesCommand(
+                cmdToBeSent, nss, getName(), CreateIndexesCommand::kIsTimeseriesNamespaceFieldName);
         }
 
         auto shardResponses = scatterGatherVersionedTargetByRoutingTable(

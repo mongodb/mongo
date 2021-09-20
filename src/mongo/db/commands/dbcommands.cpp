@@ -121,7 +121,10 @@ std::unique_ptr<CollMod> makeTimeseriesBucketsCollModCommand(OperationContext* o
                                                              const CollMod& origCmd) {
     const auto& origNs = origCmd.getNamespace();
 
-    auto timeseriesOptions = timeseries::getTimeseriesOptions(opCtx, origNs);
+    auto isCommandOnTimeseriesBucketNamespace =
+        origCmd.getIsTimeseriesNamespace() && *origCmd.getIsTimeseriesNamespace();
+    auto timeseriesOptions =
+        timeseries::getTimeseriesOptions(opCtx, origNs, !isCommandOnTimeseriesBucketNamespace);
 
     // Return early with null if we are not working with a time-series collection.
     if (!timeseriesOptions) {
@@ -141,7 +144,8 @@ std::unique_ptr<CollMod> makeTimeseriesBucketsCollModCommand(OperationContext* o
         index->setKeyPattern(std::move(bucketsIndexSpecWithStatus.getValue()));
     }
 
-    auto ns = origNs.makeTimeseriesBucketsNamespace();
+    auto ns =
+        isCommandOnTimeseriesBucketNamespace ? origNs : origNs.makeTimeseriesBucketsNamespace();
     auto cmd = std::make_unique<CollMod>(ns);
     cmd->setIndex(index);
     cmd->setValidator(origCmd.getValidator());
@@ -166,7 +170,10 @@ std::unique_ptr<CollMod> makeTimeseriesViewCollModCommand(OperationContext* opCt
                                                           const CollMod& origCmd) {
     const auto& ns = origCmd.getNamespace();
 
-    auto timeseriesOptions = timeseries::getTimeseriesOptions(opCtx, ns);
+    auto isCommandOnTimeseriesBucketNamespace =
+        origCmd.getIsTimeseriesNamespace() && *origCmd.getIsTimeseriesNamespace();
+    auto timeseriesOptions =
+        timeseries::getTimeseriesOptions(opCtx, ns, !isCommandOnTimeseriesBucketNamespace);
 
     // Return early with null if we are not working with a time-series collection.
     if (!timeseriesOptions) {

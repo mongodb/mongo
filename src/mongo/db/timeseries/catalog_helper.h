@@ -46,7 +46,8 @@ namespace timeseries {
  * collection. Otherwise returns boost::none.
  */
 boost::optional<TimeseriesOptions> getTimeseriesOptions(OperationContext* opCtx,
-                                                        const NamespaceString& nss);
+                                                        const NamespaceString& nss,
+                                                        bool convertToBucketsNamespace);
 
 }  // namespace timeseries
 }  // namespace mongo

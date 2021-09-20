@@ -491,8 +491,15 @@ Status _collModInternal(OperationContext* opCtx,
             .throwIfReshardingInProgress(nss);
     }
 
+
     // If db/collection/view does not exist, short circuit and return.
     if (!db || (!coll && !view)) {
+        if (nss.isTimeseriesBucketsCollection()) {
+            // If a sharded time-series collection is dropped, it's possible that a stale mongos
+            // sends the request on the buckets namespace instead of the view namespace. Ensure that
+            // the shardVersion is upto date before throwing an error.
+            CollectionShardingState::get(opCtx, nss)->checkShardVersionOrThrow(opCtx);
+        }
         return Status(ErrorCodes::NamespaceNotFound, "ns does not exist");
     }
 

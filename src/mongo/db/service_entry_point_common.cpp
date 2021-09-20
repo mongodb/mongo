@@ -1506,7 +1506,18 @@ void ExecCommandDatabase::_initiateCommand() {
     if (!opCtx->getClient()->isInDirectClient() &&
         readConcernArgs.getLevel() != repl::ReadConcernLevel::kAvailableReadConcern &&
         (iAmPrimary || (readConcernArgs.hasLevel() || readConcernArgs.getArgsAfterClusterTime()))) {
-        oss.initializeClientRoutingVersionsFromCommand(_invocation->ns(), request.body);
+        // If a timeseries collection is sharded, only the buckets collection would be sharded. We
+        // expect all versioned commands to be sent over 'system.buckets' namespace. But it is
+        // possible that a stale mongos may send the request over a view namespace. In this case, we
+        // initialize the 'OperationShardingState' with buckets namespace.
+        auto bucketNss = _invocation->ns().makeTimeseriesBucketsNamespace();
+        auto namespaceForSharding = CollectionCatalog::get(opCtx)
+                                        ->lookupCollectionByNamespaceForRead(opCtx, bucketNss)
+                                        .get()
+            ? bucketNss
+            : _invocation->ns();
+
+        oss.initializeClientRoutingVersionsFromCommand(namespaceForSharding, request.body);
 
         auto const shardingState = ShardingState::get(opCtx);
         if (OperationShardingState::isOperationVersioned(opCtx) || oss.hasDbVersion()) {

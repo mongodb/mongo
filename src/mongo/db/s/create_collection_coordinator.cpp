@@ -623,7 +623,7 @@ void CreateCollectionCoordinator::_checkCommandArguments(OperationContext* opCtx
                 str::stream() << "can't shard time-series collection " << nss(),
                 feature_flags::gFeatureFlagShardedTimeSeries.isEnabled(
                     serverGlobalParams.featureCompatibility) ||
-                    !timeseries::getTimeseriesOptions(opCtx, nss().getTimeseriesViewNamespace()));
+                    !timeseries::getTimeseriesOptions(opCtx, nss(), false));
     }
 
     // Ensure the namespace is valid.
