@@ -128,17 +128,9 @@ void onWriteOpCompleted(OperationContext* opCtx,
         // be uninitialized.
         return;
 
-    const bool inMultiDocumentTransaction = txnParticipant.transactionIsOpen();
-
     // We add these here since they may not exist if we return early.
     sessionTxnRecord.setSessionId(*opCtx->getLogicalSessionId());
     sessionTxnRecord.setTxnNum(*opCtx->getTxnNumber());
-    if (feature_flags::gFeatureFlagInternalTransactions.isEnabled(
-            serverGlobalParams.featureCompatibility) &&
-        inMultiDocumentTransaction) {
-        invariant(opCtx->getTxnRetryCounter());
-        sessionTxnRecord.setTxnRetryCounter(*opCtx->getTxnRetryCounter());
-    }
     txnParticipant.onWriteOpCompletedOnPrimary(opCtx, std::move(stmtIdsWritten), sessionTxnRecord);
 }
 
@@ -1193,14 +1185,17 @@ OpTimeBundle logApplyOpsForTransaction(OperationContext* opCtx,
                                        boost::optional<DurableTxnStateEnum> txnState,
                                        boost::optional<repl::OpTime> startOpTime,
                                        const bool updateTxnTable) {
+    const bool areInternalTransactionsEnabled =
+        feature_flags::gFeatureFlagInternalTransactions.isEnabled(
+            serverGlobalParams.featureCompatibility);
+    const auto txnRetryCounter = *opCtx->getTxnRetryCounter();
+
     oplogEntry->setOpType(repl::OpTypeEnum::kCommand);
     oplogEntry->setNss({"admin", "$cmd"});
     oplogEntry->setSessionId(opCtx->getLogicalSessionId());
     oplogEntry->setTxnNumber(opCtx->getTxnNumber());
-    if (feature_flags::gFeatureFlagInternalTransactions.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        invariant(opCtx->getTxnRetryCounter());
-        oplogEntry->getOperationSessionInfo().setTxnRetryCounter(*opCtx->getTxnRetryCounter());
+    if (areInternalTransactionsEnabled) {
+        oplogEntry->getOperationSessionInfo().setTxnRetryCounter(txnRetryCounter);
     }
 
     try {
@@ -1213,6 +1208,9 @@ OpTimeBundle logApplyOpsForTransaction(OperationContext* opCtx,
             sessionTxnRecord.setLastWriteDate(times.wallClockTime);
             sessionTxnRecord.setState(txnState);
             sessionTxnRecord.setStartOpTime(startOpTime);
+            if (areInternalTransactionsEnabled) {
+                sessionTxnRecord.setTxnRetryCounter(txnRetryCounter);
+            }
             onWriteOpCompleted(opCtx, {}, sessionTxnRecord);
         }
         return times;
@@ -1379,14 +1377,17 @@ int logOplogEntriesForTransaction(OperationContext* opCtx,
 void logCommitOrAbortForPreparedTransaction(OperationContext* opCtx,
                                             MutableOplogEntry* oplogEntry,
                                             DurableTxnStateEnum durableState) {
+    const bool areInternalTransactionsEnabled =
+        feature_flags::gFeatureFlagInternalTransactions.isEnabled(
+            serverGlobalParams.featureCompatibility);
+    const auto txnRetryCounter = *opCtx->getTxnRetryCounter();
+
     oplogEntry->setOpType(repl::OpTypeEnum::kCommand);
     oplogEntry->setNss({"admin", "$cmd"});
     oplogEntry->setSessionId(opCtx->getLogicalSessionId());
     oplogEntry->setTxnNumber(opCtx->getTxnNumber());
-    if (feature_flags::gFeatureFlagInternalTransactions.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        invariant(opCtx->getTxnRetryCounter());
-        oplogEntry->getOperationSessionInfo().setTxnRetryCounter(*opCtx->getTxnRetryCounter());
+    if (areInternalTransactionsEnabled) {
+        oplogEntry->getOperationSessionInfo().setTxnRetryCounter(txnRetryCounter);
     }
     oplogEntry->setPrevWriteOpTimeInTransaction(
         TransactionParticipant::get(opCtx).getLastWriteOpTime());
@@ -1413,6 +1414,9 @@ void logCommitOrAbortForPreparedTransaction(OperationContext* opCtx,
             sessionTxnRecord.setLastWriteOpTime(oplogOpTime);
             sessionTxnRecord.setLastWriteDate(oplogEntry->getWallClockTime());
             sessionTxnRecord.setState(durableState);
+            if (areInternalTransactionsEnabled) {
+                sessionTxnRecord.setTxnRetryCounter(txnRetryCounter);
+            }
             onWriteOpCompleted(opCtx, {}, sessionTxnRecord);
             wuow.commit();
         });
