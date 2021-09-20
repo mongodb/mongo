@@ -1,6 +1,10 @@
 /**
  * Capped cursors return CappedPositionLost when the document they were positioned on gets deleted.
  * When this occurs during the collection scan phase of an index build, it will get restarted.
+ *
+ * @tags: [
+ *   requires_document_locking,
+ * ]
  */
 (function() {
 "use strict";
