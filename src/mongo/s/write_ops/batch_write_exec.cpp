@@ -46,6 +46,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/write_ops/batch_write_op.h"
 #include "mongo/s/write_ops/write_error_detail.h"
+#include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -303,6 +304,12 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                                            : OID());
                 } else {
                     // Error occurred dispatching, note it
+                    if (ErrorCodes::isShutdownError(responseStatus.code()) &&
+                        globalInShutdownDeprecated()) {
+                        // Throw an error since the mongos itself is shutting down so this should
+                        // be a top level error instead of a write error.
+                        uassertStatusOK(responseStatus);
+                    }
                     const Status status = responseStatus.withContext(
                         str::stream() << "Write results unavailable from " << shardHost);
 
