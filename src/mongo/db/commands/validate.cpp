@@ -167,6 +167,13 @@ public:
                           << " performed in standalone mode.");
         }
 
+        const bool metadata = cmdObj["metadata"].trueValue();
+        if (metadata && (background || fullValidate || enforceFastCount || repair)) {
+            uasserted(ErrorCodes::CommandNotSupported,
+                      str::stream() << "Running the validate command with { metadata: true } is not"
+                                    << " supported with any other options");
+        }
+
         if (!serverGlobalParams.quiet.load()) {
             LOGV2(20514,
                   "CMD: validate",
@@ -202,6 +209,8 @@ public:
         });
 
         auto mode = [&] {
+            if (metadata)
+                return CollectionValidation::ValidateMode::kMetadata;
             if (background)
                 return CollectionValidation::ValidateMode::kBackground;
             if (enforceFastCount)

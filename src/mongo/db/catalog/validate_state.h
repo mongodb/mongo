@@ -69,6 +69,10 @@ public:
         return _nss;
     }
 
+    bool isMetadataValidation() const {
+        return _mode == ValidateMode::kMetadata;
+    }
+
     bool isBackground() const {
         return _mode == ValidateMode::kBackground;
     }

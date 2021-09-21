@@ -43,7 +43,12 @@ class Status;
 namespace CollectionValidation {
 
 enum class ValidateMode {
+    // Only performs validation on the collection metadata.
+    kMetadata,
+    // Does the above, plus checks a collection's data and indexes for correctness in a non-blocking
+    // manner using an intent collection lock.
     kBackground,
+    // Does the above, but in a blocking manner using an exclusive collection lock.
     kForeground,
 
     // The standard foreground validation above, plus a full validation of the underlying
