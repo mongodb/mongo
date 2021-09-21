@@ -12,8 +12,9 @@ var FeatureFlagUtil = class {
             const fcvDoc = admin.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
             flagDoc.hasOwnProperty("featureFlag${featureFlag}") &&
                 flagDoc.featureFlag${featureFlag}.value &&
+                (!fcvDoc.hasOwnProperty("featureCompatibilityVersion") ||
                 MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version,
-                                            flagDoc.featureFlag${featureFlag}.fcv) >= 0;`
+                                            flagDoc.featureFlag${featureFlag}.fcv) >= 0);`
         );
     }
 };
