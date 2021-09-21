@@ -1341,6 +1341,151 @@ TEST_F(KeyStringBuilderTest, RecordIdStr) {
     }
 }
 
+namespace {
+
+RecordId ridFromStr(const char* str, size_t len) {
+    KeyString::Builder builder(KeyString::Version::kLatestVersion);
+    builder.appendString(mongo::StringData(str, len));
+    return RecordId(builder.getBuffer(), builder.getSize());
+}
+}  // namespace
+
+
+TEST_F(KeyStringBuilderTest, RecordIdStrBig1SizeSegment) {
+    const int pad = 3;  // kStringLike CType + StringData terminator + RecordId len
+    {
+        const int size = 90;
+        const auto ridStr = std::string(size, 'a');
+        auto rid = ridFromStr(ridStr.c_str(), size);
+        const KeyString::Builder ks(version, rid);
+        ASSERT_EQ(ks.getSize(), size + pad);
+        ASSERT_EQ(KeyString::decodeRecordIdStrAtEnd(ks.getBuffer(), ks.getSize()), rid);
+        ASSERT_EQ(0, KeyString::sizeWithoutRecordIdStrAtEnd(ks.getBuffer(), ks.getSize()));
+    }
+    {
+        // Max 1-byte encoded string size is 127B: 1B CType + ridStr + string terminator
+        const int size = 125;
+        const auto ridStr = std::string(size, 'a');
+        auto rid = ridFromStr(ridStr.c_str(), size);
+        const KeyString::Builder ks(version, rid);
+        ASSERT_EQ(ks.getSize(), size + pad);
+        ASSERT_EQ(KeyString::decodeRecordIdStrAtEnd(ks.getBuffer(), ks.getSize()), rid);
+        ASSERT_EQ(0, KeyString::sizeWithoutRecordIdStrAtEnd(ks.getBuffer(), ks.getSize()));
+    }
+}
+
+TEST_F(KeyStringBuilderTest, RecordIdStrBig2SizeSegments) {
+    const int pad = 3;  // kStringLike CType + StringData terminator + RecordId len
+    {
+        // Min 2-byte encoded string size is 128B: 1B CType + ridStr + string terminator
+        const int size = 126;
+        const auto ridStr = std::string(size, 'a');
+        auto rid = ridFromStr(ridStr.c_str(), size);
+        const KeyString::Builder ks(version, rid);
+        ASSERT_EQ(ks.getSize(), size + pad + 1);  // 1 byte with continuation bit
+        ASSERT_EQ(KeyString::decodeRecordIdStrAtEnd(ks.getBuffer(), ks.getSize()), rid);
+        ASSERT_EQ(0, KeyString::sizeWithoutRecordIdStrAtEnd(ks.getBuffer(), ks.getSize()));
+    }
+    {
+        const int size = 128;
+        const auto ridStr = std::string(size, 'a');
+        auto rid = ridFromStr(ridStr.c_str(), size);
+        const KeyString::Builder ks(version, rid);
+        ASSERT_EQ(ks.getSize(), size + pad + 1);  // 1 byte with continuation bit
+        ASSERT_EQ(KeyString::decodeRecordIdStrAtEnd(ks.getBuffer(), ks.getSize()), rid);
+        ASSERT_EQ(0, KeyString::sizeWithoutRecordIdStrAtEnd(ks.getBuffer(), ks.getSize()));
+    }
+    {
+        // Max 2-byte encoded string size is 16383B: 1B CType + ridStr + string terminator
+        const int size = 16381;
+        const auto ridStr = std::string(size, 'a');
+        auto rid = ridFromStr(ridStr.c_str(), size);
+        const KeyString::Builder ks(version, rid);
+        ASSERT_EQ(ks.getSize(), size + pad + 1);  // 1 byte with continuation bit
+        ASSERT_EQ(KeyString::decodeRecordIdStrAtEnd(ks.getBuffer(), ks.getSize()), rid);
+        ASSERT_EQ(0, KeyString::sizeWithoutRecordIdStrAtEnd(ks.getBuffer(), ks.getSize()));
+    }
+}
+
+TEST_F(KeyStringBuilderTest, RecordIdStrBig3SizeSegments) {
+    const int pad = 3;  // kStringLike CType + StringData terminator + RecordId len
+    {
+        // Min 3-byte encoded string size is 16384B: 1B CType + ridStr + string terminator
+        const int size = 16382;
+        const auto ridStr = std::string(size, 'a');
+        auto rid = ridFromStr(ridStr.c_str(), size);
+        const KeyString::Builder ks(version, rid);
+        ASSERT_EQ(ks.getSize(), size + pad + 2);  // 2 bytes with continuation bit
+        ASSERT_EQ(KeyString::decodeRecordIdStrAtEnd(ks.getBuffer(), ks.getSize()), rid);
+        ASSERT_EQ(0, KeyString::sizeWithoutRecordIdStrAtEnd(ks.getBuffer(), ks.getSize()));
+    }
+    {
+        // Max 3-byte encoded string size is 2097151B: 1B CType + ridStr + string terminator
+        const int size = 2097149;
+        const auto ridStr = std::string(size, 'a');
+        auto rid = ridFromStr(ridStr.c_str(), size);
+        const KeyString::Builder ks(version, rid);
+        ASSERT_EQ(ks.getSize(), size + pad + 2);  // 2 bytes with continuation bit
+        ASSERT_EQ(KeyString::decodeRecordIdStrAtEnd(ks.getBuffer(), ks.getSize()), rid);
+        ASSERT_EQ(0, KeyString::sizeWithoutRecordIdStrAtEnd(ks.getBuffer(), ks.getSize()));
+    }
+}
+
+TEST_F(KeyStringBuilderTest, RecordIdStrBig4SizeSegments) {
+    const int pad = 3;  // kStringLike CType + StringData terminator + RecordId len
+    {
+        // Min 4-byte encoded string size is 2097152B: 1B CType + ridStr + string terminator
+        const int size = 2097150;
+        const auto ridStr = std::string(size, 'a');
+        auto rid = ridFromStr(ridStr.c_str(), size);
+        const KeyString::Builder ks(version, rid);
+        ASSERT_EQ(ks.getSize(), size + pad + 3);  // 3 bytes with continuation bit
+        ASSERT_EQ(KeyString::decodeRecordIdStrAtEnd(ks.getBuffer(), ks.getSize()), rid);
+        ASSERT_EQ(0, KeyString::sizeWithoutRecordIdStrAtEnd(ks.getBuffer(), ks.getSize()));
+    }
+    {
+        // Support up to RecordId::kBigStrMaxSize
+        const int size = RecordId::kBigStrMaxSize - 2 /* CType + string terminator */;
+        const auto ridStr = std::string(size, 'a');
+        auto rid = ridFromStr(ridStr.c_str(), size);
+        const KeyString::Builder ks(version, rid);
+        ASSERT_EQ(ks.getSize(), size + pad + 3);  // 3 bytes with continuation bit
+        ASSERT_EQ(KeyString::decodeRecordIdStrAtEnd(ks.getBuffer(), ks.getSize()), rid);
+        ASSERT_EQ(0, KeyString::sizeWithoutRecordIdStrAtEnd(ks.getBuffer(), ks.getSize()));
+    }
+}
+
+TEST_F(KeyStringBuilderTest, RecordIdStrBigSizeWithoutRecordIdStr) {
+    const int pad = 3;  // kStringLike CType + StringData terminator + RecordId len
+    const char str[] = "keyval";
+    const int padStr = 3;  // kStringLike CType + string terminator + discriminator
+    {
+        const int ridStrlen = 90;
+        const auto ridStr = std::string(ridStrlen, 'a');
+        auto rid = ridFromStr(ridStr.c_str(), ridStrlen);
+        KeyString::Builder ks(version);
+        ks.appendString(mongo::StringData(str, strlen(str)));
+        ks.appendRecordId(rid);
+        ASSERT_EQ(ks.getSize(), strlen(str) + padStr + ridStrlen + pad);
+        ASSERT_EQ(KeyString::decodeRecordIdStrAtEnd(ks.getBuffer(), ks.getSize()), rid);
+        ASSERT_EQ(strlen(str) + padStr,
+                  KeyString::sizeWithoutRecordIdStrAtEnd(ks.getBuffer(), ks.getSize()));
+    }
+    {
+        const int ridStrlen = 260;
+        const auto ridStr = std::string(ridStrlen, 'a');
+        auto rid = ridFromStr(ridStr.c_str(), ridStrlen);
+        KeyString::Builder ks(version);
+        ks.appendString(mongo::StringData(str, strlen(str)));
+        ks.appendRecordId(rid);
+        ASSERT_EQ(ks.getSize(),
+                  strlen(str) + padStr + ridStrlen + pad + 1);  // 1 0x80 cont byte
+        ASSERT_EQ(KeyString::decodeRecordIdStrAtEnd(ks.getBuffer(), ks.getSize()), rid);
+        ASSERT_EQ(strlen(str) + padStr,
+                  KeyString::sizeWithoutRecordIdStrAtEnd(ks.getBuffer(), ks.getSize()));
+    }
+}
+
 TEST_F(KeyStringBuilderTest, AllPermCompare) {
     std::vector<BSONObj> elements = getInterestingElements(version);
 

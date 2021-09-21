@@ -410,7 +410,7 @@ public:
     }
 
     /**
-     * Reserve room for some number of bytes to be claimed at a later time.
+     * Reserve room for some number of bytes to be claimed at a later time via claimReservedBytes.
      */
     void reserveBytes(size_t bytes) {
         size_t minSize = l + reservedBytes + bytes;

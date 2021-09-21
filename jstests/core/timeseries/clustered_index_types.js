@@ -50,15 +50,30 @@ assert.eq(1, coll.find({a: 8}).itcount());
 assert.commandWorked(coll.insert({_id: null, a: 9}));
 assert.eq(1, coll.find({_id: null}).itcount());
 assert.commandWorked(coll.insert({_id: 'x'.repeat(100), a: 10}));
+assert.commandWorked(coll.insert({}));
 
 assert.commandWorked(coll.createIndex({a: 1}));
 assert.commandWorked(coll.dropIndex({a: 1}));
 
 // This key is too large.
 assert.commandFailedWithCode(coll.insert({_id: 'x'.repeat(8 * 1024 * 1024), a: 11}), 5894900);
-// This large key should prevent the index from being created.
+// Large key but within the upper bound
 assert.commandWorked(coll.insert({_id: 'x'.repeat(3 * 1024 * 1024), a: 12}));
-assert.commandFailedWithCode(coll.createIndex({a: 1}), 5994901);
+// Can build a secondary index with a 3MB RecordId doc.
+assert.commandWorked(coll.createIndex({a: 1}));
+
+// Look up using the secondary index on {a: 1}
+assert.eq(1, coll.find({a: null}).itcount());
+assert.eq(0, coll.find({a: 0}).itcount());
+assert.eq(2, coll.find({a: 1}).itcount());
+assert.eq(1, coll.find({a: 2}).itcount());
+assert.eq(1, coll.find({a: 8}).itcount());
+assert.eq(1, coll.find({a: 9}).itcount());
+assert.eq(null, coll.findOne({a: 9})['_id']);
+assert.eq(1, coll.find({a: 10}).itcount());
+assert.eq(100, coll.findOne({a: 10})['_id'].length);
+assert.eq(1, coll.find({a: 12}).itcount());
+assert.eq(3 * 1024 * 1024, coll.findOne({a: 12})['_id'].length);
 
 // No support for numeric type differentiation.
 assert.commandWorked(coll.insert({_id: 42.0}));

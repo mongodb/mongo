@@ -207,6 +207,26 @@ void BM_KeyStringStackBuilderCopy(benchmark::State& state, BsonValueType bsonTyp
     state.SetItemsProcessed(state.iterations() * kSampleSize);
 }
 
+void BM_KeyStringRecordIdStrAppend(benchmark::State& state, const size_t size) {
+    const auto buf = std::string(size, 'a');
+    auto rid = RecordId(buf.c_str(), size);
+    for (auto _ : state) {
+        benchmark::ClobberMemory();
+        benchmark::DoNotOptimize(KeyString::Builder(KeyString::Version::V1, rid));
+    }
+}
+
+void BM_KeyStringRecordIdStrDecode(benchmark::State& state, const size_t size) {
+    const auto buf = std::string(size, 'a');
+    KeyString::Builder ks(KeyString::Version::V1, RecordId(buf.c_str(), size));
+    auto ksBuf = ks.getBuffer();
+    auto ksSize = ks.getSize();
+    for (auto _ : state) {
+        benchmark::ClobberMemory();
+        benchmark::DoNotOptimize(KeyString::decodeRecordIdStrAtEnd(ksBuf, ksSize));
+    }
+}
+
 BENCHMARK_CAPTURE(BM_KeyStringValueAssign, Int, INT);
 BENCHMARK_CAPTURE(BM_KeyStringValueAssign, Double, DOUBLE);
 BENCHMARK_CAPTURE(BM_KeyStringValueAssign, Decimal, DECIMAL);
@@ -244,6 +264,15 @@ BENCHMARK_CAPTURE(BM_KeyStringToBSON, V0_String, KeyString::Version::V0, STRING)
 BENCHMARK_CAPTURE(BM_KeyStringToBSON, V1_String, KeyString::Version::V1, STRING);
 BENCHMARK_CAPTURE(BM_KeyStringToBSON, V0_Array, KeyString::Version::V0, ARRAY);
 BENCHMARK_CAPTURE(BM_KeyStringToBSON, V1_Array, KeyString::Version::V1, ARRAY);
+
+BENCHMARK_CAPTURE(BM_KeyStringRecordIdStrAppend, 16B, 16);
+BENCHMARK_CAPTURE(BM_KeyStringRecordIdStrAppend, 512B, 512);
+BENCHMARK_CAPTURE(BM_KeyStringRecordIdStrAppend, 1kB, 1024);
+BENCHMARK_CAPTURE(BM_KeyStringRecordIdStrAppend, 1MB, 1024 * 1024);
+BENCHMARK_CAPTURE(BM_KeyStringRecordIdStrDecode, 16B, 16);
+BENCHMARK_CAPTURE(BM_KeyStringRecordIdStrDecode, 512B, 512);
+BENCHMARK_CAPTURE(BM_KeyStringRecordIdStrDecode, 1kB, 1024);
+BENCHMARK_CAPTURE(BM_KeyStringRecordIdStrDecode, 1MB, 1024 * 1024);
 
 }  // namespace
 }  // namespace mongo

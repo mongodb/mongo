@@ -62,6 +62,12 @@ static StringData keyStringVersionToString(Version version) {
 
 static const Ordering ALL_ASCENDING = Ordering::make(BSONObj());
 
+// Encode the size of a RecordId binary string using up to 4 bytes, 7 bits per byte.
+// This supports encoding sizes that fit into 28 bits, which largely covers the
+// maximum BSON size.
+static const int kRecordIdStrEncodedSizeMaxBytes = 4;
+MONGO_STATIC_ASSERT(RecordId::kBigStrMaxSize < 1 << (7 * kRecordIdStrEncodedSizeMaxBytes));
+
 /**
  * Encodes info needed to restore the original BSONTypes from a KeyString. They cannot be
  * stored in place since we don't want them to affect the ordering (1 and 1.0 compare as
