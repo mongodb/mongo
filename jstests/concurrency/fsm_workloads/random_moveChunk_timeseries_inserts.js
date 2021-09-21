@@ -121,12 +121,14 @@ var $config = extendWorkload($config, function($config, $super) {
         // Make sure that queries using various indexes on time-series buckets collection return
         // buckets with all documents.
         const verifyBucketIndex = (bucketIndex) => {
+            const unpackStage = {
+                "$_internalUnpackBucket":
+                    {"timeField": "t", "metaField": "m", "bucketMaxSpanSeconds": NumberInt(3600)}
+            };
             const bucketColl = db.getCollection(`system.buckets.${collName}`);
-            // TODO SERVER-60033: We need an implementation of this that handle compressed buckets
-            // const buckets = bucketColl.aggregate([{$sort: bucketIndex}]).toArray();
-            // const numDocsInBuckets =
-            //     buckets.map(b => Object.keys(b.data._id).length).reduce((x, y) => x + y, 0);
-            // assert.eq(numInitialDocs, numDocsInBuckets);
+            const numDocsInBuckets =
+                bucketColl.aggregate([{$sort: bucketIndex}, unpackStage]).itcount();
+            assert.eq(numInitialDocs, numDocsInBuckets);
             const plan = bucketColl.explain().aggregate([{$sort: bucketIndex}]);
             const stages = getPlanStages(plan, 'IXSCAN');
             assert(stages.length > 0);
