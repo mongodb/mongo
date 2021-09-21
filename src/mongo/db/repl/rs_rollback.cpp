@@ -96,6 +96,7 @@ using std::unique_ptr;
 namespace repl {
 
 MONGO_FAIL_POINT_DEFINE(rollbackExitEarlyAfterCollectionDrop);
+MONGO_FAIL_POINT_DEFINE(rollbackViaRefetchHangCommonPointBeforeReplCommitPoint);
 
 using namespace rollback_internal;
 
@@ -1263,6 +1264,14 @@ Status _syncRollback(OperationContext* opCtx,
           "Rollback common point is {commonPoint}",
           "Rollback common point",
           "commonPoint"_attr = commonPointOpTime);
+
+    // This failpoint is used for testing the invariant below.
+    if (MONGO_unlikely(rollbackViaRefetchHangCommonPointBeforeReplCommitPoint.shouldFail()) &&
+        (commonPointOpTime.getTimestamp() < lastCommittedOpTime.getTimestamp())) {
+        LOGV2(6009600,
+              "Hanging due to rollbackViaRefetchHangCommonPointBeforeReplCommitPoint failpoint");
+        rollbackViaRefetchHangCommonPointBeforeReplCommitPoint.pauseWhileSet(opCtx);
+    }
 
     // Rollback common point should be >= the replication commit point.
     invariant(commonPointOpTime.getTimestamp() >= lastCommittedOpTime.getTimestamp());
