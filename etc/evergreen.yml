@@ -8500,7 +8500,6 @@ buildvariants:
     test_flags: >-
         --runAllFeatureFlagTests
         --excludeWithAnyTags=incompatible_with_windows_tls
-        --mongodSetParameters="{internalQueryEnableSlotBasedExecutionEngine: true}"
   tasks:
     - name: compile_and_archive_dist_test_then_package_TG
       distros:
@@ -8610,7 +8609,6 @@ buildvariants:
     test_flags: >-
         --runAllFeatureFlagTests
         --excludeWithAnyTags=incompatible_with_windows_tls
-        --mongodSetParameters="{internalQueryEnableSlotBasedExecutionEngine: true}"
   tasks:
     - name: compile_and_archive_dist_test_then_package_TG
       distros:
@@ -9393,8 +9391,6 @@ buildvariants:
     # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
     test_flags: >-
       --runAllFeatureFlagTests
-      --mongodSetParameters="{internalQueryEnableSlotBasedExecutionEngine: true}"
-      --additionalFeatureFlags=featureFlagSbePlanCache
   tasks: &enterprise-rhel-80-64-bit-dynamic-all-feature-flags-tasks
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:
@@ -9489,16 +9485,16 @@ buildvariants:
 #    distros:
 #      - rhel80-large
 
-- &enterprise-rhel-80-64-bit-dynamic-sbe-engine
-  name: enterprise-rhel-80-64-bit-dynamic-sbe-engine
-  display_name: "Shared Library Enterprise RHEL 8.0 (SBE Engine)"
+- &enterprise-rhel-80-64-bit-dynamic-classic-engine
+  name: enterprise-rhel-80-64-bit-dynamic-classic-engine
+  display_name: "Shared Library Enterprise RHEL 8.0 (Classic Engine)"
   cron: "0 0 * * *" # Every day starting at 00:00
   stepback: false
   modules:
   - enterprise
   run_on:
   - rhel80-small
-  expansions: &enterprise-rhel-80-64-bit-dynamic-sbe-engine-expansions
+  expansions: &enterprise-rhel-80-64-bit-dynamic-classic-engine-expansions
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
     compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
     multiversion_platform: rhel80
@@ -9514,8 +9510,7 @@ buildvariants:
     burn_in_tag_buildvariants: enterprise-rhel-80-64-bit-inmem linux-64-duroff enterprise-rhel-80-64-bit-multiversion
     num_scons_link_jobs_available: 0.99
     test_flags: >-
-      --mongodSetParameters="{internalQueryEnableSlotBasedExecutionEngine: true}"
-      --additionalFeatureFlags=featureFlagTimeseriesCollection,featureFlagSbePlanCache
+      --mongodSetParameters="{internalQueryForceClassicEngine: true}"
   tasks:
   - name: .aggfuzzer
   - name: .aggregation
@@ -9731,7 +9726,6 @@ buildvariants:
     test_flags: >-
       --excludeWithAnyTags=requires_fcv_51,multiversion_incompatible
       --runAllFeatureFlagTests
-      --mongodSetParameters="{internalQueryEnableSlotBasedExecutionEngine: true}"
 
 - name: rhel-80-64-bit-nossl
   display_name: "RHEL 8.0 Shared Library (No SSL)"
@@ -10535,7 +10529,6 @@ buildvariants:
     # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
     test_flags: >-
         --runAllFeatureFlagTests
-        --mongodSetParameters="{internalQueryEnableSlotBasedExecutionEngine: true}"
   tasks:
   - name: compile_and_archive_dist_test_then_package_TG
     distros:
@@ -11273,7 +11266,6 @@ buildvariants:
     # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
     test_flags: >-
         --runAllFeatureFlagTests
-        --mongodSetParameters="{internalQueryEnableSlotBasedExecutionEngine: true}"
     separate_debug: off
   tasks:
   - name: compile_and_archive_dist_test_then_package_TG
@@ -11323,8 +11315,8 @@ buildvariants:
 #  - name: server_selection_json_test_TG
 
 - <<: *ubuntu1804-debug-asan-template
-  name: ubuntu1804-debug-asan-sbe-engine
-  display_name: ~ ASAN Enterprise Ubuntu 18.04 DEBUG (SBE Engine)
+  name: ubuntu1804-debug-asan-classic-engine
+  display_name: ~ ASAN Enterprise Ubuntu 18.04 DEBUG (Classic Engine)
   cron: "0 0 * * *" # Every day starting at 00:00
   modules:
   - enterprise
@@ -11339,8 +11331,7 @@ buildvariants:
     san_options: LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer" ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=address --ssl --ocsp-stapling=off --enable-free-mon=on -j$(grep -c ^processor /proc/cpuinfo)
     test_flags: >-
-      --mongodSetParameters="{internalQueryEnableSlotBasedExecutionEngine: true}"
-      --additionalFeatureFlags=featureFlagSbePlanCache
+      --mongodSetParameters="{internalQueryForceClassicEngine: true}"
       --excludeWithAnyTags=requires_fast_memory,requires_ocsp_stapling
     multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
@@ -11512,7 +11503,6 @@ buildvariants:
     test_flags: >-
         --excludeWithAnyTags=requires_ocsp_stapling
         --runAllFeatureFlagTests
-        --mongodSetParameters="{internalQueryEnableSlotBasedExecutionEngine: true}"
     multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under UBSAN build.
@@ -11564,8 +11554,8 @@ buildvariants:
 #  - name: server_selection_json_test_TG
 
 - <<: *ubuntu1804-debug-ubsan-template
-  name: ubuntu1804-debug-ubsan-sbe-engine
-  display_name: ~ UBSAN Enterprise Ubuntu 18.04 DEBUG (SBE Engine)
+  name: ubuntu1804-debug-ubsan-classic-engine
+  display_name: ~ UBSAN Enterprise Ubuntu 18.04 DEBUG (Classic Engine)
   cron: "0 0 * * *" # Every day starting at 00:00
   modules:
   - enterprise
@@ -11580,8 +11570,7 @@ buildvariants:
     san_options: UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --sanitize=undefined --ssl --ocsp-stapling=off --enable-free-mon=on -j$(grep -c ^processor /proc/cpuinfo)
     test_flags: >-
-      --mongodSetParameters="{internalQueryEnableSlotBasedExecutionEngine: true}"
-      --additionalFeatureFlags=featureFlagSbePlanCache
+      --mongodSetParameters="{internalQueryForceClassicEngine: true}"
       --excludeWithAnyTags=requires_ocsp_stapling
     multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
@@ -11687,7 +11676,6 @@ buildvariants:
     test_flags: >-
         --excludeWithAnyTags=requires_ocsp_stapling
         --runAllFeatureFlagTests
-        --mongodSetParameters="{internalQueryEnableSlotBasedExecutionEngine: true}"
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
     hang_analyzer_dump_core: false
     scons_cache_scope: shared
@@ -12120,19 +12108,18 @@ buildvariants:
     - windows-vsCurrent-large
 
 ### QO & QE Patch-Specific Build Variants ###
-- <<: *enterprise-rhel-80-64-bit-dynamic-sbe-engine
-  name: enterprise-rhel-80-64-bit-dynamic-sbe-engine-query-patch-only
-  display_name: "~ Shared Library Enterprise RHEL 8.0 Query Patch Only (SBE Execution Engine)"
+- <<: *enterprise-rhel-80-64-bit-dynamic-classic-engine
+  name: enterprise-rhel-80-64-bit-dynamic-classic-engine-query-patch-only
+  display_name: "~ Shared Library Enterprise RHEL 8.0 Query Patch Only (Classic Engine)"
   cron: "0 0 * * 0" # Every week starting 00:00 on Sunday . This is a patch-only variant but we run on mainline to pick up task history.
   expansions:
-    <<: *enterprise-rhel-80-64-bit-dynamic-sbe-engine-expansions
+    <<: *enterprise-rhel-80-64-bit-dynamic-classic-engine-expansions
     jstestfuzz_num_generated_files: 20
     jstestfuzz_concurrent_num_files: 5
     target_resmoke_time: 30
     max_sub_suites: 3
     test_flags: >-
-      --mongodSetParameters="{internalQueryEnableSlotBasedExecutionEngine: true}"
-      --additionalFeatureFlags=featureFlagTimeseriesCollection,featureFlagSbePlanCache,featureFlagSBEGroupPushdown
+      --mongodSetParameters="{internalQueryForceClassicEngine: true}"
       --excludeWithAnyTags=resource_intensive
 
 # Intentionally derive from SBE to run the SBE tests with all feature flags.
@@ -12146,4 +12133,7 @@ buildvariants:
     jstestfuzz_concurrent_num_files: 5
     target_resmoke_time: 30
     max_sub_suites: 3
-    test_flags: --runAllFeatureFlagTests --excludeWithAnyTags=resource_intensive
+    test_flags: >-
+      --runAllFeatureFlagTests
+      --additionalFeatureFlags=featureFlagSbePlanCache
+      --excludeWithAnyTags=resource_intensive

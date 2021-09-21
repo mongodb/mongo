@@ -1173,7 +1173,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
     std::function<void(CanonicalQuery*)> extractAndAttachPipelineStages,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     size_t plannerOptions) {
-    return canonicalQuery->getEnableSlotBasedExecutionEngine() &&
+    return !canonicalQuery->getForceClassicEngine() &&
             isQuerySbeCompatible(opCtx, canonicalQuery.get(), plannerOptions)
         ? getSlotBasedExecutor(opCtx,
                                collection,

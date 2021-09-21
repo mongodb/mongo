@@ -70,7 +70,7 @@ public:
         // If SBE is disabled, then also disallow the SBE command.
         uassert(5772200,
                 "the SBE command requires the SBE engine to be enabled",
-                internalQueryEnableSlotBasedExecutionEngine.load());
+                !internalQueryForceClassicEngine.load());
 
         // The SBE command may read from multiple collections, but no logic is in place to acquire
         // locks on all of the necessary collections and databases. Therefore, its implementation

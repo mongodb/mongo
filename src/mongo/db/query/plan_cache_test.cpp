@@ -79,7 +79,7 @@ PlanCacheKey makeKey(const CanonicalQuery& cq, const std::vector<CoreIndexInfo>&
     StringBuilder indexabilityKeyBuilder;
     plan_cache_detail::encodeIndexability(cq.root(), indexabilityState, &indexabilityKeyBuilder);
 
-    return {cq.encodeKey(), indexabilityKeyBuilder.str(), cq.getEnableSlotBasedExecutionEngine()};
+    return {cq.encodeKey(), indexabilityKeyBuilder.str(), !cq.getForceClassicEngine()};
 }
 
 /**
@@ -226,11 +226,11 @@ void assertPlanCacheKeysUnequalDueToDiscriminators(const PlanCacheKey& a, const 
 }
 
 /**
- * Check that the stable keys of 'a' and 'b' are equal, but the 'enableSlotBasedExecutionEngine'
+ * Check that the stable keys of 'a' and 'b' are equal, but the 'forceClassicEngine'
  * values are not.
  */
-void assertPlanCacheKeysUnequalDueToEnableSlotBasedExecutionEngineValue(const PlanCacheKey& a,
-                                                                        const PlanCacheKey& b) {
+void assertPlanCacheKeysUnequalDueToForceClassicEngineValue(const PlanCacheKey& a,
+                                                            const PlanCacheKey& b) {
     ASSERT_EQ(a.getStableKeyStringData(), b.getStableKeyStringData());
     auto aUnstablePart = a.getUnstablePart();
     auto bUnstablePart = b.getUnstablePart();
@@ -1332,9 +1332,7 @@ protected:
 };
 
 const std::string mockKey("mock_cache_key");
-const PlanCacheKey CachePlanSelectionTest::ck(mockKey,
-                                              "",
-                                              internalQueryEnableSlotBasedExecutionEngine.load());
+const PlanCacheKey CachePlanSelectionTest::ck(mockKey, "", internalQueryForceClassicEngine.load());
 
 //
 // Equality
@@ -2656,21 +2654,20 @@ TEST(PlanCacheTest, DifferentQueryEngines) {
                       false,                         // sparse
                       IndexEntry::Identifier{""})};  // name
 
-    // Helper to construct a plan cache key given the 'enableSlotBasedExecutionEngine' flag.
-    auto constructPlanCacheKey = [&](bool enableSlotBasedExecutionEngine) {
-        RAIIServerParameterControllerForTest controller{
-            "internalQueryEnableSlotBasedExecutionEngine", enableSlotBasedExecutionEngine};
+    // Helper to construct a plan cache key given the 'forceClassicEngine' flag.
+    auto constructPlanCacheKey = [&](bool forceClassicEngine) {
+        RAIIServerParameterControllerForTest controller{"internalQueryForceClassicEngine",
+                                                        forceClassicEngine};
         const auto queryStr = "{a: 0}";
         unique_ptr<CanonicalQuery> cq(canonicalize(queryStr));
         return makeKey(*cq, indexCores);
     };
 
     const auto classicEngineKey = constructPlanCacheKey(false);
-    const auto slotBasedExecutionEngineKey = constructPlanCacheKey(true);
+    const auto noClassicEngineKey = constructPlanCacheKey(true);
 
     // Check that the two plan cache keys are not equal because the plans were created under
     // different engines.
-    assertPlanCacheKeysUnequalDueToEnableSlotBasedExecutionEngineValue(classicEngineKey,
-                                                                       slotBasedExecutionEngineKey);
+    assertPlanCacheKeysUnequalDueToForceClassicEngineValue(classicEngineKey, noClassicEngineKey);
 }
 }  // namespace

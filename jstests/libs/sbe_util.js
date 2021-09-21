@@ -10,7 +10,7 @@ load("jstests/libs/fixture_helpers.js");    // For 'isMongos'
  * sharded clusters, SBE is either enabled on each node, or disabled on each node.
  */
 function checkSBEEnabled(theDB) {
-    let checkResult = false;
+    let checkResult = true;
 
     assert.soon(() => {
         // Some test suites kill the primary, potentially resulting in networking errors. We use:
@@ -23,8 +23,8 @@ function checkSBEEnabled(theDB) {
             return false;
         }
 
-        // Find a non-mongos node and check whether its SBE feature flag is on. We assume either all
-        // nodes in the cluster have SBE on or none.
+        // Find a non-mongos node and check whether its forceClassicEngine flag is on. We
+        // assume either all nodes in the cluster have SBE disabled or none.
         for (const node of nodes) {
             try {
                 const conn = new Mongo(node);
@@ -32,11 +32,12 @@ function checkSBEEnabled(theDB) {
                     continue;
                 }
 
-                const getParam = conn.adminCommand(
-                    {getParameter: 1, internalQueryEnableSlotBasedExecutionEngine: 1});
-                checkResult =
-                    getParam.hasOwnProperty("internalQueryEnableSlotBasedExecutionEngine") &&
-                    getParam.internalQueryEnableSlotBasedExecutionEngine;
+                const getParam =
+                    conn.adminCommand({getParameter: 1, internalQueryForceClassicEngine: 1});
+                if (getParam.hasOwnProperty("internalQueryForceClassicEngine") &&
+                    getParam.internalQueryForceClassicEngine) {
+                    checkResult = false;
+                }
                 return true;
             } catch (e) {
                 continue;

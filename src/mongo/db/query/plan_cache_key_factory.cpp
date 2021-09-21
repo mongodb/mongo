@@ -84,8 +84,7 @@ PlanCacheKey make(const CanonicalQuery& query,
         CollectionQueryInfo::get(collection).getPlanCacheIndexabilityState(),
         &indexabilityKeyBuilder);
 
-    return PlanCacheKey(
-        shapeString, indexabilityKeyBuilder.str(), query.getEnableSlotBasedExecutionEngine());
+    return PlanCacheKey(shapeString, indexabilityKeyBuilder.str(), !query.getForceClassicEngine());
 }
 
 sbe::PlanCacheKey make(const CanonicalQuery& query,

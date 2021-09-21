@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Sets the internalQueryEnableSlotBasedExecutionEngine flag to true and false, and
+ * Sets the internalQueryForceClassicEngine flag to true and false, and
  * asserts that find queries using the plan cache produce the correct results.
  *
  * @tags: [
@@ -19,7 +19,7 @@ var $config = (function() {
         }
 
         cluster.executeOnMongodNodes(function(db) {
-            db.adminCommand({setParameter: 1, internalQueryEnableSlotBasedExecutionEngine: false});
+            db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: true});
         });
 
         for (let i = 0; i < 10; ++i) {
@@ -33,11 +33,10 @@ var $config = (function() {
 
     let states = (function() {
         function init(db, coll) {
-            const originalParamValue = db.adminCommand(
-                {getParameter: 1, "internalQueryEnableSlotBasedExecutionEngine": 1});
+            const originalParamValue =
+                db.adminCommand({getParameter: 1, "internalQueryForceClassicEngine": 1});
             assertAlways.commandWorked(originalParamValue);
-            this.originalParamValue =
-                originalParamValue.internalQueryEnableSlotBasedExecutionEngine;
+            this.originalParamValue = originalParamValue.internalQueryForceClassicEngine;
 
             if (!checkSBEEnabled(db)) {
                 return;
@@ -50,8 +49,8 @@ var $config = (function() {
                 return;
             }
 
-            assertAlways.commandWorked(db.adminCommand(
-                {setParameter: 1, internalQueryEnableSlotBasedExecutionEngine: true}));
+            assertAlways.commandWorked(
+                db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: false}));
         }
 
         function toggleSBESwitchOff(db, coll) {
@@ -59,8 +58,8 @@ var $config = (function() {
                 return;
             }
 
-            assertAlways.commandWorked(db.adminCommand(
-                {setParameter: 1, internalQueryEnableSlotBasedExecutionEngine: false}));
+            assertAlways.commandWorked(
+                db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: true}));
         }
 
         function runQueriesAndCheckResults(db, coll) {
@@ -137,8 +136,8 @@ var $config = (function() {
     function teardown(db, coll, cluster) {
         const setParam = this.originalParamValue;
         cluster.executeOnMongodNodes(function(db) {
-            assertAlways.commandWorked(db.adminCommand(
-                {setParameter: 1, internalQueryEnableSlotBasedExecutionEngine: setParam}));
+            assertAlways.commandWorked(
+                db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: setParam}));
         });
     }
 

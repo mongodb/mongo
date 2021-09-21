@@ -102,7 +102,7 @@ namespace {
  * Extracts a prefix of 'DocumentSourceGroup' stages from the given pipeline to prepare for
  * pushdown of $group into the inner query layer so that it can be executed using SBE. Group stages
  * are extracted from the pipeline under when all of the following conditions are met:
- *    0. When the 'internalQueryEnableSlotBasedExecutionEngine' feature flag is 'true'.
+ *    0. When the 'internalQueryForceClassicEngine' feature flag is 'false'.
  *    1. When 'allowDiskUse' is false. We currently don't support spilling in the SBE HashAgg
  *       stage. This will change once that is supported when SERVER-58436 is complete.
  *    2. When there's only a single index other than the implicit '_id' index on the provided
@@ -139,7 +139,7 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> extractSbeCompatibleGr
 
     if (!feature_flags::gFeatureFlagSBEGroupPushdown.isEnabled(
             serverGlobalParams.featureCompatibility) ||
-        !cq->getEnableSlotBasedExecutionEngine() || expCtx->allowDiskUse || !isSingleIndex ||
+        cq->getForceClassicEngine() || expCtx->allowDiskUse || !isSingleIndex ||
         queryNeedsSubplanning) {
         return {};
     }

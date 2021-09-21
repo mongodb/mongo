@@ -5,8 +5,7 @@
 (function() {
 "use strict";
 
-const conn =
-    MongoRunner.runMongod({setParameter: "internalQueryEnableSlotBasedExecutionEngine=true"});
+const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to startup");
 const db = conn.getDB("test");
 const collName = jsTestName();

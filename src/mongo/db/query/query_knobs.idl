@@ -500,11 +500,11 @@ server_parameters:
     validator:
         gt: 0
 
-  internalQueryEnableSlotBasedExecutionEngine:
-    description: "If true, the system will use the SBE execution engine for eligible queries,
-    otherwise all queries will execute using the classic execution engine."
+  internalQueryForceClassicEngine:
+    description: "If true, the system will use the classic execution engine for all queries,
+    otherwise eligible queries will execute using the SBE execution engine."
     set_at: [ startup, runtime ]
-    cpp_varname: "internalQueryEnableSlotBasedExecutionEngine"
+    cpp_varname: "internalQueryForceClassicEngine"
     cpp_vartype: AtomicWord<bool>
     default: false
 
