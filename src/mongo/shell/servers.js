@@ -334,6 +334,7 @@ MongoRunner.logicalOptions = {
     bridgeOptions: true,
     skipValidation: true,
     backupOnRestartDir: true,
+    allowedExitCode: true,
 };
 
 MongoRunner.toRealPath = function(path, pathOpts) {
