@@ -191,10 +191,10 @@ void statsToBSON(const QuerySolutionNode* node,
     }
     childrenBob.doneFast();
 }
-
-void statsToBSON(const sbe::PlanStageStats* stats,
-                 BSONObjBuilder* bob,
-                 const BSONObjBuilder* topLevelBob) {
+void statsToBSONHelper(const sbe::PlanStageStats* stats,
+                       BSONObjBuilder* bob,
+                       const BSONObjBuilder* topLevelBob,
+                       std::uint32_t currentDepth) {
     invariant(stats);
     invariant(bob);
     invariant(topLevelBob);
@@ -202,6 +202,14 @@ void statsToBSON(const sbe::PlanStageStats* stats,
     // Stop as soon as the BSON object we're building exceeds the limit.
     if (topLevelBob->len() > internalQueryExplainSizeThresholdBytes.load()) {
         bob->append("warning", "stats tree exceeded BSON size limit for explain");
+        return;
+    }
+
+    // Stop as soon as the BSON object we're building becomes too deep. Note that we go 2 less
+    // than the max depth to account for when this stage has multiple children.
+    if (currentDepth >= BSONDepth::getMaxDepthForUserStorage() - 2) {
+        bob->append("warning",
+                    "stats tree exceeded BSON depth limit; omitting the rest of the tree");
         return;
     }
 
@@ -234,7 +242,7 @@ void statsToBSON(const sbe::PlanStageStats* stats,
     // rather than 'inputStages'.
     if (stats->children.size() == 1) {
         BSONObjBuilder childBob(bob->subobjStart("inputStage"));
-        statsToBSON(stats->children[0].get(), &childBob, topLevelBob);
+        statsToBSONHelper(stats->children[0].get(), &childBob, topLevelBob, currentDepth + 1);
         return;
     }
 
@@ -253,7 +261,7 @@ void statsToBSON(const sbe::PlanStageStats* stats,
 
         for (size_t idx = 0; idx < stats->children.size(); ++idx) {
             BSONObjBuilder childBob(bob->subobjStart(overridenNames[idx]));
-            statsToBSON(stats->children[idx].get(), &childBob, topLevelBob);
+            statsToBSONHelper(stats->children[idx].get(), &childBob, topLevelBob, currentDepth + 1);
         }
         return;
     }
@@ -263,9 +271,15 @@ void statsToBSON(const sbe::PlanStageStats* stats,
     BSONArrayBuilder childrenBob(bob->subarrayStart("inputStages"_sd));
     for (auto&& child : stats->children) {
         BSONObjBuilder childBob(childrenBob.subobjStart());
-        statsToBSON(child.get(), &childBob, topLevelBob);
+        statsToBSONHelper(child.get(), &childBob, topLevelBob, currentDepth + 2);
     }
     childrenBob.doneFast();
+}
+
+void statsToBSON(const sbe::PlanStageStats* stats,
+                 BSONObjBuilder* bob,
+                 const BSONObjBuilder* topLevelBob) {
+    statsToBSONHelper(stats, bob, topLevelBob, 0);
 }
 
 PlanSummaryStats collectExecutionStatsSummary(const sbe::PlanStageStats* stats) {
