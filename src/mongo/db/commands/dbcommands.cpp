@@ -59,6 +59,7 @@
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
@@ -107,6 +108,9 @@
 
 namespace mongo {
 namespace {
+
+// Will cause 'CmdDatasize' to hang as it starts executing.
+MONGO_FAIL_POINT_DEFINE(hangBeforeDatasizeCount);
 
 /**
  * Returns a CollMod on the underlying buckets collection of the time-series collection.
@@ -439,7 +443,7 @@ public:
                 return 1;
             }
             exec = InternalPlanner::collectionScan(
-                opCtx, &collection.getCollection(), PlanYieldPolicy::YieldPolicy::NO_YIELD);
+                opCtx, &collection.getCollection(), PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
         } else if (min.isEmpty() || max.isEmpty()) {
             errmsg = "only one of min or max specified";
             return false;
@@ -470,8 +474,11 @@ public:
                                               min,
                                               max,
                                               BoundInclusion::kIncludeStartKeyOnly,
-                                              PlanYieldPolicy::YieldPolicy::NO_YIELD);
+                                              PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
         }
+
+        CurOpFailpointHelpers::waitWhileFailPointEnabled(
+            &hangBeforeDatasizeCount, opCtx, "hangBeforeDatasizeCount", []() {});
 
         long long avgObjSize = collection->dataSize(opCtx) / numRecords;
 
