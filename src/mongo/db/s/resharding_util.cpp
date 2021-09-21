@@ -382,7 +382,6 @@ bool isFinalOplog(const repl::OplogEntry& oplog, UUID reshardingUUID) {
         reshardingUUID;
 }
 
-
 NamespaceString getLocalOplogBufferNamespace(UUID existingUUID, ShardId donorShardId) {
     return NamespaceString("config.localReshardingOplogBuffer.{}.{}"_format(
         existingUUID.toString(), donorShardId.toString()));

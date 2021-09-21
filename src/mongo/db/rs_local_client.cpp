@@ -159,7 +159,8 @@ StatusWith<Shard::QueryResponse> RSLocalClient::queryOnce(
 Status RSLocalClient::runAggregation(
     OperationContext* opCtx,
     const AggregateCommandRequest& aggRequest,
-    std::function<bool(const std::vector<BSONObj>& batch)> callback) {
+    std::function<bool(const std::vector<BSONObj>& batch,
+                       const boost::optional<BSONObj>& postBatchResumeToken)> callback) {
     DBDirectClient client(opCtx);
     auto cursor = uassertStatusOKWithContext(
         DBClientCursor::fromAggregationRequest(
@@ -174,7 +175,8 @@ Status RSLocalClient::runAggregation(
         }
 
         try {
-            if (!callback(batchDocs)) {
+            // TODO SERVER-58938 pass DBClientCursor::_postBatchResumeToken to callback
+            if (!callback(batchDocs, boost::none)) {
                 break;
             }
         } catch (const DBException& ex) {

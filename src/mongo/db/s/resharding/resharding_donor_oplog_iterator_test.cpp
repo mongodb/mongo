@@ -135,6 +135,14 @@ public:
         return makeOplog(_crudNss, _uuid, repl::OpTypeEnum::kNoop, oField, o2Field, oplogId);
     }
 
+    repl::MutableOplogEntry makeProgressMarkOplogEntry(Timestamp ts) {
+        ReshardingDonorOplogId oplogId(ts, ts);
+        const BSONObj oField(BSON("msg"
+                                  << "Latest oplog ts from donor's cursor response"));
+        const BSONObj o2Field(BSON("type" << kReshardProgressMark));
+        return makeOplog(_crudNss, _uuid, repl::OpTypeEnum::kNoop, oField, o2Field, oplogId);
+    }
+
     const NamespaceString& oplogNss() const {
         return _oplogNss;
     }
@@ -407,6 +415,35 @@ TEST_F(ReshardingDonorOplogIterTest, FillsInPostImageOplogEntry) {
     ASSERT_TRUE(bool(next[0].getPostImageOp()));
     ASSERT_BSONOBJ_BINARY_EQ(getId(postImageOp), getId(*next[0].getPostImageOp()));
     ASSERT_BSONOBJ_BINARY_EQ(postImageDoc, next[0].getPostImageOp()->getObject());
+
+    next = getNextBatch(&iter, executor, factory);
+    ASSERT_TRUE(next.empty());
+}
+
+TEST_F(ReshardingDonorOplogIterTest, BatchIncludesProgressMarkEntries) {
+    const auto oplog1 = makeInsertOplog(Timestamp(2, 4), BSON("x" << 1));
+    const auto progressMarkOplog1 = makeProgressMarkOplogEntry(Timestamp(15, 3));
+    const auto finalOplog = makeFinalOplog(Timestamp(43, 24));
+
+    DBDirectClient client(operationContext());
+    const auto ns = oplogNss().ns();
+    client.insert(ns, oplog1.toBSON());
+    client.insert(ns, progressMarkOplog1.toBSON());
+    client.insert(ns, finalOplog.toBSON());
+
+    ReshardingDonorOplogIterator iter(oplogNss(), kResumeFromBeginning, &onInsertAlwaysReady);
+    auto executor = makeTaskExecutorForIterator();
+    auto factory = makeCancelableOpCtx();
+    auto altClient = makeKillableClient();
+    AlternativeClientRegion acr(altClient);
+
+    auto next = getNextBatch(&iter, executor, factory);
+    ASSERT_EQ(next.size(), 1U);
+    ASSERT_BSONOBJ_EQ(getId(oplog1), getId(next[0]));
+
+    next = getNextBatch(&iter, executor, factory);
+    ASSERT_EQ(next.size(), 1U);
+    ASSERT_BSONOBJ_EQ(getId(progressMarkOplog1), getId(next[0]));
 
     next = getNextBatch(&iter, executor, factory);
     ASSERT_TRUE(next.empty());

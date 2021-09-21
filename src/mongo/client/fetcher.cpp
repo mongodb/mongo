@@ -58,6 +58,7 @@ const char* kNamespaceFieldName = "ns";
 
 const char* kFirstBatchFieldName = "firstBatch";
 const char* kNextBatchFieldName = "nextBatch";
+const char* kPostBatchResumeTokenFieldName = "postBatchResumeToken";
 
 /**
  * Parses cursor response in command result for cursor ID, namespace and documents.
@@ -143,6 +144,19 @@ Status parseCursorResponse(const BSONObj& obj,
     for (auto& doc : batchData->documents) {
         doc.shareOwnershipWith(obj);
     }
+
+    BSONElement postBatchResumeToken = cursorObj.getField(kPostBatchResumeTokenFieldName);
+    if (!postBatchResumeToken.eoo()) {
+        if (postBatchResumeToken.type() != BSONType::Object) {
+            return Status(ErrorCodes::FailedToParse,
+                          str::stream()
+                              << "'" << kCursorFieldName << "." << kPostBatchResumeTokenFieldName
+                              << "' field must be of type object " << obj);
+        }
+
+        batchData->otherFields.postBatchResumeToken.emplace(postBatchResumeToken.Obj().getOwned());
+    }
+
 
     return Status::OK();
 }

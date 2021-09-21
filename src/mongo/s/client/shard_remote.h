@@ -85,9 +85,11 @@ public:
                                  const std::string& dbName,
                                  const BSONObj& cmdObj) final;
 
-    Status runAggregation(OperationContext* opCtx,
-                          const AggregateCommandRequest& aggRequest,
-                          std::function<bool(const std::vector<BSONObj>& batch)> callback);
+    Status runAggregation(
+        OperationContext* opCtx,
+        const AggregateCommandRequest& aggRequest,
+        std::function<bool(const std::vector<BSONObj>& batch,
+                           const boost::optional<BSONObj>& postBatchResumeToken)> callback);
 
 private:
     struct AsyncCmdHandle {
