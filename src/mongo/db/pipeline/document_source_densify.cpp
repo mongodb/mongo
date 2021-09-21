@@ -85,13 +85,21 @@ RangeStatement RangeStatement::parse(RangeSpec spec) {
                             array[1].type() == mongo::Date);
                     uassert(5733410, "A bounding array of dates must specify a unit", unit);
                     return Bounds(std::pair<Date_t, Date_t>(array[0].date(), array[1].date()));
+                } else {
+                    uasserted(5946800, "Explicit bounds must be numeric or dates");
                 }
+                MONGO_UNREACHABLE_TASSERT(5946801);
             }
             case mongo::String: {
                 if (bounds.str() == kValFull)
                     return Bounds(Full());
                 else if (bounds.str() == kValPartition)
                     return Bounds(Partition());
+                else
+                    uasserted(5946802,
+                              str::stream() << "Bounds string must either be '" << kValFull
+                                            << "' or '" << kValPartition << "'");
+                MONGO_UNREACHABLE_TASSERT(5946803);
             }
             default:
                 uasserted(5733404,
@@ -510,13 +518,13 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::finishDensifyingPar
         _densifyState = DensifyState::kDensifyDone;
         return DocumentSource::GetNextResult::makeEOF();
     }
-    return stdx::visit(visit_helper::Overloaded{[&](Full full) {
+    return stdx::visit(visit_helper::Overloaded{[&](Full) {
                                                     // Densify between partitions's last seen value
                                                     // and global max.
                                                     return finishDensifyingPartitionedInputHelper(
                                                         stdx::get<Value>(*_globalMax));
                                                 },
-                                                [&](Partition partition) {
+                                                [&](Partition) {
                                                     // Partition bounds don't do any extra work
                                                     // after EOF;
                                                     MONGO_UNREACHABLE;
@@ -541,7 +549,7 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::handleSourceExhaust
     _eof = true;
     return stdx::visit(
         visit_helper::Overloaded{
-            [&](RangeStatement::Full full) {
+            [&](RangeStatement::Full) {
                 if (_partitionExpr) {
                     return finishDensifyingPartitionedInput();
                 } else {
@@ -549,7 +557,7 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::handleSourceExhaust
                     return DocumentSource::GetNextResult::makeEOF();
                 }
             },
-            [&](RangeStatement::Partition part) {
+            [&](RangeStatement::Partition) {
                 // We have already densified up to the last document in each partition.
                 _densifyState = DensifyState::kDensifyDone;
                 return DocumentSource::GetNextResult::makeEOF();
@@ -735,13 +743,13 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::doGetNext() {
 
             return stdx::visit(
                 visit_helper::Overloaded{
-                    [&](Full full) {
+                    [&](Full) {
                         _current = val;
                         _globalMin = val;
                         _densifyState = DensifyState::kNeedGen;
                         return nextDoc;
                     },
-                    [&](Partition partition) {
+                    [&](Partition) {
                         tassert(5734400,
                                 "Partition state must be initialized for partition bounds",
                                 _partitionExpr);
@@ -777,7 +785,7 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::doGetNext() {
 
             return stdx::visit(
                 visit_helper::Overloaded{
-                    [&](Full full) {
+                    [&](Full) {
                         if (_partitionExpr) {
                             // Keep track of '_globalMax' for later. The latest document from the
                             // source is always the max.
@@ -800,7 +808,7 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::doGetNext() {
                         }
                         return handleNeedGen(currentDoc, val);
                     },
-                    [&](Partition partition) {
+                    [&](Partition) {
                         // If we haven't seen this partition before, add it to the table then
                         // return.
                         auto partitionVal = getDensifyPartition(currentDoc);
@@ -845,7 +853,7 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::doGetNext() {
 
             return stdx::visit(
                 visit_helper::Overloaded{
-                    [&](Full full) {
+                    [&](Full) {
                         if (_docGenerator->done()) {
                             _docGenerator = boost::none;
                             if (_eof && _partitionExpr) {
@@ -862,7 +870,7 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::doGetNext() {
                         }
                         return GetNextResult(std::move(generatedDoc));
                     },
-                    [&](Partition partition) {
+                    [&](Partition) {
                         if (_docGenerator->done()) {
                             _docGenerator = boost::none;
                             _densifyState = DensifyState::kNeedGen;

@@ -79,8 +79,8 @@ public:
         spec[kArgStep] = _step;
         spec[kArgBounds] = stdx::visit(
             visit_helper::Overloaded{
-                [&](Full full) { return Value(kValFull); },
-                [&](Partition partition) { return Value(kValPartition); },
+                [&](Full) { return Value(kValFull); },
+                [&](Partition) { return Value(kValPartition); },
                 [&](std::pair<Date_t, Date_t> dates) {
                     return Value(std::vector<Value>({Value(dates.first), Value(dates.second)}));
                 },
@@ -367,14 +367,7 @@ private:
         kDensifyDone
     };
 
-    enum class TypeOfDensify {
-        kFull,
-        kExplicitRange,
-        kPartition,
-    };
-
     DensifyState _densifyState = DensifyState::kUninitializedOrBelowRange;
-    TypeOfDensify _densifyType;
     FieldPath _field;
     std::list<FieldPath> _partitions;
     RangeStatement _range;
