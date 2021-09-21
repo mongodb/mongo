@@ -11,7 +11,7 @@
 
 // For getLatestProfilerEntry and getProfilerProtocolStringForCommand
 load("jstests/libs/profiler.js");
-const conn = MongoRunner.runMongod({setParameter: "maxBSONDepth=8"});
+const conn = MongoRunner.runMongod();
 const testDB = conn.getDB("profile_agg");
 const coll = testDB.getCollection("test");
 

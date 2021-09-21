@@ -5,17 +5,21 @@
 (function() {
 "use strict";
 
-const kTestName = "max_bson_depth_parameter";
+const maxBSONDepth = 21;
 
 // Start mongod with a valid BSON depth, then test that it accepts and rejects command
 // appropriately based on the depth.
-let conn = MongoRunner.runMongod({setParameter: "maxBSONDepth=5"});
-assert.neq(null, conn, "Failed to start mongod");
-let testDB = conn.getDB("test");
+const conn = MongoRunner.runMongod({setParameter: {maxBSONDepth: maxBSONDepth}});
+const testDB = conn.getDB("test");
 
 assert.commandWorked(testDB.runCommand({ping: 1}), "Failed to run a command on the server");
 assert.commandFailedWithCode(
-    testDB.runCommand({find: "coll", filter: {x: {x: {x: {x: {x: {x: 1}}}}}}}),
+    testDB.runCommand({
+        find: "coll",
+        filter: function nestedObj(depth) {
+            return {x: depth > 1 ? nestedObj(depth - 1) : 1};
+        }(maxBSONDepth + 1),
+    }),
     ErrorCodes.Overflow,
     "Expected server to reject command for exceeding the nesting depth limit");
 
@@ -29,19 +33,16 @@ assert.commandWorked(testDB.runCommand({
     cursor: {}
 }));
 assert.commandFailedWithCode(
-        testDB.runCommand({
+    testDB.runCommand(
+        {
             aggregate: "coll1",
-            pipeline: [{
-                $lookup: {
-                    from: "coll2",
-                    as: "as",
-                    pipeline: [{$lookup: {from: "coll2", as: "as", pipeline: []}}]
-                }
-            }],
+            pipeline: function nestedPipeline(depth) {
+                return [{$lookup: {from: "coll2", as: "as", pipeline: depth > 3 ? nestedPipeline(depth - 3) : []}}];
+            }(maxBSONDepth),
             cursor: {}
         }),
-        ErrorCodes.Overflow,
-        "Expected server to reject command for exceeding the nesting depth limit");
+    ErrorCodes.Overflow,
+    "Expected server to reject command for exceeding the nesting depth limit");
 
 // Restart mongod with a negative maximum BSON depth and test that it fails to start.
 MongoRunner.stopMongod(conn);
@@ -50,7 +51,7 @@ assert.throws(() => MongoRunner.runMongod({setParameter: "maxBSONDepth=-4"}),
               [],
               "Expected mongod to fail at startup because depth was negative");
 
-assert.throws(() => MongoRunner.runMongod({setParameter: "maxBSONDepth=1"}),
+assert.throws(() => MongoRunner.runMongod({setParameter: "maxBSONDepth=20"}),
               [],
               "Expected mongod to fail at startup because depth was too low");
 }());
