@@ -101,7 +101,7 @@ bool TopologyManager::onServerDescription(const IsMasterOutcome& isMasterOutcome
         _clockSource, isMasterOutcome, lastRTT, newTopologyVersion);
 
     auto oldTopologyDescription = _topologyDescription;
-    _topologyDescription = TopologyDescription::clone(oldTopologyDescription);
+    _topologyDescription = TopologyDescription::clone(*oldTopologyDescription);
 
     // if we are equal to the old description, just install the new description without
     // performing any actions on the state machine.
@@ -131,7 +131,7 @@ void TopologyManager::onServerRTTUpdated(HostAndPort hostAndPort, IsMasterRTT rt
             auto newServerDescription = (*oldServerDescription)->cloneWithRTT(rtt);
 
             auto oldTopologyDescription = _topologyDescription;
-            _topologyDescription = TopologyDescription::clone(oldTopologyDescription);
+            _topologyDescription = TopologyDescription::clone(*oldTopologyDescription);
             _topologyDescription->installServerDescription(newServerDescription);
 
             _publishTopologyDescriptionChanged(oldTopologyDescription, _topologyDescription);
