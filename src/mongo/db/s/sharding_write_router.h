@@ -37,29 +37,23 @@ class CatalogCache;
 class ChunkManager;
 class OperationContext;
 class ShardId;
-class ReshardingDonorWriteRouter {
+class ShardingWriteRouter {
 public:
-    ReshardingDonorWriteRouter(OperationContext* opCtx,
-                               const NamespaceString& sourceNss,
-                               CatalogCache* catalogCache);
+    ShardingWriteRouter(OperationContext* opCtx,
+                        const NamespaceString& nss,
+                        CatalogCache* catalogCache);
 
-    ReshardingDonorWriteRouter(OperationContext* opCtx,
-                               const NamespaceString& sourceNss,
-                               CatalogCache* catalogCache,
-                               CollectionShardingState* css,
-                               const ScopedCollectionDescription* collDesc);
+    boost::optional<ShardId> getReshardingDestinedRecipient(const BSONObj& fullDocument) const;
 
     CollectionShardingState* getCollectionShardingState() const;
 
-    boost::optional<ShardId> getDestinedRecipient(const BSONObj& fullDocument) const;
-
 private:
-    CollectionShardingState* const _css;
-    const ScopedCollectionDescription* const _collDesc;
+    CollectionShardingState* _css{nullptr};
 
     boost::optional<ScopedCollectionFilter> _ownershipFilter;
-    boost::optional<ShardKeyPattern> _reshardingKeyPattern;
-    boost::optional<ChunkManager> _tempReshardingChunkMgr;
+    boost::optional<ShardKeyPattern> _shardKeyPattern;
+    boost::optional<ShardKeyPattern> _reshardKeyPattern;
+    boost::optional<ChunkManager> _reshardingChunkMgr;
 };
 
 }  // namespace mongo

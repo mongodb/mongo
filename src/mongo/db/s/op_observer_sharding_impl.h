@@ -33,6 +33,8 @@
 
 namespace mongo {
 
+class ShardingWriteRouter;
+
 class OpObserverShardingImpl : public OpObserverImpl {
 public:
     // True if the document being deleted belongs to a chunk which, while still in the shard,
@@ -50,7 +52,7 @@ protected:
                               const NamespaceString nss,
                               const BSONObj& insertedDoc,
                               const repl::OpTime& opTime,
-                              CollectionShardingState* css,
+                              const ShardingWriteRouter& shardingWriteRouter,
                               const bool fromMigrate,
                               const bool inMultiDocumentTransaction) override;
     void shardObserveUpdateOp(OperationContext* opCtx,
@@ -58,27 +60,20 @@ protected:
                               boost::optional<BSONObj> preImageDoc,
                               const BSONObj& updatedDoc,
                               const repl::OpTime& opTime,
-                              CollectionShardingState* css,
+                              const ShardingWriteRouter& shardingWriteRouter,
                               const repl::OpTime& prePostImageOpTime,
                               const bool inMultiDocumentTransaction) override;
     void shardObserveDeleteOp(OperationContext* opCtx,
                               const NamespaceString nss,
                               const BSONObj& documentKey,
                               const repl::OpTime& opTime,
-                              CollectionShardingState* css,
+                              const ShardingWriteRouter& shardingWriteRouter,
                               const repl::OpTime& preImageOpTime,
                               const bool inMultiDocumentTransaction) override;
     void shardObserveTransactionPrepareOrUnpreparedCommit(
         OperationContext* opCtx,
         const std::vector<repl::ReplOperation>& stmts,
         const repl::OpTime& prepareOrCommitOptime) override;
-
-    void shardAnnotateOplogEntry(OperationContext* opCtx,
-                                 const NamespaceString nss,
-                                 const BSONObj& doc,
-                                 repl::DurableReplOperation& op,
-                                 CollectionShardingState* css,
-                                 const ScopedCollectionDescription& collDesc) override;
 };
 
 }  // namespace mongo

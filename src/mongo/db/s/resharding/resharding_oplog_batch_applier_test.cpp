@@ -73,6 +73,10 @@ public:
         ServiceContextMongoDTest::setUp();
 
         auto serviceContext = getServiceContext();
+
+        // Initialize sharding components as a shard server.
+        serverGlobalParams.clusterRole = ClusterRole::ShardServer;
+
         {
             auto opCtx = makeOperationContext();
             auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(serviceContext);

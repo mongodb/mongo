@@ -74,6 +74,9 @@ protected:
 
     DBDirectClient* getDBClient() const;
 
+protected:
+    void setupOpObservers() override;
+
 private:
     VectorClock* _clock;
     std::shared_ptr<ClockSourceMock> _mockClockSource = std::make_shared<ClockSourceMock>();
