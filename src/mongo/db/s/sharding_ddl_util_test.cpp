@@ -217,7 +217,7 @@ TEST_F(ShardingDDLUtilTest, ShardedRenamePreconditionsAreMet) {
     sharding_ddl_util::checkShardedRenamePreconditions(opCtx, kToNss, false /* dropTarget */);
 
     // Initialize a chunk
-    ChunkVersion chunkVersion(1, 1, OID::gen(), boost::none);
+    ChunkVersion chunkVersion(1, 1, OID::gen(), Timestamp(2, 1));
     ChunkType chunk;
     chunk.setName(OID::gen());
     chunk.setCollectionUUID(UUID::gen());
@@ -237,7 +237,7 @@ TEST_F(ShardingDDLUtilTest, ShardedRenamePreconditionsTargetCollectionExists) {
     auto opCtx = operationContext();
 
     // Initialize a chunk
-    ChunkVersion chunkVersion(1, 1, OID::gen(), boost::none);
+    ChunkVersion chunkVersion(1, 1, OID::gen(), Timestamp(2, 1));
     ChunkType chunk;
     chunk.setName(OID::gen());
     chunk.setCollectionUUID(UUID::gen());

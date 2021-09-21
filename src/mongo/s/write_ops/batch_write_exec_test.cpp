@@ -85,6 +85,7 @@ BSONObj expectInsertsReturnStaleVersionErrorsBase(const NamespaceString& nss,
     staleResponse.setN(0);
 
     auto epoch = OID::gen();
+    Timestamp timestamp(1);
 
     // Report a stale version error for each write in the batch.
     int i = 0;
@@ -93,8 +94,8 @@ BSONObj expectInsertsReturnStaleVersionErrorsBase(const NamespaceString& nss,
         error->setStatus({ErrorCodes::StaleShardVersion, ""});
         error->setErrInfo([&] {
             StaleConfigInfo sci(nss,
-                                ChunkVersion(1, 0, epoch, boost::none /* timestamp */),
-                                ChunkVersion(2, 0, epoch, boost::none /* timestamp */),
+                                ChunkVersion(1, 0, epoch, timestamp),
+                                ChunkVersion(2, 0, epoch, timestamp),
                                 ShardId(kShardName1));
             BSONObjBuilder builder;
             sci.serialize(&builder);
@@ -280,9 +281,8 @@ public:
 
     MockNSTargeter singleShardNSTargeter{
         nss,
-        {MockRange(ShardEndpoint(kShardName1,
-                                 ChunkVersion(100, 200, OID::gen(), boost::none /* timestamp */),
-                                 boost::none),
+        {MockRange(ShardEndpoint(
+                       kShardName1, ChunkVersion(100, 200, OID::gen(), Timestamp()), boost::none),
                    BSON("x" << MINKEY),
                    BSON("x" << MAXKEY))}};
 };
@@ -344,6 +344,7 @@ TEST_F(BatchWriteExecTest, SingleUpdateTargetsShardWithLet) {
     updateRequest.setWriteConcern(BSONObj());
 
     const static auto epoch = OID::gen();
+    const static Timestamp timestamp(2);
 
     class MultiShardTargeter : public MockNSTargeter {
     public:
@@ -352,24 +353,20 @@ TEST_F(BatchWriteExecTest, SingleUpdateTargetsShardWithLet) {
         std::vector<ShardEndpoint> targetUpdate(OperationContext* opCtx,
                                                 const BatchItemRef& itemRef) const override {
             return std::vector{
-                ShardEndpoint(kShardName2,
-                              ChunkVersion(101, 200, epoch, boost::none /* timestamp */),
-                              boost::none)};
+                ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch, timestamp), boost::none)};
         }
     };
 
     MultiShardTargeter multiShardNSTargeter(
         nss,
-        {MockRange(ShardEndpoint(kShardName1,
-                                 ChunkVersion(100, 200, epoch, boost::none /* timestamp */),
-                                 boost::none),
-                   BSON("x" << MINKEY),
-                   BSON("x" << 0)),
-         MockRange(ShardEndpoint(kShardName2,
-                                 ChunkVersion(101, 200, epoch, boost::none /* timestamp */),
-                                 boost::none),
-                   BSON("x" << 0),
-                   BSON("x" << MAXKEY))});
+        {MockRange(
+             ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch, timestamp), boost::none),
+             BSON("x" << MINKEY),
+             BSON("x" << 0)),
+         MockRange(
+             ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch, timestamp), boost::none),
+             BSON("x" << 0),
+             BSON("x" << MAXKEY))});
 
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
@@ -441,25 +438,21 @@ TEST_F(BatchWriteExecTest, SingleDeleteTargetsShardWithLet) {
     protected:
         std::vector<ShardEndpoint> targetDelete(OperationContext* opCtx,
                                                 const BatchItemRef& itemRef) const override {
-            return std::vector{
-                ShardEndpoint(kShardName2,
-                              ChunkVersion(101, 200, epoch, boost::none /* timestamp */),
-                              boost::none)};
+            return std::vector{ShardEndpoint(
+                kShardName2, ChunkVersion(101, 200, epoch, Timestamp()), boost::none)};
         }
     };
 
     MultiShardTargeter multiShardNSTargeter(
         nss,
-        {MockRange(ShardEndpoint(kShardName1,
-                                 ChunkVersion(100, 200, epoch, boost::none /* timestamp */),
-                                 boost::none),
-                   BSON("x" << MINKEY),
-                   BSON("x" << 0)),
-         MockRange(ShardEndpoint(kShardName2,
-                                 ChunkVersion(101, 200, epoch, boost::none /* timestamp */),
-                                 boost::none),
-                   BSON("x" << 0),
-                   BSON("x" << MAXKEY))});
+        {MockRange(
+             ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch, Timestamp()), boost::none),
+             BSON("x" << MINKEY),
+             BSON("x" << 0)),
+         MockRange(
+             ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch, Timestamp()), boost::none),
+             BSON("x" << 0),
+             BSON("x" << MAXKEY))});
 
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
@@ -606,9 +599,9 @@ TEST_F(BatchWriteExecTest, MultiOpLargeUnorderedWithStaleShardVersionError) {
         ASSERT_EQ(kNumDocsToInsert, response.getN());
     });
 
-    expectInsertsReturnStaleVersionErrors({docsToInsert.begin(), docsToInsert.begin() + 63791});
-    expectInsertsReturnSuccess({docsToInsert.begin(), docsToInsert.begin() + 63791});
-    expectInsertsReturnSuccess({docsToInsert.begin() + 63791, docsToInsert.end()});
+    expectInsertsReturnStaleVersionErrors({docsToInsert.begin(), docsToInsert.begin() + 60133});
+    expectInsertsReturnSuccess({docsToInsert.begin(), docsToInsert.begin() + 60133});
+    expectInsertsReturnSuccess({docsToInsert.begin() + 60133, docsToInsert.end()});
 
     future.default_timed_get();
 }
@@ -629,6 +622,7 @@ TEST_F(BatchWriteExecTest, StaleShardVersionReturnedFromBatchWithSingleMultiWrit
     request.setWriteConcern(BSONObj());
 
     const static auto epoch = OID::gen();
+    const static Timestamp timestamp(2);
 
     class MultiShardTargeter : public MockNSTargeter {
     public:
@@ -637,27 +631,21 @@ TEST_F(BatchWriteExecTest, StaleShardVersionReturnedFromBatchWithSingleMultiWrit
         std::vector<ShardEndpoint> targetUpdate(OperationContext* opCtx,
                                                 const BatchItemRef& itemRef) const override {
             return std::vector{
-                ShardEndpoint(kShardName1,
-                              ChunkVersion(100, 200, epoch, boost::none /* timestamp */),
-                              boost::none),
-                ShardEndpoint(kShardName2,
-                              ChunkVersion(101, 200, epoch, boost::none /* timestamp */),
-                              boost::none)};
+                ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch, timestamp), boost::none),
+                ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch, timestamp), boost::none)};
         }
     };
 
     MultiShardTargeter multiShardNSTargeter(
         nss,
-        {MockRange(ShardEndpoint(kShardName1,
-                                 ChunkVersion(100, 200, epoch, boost::none /* timestamp */),
-                                 boost::none),
-                   BSON("x" << MINKEY),
-                   BSON("x" << 0)),
-         MockRange(ShardEndpoint(kShardName2,
-                                 ChunkVersion(101, 200, epoch, boost::none /* timestamp */),
-                                 boost::none),
-                   BSON("x" << 0),
-                   BSON("x" << MAXKEY))});
+        {MockRange(
+             ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch, timestamp), boost::none),
+             BSON("x" << MINKEY),
+             BSON("x" << 0)),
+         MockRange(
+             ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch, timestamp), boost::none),
+             BSON("x" << 0),
+             BSON("x" << MAXKEY))});
 
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
@@ -689,12 +677,11 @@ TEST_F(BatchWriteExecTest, StaleShardVersionReturnedFromBatchWithSingleMultiWrit
             errDetail->setIndex(0);
             errDetail->setStatus({ErrorCodes::StaleShardVersion, "Stale shard version"});
             errDetail->setErrInfo([&] {
-                Status ssvStatus(
-                    StaleConfigInfo(nss,
-                                    ChunkVersion(101, 200, epoch, boost::none /* timestamp */),
-                                    ChunkVersion(105, 200, epoch, boost::none /* timestamp */),
-                                    ShardId(kShardName2)),
-                    "Stale shard version");
+                Status ssvStatus(StaleConfigInfo(nss,
+                                                 ChunkVersion(101, 200, epoch, timestamp),
+                                                 ChunkVersion(105, 200, epoch, timestamp),
+                                                 ShardId(kShardName2)),
+                                 "Stale shard version");
                 BSONObjBuilder builder;
                 ssvStatus.serializeErrorToBSON(&builder);
                 return builder.obj();
@@ -741,6 +728,7 @@ TEST_F(BatchWriteExecTest,
     request.setWriteConcern(BSONObj());
 
     const static auto epoch = OID::gen();
+    const static Timestamp timestamp(2);
 
     // This allows the batch to target each write operation
     // to a specific shard (kShardName2), to perform this test
@@ -751,27 +739,21 @@ TEST_F(BatchWriteExecTest,
         std::vector<ShardEndpoint> targetUpdate(OperationContext* opCtx,
                                                 const BatchItemRef& itemRef) const override {
             return std::vector{
-                ShardEndpoint(kShardName1,
-                              ChunkVersion(100, 200, epoch, boost::none /* timestamp */),
-                              boost::none),
-                ShardEndpoint(kShardName2,
-                              ChunkVersion(101, 200, epoch, boost::none /* timestamp */),
-                              boost::none)};
+                ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch, timestamp), boost::none),
+                ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch, timestamp), boost::none)};
         }
     };
 
     MultiShardTargeter multiShardNSTargeter(
         nss,
-        {MockRange(ShardEndpoint(kShardName1,
-                                 ChunkVersion(100, 200, epoch, boost::none /* timestamp */),
-                                 boost::none),
-                   BSON("sk" << MINKEY),
-                   BSON("sk" << 10)),
-         MockRange(ShardEndpoint(kShardName2,
-                                 ChunkVersion(101, 200, epoch, boost::none /* timestamp */),
-                                 boost::none),
-                   BSON("sk" << 10),
-                   BSON("sk" << MAXKEY))});
+        {MockRange(
+             ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch, timestamp), boost::none),
+             BSON("sk" << MINKEY),
+             BSON("sk" << 10)),
+         MockRange(
+             ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch, timestamp), boost::none),
+             BSON("sk" << 10),
+             BSON("sk" << MAXKEY))});
 
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
@@ -803,12 +785,11 @@ TEST_F(BatchWriteExecTest,
             errDetail->setIndex(0);
             errDetail->setStatus({ErrorCodes::StaleShardVersion, "Stale shard version"});
             errDetail->setErrInfo([&] {
-                Status ssvStatus(
-                    StaleConfigInfo(nss,
-                                    ChunkVersion(101, 200, epoch, boost::none /* timestamp */),
-                                    ChunkVersion(105, 200, epoch, boost::none /* timestamp */),
-                                    ShardId(kShardName2)),
-                    "Stale shard version");
+                Status ssvStatus(StaleConfigInfo(nss,
+                                                 ChunkVersion(101, 200, epoch, timestamp),
+                                                 ChunkVersion(105, 200, epoch, timestamp),
+                                                 ShardId(kShardName2)),
+                                 "Stale shard version");
                 BSONObjBuilder builder;
                 ssvStatus.serializeErrorToBSON(&builder);
                 return builder.obj();
@@ -820,12 +801,11 @@ TEST_F(BatchWriteExecTest,
             errDetail->setIndex(1);
             errDetail->setStatus({ErrorCodes::StaleShardVersion, "Stale shard version"});
             errDetail->setErrInfo([&] {
-                Status ssvStatus(
-                    StaleConfigInfo(nss,
-                                    ChunkVersion(101, 200, epoch, boost::none /* timestamp */),
-                                    ChunkVersion(105, 200, epoch, boost::none /* timestamp */),
-                                    ShardId(kShardName2)),
-                    "Stale shard version");
+                Status ssvStatus(StaleConfigInfo(nss,
+                                                 ChunkVersion(101, 200, epoch, timestamp),
+                                                 ChunkVersion(105, 200, epoch, timestamp),
+                                                 ShardId(kShardName2)),
+                                 "Stale shard version");
                 BSONObjBuilder builder;
                 ssvStatus.serializeErrorToBSON(&builder);
                 return builder.obj();
@@ -871,6 +851,7 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromMultiWriteWithShard1Firs) {
     request.setWriteConcern(BSONObj());
 
     const static auto epoch = OID::gen();
+    const static Timestamp timestamp(2);
 
     // This allows the batch to target each write operation
     // to a specific shard (kShardName2), to perform this test
@@ -881,27 +862,21 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromMultiWriteWithShard1Firs) {
         std::vector<ShardEndpoint> targetUpdate(OperationContext* opCtx,
                                                 const BatchItemRef& itemRef) const override {
             return std::vector{
-                ShardEndpoint(kShardName1,
-                              ChunkVersion(100, 200, epoch, boost::none /* timestamp */),
-                              boost::none),
-                ShardEndpoint(kShardName2,
-                              ChunkVersion(101, 200, epoch, boost::none /* timestamp */),
-                              boost::none)};
+                ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch, timestamp), boost::none),
+                ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch, timestamp), boost::none)};
         }
     };
 
     MultiShardTargeter multiShardNSTargeter(
         nss,
-        {MockRange(ShardEndpoint(kShardName1,
-                                 ChunkVersion(100, 200, epoch, boost::none /* timestamp */),
-                                 boost::none),
-                   BSON("sk" << MINKEY),
-                   BSON("sk" << 10)),
-         MockRange(ShardEndpoint(kShardName2,
-                                 ChunkVersion(101, 200, epoch, boost::none /* timestamp */),
-                                 boost::none),
-                   BSON("sk" << 10),
-                   BSON("sk" << MAXKEY))});
+        {MockRange(
+             ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch, timestamp), boost::none),
+             BSON("sk" << MINKEY),
+             BSON("sk" << 10)),
+         MockRange(
+             ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch, timestamp), boost::none),
+             BSON("sk" << 10),
+             BSON("sk" << MAXKEY))});
 
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
@@ -923,12 +898,11 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromMultiWriteWithShard1Firs) {
             errDetail->setIndex(1);
             errDetail->setStatus({ErrorCodes::StaleShardVersion, "Stale shard version"});
             errDetail->setErrInfo([&] {
-                Status ssvStatus(
-                    StaleConfigInfo(nss,
-                                    ChunkVersion(101, 200, epoch, boost::none /* timestamp */),
-                                    ChunkVersion(105, 200, epoch, boost::none /* timestamp */),
-                                    ShardId(kShardName1)),
-                    "Stale shard version");
+                Status ssvStatus(StaleConfigInfo(nss,
+                                                 ChunkVersion(101, 200, epoch, timestamp),
+                                                 ChunkVersion(105, 200, epoch, timestamp),
+                                                 ShardId(kShardName1)),
+                                 "Stale shard version");
                 BSONObjBuilder builder;
                 ssvStatus.serializeErrorToBSON(&builder);
                 return builder.obj();
@@ -950,12 +924,11 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromMultiWriteWithShard1Firs) {
             errDetail->setIndex(0);
             errDetail->setStatus({ErrorCodes::StaleShardVersion, "Stale shard version"});
             errDetail->setErrInfo([&] {
-                Status ssvStatus(
-                    StaleConfigInfo(nss,
-                                    ChunkVersion(101, 200, epoch, boost::none /* timestamp */),
-                                    ChunkVersion(105, 200, epoch, boost::none /* timestamp */),
-                                    ShardId(kShardName2)),
-                    "Stale shard version");
+                Status ssvStatus(StaleConfigInfo(nss,
+                                                 ChunkVersion(101, 200, epoch, timestamp),
+                                                 ChunkVersion(105, 200, epoch, timestamp),
+                                                 ShardId(kShardName2)),
+                                 "Stale shard version");
                 BSONObjBuilder builder;
                 ssvStatus.serializeErrorToBSON(&builder);
                 return builder.obj();
@@ -1012,6 +985,7 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromMultiWriteWithShard1FirstOK
     request.setWriteConcern(BSONObj());
 
     const static auto epoch = OID::gen();
+    const static Timestamp timestamp(2);
 
     // This allows the batch to target each write operation
     // to a specific shard (kShardName2), to perform this test
@@ -1022,27 +996,21 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromMultiWriteWithShard1FirstOK
         std::vector<ShardEndpoint> targetUpdate(OperationContext* opCtx,
                                                 const BatchItemRef& itemRef) const override {
             return std::vector{
-                ShardEndpoint(kShardName1,
-                              ChunkVersion(100, 200, epoch, boost::none /* timestamp */),
-                              boost::none),
-                ShardEndpoint(kShardName2,
-                              ChunkVersion(101, 200, epoch, boost::none /* timestamp */),
-                              boost::none)};
+                ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch, timestamp), boost::none),
+                ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch, timestamp), boost::none)};
         }
     };
 
     MultiShardTargeter multiShardNSTargeter(
         nss,
-        {MockRange(ShardEndpoint(kShardName1,
-                                 ChunkVersion(100, 200, epoch, boost::none /* timestamp */),
-                                 boost::none),
-                   BSON("sk" << MINKEY),
-                   BSON("sk" << 10)),
-         MockRange(ShardEndpoint(kShardName2,
-                                 ChunkVersion(101, 200, epoch, boost::none /* timestamp */),
-                                 boost::none),
-                   BSON("sk" << 10),
-                   BSON("sk" << MAXKEY))});
+        {MockRange(
+             ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch, timestamp), boost::none),
+             BSON("sk" << MINKEY),
+             BSON("sk" << 10)),
+         MockRange(
+             ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch, timestamp), boost::none),
+             BSON("sk" << 10),
+             BSON("sk" << MAXKEY))});
 
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
@@ -1064,12 +1032,11 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromMultiWriteWithShard1FirstOK
             errDetail->setIndex(1);
             errDetail->setStatus({ErrorCodes::StaleShardVersion, "Stale shard version"});
             errDetail->setErrInfo([&] {
-                Status ssvStatus(
-                    StaleConfigInfo(nss,
-                                    ChunkVersion(101, 200, epoch, boost::none /* timestamp */),
-                                    ChunkVersion(105, 200, epoch, boost::none /* timestamp */),
-                                    ShardId(kShardName1)),
-                    "Stale shard version");
+                Status ssvStatus(StaleConfigInfo(nss,
+                                                 ChunkVersion(101, 200, epoch, timestamp),
+                                                 ChunkVersion(105, 200, epoch, timestamp),
+                                                 ShardId(kShardName1)),
+                                 "Stale shard version");
                 BSONObjBuilder builder;
                 ssvStatus.serializeErrorToBSON(&builder);
                 return builder.obj();
@@ -1091,12 +1058,11 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromMultiWriteWithShard1FirstOK
             errDetail->setIndex(1);
             errDetail->setStatus({ErrorCodes::StaleShardVersion, "Stale shard version"});
             errDetail->setErrInfo([&] {
-                Status ssvStatus(
-                    StaleConfigInfo(nss,
-                                    ChunkVersion(101, 200, epoch, boost::none /* timestamp */),
-                                    ChunkVersion(105, 200, epoch, boost::none /* timestamp */),
-                                    ShardId(kShardName2)),
-                    "Stale shard version");
+                Status ssvStatus(StaleConfigInfo(nss,
+                                                 ChunkVersion(101, 200, epoch, timestamp),
+                                                 ChunkVersion(105, 200, epoch, timestamp),
+                                                 ShardId(kShardName2)),
+                                 "Stale shard version");
                 BSONObjBuilder builder;
                 ssvStatus.serializeErrorToBSON(&builder);
                 return builder.obj();
@@ -1149,6 +1115,7 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromWriteWithShard1SSVShard2OK)
     request.setWriteConcern(BSONObj());
 
     const static auto epoch = OID::gen();
+    const static Timestamp timestamp(2);
 
     // This allows the batch to target each write operation to perform this test
     class MultiShardTargeter : public MockNSTargeter {
@@ -1159,17 +1126,13 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromWriteWithShard1SSVShard2OK)
                                                 const BatchItemRef& itemRef) const override {
             if (targetAll) {
                 return std::vector{
-                    ShardEndpoint(kShardName1,
-                                  ChunkVersion(100, 200, epoch, boost::none /* timestamp */),
-                                  boost::none),
-                    ShardEndpoint(kShardName2,
-                                  ChunkVersion(101, 200, epoch, boost::none /* timestamp */),
-                                  boost::none)};
+                    ShardEndpoint(
+                        kShardName1, ChunkVersion(100, 200, epoch, timestamp), boost::none),
+                    ShardEndpoint(
+                        kShardName2, ChunkVersion(101, 200, epoch, timestamp), boost::none)};
             } else {
-                return std::vector{
-                    ShardEndpoint(kShardName2,
-                                  ChunkVersion(101, 200, epoch, boost::none /* timestamp */),
-                                  boost::none)};
+                return std::vector{ShardEndpoint(
+                    kShardName2, ChunkVersion(101, 200, epoch, timestamp), boost::none)};
             }
         }
 
@@ -1178,16 +1141,14 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromWriteWithShard1SSVShard2OK)
 
     MultiShardTargeter multiShardNSTargeter(
         nss,
-        {MockRange(ShardEndpoint(kShardName1,
-                                 ChunkVersion(100, 200, epoch, boost::none /* timestamp */),
-                                 boost::none),
-                   BSON("sk" << MINKEY),
-                   BSON("sk" << 10)),
-         MockRange(ShardEndpoint(kShardName2,
-                                 ChunkVersion(101, 200, epoch, boost::none /* timestamp */),
-                                 boost::none),
-                   BSON("sk" << 10),
-                   BSON("sk" << MAXKEY))});
+        {MockRange(
+             ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch, timestamp), boost::none),
+             BSON("sk" << MINKEY),
+             BSON("sk" << 10)),
+         MockRange(
+             ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch, timestamp), boost::none),
+             BSON("sk" << 10),
+             BSON("sk" << MAXKEY))});
 
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
@@ -1210,12 +1171,11 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromWriteWithShard1SSVShard2OK)
             errDetail->setIndex(0);
             errDetail->setStatus({ErrorCodes::StaleShardVersion, "Stale shard version"});
             errDetail->setErrInfo([&] {
-                Status ssvStatus(
-                    StaleConfigInfo(nss,
-                                    ChunkVersion(101, 200, epoch, boost::none /* timestamp */),
-                                    ChunkVersion(105, 200, epoch, boost::none /* timestamp */),
-                                    ShardId(kShardName1)),
-                    "Migration happened");
+                Status ssvStatus(StaleConfigInfo(nss,
+                                                 ChunkVersion(101, 200, epoch, timestamp),
+                                                 ChunkVersion(105, 200, epoch, timestamp),
+                                                 ShardId(kShardName1)),
+                                 "Migration happened");
                 BSONObjBuilder builder;
                 ssvStatus.serializeErrorToBSON(&builder);
                 return builder.obj();
@@ -1731,6 +1691,7 @@ TEST_F(BatchWriteExecTargeterErrorTest, TargetedFailedAndErrorResponse) {
     request.setWriteConcern(BSONObj());
 
     const static auto epoch = OID::gen();
+    const static Timestamp timestamp(2);
 
     class MultiShardTargeter : public MockNSTargeter {
     public:
@@ -1739,27 +1700,21 @@ TEST_F(BatchWriteExecTargeterErrorTest, TargetedFailedAndErrorResponse) {
         std::vector<ShardEndpoint> targetUpdate(OperationContext* opCtx,
                                                 const BatchItemRef& itemRef) const override {
             return std::vector{
-                ShardEndpoint(kShardName1,
-                              ChunkVersion(100, 200, epoch, boost::none /* timestamp */),
-                              boost::none),
-                ShardEndpoint(kShardName2,
-                              ChunkVersion(101, 200, epoch, boost::none /* timestamp */),
-                              boost::none)};
+                ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch, timestamp), boost::none),
+                ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch, timestamp), boost::none)};
         }
     };
 
     MultiShardTargeter multiShardNSTargeter(
         nss,
-        {MockRange(ShardEndpoint(kShardName1,
-                                 ChunkVersion(100, 200, epoch, boost::none /* timestamp */),
-                                 boost::none),
-                   BSON("x" << MINKEY),
-                   BSON("x" << 0)),
-         MockRange(ShardEndpoint(kShardName2,
-                                 ChunkVersion(101, 200, epoch, boost::none /* timestamp */),
-                                 boost::none),
-                   BSON("x" << 0),
-                   BSON("x" << MAXKEY))});
+        {MockRange(
+             ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch, timestamp), boost::none),
+             BSON("x" << MINKEY),
+             BSON("x" << 0)),
+         MockRange(
+             ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch, timestamp), boost::none),
+             BSON("x" << 0),
+             BSON("x" << MAXKEY))});
 
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
@@ -1879,6 +1834,7 @@ TEST_F(BatchWriteExecTransactionTargeterErrorTest, TargetedFailedAndErrorRespons
     request.setWriteConcern(BSONObj());
 
     const static auto epoch = OID::gen();
+    const static Timestamp timestamp(2);
 
     class MultiShardTargeter : public MockNSTargeter {
     public:
@@ -1887,27 +1843,21 @@ TEST_F(BatchWriteExecTransactionTargeterErrorTest, TargetedFailedAndErrorRespons
         std::vector<ShardEndpoint> targetUpdate(OperationContext* opCtx,
                                                 const BatchItemRef& itemRef) const override {
             return std::vector{
-                ShardEndpoint(kShardName1,
-                              ChunkVersion(100, 200, epoch, boost::none /* timestamp */),
-                              boost::none),
-                ShardEndpoint(kShardName2,
-                              ChunkVersion(101, 200, epoch, boost::none /* timestamp */),
-                              boost::none)};
+                ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch, timestamp), boost::none),
+                ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch, timestamp), boost::none)};
         }
     };
 
     MultiShardTargeter multiShardNSTargeter(
         nss,
-        {MockRange(ShardEndpoint(kShardName1,
-                                 ChunkVersion(100, 200, epoch, boost::none /* timestamp */),
-                                 boost::none),
-                   BSON("x" << MINKEY),
-                   BSON("x" << 0)),
-         MockRange(ShardEndpoint(kShardName2,
-                                 ChunkVersion(101, 200, epoch, boost::none /* timestamp */),
-                                 boost::none),
-                   BSON("x" << 0),
-                   BSON("x" << MAXKEY))});
+        {MockRange(
+             ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch, timestamp), boost::none),
+             BSON("x" << MINKEY),
+             BSON("x" << 0)),
+         MockRange(
+             ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch, timestamp), boost::none),
+             BSON("x" << 0),
+             BSON("x" << MAXKEY))});
 
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
@@ -2030,6 +1980,7 @@ TEST_F(BatchWriteExecTransactionMultiShardTest, TargetedSucceededAndErrorRespons
     request.setWriteConcern(BSONObj());
 
     const static auto epoch = OID::gen();
+    const static Timestamp timestamp(2);
 
     class MultiShardTargeter : public MockNSTargeter {
     public:
@@ -2038,27 +1989,21 @@ TEST_F(BatchWriteExecTransactionMultiShardTest, TargetedSucceededAndErrorRespons
         std::vector<ShardEndpoint> targetUpdate(OperationContext* opCtx,
                                                 const BatchItemRef& itemRef) const override {
             return std::vector{
-                ShardEndpoint(kShardName1,
-                              ChunkVersion(100, 200, epoch, boost::none /* timestamp */),
-                              boost::none),
-                ShardEndpoint(kShardName2,
-                              ChunkVersion(101, 200, epoch, boost::none /* timestamp */),
-                              boost::none)};
+                ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch, timestamp), boost::none),
+                ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch, timestamp), boost::none)};
         }
     };
 
     MultiShardTargeter multiShardNSTargeter(
         nss,
-        {MockRange(ShardEndpoint(kShardName1,
-                                 ChunkVersion(100, 200, epoch, boost::none /* timestamp */),
-                                 boost::none),
-                   BSON("x" << MINKEY),
-                   BSON("x" << 0)),
-         MockRange(ShardEndpoint(kShardName2,
-                                 ChunkVersion(101, 200, epoch, boost::none /* timestamp */),
-                                 boost::none),
-                   BSON("x" << 0),
-                   BSON("x" << MAXKEY))});
+        {MockRange(
+             ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch, timestamp), boost::none),
+             BSON("x" << MINKEY),
+             BSON("x" << 0)),
+         MockRange(
+             ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch, timestamp), boost::none),
+             BSON("x" << 0),
+             BSON("x" << MAXKEY))});
 
     auto future = launchAsync([&] {
         BatchedCommandResponse response;

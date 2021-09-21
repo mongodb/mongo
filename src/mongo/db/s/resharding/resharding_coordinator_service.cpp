@@ -831,7 +831,6 @@ ReshardingCoordinatorExternalStateImpl::calculateParticipantShardsAndChunks(
 
     if (const auto& chunks = coordinatorDoc.getPresetReshardedChunks()) {
         auto version = calculateChunkVersionForInitialChunks(opCtx);
-        invariant(version.getTimestamp());
 
         // Use the provided shardIds from presetReshardedChunks to construct the
         // recipient list.

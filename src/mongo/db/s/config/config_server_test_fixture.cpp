@@ -342,12 +342,11 @@ void ConfigServerTestFixture::setupCollection(const NamespaceString& nss,
     }
 }
 
-StatusWith<ChunkType> ConfigServerTestFixture::getChunkDoc(
-    OperationContext* opCtx,
-    const UUID& uuid,
-    const BSONObj& minKey,
-    const OID& collEpoch,
-    const boost::optional<Timestamp>& collTimestamp) {
+StatusWith<ChunkType> ConfigServerTestFixture::getChunkDoc(OperationContext* opCtx,
+                                                           const UUID& uuid,
+                                                           const BSONObj& minKey,
+                                                           const OID& collEpoch,
+                                                           const Timestamp& collTimestamp) {
 
     const auto query = BSON(ChunkType::collectionUUID() << uuid << ChunkType::min(minKey));
     auto doc = findOneOnConfigCollection(opCtx, ChunkType::ConfigNS, query);
@@ -357,11 +356,10 @@ StatusWith<ChunkType> ConfigServerTestFixture::getChunkDoc(
     return ChunkType::fromConfigBSON(doc.getValue(), collEpoch, collTimestamp);
 }
 
-StatusWith<ChunkType> ConfigServerTestFixture::getChunkDoc(
-    OperationContext* opCtx,
-    const BSONObj& minKey,
-    const OID& collEpoch,
-    const boost::optional<Timestamp>& collTimestamp) {
+StatusWith<ChunkType> ConfigServerTestFixture::getChunkDoc(OperationContext* opCtx,
+                                                           const BSONObj& minKey,
+                                                           const OID& collEpoch,
+                                                           const Timestamp& collTimestamp) {
     auto doc = findOneOnConfigCollection(opCtx, ChunkType::ConfigNS, BSON(ChunkType::min(minKey)));
     if (!doc.isOK())
         return doc.getStatus();
@@ -378,7 +376,6 @@ StatusWith<ChunkVersion> ConfigServerTestFixture::getCollectionVersion(Operation
 
     const CollectionType coll(collectionDoc.getValue());
 
-    invariant(coll.getTimestamp());
     auto chunkDoc =
         findOneOnConfigCollection(opCtx,
                                   ChunkType::ConfigNS,

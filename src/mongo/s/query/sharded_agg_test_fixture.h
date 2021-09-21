@@ -78,8 +78,9 @@ public:
 
     std::vector<ChunkType> makeChunks(const UUID& uuid,
                                       const OID epoch,
+                                      const Timestamp timestamp,
                                       std::vector<std::pair<ChunkRange, ShardId>> chunkInfos) {
-        ChunkVersion version(1, 0, epoch, boost::none /* timestamp */);
+        ChunkVersion version(1, 0, epoch, timestamp);
         std::vector<ChunkType> chunks;
         for (auto&& pair : chunkInfos) {
             chunks.emplace_back(uuid, pair.first, version, pair.second);
@@ -91,13 +92,15 @@ public:
 
     void loadRoutingTable(NamespaceString nss,
                           const OID epoch,
+                          const Timestamp timestamp,
                           const ShardKeyPattern& shardKey,
                           const std::vector<ChunkType>& chunkDistribution) {
         auto future = scheduleRoutingInfoUnforcedRefresh(nss);
 
         // Mock the expected config server queries.
         expectGetDatabase(nss);
-        expectCollectionAndChunksAggregation(nss, epoch, UUID::gen(), shardKey, chunkDistribution);
+        expectCollectionAndChunksAggregation(
+            nss, epoch, timestamp, UUID::gen(), shardKey, chunkDistribution);
 
         const auto cm = future.default_timed_get();
         ASSERT(cm->isSharded());

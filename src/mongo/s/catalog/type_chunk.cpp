@@ -312,7 +312,7 @@ StatusWith<ChunkType> ChunkType::parseFromConfigBSONCommand(const BSONObj& sourc
 
 StatusWith<ChunkType> ChunkType::fromConfigBSON(const BSONObj& source,
                                                 const OID& epoch,
-                                                const boost::optional<Timestamp>& timestamp) {
+                                                const Timestamp& timestamp) {
     StatusWith<ChunkType> chunkStatus = parseFromConfigBSONCommand(source);
     if (!chunkStatus.isOK()) {
         return chunkStatus.getStatus();
@@ -331,10 +331,8 @@ StatusWith<ChunkType> ChunkType::fromConfigBSON(const BSONObj& source,
     }
 
     const ChunkVersion& version = chunk.getVersion();
-    if (version.epoch() == OID()) {
-        chunk.setVersion(
-            ChunkVersion(version.majorVersion(), version.minorVersion(), epoch, timestamp));
-    }
+    chunk.setVersion(
+        ChunkVersion(version.majorVersion(), version.minorVersion(), epoch, timestamp));
 
     return chunk;
 }
@@ -362,7 +360,7 @@ BSONObj ChunkType::toConfigBSON() const {
 
 StatusWith<ChunkType> ChunkType::fromShardBSON(const BSONObj& source,
                                                const OID& epoch,
-                                               const boost::optional<Timestamp>& timestamp) {
+                                               const Timestamp& timestamp) {
     ChunkType chunk;
 
     {

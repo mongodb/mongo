@@ -105,11 +105,7 @@ structs:
                               collection was created or it's shard key last refined. Because
                               timestamps are comparable, we are able to define a total order in time
                               in the collection. This field will replace Epoch, which are not
-                              comparable.
-
-                              It is optional for parsing purposes, because in versions of MongoDB
-                              prior to 5.0, this value wasn't being written."
-                optional: true
+                              comparable."
             uuid:
                 type: uuid
                 description: "The UUID that will be used to create the local collection on each of

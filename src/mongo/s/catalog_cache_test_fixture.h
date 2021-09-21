@@ -127,10 +127,12 @@ protected:
     void expectGetDatabase(NamespaceString nss, std::string primaryShard = "0");
     void expectGetCollection(NamespaceString nss,
                              OID epoch,
+                             Timestamp timestamp,
                              UUID uuid,
                              const ShardKeyPattern& shardKeyPattern);
     void expectCollectionAndChunksAggregation(NamespaceString nss,
                                               OID epoch,
+                                              Timestamp timestamp,
                                               UUID uuid,
                                               const ShardKeyPattern& shardKeyPattern,
                                               const std::vector<ChunkType>& chunks);

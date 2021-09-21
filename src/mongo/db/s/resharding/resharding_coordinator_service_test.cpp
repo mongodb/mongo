@@ -87,7 +87,6 @@ class ExternalStateForTest : public ReshardingCoordinatorExternalState {
         // Use the provided shardIds from presetReshardedChunks to construct the
         // recipient list.
         if (const auto& chunks = coordinatorDoc.getPresetReshardedChunks()) {
-            invariant(version.getTimestamp());
             for (const auto& reshardedChunk : *chunks) {
                 initialChunks.emplace_back(
                     coordinatorDoc.getReshardingUUID(),
@@ -404,13 +403,14 @@ public:
 
     std::vector<ChunkType> makeChunks(const UUID& uuid,
                                       OID epoch,
+                                      const Timestamp& timestamp,
                                       const ShardKeyPattern& shardKey,
                                       std::vector<OID> ids) {
         auto chunkRanges =
             _newShardKey.isShardKey(shardKey.toBSON()) ? _newChunkRanges : _oldChunkRanges;
 
         // Create two chunks, one on each shard with the given namespace and epoch
-        ChunkVersion version(1, 0, epoch, boost::none /* timestamp */);
+        ChunkVersion version(1, 0, epoch, timestamp);
         ChunkType chunk1(uuid, chunkRanges[0], version, ShardId("shard0000"));
         chunk1.setName(ids[0]);
         version.incMinor();
@@ -423,9 +423,10 @@ public:
     // Returns the chunk for the donor shard.
     ChunkType makeAndInsertChunksForDonorShard(const UUID& uuid,
                                                OID epoch,
+                                               const Timestamp& timestamp,
                                                const ShardKeyPattern& shardKey,
                                                std::vector<OID> ids) {
-        auto chunks = makeChunks(uuid, epoch, shardKey, ids);
+        auto chunks = makeChunks(uuid, epoch, timestamp, shardKey, ids);
 
         // Only the chunk corresponding to shard0000 is stored as a donor in the coordinator state
         // document constructed.
@@ -508,10 +509,12 @@ public:
     NamespaceString _originalNss = NamespaceString("db.foo");
     UUID _originalUUID = UUID::gen();
     OID _originalEpoch = OID::gen();
+    Timestamp _originalTimestamp = Timestamp(1);
 
     NamespaceString _tempNss = NamespaceString("db.system.resharding." + _originalUUID.toString());
     UUID _reshardingUUID = UUID::gen();
     OID _tempEpoch = OID::gen();
+    Timestamp _tempTimestamp = Timestamp(2);
     ShardKeyPattern _oldShardKey = ShardKeyPattern(BSON("oldShardKey" << 1));
     ShardKeyPattern _newShardKey = ShardKeyPattern(BSON("newShardKey" << 1));
 
@@ -545,11 +548,17 @@ TEST_F(ReshardingCoordinatorServiceTest, ReshardingCoordinatorSuccessfullyTransi
 
     auto doc = insertStateAndCatalogEntries(CoordinatorStateEnum::kUnused, _originalEpoch);
     auto opCtx = operationContext();
-    auto donorChunk = makeAndInsertChunksForDonorShard(
-        _originalUUID, _originalEpoch, _oldShardKey, std::vector{OID::gen(), OID::gen()});
+    auto donorChunk = makeAndInsertChunksForDonorShard(_originalUUID,
+                                                       _originalEpoch,
+                                                       _originalTimestamp,
+                                                       _oldShardKey,
+                                                       std::vector{OID::gen(), OID::gen()});
 
-    auto initialChunks =
-        makeChunks(_reshardingUUID, _tempEpoch, _newShardKey, std::vector{OID::gen(), OID::gen()});
+    auto initialChunks = makeChunks(_reshardingUUID,
+                                    _tempEpoch,
+                                    _tempTimestamp,
+                                    _newShardKey,
+                                    std::vector{OID::gen(), OID::gen()});
 
     std::vector<ReshardedChunk> presetReshardedChunks;
     for (const auto& chunk : initialChunks) {
@@ -603,11 +612,17 @@ TEST_F(ReshardingCoordinatorServiceTest, ReshardingCoordinatorTransitionsTokDone
 
     auto doc = insertStateAndCatalogEntries(CoordinatorStateEnum::kUnused, _originalEpoch);
     auto opCtx = operationContext();
-    auto donorChunk = makeAndInsertChunksForDonorShard(
-        _originalUUID, _originalEpoch, _oldShardKey, std::vector{OID::gen(), OID::gen()});
+    auto donorChunk = makeAndInsertChunksForDonorShard(_originalUUID,
+                                                       _originalEpoch,
+                                                       _originalTimestamp,
+                                                       _oldShardKey,
+                                                       std::vector{OID::gen(), OID::gen()});
 
-    auto initialChunks =
-        makeChunks(_reshardingUUID, _tempEpoch, _newShardKey, std::vector{OID::gen(), OID::gen()});
+    auto initialChunks = makeChunks(_reshardingUUID,
+                                    _tempEpoch,
+                                    _tempTimestamp,
+                                    _newShardKey,
+                                    std::vector{OID::gen(), OID::gen()});
 
     std::vector<ReshardedChunk> presetReshardedChunks;
     for (const auto& chunk : initialChunks) {
@@ -667,11 +682,17 @@ TEST_F(ReshardingCoordinatorServiceTest, StepDownStepUpDuringInitializing) {
     doc.setRecipientShards({});
     doc.setDonorShards({});
 
-    auto donorChunk = makeAndInsertChunksForDonorShard(
-        _originalUUID, _originalEpoch, _oldShardKey, std::vector{OID::gen(), OID::gen()});
+    auto donorChunk = makeAndInsertChunksForDonorShard(_originalUUID,
+                                                       _originalEpoch,
+                                                       _originalTimestamp,
+                                                       _oldShardKey,
+                                                       std::vector{OID::gen(), OID::gen()});
 
-    auto initialChunks =
-        makeChunks(_reshardingUUID, _tempEpoch, _newShardKey, std::vector{OID::gen(), OID::gen()});
+    auto initialChunks = makeChunks(_reshardingUUID,
+                                    _tempEpoch,
+                                    _tempTimestamp,
+                                    _newShardKey,
+                                    std::vector{OID::gen(), OID::gen()});
 
     std::vector<ReshardedChunk> presetReshardedChunks;
     for (const auto& chunk : initialChunks) {
@@ -727,11 +748,17 @@ TEST_F(ReshardingCoordinatorServiceTest, StepDownStepUpEachTransition) {
 
     auto doc = insertStateAndCatalogEntries(CoordinatorStateEnum::kUnused, _originalEpoch);
     auto opCtx = operationContext();
-    auto donorChunk = makeAndInsertChunksForDonorShard(
-        _originalUUID, _originalEpoch, _oldShardKey, std::vector{OID::gen(), OID::gen()});
+    auto donorChunk = makeAndInsertChunksForDonorShard(_originalUUID,
+                                                       _originalEpoch,
+                                                       _originalTimestamp,
+                                                       _oldShardKey,
+                                                       std::vector{OID::gen(), OID::gen()});
 
-    auto initialChunks =
-        makeChunks(_reshardingUUID, _tempEpoch, _newShardKey, std::vector{OID::gen(), OID::gen()});
+    auto initialChunks = makeChunks(_reshardingUUID,
+                                    _tempEpoch,
+                                    _tempTimestamp,
+                                    _newShardKey,
+                                    std::vector{OID::gen(), OID::gen()});
 
     std::vector<ReshardedChunk> presetReshardedChunks;
     for (const auto& chunk : initialChunks) {
@@ -841,7 +868,7 @@ TEST_F(ReshardingCoordinatorServiceTest, StepDownStepUpEachTransition) {
             ChunkType::ConfigNS, BSON(ChunkType::collectionUUID() << doc.getReshardingUUID()));
         while (chunkCursor->more()) {
             auto d = uassertStatusOK(ChunkType::fromConfigBSON(
-                chunkCursor->nextSafe().getOwned(), _originalEpoch, boost::none));
+                chunkCursor->nextSafe().getOwned(), _originalEpoch, _originalTimestamp));
             foundChunks.push_back(d);
         }
         ASSERT_EQUALS(foundChunks.size(), initialChunks.size());
@@ -862,11 +889,17 @@ TEST_F(ReshardingCoordinatorServiceTest, StepDownStepUpEachTransition) {
 TEST_F(ReshardingCoordinatorServiceTest, ReshardingCoordinatorFailsIfMigrationNotAllowed) {
     auto doc = insertStateAndCatalogEntries(CoordinatorStateEnum::kUnused, _originalEpoch);
     auto opCtx = operationContext();
-    auto donorChunk = makeAndInsertChunksForDonorShard(
-        _originalUUID, _originalEpoch, _oldShardKey, std::vector{OID::gen(), OID::gen()});
+    auto donorChunk = makeAndInsertChunksForDonorShard(_originalUUID,
+                                                       _originalEpoch,
+                                                       _originalTimestamp,
+                                                       _oldShardKey,
+                                                       std::vector{OID::gen(), OID::gen()});
 
-    auto initialChunks =
-        makeChunks(_reshardingUUID, _tempEpoch, _newShardKey, std::vector{OID::gen(), OID::gen()});
+    auto initialChunks = makeChunks(_reshardingUUID,
+                                    _tempEpoch,
+                                    _tempTimestamp,
+                                    _newShardKey,
+                                    std::vector{OID::gen(), OID::gen()});
 
     std::vector<ReshardedChunk> presetReshardedChunks;
     for (const auto& chunk : initialChunks) {

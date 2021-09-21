@@ -105,14 +105,14 @@ public:
             nullptr,
             false,
             epoch,
-            boost::none /* timestamp */,
+            Timestamp(),
             boost::none /* timeseriesFields */,
             boost::none,
             boost::none /* chunkSizeBytes */,
             true,
             {ChunkType{uuid,
                        ChunkRange{BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY)},
-                       ChunkVersion(1, 0, epoch, boost::none /* timestamp */),
+                       ChunkVersion(1, 0, epoch, Timestamp()),
                        ShardId("dummyShardId")}});
 
         AutoGetDb autoDb(operationContext(), kNss.db(), MODE_IX);

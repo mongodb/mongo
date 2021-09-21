@@ -175,7 +175,7 @@ StatusWith<std::vector<ChunkType>> readShardChunks(OperationContext* opCtx,
                                                    const BSONObj& sort,
                                                    boost::optional<long long> limit,
                                                    const OID& epoch,
-                                                   const boost::optional<Timestamp>& timestamp);
+                                                   const Timestamp& timestamp);
 
 /**
  * Takes a vector of 'chunks' and updates the shard's chunks collection for 'nss' or 'uuid'. Any

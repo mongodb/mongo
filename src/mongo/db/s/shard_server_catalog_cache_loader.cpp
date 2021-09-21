@@ -387,7 +387,7 @@ void forcePrimaryDatabaseRefreshAndWaitForReplication(OperationContext* opCtx, S
  * Does nothing otherwise.
  */
 void patchUpChangedChunksIfNeeded(bool mustPatchUpMetadataResults,
-                                  const boost::optional<Timestamp>& timestamp,
+                                  const Timestamp& timestamp,
                                   std::vector<ChunkType>& changedChunks) {
 
     if (!mustPatchUpMetadataResults)

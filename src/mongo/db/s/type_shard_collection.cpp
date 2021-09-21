@@ -33,21 +33,18 @@
 
 namespace mongo {
 
-ShardCollectionType::ShardCollectionType(
-    NamespaceString nss, OID epoch, UUID uuid, KeyPattern keyPattern, bool unique)
-    : ShardCollectionTypeBase(
-          std::move(nss), std::move(epoch), std::move(uuid), std::move(keyPattern), unique) {}
-
 ShardCollectionType::ShardCollectionType(NamespaceString nss,
                                          OID epoch,
-                                         boost::optional<Timestamp> creationTime,
+                                         Timestamp creationTime,
                                          UUID uuid,
                                          KeyPattern keyPattern,
                                          bool unique)
-    : ShardCollectionTypeBase(
-          std::move(nss), std::move(epoch), std::move(uuid), std::move(keyPattern), unique) {
-    setTimestamp(std::move(creationTime));
-}
+    : ShardCollectionTypeBase(std::move(nss),
+                              std::move(epoch),
+                              std::move(creationTime),
+                              std::move(uuid),
+                              std::move(keyPattern),
+                              unique) {}
 
 ShardCollectionType::ShardCollectionType(const BSONObj& obj) {
     ShardCollectionTypeBase::parseProtected(IDLParserErrorContext("ShardCollectionType"), obj);

@@ -58,7 +58,7 @@ public:
                                                                 {},     // collator
                                                                 false,  // unique
                                                                 _epoch,
-                                                                boost::none,  // timestamp
+                                                                _timestamp,   // timestamp
                                                                 boost::none,  // time series fields
                                                                 boost::none,  // resharding fields
                                                                 boost::none,  // chunk size bytes
@@ -75,9 +75,10 @@ private:
     const NamespaceString _nss{"foo.bar"};
     const UUID _uuid = UUID::gen();
     const OID _epoch{OID::gen()};
+    const Timestamp _timestamp{Timestamp(1, 1)};
     const ShardId _shardPrimary{"dummyShardPrimary"};
-    const DatabaseVersion _dbVersion{UUID::gen(), Timestamp()};
-    ChunkVersion _nextVersion{1, 0, _epoch, boost::none};
+    const DatabaseVersion _dbVersion{UUID::gen(), _timestamp};
+    ChunkVersion _nextVersion{1, 0, _epoch, _timestamp};
 };
 
 TEST_F(BalanceStatsTest, SingleChunkNoZones) {

@@ -593,7 +593,7 @@ StatusWith<std::vector<ChunkType>> ShardingCatalogClientImpl::getChunks(
     boost::optional<int> limit,
     OpTime* opTime,
     const OID& epoch,
-    const boost::optional<Timestamp>& timestamp,
+    const Timestamp& timestamp,
     repl::ReadConcernLevel readConcern,
     const boost::optional<BSONObj>& hint) {
     invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer ||

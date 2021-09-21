@@ -504,7 +504,7 @@ TEST_F(ChunkManagerQueryTest, SimpleCollationNumbersMultiShard) {
 TEST_F(ChunkManagerQueryTest, SnapshotQueryWithMoreShardsThanLatestMetadata) {
     const auto uuid = UUID::gen();
     const auto epoch = OID::gen();
-    ChunkVersion version(1, 0, epoch, boost::none /* timestamp */);
+    ChunkVersion version(1, 0, epoch, Timestamp());
 
     ChunkType chunk0(uuid, {BSON("x" << MINKEY), BSON("x" << 0)}, version, ShardId("0"));
     chunk0.setName(OID::gen());
@@ -519,7 +519,7 @@ TEST_F(ChunkManagerQueryTest, SnapshotQueryWithMoreShardsThanLatestMetadata) {
                                                         nullptr,
                                                         false,
                                                         epoch,
-                                                        boost::none /* timestamp */,
+                                                        Timestamp(),
                                                         boost::none /* timeseriesFields */,
                                                         boost::none,
                                                         boost::none /* chunkSizeBytes */,

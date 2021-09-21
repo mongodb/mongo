@@ -169,6 +169,8 @@ void CommitChunkMigrationRequest::appendAsCommand(BSONObjBuilder* builder,
         migrateChunk.appendElements(migratedChunk.toConfigBSON());
         // ChunkType::toConfigBSON() no longer adds the epoch
         migrateChunk.append(ChunkType::lastmod() + "Epoch", migratedChunk.getVersion().epoch());
+        migrateChunk.append(ChunkType::lastmod() + "Timestamp",
+                            migratedChunk.getVersion().getTimestamp());
     }
     fromShardCollectionVersion.appendWithField(builder, kFromShardCollectionVersion);
 

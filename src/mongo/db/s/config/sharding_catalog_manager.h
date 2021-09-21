@@ -576,7 +576,7 @@ private:
     StatusWith<ChunkType> _findChunkOnConfig(OperationContext* opCtx,
                                              const UUID& uuid,
                                              const OID& epoch,
-                                             const boost::optional<Timestamp>& timestamp,
+                                             const Timestamp& timestamp,
                                              const BSONObj& key);
 
     /**

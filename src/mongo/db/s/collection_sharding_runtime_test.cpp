@@ -56,13 +56,12 @@ protected:
     static CollectionMetadata makeShardedMetadata(OperationContext* opCtx,
                                                   UUID uuid = UUID::gen()) {
         const OID epoch = OID::gen();
+        const Timestamp timestamp;
         auto range = ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY));
-        auto chunk = ChunkType(uuid,
-                               std::move(range),
-                               ChunkVersion(1, 0, epoch, boost::none /* timestamp */),
-                               ShardId("other"));
+        auto chunk = ChunkType(
+            uuid, std::move(range), ChunkVersion(1, 0, epoch, timestamp), ShardId("other"));
         ChunkManager cm(ShardId("0"),
-                        DatabaseVersion(UUID::gen(), Timestamp()),
+                        DatabaseVersion(UUID::gen(), timestamp),
                         makeStandaloneRoutingTableHistory(
                             RoutingTableHistory::makeNew(kTestNss,
                                                          uuid,
@@ -70,7 +69,7 @@ protected:
                                                          nullptr,
                                                          false,
                                                          epoch,
-                                                         boost::none /* timestamp */,
+                                                         timestamp,
                                                          boost::none /* timeseriesFields */,
                                                          boost::none,
                                                          boost::none /* chunkSizeBytes */,
@@ -265,8 +264,7 @@ public:
         return std::make_unique<StaticCatalogClient>(kShardList);
     }
 
-    CollectionType createCollection(const OID& epoch,
-                                    boost::optional<Timestamp> timestamp = boost::none) {
+    CollectionType createCollection(const OID& epoch, const Timestamp& timestamp) {
         CollectionType res(kNss, epoch, timestamp, Date_t::now(), kCollUUID);
         res.setKeyPattern(BSON(kShardKey << 1));
         res.setUnique(false);
@@ -276,7 +274,7 @@ public:
 
     std::vector<ChunkType> createChunks(const OID& epoch,
                                         const UUID& uuid,
-                                        boost::optional<Timestamp> timestamp = boost::none) {
+                                        const Timestamp& timestamp) {
         auto range1 = ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << 5));
         ChunkType chunk1(
             uuid, range1, ChunkVersion(1, 0, epoch, timestamp), kShardList[0].getName());
@@ -302,8 +300,8 @@ TEST_F(CollectionShardingRuntimeTestWithMockedLoader,
     const auto epoch = OID::gen();
     const Timestamp timestamp(42);
 
-    const auto coll = createCollection(epoch);
-    const auto chunks = createChunks(epoch, coll.getUuid());
+    const auto coll = createCollection(epoch, timestamp);
+    const auto chunks = createChunks(epoch, coll.getUuid(), timestamp);
 
     const auto timestampedColl = createCollection(epoch, timestamp);
     const auto timestampedChunks = createChunks(epoch, timestampedColl.getUuid(), timestamp);
@@ -340,8 +338,8 @@ TEST_F(CollectionShardingRuntimeTestWithMockedLoader,
     const auto epoch = OID::gen();
     const Timestamp timestamp(42);
 
-    const auto coll = createCollection(epoch);
-    const auto chunks = createChunks(epoch, coll.getUuid());
+    const auto coll = createCollection(epoch, timestamp);
+    const auto chunks = createChunks(epoch, coll.getUuid(), timestamp);
     const auto collVersion = chunks.back().getVersion();
 
     const auto timestampedColl = createCollection(epoch, timestamp);

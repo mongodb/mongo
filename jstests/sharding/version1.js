@@ -42,11 +42,13 @@ assert.commandFailed(a.runCommand({
                      "should have failed because version is config is 1|0");
 
 var epoch = s.getDB('config').collections.findOne({_id: "alleyinsider.foo"}).lastmodEpoch;
+var timestamp = s.getDB('config').collections.findOne({_id: "alleyinsider.foo"}).timestamp;
 assert.commandWorked(a.runCommand({
     setShardVersion: "alleyinsider.foo",
     configdb: s._configDB,
     version: new Timestamp(1, 0),
     versionEpoch: epoch,
+    versionTimestamp: timestamp,
     authoritative: true,
     shard: s.shard0.shardName,
     shardHost: s.s.host
@@ -57,21 +59,24 @@ assert.commandFailed(a.runCommand({
     setShardVersion: "alleyinsider.foo",
     configdb: "a",
     version: new Timestamp(0, 2),
-    versionEpoch: epoch
+    versionEpoch: epoch,
+    versionTimestamp: timestamp
 }));
 
 assert.commandFailed(a.runCommand({
     setShardVersion: "alleyinsider.foo",
     configdb: s._configDB,
     version: new Timestamp(0, 2),
-    versionEpoch: epoch
+    versionEpoch: epoch,
+    versionTimestamp: timestamp
 }));
 
 assert.commandFailed(a.runCommand({
     setShardVersion: "alleyinsider.foo",
     configdb: s._configDB,
     version: new Timestamp(0, 1),
-    versionEpoch: epoch
+    versionEpoch: epoch,
+    versionTimestamp: timestamp
 }));
 
 // the only way that setSharVersion passes is if the shard agrees with the version

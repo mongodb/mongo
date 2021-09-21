@@ -43,7 +43,7 @@ CatalogCacheLoader::CollectionAndChangedChunks::CollectionAndChangedChunks() = d
 
 CatalogCacheLoader::CollectionAndChangedChunks::CollectionAndChangedChunks(
     OID collEpoch,
-    boost::optional<Timestamp> collCreationTime,
+    Timestamp collCreationTime,
     UUID collUuid,
     const BSONObj& collShardKeyPattern,
     const BSONObj& collDefaultCollation,

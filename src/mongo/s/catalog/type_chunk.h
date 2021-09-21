@@ -227,7 +227,7 @@ public:
     static StatusWith<ChunkType> parseFromConfigBSONCommand(const BSONObj& source);
     static StatusWith<ChunkType> fromConfigBSON(const BSONObj& source,
                                                 const OID& epoch,
-                                                const boost::optional<Timestamp>& timestamp);
+                                                const Timestamp& timestamp);
 
     /**
      * Returns the BSON representation of the entry for the config server's config.chunks
@@ -243,7 +243,7 @@ public:
      */
     static StatusWith<ChunkType> fromShardBSON(const BSONObj& source,
                                                const OID& epoch,
-                                               const boost::optional<Timestamp>& timestamp);
+                                               const Timestamp& timestamp);
 
     /**
      * Returns the BSON representation of the entry for a shard server's config.chunks.<epoch>

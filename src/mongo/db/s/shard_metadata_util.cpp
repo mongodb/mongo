@@ -299,7 +299,7 @@ StatusWith<std::vector<ChunkType>> readShardChunks(OperationContext* opCtx,
                                                    const BSONObj& sort,
                                                    boost::optional<long long> limit,
                                                    const OID& epoch,
-                                                   const boost::optional<Timestamp>& timestamp) {
+                                                   const Timestamp& timestamp) {
     const auto chunksNss = getShardChunksNss(nss, uuid, supportingLongName);
 
     try {

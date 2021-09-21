@@ -19,12 +19,14 @@ var a = s.shard0.getDB("admin");
 assert.eq(a.runCommand({"getShardVersion": "alleyinsider.foo", configdb: s._configDB}).global.i, 0);
 
 var fooEpoch = s.getDB('config').collections.findOne({_id: "alleyinsider.foo"}).lastmodEpoch;
+var fooTimestamp = s.getDB('config').collections.findOne({_id: "alleyinsider.foo"}).timestamp;
 assert.commandWorked(a.runCommand({
     setShardVersion: "alleyinsider.foo",
     configdb: s._configDB,
     authoritative: true,
     version: new Timestamp(1, 0),
     versionEpoch: fooEpoch,
+    versionTimestamp: fooTimestamp,
     shard: s.shard0.shardName,
     shardHost: s.s.host,
 }));

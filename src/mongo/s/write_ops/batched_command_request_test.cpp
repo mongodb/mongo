@@ -60,12 +60,14 @@ TEST(BatchedCommandRequest, InsertWithShardVersion) {
     BSONArray insertArray = BSON_ARRAY(BSON("a" << 1) << BSON("b" << 1));
 
     const OID epoch = OID::gen();
+    const Timestamp majorAndMinor(1, 2);
+    const Timestamp timestamp(2, 2);
 
     BSONObj origInsertRequestObj = BSON("insert"
                                         << "test"
                                         << "documents" << insertArray << "writeConcern"
                                         << BSON("w" << 1) << "ordered" << true << "shardVersion"
-                                        << BSON_ARRAY(Timestamp(1, 2) << epoch));
+                                        << BSON_ARRAY(majorAndMinor << epoch << timestamp));
 
     for (auto docSeq : {false, true}) {
         const auto opMsgRequest(toOpMsg("TestDB", origInsertRequestObj, docSeq));
@@ -73,7 +75,7 @@ TEST(BatchedCommandRequest, InsertWithShardVersion) {
 
         ASSERT_EQ("TestDB.test", insertRequest.getInsertRequest().getNamespace().ns());
         ASSERT(insertRequest.hasShardVersion());
-        ASSERT_EQ(ChunkVersion(1, 2, epoch, boost::none /* timestamp */).toString(),
+        ASSERT_EQ(ChunkVersion(1, 2, epoch, timestamp).toString(),
                   insertRequest.getShardVersion().toString());
     }
 }

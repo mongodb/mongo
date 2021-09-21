@@ -76,7 +76,7 @@ CollectionMetadata makeChunkManagerWithShardSelector(int nShards,
     for (uint32_t i = 0; i < nChunks; ++i) {
         chunks.emplace_back(collUuid,
                             getRangeForChunk(i, nChunks),
-                            ChunkVersion{i + 1, 0, collEpoch, boost::none /* timestamp */},
+                            ChunkVersion{i + 1, 0, collEpoch, Timestamp()},
                             selectShard(i, nShards, nChunks));
     }
 
@@ -86,7 +86,7 @@ CollectionMetadata makeChunkManagerWithShardSelector(int nShards,
                                            nullptr,
                                            true,
                                            collEpoch,
-                                           boost::none /* timestamp */,
+                                           Timestamp(),
                                            boost::none /* timeseriesFields */,
                                            boost::none,
                                            boost::none /* chunkSizeBytes */,
@@ -168,7 +168,7 @@ auto BM_FullBuildOfChunkManager(benchmark::State& state, ShardSelectorFn selectS
     for (uint32_t i = 0; i < nChunks; ++i) {
         chunks.emplace_back(collUuid,
                             getRangeForChunk(i, nChunks),
-                            ChunkVersion{i + 1, 0, collEpoch, boost::none /* timestamp */},
+                            ChunkVersion{i + 1, 0, collEpoch, Timestamp()},
                             selectShard(i, nShards, nChunks));
     }
 
@@ -179,7 +179,7 @@ auto BM_FullBuildOfChunkManager(benchmark::State& state, ShardSelectorFn selectS
                                                nullptr,
                                                true,
                                                collEpoch,
-                                               boost::none /* timestamp */,
+                                               Timestamp(),
                                                boost::none /* timeseriesFields */,
                                                boost::none,
                                                boost::none /* chunkSizeBytes */,

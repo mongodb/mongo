@@ -60,7 +60,7 @@ struct ShardVersionTargetingInfo {
     // Max chunk version for the shard
     ChunkVersion shardVersion;
 
-    ShardVersionTargetingInfo(const OID& epoch, const boost::optional<Timestamp>& timestamp);
+    ShardVersionTargetingInfo(const OID& epoch, const Timestamp& timestamp);
 };
 
 // Map from a shard to a struct indicating both the max chunk version on that shard and whether the
@@ -77,9 +77,7 @@ class ChunkMap {
     using ChunkVector = std::vector<std::shared_ptr<ChunkInfo>>;
 
 public:
-    explicit ChunkMap(OID epoch,
-                      const boost::optional<Timestamp>& timestamp,
-                      size_t initialCapacity = 0)
+    explicit ChunkMap(OID epoch, const Timestamp& timestamp, size_t initialCapacity = 0)
         : _collectionVersion(0, 0, epoch, timestamp), _collTimestamp(timestamp) {
         _chunkMap.reserve(initialCapacity);
     }
@@ -141,7 +139,7 @@ private:
     // (non-atomically), it is possible that chunks exist with timestamps, but the corresponding
     // config.collections entry doesn't. In this case, the chunks timestamp should be ignored when
     // computing the collection version and we should use _collTimestamp instead.
-    boost::optional<Timestamp> _collTimestamp;
+    Timestamp _collTimestamp;
 };
 
 /**
@@ -177,7 +175,7 @@ public:
         std::unique_ptr<CollatorInterface> defaultCollator,
         bool unique,
         OID epoch,
-        const boost::optional<Timestamp>& timestamp,
+        const Timestamp& timestamp,
         boost::optional<TypeCollectionTimeseriesFields> timeseriesFields,
         boost::optional<TypeCollectionReshardingFields> reshardingFields,
         boost::optional<uint64_t> maxChunkSizeBytes,
@@ -201,13 +199,6 @@ public:
         boost::optional<uint64_t> maxChunkSizeBytes,
         bool allowMigrations,
         const std::vector<ChunkType>& changedChunks) const;
-
-    /**
-     * Constructs a new instance with the same routing table but adding or removing timestamp on all
-     * chunks
-     */
-    RoutingTableHistory makeUpdatedReplacingTimestamp(
-        const boost::optional<Timestamp>& timestamp) const;
 
     const NamespaceString& nss() const {
         return _nss;

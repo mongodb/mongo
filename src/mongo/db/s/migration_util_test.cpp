@@ -350,7 +350,7 @@ public:
     const ShardKeyPattern kShardKeyPattern = ShardKeyPattern(BSON("_id" << 1));
     const UUID kDefaultUUID = UUID::gen();
     const OID kEpoch = OID::gen();
-    const Timestamp kDefaultTimestamp = Timestamp();
+    const Timestamp kDefaultTimestamp = Timestamp(1);
     const DatabaseType kDefaultDatabaseType = DatabaseType(
         kNss.db().toString(), ShardId("0"), true, DatabaseVersion(kDefaultUUID, kDefaultTimestamp));
     const std::vector<ShardType> kShardList = {ShardType("0", "Host0:12345"),
@@ -440,8 +440,8 @@ public:
         return mockCatalogClient;
     }
 
-    CollectionType makeCollectionType(UUID uuid, OID epoch) {
-        CollectionType coll(kNss, epoch, Date_t::now(), uuid);
+    CollectionType makeCollectionType(UUID uuid, OID epoch, Timestamp timestamp) {
+        CollectionType coll(kNss, epoch, timestamp, Date_t::now(), uuid);
         coll.setKeyPattern(kShardKeyPattern.getKeyPattern());
         coll.setUnique(true);
         return coll;
@@ -572,11 +572,11 @@ TEST_F(SubmitRangeDeletionTaskTest, SucceedsIfFilteringMetadataUUIDMatchesTaskUU
     migrationutil::markAsReadyRangeDeletionTaskLocally(opCtx, deletionTask.getId());
 
     // Force a metadata refresh with the task's UUID before the task is submitted.
-    auto coll = makeCollectionType(collectionUUID, kEpoch);
+    auto coll = makeCollectionType(collectionUUID, kEpoch, kDefaultTimestamp);
     _mockCatalogCacheLoader->setDatabaseRefreshReturnValue(kDefaultDatabaseType);
     _mockCatalogCacheLoader->setCollectionRefreshReturnValue(coll);
     _mockCatalogCacheLoader->setChunkRefreshReturnValue(
-        makeChangedChunks(ChunkVersion(1, 0, kEpoch, boost::none /* timestamp */)));
+        makeChangedChunks(ChunkVersion(1, 0, kEpoch, kDefaultTimestamp)));
     _mockCatalogClient->setCollections({coll});
     forceShardFilteringMetadataRefresh(opCtx, kNss);
 
@@ -600,11 +600,11 @@ TEST_F(
     migrationutil::markAsReadyRangeDeletionTaskLocally(opCtx, deletionTask.getId());
 
     // Make the refresh triggered by submitting the task return a UUID that matches the task's UUID.
-    auto coll = makeCollectionType(collectionUUID, kEpoch);
+    auto coll = makeCollectionType(collectionUUID, kEpoch, kDefaultTimestamp);
     _mockCatalogCacheLoader->setDatabaseRefreshReturnValue(kDefaultDatabaseType);
     _mockCatalogCacheLoader->setCollectionRefreshReturnValue(coll);
     _mockCatalogCacheLoader->setChunkRefreshReturnValue(
-        makeChangedChunks(ChunkVersion(1, 0, kEpoch, boost::none /* timestamp */)));
+        makeChangedChunks(ChunkVersion(1, 0, kEpoch, kDefaultTimestamp)));
     _mockCatalogClient->setCollections({coll});
 
     // The task should have been submitted successfully.
@@ -633,10 +633,10 @@ TEST_F(SubmitRangeDeletionTaskTest,
     migrationutil::markAsReadyRangeDeletionTaskLocally(opCtx, deletionTask.getId());
 
     // Make the refresh triggered by submitting the task return a UUID that matches the task's UUID.
-    auto matchingColl = makeCollectionType(collectionUUID, kEpoch);
+    auto matchingColl = makeCollectionType(collectionUUID, kEpoch, kDefaultTimestamp);
     _mockCatalogCacheLoader->setCollectionRefreshReturnValue(matchingColl);
     _mockCatalogCacheLoader->setChunkRefreshReturnValue(
-        makeChangedChunks(ChunkVersion(10, 0, kEpoch, boost::none /* timestamp */)));
+        makeChangedChunks(ChunkVersion(10, 0, kEpoch, kDefaultTimestamp)));
     _mockCatalogClient->setCollections({matchingColl});
 
     // The task should have been submitted successfully.
@@ -652,11 +652,12 @@ TEST_F(SubmitRangeDeletionTaskTest,
     // stale when the task is submitted.
     const auto staleUUID = UUID::gen();
     const auto staleEpoch = OID::gen();
-    auto staleColl = makeCollectionType(staleUUID, staleEpoch);
+    const auto staleTimestamp = Timestamp(0);
+    auto staleColl = makeCollectionType(staleUUID, staleEpoch, staleTimestamp);
     _mockCatalogCacheLoader->setDatabaseRefreshReturnValue(kDefaultDatabaseType);
     _mockCatalogCacheLoader->setCollectionRefreshReturnValue(staleColl);
     _mockCatalogCacheLoader->setChunkRefreshReturnValue(
-        makeChangedChunks(ChunkVersion(1, 0, staleEpoch, boost::none /* timestamp */)));
+        makeChangedChunks(ChunkVersion(1, 0, staleEpoch, staleTimestamp)));
     _mockCatalogClient->setCollections({staleColl});
     forceShardFilteringMetadataRefresh(opCtx, kNss);
 
@@ -670,10 +671,10 @@ TEST_F(SubmitRangeDeletionTaskTest,
     migrationutil::markAsReadyRangeDeletionTaskLocally(opCtx, deletionTask.getId());
 
     // Make the refresh triggered by submitting the task return a UUID that matches the task's UUID.
-    auto matchingColl = makeCollectionType(collectionUUID, kEpoch);
+    auto matchingColl = makeCollectionType(collectionUUID, kEpoch, kDefaultTimestamp);
     _mockCatalogCacheLoader->setCollectionRefreshReturnValue(matchingColl);
     _mockCatalogCacheLoader->setChunkRefreshReturnValue(
-        makeChangedChunks(ChunkVersion(10, 0, kEpoch, boost::none /* timestamp */)));
+        makeChangedChunks(ChunkVersion(10, 0, kEpoch, kDefaultTimestamp)));
     _mockCatalogClient->setCollections({matchingColl});
 
     // The task should have been submitted successfully.
@@ -695,11 +696,12 @@ TEST_F(SubmitRangeDeletionTaskTest,
 
     // Make the refresh triggered by submitting the task return an arbitrary UUID.
     const auto otherEpoch = OID::gen();
-    auto otherColl = makeCollectionType(UUID::gen(), otherEpoch);
+    const auto otherTimestamp = Timestamp(2);
+    auto otherColl = makeCollectionType(UUID::gen(), otherEpoch, otherTimestamp);
     _mockCatalogCacheLoader->setDatabaseRefreshReturnValue(kDefaultDatabaseType);
     _mockCatalogCacheLoader->setCollectionRefreshReturnValue(otherColl);
     _mockCatalogCacheLoader->setChunkRefreshReturnValue(
-        makeChangedChunks(ChunkVersion(1, 0, otherEpoch, boost::none /* timestamp */)));
+        makeChangedChunks(ChunkVersion(1, 0, otherEpoch, otherTimestamp)));
     _mockCatalogClient->setCollections({otherColl});
 
     // The task should not have been submitted, and the task's entry should have been removed from

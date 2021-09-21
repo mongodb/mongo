@@ -62,7 +62,7 @@ CollectionMetadata makeCollectionMetadataImpl(
 
     std::vector<ChunkType> allChunks;
     auto nextMinKey = shardKeyPattern.globalMin();
-    ChunkVersion version{1, 0, epoch, boost::none /* timestamp */};
+    ChunkVersion version{1, 0, epoch, timestamp};
     for (const auto& myNextChunk : thisShardsChunks) {
         if (SimpleBSONObjComparator::kInstance.evaluate(nextMinKey < myNextChunk.first)) {
             // Need to add a chunk to the other shard from nextMinKey to myNextChunk.first.
@@ -94,7 +94,7 @@ CollectionMetadata makeCollectionMetadataImpl(
                                                       nullptr,
                                                       false,
                                                       epoch,
-                                                      boost::none /* timestamp */,
+                                                      timestamp,
                                                       boost::none /* timeseriesFields */,
                                                       std::move(reshardingFields),
                                                       boost::none /* chunkSizeBytes */,

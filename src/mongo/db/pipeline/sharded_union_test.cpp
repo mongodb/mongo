@@ -168,9 +168,10 @@ TEST_F(ShardedUnionTest, RetriesSubPipelineOnStaleConfigError) {
     // Mock the expected config server queries.
     const OID epoch = OID::gen();
     const UUID uuid = UUID::gen();
+    const Timestamp timestamp;
     const ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
 
-    ChunkVersion version(1, 0, epoch, boost::none /* timestamp */);
+    ChunkVersion version(1, 0, epoch, timestamp);
 
     ChunkType chunk1(*cm.getUUID(),
                      {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << 0)},
@@ -187,7 +188,7 @@ TEST_F(ShardedUnionTest, RetriesSubPipelineOnStaleConfigError) {
     version.incMinor();
 
     expectCollectionAndChunksAggregation(
-        kTestAggregateNss, epoch, uuid, shardKeyPattern, {chunk1, chunk2});
+        kTestAggregateNss, epoch, timestamp, uuid, shardKeyPattern, {chunk1, chunk2});
 
     // That error should be retried, but only the one on that shard.
     onCommand([&](const executor::RemoteCommandRequest& request) {
@@ -246,9 +247,10 @@ TEST_F(ShardedUnionTest, CorrectlySplitsSubPipelineIfRefreshedDistributionRequir
     // created and moved to the first shard.
     const OID epoch = OID::gen();
     const UUID uuid = UUID::gen();
+    const Timestamp timestamp;
     const ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
 
-    ChunkVersion version(1, 0, epoch, boost::none /* timestamp */);
+    ChunkVersion version(1, 0, epoch, timestamp);
 
     ChunkType chunk1(*cm.getUUID(),
                      {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << 0)},
@@ -269,7 +271,7 @@ TEST_F(ShardedUnionTest, CorrectlySplitsSubPipelineIfRefreshedDistributionRequir
     chunk3.setName(OID::gen());
 
     expectCollectionAndChunksAggregation(
-        kTestAggregateNss, epoch, uuid, shardKeyPattern, {chunk1, chunk2, chunk3});
+        kTestAggregateNss, epoch, timestamp, uuid, shardKeyPattern, {chunk1, chunk2, chunk3});
 
     // That error should be retried, this time two shards.
     onCommand([&](const executor::RemoteCommandRequest& request) {
@@ -335,8 +337,9 @@ TEST_F(ShardedUnionTest, AvoidsSplittingSubPipelineIfRefreshedDistributionDoesNo
     // the same shard.
     const OID epoch = OID::gen();
     const UUID uuid = UUID::gen();
+    const Timestamp timestamp;
     const ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
-    ChunkVersion version(1, 0, epoch, boost::none /* timestamp */);
+    ChunkVersion version(1, 0, epoch, timestamp);
     ChunkType chunk1(
         *cm.getUUID(),
         {shardKeyPattern.getKeyPattern().globalMin(), shardKeyPattern.getKeyPattern().globalMax()},
@@ -344,7 +347,8 @@ TEST_F(ShardedUnionTest, AvoidsSplittingSubPipelineIfRefreshedDistributionDoesNo
         {shards[0].getName()});
     chunk1.setName(OID::gen());
 
-    expectCollectionAndChunksAggregation(kTestAggregateNss, epoch, uuid, shardKeyPattern, {chunk1});
+    expectCollectionAndChunksAggregation(
+        kTestAggregateNss, epoch, timestamp, uuid, shardKeyPattern, {chunk1});
 
     // That error should be retried, this time targetting only one shard.
     onCommand([&](const executor::RemoteCommandRequest& request) {

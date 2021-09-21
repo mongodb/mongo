@@ -58,10 +58,12 @@ public:
     const ShardKeyPattern kShardKey = ShardKeyPattern(BSON("oldKey" << 1));
     const OID kOrigEpoch = OID::gen();
     const UUID kOrigUUID = UUID::gen();
+    const Timestamp kOrigTimestamp = Timestamp(1);
     const NamespaceString kOrigNss = NamespaceString("db.foo");
     const ShardKeyPattern kReshardingKey = ShardKeyPattern(BSON("newKey" << 1));
     const OID kReshardingEpoch = OID::gen();
     const UUID kReshardingUUID = UUID::gen();
+    const Timestamp kReshardingTimestamp = Timestamp(2);
     const NamespaceString kReshardingNss = NamespaceString(
         str::stream() << "db." << NamespaceString::kTemporaryReshardingCollectionPrefix
                       << kOrigUUID);
@@ -139,11 +141,12 @@ public:
                                                         const ShardKeyPattern& skey,
                                                         UUID uuid,
                                                         OID epoch,
+                                                        Timestamp timestamp,
                                                         const BSONObj& collation = {}) {
         auto future = scheduleRoutingInfoForcedRefresh(tempNss);
 
         expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
-            CollectionType coll(tempNss, epoch, Date_t::now(), uuid);
+            CollectionType coll(tempNss, epoch, timestamp, Date_t::now(), uuid);
             coll.setKeyPattern(skey.getKeyPattern());
             coll.setUnique(false);
             coll.setDefaultCollation(collation);
@@ -161,7 +164,7 @@ public:
             reshardingFields.setRecipientFields(recipientFields);
             coll.setReshardingFields(reshardingFields);
 
-            ChunkVersion version(1, 0, epoch, boost::none /* timestamp */);
+            ChunkVersion version(1, 0, epoch, timestamp);
 
             ChunkType chunk(uuid,
                             {skey.getKeyPattern().globalMin(), skey.getKeyPattern().globalMax()},
@@ -180,13 +183,14 @@ public:
     void expectRefreshReturnForOriginalColl(const NamespaceString& origNss,
                                             const ShardKeyPattern& skey,
                                             UUID uuid,
-                                            OID epoch) {
+                                            OID epoch,
+                                            Timestamp timestamp) {
         expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
-            CollectionType coll(origNss, epoch, Date_t::now(), uuid);
+            CollectionType coll(origNss, epoch, timestamp, Date_t::now(), uuid);
             coll.setKeyPattern(skey.getKeyPattern());
             coll.setUnique(false);
 
-            ChunkVersion version(1, 0, epoch, boost::none /* timestamp */);
+            ChunkVersion version(1, 0, epoch, timestamp);
 
             ChunkType chunk(uuid,
                             {skey.getKeyPattern().globalMin(), skey.getKeyPattern().globalMax()},
@@ -280,8 +284,12 @@ TEST_F(RecipientServiceExternalStateTest, CreateLocalReshardingCollectionBasic) 
     }
 
     // Simulate a refresh for the temporary resharding collection.
-    loadOneChunkMetadataForTemporaryReshardingColl(
-        kReshardingNss, kOrigNss, kReshardingKey, kReshardingUUID, kReshardingEpoch);
+    loadOneChunkMetadataForTemporaryReshardingColl(kReshardingNss,
+                                                   kOrigNss,
+                                                   kReshardingKey,
+                                                   kReshardingUUID,
+                                                   kReshardingEpoch,
+                                                   kReshardingTimestamp);
 
     const std::vector<BSONObj> indexes = {BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
                                                    << "_id_"),
@@ -291,7 +299,8 @@ TEST_F(RecipientServiceExternalStateTest, CreateLocalReshardingCollectionBasic) 
                                                    << "name"
                                                    << "indexOne")};
     auto future = launchAsync([&] {
-        expectRefreshReturnForOriginalColl(kOrigNss, kShardKey, kOrigUUID, kOrigEpoch);
+        expectRefreshReturnForOriginalColl(
+            kOrigNss, kShardKey, kOrigUUID, kOrigEpoch, kOrigTimestamp);
         expectListCollections(
             kOrigNss,
             kOrigUUID,
@@ -328,8 +337,12 @@ TEST_F(RecipientServiceExternalStateTest,
     }
 
     // Simulate a refresh for the temporary resharding collection.
-    loadOneChunkMetadataForTemporaryReshardingColl(
-        kReshardingNss, kOrigNss, kReshardingKey, kReshardingUUID, kReshardingEpoch);
+    loadOneChunkMetadataForTemporaryReshardingColl(kReshardingNss,
+                                                   kOrigNss,
+                                                   kReshardingKey,
+                                                   kReshardingUUID,
+                                                   kReshardingEpoch,
+                                                   kReshardingTimestamp);
 
     const std::vector<BSONObj> indexes = {BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
                                                    << "_id_"),
@@ -339,7 +352,8 @@ TEST_F(RecipientServiceExternalStateTest,
                                                    << "name"
                                                    << "indexOne")};
     auto future = launchAsync([&] {
-        expectRefreshReturnForOriginalColl(kOrigNss, kShardKey, kOrigUUID, kOrigEpoch);
+        expectRefreshReturnForOriginalColl(
+            kOrigNss, kShardKey, kOrigUUID, kOrigEpoch, kOrigTimestamp);
         expectStaleDbVersionError(kOrigNss, "listCollections");
         expectGetDatabase(kOrigNss, shards[1].getHost());
         expectListCollections(
@@ -352,7 +366,8 @@ TEST_F(RecipientServiceExternalStateTest,
             HostAndPort(shards[1].getHost()));
 
         expectStaleEpochError(kOrigNss, "listIndexes");
-        expectRefreshReturnForOriginalColl(kOrigNss, kShardKey, kOrigUUID, kOrigEpoch);
+        expectRefreshReturnForOriginalColl(
+            kOrigNss, kShardKey, kOrigUUID, kOrigEpoch, kOrigTimestamp);
         expectListIndexes(kOrigNss, kOrigUUID, indexes, HostAndPort(shards[0].getHost()));
     });
 
@@ -381,8 +396,12 @@ TEST_F(RecipientServiceExternalStateTest,
     }
 
     // Simulate a refresh for the temporary resharding collection.
-    loadOneChunkMetadataForTemporaryReshardingColl(
-        kReshardingNss, kOrigNss, kReshardingKey, kReshardingUUID, kReshardingEpoch);
+    loadOneChunkMetadataForTemporaryReshardingColl(kReshardingNss,
+                                                   kOrigNss,
+                                                   kReshardingKey,
+                                                   kReshardingUUID,
+                                                   kReshardingEpoch,
+                                                   kReshardingTimestamp);
 
     const std::vector<BSONObj> indexes = {BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
                                                    << "_id_"),
@@ -407,7 +426,8 @@ TEST_F(RecipientServiceExternalStateTest,
     }
 
     auto future = launchAsync([&] {
-        expectRefreshReturnForOriginalColl(kOrigNss, kShardKey, kOrigUUID, kOrigEpoch);
+        expectRefreshReturnForOriginalColl(
+            kOrigNss, kShardKey, kOrigUUID, kOrigEpoch, kOrigTimestamp);
         expectListCollections(
             kOrigNss,
             kOrigUUID,
@@ -444,8 +464,12 @@ TEST_F(RecipientServiceExternalStateTest,
     }
 
     // Simulate a refresh for the temporary resharding collection.
-    loadOneChunkMetadataForTemporaryReshardingColl(
-        kReshardingNss, kOrigNss, kReshardingKey, kReshardingUUID, kReshardingEpoch);
+    loadOneChunkMetadataForTemporaryReshardingColl(kReshardingNss,
+                                                   kOrigNss,
+                                                   kReshardingKey,
+                                                   kReshardingUUID,
+                                                   kReshardingEpoch,
+                                                   kReshardingTimestamp);
 
     const std::vector<BSONObj> indexes = {BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
                                                    << "_id_"),
@@ -472,7 +496,8 @@ TEST_F(RecipientServiceExternalStateTest,
     }
 
     auto future = launchAsync([&] {
-        expectRefreshReturnForOriginalColl(kOrigNss, kShardKey, kOrigUUID, kOrigEpoch);
+        expectRefreshReturnForOriginalColl(
+            kOrigNss, kShardKey, kOrigUUID, kOrigEpoch, kOrigTimestamp);
         expectListCollections(
             kOrigNss,
             kOrigUUID,
@@ -509,8 +534,12 @@ TEST_F(RecipientServiceExternalStateTest,
     }
 
     // Simulate a refresh for the temporary resharding collection.
-    loadOneChunkMetadataForTemporaryReshardingColl(
-        kReshardingNss, kOrigNss, kReshardingKey, kReshardingUUID, kReshardingEpoch);
+    loadOneChunkMetadataForTemporaryReshardingColl(kReshardingNss,
+                                                   kOrigNss,
+                                                   kReshardingKey,
+                                                   kReshardingUUID,
+                                                   kReshardingEpoch,
+                                                   kReshardingTimestamp);
 
     const std::vector<BSONObj> indexes = {BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
                                                    << "_id_"),
@@ -527,7 +556,8 @@ TEST_F(RecipientServiceExternalStateTest,
         operationContext(), kReshardingNss, optionsAndIndexes);
 
     auto future = launchAsync([&] {
-        expectRefreshReturnForOriginalColl(kOrigNss, kShardKey, kOrigUUID, kOrigEpoch);
+        expectRefreshReturnForOriginalColl(
+            kOrigNss, kShardKey, kOrigUUID, kOrigEpoch, kOrigTimestamp);
         expectListCollections(
             kOrigNss,
             kOrigUUID,

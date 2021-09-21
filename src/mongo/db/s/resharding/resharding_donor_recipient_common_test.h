@@ -109,7 +109,7 @@ protected:
                                            const ShardId& shardThatChunkExistsOn) {
         auto range = ChunkRange(BSON(shardKey << MINKEY), BSON(shardKey << MAXKEY));
         auto chunk = ChunkType(
-            uuid, std::move(range), ChunkVersion(1, 0, epoch, boost::none), shardThatChunkExistsOn);
+            uuid, std::move(range), ChunkVersion(1, 0, epoch, timestamp), shardThatChunkExistsOn);
         ChunkManager cm(kThisShard.getShardId(),
                         DatabaseVersion(uuid, timestamp),
                         makeStandaloneRoutingTableHistory(
@@ -119,7 +119,7 @@ protected:
                                                          nullptr,
                                                          false,
                                                          epoch,
-                                                         boost::none,
+                                                         timestamp,
                                                          boost::none /* timeseriesFields */,
                                                          boost::none,
                                                          boost::none /* chunkSizeBytes */,

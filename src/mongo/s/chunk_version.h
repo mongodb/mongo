@@ -54,15 +54,12 @@ public:
      */
     static constexpr StringData kShardVersionField = "shardVersion"_sd;
 
-    ChunkVersion(uint32_t major,
-                 uint32_t minor,
-                 const OID& epoch,
-                 boost::optional<Timestamp> timestamp)
+    ChunkVersion(uint32_t major, uint32_t minor, const OID& epoch, Timestamp timestamp)
         : _combined(static_cast<uint64_t>(minor) | (static_cast<uint64_t>(major) << 32)),
           _epoch(epoch),
           _timestamp(std::move(timestamp)) {}
 
-    ChunkVersion() : ChunkVersion(0, 0, OID(), boost::none) {}
+    ChunkVersion() : ChunkVersion(0, 0, OID(), Timestamp()) {}
 
     static StatusWith<ChunkVersion> parseFromCommand(const BSONObj& obj) {
         return parseWithField(obj, kShardVersionField);
@@ -76,8 +73,8 @@ public:
     static StatusWith<ChunkVersion> parseWithField(const BSONObj& obj, StringData field);
 
     /**
-     * Parses 'obj', which is expected to have two elements: the timestamp and the object id. The
-     * field names don't matter, so 'obj' can be a BSONArray.
+     * Parses 'obj', which is expected to have three elements: the major/minor versions, the object
+     * id, and the timestamp. The field names don't matter, so 'obj' can be a BSONArray.
      */
     static StatusWith<ChunkVersion> fromBSON(const BSONObj& obj);
 
@@ -126,13 +123,23 @@ public:
      */
     static ChunkVersion IGNORED() {
         ChunkVersion version;
-        version._epoch.init(Date_t(), true);  // ignored OID is zero time, max machineId/inc
+        version._epoch.init(Date_t(), true);    // ignored OID is zero time, max machineId/inc
+        version._timestamp = Timestamp::max();  // ignored Timestamp is the largest timestamp
         return version;
     }
 
     static bool isIgnoredVersion(const ChunkVersion& version) {
         return version.majorVersion() == 0 && version.minorVersion() == 0 &&
-            version.epoch() == IGNORED().epoch();
+            version.epoch() == IGNORED().epoch() &&
+            version.getTimestamp() == IGNORED().getTimestamp();
+    }
+
+    /**
+     * Needed for parsing IGNORED and UNSHARDED from 5.0 that didn't include a timestamp. Should be
+     * removed after 6.0 is last-lts.
+     */
+    bool is50IgnoredOrUnsharded() {
+        return _combined == 0 && (_epoch == UNSHARDED().epoch() || _epoch == IGNORED().epoch());
     }
 
     void incMajor() {
@@ -176,7 +183,7 @@ public:
         return _epoch;
     }
 
-    boost::optional<Timestamp> getTimestamp() const {
+    const Timestamp& getTimestamp() const {
         return _timestamp;
     }
 
@@ -253,7 +260,7 @@ private:
     uint64_t _combined;
     OID _epoch;
 
-    boost::optional<Timestamp> _timestamp;
+    Timestamp _timestamp;
 };
 
 inline std::ostream& operator<<(std::ostream& s, const ChunkVersion& v) {

@@ -60,7 +60,7 @@ protected:
 
 TEST_F(MergeChunkTest, MergeExistingChunksCorrectlyShouldSucceed) {
     const auto collEpoch = OID::gen();
-    const boost::optional<Timestamp> collTimestamp(42);
+    const Timestamp collTimestamp(42);
 
     const auto collUuid = UUID::gen();
     ChunkType chunk;
@@ -141,7 +141,7 @@ TEST_F(MergeChunkTest, MergeExistingChunksCorrectlyShouldSucceed) {
 
 TEST_F(MergeChunkTest, MergeSeveralChunksCorrectlyShouldSucceed) {
     const auto collEpoch = OID::gen();
-    const boost::optional<Timestamp> collTimestamp(42);
+    const Timestamp collTimestamp(42);
     const auto collUuid = UUID::gen();
     ChunkType chunk;
     chunk.setName(OID::gen());
@@ -214,7 +214,7 @@ TEST_F(MergeChunkTest, MergeSeveralChunksCorrectlyShouldSucceed) {
 
 TEST_F(MergeChunkTest, NewMergeShouldClaimHighestVersion) {
     const auto collEpoch = OID::gen();
-    const boost::optional<Timestamp> collTimestamp(42);
+    const Timestamp collTimestamp(42);
     const auto collUuid = UUID::gen();
     ChunkType chunk, otherChunk;
     chunk.setName(OID::gen());
@@ -292,7 +292,7 @@ TEST_F(MergeChunkTest, NewMergeShouldClaimHighestVersion) {
 
 TEST_F(MergeChunkTest, MergeLeavesOtherChunksAlone) {
     const auto collEpoch = OID::gen();
-    const boost::optional<Timestamp> collTimestamp(42);
+    const Timestamp collTimestamp(42);
     const auto collUuid = UUID::gen();
     ShardId shardId(_shardName);
     ChunkType chunk;
@@ -370,7 +370,7 @@ TEST_F(MergeChunkTest, MergeLeavesOtherChunksAlone) {
 TEST_F(MergeChunkTest, NonExistingNamespace) {
     const auto collEpoch = OID::gen();
     const auto collUuidAtRequest = UUID::gen();
-    const boost::optional<Timestamp> collTimestamp(42);
+    const Timestamp collTimestamp(42);
     ChunkType chunk;
     chunk.setCollectionUUID(UUID::gen());
 
@@ -408,7 +408,7 @@ TEST_F(MergeChunkTest, NonExistingNamespace) {
 
 TEST_F(MergeChunkTest, NonMatchingUUIDsOfChunkAndRequestErrors) {
     const auto collEpoch = OID::gen();
-    const boost::optional<Timestamp> collTimestamp(42);
+    const Timestamp collTimestamp(42);
     const auto collUuid = UUID::gen();
     const auto requestUuid = UUID::gen();
     ChunkType chunk;
@@ -446,7 +446,7 @@ TEST_F(MergeChunkTest, NonMatchingUUIDsOfChunkAndRequestErrors) {
 
 TEST_F(MergeChunkTest, MergeAlreadyHappenedSucceeds) {
     const auto collEpoch = OID::gen();
-    const boost::optional<Timestamp> collTimestamp(42);
+    const Timestamp collTimestamp(42);
     const auto collUuid = UUID::gen();
 
     // Construct chunk range to be merged
@@ -498,7 +498,7 @@ TEST_F(MergeChunkTest, MergeAlreadyHappenedSucceeds) {
 
 TEST_F(MergeChunkTest, MergingChunksWithDollarPrefixShouldSucceed) {
     const auto collEpoch = OID::gen();
-    const boost::optional<Timestamp> collTimestamp(42);
+    const Timestamp collTimestamp(42);
     const auto collUuid = UUID::gen();
     ChunkType chunk1;
     chunk1.setName(OID::gen());

@@ -448,12 +448,15 @@ TEST_F(ClusterExchangeTest, WordCountUseCaseExample) {
 TEST_F(ClusterExchangeTest, WordCountUseCaseExampleShardedByWord) {
     setupNShards(2);
     const OID epoch = OID::gen();
+    const Timestamp timestamp = Timestamp(1);
     ShardKeyPattern shardKey(BSON("word" << 1));
     loadRoutingTable(kTestTargetNss,
                      epoch,
+                     timestamp,
                      shardKey,
                      makeChunks(UUID::gen(),
                                 epoch,
+                                timestamp,
                                 {{ChunkRange{BSON("word" << MINKEY),
                                              BSON("word"
                                                   << "hello")},
@@ -523,13 +526,14 @@ TEST_F(ClusterExchangeTest, WordCountUseCaseExampleShardedByWord) {
 TEST_F(ClusterExchangeTest, CompoundShardKeyThreeShards) {
     const OID epoch = OID::gen();
     const UUID uuid = UUID::gen();
+    const Timestamp timestamp;
     ShardKeyPattern shardKey(BSON("x" << 1 << "y" << 1));
 
     setupNShards(3);
     const std::vector<std::string> xBoundaries = {"a", "g", "m", "r", "u"};
     auto chunks = [&]() {
         std::vector<ChunkType> chunks;
-        ChunkVersion version(1, 0, epoch, boost::none /* timestamp */);
+        ChunkVersion version(1, 0, epoch, timestamp);
         chunks.emplace_back(uuid,
                             ChunkRange{BSON("x" << MINKEY << "y" << MINKEY),
                                        BSON("x" << xBoundaries[0] << "y" << MINKEY)},
@@ -553,7 +557,7 @@ TEST_F(ClusterExchangeTest, CompoundShardKeyThreeShards) {
         return chunks;
     }();
 
-    loadRoutingTable(kTestTargetNss, epoch, shardKey, chunks);
+    loadRoutingTable(kTestTargetNss, epoch, timestamp, shardKey, chunks);
 
     auto mergePipe = Pipeline::create({parseStage("{$group: {"
                                                   "  _id: '$x',"

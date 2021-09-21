@@ -114,7 +114,7 @@ protected:
                                       const UUID& uuid,
                                       const BSONObj& minKey,
                                       const OID& collEpoch,
-                                      const boost::optional<Timestamp>& collTimestamp);
+                                      const Timestamp& collTimestamp);
 
     /**
      * Retrieves the chunk document <minKey> from the config server.
@@ -125,7 +125,7 @@ protected:
     StatusWith<ChunkType> getChunkDoc(OperationContext* opCtx,
                                       const BSONObj& minKey,
                                       const OID& collEpoch,
-                                      const boost::optional<Timestamp>& collTimestamp);
+                                      const Timestamp& collTimestamp);
 
     /**
      * Returns the collection version.

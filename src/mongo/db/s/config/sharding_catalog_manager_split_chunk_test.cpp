@@ -57,7 +57,7 @@ protected:
 };
 
 TEST_F(SplitChunkTest, SplitExistingChunkCorrectlyShouldSucceed) {
-    auto test = [&](const NamespaceString& nss, const boost::optional<Timestamp>& collTimestamp) {
+    auto test = [&](const NamespaceString& nss, const Timestamp& collTimestamp) {
         const auto collEpoch = OID::gen();
         const auto collUuid = UUID::gen();
 
@@ -100,9 +100,6 @@ TEST_F(SplitChunkTest, SplitExistingChunkCorrectlyShouldSucceed) {
         ASSERT_EQ(expectedShardVersion, shardVersion);
         ASSERT_EQ(shardVersion, collVersion);
 
-        const auto nssOrUuid =
-            collTimestamp ? NamespaceStringOrUUID(nss.db().toString(), collUuid) : nss;
-
         // First chunkDoc should have range [chunkMin, chunkSplitPoint]
         auto chunkDocStatus =
             getChunkDoc(operationContext(), collUuid, chunkMin, collEpoch, collTimestamp);
@@ -141,7 +138,7 @@ TEST_F(SplitChunkTest, SplitExistingChunkCorrectlyShouldSucceed) {
 }
 
 TEST_F(SplitChunkTest, MultipleSplitsOnExistingChunkShouldSucceed) {
-    auto test = [&](const NamespaceString& nss, const boost::optional<Timestamp>& collTimestamp) {
+    auto test = [&](const NamespaceString& nss, const Timestamp& collTimestamp) {
         const auto collEpoch = OID::gen();
         const auto collUuid = UUID::gen();
 
@@ -173,9 +170,6 @@ TEST_F(SplitChunkTest, MultipleSplitsOnExistingChunkShouldSucceed) {
                                          ChunkRange(chunkMin, chunkMax),
                                          splitPoints,
                                          "shard0000"));
-
-        const auto nssOrUuid =
-            collTimestamp ? NamespaceStringOrUUID(nss.db().toString(), collUuid) : nss;
 
         // First chunkDoc should have range [chunkMin, chunkSplitPoint]
         auto chunkDocStatus =
@@ -231,7 +225,7 @@ TEST_F(SplitChunkTest, MultipleSplitsOnExistingChunkShouldSucceed) {
 }
 
 TEST_F(SplitChunkTest, NewSplitShouldClaimHighestVersion) {
-    auto test = [&](const NamespaceString& nss, const boost::optional<Timestamp>& collTimestamp) {
+    auto test = [&](const NamespaceString& nss, const Timestamp& collTimestamp) {
         const auto collEpoch = OID::gen();
         const auto collUuid = UUID::gen();
 
@@ -272,9 +266,6 @@ TEST_F(SplitChunkTest, NewSplitShouldClaimHighestVersion) {
                                          splitPoints,
                                          "shard0000"));
 
-        const auto nssOrUuid =
-            collTimestamp ? NamespaceStringOrUUID(nss.db().toString(), collUuid) : nss;
-
         // First chunkDoc should have range [chunkMin, chunkSplitPoint]
         auto chunkDocStatus =
             getChunkDoc(operationContext(), collUuid, chunkMin, collEpoch, collTimestamp);
@@ -304,7 +295,7 @@ TEST_F(SplitChunkTest, NewSplitShouldClaimHighestVersion) {
 }
 
 TEST_F(SplitChunkTest, PreConditionFailErrors) {
-    auto test = [&](const NamespaceString& nss, const boost::optional<Timestamp>& collTimestamp) {
+    auto test = [&](const NamespaceString& nss, const Timestamp& collTimestamp) {
         const auto collEpoch = OID::gen();
 
         ChunkType chunk;
@@ -340,7 +331,7 @@ TEST_F(SplitChunkTest, PreConditionFailErrors) {
 }
 
 TEST_F(SplitChunkTest, NonExisingNamespaceErrors) {
-    auto test = [&](const NamespaceString& nss, const boost::optional<Timestamp>& collTimestamp) {
+    auto test = [&](const NamespaceString& nss, const Timestamp& collTimestamp) {
         const auto collEpoch = OID::gen();
 
         ChunkType chunk;
@@ -373,7 +364,7 @@ TEST_F(SplitChunkTest, NonExisingNamespaceErrors) {
 }
 
 TEST_F(SplitChunkTest, NonMatchingEpochsOfChunkAndRequestErrors) {
-    auto test = [&](const NamespaceString& nss, const boost::optional<Timestamp>& collTimestamp) {
+    auto test = [&](const NamespaceString& nss, const Timestamp& collTimestamp) {
         const auto collEpoch = OID::gen();
 
         ChunkType chunk;
@@ -406,7 +397,7 @@ TEST_F(SplitChunkTest, NonMatchingEpochsOfChunkAndRequestErrors) {
 }
 
 TEST_F(SplitChunkTest, SplitPointsOutOfOrderShouldFail) {
-    auto test = [&](const NamespaceString& nss, const boost::optional<Timestamp>& collTimestamp) {
+    auto test = [&](const NamespaceString& nss, const Timestamp& collTimestamp) {
         const auto collEpoch = OID::gen();
 
         ChunkType chunk;
@@ -440,7 +431,7 @@ TEST_F(SplitChunkTest, SplitPointsOutOfOrderShouldFail) {
 }
 
 TEST_F(SplitChunkTest, SplitPointsOutOfRangeAtMinShouldFail) {
-    auto test = [&](const NamespaceString& nss, const boost::optional<Timestamp>& collTimestamp) {
+    auto test = [&](const NamespaceString& nss, const Timestamp& collTimestamp) {
         const auto collEpoch = OID::gen();
 
         ChunkType chunk;
@@ -473,7 +464,7 @@ TEST_F(SplitChunkTest, SplitPointsOutOfRangeAtMinShouldFail) {
 }
 
 TEST_F(SplitChunkTest, SplitPointsOutOfRangeAtMaxShouldFail) {
-    auto test = [&](const NamespaceString& nss, const boost::optional<Timestamp>& collTimestamp) {
+    auto test = [&](const NamespaceString& nss, const Timestamp& collTimestamp) {
         const auto collEpoch = OID::gen();
 
         ChunkType chunk;
@@ -507,7 +498,7 @@ TEST_F(SplitChunkTest, SplitPointsOutOfRangeAtMaxShouldFail) {
 }
 
 TEST_F(SplitChunkTest, SplitPointsWithDollarPrefixShouldFail) {
-    auto test = [&](const NamespaceString& nss, const boost::optional<Timestamp>& collTimestamp) {
+    auto test = [&](const NamespaceString& nss, const Timestamp& collTimestamp) {
         const auto collEpoch = OID::gen();
 
         ChunkType chunk;

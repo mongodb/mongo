@@ -73,13 +73,13 @@ protected:
             nullptr,
             false,
             epoch,
-            boost::none /* timestamp */,
+            Timestamp(),
             timeseriesFields,
             boost::none,
             boost::none,
             true,
             [&] {
-                ChunkVersion version(1, 0, epoch, boost::none /* timestamp */);
+                ChunkVersion version(1, 0, epoch, Timestamp());
 
                 ChunkType chunk1(uuid,
                                  {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << -100)},

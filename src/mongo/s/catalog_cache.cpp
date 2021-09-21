@@ -659,20 +659,10 @@ CatalogCache::CollectionCache::LookupResult CatalogCache::CollectionCache::_look
             // updating. Otherwise, we're making a whole new routing table.
             if (isIncremental &&
                 existingHistory->optRt->getVersion().epoch() == collectionAndChunks.epoch) {
-                if (existingHistory->optRt->getVersion().getTimestamp().is_initialized() !=
-                    collectionAndChunks.creationTime.is_initialized()) {
-                    return existingHistory->optRt
-                        ->makeUpdatedReplacingTimestamp(collectionAndChunks.creationTime)
-                        .makeUpdated(collectionAndChunks.reshardingFields,
-                                     maxChunkSize,
-                                     collectionAndChunks.allowMigrations,
-                                     collectionAndChunks.changedChunks);
-                } else {
-                    return existingHistory->optRt->makeUpdated(collectionAndChunks.reshardingFields,
-                                                               maxChunkSize,
-                                                               collectionAndChunks.allowMigrations,
-                                                               collectionAndChunks.changedChunks);
-                }
+                return existingHistory->optRt->makeUpdated(collectionAndChunks.reshardingFields,
+                                                           maxChunkSize,
+                                                           collectionAndChunks.allowMigrations,
+                                                           collectionAndChunks.changedChunks);
             }
 
             auto defaultCollator = [&]() -> std::unique_ptr<CollatorInterface> {

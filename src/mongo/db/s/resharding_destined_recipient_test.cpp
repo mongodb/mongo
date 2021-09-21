@@ -161,18 +161,15 @@ public:
 protected:
     std::vector<ChunkType> createChunks(const OID& epoch,
                                         const UUID& uuid,
+                                        const Timestamp& timestamp,
                                         const std::string& shardKey) {
         auto range1 = ChunkRange(BSON(shardKey << MINKEY), BSON(shardKey << 5));
-        ChunkType chunk1(uuid,
-                         range1,
-                         ChunkVersion(1, 0, epoch, boost::none /* timestamp */),
-                         kShardList[0].getName());
+        ChunkType chunk1(
+            uuid, range1, ChunkVersion(1, 0, epoch, timestamp), kShardList[0].getName());
 
         auto range2 = ChunkRange(BSON(shardKey << 5), BSON(shardKey << MAXKEY));
-        ChunkType chunk2(uuid,
-                         range2,
-                         ChunkVersion(1, 0, epoch, boost::none /* timestamp */),
-                         kShardList[1].getName());
+        ChunkType chunk2(
+            uuid, range2, ChunkVersion(1, 0, epoch, timestamp), kShardList[1].getName());
 
         return {chunk1, chunk2};
     }
@@ -201,7 +198,7 @@ protected:
 
         ReshardingEnv env(CollectionCatalog::get(opCtx)->lookupUUIDByNSS(opCtx, kNss).value());
         env.destShard = kShardList[1].getName();
-        env.version = ChunkVersion(1, 0, OID::gen(), boost::none /* timestamp */);
+        env.version = ChunkVersion(1, 0, OID::gen(), Timestamp());
         env.tempNss =
             NamespaceString(kNss.db(),
                             fmt::format("{}{}",
@@ -219,7 +216,8 @@ protected:
             {ShardId{kShardList[0].getName()}, ShardId{kShardList[1].getName()}}});
         reshardingFields.setState(CoordinatorStateEnum::kPreparingToDonate);
 
-        CollectionType coll(kNss, env.version.epoch(), Date_t::now(), UUID::gen());
+        CollectionType coll(
+            kNss, env.version.epoch(), env.version.getTimestamp(), Date_t::now(), UUID::gen());
         coll.setKeyPattern(BSON(kShardKey << 1));
         coll.setUnique(false);
         coll.setAllowMigrations(false);
@@ -229,10 +227,14 @@ protected:
         _mockCatalogCacheLoader->setCollectionRefreshValues(
             kNss,
             coll,
-            createChunks(env.version.epoch(), env.sourceUuid, kShardKey),
+            createChunks(
+                env.version.epoch(), env.sourceUuid, env.version.getTimestamp(), kShardKey),
             reshardingFields);
         _mockCatalogCacheLoader->setCollectionRefreshValues(
-            env.tempNss, coll, createChunks(env.version.epoch(), env.sourceUuid, "y"), boost::none);
+            env.tempNss,
+            coll,
+            createChunks(env.version.epoch(), env.sourceUuid, env.version.getTimestamp(), "y"),
+            boost::none);
 
         forceDatabaseRefresh(opCtx, kNss.db());
         forceShardFilteringMetadataRefresh(opCtx, kNss);

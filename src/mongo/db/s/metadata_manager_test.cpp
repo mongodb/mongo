@@ -85,13 +85,12 @@ protected:
             nullptr,
             false,
             epoch,
-            boost::none /* timestamp */,
+            Timestamp(),
             boost::none /* timeseriesFields */,
             boost::none,
             boost::none /* chunkSizeBytes */,
             true,
-            {ChunkType{
-                uuid, range, ChunkVersion(1, 0, epoch, boost::none /* timestamp */), kOtherShard}});
+            {ChunkType{uuid, range, ChunkVersion(1, 0, epoch, Timestamp()), kOtherShard}});
 
         return CollectionMetadata(ChunkManager(kThisShard,
                                                DatabaseVersion(UUID::gen(), Timestamp()),

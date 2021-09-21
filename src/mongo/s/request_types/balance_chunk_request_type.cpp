@@ -180,6 +180,7 @@ BSONObj BalanceChunkRequest::serializeToMoveCommandForConfig(
     cmdBuilder.appendElements(chunk.toConfigBSON());
     // ChunkType::toConfigBSON() no longer adds the epoch
     cmdBuilder.append(ChunkType::lastmod() + "Epoch", chunk.getVersion().epoch());
+    cmdBuilder.append(ChunkType::lastmod() + "Timestamp", chunk.getVersion().getTimestamp());
     cmdBuilder.append(kToShardId, newShardId.toString());
     cmdBuilder.append(kMaxChunkSizeBytes, static_cast<long long>(maxChunkSizeBytes));
     {
@@ -203,6 +204,7 @@ BSONObj BalanceChunkRequest::serializeToRebalanceCommandForConfig(const ChunkTyp
     cmdBuilder.appendElements(chunk.toConfigBSON());
     // ChunkType::toConfigBSON() no longer returns the epoch
     cmdBuilder.append(ChunkType::lastmod() + "Epoch", chunk.getVersion().epoch());
+    cmdBuilder.append(ChunkType::lastmod() + "Timestamp", chunk.getVersion().getTimestamp());
     cmdBuilder.append(WriteConcernOptions::kWriteConcernField,
                       kMajorityWriteConcernNoTimeout.toBSON());
 

@@ -48,6 +48,7 @@ public:
     using ShardCollectionTypeBase::kReshardingFieldsFieldName;
     using ShardCollectionTypeBase::kSupportingLongNameFieldName;
     using ShardCollectionTypeBase::kTimeseriesFieldsFieldName;
+    using ShardCollectionTypeBase::kTimestampFieldName;
     using ShardCollectionTypeBase::kUniqueFieldName;
     using ShardCollectionTypeBase::kUuidFieldName;
 
@@ -80,12 +81,9 @@ public:
     using ShardCollectionTypeBase::setUnique;
     using ShardCollectionTypeBase::setUuid;
 
-    ShardCollectionType(
-        NamespaceString nss, OID epoch, UUID uuid, KeyPattern keyPattern, bool unique);
-
     ShardCollectionType(NamespaceString nss,
                         OID epoch,
-                        boost::optional<Timestamp> creationTime,
+                        Timestamp creationTime,
                         UUID uuid,
                         KeyPattern keyPattern,
                         bool unique);

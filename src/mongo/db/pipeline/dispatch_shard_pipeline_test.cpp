@@ -219,9 +219,10 @@ TEST_F(DispatchShardPipelineTest, WrappedDispatchDoesRetryOnStaleConfigError) {
     // Mock the expected config server queries.
     const OID epoch = OID::gen();
     const UUID uuid = UUID::gen();
+    const Timestamp timestamp(1);
     const ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
 
-    ChunkVersion version(1, 0, epoch, boost::none /* timestamp */);
+    ChunkVersion version(1, 0, epoch, timestamp);
 
     ChunkType chunk1(
         uuid, {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << 0)}, version, {"0"});
@@ -233,7 +234,7 @@ TEST_F(DispatchShardPipelineTest, WrappedDispatchDoesRetryOnStaleConfigError) {
     chunk2.setName(OID::gen());
     version.incMinor();
     expectCollectionAndChunksAggregation(
-        kTestAggregateNss, epoch, uuid, shardKeyPattern, {chunk1, chunk2});
+        kTestAggregateNss, epoch, timestamp, uuid, shardKeyPattern, {chunk1, chunk2});
 
     // That error should be retried, but only the one on that shard.
     onCommand([&](const executor::RemoteCommandRequest& request) {

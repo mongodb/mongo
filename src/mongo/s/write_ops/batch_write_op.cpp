@@ -394,10 +394,10 @@ Status BatchWriteOp::targetBatch(const NSTargeter& targeter,
         // StaleShardVersion and has to return number of errors equivalent to the number of writes
         // in the batch, the response size will not exceed the max BSON size.
         //
-        // The constant of 256 is chosen as an approximation of the size of the BSON representataion
+        // The constant of 272 is chosen as an approximation of the size of the BSON representataion
         // of the StaleConfigInfo (which contains the shard id) and the adjacent error message.
         const int errorResponsePotentialSizeBytes =
-            ordered ? 0 : write_ops::kWriteCommandBSONArrayPerElementOverheadBytes + 256;
+            ordered ? 0 : write_ops::kWriteCommandBSONArrayPerElementOverheadBytes + 272;
 
         if (wouldMakeBatchesTooBig(
                 writes, std::max(writeSizeBytes, errorResponsePotentialSizeBytes), batchMap)) {
