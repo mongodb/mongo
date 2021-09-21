@@ -58,10 +58,8 @@ public:
     static TopologyDescriptionPtr create(SdamConfiguration config);
 
     /**
-     * Copy the given TopologyDescription and set the topologyDescription of all contained server
-     * descriptions to point to this instance. The copy construction won't work in this scenario
-     * because shared_from_this cannot be used from within a constructor. Making it simple to
-     * associated the serverDescriptino with the topologyDescription.
+     * Deep copy the given TopologyDescription. The copy constructor won't work in this scenario
+     * because shared_from_this cannot be used from within a constructor.
      */
     static TopologyDescriptionPtr clone(const TopologyDescription& source);
 
@@ -145,8 +143,6 @@ private:
      * https://github.com/mongodb/specifications/blob/master/source/server-discovery-and-monitoring/server-discovery-and-monitoring.rst#logical-session-timeout
      */
     void calculateLogicalSessionTimeout();
-
-    static void associateServerDescriptions(const TopologyDescriptionPtr& topologyDescription);
 
     // unique id for this topology
     UUID _id = UUID::gen();
