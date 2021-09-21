@@ -1,7 +1,5 @@
 // Helper functions for testing time-series collections.
 
-load("jstests/libs/feature_flag_util.js");
-
 var TimeseriesTest = class {
     /**
      * Returns whether time-series collections are supported.
@@ -16,7 +14,10 @@ var TimeseriesTest = class {
      * Returns whether time-series bucket compression are supported.
      */
     static timeseriesBucketCompressionEnabled(conn) {
-        return FeatureFlagUtil.isEnabled(conn, "TimeseriesBucketCompression");
+        return assert
+            .commandWorked(
+                conn.adminCommand({getParameter: 1, featureFlagTimeseriesBucketCompression: 1}))
+            .featureFlagTimeseriesBucketCompression.value;
     }
 
     /**
