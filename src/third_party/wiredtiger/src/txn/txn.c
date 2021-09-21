@@ -1367,6 +1367,10 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
         WT_STAT_CONN_INCR(session, txn_prepared_updates_committed);
     }
 
+    /* Mark the page dirty once the prepared updates are resolved. */
+    cbt = (WT_CURSOR_BTREE *)(*cursorp);
+    __wt_page_modify_set(session, cbt->ref->page);
+
     /*
      * Fix the history store contents if they exist, when there are no more updates in the update
      * list. Only in eviction, it is possible to write an unfinished history store update when the
