@@ -31,7 +31,9 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/pipeline/document_source_merge_gen.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
+#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/timeseries/timeseries_update_delete_util.h"
 #include "mongo/unittest/death_test.h"
@@ -39,6 +41,28 @@
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
+
+namespace timeseries {
+
+/**
+ * Returns true if the given query only modifies the time-series collection's given metaField, false
+ * otherwise.
+ */
+bool queryOnlyDependsOnMetaField(OperationContext* opCtx,
+                                 const NamespaceString& ns,
+                                 const BSONObj& query,
+                                 boost::optional<StringData> metaField,
+                                 const LegacyRuntimeConstants& runtimeConstants,
+                                 const boost::optional<BSONObj>& letParams) {
+    boost::intrusive_ptr<ExpressionContext> expCtx(
+        new ExpressionContext(opCtx, nullptr, ns, runtimeConstants, letParams));
+    std::vector<BSONObj> rawPipeline{BSON("$match" << query)};
+    DepsTracker dependencies = Pipeline::parse(rawPipeline, expCtx)->getDependencies({});
+    return queryOnlyDependsOnMetaField(metaField, dependencies.fields);
+}
+
+}  // namespace timeseries
+
 namespace {
 
 class TimeseriesUpdateDeleteUtilTest : public ServiceContextMongoDTest {

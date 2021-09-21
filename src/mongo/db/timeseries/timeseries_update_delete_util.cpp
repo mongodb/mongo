@@ -30,8 +30,6 @@
 #include "mongo/db/timeseries/timeseries_update_delete_util.h"
 
 #include "mongo/db/exec/bucket_unpacker.h"
-#include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 
 namespace mongo::timeseries {
@@ -136,19 +134,6 @@ void replaceQueryMetaFieldName(mutablebson::Element elem,
     }
 }
 }  // namespace
-
-bool queryOnlyDependsOnMetaField(OperationContext* opCtx,
-                                 const NamespaceString& ns,
-                                 const BSONObj& query,
-                                 boost::optional<StringData> metaField,
-                                 const LegacyRuntimeConstants& runtimeConstants,
-                                 const boost::optional<BSONObj>& letParams) {
-    boost::intrusive_ptr<ExpressionContext> expCtx(
-        new ExpressionContext(opCtx, nullptr, ns, runtimeConstants, letParams));
-    std::vector<BSONObj> rawPipeline{BSON("$match" << query)};
-    DepsTracker dependencies = Pipeline::parse(rawPipeline, expCtx)->getDependencies({});
-    return queryOnlyDependsOnMetaField(metaField, dependencies.fields);
-}
 
 bool queryOnlyDependsOnMetaField(boost::optional<StringData> metaField,
                                  const std::set<std::string>& dependencyFieldNames) {

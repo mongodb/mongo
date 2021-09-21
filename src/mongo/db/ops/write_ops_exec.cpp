@@ -60,6 +60,8 @@
 #include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/ops/write_ops_retryability.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
@@ -580,6 +582,24 @@ SingleWriteResult makeWriteResultForInsertOrDeleteRetry() {
     res.setNModified(0);
     return res;
 }
+
+/**
+ * Returns true if the given query only modifies the time-series collection's given metaField, false
+ * otherwise.
+ */
+bool timeseriesQueryOnlyDependsOnMetaField(OperationContext* opCtx,
+                                           const NamespaceString& ns,
+                                           const BSONObj& query,
+                                           boost::optional<StringData> metaField,
+                                           const LegacyRuntimeConstants& runtimeConstants,
+                                           const boost::optional<BSONObj>& letParams) {
+    boost::intrusive_ptr<ExpressionContext> expCtx(
+        new ExpressionContext(opCtx, nullptr, ns, runtimeConstants, letParams));
+    std::vector<BSONObj> rawPipeline{BSON("$match" << query)};
+    DepsTracker dependencies = Pipeline::parse(rawPipeline, expCtx)->getDependencies({});
+    return timeseries::queryOnlyDependsOnMetaField(metaField, dependencies.fields);
+}
+
 }  // namespace
 
 WriteResult performInserts(OperationContext* opCtx,
@@ -789,12 +809,12 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
                 str::stream() << "Cannot perform an update on a time-series collection "
                                  "when querying on a field that is not the metaField '"
                               << *metaField << "'",
-                timeseries::queryOnlyDependsOnMetaField(opCtx,
-                                                        ns,
-                                                        updateQuery,
-                                                        *metaField,
-                                                        *updateRequest->getLegacyRuntimeConstants(),
-                                                        updateRequest->getLetParameters()));
+                timeseriesQueryOnlyDependsOnMetaField(opCtx,
+                                                      ns,
+                                                      updateQuery,
+                                                      *metaField,
+                                                      *updateRequest->getLegacyRuntimeConstants(),
+                                                      updateRequest->getLetParameters()));
 
         // Get the original set of modifications to apply and check that they only
         // modify the metaField.
@@ -1142,12 +1162,12 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
                 str::stream() << "Cannot perform a delete on a time-series collection "
                                  "when querying on a field that is not the metaField '"
                               << timeseriesOptions->getMetaField() << "'",
-                timeseries::queryOnlyDependsOnMetaField(opCtx,
-                                                        ns,
-                                                        request.getQuery(),
-                                                        timeseriesOptions->getMetaField(),
-                                                        runtimeConstants,
-                                                        letParams));
+                timeseriesQueryOnlyDependsOnMetaField(opCtx,
+                                                      ns,
+                                                      request.getQuery(),
+                                                      timeseriesOptions->getMetaField(),
+                                                      runtimeConstants,
+                                                      letParams));
         uassert(ErrorCodes::IllegalOperation,
                 "Cannot perform a non-multi delete on a time-series collection",
                 request.getMulti());

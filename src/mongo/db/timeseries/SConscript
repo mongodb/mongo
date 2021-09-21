@@ -106,7 +106,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/exec/bucket_unpacker',
         '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/db/ops/write_ops_parsers',
-        '$BUILD_DIR/mongo/db/pipeline/pipeline',
     ],
 )
 

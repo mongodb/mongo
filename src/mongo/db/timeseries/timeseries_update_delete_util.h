@@ -38,17 +38,6 @@
 namespace mongo::timeseries {
 
 /**
- * Returns true if the given query only modifies the time-series collection's given metaField, false
- * otherwise.
- */
-bool queryOnlyDependsOnMetaField(OperationContext* opCtx,
-                                 const NamespaceString& ns,
-                                 const BSONObj& query,
-                                 boost::optional<StringData> metaField,
-                                 const LegacyRuntimeConstants& runtimeConstants,
-                                 const boost::optional<BSONObj>& letParams);
-
-/**
  * Returns true if the given query, represented by its dependent fields, only modifies the
  * time-series collection's given metaField, false otherwise.
  */
