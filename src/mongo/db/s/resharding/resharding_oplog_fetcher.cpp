@@ -255,8 +255,12 @@ AggregateCommandRequest ReshardingOplogFetcher::_makeAggregateCommandRequest(
     AggregateCommandRequest aggRequest(NamespaceString::kRsOplogNamespace,
                                        std::move(serializedPipeline));
     if (_useReadConcern) {
+        // We specify {afterClusterTime: <highest _id.clusterTime>, level: "majority"} as the read
+        // concern to guarantee the postBatchResumeToken when the batch is empty is non-decreasing.
+        // The ReshardingOplogFetcher depends on inserting documents in increasing _id order,
+        // including for the synthetic no-op oplog entries generated from the postBatchResumeToken.
         auto readConcernArgs = repl::ReadConcernArgs(
-            boost::optional<LogicalTime>(_startAt.getTs()),
+            boost::optional<LogicalTime>(_startAt.getClusterTime()),
             boost::optional<repl::ReadConcernLevel>(repl::ReadConcernLevel::kMajorityReadConcern));
         aggRequest.setReadConcern(readConcernArgs.toBSONInner());
     }
