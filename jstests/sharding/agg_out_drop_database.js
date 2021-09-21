@@ -2,7 +2,7 @@
  *  Test that aggregation's $out stage serializes behind a drop database and fails.
  *
  *  @tags: [
- *      requires_fcv_51,
+ *      requires_fcv_50,
  *      does_not_support_stepdowns, // DropDatabaseCoordinator drops the input collection on step-up
  *  ]
  */
