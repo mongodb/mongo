@@ -38,6 +38,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_consistency.h"
+#include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/catalog/validate_adaptor.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_access_method.h"
@@ -297,14 +298,13 @@ void _reportValidationResults(OperationContext* opCtx,
 void _reportInvalidResults(OperationContext* opCtx,
                            ValidateState* validateState,
                            ValidateResults* results,
-                           BSONObjBuilder* output,
-                           const string uuidString) {
+                           BSONObjBuilder* output) {
     _reportValidationResults(opCtx, validateState, results, output);
     LOGV2_OPTIONS(20302,
                   {LogComponent::kIndex},
                   "Validation complete -- Corruption found",
-                  "namespace"_attr = validateState->nss(),
-                  "uuid"_attr = uuidString);
+                  logAttrs(validateState->nss()),
+                  logAttrs(validateState->uuid()));
 }
 
 template <typename T>
@@ -405,23 +405,43 @@ void _validateCatalogEntry(OperationContext* opCtx,
                                                 << options.toBSON());
     }
 
-    std::vector<std::string> indexes;
-    collection->getReadyIndexes(&indexes);
-    for (auto& index : indexes) {
+    const auto& indexCatalog = collection->getIndexCatalog();
+    auto indexIt = indexCatalog->getIndexIterator(opCtx, /*includeUnfinishedIndexes=*/true);
+
+    while (indexIt->more()) {
+        const IndexCatalogEntry* indexEntry = indexIt->next();
+        const std::string indexName = indexEntry->descriptor()->indexName();
+
+        Status status =
+            index_key_validate::validateIndexSpecFieldNames(indexEntry->descriptor()->infoObj());
+        if (!status.isOK()) {
+            results->valid = false;
+            results->errors.push_back(fmt::format(
+                "The index specification for index '{}' contains invalid field names. {}",
+                indexName,
+                status.reason()));
+        }
+
+        if (!indexEntry->isReady(opCtx, collection)) {
+            continue;
+        }
+
         MultikeyPaths multikeyPaths;
-        const bool isMultikey = collection->isIndexMultikey(opCtx, index, &multikeyPaths);
+        const bool isMultikey = collection->isIndexMultikey(opCtx, indexName, &multikeyPaths);
         const bool hasMultiKeyPaths = std::any_of(multikeyPaths.begin(),
                                                   multikeyPaths.end(),
                                                   [](auto& pathSet) { return pathSet.size() > 0; });
-        // It is illegal for multikey paths to exist without the multikey flag set on the index, but
-        // it may be possible for multikey to be set on the index while having no multikey paths. If
-        // any of the paths are multikey, then the entire index should also be marked multikey.
+        // It is illegal for multikey paths to exist without the multikey flag set on the index,
+        // but it may be possible for multikey to be set on the index while having no multikey
+        // paths. If any of the paths are multikey, then the entire index should also be marked
+        // multikey.
         if (hasMultiKeyPaths && !isMultikey) {
             results->valid = false;
-            results->errors.push_back(fmt::format(
-                "The 'multikey' field for index {} was false with non-empty 'multikeyPaths': {}",
-                index,
-                multikeyPathsToString(multikeyPaths)));
+            results->errors.push_back(
+                fmt::format("The 'multikey' field for index {} was false with non-empty "
+                            "'multikeyPaths': {}",
+                            indexName,
+                            multikeyPathsToString(multikeyPaths)));
         }
     }
 }
@@ -491,15 +511,28 @@ Status validate(OperationContext* opCtx,
             _validateIndexesInternalStructure(opCtx, &validateState, results);
         }
 
-        const string uuidString = str::stream() << " (UUID: " << validateState.uuid() << ")";
-
         if (!results->valid) {
-            _reportInvalidResults(opCtx, &validateState, results, output, uuidString);
+            _reportInvalidResults(opCtx, &validateState, results, output);
             return Status::OK();
         }
 
         // Validate in-memory catalog information with persisted info.
         _validateCatalogEntry(opCtx, &validateState, results);
+
+        if (validateState.isMetadataValidation()) {
+            if (results->valid) {
+                LOGV2(5980500,
+                      "Validation of metadata complete for collection. No problems detected",
+                      logAttrs(validateState.nss()),
+                      logAttrs(validateState.uuid()));
+            } else {
+                LOGV2(5980501,
+                      "Validation of metadata complete for collection. Problems detected",
+                      logAttrs(validateState.nss()),
+                      logAttrs(validateState.uuid()));
+            }
+            return Status::OK();
+        }
 
         // Open all cursors at once before running non-full validation code so that all steps of
         // validation during background validation use the same view of the data.
@@ -509,8 +542,8 @@ Status validate(OperationContext* opCtx,
         LOGV2_OPTIONS(20303,
                       {LogComponent::kIndex},
                       "validating collection",
-                      "namespace"_attr = validateState.nss(),
-                      "uuid"_attr = uuidString);
+                      logAttrs(validateState.nss()),
+                      logAttrs(validateState.uuid()));
 
         IndexConsistency indexConsistency(opCtx, &validateState);
         ValidateAdaptor indexValidator(&indexConsistency, &validateState);
@@ -539,7 +572,7 @@ Status validate(OperationContext* opCtx,
         }
 
         if (!results->valid) {
-            _reportInvalidResults(opCtx, &validateState, results, output, uuidString);
+            _reportInvalidResults(opCtx, &validateState, results, output);
             return Status::OK();
         }
 
@@ -557,7 +590,7 @@ Status validate(OperationContext* opCtx,
         }
 
         if (!results->valid) {
-            _reportInvalidResults(opCtx, &validateState, results, output, uuidString);
+            _reportInvalidResults(opCtx, &validateState, results, output);
             return Status::OK();
         }
 
@@ -565,7 +598,7 @@ Status validate(OperationContext* opCtx,
         _validateIndexKeyCount(opCtx, &validateState, &indexValidator, &results->indexResultsMap);
 
         if (!results->valid) {
-            _reportInvalidResults(opCtx, &validateState, results, output, uuidString);
+            _reportInvalidResults(opCtx, &validateState, results, output);
             return Status::OK();
         }
 
@@ -577,8 +610,8 @@ Status validate(OperationContext* opCtx,
                       {LogComponent::kIndex},
                       "Validation complete for collection. No "
                       "corruption found",
-                      "namespace"_attr = validateState.nss(),
-                      "uuid"_attr = uuidString);
+                      logAttrs(validateState.nss()),
+                      logAttrs(validateState.uuid()));
     } catch (const DBException& e) {
         if (ErrorCodes::isInterruption(e.code())) {
             LOGV2_OPTIONS(5160301,

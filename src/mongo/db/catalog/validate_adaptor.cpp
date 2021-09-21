@@ -452,7 +452,6 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
         _progress->finished();
     });
 
-    results->valid = true;
     RecordId prevRecordId;
 
     // In case validation occurs twice and the progress meter persists after index traversal
