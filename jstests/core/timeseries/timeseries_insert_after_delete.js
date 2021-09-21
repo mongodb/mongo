@@ -1,7 +1,6 @@
 /**
  * Tests running the delete command on a time-series collection closes the in-memory bucket.
  * @tags: [
- *   assumes_unsharded_collection, # TODO SERVER-59180: Remove this tag.
  *   does_not_support_stepdowns,
  *   does_not_support_transactions,
  *   requires_getmore,
@@ -11,10 +10,18 @@
 (function() {
 "use strict";
 
-load("jstests/core/timeseries/libs/timeseries.js");
+load("jstests/core/timeseries/libs/timeseries.js");  // For 'TimeseriesTest'.
+load("jstests/libs/fixture_helpers.js");             // For 'FixtureHelpers'.
 
 if (!TimeseriesTest.timeseriesUpdatesAndDeletesEnabled(db.getMongo())) {
     jsTestLog("Skipping test because the time-series updates and deletes feature flag is disabled");
+    return;
+}
+
+if (FixtureHelpers.isMongos(db) &&
+    !TimeseriesTest.shardedTimeseriesUpdatesAndDeletesEnabled(db.getMongo())) {
+    jsTestLog(
+        "Skipping test because the sharded time-series updates and deletes feature flag is disabled");
     return;
 }
 

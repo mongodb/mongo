@@ -1180,16 +1180,21 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
 WriteResult performDeletes(OperationContext* opCtx,
                            const write_ops::DeleteCommandRequest& wholeOp,
                            OperationSource source) {
+    auto ns = wholeOp.getNamespace();
+    if (source == OperationSource::kTimeseriesDelete && !ns.isTimeseriesBucketsCollection()) {
+        ns = ns.makeTimeseriesBucketsNamespace();
+    }
+
     // Delete performs its own retries, so we should not be in a WriteUnitOfWork unless we are in a
     // transaction.
     auto txnParticipant = TransactionParticipant::get(opCtx);
     invariant(!opCtx->lockState()->inAWriteUnitOfWork() ||
               (txnParticipant && opCtx->inMultiDocumentTransaction()));
-    uassertStatusOK(userAllowedWriteNS(opCtx, wholeOp.getNamespace()));
+    uassertStatusOK(userAllowedWriteNS(opCtx, ns));
 
     DisableDocumentSchemaValidationIfTrue docSchemaValidationDisabler(
         opCtx, wholeOp.getWriteCommandRequestBase().getBypassDocumentValidation());
-    LastOpFixer lastOpFixer(opCtx, wholeOp.getNamespace());
+    LastOpFixer lastOpFixer(opCtx, ns);
 
     bool containsRetry = false;
     ON_BLOCK_EXIT([&] { updateRetryStats(opCtx, containsRetry); });
@@ -1237,24 +1242,12 @@ WriteResult performDeletes(OperationContext* opCtx,
         });
         try {
             lastOpFixer.startingOp();
-            out.results.push_back(
-                performSingleDeleteOp(opCtx,
-                                      source == OperationSource::kTimeseriesDelete
-                                          ? wholeOp.getNamespace().makeTimeseriesBucketsNamespace()
-                                          : wholeOp.getNamespace(),
-                                      stmtId,
-                                      singleOp,
-                                      runtimeConstants,
-                                      wholeOp.getLet(),
-                                      source));
+            out.results.push_back(performSingleDeleteOp(
+                opCtx, ns, stmtId, singleOp, runtimeConstants, wholeOp.getLet(), source));
             lastOpFixer.finishedOpSuccessfully();
         } catch (const DBException& ex) {
-            out.canContinue = handleError(opCtx,
-                                          ex,
-                                          wholeOp.getNamespace(),
-                                          wholeOp.getWriteCommandRequestBase(),
-                                          false /* multiUpdate */,
-                                          &out);
+            out.canContinue = handleError(
+                opCtx, ex, ns, wholeOp.getWriteCommandRequestBase(), false /* multiUpdate */, &out);
             if (!out.canContinue)
                 break;
         }

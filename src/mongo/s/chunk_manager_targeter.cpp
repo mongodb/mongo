@@ -57,6 +57,8 @@
 #include "mongo/util/str.h"
 #include "signal.h"
 
+#include "mongo/db/timeseries/timeseries_update_delete_util.h"
+
 namespace mongo {
 namespace {
 
@@ -480,13 +482,39 @@ std::vector<ShardEndpoint> ChunkManagerTargeter::targetDelete(OperationContext* 
                                                                itemRef.getLet(),
                                                                itemRef.getLegacyRuntimeConstants());
 
+    BSONObj deleteQuery = deleteOp.getQ();
     BSONObj shardKey;
     if (_cm.isSharded()) {
+        if (_isRequestOnTimeseriesViewNamespace) {
+            uassert(ErrorCodes::NotImplemented,
+                    "Deletes on sharded time-series collections feature is not enabled",
+                    feature_flags::gFeatureFlagShardedTimeSeriesUpdateDelete.isEnabled(
+                        serverGlobalParams.featureCompatibility));
+
+            uassert(ErrorCodes::IllegalOperation,
+                    "Cannot perform a non-multi delete on a time-series collection",
+                    deleteOp.getMulti());
+
+            auto tsFields = _cm.getTimeseriesFields();
+            tassert(5918101, "Missing timeseriesFields on buckets collection", tsFields);
+
+            const auto& metaField = tsFields->getMetaField();
+            if (metaField) {
+                // Translate delete query into the query to the time-series buckets collection.
+                deleteQuery = timeseries::translateQuery(deleteQuery, *metaField);
+            } else {
+                // In case the time-series collection does not have meta field defined, we target
+                // the request to all shards using empty predicate. Since we allow only delete
+                // requests with 'limit:0', we will not delete any extra documents.
+                deleteQuery = BSONObj();
+            }
+        }
+
         // Sharded collections have the following further requirements for targeting:
         //
         // Limit-1 deletes must be targeted exactly by shard key *or* exact _id
-        shardKey = uassertStatusOK(
-            _cm.getShardKeyPattern().extractShardKeyFromQuery(expCtx, deleteOp.getQ()));
+        shardKey =
+            uassertStatusOK(_cm.getShardKeyPattern().extractShardKeyFromQuery(expCtx, deleteQuery));
     }
 
     // Target the shard key or delete query
@@ -501,7 +529,7 @@ std::vector<ShardEndpoint> ChunkManagerTargeter::targetDelete(OperationContext* 
 
     // Parse delete query.
     auto findCommand = std::make_unique<FindCommandRequest>(_nss);
-    findCommand->setFilter(deleteOp.getQ());
+    findCommand->setFilter(deleteQuery);
     if (!collation.isEmpty()) {
         findCommand->setCollation(collation);
     }
@@ -512,7 +540,7 @@ std::vector<ShardEndpoint> ChunkManagerTargeter::targetDelete(OperationContext* 
                                      expCtx,
                                      ExtensionsCallbackNoop(),
                                      MatchExpressionParser::kAllowAllSpecialFeatures),
-        str::stream() << "Could not parse delete query " << deleteOp.getQ());
+        str::stream() << "Could not parse delete query " << deleteQuery);
 
     // Single deletes must target a single shard or be exact-ID.
     uassert(ErrorCodes::ShardKeyNotFound,
@@ -523,7 +551,7 @@ std::vector<ShardEndpoint> ChunkManagerTargeter::targetDelete(OperationContext* 
                           << ", shard key pattern: " << _cm.getShardKeyPattern().toString(),
             !_cm.isSharded() || deleteOp.getMulti() || isExactIdQuery(opCtx, *cq, _cm));
 
-    return uassertStatusOK(_targetQuery(expCtx, deleteOp.getQ(), collation));
+    return uassertStatusOK(_targetQuery(expCtx, deleteQuery, collation));
 }
 
 StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::_targetQuery(

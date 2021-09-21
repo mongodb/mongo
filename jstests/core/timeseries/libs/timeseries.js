@@ -35,6 +35,13 @@ var TimeseriesTest = class {
             .featureFlagShardedTimeSeries.value;
     }
 
+    static shardedTimeseriesUpdatesAndDeletesEnabled(conn) {
+        return assert
+            .commandWorked(
+                conn.adminCommand({getParameter: 1, featureFlagShardedTimeSeriesUpdateDelete: 1}))
+            .featureFlagShardedTimeSeriesUpdateDelete.value;
+    }
+
     static timeseriesMetricIndexesEnabled(conn) {
         return assert
             .commandWorked(
