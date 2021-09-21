@@ -72,7 +72,7 @@ class transaction_context {
     /* Begin a transaction if we are not currently in one. */
     void try_begin(const std::string &config = "");
     /*
-     * Commit a transaction and return true if a rollback is required.
+     * Commit a transaction and return true if the commit was successful.
      */
     bool commit(const std::string &config = "");
     /* Rollback a transaction, failure will abort the test. */
@@ -136,7 +136,8 @@ class thread_context {
     /*
      * Generic update function, takes a collection_id and key, will generate the value.
      *
-     * Returns true if a rollback is required.
+     * Return true if the operation was successful, a return value of false implies the transaction
+     * needs to be rolled back.
      */
     bool update(scoped_cursor &cursor, uint64_t collection_id, const std::string &key);
 
@@ -144,7 +145,8 @@ class thread_context {
      * Generic insert function, takes a collection_id and key_id, will generate the value. If a
      * timestamp is not specified, the timestamp manager will generate one.
      *
-     * Returns true if a rollback is required.
+     * Return true if the operation was successful, a return value of false implies the transaction
+     * needs to be rolled back.
      */
     bool insert(
       scoped_cursor &cursor, uint64_t collection_id, uint64_t key_id, wt_timestamp_t ts = 0);

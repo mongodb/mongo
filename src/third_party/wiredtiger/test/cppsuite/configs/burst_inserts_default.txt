@@ -1,0 +1,4 @@
+# Configuration for burst_inserts.
+# need to be defined.
+duration_seconds=5,
+cache_size_mb=250

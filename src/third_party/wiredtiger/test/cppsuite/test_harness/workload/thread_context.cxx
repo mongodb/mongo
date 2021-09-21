@@ -29,6 +29,7 @@
 #include "../core/configuration.h"
 #include "../timestamp_manager.h"
 #include "../util/api_const.h"
+#include "../util/logger.h"
 #include "workload_tracking.h"
 #include "random_generator.h"
 #include "thread_context.h"
@@ -81,22 +82,23 @@ transaction_context::try_begin(const std::string &config)
         begin(config);
 }
 
-/* It's possible to receive rollback in commit which is handled internally. */
+/*
+ * It's possible to receive rollback in commit, when this happens the API will rollback the
+ * transaction internally.
+ */
 bool
 transaction_context::commit(const std::string &config)
 {
     WT_DECL_RET;
-    testutil_assert(_in_txn);
+    testutil_assert(_in_txn && !_needs_rollback);
     if ((ret = _session->commit_transaction(_session, config.empty() ? nullptr : config.c_str())) !=
       0) {
         logger::log_msg(LOG_WARN,
           "Failed to commit transaction in commit, received error code: " + std::to_string(ret));
-        _needs_rollback = true;
-    } else {
-        _op_count = 0;
-        _in_txn = false;
     }
-    return (_needs_rollback);
+    _op_count = 0;
+    _in_txn = false;
+    return (ret == 0);
 }
 
 void
@@ -200,7 +202,7 @@ thread_context::update(scoped_cursor &cursor, uint64_t collection_id, const std:
     if (ret != 0) {
         if (ret == WT_ROLLBACK) {
             transaction.set_needs_rollback(true);
-            return (true);
+            return (false);
         } else
             testutil_die(ret, "unhandled error while trying to update a key");
     }
@@ -209,13 +211,13 @@ thread_context::update(scoped_cursor &cursor, uint64_t collection_id, const std:
     if (ret != 0) {
         if (ret == WT_ROLLBACK) {
             transaction.set_needs_rollback(true);
-            return (true);
+            return (false);
         } else
             testutil_die(
               ret, "unhandled error while trying to save an update to the tracking table");
     }
     transaction.add_op();
-    return (false);
+    return (true);
 }
 
 bool
@@ -250,7 +252,7 @@ thread_context::insert(
     if (ret != 0) {
         if (ret == WT_ROLLBACK) {
             transaction.set_needs_rollback(true);
-            return (true);
+            return (false);
         } else
             testutil_die(ret, "unhandled error while trying to insert a key");
     }
@@ -259,13 +261,13 @@ thread_context::insert(
     if (ret != 0) {
         if (ret == WT_ROLLBACK) {
             transaction.set_needs_rollback(true);
-            return (true);
+            return (false);
         } else
             testutil_die(
               ret, "unhandled error while trying to save an insert to the tracking table");
     }
     transaction.add_op();
-    return (false);
+    return (true);
 }
 
 void

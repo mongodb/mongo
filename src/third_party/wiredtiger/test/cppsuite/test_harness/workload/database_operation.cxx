@@ -49,16 +49,16 @@ populate_worker(thread_context *tc)
          * is closed, WiredTiger APIs close the cursors too.
          */
         scoped_cursor cursor = tc->session.open_scoped_cursor(coll.name.c_str());
-        for (uint64_t i = 0; i < tc->key_count; ++i) {
-            /* Start a txn. */
+        uint64_t j = 0;
+        while (j < tc->key_count) {
             tc->transaction.begin();
-            if (tc->insert(cursor, coll.id, i)) {
-                /* We failed to insert, rollback our transaction and retry. */
+            if (tc->insert(cursor, coll.id, j)) {
+                if (tc->transaction.commit()) {
+                    ++j;
+                }
+            } else {
                 tc->transaction.rollback();
-                --i;
-                continue;
             }
-            tc->transaction.commit();
         }
     }
     logger::log_msg(LOG_TRACE, "Populate: thread {" + std::to_string(tc->id) + "} finished");
@@ -161,25 +161,24 @@ database_operation::insert_operation(thread_context *tc)
         /* Collection cursor. */
         auto &cc = ccv[counter];
         while (tc->transaction.active() && tc->running()) {
-            /* Insert a key value pair. */
-            bool rollback_required = tc->insert(cc.cursor, cc.coll.id, start_key + added_count);
-            if (!rollback_required) {
+            /* Insert a key value pair, rolling back the transaction if required. */
+            if (!tc->insert(cc.cursor, cc.coll.id, start_key + added_count)) {
+                added_count = 0;
+                tc->transaction.rollback();
+            } else {
                 added_count++;
                 if (tc->transaction.can_commit()) {
-                    rollback_required = tc->transaction.commit();
-                    if (!rollback_required)
+                    if (tc->transaction.commit()) {
                         /*
                          * We need to inform the database model that we've added these keys as some
                          * other thread may rely on the key_count data. Only do so if we
                          * successfully committed.
                          */
                         cc.coll.increase_key_count(added_count);
+                    } else {
+                        added_count = 0;
+                    }
                 }
-            }
-
-            if (rollback_required) {
-                added_count = 0;
-                tc->transaction.rollback();
             }
 
             /* Sleep the duration defined by the op_rate. */
@@ -188,8 +187,9 @@ database_operation::insert_operation(thread_context *tc)
         /* Reset our cursor to avoid pinning content. */
         testutil_check(cc.cursor->reset(cc.cursor.get()));
         counter++;
-        if (counter >= collections_per_thread)
+        if (counter == collections_per_thread)
             counter = 0;
+        testutil_assert(counter < collections_per_thread);
     }
     /* Make sure the last transaction is rolled back now the work is finished. */
     if (tc->transaction.active())
@@ -278,17 +278,16 @@ database_operation::update_operation(thread_context *tc)
         /* Choose a random key to update. */
         uint64_t key_id =
           random_generator::instance().generate_integer<uint64_t>(0, coll.get_key_count() - 1);
-        bool rollback_required = tc->update(cursor, coll.id, tc->key_to_string(key_id));
+        if (!tc->update(cursor, coll.id, tc->key_to_string(key_id))) {
+            tc->transaction.rollback();
+        }
 
         /* Reset our cursor to avoid pinning content. */
         testutil_check(cursor->reset(cursor.get()));
 
         /* Commit the current transaction if we're able to. */
-        if (!rollback_required && tc->transaction.can_commit())
-            rollback_required = tc->transaction.commit();
-
-        if (rollback_required)
-            tc->transaction.rollback();
+        if (tc->transaction.can_commit())
+            tc->transaction.commit();
     }
 
     /* Make sure the last operation is rolled back now the work is finished. */
