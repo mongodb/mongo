@@ -44,6 +44,7 @@
 #include "mongo/db/startup_warnings_common.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/logv2/log.h"
+#include "mongo/transport/service_entry_point.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/str.h"
 #include "mongo/util/version.h"
@@ -280,6 +281,29 @@ void logMongodStartupWarnings(const StorageGlobalParams& storageParams,
                               {logv2::LogTag::kStartupWarnings},
                               "Failed to read " TRANSPARENT_HUGE_PAGES_DIR "/defrag",
                               "error"_attr = transparentHugePagesDefragResult.getStatus().reason());
+    }
+
+    // Check if vm.max_map_count is high enough, as per SERVER-51233
+    {
+        size_t maxConns = svcCtx->getServiceEntryPoint()->maxOpenSessions();
+        size_t requiredMapCount = 2 * maxConns;
+
+        std::fstream f("/proc/sys/vm/max_map_count", ios_base::in);
+        size_t val;
+        f >> val;
+
+        if (val < requiredMapCount) {
+            LOGV2_WARNING_OPTIONS(5123300,
+                                  {logv2::LogTag::kStartupWarnings},
+                                  "** WARNING: Maximum number of memory map areas per process is "
+                                  "too low. Current value of vm.max_map_count is {currentValue}, "
+                                  "recommended minimum is {recommendedMinimum} for currently "
+                                  "configured maximum connections ({maxConns})",
+                                  "vm.max_map_count is too low",
+                                  "currentValue"_attr = val,
+                                  "recommendedMinimum"_attr = requiredMapCount,
+                                  "maxConns"_attr = maxConns);
+        }
     }
 #endif  // __linux__
 
