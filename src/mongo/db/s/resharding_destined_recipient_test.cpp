@@ -40,10 +40,10 @@
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/operation_sharding_state.h"
-#include "mongo/db/s/resharding_util.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/s/sharding_write_router.h"
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/s/catalog/sharding_catalog_client_mock.h"
@@ -298,11 +298,10 @@ TEST_F(DestinedRecipientTest, TestGetDestinedRecipient) {
     AutoGetCollection coll(opCtx, kNss, MODE_IX);
     OperationShardingState::get(opCtx).initializeClientRoutingVersions(
         kNss, env.version, env.dbVersion);
-    auto* const css = CollectionShardingState::get(opCtx, kNss);
-    auto collDesc = css->getCollectionDescription(opCtx);
+    ShardingWriteRouter shardingWriteRouter(opCtx, kNss, Grid::get(opCtx)->catalogCache());
 
     auto destShardId =
-        getDestinedRecipient(opCtx, kNss, BSON("x" << 2 << "y" << 10), css, collDesc);
+        shardingWriteRouter.getReshardingDestinedRecipient(BSON("x" << 2 << "y" << 10));
     ASSERT(destShardId);
     ASSERT_EQ(*destShardId, env.destShard);
 }
@@ -315,18 +314,16 @@ TEST_F(DestinedRecipientTest, TestGetDestinedRecipientThrowsOnBlockedRefresh) {
         AutoGetCollection coll(opCtx, kNss, MODE_IX);
         OperationShardingState::get(opCtx).initializeClientRoutingVersions(
             kNss, env.version, env.dbVersion);
-        auto* const css = CollectionShardingState::get(opCtx, kNss);
-        auto collDesc = css->getCollectionDescription(opCtx);
 
         FailPointEnableBlock failPoint("blockCollectionCacheLookup");
-        ASSERT_THROWS_WITH_CHECK(
-            getDestinedRecipient(opCtx, kNss, BSON("x" << 2 << "y" << 10), css, collDesc),
-            ShardCannotRefreshDueToLocksHeldException,
-            [&](const ShardCannotRefreshDueToLocksHeldException& ex) {
-                const auto refreshInfo = ex.extraInfo<ShardCannotRefreshDueToLocksHeldInfo>();
-                ASSERT(refreshInfo);
-                ASSERT_EQ(refreshInfo->getNss(), env.tempNss);
-            });
+        ASSERT_THROWS_WITH_CHECK(ShardingWriteRouter(opCtx, kNss, Grid::get(opCtx)->catalogCache()),
+                                 ShardCannotRefreshDueToLocksHeldException,
+                                 [&](const ShardCannotRefreshDueToLocksHeldException& ex) {
+                                     const auto refreshInfo =
+                                         ex.extraInfo<ShardCannotRefreshDueToLocksHeldInfo>();
+                                     ASSERT(refreshInfo);
+                                     ASSERT_EQ(refreshInfo->getNss(), env.tempNss);
+                                 });
     }
 
     auto sw = catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx, env.tempNss);

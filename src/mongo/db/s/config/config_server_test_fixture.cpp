@@ -43,6 +43,8 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
+#include "mongo/db/op_observer_impl.h"
+#include "mongo/db/op_observer_registry.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/query_request_helper.h"
@@ -51,6 +53,7 @@
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/config_server_op_observer.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
@@ -471,6 +474,13 @@ void ConfigServerTestFixture::expectSetShardVersion(
 
         return BSON("ok" << true);
     });
+}
+
+void ConfigServerTestFixture::setupOpObservers() {
+    auto opObserverRegistry =
+        checked_cast<OpObserverRegistry*>(getServiceContext()->getOpObserver());
+    opObserverRegistry->addObserver(std::make_unique<OpObserverImpl>());
+    opObserverRegistry->addObserver(std::make_unique<ConfigServerOpObserver>());
 }
 
 }  // namespace mongo

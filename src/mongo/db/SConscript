@@ -1290,7 +1290,6 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/auth/auth_checks',
         '$BUILD_DIR/mongo/db/index/index_access_methods',
-        '$BUILD_DIR/mongo/db/s/resharding_util',
         '$BUILD_DIR/mongo/scripting/scripting',
         '$BUILD_DIR/mongo/util/background_job',
         '$BUILD_DIR/mongo/util/elapsed_tracker',

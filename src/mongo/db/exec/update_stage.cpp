@@ -48,13 +48,14 @@
 #include "mongo/db/query/explain.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/operation_sharding_state.h"
-#include "mongo/db/s/resharding_util.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/s/sharding_write_router.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/update/path_support.h"
 #include "mongo/db/update/storage_validation.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
 #include "mongo/util/assert_util.h"
@@ -608,7 +609,7 @@ void UpdateStage::_checkRestrictionsOnUpdatingShardKeyAreNotViolated(
 }
 
 
-bool UpdateStage::wasReshardingKeyUpdated(CollectionShardingState* css,
+bool UpdateStage::wasReshardingKeyUpdated(const ShardingWriteRouter& shardingWriteRouter,
                                           const ScopedCollectionDescription& collDesc,
                                           const BSONObj& newObj,
                                           const Snapshotted<BSONObj>& oldObj) {
@@ -625,9 +626,8 @@ bool UpdateStage::wasReshardingKeyUpdated(CollectionShardingState* css,
     FieldRefSet shardKeyPaths(collDesc.getKeyPatternFields());
     _checkRestrictionsOnUpdatingShardKeyAreNotViolated(collDesc, shardKeyPaths);
 
-    auto oldRecipShard =
-        getDestinedRecipient(opCtx(), collection()->ns(), oldObj.value(), css, collDesc);
-    auto newRecipShard = getDestinedRecipient(opCtx(), collection()->ns(), newObj, css, collDesc);
+    auto oldRecipShard = *shardingWriteRouter.getReshardingDestinedRecipient(oldObj.value());
+    auto newRecipShard = *shardingWriteRouter.getReshardingDestinedRecipient(newObj);
 
     uassert(WouldChangeOwningShardInfo(oldObj.value(), newObj, false /* upsert */),
             "This update would cause the doc to change owning shards under the new shard key",
@@ -638,7 +638,15 @@ bool UpdateStage::wasReshardingKeyUpdated(CollectionShardingState* css,
 
 bool UpdateStage::checkUpdateChangesShardKeyFields(const boost::optional<BSONObj>& newObjCopy,
                                                    const Snapshotted<BSONObj>& oldObj) {
-    auto* const css = CollectionShardingState::get(opCtx(), collection()->ns());
+    ShardingWriteRouter shardingWriteRouter(
+        opCtx(), collection()->ns(), Grid::get(opCtx())->catalogCache());
+    auto css = shardingWriteRouter.getCollectionShardingState();
+
+    // css can be null when this is a config server.
+    if (css == nullptr) {
+        return false;
+    }
+
     const auto collDesc = css->getCollectionDescription(opCtx());
 
     // Calling mutablebson::Document::getObject() renders a full copy of the updated document. This
@@ -652,16 +660,20 @@ bool UpdateStage::checkUpdateChangesShardKeyFields(const boost::optional<BSONObj
 
     // It is possible that both the existing and new shard keys are being updated, so we do not want
     // to short-circuit checking whether either is being modified.
-    const auto existingShardKeyUpdated = wasExistingShardKeyUpdated(css, collDesc, newObj, oldObj);
-    const auto reshardingKeyUpdated = wasReshardingKeyUpdated(css, collDesc, newObj, oldObj);
+    const auto existingShardKeyUpdated =
+        wasExistingShardKeyUpdated(shardingWriteRouter, collDesc, newObj, oldObj);
+    const auto reshardingKeyUpdated =
+        wasReshardingKeyUpdated(shardingWriteRouter, collDesc, newObj, oldObj);
 
     return existingShardKeyUpdated || reshardingKeyUpdated;
 }
 
-bool UpdateStage::wasExistingShardKeyUpdated(CollectionShardingState* css,
+bool UpdateStage::wasExistingShardKeyUpdated(const ShardingWriteRouter& shardingWriteRouter,
                                              const ScopedCollectionDescription& collDesc,
                                              const BSONObj& newObj,
                                              const Snapshotted<BSONObj>& oldObj) {
+    const auto css = shardingWriteRouter.getCollectionShardingState();
+
     const ShardKeyPattern shardKeyPattern(collDesc.getKeyPattern());
     auto oldShardKey = shardKeyPattern.extractShardKeyFromDoc(oldObj.value());
     auto newShardKey = shardKeyPattern.extractShardKeyFromDoc(newObj);

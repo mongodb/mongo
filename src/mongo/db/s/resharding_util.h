@@ -281,16 +281,6 @@ std::unique_ptr<Pipeline, PipelineDeleter> createOplogFetchingPipelineForReshard
     const ShardId& recipientShard);
 
 /**
- * Returns the shard Id of the recipient shard that would own the document under the new shard
- * key pattern.
- */
-boost::optional<ShardId> getDestinedRecipient(OperationContext* opCtx,
-                                              const NamespaceString& sourceNss,
-                                              const BSONObj& fullDocument,
-                                              CollectionShardingState* css,
-                                              const ScopedCollectionDescription& collDesc);
-
-/**
  * Sentinel oplog format:
  * {
  *   op: "n",

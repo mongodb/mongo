@@ -40,6 +40,7 @@
 #include "mongo/db/s/migration_chunk_cloner_source_legacy.h"
 #include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/s/resharding_util.h"
+#include "mongo/db/s/sharding_write_router.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
@@ -121,12 +122,13 @@ void OpObserverShardingImpl::shardObserveInsertOp(OperationContext* opCtx,
                                                   const NamespaceString nss,
                                                   const BSONObj& insertedDoc,
                                                   const repl::OpTime& opTime,
-                                                  CollectionShardingState* css,
+                                                  const ShardingWriteRouter& shardingWriteRouter,
                                                   const bool fromMigrate,
                                                   const bool inMultiDocumentTransaction) {
     if (nss == NamespaceString::kSessionTransactionsTableNamespace || fromMigrate)
         return;
 
+    auto css = shardingWriteRouter.getCollectionShardingState();
     auto* const csr = CollectionShardingRuntime::get(css);
     csr->checkShardVersionOrThrow(opCtx);
 
@@ -160,9 +162,10 @@ void OpObserverShardingImpl::shardObserveUpdateOp(OperationContext* opCtx,
                                                   boost::optional<BSONObj> preImageDoc,
                                                   const BSONObj& postImageDoc,
                                                   const repl::OpTime& opTime,
-                                                  CollectionShardingState* css,
+                                                  const ShardingWriteRouter& shardingWriteRouter,
                                                   const repl::OpTime& prePostImageOpTime,
                                                   const bool inMultiDocumentTransaction) {
+    auto css = shardingWriteRouter.getCollectionShardingState();
     auto* const csr = CollectionShardingRuntime::get(css);
     csr->checkShardVersionOrThrow(opCtx);
 
@@ -195,9 +198,10 @@ void OpObserverShardingImpl::shardObserveDeleteOp(OperationContext* opCtx,
                                                   const NamespaceString nss,
                                                   const BSONObj& documentKey,
                                                   const repl::OpTime& opTime,
-                                                  CollectionShardingState* css,
+                                                  const ShardingWriteRouter& shardingWriteRouter,
                                                   const repl::OpTime& preImageOpTime,
                                                   const bool inMultiDocumentTransaction) {
+    auto css = shardingWriteRouter.getCollectionShardingState();
     auto* const csr = CollectionShardingRuntime::get(css);
     csr->checkShardVersionOrThrow(opCtx);
 
@@ -235,15 +239,6 @@ void OpObserverShardingImpl::shardObserveTransactionPrepareOrUnpreparedCommit(
     opCtx->recoveryUnit()->registerChange(
         std::make_unique<LogTransactionOperationsForShardingHandler>(
             opCtx->getServiceContext(), stmts, prepareOrCommitOptime));
-}
-
-void OpObserverShardingImpl::shardAnnotateOplogEntry(OperationContext* opCtx,
-                                                     const NamespaceString nss,
-                                                     const BSONObj& doc,
-                                                     repl::DurableReplOperation& op,
-                                                     CollectionShardingState* css,
-                                                     const ScopedCollectionDescription& collDesc) {
-    op.setDestinedRecipient(getDestinedRecipient(opCtx, nss, doc, css, collDesc));
 }
 
 }  // namespace mongo

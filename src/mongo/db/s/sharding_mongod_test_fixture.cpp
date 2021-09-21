@@ -41,6 +41,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer_impl.h"
 #include "mongo/db/op_observer_registry.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
@@ -84,58 +85,7 @@ using repl::ReplicationCoordinatorMock;
 using repl::ReplSettings;
 using unittest::assertGet;
 
-ShardingMongodTestFixture::ShardingMongodTestFixture() {
-    const auto service = getServiceContext();
-
-    // Set up this node as shard node, which is part of a replica set
-
-    repl::ReplSettings replSettings;
-    replSettings.setOplogSizeBytes(512'000);
-    replSettings.setReplSetString(ConnectionString::forReplicaSet(_setName, _servers).toString());
-    auto replCoordPtr = makeReplicationCoordinator(replSettings);
-    _replCoord = replCoordPtr.get();
-
-    BSONArrayBuilder serversBob;
-    for (size_t i = 0; i < _servers.size(); ++i) {
-        serversBob.append(BSON("host" << _servers[i].toString() << "_id" << static_cast<int>(i)));
-    }
-
-    auto replSetConfig =
-        repl::ReplSetConfig::parse(BSON("_id" << _setName << "protocolVersion" << 1 << "version"
-                                              << 3 << "members" << serversBob.arr()));
-    replCoordPtr->setGetConfigReturnValue(replSetConfig);
-
-    repl::ReplicationCoordinator::set(service, std::move(replCoordPtr));
-
-    auto storagePtr = std::make_unique<repl::StorageInterfaceMock>();
-
-    repl::DropPendingCollectionReaper::set(
-        service, std::make_unique<repl::DropPendingCollectionReaper>(storagePtr.get()));
-
-    repl::ReplicationProcess::set(service,
-                                  std::make_unique<repl::ReplicationProcess>(
-                                      storagePtr.get(),
-                                      std::make_unique<repl::ReplicationConsistencyMarkersMock>(),
-                                      std::make_unique<repl::ReplicationRecoveryMock>()));
-
-    auto uniqueOpCtx = makeOperationContext();
-    ASSERT_OK(
-        repl::ReplicationProcess::get(uniqueOpCtx.get())->initializeRollbackID(uniqueOpCtx.get()));
-
-    repl::StorageInterface::set(service, std::move(storagePtr));
-
-    auto opObserver = checked_cast<OpObserverRegistry*>(service->getOpObserver());
-    opObserver->addObserver(std::make_unique<OpObserverShardingImpl>());
-    opObserver->addObserver(std::make_unique<ConfigServerOpObserver>());
-    opObserver->addObserver(std::make_unique<ShardServerOpObserver>());
-
-    repl::createOplog(uniqueOpCtx.get());
-
-    // Set the highest FCV because otherwise it defaults to the lower FCV. This way we default to
-    // testing this release's code, not backwards compatibility code.
-    // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
-    serverGlobalParams.mutableFeatureCompatibility.setVersion(multiversion::GenericFCV::kLatest);
-}
+ShardingMongodTestFixture::ShardingMongodTestFixture() {}
 
 ShardingMongodTestFixture::~ShardingMongodTestFixture() = default;
 
@@ -284,6 +234,53 @@ Status ShardingMongodTestFixture::initializeGlobalShardingStateForMongodForTest(
 void ShardingMongodTestFixture::setUp() {
     ServiceContextMongoDTest::setUp();
     ShardingTestFixtureCommon::setUp();
+
+    const auto service = getServiceContext();
+
+    // Set up this node as shard node, which is part of a replica set
+
+    repl::ReplSettings replSettings;
+    replSettings.setOplogSizeBytes(512'000);
+    replSettings.setReplSetString(ConnectionString::forReplicaSet(_setName, _servers).toString());
+    auto replCoordPtr = makeReplicationCoordinator(replSettings);
+    _replCoord = replCoordPtr.get();
+
+    BSONArrayBuilder serversBob;
+    for (size_t i = 0; i < _servers.size(); ++i) {
+        serversBob.append(BSON("host" << _servers[i].toString() << "_id" << static_cast<int>(i)));
+    }
+
+    auto replSetConfig =
+        repl::ReplSetConfig::parse(BSON("_id" << _setName << "protocolVersion" << 1 << "version"
+                                              << 3 << "members" << serversBob.arr()));
+    replCoordPtr->setGetConfigReturnValue(replSetConfig);
+
+    repl::ReplicationCoordinator::set(service, std::move(replCoordPtr));
+
+    auto storagePtr = std::make_unique<repl::StorageInterfaceMock>();
+
+    repl::DropPendingCollectionReaper::set(
+        service, std::make_unique<repl::DropPendingCollectionReaper>(storagePtr.get()));
+
+    repl::ReplicationProcess::set(service,
+                                  std::make_unique<repl::ReplicationProcess>(
+                                      storagePtr.get(),
+                                      std::make_unique<repl::ReplicationConsistencyMarkersMock>(),
+                                      std::make_unique<repl::ReplicationRecoveryMock>()));
+
+    ASSERT_OK(repl::ReplicationProcess::get(operationContext())
+                  ->initializeRollbackID(operationContext()));
+
+    repl::StorageInterface::set(service, std::move(storagePtr));
+
+    setupOpObservers();
+
+    repl::createOplog(operationContext());
+
+    // Set the highest FCV because otherwise it defaults to the lower FCV. This way we default to
+    // testing this release's code, not backwards compatibility code.
+    // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
+    serverGlobalParams.mutableFeatureCompatibility.setVersion(multiversion::GenericFCV::kLatest);
 }
 
 void ShardingMongodTestFixture::tearDown() {
@@ -347,6 +344,13 @@ std::shared_ptr<executor::TaskExecutor> ShardingMongodTestFixture::executor() co
 repl::ReplicationCoordinatorMock* ShardingMongodTestFixture::replicationCoordinator() const {
     invariant(_replCoord);
     return _replCoord;
+}
+
+void ShardingMongodTestFixture::setupOpObservers() {
+    auto opObserverRegistry =
+        checked_cast<OpObserverRegistry*>(getServiceContext()->getOpObserver());
+    opObserverRegistry->addObserver(std::make_unique<OpObserverShardingImpl>());
+    opObserverRegistry->addObserver(std::make_unique<ShardServerOpObserver>());
 }
 
 }  // namespace mongo

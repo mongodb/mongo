@@ -60,31 +60,6 @@
 namespace mongo {
 using namespace fmt::literals;
 
-namespace {
-
-UUID getCollectionUuid(OperationContext* opCtx, const NamespaceString& nss) {
-    dassert(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IS));
-
-    auto uuid = CollectionCatalog::get(opCtx)->lookupUUIDByNSS(opCtx, nss);
-    invariant(uuid);
-
-    return *uuid;
-}
-
-// Ensure that this shard owns the document. This must be called after verifying that we
-// are in a resharding operation so that we are guaranteed that migrations are suspended.
-bool documentBelongsToMe(OperationContext* opCtx,
-                         CollectionShardingState* css,
-                         const ScopedCollectionDescription& collDesc,
-                         const BSONObj& doc) {
-    auto currentKeyPattern = ShardKeyPattern(collDesc.getKeyPattern());
-    auto ownershipFilter = css->getOwnershipFilter(
-        opCtx, CollectionShardingState::OrphanCleanupPolicy::kAllowOrphanCleanup);
-
-    return ownershipFilter.keyBelongsToMe(currentKeyPattern.extractShardKeyFromDoc(doc));
-}
-}  // namespace
-
 BSONObj serializeAndTruncateReshardingErrorIfNeeded(Status originalError) {
     BSONObjBuilder originalBob;
     originalError.serializeErrorToBSON(&originalBob);
@@ -333,36 +308,6 @@ std::unique_ptr<Pipeline, PipelineDeleter> createOplogFetchingPipelineForReshard
         expCtx));
 
     return Pipeline::create(std::move(stages), expCtx);
-}
-
-boost::optional<ShardId> getDestinedRecipient(OperationContext* opCtx,
-                                              const NamespaceString& sourceNss,
-                                              const BSONObj& fullDocument,
-                                              CollectionShardingState* css,
-                                              const ScopedCollectionDescription& collDesc) {
-    if (!ShardingState::get(opCtx)->enabled()) {
-        // Don't bother looking up the sharding state for the collection if the server isn't even
-        // running with sharding enabled. We know there couldn't possibly be any resharding fields.
-        return boost::none;
-    }
-
-    auto reshardingKeyPattern = collDesc.getReshardingKeyIfShouldForwardOps();
-    if (!reshardingKeyPattern)
-        return boost::none;
-
-    if (!documentBelongsToMe(opCtx, css, collDesc, fullDocument))
-        return boost::none;
-
-    bool allowLocks = true;
-    auto tempNssRoutingInfo =
-        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(
-            opCtx,
-            constructTemporaryReshardingNss(sourceNss.db(), getCollectionUuid(opCtx, sourceNss)),
-            allowLocks));
-
-    auto shardKey = reshardingKeyPattern->extractShardKeyFromDocThrows(fullDocument);
-
-    return tempNssRoutingInfo.findIntersectingChunkWithSimpleCollation(shardKey).getShardId();
 }
 
 bool isFinalOplog(const repl::OplogEntry& oplog) {

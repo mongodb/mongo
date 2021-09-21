@@ -61,6 +61,8 @@ public:
     void setUp() override {
         ShardingMongodTestFixture::setUp();
 
+        serverGlobalParams.clusterRole = ClusterRole::ShardServer;
+
         // NOTE: this assumes that globalInit will always be called on the same thread as the main
         // test thread
         ShardingInitializationMongoD::get(operationContext())

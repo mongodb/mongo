@@ -32,6 +32,8 @@
 #include "mongo/db/keys_collection_client_direct.h"
 #include "mongo/db/keys_collection_manager.h"
 #include "mongo/db/logical_time_validator.h"
+#include "mongo/db/op_observer_impl.h"
+#include "mongo/db/op_observer_registry.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/s/sharding_mongod_test_fixture.h"
 #include "mongo/db/vector_clock_mutable.h"
@@ -77,6 +79,12 @@ protected:
      */
     void refreshKeyManager() {
         _keyManager->refreshNow(operationContext());
+    }
+
+    void setupOpObservers() override {
+        auto opObserverRegistry =
+            checked_cast<OpObserverRegistry*>(getServiceContext()->getOpObserver());
+        opObserverRegistry->addObserver(std::make_unique<OpObserverImpl>());
     }
 
 private:

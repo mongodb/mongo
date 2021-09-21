@@ -194,6 +194,9 @@ protected:
 
     std::unique_ptr<BalancerConfiguration> makeBalancerConfiguration() override;
 
+protected:
+    void setupOpObservers() override;
+
 private:
     /**
      * 'onPreInitGlobalStateFn' is invoked near the end of _setUp() before calling

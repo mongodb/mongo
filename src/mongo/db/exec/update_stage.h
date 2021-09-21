@@ -44,6 +44,7 @@ namespace mongo {
 class OperationContext;
 class OpDebug;
 struct PlanSummaryStats;
+class ShardingWriteRouter;
 
 struct UpdateStageParams {
     using DocumentCounter = std::function<size_t(const BSONObj&)>;
@@ -186,12 +187,12 @@ private:
      * If the update changes shard key fields but the new shard key remains on the same node,
      * returns true. If the update does not change shard key fields, returns false.
      */
-    bool wasExistingShardKeyUpdated(CollectionShardingState* css,
+    bool wasExistingShardKeyUpdated(const ShardingWriteRouter& shardingWriteRouter,
                                     const ScopedCollectionDescription& collDesc,
                                     const BSONObj& newObj,
                                     const Snapshotted<BSONObj>& oldObj);
 
-    bool wasReshardingKeyUpdated(CollectionShardingState* css,
+    bool wasReshardingKeyUpdated(const ShardingWriteRouter& shardingWriteRouter,
                                  const ScopedCollectionDescription& collDesc,
                                  const BSONObj& newObj,
                                  const Snapshotted<BSONObj>& oldObj);

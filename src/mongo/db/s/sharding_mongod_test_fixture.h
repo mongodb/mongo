@@ -118,6 +118,11 @@ protected:
      */
     virtual std::unique_ptr<BalancerConfiguration> makeBalancerConfiguration();
 
+    /**
+     * Setups the op observer listeners depending on cluster role.
+     */
+    virtual void setupOpObservers();
+
 private:
     /**
      * Base class returns a TaskExecutorPool with a fixed TaskExecutor and a set of arbitrary
