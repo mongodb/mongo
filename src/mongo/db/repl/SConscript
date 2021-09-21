@@ -1305,7 +1305,8 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/util/future_util',
-        "repl_server_parameters",
+        'repl_coordinator_interface',
+        'repl_server_parameters',
         'wait_for_majority_service',
     ],
     LIBDEPS_PRIVATE=[

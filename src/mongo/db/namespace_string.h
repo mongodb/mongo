@@ -133,6 +133,9 @@ public:
     // Namespace for view on local.oplog.rs for tenant migrations.
     static const NamespaceString kTenantMigrationOplogView;
 
+    // Namespace for storing the persisted state of tenant split donors.
+    static const NamespaceString kTenantSplitDonorsNamespace;
+
     // Namespace for replica set configuration settings.
     static const NamespaceString kSystemReplSetNamespace;
 
