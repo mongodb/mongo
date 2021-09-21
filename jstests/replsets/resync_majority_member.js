@@ -14,8 +14,9 @@
 (function() {
 "use strict";
 
-load("jstests/libs/write_concern_util.js");
 load("jstests/libs/fail_point_util.js");
+load("jstests/libs/storage_engine_utils.js");
+load("jstests/libs/write_concern_util.js");
 
 TestData.skipCheckDBHashes = true;  // the set is not consistent when we shutdown the test
 
@@ -97,8 +98,14 @@ assert.commandWorked(syncSource.getDB(dbName).getCollection(collName).insert(
 // This failpoint will only be hit if the node's rollback common point is before the replication
 // commit point, which triggers an invariant. This failpoint is used to verify the invariant
 // will be hit without having to search the logs.
-const rollbackCommittedWritesFailPoint =
-    configureFailPoint(rollbackNode, "rollbackHangCommonPointBeforeReplCommitPoint");
+let rollbackCommittedWritesFailPoint;
+if (storageEngineIsWiredTigerOrInMemory()) {
+    rollbackCommittedWritesFailPoint =
+        configureFailPoint(rollbackNode, "rollbackToTimestampHangCommonPointBeforeReplCommitPoint");
+} else {
+    rollbackCommittedWritesFailPoint =
+        configureFailPoint(rollbackNode, "rollbackViaRefetchHangCommonPointBeforeReplCommitPoint");
+}
 
 // Node 1 will have to roll back to rejoin the set. It will crash as it will refuse to roll back
 // majority committed data.

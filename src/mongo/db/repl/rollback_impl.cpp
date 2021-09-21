@@ -75,7 +75,7 @@ namespace repl {
 using namespace fmt::literals;
 
 MONGO_FAIL_POINT_DEFINE(rollbackHangAfterTransitionToRollback);
-MONGO_FAIL_POINT_DEFINE(rollbackHangCommonPointBeforeReplCommitPoint);
+MONGO_FAIL_POINT_DEFINE(rollbackToTimestampHangCommonPointBeforeReplCommitPoint);
 
 namespace {
 
@@ -1116,10 +1116,11 @@ StatusWith<RollBackLocalOperations::RollbackCommonPoint> RollbackImpl::_findComm
           "commonPointOpTime"_attr = commonPointOpTime);
 
     // This failpoint is used for testing the invariant below.
-    if (MONGO_unlikely(rollbackHangCommonPointBeforeReplCommitPoint.shouldFail()) &&
+    if (MONGO_unlikely(rollbackToTimestampHangCommonPointBeforeReplCommitPoint.shouldFail()) &&
         (commonPointOpTime.getTimestamp() < lastCommittedOpTime.getTimestamp())) {
-        LOGV2(5812200, "Hanging due to rollbackHangCommonPointBeforeReplCommitPoint failpoint");
-        rollbackHangCommonPointBeforeReplCommitPoint.pauseWhileSet(opCtx);
+        LOGV2(5812200,
+              "Hanging due to rollbackToTimestampHangCommonPointBeforeReplCommitPoint failpoint");
+        rollbackToTimestampHangCommonPointBeforeReplCommitPoint.pauseWhileSet(opCtx);
     }
 
     // Rollback common point should be >= the replication commit point.
