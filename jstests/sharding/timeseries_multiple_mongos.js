@@ -56,6 +56,8 @@ function generateBatch(size) {
  * command by running against mongos1 with stale config.
  */
 function runTest({shardKey, cmdObj, numProfilerEntries}) {
+    const isDelete = cmdObj["delete"] !== undefined;
+
     // Insert some dummy data using 'mongos1' as the router, so that the cache is initialized on the
     // mongos while the collection is unsharded.
     assert.commandWorked(mongos1.getCollection(collName).insert({[timeField]: ISODate()}));
@@ -100,7 +102,9 @@ function runTest({shardKey, cmdObj, numProfilerEntries}) {
 
         const queryField = `command.${Object.keys(cmdObj)[0]}`;
         let filter = {[queryField]: collName, "command.shardVersion.0": {$ne: Timestamp(0, 0)}};
-        if (unVersioned) {
+        if (isDelete) {
+            filter = {"op": "remove", "ns": `${dbName}.${collName}`, "ok": {$ne: 0}};
+        } else if (unVersioned) {
             filter["command.shardVersion.0"] = Timestamp(0, 0);
         }
 
@@ -110,14 +114,20 @@ function runTest({shardKey, cmdObj, numProfilerEntries}) {
                   numEntries,
                   {shard0Entries: shard0Entries, shard1Entries: shard1Entries});
     }
-    validateCommand(bucketsCollName, numProfilerEntries.sharded);
+
+    let targetShardedCollection = bucketsCollName;
+    if (isDelete && cmdObj["delete"] !== bucketsCollName) {
+        targetShardedCollection = collName;
+    }
+    validateCommand(targetShardedCollection, numProfilerEntries.sharded);
 
     // Insert dummy data so that the 'mongos1' sees the collection as sharded.
     assert.commandWorked(mongos1.getCollection(collName).insert({[timeField]: ISODate()}));
 
     // Drop and recreate an unsharded collection with 'mongos0' as the router.
     assert(mongos0.getCollection(collName).drop());
-    assert.commandWorked(mongos0.createCollection(collName, {timeseries: {timeField: timeField}}));
+    assert.commandWorked(mongos0.createCollection(
+        collName, {timeseries: {timeField: timeField, metaField: metaField}}));
 
     // When unsharded, the command should be run against the user requested namespace.
     validateCommand(cmdObj[Object.keys(cmdObj)[0]] /* coll name specified in the command */,
@@ -236,7 +246,58 @@ runTest({
     numProfilerEntries: {sharded: 1, unsharded: 1},
 });
 
-// TODO SERVER-59180: Add tests for updates.
-// TODO SERVER-59181: Add tests for deletes.
+if (TimeseriesTest.timeseriesUpdatesAndDeletesEnabled(st.shard0) &&
+    TimeseriesTest.shardedTimeseriesUpdatesAndDeletesEnabled(st.shard0)) {
+    runTest({
+        shardKey: {[metaField]: 1},
+        cmdObj: {
+            delete: collName,
+            deletes: [{
+                q: {},
+                limit: 0,
+            }],
+        },
+        numProfilerEntries: {sharded: 2, unsharded: 1},
+    });
+
+    runTest({
+        shardKey: {[metaField]: 1},
+        cmdObj: {
+            delete: collName,
+            deletes: [{
+                q: {[metaField]: 0},
+                limit: 0,
+            }],
+        },
+        numProfilerEntries: {sharded: 1, unsharded: 1},
+    });
+
+    runTest({
+        shardKey: {[metaField]: 1},
+        cmdObj: {
+            delete: bucketsCollName,
+            deletes: [{
+                q: {},
+                limit: 0,
+            }],
+        },
+        numProfilerEntries: {sharded: 2, unsharded: 1},
+    });
+
+    runTest({
+        shardKey: {[metaField]: 1},
+        cmdObj: {
+            delete: bucketsCollName,
+            deletes: [{
+                q: {meta: 0},
+                limit: 0,
+            }],
+        },
+        numProfilerEntries: {sharded: 1, unsharded: 1},
+    });
+
+    // TODO SERVER-59180: Add tests for updates.
+}
+
 st.stop();
 })();

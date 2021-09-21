@@ -26,6 +26,13 @@ var TimeseriesTest = class {
             .featureFlagTimeseriesUpdatesAndDeletes.value;
     }
 
+    static shardedTimeseriesUpdatesAndDeletesEnabled(conn) {
+        return assert
+            .commandWorked(
+                conn.adminCommand({getParameter: 1, featureFlagShardedTimeSeriesUpdateDelete: 1}))
+            .featureFlagShardedTimeSeriesUpdateDelete.value;
+    }
+
     /**
      * Adjusts the values in 'fields' by a random amount.
      * Ensures that the new values stay in the range [0, 100].

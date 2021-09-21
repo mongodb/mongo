@@ -36,6 +36,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/lasterror',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
+        '$BUILD_DIR/mongo/db/timeseries/timeseries_update_delete_util',
         'query/cluster_query',
         'write_ops/cluster_write_ops',
     ],
