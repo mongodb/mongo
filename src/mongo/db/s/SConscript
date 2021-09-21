@@ -336,6 +336,7 @@ env.Library(
         'shardsvr_create_collection_command.cpp',
         'shardsvr_create_collection_participant_command.cpp',
         'shardsvr_drop_collection_command.cpp',
+        'shardsvr_drop_collection_if_uuid_not_matching_command.cpp',
         'shardsvr_drop_collection_participant_command.cpp',
         'shardsvr_drop_database_command.cpp',
         'shardsvr_drop_database_participant_command.cpp',

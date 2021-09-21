@@ -74,6 +74,7 @@ const allCommands = {
     _shardsvrCommitReshardCollection: {skip: isPrimaryOnly},
     _shardsvrDropCollection: {skip: isPrimaryOnly},
     _shardsvrCreateCollection: {skip: isPrimaryOnly},
+    _shardsvrDropCollectionIfUUIDNotMatching: {skip: isNotAUserDataRead},
     _shardsvrDropCollectionParticipant: {skip: isPrimaryOnly},
     _shardsvrCreateCollectionParticipant: {skip: isPrimaryOnly},
     _shardsvrMovePrimary: {skip: isPrimaryOnly},

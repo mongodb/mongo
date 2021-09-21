@@ -187,6 +187,7 @@ env.Library(
         'request_types/commit_chunk_migration_request_type.cpp',
         'request_types/commit_reshard_collection.idl',
         'request_types/configure_collection_auto_split.idl',
+        'request_types/drop_collection_if_uuid_not_matching.idl',
         'request_types/ensure_chunk_version_is_greater_than.idl',
         'request_types/flush_database_cache_updates.idl',
         'request_types/flush_resharding_state_change.idl',
