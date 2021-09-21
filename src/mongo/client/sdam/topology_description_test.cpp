@@ -337,5 +337,34 @@ TEST_F(TopologyDescriptionTestFixture, ShouldNotUpdateTopologyVersionOnError) {
     auto topologyVersion = topologyDescription->getServers()[1]->getTopologyVersion();
     ASSERT(topologyVersion == boost::none);
 }
+
+TEST_F(TopologyDescriptionTestFixture, ShouldMakeNewUUIDWhenCloning) {
+    const auto config = SdamConfiguration(kThreeServers);
+    const auto topologyDescription = std::make_shared<TopologyDescription>(config);
+    const auto newTopologyDescription = TopologyDescription::clone(*topologyDescription);
+    ASSERT(topologyDescription->getId() != newTopologyDescription->getId());
+}
+
+TEST_F(TopologyDescriptionTestFixture, ShouldNotShareServerDescriptionsWhenCloning) {
+    const auto config = SdamConfiguration(kThreeServers);
+    const auto topologyDescription = std::make_shared<TopologyDescription>(config);
+    const auto newTopologyDescription = TopologyDescription::clone(*topologyDescription);
+
+    const auto& newServers = newTopologyDescription->getServers();
+    ASSERT_EQUALS(newServers.size(), topologyDescription->getServers().size());
+    for (const auto& server : newServers) {
+        auto resultPtr = topologyDescription->findServers(
+            [server](const ServerDescriptionPtr& s) { return s.get() == server.get(); });
+        ASSERT_EQUALS(resultPtr.size(), 0);
+
+        auto resultAddress =
+            topologyDescription->findServers([server](const ServerDescriptionPtr& s) {
+                return s->getAddress() == server->getAddress();
+            });
+        ASSERT_EQUALS(resultAddress.size(), 1);
+        ASSERT_EQUALS(*resultAddress[0], *server);
+        ASSERT_EQUALS(server->getTopologyDescription(), newTopologyDescription);
+    }
+}
 }  // namespace sdam
 }  // namespace mongo

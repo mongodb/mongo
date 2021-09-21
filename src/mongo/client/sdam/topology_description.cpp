@@ -50,14 +50,21 @@ TopologyDescription::TopologyDescription(SdamConfiguration config)
 
 TopologyDescriptionPtr TopologyDescription::create(SdamConfiguration config) {
     auto result = std::make_shared<TopologyDescription>(config);
-    TopologyDescription::associateServerDescriptions(result);
+    for (auto& server : result->_servers) {
+        server->_topologyDescription = result;
+    }
     return result;
 }
 
-TopologyDescriptionPtr TopologyDescription::clone(TopologyDescriptionPtr source) {
-    invariant(source);
-    auto result = std::make_shared<TopologyDescription>(*source);
-    TopologyDescription::associateServerDescriptions(result);
+TopologyDescriptionPtr TopologyDescription::clone(const TopologyDescription& source) {
+    auto result = std::make_shared<TopologyDescription>(source);
+    result->_id = UUID::gen();
+
+    for (auto& server : result->_servers) {
+        server = std::make_shared<ServerDescription>(*server);
+        server->_topologyDescription = result;
+    }
+
     return result;
 }
 
@@ -284,14 +291,6 @@ BSONObj TopologyDescription::toBSON() {
 
 std::string TopologyDescription::toString() {
     return toBSON().toString();
-}
-
-void TopologyDescription::associateServerDescriptions(
-    const TopologyDescriptionPtr& topologyDescription) {
-    auto& servers = topologyDescription->_servers;
-    for (auto& server : servers) {
-        server->_topologyDescription = topologyDescription;
-    }
 }
 
 boost::optional<ServerDescriptionPtr> TopologyDescription::getPrimary() {
