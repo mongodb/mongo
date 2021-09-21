@@ -35,6 +35,8 @@
 
 #include <memory>
 
+#include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_future_util.h"
 #include "mongo/db/s/resharding/resharding_oplog_application.h"
 #include "mongo/db/s/resharding/resharding_oplog_session_application.h"
@@ -78,8 +80,21 @@ SemiFuture<void> ReshardingOplogBatchApplier::applyBatch(
                                                                     cancelToken);
                            }
                        } else {
-                           uassertStatusOK(
-                               _crudApplication.applyOperation(opCtx.get(), oplogEntry));
+                           // ReshardingOpObserver depends on the collection metadata being known
+                           // when processing writes to the temporary resharding collection. We
+                           // attach shard version IGNORED to the insert operations and retry once
+                           // on a StaleConfig exception to allow the collection metadata
+                           // information to be recovered.
+                           auto& oss = OperationShardingState::get(opCtx.get());
+                           oss.initializeClientRoutingVersions(
+                               _crudApplication.getOutputNss(),
+                               ChunkVersion::IGNORED() /* shardVersion */,
+                               boost::none /* dbVersion */);
+
+                           resharding::data_copy::withOneStaleConfigRetry(opCtx.get(), [&] {
+                               uassertStatusOK(
+                                   _crudApplication.applyOperation(opCtx.get(), oplogEntry));
+                           });
                        }
                    }
                    return makeReadyFutureWith([] {}).semi();
