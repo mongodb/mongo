@@ -205,7 +205,7 @@ void ShardServerProcessInterface::renameIfOptionsAndIndexesHaveNotChanged(
         // internalRenameIfOptionsAndIndexesMatch is adminOnly.
         NamespaceString::kAdminDb,
         cachedDbInfo,
-        // $out target collection must not exist or not be sharded.
+        // Only unsharded collections can be renamed.
         _versionCommandIfAppropriate(newCmdObj, cachedDbInfo, ChunkVersion::UNSHARDED()),
         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
         Shard::RetryPolicy::kNoRetry);

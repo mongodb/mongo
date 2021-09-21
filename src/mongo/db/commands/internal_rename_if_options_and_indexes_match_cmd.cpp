@@ -36,12 +36,8 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/s/database_sharding_state.h"
-#include "mongo/db/s/dist_lock_manager.h"
 
 namespace mongo {
-MONGO_FAIL_POINT_DEFINE(blockBeforeInternalRenameIfOptionsAndIndexesMatch);
-
 namespace {
 
 bool isCollectionSharded(OperationContext* opCtx, const NamespaceString& nss) {
@@ -66,56 +62,26 @@ public:
 
         void typedRun(OperationContext* opCtx) {
             auto thisRequest = request();
-            const auto& fromNss = thisRequest.getFrom();
-            const auto& toNss = thisRequest.getTo();
-            const auto& originalIndexes = thisRequest.getIndexes();
-            const auto indexList =
-                std::list<BSONObj>(originalIndexes.begin(), originalIndexes.end());
-            const auto& collectionOptions = thisRequest.getCollectionOptions();
-
-            if (serverGlobalParams.clusterRole != ClusterRole::ShardServer) {
-                // No need to acquire additional locks in a non-sharded environment
-                _internalRun(opCtx, fromNss, toNss, indexList, collectionOptions);
-                return;
-            }
-
-            // Check if the receiving shard is still the primary for the database
-            DatabaseShardingState::checkIsPrimaryShardForDb(opCtx, fromNss.db());
-
-            // Acquiring the local part of the distributed locks for involved namespaces allows:
-            // - Serialize with sharded DDLs, ensuring no concurrent modifications of the
-            // collections.
-            // - Check safely if the target collection is sharded or not.
-            auto distLockManager = DistLockManager::get(opCtx);
-            auto fromLocalDistlock = distLockManager->lockDirectLocally(
-                opCtx, fromNss.ns(), DistLockManager::kDefaultLockTimeout);
-            auto toLocalDistLock = distLockManager->lockDirectLocally(
-                opCtx, toNss.ns(), DistLockManager::kDefaultLockTimeout);
+            auto toNss = thisRequest.getTo();
 
             uassert(ErrorCodes::IllegalOperation,
                     str::stream() << "cannot rename to sharded collection '" << toNss << "'",
                     !isCollectionSharded(opCtx, toNss));
 
-            _internalRun(opCtx, fromNss, toNss, indexList, collectionOptions);
-        }
-
-    private:
-        static void _internalRun(OperationContext* opCtx,
-                                 const NamespaceString& fromNss,
-                                 const NamespaceString& toNss,
-                                 const std::list<BSONObj>& indexList,
-                                 const BSONObj& collectionOptions) {
-            if (MONGO_unlikely(blockBeforeInternalRenameIfOptionsAndIndexesMatch.shouldFail())) {
-                blockBeforeInternalRenameIfOptionsAndIndexesMatch.pauseWhileSet();
-            }
-
+            auto originalIndexes = thisRequest.getIndexes();
+            auto indexList = std::list<BSONObj>(originalIndexes.begin(), originalIndexes.end());
             RenameCollectionOptions options;
             options.dropTarget = true;
             options.stayTemp = false;
-            doLocalRenameIfOptionsAndIndexesHaveNotChanged(
-                opCtx, fromNss, toNss, options, std::move(indexList), collectionOptions);
+            doLocalRenameIfOptionsAndIndexesHaveNotChanged(opCtx,
+                                                           thisRequest.getFrom(),
+                                                           toNss,
+                                                           options,
+                                                           std::move(indexList),
+                                                           thisRequest.getCollectionOptions());
         }
 
+    private:
         NamespaceString ns() const override {
             return request().getFrom();
         }
