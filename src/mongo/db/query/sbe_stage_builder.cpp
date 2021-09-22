@@ -2061,14 +2061,14 @@ const size_t kGroupBySlots = 1;
 std::pair<sbe::value::SlotId, EvalStage> generateGroupByKey(
     StageBuilderState& state,
     Expression* idExpr,
-    std::unique_ptr<sbe::PlanStage> childStage,
-    sbe::value::SlotId rootSlot,
+    EvalStage childEvalStage,
     PlanNodeId nodeId,
     sbe::value::SlotIdGenerator* slotIdGenerator) {
     // TODO SERVER-59951: make object form of the '_id' group-by expression work to handle multiple
     // group-by keys.
+    auto rootSlot = childEvalStage.outSlots[0];
     auto [groupByEvalExpr, groupByEvalStage] = stage_builder::generateExpression(
-        state, idExpr, {std::move(childStage), {}}, rootSlot, nodeId);
+        state, idExpr, std::move(childEvalStage), rootSlot, nodeId);
 
     if (auto isConstIdExpr = dynamic_cast<ExpressionConstant*>(idExpr) != nullptr; isConstIdExpr) {
         return projectEvalExpr(
@@ -2213,15 +2213,12 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // Builds the child and gets the child result slot.
     auto [childStage, childOutputs] = build(groupNode->children[0], reqs);
     auto childResult = childOutputs.get(kResult);
+    EvalStage childEvalStage{std::move(childStage), {childResult}};
     _shouldProduceRecordIdSlot = false;
 
     // Translates the group-by expression and binds it to a slot in a project stage.
-    auto [groupBySlot, groupByEvalStage] = generateGroupByKey(_state,
-                                                              idExpr.at("_id").get(),
-                                                              std::move(childStage),
-                                                              childResult,
-                                                              nodeId,
-                                                              &_slotIdGenerator);
+    auto [groupBySlot, groupByEvalStage] = generateGroupByKey(
+        _state, idExpr.at("_id").get(), std::move(childEvalStage), nodeId, &_slotIdGenerator);
 
     // Translates accumulators which are executed inside the group stage and gets slots for
     // accumulators.
