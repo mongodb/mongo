@@ -1257,6 +1257,62 @@ functions:
         args:
           - "./src/evergreen/do_jepsen_setup/move_binaries.sh"
 
+  "do jepsen docker setup":
+    - *f_expansions_write
+    - command: subprocess.exec
+      type: system
+      params:
+        binary: bash
+        args:
+          - "./src/evergreen/jepsen_docker/setup.sh"
+  "run jepsen docker test":
+    - *f_expansions_write
+    - command: subprocess.exec
+      type: setup
+      params:
+        binary: bash
+        args:
+          - "./src/evergreen/jepsen_docker/docker-up.sh"
+    - command: archive.targz_pack
+      params:
+        target: jepsen-docker-log.tgz
+        source_dir: jepsen/docker
+        include:
+          - "docker.log"
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: jepsen-docker-log.tgz
+        remote_file: ${project}/${build_variant}/${revision}/jstestfuzz/jepsen-docker-log-${task_id}-${execution}.tgz
+        bucket: mciuploads
+        permissions: private
+        visibility: signed
+        content_type: application/gzip
+        display_name: Jepsen Docker Build Log - Execution ${execution}
+
+    - command: subprocess.exec
+      type: test
+      timeout_secs: 2700 # Timeout test if there is no output for more than 45 minutes.
+      params:
+        binary: bash
+        args:
+          - "./src/evergreen/jepsen_docker/list-append.sh"
+    - command: subprocess.exec
+      params:
+        binary: bash
+        args:
+          - "./src/evergreen/jepsen_test_fail.sh"
+
+  "cleanup jepsen docker test":
+    - *f_expansions_write
+    - command: subprocess.exec
+      type: system
+      params:
+        binary: bash
+        args:
+          - "./src/evergreen/jepsen_docker/cleanup.sh"
+
   "run jepsen test":
     - *f_expansions_write
     - command: subprocess.exec
@@ -1943,6 +1999,7 @@ post:
   - func: "umount shared scons directory"
   - func: "cleanup FUSE watchdog"
   - func: "cleanup environment"
+  - func: "cleanup jepsen docker test"
 
 # Timeout steps
 timeout:
@@ -3011,6 +3068,14 @@ tasks:
       jepsen_storage_engine: --storage-engine wiredTiger
       jepsen_test_name: read-concern-majority
       jepsen_write_concern: --write-concern w1
+
+- <<: *run_jepsen_template
+  name: jepsen_list-append
+  tags: ["jepsen_docker"]
+  commands:
+  - func: "do setup"
+  - func: "do jepsen docker setup"
+  - func: "run jepsen docker test"
 
 ## initial sync multiversion fuzzer ##
 - <<: *jstestfuzz_template
@@ -10821,6 +10886,9 @@ buildvariants:
   - name: audit
   - name: causally_consistent_jscore_txns_passthrough
   - name: .encrypt !.replica_sets !.aggregation !.sharding !.jscore
+  - name: .jepsen_docker
+    distros:
+    - debian10-large
   - name: .jscore .common !.decimal !.sharding
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
