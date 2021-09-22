@@ -63,7 +63,8 @@ static int index_filter(const struct dirent *ent)
 		&& strcmp(ent->d_name, "posix") != 0
 		&& strcmp(ent->d_name, "posixrules") != 0
 		&& strcmp(ent->d_name, "right") != 0
-		&& strcmp(ent->d_name, "Etc") != 0
+		// TODO SERVER-60141 the upgrade to timelib 2021.09 or later should include this change
+		// && strcmp(ent->d_name, "Etc") != 0
 		&& strcmp(ent->d_name, "localtime") != 0
 		&& strstr(ent->d_name, ".list") == NULL
 		&& strstr(ent->d_name, ".tab") == NULL;
