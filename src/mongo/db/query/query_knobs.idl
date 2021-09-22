@@ -539,3 +539,12 @@ server_parameters:
     cpp_varname: "enableTimeoutOfInactiveSessionCursors"
     cpp_vartype: AtomicWord<bool>
     default: false
+
+  internalQueryMaxAllowedDensifyDocs:
+    description: "Limits the number of documents that $densify is allowed to generate."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryMaxAllowedDensifyDocs"
+    cpp_vartype: AtomicWord<int>
+    default:  500000
+    validator:
+        gt: 0

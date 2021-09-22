@@ -230,12 +230,14 @@ DocumentSourceInternalDensify::DocGenerator::DocGenerator(
     FieldPath fieldName,
     boost::optional<Document> includeFields,
     boost::optional<Document> finalDoc,
-    ValueComparator comp)
+    ValueComparator comp,
+    size_t* counter)
     : _comp(std::move(comp)),
       _range(std::move(range)),
       _path(std::move(fieldName.fullPath())),
       _finalDoc(std::move(finalDoc)),
-      _min(std::move(min)) {
+      _min(std::move(min)),
+      _counter(counter) {
 
     if (includeFields) {
         _includeFields = *includeFields;
@@ -338,6 +340,7 @@ Document DocumentSourceInternalDensify::DocGenerator::getNextDocument() {
 
     MutableDocument retDoc(_includeFields);
     retDoc.setNestedField(_path, valueToAdd);
+    ++(*_counter);
     return retDoc.freeze();
 }
 
@@ -358,16 +361,14 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::densifyAfterEOF(Num
                 stdx::holds_alternative<NumericBounds>(bounds));
         auto lowerBound = stdx::get<NumericBounds>(bounds).first;
         _current = lowerBound;
-        _docGenerator = DocGenerator(
-            lowerBound, _range, _field, boost::none, boost::none, pExpCtx->getValueComparator());
+        createDocGenerator(lowerBound, _range);
     } else if (compareValues(addValues(stdx::get<Value>(*_current), _range.getStep()) >=
                              bounds.second)) {
         _densifyState = DensifyState::kDensifyDone;
         return DocumentSource::GetNextResult::makeEOF();
     } else {
         auto lowerBound = addValues(stdx::get<Value>(*_current), _range.getStep());
-        _docGenerator = DocGenerator(
-            lowerBound, _range, _field, boost::none, boost::none, pExpCtx->getValueComparator());
+        createDocGenerator(lowerBound, _range);
     }
     _densifyState = DensifyState::kHaveGenerator;
     auto generatedDoc = _docGenerator->getNextDocument();
@@ -400,14 +401,12 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::processDocAboveMinB
         val = subtractValues(val, _range.getStep());
     }
     Value upperBound = (compareValues(val <= bounds.second)) ? val : bounds.second;
-    _docGenerator = DocGenerator(
+    createDocGenerator(
         lowerBound,
         RangeStatement(_range.getStep(), NumericBounds(lowerBound, upperBound), _range.getUnit()),
-        _field,
         _partitionExpr ? boost::make_optional<Document>(getDensifyPartition(doc).getDocument())
                        : boost::none,
-        doc,
-        pExpCtx->getValueComparator());
+        doc);
     Document nextFromGen = _docGenerator->getNextDocument();
     _current = getDensifyValue(nextFromGen);
     _densifyState = DensifyState::kHaveGenerator;
@@ -492,13 +491,12 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::finishDensifyingPar
         if (minOverride && compareValues(valToGenerate, *minOverride) < 0) {
             valToGenerate = *minOverride;
         }
-        _docGenerator = DocGenerator(
+        createDocGenerator(
             valToGenerate,
             RangeStatement(_range.getStep(), NumericBounds(valToGenerate, max), _range.getUnit()),
-            _field,
             firstPartition.getDocument(),
-            boost::none,  // final doc.
-            pExpCtx->getValueComparator());
+            boost::none  // final doc.
+        );
         // Remove this partition from the table, we're done with it.
         _partitionTable.erase(firstPartitionKeyVal);
         _densifyState = DensifyState::kHaveGenerator;
@@ -612,15 +610,13 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::handleNeedGen(Docum
         compareValues(offsetFromStep == Value(0)) ? subtractValues(max, _range.getStep()) : max;
 
     Value newCurrent = addValues(stdx::get<Value>(*_current), _range.getStep());
-    _docGenerator = DocumentSourceInternalDensify::DocGenerator(
+    createDocGenerator(
         DensifyValueType(newCurrent),
         RangeStatement(_range.getStep(), NumericBounds(newCurrent, maxAdjusted), _range.getUnit()),
-        _field,
         _partitionExpr
             ? boost::make_optional<Document>(getDensifyPartition(currentDoc).getDocument())
             : boost::none,
-        currentDoc,
-        pExpCtx->getValueComparator());
+        currentDoc);
 
     _densifyState = DensifyState::kHaveGenerator;
     auto nextDoc = _docGenerator->getNextDocument();
@@ -715,6 +711,14 @@ void DocumentSourceInternalDensify::initializePartitionState(Document initialDoc
 }
 
 DocumentSource::GetNextResult DocumentSourceInternalDensify::doGetNext() {
+    // When we return a generated document '_docsGenerated' is incremented. Check that the last
+    // document didn't put us over the limit.
+    uassert(5897900,
+            str::stream() << "Generated " << _docsGenerated
+                          << " documents in $densify, which is over the limit of " << _maxDocs
+                          << ". Increase the 'internalQueryMaxAllowedDensifyDocs' parameter to "
+                             "allow more generated documents",
+            _docsGenerated <= _maxDocs);
     switch (_densifyState) {
         case DensifyState::kUninitializedOrBelowRange: {
             // This state represents the first run of doGetNext() or that the value that we last

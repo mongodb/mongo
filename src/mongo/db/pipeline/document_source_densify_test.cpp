@@ -75,52 +75,60 @@ Date_t makeDate(std::string dateStr) {
 
 DEATH_TEST(DensifyGeneratorTest, ErrorsIfMinOverMax, "lower or equal to max") {
     Document doc{{"a", 1}};
+    size_t counter = 0;
     ASSERT_THROWS_CODE(
         GenClass(Value(1),
                  RangeStatement(Value(1), NumericBounds(Value(1), Value(0)), boost::none),
                  "path",
                  doc,
                  doc,
-                 ValueComparator()),
+                 ValueComparator(),
+                 &counter),
         AssertionException,
         5733303);
 }
 
 DEATH_TEST(DensifyGeneratorTest, ErrorsIfStepIsZero, "be positive") {
     Document doc{{"a", 1}};
+    size_t counter = 0;
     ASSERT_THROWS_CODE(
         GenClass(Value(0),
                  RangeStatement(Value(0), NumericBounds(Value(0), Value(1)), boost::none),
                  "path",
                  doc,
                  doc,
-                 ValueComparator()),
+                 ValueComparator(),
+                 &counter),
         AssertionException,
         5733305);
 }
 
 DEATH_TEST(DensifyGeneratorTest, ErrorsOnMixedValues, "same type") {
     Document doc{{"a", 1}};
+    size_t counter = 0;
     ASSERT_THROWS_CODE(
         GenClass(Date_t::max(),
                  RangeStatement(Value(1), NumericBounds(Value(0), Value(1)), boost::none),
                  "path",
                  doc,
                  doc,
-                 ValueComparator()),
+                 ValueComparator(),
+                 &counter),
         AssertionException,
         5733300);
 }
 
 DEATH_TEST(DensifyGeneratorTest, ErrorsIfFieldExistsInDocument, "cannot include field") {
     Document doc{{"path", 1}};
+    size_t counter = 0;
     ASSERT_THROWS_CODE(
         GenClass(Value(0),
                  RangeStatement(Value(1), NumericBounds(Value(0), Value(1)), boost::none),
                  "path",
                  doc,
                  doc,
-                 ValueComparator()),
+                 ValueComparator(),
+                 &counter),
         AssertionException,
         5733306);
 }
@@ -131,13 +139,15 @@ DEATH_TEST(DensifyGeneratorTest, ErrorsIfFieldExistsButIsArray, "cannot include 
     docArray.push_back(doc);
     docArray.push_back(doc);
     Document preservedFields{{"arr", Value(docArray)}};
+    size_t counter = 0;
     ASSERT_THROWS_CODE(
         GenClass(Value(0),
                  RangeStatement(Value(1), NumericBounds(Value(0), Value(1)), boost::none),
                  "arr",
                  preservedFields,
                  doc,
-                 ValueComparator()),
+                 ValueComparator(),
+                 &counter),
         AssertionException,
         5733306);
 }
@@ -148,39 +158,45 @@ TEST(DensifyGeneratorTest, ErrorsIfFieldIsInArray) {
     docArray.push_back(doc);
     docArray.push_back(doc);
     Document preservedFields{{"arr", Value(docArray)}};
+    size_t counter = 0;
     ASSERT_THROWS_CODE(
         GenClass(Value(0),
                  RangeStatement(Value(1), NumericBounds(Value(0), Value(1)), boost::none),
                  "arr.path",
                  preservedFields,
                  doc,
-                 ValueComparator()),
+                 ValueComparator(),
+                 &counter),
         AssertionException,
         5733307);
 }
 
 TEST(DensifyGeneratorTest, ErrorsIfPrefixOfFieldExists) {
     Document doc{{"a", 2}};
+    size_t counter = 0;
     ASSERT_THROWS_CODE(
         GenClass(Value(1),
                  RangeStatement(Value(1), NumericBounds(Value(1), Value(1)), boost::none),
                  "a.b",
                  doc,
                  doc,
-                 ValueComparator()),
+                 ValueComparator(),
+                 &counter),
         AssertionException,
         5733308);
 }
 
 TEST(DensifyGeneratorTest, GeneratesNumericDocumentCorrectly) {
     Document doc{{"a", 2}};
+    size_t counter = 0;
     auto generator =
         GenClass(Value(1),
                  RangeStatement(Value(1), NumericBounds(Value(1), Value(1)), boost::none),
                  "a",
                  Document(),
                  doc,
-                 ValueComparator());
+                 ValueComparator(),
+                 &counter);
     ASSERT_FALSE(generator.done());
     Document docOne{{"a", 1}};
     ASSERT_DOCUMENT_EQ(docOne, generator.getNextDocument());
@@ -190,13 +206,15 @@ TEST(DensifyGeneratorTest, GeneratesNumericDocumentCorrectly) {
 }
 
 TEST(DensifyGeneratorTest, GeneratesNumericDocumentCorrectlyWithoutFinalDoc) {
+    size_t counter = 0;
     auto generator =
         GenClass(Value(1),
                  RangeStatement(Value(1), NumericBounds(Value(1), Value(1)), boost::none),
                  "a",
                  Document(),
                  boost::none,
-                 ValueComparator());
+                 ValueComparator(),
+                 &counter);
     ASSERT_FALSE(generator.done());
     Document docOne{{"a", 1}};
     ASSERT_DOCUMENT_EQ(docOne, generator.getNextDocument());
@@ -206,13 +224,15 @@ TEST(DensifyGeneratorTest, GeneratesNumericDocumentCorrectlyWithoutFinalDoc) {
 TEST(DensifyGeneratorTest, PreservesIncludeFields) {
     Document doc{{"a", 2}, {"b", 2}, {"c", 2}};
     Document preserveFields{{"b", 1}, {"c", 1}};
+    size_t counter = 0;
     auto generator =
         GenClass(Value(1),
                  RangeStatement(Value(1), NumericBounds(Value(1), Value(1)), boost::none),
                  "a",
                  preserveFields,
                  doc,
-                 ValueComparator());
+                 ValueComparator(),
+                 &counter);
     ASSERT_FALSE(generator.done());
     Document docOne{{"b", 1}, {"c", 1}, {"a", 1}};
     ASSERT_DOCUMENT_EQ(docOne, generator.getNextDocument());
@@ -223,13 +243,15 @@ TEST(DensifyGeneratorTest, PreservesIncludeFields) {
 
 TEST(DensifyGeneratorTest, GeneratesNumberOfNumericDocumentsCorrectly) {
     Document doc{{"a", 83}};
+    size_t counter = 0;
     auto generator =
         GenClass(Value(0),
                  RangeStatement(Value(2), NumericBounds(Value(0), Value(10)), boost::none),
                  "a",
                  Document(),
                  doc,
-                 ValueComparator());
+                 ValueComparator(),
+                 &counter);
     for (int curVal = 0; curVal <= 10; curVal += 2) {
         ASSERT_FALSE(generator.done());
         Document nextDoc{{"a", curVal}};
@@ -243,13 +265,15 @@ TEST(DensifyGeneratorTest, GeneratesNumberOfNumericDocumentsCorrectly) {
 TEST(DensifyGeneratorTest, WorksWithNonIntegerStepAndPreserveFields) {
     Document doc{{"a", 2}, {"b", 2}, {"c", 2}};
     Document preserveFields{{"b", 1}, {"c", 1}};
+    size_t counter = 0;
     auto generator =
         GenClass(Value(0),
                  RangeStatement(Value(1.3), NumericBounds(Value(0), Value(10)), boost::none),
                  "a",
                  preserveFields,
                  doc,
-                 ValueComparator());
+                 ValueComparator(),
+                 &counter);
     for (double curVal = 0; curVal <= 10; curVal += 1.3) {
         ASSERT_FALSE(generator.done());
         Document nextDoc{{"b", 1}, {"c", 1}, {"a", curVal}};
@@ -262,13 +286,15 @@ TEST(DensifyGeneratorTest, WorksWithNonIntegerStepAndPreserveFields) {
 
 TEST(DensifyGeneratorTest, GeneratesOffsetFromMaxDocsCorrectly) {
     Document doc{{"a", 83}};
+    size_t counter = 0;
     auto generator =
         GenClass(Value(1),
                  RangeStatement(Value(2), NumericBounds(Value(1), Value(11)), boost::none),
                  "a",
                  Document(),
                  doc,
-                 ValueComparator());
+                 ValueComparator(),
+                 &counter);
     for (int curVal = 1; curVal <= 11; curVal += 2) {
         ASSERT_FALSE(generator.done());
         Document nextDoc{{"a", curVal}};
@@ -282,13 +308,15 @@ TEST(DensifyGeneratorTest, GeneratesOffsetFromMaxDocsCorrectly) {
 TEST(DensifyGeneratorTest, GeneratesAtDottedPathCorrectly) {
     Document doc{{"a", 83}};
     Document preservedFields{{"a", Document{{"b", 1}}}};
+    size_t counter = 0;
     auto generator =
         GenClass(Value(1),
                  RangeStatement(Value(2), NumericBounds(Value(1), Value(11)), boost::none),
                  "a.c",
                  preservedFields,
                  doc,
-                 ValueComparator());
+                 ValueComparator(),
+                 &counter);
     for (int curVal = 1; curVal <= 11; curVal += 2) {
         ASSERT_FALSE(generator.done());
         Document nextDoc{{"a", Document{{"b", 1}, {"c", curVal}}}};
@@ -297,6 +325,7 @@ TEST(DensifyGeneratorTest, GeneratesAtDottedPathCorrectly) {
     ASSERT_FALSE(generator.done());
     ASSERT_DOCUMENT_EQ(doc, generator.getNextDocument());
     ASSERT_TRUE(generator.done());
+    counter = 0;
     // Test deeply nested fields.
     Document secondPreservedFields{{"a", Document{{"b", 1}}}};
     generator = GenClass(Value(1),
@@ -304,7 +333,8 @@ TEST(DensifyGeneratorTest, GeneratesAtDottedPathCorrectly) {
                          "a.c.d",
                          secondPreservedFields,
                          doc,
-                         ValueComparator());
+                         ValueComparator(),
+                         &counter);
     for (int curVal = 1; curVal <= 11; curVal += 2) {
         ASSERT_FALSE(generator.done());
         Document nextDoc{{"a", Document{{"b", 1}, {"c", Document{{"d", curVal}}}}}};
@@ -316,6 +346,7 @@ TEST(DensifyGeneratorTest, GeneratesAtDottedPathCorrectly) {
 }
 
 DEATH_TEST(DensifyGeneratorTest, FailsIfDatesAndUnitNotProvided, "date step") {
+    size_t counter = 0;
     ASSERT_THROWS_CODE(GenClass(makeDate("2021-01-01T00:00:00.000Z"),
                                 RangeStatement(Value(1),
                                                DateBounds(makeDate("2021-01-01T00:00:00.000Z"),
@@ -324,24 +355,28 @@ DEATH_TEST(DensifyGeneratorTest, FailsIfDatesAndUnitNotProvided, "date step") {
                                 "a",
                                 Document(),
                                 Document(),
-                                ValueComparator()),
+                                ValueComparator(),
+                                &counter),
                        AssertionException,
                        5733501);
 }
 
 DEATH_TEST(DensifyGeneratorTest, FailsIfNumberAndUnitProvided, "non-date") {
+    size_t counter = 0;
     ASSERT_THROWS_CODE(
         GenClass(Value(1),
                  RangeStatement(Value(1), NumericBounds(Value(1), Value(10)), TimeUnit::second),
                  "a",
                  Document(),
                  Document(),
-                 ValueComparator()),
+                 ValueComparator(),
+                 &counter),
         AssertionException,
         5733506);
 }
 
 DEATH_TEST(DensifyGeneratorTest, DateMinMustBeLessThanMax, "lower or equal to") {
+    size_t counter = 0;
     ASSERT_THROWS_CODE(GenClass(makeDate("2021-01-01T00:00:02.000Z"),
                                 RangeStatement(Value(1),
                                                DateBounds(makeDate("2021-01-01T00:00:02.000Z"),
@@ -350,12 +385,14 @@ DEATH_TEST(DensifyGeneratorTest, DateMinMustBeLessThanMax, "lower or equal to") 
                                 "a",
                                 Document(),
                                 Document(),
-                                ValueComparator()),
+                                ValueComparator(),
+                                &counter),
                        AssertionException,
                        5733502);
 }
 
 DEATH_TEST(DensifyGeneratorTest, DateStepMustBeInt, "integer") {
+    size_t counter = 0;
     ASSERT_THROWS_CODE(GenClass(makeDate("2021-01-01T00:00:00.000Z"),
                                 RangeStatement(Value(1.5),
                                                DateBounds(makeDate("2021-01-01T00:00:00.000Z"),
@@ -364,12 +401,14 @@ DEATH_TEST(DensifyGeneratorTest, DateStepMustBeInt, "integer") {
                                 "a",
                                 Document(),
                                 Document(),
-                                ValueComparator()),
+                                ValueComparator(),
+                                &counter),
                        AssertionException,
                        5733505);
 }
 
 TEST(DensifyGeneratorTest, GeneratesDatesBySecondCorrectly) {
+    size_t counter = 0;
     Document doc{{"a", 83}};
     std::string dateBase = "2021-01-01T00:00:";
     auto generator = GenClass(makeDate("2021-01-01T00:00:01.000Z"),
@@ -380,7 +419,8 @@ TEST(DensifyGeneratorTest, GeneratesDatesBySecondCorrectly) {
                               "a",
                               Document(),
                               doc,
-                              ValueComparator());
+                              ValueComparator(),
+                              &counter);
     for (int curVal = 1; curVal <= 11; curVal += 2) {
         auto appendStr = std::to_string(curVal);
         appendStr.insert(appendStr.begin(), 2 - appendStr.length(), '0');
@@ -395,6 +435,7 @@ TEST(DensifyGeneratorTest, GeneratesDatesBySecondCorrectly) {
 
 TEST(DensifyGeneratorTest, GeneratesDatesByHourCorrectly) {
     Document doc{{"a", 83}};
+    size_t counter = 0;
     std::string dateBase = "2021-01-01T";
     auto generator = GenClass(makeDate("2021-01-01T01:00:00.000Z"),
                               RangeStatement(Value(2),
@@ -404,7 +445,8 @@ TEST(DensifyGeneratorTest, GeneratesDatesByHourCorrectly) {
                               "a",
                               Document(),
                               doc,
-                              ValueComparator());
+                              ValueComparator(),
+                              &counter);
     for (int curVal = 1; curVal <= 15; curVal += 2) {
         auto appendStr = std::to_string(curVal);
         appendStr.insert(appendStr.begin(), 2 - appendStr.length(), '0');
@@ -418,6 +460,7 @@ TEST(DensifyGeneratorTest, GeneratesDatesByHourCorrectly) {
 }
 
 TEST(DensifyGeneratorTest, GeneratesDatesByMonthCorrectly) {
+    size_t counter = 0;
     Document doc{{"a", 83}};
     std::string dateBase = "2021-";
     auto generator = GenClass(makeDate("2021-01-01T01:00:00.000Z"),
@@ -428,7 +471,8 @@ TEST(DensifyGeneratorTest, GeneratesDatesByMonthCorrectly) {
                               "a",
                               Document(),
                               doc,
-                              ValueComparator());
+                              ValueComparator(),
+                              &counter);
     for (int curVal = 1; curVal <= 10; curVal += 2) {
         auto appendStr = std::to_string(curVal);
         appendStr.insert(appendStr.begin(), 2 - appendStr.length(), '0');
