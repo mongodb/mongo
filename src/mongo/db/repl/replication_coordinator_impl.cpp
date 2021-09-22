@@ -2864,6 +2864,13 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* opCt
     if (!serverGlobalParams.enableMajorityReadConcern) {
         _shouldSetStableTimestamp = false;
     }
+    auto setStableTimestampGuard = makeGuard([&] {
+        lockAndCall(&lk, [=] {
+            if (!serverGlobalParams.enableMajorityReadConcern) {
+                _shouldSetStableTimestamp = true;
+            }
+        });
+    });
 
     lk.unlock();
 
@@ -2924,6 +2931,7 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* opCt
 
     // Set our stable timestamp for storage and re-enable stable timestamp advancement after we have
     // set our initial data timestamp.
+    setStableTimestampGuard.dismiss();
     if (!serverGlobalParams.enableMajorityReadConcern) {
         stdx::unique_lock<Latch> lk(_mutex);
         _shouldSetStableTimestamp = true;
