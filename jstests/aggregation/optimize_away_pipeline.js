@@ -136,6 +136,17 @@ function testGetMore({command = null, expectedResult = null} = {}) {
     assert.sameMembers(documents, expectedResult);
 }
 
+const groupPushdownEnabled = function() {
+    return assert.commandWorked(db.adminCommand({getParameter: 1, featureFlagSBEGroupPushdown: 1}))
+        .featureFlagSBEGroupPushdown.value;
+}();
+
+// Calls 'assertPushdownEnabled' if groupPushdownEnabled is 'true'. Otherwise, it calls
+// 'assertPushdownDisabled'.
+function assertPipelineIfGroupPushdown(assertPushdownEnabled, assertPushdownDisabled) {
+    return groupPushdownEnabled ? assertPushdownEnabled() : assertPushdownDisabled();
+}
+
 let explainOutput;
 
 // Basic pipelines.
@@ -247,11 +258,22 @@ assertPipelineUsesAggregation({
     expectedStages: ["COLLSCAN"],
     expectedResult: [{count: 2}]
 });
-assertPipelineUsesAggregation({
-    pipeline: [{$match: {x: {$gte: 20}}}, {$group: {_id: "null", s: {$sum: "$x"}}}],
-    expectedStages: ["COLLSCAN"],
-    expectedResult: [{_id: "null", s: 50}]
-});
+
+assertPipelineIfGroupPushdown(
+    function() {
+        return assertPipelineDoesNotUseAggregation({
+            pipeline: [{$match: {x: {$gte: 20}}}, {$group: {_id: "null", s: {$sum: "$x"}}}],
+            expectedStages: ["COLLSCAN", "PROJECTION_SIMPLE", "GROUP"],
+            expectedResult: [{_id: "null", s: 50}],
+        });
+    },
+    function() {
+        return assertPipelineUsesAggregation({
+            pipeline: [{$match: {x: {$gte: 20}}}, {$group: {_id: "null", s: {$sum: "$x"}}}],
+            expectedStages: ["COLLSCAN", "PROJECTION_SIMPLE"],
+            expectedResult: [{_id: "null", s: 50}],
+        });
+    });
 
 // Test that we can optimize away a pipeline with a $text search predicate.
 assert.commandWorked(coll.createIndex({y: "text"}));
@@ -479,10 +501,20 @@ assert.commandWorked(coll.dropIndexes());
 // Test that even if we don't have a projection stage at the front of the pipeline but there is a
 // finite dependency set, a projection representing this dependency set is pushed down.
 pipeline = [{$group: {_id: "$a", b: {$sum: "$b"}}}];
-assertPipelineUsesAggregation({
-    pipeline: pipeline,
-    expectedStages: ["COLLSCAN", "PROJECTION_SIMPLE"],
-});
+assertPipelineIfGroupPushdown(
+    function() {
+        return assertPipelineDoesNotUseAggregation({
+            pipeline: pipeline,
+            expectedStages: ["COLLSCAN", "PROJECTION_SIMPLE", "GROUP"],
+        });
+    },
+    function() {
+        return assertPipelineUsesAggregation({
+            pipeline: pipeline,
+            expectedStages: ["COLLSCAN", "PROJECTION_SIMPLE"],
+        });
+    });
+
 explain = coll.explain().aggregate(pipeline);
 let projStage = getAggPlanStage(explain, "PROJECTION_SIMPLE");
 assert.neq(null, projStage, explain);
