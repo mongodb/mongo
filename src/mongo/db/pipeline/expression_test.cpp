@@ -53,10 +53,8 @@ namespace ExpressionTests {
 
 using boost::intrusive_ptr;
 using std::initializer_list;
-using std::list;
 using std::numeric_limits;
 using std::pair;
-using std::set;
 using std::sort;
 using std::string;
 using std::vector;
@@ -3456,13 +3454,14 @@ TEST(ExpressionIfNullTest,
     ASSERT_VALUE_EQ(optimizedNullRemoved->serialize(false), Value("$a"_sd));
 }
 
-TEST(ExpressionIfNullTest, OptimizedExpressionIfNullShouldRemoveAllNullConstants) {
+TEST(ExpressionIfNullTest, OptimizedExpressionIfNullShouldRemoveAllNullConstantsButLast) {
     auto expCtx = ExpressionContextForTest{};
     auto vps = expCtx.variablesParseState;
     auto expr = fromjson("{$ifNull: [null, \"$a\", null, null]}");
     auto exprIfNull = ExpressionIfNull::parse(&expCtx, expr.firstElement(), vps);
     auto optimizedNullRemoved = exprIfNull->optimize();
-    ASSERT_VALUE_EQ(optimizedNullRemoved->serialize(false), Value("$a"_sd));
+    auto expectedResult = fromjson("{$ifNull: [\"$a\", {$const: null}]}");
+    ASSERT_BSONOBJ_BINARY_EQ(expectedResult, expressionToBson(optimizedNullRemoved));
 }
 
 TEST(ExpressionIfNullTest,

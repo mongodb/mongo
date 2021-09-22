@@ -44,6 +44,8 @@ assertResult(2, ['$two', '$my_undefined']);
 assertResult(1, ['$one', '$two', '$three']);
 assertResult(1, ['$one', '$two', '$my_null']);
 assertResult(1, ['$one', '$my_null', '$two']);
+assertResult(1, ['$one', '$two', null]);
+assertResult(2, ['$two', '$my_undefined', null]);
 
 // First arg null.
 assertResult(2, ['$my_null', '$two']);
@@ -52,6 +54,9 @@ assertResult(null, ['$my_null', '$my_null']);
 assertResult(false, ['$my_null', '$my_false', '$one']);
 assertResult(false, ['$my_null', '$my_null', '$my_false']);
 assertResult(null, ['$my_null', '$my_null', '$my_null', '$my_null']);
+assertResult(null, ['$nonexistent', '$nonexistent', null]);
+assertResult(null, ['$my_null', '$my_null', null]);
+assertResult(undefined, ['$my_null', '$my_null', undefined]);
 
 // First arg undefined.
 assertResult(2, ['$my_undefined', '$two']);
@@ -59,6 +64,7 @@ assertResult(1, ['$my_undefined', '$one']);
 assertResult(null, ['$my_undefined', '$my_null']);
 assertResult(false, ['$my_undefined', '$my_false', '$one']);
 assertResult('', ['$my_undefined', '$my_null', '$missingField', '$my_str', '$two']);
+assertResult(null, ['$my_undefined', '$my_undefined', null]);
 
 // Computed expression.
 assertResult(2, [{$add: ['$one', '$one']}, '$three']);

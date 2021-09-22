@@ -86,7 +86,6 @@
 namespace mongo {
 
 using boost::intrusive_ptr;
-using std::endl;
 using std::shared_ptr;
 using std::string;
 using std::stringstream;

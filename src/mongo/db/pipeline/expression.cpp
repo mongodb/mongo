@@ -60,10 +60,8 @@ namespace mongo {
 using Parser = Expression::Parser;
 
 using boost::intrusive_ptr;
-using std::map;
 using std::move;
 using std::pair;
-using std::set;
 using std::string;
 using std::vector;
 
@@ -3223,10 +3221,14 @@ boost::intrusive_ptr<Expression> ExpressionIfNull::optimize() {
             getExpressionContext(), evaluate(Document(), &(getExpressionContext()->variables)));
     }
 
-    // Remove all null constants, unless it is the only child.
-    // If one of the operands is a non-null constant expression, remove any operands that follow it.
+    // Remove all null constants, unless it is the only child or it is the last parameter
+    // (<replacement-expression-if-null>). If one of the operands is a non-null constant expression,
+    // remove any operands that follow it.
     auto it = _children.begin();
-    while (it != _children.end() && _children.size() > 1) {
+    tassert(5868001,
+            str::stream() << "$ifNull needs at least two arguments, had: " << _children.size(),
+            _children.size() > 1);
+    while (it != _children.end() - 1) {
         if (auto constExpression = dynamic_cast<ExpressionConstant*>(it->get())) {
             if (constExpression->getValue().nullish()) {
                 it = _children.erase(it);
