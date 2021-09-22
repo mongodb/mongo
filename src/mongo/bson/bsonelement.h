@@ -1056,11 +1056,9 @@ Status BSONElement::tryCoerce(T* out) const {
             if (!std::isfinite(d)) {
                 return {ErrorCodes::BadValue, "Unable to coerce NaN/Inf to integral type"};
             }
-            // TODO(SERVER-48076): Revisit the use of the > operator for the T::max() comparison in
-            // the case when T is a 64 bit type. When T is a 64 bit type, this comparison should
-            // be >=, as the conversion rounds the the max to 2**63 which is double that cannot be
-            // converted.
-            if ((d > static_cast<double>(std::numeric_limits<T>::max())) ||
+            bool sameMax = std::numeric_limits<T>::max() == std::numeric_limits<long long>::max();
+            if ((!sameMax && d > static_cast<double>(std::numeric_limits<T>::max())) ||
+                (sameMax && d >= static_cast<double>(std::numeric_limits<T>::max())) ||
                 (d < std::numeric_limits<T>::lowest())) {
                 return {ErrorCodes::BadValue, "Out of bounds coercing to integral value"};
             }
