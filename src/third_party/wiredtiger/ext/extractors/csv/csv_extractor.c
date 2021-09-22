@@ -167,10 +167,6 @@ csv_customize(WT_EXTRACTOR *extractor, WT_SESSION *session, const char *uri, WT_
               wt_api->strerror(wt_api, session, ret));
         goto err;
     }
-    if (ret != 0) {
-        (void)wt_api->err_printf(
-          wt_api, session, "WT_CONFIG_PARSER.close: %s", wt_api->strerror(wt_api, session, ret));
-    }
 
     field_num = strtol(field.str, NULL, 10);
     if (field_num < 0 || field_num > INT_MAX) {
@@ -195,8 +191,7 @@ csv_customize(WT_EXTRACTOR *extractor, WT_SESSION *session, const char *uri, WT_
     return (0);
 
 err:
-    if (parser != NULL)
-        (void)parser->close(parser);
+    (void)parser->close(parser);
     return (ret);
 }
 

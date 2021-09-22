@@ -67,7 +67,7 @@ util_verify(WT_SESSION *session, int argc, char *argv[])
 
     /*
      * The remaining argument is the table name. If we are verifying the history store we do not
-     * accept a URI. Otherwise, we need a URI top operate on.
+     * accept a URI. Otherwise, we need a URI to operate on.
      */
     if (argc != 1)
         return (usage());

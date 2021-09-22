@@ -176,10 +176,6 @@ static int local_file_size(WT_FILE_HANDLE *, WT_SESSION *, wt_off_t *);
 static int local_file_sync(WT_FILE_HANDLE *, WT_SESSION *);
 static int local_file_write(WT_FILE_HANDLE *, WT_SESSION *, wt_off_t, size_t, const void *);
 
-/*
- * Report an error for a file operation. Note that local_err returns its third argument, and this
- * macro will too.
- */
 #define FS2LOCAL(fs) (((LOCAL_FILE_SYSTEM *)(fs))->local_storage)
 #define SHOW_STRING(s) (((s) == NULL) ? "<null>" : (s))
 #define VERBOSE_LS(local, ...)            \
@@ -285,7 +281,7 @@ local_err(LOCAL_STORAGE *local, WT_SESSION *session, int ret, const char *format
 
     va_start(ap, format);
     wt_api = local->wt_api;
-    if (vsnprintf(buf, sizeof(buf), format, ap) > (int)sizeof(buf))
+    if (vsnprintf(buf, sizeof(buf), format, ap) >= (int)sizeof(buf))
         wt_api->err_printf(wt_api, session, "local_storage: error overflow");
     wt_api->err_printf(
       wt_api, session, "local_storage: %s: %s", wt_api->strerror(wt_api, session, ret), buf);
@@ -317,7 +313,8 @@ local_get_directory(const char *home, const char *s, ssize_t len, bool create, c
     else {
         buflen = (size_t)len + strlen(home) + 2; /* Room for slash, null */
         if ((dirname = malloc(buflen)) != NULL)
-            snprintf(dirname, buflen, "%s/%.*s", home, (int)len, s);
+            if (snprintf(dirname, buflen, "%s/%.*s", home, (int)len, s) >= (int)buflen)
+                return (EINVAL);
     }
     if (dirname == NULL)
         return (ENOMEM);
@@ -382,7 +379,8 @@ local_path(WT_FILE_SYSTEM *file_system, const char *dir, const char *name, char 
     len = strlen(dir) + strlen(name) + 2;
     if ((p = malloc(len)) == NULL)
         return (local_err(FS2LOCAL(file_system), NULL, ENOMEM, "local_path"));
-    snprintf(p, len, "%s/%s", dir, name);
+    if (snprintf(p, len, "%s/%s", dir, name) >= (int)len)
+        return (local_err(FS2LOCAL(file_system), NULL, EINVAL, "overflow sprintf"));
     *pathp = p;
     return (ret);
 }
@@ -526,7 +524,10 @@ local_customize_file_system(WT_STORAGE_SOURCE *storage_source, WT_SESSION *sessi
             p++;
         else
             p = bucket_name;
-        snprintf(buf, sizeof(buf), "cache-%s", p);
+        if (snprintf(buf, sizeof(buf), "cache-%s", p) >= (int)sizeof(buf)) {
+            ret = local_err(local, session, EINVAL, "overflow snprintf");
+            goto err;
+        }
         cachedir.str = buf;
         cachedir.len = strlen(buf);
     }
@@ -593,10 +594,17 @@ local_file_copy(LOCAL_STORAGE *local, WT_SESSION *session, const char *src_path,
     WT_FILE_SYSTEM *wt_fs;
     wt_off_t copy_size, file_size, left;
     ssize_t pos;
+    size_t pathlen;
     int ret, t_ret;
-    char buffer[1024 * 64];
+    char buffer[1024 * 64], *tmp_path;
 
     dest = src = NULL;
+    pathlen = strlen(dest_path) + 10;
+    if ((tmp_path = malloc(pathlen)) != NULL)
+        if (snprintf(tmp_path, pathlen, "%s.TMP", dest_path) >= (int)pathlen) {
+            ret = local_err(local, session, EINVAL, "overflow snprintf");
+            goto err;
+        }
 
     if ((ret = local->wt_api->file_system_get(local->wt_api, session, &wt_fs)) != 0) {
         ret =
@@ -609,9 +617,9 @@ local_file_copy(LOCAL_STORAGE *local, WT_SESSION *session, const char *src_path,
         goto err;
     }
 
-    if ((ret = wt_fs->fs_open_file(wt_fs, session, dest_path, type, WT_FS_OPEN_CREATE, &dest)) !=
+    if ((ret = wt_fs->fs_open_file(wt_fs, session, tmp_path, type, WT_FS_OPEN_CREATE, &dest)) !=
       0) {
-        ret = local_err(local, session, ret, "%s: cannot create", dest_path);
+        ret = local_err(local, session, ret, "%s: cannot create", tmp_path);
         goto err;
     }
     if ((ret = wt_fs->fs_size(wt_fs, session, src_path, &file_size)) != 0) {
@@ -625,9 +633,13 @@ local_file_copy(LOCAL_STORAGE *local, WT_SESSION *session, const char *src_path,
             goto err;
         }
         if ((ret = dest->fh_write(dest, session, pos, (size_t)copy_size, buffer)) != 0) {
-            ret = local_err(local, session, ret, "%s: cannot write", dest_path);
+            ret = local_err(local, session, ret, "%s: cannot write", tmp_path);
             goto err;
         }
+    }
+    if ((ret = rename(tmp_path, dest_path)) != 0) {
+        ret = local_err(local, session, errno, "%s: cannot rename from %s", dest_path, tmp_path);
+        goto err;
     }
 err:
     if (src != NULL && (t_ret = src->close(src, session)) != 0)
@@ -636,6 +648,9 @@ err:
     if (dest != NULL && (t_ret = dest->close(dest, session)) != 0)
         if (ret == 0)
             ret = t_ret;
+    if (ret != 0)
+        (void)unlink(tmp_path);
+    free(tmp_path);
 
     return (ret);
 }
