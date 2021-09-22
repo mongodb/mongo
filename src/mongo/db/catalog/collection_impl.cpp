@@ -1830,6 +1830,26 @@ void CollectionImpl::updateHiddenSetting(OperationContext* opCtx, StringData idx
     });
 }
 
+std::vector<std::string> CollectionImpl::removeInvalidIndexOptions(OperationContext* opCtx) {
+    std::vector<std::string> indexesWithInvalidOptions;
+
+    _writeMetadata(opCtx, [&](BSONCollectionCatalogEntry::MetaData& md) {
+        for (auto& index : md.indexes) {
+            BSONObj oldSpec = index.spec;
+
+            Status status = index_key_validate::validateIndexSpecFieldNames(oldSpec);
+            if (status.isOK()) {
+                continue;
+            }
+
+            indexesWithInvalidOptions.push_back(std::string(index.nameStringData()));
+            index.spec = index_key_validate::removeUnknownFields(oldSpec);
+        }
+    });
+
+    return indexesWithInvalidOptions;
+}
+
 void CollectionImpl::setIsTemp(OperationContext* opCtx, bool isTemp) {
     _writeMetadata(opCtx,
                    [&](BSONCollectionCatalogEntry::MetaData& md) { md.options.temp = isTemp; });

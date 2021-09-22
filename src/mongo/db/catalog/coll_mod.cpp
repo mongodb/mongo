@@ -690,6 +690,19 @@ Status _collModInternal(OperationContext* opCtx,
             }
         }
 
+        // Remove any invalid index options for indexes belonging to this collection.
+        std::vector<std::string> indexesWithInvalidOptions =
+            coll.getWritableCollection()->removeInvalidIndexOptions(opCtx);
+        for (const auto& indexWithInvalidOptions : indexesWithInvalidOptions) {
+            const IndexDescriptor* desc =
+                coll->getIndexCatalog()->findIndexByName(opCtx, indexWithInvalidOptions);
+            invariant(desc);
+
+            // Notify the index catalog that the definition of this index changed.
+            coll.getWritableCollection()->getIndexCatalog()->refreshEntry(
+                opCtx, coll.getWritableCollection(), desc);
+        }
+
         // Only observe non-view collMods, as view operations are observed as operations on the
         // system.views collection.
         auto* const opObserver = opCtx->getServiceContext()->getOpObserver();
