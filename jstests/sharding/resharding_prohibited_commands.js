@@ -75,7 +75,7 @@ reshardingTest.withReshardingInBackground(
             assert.soon(() => {
                 const res0 = donor0.getCollection("config.cache.collections").findOne({_id: ns});
                 const res1 = donor1.getCollection("config.cache.collections").findOne({_id: ns});
-                return res0.reshardingFields.state === "aborting" &&
+                return res0 && res0.reshardingFields.state === "aborting" && res1 &&
                     res1.reshardingFields.state === "aborting";
             }, () => `timed out waiting for the coordinator to persist decision`);
 
@@ -160,7 +160,7 @@ reshardingTest.withReshardingInBackground(
             const recipient = new Mongo(topology.shards[recipientShardNames[0]].primary);
             assert.soon(() => {
                 const res = recipient.getCollection("config.cache.collections").findOne({_id: ns});
-                return res.reshardingFields.state === "committing";
+                return res && res.reshardingFields.state === "committing";
             }, () => `timed out waiting for the coordinator to persist decision: ${tojson(res)}`);
 
             const db = mongos.getDB("reshardingDb");
