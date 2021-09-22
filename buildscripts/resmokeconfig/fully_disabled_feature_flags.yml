@@ -6,3 +6,5 @@
 - featureFlagFryer
 - featureFlagSbePlanCache
 - featureFlagSBEGroupPushdown
+- featureFlagMigrationRecipientCriticalSection
+- featureFlagNoChangeStreamEventsDueToOrphans
