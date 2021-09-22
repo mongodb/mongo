@@ -11958,7 +11958,7 @@ buildvariants:
     max_sub_suites: 3
     test_flags: >-
       --mongodSetParameters="{internalQueryEnableSlotBasedExecutionEngine: true}"
-      --additionalFeatureFlags=featureFlagTimeseriesCollection,featureFlagSbePlanCache
+      --additionalFeatureFlags=featureFlagTimeseriesCollection,featureFlagSbePlanCache,featureFlagSBEGroupPushdown
       --excludeWithAnyTags=resource_intensive
 
 # Intentionally derive from SBE to run the SBE tests with all feature flags.
