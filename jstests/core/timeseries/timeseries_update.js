@@ -347,7 +347,7 @@ TimeseriesTest.run((insert) => {
         failCode: ErrorCodes.InvalidOptions,
     });
 
-    // Rename a subfield the metaField.
+    // Rename a subfield of the metaField.
     testUpdate({
         initialDocList: [doc1, doc2],
         updateList: [{
@@ -360,7 +360,7 @@ TimeseriesTest.run((insert) => {
         n: 1,
     });
 
-    // Rename a subfield the metaField to something not in the metaField.
+    // Rename a subfield of the metaField to something not in the metaField.
     testUpdate({
         initialDocList: [doc1, doc2, doc4],
         updateList: [{
@@ -870,7 +870,6 @@ TimeseriesTest.run((insert) => {
             q: {
                 "$jsonSchema": {
                     "required": [metaFieldName],
-
                     "properties": {[metaFieldName]: {"required": [metaFieldName]}}
                 }
             },
@@ -1199,7 +1198,7 @@ TimeseriesTest.run((insert) => {
         n: 3,
     });
 
-    // Query on the metafield and modify the metaField using collation with the default strength
+    // Query on the metaField and modify the metaField using collation with the default strength
     // (level 3).
     testUpdate({
         initialDocList: [collationDoc1, collationDoc2, collationDoc3],
