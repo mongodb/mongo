@@ -416,10 +416,12 @@ void _validateCatalogEntry(OperationContext* opCtx,
             index_key_validate::validateIndexSpecFieldNames(indexEntry->descriptor()->infoObj());
         if (!status.isOK()) {
             results->valid = false;
-            results->errors.push_back(fmt::format(
-                "The index specification for index '{}' contains invalid field names. {}",
-                indexName,
-                status.reason()));
+            results->errors.push_back(
+                fmt::format("The index specification for index '{}' contains invalid field names. "
+                            "{}. Run the 'collMod' command on the collection without any arguments "
+                            "to remove the invalid index options",
+                            indexName,
+                            status.reason()));
         }
 
         if (!indexEntry->isReady(opCtx, collection)) {
