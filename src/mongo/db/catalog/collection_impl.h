@@ -418,6 +418,8 @@ public:
 
     void updateHiddenSetting(OperationContext* opCtx, StringData idxName, bool hidden) final;
 
+    std::vector<std::string> removeInvalidIndexOptions(OperationContext* opCtx) final;
+
     void setIsTemp(OperationContext* opCtx, bool isTemp) final;
 
     void removeIndex(OperationContext* opCtx, StringData indexName) final;

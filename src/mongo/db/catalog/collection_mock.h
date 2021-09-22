@@ -377,6 +377,10 @@ public:
         std::abort();
     }
 
+    std::vector<std::string> removeInvalidIndexOptions(OperationContext* opCtx) {
+        std::abort();
+    }
+
     void setIsTemp(OperationContext* opCtx, bool isTemp) {
         std::abort();
     }

@@ -564,6 +564,12 @@ public:
     virtual void updateHiddenSetting(OperationContext* opCtx, StringData idxName, bool hidden) = 0;
 
     /**
+     * Removes invalid index options on all indexes in this collection. Returns a list of index
+     * names that contained invalid index options.
+     */
+    virtual std::vector<std::string> removeInvalidIndexOptions(OperationContext* opCtx) = 0;
+
+    /**
      * Updates the 'temp' setting for this collection.
      */
     virtual void setIsTemp(OperationContext* opCtx, bool isTemp) = 0;
