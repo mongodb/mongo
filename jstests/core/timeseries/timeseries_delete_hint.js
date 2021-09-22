@@ -180,14 +180,6 @@ validateDeleteIndex([objA, objB, objC],
                     [{[metaFieldName]: -1}, {[timeFieldName]: 1}],
                     "IXSCAN { control.min.time: 1, control.max.time: 1 }");
 
-// Query on a collection with multiple indexes using the timeField index as a hint.
-validateDeleteIndex([objA, objB, objC],
-                    [objA, objB],
-                    1,
-                    [{q: {[metaFieldName]: {c: "C"}}, limit: 0, hint: {[timeFieldName]: 1}}],
-                    [{[metaFieldName]: -1}, {[timeFieldName]: 1}],
-                    "IXSCAN { control.min.time: 1, control.max.time: 1 }");
-
 // Query on a collection with multiple indexes using an invalid index name.
 validateDeleteIndex([objA, objB, objC],
                     [objA, objB, objC],
