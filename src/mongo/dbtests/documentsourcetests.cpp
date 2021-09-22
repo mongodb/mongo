@@ -102,6 +102,7 @@ protected:
         auto exec = uassertStatusOK(getExecutor(opCtx(),
                                                 &_coll,
                                                 std::move(cq),
+                                                nullptr /* extractAndAttachPipelineStages */,
                                                 PlanYieldPolicy::YieldPolicy::NO_YIELD,
                                                 QueryPlannerParams::RETURN_OWNED_DATA));
 

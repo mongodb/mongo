@@ -91,7 +91,11 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeTailableQueryPlan(
     std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
     bool permitYield = true;
-    auto swExec = getExecutorFind(opCtx, &collection, std::move(cq), permitYield);
+    auto swExec = getExecutorFind(opCtx,
+                                  &collection,
+                                  std::move(cq),
+                                  nullptr /* extractAndAttachPipelineStages */,
+                                  permitYield);
     ASSERT_OK(swExec.getStatus());
     return std::move(swExec.getValue());
 }

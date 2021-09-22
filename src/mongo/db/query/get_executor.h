@@ -120,11 +120,17 @@ bool shouldWaitForOplogVisibility(OperationContext* opCtx,
  * PlanExecutor.
  *
  * If the query cannot be executed, returns a Status indicating why.
+ *
+ * If the caller provides a 'extractAndAttachPipelineStages' function and the query is eligible for
+ * pushdown into the find layer this function will be invoked to extract pipeline stages and
+ * attach them to the provided 'CanonicalQuery'. This function should capture the Pipeline that
+ * stages should be extracted from.
  */
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
     OperationContext* opCtx,
     const CollectionPtr* collection,
     std::unique_ptr<CanonicalQuery> canonicalQuery,
+    std::function<void(CanonicalQuery*)> extractAndAttachPipelineStages,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     size_t plannerOptions = 0);
 
@@ -137,11 +143,17 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
  * PlanExecutor.
  *
  * If the query cannot be executed, returns a Status indicating why.
+ *
+ * If the caller provides a 'extractAndAttachPipelineStages' function and the query is eligible for
+ * pushdown into the find layer this function will be invoked to extract pipeline stages and
+ * attach them to the provided 'CanonicalQuery'. This function should capture the Pipeline that
+ * stages should be extracted from.
  */
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind(
     OperationContext* opCtx,
     const CollectionPtr* collection,
     std::unique_ptr<CanonicalQuery> canonicalQuery,
+    std::function<void(CanonicalQuery*)> extractAndAttachPipelineStages,
     bool permitYield = false,
     size_t plannerOptions = QueryPlannerParams::DEFAULT);
 

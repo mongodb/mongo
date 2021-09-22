@@ -228,6 +228,10 @@ public:
         return _expCtx.get();
     }
 
+    void setPipeline(std::vector<std::unique_ptr<InnerPipelineStageInterface>> pipeline) {
+        _pipeline = std::move(pipeline);
+    }
+
     const std::vector<std::unique_ptr<InnerPipelineStageInterface>>& pipeline() const {
         return _pipeline;
     }

@@ -124,8 +124,12 @@ RecordId Helpers::findOne(OperationContext* opCtx,
     unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
     size_t options = requireIndex ? QueryPlannerParams::NO_TABLE_SCAN : QueryPlannerParams::DEFAULT;
-    auto exec = uassertStatusOK(getExecutor(
-        opCtx, &collection, std::move(cq), PlanYieldPolicy::YieldPolicy::NO_YIELD, options));
+    auto exec = uassertStatusOK(getExecutor(opCtx,
+                                            &collection,
+                                            std::move(cq),
+                                            nullptr /* extractAndAttachPipelineStages */,
+                                            PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                            options));
 
     PlanExecutor::ExecState state;
     BSONObj obj;

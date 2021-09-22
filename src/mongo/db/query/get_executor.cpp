@@ -1083,9 +1083,14 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
     OperationContext* opCtx,
     const CollectionPtr* collection,
     std::unique_ptr<CanonicalQuery> cq,
+    std::function<void(CanonicalQuery*)> extractAndAttachPipelineStages,
     PlanYieldPolicy::YieldPolicy requestedYieldPolicy,
     size_t plannerOptions) {
     invariant(cq);
+    if (extractAndAttachPipelineStages) {
+        extractAndAttachPipelineStages(cq.get());
+    }
+
     auto nss = cq->nss();
     auto yieldPolicy = makeSbeYieldPolicy(opCtx, requestedYieldPolicy, collection, nss);
     SlotBasedPrepareExecutionHelper helper{
@@ -1159,12 +1164,17 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
     OperationContext* opCtx,
     const CollectionPtr* collection,
     std::unique_ptr<CanonicalQuery> canonicalQuery,
+    std::function<void(CanonicalQuery*)> extractAndAttachPipelineStages,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     size_t plannerOptions) {
     return canonicalQuery->getEnableSlotBasedExecutionEngine() &&
             isQuerySbeCompatible(opCtx, canonicalQuery.get(), plannerOptions)
-        ? getSlotBasedExecutor(
-              opCtx, collection, std::move(canonicalQuery), yieldPolicy, plannerOptions)
+        ? getSlotBasedExecutor(opCtx,
+                               collection,
+                               std::move(canonicalQuery),
+                               extractAndAttachPipelineStages,
+                               yieldPolicy,
+                               plannerOptions)
         : getClassicExecutor(
               opCtx, collection, std::move(canonicalQuery), yieldPolicy, plannerOptions);
 }
@@ -1177,6 +1187,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
     OperationContext* opCtx,
     const CollectionPtr* collection,
     std::unique_ptr<CanonicalQuery> canonicalQuery,
+    std::function<void(CanonicalQuery*)> extractAndAttachPipelineStages,
     bool permitYield,
     size_t plannerOptions) {
     auto yieldPolicy = (permitYield && !opCtx->inMultiDocumentTransaction())
@@ -1186,7 +1197,12 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
     if (OperationShardingState::isOperationVersioned(opCtx)) {
         plannerOptions |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
     }
-    return getExecutor(opCtx, collection, std::move(canonicalQuery), yieldPolicy, plannerOptions);
+    return getExecutor(opCtx,
+                       collection,
+                       std::move(canonicalQuery),
+                       extractAndAttachPipelineStages,
+                       yieldPolicy,
+                       plannerOptions);
 }
 
 namespace {
@@ -2302,7 +2318,12 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorWith
                                      MatchExpressionParser::kAllowAllSpecialFeatures),
         "Unable to canonicalize query");
 
-    return getExecutor(opCtx, coll, std::move(cqWithoutProjection), yieldPolicy, plannerOptions);
+    return getExecutor(opCtx,
+                       coll,
+                       std::move(cqWithoutProjection),
+                       nullptr /* extractAndAttachPipelineStages */,
+                       yieldPolicy,
+                       plannerOptions);
 }
 }  // namespace
 
@@ -2378,8 +2399,12 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDist
         if (plannerOptions & QueryPlannerParams::STRICT_DISTINCT_ONLY) {
             return {nullptr};
         } else {
-            return getExecutor(
-                opCtx, coll, parsedDistinct->releaseQuery(), yieldPolicy, plannerOptions);
+            return getExecutor(opCtx,
+                               coll,
+                               parsedDistinct->releaseQuery(),
+                               nullptr /* extractAndAttachPipelineStages */,
+                               yieldPolicy,
+                               plannerOptions);
         }
     }
     auto solutions = std::move(statusWithMultiPlanSolns.getValue());

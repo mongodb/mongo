@@ -47,6 +47,7 @@ StringData stageTypeToString(StageType stageType) {
         {STAGE_FETCH, "FETCH"_sd},
         {STAGE_GEO_NEAR_2D, "GEO_NEAR_2D"_sd},
         {STAGE_GEO_NEAR_2DSPHERE, "GEO_NEAR_2DSPHERE"_sd},
+        {STAGE_GROUP, "GROUP"_sd},
         {STAGE_IDHACK, "IDHACK"_sd},
         {STAGE_IXSCAN, "IXSCAN"_sd},
         {STAGE_LIMIT, "LIMIT"_sd},

@@ -86,8 +86,11 @@ BSONObj findOneOplogEntry(OperationContext* opCtx,
         CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(NamespaceString::kLocalDb),
         Date_t::max());
 
-    auto exec = uassertStatusOK(
-        getExecutorFind(opCtx, &oplogRead.getCollection(), std::move(cq), permitYield));
+    auto exec = uassertStatusOK(getExecutorFind(opCtx,
+                                                &oplogRead.getCollection(),
+                                                std::move(cq),
+                                                nullptr /*extractAndAttachPipelineStages */,
+                                                permitYield));
 
     PlanExecutor::ExecState getNextResult;
     try {

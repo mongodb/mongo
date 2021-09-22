@@ -302,6 +302,7 @@ public:
             auto exec = uassertStatusOK(getExecutor(opCtx,
                                                     &coll,
                                                     std::move(cq),
+                                                    nullptr /* extractAndAttachPipelineStages */,
                                                     PlanYieldPolicy::YieldPolicy::YIELD_MANUAL,
                                                     QueryPlannerParams::NO_TABLE_SCAN));
 

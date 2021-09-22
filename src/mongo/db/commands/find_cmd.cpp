@@ -354,7 +354,11 @@ public:
             // Get the execution plan for the query.
             bool permitYield = true;
             auto exec =
-                uassertStatusOK(getExecutorFind(opCtx, &collection, std::move(cq), permitYield));
+                uassertStatusOK(getExecutorFind(opCtx,
+                                                &collection,
+                                                std::move(cq),
+                                                nullptr /* extractAndAttachPipelineStages */,
+                                                permitYield));
 
             auto bodyBuilder = result->getBodyBuilder();
             // Got the execution tree. Explain it.
@@ -489,7 +493,11 @@ public:
             // Get the execution plan for the query.
             bool permitYield = true;
             auto exec =
-                uassertStatusOK(getExecutorFind(opCtx, &collection, std::move(cq), permitYield));
+                uassertStatusOK(getExecutorFind(opCtx,
+                                                &collection,
+                                                std::move(cq),
+                                                nullptr /* extractAndAttachPipelineStages */,
+                                                permitYield));
 
             {
                 stdx::lock_guard<Client> lk(*opCtx->getClient());

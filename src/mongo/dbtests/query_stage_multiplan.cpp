@@ -566,8 +566,12 @@ TEST_F(QueryStageMultiPlanTest, MPSSummaryStats) {
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(BSON("foo" << BSON("$gte" << 0)));
     auto cq = uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(findCommand)));
-    auto exec = uassertStatusOK(
-        getExecutor(opCtx(), &coll, std::move(cq), PlanYieldPolicy::YieldPolicy::NO_YIELD, 0));
+    auto exec = uassertStatusOK(getExecutor(opCtx(),
+                                            &coll,
+                                            std::move(cq),
+                                            nullptr /* extractAndAttachPipelineStages */,
+                                            PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                            0));
 
     auto execImpl = dynamic_cast<PlanExecutorImpl*>(exec.get());
     ASSERT(execImpl);
