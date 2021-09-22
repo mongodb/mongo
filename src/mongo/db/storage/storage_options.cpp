@@ -67,29 +67,15 @@ StorageGlobalParams storageGlobalParams;
 // Storage global parameters exported read-only via the getParameter mechanism.
 // The IDL has no ability to specify 'none' as set_at type,
 // so use 'startup' in the IDL file, then override to none here.
-StorageDbpathParameter::StorageDbpathParameter(StringData name, ServerParameterType)
-    : ServerParameter(
-          ServerParameterSet::getGlobal(), name, false /* allowedToChangeAtStartup */, false
-          /* allowedToChangeAtRuntime */) {}
 StorageDirectoryPerDbParameter::StorageDirectoryPerDbParameter(StringData name, ServerParameterType)
     : ServerParameter(
           ServerParameterSet::getGlobal(), name, false /* allowedToChangeAtStartup */, false
           /* allowedToChangeAtRuntime */) {}
 
-Status StorageDbpathParameter::setFromString(const std::string&) {
-    return {ErrorCodes::IllegalOperation,
-            str::stream() << name() << " cannot be set via setParameter"};
-};
 Status StorageDirectoryPerDbParameter::setFromString(const std::string&) {
     return {ErrorCodes::IllegalOperation,
             str::stream() << name() << " cannot be set via setParameter"};
 };
-
-void StorageDbpathParameter::append(OperationContext* opCtx,
-                                    BSONObjBuilder& builder,
-                                    const std::string& name) {
-    builder.append(name, storageGlobalParams.dbpath);
-}
 
 void StorageDirectoryPerDbParameter::append(OperationContext* opCtx,
                                             BSONObjBuilder& builder,
