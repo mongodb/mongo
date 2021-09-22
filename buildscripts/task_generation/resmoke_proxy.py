@@ -1,7 +1,7 @@
 """A service to proxy requests to resmoke."""
 import os
 from copy import deepcopy
-from typing import List, Dict, Any, NamedTuple
+from typing import List, Dict, Any, NamedTuple, TYPE_CHECKING
 
 import inject
 import structlog
@@ -11,6 +11,9 @@ import buildscripts.resmokelib.parser as _parser
 import buildscripts.resmokelib.suitesconfig as suitesconfig
 from buildscripts.task_generation.generated_config import GeneratedFile
 from buildscripts.util.fileops import read_yaml_file
+
+if TYPE_CHECKING:
+    from buildscripts.task_generation.suite_split import GeneratedSuite, SubSuite
 
 LOGGER = structlog.get_logger(__name__)
 
@@ -71,9 +74,9 @@ class ResmokeProxyService:
         """
         return read_yaml_file(os.path.join(self.resmoke_suite_dir, f"{suite_name}.yml"))
 
-    def render_suite_files(self, suites: List, suite_name: str, generated_suite_filename: str,
-                           test_list: List[str], create_misc_suite: bool, build_variant: str,
-                           is_multiversion: bool) -> List[GeneratedFile]:
+    def render_suite_files(self, suites: List["SubSuite"], suite_name: str,
+                           generated_suite_filename: str, test_list: List[str],
+                           create_misc_suite: bool, suite: "GeneratedSuite") -> List[GeneratedFile]:
         """
         Render the given list of suites.
 
@@ -85,24 +88,20 @@ class ResmokeProxyService:
         :param generated_suite_filename: The name to use as the file name for generated suite file.
         :param test_list: List of tests used in suites.
         :param create_misc_suite: Whether or not a _misc suite file should be created.
-        :param build_variant: Build variant suite file is being rendered for.
-        :param is_multiversion: True if the files being generated are for multiversion.
+        :param suite: Generated suite files belong to.
         :return: Dictionary of rendered resmoke config files.
         """
         # pylint: disable=too-many-arguments
         source_config = self.read_suite_config(suite_name)
-        multiversion_str = "_multiversion" if is_multiversion else ""
         suite_configs = [
-            GeneratedFile(
-                file_name=
-                f"{os.path.basename(suite.name(len(suites)))}{multiversion_str}_{build_variant}.yml",
-                content=suite.generate_resmoke_config(source_config)) for suite in suites
+            GeneratedFile(file_name=f"{suite.sub_suite_config_file(i)}.yml",
+                          content=sub_suite.generate_resmoke_config(source_config))
+            for i, sub_suite in enumerate(suites)
         ]
         if create_misc_suite:
             suite_configs.append(
                 GeneratedFile(
-                    file_name=
-                    f"{generated_suite_filename}_misc{multiversion_str}_{build_variant}.yml",
+                    file_name=f"{suite.sub_suite_config_file(None)}.yml",
                     content=generate_resmoke_suite_config(source_config, generated_suite_filename,
                                                           excludes=test_list)))
 

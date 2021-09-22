@@ -105,6 +105,19 @@ class TestGeneratedSuite(unittest.TestCase):
             for test in test_list:
                 self.assertIn(test, all_tests)
 
+    def test_sub_suite_config_file_should_generate_filename_for_sub_suites(self):
+        task_name = "task_name"
+        n_sub_suites = 42
+        mock_sub_suites = [build_mock_sub_suite(i, []) for i in range(n_sub_suites)]
+        mock_suite = under_test.GeneratedSuite(
+            sub_suites=mock_sub_suites, build_variant="build_variant", task_name=f"{task_name}_gen",
+            suite_name="suite_name", filename="filename")
+
+        self.assertEqual(mock_suite.sub_suite_config_file(34), "task_name_34")
+        self.assertEqual(mock_suite.sub_suite_config_file(0), "task_name_00")
+        self.assertEqual(mock_suite.sub_suite_config_file(3), "task_name_03")
+        self.assertEqual(mock_suite.sub_suite_config_file(None), "task_name_misc")
+
 
 class TestSplitSuite(unittest.TestCase):
     def test_calculate_suites(self):

@@ -1,6 +1,6 @@
 """Builder for generating evergreen configuration."""
 from threading import Lock
-from typing import Optional, Set, List, Dict
+from typing import Set, List, Dict
 
 import inject
 from shrub.v2 import ShrubProject, BuildVariant, ExistingTask, Task
@@ -60,20 +60,17 @@ class EvgConfigBuilder:
             self.build_variants[build_variant] = BuildVariant(build_variant, activate=False)
         return self.build_variants[build_variant]
 
-    def _generate_suites_config(self, generated_suite: GeneratedSuite,
-                                is_multiversion: bool = False) -> List[GeneratedFile]:
+    def _generate_suites_config(self, generated_suite: GeneratedSuite) -> List[GeneratedFile]:
         """
         Generate the suites files and evergreen configuration for the generated task.
 
         :param generated_suite: Generated suite to create config files for.
-        :param is_multiversion: True if the generated suite is a multiversion suite.
         :return: The suites files and evergreen configuration for the generated task.
         """
         test_list = generated_suite.get_test_list()
         return self.resmoke_proxy.render_suite_files(
             generated_suite.sub_suites, generated_suite.suite_name, generated_suite.filename,
-            test_list, self.gen_options.create_misc_suite, generated_suite.build_variant,
-            is_multiversion)
+            test_list, self.gen_options.create_misc_suite, generated_suite)
 
     def generate_suite(self, split_params: SuiteSplitParameters,
                        gen_params: ResmokeGenTaskParams) -> None:
@@ -102,8 +99,7 @@ class EvgConfigBuilder:
             build_variant = self.get_build_variant(generated_suite.build_variant)
             self.evg_config_gen_service.generate_multiversion_task(generated_suite, build_variant,
                                                                    gen_params)
-        self.generated_files.extend(
-            self._generate_suites_config(generated_suite, is_multiversion=True))
+        self.generated_files.extend(self._generate_suites_config(generated_suite))
 
     def add_multiversion_burn_in_test(self, split_params: SuiteSplitParameters,
                                       gen_params: MultiversionGenTaskParams) -> Set[Task]:
@@ -118,7 +114,7 @@ class EvgConfigBuilder:
             build_variant = self.get_build_variant(generated_suite.build_variant)
             tasks = self.evg_config_gen_service.generate_multiversion_burnin_task(
                 generated_suite, gen_params, build_variant)
-        self.generated_files.extend(self._generate_suites_config(generated_suite, True))
+        self.generated_files.extend(self._generate_suites_config(generated_suite))
         return tasks
 
     def generate_fuzzer(self, fuzzer_params: FuzzerGenTaskParams) -> FuzzerTask:
