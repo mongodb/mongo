@@ -64,6 +64,11 @@ public:
                     str::stream() << Request::kCommandName << " can only be run on config servers",
                     serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
 
+            uassert(8423309,
+                    "_configsvrConfigureAutoSplit command not supported",
+                    mongo::feature_flags::gShardingPerCollectionAutoSplitter.isEnabled(
+                        serverGlobalParams.featureCompatibility));
+
             const NamespaceString& nss = ns();
 
             uassert(ErrorCodes::InvalidNamespace,

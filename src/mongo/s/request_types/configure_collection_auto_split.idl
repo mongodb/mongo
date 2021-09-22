@@ -34,6 +34,12 @@ global:
 imports:
     - "mongo/idl/basic_types.idl"
 
+feature_flags:
+  featureFlagPerCollectionAutoSplitter:
+    description: "Add capability to configure per collection auto-splitter settings."
+    cpp_varname: feature_flags::gShardingPerCollectionAutoSplitter
+    default: false
+
 structs:
     configure_auto_split_params:
         description: "Parameters for configureCollectionAutoSplitter command"

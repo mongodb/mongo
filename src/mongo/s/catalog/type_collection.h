@@ -145,7 +145,7 @@ public:
     void setMaxChunkSizeBytes(int64_t value);
 
     bool getAllowAutoSplit() const {
-        return !getNoAutoSplit();
+        return !getNoAutoSplit().get_value_or(false);
     }
 
     bool getAllowBalance() const {

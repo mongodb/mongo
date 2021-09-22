@@ -113,7 +113,7 @@ structs:
             noAutoSplit: 
                 type: bool
                 description: "Specifies whether the auto-splitter should be running or not for this collection."
-                default: false
+                optional: true
             noBalance:
                 type: bool
                 description: "Consulted by the Balancer only and indicates whether this collection

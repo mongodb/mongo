@@ -3,7 +3,8 @@
  * due to data insertion.
  *
  * @tags: [
- *  requires_fcv_51
+ *  requires_fcv_51,
+ *  featureFlagPerCollectionAutoSplitter,
  * ]
  */
 (function() {
