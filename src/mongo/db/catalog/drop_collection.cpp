@@ -87,7 +87,9 @@ Status _dropView(OperationContext* opCtx,
     // Validates the view or throws an "invalid view" error.
     ViewCatalog::get(db)->lookup(opCtx, collectionName);
 
-    Lock::CollectionLock collLock(opCtx, collectionName, MODE_IX);
+    // Take a MODE_X lock when dropping a view. This is to prevent a concurrent create
+    // collection on the same namespace that will reserve an OpTime before this drop.
+    Lock::CollectionLock collLock(opCtx, collectionName, MODE_X);
     // Operations all lock system.views in the end to prevent deadlock.
     Lock::CollectionLock systemViewsLock(opCtx, db->getSystemViewsName(), MODE_X);
 
@@ -332,13 +334,9 @@ Status _dropCollection(OperationContext* opCtx,
                     [opCtx, dropView, &collectionName, &reply](Database* db,
                                                                const NamespaceString& bucketsNs) {
                         if (dropView) {
-                            // Take a MODE_X lock when dropping timeseries view. This is to prevent
-                            // a concurrent create collection on the same namespace that will
-                            // reserve an OpTime before this drop. We already hold a MODE_X lock on
-                            // the bucket collection inside '_abortIndexBuildsAndDrop' above. When
-                            // taking both these locks it needs to happen in this order to prevent a
-                            // deadlock.
-                            Lock::CollectionLock viewLock(opCtx, collectionName, MODE_X);
+                            // We already hold a MODE_X lock on the bucket collection inside
+                            // '_abortIndexBuildsAndDrop' above. Taking that MODE_X lock on the
+                            // view must happen after in order to prevent a deadlock.
                             auto status = _dropView(opCtx, db, collectionName, reply);
                             if (!status.isOK()) {
                                 return status;
