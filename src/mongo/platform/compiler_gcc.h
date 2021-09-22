@@ -95,3 +95,9 @@
 #define MONGO_COMPILER_UNREACHABLE __builtin_unreachable()
 
 #define MONGO_COMPILER_NOINLINE [[gnu::noinline]]
+
+#define MONGO_COMPILER_RETURNS_NONNULL [[gnu::returns_nonnull]]
+
+#define MONGO_COMPILER_MALLOC [[gnu::malloc]]
+
+#define MONGO_COMPILER_ALLOC_SIZE(varindex) [[gnu::alloc_size(varindex)]]

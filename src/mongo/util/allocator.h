@@ -37,12 +37,14 @@ namespace mongo {
  * Wrapper around std::malloc().
  * If std::malloc() fails, reports error with stack trace and exit.
  */
-void* mongoMalloc(size_t size);
+MONGO_WARN_UNUSED_RESULT_FUNCTION MONGO_COMPILER_RETURNS_NONNULL MONGO_COMPILER_MALLOC
+    MONGO_COMPILER_ALLOC_SIZE(1) void* mongoMalloc(size_t size) noexcept;
 
 /**
  * Wrapper around std::realloc().
  * If std::realloc() fails, reports error with stack trace and exit.
  */
-void* mongoRealloc(void* ptr, size_t size);
+MONGO_WARN_UNUSED_RESULT_FUNCTION MONGO_COMPILER_RETURNS_NONNULL
+    MONGO_COMPILER_ALLOC_SIZE(2) void* mongoRealloc(void* ptr, size_t size) noexcept;
 
 }  // namespace mongo

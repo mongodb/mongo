@@ -70,3 +70,9 @@
 #define MONGO_COMPILER_ALWAYS_INLINE __forceinline
 
 #define MONGO_COMPILER_UNREACHABLE __assume(false)
+
+#define MONGO_COMPILER_RETURNS_NONNULL
+
+#define MONGO_COMPILER_MALLOC __declspec(restrict)
+
+#define MONGO_COMPILER_ALLOC_SIZE(varindex)

@@ -156,6 +156,27 @@
  *    Tells the compiler that a function returns a value for which consuming the result is
  *    necessary.  Functions thus defined are "must check results" style functions.  Preview of the
  *    `[[nodiscard]]` C++17 attribute.
+ *
+ *
+ * MONGO_COMPILER_RETURNS_NONNULL
+ *
+ *    Tells the compiler that the function always returns a non-null value, potentially allowing
+ *    additional optimizations at call sites.
+ *
+ *
+ * MONGO_COMPILER_MALLOC
+ *
+ *    Tells the compiler that the function is "malloc like", in that the return value points
+ *    to uninitialized memory which does not alias any other valid pointers.
+ *
+ *
+ * MONGO_COMPILER_ALLOC_SIZE(varindex)
+ *
+ *    Tells the compiler that the parameter indexed by `varindex`
+ *    provides the size of the allocated region that a "malloc like"
+ *    function will return a pointer to, potentially allowing static
+ *    analysis of use of the region when the argument to the
+ *    allocation function is a constant expression.
  */
 
 
