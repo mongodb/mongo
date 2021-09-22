@@ -388,8 +388,4 @@ inline std::ostream& operator<<(std::ostream& stream, const RecordId& id) {
     return stream << "RecordId(" << id.toString() << ')';
 }
 
-inline std::ostream& operator<<(std::ostream& stream, const boost::optional<RecordId>& id) {
-    return stream << "RecordId(" << (id ? id->toString() : 0) << ')';
-}
-
 }  // namespace mongo
