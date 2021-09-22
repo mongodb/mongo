@@ -136,7 +136,7 @@ class TestAcceptance(unittest.TestCase):
 
         # assert that generated suite files have the suite name and the variant name in the
         # filename, to prevent tasks on different variants from using the same suite file
-        self.assertIn("auth_0_enterprise-rhel-80-64-bit-dynamic-required.yml", files_to_generate)
+        self.assertIn("auth_enterprise-rhel-80-64-bit-dynamic-required_0.yml", files_to_generate)
 
         generated_evg_config_raw = [
             gen_file.content for gen_file in generated_config.file_list

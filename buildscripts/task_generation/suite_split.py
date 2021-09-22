@@ -198,6 +198,18 @@ class GeneratedSuite(NamedTuple):
         """Get the number of sub-suites."""
         return len(self.sub_suites)
 
+    def sub_suite_config_file(self, index: Optional[int] = None) -> str:
+        """
+        Get the name of the file to store the resmoke configuration.
+
+        :param index: Index of suite or None for '_misc' suite.
+        :return: Name resmoke configuration for subtask should stored.
+        """
+        if index is not None:
+            return taskname.name_generated_task(self.display_task_name(), index,
+                                                len(self.sub_suites))
+        return f"{self.display_task_name()}_misc"
+
 
 class SuiteSplitParameters(NamedTuple):
     """
