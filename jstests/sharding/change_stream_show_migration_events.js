@@ -87,10 +87,6 @@ var shardOneEvents = [makeEvent(20, "insert")];
 
 // Check that each change stream returns the expected events.
 checkEvents(changeStreamShardZero, shardZeroEventsBeforeNewShard);
-assert.soon(() => changeStreamShardZero.hasNext());
-let next = changeStreamShardZero.next();
-assert.eq(next.operationType, "kNewShardDetected");
-
 checkEvents(changeStreamShardZero, shardZeroEventsAfterNewShard);
 checkEvents(changeStreamShardOne, shardOneEvents);
 
@@ -242,9 +238,6 @@ let newShardEvents = [
 // Check that each change stream returns the expected events.
 assert(!changeStreamShardZero.hasNext(), "Do not expect any results");
 checkEvents(changeStreamShardOne, shardOneEventsBeforeNewShard);
-assert.soon(() => changeStreamShardOne.hasNext());
-next = changeStreamShardOne.next();
-assert.eq(next.operationType, "kNewShardDetected");
 checkEvents(changeStreamShardOne, shardOneEventsAfterNewShard);
 checkEvents(changeStreamNewShard, newShardEvents);
 

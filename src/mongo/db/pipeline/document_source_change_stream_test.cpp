@@ -1239,6 +1239,9 @@ TEST_F(ChangeStreamStageTest, TransformNewShardDetected) {
         {DSChangeStream::kOperationTypeField, DSChangeStream::kNewShardDetectedOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
     };
+
+    getExpCtx()->needsMerge = true;
+
     checkTransformation(newShardDetected, expectedNewShardDetected);
 }
 

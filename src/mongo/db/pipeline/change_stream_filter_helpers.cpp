@@ -219,12 +219,17 @@ std::unique_ptr<MatchExpression> buildTransactionFilter(
 std::unique_ptr<MatchExpression> buildInternalOpFilter(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, const MatchExpression* userMatch) {
     // Noop change events:
-    //   a) migrateChunkToNewShard: A chunk migrated to a shard that didn't have any chunks.
-    //   b) reshardBegin: A resharding operation begins.
-    //   c) reshardDoneCatchUp: "Catch up" phase of reshard operation completes.
-    static const std::vector<StringData> internalOpTypes = {
-        "migrateChunkToNewShard", "reshardBegin", "reshardDoneCatchUp"};
+    //   - reshardBegin: A resharding operation begins.
+    //   - reshardDoneCatchUp: "Catch up" phase of reshard operation completes.
+    std::vector<StringData> internalOpTypes = {"reshardBegin"_sd, "reshardDoneCatchUp"_sd};
 
+    // Noop change events that are only applicable when merging results on mongoS:
+    //   - migrateChunkToNewShard: A chunk migrated to a shard that didn't have any chunks.
+    if (expCtx->inMongos || expCtx->needsMerge) {
+        internalOpTypes.push_back("migrateChunkToNewShard"_sd);
+    }
+
+    // Build the oplog filter to match the required internal op types.
     BSONArrayBuilder internalOpTypeOrBuilder;
     for (const auto& eventName : internalOpTypes) {
         internalOpTypeOrBuilder.append(BSON("o2.type" << eventName));
