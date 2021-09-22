@@ -409,6 +409,7 @@ std::unique_ptr<PlanStageStats> IndexScanStage::getStats(bool includeDebugInfo) 
 
     if (includeDebugInfo) {
         BSONObjBuilder bob;
+        bob.append("indexName", _indexName);
         bob.appendNumber("keysExamined", static_cast<long long>(_specificStats.keysExamined));
         bob.appendNumber("seeks", static_cast<long long>(_specificStats.seeks));
         bob.appendNumber("numReads", static_cast<long long>(_specificStats.numReads));
