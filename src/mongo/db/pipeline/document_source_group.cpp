@@ -495,7 +495,7 @@ intrusive_ptr<DocumentSource> DocumentSourceGroup::createFromBson(
             groupStage->_memoryTracker.set(pFieldName, 0);
         }
     }
-    groupStage->_sbeCompatible = expCtx->sbeGroupCompatible;
+    groupStage->_sbeCompatible = expCtx->sbeGroupCompatible && expCtx->sbeCompatible;
 
     uassert(
         15955, "a group specification must include an _id", !groupStage->_idExpressions.empty());
