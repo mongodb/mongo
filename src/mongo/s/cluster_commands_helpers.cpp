@@ -657,31 +657,6 @@ RawResponsesResult appendRawResponses(
     return {false, shardsWithSuccessResponses, successARSResponses, firstStaleConfigErrorReceived};
 }
 
-BSONObj extractQuery(const BSONObj& cmdObj) {
-    auto queryElem = cmdObj["query"];
-    if (!queryElem)
-        queryElem = cmdObj["q"];
-
-    if (!queryElem || queryElem.isNull())
-        return BSONObj();
-
-    uassert(ErrorCodes::TypeMismatch,
-            str::stream() << "Illegal type specified for query " << queryElem,
-            queryElem.type() == Object);
-    return queryElem.embeddedObject();
-}
-
-BSONObj extractCollation(const BSONObj& cmdObj) {
-    const auto collationElem = cmdObj["collation"];
-    if (!collationElem)
-        return BSONObj();
-
-    uassert(ErrorCodes::TypeMismatch,
-            str::stream() << "Illegal type specified for collation " << collationElem,
-            collationElem.type() == Object);
-    return collationElem.embeddedObject();
-}
-
 bool appendEmptyResultSet(OperationContext* opCtx,
                           BSONObjBuilder& result,
                           Status status,

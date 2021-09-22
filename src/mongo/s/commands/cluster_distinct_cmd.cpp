@@ -99,8 +99,20 @@ public:
         const BSONObj& cmdObj = opMsgRequest.body;
         const NamespaceString nss(parseNs(dbname, cmdObj));
 
-        auto targetingQuery = extractQuery(cmdObj);
-        auto targetingCollation = extractCollation(cmdObj);
+        auto parsedDistinctCmd =
+            ParsedDistinct::parse(opCtx, nss, cmdObj, ExtensionsCallbackNoop(), true);
+        uassertStatusOK(parsedDistinctCmd.getStatus());
+
+        auto distinctCanonicalQuery = parsedDistinctCmd.getValue().releaseQuery();
+        auto targetingQuery = distinctCanonicalQuery->getQueryObj();
+        auto targetingCollation = distinctCanonicalQuery->getFindCommandRequest().getCollation();
+
+        // Construct collator for deduping.
+        std::unique_ptr<CollatorInterface> collator;
+        if (!targetingCollation.isEmpty()) {
+            collator = uassertStatusOK(CollatorFactoryInterface::get(opCtx->getServiceContext())
+                                           ->makeFromBSON(targetingCollation));
+        }
 
         const auto explainCmd = ClusterExplain::wrapAsExplain(cmdObj, verbosity);
 
@@ -169,8 +181,13 @@ public:
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
         const NamespaceString nss(parseNs(dbName, cmdObj));
 
-        auto query = extractQuery(cmdObj);
-        auto collation = extractCollation(cmdObj);
+        auto parsedDistinctCmd =
+            ParsedDistinct::parse(opCtx, nss, cmdObj, ExtensionsCallbackNoop(), false);
+        uassertStatusOK(parsedDistinctCmd.getStatus());
+
+        auto distinctCanonicalQuery = parsedDistinctCmd.getValue().releaseQuery();
+        auto query = distinctCanonicalQuery->getQueryObj();
+        auto collation = distinctCanonicalQuery->getFindCommandRequest().getCollation();
 
         // Construct collator for deduping.
         std::unique_ptr<CollatorInterface> collator;
@@ -247,8 +264,17 @@ public:
                 : response.swResponse.getStatus();
             uassertStatusOK(status);
 
-            BSONObj res = std::move(response.swResponse.getValue().data);
-            BSONObjIterator it(res["values"].embeddedObject());
+            BSONObj res = response.swResponse.getValue().data;
+            auto values = res["values"];
+            uassert(5986900,
+                    str::stream() << "No 'values' field in distinct command response: "
+                                  << res.toString() << ". Original command: " << cmdObj.toString(),
+                    !values.eoo());
+            uassert(5986901,
+                    str::stream() << "Expected 'values' field to be of type Array, but found "
+                                  << typeName(values.type()),
+                    values.type() == BSONType::Array);
+            BSONObjIterator it(values.embeddedObject());
             while (it.more()) {
                 BSONElement nxt = it.next();
                 BSONObjBuilder temp(32);
