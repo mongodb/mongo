@@ -4579,14 +4579,13 @@ tasks:
     vars:
       resmoke_args: --storageEngine=wiredTiger
 
-- <<: *task_template
-  name: replica_sets_reconfig_kill_primary_jscore_passthrough
+- <<: *gen_task_template
+  name: replica_sets_reconfig_kill_primary_jscore_passthrough_gen
   tags: []
   commands:
-  - func: "do setup"
-  - func: "run tests"
+  - func: "generate resmoke tasks"
     vars:
-      resmoke_args: --suites=replica_sets_reconfig_kill_primary_jscore_passthrough --storageEngine=wiredTiger
+      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: replica_sets_api_version_jscore_passthrough_gen
@@ -4633,14 +4632,13 @@ tasks:
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger
 
-- <<: *task_template
-  name: replica_sets_multi_stmt_txn_kill_primary_jscore_passthrough
+- <<: *gen_task_template
+  name: replica_sets_multi_stmt_txn_kill_primary_jscore_passthrough_gen
   tags: ["replica_sets", "non_maj_read", "non_live_record"]
   commands:
-  - func: "do setup"
-  - func: "run tests"
+  - func: "generate resmoke tasks"
     vars:
-      resmoke_args: --suites=replica_sets_multi_stmt_txn_kill_primary_jscore_passthrough --storageEngine=wiredTiger
+      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: replica_sets_multi_stmt_txn_terminate_primary_jscore_passthrough
@@ -4676,14 +4674,13 @@ tasks:
     vars:
       resmoke_args: --suites=replica_sets_initsync_static_jscore_passthrough --storageEngine=wiredTiger
 
-- <<: *task_template
-  name: replica_sets_kill_primary_jscore_passthrough
+- <<: *gen_task_template
+  name: replica_sets_kill_primary_jscore_passthrough_gen
   tags: ["replica_sets", "large", "non_maj_read", "non_live_record"]
   commands:
-  - func: "do setup"
-  - func: "run tests"
+  - func: "generate resmoke tasks"
     vars:
-      resmoke_args: --suites=replica_sets_kill_primary_jscore_passthrough --storageEngine=wiredTiger
+      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: replica_sets_terminate_primary_jscore_passthrough
@@ -5809,14 +5806,13 @@ tasks:
     vars:
       resmoke_args: --storageEngine=wiredTiger
 
-- <<: *task_template
-  name: retryable_writes_jscore_stepdown_passthrough
+- <<: *gen_task_template
+  name: retryable_writes_jscore_stepdown_passthrough_gen
   tags: ["retry"]
   commands:
-  - func: "do setup"
-  - func: "run tests"
+  - func: "generate resmoke tasks"
     vars:
-      resmoke_args: --suites=retryable_writes_jscore_stepdown_passthrough --storageEngine=wiredTiger
+      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: watchdog_wiredtiger
@@ -8294,7 +8290,7 @@ buildvariants:
     - windows-vsCurrent-large
   - name: .resharding_fuzzer
   - name: retryable_writes_jscore_passthrough_gen
-  - name: retryable_writes_jscore_stepdown_passthrough
+  - name: retryable_writes_jscore_stepdown_passthrough_gen
     distros:
     - windows-vsCurrent-large
   - name: session_jscore_passthrough
@@ -9071,12 +9067,12 @@ buildvariants:
   - name: replica_sets_reconfig_jscore_stepdown_passthrough_gen
     distros:
     - rhel80-medium
-  - name: replica_sets_reconfig_kill_primary_jscore_passthrough
+  - name: replica_sets_reconfig_kill_primary_jscore_passthrough_gen
     distros:
     - rhel80-medium
   - name: .resharding_fuzzer
   - name: retryable_writes_jscore_passthrough_gen
-  - name: retryable_writes_jscore_stepdown_passthrough
+  - name: retryable_writes_jscore_stepdown_passthrough_gen
     distros:
     - rhel80-medium
   - name: .read_only
@@ -9200,11 +9196,11 @@ buildvariants:
   - name: replica_sets_reconfig_jscore_stepdown_passthrough_gen
     distros:
     - rhel80-xlarge
-  - name: replica_sets_reconfig_kill_primary_jscore_passthrough
+  - name: replica_sets_reconfig_kill_primary_jscore_passthrough_gen
     distros:
     - rhel80-xlarge
   - name: retryable_writes_jscore_passthrough_gen
-  - name: retryable_writes_jscore_stepdown_passthrough
+  - name: retryable_writes_jscore_stepdown_passthrough_gen
     distros:
     - rhel80-medium
   - name: .read_only
@@ -9321,11 +9317,11 @@ buildvariants:
   - name: replica_sets_reconfig_jscore_stepdown_passthrough_gen
     distros:
     - rhel80-medium
-  - name: replica_sets_reconfig_kill_primary_jscore_passthrough
+  - name: replica_sets_reconfig_kill_primary_jscore_passthrough_gen
     distros:
     - rhel80-medium
   - name: retryable_writes_jscore_passthrough_gen
-  - name: retryable_writes_jscore_stepdown_passthrough
+  - name: retryable_writes_jscore_stepdown_passthrough_gen
     distros:
     - rhel80-medium
   - name: .read_only
@@ -9456,11 +9452,11 @@ buildvariants:
   - name: replica_sets_reconfig_jscore_stepdown_passthrough_gen
     distros:
     - rhel80-xlarge
-  - name: replica_sets_reconfig_kill_primary_jscore_passthrough
+  - name: replica_sets_reconfig_kill_primary_jscore_passthrough_gen
     distros:
     - rhel80-xlarge
   - name: retryable_writes_jscore_passthrough_gen
-  - name: retryable_writes_jscore_stepdown_passthrough
+  - name: retryable_writes_jscore_stepdown_passthrough_gen
   - name: sasl
   - name: search
   - name: search_auth
@@ -11917,7 +11913,7 @@ buildvariants:
 #  - name: replica_sets_reconfig_jscore_passthrough_gen
 #  - name: replica_sets_reconfig_jscore_stepdown_passthrough_gen
   - name: retryable_writes_jscore_passthrough_gen
-  - name: retryable_writes_jscore_stepdown_passthrough
+  - name: retryable_writes_jscore_stepdown_passthrough_gen
 #  - name: .read_only
 #  - name: .rollbackfuzzer
   - name: sasl
