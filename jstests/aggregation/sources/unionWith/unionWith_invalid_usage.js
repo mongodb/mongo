@@ -1,5 +1,9 @@
 /**
  * Tests for invalid usages of $unionWith, or invalid stages within the $unionWith sub-pipeline.
+ * @tags: [
+ *  # Some stages we're checking are only supported with a single read concern.
+ *  assumes_read_concern_unchanged
+ * ]
  */
 (function() {
 "use strict";
