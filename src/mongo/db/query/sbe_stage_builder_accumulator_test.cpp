@@ -201,6 +201,7 @@ protected:
 
     void runSbeGroupCompatibleFlagTest(const std::vector<BSONObj>& groupSpecs,
                                        boost::intrusive_ptr<ExpressionContext>& expCtx) {
+        expCtx->sbeCompatible = true;
         for (const auto& groupSpec : groupSpecs) {
             // When we parse the groupSpec to build the DocumentSourceGroup, those
             // AccumulationExpressions or _id expression that are not supported by SBE will flip the
@@ -220,11 +221,12 @@ protected:
             } catch (const DBException& e) {
                 // The accumulator or the _id expression is unsupported in SBE, so we expect that
                 // the sbeCompatible flag should be false.
-                ASSERT(e.code() == 5754701 || e.code() == 5851602);
+                ASSERT(e.code() == 5754701 || e.code() == 5851602) << "group spec: " << groupSpec;
                 sbeGroupCompatible = false;
                 break;
             }
-            ASSERT_EQ(sbeGroupCompatible, groupStage->sbeCompatible());
+            ASSERT_EQ(sbeGroupCompatible, groupStage->sbeCompatible())
+                << "group spec: " << groupSpec;
         }
     }
 };
@@ -268,6 +270,15 @@ TEST_F(SbeStageBuilderGroupTest, NullForMissingGroupBySlot) {
     // _id: null is returned if the group-by field is missing.
     runGroupAggregationTest(
         R"({_id: "$z", x: {$first: "$b"}})", docs, BSON_ARRAY(BSON("_id" << BSONNULL << "x" << 1)));
+}
+
+TEST_F(SbeStageBuilderGroupTest, OneNullForMissingAndNullGroupBySlot) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << BSONNULL << "b" << 1)),
+                                       BSON_ARRAY(BSON("b" << 3))};
+    // One _id: null document is returned when there exist null and a value is missing for the _id
+    // field path.
+    runGroupAggregationTest(
+        R"({_id: "$a", x: {$first: "$b"}})", docs, BSON_ARRAY(BSON("_id" << BSONNULL << "x" << 1)));
 }
 
 TEST_F(SbeStageBuilderGroupTest, TestGroupNoAccumulators) {

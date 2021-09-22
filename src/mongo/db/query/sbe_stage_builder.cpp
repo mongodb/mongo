@@ -2060,7 +2060,7 @@ const size_t kGroupBySlots = 1;
 
 std::pair<sbe::value::SlotId, EvalStage> generateGroupByKey(
     StageBuilderState& state,
-    Expression* expr,
+    Expression* idExpr,
     std::unique_ptr<sbe::PlanStage> childStage,
     sbe::value::SlotId rootSlot,
     PlanNodeId nodeId,
@@ -2068,10 +2068,19 @@ std::pair<sbe::value::SlotId, EvalStage> generateGroupByKey(
     // TODO SERVER-59951: make object form of the '_id' group-by expression work to handle multiple
     // group-by keys.
     auto [groupByEvalExpr, groupByEvalStage] = stage_builder::generateExpression(
-        state, expr, stage_builder::EvalStage{std::move(childStage), {}}, rootSlot, nodeId);
+        state, idExpr, {std::move(childStage), {}}, rootSlot, nodeId);
 
-    return projectEvalExpr(
-        std::move(groupByEvalExpr), std::move(groupByEvalStage), nodeId, slotIdGenerator);
+    if (auto isConstIdExpr = dynamic_cast<ExpressionConstant*>(idExpr) != nullptr; isConstIdExpr) {
+        return projectEvalExpr(
+            std::move(groupByEvalExpr), std::move(groupByEvalStage), nodeId, slotIdGenerator);
+    } else {
+        // The group-by field may end up being 'Nothing' and in that case _id: null will be
+        // returned. Calling 'makeFillEmptyNull' for the group-by field takes care of that.
+        return projectEvalExpr(makeFillEmptyNull(groupByEvalExpr.extractExpr()),
+                               std::move(groupByEvalStage),
+                               nodeId,
+                               slotIdGenerator);
+    }
 }
 
 std::tuple<sbe::value::SlotVector, EvalStage> generateAccumulator(
@@ -2119,14 +2128,7 @@ std::tuple<std::vector<std::string>, sbe::value::SlotVector, EvalStage> generate
     // slots at the front and the accumulator slots at the back.
     std::sort(groupOutSlots.begin() + kGroupBySlots, groupOutSlots.end());
 
-    // The group-by slot may end up being 'Nothing' and in that case _id: null will be returned.
-    // Calling 'makeFillEmptyNull' for 'groupBySlot' takes care of that. Adds the final group-by
-    // slot and the associated expression to the 'prjSlotToExprMap' for the final project stage
-    // which is generated at the end of this function.
-    auto finalGroupBySlot = slotIdGenerator->generate();
-    prjSlotToExprMap.emplace(finalGroupBySlot, makeFillEmptyNull(makeVariable(groupBySlot)));
-
-    auto finalSlots{sbe::value::SlotVector{finalGroupBySlot}};
+    auto finalSlots{sbe::value::SlotVector{groupBySlot}};
     finalSlots.reserve(kGroupBySlots + accStmts.size());
     std::vector<std::string> fieldNames{"_id"};
     fieldNames.reserve(kGroupBySlots + accStmts.size());
@@ -2155,11 +2157,13 @@ std::tuple<std::vector<std::string>, sbe::value::SlotVector, EvalStage> generate
         groupFinalEvalStage = std::move(tempEvalStage);
     }
 
-    // Lastly, makes a final project stage with the gathered group-by slot(s) and accumulator result
-    // slots.
-    return {std::move(fieldNames),
-            std::move(finalSlots),
-            makeProject(std::move(groupFinalEvalStage), std::move(prjSlotToExprMap), nodeId)};
+    // Gathers all accumulator results. If there're no project expressions, does not add a project
+    // stage.
+    auto retEvalStage = prjSlotToExprMap.empty()
+        ? std::move(groupFinalEvalStage)
+        : makeProject(std::move(groupFinalEvalStage), std::move(prjSlotToExprMap), nodeId);
+
+    return {std::move(fieldNames), std::move(finalSlots), std::move(retEvalStage)};
 }
 }  // namespace
 
@@ -2173,12 +2177,13 @@ std::tuple<std::vector<std::string>, sbe::value::SlotVector, EvalStage> generate
  * following translated sbe::PlanStage tree. In this example, we assume that the $group pipeline
  * spec is {"_id": "$a", "x": {"$min": "$b"}, "y": {"$first": "$b"}}.
  *
- * [2] mkbson s14 [_id = s13, x = s14, y = s12] true false
- * [2] project [s13 = fillEmpty (s8, null), s14 = fillEmpty (s11, null)]
- * [2] group [s8] [s11 = min (if (! exists (s9) || typeMatch (s9, 0x00000440), Nothing, s9)),
- *                 s12 = first (fillEmpty (s10, null))]
+ * [2] mkbson s14 [_id = s9, x = s14, y = s13] true false
+ * [2] project [s14 = fillEmpty (s11, null)]
+ * [2] group [s9] [s12 = min (if (! exists (s9) || typeMatch (s9, 0x00000440), Nothing, s9)),
+ *                 s13 = first (fillEmpty (s10, null))]
+ * [2] project [s11 = getField (s7, "b")]
  * [2] project [s10 = getField (s7, "b")]
- * [2] project [s9 = getField (s7, "b")]
+ * [2] project [s9 = fillEmpty (s8, null)]
  * [2] project [s8 = getField (s7, "a")]
  * [1] project [s7 = getElement (s5, 0)]
  * [1] unwind s5 s6 s4 false
@@ -2240,7 +2245,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto groupEvalStage = makeHashAgg(std::move(accProjEvalStage),
                                       {groupBySlot},
                                       std::move(accSlotToExprMap),
-                                      boost::none,
+                                      _state.env->getSlotIfExists("collator"_sd),
                                       nodeId);
 
     tassert(
