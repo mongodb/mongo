@@ -62,7 +62,11 @@ class _SingleJSTestCase(interface.ProcessTestCase):
         test_data["peerPids"] = self.fixture.pids()
         test_data["alwaysUseLogFiles"] = config.ALWAYS_USE_LOG_FILES
         test_data["failIfUnterminatedProcesses"] = True
-        test_data["implicitlyShardOnCreateCollectionOnly"] = "/timeseries/" in self.js_filename
+
+        # The tests in 'timeseries' directory need to use a different logic for implicity sharding
+        # the collection. Make sure that we consider both unix and windows directory structures.
+        test_data["implicitlyShardOnCreateCollectionOnly"] = "/timeseries/" in self.js_filename or \
+        "\\timeseries\\" in self.js_filename
 
         global_vars["TestData"] = test_data
         self.shell_options["global_vars"] = global_vars
