@@ -234,7 +234,7 @@ std::shared_ptr<IWIterator> mergeIterators(IteratorPtr (&array)[N],
     std::vector<std::shared_ptr<IWIterator>> vec;
     for (int i = 0; i < N; i++)
         vec.push_back(std::shared_ptr<IWIterator>(array[i]));
-    return std::shared_ptr<IWIterator>(IWIterator::merge(vec, "", opts, IWComparator(Dir)));
+    return std::shared_ptr<IWIterator>(IWIterator::merge(vec, opts, IWComparator(Dir)));
 }
 
 //
@@ -285,29 +285,28 @@ public:
     void run() {
         unittest::TempDir tempDir("sortedFileWriterTests");
         const SortOptions opts = SortOptions().TempDir(tempDir.path());
+        auto makeFile = [&] {
+            return std::make_shared<Sorter<IntWrapper, IntWrapper>::File>(opts.tempDir + "/" +
+                                                                          nextFileName());
+        };
+
         {  // small
-            std::string fileName = opts.tempDir + "/" + nextFileName();
-            SortedFileWriter<IntWrapper, IntWrapper> sorter(opts, fileName, 0);
+            SortedFileWriter<IntWrapper, IntWrapper> sorter(opts, makeFile());
             sorter.addAlreadySorted(0, 0);
             sorter.addAlreadySorted(1, -1);
             sorter.addAlreadySorted(2, -2);
             sorter.addAlreadySorted(3, -3);
             sorter.addAlreadySorted(4, -4);
             ASSERT_ITERATORS_EQUIVALENT(std::shared_ptr<IWIterator>(sorter.done()),
-                                        make_shared<IntIterator>(0, 5));
-
-            ASSERT_TRUE(boost::filesystem::remove(fileName));
+                                        std::make_shared<IntIterator>(0, 5));
         }
         {  // big
-            std::string fileName = opts.tempDir + "/" + nextFileName();
-            SortedFileWriter<IntWrapper, IntWrapper> sorter(opts, fileName, 0);
+            SortedFileWriter<IntWrapper, IntWrapper> sorter(opts, makeFile());
             for (int i = 0; i < 10 * 1000 * 1000; i++)
                 sorter.addAlreadySorted(i, -i);
 
             ASSERT_ITERATORS_EQUIVALENT(std::shared_ptr<IWIterator>(sorter.done()),
-                                        make_shared<IntIterator>(0, 10 * 1000 * 1000));
-
-            ASSERT_TRUE(boost::filesystem::remove(fileName));
+                                        std::make_shared<IntIterator>(0, 10 * 1000 * 1000));
         }
 
         ASSERT(boost::filesystem::is_empty(tempDir.path()));
@@ -321,7 +320,7 @@ public:
         {  // test empty (no inputs)
             std::vector<std::shared_ptr<IWIterator>> vec;
             std::shared_ptr<IWIterator> mergeIter(
-                IWIterator::merge(vec, "", SortOptions(), IWComparator()));
+                IWIterator::merge(vec, SortOptions(), IWComparator()));
             ASSERT_ITERATORS_EQUIVALENT(mergeIter, make_shared<EmptyIterator>());
         }
         {  // test empty (only empty inputs)
