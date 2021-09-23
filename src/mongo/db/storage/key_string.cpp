@@ -238,8 +238,6 @@ const uint8_t kEnd = 0x4;
 const uint8_t kLess = 1;
 const uint8_t kGreater = 254;
 
-// The maximum length of a RecordId binary string that may be appended to a KeyString.
-const int8_t kMaxRecordIdStrLen = 127;
 }  // namespace
 
 // some utility functions
@@ -517,23 +515,45 @@ void BuilderBase<BufferT>::_appendRecordIdLong(int64_t val) {
 
 template <class BufferT>
 void BuilderBase<BufferT>::_appendRecordIdStr(const char* str, int size) {
-    // This encoding for RecordId binary strings stores the size at the end. This means that a
-    // RecordId may only be appended at the end of a KeyString. That is, it cannot be appended in
-    // the middle of a KeyString and also be binary-comparable.
+    // Append the RecordId binary string as-is, then append the encoded binary string size.
+    // The binary string size is encoded in 7-bit increments over one or more size bytes.
+    // The 8th bit of a size byte is a continuation bit that is set on all size bytes except
+    // the leftmost (i.e. the last) one. This allows decoding the size right-to-left until there are
+    // no more size bytes remaining with continuation bits. See decodeRecordIdStrAtEnd for the
+    // decoding algorithm. This 7-bit size encoding ensures backward compatibility with 5.0, which
+    // supports RecordId binary strings up to 127 bytes, or what fits in 7 bits.
 
-    // The current maximum string length is 127. The high bit is reserved for future usage.
-    keyStringAssert(5994901,
-                    fmt::format("cannot generate key for RecordId longer than maximum of {} bytes",
-                                kMaxRecordIdStrLen),
-                    size <= kMaxRecordIdStrLen);
     invariant(size > 0);
+    invariant(size <= RecordId::kBigStrMaxSize);
 
     const bool invert = false;
 
-    // String is encoded with a single byte for the size at the end.
+    // Encode size
+    uint8_t encodedSize[kRecordIdStrEncodedSizeMaxBytes] = {0};
+    int highestSizeByte = 0;
+    bool highestSizeByteSet = false;
+
+    for (int sizeBytes = kRecordIdStrEncodedSizeMaxBytes - 1; sizeBytes >= 0; sizeBytes--) {
+        encodedSize[sizeBytes] = (size >> (sizeBytes * 7)) & 0x7F;
+        if (encodedSize[sizeBytes] && highestSizeByteSet == false) {
+            highestSizeByteSet = true;
+            highestSizeByte = sizeBytes;
+        }
+    }
+    for (int i = highestSizeByte; i > 0; i--) {
+        encodedSize[i] |= 0x80;
+    }
+
+    const int encodedSizeLen = highestSizeByte + 1;
+
+    // Preallocate room for the RecordId binary string and its encoded size
+    // to reduce the number of potential reallocs
+    _buffer().reserveBytes(size + encodedSizeLen);
+    _buffer().claimReservedBytes(size + encodedSizeLen);
+
+    // Append RecordId and its encoded size
     _appendBytes(str, size, invert);
-    auto encodedSize = static_cast<uint8_t>(size);
-    _append(encodedSize, invert);
+    _appendBytes(encodedSize, encodedSizeLen, invert);
 }
 
 template <class BufferT>
@@ -2506,19 +2526,34 @@ size_t sizeWithoutRecordIdLongAtEnd(const void* bufferRaw, size_t bufSize) {
 }
 
 size_t sizeWithoutRecordIdStrAtEnd(const void* bufferRaw, size_t bufSize) {
+    // See decodeRecordIdStrAtEnd for the size decoding algorithm
     invariant(bufSize > 0);
     const uint8_t* buffer = static_cast<const uint8_t*>(bufferRaw);
 
-    // The current encoding for strings supports strings up to 128 bytes. The high bit is reserved
-    // for future usage.
-    uint8_t len = buffer[bufSize - 1];
-    keyStringAssert(5566400,
-                    fmt::format("Cannot decode record id string longer than {} bytes; size is {}",
-                                kMaxRecordIdStrLen,
-                                len),
-                    len <= kMaxRecordIdStrLen);
-    invariant(bufSize > static_cast<size_t>(len + 1));
-    return bufSize - len - 1;
+    // Decode RecordId binary string size
+    size_t ridSize = 0;
+    uint8_t sizes[kRecordIdStrEncodedSizeMaxBytes] = {0};
+
+    // Continuation bytes
+    size_t sizeByteId = 0;
+    for (; buffer[bufSize - 1 - sizeByteId] & 0x80; sizeByteId++) {
+        invariant(bufSize >= sizeByteId + 1 /* non-cont bytes */);
+        invariant(sizeByteId < kRecordIdStrEncodedSizeMaxBytes);
+        sizes[sizeByteId] = buffer[bufSize - 1 - sizeByteId] & 0x7F;
+    }
+    // Last (non-continuation) byte
+    invariant(sizeByteId < kRecordIdStrEncodedSizeMaxBytes);
+    sizes[sizeByteId] = buffer[bufSize - 1 - sizeByteId];
+
+    const size_t numSegments = sizeByteId + 1;
+
+    for (; sizeByteId > 0; sizeByteId--) {
+        ridSize += sizes[sizeByteId] << ((numSegments - sizeByteId - 1) * 7);
+    }
+    ridSize += sizes[sizeByteId] << ((numSegments - sizeByteId - 1) * 7);
+
+    invariant(bufSize >= ridSize + numSegments);
+    return bufSize - ridSize - numSegments;
 }
 
 RecordId decodeRecordIdLong(BufReader* reader) {
@@ -2536,20 +2571,39 @@ RecordId decodeRecordIdLong(BufReader* reader) {
 }
 
 RecordId decodeRecordIdStrAtEnd(const void* bufferRaw, size_t bufSize) {
+    // See _appendRecordIdStr for the encoding scheme.
+    // The RecordId binary string size is decoded right-to-left, up to the size byte
+    // without continuation bit.
+
     invariant(bufSize > 0);
     const uint8_t* buffer = static_cast<const uint8_t*>(bufferRaw);
 
-    // The current encoding for strings supports strings up to 128 bytes. The high bit is reserved
-    // for future usage.
-    uint8_t len = buffer[bufSize - 1];
-    keyStringAssert(5577900,
-                    fmt::format("Cannot decode record id string longer than {} bytes; size is {}",
-                                kMaxRecordIdStrLen,
-                                len),
-                    len <= kMaxRecordIdStrLen);
-    invariant(bufSize > len);
-    const uint8_t* firstBytePtr = (buffer + bufSize - len - 1);
-    return RecordId(reinterpret_cast<const char*>(firstBytePtr), len);
+    // Decode RecordId binary string size
+    size_t ridSize = 0;
+    uint8_t sizes[kRecordIdStrEncodedSizeMaxBytes] = {0};
+
+    // Continuation bytes
+    size_t sizeByteId = 0;
+    for (; buffer[bufSize - 1 - sizeByteId] & 0x80; sizeByteId++) {
+        invariant(bufSize >= sizeByteId + 1 /* non-cont byte */);
+        invariant(sizeByteId < kRecordIdStrEncodedSizeMaxBytes);
+        sizes[sizeByteId] = buffer[bufSize - 1 - sizeByteId] & 0x7F;
+    }
+    // Last (non-continuation) byte
+    invariant(sizeByteId < kRecordIdStrEncodedSizeMaxBytes);
+    sizes[sizeByteId] = buffer[bufSize - 1 - sizeByteId];
+
+    const size_t numSegments = sizeByteId + 1;
+
+    for (; sizeByteId > 0; sizeByteId--) {
+        ridSize += sizes[sizeByteId] << ((numSegments - sizeByteId - 1) * 7);
+    }
+    ridSize += sizes[sizeByteId] << ((numSegments - sizeByteId - 1) * 7);
+
+    invariant(bufSize >= ridSize + numSegments);
+
+    return RecordId(reinterpret_cast<const char*>(buffer) + (bufSize - ridSize - numSegments),
+                    ridSize);
 }
 
 int compare(const char* leftBuf, const char* rightBuf, size_t leftSize, size_t rightSize) {
