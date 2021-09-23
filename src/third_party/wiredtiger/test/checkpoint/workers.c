@@ -332,7 +332,7 @@ real_worker(void)
         /* If we have specified to run with mix mode deletes we need to do it in it's own txn. */
         if (g.use_timestamps && g.mixed_mode_deletes && new_txn && __wt_random(&rnd) % 72 == 0) {
             new_txn = false;
-            for (j = 0; ret == 0 && j < g.ntables; j++) {
+            for (j = 0; j < g.ntables; j++) {
                 ret = worker_mm_delete(cursors[j], keyno);
                 if (ret == WT_ROLLBACK || ret == WT_PREPARE_CONFLICT)
                     break;
