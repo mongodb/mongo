@@ -156,6 +156,9 @@ void HashAggStage::open(bool reOpen) {
 
         _seekKeys.resize(_seekKeysAccessors.size());
 
+        // A counter to check memory usage periodically.
+        auto memoryUseCheckCounter = 0;
+
         while (_children[0]->getNext() == PlanState::ADVANCED) {
             value::MaterializedRow key{_inKeyAccessors.size()};
             // Copy keys in order to do the lookup.
@@ -183,7 +186,8 @@ void HashAggStage::open(bool reOpen) {
             // Track memory usage.
             auto shouldCalculateEstimatedSize =
                 _pseudoRandom.nextCanonicalDouble() < _memoryUseSampleRate;
-            if (shouldCalculateEstimatedSize) {
+            if (shouldCalculateEstimatedSize || ++memoryUseCheckCounter % 100 == 0) {
+                memoryUseCheckCounter = 0;
                 long estimatedSizeForOneRow =
                     it->first.memUsageForSorter() + it->second.memUsageForSorter();
                 long long estimatedTotalSize = _ht->size() * estimatedSizeForOneRow;

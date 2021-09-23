@@ -10,7 +10,8 @@
 (function() {
 'use strict';
 
-load('jstests/libs/fixture_helpers.js');  // For 'FixtureHelpers'
+load('jstests/libs/fixture_helpers.js');            // For 'FixtureHelpers'
+load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
 
 const coll = db.spill_to_disk;
 coll.drop();
