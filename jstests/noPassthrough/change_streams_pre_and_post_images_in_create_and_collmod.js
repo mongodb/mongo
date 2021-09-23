@@ -44,7 +44,7 @@ function assertPreimagesCollectionExists() {
     assert.eq(result.cursor.firstBatch[0].name, preimagesCollName);
 }
 
-// Check that we cannot set 'changeStreamPreAndPostImages' on the local or admin databases.
+// Check that we cannot set 'changeStreamPreAndPostImages' on the local, admin and config databases.
 for (const db of [localDB, adminDB, configDB]) {
     assert.commandFailedWithCode(
         db.runCommand({create: collName, changeStreamPreAndPostImages: true}),

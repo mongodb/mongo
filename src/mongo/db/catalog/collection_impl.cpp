@@ -1252,6 +1252,9 @@ RecordId CollectionImpl::updateDocument(OperationContext* opCtx,
         args->preImageDoc = oldDoc.value().getOwned();
     }
     args->preImageRecordingEnabledForCollection = getRecordPreImages();
+    args->changeStreamPreAndPostImagesEnabledForCollection =
+        isChangeStreamPreAndPostImagesEnabled();
+
     const bool storePrePostImage =
         args->storeDocOption != CollectionUpdateArgs::StoreDocOption::None;
     if (!args->oplogSlot && storePrePostImage) {
@@ -1315,7 +1318,7 @@ StatusWith<RecordData> CollectionImpl::updateDocumentWithDamages(
     // For in-place updates we need to grab an owned copy of the pre-image doc if pre-image
     // recording is enabled and we haven't already set the pre-image due to this update being
     // a retryable findAndModify or a possible update to the shard key.
-    if (!args->preImageDoc && getRecordPreImages()) {
+    if (!args->preImageDoc && (getRecordPreImages() || isChangeStreamPreAndPostImagesEnabled())) {
         args->preImageDoc = oldRec.value().toBson().getOwned();
     }
     const bool storePrePostImage =
@@ -1337,6 +1340,9 @@ StatusWith<RecordData> CollectionImpl::updateDocumentWithDamages(
     if (newRecStatus.isOK()) {
         args->updatedDoc = newRecStatus.getValue().toBson();
         args->preImageRecordingEnabledForCollection = getRecordPreImages();
+        args->changeStreamPreAndPostImagesEnabledForCollection =
+            isChangeStreamPreAndPostImagesEnabled();
+
         OplogUpdateEntryArgs entryArgs(*args, ns(), _uuid);
         getGlobalServiceContext()->getOpObserver()->onUpdate(opCtx, entryArgs);
     }

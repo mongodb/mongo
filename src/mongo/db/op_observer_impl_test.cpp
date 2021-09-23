@@ -43,6 +43,7 @@
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/op_observer_impl.h"
 #include "mongo/db/op_observer_registry.h"
+#include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mock.h"
 #include "mongo/db/repl/image_collection_entry_gen.h"
@@ -1637,12 +1638,15 @@ TEST_F(OpObserverTest, TestFundamentalOnUpdateOutputs) {
         {StoreDocOption::PostImage, kRecordPreImages, RetryableOptions::WithOplog, 3},
         {StoreDocOption::PostImage, kRecordPreImages, RetryableOptions::WithSideCollection, 2}};
 
-    for (std::size_t testIdx = 0; testIdx < cases.size(); ++testIdx) {
-        const auto& testCase = cases[testIdx];
+    const auto testFunc = [&](CollectionUpdateArgs& updateArgs,
+                              const UpdateTestCase& testCase,
+                              const int testIdx) {
         LOGV2(5739902,
               "UpdateTestCase",
               "ImageType"_attr = testCase.getImageTypeStr(),
-              "AlwaysRecordPreImages"_attr = testCase.alwaysRecordPreImages,
+              "PreImageRecording"_attr = updateArgs.preImageRecordingEnabledForCollection,
+              "ChangeStreamPreAndPostImagesEnabled"_attr =
+                  updateArgs.changeStreamPreAndPostImagesEnabledForCollection,
               "RetryableOptions"_attr = testCase.getRetryableOptionsStr(),
               "ExpectedOplogEntries"_attr = testCase.numOutputOplogs);
 
@@ -1653,7 +1657,6 @@ TEST_F(OpObserverTest, TestFundamentalOnUpdateOutputs) {
 
         boost::optional<MongoDOperationContextSession> contextSession;
         boost::optional<TransactionParticipant::Participant> txnParticipant;
-        CollectionUpdateArgs updateArgs;
         switch (testCase.retryableOptions) {
             case RetryableOptions::NotRetryable:
                 updateArgs.stmtIds = {kUninitializedStmtId};
@@ -1690,7 +1693,6 @@ TEST_F(OpObserverTest, TestFundamentalOnUpdateOutputs) {
             BSON("$set" << BSON("postImage" << true) << "$unset" << BSON("preImage" << 1));
         updateArgs.criteria = BSON("_id" << 0);
         updateArgs.storeDocOption = testCase.imageType;
-        updateArgs.preImageRecordingEnabledForCollection = testCase.alwaysRecordPreImages;
         OplogUpdateEntryArgs update(std::move(updateArgs), nss, uuid);
 
         // Phase 2: Call the code we're testing.
@@ -1706,7 +1708,7 @@ TEST_F(OpObserverTest, TestFundamentalOnUpdateOutputs) {
         // Entries are returned in ascending timestamp order.
         const OplogEntry& actualOp = assertGet(OplogEntry::parse(oplogs.back()));
 
-        const bool checkPreImageInOplog = testCase.alwaysRecordPreImages ||
+        const bool checkPreImageInOplog = update.updateArgs.preImageRecordingEnabledForCollection ||
             (testCase.imageType == StoreDocOption::PreImage &&
              testCase.retryableOptions == RetryableOptions::WithOplog);
         if (checkPreImageInOplog) {
@@ -1729,11 +1731,11 @@ TEST_F(OpObserverTest, TestFundamentalOnUpdateOutputs) {
 
         bool checkSideCollection = testCase.imageType != StoreDocOption::None &&
             testCase.retryableOptions == RetryableOptions::WithSideCollection;
-        if (checkSideCollection && testCase.alwaysRecordPreImages &&
+        if (checkSideCollection && update.updateArgs.preImageRecordingEnabledForCollection &&
             testCase.imageType == StoreDocOption::PreImage) {
-            // When `alwaysRecordPreImages` is enabled for a collection, we always store an image in
-            // the oplog. To avoid unnecessary writes, we won't also store an image in the side
-            // collection.
+            // When `alwaysRecordPreImages` is enabled for a collection, we always store an
+            // image in the oplog. To avoid unnecessary writes, we won't also store an image
+            // in the side collection.
             checkSideCollection = false;
         }
 
@@ -1749,6 +1751,50 @@ TEST_F(OpObserverTest, TestFundamentalOnUpdateOutputs) {
             } else {
                 ASSERT(imageEntry.getImageKind() == repl::RetryImageEnum::kPostImage);
             }
+        }
+
+        if (update.updateArgs.changeStreamPreAndPostImagesEnabledForCollection) {
+            const Timestamp preImageOpTime = actualOp.getOpTime().getTimestamp();
+            ChangeStreamPreImageId preImageId(uuid, preImageOpTime, 0);
+            AutoGetCollection preImagesCollection(
+                opCtx, NamespaceString::kChangeStreamPreImagesNamespace, LockMode::MODE_IS);
+            const auto preImage = Helpers::findOneForTesting(
+                opCtx, preImagesCollection.getCollection(), BSON("_id" << preImageId.toBSON()));
+            const auto changeStreamPreImage =
+                ChangeStreamPreImage::parse(IDLParserErrorContext("pre-image"), preImage);
+            const BSONObj& expectedImage = update.updateArgs.preImageDoc.get();
+            ASSERT_BSONOBJ_EQ(expectedImage, changeStreamPreImage.getPreImage());
+            ASSERT_EQ(actualOp.getWallClockTime(), changeStreamPreImage.getOperationTime());
+        }
+    };
+
+    for (std::size_t testIdx = 0; testIdx < cases.size(); ++testIdx) {
+        auto& testCase = cases[testIdx];
+
+        // In case when 'alwaysRecordPreImages' is set to true, run the test for both
+        // 'preImageRecordingEnabledForCollection' and
+        // 'changeStreamPreAndPostImagesEnabledForCollection' cases.
+        CollectionUpdateArgs updateArgs;
+        if (testCase.alwaysRecordPreImages) {
+            updateArgs.preImageRecordingEnabledForCollection = testCase.alwaysRecordPreImages;
+            updateArgs.changeStreamPreAndPostImagesEnabledForCollection =
+                !testCase.alwaysRecordPreImages;
+            testFunc(updateArgs, testCase, testIdx);
+
+            const auto numOutputOplogs = (testCase.imageType == StoreDocOption::PreImage &&
+                                          testCase.retryableOptions == RetryableOptions::WithOplog)
+                ? testCase.numOutputOplogs
+                : testCase.numOutputOplogs - 1;
+            updateArgs.preImageRecordingEnabledForCollection = !testCase.alwaysRecordPreImages;
+            updateArgs.changeStreamPreAndPostImagesEnabledForCollection =
+                testCase.alwaysRecordPreImages;
+            testCase.numOutputOplogs = numOutputOplogs;
+            testFunc(updateArgs, testCase, testIdx);
+        } else {
+            updateArgs.preImageRecordingEnabledForCollection = testCase.alwaysRecordPreImages;
+            updateArgs.changeStreamPreAndPostImagesEnabledForCollection =
+                testCase.alwaysRecordPreImages;
+            testFunc(updateArgs, testCase, testIdx);
         }
     }
 }

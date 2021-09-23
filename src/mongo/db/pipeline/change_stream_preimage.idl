@@ -59,6 +59,6 @@ structs:
                 description: Operation execution wall clock time. Used to determine if the
                              pre-image expired.
                 type: date
-            preimage:
+            preImage:
                 description: Pre-image of a document for an operation recorded to an oplog entry.
                 type: object
