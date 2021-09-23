@@ -15,6 +15,7 @@
 "use strict";
 
 load("jstests/libs/change_stream_rewrite_util.js");  // For rewrite helpers.
+load("jstests/libs/fixture_helpers.js");             // For FixtureHelpers.
 
 const dbName = "change_stream_match_pushdown_documentKey_rewrite";
 const collName = "change_stream_match_pushdown_documentKey_rewrite";
@@ -94,6 +95,10 @@ assert.commandWorked(coll.deleteOne({_id: 3, shard: 1}));
 // rewrites.
 assert.commandWorked(
     db.adminCommand({configureFailPoint: "disableMatchExpressionOptimization", mode: "alwaysOn"}));
+FixtureHelpers.runCommandOnEachPrimary({
+    db: db.getSiblingDB("admin"),
+    cmdObj: {configureFailPoint: "disableMatchExpressionOptimization", mode: "alwaysOn"}
+});
 
 // Ensure that the '$match' on the 'insert', 'update', 'replace', and 'delete' operation types with
 // various predicates are rewritten correctly.

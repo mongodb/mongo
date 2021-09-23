@@ -14,9 +14,12 @@
 "use strict";
 
 load("jstests/libs/change_stream_rewrite_util.js");  // For rewrite helpers.
+load("jstests/libs/fixture_helpers.js");             // For FixtureHelpers.
 
 const dbName = "change_stream_match_pushdown_and_rewrite";
+const otherDbName = "other_db";
 const collName = "coll1";
+const otherCollName = "other_coll";
 
 const st = new ShardingTest({
     shards: 2,
@@ -26,8 +29,12 @@ const st = new ShardingTest({
 const mongosConn = st.s;
 const db = mongosConn.getDB(dbName);
 
-// Create a sharded collection.
+// Create a sharded collection in the main test database.
 const coll = createShardedCollection(st, "_id" /* shardKey */, dbName, collName, 2 /* splitAt */);
+
+// Create a sharded collection in the "other" database.
+const otherColl =
+    createShardedCollection(st, "_id" /* shardKey */, otherDbName, otherCollName, 2 /* splitAt */);
 
 // A helper that opens a change stream on the whole cluster with the user supplied match expression
 // 'userMatchExpr' and validates that:
@@ -84,6 +91,16 @@ function verifyOnWholeCluster(
     assertNumMatchingOplogEventsForShard(stats, st.rs1.name, expectedOplogRetDocsForEachShard);
 }
 
+// Enable a failpoint that will prevent $expr match expressions from generating $_internalExprEq
+// or similar expressions. This ensures that the following test-cases only exercise the $expr
+// rewrites.
+assert.commandWorked(
+    db.adminCommand({configureFailPoint: "disableMatchExpressionOptimization", mode: "alwaysOn"}));
+FixtureHelpers.runCommandOnEachPrimary({
+    db: db.getSiblingDB("admin"),
+    cmdObj: {configureFailPoint: "disableMatchExpressionOptimization", mode: "alwaysOn"}
+});
+
 // Create some new collections to ensure that test cases has sufficient namespaces to verify
 // that the namespace filtering is working correctly.
 const coll2 = createShardedCollection(st, "_id" /* shardKey */, dbName, "coll2", 4 /* splitAt */);
@@ -131,6 +148,12 @@ assert.commandWorked(coll4.insert({_id: 11, renameCollection: true, drop: {}, dr
 assert.commandWorked(
     coll4.insert({_id: 12, renameCollection: "no_dot_ns", drop: "", dropDatabase: ""}));
 
+// These events from unmonitored collection should not been seen unexpectedly.
+assert.commandWorked(
+    otherColl.insert({_id: 1, renameCollection: true, drop: {}, dropDatabase: null}));
+assert.commandWorked(
+    otherColl.insert({_id: 2, renameCollection: true, drop: {}, dropDatabase: null}));
+
 // This group of tests ensures that the '$match' on a particular namespace object only sees its
 // documents and only required document(s) are returned at the oplog for each shard.
 verifyOnWholeCluster(resumeAfterToken,
@@ -138,11 +161,23 @@ verifyOnWholeCluster(resumeAfterToken,
                      {coll1: {insert: [1, 2]}},
                      1 /* expectedOplogRetDocsForEachShard */);
 verifyOnWholeCluster(resumeAfterToken,
+                     {$match: {$expr: {$eq: ["$ns", {db: dbName, coll: "coll1"}]}}},
+                     {coll1: {insert: [1, 2]}},
+                     1 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(resumeAfterToken,
                      {$match: {ns: {db: dbName, coll: "coll2"}}},
                      {coll2: {insert: [3, 4], rename: ["newColl2", "newColl2"]}},
                      2 /* expectedOplogRetDocsForEachShard */);
 verifyOnWholeCluster(resumeAfterToken,
+                     {$match: {$expr: {$eq: ["$ns", {db: dbName, coll: "coll2"}]}}},
+                     {coll2: {insert: [3, 4], rename: ["newColl2", "newColl2"]}},
+                     2 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(resumeAfterToken,
                      {$match: {ns: {db: dbName, coll: "coll.coll3"}}},
+                     {"coll.coll3": {insert: [5, 6], drop: ["coll.coll3", "coll.coll3"]}},
+                     2 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(resumeAfterToken,
+                     {$match: {$expr: {$eq: ["$ns", {db: dbName, coll: "coll.coll3"}]}}},
                      {"coll.coll3": {insert: [5, 6], drop: ["coll.coll3", "coll.coll3"]}},
                      2 /* expectedOplogRetDocsForEachShard */);
 
@@ -150,11 +185,19 @@ verifyOnWholeCluster(resumeAfterToken,
 // the oplog should not return any documents.
 verifyOnWholeCluster(
     resumeAfterToken, {$match: {ns: {db: dbName}}}, {}, 0 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(resumeAfterToken,
+                     {$match: {$expr: {$eq: ["$ns", {db: dbName}]}}},
+                     {},
+                     0 /* expectedOplogRetDocsForEachShard */);
 
 // Ensure that the namespace object with 'unknown' collection does not exists and the oplog cursor
 // returns 0 document.
 verifyOnWholeCluster(resumeAfterToken,
                      {$match: {ns: {db: dbName, coll: "unknown"}}},
+                     {},
+                     0 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(resumeAfterToken,
+                     {$match: {$expr: {$eq: ["$ns", {db: dbName, coll: "unknown"}]}}},
                      {},
                      0 /* expectedOplogRetDocsForEachShard */);
 
@@ -164,6 +207,10 @@ verifyOnWholeCluster(resumeAfterToken,
                      {$match: {ns: {coll: "coll1", db: dbName}}},
                      {},
                      0 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(resumeAfterToken,
+                     {$match: {$expr: {$eq: ["$ns", {coll: "coll1", db: dbName}]}}},
+                     {},
+                     0 /* expectedOplogRetDocsForEachShard */);
 
 // Ensure that the namespace object with extra fields does not match with the namespace object and
 // the oplog cursor returns 0 document.
@@ -171,15 +218,33 @@ verifyOnWholeCluster(resumeAfterToken,
                      {$match: {ns: {db: dbName, coll: "coll1", extra: "extra"}}},
                      {},
                      0 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(
+    resumeAfterToken,
+    {$match: {$expr: {$eq: ["$ns", {db: dbName, coll: "unknown", extra: "extra"}]}}},
+    {},
+    0 /* expectedOplogRetDocsForEachShard */);
 
 // Ensure that the empty namespace object does not match with the namespace object and the oplog
 // cursor returns 0 document.
 verifyOnWholeCluster(resumeAfterToken, {$match: {ns: {}}}, {}, 0);
+verifyOnWholeCluster(resumeAfterToken,
+                     {$match: {$expr: {$eq: ["$ns", {}]}}},
+                     {},
+                     0 /* expectedOplogRetDocsForEachShard */);
 
 // Ensure the '$match' on namespace's db should return documents for all collection and oplog should
 // return all documents for each shard.
 verifyOnWholeCluster(resumeAfterToken,
                      {$match: {"ns.db": dbName}},
+                     {
+                         coll1: {insert: [1, 2]},
+                         coll2: {insert: [3, 4], rename: ["newColl2", "newColl2"]},
+                         "coll.coll3": {insert: [5, 6], drop: ["coll.coll3", "coll.coll3"]},
+                         "coll4": {insert: [7, 8, 9, 10, 11, 12]}
+                     },
+                     8 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(resumeAfterToken,
+                     {$match: {$expr: {$eq: ["$ns.db", dbName]}}},
                      {
                          coll1: {insert: [1, 2]},
                          coll2: {insert: [3, 4], rename: ["newColl2", "newColl2"]},
@@ -199,6 +264,16 @@ verifyOnWholeCluster(resumeAfterToken,
                          "coll4": {insert: [7, 8, 9, 10, 11, 12]}
                      },
                      8 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(
+    resumeAfterToken,
+    {$match: {$expr: {$regexMatch: {input: "$ns.db", regex: "^change_stream_match_pushdown.*$"}}}},
+    {
+        coll1: {insert: [1, 2]},
+        coll2: {insert: [3, 4], rename: ["newColl2", "newColl2"]},
+        "coll.coll3": {insert: [5, 6], drop: ["coll.coll3", "coll.coll3"]},
+        "coll4": {insert: [7, 8, 9, 10, 11, 12]}
+    },
+    8 /* expectedOplogRetDocsForEachShard */);
 verifyOnWholeCluster(resumeAfterToken,
                      {$match: {"ns.db": /^(change_stream_match_pushdown.*$)/}},
                      {
@@ -208,6 +283,19 @@ verifyOnWholeCluster(resumeAfterToken,
                          "coll4": {insert: [7, 8, 9, 10, 11, 12]}
                      },
                      8 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(
+    resumeAfterToken,
+    {
+        $match:
+            {$expr: {$regexMatch: {input: "$ns.db", regex: "(^change_stream_match_pushdown.*$)"}}}
+    },
+    {
+        coll1: {insert: [1, 2]},
+        coll2: {insert: [3, 4], rename: ["newColl2", "newColl2"]},
+        "coll.coll3": {insert: [5, 6], drop: ["coll.coll3", "coll.coll3"]},
+        "coll4": {insert: [7, 8, 9, 10, 11, 12]}
+    },
+    8 /* expectedOplogRetDocsForEachShard */);
 verifyOnWholeCluster(resumeAfterToken,
                      {$match: {"ns.db": /^(Change_Stream_MATCH_PUSHDOWN.*$)/i}},
                      {
@@ -217,6 +305,23 @@ verifyOnWholeCluster(resumeAfterToken,
                          "coll4": {insert: [7, 8, 9, 10, 11, 12]}
                      },
                      8 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(
+    resumeAfterToken,
+    {
+        $match: {
+            $expr: {
+                $regexMatch:
+                    {input: "$ns.db", regex: "^(Change_Stream_MATCH_PUSHDOWN.*$)", options: "i"}
+            }
+        }
+    },
+    {
+        coll1: {insert: [1, 2]},
+        coll2: {insert: [3, 4], rename: ["newColl2", "newColl2"]},
+        "coll.coll3": {insert: [5, 6], drop: ["coll.coll3", "coll.coll3"]},
+        "coll4": {insert: [7, 8, 9, 10, 11, 12]}
+    },
+    8 /* expectedOplogRetDocsForEachShard */);
 verifyOnWholeCluster(resumeAfterToken,
                      {$match: {"ns.db": /(^unknown$|^change_stream_match_pushdown.*$)/}},
                      {
@@ -226,6 +331,23 @@ verifyOnWholeCluster(resumeAfterToken,
                          "coll4": {insert: [7, 8, 9, 10, 11, 12]}
                      },
                      8 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(
+    resumeAfterToken,
+    {
+        $match: {
+            $expr: {
+                $regexMatch:
+                    {input: "$ns.db", regex: "(^unknown$|^change_stream_match_pushdown.*$)"}
+            }
+        }
+    },
+    {
+        coll1: {insert: [1, 2]},
+        coll2: {insert: [3, 4], rename: ["newColl2", "newColl2"]},
+        "coll.coll3": {insert: [5, 6], drop: ["coll.coll3", "coll.coll3"]},
+        "coll4": {insert: [7, 8, 9, 10, 11, 12]}
+    },
+    8 /* expectedOplogRetDocsForEachShard */);
 verifyOnWholeCluster(resumeAfterToken,
                      {$match: {"ns.db": /^unknown$|^change_stream_match_pushdown.*$/}},
                      {
@@ -235,21 +357,49 @@ verifyOnWholeCluster(resumeAfterToken,
                          "coll4": {insert: [7, 8, 9, 10, 11, 12]}
                      },
                      8 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(
+    resumeAfterToken,
+    {
+        $match: {
+            $expr: {
+                $regexMatch: {input: "$ns.db", regex: "^unknown$|^change_stream_match_pushdown.*$"}
+            }
+        }
+    },
+    {
+        coll1: {insert: [1, 2]},
+        coll2: {insert: [3, 4], rename: ["newColl2", "newColl2"]},
+        "coll.coll3": {insert: [5, 6], drop: ["coll.coll3", "coll.coll3"]},
+        "coll4": {insert: [7, 8, 9, 10, 11, 12]}
+    },
+    8 /* expectedOplogRetDocsForEachShard */);
 
 // Ensure that the '$match' on non-existing db should not return any document and oplog should not
 // return any document for each shard.
 verifyOnWholeCluster(
     resumeAfterToken, {$match: {"ns.db": "unknown"}}, {}, 0 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(resumeAfterToken,
+                     {$match: {$expr: {$eq: ["$ns.db", "unknown"]}}},
+                     {},
+                     0 /* expectedOplogRetDocsForEachShard */);
 
 // Ensure that the '$match' on empty db should not return any document and oplog should not return
 // any document for each shard.
 verifyOnWholeCluster(
     resumeAfterToken, {$match: {"ns.db": ""}}, {}, 0 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(resumeAfterToken,
+                     {$match: {$expr: {$eq: ["$ns.db", ""]}}},
+                     {},
+                     0 /* expectedOplogRetDocsForEachShard */);
 
 // Ensure that the '$match' on sub field of db should not return any document and oplog should not
 // return any document for each shard.
 verifyOnWholeCluster(resumeAfterToken,
                      {$match: {"ns.db.extra": dbName}},
+                     {},
+                     0 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(resumeAfterToken,
+                     {$match: {$expr: {$eq: ["$ns.db.extra", "unknown"]}}},
                      {},
                      0 /* expectedOplogRetDocsForEachShard */);
 
@@ -260,11 +410,23 @@ verifyOnWholeCluster(resumeAfterToken,
                      {coll1: {insert: [1, 2]}},
                      1 /* expectedOplogRetDocsForEachShard */);
 verifyOnWholeCluster(resumeAfterToken,
+                     {$match: {$expr: {$eq: ["$ns.coll", "coll1"]}}},
+                     {coll1: {insert: [1, 2]}},
+                     1 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(resumeAfterToken,
                      {$match: {"ns.coll": "coll2"}},
                      {coll2: {insert: [3, 4], rename: ["newColl2", "newColl2"]}},
                      2 /* expectedOplogRetDocsForEachShard */);
 verifyOnWholeCluster(resumeAfterToken,
+                     {$match: {$expr: {$eq: ["$ns.coll", "coll2"]}}},
+                     {coll2: {insert: [3, 4], rename: ["newColl2", "newColl2"]}},
+                     2 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(resumeAfterToken,
                      {$match: {"ns.coll": "coll.coll3"}},
+                     {"coll.coll3": {insert: [5, 6], drop: ["coll.coll3", "coll.coll3"]}},
+                     2 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(resumeAfterToken,
+                     {$match: {$expr: {$eq: ["$ns.coll", "coll.coll3"]}}},
                      {"coll.coll3": {insert: [5, 6], drop: ["coll.coll3", "coll.coll3"]}},
                      2 /* expectedOplogRetDocsForEachShard */);
 
@@ -276,11 +438,23 @@ verifyOnWholeCluster(resumeAfterToken,
                      {coll1: {insert: [1, 2]}},
                      1 /* expectedOplogRetDocsForEachShard */);
 verifyOnWholeCluster(resumeAfterToken,
+                     {$match: {$expr: {$regexMatch: {input: "$ns.coll", regex: "^col.*1"}}}},
+                     {coll1: {insert: [1, 2]}},
+                     1 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(resumeAfterToken,
                      {$match: {"ns.coll": /^col.*2/}},
                      {coll2: {insert: [3, 4], rename: ["newColl2", "newColl2"]}},
                      2 /* expectedOplogRetDocsForEachShard */);
 verifyOnWholeCluster(resumeAfterToken,
+                     {$match: {$expr: {$regexMatch: {input: "$ns.coll", regex: "^col.*2"}}}},
+                     {coll2: {insert: [3, 4], rename: ["newColl2", "newColl2"]}},
+                     2 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(resumeAfterToken,
                      {$match: {"ns.coll": /^col.*3/}},
+                     {"coll.coll3": {insert: [5, 6], drop: ["coll.coll3", "coll.coll3"]}},
+                     2 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(resumeAfterToken,
+                     {$match: {$expr: {$regexMatch: {input: "$ns.coll", regex: "^col.*3"}}}},
                      {"coll.coll3": {insert: [5, 6], drop: ["coll.coll3", "coll.coll3"]}},
                      2 /* expectedOplogRetDocsForEachShard */);
 
@@ -288,6 +462,15 @@ verifyOnWholeCluster(resumeAfterToken,
 // documents from all collection and oplog should return all document for each shard.
 verifyOnWholeCluster(resumeAfterToken,
                      {$match: {"ns.coll": /^col.*/}},
+                     {
+                         coll1: {insert: [1, 2]},
+                         coll2: {insert: [3, 4], rename: ["newColl2", "newColl2"]},
+                         "coll.coll3": {insert: [5, 6], drop: ["coll.coll3", "coll.coll3"]},
+                         "coll4": {insert: [7, 8, 9, 10, 11, 12]}
+                     },
+                     8 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(resumeAfterToken,
+                     {$match: {$expr: {$regexMatch: {input: "$ns.coll", regex: "^col.*"}}}},
                      {
                          coll1: {insert: [1, 2]},
                          coll2: {insert: [3, 4], rename: ["newColl2", "newColl2"]},
@@ -304,6 +487,16 @@ verifyOnWholeCluster(resumeAfterToken,
                          "coll4": {insert: [7, 8, 9, 10, 11, 12]}
                      },
                      8 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(
+    resumeAfterToken,
+    {$match: {$expr: {$regexMatch: {input: "$ns.coll", regex: "^CoLL.*", options: "i"}}}},
+    {
+        coll1: {insert: [1, 2]},
+        coll2: {insert: [3, 4], rename: ["newColl2", "newColl2"]},
+        "coll.coll3": {insert: [5, 6], drop: ["coll.coll3", "coll.coll3"]},
+        "coll4": {insert: [7, 8, 9, 10, 11, 12]}
+    },
+    8 /* expectedOplogRetDocsForEachShard */);
 
 // Ensure that the '$match' on the regex matching 3 collection should return documents from these
 // collections and oplog should return required documents for each shard.
@@ -315,11 +508,24 @@ verifyOnWholeCluster(resumeAfterToken,
                          "coll.coll3": {insert: [5, 6], drop: ["coll.coll3", "coll.coll3"]}
                      },
                      5 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(
+    resumeAfterToken,
+    {$match: {$expr: {$regexMatch: {input: "$ns.coll", regex: "^col.*1$|^col.*2$|^col.*3$"}}}},
+    {
+        coll1: {insert: [1, 2]},
+        coll2: {insert: [3, 4], rename: ["newColl2", "newColl2"]},
+        "coll.coll3": {insert: [5, 6], drop: ["coll.coll3", "coll.coll3"]}
+    },
+    5 /* expectedOplogRetDocsForEachShard */);
 
 // Ensure that the '$match' on the regex to exclude 'coll1', 'coll2' and 'coll4' should return only
 // documents from 'coll.coll3' and oplog should return required documents for each shard.
 verifyOnWholeCluster(resumeAfterToken,
                      {$match: {"ns.coll": /^coll[^124]/}},
+                     {"coll.coll3": {insert: [5, 6], drop: ["coll.coll3", "coll.coll3"]}},
+                     2 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(resumeAfterToken,
+                     {$match: {$expr: {$regexMatch: {input: "$ns.coll", regex: "^coll[^124]"}}}},
                      {"coll.coll3": {insert: [5, 6], drop: ["coll.coll3", "coll.coll3"]}},
                      2 /* expectedOplogRetDocsForEachShard */);
 
@@ -329,16 +535,28 @@ verifyOnWholeCluster(resumeAfterToken,
                      {$match: {"ns.coll": "unknown"}},
                      {},
                      0 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(resumeAfterToken,
+                     {$match: {$expr: {$eq: ["$ns.coll", "unknown"]}}},
+                     {},
+                     0 /* expectedOplogRetDocsForEachShard */);
 
 // Ensure that the '$match' on empty collection should not return any document and oplog should not
 // return any document for each shard.
 verifyOnWholeCluster(
     resumeAfterToken, {$match: {"ns.coll": ""}}, {}, 0 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(resumeAfterToken,
+                     {$match: {$expr: {$eq: ["$ns.coll", ""]}}},
+                     {},
+                     0 /* expectedOplogRetDocsForEachShard */);
 
 // Ensure that the '$match' on sub field of collection should not return any document and oplog
 // should not return any document for each shard.
 verifyOnWholeCluster(resumeAfterToken,
                      {$match: {"ns.coll.extra": "coll1"}},
+                     {},
+                     0 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(resumeAfterToken,
+                     {$match: {$expr: {$eq: ["$ns.coll.extra", "coll1"]}}},
                      {},
                      0 /* expectedOplogRetDocsForEachShard */);
 
@@ -353,9 +571,18 @@ verifyOnWholeCluster(resumeAfterToken,
                          "coll4": {insert: [7, 8, 9, 10, 11, 12]}
                      },
                      8 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(resumeAfterToken,
+                     {$match: {$expr: {$in: ["$ns.db", [dbName]]}}},
+                     {
+                         coll1: {insert: [1, 2]},
+                         coll2: {insert: [3, 4], rename: ["newColl2", "newColl2"]},
+                         "coll.coll3": {insert: [5, 6], drop: ["coll.coll3", "coll.coll3"]},
+                         "coll4": {insert: [7, 8, 9, 10, 11, 12]}
+                     },
+                     8 /* expectedOplogRetDocsForEachShard */);
 
-// This group of tests ensures that '$in' on regex matching the db name should return all documents
-// and oplog should return all documents for each shard.
+// This group of tests ensures that '$in' and equivalent '$expr' expression on regex matching the db
+// name should return all documents and oplog should return all documents for each shard.
 verifyOnWholeCluster(resumeAfterToken,
                      {$match: {"ns.db": {$in: [/^change_stream_match.*$/]}}},
                      {
@@ -365,6 +592,16 @@ verifyOnWholeCluster(resumeAfterToken,
                          "coll4": {insert: [7, 8, 9, 10, 11, 12]}
                      },
                      8 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(
+    resumeAfterToken,
+    {$match: {$expr: {$or: [{$regexMatch: {input: "$ns.db", regex: "^change_stream_match.*$"}}]}}},
+    {
+        coll1: {insert: [1, 2]},
+        coll2: {insert: [3, 4], rename: ["newColl2", "newColl2"]},
+        "coll.coll3": {insert: [5, 6], drop: ["coll.coll3", "coll.coll3"]},
+        "coll4": {insert: [7, 8, 9, 10, 11, 12]}
+    },
+    8 /* expectedOplogRetDocsForEachShard */);
 verifyOnWholeCluster(resumeAfterToken,
                      {$match: {"ns.db": {$in: [/^change_stream_MATCH.*$/i]}}},
                      {
@@ -374,16 +611,50 @@ verifyOnWholeCluster(resumeAfterToken,
                          "coll4": {insert: [7, 8, 9, 10, 11, 12]}
                      },
                      8 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(
+    resumeAfterToken,
+    {
+        $match: {
+            $expr: {
+                $or: [
+                    {$regexMatch: {input: "$ns.db", regex: "^change_stream_MATCH.*$", options: "i"}}
+                ]
+            }
+        }
+    },
+    {
+        coll1: {insert: [1, 2]},
+        coll2: {insert: [3, 4], rename: ["newColl2", "newColl2"]},
+        "coll.coll3": {insert: [5, 6], drop: ["coll.coll3", "coll.coll3"]},
+        "coll4": {insert: [7, 8, 9, 10, 11, 12]}
+    },
+    8 /* expectedOplogRetDocsForEachShard */);
 
 // Ensure that an empty '$in' on db path should not match any collection and oplog should not return
 // any document for each shard.
 verifyOnWholeCluster(
     resumeAfterToken, {$match: {"ns.db": {$in: []}}}, {}, 0 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(resumeAfterToken,
+                     {$match: {$expr: {$in: ["$ns.db", []]}}},
+                     {},
+                     0 /* expectedOplogRetDocsForEachShard */);
 
 // Ensure that '$in' with invalid db cannot be rewritten and oplog should return all documents for
 // each shard.
 verifyOnWholeCluster(resumeAfterToken,
                      {$match: {"ns.db": {$in: [dbName, 1]}}},
+                     {
+                         coll1: {insert: [1, 2]},
+                         coll2: {insert: [3, 4], rename: ["newColl2", "newColl2"]},
+                         "coll.coll3": {insert: [5, 6], drop: ["coll.coll3", "coll.coll3"]},
+                         "coll4": {insert: [7, 8, 9, 10, 11, 12]}
+                     },
+                     9 /* expectedOplogRetDocsForEachShard */);
+
+// Ensure tht '$expr' with mix of valid and invalid db names should return required documents at the
+// oplog for each shard.
+verifyOnWholeCluster(resumeAfterToken,
+                     {$match: {$expr: {$in: ["$ns.db", [dbName, 1]]}}},
                      {
                          coll1: {insert: [1, 2]},
                          coll2: {insert: [3, 4], rename: ["newColl2", "newColl2"]},
@@ -398,6 +669,19 @@ verifyOnWholeCluster(resumeAfterToken,
                      {$match: {"ns.db": {$in: ["unknown1", /^unknown2$/]}}},
                      {},
                      0 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(resumeAfterToken,
+                     {
+                         $match: {
+                             $expr: {
+                                 $or: [
+                                     {$eq: ["$ns.db", "unknown1"]},
+                                     {$regexMatch: {input: "$ns.db", regex: "^unknown2$"}}
+                                 ]
+                             }
+                         }
+                     },
+                     {},
+                     0 /* expectedOplogRetDocsForEachShard */);
 
 // Ensure that '$in' on multiple collections should return the required documents and oplog should
 // return required documents for each shard.
@@ -408,7 +692,17 @@ verifyOnWholeCluster(
     3 /* expectedOplogRetDocsForEachShard */);
 verifyOnWholeCluster(
     resumeAfterToken,
+    {$match: {$expr: {$in: ["$ns", [{db: dbName, coll: "coll1"}, {db: dbName, coll: "coll2"}]]}}},
+    {coll1: {insert: [1, 2]}, coll2: {insert: [3, 4], rename: ["newColl2", "newColl2"]}},
+    3 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(
+    resumeAfterToken,
     {$match: {"ns.coll": {$in: ["coll1", "coll2"]}}},
+    {coll1: {insert: [1, 2]}, coll2: {insert: [3, 4], rename: ["newColl2", "newColl2"]}},
+    3 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(
+    resumeAfterToken,
+    {$match: {$expr: {$in: ["$ns.coll", ["coll1", "coll2"]]}}},
     {coll1: {insert: [1, 2]}, coll2: {insert: [3, 4], rename: ["newColl2", "newColl2"]}},
     3 /* expectedOplogRetDocsForEachShard */);
 
@@ -419,11 +713,42 @@ verifyOnWholeCluster(
     {$match: {"ns.coll": {$in: [/^coll1$/, /^coll2$/]}}},
     {coll1: {insert: [1, 2]}, coll2: {insert: [3, 4], rename: ["newColl2", "newColl2"]}},
     3 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(
+    resumeAfterToken,
+    {
+        $match: {
+            $expr: {
+                $or: [
+                    {$regexMatch: {input: "$ns.coll", regex: "^coll1$"}},
+                    {$regexMatch: {input: "$ns.coll", regex: "^coll2$"}}
+                ]
+            }
+        }
+    },
+    {coll1: {insert: [1, 2]}, coll2: {insert: [3, 4], rename: ["newColl2", "newColl2"]}},
+    3 /* expectedOplogRetDocsForEachShard */);
 
-// This group of tests ensures that '$in' on regex of matching all collections should return all
-// documents and oplog should return all documents for each shard.
+// This group of tests ensures that '$in' and equivalent '$expr' expression on regex of matching all
+// collections should return all documents and oplog should return all documents for each shard.
 verifyOnWholeCluster(resumeAfterToken,
                      {$match: {"ns.coll": {$in: [/^coll.*$/]}}},
+                     {
+                         coll1: {insert: [1, 2]},
+                         coll2: {insert: [3, 4], rename: ["newColl2", "newColl2"]},
+                         "coll.coll3": {insert: [5, 6], drop: ["coll.coll3", "coll.coll3"]},
+                         "coll4": {insert: [7, 8, 9, 10, 11, 12]}
+                     },
+                     8 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(resumeAfterToken,
+                     {
+                         $match: {
+                             $expr: {
+                                 $or: [
+                                     {$regexMatch: {input: "$ns.coll", regex: "^coll.*$"}},
+                                 ]
+                             }
+                         }
+                     },
                      {
                          coll1: {insert: [1, 2]},
                          coll2: {insert: [3, 4], rename: ["newColl2", "newColl2"]},
@@ -440,6 +765,24 @@ verifyOnWholeCluster(resumeAfterToken,
                          "coll4": {insert: [7, 8, 9, 10, 11, 12]}
                      },
                      8 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(
+    resumeAfterToken,
+    {
+        $match: {
+            $expr: {
+                $or: [
+                    {$regexMatch: {input: "$ns.coll", regex: "^COLL.*$", options: "i"}},
+                ]
+            }
+        }
+    },
+    {
+        coll1: {insert: [1, 2]},
+        coll2: {insert: [3, 4], rename: ["newColl2", "newColl2"]},
+        "coll.coll3": {insert: [5, 6], drop: ["coll.coll3", "coll.coll3"]},
+        "coll4": {insert: [7, 8, 9, 10, 11, 12]}
+    },
+    8 /* expectedOplogRetDocsForEachShard */);
 
 // Ensure that an empty '$in' should not match any collection and oplog should not return any
 // document for each shard.
@@ -453,7 +796,14 @@ verifyOnWholeCluster(resumeAfterToken,
 verifyOnWholeCluster(resumeAfterToken,
                      {$match: {"ns.coll": {$in: ["coll1", 1]}}},
                      {coll1: {insert: [1, 2]}},
-                     8 /* expectedOplogRetDocsForEachShard */);
+                     9 /* expectedOplogRetDocsForEachShard */);
+
+// Ensure that '$expr' on '$in' with mix of valid and invalid collections should return only
+// required documents at oplog for each shard.
+verifyOnWholeCluster(resumeAfterToken,
+                     {$match: {$expr: {$in: ["$ns.coll", ["coll1", 1]]}}},
+                     {coll1: {insert: [1, 2]}},
+                     1 /* expectedOplogRetDocsForEachShard */);
 
 // Ensure that '$in' with mix of string and regex matching collections can be rewritten and oplog
 // should return required documents for each shard.
@@ -464,87 +814,210 @@ verifyOnWholeCluster(resumeAfterToken,
                          "coll.coll3": {insert: [5, 6], drop: ["coll.coll3", "coll.coll3"]},
                      },
                      3 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(resumeAfterToken,
+                     {
+                         $match: {
+                             $expr: {
+                                 $or: [
+                                     {$eq: ["$ns.coll", "coll1"]},
+                                     {$regexMatch: {input: "$ns.coll", regex: "^coll.*3$"}},
+                                 ]
+                             }
+                         }
+                     },
+                     {
+                         coll1: {insert: [1, 2]},
+                         "coll.coll3": {insert: [5, 6], drop: ["coll.coll3", "coll.coll3"]},
+                     },
+                     3 /* expectedOplogRetDocsForEachShard */);
 
-// Ensure that '$in' with mix of string and regex can be rewritten and oplog should return '0'
-// document for each shard.
+// Ensure that '$in' and equivalent '$expr' expression with mix of string and regex can be rewritten
+// and oplog should return '0' document for each shard.
 verifyOnWholeCluster(resumeAfterToken,
                      {$match: {"ns.coll": {$in: ["unknown1", /^unknown2$/]}}},
                      {},
                      0 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(resumeAfterToken,
+                     {
+                         $match: {
+                             $expr: {
+                                 $or: [
+                                     {$eq: ["$ns.coll", "unknown1"]},
+                                     {$regexMatch: {input: "$ns.coll", regex: "^unknown2$"}},
+                                 ]
+                             }
+                         }
+                     },
+                     {},
+                     0 /* expectedOplogRetDocsForEachShard */);
 
-// This group of tests ensure that '$nin' on db path should return all documents and oplog should
-// return all documents for each shard.
+// This group of tests ensure that '$nin' and equivalent '$expr' expression on db path should return
+// all documents and oplog should return all documents for each shard.
 verifyOnWholeCluster(resumeAfterToken,
                      {$match: {"ns.db": {$nin: []}}},
                      {
                          coll1: {insert: [1, 2]},
                          coll2: {insert: [3, 4], rename: ["newColl2", "newColl2"]},
                          "coll.coll3": {insert: [5, 6], drop: ["coll.coll3", "coll.coll3"]},
-                         "coll4": {insert: [7, 8, 9, 10, 11, 12]}
+                         "coll4": {insert: [7, 8, 9, 10, 11, 12]},
+                         "other_coll": {insert: [1, 2]}
                      },
-                     8 /* expectedOplogRetDocsForEachShard */);
+                     9 /* expectedOplogRetDocsForEachShard */);
 verifyOnWholeCluster(resumeAfterToken,
                      {$match: {"ns.db": {$nin: ["unknown"]}}},
                      {
                          coll1: {insert: [1, 2]},
                          coll2: {insert: [3, 4], rename: ["newColl2", "newColl2"]},
                          "coll.coll3": {insert: [5, 6], drop: ["coll.coll3", "coll.coll3"]},
-                         "coll4": {insert: [7, 8, 9, 10, 11, 12]}
+                         "coll4": {insert: [7, 8, 9, 10, 11, 12]},
+                         "other_coll": {insert: [1, 2]}
                      },
-                     8 /* expectedOplogRetDocsForEachShard */);
+                     9 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(resumeAfterToken,
+                     {$match: {$expr: {$not: {$or: [{$eq: ["$ns.db", "unknown"]}]}}}},
+                     {
+                         coll1: {insert: [1, 2]},
+                         coll2: {insert: [3, 4], rename: ["newColl2", "newColl2"]},
+                         "coll.coll3": {insert: [5, 6], drop: ["coll.coll3", "coll.coll3"]},
+                         "coll4": {insert: [7, 8, 9, 10, 11, 12]},
+                         "other_coll": {insert: [1, 2]}
+                     },
+                     9 /* expectedOplogRetDocsForEachShard */);
 verifyOnWholeCluster(resumeAfterToken,
                      {$match: {"ns.db": {$nin: [/^unknown$/]}}},
                      {
                          coll1: {insert: [1, 2]},
                          coll2: {insert: [3, 4], rename: ["newColl2", "newColl2"]},
                          "coll.coll3": {insert: [5, 6], drop: ["coll.coll3", "coll.coll3"]},
-                         "coll4": {insert: [7, 8, 9, 10, 11, 12]}
+                         "coll4": {insert: [7, 8, 9, 10, 11, 12]},
+                         "other_coll": {insert: [1, 2]}
                      },
-                     8 /* expectedOplogRetDocsForEachShard */);
+                     9 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(
+    resumeAfterToken,
+    {$match: {$expr: {$not: {$or: [{$regexMatch: {input: "$ns.db", regex: "^unknown$"}}]}}}},
+    {
+        coll1: {insert: [1, 2]},
+        coll2: {insert: [3, 4], rename: ["newColl2", "newColl2"]},
+        "coll.coll3": {insert: [5, 6], drop: ["coll.coll3", "coll.coll3"]},
+        "coll4": {insert: [7, 8, 9, 10, 11, 12]},
+        "other_coll": {insert: [1, 2]}
+    },
+    9 /* expectedOplogRetDocsForEachShard */);
 
-// These group of tests ensure that '$nin' on matching db name should not return any documents and
-// oplog should return '0' documents for each shard.
+// These group of tests ensure that '$nin' and equivalent '$expr' expression on matching db name
+// should only return documents from unmonitored db and oplog should return only required documents
+// from unmonitored db.
 verifyOnWholeCluster(resumeAfterToken,
                      {$match: {"ns.db": {$nin: [dbName]}}},
-                     {},
-                     0 /* expectedOplogRetDocsForEachShard */);
+                     {"other_coll": {insert: [1, 2]}},
+                     1 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(resumeAfterToken,
+                     {$match: {$expr: {$not: {$or: [{$eq: ["$ns.db", dbName]}]}}}},
+                     {"other_coll": {insert: [1, 2]}},
+                     1 /* expectedOplogRetDocsForEachShard */);
 verifyOnWholeCluster(resumeAfterToken,
                      {$match: {"ns.db": {$nin: [/change_stream_match_pushdown_and_rewr.*/]}}},
-                     {},
-                     0 /* expectedOplogRetDocsForEachShard */);
+                     {"other_coll": {insert: [1, 2]}},
+                     1 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(
+    resumeAfterToken,
+    {
+        $match: {
+            $expr: {
+                $not: {
+                    $or: [{
+                        $regexMatch:
+                            {input: "$ns.db", regex: "change_stream_match_pushdown_and_rewr.*"}
+                    }]
+                }
+            }
+        }
+    },
+    {"other_coll": {insert: [1, 2]}},
+    1 /* expectedOplogRetDocsForEachShard */);
 
-// Ensure that '$nin' on multiple collections should return the required documents and oplog should
-// return required documents for each shard.
+// Ensure that '$nin' and equivalent '$expr' expression on multiple collections should return the
+// required documents and oplog should return required documents for each shard.
 verifyOnWholeCluster(resumeAfterToken,
                      {$match: {"ns.coll": {$nin: ["coll1", "coll2", "coll4"]}}},
-                     {"coll.coll3": {insert: [5, 6], drop: ["coll.coll3", "coll.coll3"]}},
-                     2 /* expectedOplogRetDocsForEachShard */);
+                     {
+                         "coll.coll3": {insert: [5, 6], drop: ["coll.coll3", "coll.coll3"]},
+                         "other_coll": {insert: [1, 2]}
+                     },
+                     3 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(resumeAfterToken,
+                     {$match: {$expr: {$not: {$in: ["$ns.coll", ["coll1", "coll2", "coll4"]]}}}},
+                     {
+                         "coll.coll3": {insert: [5, 6], drop: ["coll.coll3", "coll.coll3"]},
+                         "other_coll": {insert: [1, 2]}
+                     },
+                     3 /* expectedOplogRetDocsForEachShard */);
 
-// Ensure that '$nin' on regex of multiple collections should return the required documents and
-// oplog should return required documents for each shard.
+// Ensure that '$nin' and equivalent '$expr' expression on regex of multiple collections should
+// return the required documents and oplog should return required documents for each shard.
 verifyOnWholeCluster(resumeAfterToken,
                      {$match: {"ns.coll": {$nin: [/^coll1$/, /^coll2$/, /^coll4$/]}}},
-                     {"coll.coll3": {insert: [5, 6], drop: ["coll.coll3", "coll.coll3"]}},
-                     2 /* expectedOplogRetDocsForEachShard */);
+                     {
+                         "coll.coll3": {insert: [5, 6], drop: ["coll.coll3", "coll.coll3"]},
+                         "other_coll": {insert: [1, 2]}
+                     },
+                     3 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(resumeAfterToken,
+                     {
+                         $match: {
+                             $expr: {
+                                 $not: {
+                                     $or: [
+                                         {$regexMatch: {input: "$ns.coll", regex: "^coll1$"}},
+                                         {$regexMatch: {input: "$ns.coll", regex: "^coll2$"}},
+                                         {$regexMatch: {input: "$ns.coll", regex: "^coll4$"}}
+                                     ]
+                                 }
+                             }
+                         }
+                     },
+                     {
+                         "coll.coll3": {insert: [5, 6], drop: ["coll.coll3", "coll.coll3"]},
+                         "other_coll": {insert: [1, 2]}
+                     },
+                     3 /* expectedOplogRetDocsForEachShard */);
 
-// Ensure that '$nin' on regex of matching all collections should not return any document and oplog
-// should return '0' documents for each shard.
+// Ensure that '$nin' and equivalent '$expr' expression on regex of matching all collections should
+// return documents from unmonitored db and oplog should also return documentss for unmonitored db
+// each shard.
 verifyOnWholeCluster(resumeAfterToken,
                      {$match: {"ns.coll": {$nin: [/^coll.*$/, /^sys.*$/]}}},
-                     {},
-                     0 /* expectedOplogRetDocsForEachShard */);
+                     {"other_coll": {insert: [1, 2]}},
+                     1 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(resumeAfterToken,
+                     {
+                         $match: {
+                             $expr: {
+                                 $not: {
+                                     $or: [
+                                         {$regexMatch: {input: "$ns.coll", regex: "^coll.*$"}},
+                                         {$regexMatch: {input: "$ns.coll", regex: "^sys.*$"}}
+                                     ]
+                                 }
+                             }
+                         }
+                     },
+                     {"other_coll": {insert: [1, 2]}},
+                     1 /* expectedOplogRetDocsForEachShard */);
 
-// Ensure that an empty '$nin' should match all collections and oplog should return all documents
-// for each shard.
+// Ensure that an empty '$nin' and equivalent '$expr' expression should match all collections and
+// oplog should return all documents for each shard.
 verifyOnWholeCluster(resumeAfterToken,
                      {$match: {"ns.coll": {$nin: []}}},
                      {
                          coll1: {insert: [1, 2]},
                          coll2: {insert: [3, 4], rename: ["newColl2", "newColl2"]},
                          "coll.coll3": {insert: [5, 6], drop: ["coll.coll3", "coll.coll3"]},
-                         "coll4": {insert: [7, 8, 9, 10, 11, 12]}
+                         "coll4": {insert: [7, 8, 9, 10, 11, 12]},
+                         "other_coll": {insert: [1, 2]}
                      },
-                     8 /* expectedOplogRetDocsForEachShard */);
+                     9 /* expectedOplogRetDocsForEachShard */);
 
 // Ensure that '$nin' with invalid collection cannot be rewritten and oplog should return all
 // documents for each shard.
@@ -553,16 +1026,50 @@ verifyOnWholeCluster(resumeAfterToken,
                      {
                          coll2: {insert: [3, 4], rename: ["newColl2", "newColl2"]},
                          "coll.coll3": {insert: [5, 6], drop: ["coll.coll3", "coll.coll3"]},
-                         coll4: {insert: [7, 8, 9, 10, 11, 12]}
+                         coll4: {insert: [7, 8, 9, 10, 11, 12]},
+                         "other_coll": {insert: [1, 2]}
+                     },
+                     9 /* expectedOplogRetDocsForEachShard */);
+
+// Ensure that '$expr' with mix of valid and invalid collection should return required documents at
+// the oplog for each shard.
+verifyOnWholeCluster(resumeAfterToken,
+                     {$match: {$expr: {$not: {$in: ["$ns.coll", ["coll1", 1]]}}}},
+                     {
+                         coll2: {insert: [3, 4], rename: ["newColl2", "newColl2"]},
+                         "coll.coll3": {insert: [5, 6], drop: ["coll.coll3", "coll.coll3"]},
+                         coll4: {insert: [7, 8, 9, 10, 11, 12]},
+                         "other_coll": {insert: [1, 2]}
                      },
                      8 /* expectedOplogRetDocsForEachShard */);
 
-// Ensure that '$nin' with mix of string and regex can be rewritten and oplog should return required
-// documents for each shard.
+// Ensure that '$nin' and equivalent '$expr' expression with mix of string and regex can be
+// rewritten and oplog should return required documents for each shard.
 verifyOnWholeCluster(resumeAfterToken,
                      {$match: {"ns.coll": {$nin: ["coll1", /^coll2$/, "coll4"]}}},
-                     {"coll.coll3": {insert: [5, 6], drop: ["coll.coll3", "coll.coll3"]}},
-                     2 /* expectedOplogRetDocsForEachShard */);
+                     {
+                         "coll.coll3": {insert: [5, 6], drop: ["coll.coll3", "coll.coll3"]},
+                         "other_coll": {insert: [1, 2]}
+                     },
+                     3 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(resumeAfterToken,
+                     {
+                         $match: {
+                             $expr: {
+                                 $not: {
+                                     $or: [
+                                         {$in: ["$ns.coll", ["coll1", "coll4"]]},
+                                         {$regexMatch: {input: "$ns.coll", regex: "^coll2$"}},
+                                     ]
+                                 }
+                             }
+                         }
+                     },
+                     {
+                         "coll.coll3": {insert: [5, 6], drop: ["coll.coll3", "coll.coll3"]},
+                         "other_coll": {insert: [1, 2]}
+                     },
+                     3 /* expectedOplogRetDocsForEachShard */);
 
 // At this stage, the coll2 has been renamed to 'newColl2' and coll3 has been dropped. The test from
 // here will drop the database and ensure that the 'ns' filter when applied over the collection
@@ -583,17 +1090,36 @@ verifyOnWholeCluster(secondResumeAfterToken,
                      {coll1: {drop: ["coll1", "coll1"]}},
                      1 /* expectedOplogRetDocsForEachShard */);
 verifyOnWholeCluster(secondResumeAfterToken,
+                     {$match: {$expr: {$eq: ["$ns", {db: dbName, coll: "coll1"}]}}},
+                     {coll1: {drop: ["coll1", "coll1"]}},
+                     1 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(secondResumeAfterToken,
                      {$match: {"ns.coll": "coll1"}},
+                     {coll1: {drop: ["coll1", "coll1"]}},
+                     1 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(secondResumeAfterToken,
+                     {$match: {$expr: {$eq: ["$ns.coll", "coll1"]}}},
                      {coll1: {drop: ["coll1", "coll1"]}},
                      1 /* expectedOplogRetDocsForEachShard */);
 verifyOnWholeCluster(secondResumeAfterToken,
                      {$match: {"ns.coll": /^col.*1/}},
                      {coll1: {drop: ["coll1", "coll1"]}},
                      1 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(secondResumeAfterToken,
+                     {$match: {$expr: {$regexMatch: {input: "$ns.coll", regex: "^col.*1"}}}},
+                     {coll1: {drop: ["coll1", "coll1"]}},
+                     1 /* expectedOplogRetDocsForEachShard */);
 
+// Ensure that the '$ns' object containing only 'db' should see only the 'dropDatabase' event and
+// only the required documents gets returned at the oplog for each shard.
 verifyOnWholeCluster(
     secondResumeAfterToken,
     {$match: {ns: {db: dbName}}},
+    {change_stream_match_pushdown_and_rewrite_and_rewrite: {dropDatabase: [dbName, dbName]}},
+    1 /* expectedOplogRetDocsForEachShard */);
+verifyOnWholeCluster(
+    secondResumeAfterToken,
+    {$match: {$expr: {$eq: ["$ns", {db: dbName}]}}},
     {change_stream_match_pushdown_and_rewrite_and_rewrite: {dropDatabase: [dbName, dbName]}},
     1 /* expectedOplogRetDocsForEachShard */);
 

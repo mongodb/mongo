@@ -5628,6 +5628,186 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceWithEmptyNinExpression) {
                                               fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))))));
 }
 
+TEST_F(ChangeStreamRewriteTest, CanRewriteNsWithExprOnFullObject) {
+    auto expCtx = getExpCtx();
+    auto expr = fromjson("{$expr: {$eq: ['$ns', {db: '" + expCtx->ns.db() + "', coll: '" +
+                         expCtx->ns.coll() + "'}]}}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        expCtx, statusWithMatchExpression.getValue().get(), {"ns"});
+    ASSERT(rewrittenMatchExpression);
+
+    auto case1 =
+        "{case: {$in: ['$op', [{$const: 'i' }, {$const: 'u' }, {$const: 'd'}]]}, then: "
+        "{$substrBytes: ['$ns', {$add: [{$strLenBytes: ['$$dbName']}, {$const: 1}]}, {$const: "
+        "-1}]}}";
+    auto case2 = "{case: { $ne: ['$op', {$const: 'c'}]}, then: '$$REMOVE'}";
+    auto case3 = "{case: {$ne: ['$o.drop', '$$REMOVE']}, then: '$o.drop'}";
+    auto case4 = "{case: {$ne: ['$o.dropDatabase', '$$REMOVE']}, then: '$$REMOVE'}";
+    auto case5 =
+        "{case: {$ne: ['$o.renameCollection', '$$REMOVE']}, then: {$substrBytes: "
+        "['$o.renameCollection', {$add: [{$strLenBytes: ['$$dbName']}, {$const: 1}]}, {$const: "
+        "-1}]}}";
+
+    auto expectedExpr = fromjson(
+        "{"
+        "  $expr: {"
+        "    $eq: [{"
+        "      $let: {"
+        "        vars: {"
+        "          dbName: {$substrBytes: ["
+        "            '$ns', "
+        "            {$const: 0}, "
+        "            {$indexOfBytes: ['$ns', {$const: '.'}]}]}}, "
+        "        in: {"
+        "          db: '$$dbName',"
+        "          coll: {"
+        "            $switch: {"
+        "              branches: ["s +
+        "                " + case1 + ", " + case2 + ", " + case3 + ", " + case4 + ", " + case5 +
+        "              ], default: '$$REMOVE'}}}}}, "
+        "      {db: {$const: 'unittests' }, coll: {$const: 'pipeline_test'}}]}"
+        "}");
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(rewrittenPredicate, expectedExpr);
+}
+
+TEST_F(ChangeStreamRewriteTest, CanRewriteNsWithExprOnFullObjectWithOnlyDb) {
+    auto expCtx = getExpCtx();
+    auto expr = fromjson("{$expr: {$eq: ['$ns', {db: '" + expCtx->ns.db() + "'}]}}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        expCtx, statusWithMatchExpression.getValue().get(), {"ns"});
+    ASSERT(rewrittenMatchExpression);
+
+    auto case1 =
+        "{case: {$in: ['$op', [{$const: 'i' }, {$const: 'u' }, {$const: 'd'}]]}, then: "
+        "{$substrBytes: ['$ns', {$add: [{$strLenBytes: ['$$dbName']}, {$const: 1}]}, {$const: "
+        "-1}]}}";
+    auto case2 = "{case: { $ne: ['$op', {$const: 'c'}]}, then: '$$REMOVE'}";
+    auto case3 = "{case: {$ne: ['$o.drop', '$$REMOVE']}, then: '$o.drop'}";
+    auto case4 = "{case: {$ne: ['$o.dropDatabase', '$$REMOVE']}, then: '$$REMOVE'}";
+    auto case5 =
+        "{case: {$ne: ['$o.renameCollection', '$$REMOVE']}, then: {$substrBytes: "
+        "['$o.renameCollection', {$add: [{$strLenBytes: ['$$dbName']}, {$const: 1}]}, {$const: "
+        "-1}]}}";
+
+    auto expectedExpr = fromjson(
+        "{"
+        "  $expr: {"
+        "    $eq: [{"
+        "      $let: {"
+        "        vars: {"
+        "          dbName: {$substrBytes: ["
+        "            '$ns', "
+        "            {$const: 0}, "
+        "            {$indexOfBytes: ['$ns', {$const: '.'}]}]}}, "
+        "        in: {"
+        "          db: '$$dbName',"
+        "          coll: {"
+        "            $switch: {"
+        "              branches: ["s +
+        "                " + case1 + ", " + case2 + ", " + case3 + ", " + case4 + ", " + case5 +
+        "              ], default: '$$REMOVE'}}}}}, "
+        "      {db: {$const: 'unittests' }}]}"
+        "}");
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(rewrittenPredicate, expectedExpr);
+}
+
+TEST_F(ChangeStreamRewriteTest, CanRewriteNsWithExprOnDbFieldPath) {
+    auto expCtx = getExpCtx();
+    auto expr = fromjson("{$expr: {$eq: ['$ns.db', '" + expCtx->ns.coll() + "']}}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        expCtx, statusWithMatchExpression.getValue().get(), {"ns"});
+    ASSERT(rewrittenMatchExpression);
+
+    auto expectedExpr = fromjson(
+        "{"
+        "  $expr: {"
+        "    $eq: [{"
+        "      $let: {"
+        "        vars: {"
+        "          dbName: {$substrBytes: ["
+        "            '$ns', "
+        "            {$const: 0}, "
+        "            {$indexOfBytes: ['$ns', {$const: '.'}]}]}}, "
+        "        in: '$$dbName' }},"
+        "      {$const: 'pipeline_test'}]}"
+        "}");
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(rewrittenPredicate, expectedExpr);
+}
+
+TEST_F(ChangeStreamRewriteTest, CanRewriteNsWithExprOnCollFieldPath) {
+    auto expCtx = getExpCtx();
+    auto expr = fromjson("{$expr: {$eq: ['$ns.coll', '" + expCtx->ns.coll() + "']}}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        expCtx, statusWithMatchExpression.getValue().get(), {"ns"});
+    ASSERT(rewrittenMatchExpression);
+
+    auto case1 =
+        "{case: {$in: ['$op', [{$const: 'i' }, {$const: 'u' }, {$const: 'd'}]]}, then: "
+        "{$substrBytes: ['$ns', {$add: [{$strLenBytes: ['$$dbName']}, {$const: 1}]}, {$const: "
+        "-1}]}}";
+    auto case2 = "{case: { $ne: ['$op', {$const: 'c'}]}, then: '$$REMOVE'}";
+    auto case3 = "{case: {$ne: ['$o.drop', '$$REMOVE']}, then: '$o.drop'}";
+    auto case4 = "{case: {$ne: ['$o.dropDatabase', '$$REMOVE']}, then: '$$REMOVE'}";
+    auto case5 =
+        "{case: {$ne: ['$o.renameCollection', '$$REMOVE']}, then: {$substrBytes: "
+        "['$o.renameCollection', {$add: [{$strLenBytes: ['$$dbName']}, {$const: 1}]}, {$const: "
+        "-1}]}}";
+
+    auto expectedExpr = fromjson(
+        "{"
+        "  $expr: {"
+        "    $eq: [{"
+        "      $let: {"
+        "        vars: {"
+        "          dbName: {$substrBytes: ["
+        "            '$ns', "
+        "            {$const: 0}, "
+        "            {$indexOfBytes: ['$ns', {$const: '.'}]}]}}, "
+        "        in: {"
+        "            $switch: {"
+        "              branches: ["s +
+        "                " + case1 + ", " + case2 + ", " + case3 + ", " + case4 + ", " + case5 +
+        "              ], default: '$$REMOVE'}}}}, "
+        "      {$const: 'pipeline_test'}]}"
+        "}");
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(rewrittenPredicate, expectedExpr);
+}
+
+TEST_F(ChangeStreamRewriteTest, CanRewriteNsWithExprOnInvalidFieldPath) {
+    auto expCtx = getExpCtx();
+    auto expr = fromjson("{$expr: {$eq: ['$ns.test', '" + expCtx->ns.coll() + "']}}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(expr, expCtx);
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        expCtx, statusWithMatchExpression.getValue().get(), {"ns"});
+    ASSERT(rewrittenMatchExpression);
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
+                      fromjson("{$expr: {$eq: ['$$REMOVE', {$const: 'pipeline_test'}]}}"));
+}
+
 TEST_F(ChangeStreamRewriteTest, CanRewriteFullToObject) {
     auto expCtx = getExpCtx();
     auto statusWithMatchExpression = MatchExpressionParser::parse(
