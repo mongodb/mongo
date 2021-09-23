@@ -100,6 +100,7 @@ namespace QueryResult {
  */
 struct Layout {
     MsgData::Layout msgdata;
+    int32_t resultFlags;
     int64_t cursorId;
     int32_t startingFrom;
     int32_t nReturned;
@@ -116,6 +117,10 @@ public:
 
     MsgData::ConstView msgdata() const {
         return storage().view(offsetof(Layout, msgdata));
+    }
+
+    int32_t getResultFlags() const {
+        return storage().read<LittleEndian<int32_t>>(offsetof(Layout, resultFlags));
     }
 
     int64_t getCursorId() const {
@@ -161,6 +166,10 @@ public:
         return storage().view(offsetof(Layout, msgdata));
     }
 
+    void setResultFlags(int32_t value) {
+        storage().write(tagLittleEndian(value), offsetof(Layout, resultFlags));
+    }
+
     void setCursorId(int64_t value) {
         storage().write(tagLittleEndian(value), offsetof(Layout, cursorId));
     }
@@ -171,14 +180,6 @@ public:
 
     void setNReturned(int32_t value) {
         storage().write(tagLittleEndian(value), offsetof(Layout, nReturned));
-    }
-
-    int32_t getResultFlags() {
-        return DataView(msgdata().data()).read<LittleEndian<int32_t>>();
-    }
-
-    void setResultFlags(int32_t value) {
-        DataView(msgdata().data()).write(tagLittleEndian(value));
     }
 
     void setResultFlagsToOk() {

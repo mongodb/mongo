@@ -183,9 +183,9 @@ DbResponse makeErrorResponseToDeprecatedOpQuery(StringData errorMsg) {
     buffer.appendBuf(errObj.objdata(), errObj.objsize());
 
     QueryResult::View qr = buffer.buf();
-    qr.setResultFlags(ResultFlag_ErrSet);
     qr.msgdata().setLen(buffer.len());
     qr.msgdata().setOperation(opReply);
+    qr.setResultFlags(ResultFlag_ErrSet);
     qr.setCursorId(0);
     qr.setStartingFrom(0);
     qr.setNReturned(1);

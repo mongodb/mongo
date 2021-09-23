@@ -7952,7 +7952,7 @@ buildvariants:
   - ubuntu2104-small
   expansions: &enterprise-ubuntu2104-dynamic-gcc11-debug-experimental-expansions
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
-    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --link-model=dynamic CC=/usr/bin/gcc-11 CXX=/usr/bin/g++-11 --disable-warnings-as-errors
+    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --link-model=dynamic CC=/usr/bin/gcc-11 CXX=/usr/bin/g++-11
     has_packages: false
     scons_cache_scope: shared
     scons_cache_mode: all

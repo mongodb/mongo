@@ -107,9 +107,9 @@ Message LegacyReplyBuilder::done() {
     invariant(_haveCommandReply);
 
     QueryResult::View qr = _builder.buf();
-    qr.setResultFlagsToOk();
     qr.msgdata().setLen(_builder.len());
     qr.msgdata().setOperation(opReply);
+    qr.setResultFlagsToOk();
     qr.setCursorId(0);
     qr.setStartingFrom(0);
     qr.setNReturned(1);

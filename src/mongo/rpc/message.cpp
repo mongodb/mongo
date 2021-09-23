@@ -46,6 +46,17 @@ int32_t nextMessageId() {
     return NextMsgId.fetchAndAdd(1);
 }
 
+void Message::setData(int operation, const char* msgdata, size_t len) {
+    const size_t dataLen = sizeof(MsgData::Value) + len;
+    auto buf = SharedBuffer::allocate(dataLen);
+    MsgData::View d = buf.get();
+    d.setLen(dataLen);
+    d.setOperation(operation);
+    if (len)
+        memcpy(d.data(), msgdata, len);
+    setData(std::move(buf));
+}
+
 std::string Message::opMsgDebugString() const {
     MsgData::ConstView headerView = header();
     auto opMsgRequest = OpMsgRequest::parse(*this);

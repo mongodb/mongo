@@ -272,7 +272,6 @@ namespace MsgData {
 #pragma pack(1)
 struct Layout {
     MSGHEADER::Layout header;
-    char data[4];
 };
 #pragma pack()
 
@@ -301,7 +300,7 @@ public:
     }
 
     const char* data() const {
-        return storage().view(offsetof(Layout, data));
+        return storage().view(sizeof(Layout));
     }
 
     bool valid() const {
@@ -310,12 +309,6 @@ public:
         if (getNetworkOp() < 0 || getNetworkOp() > 30000)
             return false;
         return true;
-    }
-
-    int64_t getCursor() const {
-        verify(getResponseToMsgId() > 0);
-        verify(getNetworkOp() == opReply);
-        return ConstDataView(data() + sizeof(int32_t)).read<LittleEndian<int64_t>>();
     }
 
     int dataLen() const;  // len without header
@@ -360,7 +353,7 @@ public:
 
     using ConstView::data;
     char* data() {
-        return storage().view(offsetof(Layout, data));
+        return storage().view(sizeof(Layout));
     }
 
 private:
@@ -382,7 +375,7 @@ public:
     Value(ZeroInitTag_t zit) : EncodedValueStorage<Layout, ConstView, View>(zit) {}
 };
 
-const int MsgDataHeaderSize = sizeof(Value) - 4;
+const int MsgDataHeaderSize = sizeof(Value);
 
 inline int ConstView::dataLen() const {
     return getLen() - MsgDataHeaderSize;
@@ -441,19 +434,12 @@ public:
         verify(empty());
         _buf = std::move(buf);
     }
+
     void setData(int operation, const char* msgtxt) {
         setData(operation, msgtxt, strlen(msgtxt) + 1);
     }
-    void setData(int operation, const char* msgdata, size_t len) {
-        verify(empty());
-        size_t dataLen = len + sizeof(MsgData::Value) - 4;
-        _buf = SharedBuffer::allocate(dataLen);
-        MsgData::View d = _buf.get();
-        if (len)
-            memcpy(d.data(), msgdata, len);
-        d.setLen(dataLen);
-        d.setOperation(operation);
-    }
+
+    void setData(int operation, const char* msgdata, size_t len);
 
     char* buf() {
         return _buf.get();
