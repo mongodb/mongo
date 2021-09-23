@@ -37,10 +37,6 @@ class RunChangeStreamsInBackground(interface.Hook):
         """Stop the background thread."""
         if self._change_streams_thread is not None:
             self._stop_background_thread()
-        if self._full_suite_changes_num == 0:
-            teardown_flag.set()
-            raise Exception(
-                "No change stream documents were observed during the background hook run.")
 
     def before_test(self, test, test_report):
         """Start the background thread if it is not already started."""
