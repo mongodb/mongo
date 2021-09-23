@@ -43,7 +43,7 @@ namespace mongo {
 using boost::intrusive_ptr;
 using std::vector;
 
-REGISTER_ACCUMULATOR(push, genericParseSingleExpressionAccumulator<AccumulatorPush>);
+REGISTER_ACCUMULATOR(push, genericParseSBEUnsupportedSingleExpressionAccumulator<AccumulatorPush>);
 REGISTER_REMOVABLE_WINDOW_FUNCTION(push, AccumulatorPush, WindowFunctionPush);
 
 void AccumulatorPush::processInternal(const Value& input, bool merging) {

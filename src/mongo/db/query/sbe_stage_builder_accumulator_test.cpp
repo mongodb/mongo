@@ -1097,29 +1097,35 @@ REGISTER_ACCUMULATOR(
 TEST_F(SbeStageBuilderGroupTest, SbeGroupCompatibleFlag) {
     std::vector<BSONArray> docs;
     std::vector<std::string> testCases = {
-        R"(_id: null, agg: {$addToSet: "$item"})",
-        R"(_id: null, agg: {$avg: "$quantity"})",
-        R"(_id: null, agg: {$first: "$item"})",
-        R"(_id: null, agg: {$last: "$item"})",
+        // TODO (SERVER-XXXX): Uncomment the following two test cases when we support pushdown of
+        // accumlators to SBE.
+        // R"(_id: null, agg: {$addToSet: "$item"})",
+        // R"(_id: null, agg: {$avg: "$quantity"})",
+        // R"(_id: null, agg: {$first: "$item"})",
+        // R"(_id: null, agg: {$last: "$item"})",
         // TODO (SERVER-51541): Uncomment the following two test cases when $object supported is
         // added to SBE.
         // R"(_id: null, agg: {$_internalJsReduce: {data: {k: "$word", v: "$val"}, eval: "null"}})",
         //
         // R"(_id: null, agg: {$accumulator: {init: "a", accumulate: "b", accumulateArgs:
         // ["$copies"], merge: "c", lang: "js"}})",
-        R"(_id: null, agg: {$mergeObjects: "$item"})",
-        R"(_id: null, agg: {$min: "$item"})",
-        R"(_id: null, agg: {$max: "$item"})",
-        R"(_id: null, agg: {$push: "$item"})",
-        R"(_id: null, agg: {$stdDevPop: "$item"})",
-        R"(_id: null, agg: {$stdDevSamp: "$item"})",
-        R"(_id: null, agg: {$sum: "$item"})",
-        R"(_id: {a: "$a", b: "$b"})",
+        // R"(_id: null, agg: {$mergeObjects: "$item"})",
+        // R"(_id: null, agg: {$min: "$item"})",
+        // R"(_id: null, agg: {$max: "$item"})",
+        // R"(_id: null, agg: {$push: "$item"})",
+        // R"(_id: null, agg: {$stdDevPop: "$item"})",
+        // R"(_id: null, agg: {$stdDevSamp: "$item"})",
+        // R"(_id: null, agg: {$sum: "$item"})",
+        // R"(_id: {a: "$a", b: "$b"})",
         // All supported case.
-        R"(_id: null, agg1: {$sum: "$item"}, agg2: {$max: "$item"}, agg3: {$avg: "$quantity"})",
+        // R"(_id: null, agg1: {$sum: "$item"}, agg2: {$max: "$item"}, agg3: {$avg: "$quantity"})",
         // Mix of supported/unsupported accumulators.
-        R"(_id: null, agg1: {$sum: "$item"}, agg2: {$incompatible: "$item"}, agg3: {$avg: "$a"})",
-        R"(_id: null, agg1: {$incompatible: "$item"}, agg2: {$min: "$item"}, agg3: {$avg: "$quantity"})",
+        // R"(_id: null, agg1: {$sum: "$item"}, agg2: {$incompatible: "$item"}, agg3: {$avg:
+        // "$a"})",
+        // R"(_id: null, agg1: {$incompatible: "$item"}, agg2: {$min: "$item"}, agg3: {$avg:
+        // "$quantity"})",
+        // No accumulator case
+        R"(_id: "$a")",
     };
 
     boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContextForTest());

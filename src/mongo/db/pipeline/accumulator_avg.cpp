@@ -44,7 +44,7 @@ namespace mongo {
 
 using boost::intrusive_ptr;
 
-REGISTER_ACCUMULATOR(avg, genericParseSingleExpressionAccumulator<AccumulatorAvg>);
+REGISTER_ACCUMULATOR(avg, genericParseSBEUnsupportedSingleExpressionAccumulator<AccumulatorAvg>);
 REGISTER_STABLE_EXPRESSION(avg, ExpressionFromAccumulator<AccumulatorAvg>::parse);
 REGISTER_REMOVABLE_WINDOW_FUNCTION(avg, AccumulatorAvg, WindowFunctionAvg);
 

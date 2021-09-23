@@ -119,11 +119,23 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> extractSbeCompatibleGr
     // which requires stages to be wrapped in an interface.
     std::vector<std::unique_ptr<InnerPipelineStageInterface>> groupsForPushdown;
 
+    // This handles the case of unionWith against an unknown collection.
+    if (collection == nullptr) {
+        return {};
+    }
+
+    const auto indexCatalog = collection->getIndexCatalog();
     const auto isSingleIndex =
-        collection && collection->getIndexCatalog()->numIndexesTotal(expCtx->opCtx) == 1;
+        indexCatalog ? indexCatalog->numIndexesTotal(expCtx->opCtx) == 1 : false;
+
+    // TODO: Don't split the pipeline if the collection is sharded until SERVER-59070 is done.
+    auto css = CollectionShardingState::get(expCtx->opCtx, collection->ns());
+    const auto isSharded = css && css->getCollectionDescription(expCtx->opCtx).isSharded();
+
     if (!feature_flags::gFeatureFlagSBEGroupPushdown.isEnabled(
             serverGlobalParams.featureCompatibility) ||
-        !cq->getEnableSlotBasedExecutionEngine() || expCtx->allowDiskUse || !isSingleIndex) {
+        !cq->getEnableSlotBasedExecutionEngine() || expCtx->allowDiskUse || isSharded ||
+        !isSingleIndex) {
         return {};
     }
 

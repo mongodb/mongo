@@ -38,7 +38,7 @@ namespace mongo {
 
 using boost::intrusive_ptr;
 
-REGISTER_ACCUMULATOR(last, genericParseSingleExpressionAccumulator<AccumulatorLast>);
+REGISTER_ACCUMULATOR(last, genericParseSBEUnsupportedSingleExpressionAccumulator<AccumulatorLast>);
 
 void AccumulatorLast::processInternal(const Value& input, bool merging) {
     /* always remember the last value seen */

@@ -62,32 +62,21 @@ let assertResultsMatchWithAndWithoutPushdown = function(
     assert.sameMembers(resultNoGroupPushdown, resultWithGroupPushdown);
 };
 
-// Baseline with SBE off.
-assertNoGroupPushdown(coll,
-                      [{$group: {_id: "$item", s: {$sum: "$price"}}}],
-                      [{_id: "a", s: 15}, {_id: "b", s: 30}, {_id: "c", s: 5}]);
-
-// Turn sbe on which will allow $group stages that contain supported accumulators to be pushed
-// down under certain conditions.
-db.adminCommand({setParameter: 1, internalQueryEnableSlotBasedExecutionEngine: true});
-
 // Try a pipeline with no group stage.
 assert.eq(
     coll.aggregate([{$match: {item: "c"}}]).toArray(),
     [{"_id": 5, "item": "c", "price": 5, "quantity": 10, "date": ISODate("2014-02-15T09:05:00Z")}]);
 
-// Run a simple $group with supported $sum accumulator, and check if it gets pushed down.
-assertResultsMatchWithAndWithoutPushdown(coll,
-                                         [{$group: {_id: "$item", s: {$sum: "$price"}}}],
-                                         [{_id: "a", s: 15}, {_id: "b", s: 30}, {_id: "c", s: 5}],
-                                         1);
+// Run a simple $group with supported $sum accumulator, and check if it doesn't get pushed down.
+assertNoGroupPushdown(coll,
+                      [{$group: {_id: "$item", s: {$sum: "$price"}}}],
+                      [{_id: "a", s: 15}, {_id: "b", s: 30}, {_id: "c", s: 5}]);
 
 // Two group stages both get pushed down.
-assertResultsMatchWithAndWithoutPushdown(
+assertNoGroupPushdown(
     coll,
     [{$group: {_id: "$item", s: {$sum: "$price"}}}, {$group: {_id: "$quantity", c: {$count: {}}}}],
-    [{_id: null, c: 3}],
-    2);
+    [{_id: null, c: 3}]);
 
 // Run a group with an unsupported accumultor and check that it doesn't get pushed down.
 assertNoGroupPushdown(coll, [{$group: {_id: "$item", s: {$stdDevSamp: "$quantity"}}}], [
@@ -130,10 +119,9 @@ assertNoGroupPushdown(coll,
 assert.commandWorked(coll.dropIndex({item: 1}));
 
 // Supported group and then a group with no supported accumulators.
-explain = coll.explain().aggregate([
-    {$group: {_id: "$item", s: {$sum: "$price"}}},
-    {$group: {_id: "$quantity", c: {$stdDevPop: "$price"}}}
-]);
+explain = coll.explain().aggregate(
+    [{$group: {_id: "$item"}}, {$group: {_id: "$quantity", c: {$stdDevPop: "$price"}}}]);
+
 assert.neq(null, getAggPlanStage(explain, "GROUP"), explain);
 assert(explain.stages[1].hasOwnProperty("$group"));
 
@@ -142,7 +130,4 @@ explain = coll.explain().aggregate(
     [{$group: {_id: "$item", s: {$sum: "$price"}, stdev: {$stdDevPop: "$price"}}}]);
 assert.eq(null, getAggPlanStage(explain, "GROUP"), explain);
 assert(explain.stages[1].hasOwnProperty("$group"));
-
-// Leave sbe in the initial state.
-db.adminCommand({setParameter: 1, internalQueryEnableSlotBasedExecutionEngine: false});
 })();
