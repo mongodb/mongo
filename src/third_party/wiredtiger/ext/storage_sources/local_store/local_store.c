@@ -103,9 +103,10 @@ typedef struct {
     /* This is WiredTiger's file system, it is used in implementing the local file system. */
     WT_FILE_SYSTEM *wt_fs;
 
-    char *auth_token; /* Identifier for key management system */
-    char *bucket_dir; /* Directory that stands in for cloud storage bucket */
-    char *cache_dir;  /* Directory for pre-flushed objects and cached objects */
+    char *auth_token;     /* Identifier for key management system */
+    char *bucket_dir;     /* Directory that stands in for cloud storage bucket */
+    char *cache_dir;      /* Directory for cached objects */
+    const char *home_dir; /* Owned by the connection */
 } LOCAL_FILE_SYSTEM;
 
 typedef struct local_file_handle {
@@ -128,7 +129,7 @@ static int local_delay(LOCAL_STORAGE *);
 static int local_err(LOCAL_STORAGE *, WT_SESSION *, int, const char *, ...);
 static int local_file_copy(
   LOCAL_STORAGE *, WT_SESSION *, const char *, const char *, WT_FS_OPEN_FILE_TYPE);
-static int local_get_directory(const char *, ssize_t len, char **);
+static int local_get_directory(const char *, const char *, ssize_t len, bool, char **);
 static int local_path(WT_FILE_SYSTEM *, const char *, const char *, char **);
 static int local_stat(
   WT_FILE_SYSTEM *, WT_SESSION *, const char *, const char *, bool, struct stat *);
@@ -175,18 +176,13 @@ static int local_file_size(WT_FILE_HANDLE *, WT_SESSION *, wt_off_t *);
 static int local_file_sync(WT_FILE_HANDLE *, WT_SESSION *);
 static int local_file_write(WT_FILE_HANDLE *, WT_SESSION *, wt_off_t, size_t, const void *);
 
-/*
- * Report an error for a file operation. Note that local_err returns its third argument, and this
- * macro will too.
- */
-#define WT_FS2LOCAL(fs) (((LOCAL_FILE_SYSTEM *)(fs))->local_storage)
-
-#define WT_VERBOSE_LS(local, ...)         \
+#define FS2LOCAL(fs) (((LOCAL_FILE_SYSTEM *)(fs))->local_storage)
+#define SHOW_STRING(s) (((s) == NULL) ? "<null>" : (s))
+#define VERBOSE_LS(local, ...)            \
     do {                                  \
         if ((local)->verbose > 0)         \
             fprintf(stderr, __VA_ARGS__); \
     } while (0);
-#define WT_SHOW_STRING(s) (((s) == NULL) ? "<null>" : (s))
 
 /*
  * local_configure
@@ -247,7 +243,7 @@ local_delay(LOCAL_STORAGE *local)
     ret = 0;
     if (local->force_delay != 0 &&
       (local->object_reads + local->object_writes) % local->force_delay == 0) {
-        WT_VERBOSE_LS(local,
+        VERBOSE_LS(local,
           "Artificial delay %" PRIu32 " milliseconds after %" PRIu64 " object reads, %" PRIu64
           " object writes\n",
           local->delay_ms, local->object_reads, local->object_writes);
@@ -263,7 +259,7 @@ local_delay(LOCAL_STORAGE *local)
     }
     if (local->force_error != 0 &&
       (local->object_reads + local->object_writes) % local->force_error == 0) {
-        WT_VERBOSE_LS(local,
+        VERBOSE_LS(local,
           "Artificial error returned after %" PRIu64 " object reads, %" PRIu64 " object writes\n",
           local->object_reads, local->object_writes);
         ret = ENETUNREACH;
@@ -285,7 +281,7 @@ local_err(LOCAL_STORAGE *local, WT_SESSION *session, int ret, const char *format
 
     va_start(ap, format);
     wt_api = local->wt_api;
-    if (vsnprintf(buf, sizeof(buf), format, ap) > (int)sizeof(buf))
+    if (vsnprintf(buf, sizeof(buf), format, ap) >= (int)sizeof(buf))
         wt_api->err_printf(wt_api, session, "local_storage: error overflow");
     wt_api->err_printf(
       wt_api, session, "local_storage: %s: %s", wt_api->strerror(wt_api, session, ret), buf);
@@ -299,18 +295,35 @@ local_err(LOCAL_STORAGE *local, WT_SESSION *session, int ret, const char *format
  *     Return a copy of a directory name after verifying that it is a directory.
  */
 static int
-local_get_directory(const char *s, ssize_t len, char **copy)
+local_get_directory(const char *home, const char *s, ssize_t len, bool create, char **copy)
 {
     struct stat sb;
+    size_t buflen;
     int ret;
     char *dirname;
 
+    *copy = NULL;
+
     if (len == -1)
         len = (ssize_t)strlen(s);
-    dirname = strndup(s, (size_t)len + 1); /* Room for null */
+
+    /* For relative pathnames, the path is considered to be relative to the home directory. */
+    if (*s == '/')
+        dirname = strndup(s, (size_t)len + 1); /* Room for null */
+    else {
+        buflen = (size_t)len + strlen(home) + 2; /* Room for slash, null */
+        if ((dirname = malloc(buflen)) != NULL)
+            if (snprintf(dirname, buflen, "%s/%.*s", home, (int)len, s) >= (int)buflen)
+                return (EINVAL);
+    }
     if (dirname == NULL)
         return (ENOMEM);
+
     ret = stat(dirname, &sb);
+    if (ret != 0 && errno == ENOENT && create) {
+        (void)mkdir(dirname, 0777);
+        ret = stat(dirname, &sb);
+    }
     if (ret != 0)
         ret = errno;
     else if ((sb.st_mode & S_IFMT) != S_IFDIR)
@@ -365,8 +378,9 @@ local_path(WT_FILE_SYSTEM *file_system, const char *dir, const char *name, char 
     }
     len = strlen(dir) + strlen(name) + 2;
     if ((p = malloc(len)) == NULL)
-        return (local_err(WT_FS2LOCAL(file_system), NULL, ENOMEM, "local_path"));
-    snprintf(p, len, "%s/%s", dir, name);
+        return (local_err(FS2LOCAL(file_system), NULL, ENOMEM, "local_path"));
+    if (snprintf(p, len, "%s/%s", dir, name) >= (int)len)
+        return (local_err(FS2LOCAL(file_system), NULL, EINVAL, "overflow sprintf"));
     *pathp = p;
     return (ret);
 }
@@ -405,7 +419,7 @@ local_stat(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *name, c
          * If the file must exist, report the error no matter what.
          */
         if (must_exist || errno != ENOENT)
-            ret = local_err(WT_FS2LOCAL(file_system), session, errno, "%s: %s stat", path, caller);
+            ret = local_err(FS2LOCAL(file_system), session, errno, "%s: %s stat", path, caller);
         else
             ret = errno;
     }
@@ -485,10 +499,18 @@ local_customize_file_system(WT_STORAGE_SOURCE *storage_source, WT_SESSION *sessi
         ret = local_err(local, session, ENOMEM, "local_file_system.auth_token");
         goto err;
     }
+
+    /*
+     * The home directory owned by the connection will not change, and will be valid memory, for as
+     * long as the connection is open. That is longer than this file system will be open, so we can
+     * use the string without copying.
+     */
+    fs->home_dir = session->connection->get_home(session->connection);
+
     /*
      * Get the bucket directory and the cache directory.
      */
-    if ((ret = local_get_directory(bucket_name, -1, &fs->bucket_dir)) != 0) {
+    if ((ret = local_get_directory(fs->home_dir, bucket_name, -1, false, &fs->bucket_dir)) != 0) {
         ret = local_err(local, session, ret, "%s: bucket directory", bucket_name);
         goto err;
     }
@@ -502,12 +524,15 @@ local_customize_file_system(WT_STORAGE_SOURCE *storage_source, WT_SESSION *sessi
             p++;
         else
             p = bucket_name;
-        snprintf(buf, sizeof(buf), "cache-%s", p);
+        if (snprintf(buf, sizeof(buf), "cache-%s", p) >= (int)sizeof(buf)) {
+            ret = local_err(local, session, EINVAL, "overflow snprintf");
+            goto err;
+        }
         cachedir.str = buf;
         cachedir.len = strlen(buf);
-        (void)mkdir(buf, 0777);
     }
-    if ((ret = local_get_directory(cachedir.str, (ssize_t)cachedir.len, &fs->cache_dir)) != 0) {
+    if ((ret = local_get_directory(
+           fs->home_dir, cachedir.str, (ssize_t)cachedir.len, true, &fs->cache_dir)) != 0) {
         ret =
           local_err(local, session, ret, "%*s: cache directory", (int)cachedir.len, cachedir.str);
         goto err;
@@ -545,7 +570,7 @@ local_exist(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *name, 
     LOCAL_STORAGE *local;
     int ret;
 
-    local = WT_FS2LOCAL(file_system);
+    local = FS2LOCAL(file_system);
     local->op_count++;
     *existp = false;
 
@@ -569,10 +594,17 @@ local_file_copy(LOCAL_STORAGE *local, WT_SESSION *session, const char *src_path,
     WT_FILE_SYSTEM *wt_fs;
     wt_off_t copy_size, file_size, left;
     ssize_t pos;
+    size_t pathlen;
     int ret, t_ret;
-    char buffer[1024 * 64];
+    char buffer[1024 * 64], *tmp_path;
 
     dest = src = NULL;
+    pathlen = strlen(dest_path) + 10;
+    if ((tmp_path = malloc(pathlen)) != NULL)
+        if (snprintf(tmp_path, pathlen, "%s.TMP", dest_path) >= (int)pathlen) {
+            ret = local_err(local, session, EINVAL, "overflow snprintf");
+            goto err;
+        }
 
     if ((ret = local->wt_api->file_system_get(local->wt_api, session, &wt_fs)) != 0) {
         ret =
@@ -585,9 +617,9 @@ local_file_copy(LOCAL_STORAGE *local, WT_SESSION *session, const char *src_path,
         goto err;
     }
 
-    if ((ret = wt_fs->fs_open_file(wt_fs, session, dest_path, type, WT_FS_OPEN_CREATE, &dest)) !=
+    if ((ret = wt_fs->fs_open_file(wt_fs, session, tmp_path, type, WT_FS_OPEN_CREATE, &dest)) !=
       0) {
-        ret = local_err(local, session, ret, "%s: cannot create", dest_path);
+        ret = local_err(local, session, ret, "%s: cannot create", tmp_path);
         goto err;
     }
     if ((ret = wt_fs->fs_size(wt_fs, session, src_path, &file_size)) != 0) {
@@ -601,9 +633,13 @@ local_file_copy(LOCAL_STORAGE *local, WT_SESSION *session, const char *src_path,
             goto err;
         }
         if ((ret = dest->fh_write(dest, session, pos, (size_t)copy_size, buffer)) != 0) {
-            ret = local_err(local, session, ret, "%s: cannot write", dest_path);
+            ret = local_err(local, session, ret, "%s: cannot write", tmp_path);
             goto err;
         }
+    }
+    if ((ret = rename(tmp_path, dest_path)) != 0) {
+        ret = local_err(local, session, errno, "%s: cannot rename from %s", dest_path, tmp_path);
+        goto err;
     }
 err:
     if (src != NULL && (t_ret = src->close(src, session)) != 0)
@@ -612,6 +648,9 @@ err:
     if (dest != NULL && (t_ret = dest->close(dest, session)) != 0)
         if (ret == 0)
             ret = t_ret;
+    if (ret != 0)
+        (void)unlink(tmp_path);
+    free(tmp_path);
 
     return (ret);
 }
@@ -697,7 +736,7 @@ static int
 local_directory_list(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *directory,
   const char *prefix, char ***dirlistp, uint32_t *countp)
 {
-    WT_FS2LOCAL(file_system)->op_count++;
+    FS2LOCAL(file_system)->op_count++;
     return (
       local_directory_list_internal(file_system, session, directory, prefix, 0, dirlistp, countp));
 }
@@ -710,7 +749,7 @@ static int
 local_directory_list_single(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *directory,
   const char *prefix, char ***dirlistp, uint32_t *countp)
 {
-    WT_FS2LOCAL(file_system)->op_count++;
+    FS2LOCAL(file_system)->op_count++;
     return (
       local_directory_list_internal(file_system, session, directory, prefix, 1, dirlistp, countp));
 }
@@ -725,7 +764,7 @@ local_directory_list_free(
 {
     (void)session;
 
-    WT_FS2LOCAL(file_system)->op_count++;
+    FS2LOCAL(file_system)->op_count++;
     if (dirlist != NULL) {
         while (count > 0)
             free(dirlist[--count]);
@@ -853,7 +892,7 @@ local_fs_terminate(WT_FILE_SYSTEM *file_system, WT_SESSION *session)
     (void)session; /* unused */
 
     local_fs = (LOCAL_FILE_SYSTEM *)file_system;
-    WT_FS2LOCAL(file_system)->op_count++;
+    FS2LOCAL(file_system)->op_count++;
     free(local_fs->auth_token);
     free(local_fs->bucket_dir);
     free(local_fs->cache_dir);
@@ -983,8 +1022,8 @@ local_open(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *name,
 
     *file_handlep = file_handle;
 
-    WT_VERBOSE_LS(local, "File opened: %s final path=%s\n", WT_SHOW_STRING(name),
-      WT_SHOW_STRING(local_fh->fh->name));
+    VERBOSE_LS(
+      local, "File opened: %s final path=%s\n", SHOW_STRING(name), SHOW_STRING(local_fh->fh->name));
 
 err:
     free(bucket_path);
@@ -1007,8 +1046,8 @@ local_rename(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *from,
     (void)to;    /* unused */
     (void)flags; /* unused */
 
-    return (local_err(
-      WT_FS2LOCAL(file_system), session, ENOTSUP, "%s: rename of file not supported", from));
+    return (
+      local_err(FS2LOCAL(file_system), session, ENOTSUP, "%s: rename of file not supported", from));
 }
 
 /*
@@ -1020,8 +1059,8 @@ local_remove(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *name,
 {
     (void)flags; /* unused */
 
-    return (local_err(
-      WT_FS2LOCAL(file_system), session, ENOTSUP, "%s: remove of file not supported", name));
+    return (
+      local_err(FS2LOCAL(file_system), session, ENOTSUP, "%s: remove of file not supported", name));
 }
 
 /*
@@ -1035,7 +1074,7 @@ local_size(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *name, w
     LOCAL_STORAGE *local;
     int ret;
 
-    local = WT_FS2LOCAL(file_system);
+    local = FS2LOCAL(file_system);
     local->op_count++;
     *sizep = 0;
 

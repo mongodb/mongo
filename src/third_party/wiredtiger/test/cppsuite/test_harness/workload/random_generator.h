@@ -29,25 +29,36 @@
 #ifndef RANDOM_GENERATOR_H
 #define RANDOM_GENERATOR_H
 
+/* Following definitions are required in order to use printing format specifiers in C++. */
+#define __STDC_LIMIT_MACROS
+#define __STDC_FORMAT_MACROS
+
 #include <random>
 #include <string>
 
 namespace test_harness {
 /* Helper class to generate random values using uniform distributions. */
+
+enum characters_type { PSEUDO_ALPHANUMERIC, ALPHABET };
+
 class random_generator {
     public:
     static random_generator &instance();
 
-    public:
     /* No copies of the singleton allowed. */
     random_generator(random_generator const &) = delete;
     random_generator &operator=(random_generator const &) = delete;
 
     /* Generate a random string of a given length. */
-    std::string generate_string(std::size_t length);
+    std::string generate_random_string(
+      std::size_t length, characters_type type = PSEUDO_ALPHANUMERIC);
 
-    /* Generate a pseudo random string which compresses better. */
-    std::string generate_pseudo_random_string(std::size_t length);
+    /*
+     * Generate a pseudo random string which compresses better. It should not be used to generate
+     * keys due to the limited randomness.
+     */
+    std::string generate_pseudo_random_string(
+      std::size_t length, characters_type type = PSEUDO_ALPHANUMERIC);
 
     /* Generate a random integer between min and max. */
     template <typename T>
@@ -60,10 +71,13 @@ class random_generator {
 
     private:
     random_generator();
+    std::uniform_int_distribution<> &get_distribution(characters_type type);
+    const std::string &get_characters(characters_type type);
 
     std::mt19937 _generator;
-    std::uniform_int_distribution<> _distribution;
-    const std::string _characters =
+    std::uniform_int_distribution<> _alphanum_distrib, _alpha_distrib;
+    const std::string _alphabet = "abcdefghijklmnopqrstuvwxyz";
+    const std::string _pseudo_alphanum =
       "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 };
 } // namespace test_harness

@@ -195,14 +195,15 @@ class TieredHookCreator(wthooks.WiredTigerHookCreator):
     # Is this test one we should skip?
     def skip_test(self, test):
         # Skip any test that contains one of these strings as a substring
-        skip = ["backup",              # Can't backup a tiered table
-                "cursor13_ckpt",       # Checkpoint tests with cached cursors
-                "cursor13_drops",      # Tests that require working drop implementation
-                "cursor13_dup",        # More cursor cache tests
-                "cursor13_reopens",    # More cursor cache tests
-                "lsm",                 # If the test name tells us it uses lsm ignore it
-                "test_config_json",    # create replacement can't handle a json config string
-                "test_cursor_big",     # Cursor caching verified with stats
+        skip = ["backup",               # Can't backup a tiered table
+                "cursor13_ckpt",        # Checkpoint tests with cached cursors
+                "cursor13_drops",       # Tests that require working drop implementation
+                "cursor13_dup",         # More cursor cache tests
+                "cursor13_reopens",     # More cursor cache tests
+                "lsm",                  # If the test name tells us it uses lsm ignore it
+                "modify_smoke_recover", # Copying WT dir doesn't copy the bucket directory
+                "test_config_json",     # create replacement can't handle a json config string
+                "test_cursor_big",      # Cursor caching verified with stats
                 "tiered"]
         for item in skip:
             if item in str(test):
@@ -217,19 +218,19 @@ class TieredHookCreator(wthooks.WiredTigerHookCreator):
 
     def setup_hooks(self):
         orig_connection_close = self.Connection['close']
-        self.Connection['close'] = (wthooks.HOOK_REPLACE, lambda s, config:
+        self.Connection['close'] = (wthooks.HOOK_REPLACE, lambda s, config=None:
           connection_close_replace(orig_connection_close, s, config))
 
         orig_session_alter = self.Session['alter']
-        self.Session['alter'] =  (wthooks.HOOK_REPLACE, lambda s, uri, config:
+        self.Session['alter'] =  (wthooks.HOOK_REPLACE, lambda s, uri, config=None:
           session_alter_replace(orig_session_alter, s, uri, config))
 
         orig_session_compact = self.Session['compact']
-        self.Session['compact'] =  (wthooks.HOOK_REPLACE, lambda s, uri, config:
+        self.Session['compact'] =  (wthooks.HOOK_REPLACE, lambda s, uri, config=None:
           session_compact_replace(orig_session_compact, s, uri, config))
 
         orig_session_create = self.Session['create']
-        self.Session['create'] =  (wthooks.HOOK_REPLACE, lambda s, uri, config:
+        self.Session['create'] =  (wthooks.HOOK_REPLACE, lambda s, uri, config=None:
           session_create_replace(orig_session_create, s, uri, config))
 
         orig_session_drop = self.Session['drop']
@@ -241,11 +242,11 @@ class TieredHookCreator(wthooks.WiredTigerHookCreator):
           session_rename_replace(orig_session_rename, s, uri, newuri, config))
 
         orig_session_salvage = self.Session['salvage']
-        self.Session['salvage'] = (wthooks.HOOK_REPLACE, lambda s, uri, config:
+        self.Session['salvage'] = (wthooks.HOOK_REPLACE, lambda s, uri, config=None:
           session_salvage_replace(orig_session_salvage, s, uri, config))
 
         orig_session_verify = self.Session['verify']
-        self.Session['verify'] = (wthooks.HOOK_REPLACE, lambda s, uri, config:
+        self.Session['verify'] = (wthooks.HOOK_REPLACE, lambda s, uri, config=None:
           session_verify_replace(orig_session_verify, s, uri, config))
 
         self.wiredtiger['wiredtiger_open'] = (wthooks.HOOK_ARGS, wiredtiger_open_tiered)

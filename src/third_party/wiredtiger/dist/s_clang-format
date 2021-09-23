@@ -7,8 +7,8 @@ trap 'rm -rf $t' 0 1 2 3 13 15
 
 download_clang_format() {
 	if [ `uname` = "Linux" ]; then
-		curl https://s3.amazonaws.com/boxes.10gen.com/build/build/clang-format-llvm-10.0.0-x86_64-linux-gnu-ubuntu-18.04.tar.gz -o dist/clang-format.tar.gz
-		tar --strip=1 -C dist/ -xf dist/clang-format.tar.gz clang-format-llvm-10.0.0-x86_64-linux-gnu-ubuntu-18.04/clang-format && rm dist/clang-format.tar.gz
+		curl https://s3.amazonaws.com/boxes.10gen.com/build/clang-format-llvm-10.0.0-x86_64-linux-gnu-ubuntu-20.04.tar-1.gz -o dist/clang-format.tar.gz
+		tar --strip=1 -C dist/ -xf dist/clang-format.tar.gz clang-format-llvm-10.0.0-x86_64-linux-gnu-ubuntu-20.04/clang-format && rm dist/clang-format.tar.gz
 	elif [ `uname` = "Darwin" ]; then
 		curl https://s3.amazonaws.com/boxes.10gen.com/build/build/clang-format-llvm-10.0.0-x86_64-apple-darwin.tar.gz -o dist/clang-format.tar.gz
 		tar --strip=1 -C dist/ -xf dist/clang-format.tar.gz clang-format-llvm-10.0.0-x86_64-apple-darwin/clang-format && rm dist/clang-format.tar.gz

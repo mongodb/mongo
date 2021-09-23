@@ -369,6 +369,7 @@ struct __wt_connection_stats {
     int64_t cache_eviction_slow;
     int64_t cache_eviction_walk_leaf_notfound;
     int64_t cache_eviction_state;
+    int64_t cache_eviction_walk_sleeps;
     int64_t cache_eviction_target_page_lt10;
     int64_t cache_eviction_target_page_lt32;
     int64_t cache_eviction_target_page_ge128;
@@ -693,6 +694,7 @@ struct __wt_connection_stats {
     int64_t session_query_ts;
     int64_t session_table_alter_fail;
     int64_t session_table_alter_success;
+    int64_t session_table_alter_trigger_checkpoint;
     int64_t session_table_alter_skip;
     int64_t session_table_compact_fail;
     int64_t session_table_compact_success;

@@ -42,7 +42,8 @@ possible timestamp (\c WT_TS_MAX). The stop timestamp of the latest update in th
 updated once the prepared update is resolved. A tombstone becomes globally visible if the stop
 timestamp is less than the oldest timestamp and the stop transaction id is visible to all concurrent
 transactions in the system. A checkpoint can delete history store pages that only contain globally
-visible tombstones. The garbage collection process is discussed in @ref arch-checkpoint.
+visible tombstones. The garbage collection process is discussed in @ref arch-checkpoint
+"Checkpoint".
 
 @section arch_hs_initialize History store initialization
 WiredTiger checks for an existing history store table at startup and creates a new table if it is
@@ -237,7 +238,7 @@ created without records which have globally visible tombstones. This ensures tha
 only keeping the relevant historical data required to serve the oldest reader in the system or
 as dictated by the oldest timestamp set by the application. Once all records on a page are obsolete,
 the page itself can be removed to reduce the size of the history store table
-(see @ref arch-transaction for more details about oldest timestamp).
+(see @ref arch-transaction "Transaction" for more details about oldest timestamp).
 
 @section arch_hs_read Searching for older versions of a key in History Store
 When looking for an update visible to the current transaction, WiredTiger first searches the update
@@ -251,13 +252,13 @@ in the history store for a key and read timestamp combination, each update would
 visibility based on transaction and timestamp based visibility rules. In case there are no records
 visible in the history store table, \c WT_NOTFOUND error is returned to the reader.
 
-@section arch_hs_rts History store and rollback-to-stable
-Rollback-to-stable searches the history store table for valid updates that are stable according to
+@section arch_hs_rts History store and rollback to stable
+@ref arch-rts "Rollback to stable" searches the history store table for valid updates that are
+stable according to
 the supplied stable timestamp and replaces the on-disk version with an update from the history store
-table that fulfills the criteria. Rollback-to-stable also removes updates from the
+table that fulfills the criteria. Rollback to stable also removes updates from the
 history store table that are not stable according to the stable timestamp and transaction snapshot
-being used for rollback-to-stable operation. More details about the rollback-to-stable operation
-can be found in the @ref arch-rts page.
+being used for rollback to stable operation.
 
 @section arch_hs_prepared History store and prepared transactions
 When there is a prepared update for a key and the page is evicted, the prepared update is written

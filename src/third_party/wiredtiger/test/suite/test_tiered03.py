@@ -49,15 +49,24 @@ class test_tiered03(wttest.WiredTigerTestCase):
 
     auth_token = "test_token"
     bucket = "mybucket"
+    absolute_bucket_dir = None  # initialied in conn_config to an absolute path
+    cache_dir = "mybucket-cache" # a relative pathname, it will not be shared
     bucket_prefix = "pfx_"
     extension_name = "local_store"
 
     def conn_config(self):
-        if not os.path.exists(self.bucket):
-            os.mkdir(self.bucket)
+        # We have multiple connections that want to share a bucket directory.
+        # The first time this function is called, we'll establish the absolute
+        # path for the bucket, and always use that for the bucket name.
+        # The cache directory name is a relative one, so it won't be shared
+        # between connections.
+        if self.absolute_bucket_dir == None:
+            self.absolute_bucket_dir = os.path.join(os.getcwd(), self.bucket)
+            os.mkdir(self.absolute_bucket_dir)
         return \
           'tiered_storage=(auth_token=%s,' % self.auth_token + \
-          'bucket=%s,' % self.bucket + \
+          'bucket=%s,' % self.absolute_bucket_dir + \
+          'cache_directory=%s,' % self.cache_dir + \
           'bucket_prefix=%s,' % self.bucket_prefix + \
           'name=%s)' % self.extension_name
 

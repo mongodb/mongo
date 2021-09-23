@@ -91,14 +91,13 @@ class hs_cleanup : public test {
              * API doesn't guarantee our buffer will still be valid once it is called, as such we
              * copy the buffer and then pass it into the API.
              */
-            bool rollback_required = tc->update(cursor, coll.id, key_value_t(key_tmp));
-
-            /* Commit our transaction. */
-            if (!rollback_required && tc->transaction.can_commit())
-                rollback_required = tc->transaction.commit();
-
-            if (rollback_required)
+            if (tc->update(cursor, coll.id, key_value_t(key_tmp))) {
+                if (tc->transaction.can_commit()) {
+                    tc->transaction.commit();
+                }
+            } else {
                 tc->transaction.rollback();
+            }
         }
         /* Ensure our last transaction is resolved. */
         if (tc->transaction.active())

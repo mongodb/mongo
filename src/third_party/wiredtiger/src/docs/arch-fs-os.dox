@@ -1,10 +1,61 @@
-/*! @arch_page arch-fs-os File System and Operating System Interface
+/*! @arch_page arch-fs-os File System Interface and Operating System Support
 
-Internally, a layer of abstraction is above all operating system calls,
-allowing main line WiredTiger code to make a call to single set of interfaces.
-There are currently OS specific APIs for POSIX and Windows.
+@section multiple_os Support for Multiple Operating Systems
+WiredTiger runs on a variety of systems with different interfaces for file system
+and operating system services. Therefore we have abstract implementations of various
+OS services, such as threading, clock, etc. We choose which implementation of the
+abstraction to include at compile time, and the rest of WT code doesn't need to worry
+about these details. Currently WiredTiger supports POSIX and Windows operating systems
+through maintaining separate folders for each system. By checking the current machine's
+operating system, WiredTiger either compiles the \c os_posix or \c os_win folder.
+Additional structures and definitions specific to the operating system are defined
+in the header files \c posix.h or \c os_windows.h.
 
-Additionally, a program can use WT_CONNECTION::set_file_system to register
-a set of functions that will be called for each file system operation.
-WiredTiger will then call these functions at the appropriate time.
+@section file_system_and_handle WiredTiger File System and File Handle Interfaces
+WiredTiger provides file system and file handle abstraction layers, or interfaces,
+to accommodate for a standard set of functionalities across multiple file systems
+that may not have identical features.
+
+@subsection file_system File System Interface
+The file system interface handles system calls on the file system namespace such
+as creation and deletion. WiredTiger defines the file system interface through
+\c WT_FILE_SYSTEM, which is initialized when a WiredTiger connection is opened. The
+interface has a set of function pointers that represent the file system functionalities
+that WiredTiger supports for a directory. WiredTiger defines POSIX and Windows file
+system function implementations in \c os_fs.c.
+
+@subsection file_handle File Handle Interface
+WiredTiger has a file handle interface called WT_FILE_HANDLE which defines a
+set of function pointers that represent I/O operations for a file. We use this
+interface as a base class to create file handle implementations specific to the
+operating system, for example \c WT_FILE_HANDLE_POSIX or \c WT_FILE_HANDLE_WINDOWS.
+These WiredTiger file handle structures are initialized when WT_FILE_SYSTEM::fs_open_file
+is called.
+
+In WiredTiger, whenever a file is opened a file handle is created to accommodate
+the state of the file in cache. To prevent multiple file handles being created for a
+file, WiredTiger uses a hash table to maintain an single file handle for each opened
+file. A structure called \c WT_FH is used for accessing each entry in the hash table.
+Thus WiredTiger checks the hash table via \c WT_FH for an open file handle.
+
+@subsection file_customization File System and Handle Customization
+WiredTiger provides an API that allows programs to register their own customized file
+system using the WT_CONNECTION::set_file_system function. Programs need to supply
+their own file system structure and file handle implementations. See @ref custom_file_systems
+for an example of how file system and handles are customized.
+
+@subsection file_in_memory In-memory support
+The in-memory configuration changes WiredTiger to run only in cache with no disk writes
+and is enabled through the WiredTiger connection configuration string. WiredTiger maintains
+each file through providing an in memory buffer for each file handle. Both in-memory file
+system and file handle implementations are found in \c os_fs_inmemory.c.
+
+@subsection file_stream File Stream
+WiredTiger contains a file stream implementation called \c WT_FSTREAM. This structure
+is mainly used for non-critical functionalities such as writing verbose messages or
+writing to WiredTiger statistics logs.
+
+@section filesystem_usage Multiple System Architecture Support
+WiredTiger supports x86_64, i386, mips, ppc, aarch64, s390x, and sparc system architectures
+which are found in gcc.h.
 */

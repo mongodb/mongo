@@ -150,7 +150,7 @@ API is called. See \c bt_io.c for more detail.
 
 @subsubsection Checkpoint
 
-For details on checkpoint at the WiredTiger level see: @ref arch-checkpoint.
+For details on checkpoint at the WiredTiger level see: @ref arch-checkpoint "Checkpoint".
 
 At the block manager level, a checkpoint corresponds with a set of blocks that
 are stored in the file associated with the given URI. Typically each file will
@@ -223,7 +223,7 @@ range in the file, that is, any number of contiguous blocks.
 
 @subsubsection Eviction
 
-For more detail on how WiredTiger eviction works see: @ref arch-eviction.
+For more detail on how WiredTiger eviction works see: @ref arch-eviction "Eviction".
 
 Eviction also utilizes the block manager. When a page is evicted and contains
 data that needs to be maintained, logically a block needs to be written.

@@ -990,7 +990,7 @@ __wt_metadata_correct_base_write_gen(WT_SESSION_IMPL *session)
     while ((ret = cursor->next(cursor)) == 0) {
         WT_ERR(cursor->get_key(cursor, &uri));
 
-        if (!WT_PREFIX_MATCH(uri, "file:") && !WT_PREFIX_MATCH(uri, "tiered:"))
+        if (!WT_BTREE_PREFIX(uri))
             continue;
 
         WT_ERR(cursor->get_value(cursor, &config));

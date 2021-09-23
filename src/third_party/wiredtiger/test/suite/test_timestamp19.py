@@ -98,12 +98,6 @@ class test_timestamp19(wttest.WiredTigerTestCase):
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10))
         self.assertTimestampsEqual(self.conn.query_timestamp('get=oldest'), self.timestamp_str(40))
 
-        # Trying to set an earlier stable timestamp is an error.
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(10)),
-            '/oldest timestamp \(0, 40\) must not be later than stable timestamp \(0, 10\)/')
-        self.assertTimestampsEqual(self.conn.query_timestamp('get=stable'), self.timestamp_str(40))
-
         # Move the oldest and stable timestamps to 70.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(70) +
           ', stable_timestamp=' + self.timestamp_str(70))

@@ -80,10 +80,12 @@ class test : public database_operation {
     timestamp_manager *get_timestamp_manager();
     thread_manager *get_thread_manager();
 
+    protected:
+    configuration *_config;
+
     private:
     const test_args &_args;
     std::vector<component *> _components;
-    configuration *_config;
     checkpoint_manager *_checkpoint_manager = nullptr;
     runtime_monitor *_runtime_monitor = nullptr;
     thread_manager *_thread_manager = nullptr;

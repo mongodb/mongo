@@ -684,6 +684,14 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
     }
 
     /*
+     * If a valid key has been found and we are doing a prefix search near, we want to return the
+     * key only if it is a prefix match.
+     */
+    if (valid && F_ISSET(cursor, WT_CURSTD_PREFIX_SEARCH) &&
+      __wt_prefix_match(&state.key, cbt->tmp) != 0)
+        valid = false;
+
+    /*
      * If we find a valid key, return it.
      *
      * Else, creating a record past the end of the tree in a fixed-length column-store implicitly

@@ -280,7 +280,7 @@ static CONFIG c[] = {
 
   {"runs.timer", "run time (minutes)", C_IGNORE, 0, 0, UINT_MAX, &g.c_timer, NULL},
 
-  {"runs.type", "object type (fix | var | row)", C_IGNORE | C_STRING, 0, 0, 0, NULL,
+  {"runs.type", "object type (fix | row | var)", C_IGNORE | C_STRING, 0, 0, 0, NULL,
     &g.c_file_type},
 
   {"runs.verify_failure_dump", "configure page dump on repeatable read error", C_IGNORE | C_BOOL, 0,
