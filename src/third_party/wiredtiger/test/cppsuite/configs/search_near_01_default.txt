@@ -1,0 +1,22 @@
+# Configuration for search_near_01.
+# The test will generate key_count_per_collection number of keys for each prefix in aaa -> zzz.
+# This config will have a 3 minute duration, with 3 tables of an entry for each prefix.
+duration_seconds=180,
+cache_size_mb=1000,
+timestamp_manager=
+(
+    enabled=false,
+),
+workload_generator=
+(
+    populate_config=
+    (
+        collection_count=3,
+        key_count_per_collection=1,
+        key_size=5,
+    ),
+    read_config=
+    (
+        thread_count=10
+    )
+),

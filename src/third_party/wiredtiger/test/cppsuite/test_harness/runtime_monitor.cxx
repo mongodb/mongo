@@ -36,16 +36,6 @@
 
 namespace test_harness {
 /* Static methods implementation. */
-static void
-get_stat(scoped_cursor &cursor, int stat_field, int64_t *valuep)
-{
-    const char *desc, *pvalue;
-    cursor->set_key(cursor.get(), stat_field);
-    testutil_check(cursor->search(cursor.get()));
-    testutil_check(cursor->get_value(cursor.get(), &desc, &pvalue, valuep));
-    testutil_check(cursor->reset(cursor.get()));
-}
-
 static std::string
 collection_name_to_file_name(const std::string &collection_name)
 {
@@ -100,9 +90,9 @@ cache_limit_statistic::check(scoped_cursor &cursor)
     int64_t cache_bytes_image, cache_bytes_other, cache_bytes_max;
     double use_percent;
     /* Three statistics are required to compute cache use percentage. */
-    get_stat(cursor, WT_STAT_CONN_CACHE_BYTES_IMAGE, &cache_bytes_image);
-    get_stat(cursor, WT_STAT_CONN_CACHE_BYTES_OTHER, &cache_bytes_other);
-    get_stat(cursor, WT_STAT_CONN_CACHE_BYTES_MAX, &cache_bytes_max);
+    runtime_monitor::get_stat(cursor, WT_STAT_CONN_CACHE_BYTES_IMAGE, &cache_bytes_image);
+    runtime_monitor::get_stat(cursor, WT_STAT_CONN_CACHE_BYTES_OTHER, &cache_bytes_other);
+    runtime_monitor::get_stat(cursor, WT_STAT_CONN_CACHE_BYTES_MAX, &cache_bytes_max);
     /*
      * Assert that we never exceed our configured limit for cache usage. Add 0.0 to avoid floating
      * point conversion errors.
@@ -222,7 +212,7 @@ postrun_statistic_check::check_stat(scoped_cursor &cursor, const postrun_statist
     int64_t stat_value;
 
     testutil_assert(cursor.get() != nullptr);
-    get_stat(cursor, stat.field, &stat_value);
+    runtime_monitor::get_stat(cursor, stat.field, &stat_value);
     if (stat_value < stat.min_limit || stat_value > stat.max_limit) {
         const std::string error_string = "runtime_monitor: Postrun stat \"" + stat.name +
           "\" was outside of the specified limits. Min=" + std::to_string(stat.min_limit) +
@@ -236,6 +226,16 @@ postrun_statistic_check::check_stat(scoped_cursor &cursor, const postrun_statist
 }
 
 /* runtime_monitor class implementation */
+void
+runtime_monitor::get_stat(scoped_cursor &cursor, int stat_field, int64_t *valuep)
+{
+    const char *desc, *pvalue;
+    cursor->set_key(cursor.get(), stat_field);
+    testutil_check(cursor->search(cursor.get()));
+    testutil_check(cursor->get_value(cursor.get(), &desc, &pvalue, valuep));
+    testutil_check(cursor->reset(cursor.get()));
+}
+
 runtime_monitor::runtime_monitor(configuration *config, database &database)
     : component("runtime_monitor", config), _postrun_stats(config), _database(database)
 {

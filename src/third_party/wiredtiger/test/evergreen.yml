@@ -968,6 +968,21 @@ tasks:
 
             ${test_env_vars|} $(pwd)/test/cppsuite/run -t hs_cleanup -C 'debug_mode=(cursor_copy=true)' -f test/cppsuite/configs/hs_cleanup_default.txt -l 2
 
+  - name: cppsuite-search-near-01-default
+    tags: ["pull_request"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/build_posix/"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} $(pwd)/test/cppsuite/run -t search_near_01 -f test/cppsuite/configs/search_near_01_default.txt -l 2
+
   - name: cppsuite-base-test-stress
     depends_on:
       - name: compile
@@ -2990,6 +3005,7 @@ buildvariants:
     - name: make-check-test
     - name: cppsuite-base-test-default
     - name: cppsuite-hs-cleanup-default
+    - name: cppsuite-search-near-01-default
 
 - name: ubuntu2004-compilers
   display_name: "! Ubuntu 20.04 Compilers"
