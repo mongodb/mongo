@@ -1,3 +1,7 @@
+// @tags: [
+//   assumes_read_concern_local,
+// ]
+
 var t = db.array_match4;
 
 t.drop();

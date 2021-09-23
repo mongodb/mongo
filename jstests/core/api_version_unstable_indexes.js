@@ -5,6 +5,7 @@
  *
  * @tags: [
  *   uses_api_parameters,
+ *   assumes_read_concern_local,
  * ]
  */
 

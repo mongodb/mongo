@@ -2,6 +2,7 @@
  * Analyzes execution stats for indexed distinct.
  * @tags: [
  *   assumes_balancer_off,
+ *   assumes_read_concern_local,
  * ]
  */
 (function() {

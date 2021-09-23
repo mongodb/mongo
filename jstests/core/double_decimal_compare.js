@@ -1,9 +1,11 @@
 /**
  * Verifies correctness of double/decimal comparisons depending on the engine being used. This
  * is intended to reproduce SERVER-58155.
- *
- * TODO SERVER-60106 Remove the tag below once SBE is enabled by default.
- * @tags: [requires_fcv_51]
+ * @tags: [
+ *   TODO SERVER-60106 Remove the tag below once SBE is enabled by default.
+ *   requires_fcv_51,
+ *   assumes_read_concern_local,
+ * ]
  */
 (function() {
 "use strict";

@@ -1,5 +1,8 @@
 /**
  * This test ensures that bit test query operators work.
+ * @tags: [
+ *   assumes_read_concern_local,
+ * ]
  */
 (function() {
 'use strict';

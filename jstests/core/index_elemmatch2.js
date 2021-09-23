@@ -1,6 +1,9 @@
 /**
  * Test that queries containing $elemMatch correctly use an index if each child expression is
  * compatible with the index.
+ * @tags: [
+ *   assumes_read_concern_local,
+ * ]
  */
 (function() {
 "use strict";

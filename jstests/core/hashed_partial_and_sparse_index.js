@@ -3,6 +3,7 @@
  * index and sparse index. The test verifies compound hashed index with hashed prefix and non-hashed
  * prefix.
  * @tags: [
+ *   assumes_read_concern_local,
  * ]
  */
 (function() {

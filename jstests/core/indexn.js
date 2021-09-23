@@ -1,5 +1,8 @@
 // Test "impossible match" queries, or queries that will always have
 // an empty result set.
+// @tags: [
+//   assumes_read_concern_local,
+// ]
 
 t = db.jstests_indexn;
 t.drop();

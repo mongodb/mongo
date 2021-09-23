@@ -1,6 +1,9 @@
 // Index bounds generation tests for Timestamp values.
 // This file tests whether index bounds for timestamps are generated properly in terms of
 // inclusiveness and exactness.
+// @tags: [
+//   assumes_read_concern_local,
+// ]
 
 (function() {
 "use strict";

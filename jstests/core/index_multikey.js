@@ -1,6 +1,9 @@
 /**
  * Tests that an index properly reports multikeyness and multikey paths metadata in the presence of
  * successful and unsuccessful inserts.
+ * @tags: [
+ *   assumes_read_concern_local,
+ * ]
  */
 (function() {
 "use strict";

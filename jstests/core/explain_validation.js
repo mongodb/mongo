@@ -3,6 +3,7 @@
  * arguments will be permitted to pass validation.
  *
  * @tags: [
+ *   assumes_read_concern_local,
  * ]
  */
 

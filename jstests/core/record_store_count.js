@@ -1,6 +1,9 @@
 /**
  * Tests that a count will ask the record store for the count when the query predicate is empty, or
  * logically empty. See SERVER-20536 for more details.
+ * @tags: [
+ *   assumes_read_concern_local,
+ * ]
  */
 
 load("jstests/libs/analyze_plan.js");     // For 'planHasStage'.

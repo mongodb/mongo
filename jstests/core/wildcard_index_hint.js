@@ -1,5 +1,8 @@
 /**
  * Tests that $** indexes obey hinting.
+ * @tags: [
+ *   assumes_read_concern_local,
+ * ]
  */
 (function() {
 "use strict";

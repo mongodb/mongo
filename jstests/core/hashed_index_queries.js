@@ -1,6 +1,9 @@
 /**
  * Test to verify the behaviour of find, count, distinct operations in the presence of compound
  * hashed indexes.
+ * @tags: [
+ *   assumes_read_concern_local,
+ * ]
  */
 (function() {
 "use strict";

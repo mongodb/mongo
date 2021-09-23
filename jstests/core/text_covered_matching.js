@@ -9,6 +9,7 @@
 //
 // @tags: [
 //   assumes_balancer_off,
+//   assumes_read_concern_local,
 // ]
 
 load("jstests/libs/analyze_plan.js");

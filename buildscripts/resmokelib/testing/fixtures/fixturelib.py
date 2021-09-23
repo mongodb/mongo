@@ -133,6 +133,3 @@ class _FixtureConfig(object):  # pylint: disable=too-many-instance-attributes
         self.MONGOS_SET_PARAMETERS = config.MONGOS_SET_PARAMETERS
         self.DBPATH_PREFIX = config.DBPATH_PREFIX
         self.DEFAULT_DBPATH_PREFIX = config.DEFAULT_DBPATH_PREFIX
-        # Config servers have to be upgraded first. We hardcode the value here since there's
-        # no way to set it on the command line.
-        self.CONFIG_SVR_MIXED_BIN_VERSIONS = ["new", "new"]

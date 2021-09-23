@@ -1,5 +1,8 @@
 /**
  * Test the behavior of match expressions with empty field names.
+ * @tags: [
+ *   assumes_read_concern_local,
+ * ]
  */
 (function() {
 "use strict";

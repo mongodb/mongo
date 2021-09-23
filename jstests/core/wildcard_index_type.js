@@ -1,5 +1,8 @@
 /**
  * Test $** support for the $type operator.
+ * @tags: [
+ *   assumes_read_concern_local,
+ * ]
  */
 (function() {
 "use strict";

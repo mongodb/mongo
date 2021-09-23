@@ -1,5 +1,8 @@
 /**
  * Test that $** indexes work when provided with a partial filter expression.
+ * @tags: [
+ *   assumes_read_concern_local,
+ * ]
  */
 (function() {
 "use strict";

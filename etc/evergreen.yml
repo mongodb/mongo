@@ -5703,6 +5703,17 @@ tasks:
       implicit_multiversion: true
 
 - <<: *gen_task_template
+  name: sharded_retryable_writes_downgrade_passthrough_gen
+  tags: ["multiversion_passthrough"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      suite: sharded_retryable_writes_downgrade_passthrough
+      resmoke_args: --storageEngine=wiredTiger
+      require_multiversion: true
+      implicit_multiversion: true
+
+- <<: *gen_task_template
   name: logical_session_cache_replication_default_refresh_jscore_passthrough_gen
   tags: ["logical_session_cache", "repl"]
   commands:

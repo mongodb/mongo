@@ -1,5 +1,6 @@
 // Confirms expected index use when performing a match with a $expr statement.
 // @tags: [
+//   assumes_read_concern_local,
 // ]
 
 (function() {

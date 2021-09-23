@@ -1,4 +1,8 @@
 // Test $text with $textScore projection.
+// @tags: [
+//   assumes_read_concern_local,
+// ]
+
 (function() {
 "use strict";
 

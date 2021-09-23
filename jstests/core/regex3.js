@@ -1,5 +1,6 @@
 // @tags: [
 //   assumes_balancer_off,
+//   assumes_read_concern_local,
 // ]
 
 t = db.regex3;

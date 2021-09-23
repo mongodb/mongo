@@ -1,6 +1,9 @@
 /**
  * Tests the tightness of index bounds when attempting to match a regex that contains escaped and
  * non-escaped pipe '|' characters.
+ * @tags: [
+ *   assumes_read_concern_local,
+ * ]
  */
 (function() {
 'use strict';

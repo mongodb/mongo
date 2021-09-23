@@ -1,6 +1,9 @@
 /**
  * Tests $or queries which can be answered with a SORT_MERGE stage.
  *
+ * @tags: [
+ *   assumes_read_concern_local,
+ * ]
  */
 (function() {
 "use strict";

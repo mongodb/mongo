@@ -1,6 +1,9 @@
 /**
  * Test that 'queryHash' and 'planCacheKey' from explain() output have sensible values
  * across catalog changes.
+ * @tags: [
+ *   assumes_read_concern_local,
+ * ]
  */
 (function() {
 "use strict";

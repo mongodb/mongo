@@ -1,4 +1,7 @@
 // check that we don't scan $ne values
+// @tags: [
+//   assumes_read_concern_local,
+// ]
 
 t = db.jstests_ne2;
 t.drop();

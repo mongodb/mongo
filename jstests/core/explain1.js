@@ -1,3 +1,7 @@
+// @tags: [
+//   assumes_read_concern_local,
+// ]
+
 t = db.explain1;
 t.drop();
 

@@ -48,7 +48,7 @@ class FixtureBuilder(ABC, metaclass=registry.make_registry_metaclass(_BUILDERS, 
 
     @abstractmethod
     def build_fixture(self, logger, job_num, fixturelib, *args, **kwargs):
-        """Abstract method to build a replica set."""
+        """Abstract method to build a fixture."""
         return
 
 
@@ -83,7 +83,6 @@ class ReplSetBuilder(FixtureBuilder):
             kwargs.get("mongod_executable"), config.MONGOD_EXECUTABLE,
             config.DEFAULT_MONGOD_EXECUTABLE)
         kwargs["mongod_executable"] = mongod_executable
-        num_nodes = kwargs["num_nodes"]
         latest_mongod = mongod_executable
 
         from buildscripts.resmokelib import multiversionconstants
@@ -120,13 +119,7 @@ class ReplSetBuilder(FixtureBuilder):
             is_config_svr = "configsvr" in replset_config_options and replset_config_options[
                 "configsvr"]
 
-            if not is_config_svr:
-                mongod_binary_versions = [x for x in mixed_bin_versions]
-            else:
-
-                # Our documented recommended path for upgrading shards lets us assume that config
-                # server nodes will always be fully upgraded before shard nodes.
-                mongod_binary_versions = [BinVersionEnum.NEW] * 2
+            mongod_binary_versions = [x for x in mixed_bin_versions]
 
             num_versions = len(mixed_bin_versions)
             fcv = {
@@ -136,8 +129,8 @@ class ReplSetBuilder(FixtureBuilder):
             }[old_bin_version]
 
             if num_versions != num_nodes and not is_config_svr:
-                msg = (("The number of binary versions specified: {} do not match the number of"\
-                        " nodes in the replica set: {}.")).format(num_versions, num_nodes)
+                msg = ("The number of binary versions specified: {} do not match the number of"
+                       " nodes in the replica set: {}.").format(num_versions, num_nodes)
                 raise errors.ServerFailure(msg)
 
         replset = _FIXTURES[self.REGISTERED_NAME](logger, job_num, fixturelib, *args, **kwargs)
@@ -270,3 +263,111 @@ class FixtureContainer(object):
             return object.__setattr__(self, key, value)
         else:
             return self.cur_version_cls.__setattr__(key, value)
+
+
+class ShardedClusterBuilder(FixtureBuilder):
+    """Builder class for sharded cluster fixtures."""
+
+    REGISTERED_NAME = "ShardedClusterFixture"
+
+    def build_fixture(self, logger, job_num, fixturelib, *args, **kwargs):
+        """Build a sharded cluster."""
+
+        mixed_bin_versions = kwargs.get("mixed_bin_versions", config.MIXED_BIN_VERSIONS)
+        old_bin_version = kwargs.pop("old_bin_version", config.MULTIVERSION_BIN_VERSION)
+        is_multiversion = mixed_bin_versions is not None
+
+        num_shards = kwargs.pop("num_shards", 1)
+        num_shards_option = config.NUM_SHARDS
+        num_shards = num_shards if not num_shards_option else num_shards_option
+        kwargs["num_shards"] = num_shards
+
+        num_rs_nodes_per_shard = kwargs.pop("num_rs_nodes_per_shard", 1)
+        num_rs_nodes_per_shard_option = config.NUM_REPLSET_NODES
+        num_rs_nodes_per_shard = num_rs_nodes_per_shard if not num_rs_nodes_per_shard_option else num_rs_nodes_per_shard_option
+        kwargs["num_rs_nodes_per_shard"] = num_rs_nodes_per_shard
+
+        num_mongos = kwargs.pop("num_mongos", 1)
+        kwargs["num_mongos"] = num_mongos
+
+        mongos_executable = default_if_none(
+            kwargs.get("mongos_executable"), config.MONGOS_EXECUTABLE,
+            config.DEFAULT_MONGOS_EXECUTABLE)
+
+        if is_multiversion:
+            len_versions = len(mixed_bin_versions)
+            num_mongods = num_shards * num_rs_nodes_per_shard
+            if len_versions != num_mongods:
+                msg = ("The number of binary versions specified: {} do not match the number of"
+                       " nodes in the sharded cluster: {}.").format(len_versions, num_mongods)
+                raise errors.ServerFailure(msg)
+
+            from buildscripts.resmokelib import multiversionconstants
+            mongos_executable = {
+                config.MultiversionOptions.LAST_LTS:
+                    multiversionconstants.LAST_LTS_MONGOS_BINARY,
+                config.MultiversionOptions.LAST_CONTINUOUS:
+                    multiversionconstants.LAST_CONTINUOUS_MONGOS_BINARY
+            }[old_bin_version]
+
+        kwargs["mongos_executable"] = mongos_executable
+
+        sharded_cluster = _FIXTURES[self.REGISTERED_NAME](logger, job_num, fixturelib, *args,
+                                                          **kwargs)
+
+        config_svr = self._new_configsvr(sharded_cluster, is_multiversion)
+        sharded_cluster.install_configsvr(config_svr)
+
+        for rs_shard_index in range(num_shards):
+            rs_shard = self._new_rs_shard(sharded_cluster, mixed_bin_versions, rs_shard_index,
+                                          num_rs_nodes_per_shard)
+            sharded_cluster.install_rs_shard(rs_shard)
+
+        for mongos_index in range(num_mongos):
+            mongos = self._new_mongos(sharded_cluster, mongos_executable, mongos_index, num_mongos)
+            sharded_cluster.install_mongos(mongos)
+
+        return sharded_cluster
+
+    @classmethod
+    def _new_configsvr(cls, sharded_cluster, is_multiversion):
+        """Return a replicaset.ReplicaSetFixture configured as the config server."""
+
+        configsvr_logger = sharded_cluster.get_configsvr_logger()
+        configsvr_kwargs = sharded_cluster.get_configsvr_kwargs()
+
+        mixed_bin_versions = None
+        if is_multiversion:
+            # Our documented recommended path for upgrading shards lets us assume that config
+            # server nodes will always be fully upgraded before shard nodes.
+            mixed_bin_versions = [BinVersionEnum.NEW] * 2
+
+        return make_fixture("ReplicaSetFixture", configsvr_logger, sharded_cluster.job_num,
+                            mixed_bin_versions=mixed_bin_versions, **configsvr_kwargs)
+
+    @classmethod
+    def _new_rs_shard(cls, sharded_cluster, mixed_bin_versions, rs_shard_index,
+                      num_rs_nodes_per_shard):
+        """Return a replicaset.ReplicaSetFixture configured as a shard in a sharded cluster."""
+
+        rs_shard_logger = sharded_cluster.get_rs_shard_logger(rs_shard_index)
+        rs_shard_kwargs = sharded_cluster.get_rs_shard_kwargs(rs_shard_index)
+
+        if mixed_bin_versions is not None:
+            start_index = rs_shard_index * num_rs_nodes_per_shard
+            mixed_bin_versions = mixed_bin_versions[start_index:start_index +
+                                                    num_rs_nodes_per_shard]
+
+        return make_fixture("ReplicaSetFixture", rs_shard_logger, sharded_cluster.job_num,
+                            num_nodes=num_rs_nodes_per_shard, mixed_bin_versions=mixed_bin_versions,
+                            **rs_shard_kwargs)
+
+    @classmethod
+    def _new_mongos(cls, sharded_cluster, mongos_executable, mongos_index, total):
+        """Return a _MongoSFixture configured to be used as the mongos for a sharded cluster."""
+
+        mongos_logger = sharded_cluster.get_mongos_logger(mongos_index, total)
+        mongos_kwargs = sharded_cluster.get_mongos_kwargs()
+
+        return make_fixture("_MongoSFixture", mongos_logger, sharded_cluster.job_num,
+                            mongos_executable=mongos_executable, **mongos_kwargs)

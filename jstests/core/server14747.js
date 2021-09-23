@@ -1,5 +1,8 @@
 // Validation test for SERVER-14747. Note that the issue under test is a memory leak, so this
 // test would only be expected to fail when run under address sanitizer.
+// @tags: [
+//   assumes_read_concern_local,
+// ]
 
 (function() {
 

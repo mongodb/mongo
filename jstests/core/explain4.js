@@ -1,4 +1,8 @@
 // Test that limit is applied by explain.
+// @tags: [
+//   assumes_read_concern_local,
+// ]
+
 t = db.jstests_explain4;
 t.drop();
 

@@ -1,6 +1,7 @@
 /**
  * Tests for explaining find through the explain command.
  * @tags: [
+ *   assumes_read_concern_local,
  * ]
  */
 

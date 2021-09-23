@@ -1,7 +1,10 @@
 /**
  * Tests for explaining an aggregation pipeline which uses the $sample stage. Only run on WT, since
  * currently only the WT storage engine uses a storage-engine supported random cursor for $sample.
- * @tags: [requires_wiredtiger]
+ * @tags: [
+ *   requires_wiredtiger,
+ *   assumes_read_concern_local,
+ * ]
  */
 (function() {
 "use strict";

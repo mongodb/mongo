@@ -2,6 +2,9 @@
  * This test ensures that range predicates with a BinData value:
  * 1) Return the correct documents.
  * 2) Can perform index-only data access.
+ * @tags: [
+ *   assumes_read_concern_local,
+ * ]
  */
 (function() {
 'use strict';
