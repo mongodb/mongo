@@ -44,6 +44,7 @@ class test_timestamp22(wttest.WiredTigerTestCase):
     rand = suite_random.suite_random()
     oldest_ts = 0
     stable_ts = 0
+    last_durable = 0
     SUCCESS = 'success'
     FAILURE = 'failure'
 
@@ -147,6 +148,12 @@ class test_timestamp22(wttest.WiredTigerTestCase):
                 else:
                     # It's possible this will succeed, we'll check below.
                     this_commit_ts = self.gen_ts(commit_ts)
+
+                    # OOD does not work with prepared updates. Hence, the commit ts should always be
+                    # greater than the last durable ts.
+                    if this_commit_ts <= self.last_durable:
+                        this_commit_ts = self.last_durable + 1
+
                 config += ',commit_timestamp=' + self.timestamp_str(this_commit_ts)
 
             if this_commit_ts >= 0:
@@ -288,6 +295,8 @@ class test_timestamp22(wttest.WiredTigerTestCase):
                     with self.expect(ok_commit, 'commit'):
                         session.commit_transaction(commit_config)
                         self.commit_value = value
+                        if do_prepare:
+                            self.last_durable = durable_ts
                 if needs_rollback:
                     # Rollback this one transaction, and continue the loop
                     self.report('rollback_transaction')
@@ -422,6 +431,12 @@ class test_timestamp22(wttest.WiredTigerTestCase):
                     read_ts = self.gen_ts(iternum)
                 else:
                     read_ts = -1   # no read_timestamp used in txn
+
+                # OOD does not work with prepared updates. Hence, the commit ts should always be
+                # greater than the last durable ts.
+                if commit_ts <= self.last_durable:
+                    commit_ts = self.last_durable + 1
+
                 if do_prepare:
                     # If we doing a prepare, we must abide by some additional rules.
                     # If we don't we'll immediately panic
