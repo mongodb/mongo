@@ -1001,9 +1001,13 @@ public:
 class ExpressionAnyElementTrue final : public ExpressionFixedArity<ExpressionAnyElementTrue, 1> {
 public:
     explicit ExpressionAnyElementTrue(ExpressionContext* const expCtx)
-        : ExpressionFixedArity<ExpressionAnyElementTrue, 1>(expCtx) {}
+        : ExpressionFixedArity<ExpressionAnyElementTrue, 1>(expCtx) {
+        expCtx->sbeCompatible = false;
+    }
     ExpressionAnyElementTrue(ExpressionContext* const expCtx, ExpressionVector&& children)
-        : ExpressionFixedArity<ExpressionAnyElementTrue, 1>(expCtx, std::move(children)) {}
+        : ExpressionFixedArity<ExpressionAnyElementTrue, 1>(expCtx, std::move(children)) {
+        expCtx->sbeCompatible = false;
+    }
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
