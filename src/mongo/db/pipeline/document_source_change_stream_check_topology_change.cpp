@@ -92,7 +92,7 @@ Value DocumentSourceChangeStreamCheckTopologyChange::serializeLatest(
     if (explain) {
         return Value(DOC(DocumentSourceChangeStream::kStageName
                          << DOC("stage"
-                                << "internalChangeStreamTopologyChange"_sd)));
+                                << "internalCheckTopologyChange"_sd)));
     }
 
     return Value(Document{{kStageName, Document()}});

@@ -229,4 +229,15 @@ BSONObj DocumentSourceChangeStreamHandleTopologyChange::replaceResumeTokenInComm
     return newCmd.freeze().toBson();
 }
 
+Value DocumentSourceChangeStreamHandleTopologyChange::serializeLatest(
+    boost::optional<ExplainOptions::Verbosity> explain) const {
+    if (explain) {
+        return Value(DOC(DocumentSourceChangeStream::kStageName
+                         << DOC("stage"
+                                << "internalHandleTopologyChange"_sd)));
+    }
+
+    return Value(Document{{kStageName, Document()}});
+}
+
 }  // namespace mongo

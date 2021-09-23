@@ -183,4 +183,9 @@ Value DocumentSourceChangeStreamCheckTopologyChange::serializeLegacy(
     return (explain ? Value{Document{{kStageName, Document()}}} : Value());
 }
 
+Value DocumentSourceChangeStreamHandleTopologyChange::serializeLegacy(
+    boost::optional<ExplainOptions::Verbosity> explain) const {
+    return (explain ? Value(Document{{kStageName, Value()}}) : Value());
+}
+
 }  // namespace mongo

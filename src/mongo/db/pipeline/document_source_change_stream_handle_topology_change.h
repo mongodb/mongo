@@ -33,6 +33,7 @@
 
 #include "mongo/db/pipeline/change_stream_constants.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/s/query/document_source_merge_cursors.h"
 #include "mongo/s/shard_id.h"
 
@@ -45,7 +46,9 @@ namespace mongo {
  * the first time. When this event is detected, this stage will establish a new cursor on that
  * shard and add it to the cursors being merged.
  */
-class DocumentSourceChangeStreamHandleTopologyChange final : public DocumentSource {
+class DocumentSourceChangeStreamHandleTopologyChange final
+    : public DocumentSource,
+      public ChangeStreamStageSerializationInterface {
 public:
     static constexpr StringData kStageName = "$_internalChangeStreamHandleTopologyChange"_sd;
 
@@ -61,7 +64,7 @@ public:
     }
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final {
-        return (explain ? Value(Document{{kStageName, Value()}}) : Value());
+        return ChangeStreamStageSerializationInterface::serializeToValue(explain);
     }
 
     StageConstraints constraints(Pipeline::SplitState) const final;
@@ -79,6 +82,10 @@ private:
     DocumentSourceChangeStreamHandleTopologyChange(const boost::intrusive_ptr<ExpressionContext>&);
 
     GetNextResult doGetNext() final;
+
+    Value serializeLegacy(boost::optional<ExplainOptions::Verbosity> explain) const final;
+
+    Value serializeLatest(boost::optional<ExplainOptions::Verbosity> explain) const final;
 
     /**
      * Establish the new cursors and tell the RouterStageMerge about them.
