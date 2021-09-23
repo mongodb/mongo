@@ -236,10 +236,7 @@ Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
                                                const NamespaceString& nss,
                                                const UUID& collectionUuid,
                                                ChunkRange orphanRange,
-                                               Milliseconds waitTimeout) {
-    auto rangeDeletionWaitDeadline = waitTimeout == Milliseconds::max()
-        ? Date_t::max()
-        : opCtx->getServiceContext()->getFastClockSource()->now() + waitTimeout;
+                                               Date_t deadline) {
     while (true) {
         boost::optional<SharedSemiFuture<void>> stillScheduled;
 
@@ -276,9 +273,8 @@ Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
                       "namespace"_attr = nss.ns(),
                       "orphanRange"_attr = orphanRange);
         try {
-            opCtx->runWithDeadline(rangeDeletionWaitDeadline, ErrorCodes::ExceededTimeLimit, [&] {
-                stillScheduled->get(opCtx);
-            });
+            opCtx->runWithDeadline(
+                deadline, ErrorCodes::ExceededTimeLimit, [&] { stillScheduled->get(opCtx); });
         } catch (const DBException& ex) {
             auto result = ex.toStatus();
             // Swallow RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist error since the

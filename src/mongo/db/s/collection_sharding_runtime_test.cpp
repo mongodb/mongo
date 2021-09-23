@@ -431,7 +431,7 @@ TEST_F(CollectionShardingRuntimeWithRangeDeleterTest,
         kTestNss,
         uuid(),
         ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY)),
-        Milliseconds::max());
+        Date_t::max());
     ASSERT_EQ(status.code(), ErrorCodes::ConflictingOperationInProgress);
 }
 
@@ -447,7 +447,7 @@ TEST_F(CollectionShardingRuntimeWithRangeDeleterTest,
         kTestNss,
         randomUuid,
         ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY)),
-        Milliseconds::max());
+        Date_t::max());
     ASSERT_EQ(status.code(), ErrorCodes::ConflictingOperationInProgress);
 }
 
@@ -462,7 +462,7 @@ TEST_F(CollectionShardingRuntimeWithRangeDeleterTest,
         kTestNss,
         uuid(),
         ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY)),
-        Milliseconds::max());
+        Date_t::max());
 
     ASSERT_OK(status);
 }
@@ -487,7 +487,7 @@ TEST_F(CollectionShardingRuntimeWithRangeDeleterTest,
         kTestNss,
         uuid(),
         ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY)),
-        Milliseconds::max());
+        Date_t::max());
 
     ASSERT_EQ(status.code(), ErrorCodes::MaxTimeMSExpired);
 
@@ -518,7 +518,7 @@ TEST_F(CollectionShardingRuntimeWithRangeDeleterTest,
         kTestNss,
         uuid(),
         ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY)),
-        Milliseconds::max());
+        Date_t::max());
 
     // waitForClean should block until both cleanup tasks have run. This is a best-effort check,
     // since even if it did not block, it is possible that the cleanup tasks could complete before
@@ -545,7 +545,7 @@ TEST_F(CollectionShardingRuntimeWithRangeDeleterTest,
         kTestNss,
         uuid(),
         ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY)),
-        Milliseconds::max());
+        Date_t::max());
 
     ASSERT_OK(status);
     ASSERT(cleanupComplete.isReady());
