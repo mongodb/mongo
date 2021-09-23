@@ -147,6 +147,8 @@ csv_customize(WT_EXTRACTOR *extractor, WT_SESSION *session, const char *uri, WT_
 
     orig = (const CSV_EXTRACTOR *)extractor;
     wt_api = orig->wt_api;
+    parser = NULL;
+
     if ((ret = wt_api->config_parser_open(wt_api, session, appcfg->str, appcfg->len, &parser)) != 0)
         return (ret);
     if ((ret = parser->get(parser, "field", &field)) != 0) {
@@ -164,12 +166,6 @@ csv_customize(WT_EXTRACTOR *extractor, WT_SESSION *session, const char *uri, WT_
             (void)wt_api->err_printf(wt_api, session, "WT_CONFIG_PARSER.get: format: %s",
               wt_api->strerror(wt_api, session, ret));
         goto err;
-    }
-    ret = parser->close(parser);
-    parser = NULL;
-    if (ret != 0) {
-        (void)wt_api->err_printf(
-          wt_api, session, "WT_CONFIG_PARSER.close: %s", wt_api->strerror(wt_api, session, ret));
     }
 
     field_num = strtol(field.str, NULL, 10);
@@ -195,8 +191,7 @@ csv_customize(WT_EXTRACTOR *extractor, WT_SESSION *session, const char *uri, WT_
     return (0);
 
 err:
-    if (parser != NULL)
-        (void)parser->close(parser);
+    (void)parser->close(parser);
     return (ret);
 }
 

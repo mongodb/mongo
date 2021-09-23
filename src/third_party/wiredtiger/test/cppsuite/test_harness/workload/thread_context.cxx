@@ -29,6 +29,7 @@
 #include "../core/configuration.h"
 #include "../timestamp_manager.h"
 #include "../util/api_const.h"
+#include "../util/logger.h"
 #include "workload_tracking.h"
 #include "random_generator.h"
 #include "thread_context.h"
@@ -81,22 +82,23 @@ transaction_context::try_begin(const std::string &config)
         begin(config);
 }
 
-/* It's possible to receive rollback in commit which is handled internally. */
+/*
+ * It's possible to receive rollback in commit, when this happens the API will rollback the
+ * transaction internally.
+ */
 bool
 transaction_context::commit(const std::string &config)
 {
     WT_DECL_RET;
-    testutil_assert(_in_txn);
+    testutil_assert(_in_txn && !_needs_rollback);
     if ((ret = _session->commit_transaction(_session, config.empty() ? nullptr : config.c_str())) !=
       0) {
         logger::log_msg(LOG_WARN,
           "Failed to commit transaction in commit, received error code: " + std::to_string(ret));
-        _needs_rollback = true;
-    } else {
-        _op_count = 0;
-        _in_txn = false;
     }
-    return (_needs_rollback);
+    _op_count = 0;
+    _in_txn = false;
+    return (ret == 0);
 }
 
 void
@@ -200,7 +202,7 @@ thread_context::update(scoped_cursor &cursor, uint64_t collection_id, const std:
     if (ret != 0) {
         if (ret == WT_ROLLBACK) {
             transaction.set_needs_rollback(true);
-            return (true);
+            return (false);
         } else
             testutil_die(ret, "unhandled error while trying to update a key");
     }
@@ -209,31 +211,39 @@ thread_context::update(scoped_cursor &cursor, uint64_t collection_id, const std:
     if (ret != 0) {
         if (ret == WT_ROLLBACK) {
             transaction.set_needs_rollback(true);
-            return (true);
+            return (false);
         } else
             testutil_die(
               ret, "unhandled error while trying to save an update to the tracking table");
     }
     transaction.add_op();
-    return (false);
+    return (true);
 }
 
 bool
-thread_context::insert(scoped_cursor &cursor, uint64_t collection_id, uint64_t key_id)
+thread_context::insert(
+  scoped_cursor &cursor, uint64_t collection_id, uint64_t key_id, wt_timestamp_t ts)
+{
+    return insert(cursor, collection_id, key_to_string(key_id), ts);
+}
+
+bool
+thread_context::insert(
+  scoped_cursor &cursor, uint64_t collection_id, const std::string &key, wt_timestamp_t ts)
 {
     WT_DECL_RET;
-    std::string key, value;
+    std::string value;
     testutil_assert(tracking != nullptr);
     testutil_assert(cursor.get() != nullptr);
 
     /*
-     * Get a timestamp to apply to the update. We still do this even if timestamps aren't enabled as
-     * it will return a value for the tracking table.
+     * When no timestamp is specified, get one to apply to the update. We still do this even if the
+     * timestamp manager is not enabled as it will return a value for the tracking table.
      */
-    wt_timestamp_t ts = tsm->get_next_ts();
+    if (ts == 0)
+        ts = tsm->get_next_ts();
     transaction.set_commit_timestamp(ts);
 
-    key = key_to_string(key_id);
     value = random_generator::instance().generate_pseudo_random_string(value_size);
 
     cursor->set_key(cursor.get(), key.c_str());
@@ -242,7 +252,7 @@ thread_context::insert(scoped_cursor &cursor, uint64_t collection_id, uint64_t k
     if (ret != 0) {
         if (ret == WT_ROLLBACK) {
             transaction.set_needs_rollback(true);
-            return (true);
+            return (false);
         } else
             testutil_die(ret, "unhandled error while trying to insert a key");
     }
@@ -251,13 +261,13 @@ thread_context::insert(scoped_cursor &cursor, uint64_t collection_id, uint64_t k
     if (ret != 0) {
         if (ret == WT_ROLLBACK) {
             transaction.set_needs_rollback(true);
-            return (true);
+            return (false);
         } else
             testutil_die(
               ret, "unhandled error while trying to save an insert to the tracking table");
     }
     transaction.add_op();
-    return (false);
+    return (true);
 }
 
 void

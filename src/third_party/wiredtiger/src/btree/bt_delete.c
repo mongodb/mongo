@@ -305,12 +305,14 @@ __wt_delete_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
 
     /*
      * Give the page a modify structure.
-     *
-     * Mark tree dirty, unless the handle is read-only. (We'd like to free the deleted pages, but if
-     * the handle is read-only, we're not able to do so.)
      */
     WT_RET(__wt_page_modify_init(session, page));
-    if (!F_ISSET(btree, WT_BTREE_READONLY))
+
+    /*
+     * We would like to free the deleted pages, but if the tree is newly created, there is nothing
+     * that needs to be freed. Furthermore, if the handle is read-only, we are not able to do so.
+     */
+    if (!btree->original)
         __wt_page_modify_set(session, page);
 
     /*

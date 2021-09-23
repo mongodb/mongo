@@ -193,53 +193,6 @@ __wt_session_compact_check_timeout(WT_SESSION_IMPL *session)
 }
 
 /*
- * __compact_checkpoint --
- *     Perform a checkpoint for compaction.
- */
-static int
-__compact_checkpoint(WT_SESSION_IMPL *session)
-{
-    WT_DECL_RET;
-    WT_TXN_GLOBAL *txn_global;
-    uint64_t txn_gen;
-
-    /*
-     * Force compaction checkpoints: we don't want to skip it because the work we need to have done
-     * is done in the underlying block manager.
-     */
-    const char *checkpoint_cfg[] = {
-      WT_CONFIG_BASE(session, WT_SESSION_checkpoint), "force=1", NULL};
-
-    /* Checkpoints take a lot of time, check if we've run out. */
-    WT_RET(__wt_session_compact_check_timeout(session));
-
-    ret = __wt_txn_checkpoint(session, checkpoint_cfg, false);
-    if (ret == 0)
-        return (0);
-    WT_RET_BUSY_OK(ret);
-
-    /*
-     * If there's a checkpoint running, wait for it to complete, checking if we're out of time. If
-     * there's no checkpoint running or the checkpoint generation number changes, the checkpoint
-     * blocking us has completed.
-     */
-    txn_global = &S2C(session)->txn_global;
-    for (txn_gen = __wt_gen(session, WT_GEN_CHECKPOINT);;) {
-        /*
-         * This loop only checks objects that are declared volatile, therefore no barriers are
-         * needed.
-         */
-        if (!txn_global->checkpoint_running || txn_gen != __wt_gen(session, WT_GEN_CHECKPOINT))
-            break;
-
-        WT_RET(__wt_session_compact_check_timeout(session));
-        __wt_sleep(2, 0);
-    }
-
-    return (0);
-}
-
-/*
  * __compact_worker --
  *     Function to alternate between checkpoints and compaction calls.
  */
@@ -260,7 +213,7 @@ __compact_worker(WT_SESSION_IMPL *session)
     /*
      * Perform an initial checkpoint (see this file's leading comment for details).
      */
-    WT_ERR(__compact_checkpoint(session));
+    WT_ERR(__wt_session_blocking_checkpoint(session, true, session->compact->max_time));
 
     /*
      * We compact 10% of a file on each pass (but the overall size of the file is decreasing each
@@ -310,8 +263,8 @@ __compact_worker(WT_SESSION_IMPL *session)
         /*
          * Perform two checkpoints (see this file's leading comment for details).
          */
-        WT_ERR(__compact_checkpoint(session));
-        WT_ERR(__compact_checkpoint(session));
+        WT_ERR(__wt_session_blocking_checkpoint(session, true, session->compact->max_time));
+        WT_ERR(__wt_session_blocking_checkpoint(session, true, session->compact->max_time));
     }
 
 err:

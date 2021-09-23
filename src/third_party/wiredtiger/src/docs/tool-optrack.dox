@@ -76,7 +76,7 @@ connection configuration string.
 For example, if you are running `wtperf`, you would add it to the `conn_config`
 string:
 
-    ./wtperf -c conn_config="operation_tracking=(enabled=true,path=.)"
+    ./wtperf -C conn_config="operation_tracking=(enabled=true,path=.)"
 
 The "path" argument determines where the log files, produced by operation
 tracking, will be stored. Now you can run your workload.

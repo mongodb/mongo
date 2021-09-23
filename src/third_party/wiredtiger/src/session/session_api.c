@@ -142,7 +142,7 @@ __wt_session_copy_values(WT_SESSION_IMPL *session)
             WT_TXN_SHARED *txn_shared = WT_SESSION_TXN_SHARED(session);
             WT_ASSERT(session,
               txn_shared->pinned_id != WT_TXN_NONE ||
-                (WT_PREFIX_MATCH(cursor->uri, "file:") &&
+                (WT_BTREE_PREFIX(cursor->uri) &&
                   F_ISSET((WT_CURSOR_BTREE *)cursor, WT_CBT_NO_TXN)));
 #endif
             WT_RET(__cursor_localvalue(cursor));
@@ -637,16 +637,13 @@ err:
 }
 
 /*
- * __session_alter --
- *     Alter a table setting.
+ * __session_alter_internal --
+ *     Internal implementation of the WT_SESSION.alter method.
  */
 static int
-__session_alter(WT_SESSION *wt_session, const char *uri, const char *config)
+__session_alter_internal(WT_SESSION_IMPL *session, const char *uri, const char *config)
 {
     WT_DECL_RET;
-    WT_SESSION_IMPL *session;
-
-    session = (WT_SESSION_IMPL *)wt_session;
 
     SESSION_API_CALL(session, alter, config, cfg);
 
@@ -672,6 +669,78 @@ err:
     else
         WT_STAT_CONN_INCR(session, session_table_alter_success);
     API_END_RET_NOTFOUND_MAP(session, ret);
+}
+
+/*
+ * __wt_session_blocking_checkpoint --
+ *     Perform a checkpoint or wait if it is already running to resolve an EBUSY error.
+ */
+int
+__wt_session_blocking_checkpoint(WT_SESSION_IMPL *session, bool force, uint64_t seconds)
+{
+    WT_DECL_RET;
+    WT_TXN_GLOBAL *txn_global;
+    uint64_t txn_gen;
+    const char *cfg[3] = {NULL, NULL, NULL};
+
+    cfg[0] = WT_CONFIG_BASE(session, WT_SESSION_checkpoint);
+    if (force)
+        cfg[1] = "force=1";
+
+    if ((ret = __wt_txn_checkpoint(session, cfg, false)) == 0)
+        return (0);
+    WT_RET_BUSY_OK(ret);
+
+    /*
+     * If there's a checkpoint running, wait for it to complete. If there's no checkpoint running or
+     * the checkpoint generation number changes, the checkpoint blocking us has completed.
+     */
+#define WT_CKPT_WAIT 2
+    txn_global = &S2C(session)->txn_global;
+    for (txn_gen = __wt_gen(session, WT_GEN_CHECKPOINT);; __wt_sleep(WT_CKPT_WAIT, 0)) {
+        /*
+         * This loop only checks objects that are declared volatile, therefore no barriers are
+         * needed.
+         */
+        if (!txn_global->checkpoint_running || txn_gen != __wt_gen(session, WT_GEN_CHECKPOINT))
+            break;
+
+        /* If there's a timeout, give up. */
+        if (seconds == 0)
+            continue;
+        if (seconds <= WT_CKPT_WAIT)
+            return (EBUSY);
+        seconds -= WT_CKPT_WAIT;
+    }
+
+    return (0);
+}
+
+/*
+ * __session_alter --
+ *     Alter a table setting.
+ */
+static int
+__session_alter(WT_SESSION *wt_session, const char *uri, const char *config)
+{
+    WT_DECL_RET;
+    WT_SESSION_IMPL *session;
+
+    session = (WT_SESSION_IMPL *)wt_session;
+
+    /*
+     * Alter table can return EBUSY error when the table is modified in parallel by eviction. Retry
+     * the command after performing a system wide checkpoint. Only retry once to avoid potentially
+     * waiting forever.
+     */
+    ret = __session_alter_internal(session, uri, config);
+    if (ret == EBUSY) {
+        WT_RET(__wt_session_blocking_checkpoint(session, false, 0));
+        WT_STAT_CONN_INCR(session, session_table_alter_trigger_checkpoint);
+        ret = __session_alter_internal(session, uri, config);
+    }
+
+    return (ret);
 }
 
 /*
@@ -1254,7 +1323,7 @@ __wt_session_range_truncate(
 
     local_start = false;
     if (uri != NULL) {
-        WT_ASSERT(session, WT_PREFIX_MATCH(uri, "file:"));
+        WT_ASSERT(session, WT_BTREE_PREFIX(uri));
         /*
          * A URI file truncate becomes a range truncate where we set a start cursor at the
          * beginning. We already know the NULL stop goes to the end of the range.
@@ -1402,7 +1471,7 @@ __session_truncate(
                 WT_ERR_MSG(session, EINVAL,
                   "the truncate method should not specify any target after the log: URI prefix");
             WT_ERR(__wt_log_truncate_files(session, start, false));
-        } else if (WT_PREFIX_MATCH(uri, "file:"))
+        } else if (WT_BTREE_PREFIX(uri))
             WT_ERR(__wt_session_range_truncate(session, uri, start, stop));
         else
             /* Wait for checkpoints to avoid EBUSY errors. */

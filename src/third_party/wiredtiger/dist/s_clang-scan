@@ -17,9 +17,9 @@ test -z "$scan" || compiler="${SCANCOMPILER:-clang}"
 
 if test -z "$scan" &&
     test -x /usr/bin/clang &&
-    test -x /usr/lib/llvm-3.9/bin/scan-build; then
+    test -x /usr/bin/scan-build; then
 	compiler="/usr/bin/clang"
-	scan="/usr/lib/llvm-3.9/bin/scan-build"
+	scan="/usr/bin/scan-build"
 fi
 
 if test -z "$scan"; then
@@ -50,9 +50,9 @@ grep 'No bugs found' $t > /dev/null && exit 0
 # clang-scan outputs errors/warnings with a leading file path followed by a
 # colon, followed by the string "error:" or "warning:".
 cat dist/s_clang-scan.diff |
-    egrep '^[a-z\./].*error: |^[a-z\./].*warning: ' | sed -e 's/:.*//' > $a
+    egrep '^[a-z\./].*error: |^[a-z\./].*warning: ' | sed -e 's/:.*:.*://' | sort > $a
 cat $t |
-    egrep '^[a-z\./].*error: |^[a-z\./].*warning: ' | sed -e 's/:.*//' > $b
+    egrep '^[a-z\./].*error: |^[a-z\./].*warning: ' | sed -e 's/:.*:.*://' | sort > $b
 diff $a $b > /dev/null && exit 0
 
 echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="

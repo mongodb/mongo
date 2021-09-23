@@ -51,6 +51,7 @@ ENOTSUP
 EXTLIST
 EmpId
 Encryptors
+FSTREAM
 Facebook
 Facebook's
 FlameGraph
@@ -114,7 +115,6 @@ RLE
 RedHat
 RepMgr
 Riak
-RLE
 RocksDB
 Roelofs
 RrVv
@@ -125,6 +125,7 @@ Sanitizer
 Seward's
 SiH
 TSC
+TXID
 TXT
 UBSAN
 UNC
@@ -151,6 +152,7 @@ Yann
 Za
 Zstd
 aR
+aarch
 abc
 abstime
 ack'ed
@@ -177,17 +179,18 @@ benchmarking
 bigram
 bindir
 bitstring
+bm
 bokeh
 bool
 boolean
 booleans
-bm
 br
 bt
+btcur
 btmem
 btree
-btrees
 btree's
+btrees
 bufs
 builtin
 builtins
@@ -288,8 +291,8 @@ dup
 dups
 encrypt
 encryptor
-encryptors
 encryptor's
+encryptors
 endcode
 endcond
 endian
@@ -302,6 +305,7 @@ eof
 eq
 erlang
 errno
+evictable
 exe
 extensibility
 fadvise
@@ -329,6 +333,7 @@ flamegraph
 flamegraphs
 flcs
 fnv
+fontsize
 forw
 fprofile
 fput
@@ -337,6 +342,7 @@ fs
 fsanitize
 fsync
 ftruncate
+func
 fuzzer
 fuzzers
 fuzzutil
@@ -370,6 +376,7 @@ iflag
 incr
 indices
 init
+inmemory
 insn
 intl
 intpack
@@ -441,6 +448,7 @@ memp
 metadata
 metatracking
 minkey
+mips
 mispredictions
 mixin
 mixins
@@ -509,6 +517,7 @@ pid
 plantuml
 png
 posix
+ppc
 pre
 prealloc
 prepended
@@ -533,6 +542,7 @@ py
 qnx
 qqq
 rVv
+rankdir
 rdbms
 rdlock
 readlock
@@ -581,6 +591,7 @@ skinparam
 skiplist
 skiplists
 sortable
+sparc
 spinlock
 spinlocks
 sql
@@ -671,6 +682,7 @@ workgen
 writelock
 writelocks
 wrlock
+wti
 wtperf
 wtstats
 xa

@@ -1,11 +1,118 @@
 /*! @arch_page arch-schema Schema
 
-A schema defines the format of the application data in WiredTiger. WiredTiger
-supports various types of schemas (See @ref schema for more
-information), operated upon through a WT_SESSION reference.
+A schema defines the format of the application data and how it will be stored by WiredTiger. While
+many tables have simple key/value pairs for records, WiredTiger also supports more complex data
+patterns. See @ref schema for more information.
 
-@subpage arch-schema-ops
+@section schema_data_formats Data Formats
 
-This section details the internals of various API operations that operate on schemas, such as WT_SESSION::create and WT_SESSION::rename.
+The format of keys and values is configured through \c key_format and \c value_format entries in
+@ref config_strings. WiredTiger supports simple or composite data formats for keys and values.
+See @ref schema_format_types for the full list of supported data types.
+ - A simple format stores data in one type, for example \c "key_format=i,value_format=S".
+ - A composite format can store multiple data types as a single blob. The configuration string
+ can be something like \c "key_format=Si,value_format=ul". Cursors support encoding and decoding of
+ these types of keys and values. See @ref arch_cursor_raw and @ref schema_cursor_formats for
+ more details.
 
+Column store requires the key format to be defined as the record number \c 'r' type.
+@ref schema has more information on key/value formats.
+
+@section schema_files Data Files
+
+Database schema defines how data files are organized in the database home folder:
+ - A row-oriented table keeps all the data in one file called \c "<table name>.wt", where
+ \c "<table name>" is the name that was passed as a part of the \c name parameter to WT_SESSION::create.
+ - A column-oriented table stores the data in multiple files. One for each column group. The
+ filename will be as follows \c "<table name>_<colgroup name>.wt". Where \c "<table name>" is
+ the name that was specified as a part of the \c name parameter to WT_SESSION::create. And
+ \c "<colgroup name>" is the column group name defined in the \c colgroups entry during the
+ definition of the table format. See this example of how column groups can be configured in
+ WiredTiger @ex_ref{ex_col_store.c}. @ref arch-row-column "Row Store and Column Store" describes
+ in more detail how row and column stores work.
+ - Each table index is stored in a separate file \c "<table name>_<index name>.wti".
+ Where \c "<table name>" is the table name passed into WT_SESSION::create. And \c "<index name>"
+ is the index name defined during index creation. See @ref schema_indices for more
+ information on how to create a table index.
+ - LSM trees are store on the file system in \c "<table name>-<chunk id>.lsm" files. Where
+ \c "<table name>" is the name that was specified as a part of the \c name parameter to
+ WT_SESSION::create. \c "<chunk id>" is the chunk index managed by WiredTiger. More information
+ on LSM trees can be found on this page @ref lsm.
+ - Bloom filters for LSM trees are stored in the files with the same name as the LSM tree chunk,
+ but with a different extension: "<table name>-<chunk id>.bf". See @ref lsm_bloom for more details.
+
+@section schema_integrity Schema Integrity
+
+A user can create and manipulate database objects through the API listed on this page
+@ref schema_api. There are several WiredTiger internal objects such as
+@ref arch-metadata "Metadata", @ref arch-hs "History Store", etc. The schema of those objects
+is locked and cannot be altered from outside of WiredTiger.
+
+Schema operations cause an update to the metadata and are performed under the schema lock to avoid
+concurrent operations on the database schema. The following sequence of steps define a generic schema
+operation:
+
+@plantuml_start{schema_generic.png }
+@startuml{schema_generic.png}
+:A schema operation;
+partition with-schema-lock {
+    :perform operation on underlying data-object;
+    :update metadata-file;
+    :checkpoint and sync metadata;
+}
+stop
+@enduml
+@plantuml_end
+
+Apart from the schema API, the schema lock is necessary for many other
+operations in WiredTiger including the following "heavy" database modifications:
+ - The schema lock wraps `checkpoint prepare` to avoid any tables being created or dropped
+ during this phase. See @ref arch-checkpoint "Checkpoint" for details.
+ - `Rollback to stable` operation acquires the schema lock to make sure no schema changes are
+ done during this complex process. @ref arch-rts "Rollback to Stable" has more information on the
+ operation.
+ - A `backup cursor` also holds the schema lock because it must guarantee a consistent view
+ of what files and tables exist while it is being used, so it prevents any tables or files being
+ created or dropped during that time. See @ref backup and @ref arch_cursor_backup for
+ more information.
+
+All the schema operations listed below perform multi-step metadata modifications. Although they
+are \c non-transactional, the schema code tracks the metadata changes and performs the file and
+metadata operations in a specific order to provide recovery in the case of a crash.
+
+@section schema_api Schema Manipulation
+
+All schema manipulations are done in the context of WT_SESSION. All the methods below,
+except WT_SESSION::create and WT_SESSION::truncate, require exclusive access to the specified
+data source(s). If any cursors are open with the specified name(s) or a data source is otherwise
+in use, the call will fail and return EBUSY.
+
+@subsection schema_create Create
+
+The create schema operation is responsible for creating the underlying data
+objects on the filesystem and then creating required entries in the metadata. The API for this
+operation is WT_SESSION::create.
+
+@subsection schema_drop Drop
+
+WT_SESSION::drop operation drops the specified \c uri. The method will delete all related files
+and metadata entries. It is possible to keep the underlying files by specifying
+\c "remove_files=false" in the config string.
+
+@subsection schema_rename Rename
+
+WT_SESSION::rename schema operation renames the underlying data objects on the filesystem and
+updates the metadata accordingly.
+
+@subsection schema_alter Alter
+
+WT_SESSION::alter allows modification of some table settings after creation.
+
+@subsection schema_truncate Truncate
+
+WT_SESSION::truncate truncates a file, table, cursor range, or backup cursor. If \c start and
+\c stop cursors are not specified all the data stored in the \c uri will be wiped out. When a range
+truncate is in progress, and another transaction inserts a key into that range, the behavior
+is not well defined. It is best to avoid this type of situations. See @ref btree_truncate_operation
+for more details.
 */

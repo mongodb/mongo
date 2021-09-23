@@ -228,7 +228,7 @@ demo_file_system_create(WT_CONNECTION *conn, WT_CONFIG_ARG *config)
     }
 
     allocate_file_system_lock(&demo_fs->lock);
-
+    /*! [WT_FILE_SYSTEM create] */
     /* Initialize the in-memory jump table. */
     file_system->fs_directory_list = demo_fs_directory_list;
     file_system->fs_directory_list_free = demo_fs_directory_list_free;
@@ -244,6 +244,7 @@ demo_file_system_create(WT_CONNECTION *conn, WT_CONFIG_ARG *config)
           wtext, NULL, "WT_CONNECTION.set_file_system: %s", wtext->strerror(wtext, NULL, ret));
         goto err;
     }
+    /*! [WT_FILE_SYSTEM create] */
     return (0);
 
 err:
@@ -320,7 +321,7 @@ demo_fs_open(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *name,
         ret = ENOMEM;
         goto err;
     }
-
+    /*! [WT_FILE_HANDLE create] */
     /*
      * Setup the function call table for our custom file system. Set the function pointer to NULL
      * where our implementation doesn't support the functionality.
@@ -345,6 +346,7 @@ demo_fs_open(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *name,
     ++demo_fs->opened_unique_file_count;
 
     *file_handlep = file_handle;
+    /*! [WT_FILE_HANDLE create] */
 
     if (0) {
 err:

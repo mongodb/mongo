@@ -45,6 +45,19 @@ __tiered_opener_open(WT_BLOCK_FILE_OPENER *opener, WT_SESSION_IMPL *session, uin
         flags |= WT_FS_OPEN_READONLY;
         WT_WITH_BUCKET_STORAGE(
           bstorage, session, { ret = __wt_open(session, object_name, type, flags, fhp); });
+        if (ret == ENOENT) {
+            /*
+             * There is a window where the object may not be copied yet to the bucket. If it isn't
+             * found try the local system. If it isn't found there then try the bucket one more
+             * time.
+             */
+            ret = __wt_open(session, object_name, type, flags, fhp);
+            __wt_errx(session, "OPENER: local %s ret %d", object_name, ret);
+            if (ret == ENOENT)
+                WT_WITH_BUCKET_STORAGE(
+                  bstorage, session, { ret = __wt_open(session, object_name, type, flags, fhp); });
+            WT_ERR(ret);
+        }
     }
 err:
     __wt_free(session, object_uri);

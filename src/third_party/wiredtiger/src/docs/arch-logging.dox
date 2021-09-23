@@ -167,8 +167,7 @@ in the case of crash or failure. When the system is restarted, WiredTiger will a
 run recovery. If the system previously shutdown cleanly, then recovery determines that
 the log does not need to be replayed. Otherwise, recovery replays all operations from
 the LSN of the most recent checkpoint. When timestamps are in use, recovery also
-performs a rollback-to-stable operation on tables that are not logged.
-This aspect of recovery is discussed in @ref arch-rts.
+performs a @ref arch-rts "rollback to stable" operation on tables that are not logged.
 
 Users can access and view the records in the log using one of two methods. The most
 common method is via the \c wt printlog command. The command utility will print the

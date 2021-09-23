@@ -21,8 +21,8 @@
 
 /*
  * __wt_lex_compare --
- *     Lexicographic comparison routine. Returns: < 0 if user_item is lexicographically < tree_item
- *     = 0 if user_item is lexicographically = tree_item > 0 if user_item is lexicographically >
+ *     Lexicographic comparison routine. Returns: < 0 if user_item is lexicographically < tree_item,
+ *     = 0 if user_item is lexicographically = tree_item, > 0 if user_item is lexicographically >
  *     tree_item. We use the names "user" and "tree" so it's clear in the btree code which the
  *     application is looking at when we call its comparison function. If prefix is specified, 0 can
  *     be returned when the user_item is equal to the tree_item for the minimum size.
@@ -88,12 +88,28 @@ __wt_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item, bool prefix
     /*
      * Use the non-vectorized version for the remaining bytes and for the small key sizes.
      */
-    for (; len > 0; --len, ++userp, ++treep)
+    for (; len > 0; --len, ++userp, ++treep) {
+        /*
+         * When prefix is enabled and we are performing lexicographic comparison on schema formats s
+         * or S, we only want to compare the characters before either of them reach a NUL character.
+         * For format S, a NUL character is always at the end of the string, while for the format s,
+         * NUL characters are set for the remaining unused bytes. If we are at the end of the user
+         * item (which is the prefix here), there is a prefix match. Otherwise, the tree item is
+         * lexicographically smaller than the prefix.
+         */
+        if (prefix && (*userp == '\0' || *treep == '\0'))
+            return (*userp == '\0' ? 0 : 1);
         if (*userp != *treep)
             return (*userp < *treep ? -1 : 1);
+    }
 
-    /* Contents are equal up to the smallest length. */
-    return ((usz == tsz || prefix) ? 0 : (usz < tsz) ? -1 : 1);
+    /*
+     * Contents are equal up to the smallest length. In the case of a prefix match, we consider the
+     * tree item and the prefix equal only if the tree item is bigger in size.
+     */
+    if (usz == tsz || (prefix && usz < tsz))
+        return (0);
+    return ((usz < tsz) ? -1 : 1);
 }
 
 /*

@@ -62,8 +62,9 @@ __wt_tiered_bucket_config(
   WT_SESSION_IMPL *session, const char *cfg[], WT_BUCKET_STORAGE **bstoragep)
 {
     WT_BUCKET_STORAGE *bstorage, *new;
-    WT_CONFIG_ITEM auth, bucket, name, prefix;
+    WT_CONFIG_ITEM auth, bucket, cachedir, name, prefix;
     WT_CONNECTION_IMPL *conn;
+    WT_DECL_ITEM(buf);
     WT_DECL_RET;
     WT_NAMED_STORAGE_SOURCE *nstorage;
     WT_STORAGE_SOURCE *storage;
@@ -72,6 +73,7 @@ __wt_tiered_bucket_config(
     *bstoragep = NULL;
 
     WT_RET(__wt_config_gets(session, cfg, "tiered_storage.name", &name));
+    WT_RET(__wt_scr_alloc(session, 0, &buf));
     bstorage = new = NULL;
     conn = S2C(session);
 
@@ -92,14 +94,15 @@ __wt_tiered_bucket_config(
     if (conn->bstorage == NULL && bstoragep != &conn->bstorage)
         WT_ERR_MSG(
           session, EINVAL, "table tiered storage requires connection tiered storage to be set");
-    /* A bucket and bucket_prefix are required, auth_token is not. */
+    /* A bucket and bucket_prefix are required, cache_directory and auth_token are not. */
+    WT_ERR(__wt_config_gets(session, cfg, "tiered_storage.auth_token", &auth));
     WT_ERR(__wt_config_gets(session, cfg, "tiered_storage.bucket", &bucket));
     if (bucket.len == 0)
         WT_ERR_MSG(session, EINVAL, "table tiered storage requires bucket to be set");
     WT_ERR(__wt_config_gets(session, cfg, "tiered_storage.bucket_prefix", &prefix));
     if (prefix.len == 0)
         WT_ERR_MSG(session, EINVAL, "table tiered storage requires bucket_prefix to be set");
-    WT_ERR(__wt_config_gets(session, cfg, "tiered_storage.auth_token", &auth));
+    WT_ERR(__wt_config_gets(session, cfg, "tiered_storage.cache_directory", &cachedir));
 
     hash = __wt_hash_city64(bucket.str, bucket.len);
     hash_bucket = hash & (conn->hash_size - 1);
@@ -115,10 +118,13 @@ __wt_tiered_bucket_config(
     WT_ERR(__wt_strndup(session, auth.str, auth.len, &new->auth_token));
     WT_ERR(__wt_strndup(session, bucket.str, bucket.len, &new->bucket));
     WT_ERR(__wt_strndup(session, prefix.str, prefix.len, &new->bucket_prefix));
+    WT_ERR(__wt_strndup(session, cachedir.str, auth.len, &new->cache_directory));
 
     storage = nstorage->storage_source;
+    if (cachedir.len != 0)
+        WT_ERR(__wt_buf_fmt(session, buf, "cache_directory=%s", new->cache_directory));
     WT_ERR(storage->ss_customize_file_system(
-      storage, &session->iface, new->bucket, new->auth_token, NULL, &new->file_system));
+      storage, &session->iface, new->bucket, new->auth_token, buf->data, &new->file_system));
     new->storage_source = storage;
 
     /* If we're creating a new bucket storage, parse the other settings into it. */
@@ -138,6 +144,7 @@ err:
         __wt_free(session, new);
     }
     __wt_spin_unlock(session, &conn->storage_lock);
+    __wt_scr_free(session, &buf);
     return (ret);
 }
 
@@ -181,6 +188,7 @@ err:
     __wt_free(session, conn->bstorage->auth_token);
     __wt_free(session, conn->bstorage->bucket);
     __wt_free(session, conn->bstorage->bucket_prefix);
+    __wt_free(session, conn->bstorage->cache_directory);
     __wt_free(session, conn->bstorage);
     return (ret);
 }

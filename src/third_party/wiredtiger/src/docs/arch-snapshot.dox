@@ -1,9 +1,170 @@
 /*! @arch_page arch-snapshot Snapshot
 
-When the snapshot isolation level is used in WiredTiger, the transaction
-will see versions of records committed before the transaction started.
+Transaction snapshots are an important mechanism for providing strong isolation guarantees
+in WiredTiger. WiredTiger will often maintain multiple versions of the users data throughout
+its lifetime, with which snapshots provide the mechanisms to ensure particular versions of that data are
+made accessible. Snapshots are importantly leveraged by WiredTiger to define the visibility rules for data such
+as isolating concurrent transactions from reading each others updates.
 
-Snapshots are implemented by storing the set of transaction ids committed
-before the transaction started in the \c WT_TXN structure.  Transaction
-ids older than a certain point need not be stored.
+@section snapshot_transaction Transactions using Snapshots
+
+Within the context of a WiredTiger transaction, a snapshot ensures specific versions of a record are accessible based on the
+time the snapshot was created. In particular, these accessibility rules are defined by a transactions isolation level.
+Transactions more specifically use snapshots for the following isolation levels:
+
+- \c snapshot: A snapshot is created at the beginning of a snapshot-level isolated transaction and is sustained throughout
+the entire life cycle of the transaction. In effect, a transaction using \c snapshot isolation will only read versions of
+records before the transaction started. The default isolation level is \c snapshot.
+- \c read-committed: Read-committed transactions ensure a transaction is able to see committed updates by other transactions
+at the time of reading. To achieve this, under a read-committed isolation, a snapshot is created when performing a search. The
+same snapshot is used for all subsequent reads until another search is called.
+
+See @ref transactions for further details about how WiredTiger transactions utilize snapshots to create isolation guarantees and
+implement concurrency control.
+
+@section snapshot_internals Snapshot Internals
+
+Snapshots are implemented by capturing the global state of transactions in the system at the time of snapshot creation. Snapshots
+are managed within per-session transaction contexts, encapsulated by the \c WT_TXN data structure. The main
+data points that encapsulate a given snapshot include:
+
+- Maximum transaction ID: The maximum global transaction ID value seen when creating the snapshot. This being the upper
+bound value which all concurrent transactions IDs are currently smaller than. We resolve the maximum transaction ID value by reading the
+global current transaction ID/counter at the time of snapshot creation. Transactions with IDs greater than or equal to the maximum ID are
+considered invisible to the snapshot.
+- Concurrent transaction IDs: A list of transaction IDs that are concurrently active at the time of the snapshot creation. As these
+transactions are yet to be committed at the time of snapshot creation, transactions stored in this list are considered invisible when performing visibility checks.
+When building the list of concurrent transactions, WiredTiger walks a global array of running transactions, storing each walked transaction ID in a list managed by the snapshot.
+When walking the global set of running transactions, WiredTiger will ignore a transaction ID that is:
+    -# Its own ID ie. the ID of the transaction creating the given snapshot. A transaction will always read its own updates.
+    -# An ID that is greater than or equal to the snapshot's maximum transaction ID. As WiredTiger walks the global list,
+    it may find a transaction that has concurrently allocated a new transaction ID, exceeding the snapshots maximum ID bounds. This will
+    however be ignored as it is not considered visible at the time of snapshot creation.
+- Minimum transaction ID: The minimum global transaction ID value seen when creating the snapshot. This being the lower
+bound value which all concurrent transactions IDs are greater than or equal to. Transaction IDs strictly less than the minimum value
+are considered visible as these would've been allocated and committed before the snapshot was created. This value is usually taken to be the
+smallest transaction ID value found from the list of concurrent transactions.
+
+An example of building out the aforementioned components of a snapshot can be seen in the below figure. This figure illustrates constructing a snapshot for a transaction with
+ID \c 8. Consider that at the given time, the concurrent running transactions are \c 3, \c 5, \c 7, \c 8 and the global current transaction ID is \c 9.
+
+@plantuml_start{snapshot.png}
+@startuml{snapshot.png}
+digraph g {
+graph [
+ordering="in";
+rankdir = "LR";
+];
+node [
+fontsize = "16"
+];
+edge [
+];
+"node1" [
+label = "<f0> Snapshot [TXID 8] | <f1> Concurrent Transactions | <f2> Maximum Transaction ID | <f3> Minimum Transaction ID"
+shape = "record"
+];
+"node0" [
+label = "<f0> Global Transaction State | <f1> Running Transactions| <f2> Current Transaction ID"
+shape = "record"
+];
+"node2" [
+label = "<f0> 3"
+shape = "record"
+];
+"node3" [
+label = "<f0> 3"
+shape = "record"
+];
+"node4" [
+label = "<f0> 5"
+shape = "record"
+];
+"node6" [
+label = "<f0> 7"
+shape = "record"
+];
+"node7" [
+label = "<f0> 8"
+shape = "record"
+];
+"node8" [
+label = "<f0> 5"
+shape = "record"
+];
+"node10" [
+label = "<f0> 7"
+shape = "record"
+];
+"node11" [
+label = "<f0> 9"
+shape = "record"
+];
+"node12" [
+label = "<f0> 3"
+shape = "record"
+];
+"node13" [
+label = "<f0> 9"
+shape = "record"
+];
+"node1":f1 -> "node2":f0 [
+id = 0
+];
+"node2":f0 -> "node8":f0 [
+id = 0
+];
+"node8":f0 -> "node10":f0 [
+id = 0
+];
+"node0":f1 -> "node3":f0 [
+id = 0
+];
+"node3":f0 -> "node4":f0 [
+id = 0
+];
+"node4":f0 -> "node6":f0 [
+id = 0
+];
+"node6":f0 -> "node7":f0 [
+id = 0
+];
+"node0":f2 -> "node11":f0 [
+id = 0
+];
+"node1":f2 -> "node13":f0 [
+id = 0
+];
+"node1":f3 -> "node12":f0 [
+id = 0
+];
+}
+@enduml
+@plantuml_end
+
+@section snapshot_visibility Snapshot Visibility
+
+When determining if a transaction can read a given record, WiredTiger applies a visibility function to discern whether the committed value is
+visible. When using \c snapshot and \c read-committed isolated transactions, WiredTiger's visibility function will leverage a transactions snapshot information
+to determine if a given record is visible. When determining if a given transaction ID is visible to a snapshot,
+WiredTiger applies the below checks in the following order:
+1. The transaction ID is greater than or equal to the snapshots recorded maximum transaction ID: If satisfied, the transaction ID is invisible, as the ID
+would've been allocated after the snapshot was created.
+2. The transaction ID is less than the snapshots recorded minimum transaction ID: If satisfied, the transaction ID is visible, as these would've been
+allocated and committed before the snapshot was created.
+3. The transaction ID exists in the snapshots recorded concurrent transaction list: If found, the transaction ID is invisible, as this ID wasn't committed at the
+time the snapshot was created.
+4. Otherwise the ID is visible.
+
+The early ordering of checking whether the transaction ID sits outside the maximum and minimum bounds is an important detail since the concurrent transaction list
+can be empty i.e. snapshot was taken at a time when no concurrent transactions were running.
+
+@section snapshot_checkpoint Snapshots \& Checkpoints
+
+Checkpoints require a snapshot to write a transactionally consistent view of the data. A checkpoint maintains its own special global
+transaction and snapshot state. This being independent from the application's running transactions.
+
+When checkpoints are running, application transactions using snapshots will also store the checkpoints transaction ID as a concurrent transaction.
+This allowing a snapshot to ignore any uncommitted changes the checkpoint has written to the metadata.
+
 */

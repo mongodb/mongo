@@ -356,8 +356,8 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_MULTI *mult
             break;
         case WT_PAGE_ROW_LEAF:
             if (list->ins == NULL) {
-                WT_WITH_BTREE(session, btree,
-                  ret = __wt_row_leaf_key(session, r->page, list->ripcip, key, false));
+                WT_WITH_BTREE(
+                  session, btree, ret = __wt_row_leaf_key(session, r->page, list->rip, key, false));
                 WT_ERR(ret);
             } else {
                 key->data = WT_INSERT_KEY(list->ins);

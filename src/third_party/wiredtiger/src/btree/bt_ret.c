@@ -109,25 +109,36 @@ __wt_read_row_time_window(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip, 
  *     Read the time window from the cell.
  */
 void
-__wt_read_cell_time_window(WT_CURSOR_BTREE *cbt, WT_REF *ref, WT_TIME_WINDOW *tw)
+__wt_read_cell_time_window(WT_CURSOR_BTREE *cbt, WT_TIME_WINDOW *tw, bool *tw_foundp)
 {
     WT_PAGE *page;
     WT_SESSION_IMPL *session;
 
-    session = CUR2S(cbt);
-    page = ref->page;
+    *tw_foundp = false;
 
-    WT_ASSERT(session, tw != NULL);
+    session = CUR2S(cbt);
+    page = cbt->ref->page;
+
+    if (cbt->slot == UINT32_MAX)
+        return;
 
     /* Take the value from the original page cell. */
-    if (page->type == WT_PAGE_ROW_LEAF) {
+    switch (page->type) {
+    case WT_PAGE_ROW_LEAF:
+        if (page->pg_row == NULL)
+            return;
         __wt_read_row_time_window(session, page, &page->pg_row[cbt->slot], tw);
-    } else if (page->type == WT_PAGE_COL_VAR) {
+        break;
+    case WT_PAGE_COL_VAR:
+        if (page->pg_var == NULL)
+            return;
         __read_col_time_window(session, page, WT_COL_PTR(page, &page->pg_var[cbt->slot]), tw);
-    } else {
-        /* WT_PAGE_COL_FIX: return the default time window. */
-        WT_TIME_WINDOW_INIT(tw);
+        break;
+    default: /* WT_PAGE_COL_FIX */
+        /* no time windows yet */
+        return;
     }
+    *tw_foundp = true;
 }
 
 /*

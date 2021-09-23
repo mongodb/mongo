@@ -146,7 +146,7 @@ With projections, the simple algorithm following the plan works well if the colu
 are grouped by column group and requested in order.  Without that discipline, as in this example,
 the performance will not be optimal.
 
-The implementation of plan creation and execution resides in the @ref arch-schema.
+The implementation of plan creation and execution resides in the @ref arch-schema "Schema".
 
 @section arch_cursor_dump Dump cursors
 

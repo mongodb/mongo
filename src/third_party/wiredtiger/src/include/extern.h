@@ -1243,7 +1243,7 @@ extern int __wt_rec_split_finish(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 extern int __wt_rec_split_init(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page,
   uint64_t recno, uint64_t max) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins,
-  void *ripcip, WT_CELL_UNPACK_KV *vpack, WT_UPDATE_SELECT *upd_select)
+  WT_ROW *rip, WT_CELL_UNPACK_KV *vpack, WT_UPDATE_SELECT *upd_select)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage,
   uint32_t flags) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
@@ -1363,6 +1363,8 @@ extern int __wt_scr_alloc_func(WT_SESSION_IMPL *session, size_t size, WT_ITEM **
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_search_insert(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
   WT_INSERT_HEAD *ins_head, WT_ITEM *srch_key) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_session_blocking_checkpoint(WT_SESSION_IMPL *session, bool force, uint64_t seconds)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_session_breakpoint(WT_SESSION *wt_session)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_session_close_internal(WT_SESSION_IMPL *session)
@@ -1810,7 +1812,7 @@ extern void __wt_random_init(WT_RAND_STATE volatile *rnd_state)
   WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("default")));
 extern void __wt_random_init_seed(WT_SESSION_IMPL *session, WT_RAND_STATE volatile *rnd_state)
   WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("default")));
-extern void __wt_read_cell_time_window(WT_CURSOR_BTREE *cbt, WT_REF *ref, WT_TIME_WINDOW *tw);
+extern void __wt_read_cell_time_window(WT_CURSOR_BTREE *cbt, WT_TIME_WINDOW *tw, bool *tw_foundp);
 extern void __wt_read_row_time_window(
   WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip, WT_TIME_WINDOW *tw);
 extern void __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *l);

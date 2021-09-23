@@ -1069,7 +1069,7 @@ __rec_split_row_promote(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_ITEM *key,
         for (i = r->supd_next; i > 0; --i) {
             supd = &r->supd[i - 1];
             if (supd->ins == NULL)
-                WT_ERR(__wt_row_leaf_key(session, r->page, supd->ripcip, update, false));
+                WT_ERR(__wt_row_leaf_key(session, r->page, supd->rip, update, false));
             else {
                 update->data = WT_INSERT_KEY(supd->ins);
                 update->size = WT_INSERT_KEY_SIZE(supd->ins);
@@ -1478,7 +1478,7 @@ __rec_split_write_supd(
 
         for (i = 0, supd = r->supd; i < r->supd_next; ++i, ++supd) {
             if (supd->ins == NULL)
-                WT_ERR(__wt_row_leaf_key(session, page, supd->ripcip, key, false));
+                WT_ERR(__wt_row_leaf_key(session, page, supd->rip, key, false));
             else {
                 key->data = WT_INSERT_KEY(supd->ins);
                 key->size = WT_INSERT_KEY_SIZE(supd->ins);
@@ -1504,9 +1504,8 @@ __rec_split_write_supd(
         for (j = 0; i < r->supd_next; ++j, ++i) {
             /* Account for the remaining update memory. */
             if (r->supd[i].ins == NULL)
-                upd = page->modify->mod_row_update[page->type == WT_PAGE_ROW_LEAF ?
-                    WT_ROW_SLOT(page, r->supd[i].ripcip) :
-                    WT_COL_SLOT(page, r->supd[i].ripcip)];
+                /* Note: ins is never NULL for column-store */
+                upd = page->modify->mod_row_update[WT_ROW_SLOT(page, r->supd[i].rip)];
             else
                 upd = r->supd[i].ins->upd;
             r->supd_memsize += __wt_update_list_memsize(upd);

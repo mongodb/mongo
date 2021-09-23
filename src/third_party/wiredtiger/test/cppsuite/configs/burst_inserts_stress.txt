@@ -1,0 +1,41 @@
+# Used as a stress test for the framework.
+duration_seconds=14400,
+cache_size_mb=2000,
+checkpoint_manager=
+(
+    enabled=true,
+    op_rate=60s
+),
+runtime_monitor=
+(
+    enabled=false
+),
+timestamp_manager=
+(
+    enabled=true,
+    oldest_lag=10,
+    stable_lag=10
+),
+workload_generator=
+(
+    populate_config=
+    (
+        collection_count=160,
+        key_count_per_collection=500,
+        key_size=200,
+        thread_count=40,
+        value_size=20000
+    ),
+    insert_config=
+    (
+        key_size=200,
+        op_rate=10s,
+        ops_per_transaction=(max=2000,min=1000),
+        thread_count=40,
+        value_size=20000
+    )
+),
+workload_tracking=
+(
+    enabled=false,
+)

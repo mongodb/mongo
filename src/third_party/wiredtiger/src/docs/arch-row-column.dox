@@ -1,4 +1,4 @@
-/*! @arch_page arch-row-column Row Store & Column Store
+/*! @arch_page arch-row-column Row Store and Column Store
 
 @section row_column_definition Definition
 
@@ -14,8 +14,8 @@ column store is created. The fixed length column store has specialized use cases
 - The variable length is a more general case which allows for values to have any length similarly to
 row-stores.
 
-Please refer to @ref arch-data-file to learn more about the on-disk format for row-stores and
-column-stores.
+Please refer to @ref arch-data-file "Data File Format" to learn more about the on-disk format for
+row-stores and column-stores.
 
 @section row_column_rs Row-stores
 

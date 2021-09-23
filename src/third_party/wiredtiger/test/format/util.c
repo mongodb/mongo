@@ -280,6 +280,7 @@ timestamp_once(WT_SESSION *session, bool allow_lag, bool final)
             testutil_timestamp_parse(buf, &all_durable);
         else {
             testutil_assert(ret == WT_NOTFOUND);
+            lock_writeunlock(session, &g.ts_lock);
             return;
         }
 

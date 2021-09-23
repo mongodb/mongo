@@ -1,4 +1,4 @@
-/*! @arch_page arch-rts Rollback to stable
+/*! @arch_page arch-rts Rollback to Stable
 
 Rollback to stable is an operation that retains only the modifications that
 are stable according to the stable timestamp and recovered checkpoint snapshot.
@@ -8,7 +8,7 @@ checkpoint are recovered and used as a recovered checkpoint snapshot.
 @section rts-overview Overview of rollback to stable
 
 Rollback to stable scans each and every table present in the database except
-metadata @ref arch-metadata to remove the modifications from the table
+@ref arch-metadata "Metadata" to remove the modifications from the table
 that are more than stable timestamp and recovered checkpoint snapshot.
 
 In the process of removing newer modifications from the table, all the in-memory

@@ -387,6 +387,13 @@ __wt_txn_global_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
     last_oldest_ts = txn_global->oldest_timestamp;
     last_stable_ts = txn_global->stable_timestamp;
 
+    /* It is a no-op to set the oldest or stable timestamps behind the global values. */
+    if (has_oldest && txn_global->has_oldest_timestamp && oldest_ts <= last_oldest_ts)
+        has_oldest = false;
+
+    if (has_stable && txn_global->has_stable_timestamp && stable_ts <= last_stable_ts)
+        has_stable = false;
+
     /*
      * First do error checking on the timestamp values. The oldest timestamp must always be less
      * than or equal to the stable timestamp. If we're only setting one then compare against the
@@ -434,12 +441,6 @@ __wt_txn_global_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
     __wt_readunlock(session, &txn_global->rwlock);
 
     /* Check if we are actually updating anything. */
-    if (has_oldest && txn_global->has_oldest_timestamp && oldest_ts <= last_oldest_ts)
-        has_oldest = false;
-
-    if (has_stable && txn_global->has_stable_timestamp && stable_ts <= last_stable_ts)
-        has_stable = false;
-
     if (!has_durable && !has_oldest && !has_stable)
         return (0);
 

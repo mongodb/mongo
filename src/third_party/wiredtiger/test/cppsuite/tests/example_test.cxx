@@ -37,21 +37,26 @@ class example_test : public test_harness::test {
     example_test(const test_harness::test_args &args) : test(args) {}
 
     void
-    populate(test_harness::database &database, test_harness::timestamp_manager *_timestamp_manager,
-      test_harness::configuration *_config,
-      test_harness::workload_tracking *tracking) override final
+    populate(test_harness::database &, test_harness::timestamp_manager *,
+      test_harness::configuration *, test_harness::workload_tracking *) override final
     {
         std::cout << "populate: nothing done." << std::endl;
     }
 
     void
-    read_operation(test_harness::thread_context *context) override final
+    insert_operation(test_harness::thread_context *) override final
+    {
+        std::cout << "insert_operation: nothing done." << std::endl;
+    }
+
+    void
+    read_operation(test_harness::thread_context *) override final
     {
         std::cout << "read_operation: nothing done." << std::endl;
     }
 
     void
-    update_operation(test_harness::thread_context *context) override final
+    update_operation(test_harness::thread_context *) override final
     {
         std::cout << "update_operation: nothing done." << std::endl;
     }
