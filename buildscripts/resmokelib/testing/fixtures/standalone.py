@@ -326,6 +326,10 @@ class MongodLauncher(object):
                 "mode": "alwaysOn", "data": {"numTickets": self.config.FLOW_CONTROL_TICKETS}
             }
 
+        # The internalQueryForceClassicEngine setParameter was only added in 5.0.1.
+        if "internalQueryForceClassicEngine" in suite_set_parameters:
+            del suite_set_parameters["internalQueryForceClassicEngine"]
+
         _add_testing_set_parameters(suite_set_parameters)
 
         shortcut_opts = {
