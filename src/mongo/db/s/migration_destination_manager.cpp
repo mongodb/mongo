@@ -982,8 +982,8 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
 
     // 1. Ensure any data which might have been left orphaned in the range being moved has been
     // deleted.
-    if (migrationutil::checkForConflictingDeletions(
-            outerOpCtx, range, donorCollectionOptionsAndIndexes.uuid)) {
+    while (migrationutil::checkForConflictingDeletions(
+        outerOpCtx, range, donorCollectionOptionsAndIndexes.uuid)) {
         uassert(ErrorCodes::ResumableRangeDeleterDisabled,
                 "Failing migration because the disableResumableRangeDeleter server "
                 "parameter is set to true on the recipient shard, which contains range "
@@ -1006,6 +1006,12 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
             _setStateFail(redact(status.toString()));
             return;
         }
+
+        // If the filtering metadata was cleared while the range deletion task was ongoing, then
+        // 'waitForClean' would return immediately even though there really is an ongoing range
+        // deletion task. For that case, we loop again until there is no conflicting task in
+        // config.rangeDeletions
+        outerOpCtx->sleepFor(Milliseconds(1000));
     }
 
     timing.done(1);
