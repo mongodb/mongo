@@ -159,9 +159,11 @@ explain = t.find().showDiskLoc().explain();
 assert.commandWorked(explain);
 
 // .maxTimeMS()
-explain = t.explain().find().maxTimeMS(200).finish();
+// Provide longer maxTime when the test runs in suites which can affect query execution time.
+const numConn = db.serverStatus().connections.current;
+explain = t.explain().find().maxTimeMS(200 * numConn).finish();
 assert.commandWorked(explain);
-explain = t.find().maxTimeMS(200).explain();
+explain = t.find().maxTimeMS(200 * numConn).explain();
 assert.commandWorked(explain);
 
 // .readPref()
