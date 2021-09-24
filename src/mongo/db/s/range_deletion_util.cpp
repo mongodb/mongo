@@ -430,7 +430,29 @@ SharedSemiFuture<void> removeDocumentsInRange(
             invariant(s.isOK());
         })
         .then([=]() mutable {
+            auto shouldSkipDeletion = false;
+            withTemporaryOperationContext([&](OperationContext* opCtx) {
+                AutoGetCollection autoColl(opCtx, nss, MODE_IS);
+                auto* const collection = autoColl.getCollection();
+
+                if (!collection) {
+                    LOGV2(5774300,
+                          "Skip scheduling deletion of any documents in {namespace} "
+                          "range {range} since the collection does not exist",
+                          "Skip scheduling deletion of any documents in range "
+                          "since the collection does not exist",
+                          "namespace"_attr = nss.ns(),
+                          "range"_attr = redact(range.toString()));
+                    shouldSkipDeletion = true;
+                }
+            });
+
+            if (shouldSkipDeletion) {
+                return ExecutorFuture(executor);
+            }
+
             suspendRangeDeletion.pauseWhileSet();
+
             // Wait for possibly ongoing queries on secondaries to complete.
             return sleepUntil(executor,
                               executor->now() + delayForActiveQueriesOnSecondariesToComplete);
