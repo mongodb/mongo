@@ -21,19 +21,14 @@ rst.initiateWithHighElectionTimeout();
 const primary = rst.getPrimary();
 assert.eq(primary, rst.nodes[0], "the primary should be the node at index 0");
 
-// Store the old config so that we can reset to it after every successful reconfig.
-const originalConfig = rst.getReplSetConfigFromNode();
-
-// Verify that directly calling the standard 'rs.reconfig()' function to give the secondary 'votes:
-// 1' and 'priority: 1' will fail.
-let config = rst.getReplSetConfigFromNode();
+// Verify that a reconfig that directly gives the secondary 'votes: 1' and 'priority: 1' will fail.
+const config = rst.getReplSetConfigFromNode();
 config.members[1].votes = 1;
 config.members[1].priority = 1;
 
-jsTestLog("Testing standard rs.reconfig() function");
-const reconfigScript = `assert.commandFailedWithCode(rs.reconfig(${
+let reconfigScript = `assert.commandFailedWithCode(rs.reconfig(${
     tojson(config)}), ErrorCodes.NewReplicaSetConfigurationIncompatible)`;
-const result = runMongoProgram('mongo', '--port', primary.port, '--eval', reconfigScript);
+let result = runMongoProgram('mongo', '--port', primary.port, '--eval', reconfigScript);
 assert.eq(0, result, `reconfig did not fail with expected error code`);
 
 const runReconfigForPSASet = (memberIndex, config, shouldSucceed, endPriority = 1) => {
@@ -93,38 +88,9 @@ config.members = filteredMembers;
 config.version += 1;
 assert.commandWorked(primary.adminCommand({replSetReconfig: config}));
 
-// Attempt to add a node and assert that the reconfigToPSASet() call is successful.
-config.members = originalConfig.members;
-config.members[1].votes = 1;
-config.members[1].priority = 1;
-config.version += 1;
-runReconfigForPSASet(1, config, true /* shouldSucceed */);
-
-// Test that reconfigToPSASet() will succeed even if the priority of the node is 0 in the final
-// config.
-jsTestLog("Testing reconfigForPSASet() succeeded: priority of node is 0 in final config");
-config = rst.getReplSetConfigFromNode();
-config.members[1].votes = 1;
-config.members[1].priority = 0;
-runReconfigForPSASet(1, config, true /* shouldSucceed */, 0 /* endPriority */);
-
-// Test that reconfigToPSASet() will fail if the node at 'memberIndex' exists in the old config but
-// was a voter. It should fail because this is not the use case of the helper function.
-jsTestLog("Testing reconfigForPSASet() failed: node at memberIndex was a voter in old config");
-
-// First turn the secondary into a voting node but with priority 0.
-config = rst.getReplSetConfigFromNode();
-config.members[1].votes = 1;
-config.members[1].priority = 0;
-config.version += 1;
-assert.commandWorked(primary.adminCommand({replSetReconfig: config}));
-
-// Now attempt a reconfig to give the secondary priority 1 via the reconfigForPSASet() function.
-// This should fail because this function should not be used if the secondary is a voter in the old
-// config.
-config.members[1].priority = 1;
-config.version += 1;
-runReconfigForPSASet(1, config, false /* shouldSucceed */);
+const replSetGetConfig = assert.commandWorked(primary.adminCommand({replSetGetConfig: 1})).config;
+assert.eq(1, replSetGetConfig.members[1].votes);
+assert.eq(1, replSetGetConfig.members[1].priority);
 
 rst.stopSet();
 })();
