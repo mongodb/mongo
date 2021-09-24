@@ -1368,57 +1368,6 @@ var ReplSetTest = function(opts) {
             });
         }
 
-        asCluster(self.nodes, () => {
-            for (let node of self.nodes) {
-                // asCluster() currently does not validate connections with X509 authentication.
-                // If the test is using X509, we skip disabling the server parameter as the
-                // 'setParameter' command will fail.
-                const nodeId = "n" + self.getNodeId(node);
-                const nodeOptions = self.nodeOptions[nodeId] || {};
-                const options =
-                    (nodeOptions === {} || !self.startOptions) ? nodeOptions : self.startOptions;
-                const authMode = options.clusterAuthMode;
-                const notX509 =
-                    authMode != "sendX509" && authMode != "x509" && authMode != "sendKeyFile";
-
-                // We should only be checking the binary version if we are not using X509 auth,
-                // as any server command will fail if the 'authMode' is X509.
-                if (notX509) {
-                    let serverStatus;
-                    try {
-                        serverStatus =
-                            assert.commandWorked(node.getDB("admin").runCommand({serverStatus: 1}));
-                    } catch (e) {
-                        // If we are not authorized, skip resetting the flag to enable reconfig
-                        // checks. This is safe as we should have sufficient coverage across
-                        // non-auth tests.
-                        assert.eq(ErrorCodes.Unauthorized, e.code, tojson(e));
-                        continue;
-                    }
-
-                    const currVersion = serverStatus.version;
-                    const binVersionLatest =
-                        MongoRunner.areBinVersionsTheSame(MongoRunner.getBinVersionFor(currVersion),
-                                                          MongoRunner.getBinVersionFor("latest"));
-
-                    // Only set the following server parameters for nodes running on the latest
-                    // binary version.
-                    if (!binVersionLatest) {
-                        continue;
-                    }
-
-                    // Re-enable the reconfig check to ensure that committed writes cannot be rolled
-                    // back. We disabled this check during initialization to ensure that replica
-                    // sets will not fail to start up.
-                    if (jsTestOptions().enableTestCommands &&
-                        !jsTestOptions().networkErrorAndTxnOverrideConfig.retryOnNetworkErrors) {
-                        assert.commandWorked(node.adminCommand(
-                            {setParameter: 1, enableReconfigRollbackCommittedWritesCheck: true}));
-                    }
-                }
-            }
-        });
-
         const awaitTsStart = new Date();  // Measure duration of awaitLastStableRecoveryTimestamp.
         if (!doNotWaitForStableRecoveryTimestamp) {
             // Speed up the polling interval so we can detect recovery timestamps more quickly.
@@ -2885,12 +2834,6 @@ var ReplSetTest = function(opts) {
         // the number of connection attempts.
         options.setParameter.numInitialSyncConnectAttempts =
             options.setParameter.numInitialSyncConnectAttempts || 60;
-
-        // Disable a check in reconfig that will prevent certain configs with arbiters from
-        // spinning up. We will re-enable this check after the replica set has finished initiating.
-        if (jsTestOptions().enableTestCommands) {
-            options.setParameter.enableReconfigRollbackCommittedWritesCheck = false;
-        }
 
         if (tojson(options) != tojson({}))
             printjson(options);

@@ -20,7 +20,6 @@ var clearFailPoint;
 var isConfigCommitted;
 var waitForConfigReplication;
 var assertSameConfigContent;
-var assertVoteCount;
 
 (function() {
 "use strict";
@@ -734,20 +733,5 @@ assertSameConfigContent = function(configA, configB) {
     configA.term = termA;
     configB.version = versionB;
     configB.term = termB;
-};
-
-assertVoteCount = function(node, {
-    votingMembersCount,
-    majorityVoteCount,
-    writableVotingMembersCount,
-    writeMajorityCount,
-    totalMembersCount
-}) {
-    const status = assert.commandWorked(node.adminCommand({replSetGetStatus: 1}));
-    assert.eq(status["votingMembersCount"], votingMembersCount, status);
-    assert.eq(status["majorityVoteCount"], majorityVoteCount, status);
-    assert.eq(status["writableVotingMembersCount"], writableVotingMembersCount, status);
-    assert.eq(status["writeMajorityCount"], writeMajorityCount, status);
-    assert.eq(status["members"].length, totalMembersCount, status);
 };
 }());
