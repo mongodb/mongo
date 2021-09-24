@@ -225,57 +225,27 @@ err:
  *     Add the provided update to the head of the update list.
  */
 static inline int
-__rollback_row_modify(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip, WT_UPDATE *upd)
+__rollback_row_modify(WT_SESSION_IMPL *session, WT_REF *ref, WT_UPDATE *upd, WT_ITEM *key)
 {
+    WT_CURSOR_BTREE cbt;
     WT_DECL_RET;
-    WT_PAGE_MODIFY *mod;
-    WT_UPDATE *last_upd, *old_upd, **upd_entry;
-    size_t upd_size;
 
-    last_upd = NULL;
-    /* If we don't yet have a modify structure, we'll need one. */
-    WT_RET(__wt_page_modify_init(session, page));
-    mod = page->modify;
+    __wt_btcur_init(session, &cbt);
+    __wt_btcur_open(&cbt);
 
-    /* Allocate an update array as necessary. */
-    WT_PAGE_ALLOC_AND_SWAP(session, page, mod->mod_row_update, upd_entry, page->entries);
+    /* Search the page. */
+    WT_ERR(__wt_row_search(&cbt, key, true, ref, true, NULL));
 
-    /* Set the WT_UPDATE array reference. */
-    upd_entry = &mod->mod_row_update[WT_ROW_SLOT(page, rip)];
-    upd_size = __wt_update_list_memsize(upd);
+    /* Apply the modification. */
+#ifdef HAVE_DIAGNOSTIC
+    WT_ERR(__wt_row_modify(&cbt, key, NULL, upd, WT_UPDATE_INVALID, true, false));
+#else
+    WT_ERR(__wt_row_modify(&cbt, key, NULL, upd, WT_UPDATE_INVALID, true));
+#endif
 
-    /* If there are existing updates, append them after the new updates. */
-    for (last_upd = upd; last_upd->next != NULL; last_upd = last_upd->next)
-        ;
-    last_upd->next = *upd_entry;
-
-    /*
-     * We can either put a tombstone plus an update or a single update on the update chain.
-     *
-     * Set the "old" entry to the second update in the list so that the serialization function
-     * succeeds in swapping the first update into place.
-     */
-    if (upd->next != NULL)
-        *upd_entry = upd->next;
-    old_upd = *upd_entry;
-
-    /*
-     * Point the new WT_UPDATE item to the next element in the list. The serialization function acts
-     * as our memory barrier to flush this write.
-     */
-    upd->next = old_upd;
-
-    /*
-     * Serialize the update. Rollback to stable doesn't need to check the visibility of the on page
-     * value to detect conflict.
-     */
-    WT_ERR(__wt_update_serial(session, NULL, page, upd_entry, &upd, upd_size, true));
-
-    if (0) {
 err:
-        if (last_upd != NULL)
-            last_upd->next = NULL;
-    }
+    /* Free any resources that may have been cached in the cursor. */
+    WT_TRET(__wt_btcur_close(&cbt, true));
 
     return (ret);
 }
@@ -606,7 +576,7 @@ __rollback_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip, 
     }
 
     if (rip != NULL)
-        WT_ERR(__rollback_row_modify(session, page, rip, upd));
+        WT_ERR(__rollback_row_modify(session, ref, upd, key));
     else
         WT_ERR(__rollback_col_modify(session, ref, upd, recno));
 
@@ -644,6 +614,7 @@ __rollback_abort_ondisk_kv(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip, u
   WT_ITEM *row_key, WT_CELL_UNPACK_KV *vpack, wt_timestamp_t rollback_timestamp,
   bool *is_ondisk_stable)
 {
+    WT_DECL_ITEM(key);
     WT_DECL_ITEM(tmp);
     WT_DECL_RET;
     WT_PAGE *page;
@@ -766,14 +737,24 @@ __rollback_abort_ondisk_kv(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip, u
         return (0);
     }
 
-    if (rip != NULL)
-        WT_ERR(__rollback_row_modify(session, page, rip, upd));
-    else
+    if (rip != NULL) {
+        if (row_key != NULL)
+            key = row_key;
+        else {
+            /* Unpack a row key. */
+            WT_ERR(__wt_scr_alloc(session, 0, &key));
+            WT_ERR(__wt_row_leaf_key(session, page, rip, key, false));
+        }
+        WT_ERR(__rollback_row_modify(session, ref, upd, key));
+    } else
         WT_ERR(__rollback_col_modify(session, ref, upd, recno));
-    return (0);
 
+    if (0) {
 err:
-    __wt_free(session, upd);
+        __wt_free(session, upd);
+    }
+    if (rip != NULL && row_key == NULL)
+        __wt_scr_free(session, &key);
     return (ret);
 }
 
