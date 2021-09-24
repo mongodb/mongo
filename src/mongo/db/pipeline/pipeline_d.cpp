@@ -109,6 +109,7 @@ namespace {
  *       collection. This case is necessary because we don't currently support extending the
  *       QuerySolution with the 'postMultiPlan' QuerySolutionNode when the PlanCache is involved in
  *       the query. This will be resolved when SERVER-58429 is complete.
+ *    3. $match stage does not have $or and thus, does not need subplanning.
  */
 std::vector<std::unique_ptr<InnerPipelineStageInterface>> extractSbeCompatibleGroupsForPushdown(
     const intrusive_ptr<ExpressionContext>& expCtx,
@@ -118,6 +119,12 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> extractSbeCompatibleGr
     // We will eventually use the extracted group stages to populate 'CanonicalQuery::pipeline'
     // which requires stages to be wrapped in an interface.
     std::vector<std::unique_ptr<InnerPipelineStageInterface>> groupsForPushdown;
+
+    // In case that we have a top $or for $match stage, it triggers the tripwire assertion 5842500
+    // because subplanning does not expect that the base query has pushed down $group stage(s) but
+    // it does when $group stage exist in pipeline.
+    // TODO SERVER-60197: Remove this check after supporting this scenario.
+    auto queryNeedsSubplanning = cq->getQueryObj().hasField("$or");
 
     // This handles the case of unionWith against an unknown collection.
     if (collection == nullptr) {
@@ -135,7 +142,7 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> extractSbeCompatibleGr
     if (!feature_flags::gFeatureFlagSBEGroupPushdown.isEnabled(
             serverGlobalParams.featureCompatibility) ||
         !cq->getEnableSlotBasedExecutionEngine() || expCtx->allowDiskUse || isSharded ||
-        !isSingleIndex) {
+        !isSingleIndex || queryNeedsSubplanning) {
         return {};
     }
 

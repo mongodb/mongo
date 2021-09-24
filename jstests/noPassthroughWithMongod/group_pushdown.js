@@ -130,4 +130,16 @@ explain = coll.explain().aggregate(
     [{$group: {_id: "$item", s: {$sum: "$price"}, stdev: {$stdDevPop: "$price"}}}]);
 assert.eq(null, getAggPlanStage(explain, "GROUP"), explain);
 assert(explain.stages[1].hasOwnProperty("$group"));
+
+// $group cannot be pushed down to SBE when there's $match with $or due to an issue with
+// subplanning even though $group alone can be pushed down.
+const matchWithOr = {
+    $match: {$or: [{"item": "a"}, {"price": 10}]}
+};
+const groupPossiblyPushedDown = {
+    $group: {_id: "$item", quantity: {$sum: "$quantity"}}
+};
+assertNoGroupPushdown(coll,
+                      [matchWithOr, groupPossiblyPushedDown],
+                      [{_id: "a", quantity: 7}, {_id: "b", quantity: 10}]);
 })();
