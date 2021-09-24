@@ -46,6 +46,7 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/query/plan_cache_key_factory.h"
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner.h"
@@ -70,6 +71,16 @@ using std::unique_ptr;
 using std::vector;
 
 static const NamespaceString nss("test.collection");
+
+PlanCacheKey makeKey(const CanonicalQuery& cq, const std::vector<CoreIndexInfo>& indexCores = {}) {
+    PlanCacheIndexabilityState indexabilityState;
+    indexabilityState.updateDiscriminators(indexCores);
+
+    StringBuilder indexabilityKeyBuilder;
+    plan_cache_detail::encodeIndexability(cq.root(), indexabilityState, &indexabilityKeyBuilder);
+
+    return {cq.encodeKey(), indexabilityKeyBuilder.str(), cq.getEnableSlotBasedExecutionEngine()};
+}
 
 /**
  * Utility functions to create a CanonicalQuery
@@ -352,7 +363,7 @@ std::unique_ptr<plan_ranker::PlanRankingDecision> createDecision(size_t numPlans
  * in the planner cache.
  */
 void assertShouldCacheQuery(const CanonicalQuery& query) {
-    if (PlanCache::shouldCacheQuery(query)) {
+    if (shouldCacheQuery(query)) {
         return;
     }
     str::stream ss;
@@ -361,7 +372,7 @@ void assertShouldCacheQuery(const CanonicalQuery& query) {
 }
 
 void assertShouldNotCacheQuery(const CanonicalQuery& query) {
-    if (!PlanCache::shouldCacheQuery(query)) {
+    if (!shouldCacheQuery(query)) {
         return;
     }
     str::stream ss;
@@ -529,7 +540,7 @@ TEST(PlanCacheTest, AddEmptySolutions) {
     unique_ptr<plan_ranker::PlanRankingDecision> decision(createDecision(1U));
     QueryTestServiceContext serviceContext;
     ASSERT_NOT_OK(planCache.set(
-        *cq, std::make_unique<SolutionCacheData>(), solns, std::move(decision), Date_t{}));
+        makeKey(*cq), std::make_unique<SolutionCacheData>(), solns, std::move(decision), Date_t{}));
 }
 
 void addCacheEntryForShape(const CanonicalQuery& cq, PlanCache* planCache) {
@@ -537,7 +548,8 @@ void addCacheEntryForShape(const CanonicalQuery& cq, PlanCache* planCache) {
     auto qs = getQuerySolutionForCaching();
     std::vector<QuerySolution*> solns = {qs.get()};
 
-    ASSERT_OK(planCache->set(cq, qs->cacheData->clone(), solns, createDecision(1U), Date_t{}));
+    ASSERT_OK(
+        planCache->set(makeKey(cq), qs->cacheData->clone(), solns, createDecision(1U), Date_t{}));
 }
 
 TEST(PlanCacheTest, InactiveEntriesDisabled) {
@@ -549,26 +561,26 @@ TEST(PlanCacheTest, InactiveEntriesDisabled) {
     unique_ptr<CanonicalQuery> cq(canonicalize("{a: 1}"));
     auto qs = getQuerySolutionForCaching();
     std::vector<QuerySolution*> solns = {qs.get()};
+    auto key = makeKey(*cq);
 
-    ASSERT_EQ(planCache.get(*cq).state, PlanCache::CacheEntryState::kNotPresent);
+    ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kNotPresent);
     QueryTestServiceContext serviceContext;
-    ASSERT_OK(planCache.set(*cq, qs->cacheData->clone(), solns, createDecision(1U), Date_t{}));
+    ASSERT_OK(planCache.set(key, qs->cacheData->clone(), solns, createDecision(1U), Date_t{}));
 
     // After add, the planCache should have an _active_ entry.
-    ASSERT_EQ(planCache.get(*cq).state, PlanCache::CacheEntryState::kPresentActive);
+    ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentActive);
 
     // Call deactivate(). It should be a noop.
-    planCache.deactivate(*cq);
+    planCache.deactivate(key);
 
     // The entry should still be active.
-    ASSERT_EQ(planCache.get(*cq).state, PlanCache::CacheEntryState::kPresentActive);
+    ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentActive);
 
     // remove() the entry.
-    ASSERT_OK(planCache.remove(*cq));
+    planCache.remove(key);
     ASSERT_EQ(planCache.size(), 0U);
-    ASSERT_EQ(planCache.get(*cq).state, PlanCache::CacheEntryState::kNotPresent);
+    ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kNotPresent);
 }
-
 
 TEST(PlanCacheTest, PlanCacheLRUPolicyRemovesInactiveEntries) {
     // Use a tiny cache size.
@@ -577,31 +589,33 @@ TEST(PlanCacheTest, PlanCacheLRUPolicyRemovesInactiveEntries) {
     QueryTestServiceContext serviceContext;
 
     unique_ptr<CanonicalQuery> cqA(canonicalize("{a: 1}"));
-    ASSERT_EQ(planCache.get(*cqA).state, PlanCache::CacheEntryState::kNotPresent);
+    auto keyA = makeKey(*cqA);
+    ASSERT_EQ(planCache.get(keyA).state, PlanCache::CacheEntryState::kNotPresent);
     addCacheEntryForShape(*cqA.get(), &planCache);
-
     // After add, the planCache should have an inactive entry.
-    ASSERT_EQ(planCache.get(*cqA).state, PlanCache::CacheEntryState::kPresentInactive);
+    ASSERT_EQ(planCache.get(keyA).state, PlanCache::CacheEntryState::kPresentInactive);
 
     // Add a cache entry for another shape.
     unique_ptr<CanonicalQuery> cqB(canonicalize("{b: 1}"));
-    ASSERT_EQ(planCache.get(*cqB).state, PlanCache::CacheEntryState::kNotPresent);
+    auto keyB = makeKey(*cqB);
+    ASSERT_EQ(planCache.get(keyB).state, PlanCache::CacheEntryState::kNotPresent);
     addCacheEntryForShape(*cqB.get(), &planCache);
-    ASSERT_EQ(planCache.get(*cqB).state, PlanCache::CacheEntryState::kPresentInactive);
+    ASSERT_EQ(planCache.get(keyB).state, PlanCache::CacheEntryState::kPresentInactive);
 
     // Access the cached solution for the {a: 1} shape. Now the entry for {b: 1} will be the least
     // recently used.
-    ASSERT_EQ(planCache.get(*cqA).state, PlanCache::CacheEntryState::kPresentInactive);
+    ASSERT_EQ(planCache.get(keyA).state, PlanCache::CacheEntryState::kPresentInactive);
 
     // Insert another entry. Since the cache size is 2, we expect the {b: 1} entry to be ejected.
     unique_ptr<CanonicalQuery> cqC(canonicalize("{c: 1}"));
-    ASSERT_EQ(planCache.get(*cqC).state, PlanCache::CacheEntryState::kNotPresent);
+    auto keyC = makeKey(*cqC);
+    ASSERT_EQ(planCache.get(keyC).state, PlanCache::CacheEntryState::kNotPresent);
     addCacheEntryForShape(*cqC.get(), &planCache);
 
     // Check that {b: 1} is gone, but {a: 1} and {c: 1} both still have entries.
-    ASSERT_EQ(planCache.get(*cqB).state, PlanCache::CacheEntryState::kNotPresent);
-    ASSERT_EQ(planCache.get(*cqA).state, PlanCache::CacheEntryState::kPresentInactive);
-    ASSERT_EQ(planCache.get(*cqC).state, PlanCache::CacheEntryState::kPresentInactive);
+    ASSERT_EQ(planCache.get(keyB).state, PlanCache::CacheEntryState::kNotPresent);
+    ASSERT_EQ(planCache.get(keyA).state, PlanCache::CacheEntryState::kPresentInactive);
+    ASSERT_EQ(planCache.get(keyC).state, PlanCache::CacheEntryState::kPresentInactive);
 }
 
 TEST(PlanCacheTest, PlanCacheRemoveDeletesInactiveEntries) {
@@ -609,18 +623,19 @@ TEST(PlanCacheTest, PlanCacheRemoveDeletesInactiveEntries) {
     unique_ptr<CanonicalQuery> cq(canonicalize("{a: 1}"));
     auto qs = getQuerySolutionForCaching();
     std::vector<QuerySolution*> solns = {qs.get()};
+    auto key = makeKey(*cq);
 
-    ASSERT_EQ(planCache.get(*cq).state, PlanCache::CacheEntryState::kNotPresent);
+    ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kNotPresent);
     QueryTestServiceContext serviceContext;
-    ASSERT_OK(planCache.set(*cq, qs->cacheData->clone(), solns, createDecision(1U), Date_t{}));
+    ASSERT_OK(planCache.set(key, qs->cacheData->clone(), solns, createDecision(1U), Date_t{}));
 
     // After add, the planCache should have an inactive entry.
-    ASSERT_EQ(planCache.get(*cq).state, PlanCache::CacheEntryState::kPresentInactive);
+    ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentInactive);
 
     // remove() the entry.
-    ASSERT_OK(planCache.remove(*cq));
+    planCache.remove(key);
     ASSERT_EQ(planCache.size(), 0U);
-    ASSERT_EQ(planCache.get(*cq).state, PlanCache::CacheEntryState::kNotPresent);
+    ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kNotPresent);
 }
 
 TEST(PlanCacheTest, PlanCacheFlushDeletesInactiveEntries) {
@@ -628,18 +643,19 @@ TEST(PlanCacheTest, PlanCacheFlushDeletesInactiveEntries) {
     unique_ptr<CanonicalQuery> cq(canonicalize("{a: 1}"));
     auto qs = getQuerySolutionForCaching();
     std::vector<QuerySolution*> solns = {qs.get()};
+    auto key = makeKey(*cq);
 
-    ASSERT_EQ(planCache.get(*cq).state, PlanCache::CacheEntryState::kNotPresent);
+    ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kNotPresent);
     QueryTestServiceContext serviceContext;
-    ASSERT_OK(planCache.set(*cq, qs->cacheData->clone(), solns, createDecision(1U), Date_t{}));
+    ASSERT_OK(planCache.set(key, qs->cacheData->clone(), solns, createDecision(1U), Date_t{}));
 
     // After add, the planCache should have an inactive entry.
-    ASSERT_EQ(planCache.get(*cq).state, PlanCache::CacheEntryState::kPresentInactive);
+    ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentInactive);
 
     // Clear the plan cache. The inactive entry should now be removed.
     planCache.clear();
     ASSERT_EQ(planCache.size(), 0U);
-    ASSERT_EQ(planCache.get(*cq).state, PlanCache::CacheEntryState::kNotPresent);
+    ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kNotPresent);
 }
 
 TEST(PlanCacheTest, AddActiveCacheEntry) {
@@ -647,25 +663,26 @@ TEST(PlanCacheTest, AddActiveCacheEntry) {
     unique_ptr<CanonicalQuery> cq(canonicalize("{a: 1}"));
     auto qs = getQuerySolutionForCaching();
     std::vector<QuerySolution*> solns = {qs.get()};
+    auto key = makeKey(*cq);
 
     // Check if key is in cache before and after set().
-    ASSERT_EQ(planCache.get(*cq).state, PlanCache::CacheEntryState::kNotPresent);
+    ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kNotPresent);
     QueryTestServiceContext serviceContext;
-    ASSERT_OK(planCache.set(*cq, qs->cacheData->clone(), solns, createDecision(1U, 20), Date_t{}));
+    ASSERT_OK(planCache.set(key, qs->cacheData->clone(), solns, createDecision(1U, 20), Date_t{}));
 
     // After add, the planCache should have an inactive entry.
-    ASSERT_EQ(planCache.get(*cq).state, PlanCache::CacheEntryState::kPresentInactive);
+    ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentInactive);
 
     // Calling set() again, with a solution that had a lower works value should create an active
     // entry.
-    ASSERT_OK(planCache.set(*cq, qs->cacheData->clone(), solns, createDecision(1U, 10), Date_t{}));
-    ASSERT_EQ(planCache.get(*cq).state, PlanCache::CacheEntryState::kPresentActive);
+    ASSERT_OK(planCache.set(key, qs->cacheData->clone(), solns, createDecision(1U, 10), Date_t{}));
+    ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentActive);
     ASSERT_EQUALS(planCache.size(), 1U);
 
     // Clear the plan cache. The active entry should now be removed.
     planCache.clear();
     ASSERT_EQ(planCache.size(), 0U);
-    ASSERT_EQ(planCache.get(*cq).state, PlanCache::CacheEntryState::kNotPresent);
+    ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kNotPresent);
 }
 
 TEST(PlanCacheTest, WorksValueIncreases) {
@@ -673,45 +690,59 @@ TEST(PlanCacheTest, WorksValueIncreases) {
     unique_ptr<CanonicalQuery> cq(canonicalize("{a: 1}"));
     auto qs = getQuerySolutionForCaching();
     std::vector<QuerySolution*> solns = {qs.get()};
+    auto key = makeKey(*cq);
+    PlanCacheLoggingCallbacks<PlanCacheKey, SolutionCacheData> callbacks{*cq};
 
-    ASSERT_EQ(planCache.get(*cq).state, PlanCache::CacheEntryState::kNotPresent);
+    ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kNotPresent);
     QueryTestServiceContext serviceContext;
-    ASSERT_OK(planCache.set(*cq, qs->cacheData->clone(), solns, createDecision(1U, 10), Date_t{}));
+    ASSERT_OK(planCache.set(key,
+                            qs->cacheData->clone(),
+                            solns,
+                            createDecision(1U, 10),
+                            Date_t{},
+                            boost::none /* worksGrowthCoefficient */,
+                            &callbacks));
 
     // After add, the planCache should have an inactive entry.
-    ASSERT_EQ(planCache.get(*cq).state, PlanCache::CacheEntryState::kPresentInactive);
-    auto entry = assertGet(planCache.getEntry(*cq));
+    ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentInactive);
+    auto entry = assertGet(planCache.getEntry(key));
     ASSERT_EQ(entry->works, 10U);
     ASSERT_FALSE(entry->isActive);
 
     // Calling set() again, with a solution that had a higher works value. This should cause the
     // works on the original entry to be increased.
-    ASSERT_OK(planCache.set(*cq, qs->cacheData->clone(), solns, createDecision(1U, 50), Date_t{}));
+    ASSERT_OK(planCache.set(key, qs->cacheData->clone(), solns, createDecision(1U, 50), Date_t{}));
 
     // The entry should still be inactive. Its works should double though.
-    ASSERT_EQ(planCache.get(*cq).state, PlanCache::CacheEntryState::kPresentInactive);
-    entry = assertGet(planCache.getEntry(*cq));
+    ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentInactive);
+    entry = assertGet(planCache.getEntry(key));
     ASSERT_FALSE(entry->isActive);
     ASSERT_EQ(entry->works, 20U);
 
     // Calling set() again, with a solution that had a higher works value. This should cause the
     // works on the original entry to be increased.
-    ASSERT_OK(planCache.set(*cq, qs->cacheData->clone(), solns, createDecision(1U, 30), Date_t{}));
+    ASSERT_OK(planCache.set(key, qs->cacheData->clone(), solns, createDecision(1U, 30), Date_t{}));
 
     // The entry should still be inactive. Its works should have doubled again.
-    ASSERT_EQ(planCache.get(*cq).state, PlanCache::CacheEntryState::kPresentInactive);
-    entry = assertGet(planCache.getEntry(*cq));
+    ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentInactive);
+    entry = assertGet(planCache.getEntry(key));
     ASSERT_FALSE(entry->isActive);
     ASSERT_EQ(entry->works, 40U);
 
     // Calling set() again, with a solution that has a lower works value than what's currently in
     // the cache.
-    ASSERT_OK(planCache.set(*cq, qs->cacheData->clone(), solns, createDecision(1U, 25), Date_t{}));
+    ASSERT_OK(planCache.set(key,
+                            qs->cacheData->clone(),
+                            solns,
+                            createDecision(1U, 25),
+                            Date_t{},
+                            boost::none /* worksGrowthCoefficient */,
+                            &callbacks));
 
     // The solution just run should now be in an active cache entry, with a works
     // equal to the number of works the solution took.
-    ASSERT_EQ(planCache.get(*cq).state, PlanCache::CacheEntryState::kPresentActive);
-    entry = assertGet(planCache.getEntry(*cq));
+    ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentActive);
+    entry = assertGet(planCache.getEntry(key));
     ASSERT_TRUE(entry->isActive);
 
     ASSERT(entry->debugInfo);
@@ -725,7 +756,7 @@ TEST(PlanCacheTest, WorksValueIncreases) {
     // Clear the plan cache. The active entry should now be removed.
     planCache.clear();
     ASSERT_EQ(planCache.size(), 0U);
-    ASSERT_EQ(planCache.get(*cq).state, PlanCache::CacheEntryState::kNotPresent);
+    ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kNotPresent);
 }
 
 TEST(PlanCacheTest, WorksValueIncreasesByAtLeastOne) {
@@ -736,14 +767,15 @@ TEST(PlanCacheTest, WorksValueIncreasesByAtLeastOne) {
     unique_ptr<CanonicalQuery> cq(canonicalize("{a: 1}"));
     auto qs = getQuerySolutionForCaching();
     std::vector<QuerySolution*> solns = {qs.get()};
+    auto key = makeKey(*cq);
 
-    ASSERT_EQ(planCache.get(*cq).state, PlanCache::CacheEntryState::kNotPresent);
+    ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kNotPresent);
     QueryTestServiceContext serviceContext;
-    ASSERT_OK(planCache.set(*cq, qs->cacheData->clone(), solns, createDecision(1U, 3), Date_t{}));
+    ASSERT_OK(planCache.set(key, qs->cacheData->clone(), solns, createDecision(1U, 3), Date_t{}));
 
     // After add, the planCache should have an inactive entry.
-    ASSERT_EQ(planCache.get(*cq).state, PlanCache::CacheEntryState::kPresentInactive);
-    auto entry = assertGet(planCache.getEntry(*cq));
+    ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentInactive);
+    auto entry = assertGet(planCache.getEntry(key));
     ASSERT_EQ(entry->works, 3U);
     ASSERT_FALSE(entry->isActive);
 
@@ -752,18 +784,18 @@ TEST(PlanCacheTest, WorksValueIncreasesByAtLeastOne) {
     // multiplying by the value 1.10 will give a value of 3 (static_cast<size_t>(1.1 * 3) == 3).
     // We check that the works value is increased 1 instead.
     ASSERT_OK(planCache.set(
-        *cq, qs->cacheData->clone(), solns, createDecision(1U, 50), Date_t{}, kWorksCoeff));
+        key, qs->cacheData->clone(), solns, createDecision(1U, 50), Date_t{}, kWorksCoeff));
 
     // The entry should still be inactive. Its works should increase by 1.
-    ASSERT_EQ(planCache.get(*cq).state, PlanCache::CacheEntryState::kPresentInactive);
-    entry = assertGet(planCache.getEntry(*cq));
+    ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentInactive);
+    entry = assertGet(planCache.getEntry(key));
     ASSERT_FALSE(entry->isActive);
     ASSERT_EQ(entry->works, 4U);
 
     // Clear the plan cache. The inactive entry should now be removed.
     planCache.clear();
     ASSERT_EQ(planCache.size(), 0U);
-    ASSERT_EQ(planCache.get(*cq).state, PlanCache::CacheEntryState::kNotPresent);
+    ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kNotPresent);
 }
 
 TEST(PlanCacheTest, SetIsNoopWhenNewEntryIsWorse) {
@@ -771,30 +803,31 @@ TEST(PlanCacheTest, SetIsNoopWhenNewEntryIsWorse) {
     unique_ptr<CanonicalQuery> cq(canonicalize("{a: 1}"));
     auto qs = getQuerySolutionForCaching();
     std::vector<QuerySolution*> solns = {qs.get()};
+    auto key = makeKey(*cq);
 
-    ASSERT_EQ(planCache.get(*cq).state, PlanCache::CacheEntryState::kNotPresent);
+    ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kNotPresent);
     QueryTestServiceContext serviceContext;
-    ASSERT_OK(planCache.set(*cq, qs->cacheData->clone(), solns, createDecision(1U, 50), Date_t{}));
+    ASSERT_OK(planCache.set(key, qs->cacheData->clone(), solns, createDecision(1U, 50), Date_t{}));
 
     // After add, the planCache should have an inactive entry.
-    ASSERT_EQ(planCache.get(*cq).state, PlanCache::CacheEntryState::kPresentInactive);
-    auto entry = assertGet(planCache.getEntry(*cq));
+    ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentInactive);
+    auto entry = assertGet(planCache.getEntry(key));
     ASSERT_EQ(entry->works, 50U);
     ASSERT_FALSE(entry->isActive);
 
     // Call set() again, with a solution that has a lower works value. This will result in an
     // active entry being created.
-    ASSERT_OK(planCache.set(*cq, qs->cacheData->clone(), solns, createDecision(1U, 20), Date_t{}));
-    ASSERT_EQ(planCache.get(*cq).state, PlanCache::CacheEntryState::kPresentActive);
-    entry = assertGet(planCache.getEntry(*cq));
+    ASSERT_OK(planCache.set(key, qs->cacheData->clone(), solns, createDecision(1U, 20), Date_t{}));
+    ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentActive);
+    entry = assertGet(planCache.getEntry(key));
     ASSERT_TRUE(entry->isActive);
     ASSERT_EQ(entry->works, 20U);
 
     // Now call set() again, but with a solution that has a higher works value. This should be
     // a noop.
-    ASSERT_OK(planCache.set(*cq, qs->cacheData->clone(), solns, createDecision(1U, 100), Date_t{}));
-    ASSERT_EQ(planCache.get(*cq).state, PlanCache::CacheEntryState::kPresentActive);
-    entry = assertGet(planCache.getEntry(*cq));
+    ASSERT_OK(planCache.set(key, qs->cacheData->clone(), solns, createDecision(1U, 100), Date_t{}));
+    ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentActive);
+    entry = assertGet(planCache.getEntry(key));
     ASSERT_TRUE(entry->isActive);
     ASSERT_EQ(entry->works, 20U);
 }
@@ -804,29 +837,30 @@ TEST(PlanCacheTest, SetOverwritesWhenNewEntryIsBetter) {
     unique_ptr<CanonicalQuery> cq(canonicalize("{a: 1}"));
     auto qs = getQuerySolutionForCaching();
     std::vector<QuerySolution*> solns = {qs.get()};
+    auto key = makeKey(*cq);
 
-    ASSERT_EQ(planCache.get(*cq).state, PlanCache::CacheEntryState::kNotPresent);
+    ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kNotPresent);
     QueryTestServiceContext serviceContext;
-    ASSERT_OK(planCache.set(*cq, qs->cacheData->clone(), solns, createDecision(1U, 50), Date_t{}));
+    ASSERT_OK(planCache.set(key, qs->cacheData->clone(), solns, createDecision(1U, 50), Date_t{}));
 
     // After add, the planCache should have an inactive entry.
-    auto entry = assertGet(planCache.getEntry(*cq));
+    auto entry = assertGet(planCache.getEntry(key));
     ASSERT_EQ(entry->works, 50U);
     ASSERT_FALSE(entry->isActive);
 
     // Call set() again, with a solution that has a lower works value. This will result in an
     // active entry being created.
-    ASSERT_OK(planCache.set(*cq, qs->cacheData->clone(), solns, createDecision(1U, 20), Date_t{}));
-    ASSERT_EQ(planCache.get(*cq).state, PlanCache::CacheEntryState::kPresentActive);
-    entry = assertGet(planCache.getEntry(*cq));
+    ASSERT_OK(planCache.set(key, qs->cacheData->clone(), solns, createDecision(1U, 20), Date_t{}));
+    ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentActive);
+    entry = assertGet(planCache.getEntry(key));
     ASSERT_TRUE(entry->isActive);
     ASSERT_EQ(entry->works, 20U);
 
     // Now call set() again, with a solution that has a lower works value. The current active entry
     // should be overwritten.
-    ASSERT_OK(planCache.set(*cq, qs->cacheData->clone(), solns, createDecision(1U, 10), Date_t{}));
-    ASSERT_EQ(planCache.get(*cq).state, PlanCache::CacheEntryState::kPresentActive);
-    entry = assertGet(planCache.getEntry(*cq));
+    ASSERT_OK(planCache.set(key, qs->cacheData->clone(), solns, createDecision(1U, 10), Date_t{}));
+    ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentActive);
+    entry = assertGet(planCache.getEntry(key));
     ASSERT_TRUE(entry->isActive);
     ASSERT_EQ(entry->works, 10U);
 }
@@ -836,29 +870,30 @@ TEST(PlanCacheTest, DeactivateCacheEntry) {
     unique_ptr<CanonicalQuery> cq(canonicalize("{a: 1}"));
     auto qs = getQuerySolutionForCaching();
     std::vector<QuerySolution*> solns = {qs.get()};
+    auto key = makeKey(*cq);
 
-    ASSERT_EQ(planCache.get(*cq).state, PlanCache::CacheEntryState::kNotPresent);
+    ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kNotPresent);
     QueryTestServiceContext serviceContext;
-    ASSERT_OK(planCache.set(*cq, qs->cacheData->clone(), solns, createDecision(1U, 50), Date_t{}));
+    ASSERT_OK(planCache.set(key, qs->cacheData->clone(), solns, createDecision(1U, 50), Date_t{}));
 
     // After add, the planCache should have an inactive entry.
-    auto entry = assertGet(planCache.getEntry(*cq));
+    auto entry = assertGet(planCache.getEntry(key));
     ASSERT_EQ(entry->works, 50U);
     ASSERT_FALSE(entry->isActive);
 
     // Call set() again, with a solution that has a lower works value. This will result in an
     // active entry being created.
-    ASSERT_OK(planCache.set(*cq, qs->cacheData->clone(), solns, createDecision(1U, 20), Date_t{}));
-    ASSERT_EQ(planCache.get(*cq).state, PlanCache::CacheEntryState::kPresentActive);
-    entry = assertGet(planCache.getEntry(*cq));
+    ASSERT_OK(planCache.set(key, qs->cacheData->clone(), solns, createDecision(1U, 20), Date_t{}));
+    ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentActive);
+    entry = assertGet(planCache.getEntry(key));
     ASSERT_TRUE(entry->isActive);
     ASSERT_EQ(entry->works, 20U);
 
-    planCache.deactivate(*cq);
-    ASSERT_EQ(planCache.get(*cq).state, PlanCache::CacheEntryState::kPresentInactive);
+    planCache.deactivate(key);
+    ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentInactive);
 
     // Be sure the entry has the same works value.
-    entry = assertGet(planCache.getEntry(*cq));
+    entry = assertGet(planCache.getEntry(key));
     ASSERT_FALSE(entry->isActive);
     ASSERT_EQ(entry->works, 20U);
 }
@@ -871,8 +906,8 @@ TEST(PlanCacheTest, GetMatchingStatsMatchesAndSerializesCorrectly) {
         unique_ptr<CanonicalQuery> cq(canonicalize("{a: 1}"));
         auto qs = getQuerySolutionForCaching();
         std::vector<QuerySolution*> solns = {qs.get()};
-        ASSERT_OK(
-            planCache.set(*cq, qs->cacheData->clone(), solns, createDecision(1U, 5), Date_t{}));
+        ASSERT_OK(planCache.set(
+            makeKey(*cq), qs->cacheData->clone(), solns, createDecision(1U, 5), Date_t{}));
     }
 
     // Create a second cache entry with 3 works.
@@ -880,8 +915,8 @@ TEST(PlanCacheTest, GetMatchingStatsMatchesAndSerializesCorrectly) {
         unique_ptr<CanonicalQuery> cq(canonicalize("{b: 1}"));
         auto qs = getQuerySolutionForCaching();
         std::vector<QuerySolution*> solns = {qs.get()};
-        ASSERT_OK(
-            planCache.set(*cq, qs->cacheData->clone(), solns, createDecision(1U, 3), Date_t{}));
+        ASSERT_OK(planCache.set(
+            makeKey(*cq), qs->cacheData->clone(), solns, createDecision(1U, 3), Date_t{}));
     }
 
     // Verify that the cache entries have been created.
@@ -1184,17 +1219,17 @@ protected:
         std::vector<QuerySolution*> solutions;
         solutions.push_back(&qs);
 
-        uint32_t queryHash = canonical_query_encoder::computeHash(ck.stringData());
+        uint32_t queryHash = ck.queryHash();
         uint32_t planCacheKey = queryHash;
-        auto entry = PlanCacheEntry::create(solutions,
-                                            createDecision(1U),
-                                            *scopedCq,
-                                            qs.cacheData->clone(),
-                                            queryHash,
-                                            planCacheKey,
-                                            Date_t(),
-                                            false,
-                                            0);
+        auto entry = PlanCacheEntry::create<PlanCacheKey>(solutions,
+                                                          createDecision(1U),
+                                                          qs.cacheData->clone(),
+                                                          queryHash,
+                                                          planCacheKey,
+                                                          Date_t(),
+                                                          false /* isActive  */,
+                                                          0 /* works */,
+                                                          nullptr /* callbacks */);
         CachedSolution cachedSoln(*entry);
 
         auto statusWithQs = QueryPlanner::planFromCache(*scopedCq, params, cachedSoln);
@@ -1873,11 +1908,11 @@ TEST_F(CachePlanSelectionTest, ContainedOrAndIntersection) {
 TEST(PlanCacheTest, ComputeKeySparseIndex) {
     PlanCache planCache(5000);
     const auto keyPattern = BSON("a" << 1);
-    planCache.notifyOfIndexUpdates(
-        {CoreIndexInfo(keyPattern,
-                       IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                       true,                           // sparse
-                       IndexEntry::Identifier{""})});  // name
+    const std::vector<CoreIndexInfo> indexCores = {
+        CoreIndexInfo(keyPattern,
+                      IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+                      true,                          // sparse
+                      IndexEntry::Identifier{""})};  // name
 
     unique_ptr<CanonicalQuery> cqEqNumber(canonicalize("{a: 0}}"));
     unique_ptr<CanonicalQuery> cqEqString(canonicalize("{a: 'x'}}"));
@@ -1885,12 +1920,12 @@ TEST(PlanCacheTest, ComputeKeySparseIndex) {
 
     // 'cqEqNumber' and 'cqEqString' get the same key, since both are compatible with this
     // index.
-    const auto eqNumberKey = planCache.computeKey(*cqEqNumber);
-    const auto eqStringKey = planCache.computeKey(*cqEqString);
+    const auto eqNumberKey = makeKey(*cqEqNumber, indexCores);
+    const auto eqStringKey = makeKey(*cqEqString, indexCores);
     ASSERT_EQ(eqNumberKey, eqStringKey);
 
     // 'cqEqNull' gets a different key, since it is not compatible with this index.
-    const auto eqNullKey = planCache.computeKey(*cqEqNull);
+    const auto eqNullKey = makeKey(*cqEqNull, indexCores);
     ASSERT_NOT_EQUALS(eqNullKey, eqNumberKey);
 
     assertPlanCacheKeysUnequalDueToDiscriminators(eqNullKey, eqNumberKey);
@@ -1906,23 +1941,23 @@ TEST(PlanCacheTest, ComputeKeyPartialIndex) {
 
     PlanCache planCache(5000);
     const auto keyPattern = BSON("a" << 1);
-    planCache.notifyOfIndexUpdates(
-        {CoreIndexInfo(keyPattern,
-                       IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                       false,                       // sparse
-                       IndexEntry::Identifier{""},  // name
-                       filterExpr.get())});         // filterExpr
+    const std::vector<CoreIndexInfo> indexCores = {
+        CoreIndexInfo(keyPattern,
+                      IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+                      false,                       // sparse
+                      IndexEntry::Identifier{""},  // name
+                      filterExpr.get())};          // filterExpr
 
     unique_ptr<CanonicalQuery> cqGtNegativeFive(canonicalize("{f: {$gt: -5}}"));
     unique_ptr<CanonicalQuery> cqGtZero(canonicalize("{f: {$gt: 0}}"));
     unique_ptr<CanonicalQuery> cqGtFive(canonicalize("{f: {$gt: 5}}"));
 
     // 'cqGtZero' and 'cqGtFive' get the same key, since both are compatible with this index.
-    ASSERT_EQ(planCache.computeKey(*cqGtZero), planCache.computeKey(*cqGtFive));
+    ASSERT_EQ(makeKey(*cqGtZero, indexCores), makeKey(*cqGtFive, indexCores));
 
     // 'cqGtNegativeFive' gets a different key, since it is not compatible with this index.
-    assertPlanCacheKeysUnequalDueToDiscriminators(planCache.computeKey(*cqGtNegativeFive),
-                                                  planCache.computeKey(*cqGtZero));
+    assertPlanCacheKeysUnequalDueToDiscriminators(makeKey(*cqGtNegativeFive, indexCores),
+                                                  makeKey(*cqGtZero, indexCores));
 }
 
 // Query shapes should get the same plan cache key if they have the same collation indexability.
@@ -1931,13 +1966,13 @@ TEST(PlanCacheTest, ComputeKeyCollationIndex) {
 
     PlanCache planCache(5000);
     const auto keyPattern = BSON("a" << 1);
-    planCache.notifyOfIndexUpdates(
-        {CoreIndexInfo(keyPattern,
-                       IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                       false,                       // sparse
-                       IndexEntry::Identifier{""},  // name
-                       nullptr,                     // filterExpr
-                       &collator)});                // collation
+    const std::vector<CoreIndexInfo> indexCores = {
+        CoreIndexInfo(keyPattern,
+                      IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+                      false,                       // sparse
+                      IndexEntry::Identifier{""},  // name
+                      nullptr,                     // filterExpr
+                      &collator)};                 // collation
 
     unique_ptr<CanonicalQuery> containsString(canonicalize("{a: 'abc'}"));
     unique_ptr<CanonicalQuery> containsObject(canonicalize("{a: {b: 'abc'}}"));
@@ -1948,20 +1983,20 @@ TEST(PlanCacheTest, ComputeKeyCollationIndex) {
 
     // 'containsString', 'containsObject', and 'containsArray' have the same key, since none are
     // compatible with the index.
-    ASSERT_EQ(planCache.computeKey(*containsString), planCache.computeKey(*containsObject));
-    ASSERT_EQ(planCache.computeKey(*containsString), planCache.computeKey(*containsArray));
+    ASSERT_EQ(makeKey(*containsString, indexCores), makeKey(*containsObject, indexCores));
+    ASSERT_EQ(makeKey(*containsString, indexCores), makeKey(*containsArray, indexCores));
 
     // 'noStrings' gets a different key since it is compatible with the index.
-    assertPlanCacheKeysUnequalDueToDiscriminators(planCache.computeKey(*containsString),
-                                                  planCache.computeKey(*noStrings));
-    ASSERT_EQ(planCache.computeKey(*containsString).getIndexabilityDiscriminators(), "<0>");
-    ASSERT_EQ(planCache.computeKey(*noStrings).getIndexabilityDiscriminators(), "<1>");
+    assertPlanCacheKeysUnequalDueToDiscriminators(makeKey(*containsString, indexCores),
+                                                  makeKey(*noStrings, indexCores));
+    ASSERT_EQ(makeKey(*containsString, indexCores).getIndexabilityDiscriminators(), "<0>");
+    ASSERT_EQ(makeKey(*noStrings, indexCores).getIndexabilityDiscriminators(), "<1>");
 
     // 'noStrings' and 'containsStringHasCollation' get different keys, since the collation
     // specified in the query is considered part of its shape. However, they have the same index
     // compatibility, so the unstable part of their PlanCacheKeys should be the same.
-    PlanCacheKey noStringKey = planCache.computeKey(*noStrings);
-    PlanCacheKey withStringAndCollationKey = planCache.computeKey(*containsStringHasCollation);
+    PlanCacheKey noStringKey = makeKey(*noStrings, indexCores);
+    PlanCacheKey withStringAndCollationKey = makeKey(*containsStringHasCollation, indexCores);
     ASSERT_NE(noStringKey, withStringAndCollationKey);
     ASSERT_EQ(noStringKey.getUnstablePart(), withStringAndCollationKey.getUnstablePart());
     ASSERT_NE(noStringKey.getStableKeyStringData(),
@@ -1976,28 +2011,28 @@ TEST(PlanCacheTest, ComputeKeyCollationIndex) {
 
     // 'inContainsString', 'inContainsObject', and 'inContainsArray' have the same key, since none
     // are compatible with the index.
-    ASSERT_EQ(planCache.computeKey(*inContainsString), planCache.computeKey(*inContainsObject));
-    ASSERT_EQ(planCache.computeKey(*inContainsString), planCache.computeKey(*inContainsArray));
+    ASSERT_EQ(makeKey(*inContainsString, indexCores), makeKey(*inContainsObject, indexCores));
+    ASSERT_EQ(makeKey(*inContainsString, indexCores), makeKey(*inContainsArray, indexCores));
 
     // 'inNoStrings' gets a different key since it is compatible with the index.
-    assertPlanCacheKeysUnequalDueToDiscriminators(planCache.computeKey(*inContainsString),
-                                                  planCache.computeKey(*inNoStrings));
-    ASSERT_EQ(planCache.computeKey(*inContainsString).getIndexabilityDiscriminators(), "<0>");
-    ASSERT_EQ(planCache.computeKey(*inNoStrings).getIndexabilityDiscriminators(), "<1>");
+    assertPlanCacheKeysUnequalDueToDiscriminators(makeKey(*inContainsString, indexCores),
+                                                  makeKey(*inNoStrings, indexCores));
+    ASSERT_EQ(makeKey(*inContainsString, indexCores).getIndexabilityDiscriminators(), "<0>");
+    ASSERT_EQ(makeKey(*inNoStrings, indexCores).getIndexabilityDiscriminators(), "<1>");
 
     // 'inNoStrings' and 'inContainsStringHasCollation' get the same key since they compatible with
     // the index.
-    ASSERT_NE(planCache.computeKey(*inNoStrings),
-              planCache.computeKey(*inContainsStringHasCollation));
-    ASSERT_EQ(planCache.computeKey(*inNoStrings).getUnstablePart(),
-              planCache.computeKey(*inContainsStringHasCollation).getUnstablePart());
+    ASSERT_NE(makeKey(*inNoStrings, indexCores),
+              makeKey(*inContainsStringHasCollation, indexCores));
+    ASSERT_EQ(makeKey(*inNoStrings, indexCores).getUnstablePart(),
+              makeKey(*inContainsStringHasCollation, indexCores).getUnstablePart());
 }
 
 TEST(PlanCacheTest, ComputeKeyWildcardIndex) {
     auto entryProjUpdatePair = makeWildcardUpdate(BSON("a.$**" << 1));
 
     PlanCache planCache(5000);
-    planCache.notifyOfIndexUpdates({entryProjUpdatePair.first});
+    const std::vector<CoreIndexInfo> indexCores = {entryProjUpdatePair.first};
 
     // Used to check that two queries have the same shape when no indexes are present.
     PlanCache planCacheWithNoIndexes(5000);
@@ -2014,30 +2049,27 @@ TEST(PlanCacheTest, ComputeKeyWildcardIndex) {
     unique_ptr<CanonicalQuery> doesNotUsePath(canonicalize("{b: 1234}"));
 
     // Check that the queries which are compatible with the index have the same key.
-    ASSERT_EQ(planCache.computeKey(*usesPathWithScalar),
-              planCache.computeKey(*usesPathWithEmptyArray));
+    ASSERT_EQ(makeKey(*usesPathWithScalar, indexCores),
+              makeKey(*usesPathWithEmptyArray, indexCores));
 
     // Check that the queries which have the same path as the index, but aren't supported, have
     // different keys.
-    ASSERT_EQ(planCacheWithNoIndexes.computeKey(*usesPathWithScalar),
-              planCacheWithNoIndexes.computeKey(*usesPathWithObject));
-    assertPlanCacheKeysUnequalDueToDiscriminators(planCache.computeKey(*usesPathWithScalar),
-                                                  planCache.computeKey(*usesPathWithObject));
-    ASSERT_EQ(planCache.computeKey(*usesPathWithScalar).getIndexabilityDiscriminators(), "<1>");
-    ASSERT_EQ(planCache.computeKey(*usesPathWithObject).getIndexabilityDiscriminators(), "<0>");
+    ASSERT_EQ(makeKey(*usesPathWithScalar), makeKey(*usesPathWithObject));
+    assertPlanCacheKeysUnequalDueToDiscriminators(makeKey(*usesPathWithScalar, indexCores),
+                                                  makeKey(*usesPathWithObject, indexCores));
+    ASSERT_EQ(makeKey(*usesPathWithScalar, indexCores).getIndexabilityDiscriminators(), "<1>");
+    ASSERT_EQ(makeKey(*usesPathWithObject, indexCores).getIndexabilityDiscriminators(), "<0>");
 
-    ASSERT_EQ(planCache.computeKey(*usesPathWithObject), planCache.computeKey(*usesPathWithArray));
-    ASSERT_EQ(planCache.computeKey(*usesPathWithObject),
-              planCache.computeKey(*usesPathWithArrayContainingObject));
+    ASSERT_EQ(makeKey(*usesPathWithObject, indexCores), makeKey(*usesPathWithArray, indexCores));
+    ASSERT_EQ(makeKey(*usesPathWithObject, indexCores),
+              makeKey(*usesPathWithArrayContainingObject, indexCores));
 
     // The query on 'b' should have a completely different plan cache key (both with and without a
     // wildcard index).
-    ASSERT_NE(planCacheWithNoIndexes.computeKey(*usesPathWithScalar),
-              planCacheWithNoIndexes.computeKey(*doesNotUsePath));
-    ASSERT_NE(planCache.computeKey(*usesPathWithScalar), planCache.computeKey(*doesNotUsePath));
-    ASSERT_NE(planCacheWithNoIndexes.computeKey(*usesPathWithObject),
-              planCacheWithNoIndexes.computeKey(*doesNotUsePath));
-    ASSERT_NE(planCache.computeKey(*usesPathWithObject), planCache.computeKey(*doesNotUsePath));
+    ASSERT_NE(makeKey(*usesPathWithScalar), makeKey(*doesNotUsePath));
+    ASSERT_NE(makeKey(*usesPathWithScalar, indexCores), makeKey(*doesNotUsePath, indexCores));
+    ASSERT_NE(makeKey(*usesPathWithObject), makeKey(*doesNotUsePath));
+    ASSERT_NE(makeKey(*usesPathWithObject, indexCores), makeKey(*doesNotUsePath, indexCores));
 
     // More complex queries with similar shapes. This is to ensure that plan cache key encoding
     // correctly traverses the expression tree.
@@ -2047,14 +2079,13 @@ TEST(PlanCacheTest, ComputeKeyWildcardIndex) {
         canonicalize("{$or: [{a: {someobject: 1}}, {a: {$gt: [1,2]}}]}");
     // The two queries should have the same shape when no indexes are present, but different shapes
     // when a $** index is present.
-    ASSERT_EQ(planCacheWithNoIndexes.computeKey(*orQueryWithOneBranchAllowed),
-              planCacheWithNoIndexes.computeKey(*orQueryWithNoBranchesAllowed));
+    ASSERT_EQ(makeKey(*orQueryWithOneBranchAllowed), makeKey(*orQueryWithNoBranchesAllowed));
     assertPlanCacheKeysUnequalDueToDiscriminators(
-        planCache.computeKey(*orQueryWithOneBranchAllowed),
-        planCache.computeKey(*orQueryWithNoBranchesAllowed));
-    ASSERT_EQ(planCache.computeKey(*orQueryWithOneBranchAllowed).getIndexabilityDiscriminators(),
+        makeKey(*orQueryWithOneBranchAllowed, indexCores),
+        makeKey(*orQueryWithNoBranchesAllowed, indexCores));
+    ASSERT_EQ(makeKey(*orQueryWithOneBranchAllowed, indexCores).getIndexabilityDiscriminators(),
               "<1><0>");
-    ASSERT_EQ(planCache.computeKey(*orQueryWithNoBranchesAllowed).getIndexabilityDiscriminators(),
+    ASSERT_EQ(makeKey(*orQueryWithNoBranchesAllowed, indexCores).getIndexabilityDiscriminators(),
               "<0><0>");
 }
 
@@ -2062,23 +2093,23 @@ TEST(PlanCacheTest, ComputeKeyWildcardIndexDiscriminatesEqualityToEmptyObj) {
     auto entryProjUpdatePair = makeWildcardUpdate(BSON("a.$**" << 1));
 
     PlanCache planCache(5000);
-    planCache.notifyOfIndexUpdates({entryProjUpdatePair.first});
+    const std::vector<CoreIndexInfo> indexCores = {entryProjUpdatePair.first};
 
     // Equality to empty obj and equality to non-empty obj have different plan cache keys.
     std::unique_ptr<CanonicalQuery> equalsEmptyObj(canonicalize("{a: {}}"));
     std::unique_ptr<CanonicalQuery> equalsNonEmptyObj(canonicalize("{a: {b: 1}}"));
-    assertPlanCacheKeysUnequalDueToDiscriminators(planCache.computeKey(*equalsEmptyObj),
-                                                  planCache.computeKey(*equalsNonEmptyObj));
-    ASSERT_EQ(planCache.computeKey(*equalsNonEmptyObj).getIndexabilityDiscriminators(), "<0>");
-    ASSERT_EQ(planCache.computeKey(*equalsEmptyObj).getIndexabilityDiscriminators(), "<1>");
+    assertPlanCacheKeysUnequalDueToDiscriminators(makeKey(*equalsEmptyObj, indexCores),
+                                                  makeKey(*equalsNonEmptyObj, indexCores));
+    ASSERT_EQ(makeKey(*equalsNonEmptyObj, indexCores).getIndexabilityDiscriminators(), "<0>");
+    ASSERT_EQ(makeKey(*equalsEmptyObj, indexCores).getIndexabilityDiscriminators(), "<1>");
 
     // $in with empty obj and $in with non-empty obj have different plan cache keys.
     std::unique_ptr<CanonicalQuery> inWithEmptyObj(canonicalize("{a: {$in: [{}]}}"));
     std::unique_ptr<CanonicalQuery> inWithNonEmptyObj(canonicalize("{a: {$in: [{b: 1}]}}"));
-    assertPlanCacheKeysUnequalDueToDiscriminators(planCache.computeKey(*inWithEmptyObj),
-                                                  planCache.computeKey(*inWithNonEmptyObj));
-    ASSERT_EQ(planCache.computeKey(*inWithNonEmptyObj).getIndexabilityDiscriminators(), "<0>");
-    ASSERT_EQ(planCache.computeKey(*inWithEmptyObj).getIndexabilityDiscriminators(), "<1>");
+    assertPlanCacheKeysUnequalDueToDiscriminators(makeKey(*inWithEmptyObj, indexCores),
+                                                  makeKey(*inWithNonEmptyObj, indexCores));
+    ASSERT_EQ(makeKey(*inWithNonEmptyObj, indexCores).getIndexabilityDiscriminators(), "<0>");
+    ASSERT_EQ(makeKey(*inWithEmptyObj, indexCores).getIndexabilityDiscriminators(), "<1>");
 }
 
 TEST(PlanCacheTest, ComputeKeyWildcardDiscriminatesCorrectlyBasedOnPartialFilterExpression) {
@@ -2090,15 +2121,15 @@ TEST(PlanCacheTest, ComputeKeyWildcardDiscriminatesCorrectlyBasedOnPartialFilter
     indexInfo.filterExpr = filterExpr.get();
 
     PlanCache planCache(5000);
-    planCache.notifyOfIndexUpdates({indexInfo});
+    const std::vector<CoreIndexInfo> indexCores = {indexInfo};
 
     // Test that queries on field 'x' are discriminated based on their relationship with the partial
     // filter expression.
     {
         auto compatibleWithFilter = canonicalize("{x: {$eq: 5}}");
         auto incompatibleWithFilter = canonicalize("{x: {$eq: -5}}");
-        auto compatibleKey = planCache.computeKey(*compatibleWithFilter);
-        auto incompatibleKey = planCache.computeKey(*incompatibleWithFilter);
+        auto compatibleKey = makeKey(*compatibleWithFilter, indexCores);
+        auto incompatibleKey = makeKey(*incompatibleWithFilter, indexCores);
 
         assertPlanCacheKeysUnequalDueToDiscriminators(compatibleKey, incompatibleKey);
         // The discriminator strings have the format "<xx>". That is, there are two discriminator
@@ -2113,8 +2144,8 @@ TEST(PlanCacheTest, ComputeKeyWildcardDiscriminatesCorrectlyBasedOnPartialFilter
     {
         auto compatibleWithFilter = canonicalize("{x: {$eq: 5}, y: 1}");
         auto incompatibleWithFilter = canonicalize("{x: {$eq: -5}, y: 1}");
-        auto compatibleKey = planCache.computeKey(*compatibleWithFilter);
-        auto incompatibleKey = planCache.computeKey(*incompatibleWithFilter);
+        auto compatibleKey = makeKey(*compatibleWithFilter, indexCores);
+        auto incompatibleKey = makeKey(*incompatibleWithFilter, indexCores);
 
         assertPlanCacheKeysUnequalDueToDiscriminators(compatibleKey, incompatibleKey);
         // The discriminator strings have the format "<xx><y>". That is, there are two discriminator
@@ -2129,8 +2160,8 @@ TEST(PlanCacheTest, ComputeKeyWildcardDiscriminatesCorrectlyBasedOnPartialFilter
     {
         auto compatibleQuery = canonicalize("{x: {$eq: 5}, y: 1}");
         auto incompatibleQuery = canonicalize("{x: {$eq: 5}, y: null}");
-        auto compatibleKey = planCache.computeKey(*compatibleQuery);
-        auto incompatibleKey = planCache.computeKey(*incompatibleQuery);
+        auto compatibleKey = makeKey(*compatibleQuery, indexCores);
+        auto incompatibleKey = makeKey(*incompatibleQuery, indexCores);
 
         assertPlanCacheKeysUnequalDueToDiscriminators(compatibleKey, incompatibleKey);
         // The discriminator strings have the format "<xx><y>". That is, there are two discriminator
@@ -2145,7 +2176,7 @@ TEST(PlanCacheTest, ComputeKeyWildcardDiscriminatesCorrectlyBasedOnPartialFilter
     // indexes, and the predicate is not compatible with the partial filter expression. This should
     // result in two "0" bits inside the discriminator string.
     {
-        auto key = planCache.computeKey(*canonicalize("{x: {$eq: null}}"));
+        auto key = makeKey(*canonicalize("{x: {$eq: null}}"), indexCores);
         ASSERT_EQ(key.getIndexabilityDiscriminators(), "<00>");
     }
 }
@@ -2160,13 +2191,13 @@ TEST(PlanCacheTest, ComputeKeyWildcardDiscriminatesCorrectlyWithPartialFilterAnd
     indexInfo.filterExpr = filterExpr.get();
 
     PlanCache planCache(5000);
-    planCache.notifyOfIndexUpdates({indexInfo});
+    const std::vector<CoreIndexInfo> indexCores = {indexInfo};
 
     {
         // The discriminators should have the format <xx><yy><z>. The 'z' predicate has just one
         // discriminator because it is not referenced in the partial filter expression.  All
         // predicates are compatible.
-        auto key = planCache.computeKey(*canonicalize("{x: {$eq: 1}, y: {$eq: 2}, z: {$eq: 3}}"));
+        auto key = makeKey(*canonicalize("{x: {$eq: 1}, y: {$eq: 2}, z: {$eq: 3}}"), indexCores);
         ASSERT_EQ(key.getIndexabilityDiscriminators(), "<11><11><1>");
     }
 
@@ -2174,7 +2205,7 @@ TEST(PlanCacheTest, ComputeKeyWildcardDiscriminatesCorrectlyWithPartialFilterAnd
         // The discriminators should have the format <xx><yy><z>. The 'y' predicate is not
         // compatible with the partial filter expression, leading to one of the 'y' bits being set
         // to zero.
-        auto key = planCache.computeKey(*canonicalize("{x: {$eq: 1}, y: {$eq: -2}, z: {$eq: 3}}"));
+        auto key = makeKey(*canonicalize("{x: {$eq: 1}, y: {$eq: -2}, z: {$eq: 3}}"), indexCores);
         ASSERT_EQ(key.getIndexabilityDiscriminators(), "<11><01><1>");
     }
 }
@@ -2188,19 +2219,19 @@ TEST(PlanCacheTest, ComputeKeyWildcardDiscriminatesCorrectlyWithPartialFilterOnN
     indexInfo.filterExpr = filterExpr.get();
 
     PlanCache planCache(5000);
-    planCache.notifyOfIndexUpdates({indexInfo});
+    const std::vector<CoreIndexInfo> indexCores = {indexInfo};
 
     {
         // The discriminators have the format <x><(x.y)(x.y)<y>. All predicates are compatible
         auto key =
-            planCache.computeKey(*canonicalize("{x: {$eq: 1}, y: {$eq: 2}, 'x.y': {$eq: 3}}"));
+            makeKey(*canonicalize("{x: {$eq: 1}, y: {$eq: 2}, 'x.y': {$eq: 3}}"), indexCores);
         ASSERT_EQ(key.getIndexabilityDiscriminators(), "<1><11><1>");
     }
 
     {
         // Here, the predicate on "x.y" is not compatible with the partial filter expression.
         auto key =
-            planCache.computeKey(*canonicalize("{x: {$eq: 1}, y: {$eq: 2}, 'x.y': {$eq: -3}}"));
+            makeKey(*canonicalize("{x: {$eq: 1}, y: {$eq: 2}, 'x.y': {$eq: -3}}"), indexCores);
         ASSERT_EQ(key.getIndexabilityDiscriminators(), "<1><01><1>");
     }
 }
@@ -2214,27 +2245,26 @@ TEST(PlanCacheTest, ComputeKeyDiscriminatesCorrectlyWithPartialFilterAndWildcard
     indexInfo.filterExpr = filterExpr.get();
 
     PlanCache planCache(5000);
-    planCache.notifyOfIndexUpdates({indexInfo});
+    const std::vector<CoreIndexInfo> indexCores = {indexInfo};
 
     {
         // The discriminators have the format <x><y>. The discriminator for 'x' indicates whether
         // the predicate is compatible with the partial filter expression, whereas the disciminator
         // for 'y' is about compatibility with the wildcard index.
-        auto key = planCache.computeKey(*canonicalize("{x: {$eq: 1}, y: {$eq: 2}, z: {$eq: 3}}"));
+        auto key = makeKey(*canonicalize("{x: {$eq: 1}, y: {$eq: 2}, z: {$eq: 3}}"), indexCores);
         ASSERT_EQ(key.getIndexabilityDiscriminators(), "<1><1>");
     }
 
     {
         // Similar to the previous case, except with an 'x' predicate that is incompatible with the
         // partial filter expression.
-        auto key = planCache.computeKey(*canonicalize("{x: {$eq: -1}, y: {$eq: 2}, z: {$eq: 3}}"));
+        auto key = makeKey(*canonicalize("{x: {$eq: -1}, y: {$eq: 2}, z: {$eq: 3}}"), indexCores);
         ASSERT_EQ(key.getIndexabilityDiscriminators(), "<0><1>");
     }
 
     {
         // Case where the 'y' predicate is not compatible with the wildcard index.
-        auto key =
-            planCache.computeKey(*canonicalize("{x: {$eq: 1}, y: {$eq: null}, z: {$eq: 3}}"));
+        auto key = makeKey(*canonicalize("{x: {$eq: 1}, y: {$eq: null}, z: {$eq: 3}}"), indexCores);
         ASSERT_EQ(key.getIndexabilityDiscriminators(), "<1><0>");
     }
 }
@@ -2242,19 +2272,19 @@ TEST(PlanCacheTest, ComputeKeyDiscriminatesCorrectlyWithPartialFilterAndWildcard
 TEST(PlanCacheTest, StableKeyDoesNotChangeAcrossIndexCreation) {
     PlanCache planCache(5000);
     unique_ptr<CanonicalQuery> cq(canonicalize("{a: 0}}"));
-    const PlanCacheKey preIndexKey = planCache.computeKey(*cq);
+    const PlanCacheKey preIndexKey = makeKey(*cq);
     const auto preIndexStableKey = preIndexKey.getStableKey();
     ASSERT_EQ(preIndexKey.getIndexabilityDiscriminators(), "");
 
     const auto keyPattern = BSON("a" << 1);
     // Create a sparse index (which requires a discriminator).
-    planCache.notifyOfIndexUpdates(
-        {CoreIndexInfo(keyPattern,
-                       IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                       true,                           // sparse
-                       IndexEntry::Identifier{""})});  // name
+    const std::vector<CoreIndexInfo> indexCores = {
+        CoreIndexInfo(keyPattern,
+                      IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+                      true,                          // sparse
+                      IndexEntry::Identifier{""})};  // name
 
-    const PlanCacheKey postIndexKey = planCache.computeKey(*cq);
+    const PlanCacheKey postIndexKey = makeKey(*cq, indexCores);
     const auto postIndexStableKey = postIndexKey.getStableKey();
     ASSERT_NE(preIndexKey, postIndexKey);
     ASSERT_EQ(preIndexStableKey, postIndexStableKey);
@@ -2266,22 +2296,22 @@ TEST(PlanCacheTest, ComputeKeyNotEqualsArray) {
     unique_ptr<CanonicalQuery> cqNeArray(canonicalize("{a: {$ne: [1]}}"));
     unique_ptr<CanonicalQuery> cqNeScalar(canonicalize("{a: {$ne: 123}}"));
 
-    const PlanCacheKey noIndexNeArrayKey = planCache.computeKey(*cqNeArray);
-    const PlanCacheKey noIndexNeScalarKey = planCache.computeKey(*cqNeScalar);
+    const PlanCacheKey noIndexNeArrayKey = makeKey(*cqNeArray);
+    const PlanCacheKey noIndexNeScalarKey = makeKey(*cqNeScalar);
     ASSERT_EQ(noIndexNeArrayKey.getIndexabilityDiscriminators(), "<0>");
     ASSERT_EQ(noIndexNeScalarKey.getIndexabilityDiscriminators(), "<1>");
     ASSERT_EQ(noIndexNeScalarKey.getStableKey(), noIndexNeArrayKey.getStableKey());
 
     const auto keyPattern = BSON("a" << 1);
     // Create a normal btree index. It will have a discriminator.
-    planCache.notifyOfIndexUpdates(
-        {CoreIndexInfo(keyPattern,
-                       IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                       false,                          // sparse
-                       IndexEntry::Identifier{""})});  // name
+    const std::vector<CoreIndexInfo> indexCores = {
+        CoreIndexInfo(keyPattern,
+                      IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+                      false,                         // sparse
+                      IndexEntry::Identifier{""})};  // name*/
 
-    const PlanCacheKey withIndexNeArrayKey = planCache.computeKey(*cqNeArray);
-    const PlanCacheKey withIndexNeScalarKey = planCache.computeKey(*cqNeScalar);
+    const PlanCacheKey withIndexNeArrayKey = makeKey(*cqNeArray, indexCores);
+    const PlanCacheKey withIndexNeScalarKey = makeKey(*cqNeScalar, indexCores);
 
     ASSERT_NE(noIndexNeArrayKey, withIndexNeArrayKey);
     ASSERT_EQ(noIndexNeArrayKey.getStableKey(), withIndexNeArrayKey.getStableKey());
@@ -2300,22 +2330,22 @@ TEST(PlanCacheTest, ComputeKeyNinArray) {
     unique_ptr<CanonicalQuery> cqNinArray(canonicalize("{a: {$nin: [123, [1]]}}"));
     unique_ptr<CanonicalQuery> cqNinScalar(canonicalize("{a: {$nin: [123, 456]}}"));
 
-    const PlanCacheKey noIndexNinArrayKey = planCache.computeKey(*cqNinArray);
-    const PlanCacheKey noIndexNinScalarKey = planCache.computeKey(*cqNinScalar);
+    const PlanCacheKey noIndexNinArrayKey = makeKey(*cqNinArray);
+    const PlanCacheKey noIndexNinScalarKey = makeKey(*cqNinScalar);
     ASSERT_EQ(noIndexNinArrayKey.getIndexabilityDiscriminators(), "<0>");
     ASSERT_EQ(noIndexNinScalarKey.getIndexabilityDiscriminators(), "<1>");
     ASSERT_EQ(noIndexNinScalarKey.getStableKey(), noIndexNinArrayKey.getStableKey());
 
     const auto keyPattern = BSON("a" << 1);
     // Create a normal btree index. It will have a discriminator.
-    planCache.notifyOfIndexUpdates(
-        {CoreIndexInfo(keyPattern,
-                       IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                       false,                          // sparse
-                       IndexEntry::Identifier{""})});  // name
+    const std::vector<CoreIndexInfo> indexCores = {
+        CoreIndexInfo(keyPattern,
+                      IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+                      false,                         // sparse
+                      IndexEntry::Identifier{""})};  // name
 
-    const PlanCacheKey withIndexNinArrayKey = planCache.computeKey(*cqNinArray);
-    const PlanCacheKey withIndexNinScalarKey = planCache.computeKey(*cqNinScalar);
+    const PlanCacheKey withIndexNinArrayKey = makeKey(*cqNinArray, indexCores);
+    const PlanCacheKey withIndexNinScalarKey = makeKey(*cqNinScalar, indexCores);
 
     // The unstable part of the key for $nin: [<array>] should have changed. The stable part,
     // however, should not.
@@ -2341,21 +2371,19 @@ TEST(PlanCacheTest, PlanCacheKeyCollision) {
     unique_ptr<CanonicalQuery> cqNeA(canonicalize("{$or: [{a: {$ne: 5}}, {a: {$ne: [12]}}]}"));
     unique_ptr<CanonicalQuery> cqNeB(canonicalize("{$or: [{a: {$ne: [12]}}, {a: {$ne: 5}}]}"));
 
-    const PlanCacheKey keyA = planCache.computeKey(*cqNeA);
-    const PlanCacheKey keyB = planCache.computeKey(*cqNeB);
+    const PlanCacheKey keyA = makeKey(*cqNeA);
+    const PlanCacheKey keyB = makeKey(*cqNeB);
     ASSERT_EQ(keyA.getStableKey(), keyB.getStableKey());
     ASSERT_NE(keyA.getUnstablePart(), keyB.getUnstablePart());
-
     const auto keyPattern = BSON("a" << 1);
     // Create a normal btree index. It will have a discriminator.
-    planCache.notifyOfIndexUpdates(
-        {CoreIndexInfo(keyPattern,
-                       IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                       false,                          // sparse
-                       IndexEntry::Identifier{""})});  // name
-
-    const PlanCacheKey keyAWithIndex = planCache.computeKey(*cqNeA);
-    const PlanCacheKey keyBWithIndex = planCache.computeKey(*cqNeB);
+    std::vector<CoreIndexInfo> indexCores = {
+        CoreIndexInfo(keyPattern,
+                      IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+                      false,                         // sparse
+                      IndexEntry::Identifier{""})};  // name
+    const PlanCacheKey keyAWithIndex = makeKey(*cqNeA, indexCores);
+    const PlanCacheKey keyBWithIndex = makeKey(*cqNeB, indexCores);
 
     ASSERT_EQ(keyAWithIndex.getStableKey(), keyBWithIndex.getStableKey());
     ASSERT_NE(keyAWithIndex.getUnstablePart(), keyBWithIndex.getUnstablePart());
@@ -2367,26 +2395,52 @@ TEST(PlanCacheTest, PlanCacheSizeWithCRUDOperations) {
     auto qs = getQuerySolutionForCaching();
     std::vector<QuerySolution*> solns = {qs.get()};
     long long previousSize, originalSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
+    auto key = makeKey(*cq);
+    PlanCacheLoggingCallbacks<PlanCacheKey, SolutionCacheData> callbacks{*cq};
 
     // Verify that the plan cache size increases after adding new entry to cache.
     previousSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
-    ASSERT_OK(planCache.set(*cq, qs->cacheData->clone(), solns, createDecision(1U), Date_t{}));
+    ASSERT_OK(planCache.set(key,
+                            qs->cacheData->clone(),
+                            solns,
+                            createDecision(1U),
+                            Date_t{},
+                            boost::none /* worksGrowthCoefficient */,
+                            &callbacks));
     ASSERT_GT(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), previousSize);
 
     // Verify that trying to set the same entry won't change the plan cache size.
     previousSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
-    ASSERT_OK(planCache.set(*cq, qs->cacheData->clone(), solns, createDecision(1U), Date_t{}));
+    ASSERT_OK(planCache.set(key,
+                            qs->cacheData->clone(),
+                            solns,
+                            createDecision(1U),
+                            Date_t{},
+                            boost::none /* worksGrowthCoefficient */,
+                            &callbacks));
     ASSERT_EQ(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), previousSize);
 
     // Verify that the plan cache size increases after updating the same entry with more solutions.
     solns.push_back(qs.get());
-    ASSERT_OK(planCache.set(*cq, qs->cacheData->clone(), solns, createDecision(2U), Date_t{}));
+    ASSERT_OK(planCache.set(key,
+                            qs->cacheData->clone(),
+                            solns,
+                            createDecision(2U),
+                            Date_t{},
+                            boost::none /* worksGrowthCoefficient */,
+                            &callbacks));
     ASSERT_GT(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), previousSize);
 
     // Verify that the plan cache size decreases after updating the same entry with fewer solutions.
     solns.erase(solns.end() - 1);
     previousSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
-    ASSERT_OK(planCache.set(*cq, qs->cacheData->clone(), solns, createDecision(1U), Date_t{}));
+    ASSERT_OK(planCache.set(key,
+                            qs->cacheData->clone(),
+                            solns,
+                            createDecision(1U),
+                            Date_t{},
+                            boost::none /* worksGrowthCoefficient */,
+                            &callbacks));
     ASSERT_LT(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), previousSize);
     ASSERT_GT(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), originalSize);
 
@@ -2398,8 +2452,13 @@ TEST(PlanCacheTest, PlanCacheSizeWithCRUDOperations) {
         queryString[1] = 'b' + i;
         unique_ptr<CanonicalQuery> query(canonicalize(queryString));
         previousSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
-        ASSERT_OK(
-            planCache.set(*query, qs->cacheData->clone(), solns, createDecision(1U), Date_t{}));
+        ASSERT_OK(planCache.set(makeKey(*query),
+                                qs->cacheData->clone(),
+                                solns,
+                                createDecision(1U),
+                                Date_t{},
+                                boost::none /* worksGrowthCoefficient */,
+                                &callbacks));
         ASSERT_GT(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), previousSize);
     }
 
@@ -2409,7 +2468,7 @@ TEST(PlanCacheTest, PlanCacheSizeWithCRUDOperations) {
         queryString[1] = 'b' + i;
         unique_ptr<CanonicalQuery> query(canonicalize(queryString));
         previousSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
-        ASSERT_OK(planCache.remove(*query));
+        planCache.remove(makeKey(*query));
         ASSERT_LT(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), previousSize);
     }
     // Verify that size is reset to the size when there is only entry.
@@ -2418,11 +2477,11 @@ TEST(PlanCacheTest, PlanCacheSizeWithCRUDOperations) {
     // Verify that trying to remove a non-existing key won't change the plan cache size.
     previousSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
     unique_ptr<CanonicalQuery> newQuery(canonicalize("{a: 1}"));
-    ASSERT_NOT_OK(planCache.remove(*newQuery));
+    planCache.remove(makeKey(*newQuery));
     ASSERT_EQ(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), previousSize);
 
     // Verify that the plan cache size goes back to original size when the entry is removed.
-    ASSERT_OK(planCache.remove(*cq));
+    planCache.remove(key);
     ASSERT_EQ(planCache.size(), 0U);
     ASSERT_EQ(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), originalSize);
 }
@@ -2435,6 +2494,7 @@ TEST(PlanCacheTest, PlanCacheSizeWithEviction) {
     std::vector<QuerySolution*> solns = {qs.get(), qs.get()};
     long long originalSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
     long long previousSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
+    auto key = makeKey(*cq);
 
     // Add entries until plan cache is full and verify that the size keeps increasing.
     std::string queryString = "{a: 1, c: 1}";
@@ -2443,50 +2503,91 @@ TEST(PlanCacheTest, PlanCacheSizeWithEviction) {
         queryString[1]++;
         unique_ptr<CanonicalQuery> query(canonicalize(queryString));
         previousSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
-        ASSERT_OK(
-            planCache.set(*query, qs->cacheData->clone(), solns, createDecision(2U), Date_t{}));
+        PlanCacheLoggingCallbacks<PlanCacheKey, SolutionCacheData> callbacks{*cq};
+        ASSERT_OK(planCache.set(makeKey(*query),
+                                qs->cacheData->clone(),
+                                solns,
+                                createDecision(2U),
+                                Date_t{},
+                                boost::none /* worksGrowthCoefficient */,
+                                &callbacks));
         ASSERT_GT(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), previousSize);
     }
 
     // Verify that adding entry of same size as evicted entry wouldn't change the plan cache size.
-    queryString = "{k: 1, c: 1}";
-    cq = unique_ptr<CanonicalQuery>(canonicalize(queryString));
-    previousSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
-    ASSERT_EQ(planCache.size(), kCacheSize);
-    ASSERT_OK(planCache.set(*cq, qs->cacheData->clone(), solns, createDecision(2U), Date_t{}));
-    ASSERT_EQ(planCache.size(), kCacheSize);
-    ASSERT_EQ(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), previousSize);
+    {
+        queryString = "{k: 1, c: 1}";
+        cq = unique_ptr<CanonicalQuery>(canonicalize(queryString));
+        PlanCacheLoggingCallbacks<PlanCacheKey, SolutionCacheData> callbacks{*cq};
+        previousSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
+        ASSERT_EQ(planCache.size(), kCacheSize);
+        ASSERT_OK(planCache.set(key,
+                                qs->cacheData->clone(),
+                                solns,
+                                createDecision(2U),
+                                Date_t{},
+                                boost::none /* worksGrowthCoefficient */,
+                                &callbacks));
+        ASSERT_EQ(planCache.size(), kCacheSize);
+        ASSERT_EQ(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), previousSize);
+    }
 
     // Verify that adding entry with query bigger than the evicted entry's key should change the
     // plan cache size.
-    queryString = "{k: 1, c: 1, extraField: 1}";
-    unique_ptr<CanonicalQuery> queryBiggerKey(canonicalize(queryString));
-    previousSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
-    ASSERT_OK(planCache.set(
-        *queryBiggerKey, qs->cacheData->clone(), solns, createDecision(2U), Date_t{}));
-    ASSERT_GT(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), previousSize);
+    {
+        queryString = "{k: 1, c: 1, extraField: 1}";
+        unique_ptr<CanonicalQuery> queryBiggerKey(canonicalize(queryString));
+        PlanCacheLoggingCallbacks<PlanCacheKey, SolutionCacheData> callbacks{*queryBiggerKey};
+        previousSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
+        ASSERT_OK(planCache.set(makeKey(*queryBiggerKey),
+                                qs->cacheData->clone(),
+                                solns,
+                                createDecision(2U),
+                                Date_t{},
+                                boost::none /* worksGrowthCoefficient */,
+                                &callbacks));
+        ASSERT_GT(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), previousSize);
+    }
 
     // Verify that adding entry with query solutions larger than the evicted entry's query solutions
     // should increase the plan cache size.
-    queryString = "{l: 1, c: 1}";
-    cq = unique_ptr<CanonicalQuery>(canonicalize(queryString));
-    previousSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
-    solns.push_back(qs.get());
-    ASSERT_OK(planCache.set(*cq, qs->cacheData->clone(), solns, createDecision(3U), Date_t{}));
-    ASSERT_GT(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), previousSize);
+    {
+        queryString = "{l: 1, c: 1}";
+        cq = unique_ptr<CanonicalQuery>(canonicalize(queryString));
+        PlanCacheLoggingCallbacks<PlanCacheKey, SolutionCacheData> callbacks{*cq};
+        previousSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
+        solns.push_back(qs.get());
+        ASSERT_OK(planCache.set(key,
+                                qs->cacheData->clone(),
+                                solns,
+                                createDecision(3U),
+                                Date_t{},
+                                boost::none /* worksGrowthCoefficient */,
+                                &callbacks));
+        ASSERT_GT(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), previousSize);
+    }
 
     // Verify that adding entry with query solutions smaller than the evicted entry's query
     // solutions should decrease the plan cache size.
-    queryString = "{m: 1, c: 1}";
-    cq = unique_ptr<CanonicalQuery>(canonicalize(queryString));
-    previousSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
-    solns = {qs.get()};
-    ASSERT_OK(planCache.set(*cq, qs->cacheData->clone(), solns, createDecision(1U), Date_t{}));
-    ASSERT_LT(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), previousSize);
+    {
+        queryString = "{m: 1, c: 1}";
+        cq = unique_ptr<CanonicalQuery>(canonicalize(queryString));
+        PlanCacheLoggingCallbacks<PlanCacheKey, SolutionCacheData> callbacks{*cq};
+        previousSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
+        solns = {qs.get()};
+        ASSERT_OK(planCache.set(key,
+                                qs->cacheData->clone(),
+                                solns,
+                                createDecision(1U),
+                                Date_t{},
+                                boost::none /* worksGrowthCoefficient */,
+                                &callbacks));
+        ASSERT_LT(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), previousSize);
 
-    // clear() should reset the size.
-    planCache.clear();
-    ASSERT_EQ(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), originalSize);
+        // clear() should reset the size.
+        planCache.clear();
+        ASSERT_EQ(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), originalSize);
+    }
 }
 
 TEST(PlanCacheTest, PlanCacheSizeWithMultiplePlanCaches) {
@@ -2504,13 +2605,13 @@ TEST(PlanCacheTest, PlanCacheSizeWithMultiplePlanCaches) {
         queryString[1] = 'b' + i;
         unique_ptr<CanonicalQuery> query(canonicalize(queryString));
         previousSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
-        ASSERT_OK(
-            planCache1.set(*query, qs->cacheData->clone(), solns, createDecision(1U), Date_t{}));
+        ASSERT_OK(planCache1.set(
+            makeKey(*query), qs->cacheData->clone(), solns, createDecision(1U), Date_t{}));
         ASSERT_GT(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), previousSize);
 
         previousSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
-        ASSERT_OK(
-            planCache2.set(*query, qs->cacheData->clone(), solns, createDecision(1U), Date_t{}));
+        ASSERT_OK(planCache2.set(
+            makeKey(*query), qs->cacheData->clone(), solns, createDecision(1U), Date_t{}));
         ASSERT_GT(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), previousSize);
     }
 
@@ -2520,7 +2621,7 @@ TEST(PlanCacheTest, PlanCacheSizeWithMultiplePlanCaches) {
         queryString[1] = 'b' + i;
         unique_ptr<CanonicalQuery> query(canonicalize(queryString));
         previousSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
-        ASSERT_OK(planCache1.remove(*query));
+        planCache1.remove(makeKey(*query));
         ASSERT_LT(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), previousSize);
     }
 
@@ -2529,7 +2630,8 @@ TEST(PlanCacheTest, PlanCacheSizeWithMultiplePlanCaches) {
     {
         PlanCache planCache(5000);
         previousSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
-        ASSERT_OK(planCache.set(*cq, qs->cacheData->clone(), solns, createDecision(1U), Date_t{}));
+        ASSERT_OK(planCache.set(
+            makeKey(*cq), qs->cacheData->clone(), solns, createDecision(1U), Date_t{}));
         ASSERT_GT(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), previousSize);
     }
 
@@ -2547,28 +2649,24 @@ TEST(PlanCacheTest, PlanCacheSizeWithMultiplePlanCaches) {
 }
 
 TEST(PlanCacheTest, DifferentQueryEngines) {
+    const auto keyPattern = BSON("a" << 1);
+    const std::vector<CoreIndexInfo> indexCores = {
+        CoreIndexInfo(keyPattern,
+                      IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+                      false,                         // sparse
+                      IndexEntry::Identifier{""})};  // name
+
     // Helper to construct a plan cache key given the 'enableSlotBasedExecutionEngine' flag.
-    auto constructPlanCacheKey = [](const PlanCache& pc,
-                                    bool enableSlotBasedExecutionEngine) -> PlanCacheKey {
+    auto constructPlanCacheKey = [&](bool enableSlotBasedExecutionEngine) {
         RAIIServerParameterControllerForTest controller{
             "internalQueryEnableSlotBasedExecutionEngine", enableSlotBasedExecutionEngine};
         const auto queryStr = "{a: 0}";
         unique_ptr<CanonicalQuery> cq(canonicalize(queryStr));
-        return pc.computeKey(*cq);
+        return makeKey(*cq, indexCores);
     };
 
-    PlanCache planCache(5000);
-    const auto keyPattern = BSON("a" << 1);
-
-    // Create a normal btree index. It will have a discriminator.
-    planCache.notifyOfIndexUpdates(
-        {CoreIndexInfo(keyPattern,
-                       IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                       false,                          // sparse
-                       IndexEntry::Identifier{""})});  // name
-
-    const auto classicEngineKey = constructPlanCacheKey(planCache, false);
-    const auto slotBasedExecutionEngineKey = constructPlanCacheKey(planCache, true);
+    const auto classicEngineKey = constructPlanCacheKey(false);
+    const auto slotBasedExecutionEngineKey = constructPlanCacheKey(true);
 
     // Check that the two plan cache keys are not equal because the plans were created under
     // different engines.

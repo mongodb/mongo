@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2020-present MongoDB, Inc.
+ *    Copyright (C) 2021-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,39 +27,28 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/db/query/plan_cache_debug_info.h"
 
-#include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/query/plan_explainer.h"
-
-namespace mongo {
-/**
- * A PlanExplainer implementation for aggregation pipelines.
- */
-class PlanExplainerPipeline final : public PlanExplainer {
-public:
-    PlanExplainerPipeline(const Pipeline* pipeline) : _pipeline{pipeline} {}
-
-    bool isMultiPlan() const final {
-        return false;
+namespace mongo::plan_cache_debug_info {
+DebugInfo buildDebugInfo(const CanonicalQuery& query,
+                         std::unique_ptr<const plan_ranker::PlanRankingDecision> decision) {
+    // Strip projections on $-prefixed fields, as these are added by internal callers of the
+    // system and are not considered part of the user projection.
+    const FindCommandRequest& findCommand = query.getFindCommandRequest();
+    BSONObjBuilder projBuilder;
+    for (auto elem : findCommand.getProjection()) {
+        if (elem.fieldName()[0] == '$') {
+            continue;
+        }
+        projBuilder.append(elem);
     }
 
-    const ExplainVersion& getVersion() const final;
-    std::string getPlanSummary() const final;
-    void getSummaryStats(PlanSummaryStats* statsOut) const final;
-    PlanStatsDetails getWinningPlanStats(ExplainOptions::Verbosity verbosity) const final;
-    PlanStatsDetails getWinningPlanTrialStats() const final;
-    std::vector<PlanStatsDetails> getRejectedPlansStats(
-        ExplainOptions::Verbosity verbosity) const final;
-    std::vector<PlanStatsDetails> getCachedPlanStats(const plan_cache_debug_info::DebugInfo&,
-                                                     ExplainOptions::Verbosity) const final;
+    CreatedFromQuery createdFromQuery{findCommand.getFilter(),
+                                      findCommand.getSort(),
+                                      projBuilder.obj(),
+                                      query.getCollator() ? query.getCollator()->getSpec().toBSON()
+                                                          : BSONObj()};
 
-    void incrementNReturned() {
-        ++_nReturned;
-    }
-
-private:
-    const Pipeline* const _pipeline;
-    size_t _nReturned{0};
-};
-}  // namespace mongo
+    return {std::move(createdFromQuery), std::move(decision)};
+}
+}  // namespace mongo::plan_cache_debug_info

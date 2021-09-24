@@ -43,6 +43,7 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/plan_executor_factory.h"
+#include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/service_context.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/unittest/unittest.h"

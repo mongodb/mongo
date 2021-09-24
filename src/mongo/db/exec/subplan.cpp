@@ -40,6 +40,7 @@
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/get_executor.h"
+#include "mongo/db/query/plan_cache_key_factory.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/planner_access.h"
 #include "mongo/db/query/planner_analysis.h"
@@ -166,11 +167,17 @@ Status SubplanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
     // Dismiss the requirement that no indices can be dropped when this method returns.
     ON_BLOCK_EXIT([this] { releaseAllIndicesRequirement(); });
 
+    std::function<PlanCacheKey(const CanonicalQuery& cq, const CollectionPtr& coll)>
+        createPlanCacheKey = [](const CanonicalQuery& cq, const CollectionPtr& coll) {
+            return plan_cache_key_factory::make<PlanCacheKey>(cq, coll);
+        };
+
     // Plan each branch of the $or.
     auto subplanningStatus =
         QueryPlanner::planSubqueries(expCtx()->opCtx,
-                                     collection(),
                                      CollectionQueryInfo::get(collection()).getPlanCache(),
+                                     createPlanCacheKey,
+                                     collection(),
                                      *_query,
                                      _plannerParams);
     if (!subplanningStatus.isOK()) {

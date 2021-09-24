@@ -48,6 +48,7 @@
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/explain_common.h"
 #include "mongo/db/query/get_executor.h"
+#include "mongo/db/query/plan_cache_key_factory.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/query/plan_executor_sbe.h"
@@ -93,11 +94,10 @@ void generatePlannerInfo(PlanExecutor* exec,
     if (collection && exec->getCanonicalQuery()) {
         const QuerySettings* querySettings =
             QuerySettingsDecoration::get(collection->getSharedDecorations());
-        PlanCacheKey planCacheKey = CollectionQueryInfo::get(collection)
-                                        .getPlanCache()
-                                        ->computeKey(*exec->getCanonicalQuery());
-        planCacheKeyHash = canonical_query_encoder::computeHash(planCacheKey.toString());
-        queryHash = canonical_query_encoder::computeHash(planCacheKey.getStableKeyStringData());
+        const PlanCacheKey planCacheKey =
+            plan_cache_key_factory::make<PlanCacheKey>(*exec->getCanonicalQuery(), collection);
+        planCacheKeyHash = planCacheKey.planCacheKeyHash();
+        queryHash = planCacheKey.queryHash();
 
         if (auto allowedIndicesFilter =
                 querySettings->getAllowedIndicesFilter(planCacheKey.getStableKey())) {

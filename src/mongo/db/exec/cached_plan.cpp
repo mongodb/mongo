@@ -45,6 +45,7 @@
 #include "mongo/db/query/classic_plan_cache.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/explain.h"
+#include "mongo/db/query/plan_cache_key_factory.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner.h"
@@ -206,8 +207,9 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache, s
 
     if (shouldCache) {
         // Deactivate the current cache entry.
-        PlanCache* cache = CollectionQueryInfo::get(collection()).getPlanCache();
-        cache->deactivate(*_canonicalQuery);
+        const auto& coll = collection();
+        auto cache = CollectionQueryInfo::get(coll).getPlanCache();
+        cache->deactivate(plan_cache_key_factory::make<PlanCacheKey>(*_canonicalQuery, coll));
     }
 
     // Use the query planning module to plan the whole query.

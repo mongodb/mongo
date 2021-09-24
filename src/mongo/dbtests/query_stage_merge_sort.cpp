@@ -46,6 +46,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/plan_executor_factory.h"
+#include "mongo/db/query/query_planner_params.h"
 #include "mongo/dbtests/dbtests.h"
 
 /**

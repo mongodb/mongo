@@ -44,6 +44,7 @@
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_executor_factory.h"
+#include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/dbtests/dbtests.h"

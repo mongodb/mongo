@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2021-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,14 +29,11 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
-#include "mongo/db/query/plan_cache.h"
+#include "mongo/db/query/plan_cache_callbacks.h"
 
-#include "mongo/db/query/plan_cache_indexability.h"
-#include "mongo/db/query/planner_ixselect.h"
 #include "mongo/logv2/log.h"
 
-namespace mongo {
-namespace log_detail {
+namespace mongo::log_detail {
 void logInactiveCacheEntry(const std::string& key) {
     LOGV2_DEBUG(
         20936, 2, "Not using cached entry since it is inactive", "cacheKey"_attr = redact(key));
@@ -123,48 +120,39 @@ void logPromoteCacheEntry(std::string&& query,
                 "oldWorks"_attr = works,
                 "newWorks"_attr = newWorks);
 }
-}  // namespace log_detail
 
-namespace plan_cache_detail {
-// Delimiters for cache key encoding.
-const char kEncodeDiscriminatorsBegin = '<';
-const char kEncodeDiscriminatorsEnd = '>';
-
-void encodeIndexabilityForDiscriminators(const MatchExpression* tree,
-                                         const IndexToDiscriminatorMap& discriminators,
-                                         StringBuilder* keyBuilder) {
-    for (auto&& indexAndDiscriminatorPair : discriminators) {
-        *keyBuilder << indexAndDiscriminatorPair.second.isMatchCompatibleWithIndex(tree);
-    }
+void logRemoveCacheEntry(const std::string& ns,
+                         const BSONObj& query,
+                         const BSONObj& projection,
+                         const BSONObj& sort,
+                         const BSONObj& collation) {
+    LOGV2_DEBUG(23907,
+                1,
+                "{namespace}: Removed plan cache entry - {query}"
+                "(sort: {sort}; projection: {projection}; collation: {collation})",
+                "Removed plan cache entry",
+                "namespace"_attr = ns,
+                "query"_attr = redact(query),
+                "sort"_attr = sort,
+                "projection"_attr = projection,
+                "collation"_attr = collation);
 }
 
-void encodeIndexability(const MatchExpression* tree,
-                        const PlanCacheIndexabilityState& indexabilityState,
-                        StringBuilder* keyBuilder) {
-    if (!tree->path().empty()) {
-        const IndexToDiscriminatorMap& discriminators =
-            indexabilityState.getDiscriminators(tree->path());
-        IndexToDiscriminatorMap wildcardDiscriminators =
-            indexabilityState.buildWildcardDiscriminators(tree->path());
-        if (!discriminators.empty() || !wildcardDiscriminators.empty()) {
-            *keyBuilder << kEncodeDiscriminatorsBegin;
-            // For each discriminator on this path, append the character '0' or '1'.
-            encodeIndexabilityForDiscriminators(tree, discriminators, keyBuilder);
-            encodeIndexabilityForDiscriminators(tree, wildcardDiscriminators, keyBuilder);
-
-            *keyBuilder << kEncodeDiscriminatorsEnd;
-        }
-    } else if (tree->matchType() == MatchExpression::MatchType::NOT) {
-        // If the node is not compatible with any type of index, add a single '0' discriminator
-        // here. Otherwise add a '1'.
-        *keyBuilder << kEncodeDiscriminatorsBegin;
-        *keyBuilder << QueryPlannerIXSelect::logicalNodeMayBeSupportedByAnIndex(tree);
-        *keyBuilder << kEncodeDiscriminatorsEnd;
-    }
-
-    for (size_t i = 0; i < tree->numChildren(); ++i) {
-        encodeIndexability(tree->getChild(i), indexabilityState, keyBuilder);
-    }
+void logMissingCacheEntry(const std::string& ns,
+                          const BSONObj& query,
+                          const BSONObj& projection,
+                          const BSONObj& sort,
+                          const BSONObj& collation) {
+    LOGV2_DEBUG(23906,
+                1,
+                "{namespace}: Query shape doesn't exist in PlanCache - {query}"
+                "(sort: {sort}; projection: {projection}; collation: {collation})",
+                "Query shape doesn't exist in PlanCache",
+                "namespace"_attr = ns,
+                "query"_attr = redact(query),
+                "sort"_attr = sort,
+                "projection"_attr = projection,
+                "collation"_attr = collation);
 }
-}  // namespace plan_cache_detail
-}  // namespace mongo
+
+}  // namespace mongo::log_detail

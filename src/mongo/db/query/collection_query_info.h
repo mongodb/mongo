@@ -31,6 +31,7 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/query/classic_plan_cache.h"
+#include "mongo/db/query/plan_cache_indexability.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/update_index_data.h"
 
@@ -61,6 +62,11 @@ public:
      * Get the PlanCache for this collection.
      */
     PlanCache* getPlanCache() const;
+
+    /**
+     * Get the "indexability discriminators" used in the PlanCache for generating plan cache keys.
+     */
+    const PlanCacheIndexabilityState& getPlanCacheIndexabilityState() const;
 
     /* get set of index keys for this namespace.  handy to quickly check if a given
        field is indexed (Note it might be a secondary component of a compound index.)
@@ -99,13 +105,16 @@ public:
                        const PlanSummaryStats& summaryStats) const;
 
 private:
-    static std::shared_ptr<PlanCache> makePlanCache();
     void computeIndexKeys(OperationContext* opCtx, const CollectionPtr& coll);
     void updatePlanCacheIndexEntries(OperationContext* opCtx, const CollectionPtr& coll);
 
     // ---  index keys cache
     bool _keysComputed;
     UpdateIndexData _indexedPaths;
+
+    // Holds computed information about the collection's indexes. Used for generating plan
+    // cache keys.
+    std::shared_ptr<PlanCacheIndexabilityState> _planCacheIndexabilityState;
 
     // A cache for query plans. Shared across cloned Collection instances.
     std::shared_ptr<PlanCache> _planCache;

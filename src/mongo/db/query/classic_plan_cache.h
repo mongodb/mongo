@@ -32,9 +32,12 @@
 #include <string>
 
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/canonical_query_encoder.h"
+#include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/plan_cache.h"
 
 namespace mongo {
+
 /**
  * Represents the "key" used in the PlanCache mapping from query shape -> query plan.
  */
@@ -272,4 +275,9 @@ struct BudgetEstimator {
 using PlanCache =
     PlanCacheBase<PlanCacheKey, SolutionCacheData, BudgetEstimator, PlanCacheKeyHasher>;
 
+/**
+ * We don't want to cache every possible query. This function encapsulates the criteria for what
+ * makes a canonical query suitable for inclusion in the cache.
+ */
+bool shouldCacheQuery(const CanonicalQuery& query);
 }  // namespace mongo

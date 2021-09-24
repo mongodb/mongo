@@ -35,9 +35,11 @@
 
 #include <memory>
 
+#include "mongo/db/catalog/collection_mock.h"
 #include "mongo/db/json.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/query/plan_cache_key_factory.h"
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/query_test_service_context.h"
@@ -52,6 +54,11 @@ using std::unique_ptr;
 using std::vector;
 
 static const NamespaceString nss("test.collection");
+
+PlanCacheKey makeKey(const CanonicalQuery& cq) {
+    CollectionMock coll(nss);
+    return plan_cache_key_factory::make<PlanCacheKey>(cq, &coll);
+}
 
 /**
  * Utility function to get list of index filters from the query settings.
@@ -144,11 +151,14 @@ void addQueryShapeToPlanCache(OperationContext* opCtx,
     qs.cacheData->tree.reset(new PlanCacheIndexTree());
     std::vector<QuerySolution*> solns;
     solns.push_back(&qs);
-    ASSERT_OK(planCache->set(*cq,
+    PlanCacheLoggingCallbacks<PlanCacheKey, SolutionCacheData> callbacks{*cq};
+    ASSERT_OK(planCache->set(makeKey(*cq),
                              qs.cacheData->clone(),
                              solns,
                              createDecision(1U),
-                             opCtx->getServiceContext()->getPreciseClockSource()->now()));
+                             opCtx->getServiceContext()->getPreciseClockSource()->now(),
+                             boost::none, /* worksGrowthCoefficient */
+                             &callbacks));
 }
 
 /**
@@ -191,7 +201,7 @@ bool planCacheContains(OperationContext* opCtx,
         ASSERT_OK(statusWithCurrentQuery.getStatus());
         unique_ptr<CanonicalQuery> currentQuery = std::move(statusWithCurrentQuery.getValue());
 
-        if (planCache.computeKey(*currentQuery) == planCache.computeKey(*inputQuery)) {
+        if (makeKey(*currentQuery) == makeKey(*inputQuery)) {
             found = true;
         }
     }
@@ -216,44 +226,43 @@ TEST(IndexFilterCommandsTest, ClearFiltersInvalidParameter) {
     QuerySettings empty;
     PlanCache planCache(5000);
     OperationContextNoop opCtx;
+    CollectionMock coll(nss);
 
     // If present, query has to be an object.
     ASSERT_NOT_OK(
-        ClearFilters::clear(&opCtx, &empty, &planCache, nss.ns(), fromjson("{query: 1234}")));
+        ClearFilters::clear(&opCtx, &coll, &empty, &planCache, fromjson("{query: 1234}")));
     // If present, sort must be an object.
     ASSERT_NOT_OK(ClearFilters::clear(
-        &opCtx, &empty, &planCache, nss.ns(), fromjson("{query: {a: 1}, sort: 1234}")));
+        &opCtx, &coll, &empty, &planCache, fromjson("{query: {a: 1}, sort: 1234}")));
     // If present, projection must be an object.
     ASSERT_NOT_OK(ClearFilters::clear(
-        &opCtx, &empty, &planCache, nss.ns(), fromjson("{query: {a: 1}, projection: 1234}")));
+        &opCtx, &coll, &empty, &planCache, fromjson("{query: {a: 1}, projection: 1234}")));
     // Query must pass canonicalization.
     ASSERT_NOT_OK(ClearFilters::clear(
-        &opCtx, &empty, &planCache, nss.ns(), fromjson("{query: {a: {$no_such_op: 1}}}")));
+        &opCtx, &coll, &empty, &planCache, fromjson("{query: {a: {$no_such_op: 1}}}")));
     // Sort present without query is an error.
     ASSERT_NOT_OK(
-        ClearFilters::clear(&opCtx, &empty, &planCache, nss.ns(), fromjson("{sort: {a: 1}}")));
+        ClearFilters::clear(&opCtx, &coll, &empty, &planCache, fromjson("{sort: {a: 1}}")));
     // Projection present without query is an error.
     ASSERT_NOT_OK(ClearFilters::clear(
-        &opCtx, &empty, &planCache, nss.ns(), fromjson("{projection: {_id: 0, a: 1}}")));
+        &opCtx, &coll, &empty, &planCache, fromjson("{projection: {_id: 0, a: 1}}")));
 }
 
 TEST(IndexFilterCommandsTest, ClearNonexistentHint) {
     QuerySettings querySettings;
     PlanCache planCache(5000);
     OperationContextNoop opCtx;
+    CollectionMock coll(nss);
 
-    ASSERT_OK(SetFilter::set(&opCtx,
-                             &querySettings,
-                             &planCache,
-                             nss.ns(),
-                             fromjson("{query: {a: 1}, indexes: [{a: 1}]}")));
+    ASSERT_OK(SetFilter::set(
+        &opCtx, &coll, &querySettings, &planCache, fromjson("{query: {a: 1}, indexes: [{a: 1}]}")));
     vector<BSONObj> filters = getFilters(querySettings);
     ASSERT_EQUALS(filters.size(), 1U);
 
     // Clear nonexistent hint.
     // Command should succeed and cache should remain unchanged.
     ASSERT_OK(ClearFilters::clear(
-        &opCtx, &querySettings, &planCache, nss.ns(), fromjson("{query: {b: 1}}")));
+        &opCtx, &coll, &querySettings, &planCache, fromjson("{query: {b: 1}}")));
     filters = getFilters(querySettings);
     ASSERT_EQUALS(filters.size(), 1U);
 }
@@ -266,59 +275,56 @@ TEST(IndexFilterCommandsTest, SetFilterInvalidParameter) {
     QuerySettings empty;
     PlanCache planCache(5000);
     OperationContextNoop opCtx;
+    CollectionMock coll(nss);
 
-    ASSERT_NOT_OK(SetFilter::set(&opCtx, &empty, &planCache, nss.ns(), fromjson("{}")));
+    ASSERT_NOT_OK(SetFilter::set(&opCtx, &coll, &empty, &planCache, fromjson("{}")));
     // Missing required query field.
     ASSERT_NOT_OK(
-        SetFilter::set(&opCtx, &empty, &planCache, nss.ns(), fromjson("{indexes: [{a: 1}]}")));
+        SetFilter::set(&opCtx, &coll, &empty, &planCache, fromjson("{indexes: [{a: 1}]}")));
     // Missing required indexes field.
-    ASSERT_NOT_OK(
-        SetFilter::set(&opCtx, &empty, &planCache, nss.ns(), fromjson("{query: {a: 1}}")));
+    ASSERT_NOT_OK(SetFilter::set(&opCtx, &coll, &empty, &planCache, fromjson("{query: {a: 1}}")));
     // Query has to be an object.
-    ASSERT_NOT_OK(SetFilter::set(&opCtx,
-                                 &empty,
-                                 &planCache,
-                                 nss.ns(),
-                                 fromjson("{query: 1234, indexes: [{a: 1}, {b: 1}]}")));
+    ASSERT_NOT_OK(SetFilter::set(
+        &opCtx, &coll, &empty, &planCache, fromjson("{query: 1234, indexes: [{a: 1}, {b: 1}]}")));
     // Indexes field has to be an array.
     ASSERT_NOT_OK(SetFilter::set(
-        &opCtx, &empty, &planCache, nss.ns(), fromjson("{query: {a: 1}, indexes: 1234}")));
+        &opCtx, &coll, &empty, &planCache, fromjson("{query: {a: 1}, indexes: 1234}")));
     // Array indexes field cannot empty.
     ASSERT_NOT_OK(SetFilter::set(
-        &opCtx, &empty, &planCache, nss.ns(), fromjson("{query: {a: 1}, indexes: []}")));
+        &opCtx, &coll, &empty, &planCache, fromjson("{query: {a: 1}, indexes: []}")));
     // Elements in indexes have to be objects.
     ASSERT_NOT_OK(SetFilter::set(
-        &opCtx, &empty, &planCache, nss.ns(), fromjson("{query: {a: 1}, indexes: [{a: 1}, 99]}")));
+        &opCtx, &coll, &empty, &planCache, fromjson("{query: {a: 1}, indexes: [{a: 1}, 99]}")));
     // Objects in indexes cannot be empty.
     ASSERT_NOT_OK(SetFilter::set(
-        &opCtx, &empty, &planCache, nss.ns(), fromjson("{query: {a: 1}, indexes: [{a: 1}, {}]}")));
+        &opCtx, &coll, &empty, &planCache, fromjson("{query: {a: 1}, indexes: [{a: 1}, {}]}")));
     // If present, sort must be an object.
     ASSERT_NOT_OK(
         SetFilter::set(&opCtx,
+                       &coll,
                        &empty,
                        &planCache,
-                       nss.ns(),
                        fromjson("{query: {a: 1}, sort: 1234, indexes: [{a: 1}, {b: 1}]}")));
     // If present, projection must be an object.
     ASSERT_NOT_OK(
         SetFilter::set(&opCtx,
+                       &coll,
                        &empty,
                        &planCache,
-                       nss.ns(),
                        fromjson("{query: {a: 1}, projection: 1234, indexes: [{a: 1}, {b: 1}]}")));
     // If present, collation must be an object.
     ASSERT_NOT_OK(
         SetFilter::set(&opCtx,
+                       &coll,
                        &empty,
                        &planCache,
-                       nss.ns(),
                        fromjson("{query: {a: 1}, collation: 1234, indexes: [{a: 1}, {b: 1}]}")));
     // Query must pass canonicalization.
     ASSERT_NOT_OK(
         SetFilter::set(&opCtx,
+                       &coll,
                        &empty,
                        &planCache,
-                       nss.ns(),
                        fromjson("{query: {a: {$no_such_op: 1}}, indexes: [{a: 1}, {b: 1}]}")));
 }
 
@@ -327,6 +333,7 @@ TEST(IndexFilterCommandsTest, SetAndClearFilters) {
     PlanCache planCache(5000);
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
+    CollectionMock coll(nss);
 
     // Inject query shape into plan cache.
     addQueryShapeToPlanCache(opCtx.get(),
@@ -343,9 +350,9 @@ TEST(IndexFilterCommandsTest, SetAndClearFilters) {
                                   "{locale: 'mock_reverse_string'}"));
 
     ASSERT_OK(SetFilter::set(opCtx.get(),
+                             &coll,
                              &querySettings,
                              &planCache,
-                             nss.ns(),
                              fromjson("{query: {a: 1, b: 1}, sort: {a: -1}, projection: {_id: 0, "
                                       "a: 1}, collation: {locale: 'mock_reverse_string'}, "
                                       "indexes: [{a: 1}]}")));
@@ -370,9 +377,9 @@ TEST(IndexFilterCommandsTest, SetAndClearFilters) {
     // Replacing the hint for the same query shape ({a: 1, b: 1} and {b: 2, a: 3}
     // share same shape) should not change the query settings size.
     ASSERT_OK(SetFilter::set(opCtx.get(),
+                             &coll,
                              &querySettings,
                              &planCache,
-                             nss.ns(),
                              fromjson("{query: {b: 2, a: 3}, sort: {a: -1}, projection: {_id: 0, "
                                       "a: 1}, collation: {locale: 'mock_reverse_string'}, "
                                       "indexes: [{a: 1, b: 1}]}")));
@@ -386,18 +393,18 @@ TEST(IndexFilterCommandsTest, SetAndClearFilters) {
 
     // Add hint for different query shape.
     ASSERT_OK(SetFilter::set(opCtx.get(),
+                             &coll,
                              &querySettings,
                              &planCache,
-                             nss.ns(),
                              fromjson("{query: {b: 1}, indexes: [{b: 1}]}")));
     filters = getFilters(querySettings);
     ASSERT_EQUALS(filters.size(), 2U);
 
     // Add hint for 3rd query shape. This is to prepare for ClearHint tests.
     ASSERT_OK(SetFilter::set(opCtx.get(),
+                             &coll,
                              &querySettings,
                              &planCache,
-                             nss.ns(),
                              fromjson("{query: {a: 1}, indexes: [{a: 1}]}")));
     filters = getFilters(querySettings);
     ASSERT_EQUALS(filters.size(), 3U);
@@ -408,7 +415,7 @@ TEST(IndexFilterCommandsTest, SetAndClearFilters) {
 
     // Clear single hint.
     ASSERT_OK(ClearFilters::clear(
-        opCtx.get(), &querySettings, &planCache, nss.ns(), fromjson("{query: {a: 1}}")));
+        opCtx.get(), &coll, &querySettings, &planCache, fromjson("{query: {a: 1}}")));
     filters = getFilters(querySettings);
     ASSERT_EQUALS(filters.size(), 2U);
 
@@ -417,8 +424,7 @@ TEST(IndexFilterCommandsTest, SetAndClearFilters) {
     ASSERT_TRUE(planCacheContains(opCtx.get(), planCache, "{b: 1}", "{}", "{}", "{}"));
 
     // Clear all filters
-    ASSERT_OK(
-        ClearFilters::clear(opCtx.get(), &querySettings, &planCache, nss.ns(), fromjson("{}")));
+    ASSERT_OK(ClearFilters::clear(opCtx.get(), &coll, &querySettings, &planCache, fromjson("{}")));
     filters = getFilters(querySettings);
     ASSERT_TRUE(filters.empty());
 
@@ -430,15 +436,8 @@ TEST(IndexFilterCommandsTest, SetAndClearFiltersCollation) {
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
     QuerySettings querySettings;
-
-    // Create a plan cache. Add an index so that indexability is included in the plan cache keys.
+    CollectionMock coll(nss);
     PlanCache planCache(5000);
-    const auto keyPattern = fromjson("{a: 1}");
-    planCache.notifyOfIndexUpdates(
-        {CoreIndexInfo(keyPattern,
-                       IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                       true,                                     // sparse
-                       IndexEntry::Identifier{"index_name"})});  // name
 
     // Inject query shapes with and without collation into plan cache.
     addQueryShapeToPlanCache(
@@ -449,9 +448,9 @@ TEST(IndexFilterCommandsTest, SetAndClearFiltersCollation) {
     ASSERT_TRUE(planCacheContains(opCtx.get(), planCache, "{a: 'foo'}", "{}", "{}", "{}"));
 
     ASSERT_OK(SetFilter::set(opCtx.get(),
+                             &coll,
                              &querySettings,
                              &planCache,
-                             nss.ns(),
                              fromjson("{query: {a: 'foo'}, sort: {}, projection: {}, collation: "
                                       "{locale: 'mock_reverse_string'}, "
                                       "indexes: [{a: 1}]}")));
@@ -471,9 +470,9 @@ TEST(IndexFilterCommandsTest, SetAndClearFiltersCollation) {
 
     // Add filter for query shape without collation.
     ASSERT_OK(SetFilter::set(opCtx.get(),
+                             &coll,
                              &querySettings,
                              &planCache,
-                             nss.ns(),
                              fromjson("{query: {a: 'foo'}, indexes: [{b: 1}]}")));
     filters = getFilters(querySettings);
     ASSERT_EQUALS(filters.size(), 2U);
@@ -486,9 +485,9 @@ TEST(IndexFilterCommandsTest, SetAndClearFiltersCollation) {
     // Clear filter for query with collation.
     ASSERT_OK(ClearFilters::clear(
         opCtx.get(),
+        &coll,
         &querySettings,
         &planCache,
-        nss.ns(),
         fromjson("{query: {a: 'foo'}, collation: {locale: 'mock_reverse_string'}}")));
     filters = getFilters(querySettings);
     ASSERT_EQUALS(filters.size(), 1U);
@@ -505,34 +504,22 @@ TEST(IndexFilterCommandsTest, SetAndClearFiltersCollation) {
 
 
 TEST(IndexFilterCommandsTest, SetFilterAcceptsIndexNames) {
-    CollatorInterfaceMock reverseCollator(CollatorInterfaceMock::MockType::kReverseString);
     PlanCache planCache(5000);
-    const auto keyPattern = fromjson("{a: 1}");
-    CoreIndexInfo collatedIndex(keyPattern,
-                                IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                                false,                               // sparse
-                                IndexEntry::Identifier{"a_1:rev"});  // name
-    collatedIndex.collator = &reverseCollator;
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
     QuerySettings querySettings;
-
-    planCache.notifyOfIndexUpdates(
-        {CoreIndexInfo(keyPattern,
-                       IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                       false,                           // sparse
-                       IndexEntry::Identifier{"a_1"}),  // name
-         collatedIndex});
+    CollectionMock coll(nss);
 
     addQueryShapeToPlanCache(opCtx.get(), &planCache, "{a: 2}", "{}", "{}", "{}");
     ASSERT_TRUE(planCacheContains(opCtx.get(), planCache, "{a: 2}", "{}", "{}", "{}"));
 
     ASSERT_OK(SetFilter::set(opCtx.get(),
+                             &coll,
                              &querySettings,
                              &planCache,
-                             nss.ns(),
                              fromjson("{query: {a: 2}, sort: {}, projection: {},"
                                       "indexes: [{a: 1}, 'a_1:rev']}")));
+    ASSERT_FALSE(planCacheContains(opCtx.get(), planCache, "{a: 2}", "{}", "{}", "{}"));
     auto filters = getFilters(querySettings);
     ASSERT_EQUALS(filters.size(), 1U);
     auto indexes = filters[0]["indexes"].Array();

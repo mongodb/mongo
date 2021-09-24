@@ -34,6 +34,7 @@
 
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/explain.h"
+#include "mongo/db/query/plan_cache_key_factory.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/sbe_multi_planner.h"
 #include "mongo/db/query/stage_builder_util.h"
@@ -132,7 +133,7 @@ CandidatePlans CachedSolutionPlanner::replan(bool shouldCache, std::string reaso
     if (shouldCache) {
         // Deactivate the current cache entry.
         auto cache = CollectionQueryInfo::get(_collection).getPlanCache();
-        cache->deactivate(_cq);
+        cache->deactivate(plan_cache_key_factory::make<mongo::PlanCacheKey>(_cq, _collection));
     }
 
     auto buildExecutableTree = [&](const QuerySolution& sol) {

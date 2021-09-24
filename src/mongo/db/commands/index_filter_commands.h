@@ -142,9 +142,9 @@ public:
      * Removes corresponding entries from plan cache.
      */
     static Status clear(OperationContext* opCtx,
+                        const CollectionPtr& collection,
                         QuerySettings* querySettings,
                         PlanCache* planCache,
-                        const std::string& ns,
                         const BSONObj& cmdObj);
 };
 
@@ -174,9 +174,9 @@ public:
      * Removes entry for query shape from plan cache.
      */
     static Status set(OperationContext* opCtx,
+                      const CollectionPtr& collection,
                       QuerySettings* querySettings,
                       PlanCache* planCache,
-                      const std::string& ns,
                       const BSONObj& cmdObj);
 };
 

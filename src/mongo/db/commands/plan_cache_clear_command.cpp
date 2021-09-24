@@ -41,6 +41,8 @@
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/collection_query_info.h"
+#include "mongo/db/query/plan_cache_callbacks.h"
+#include "mongo/db/query/plan_cache_key_factory.h"
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/logv2/log.h"
 
@@ -59,6 +61,7 @@ PlanCache* getPlanCache(OperationContext* opCtx, const CollectionPtr& collection
  * shape only.
  */
 Status clear(OperationContext* opCtx,
+             const CollectionPtr& collection,
              PlanCache* planCache,
              const std::string& ns,
              const BSONObj& cmdObj) {
@@ -76,33 +79,7 @@ Status clear(OperationContext* opCtx,
 
         auto cq = std::move(statusWithCQ.getValue());
 
-        Status result = planCache->remove(*cq);
-        if (!result.isOK()) {
-            invariant(result.code() == ErrorCodes::NoSuchKey);
-            LOGV2_DEBUG(23906,
-                        1,
-                        "{namespace}: Query shape doesn't exist in PlanCache - {query}"
-                        "(sort: {sort}; projection: {projection}; collation: {collation})",
-                        "Query shape doesn't exist in PlanCache",
-                        "namespace"_attr = ns,
-                        "query"_attr = redact(cq->getQueryObj()),
-                        "sort"_attr = cq->getFindCommandRequest().getSort(),
-                        "projection"_attr = cq->getFindCommandRequest().getProjection(),
-                        "collation"_attr = cq->getFindCommandRequest().getCollation());
-            return Status::OK();
-        }
-
-        LOGV2_DEBUG(23907,
-                    1,
-                    "{namespace}: Removed plan cache entry - {query}"
-                    "(sort: {sort}; projection: {projection}; collation: {collation})",
-                    "Removed plan cache entry",
-                    "namespace"_attr = ns,
-                    "query"_attr = redact(cq->getQueryObj()),
-                    "sort"_attr = cq->getFindCommandRequest().getSort(),
-                    "projection"_attr = cq->getFindCommandRequest().getProjection(),
-                    "collation"_attr = cq->getFindCommandRequest().getCollation());
-
+        planCache->remove(plan_cache_key_factory::make<PlanCacheKey>(*cq, collection));
         return Status::OK();
     }
 
@@ -189,7 +166,7 @@ bool PlanCacheClearCommand::run(OperationContext* opCtx,
     }
 
     auto planCache = getPlanCache(opCtx, ctx.getCollection());
-    uassertStatusOK(clear(opCtx, planCache, nss.ns(), cmdObj));
+    uassertStatusOK(clear(opCtx, ctx.getCollection(), planCache, nss.ns(), cmdObj));
     return true;
 }
 

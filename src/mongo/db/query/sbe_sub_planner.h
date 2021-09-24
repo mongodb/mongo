@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/query/all_indices_required_checker.h"
+#include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/sbe_plan_ranker.h"
 #include "mongo/db/query/sbe_runtime_planner.h"
 

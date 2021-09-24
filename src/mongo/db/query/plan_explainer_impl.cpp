@@ -794,7 +794,7 @@ std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerImpl::getRejectedPlans
 }
 
 std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerImpl::getCachedPlanStats(
-    const PlanCacheEntry::DebugInfo& debugInfo, ExplainOptions::Verbosity verbosity) const {
+    const plan_cache_debug_info::DebugInfo& debugInfo, ExplainOptions::Verbosity verbosity) const {
     const auto& decision = *debugInfo.decision;
     std::vector<PlanStatsDetails> res;
     auto winningPlanIdx = getWinningPlanIdx(_root);

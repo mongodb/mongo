@@ -129,4 +129,39 @@ std::string SolutionCacheData::toString() const {
     MONGO_UNREACHABLE;
 }
 
+bool shouldCacheQuery(const CanonicalQuery& query) {
+    const FindCommandRequest& findCommand = query.getFindCommandRequest();
+    const MatchExpression* expr = query.root();
+
+    if (!query.getSortPattern() && expr->matchType() == MatchExpression::AND &&
+        expr->numChildren() == 0) {
+        return false;
+    }
+
+    if (!findCommand.getHint().isEmpty()) {
+        return false;
+    }
+
+    if (!findCommand.getMin().isEmpty()) {
+        return false;
+    }
+
+    if (!findCommand.getMax().isEmpty()) {
+        return false;
+    }
+
+    // We don't read or write from the plan cache for explain. This ensures that explain queries
+    // don't affect cache state, and it also makes sure that we can always generate information
+    // regarding rejected plans and/or trial period execution of candidate plans.
+    if (query.getExplain()) {
+        return false;
+    }
+
+    // Tailable cursors won't get cached, just turn into collscans.
+    if (query.getFindCommandRequest().getTailable()) {
+        return false;
+    }
+
+    return true;
+}
 }  // namespace mongo

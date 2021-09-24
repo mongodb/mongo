@@ -32,6 +32,7 @@
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collection_query_info.h"
+#include "mongo/db/query/plan_cache_key_factory.h"
 #include "mongo/db/query/plan_explainer_factory.h"
 #include "mongo/db/query/sbe_plan_ranker.h"
 
@@ -156,7 +157,7 @@ void updatePlanCache(
 
     // Store the choice we just made in the cache, if the query is of a type that is safe to
     // cache.
-    if (PlanCache::shouldCacheQuery(query) && canCache) {
+    if (shouldCacheQuery(query) && canCache) {
         // Create list of candidate solutions for the cache with the best solution at the front.
         std::vector<QuerySolution*> solutions;
 
@@ -191,13 +192,16 @@ void updatePlanCache(
             invariant(solutions[0]->cacheData);
             auto plannerDataForCache = solutions[0]->cacheData->clone();
 
+            PlanCacheLoggingCallbacks<PlanCacheKey, SolutionCacheData> callbacks{query};
             uassertStatusOK(CollectionQueryInfo::get(collection)
                                 .getPlanCache()
-                                ->set(query,
+                                ->set(plan_cache_key_factory::make<PlanCacheKey>(query, collection),
                                       std::move(plannerDataForCache),
                                       solutions,
                                       std::move(ranking),
-                                      opCtx->getServiceContext()->getPreciseClockSource()->now()));
+                                      opCtx->getServiceContext()->getPreciseClockSource()->now(),
+                                      boost::none, /* worksGrowthCoefficient */
+                                      &callbacks));
         }
     }
 }

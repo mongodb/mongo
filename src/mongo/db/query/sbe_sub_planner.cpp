@@ -31,6 +31,7 @@
 #include "mongo/db/query/sbe_sub_planner.h"
 
 #include "mongo/db/query/collection_query_info.h"
+#include "mongo/db/query/plan_cache_key_factory.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/sbe_multi_planner.h"
 #include "mongo/db/query/stage_builder_util.h"
@@ -40,11 +41,17 @@ namespace mongo::sbe {
 CandidatePlans SubPlanner::plan(
     std::vector<std::unique_ptr<QuerySolution>> solutions,
     std::vector<std::pair<std::unique_ptr<PlanStage>, stage_builder::PlanStageData>> roots) {
+    std::function<mongo::PlanCacheKey(const CanonicalQuery& cq, const CollectionPtr& coll)>
+        createPlanCacheKey = [](const CanonicalQuery& cq, const CollectionPtr& coll) {
+            return plan_cache_key_factory::make<mongo::PlanCacheKey>(cq, coll);
+        };
+
     // Plan each branch of the $or.
     auto subplanningStatus =
         QueryPlanner::planSubqueries(_opCtx,
-                                     _collection,
                                      CollectionQueryInfo::get(_collection).getPlanCache(),
+                                     createPlanCacheKey,
+                                     _collection,
                                      _cq,
                                      _queryParams);
     if (!subplanningStatus.isOK()) {

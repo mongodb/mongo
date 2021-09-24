@@ -36,6 +36,16 @@
 #include "mongo/db/query/query_solution.h"
 
 namespace mongo {
+// The logging facility enforces the rule that logging should not be done in a header file. Since
+// template classes and functions below must be defined in the header file and since they use the
+// logging facility, we have to define the helper functions below to perform the actual logging
+// operation from template code.
+namespace log_detail {
+void logSubplannerIndexEntry(const IndexEntry& entry, size_t childIndex);
+void logCachedPlanFound(size_t numChildren, size_t childIndex);
+void logCachedPlanNotFound(size_t numChildren, size_t childIndex);
+void logNumberOfSolutions(size_t numSolutions);
+}  // namespace log_detail
 
 class Collection;
 class CollectionPtr;
@@ -119,14 +129,21 @@ public:
         const CachedSolution& cachedSoln);
 
     /**
-     * Plan each branch of the rooted $or query independently, and store the resulting
+     * Plan each branch of the rooted $or query independently, and return the resulting
      * lists of query solutions in 'SubqueriesPlanningResult'.
+     *
+     * The 'createPlanCacheKey' callback is used to create a plan cache key of the specified
+     * 'KeyType' for each of the branches to look up the plan in the 'planCache'.
      */
-    static StatusWith<SubqueriesPlanningResult> planSubqueries(OperationContext* opCtx,
-                                                               const CollectionPtr& collection,
-                                                               const PlanCache* planCache,
-                                                               const CanonicalQuery& query,
-                                                               const QueryPlannerParams& params);
+    template <typename KeyType, typename... Args>
+    static StatusWith<SubqueriesPlanningResult> planSubqueries(
+        OperationContext* opCtx,
+        const PlanCacheBase<KeyType, Args...>* planCache,
+        std::function<KeyType(const CanonicalQuery& cq, const CollectionPtr& coll)>
+            createPlanCacheKey,
+        const CollectionPtr& collection,
+        const CanonicalQuery& query,
+        const QueryPlannerParams& params);
 
     /**
      * Generates and returns the index tag tree that will be inserted into the plan cache. This data
@@ -174,4 +191,80 @@ public:
         std::function<StatusWith<std::unique_ptr<QuerySolution>>(
             CanonicalQuery* cq, std::vector<std::unique_ptr<QuerySolution>>)> multiplanCallback);
 };
+
+template <typename KeyType, typename... Args>
+StatusWith<QueryPlanner::SubqueriesPlanningResult> QueryPlanner::planSubqueries(
+    OperationContext* opCtx,
+    const PlanCacheBase<KeyType, Args...>* planCache,
+    std::function<KeyType(const CanonicalQuery& cq, const CollectionPtr& coll)> createPlanCacheKey,
+    const CollectionPtr& collection,
+    const CanonicalQuery& query,
+    const QueryPlannerParams& params) {
+    invariant(query.root()->matchType() == MatchExpression::OR);
+    invariant(query.root()->numChildren(), "Cannot plan subqueries for an $or with no children");
+
+    SubqueriesPlanningResult planningResult{query.root()->shallowClone()};
+    for (size_t i = 0; i < params.indices.size(); ++i) {
+        const IndexEntry& ie = params.indices[i];
+        const auto insertionRes = planningResult.indexMap.insert(std::make_pair(ie.identifier, i));
+        // Be sure the key was not already in the map.
+        invariant(insertionRes.second);
+        log_detail::logSubplannerIndexEntry(ie, i);
+    }
+
+    for (size_t i = 0; i < planningResult.orExpression->numChildren(); ++i) {
+        // We need a place to shove the results from planning this branch.
+        planningResult.branches.push_back(
+            std::make_unique<SubqueriesPlanningResult::BranchPlanningResult>());
+        auto branchResult = planningResult.branches.back().get();
+        auto orChild = planningResult.orExpression->getChild(i);
+
+        // Turn the i-th child into its own query.
+        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx, query, orChild);
+        if (!statusWithCQ.isOK()) {
+            str::stream ss;
+            ss << "Can't canonicalize subchild " << orChild->debugString() << " "
+               << statusWithCQ.getStatus().reason();
+            return Status(ErrorCodes::BadValue, ss);
+        }
+
+        branchResult->canonicalQuery = std::move(statusWithCQ.getValue());
+
+        // Plan the i-th child. We might be able to find a plan for the i-th child in the plan
+        // cache. If there's no cached plan, then we generate and rank plans using the MPS.
+
+        // Populate branchResult->cachedSolution if an active cachedSolution entry exists.
+        if (planCache && shouldCacheQuery(*branchResult->canonicalQuery)) {
+            if (auto cachedSol = planCache->getCacheEntryIfActive(
+                    createPlanCacheKey(*branchResult->canonicalQuery, collection))) {
+                // We have a CachedSolution. Store it for later.
+                log_detail::logCachedPlanFound(planningResult.orExpression->numChildren(), i);
+
+                branchResult->cachedSolution = std::move(cachedSol);
+            }
+        }
+
+        if (!branchResult->cachedSolution) {
+            // No CachedSolution found. We'll have to plan from scratch.
+            log_detail::logCachedPlanNotFound(planningResult.orExpression->numChildren(), i);
+
+            // We don't set NO_TABLE_SCAN because peeking at the cache data will keep us from
+            // considering any plan that's a collscan.
+            invariant(branchResult->solutions.empty());
+            auto statusWithMultiPlanSolns =
+                QueryPlanner::planForMultiPlanner(*branchResult->canonicalQuery, params);
+            if (!statusWithMultiPlanSolns.isOK()) {
+                str::stream ss;
+                ss << "Can't plan for subchild " << branchResult->canonicalQuery->toString() << " "
+                   << statusWithMultiPlanSolns.getStatus().reason();
+                return Status(ErrorCodes::BadValue, ss);
+            }
+            branchResult->solutions = std::move(statusWithMultiPlanSolns.getValue());
+
+            log_detail::logNumberOfSolutions(branchResult->solutions.size());
+        }
+    }
+
+    return std::move(planningResult);
+}
 }  // namespace mongo

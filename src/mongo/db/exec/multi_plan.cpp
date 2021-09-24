@@ -48,6 +48,7 @@
 #include "mongo/db/query/classic_plan_cache.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/explain.h"
+#include "mongo/db/query/plan_cache_key_factory.h"
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/plan_ranker_util.h"
 #include "mongo/logv2/log.h"
@@ -130,9 +131,9 @@ PlanStage::StageState MultiPlanStage::doWork(WorkingSetID* out) {
 
         LOGV2_DEBUG(20588, 5, "Best plan errored, switching to backup plan");
 
-        // Attempt to remove the plan from the cache. This will fail if the plan has already been
-        // removed, and we intentionally ignore such errors.
-        CollectionQueryInfo::get(collection()).getPlanCache()->remove(*_query).ignore();
+        CollectionQueryInfo::get(collection())
+            .getPlanCache()
+            ->remove(plan_cache_key_factory::make<PlanCacheKey>(*_query, collection()));
 
         _bestPlanIdx = _backupPlanIdx;
         _backupPlanIdx = kNoSuchPlan;

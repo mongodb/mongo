@@ -29,65 +29,13 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <set>
-
-#include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/db/query/lru_key_value.h"
-#include "mongo/db/query/plan_cache_indexability.h"
-#include "mongo/db/query/plan_ranking_decision.h"
-#include "mongo/db/query/query_planner_params.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/db/query/plan_cache_callbacks.h"
+#include "mongo/db/query/plan_cache_debug_info.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/container_size_helper.h"
 
 namespace mongo {
-
-namespace plan_cache_detail {
-/**
- * Serializes indexability discriminators, appending them to keyBuilder. This function is used
- * during the computation of a query's plan cache key to ensure that two queries with different
- * index eligibilities will have different cache keys.
- */
-void encodeIndexability(const MatchExpression* tree,
-                        const PlanCacheIndexabilityState& indexabilityState,
-                        StringBuilder* keyBuilder);
-}  // namespace plan_cache_detail
-
-// The logging facility enforces the rule that logging should not be done in a header file. Since
-// template classes and functions below must be defined in the header file and since they use the
-// logging facility, we have to define the helper functions below to perform the actual logging
-// operation from template code.
-namespace log_detail {
-void logInactiveCacheEntry(const std::string& key);
-void logCacheEviction(NamespaceString nss, std::string&& evictedEntry);
-void logCreateInactiveCacheEntry(std::string&& query,
-                                 std::string&& queryHash,
-                                 std::string&& planCacheKey,
-                                 size_t newWorks);
-void logReplaceActiveCacheEntry(std::string&& query,
-                                std::string&& queryHash,
-                                std::string&& planCacheKey,
-                                size_t works,
-                                size_t newWorks);
-void logNoop(std::string&& query,
-             std::string&& queryHash,
-             std::string&& planCacheKey,
-             size_t works,
-             size_t newWorks);
-void logIncreasingWorkValue(std::string&& query,
-                            std::string&& queryHash,
-                            std::string&& planCacheKey,
-                            size_t works,
-                            size_t increasedWorks);
-void logPromoteCacheEntry(std::string&& query,
-                          std::string&& queryHash,
-                          std::string&& planCacheKey,
-                          size_t works,
-                          size_t newWorks);
-}  // namespace log_detail
-
 class QuerySolution;
 struct QuerySolutionNode;
 
@@ -123,99 +71,17 @@ public:
 template <class CachedPlanType>
 class PlanCacheEntryBase {
 public:
-    /**
-     * A description of the query from which a 'PlanCacheEntryBase' was created.
-     */
-    struct CreatedFromQuery {
-        /**
-         * Returns an estimate of the size of this object, including the memory allocated elsewhere
-         * that it owns, in bytes.
-         */
-        uint64_t estimateObjectSizeInBytes() const {
-            uint64_t size = 0;
-            size += filter.objsize();
-            size += sort.objsize();
-            size += projection.objsize();
-            size += collation.objsize();
-            return size;
-        }
-
-        std::string debugString() const {
-            return str::stream() << "query: " << filter.toString() << "; sort: " << sort.toString()
-                                 << "; projection: " << projection.toString()
-                                 << "; collation: " << collation.toString();
-        }
-
-        BSONObj filter;
-        BSONObj sort;
-        BSONObj projection;
-        BSONObj collation;
-    };
-
-    /**
-     * Per-plan cache entry information that is used strictly as debug information (e.g. is intended
-     * for display by the $planCacheStats aggregation source). In order to save memory, this
-     * information is sometimes discarded instead of kept in the plan cache entry. Therefore, this
-     * information may not be used for any purpose outside displaying debug info, such as recovering
-     * a plan from the cache or determining whether or not the cache entry is active.
-     */
-    struct DebugInfo {
-        DebugInfo(CreatedFromQuery createdFromQuery,
-                  std::unique_ptr<const plan_ranker::PlanRankingDecision> decision)
-            : createdFromQuery(std::move(createdFromQuery)), decision(std::move(decision)) {
-            invariant(this->decision);
-        }
-
-        /**
-         * 'DebugInfo' is copy-constructible, copy-assignable, move-constructible, and
-         * move-assignable.
-         */
-        DebugInfo(const DebugInfo& other)
-            : createdFromQuery(other.createdFromQuery), decision(other.decision->clone()) {}
-
-        DebugInfo& operator=(const DebugInfo& other) {
-            createdFromQuery = other.createdFromQuery;
-            decision = other.decision->clone();
-            return *this;
-        }
-
-        DebugInfo(DebugInfo&&) = default;
-        DebugInfo& operator=(DebugInfo&&) = default;
-
-        ~DebugInfo() = default;
-
-        /**
-         * Returns an estimate of the size of this object, including the memory allocated elsewhere
-         * that it owns, in bytes.
-         */
-        uint64_t estimateObjectSizeInBytes() const {
-            uint64_t size = 0;
-            size += createdFromQuery.estimateObjectSizeInBytes();
-            size += decision->estimateObjectSizeInBytes();
-            return size;
-        }
-
-        CreatedFromQuery createdFromQuery;
-
-        // Information that went into picking the winning plan and also why the other plans lost.
-        // Never nullptr.
-        std::unique_ptr<const plan_ranker::PlanRankingDecision> decision;
-    };
-
-    /**
-     * Create a new PlanCacheEntrBase.
-     * Grabs any planner-specific data required from the solutions.
-     */
+    template <typename KeyType>
     static std::unique_ptr<PlanCacheEntryBase<CachedPlanType>> create(
         const std::vector<QuerySolution*>& solutions,
         std::unique_ptr<const plan_ranker::PlanRankingDecision> decision,
-        const CanonicalQuery& query,
         std::unique_ptr<CachedPlanType> cachedPlan,
         uint32_t queryHash,
         uint32_t planCacheKey,
         Date_t timeOfCreation,
         bool isActive,
-        size_t works) {
+        size_t works,
+        const PlanCacheCallbacks<KeyType, CachedPlanType>* callbacks) {
         invariant(decision);
 
         // If the cumulative size of the plan caches is estimated to remain within a predefined
@@ -226,25 +92,9 @@ public:
         const bool includeDebugInfo = planCacheTotalSizeEstimateBytes.get() <
             internalQueryCacheMaxSizeBytesBeforeStripDebugInfo.load();
 
-        boost::optional<DebugInfo> debugInfo;
-        if (includeDebugInfo) {
-            // Strip projections on $-prefixed fields, as these are added by internal callers of the
-            // system and are not considered part of the user projection.
-            const FindCommandRequest& findCommand = query.getFindCommandRequest();
-            BSONObjBuilder projBuilder;
-            for (auto elem : findCommand.getProjection()) {
-                if (elem.fieldName()[0] == '$') {
-                    continue;
-                }
-                projBuilder.append(elem);
-            }
-
-            CreatedFromQuery createdFromQuery{
-                findCommand.getFilter(),
-                findCommand.getSort(),
-                projBuilder.obj(),
-                query.getCollator() ? query.getCollator()->getSpec().toBSON() : BSONObj()};
-            debugInfo.emplace(std::move(createdFromQuery), std::move(decision));
+        boost::optional<plan_cache_debug_info::DebugInfo> debugInfo;
+        if (includeDebugInfo && callbacks) {
+            debugInfo.emplace(callbacks->buildDebugInfo(std::move(decision)));
         }
 
         return std::unique_ptr<PlanCacheEntryBase<CachedPlanType>>(
@@ -265,7 +115,7 @@ public:
      * Make a deep copy.
      */
     std::unique_ptr<PlanCacheEntryBase<CachedPlanType>> clone() const {
-        boost::optional<DebugInfo> debugInfoCopy;
+        boost::optional<plan_cache_debug_info::DebugInfo> debugInfoCopy;
         if (debugInfo) {
             debugInfoCopy.emplace(*debugInfo);
         }
@@ -321,7 +171,7 @@ public:
     //
     // Once the estimated cumulative size of the mongod's plan caches exceeds a threshold, this
     // debug info is omitted from new plan cache entries.
-    const boost::optional<DebugInfo> debugInfo;
+    const boost::optional<plan_cache_debug_info::DebugInfo> debugInfo;
 
     // An estimate of the size in bytes of this plan cache entry. This is the "deep size",
     // calculated by recursively incorporating the size of owned objects, the objects that they in
@@ -343,7 +193,7 @@ private:
                        uint32_t planCacheKey,
                        bool isActive,
                        size_t works,
-                       boost::optional<DebugInfo> debugInfo)
+                       boost::optional<plan_cache_debug_info::DebugInfo> debugInfo)
         : cachedPlan(std::move(cachedPlan)),
           timeOfCreation(timeOfCreation),
           queryHash(queryHash),
@@ -375,9 +225,11 @@ private:
 };
 
 /**
- * Caches the best solution to a query.  Aside from the (CanonicalQuery -> QuerySolution)
- * mapping, the cache contains information on why that mapping was made and statistics on the
- * cache entry's actual performance on subsequent runs.
+ * A data structure for caching execution plans, to avoid repeatedly performing query optimization
+ * and plan compilation on each invocation of a query. The cache is logically a mapping from
+ * 'KeyType' to 'CachedPlanType'. The cache key is derived from the query, and can be used to
+ * determine whether a cached plan is available. The cache has an LRU replacement policy, so it only
+ * keeps the most recently used plans.
  */
 template <class KeyType,
           class CachedPlanType,
@@ -419,55 +271,6 @@ public:
         std::unique_ptr<CachedPlanHolder<CachedPlanType>> cachedPlanHolder;
     };
 
-    /**
-     * We don't want to cache every possible query. This function
-     * encapsulates the criteria for what makes a canonical query
-     * suitable for lookup/inclusion in the cache.
-     */
-    static bool shouldCacheQuery(const CanonicalQuery& query) {
-        const FindCommandRequest& findCommand = query.getFindCommandRequest();
-        const MatchExpression* expr = query.root();
-
-        // Collection scan
-        // No sort order requested
-        if (!query.getSortPattern() && expr->matchType() == MatchExpression::AND &&
-            expr->numChildren() == 0) {
-            return false;
-        }
-
-        // Hint provided
-        if (!findCommand.getHint().isEmpty()) {
-            return false;
-        }
-
-        // Min provided
-        // Min queries are a special case of hinted queries.
-        if (!findCommand.getMin().isEmpty()) {
-            return false;
-        }
-
-        // Max provided
-        // Similar to min, max queries are a special case of hinted queries.
-        if (!findCommand.getMax().isEmpty()) {
-            return false;
-        }
-
-        // We don't read or write from the plan cache for explain. This ensures
-        // that explain queries don't affect cache state, and it also makes
-        // sure that we can always generate information regarding rejected plans
-        // and/or trial period execution of candidate plans.
-        if (query.getExplain()) {
-            return false;
-        }
-
-        // Tailable cursors won't get cached, just turn into collscans.
-        if (query.getFindCommandRequest().getTailable()) {
-            return false;
-        }
-
-        return true;
-    }
-
     PlanCacheBase(size_t size) : PlanCacheBase(BudgetTracker(size)) {}
 
     PlanCacheBase(BudgetTracker&& budgetTracker) : _cache{std::move(budgetTracker)} {}
@@ -486,14 +289,18 @@ public:
      * an inactive cache entry.  If boost::none is provided, the function will use
      * 'internalQueryCacheWorksGrowthCoefficient'.
      *
+     * A 'callbacks' argument can be provided to perform some custom actions when the state of the
+     * plan cache or a plan cache entry has been changed.
+     *
      * If the mapping was set successfully, returns Status::OK(), even if it evicted another entry.
      */
-    Status set(const CanonicalQuery& query,
+    Status set(const KeyType& key,
                std::unique_ptr<CachedPlanType> cachedPlan,
                const std::vector<QuerySolution*>& solns,
                std::unique_ptr<plan_ranker::PlanRankingDecision> why,
                Date_t now,
-               boost::optional<double> worksGrowthCoefficient = boost::none) {
+               boost::optional<double> worksGrowthCoefficient = boost::none,
+               const PlanCacheCallbacks<KeyType, CachedPlanType>* callbacks = nullptr) {
         invariant(why);
         invariant(cachedPlan);
 
@@ -528,56 +335,57 @@ public:
                                              details.candidatePlanStats[0].get());
                                      }},
             why->stats);
-        const auto key = computeKey(query);
+
         stdx::lock_guard<Latch> cacheLock(_cacheMutex);
-        bool isNewEntryActive = false;
-        uint32_t queryHash;
-        uint32_t planCacheKey;
-        if (internalQueryCacheDisableInactiveEntries.load()) {
-            // All entries are always active.
-            isNewEntryActive = true;
-            planCacheKey = key.planCacheKeyHash();
-            queryHash = key.queryHash();
-        } else {
-            Entry* oldEntry = nullptr;
-            Status cacheStatus = _cache.get(key, &oldEntry);
-            invariant(cacheStatus.isOK() || cacheStatus == ErrorCodes::NoSuchKey);
-            if (oldEntry) {
-                queryHash = oldEntry->queryHash;
-                planCacheKey = oldEntry->planCacheKey;
+        auto [queryHash, planCacheKey, isNewEntryActive, shouldBeCreated] = [&]() {
+            if (internalQueryCacheDisableInactiveEntries.load()) {
+                // All entries are always active.
+                return std::make_tuple(key.queryHash(),
+                                       key.planCacheKeyHash(),
+                                       true /* isNewEntryActive  */,
+                                       true /* shouldBeCreated  */);
             } else {
-                planCacheKey = key.planCacheKeyHash();
-                queryHash = key.queryHash();
-            }
+                Entry* oldEntry = nullptr;
+                Status cacheStatus = _cache.get(key, &oldEntry);
+                invariant(cacheStatus.isOK() || cacheStatus == ErrorCodes::NoSuchKey);
 
-            const auto newState = getNewEntryState(
-                query,
-                queryHash,
-                planCacheKey,
-                oldEntry,
-                newWorks,
-                worksGrowthCoefficient.get_value_or(internalQueryCacheWorksGrowthCoefficient));
+                const auto newState = getNewEntryState(
+                    key,
+                    oldEntry,
+                    newWorks,
+                    worksGrowthCoefficient.get_value_or(internalQueryCacheWorksGrowthCoefficient),
+                    callbacks);
 
-            if (!newState.shouldBeCreated) {
-                return Status::OK();
+                // Avoid recomputing the hashes if we've got an old entry to grab them from.
+                return oldEntry ? std::make_tuple(oldEntry->queryHash,
+                                                  oldEntry->planCacheKey,
+                                                  newState.shouldBeActive,
+                                                  newState.shouldBeCreated)
+                                : std::make_tuple(key.queryHash(),
+                                                  key.planCacheKeyHash(),
+                                                  newState.shouldBeActive,
+                                                  newState.shouldBeCreated);
             }
-            isNewEntryActive = newState.shouldBeActive;
+        }();
+
+        if (!shouldBeCreated) {
+            return Status::OK();
         }
 
         auto newEntry(Entry::create(solns,
                                     std::move(why),
-                                    query,
                                     std::move(cachedPlan),
                                     queryHash,
                                     planCacheKey,
                                     now,
                                     isNewEntryActive,
-                                    newWorks));
+                                    newWorks,
+                                    callbacks));
 
         auto evictedEntry = _cache.add(key, newEntry.release());
 
-        if (nullptr != evictedEntry.get()) {
-            log_detail::logCacheEviction(query.nss(), evictedEntry->debugString());
+        if (evictedEntry && callbacks) {
+            callbacks->onCacheEviction(*evictedEntry);
         }
 
         return Status::OK();
@@ -588,13 +396,12 @@ public:
      * when the associated plan starts to perform poorly, we deactivate it, so that plans which
      * perform even worse than the one already in the cache may not easily take its place.
      */
-    void deactivate(const CanonicalQuery& query) {
+    void deactivate(const KeyType& key) {
         if (internalQueryCacheDisableInactiveEntries.load()) {
             // This is a noop if inactive entries are disabled.
             return;
         }
 
-        KeyType key = computeKey(query);
         stdx::lock_guard<Latch> cacheLock(_cacheMutex);
         Entry* entry = nullptr;
         Status cacheStatus = _cache.get(key, &entry);
@@ -604,18 +411,6 @@ public:
         }
         invariant(entry);
         entry->isActive = false;
-    }
-
-    /**
-     * Look up the cached data access for the provided 'query'.  Used by the query planner
-     * to shortcut planning.
-     *
-     * The return value will provide the "state" of the cache entry, as well as the CachedSolution
-     * for the query (if there is one).
-     */
-    GetResult get(const CanonicalQuery& query) const {
-        KeyType key = computeKey(query);
-        return get(key);
     }
 
     /**
@@ -656,12 +451,12 @@ public:
     }
 
     /**
-     * Remove the entry corresponding to 'cq' from the cache.  Returns Status::OK() if the plan
-     * was present and removed and an error status otherwise.
+     * Remove the entry with the 'key' from the cache. If there is no entry for the given key in
+     * the cache, this call is a no-op.
      */
-    Status remove(const CanonicalQuery& cq) {
+    void remove(const KeyType& key) {
         stdx::lock_guard<Latch> cacheLock(_cacheMutex);
-        return _cache.remove(computeKey(cq));
+        [[maybe_unused]] auto ret = _cache.remove(key);
     }
 
     /**
@@ -673,33 +468,11 @@ public:
     }
 
     /**
-     * Get the cache key corresponding to the given canonical query.  The query need not already
-     * be cached.
-     *
-     * This is provided in the public API simply as a convenience for consumers who need some
-     * description of query shape (e.g. index filters).
-     *
-     * Callers must hold the collection lock when calling this method.
-     */
-    KeyType computeKey(const CanonicalQuery& cq) const {
-        const auto shapeString = cq.encodeKey();
-
-        StringBuilder indexabilityKeyBuilder;
-        plan_cache_detail::encodeIndexability(
-            cq.root(), _indexabilityState, &indexabilityKeyBuilder);
-        return KeyType(std::move(shapeString),
-                       indexabilityKeyBuilder.str(),
-                       cq.getEnableSlotBasedExecutionEngine());
-    }
-
-    /**
-     * Returns a copy of a cache entry, looked up by CanonicalQuery.
+     * Returns a copy of a cache entry, looked up by the plan cache key.
      *
      * If there is no entry in the cache for the 'query', returns an error Status.
      */
-    StatusWith<std::unique_ptr<Entry>> getEntry(const CanonicalQuery& cq) const {
-        KeyType key = computeKey(cq);
-
+    StatusWith<std::unique_ptr<Entry>> getEntry(const KeyType& key) const {
         stdx::lock_guard<Latch> cacheLock(_cacheMutex);
         Entry* entry;
         Status cacheStatus = _cache.get(key, &entry);
@@ -737,16 +510,6 @@ public:
     }
 
     /**
-     * Updates internal state kept about the collection's indexes.  Must be called when the set
-     * of indexes on the associated collection have changed.
-     *
-     * Callers must hold the collection lock in exclusive mode when calling this method.
-     */
-    void notifyOfIndexUpdates(const std::vector<CoreIndexInfo>& indexCores) {
-        _indexabilityState.updateDiscriminators(indexCores);
-    }
-
-    /**
      * Iterates over the plan cache. For each entry, serializes the PlanCacheEntryBase according to
      * 'serializationFunc'. Returns a vector of all serialized entries which match 'filterFunc'.
      */
@@ -779,18 +542,16 @@ private:
      * - We should create a new entry
      * - The new entry should be marked 'active'
      */
-    NewEntryState getNewEntryState(const CanonicalQuery& query,
-                                   uint32_t queryHash,
-                                   uint32_t planCacheKey,
+    NewEntryState getNewEntryState(const KeyType& key,
                                    Entry* oldEntry,
                                    size_t newWorks,
-                                   double growthCoefficient) {
+                                   double growthCoefficient,
+                                   const PlanCacheCallbacks<KeyType, CachedPlanType>* callbacks) {
         NewEntryState res;
         if (!oldEntry) {
-            log_detail::logCreateInactiveCacheEntry(query.toStringShort(),
-                                                    zeroPaddedHex(queryHash),
-                                                    zeroPaddedHex(planCacheKey),
-                                                    newWorks);
+            if (callbacks) {
+                callbacks->onCreateInactiveCacheEntry(key, oldEntry, newWorks);
+            }
             res.shouldBeCreated = true;
             res.shouldBeActive = false;
             return res;
@@ -799,19 +560,15 @@ private:
         if (oldEntry->isActive && newWorks <= oldEntry->works) {
             // The new plan did better than the currently stored active plan. This case may
             // occur if many MultiPlanners are run simultaneously.
-            log_detail::logReplaceActiveCacheEntry(query.toStringShort(),
-                                                   zeroPaddedHex(queryHash),
-                                                   zeroPaddedHex(planCacheKey),
-                                                   oldEntry->works,
-                                                   newWorks);
+            if (callbacks) {
+                callbacks->onReplaceActiveCacheEntry(key, oldEntry, newWorks);
+            }
             res.shouldBeCreated = true;
             res.shouldBeActive = true;
         } else if (oldEntry->isActive) {
-            log_detail::logNoop(query.toStringShort(),
-                                zeroPaddedHex(queryHash),
-                                zeroPaddedHex(planCacheKey),
-                                oldEntry->works,
-                                newWorks);
+            if (callbacks) {
+                callbacks->onNoopActiveCacheEntry(key, oldEntry, newWorks);
+            }
             // There is already an active cache entry with a lower works value.
             // We do nothing.
             res.shouldBeCreated = false;
@@ -827,11 +584,9 @@ private:
             const double increasedWorks = std::max(
                 oldEntry->works + 1u, static_cast<size_t>(oldEntry->works * growthCoefficient));
 
-            log_detail::logIncreasingWorkValue(query.toStringShort(),
-                                               zeroPaddedHex(queryHash),
-                                               zeroPaddedHex(planCacheKey),
-                                               oldEntry->works,
-                                               increasedWorks);
+            if (callbacks) {
+                callbacks->onIncreasingWorkValue(key, oldEntry, increasedWorks);
+            }
             oldEntry->works = increasedWorks;
 
             // Don't create a new entry.
@@ -840,11 +595,9 @@ private:
             // This plan performed just as well or better than we expected, based on the
             // inactive entry's works. We use this as an indicator that it's safe to
             // cache (as an active entry) the plan this query used for the future.
-            log_detail::logPromoteCacheEntry(query.toStringShort(),
-                                             zeroPaddedHex(queryHash),
-                                             zeroPaddedHex(planCacheKey),
-                                             oldEntry->works,
-                                             newWorks);
+            if (callbacks) {
+                callbacks->onPromoteCacheEntry(key, oldEntry, newWorks);
+            }
             // We'll replace the old inactive entry with an active entry.
             res.shouldBeCreated = true;
             res.shouldBeActive = true;
@@ -857,12 +610,6 @@ private:
 
     // Protects _cache.
     mutable Mutex _cacheMutex = MONGO_MAKE_LATCH("PlanCache::_cacheMutex");
-
-    // Holds computed information about the collection's indexes.  Used for generating plan
-    // cache keys.
-    //
-    // Concurrent access is synchronized by the collection lock.  Multiple concurrent readers
-    // are allowed.
-    PlanCacheIndexabilityState _indexabilityState;
 };
+
 }  // namespace mongo

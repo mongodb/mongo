@@ -29,10 +29,12 @@
 
 #include "mongo/db/query/canonical_query_encoder.h"
 
+#include "mongo/db/catalog/collection_mock.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/plan_cache_key_factory.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -44,6 +46,11 @@ namespace {
 using std::unique_ptr;
 
 static const NamespaceString nss("testdb.testcoll");
+
+PlanCacheKey makeKey(const CanonicalQuery& cq) {
+    CollectionMock coll(nss);
+    return plan_cache_key_factory::make<PlanCacheKey>(cq, &coll);
+}
 
 /**
  * Utility functions to create a CanonicalQuery
@@ -223,7 +230,7 @@ TEST(CanonicalQueryEncoderTest, ComputeKeyGeoWithin) {
         canonicalize("{a: {$geoWithin: "
                      "{$geometry: {type: 'Polygon', coordinates: "
                      "[[[0, 0], [0, 90], [90, 0], [0, 0]]]}}}}"));
-    ASSERT_NOT_EQUALS(planCache.computeKey(*cqLegacy), planCache.computeKey(*cqNew));
+    ASSERT_NOT_EQUALS(makeKey(*cqLegacy), makeKey(*cqNew));
 }
 
 // GEO_NEAR cache keys should include information on geometry and CRS in addition

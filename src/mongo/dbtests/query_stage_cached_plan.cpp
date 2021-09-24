@@ -48,6 +48,7 @@
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/mock_yield_policies.h"
 #include "mongo/db/query/plan_cache.h"
+#include "mongo/db/query/plan_cache_key_factory.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/dbtests/dbtests.h"
@@ -192,11 +193,12 @@ TEST_F(QueryStageCachedPlan, QueryStageCachedPlanFailureMemoryLimitExceeded) {
     auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
     ASSERT_OK(statusWithCQ.getStatus());
     const std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+    auto key = plan_cache_key_factory::make<PlanCacheKey>(*cq, collection.getCollection());
 
     // We shouldn't have anything in the plan cache for this shape yet.
     PlanCache* cache = CollectionQueryInfo::get(collection.getCollection()).getPlanCache();
     ASSERT(cache);
-    ASSERT_EQ(cache->get(*cq).state, PlanCache::CacheEntryState::kNotPresent);
+    ASSERT_EQ(cache->get(key).state, PlanCache::CacheEntryState::kNotPresent);
 
     // Get planner params.
     QueryPlannerParams plannerParams;
@@ -225,7 +227,7 @@ TEST_F(QueryStageCachedPlan, QueryStageCachedPlanFailureMemoryLimitExceeded) {
 
     // Plan cache should still be empty, as we don't write to it when we replan a failed
     // query.
-    ASSERT_EQ(cache->get(*cq).state, PlanCache::CacheEntryState::kNotPresent);
+    ASSERT_EQ(cache->get(key).state, PlanCache::CacheEntryState::kNotPresent);
 }
 
 /**
@@ -242,11 +244,12 @@ TEST_F(QueryStageCachedPlan, QueryStageCachedPlanHitMaxWorks) {
     auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
     ASSERT_OK(statusWithCQ.getStatus());
     const std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+    auto key = plan_cache_key_factory::make<PlanCacheKey>(*cq, collection.getCollection());
 
     // We shouldn't have anything in the plan cache for this shape yet.
     PlanCache* cache = CollectionQueryInfo::get(collection.getCollection()).getPlanCache();
     ASSERT(cache);
-    ASSERT_EQ(cache->get(*cq).state, PlanCache::CacheEntryState::kNotPresent);
+    ASSERT_EQ(cache->get(key).state, PlanCache::CacheEntryState::kNotPresent);
 
     // Get planner params.
     QueryPlannerParams plannerParams;
@@ -278,7 +281,7 @@ TEST_F(QueryStageCachedPlan, QueryStageCachedPlanHitMaxWorks) {
 
     // This time we expect to find something in the plan cache. Replans after hitting the
     // works threshold result in a cache entry.
-    ASSERT_EQ(cache->get(*cq).state, PlanCache::CacheEntryState::kPresentInactive);
+    ASSERT_EQ(cache->get(key).state, PlanCache::CacheEntryState::kPresentInactive);
 }
 
 /**
@@ -292,6 +295,8 @@ TEST_F(QueryStageCachedPlan, QueryStageCachedPlanAddsActiveCacheEntries) {
     // CanonicalQueries created in this test will have this shape.
     const auto shapeCq =
         canonicalQueryFromFilterObj(opCtx(), nss, fromjson("{a: {$gte: 123}, b: {$gte: 123}}"));
+    auto planCacheKey =
+        plan_cache_key_factory::make<PlanCacheKey>(*shapeCq, collection.getCollection());
 
     // Query can be answered by either index on "a" or index on "b".
     const auto noResultsCq =
@@ -300,17 +305,17 @@ TEST_F(QueryStageCachedPlan, QueryStageCachedPlanAddsActiveCacheEntries) {
     // We shouldn't have anything in the plan cache for this shape yet.
     PlanCache* cache = CollectionQueryInfo::get(collection.getCollection()).getPlanCache();
     ASSERT(cache);
-    ASSERT_EQ(cache->get(*shapeCq).state, PlanCache::CacheEntryState::kNotPresent);
+    ASSERT_EQ(cache->get(planCacheKey).state, PlanCache::CacheEntryState::kNotPresent);
 
     // Run the CachedPlanStage with a long-running child plan. Replanning should be
     // triggered and an inactive entry will be added.
     forceReplanning(collection.getCollection(), noResultsCq.get());
 
     // Check for an inactive cache entry.
-    ASSERT_EQ(cache->get(*shapeCq).state, PlanCache::CacheEntryState::kPresentInactive);
+    ASSERT_EQ(cache->get(planCacheKey).state, PlanCache::CacheEntryState::kPresentInactive);
 
     // The works should be 1 for the entry since the query we ran should not have any results.
-    auto entry = assertGet(cache->getEntry(*shapeCq));
+    auto entry = assertGet(cache->getEntry(planCacheKey));
     size_t works = 1U;
     ASSERT_EQ(entry->works, works);
 
@@ -323,9 +328,9 @@ TEST_F(QueryStageCachedPlan, QueryStageCachedPlanAddsActiveCacheEntries) {
             canonicalQueryFromFilterObj(opCtx(), nss, fromjson("{a: {$gte: 1}, b: {$gte: 0}}"));
         forceReplanning(collection.getCollection(), someResultsCq.get());
 
-        ASSERT_EQ(cache->get(*shapeCq).state, PlanCache::CacheEntryState::kPresentInactive);
+        ASSERT_EQ(cache->get(planCacheKey).state, PlanCache::CacheEntryState::kPresentInactive);
         // The works on the cache entry should have doubled.
-        entry = assertGet(cache->getEntry(*shapeCq));
+        entry = assertGet(cache->getEntry(planCacheKey));
         ASSERT_EQ(entry->works, works);
     }
 
@@ -335,8 +340,8 @@ TEST_F(QueryStageCachedPlan, QueryStageCachedPlanAddsActiveCacheEntries) {
     forceReplanning(collection.getCollection(), fewResultsCq.get());
 
     // Now there should be an active cache entry.
-    ASSERT_EQ(cache->get(*shapeCq).state, PlanCache::CacheEntryState::kPresentActive);
-    entry = assertGet(cache->getEntry(*shapeCq));
+    ASSERT_EQ(cache->get(planCacheKey).state, PlanCache::CacheEntryState::kPresentActive);
+    entry = assertGet(cache->getEntry(planCacheKey));
     // This will query will match {a: 6} through {a:9} (4 works), plus one for EOF = 5 works.
     ASSERT_EQ(entry->works, 5U);
 }
@@ -350,6 +355,8 @@ TEST_F(QueryStageCachedPlan, DeactivatesEntriesOnReplan) {
     // CanonicalQueries created in this test will have this shape.
     const auto shapeCq =
         canonicalQueryFromFilterObj(opCtx(), nss, fromjson("{a: {$gte: 123}, b: {$gte: 123}}"));
+    auto planCacheKey =
+        plan_cache_key_factory::make<PlanCacheKey>(*shapeCq, collection.getCollection());
 
     // Query can be answered by either index on "a" or index on "b".
     const auto noResultsCq =
@@ -358,21 +365,25 @@ TEST_F(QueryStageCachedPlan, DeactivatesEntriesOnReplan) {
     // We shouldn't have anything in the plan cache for this shape yet.
     PlanCache* cache = CollectionQueryInfo::get(collection.getCollection()).getPlanCache();
     ASSERT(cache);
-    ASSERT_EQ(cache->get(*shapeCq).state, PlanCache::CacheEntryState::kNotPresent);
+    ASSERT_EQ(cache->get(planCacheKey).state, PlanCache::CacheEntryState::kNotPresent);
 
     // Run the CachedPlanStage with a long-running child plan. Replanning should be
     // triggered and an inactive entry will be added.
     forceReplanning(collection.getCollection(), noResultsCq.get());
 
     // Check for an inactive cache entry.
-    ASSERT_EQ(cache->get(*shapeCq).state, PlanCache::CacheEntryState::kPresentInactive);
+    ASSERT_EQ(cache->get(planCacheKey).state, PlanCache::CacheEntryState::kPresentInactive);
 
     // Run the plan again, to create an active entry.
     forceReplanning(collection.getCollection(), noResultsCq.get());
 
     // The works should be 1 for the entry since the query we ran should not have any results.
-    ASSERT_EQ(cache->get(*noResultsCq.get()).state, PlanCache::CacheEntryState::kPresentActive);
-    auto entry = assertGet(cache->getEntry(*shapeCq));
+    ASSERT_EQ(cache
+                  ->get(plan_cache_key_factory::make<PlanCacheKey>(*noResultsCq,
+                                                                   collection.getCollection()))
+                  .state,
+              PlanCache::CacheEntryState::kPresentActive);
+    auto entry = assertGet(cache->getEntry(planCacheKey));
     size_t works = 1U;
     ASSERT_EQ(entry->works, works);
 
@@ -384,16 +395,16 @@ TEST_F(QueryStageCachedPlan, DeactivatesEntriesOnReplan) {
     auto highWorksCq =
         canonicalQueryFromFilterObj(opCtx(), nss, fromjson("{a: {$gte: 0}, b: {$gte:0}}"));
     forceReplanning(collection.getCollection(), highWorksCq.get());
-    ASSERT_EQ(cache->get(*shapeCq).state, PlanCache::CacheEntryState::kPresentInactive);
-    ASSERT_EQ(assertGet(cache->getEntry(*shapeCq))->works, 2U);
+    ASSERT_EQ(cache->get(planCacheKey).state, PlanCache::CacheEntryState::kPresentInactive);
+    ASSERT_EQ(assertGet(cache->getEntry(planCacheKey))->works, 2U);
 
     // Again, force replanning. This time run the initial query which finds no results. The multi
     // planner will choose a plan with works value lower than the existing inactive
     // entry. Replanning will thus deactivate the existing entry (it's already
     // inactive so this is a noop), then create a new entry with a works value of 1.
     forceReplanning(collection.getCollection(), noResultsCq.get());
-    ASSERT_EQ(cache->get(*shapeCq).state, PlanCache::CacheEntryState::kPresentActive);
-    ASSERT_EQ(assertGet(cache->getEntry(*shapeCq))->works, 1U);
+    ASSERT_EQ(cache->get(planCacheKey).state, PlanCache::CacheEntryState::kPresentActive);
+    ASSERT_EQ(assertGet(cache->getEntry(planCacheKey))->works, 1U);
 }
 
 TEST_F(QueryStageCachedPlan, EntriesAreNotDeactivatedWhenInactiveEntriesDisabled) {
@@ -408,33 +419,37 @@ TEST_F(QueryStageCachedPlan, EntriesAreNotDeactivatedWhenInactiveEntriesDisabled
     // CanonicalQueries created in this test will have this shape.
     const auto shapeCq =
         canonicalQueryFromFilterObj(opCtx(), nss, fromjson("{a: {$gte: 123}, b: {$gte: 123}}"));
+    auto planCacheKey =
+        plan_cache_key_factory::make<PlanCacheKey>(*shapeCq, collection.getCollection());
 
     // Query can be answered by either index on "a" or index on "b".
     const auto noResultsCq =
         canonicalQueryFromFilterObj(opCtx(), nss, fromjson("{a: {$gte: 11}, b: {$gte: 11}}"));
+    auto noResultKey =
+        plan_cache_key_factory::make<PlanCacheKey>(*noResultsCq, collection.getCollection());
 
     // We shouldn't have anything in the plan cache for this shape yet.
     PlanCache* cache = CollectionQueryInfo::get(collection.getCollection()).getPlanCache();
     ASSERT(cache);
-    ASSERT_EQ(cache->get(*shapeCq).state, PlanCache::CacheEntryState::kNotPresent);
+    ASSERT_EQ(cache->get(planCacheKey).state, PlanCache::CacheEntryState::kNotPresent);
 
     // Run the CachedPlanStage with a long-running child plan. Replanning should be
     // triggered and an _active_ entry will be added (since the disableInactiveEntries flag is on).
     forceReplanning(collection.getCollection(), noResultsCq.get());
 
     // Check for an inactive cache entry.
-    ASSERT_EQ(cache->get(*shapeCq).state, PlanCache::CacheEntryState::kPresentActive);
+    ASSERT_EQ(cache->get(planCacheKey).state, PlanCache::CacheEntryState::kPresentActive);
 
     // Run the plan again. The entry should still be active.
     forceReplanning(collection.getCollection(), noResultsCq.get());
-    ASSERT_EQ(cache->get(*noResultsCq.get()).state, PlanCache::CacheEntryState::kPresentActive);
+    ASSERT_EQ(cache->get(noResultKey).state, PlanCache::CacheEntryState::kPresentActive);
 
     // Run another query which takes long enough to evict the active cache entry. After replanning
     // is triggered, be sure that the the cache entry is still active.
     auto highWorksCq =
         canonicalQueryFromFilterObj(opCtx(), nss, fromjson("{a: {$gte: 0}, b: {$gte:0}}"));
     forceReplanning(collection.getCollection(), highWorksCq.get());
-    ASSERT_EQ(cache->get(*shapeCq).state, PlanCache::CacheEntryState::kPresentActive);
+    ASSERT_EQ(cache->get(planCacheKey).state, PlanCache::CacheEntryState::kPresentActive);
 }
 
 TEST_F(QueryStageCachedPlan, ThrowsOnYieldRecoveryWhenIndexIsDroppedBeforePlanSelection) {

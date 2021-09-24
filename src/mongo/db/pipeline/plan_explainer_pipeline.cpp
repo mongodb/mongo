@@ -114,7 +114,7 @@ std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerPipeline::getRejectedP
 }
 
 std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerPipeline::getCachedPlanStats(
-    const PlanCacheEntry::DebugInfo&, ExplainOptions::Verbosity) const {
+    const plan_cache_debug_info::DebugInfo&, ExplainOptions::Verbosity) const {
     // Pipelines are not cached, so we should never try to rebuild the stats from a cached entry.
     MONGO_UNREACHABLE;
 }

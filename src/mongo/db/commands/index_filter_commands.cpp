@@ -50,6 +50,7 @@
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/collection_query_info.h"
+#include "mongo/db/query/plan_cache_key_factory.h"
 #include "mongo/db/query/query_settings_decoration.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/unordered_set.h"
@@ -66,7 +67,6 @@ using namespace mongo;
  */
 static Status getQuerySettingsAndPlanCache(OperationContext* opCtx,
                                            const CollectionPtr& collection,
-                                           const string& ns,
                                            QuerySettings** querySettingsOut,
                                            PlanCache** planCacheOut) {
     *querySettingsOut = nullptr;
@@ -163,7 +163,7 @@ Status ListFilters::runIndexFilterCommand(OperationContext* opCtx,
     QuerySettings* querySettings;
     PlanCache* unused;
     Status status =
-        getQuerySettingsAndPlanCache(opCtx, ctx.getCollection(), ns, &querySettings, &unused);
+        getQuerySettingsAndPlanCache(opCtx, ctx.getCollection(), &querySettings, &unused);
     if (!status.isOK()) {
         // No collection - return empty array of filters.
         BSONArrayBuilder hintsBuilder(bob->subarrayStart("filters"));
@@ -231,19 +231,19 @@ Status ClearFilters::runIndexFilterCommand(OperationContext* opCtx,
     QuerySettings* querySettings;
     PlanCache* planCache;
     Status status =
-        getQuerySettingsAndPlanCache(opCtx, ctx.getCollection(), ns, &querySettings, &planCache);
+        getQuerySettingsAndPlanCache(opCtx, ctx.getCollection(), &querySettings, &planCache);
     if (!status.isOK()) {
         // No collection - do nothing.
         return Status::OK();
     }
-    return clear(opCtx, querySettings, planCache, ns, cmdObj);
+    return clear(opCtx, ctx.getCollection(), querySettings, planCache, cmdObj);
 }
 
 // static
 Status ClearFilters::clear(OperationContext* opCtx,
+                           const CollectionPtr& collection,
                            QuerySettings* querySettings,
                            PlanCache* planCache,
-                           const std::string& ns,
                            const BSONObj& cmdObj) {
     invariant(querySettings);
 
@@ -252,7 +252,7 @@ Status ClearFilters::clear(OperationContext* opCtx,
     // - clear hints for single query shape when a query shape is described in the
     //   command arguments.
     if (cmdObj.hasField("query")) {
-        auto statusWithCQ = plan_cache_commands::canonicalize(opCtx, ns, cmdObj);
+        auto statusWithCQ = plan_cache_commands::canonicalize(opCtx, collection->ns().ns(), cmdObj);
         if (!statusWithCQ.isOK()) {
             return statusWithCQ.getStatus();
         }
@@ -261,7 +261,7 @@ Status ClearFilters::clear(OperationContext* opCtx,
         querySettings->removeAllowedIndices(cq->encodeKey());
 
         // Remove entry from plan cache
-        planCache->remove(*cq).transitional_ignore();
+        planCache->remove(plan_cache_key_factory::make<PlanCacheKey>(*cq, collection));
 
         LOGV2(20479,
               "Removed index filter on {query}",
@@ -286,7 +286,7 @@ Status ClearFilters::clear(OperationContext* opCtx,
     // OK to proceed with clearing entire cache.
     querySettings->clearAllowedIndices();
 
-    const NamespaceString nss(ns);
+    const NamespaceString nss(collection->ns());
     const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
 
     // Remove corresponding entries from plan cache.
@@ -320,13 +320,13 @@ Status ClearFilters::clear(OperationContext* opCtx,
         std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
         // Remove plan cache entry.
-        planCache->remove(*cq).transitional_ignore();
+        planCache->remove(plan_cache_key_factory::make<PlanCacheKey>(*cq, collection));
     }
 
     LOGV2(20480,
           "Removed all index filters for collection: {namespace}",
           "Removed all index filters for collection",
-          "namespace"_attr = ns);
+          "namespace"_attr = collection->ns().ns());
 
     return Status::OK();
 }
@@ -346,18 +346,18 @@ Status SetFilter::runIndexFilterCommand(OperationContext* opCtx,
     QuerySettings* querySettings;
     PlanCache* planCache;
     Status status =
-        getQuerySettingsAndPlanCache(opCtx, ctx.getCollection(), ns, &querySettings, &planCache);
+        getQuerySettingsAndPlanCache(opCtx, ctx.getCollection(), &querySettings, &planCache);
     if (!status.isOK()) {
         return status;
     }
-    return set(opCtx, querySettings, planCache, ns, cmdObj);
+    return set(opCtx, ctx.getCollection(), querySettings, planCache, cmdObj);
 }
 
 // static
 Status SetFilter::set(OperationContext* opCtx,
+                      const CollectionPtr& collection,
                       QuerySettings* querySettings,
                       PlanCache* planCache,
-                      const string& ns,
                       const BSONObj& cmdObj) {
     // indexes - required
     BSONElement indexesElt = cmdObj.getField("indexes");
@@ -391,7 +391,7 @@ Status SetFilter::set(OperationContext* opCtx,
         }
     }
 
-    auto statusWithCQ = plan_cache_commands::canonicalize(opCtx, ns, cmdObj);
+    auto statusWithCQ = plan_cache_commands::canonicalize(opCtx, collection->ns().ns(), cmdObj);
     if (!statusWithCQ.isOK()) {
         return statusWithCQ.getStatus();
     }
@@ -401,7 +401,7 @@ Status SetFilter::set(OperationContext* opCtx,
     querySettings->setAllowedIndices(*cq, indexes, indexNames);
 
     // Remove entry from plan cache.
-    planCache->remove(*cq).transitional_ignore();
+    planCache->remove(plan_cache_key_factory::make<PlanCacheKey>(*cq, collection));
 
     LOGV2(20481,
           "Index filter set on {query} {indexes}",

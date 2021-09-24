@@ -202,18 +202,19 @@ public:
 
     /**
      * Remove the kv-store entry keyed by 'key'.
+     * Returns false if there doesn't exist such 'key', otherwise returns true.
      */
-    Status remove(const K& key) {
+    bool remove(const K& key) {
         KVMapConstIt i = _kvMap.find(key);
         if (i == _kvMap.end()) {
-            return Status(ErrorCodes::NoSuchKey, "no such key in LRU key-value store");
+            return false;
         }
         KVListIt found = i->second;
         _budgetTracker.onRemove(*i->second->second);
         delete found->second;
         _kvMap.erase(i);
         _kvList.erase(found);
-        return Status::OK();
+        return true;
     }
 
     /**

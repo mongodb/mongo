@@ -49,6 +49,7 @@
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/mock_yield_policies.h"
+#include "mongo/db/query/plan_cache_key_factory.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/query/plan_summary_stats.h"
@@ -298,6 +299,7 @@ TEST_F(QueryStageMultiPlanTest, MPSDoesNotCreateActiveCacheEntryImmediately) {
     const CollectionPtr& coll = ctx.getCollection();
 
     const auto cq = makeCanonicalQuery(_opCtx.get(), nss, BSON("foo" << 7));
+    auto key = plan_cache_key_factory::make<PlanCacheKey>(*cq, coll);
 
     // Run an index scan and collection scan, searching for {foo: 7}.
     auto mps = runMultiPlanner(_expCtx.get(), nss, coll, 7);
@@ -305,7 +307,7 @@ TEST_F(QueryStageMultiPlanTest, MPSDoesNotCreateActiveCacheEntryImmediately) {
     // Be sure that an inactive cache entry was added.
     PlanCache* cache = CollectionQueryInfo::get(coll).getPlanCache();
     ASSERT_EQ(cache->size(), 1U);
-    auto entry = assertGet(cache->getEntry(*cq));
+    auto entry = assertGet(cache->getEntry(key));
     ASSERT_FALSE(entry->isActive);
     const size_t firstQueryWorks = getBestPlanWorks(mps.get());
     ASSERT_EQ(firstQueryWorks, entry->works);
@@ -317,7 +319,7 @@ TEST_F(QueryStageMultiPlanTest, MPSDoesNotCreateActiveCacheEntryImmediately) {
     // The last plan run should have required far more works than the previous plan. This means
     // that the 'works' in the cache entry should have doubled.
     ASSERT_EQ(cache->size(), 1U);
-    entry = assertGet(cache->getEntry(*cq));
+    entry = assertGet(cache->getEntry(key));
     ASSERT_FALSE(entry->isActive);
     ASSERT_EQ(firstQueryWorks * 2, entry->works);
 
@@ -325,14 +327,14 @@ TEST_F(QueryStageMultiPlanTest, MPSDoesNotCreateActiveCacheEntryImmediately) {
     // should cause the cache entry's 'works' to be doubled again.
     mps = runMultiPlanner(_expCtx.get(), nss, coll, 5);
     ASSERT_EQ(cache->size(), 1U);
-    entry = assertGet(cache->getEntry(*cq));
+    entry = assertGet(cache->getEntry(key));
     ASSERT_FALSE(entry->isActive);
     ASSERT_EQ(firstQueryWorks * 2 * 2, entry->works);
 
     // Run the query yet again. This time, an active cache entry should be created.
     mps = runMultiPlanner(_expCtx.get(), nss, coll, 5);
     ASSERT_EQ(cache->size(), 1U);
-    entry = assertGet(cache->getEntry(*cq));
+    entry = assertGet(cache->getEntry(key));
     ASSERT_TRUE(entry->isActive);
     ASSERT_EQ(getBestPlanWorks(mps.get()), entry->works);
 }
@@ -353,18 +355,19 @@ TEST_F(QueryStageMultiPlanTest, MPSDoesCreatesActiveEntryWhenInactiveEntriesDisa
     const CollectionPtr& coll = ctx.getCollection();
 
     const auto cq = makeCanonicalQuery(_opCtx.get(), nss, BSON("foo" << 7));
+    auto key = plan_cache_key_factory::make<PlanCacheKey>(*cq, coll);
 
     // Run an index scan and collection scan, searching for {foo: 7}.
     auto mps = runMultiPlanner(_expCtx.get(), nss, coll, 7);
 
     // Be sure that an _active_ cache entry was added.
     PlanCache* cache = CollectionQueryInfo::get(coll).getPlanCache();
-    ASSERT_EQ(cache->get(*cq).state, PlanCache::CacheEntryState::kPresentActive);
+    ASSERT_EQ(cache->get(key).state, PlanCache::CacheEntryState::kPresentActive);
 
     // Run the multi-planner again. The entry should still be active.
     mps = runMultiPlanner(_expCtx.get(), nss, coll, 5);
 
-    ASSERT_EQ(cache->get(*cq).state, PlanCache::CacheEntryState::kPresentActive);
+    ASSERT_EQ(cache->get(key).state, PlanCache::CacheEntryState::kPresentActive);
 }
 
 // Case in which we select a blocking plan as the winner, and a non-blocking plan
@@ -387,6 +390,7 @@ TEST_F(QueryStageMultiPlanTest, MPSBackupPlan) {
     verify(statusWithCQ.isOK());
     unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
     ASSERT(nullptr != cq.get());
+    auto key = plan_cache_key_factory::make<PlanCacheKey>(*cq, collection.getCollection());
 
     // Force index intersection.
     bool forceIxisectOldValue = internalQueryForceIntersectionPlans.load();

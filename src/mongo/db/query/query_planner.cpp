@@ -46,6 +46,7 @@
 #include "mongo/db/matcher/expression_text.h"
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/classic_plan_cache.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/plan_cache.h"
@@ -58,6 +59,36 @@
 #include "mongo/logv2/log.h"
 
 namespace mongo {
+namespace log_detail {
+void logSubplannerIndexEntry(const IndexEntry& entry, size_t childIndex) {
+    LOGV2_DEBUG(20598,
+                5,
+                "Subplanner: index number and entry",
+                "indexNumber"_attr = childIndex,
+                "indexEntry"_attr = entry);
+}
+
+void logCachedPlanFound(size_t numChildren, size_t childIndex) {
+    LOGV2_DEBUG(20599,
+                5,
+                "Subplanner: cached plan found",
+                "childIndex"_attr = childIndex,
+                "numChildren"_attr = numChildren);
+}
+
+void logCachedPlanNotFound(size_t numChildren, size_t childIndex) {
+    LOGV2_DEBUG(20600,
+                5,
+                "Subplanner: planning child",
+                "childIndex"_attr = childIndex,
+                "numChildren"_attr = numChildren);
+}
+
+void logNumberOfSolutions(size_t numSolutions) {
+    LOGV2_DEBUG(20601, 5, "Subplanner: number of solutions", "numSolutions"_attr = numSolutions);
+}
+}  // namespace log_detail
+
 namespace {
 /**
  * On success, applies the index tags from 'branchCacheData' (which represent the winning
@@ -479,7 +510,7 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::planFromCache(
     invariant(cachedSoln.cachedPlan);
 
     // A query not suitable for caching should not have made its way into the cache.
-    invariant(PlanCache::shouldCacheQuery(query));
+    invariant(shouldCacheQuery(query));
 
     // Look up winning solution in cached solution's array.
     const auto& winnerCacheData = *cachedSoln.cachedPlan;
@@ -1141,95 +1172,6 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::planForMul
 
     invariant(out.size() > 0);
     return {std::move(out)};
-}
-
-StatusWith<QueryPlanner::SubqueriesPlanningResult> QueryPlanner::planSubqueries(
-    OperationContext* opCtx,
-    const CollectionPtr& collection,
-    const PlanCache* planCache,
-    const CanonicalQuery& query,
-    const QueryPlannerParams& params) {
-    invariant(query.root()->matchType() == MatchExpression::OR);
-    invariant(query.root()->numChildren(), "Cannot plan subqueries for an $or with no children");
-
-    SubqueriesPlanningResult planningResult{query.root()->shallowClone()};
-    for (size_t i = 0; i < params.indices.size(); ++i) {
-        const IndexEntry& ie = params.indices[i];
-        const auto insertionRes = planningResult.indexMap.insert(std::make_pair(ie.identifier, i));
-        // Be sure the key was not already in the map.
-        invariant(insertionRes.second);
-        LOGV2_DEBUG(20598,
-                    5,
-                    "Subplanner: index number and entry",
-                    "indexNumber"_attr = i,
-                    "indexEntry"_attr = ie);
-    }
-
-    for (size_t i = 0; i < planningResult.orExpression->numChildren(); ++i) {
-        // We need a place to shove the results from planning this branch.
-        planningResult.branches.push_back(
-            std::make_unique<SubqueriesPlanningResult::BranchPlanningResult>());
-        auto branchResult = planningResult.branches.back().get();
-        auto orChild = planningResult.orExpression->getChild(i);
-
-        // Turn the i-th child into its own query.
-        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx, query, orChild);
-        if (!statusWithCQ.isOK()) {
-            str::stream ss;
-            ss << "Can't canonicalize subchild " << orChild->debugString() << " "
-               << statusWithCQ.getStatus().reason();
-            return Status(ErrorCodes::BadValue, ss);
-        }
-
-        branchResult->canonicalQuery = std::move(statusWithCQ.getValue());
-
-        // Plan the i-th child. We might be able to find a plan for the i-th child in the plan
-        // cache. If there's no cached plan, then we generate and rank plans using the MPS.
-
-        // Populate branchResult->cachedSolution if an active cachedSolution entry exists.
-        if (planCache && planCache->shouldCacheQuery(*branchResult->canonicalQuery)) {
-            auto planCacheKey = planCache->computeKey(*branchResult->canonicalQuery);
-            if (auto cachedSol = planCache->getCacheEntryIfActive(planCacheKey)) {
-                // We have a CachedSolution. Store it for later.
-                LOGV2_DEBUG(20599,
-                            5,
-                            "Subplanner: cached plan found",
-                            "childIndex"_attr = i,
-                            "numChildren"_attr = planningResult.orExpression->numChildren());
-
-                branchResult->cachedSolution = std::move(cachedSol);
-            }
-        }
-
-        if (!branchResult->cachedSolution) {
-            // No CachedSolution found. We'll have to plan from scratch.
-            LOGV2_DEBUG(20600,
-                        5,
-                        "Subplanner: planning child",
-                        "childIndex"_attr = i,
-                        "numChildren"_attr = planningResult.orExpression->numChildren());
-
-            // We don't set NO_TABLE_SCAN because peeking at the cache data will keep us from
-            // considering any plan that's a collscan.
-            invariant(branchResult->solutions.empty());
-            auto statusWithMultiPlanSolns =
-                QueryPlanner::planForMultiPlanner(*branchResult->canonicalQuery, params);
-            if (!statusWithMultiPlanSolns.isOK()) {
-                str::stream ss;
-                ss << "Can't plan for subchild " << branchResult->canonicalQuery->toString() << " "
-                   << statusWithMultiPlanSolns.getStatus().reason();
-                return Status(ErrorCodes::BadValue, ss);
-            }
-            branchResult->solutions = std::move(statusWithMultiPlanSolns.getValue());
-
-            LOGV2_DEBUG(20601,
-                        5,
-                        "Subplanner: number of solutions",
-                        "numSolutions"_attr = branchResult->solutions.size());
-        }
-    }
-
-    return std::move(planningResult);
 }
 
 StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::choosePlanForSubqueries(

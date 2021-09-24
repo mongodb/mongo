@@ -70,6 +70,7 @@
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/query/plan_cache_key_factory.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/planner_access.h"
 #include "mongo/db/query/planner_analysis.h"
@@ -563,16 +564,14 @@ public:
         }
 
         // Fill in some opDebug information.
-        const auto planCacheKey =
-            CollectionQueryInfo::get(_collection).getPlanCache()->computeKey(*_cq);
-        CurOp::get(_opCtx)->debug().queryHash =
-            canonical_query_encoder::computeHash(planCacheKey.getStableKeyStringData());
+        const PlanCacheKey planCacheKey =
+            plan_cache_key_factory::make<PlanCacheKey>(*_cq, _collection);
+        CurOp::get(_opCtx)->debug().queryHash = planCacheKey.queryHash();
 
         // Check that the query should be cached.
-        if (CollectionQueryInfo::get(_collection).getPlanCache()->shouldCacheQuery(*_cq)) {
+        if (shouldCacheQuery(*_cq)) {
             // Fill in the 'planCacheKey' too if the query is actually being cached.
-            CurOp::get(_opCtx)->debug().planCacheKey =
-                canonical_query_encoder::computeHash(planCacheKey.toString());
+            CurOp::get(_opCtx)->debug().planCacheKey = planCacheKey.planCacheKeyHash();
 
             // Try to look up a cached solution for the query.
             if (auto cs = CollectionQueryInfo::get(_collection)
