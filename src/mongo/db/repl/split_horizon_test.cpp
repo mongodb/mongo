@@ -443,6 +443,12 @@ TEST(SplitHorizonTesting, BSONRoundTrip) {
     const Input tests[] = {
         {{{"horizon1", "horizon1.example.com:42"}}},
         {{{"horizon1", "horizon1.example.com:42"}, {"horizon2", "horizon2.example.com:42"}}},
+        {{{"horizon1", "horizon1.example.com:42"}, {"horizon2", "horizon2.example.com:42"}}},
+        {{{"q_horizon", "horizonq.example.com:42"},
+          {"b_horizon1", "horizonb.example.com:42"},
+          {"z_horizon1", "horizonz.example.com:42"},
+          {"horizon1", "horizon1.example.com:42"},
+          {"horizon2", "horizon2.example.com:42"}}},
     };
     for (const auto& input : tests) {
         const auto testNumber = &input - tests;
@@ -457,10 +463,19 @@ TEST(SplitHorizonTesting, BSONRoundTrip) {
 
         const SplitHorizon witness(HostAndPort(defaultHostAndPort), bson["horizons"].Obj());
 
+        const BSONObj witnessBson = [&] {
+            BSONObjBuilder outputBuilder;
+            witness.toBSON(outputBuilder);
+            return outputBuilder.obj();
+        }();
+
         ASSERT_TRUE(horizon.getForwardMappings() == witness.getForwardMappings())
             << "Test #" << testNumber << " Failed on bson round trip with forward map";
         ASSERT_TRUE(horizon.getReverseHostMappings() == witness.getReverseHostMappings())
             << "Test #" << testNumber << " Failed on bson round trip with reverse map";
+        ASSERT_EQ(0, bson.woCompare(witnessBson))
+            << "Test #" << testNumber << " Failed on bson round trip with toBSON. BSONObj " << bson
+            << " != " << witnessBson;
     }
 }
 }  // namespace

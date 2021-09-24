@@ -109,6 +109,32 @@ TEST(ReplSetWriteConcernModeDefinitions, HasCustomModes) {
            tagPatternMap["wc2"].constraintsEnd());
 }
 
+TEST(ReplSetWriteConcernModeDefinitions, RoundTripBson) {
+    const StringData fieldName("modes"_sd);
+    auto writeConcernModes = BSON(
+        fieldName << BSON("wc2" << BSON("tag1" << 1 << "tag2" << 2) << "wc4" << BSON("tag3" << 3)
+                                << "wc3" << BSON("tag5" << 5 << "tag4" << 4) << "wc1"
+                                << BSON("tag6" << 6 << "tag8" << 8 << "tag7" << 7)));
+    auto definitions =
+        ReplSetWriteConcernModeDefinitions::parseFromBSON(writeConcernModes.firstElement());
+    BSONObjBuilder bob;
+    definitions.serializeToBSON(fieldName, &bob);
+    auto roundTrip = bob.obj();
+    UnorderedFieldsBSONObjComparator comparator;
+    ASSERT_EQ(0, comparator.compare(roundTrip, writeConcernModes))
+        << "Expected " << writeConcernModes << " == " << roundTrip;
+
+    // We do not require that the fields be in the order given by arbitrary input BSON.  We do
+    // require that two objects with equivalent inputs produce identical outputs.  This ensures
+    // a consistent serialization of config objects.
+    auto definitions2 = ReplSetWriteConcernModeDefinitions::parseFromBSON(roundTrip.firstElement());
+    BSONObjBuilder bob2;
+    definitions2.serializeToBSON(fieldName, &bob2);
+    auto roundTrip2 = bob2.obj();
+    ASSERT_EQ(0, roundTrip.woCompare(roundTrip2))
+        << "Expected " << roundTrip << " == (ordered) " << roundTrip2;
+}
+
 TEST(ReplSetWriteConcernModeDefinitions, TagMissingFromTagConfig) {
     const StringData fieldName("modes"_sd);
     auto writeConcernModes = BSON(

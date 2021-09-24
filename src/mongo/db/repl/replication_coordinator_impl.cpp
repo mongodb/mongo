@@ -3586,6 +3586,15 @@ Status ReplicationCoordinatorImpl::_doReplSetReconfig(OperationContext* opCtx,
     // we bypass the check for finding ourselves in the config, since we know it should already be
     // satisfied.
     if (!sameConfigContents(oldConfig, newConfig)) {
+        if (skipSafetyChecks) {
+            LOGV2_ERROR(5986700,
+                        "Configuration changed substantially in a config change that should have "
+                        "only changed term",
+                        "oldConfig"_attr = oldConfig,
+                        "newConfig"_attr = newConfig);
+            // Always debug assert if we reach this point.
+            dassert(!skipSafetyChecks);
+        }
         StatusWith<int> myIndexSw = force
             ? findSelfInConfig(_externalState.get(), newConfig, opCtx->getServiceContext())
             : findSelfInConfigIfElectable(
