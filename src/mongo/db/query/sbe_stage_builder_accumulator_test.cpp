@@ -1115,13 +1115,12 @@ TEST_F(SbeStageBuilderGroupTest, SbeGroupCompatibleFlag) {
         // R"(_id: null, agg: {$push: "$item"})",
         // R"(_id: null, agg: {$stdDevPop: "$item"})",
         // R"(_id: null, agg: {$stdDevSamp: "$item"})",
-        // R"(_id: null, agg: {$sum: "$item"})",
+        R"(_id: null, agg: {$sum: "$item"})",
         // R"(_id: {a: "$a", b: "$b"})",
         // All supported case.
         // R"(_id: null, agg1: {$sum: "$item"}, agg2: {$max: "$item"}, agg3: {$avg: "$quantity"})",
         // Mix of supported/unsupported accumulators.
-        // R"(_id: null, agg1: {$sum: "$item"}, agg2: {$incompatible: "$item"}, agg3: {$avg:
-        // "$a"})",
+        R"(_id: null, agg1: {$sum: "$item"}, agg2: {$incompatible: "$item"}, agg3: {$avg: "$a"})",
         // R"(_id: null, agg1: {$incompatible: "$item"}, agg2: {$min: "$item"}, agg3: {$avg:
         // "$quantity"})",
         // No accumulator case

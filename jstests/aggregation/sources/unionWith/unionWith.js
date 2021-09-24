@@ -133,6 +133,20 @@ FixtureHelpers.runCommandOnEachPrimary({
         "internalDocumentSourceGroupMaxMemoryBytes": 1,
     }
 });
+
+const groupPushdownEnabled =
+    assert.commandWorked(db.adminCommand({getParameter: 1, featureFlagSBEGroupPushdown: 1}))
+        .featureFlagSBEGroupPushdown.value;
+if (groupPushdownEnabled) {
+    FixtureHelpers.runCommandOnEachPrimary({
+        db: testDB.getSiblingDB("admin"),
+        cmdObj: {
+            setParameter: 1,
+            "internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill": 1,
+        }
+    });
+}
+
 resSet =
     [{_id: 0, sum: 0}, {_id: 1, sum: 3}, {_id: 2, sum: 6}, {_id: 3, sum: 9}, {_id: 4, sum: 12}];
 checkResults(testDB.runCommand({
@@ -194,7 +208,7 @@ assert.commandFailedWithCode(testDB.runCommand({
             $unionWith: {
                 coll: collB.getName(),
                 pipeline: [
-                    {"$group": {_id: "$groupKey", val: {$sum: "$val"}}},
+                    {"$group": {_id: "$groupKey", val: {$min: "$val"}}},
                     {"$addFields": {groupKey: 1}}
                 ]
             }
@@ -213,6 +227,16 @@ FixtureHelpers.runCommandOnEachPrimary({
         "internalDocumentSourceGroupMaxMemoryBytes": 100 * 1024 * 1024,
     }
 });
+
+if (groupPushdownEnabled) {
+    FixtureHelpers.runCommandOnEachPrimary({
+        db: testDB.getSiblingDB("admin"),
+        cmdObj: {
+            setParameter: 1,
+            "internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill": 1024 * 1024,
+        }
+    });
+}
 
 // Test with $limit and sort in a sub-pipeline.
 const setBResult = collB.find().sort({b: 1}).limit(2).toArray();
