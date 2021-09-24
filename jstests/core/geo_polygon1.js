@@ -2,25 +2,30 @@
 // Tests for N-dimensional polygon querying
 //
 
-t = db.geo_polygon1;
+(function() {
+'use strict';
+
+const collNamePrefix = 'geo_polygon1_';
+let collCount = 0;
+let t = db.getCollection(collNamePrefix + collCount++);
 t.drop();
 
-num = 0;
-for (x = 1; x < 9; x++) {
-    for (y = 1; y < 9; y++) {
-        o = {_id: num++, loc: [x, y]};
+let num = 0;
+for (let x = 1; x < 9; x++) {
+    for (let y = 1; y < 9; y++) {
+        const o = {_id: num++, loc: [x, y]};
         t.save(o);
     }
 }
 
 t.createIndex({loc: "2d"});
 
-triangle = [[0, 0], [1, 1], [0, 2]];
+const triangle = [[0, 0], [1, 1], [0, 2]];
 
 // Look at only a small slice of the data within a triangle
 assert.eq(1, t.find({loc: {"$within": {"$polygon": triangle}}}).count(), "Triangle Test");
 
-boxBounds = [[0, 0], [0, 10], [10, 10], [10, 0]];
+let boxBounds = [[0, 0], [0, 10], [10, 10], [10, 0]];
 
 assert.eq(num, t.find({loc: {"$within": {"$polygon": boxBounds}}}).count(), "Bounding Box Test");
 
@@ -35,9 +40,10 @@ boxBounds = [[-100, -100], [-100, 100], [100, 100], [100, -100]];
 assert.eq(
     num, t.find({loc: {"$within": {"$polygon": boxBounds}}}).count(), "Big Bounding Box Test");
 
+t = db.getCollection(collNamePrefix + collCount++);
 t.drop();
 
-pacman = [
+const pacman = [
     [0, 2],
     [0, 4],
     [2, 6],
@@ -61,7 +67,7 @@ t.save({loc: [3, -1]});  // Add a point below the center of the bottom
 assert.eq(1, t.find({loc: {$within: {$polygon: pacman}}}).count(), "Pacman double point");
 
 // Make sure we can't add bad polygons
-okay = true;
+let okay = true;
 try {
     t.find({loc: {$within: {$polygon: [1, 2]}}}).toArray();
     okay = false;
@@ -80,3 +86,4 @@ try {
 } catch (e) {
 }
 assert(okay);
+})();
