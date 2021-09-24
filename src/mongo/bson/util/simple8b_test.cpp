@@ -1130,3 +1130,62 @@ TEST(Simple8b, EightSelectorLargeMax) {
     std::vector<uint8_t> expectedBinary = {0x98, 0xFF, 0xF9, 0xCF, 0x7F, 0xFE, 0xF3, 0x1f};
     testSimple8b(expectedInts, expectedBinary);
 }
+
+TEST(Simple8b, ValueTooLarge) {
+    // This value needs 61 bits which it too large for Simple8b
+    uint64_t value = 0x1FFFFFFFFFFFFFFF;
+    Simple8bBuilder<uint64_t> builder([](uint64_t) {
+        ASSERT(false);
+        return true;
+    });
+    ASSERT_FALSE(builder.append(value));
+}
+
+TEST(Simple8b, ValueTooManyTrailingFor8SmallTooManyMeaningfulFor8Large) {
+    // This value has 52 meaningful bits and 61 trailing zeros. This is too many trailing zeros for
+    // Selector 8 Small and too many meaningful bits for Selector 8 Large.
+    uint128_t value = absl::MakeUint128(0x1FFFFF0FFFFFF, 0xE000000000000000);
+    Simple8bBuilder<uint128_t> builder([](uint64_t) {
+        ASSERT(false);
+        return true;
+    });
+    ASSERT_FALSE(builder.append(value));
+}
+
+TEST(Simple8b, ValueTooLargeMax8SmallAddForSkipPattern) {
+    // This value has 52 meaningful bits and 60 trailing zeros. But one extra 0 needs to be added to
+    // the meaningful bits to differentiate from the missing value pattern to be able to store in
+    // Extended 8 Small which brings it to 53 bits which is too many. Extended 8 Large can't be used
+    // either as it can only store 51 meaningful bits.
+    uint128_t value = absl::MakeUint128(0xFFFFFFFFFFFF, 0xF000000000000000);
+    Simple8bBuilder<uint128_t> builder([](uint64_t) {
+        ASSERT(false);
+        return true;
+    });
+    ASSERT_FALSE(builder.append(value));
+}
+
+TEST(Simple8b, ValueTooLargeTrailingZerosNotDivisibleBy4) {
+    // This value has 52 meaningful bits and 59 trailing zeros. But 3 of the trailing bits need to
+    // be stored in the data bits as it's not divisible by 4. This brings the data bits to 55 which
+    // it too large.
+    uint128_t value = absl::MakeUint128(0x7FFFFFFFFFFF, 0xF800000000000000);
+    Simple8bBuilder<uint128_t> builder([](uint64_t) {
+        ASSERT(false);
+        return true;
+    });
+    ASSERT_FALSE(builder.append(value));
+}
+
+TEST(Simple8b, ValueTooLargeBitCountUsedForExtendedSelectors) {
+    // This value has 63 meaningful bits and does not fit in Simple8b. When evaluating the extended
+    // selectors it will almost fit as it can pack the 9 trailing zero in the count but the amount
+    // of bits required will still be too large. Make sure append takes into the account the number
+    // of bits used for the count when checking if the value can be stored.
+    uint64_t value = 0x646075fffc000200;
+    Simple8bBuilder<uint64_t> builder([](uint64_t) {
+        ASSERT(false);
+        return true;
+    });
+    ASSERT_FALSE(builder.append(value));
+}

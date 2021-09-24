@@ -103,8 +103,9 @@ constexpr std::array<uint8_t, 4> kMaxSelector = {14, 9, 7, 13};
 // The min selector value for each extension
 constexpr std::array<uint8_t, 4> kMinSelector = {1, 1, 1, 8};
 
-// The max amount of meaningful bits each selector can store
-constexpr std::array<uint8_t, 4> kMaxDataBits = {60, 56, 56, 56};
+// The max amount of data bits each selector type can store. This is the amount of bits in the 64bit
+// word that are not used for selector values.
+constexpr std::array<uint8_t, 4> kDataBits = {60, 56, 56, 56};
 
 // The amount of bits allocated to store a set of trailing zeros
 constexpr std::array<uint8_t, 4> kTrailingZeroBitSize = {0, 4, 4, 5};
@@ -486,15 +487,15 @@ bool Simple8bBuilder<T>::_appendValue(T value, bool tryRle) {
                                         trailingZerosStoredInCountEightLarge};
 
     // Check if the amount of bits needed is more than we can store using all selector combinations.
-    // Check in order of most feasible to least feasible with or for efficiency. Add 3 to
-    // eightSelectors as they are using a nibble shift which can encode 3 more zeros in the actual
-    // value.
-    if ((bitCountWithoutLeadingZeros > kMaxDataBits[kBaseSelector]) &&
-        (meaningfulValueBitsStoredWithSeven > kMaxDataBits[kSevenSelector]) &&
-        (meaningfulValueBitsStoredWithEightSmall > kMaxDataBits[kEightSelectorSmall]) &&
-        (meaningfulValueBitsStoredWithEightLarge > kMaxDataBits[kEightSelectorLarge]))
+    if ((bitCountWithoutLeadingZeros > kDataBits[kBaseSelector]) &&
+        (meaningfulValueBitsStoredWithSeven + kTrailingZeroBitSize[kSevenSelector] >
+         kDataBits[kSevenSelector]) &&
+        (meaningfulValueBitsStoredWithEightSmall + kTrailingZeroBitSize[kEightSelectorSmall] >
+         kDataBits[kEightSelectorSmall]) &&
+        (meaningfulValueBitsStoredWithEightLarge + kTrailingZeroBitSize[kEightSelectorLarge] >
+         kDataBits[kEightSelectorLarge])) {
         return false;
-
+    }
 
     PendingValue pendingValue(value,
                               {bitCountWithoutLeadingZeros,
@@ -635,7 +636,7 @@ bool Simple8bBuilder<T>::_doesIntegerFitInCurrentWordWithGivenSelectorType(
     // If the numBitswithValue is greater than max bits or we cannot fit the trailingZeros we update
     // this selector as false and return false. Special case for baseSelector where we never add
     // trailingZeros so we always pass the zeros comparison.
-    if (kMaxDataBits[extensionType] < numBitsWithValue) {
+    if (kDataBits[extensionType] < numBitsWithValue) {
         isSelectorPossible[extensionType] = false;
         return false;
     }
