@@ -88,12 +88,8 @@ const kNs = kDbName + "." + kCollName;
         txnRetryCounter: NumberInt(0)
     };
     assert.commandFailedWithCode(mongosTestDB.runCommand(insertCmdObj), ErrorCodes.InvalidOptions);
-    // TODO (SERVER-59343): Investigate AuthorizationSession error in internal session tests in
-    // auth suites.
-    if (!TestData.auth) {
-        assert.commandFailedWithCode(shard0TestDB.runCommand(insertCmdObj),
-                                     ErrorCodes.InvalidOptions);
-    }
+
+    assert.commandFailedWithCode(shard0TestDB.runCommand(insertCmdObj), ErrorCodes.InvalidOptions);
 
     st.stop();
 })();

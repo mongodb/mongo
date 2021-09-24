@@ -947,6 +947,12 @@ void AuthorizationSessionImpl::verifyContract(const AuthorizationContract* contr
     tempContract.addAccessCheck(AccessCheckEnum::kGetImpersonatedUserNames);
     tempContract.addAccessCheck(AccessCheckEnum::kGetImpersonatedRoleNames);
 
+    // Since internal sessions are started by the server, the generated authorization contract is
+    // missing the following user access checks, so we add them here to allow commands that spawn
+    // internal sessions to pass this authorization check.
+    tempContract.addAccessCheck(AccessCheckEnum::kGetSingleUser);
+    tempContract.addAccessCheck(AccessCheckEnum::kLookupUser);
+
     // "internal" comes from readRequestMetadata and sharded clusters
     // "advanceClusterTime" is an implicit check in clusters in metadata handling
     tempContract.addPrivilege(Privilege(ResourcePattern::forClusterResource(),
