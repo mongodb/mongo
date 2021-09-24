@@ -375,9 +375,6 @@ restart:
                 empty_internal = false;
             }
 
-            /* Encourage races. */
-            __wt_timing_stress(session, WT_TIMING_STRESS_SPLIT_8);
-
             /* Optionally return internal pages. */
             if (LF_ISSET(WT_READ_SKIP_INTL))
                 continue;
