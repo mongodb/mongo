@@ -38,9 +38,14 @@ namespace repl {
 void ReplSetWriteConcernModeDefinitions::serializeToBSON(StringData fieldName,
                                                          BSONObjBuilder* bob) const {
     BSONObjBuilder mapBuilder(bob->subobjStart(fieldName));
+    std::vector<std::pair<StringData, const Definition*>> sortedDefinitions;
     for (const auto& definitionItems : _definitions) {
+        sortedDefinitions.emplace_back(definitionItems.first, &definitionItems.second);
+    }
+    std::sort(sortedDefinitions.begin(), sortedDefinitions.end());
+    for (const auto& definitionItems : sortedDefinitions) {
         BSONObjBuilder defBuilder(mapBuilder.subobjStart(definitionItems.first));
-        for (const auto& constraint : definitionItems.second) {
+        for (const auto& constraint : *definitionItems.second) {
             defBuilder.append(constraint.first, constraint.second);
         }
         defBuilder.done();
