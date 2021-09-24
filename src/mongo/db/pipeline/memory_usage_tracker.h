@@ -158,6 +158,10 @@ public:
         return _maxMemoryUsageBytes;
     }
 
+    bool withinMemoryLimit() const {
+        return _memoryUsageBytes <= static_cast<long long>(_maxAllowedMemoryUsageBytes);
+    }
+
     const bool _allowDiskUse;
     const size_t _maxAllowedMemoryUsageBytes;
 

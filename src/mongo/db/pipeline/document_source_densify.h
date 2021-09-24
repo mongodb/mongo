@@ -36,6 +36,7 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/pipeline/memory_usage_tracker.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/visit_helper.h"
@@ -143,9 +144,12 @@ public:
           _field(std::move(field)),
           _partitions(std::move(partitions)),
           _range(std::move(range)),
-          _partitionTable(pExpCtx->getValueComparator().makeUnorderedValueMap<Value>()) {
+          _partitionTable(pExpCtx->getValueComparator().makeUnorderedValueMap<Value>()),
+          _memTracker(
+              MemoryUsageTracker(false, internalDocumentSourceDensifyMaxMemoryBytes.load())) {
         _maxDocs = internalQueryMaxAllowedDensifyDocs.load();
     };
+
     class DocGenerator {
     public:
         DocGenerator(DensifyValueType current,
@@ -346,7 +350,24 @@ private:
      */
     void setPartitionValue(Document doc) {
         if (_partitionExpr) {
-            _partitionTable[getDensifyPartition(doc)] = getDensifyValue(doc);
+            auto partitionKey = getDensifyPartition(doc);
+            auto partitionVal = getDensifyValue(doc);
+            auto lastValForPartitionIt = _partitionTable.find(partitionKey);
+            if (lastValForPartitionIt == _partitionTable.end()) {
+                // If this is a new partition, store the size of the key and the value.
+                _memTracker.update(partitionKey.getApproximateSize() +
+                                   partitionVal.getApproximateSize());
+            } else {
+                // Subtract the size of the previous value and add the new one.
+                _memTracker.update(partitionVal.getApproximateSize() -
+                                   lastValForPartitionIt->second.getApproximateSize());
+            }
+            uassert(6007200,
+                    str::stream() << "$densify exceeded memory limit of "
+                                  << _memTracker._maxAllowedMemoryUsageBytes,
+                    _memTracker.withinMemoryLimit());
+
+            _partitionTable[partitionKey] = partitionVal;
         }
     }
 
@@ -403,5 +424,6 @@ private:
     // Keep track of documents generated, error if it goes above the limit.
     size_t _docsGenerated = 0;
     size_t _maxDocs = 0;
+    MemoryUsageTracker _memTracker;
 };
 }  // namespace mongo
