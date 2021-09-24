@@ -2,7 +2,6 @@
  * Tests that hashed indexes are prohibited on measurement fields.
  *
  * @tags: [
- *     assumes_no_implicit_collection_creation_after_drop,
  *     does_not_support_stepdowns,
  *     does_not_support_transactions,
  *     requires_fcv_51,

@@ -2,7 +2,6 @@
  * Tests creating and using ascending and descending indexes on time-series measurement fields.
  *
  * @tags: [
- *     assumes_no_implicit_collection_creation_after_drop,
  *     does_not_support_stepdowns,
  *     does_not_support_transactions,
  *     requires_fcv_50,
@@ -36,6 +35,7 @@ TimeseriesTest.run((insert) => {
 
     const setup = function(keyForCreate) {
         const coll = db.getCollection(collName);
+        const bucketsColl = db.getCollection("system.buckets." + collName);
         coll.drop();
 
         jsTestLog("Setting up collection: " + coll.getFullName() +
@@ -44,6 +44,9 @@ TimeseriesTest.run((insert) => {
         assert.commandWorked(db.createCollection(
             coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
 
+        const numUserIndexesBefore = coll.getIndexes().length;
+        const numBucketIndexesBefore = bucketsColl.getIndexes().length;
+
         // Insert data on the time-series collection and index it.
         assert.commandWorked(insert(coll, firstDoc), "failed to insert doc: " + tojson(firstDoc));
         assert.commandWorked(insert(coll, secondDoc), "failed to insert doc: " + tojson(secondDoc));
@@ -51,6 +54,9 @@ TimeseriesTest.run((insert) => {
         assert.commandWorked(insert(coll, fourthDoc), "failed to insert doc: " + tojson(fourthDoc));
         assert.commandWorked(coll.createIndex(keyForCreate),
                              "failed to create index: " + tojson(keyForCreate));
+
+        assert.eq(numUserIndexesBefore + 1, coll.getIndexes().length);
+        assert.eq(numBucketIndexesBefore + 1, bucketsColl.getIndexes().length);
     };
 
     const testHint = function(indexName) {
@@ -76,51 +82,43 @@ TimeseriesTest.run((insert) => {
     // Test a simple ascending index.
     setup({x: 1});
     let userIndexes = coll.getIndexes();
-    assert.eq(1, userIndexes.length);
-    assert.eq({x: 1}, userIndexes[0].key);
+    assert.eq({x: 1}, userIndexes[userIndexes.length - 1].key);
 
     let bucketIndexes = bucketsColl.getIndexes();
-    assert.eq(1, bucketIndexes.length);
-    assert.eq({"control.min.x": 1, "control.max.x": 1}, bucketIndexes[0].key);
-
-    testHint(bucketIndexes[0].name);
+    assert.eq({"control.min.x": 1, "control.max.x": 1},
+              bucketIndexes[bucketIndexes.length - 1].key);
+    testHint(bucketIndexes[bucketIndexes.length - 1].name);
 
     // Drop index by key pattern.
     assert.commandWorked(coll.dropIndex({x: 1}));
     bucketIndexes = bucketsColl.getIndexes();
-    assert.eq(0, bucketIndexes.length);
 
     // Test a simple descending index.
     setup({x: -1});
     userIndexes = coll.getIndexes();
-    assert.eq(1, userIndexes.length);
-    assert.eq({x: -1}, userIndexes[0].key);
+    assert.eq({x: -1}, userIndexes[userIndexes.length - 1].key);
 
     bucketIndexes = bucketsColl.getIndexes();
-    assert.eq(1, bucketIndexes.length);
-    assert.eq({"control.max.x": -1, "control.min.x": -1}, bucketIndexes[0].key);
-
-    testHint(bucketIndexes[0].name);
+    assert.eq({"control.max.x": -1, "control.min.x": -1},
+              bucketIndexes[bucketIndexes.length - 1].key);
+    testHint(bucketIndexes[bucketIndexes.length - 1].name);
 
     // Drop index by name.
     assert.commandWorked(coll.dropIndex(bucketIndexes[0].name));
     bucketIndexes = bucketsColl.getIndexes();
-    assert.eq(0, bucketIndexes.length);
 
     // Test an index on dotted and sub document fields.
     setup({"x.y": 1});
     userIndexes = coll.getIndexes();
-    assert.eq(1, userIndexes.length);
-    assert.eq({"x.y": 1}, userIndexes[0].key);
+    assert.eq({"x.y": 1}, userIndexes[userIndexes.length - 1].key);
 
     bucketIndexes = bucketsColl.getIndexes();
-    assert.eq(1, bucketIndexes.length);
-    assert.eq({"control.min.x.y": 1, "control.max.x.y": 1}, bucketIndexes[0].key);
-    testHint(bucketIndexes[0].name);
+    assert.eq({"control.min.x.y": 1, "control.max.x.y": 1},
+              bucketIndexes[bucketIndexes.length - 1].key);
+    testHint(bucketIndexes[bucketIndexes.length - 1].name);
 
     assert.commandWorked(coll.dropIndex(bucketIndexes[0].name));
     bucketIndexes = bucketsColl.getIndexes();
-    assert.eq(0, bucketIndexes.length);
 
     // Test bad input.
     assert.commandFailedWithCode(coll.createIndex({x: "abc"}), ErrorCodes.CannotCreateIndex);

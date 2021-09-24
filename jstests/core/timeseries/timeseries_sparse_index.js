@@ -2,7 +2,6 @@
  * Tests that sparse indexes are not allowed on a time-series measurement field.
  *
  * @tags: [
- *     assumes_no_implicit_collection_creation_after_drop,
  *     does_not_support_stepdowns,
  *     does_not_support_transactions,
  *     requires_fcv_51,
@@ -41,6 +40,7 @@ TimeseriesTest.run((insert) => {
 
     const setup = function(keyForCreate, shouldSucceed) {
         const coll = db.getCollection(collName);
+        const bucketsColl = db.getCollection("system.buckets." + collName);
         coll.drop();
 
         const options = {sparse: true};
@@ -50,6 +50,9 @@ TimeseriesTest.run((insert) => {
         assert.commandWorked(db.createCollection(
             coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
 
+        const numUserIndexesBefore = coll.getIndexes().length;
+        const numBucketIndexesBefore = bucketsColl.getIndexes().length;
+
         // Insert data on the time-series collection and index it.
         assert.commandWorked(insert(coll, docs), "failed to insert docs: " + tojson(docs));
 
@@ -58,6 +61,9 @@ TimeseriesTest.run((insert) => {
             assert.commandWorked(res,
                                  "failed to create index: " + tojson(keyForCreate) +
                                      " with options: " + tojson(options));
+
+            assert.eq(numUserIndexesBefore + 1, coll.getIndexes().length);
+            assert.eq(numBucketIndexesBefore + 1, bucketsColl.getIndexes().length);
         } else {
             assert.commandFailedWithCode(res, ErrorCodes.InvalidOptions);
         }
@@ -88,20 +94,16 @@ TimeseriesTest.run((insert) => {
 
         // Check definition on view
         let userIndexes = coll.getIndexes();
-        assert.eq(1, userIndexes.length);
-        assert.eq(viewDefinition, userIndexes[0].key);
+        assert.eq(viewDefinition, userIndexes[userIndexes.length - 1].key);
 
         // Check definition on buckets collection
         let bucketIndexes = bucketsColl.getIndexes();
-        assert.eq(1, bucketIndexes.length);
-        assert.eq(bucketsDefinition, bucketIndexes[0].key);
+        assert.eq(bucketsDefinition, bucketIndexes[bucketIndexes.length - 1].key);
 
-        testHint(bucketIndexes[0].name, numDocsExpected);
+        testHint(bucketIndexes[bucketIndexes.length - 1].name, numDocsExpected);
 
         // Drop index by key pattern.
         assert.commandWorked(coll.dropIndex(viewDefinition));
-        bucketIndexes = bucketsColl.getIndexes();
-        assert.eq(0, bucketIndexes.length);
     };
 
     // Test metadata-only sparse indexes.
