@@ -15,6 +15,8 @@
 (function() {
 "use strict";
 
+const testDB = db.getSiblingDB("view_with_invalid_dbname");
+
 // Create a view whose dbname has an invalid embedded NULL character. That's not possible with
 // the 'create' command, but it is possible by manually inserting into the 'system.views'
 // collection.
@@ -26,11 +28,12 @@ const viewDef = {
     pipeline: []
 };
 
-db.system.views.drop();
-assert.commandWorked(db.createCollection("system.views"));
-assert.commandWorked(db.adminCommand({applyOps: [{op: "i", ns: "test.system.views", o: viewDef}]}));
+testDB.system.views.drop();
+assert.commandWorked(testDB.createCollection("system.views"));
+assert.commandWorked(testDB.adminCommand(
+    {applyOps: [{op: "i", ns: testDB.getName() + ".system.views", o: viewDef}]}));
 
 // Don't let the bogus view stick around, or else it will cause an error in validation.
-assert.commandWorked(
-    db.adminCommand({applyOps: [{op: "d", ns: "test.system.views", o: {_id: viewName}}]}));
+assert.commandWorked(testDB.adminCommand(
+    {applyOps: [{op: "d", ns: testDB.getName() + ".system.views", o: {_id: viewName}}]}));
 }());

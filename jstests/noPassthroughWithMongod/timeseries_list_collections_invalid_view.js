@@ -44,5 +44,13 @@ assert.eq(collections.length, 2);
 assert(collections.find(entry => entry.name === 'system.views'));
 assert(collections.find(entry => entry.name === 'system.buckets.' + coll.getName()));
 
+// Users are prohibited from dropping system.views when there are time-series collections present.
+// However, this restriction isn't in place on earlier versions and its possible for users to
+// upgrade to this version with a dropped system.views collection while having time-series
+// collections present. This allows us to continue to test the behaviour of this scenario.
+assert.commandWorked(
+    testDB.adminCommand({configureFailPoint: "allowSystemViewsDrop", mode: "alwaysOn"}));
 assert(testDB.system.views.drop());
+assert.commandWorked(
+    testDB.adminCommand({configureFailPoint: "allowSystemViewsDrop", mode: "off"}));
 })();
