@@ -549,11 +549,16 @@ private:
 }  // namespace
 
 DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
-    const size_t numAccumulators = _accumulatedFields.size();
-
-    // Barring any pausing, this loop exhausts 'pSource' and populates '_groups'.
     GetNextResult input = pSource->getNext();
+    return initializeSelf(input);
+}
 
+// This separate NOINLINE function is used here to decrease stack utilization of initialize() and
+// prevent stack overflows.
+MONGO_COMPILER_NOINLINE DocumentSource::GetNextResult DocumentSourceGroup::initializeSelf(
+    GetNextResult input) {
+    const size_t numAccumulators = _accumulatedFields.size();
+    // Barring any pausing, this loop exhausts 'pSource' and populates '_groups'.
     for (; input.isAdvanced(); input = pSource->getNext()) {
         if (shouldSpillWithAttemptToSaveMemory()) {
             _sortedFiles.push_back(spill());

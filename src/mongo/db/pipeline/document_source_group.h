@@ -223,6 +223,12 @@ private:
     GetNextResult initialize();
 
     /**
+     * Initializes this $group after any children are potentially initialized see initialize() for
+     * more details.
+     */
+    GetNextResult initializeSelf(GetNextResult input);
+
+    /**
      * Spill groups map to disk and returns an iterator to the file. Note: Since a sorted $group
      * does not exhaust the previous stage before returning, and thus does not maintain as large a
      * store of documents at any one time, only an unsorted group can spill to disk.
