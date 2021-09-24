@@ -64,23 +64,26 @@ class DynamicJSTestCase(interface.DynamicTestCase):
         """Initialize DynamicJSTestCase."""
         interface.DynamicTestCase.__init__(self, logger, test_name, description, base_test_name,
                                            hook)
-        self._js_test = jstest.JSTestCase(logger, js_filename, shell_options=shell_options)
+        self._js_test_builder = jstest.JSTestCaseBuilder(logger, js_filename, self.id,
+                                                         shell_options=shell_options)
+        self._js_test_case = None
 
     def override_logger(self, new_logger):
         """Override logger."""
         interface.DynamicTestCase.override_logger(self, new_logger)
-        self._js_test.override_logger(new_logger)
+        self._js_test_case.override_logger(new_logger)
 
     def reset_logger(self):
         """Reset the logger."""
         interface.DynamicTestCase.reset_logger(self)
-        self._js_test.reset_logger()
+        self._js_test_case.reset_logger()
 
     def configure(self, fixture, *args, **kwargs):  # pylint: disable=unused-argument
         """Configure the fixture."""
-        interface.DynamicTestCase.configure(self, fixture, *args, **kwargs)
-        self._js_test.configure(fixture, *args, **kwargs)
+        super().configure(fixture, *args, **kwargs)
+        self._js_test_builder.configure(fixture, *args, **kwargs)
+        self._js_test_case = self._js_test_builder.create_test_case_for_thread(self.logger)
 
     def run_test(self):
         """Execute the test."""
-        self._js_test.run_test()
+        self._js_test_case.run_test()

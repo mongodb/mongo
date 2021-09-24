@@ -1,4 +1,5 @@
 """The unittest.TestCase for JavaScript tests."""
+import unittest
 
 import copy
 import os
@@ -113,10 +114,62 @@ class _SingleJSTestCase(interface.ProcessTestCase):
             connection_string=self.fixture.get_driver_connection_url(), **self.shell_options)
 
 
-class JSTestCase(interface.ProcessTestCase):
+class JSTestCaseBuilder:
+    """Build the real TestCase in the JSTestCase wrapper."""
+
+    def __init__(self, logger, js_filename, test_id, shell_executable=None, shell_options=None):
+        """Initialize the JSTestCase with the JS file to run."""
+        self.test_case_template = _SingleJSTestCase(logger, js_filename, test_id, shell_executable,
+                                                    shell_options)
+
+    def configure(self, fixture, *args, **kwargs):
+        """Configure the jstest."""
+        self.test_case_template.configure(fixture, *args, **kwargs)
+        self.test_case_template.configure_shell()
+
+    def _make_process(self):
+        # This function should only be called by interface.py's as_command().
+        return self.test_case_template._make_process()  # pylint: disable=protected-access
+
+    def _get_shell_options_for_thread(self, num_clients, thread_id):
+        """Get shell_options with an initialized TestData object for given thread."""
+
+        # We give each _SingleJSTestCase its own copy of the shell_options.
+        shell_options = self.test_case_template.shell_options.copy()
+        global_vars = shell_options["global_vars"].copy()
+        test_data = global_vars["TestData"].copy()
+
+        # We set a property on TestData to mark the main test when multiple clients are going to run
+        # concurrently in case there is logic within the test that must execute only once. We also
+        # set a property on TestData to indicate how many clients are going to run the test so they
+        # can avoid executing certain logic when there may be other operations running concurrently.
+        is_main_test = thread_id == 0
+        test_data["isMainTest"] = is_main_test
+        test_data["numTestClients"] = num_clients
+
+        global_vars["TestData"] = test_data
+        shell_options["global_vars"] = global_vars
+
+        return shell_options
+
+    def create_test_case_for_thread(self, logger, num_clients=1, thread_id=0):
+        """Create and configure a _SingleJSTestCase to be run in a separate thread."""
+
+        shell_options = self._get_shell_options_for_thread(num_clients, thread_id)
+        test_case = _SingleJSTestCase(logger, self.test_case_template.js_filename,
+                                      self.test_case_template.id,
+                                      self.test_case_template.shell_executable, shell_options)
+
+        test_case.configure(self.test_case_template.fixture)
+        return test_case
+
+
+class JSTestCase(interface.TestCase, interface.UndoDBUtilsMixin):
     """A wrapper for several copies of a SingleJSTest to execute."""
 
     REGISTERED_NAME = "js_test"
+    TEST_KIND = "JSTest"
+    DEFAULT_CLIENT_NUM = 1
 
     class ThreadWithException(threading.Thread):
         """A wrapper for the thread class that lets us propagate exceptions."""
@@ -133,61 +186,26 @@ class JSTestCase(interface.ProcessTestCase):
             except:  # pylint: disable=bare-except
                 self.exc_info = sys.exc_info()
 
-    DEFAULT_CLIENT_NUM = 1
-
     def __init__(self, logger, js_filename, shell_executable=None, shell_options=None):
-        """Initialize the JSTestCase with the JS file to run."""
-
-        interface.ProcessTestCase.__init__(self, logger, "JSTest", js_filename)
+        """Initialize the TestCase for running JS files."""
+        super().__init__(logger, self.TEST_KIND, js_filename)
         self.num_clients = JSTestCase.DEFAULT_CLIENT_NUM
-        self.test_case_template = _SingleJSTestCase(logger, js_filename, self._id, shell_executable,
-                                                    shell_options)
+        self._builder = JSTestCaseBuilder(logger, js_filename, self.id, shell_executable,
+                                          shell_options)
 
     def configure(  # pylint: disable=arguments-differ,keyword-arg-before-vararg
             self, fixture, num_clients=DEFAULT_CLIENT_NUM, *args, **kwargs):
         """Configure the jstest."""
-        interface.ProcessTestCase.configure(self, fixture, *args, **kwargs)
+        super().configure(fixture, *args, **kwargs)
         self.num_clients = num_clients
-        self.test_case_template.configure(fixture, *args, **kwargs)
-        self.test_case_template.configure_shell()
+        self._builder.configure(fixture, *args, **kwargs)
 
     def _make_process(self):
         # This function should only be called by interface.py's as_command().
-        return self.test_case_template._make_process()  # pylint: disable=protected-access
-
-    def _get_shell_options_for_thread(self, thread_id):
-        """Get shell_options with an initialized TestData object for given thread."""
-
-        # We give each _SingleJSTestCase its own copy of the shell_options.
-        shell_options = self.test_case_template.shell_options.copy()
-        global_vars = shell_options["global_vars"].copy()
-        test_data = global_vars["TestData"].copy()
-
-        # We set a property on TestData to mark the main test when multiple clients are going to run
-        # concurrently in case there is logic within the test that must execute only once. We also
-        # set a property on TestData to indicate how many clients are going to run the test so they
-        # can avoid executing certain logic when there may be other operations running concurrently.
-        is_main_test = thread_id == 0
-        test_data["isMainTest"] = is_main_test
-        test_data["numTestClients"] = self.num_clients
-
-        global_vars["TestData"] = test_data
-        shell_options["global_vars"] = global_vars
-
-        return shell_options
-
-    def _create_test_case_for_thread(self, logger, thread_id):
-        """Create and configure a _SingleJSTestCase to be run in a separate thread."""
-
-        shell_options = self._get_shell_options_for_thread(thread_id)
-        test_case = _SingleJSTestCase(logger, self.test_case_template.js_filename, self._id,
-                                      self.test_case_template.shell_executable, shell_options)
-
-        test_case.configure(self.fixture)
-        return test_case
+        return self._builder._make_process()  # pylint: disable=protected-access
 
     def _run_single_copy(self):
-        test_case = self._create_test_case_for_thread(self.logger, thread_id=0)
+        test_case = self._builder.create_test_case_for_thread(self.logger)
         try:
             test_case.run_test()
             # If there was an exception, it will be logged in test_case's run_test function.
@@ -203,7 +221,8 @@ class JSTestCase(interface.ProcessTestCase):
             for thread_id in range(self.num_clients):
                 logger = logging.loggers.new_test_thread_logger(self.logger, self.test_kind,
                                                                 str(thread_id))
-                test_case = self._create_test_case_for_thread(logger, thread_id)
+                test_case = self._builder.create_test_case_for_thread(
+                    logger, num_clients=self.num_clients, thread_id=thread_id)
                 test_cases.append(test_case)
 
                 thread = self.ThreadWithException(target=test_case.run_test)

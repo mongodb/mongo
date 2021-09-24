@@ -120,7 +120,7 @@ class BackgroundInitialSyncTestCase(jsfile.DynamicJSTestCase):
         self._hook.random_restarts = 0
 
         # Run data validation and dbhash checking.
-        self._js_test.run_test()
+        self._js_test_case.run_test()
 
         self.__restart_init_sync(sync_node)
 
@@ -211,4 +211,4 @@ class IntermediateInitialSyncTestCase(jsfile.DynamicJSTestCase):
         sync_node_conn.admin.command(cmd)
 
         # Run data validation and dbhash checking.
-        self._js_test.run_test()
+        self._js_test_case.run_test()
