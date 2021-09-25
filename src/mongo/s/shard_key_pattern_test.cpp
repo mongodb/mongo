@@ -54,6 +54,36 @@ protected:
     OperationContext* const _opCtx{_opCtxHolder.get()};
 };
 
+/**
+ * Creates OplogEntry with given field values.
+ */
+repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
+                                repl::OpTypeEnum opType,
+                                NamespaceString nss,
+                                BSONObj oField,
+                                boost::optional<BSONObj> o2Field = boost::none) {
+    return {
+        repl::DurableOplogEntry(opTime,                           // optime
+                                boost::none,                      // hash
+                                opType,                           // opType
+                                nss,                              // namespace
+                                boost::none,                      // uuid
+                                boost::none,                      // fromMigrate
+                                repl::OplogEntry::kOplogVersion,  // version
+                                oField,                           // o
+                                o2Field,                          // o2
+                                {},                               // sessionInfo
+                                boost::none,                      // upsert
+                                Date_t(),                         // wall clock time
+                                {},                               // statement ids
+                                boost::none,    // optime of previous write within same transaction
+                                boost::none,    // pre-image optime
+                                boost::none,    // post-image optime
+                                boost::none,    // ShardId of resharding recipient
+                                boost::none,    // _id
+                                boost::none)};  // needsRetryImage
+}
+
 TEST_F(ShardKeyPatternTest, SingleFieldShardKeyPatternsValidityCheck) {
     ShardKeyPattern s1(BSON("a" << 1));
     ShardKeyPattern s2(BSON("a" << 1.0f));
@@ -135,6 +165,10 @@ TEST_F(ShardKeyPatternTest, NormalizeShardKey) {
 
 static BSONObj docKey(const ShardKeyPattern& pattern, const BSONObj& doc) {
     return pattern.extractShardKeyFromDoc(doc);
+}
+
+static BSONObj docKeyFromOplog(const ShardKeyPattern& pattern, const repl::OplogEntry& entry) {
+    return pattern.extractShardKeyFromOplogEntry(entry);
 }
 
 TEST_F(ShardKeyPatternTest, ExtractDocShardKeySingle) {
@@ -226,6 +260,76 @@ TEST_F(ShardKeyPatternTest, ExtractDocShardKeyNested) {
     ASSERT_BSONOBJ_EQ(docKey(pattern, fromjson("{a:[{b:10}, {b:20}], c:30}")), BSONObj());
 
     ASSERT_BSONOBJ_EQ(docKey(pattern, fromjson("{a:{b:[10, 20]}, c:30}")), BSONObj());
+}
+
+TEST_F(ShardKeyPatternTest, ExtractShardKeyFromOplogUnnested) {
+    //
+    // Unnested ShardKeyPatterns from oplog entries with CRUD operation
+    //
+
+    ShardKeyPattern pattern(BSON("a" << 1));
+    auto deleteOplog = makeOplogEntry(repl::OpTime(Timestamp(50, 10), 1),  // optime
+                                      repl::OpTypeEnum::kDelete,           // op type
+                                      NamespaceString("a"),                // namespace
+                                      BSON("_id" << 1 << "a" << 5));       // o
+    auto insertOplog = makeOplogEntry(repl::OpTime(Timestamp(60, 10), 1),  // optime
+                                      repl::OpTypeEnum::kInsert,           // op type
+                                      NamespaceString("a"),                // namespace
+                                      BSON("_id" << 2 << "a" << 6));       // o
+    auto updateOplog = makeOplogEntry(repl::OpTime(Timestamp(70, 10), 1),  // optime
+                                      repl::OpTypeEnum::kUpdate,           // op type
+                                      NamespaceString("a"),                // namespace
+                                      BSON("_id" << 3),                    // o
+                                      BSON("_id" << 3 << "a" << 7));       // o2
+
+    ASSERT_BSONOBJ_EQ(docKeyFromOplog(pattern, deleteOplog), fromjson("{a: 5}"));
+    ASSERT_BSONOBJ_EQ(docKeyFromOplog(pattern, insertOplog), fromjson("{a: 6}"));
+    ASSERT_BSONOBJ_EQ(docKeyFromOplog(pattern, updateOplog), fromjson("{a: 7}"));
+}
+
+TEST_F(ShardKeyPatternTest, ExtractShardKeyFromOplogNested) {
+    //
+    // Nested ShardKeyPatterns from oplog entries with CRUD operation
+    //
+
+    ShardKeyPattern pattern(BSON("a.b" << 1));
+    auto deleteOplog = makeOplogEntry(repl::OpTime(Timestamp(50, 10), 1),          // optime
+                                      repl::OpTypeEnum::kDelete,                   // op type
+                                      NamespaceString("a.b"),                      // namespace
+                                      BSON("_id" << 1 << "a.b" << 5));             // o
+    auto insertOplog = makeOplogEntry(repl::OpTime(Timestamp(60, 10), 1),          // optime
+                                      repl::OpTypeEnum::kInsert,                   // op type
+                                      NamespaceString("a.b"),                      // namespace
+                                      BSON("_id" << 2 << "a" << BSON("b" << 6)));  // o
+    auto updateOplog = makeOplogEntry(repl::OpTime(Timestamp(70, 10), 1),          // optime
+                                      repl::OpTypeEnum::kUpdate,                   // op type
+                                      NamespaceString("a.b"),                      // namespace
+                                      BSON("_id" << 3),                            // o
+                                      BSON("_id" << 3 << "a.b" << 7));             // o2
+
+    ASSERT_BSONOBJ_EQ(docKeyFromOplog(pattern, deleteOplog), fromjson("{'a.b': 5}"));
+    ASSERT_BSONOBJ_EQ(docKeyFromOplog(pattern, insertOplog), fromjson("{'a.b': 6}"));
+    ASSERT_BSONOBJ_EQ(docKeyFromOplog(pattern, updateOplog), fromjson("{'a.b': 7}"));
+}
+
+TEST_F(ShardKeyPatternTest, ExtractShardKeyFromOplogNonCRUD) {
+    //
+    // Oplogs with non-CRUD op types
+    //
+
+    ShardKeyPattern pattern(BSON("a.b" << 1));
+    auto noopOplog = makeOplogEntry(repl::OpTime(Timestamp(50, 10), 1),     // optime
+                                    repl::OpTypeEnum::kNoop,                // op type
+                                    NamespaceString("a.b"),                 // namespace
+                                    BSON("_id" << 1 << "a.b" << 5));        // o
+    auto commandOplog = makeOplogEntry(repl::OpTime(Timestamp(60, 10), 1),  // optime
+                                       repl::OpTypeEnum::kCommand,          // op type
+                                       NamespaceString("a.b"),              // namespace
+                                       BSON("create"
+                                            << "c"));  // o
+
+    ASSERT_BSONOBJ_EQ(docKeyFromOplog(pattern, noopOplog), BSONObj());
+    ASSERT_BSONOBJ_EQ(docKeyFromOplog(pattern, commandOplog), BSONObj());
 }
 
 TEST_F(ShardKeyPatternTest, ExtractDocShardKeyDeepNested) {
