@@ -118,6 +118,8 @@ last-continuous:
       test_file: jstests/sharding/coordinate_txn_commit_with_tickets_exhausted.js
     - ticket: SERVER-60685
       test_file: jstests/sharding/cancel_coordinate_txn_commit_with_tickets_exhausted.js
+    - ticket: SERVER-56127
+      test_file: jstests/sharding/retryable_writes_nested_shard_key.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -396,6 +398,8 @@ last-lts:
       test_file: jstests/sharding/coordinate_txn_commit_with_tickets_exhausted.js
     - ticket: SERVER-60685
       test_file: jstests/sharding/cancel_coordinate_txn_commit_with_tickets_exhausted.js
+    - ticket: SERVER-56127
+      test_file: jstests/sharding/retryable_writes_nested_shard_key.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:

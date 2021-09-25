@@ -335,8 +335,7 @@ bool SessionCatalogMigrationSource::_handleWriteHistory(WithLock, OperationConte
             }
 
             if (nextOplog->isCrudOpType()) {
-                auto shardKey =
-                    _keyPattern.extractShardKeyFromDoc(nextOplog->getObjectContainingDocumentKey());
+                auto shardKey = _keyPattern.extractShardKeyFromOplogEntry(*nextOplog);
                 if (!_chunkRange.containsKey(shardKey)) {
                     continue;
                 }

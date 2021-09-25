@@ -386,6 +386,11 @@ public:
     bool isCrudOpType() const;
 
     /**
+     * Returns true if the oplog entry is for an Update or Delete operation.
+     */
+    bool isUpdateOrDelete() const;
+
+    /**
      * Returns true if the oplog entry is for a command related to indexes.
      * i.e createIndexes, dropIndexes, startIndexBuild, commitIndexBuild, abortIndexBuild.
      */
@@ -554,6 +559,7 @@ public:
     bool isSingleOplogEntryTransaction() const;
     bool isSingleOplogEntryTransactionWithCommand() const;
     bool isCrudOpType() const;
+    bool isUpdateOrDelete() const;
     bool isIndexCommandType() const;
     bool shouldPrepare() const;
     BSONElement getIdElement() const;
