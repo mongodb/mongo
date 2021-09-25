@@ -104,6 +104,8 @@ last-continuous:
       test_file: jstests/sharding/test_resharding_test_fixture_shutdown_retry_needed.js
     - ticket: SERVER-60567
       test_file: jstests/core/sbe/sbe_cmd.js
+    - ticket: SERVER-56127
+      test_file: jstests/sharding/retryable_writes_nested_shard_key.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -368,6 +370,8 @@ last-lts:
       test_file: jstests/sharding/test_resharding_test_fixture_shutdown_retry_needed.js
     - ticket: SERVER-60567
       test_file: jstests/core/sbe/sbe_cmd.js
+    - ticket: SERVER-56127
+      test_file: jstests/sharding/retryable_writes_nested_shard_key.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:

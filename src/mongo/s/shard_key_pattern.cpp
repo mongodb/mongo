@@ -429,6 +429,20 @@ BSONObj ShardKeyPattern::extractShardKeyFromDocThrows(const BSONObj& doc) const 
     return shardKey;
 }
 
+BSONObj ShardKeyPattern::extractShardKeyFromOplogEntry(const repl::OplogEntry& entry) const {
+    if (!entry.isCrudOpType()) {
+        return BSONObj();
+    }
+
+    auto objWithDocumentKey = entry.getObjectContainingDocumentKey();
+
+    if (!entry.isUpdateOrDelete()) {
+        return extractShardKeyFromDoc(objWithDocumentKey);
+    }
+
+    return extractShardKeyFromDocumentKey(objWithDocumentKey);
+}
+
 BSONObj ShardKeyPattern::emplaceMissingShardKeyValuesForDocument(const BSONObj doc) const {
     BSONObjBuilder fullDocBuilder(doc);
     for (const auto& skField : _keyPattern.toBSON()) {

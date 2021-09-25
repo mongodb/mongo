@@ -369,6 +369,20 @@ bool DurableOplogEntry::isCrudOpType() const {
     return isCrudOpType(getOpType());
 }
 
+bool DurableOplogEntry::isUpdateOrDelete() const {
+    auto opType = getOpType();
+    switch (opType) {
+        case OpTypeEnum::kDelete:
+        case OpTypeEnum::kUpdate:
+            return true;
+        case OpTypeEnum::kInsert:
+        case OpTypeEnum::kCommand:
+        case OpTypeEnum::kNoop:
+            return false;
+    }
+    MONGO_UNREACHABLE;
+}
+
 bool DurableOplogEntry::shouldPrepare() const {
     return getCommandType() == CommandType::kApplyOps &&
         getObject()[ApplyOpsCommandInfoBase::kPrepareFieldName].booleanSafe();
@@ -710,6 +724,9 @@ bool OplogEntry::isSingleOplogEntryTransactionWithCommand() const {
 
 bool OplogEntry::isCrudOpType() const {
     return _entry.isCrudOpType();
+}
+bool OplogEntry::isUpdateOrDelete() const {
+    return _entry.isUpdateOrDelete();
 }
 
 bool OplogEntry::isIndexCommandType() const {

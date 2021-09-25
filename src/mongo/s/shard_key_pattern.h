@@ -38,6 +38,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/query/index_bounds.h"
+#include "mongo/db/repl/oplog_entry.h"
 
 namespace mongo {
 
@@ -211,6 +212,26 @@ public:
      */
     BSONObj extractShardKeyFromDoc(const BSONObj& doc) const;
     BSONObj extractShardKeyFromDocThrows(const BSONObj& doc) const;
+
+    /**
+     * Given an Oplog entry, extracts the shard key corresponding to the key pattern for insert,
+     * update, and delete op types. If the op type is not a CRUD operation, an empty BSONObj()
+     * will be returned.
+     *
+     * For update and delete operations, the Oplog entry will contain an object with the document
+     * key.
+     *
+     * For insert operations, the Oplog entry will contain the original document from which the
+     * document key must be extracted
+     *
+     * Examples:
+     *  For KeyPattern {'a.b': 1}
+     *   If the oplog entries contains field op='i'
+     *     oplog contains: { a : { b : "1" } }
+     *   If the oplog entries contains field op='u' or op='d'
+     *     oplog contains: { 'a.b': "1" }
+     */
+    BSONObj extractShardKeyFromOplogEntry(const repl::OplogEntry& entry) const;
 
     /**
      * Returns the document with missing shard key values set to null.
