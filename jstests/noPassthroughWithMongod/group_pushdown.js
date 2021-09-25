@@ -146,4 +146,27 @@ const groupPossiblyPushedDown = {
 assertNoGroupPushdown(coll,
                       [matchWithOr, groupPossiblyPushedDown],
                       [{_id: "a", quantity: 7}, {_id: "b", quantity: 10}]);
+
+// $bucketAuto/$bucket/$sortByCount are sugared $group stages which are not compatible with SBE.
+// TODO SERVER-60203: When we support pushdown of these stages, change these assertions to check
+// that they are pushed down.
+assertNoGroupPushdown(
+    coll,
+    [{$bucketAuto: {groupBy: "$price", buckets: 5, output: {quantity: {$sum: "$quantity"}}}}],
+    [
+        {"_id": {"min": 5, "max": 10}, "quantity": 15},
+        {"_id": {"min": 10, "max": 20}, "quantity": 12},
+        {"_id": {"min": 20, "max": 20}, "quantity": 1}
+    ]);
+assertNoGroupPushdown(
+    coll,
+    [{
+        $bucket:
+            {groupBy: "$price", boundaries: [1, 10, 50], output: {quantity: {$sum: "$quantity"}}}
+    }],
+    [{"_id": 1, "quantity": 15}, {"_id": 10, "quantity": 13}]);
+assertNoGroupPushdown(
+    coll,
+    [{$sortByCount: "$item"}],
+    [{"_id": "a", "count": 2}, {"_id": "b", "count": 2}, {"_id": "c", "count": 1}]);
 })();

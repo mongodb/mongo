@@ -462,6 +462,7 @@ intrusive_ptr<DocumentSource> DocumentSourceBucketAuto::createFromBson(
     boost::optional<int> numBuckets;
     boost::intrusive_ptr<GranularityRounder> granularityRounder;
 
+    pExpCtx->sbeCompatible = false;
     for (auto&& argument : elem.Obj()) {
         const auto argName = argument.fieldNameStringData();
         if ("groupBy" == argName) {
