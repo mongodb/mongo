@@ -104,6 +104,7 @@ class MultiversionGenTaskService:
             "resmoke_args": self._build_resmoke_args(suite_file, mixed_version_config, params),
             "task": params.parent_task_name,
             "gen_task_config_location": params.config_location,
+            "require_multiversion": True,
         }
 
         commands = [
