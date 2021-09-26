@@ -286,6 +286,11 @@ SharedSemiFuture<void> ReplicationCoordinatorEmbedded::awaitReplicationAsyncNoWT
     UASSERT_NOT_IMPLEMENTED;
 }
 
+SharedSemiFuture<void> ReplicationCoordinatorEmbedded::awaitTopologyState(
+    const CancellationToken& token, TopologyStatePredicate predicate) {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
 void ReplicationCoordinatorEmbedded::stepDown(OperationContext*,
                                               const bool,
                                               const Milliseconds&,

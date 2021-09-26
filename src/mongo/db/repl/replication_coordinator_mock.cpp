@@ -176,6 +176,11 @@ SharedSemiFuture<void> ReplicationCoordinatorMock::awaitReplicationAsyncNoWTimeo
     MONGO_UNREACHABLE;
 }
 
+SharedSemiFuture<void> ReplicationCoordinatorMock::awaitTopologyState(
+    const CancellationToken& token, TopologyStatePredicate predicate) {
+    MONGO_UNREACHABLE;
+}
+
 void ReplicationCoordinatorMock::stepDown(OperationContext* opCtx,
                                           bool force,
                                           const Milliseconds& waitTime,

@@ -31,6 +31,7 @@
 
 #include "mongo/db/repl/replication_coordinator_fwd.h"
 
+#include "mongo/util/cancellation.h"
 #include <vector>
 
 #include "mongo/base/status.h"
@@ -247,6 +248,18 @@ public:
      */
     virtual SharedSemiFuture<void> awaitReplicationAsyncNoWTimeout(
         const OpTime& opTime, const WriteConcernOptions& writeConcern) = 0;
+
+    struct NodeInfo {
+        MemberState state;
+        MemberConfig config;
+    };
+
+    /**
+     * Returns a future that will be set when a desired topology state predicate has been satisfied
+     */
+    using TopologyStatePredicate = std::function<bool(std::vector<NodeInfo>)>;
+    virtual SharedSemiFuture<void> awaitTopologyState(const CancellationToken& token,
+                                                      TopologyStatePredicate predicate) = 0;
 
     /**
      * Causes this node to relinquish being primary for at least 'stepdownTime'.  If 'force' is

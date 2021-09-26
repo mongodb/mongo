@@ -107,6 +107,9 @@ public:
     virtual SharedSemiFuture<void> awaitReplicationAsyncNoWTimeout(
         const OpTime& opTime, const WriteConcernOptions& writeConcern);
 
+    virtual SharedSemiFuture<void> awaitTopologyState(const CancellationToken& token,
+                                                      TopologyStatePredicate predicate);
+
     void stepDown(OperationContext* opCtx,
                   bool force,
                   const Milliseconds& waitTime,

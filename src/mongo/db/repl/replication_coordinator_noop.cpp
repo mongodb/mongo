@@ -262,6 +262,11 @@ SharedSemiFuture<void> ReplicationCoordinatorNoOp::awaitReplicationAsyncNoWTimeo
     MONGO_UNREACHABLE;
 }
 
+SharedSemiFuture<void> ReplicationCoordinatorNoOp::awaitTopologyState(
+    const CancellationToken& token, TopologyStatePredicate predicate) {
+    MONGO_UNREACHABLE;
+}
+
 void ReplicationCoordinatorNoOp::stepDown(OperationContext*,
                                           const bool,
                                           const Milliseconds&,

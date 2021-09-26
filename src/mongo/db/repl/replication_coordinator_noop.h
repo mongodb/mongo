@@ -114,6 +114,9 @@ public:
     SharedSemiFuture<void> awaitReplicationAsyncNoWTimeout(
         const OpTime& opTime, const WriteConcernOptions& writeConcern) final;
 
+    SharedSemiFuture<void> awaitTopologyState(const CancellationToken& token,
+                                              TopologyStatePredicate predicate) final;
+
     void stepDown(OperationContext*, bool, const Milliseconds&, const Milliseconds&) final;
 
     Status checkIfWriteConcernCanBeSatisfied(const WriteConcernOptions&) const final;

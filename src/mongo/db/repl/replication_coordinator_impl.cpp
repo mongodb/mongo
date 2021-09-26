@@ -107,7 +107,9 @@
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/transport/hello_metrics.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/cancellation.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/future_util.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/testing_proctor.h"
@@ -978,6 +980,8 @@ void ReplicationCoordinatorImpl::shutdown(OperationContext* opCtx) {
         _replicationWaiterList.setErrorAll_inlock(
             {ErrorCodes::ShutdownInProgress, "Replication is being shut down"});
         _opTimeWaiterList.setErrorAll_inlock(
+            {ErrorCodes::ShutdownInProgress, "Replication is being shut down"});
+        _topologyStateWaiterList.clear(
             {ErrorCodes::ShutdownInProgress, "Replication is being shut down"});
         _currentCommittedSnapshotCond.notify_all();
         _initialSyncer.swap(initialSyncerCopy);
@@ -1988,6 +1992,18 @@ SharedSemiFuture<void> ReplicationCoordinatorImpl::awaitReplicationAsyncNoWTimeo
 
     stdx::lock_guard lg(_mutex);
     return _startWaitingForReplication(lg, opTime, fixedWriteConcern);
+}
+
+SharedSemiFuture<void> ReplicationCoordinatorImpl::awaitTopologyState(
+    const CancellationToken& token, TopologyStatePredicate predicate) {
+    // Return immediately if we can satisfy the predicate without waiting
+    auto nodes = getNodeInfoList();
+    if (predicate(nodes)) {
+        return SemiFuture<void>::makeReady().share();
+    }
+
+    stdx::lock_guard lg(_mutex);
+    return _topologyStateWaiterList.addTopologyStateWaiter(predicate, token);
 }
 
 BSONObj ReplicationCoordinatorImpl::_getReplicationProgress(WithLock wl) const {
@@ -4159,6 +4175,16 @@ void ReplicationCoordinatorImpl::_fulfillTopologyChangePromise(WithLock lock) {
         // No more hello requests will wait for a topology change, so clear _horizonToPromiseMap.
         _horizonToTopologyChangePromiseMap.clear();
     }
+
+    _wakeTopologyStateWaiters(lock);
+}
+
+void ReplicationCoordinatorImpl::_wakeTopologyStateWaiters(WithLock lk) {
+    auto nodes = _getNodeInfoList_inlock();
+    _topologyStateWaiterList.setValueIf(
+        [this, nodes](const CancellableWaiterList::WaiterPtr& waiter) {
+            return waiter->predicate(nodes);
+        });
 }
 
 void ReplicationCoordinatorImpl::incrementTopologyVersion() {
@@ -4172,6 +4198,36 @@ void ReplicationCoordinatorImpl::_updateWriteAbilityFromTopologyCoordinator(
     _readWriteAbility->setCanAcceptNonLocalWrites(lk, opCtx, canAcceptWrites);
 }
 
+std::vector<ReplicationCoordinator::NodeInfo> ReplicationCoordinatorImpl::getNodeInfoList() {
+    stdx::lock_guard<Latch> lock(_mutex);
+    return _getNodeInfoList_inlock();
+}
+
+std::vector<ReplicationCoordinator::NodeInfo>
+ReplicationCoordinatorImpl::_getNodeInfoList_inlock() {
+    auto members = _topCoord->getMemberData();
+    auto configs = _rsConfig.members();
+
+    std::vector<NodeInfo> nodes;
+    std::transform(
+        members.cbegin(), members.cend(), std::back_inserter(nodes), [&](const MemberData& member) {
+            // The TopologyCoordinator only tracks up-to-date MemberData for nodes it receives
+            // pings for, which does not include the local node. We need to use `getMemberState` to
+            // read the local node's state.
+            auto state = member.getMemberId().getData() == _getMyId_inlock()
+                ? _topCoord->getMemberState()
+                : member.getState();
+
+            auto configIndex = member.getConfigIndex();
+            invariant(memberIndex >= 0);
+            invariant(memberIndex <= configs.size());
+            auto config = configs.at(configIndex);
+            return NodeInfo{state, config};
+        });
+
+    return nodes;
+}
+
 ReplicationCoordinatorImpl::PostMemberStateUpdateAction
 ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator(WithLock lk) {
     // We want to respond to any waiting hellos even if our current and target state are the
@@ -4182,6 +4238,9 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator(WithLock l
     ON_BLOCK_EXIT([&] {
         if (_rsConfig.isInitialized() && !_waitingForRSTLAtStepDown) {
             _fulfillTopologyChangePromise(lk);
+        } else {
+            // We still want to wake any topology state waiters.
+            _wakeTopologyStateWaiters(lk);
         }
     });
 

@@ -8218,6 +8218,50 @@ TEST_F(ReplCoordTest, IgnoreNonNullDurableOpTimeOrWallTimeForArbiterFromHeartbea
                       "Received non-null durable optime/walltime for arbiter from heartbeat"));
 }
 
+TEST_F(ReplCoordTest, AwaitTopologyState) {
+    init();
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("host"
+                                               << "node1:12345"
+                                               << "_id" << 0)
+                                          << BSON("host"
+                                                  << "node2:12345"
+                                                  << "_id" << 1))),
+                       HostAndPort("node1", 12345));
+
+    auto hasPrimaryState = [&](const std::vector<ReplicationCoordinator::NodeInfo>& members) {
+        return std::any_of(
+            members.cbegin(), members.cend(), [&](const ReplicationCoordinator::NodeInfo& member) {
+                return member.state.primary();
+            });
+    };
+
+    // Validate that we are not in the desired primary state already
+    ASSERT_FALSE(hasPrimaryState(getReplCoord()->getNodeInfoList()));
+
+    CancellationSource cancelSource;
+    stdx::thread topologyStateThread([&]() {
+        auto topologyStateFuture =
+            getReplCoord()->awaitTopologyState(cancelSource.token(), hasPrimaryState);
+        topologyStateFuture.get();
+        auto nodes = getReplCoord()->getNodeInfoList();
+        ASSERT_EQUALS(2, nodes.size());
+        ASSERT_TRUE(hasPrimaryState(nodes));
+    });
+
+    // Become primary
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    simulateSuccessfulV1Election();
+    ASSERT(getReplCoord()->getMemberState().primary());
+
+    // Wait for the desired topology state
+    topologyStateThread.join();
+}
+
 // TODO(schwerin): Unit test election id updating
 }  // namespace
 }  // namespace repl

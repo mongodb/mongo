@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/error_codes.h"
 #include <map>
 #include <memory>
 #include <utility>
@@ -57,6 +58,7 @@
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/future.h"
+#include "mongo/util/future_util.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
@@ -141,6 +143,14 @@ public:
 
     virtual SharedSemiFuture<void> awaitReplicationAsyncNoWTimeout(
         const OpTime& opTime, const WriteConcernOptions& writeConcern);
+
+    /**
+     * Returns a snapshot of the configurations of all known nodes with their current state.
+     */
+    std::vector<NodeInfo> getNodeInfoList();
+
+    virtual SharedSemiFuture<void> awaitTopologyState(const CancellationToken& token,
+                                                      TopologyStatePredicate predicate);
 
     void stepDown(OperationContext* opCtx,
                   bool force,
@@ -708,6 +718,69 @@ private:
         std::multimap<OpTime, SharedWaiterHandle> _waiters;
     };
 
+    class CancellableWaiterList {
+    public:
+        struct Waiter {
+            Promise<void> promise;
+            TopologyStatePredicate predicate;
+
+            explicit Waiter(Promise<void> p, TopologyStatePredicate pred)
+                : promise(std::move(p)), predicate(pred) {}
+        };
+
+        using WaiterPtr = std::shared_ptr<Waiter>;
+
+        ~CancellableWaiterList() {
+            clear({ErrorCodes::Interrupted, "Waiter list destroyed"});
+        }
+
+        /**
+         * Add a new topology state waiter. This will return a future which is resolved when some
+         * topology state defined by the passed in predicate has been reached.
+         */
+        SharedSemiFuture<void> addTopologyStateWaiter(TopologyStatePredicate predicate,
+                                                      const CancellationToken& token) {
+            auto pf = makePromiseFuture<void>();
+            _waiters.emplace_back(std::make_shared<Waiter>(std::move(pf.promise), predicate));
+            return future_util::withCancellation(std::move(pf.future), token).share();
+        }
+
+        /**
+         * Iterate through the wait list and resolve waiters which now satisfy their condition.
+         */
+        TEMPLATE(typename Func)
+        REQUIRES(future_details::isCallableR<bool, Func, WaiterPtr>)
+        void setValueIf(Func&& func) {
+            for (auto it = _waiters.begin(); it != _waiters.end();) {
+                const auto& waiter = *it;
+                try {
+                    if (func(waiter)) {
+                        waiter->promise.emplaceValue();
+                        it = _waiters.erase(it);
+                    } else {
+                        ++it;
+                    }
+                } catch (const DBException& e) {
+                    waiter->promise.setError(e.toStatus());
+                    it = _waiters.erase(it);
+                }
+            }
+        }
+
+        /**
+         * Resolve all pending waiters with the provided status.
+         */
+        void clear(Status status = Status::OK()) {
+            for (auto& waiter : _waiters) {
+                waiter->promise.setFrom(status);
+            }
+            _waiters.clear();
+        }
+
+    private:
+        std::list<WaiterPtr> _waiters;
+    };
+
     enum class HeartbeatState { kScheduled = 0, kSent = 1 };
     struct HeartbeatHandle {
         executor::TaskExecutor::CallbackHandle handle;
@@ -952,6 +1025,11 @@ private:
      * (or all waiters if opTime passed in is boost::none) that are doneWaitingForReplication.
      */
     void _wakeReadyWaiters(WithLock lk, boost::optional<OpTime> opTime = boost::none);
+
+    /**
+     * Helper to wake any waiters waiting on topology state changes.
+     */
+    void _wakeTopologyStateWaiters(WithLock lk);
 
     /**
      * Scheduled to cause the ReplicationCoordinator to reconsider any state that might
@@ -1520,6 +1598,11 @@ private:
      */
     void _validateDefaultWriteConcernOnShardStartup(WithLock lk) const;
 
+    /**
+     * Implementation for the getNodeInfoList method, called while holding replCoord _mutex.
+     */
+    std::vector<NodeInfo> _getNodeInfoList_inlock();
+
     //
     // All member variables are labeled with one of the following codes indicating the
     // synchronization rules for accessing them.
@@ -1570,6 +1653,9 @@ private:
     // list of information about clients waiting for a particular lastApplied opTime.
     // Waiters in this list are checked and notified on self's lastApplied opTime updates.
     WaiterList _opTimeWaiterList;  // (M)
+
+    // List of waiters awaiting certain topology conditions.
+    CancellableWaiterList _topologyStateWaiterList;  // (M)
 
     // Maps a horizon name to the promise waited on by awaitable hello requests when the node
     // has an initialized replica set config and is an active member of the replica set.
