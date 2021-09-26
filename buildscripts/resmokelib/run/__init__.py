@@ -306,8 +306,9 @@ class TestRunner(Subcommand):  # pylint: disable=too-many-instance-attributes
                                     suite.test_kind, suite.get_display_name(), err)
             suite.return_code = err.EXIT_CODE
             return True
-        except IOError:
-            suite.return_code = 74  # Exit code for IOError on POSIX systems.
+        except OSError as err:
+            self._exec_logger.error("Encountered an OSError: %s", err)
+            suite.return_code = 74  # Exit code for OSError on POSIX systems.
             return True
         except:  # pylint: disable=bare-except
             self._exec_logger.exception("Encountered an error when running %ss of suite %s.",
