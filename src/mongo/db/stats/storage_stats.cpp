@@ -38,6 +38,7 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/timeseries/bucket_catalog.h"
+#include "mongo/db/timeseries/timeseries_stats.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/logv2/log.h"
 
@@ -99,6 +100,7 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
             bob.append("avgBucketSize", collection->averageObjectSize(opCtx));
         }
         BucketCatalog::get(opCtx).appendExecutionStats(collNss.getTimeseriesViewNamespace(), &bob);
+        TimeseriesStats::get(collection.get()).append(&bob);
     } else {
         result->appendNumber("count", numRecords);
         if (numRecords) {

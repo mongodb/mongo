@@ -368,6 +368,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/timeseries/catalog_helper',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_conversion_util',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
+        '$BUILD_DIR/mongo/db/timeseries/timeseries_stats',
         '$BUILD_DIR/mongo/db/transaction',
         '$BUILD_DIR/mongo/db/views/views_mongod',
         '$BUILD_DIR/mongo/executor/async_request_executor',

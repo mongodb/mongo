@@ -22,6 +22,9 @@ if (!TimeseriesTest.timeseriesCollectionsEnabled(conn)) {
 
 const dbName = jsTestName();
 const testDB = conn.getDB(dbName);
+const isTimeseriesBucketCompressionEnabled =
+    TimeseriesTest.timeseriesBucketCompressionEnabled(testDB);
+
 assert.commandWorked(testDB.dropDatabase());
 
 const coll = testDB.getCollection('t');
@@ -52,6 +55,8 @@ const clearCollection = function() {
     expectedStats.numCommits = 0;
     expectedStats.numWaits = 0;
     expectedStats.numMeasurementsCommitted = 0;
+    expectedStats.numCompressedBuckets = 0;
+    expectedStats.numUncompressedBuckets = 0;
 };
 clearCollection();
 
@@ -75,18 +80,24 @@ const checkCollStats = function(empty = false) {
 
     assert(!stats.timeseries.hasOwnProperty('count'));
     assert(!stats.timeseries.hasOwnProperty('avgObjSize'));
+
+    if (expectedStats.numCompressedBuckets > 0) {
+        assert.lt(stats.timeseries["numBytesCompressed"],
+                  stats.timeseries["numBytesUncompressed"],
+                  "Invalid 'timeseries.numBytesCompressed' value in collStats: " + tojson(stats));
+    }
 };
 
 checkCollStats(true);
 
-let docs = Array(2).fill({[timeFieldName]: ISODate(), [metaFieldName]: {a: 1}});
+let docs = Array(3).fill({[timeFieldName]: ISODate(), [metaFieldName]: {a: 1}});
 assert.commandWorked(coll.insert(docs, {ordered: false}));
 expectedStats.bucketCount++;
 expectedStats.numBucketInserts++;
 expectedStats.numBucketsOpenedDueToMetadata++;
 expectedStats.numCommits++;
-expectedStats.numMeasurementsCommitted += 2;
-expectedStats.avgNumMeasurementsPerCommit = 2;
+expectedStats.numMeasurementsCommitted += 3;
+expectedStats.avgNumMeasurementsPerCommit = 3;
 checkCollStats();
 
 assert.commandWorked(
@@ -96,7 +107,7 @@ expectedStats.numBucketInserts++;
 expectedStats.numBucketsOpenedDueToMetadata++;
 expectedStats.numCommits++;
 expectedStats.numMeasurementsCommitted++;
-expectedStats.avgNumMeasurementsPerCommit = 1;
+expectedStats.avgNumMeasurementsPerCommit = 2;
 checkCollStats();
 
 assert.commandWorked(
@@ -104,6 +115,7 @@ assert.commandWorked(
 expectedStats.numBucketUpdates++;
 expectedStats.numCommits++;
 expectedStats.numMeasurementsCommitted++;
+expectedStats.avgNumMeasurementsPerCommit = 1;
 checkCollStats();
 
 docs = Array(5).fill({[timeFieldName]: ISODate(), [metaFieldName]: {a: 2}});
@@ -121,6 +133,9 @@ expectedStats.numBucketInserts++;
 expectedStats.numCommits++;
 expectedStats.numBucketsClosedDueToTimeBackward++;
 expectedStats.numMeasurementsCommitted++;
+if (isTimeseriesBucketCompressionEnabled) {
+    expectedStats.numCompressedBuckets++;
+}
 checkCollStats();
 
 // Assumes each bucket has a limit of 1000 measurements.
@@ -136,6 +151,9 @@ expectedStats.numCommits += 2;
 expectedStats.numMeasurementsCommitted += numDocs;
 expectedStats.avgNumMeasurementsPerCommit =
     Math.floor(expectedStats.numMeasurementsCommitted / expectedStats.numCommits);
+if (isTimeseriesBucketCompressionEnabled) {
+    expectedStats.numCompressedBuckets++;
+}
 checkCollStats();
 
 // Assumes each bucket has a limit of 125kB on the measurements stored in the 'data' field.
@@ -143,6 +161,8 @@ const bucketMaxSizeKB = 125;
 numDocs = 2;
 // The measurement data should not take up all of the 'bucketMaxSizeKB' limit because we need
 // to leave a little room for the _id and the time fields.
+// This test leaves the bucket with a single measurement which will cause compression to be
+// by-passed. The stats tracking of compressed buckets will thus also be by-passed.
 let largeValue = 'x'.repeat((bucketMaxSizeKB - 1) * 1024);
 docs = Array(numDocs).fill(
     {[timeFieldName]: ISODate(), x: largeValue, [metaFieldName]: {a: 'limit_size'}});
@@ -158,6 +178,8 @@ expectedStats.avgNumMeasurementsPerCommit =
 checkCollStats();
 
 // Assumes the measurements in each bucket span at most one hour (based on the time field).
+// This test leaves just one measurement per bucket which will cause compression to be
+// by-passed. The stats tracking of compressed buckets will thus also be by-passed.
 const docTimes = [ISODate("2020-11-13T01:00:00Z"), ISODate("2020-11-13T03:00:00Z")];
 numDocs = 2;
 docs = [];

@@ -69,6 +69,7 @@
 #include "mongo/db/timeseries/bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
+#include "mongo/db/timeseries/timeseries_stats.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/db/write_concern.h"
@@ -690,11 +691,16 @@ public:
                 return SingleWriteResult();
             }
 
-            auto bucketCompressionFunc =
-                [&closedBucket](const BSONObj& bucketDoc) -> boost::optional<BSONObj> {
+            boost::optional<int> beforeSize;
+            boost::optional<int> afterSize;
+
+            auto bucketCompressionFunc = [&](const BSONObj& bucketDoc) -> boost::optional<BSONObj> {
+                beforeSize = bucketDoc.objsize();
+                // Reset every time we run to ensure we never use a stale value
+                afterSize = boost::none;
                 auto compressed = timeseries::compressBucket(bucketDoc, closedBucket.timeField);
                 // If compressed object size is larger than uncompressed, skip compression update.
-                if (compressed && compressed->objsize() > bucketDoc.objsize()) {
+                if (compressed && compressed->objsize() >= *beforeSize) {
                     LOGV2_DEBUG(5857802,
                                 1,
                                 "Skipping time-series bucket compression, compressed object is "
@@ -703,13 +709,27 @@ public:
                                 "compressedSize"_attr = compressed->objsize());
                     return boost::none;
                 }
+                afterSize = compressed->objsize();
                 return compressed;
             };
 
-            return _getTimeseriesSingleWriteResult(write_ops_exec::performUpdates(
-                opCtx,
-                _makeTimeseriesCompressionOp(opCtx, closedBucket.bucketId, bucketCompressionFunc),
-                OperationSource::kStandard));
+            auto compressionOp =
+                _makeTimeseriesCompressionOp(opCtx, closedBucket.bucketId, bucketCompressionFunc);
+            auto result = _getTimeseriesSingleWriteResult(
+                write_ops_exec::performUpdates(opCtx, compressionOp, OperationSource::kStandard));
+
+            // Report stats, if we fail before running the transform function then just skip
+            // reporting.
+            if (result.isOK() && beforeSize) {
+                auto coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForRead(
+                    opCtx, compressionOp.getNamespace());
+                if (coll) {
+                    const auto& stats = TimeseriesStats::get(coll.get());
+                    stats.onBucketClosed(*beforeSize, afterSize);
+                }
+            }
+
+            return result;
         }
 
         void _commitTimeseriesBucket(OperationContext* opCtx,
