@@ -484,10 +484,12 @@ __cursor_row_prev(
     WT_PAGE *page;
     WT_ROW *rip;
     WT_SESSION_IMPL *session;
+    bool prefix_search;
 
-    session = CUR2S(cbt);
-    page = cbt->ref->page;
     key = &cbt->iface.key;
+    page = cbt->ref->page;
+    session = CUR2S(cbt);
+    prefix_search = prefix != NULL && F_ISSET(&cbt->iface, WT_CURSTD_PREFIX_SEARCH);
     *skippedp = 0;
 
     /* If restarting after a prepare conflict, jump to the right spot. */
@@ -541,6 +543,14 @@ restart_read_insert:
         if ((ins = cbt->ins) != NULL) {
             key->data = WT_INSERT_KEY(ins);
             key->size = WT_INSERT_KEY_SIZE(ins);
+            /*
+             * If the cursor has prefix search configured we can early exit here if the key we are
+             * visiting is before our prefix.
+             */
+            if (prefix_search && __wt_prefix_match(prefix, key) > 0) {
+                WT_STAT_CONN_DATA_INCR(session, cursor_search_near_prefix_fast_paths);
+                return (WT_NOTFOUND);
+            }
             WT_RET(__wt_txn_read_upd_list(session, cbt, ins->upd));
             if (cbt->upd_value->type == WT_UPDATE_INVALID) {
                 ++*skippedp;
@@ -584,10 +594,7 @@ restart_read_page:
          * If the cursor has prefix search configured we can early exit here if the key we are
          * visiting is before our prefix.
          */
-        if (F_ISSET(&cbt->iface, WT_CURSTD_PREFIX_SEARCH) && prefix != NULL &&
-          __wt_prefix_match(prefix, &cbt->iface.key) > 0) {
-            /* It is not okay for the user to have a custom collator. */
-            WT_ASSERT(session, CUR2BT(cbt)->collator == NULL);
+        if (prefix_search && __wt_prefix_match(prefix, &cbt->iface.key) > 0) {
             WT_STAT_CONN_DATA_INCR(session, cursor_search_near_prefix_fast_paths);
             return (WT_NOTFOUND);
         }

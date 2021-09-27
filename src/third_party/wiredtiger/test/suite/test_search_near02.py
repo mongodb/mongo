@@ -44,7 +44,12 @@ class test_search_near02(wttest.WiredTigerTestCase):
         ('byte_array', dict(key_format='u')),
     ]
 
-    scenarios = make_scenarios(key_format_values)
+    eviction = [
+        ('eviction', dict(eviction=True)),
+        ('no eviction', dict(eviction=False)),
+    ]
+
+    scenarios = make_scenarios(key_format_values, eviction)
 
     def check_key(self, key):
         if self.key_format == 'u':
@@ -80,15 +85,15 @@ class test_search_near02(wttest.WiredTigerTestCase):
         cursor[prefix + "zab"] = prefix + "zab"
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(250))
 
-        # Evict the whole range.
-        for k in range (0, 26):
-            cursor2.set_key(prefix + l[k])
+        if self.eviction:
+            # Evict the whole range.
+            for k in range (0, 26):
+                cursor2.set_key(prefix + l[k])
+                self.assertEqual(cursor2.search(), 0)
+                self.assertEqual(cursor2.reset(), 0)
+            cursor2.set_key(prefix + "zab")
             self.assertEqual(cursor2.search(), 0)
             self.assertEqual(cursor2.reset(), 0)
-
-        cursor2.set_key(prefix + "zab")
-        self.assertEqual(cursor2.search(), 0)
-        self.assertEqual(cursor2.reset(), 0)
 
         # Start a transaction at timestamp 100, aaz should be the only key that is visible.
         self.session.begin_transaction('read_timestamp=' + self.timestamp_str(100))
