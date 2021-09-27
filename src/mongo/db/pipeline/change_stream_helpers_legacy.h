@@ -39,4 +39,12 @@ namespace mongo::change_stream_legacy {
 std::list<boost::intrusive_ptr<DocumentSource>> buildPipeline(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, DocumentSourceChangeStreamSpec spec);
 
+/**
+ * Looks up and returns a pre-image document at the specified opTime in the oplog. Asserts that if
+ * an oplog entry with the given opTime is found, it is a no-op entry with a valid non-empty
+ * pre-image document.
+ */
+boost::optional<Document> legacyLookupPreImage(boost::intrusive_ptr<ExpressionContext> pExpCtx,
+                                               const Document& preImageId);
+
 }  // namespace mongo::change_stream_legacy

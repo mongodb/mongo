@@ -48,10 +48,10 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_change_stream_add_post_image.h"
+#include "mongo/db/pipeline/document_source_change_stream_add_pre_image.h"
 #include "mongo/db/pipeline/document_source_change_stream_check_invalidate.h"
 #include "mongo/db/pipeline/document_source_change_stream_check_resumability.h"
 #include "mongo/db/pipeline/document_source_change_stream_ensure_resume_token_present.h"
-#include "mongo/db/pipeline/document_source_change_stream_lookup_pre_image.h"
 #include "mongo/db/pipeline/document_source_change_stream_oplog_match.h"
 #include "mongo/db/pipeline/document_source_change_stream_transform.h"
 #include "mongo/db/pipeline/document_source_change_stream_unwind_transaction.h"
@@ -2971,9 +2971,9 @@ TEST_F(ChangeStreamStageTest, TransformPreImageForDelete) {
         {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid(), documentKey)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kDeleteOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
-        {DSChangeStream::kFullDocumentBeforeChangeField, preImageObj},
         {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, documentKey},
+        {DSChangeStream::kFullDocumentBeforeChangeField, preImageObj},
     };
     checkTransformation(
         deleteEntry, expectedDeleteWithPreImage, {}, spec, boost::none, {}, documentsForLookup);
@@ -2984,11 +2984,14 @@ TEST_F(ChangeStreamStageTest, TransformPreImageForDelete) {
     checkTransformation(
         deleteEntry, expectedDeleteWithPreImage, {}, spec, boost::none, {}, documentsForLookup);
 
-    // When run with {fullDocumentBeforeChange: "whenAvailable"} but no pre-image, we see the event
-    // without the pre-image.
+    // When run with {fullDocumentBeforeChange: "whenAvailable"} but no pre-image is available, the
+    // output 'fullDocumentBeforeChange' field is explicitly set to 'null'.
     spec = BSON("$changeStream" << BSON("fullDocumentBeforeChange"
                                         << "whenAvailable"));
-    checkTransformation(deleteEntry, expectedDeleteNoPreImage, {}, spec);
+    MutableDocument expectedDeleteWithNullPreImage(expectedDeleteNoPreImage);
+    expectedDeleteWithNullPreImage.addField(DSChangeStream::kFullDocumentBeforeChangeField,
+                                            Value(BSONNULL));
+    checkTransformation(deleteEntry, expectedDeleteWithNullPreImage.freeze(), {}, spec);
 
     // When run with {fullDocumentBeforeChange: "required"} and a 'preImageOpTime' is present in the
     // event's oplog entry but we cannot find the pre-image, we throw ChangeStreamHistoryLost.
@@ -3064,13 +3067,13 @@ TEST_F(ChangeStreamStageTest, TransformPreImageForUpdate) {
         {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid(), documentKey)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kUpdateOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
-        {DSChangeStream::kFullDocumentBeforeChangeField, preImageObj},
         {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, documentKey},
         {
             "updateDescription",
             D{{"updatedFields", D{}}, {"removedFields", vector<V>{V("x"_sd)}}},
         },
+        {DSChangeStream::kFullDocumentBeforeChangeField, preImageObj},
     };
     checkTransformation(
         updateEntry, expectedUpdateWithPreImage, {}, spec, boost::none, {}, documentsForLookup);
@@ -3081,11 +3084,14 @@ TEST_F(ChangeStreamStageTest, TransformPreImageForUpdate) {
     checkTransformation(
         updateEntry, expectedUpdateWithPreImage, {}, spec, boost::none, {}, documentsForLookup);
 
-    // When run with {fullDocumentBeforeChange: "whenAvailable"} but no pre-image, we see the event
-    // without the pre-image.
+    // When run with {fullDocumentBeforeChange: "whenAvailable"} but no pre-image is available, the
+    // output 'fullDocumentBeforeChange' field is explicitly set to 'null'.
     spec = BSON("$changeStream" << BSON("fullDocumentBeforeChange"
                                         << "whenAvailable"));
-    checkTransformation(updateEntry, expectedUpdateNoPreImage, {}, spec);
+    MutableDocument expectedUpdateWithNullPreImage(expectedUpdateNoPreImage);
+    expectedUpdateWithNullPreImage.addField(DSChangeStream::kFullDocumentBeforeChangeField,
+                                            Value(BSONNULL));
+    checkTransformation(updateEntry, expectedUpdateWithNullPreImage.freeze(), {}, spec);
 
     // When run with {fullDocumentBeforeChange: "required"} and a 'preImageOpTime' is present in the
     // event's oplog entry but we cannot find the pre-image, we throw ChangeStreamHistoryLost.
@@ -3159,9 +3165,9 @@ TEST_F(ChangeStreamStageTest, TransformPreImageForReplace) {
         {DSChangeStream::kOperationTypeField, DSChangeStream::kReplaceOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kFullDocumentField, replacementDoc},
-        {DSChangeStream::kFullDocumentBeforeChangeField, preImageObj},
         {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, documentKey},
+        {DSChangeStream::kFullDocumentBeforeChangeField, preImageObj},
     };
     checkTransformation(
         replaceEntry, expectedReplaceWithPreImage, {}, spec, boost::none, {}, documentsForLookup);
@@ -3172,11 +3178,14 @@ TEST_F(ChangeStreamStageTest, TransformPreImageForReplace) {
     checkTransformation(
         replaceEntry, expectedReplaceWithPreImage, {}, spec, boost::none, {}, documentsForLookup);
 
-    // When run with {fullDocumentBeforeChange: "whenAvailable"} but no pre-image, we see the event
-    // without the pre-image.
+    // When run with {fullDocumentBeforeChange: "whenAvailable"} but no pre-image is available, the
+    // output 'fullDocumentBeforeChange' field is explicitly set to 'null'.
     spec = BSON("$changeStream" << BSON("fullDocumentBeforeChange"
                                         << "whenAvailable"));
-    checkTransformation(replaceEntry, expectedReplaceNoPreImage, {}, spec);
+    MutableDocument expectedReplaceWithNullPreImage(expectedReplaceNoPreImage);
+    expectedReplaceWithNullPreImage.addField(DSChangeStream::kFullDocumentBeforeChangeField,
+                                             Value(BSONNULL));
+    checkTransformation(replaceEntry, expectedReplaceWithNullPreImage.freeze(), {}, spec);
 
     // When run with {fullDocumentBeforeChange: "required"} and a 'preImageOpTime' is present in the
     // event's oplog entry but we cannot find the pre-image, we throw ChangeStreamHistoryLost.

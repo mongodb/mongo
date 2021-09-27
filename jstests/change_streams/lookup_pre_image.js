@@ -6,6 +6,7 @@
  *   assumes_unsharded_collection,
  *   do_not_wrap_aggregations_in_facets,
  *   uses_multiple_connections,
+ *   multiversion_incompatible,
  * ]
  */
 (function() {
@@ -113,10 +114,15 @@ latestChange = cst.getOneChange(csNoPreImages);
 assert.eq(latestChange.operationType, "replace");
 assert(!latestChange.hasOwnProperty("fullDocumentBeforeChange"));
 assert.docEq(latestChange.fullDocument, {_id: "y", foo: "bar"});
+
+// Add the expected "fullDocumentBeforeChange" and confirm that pre-image is not present.
+latestChange.fullDocumentBeforeChange = null;
+
 // The "whenAvailable" cursor retrieves a document without the pre-image...
 assert.docEq(latestChange, cst.getOneChange(csPreImageWhenAvailableCursor));
 // ... but the "required" cursor throws an exception.
-assert.throwsWithCode(() => cst.getOneChange(csPreImageRequiredCursor), 51770);
+assert.throwsWithCode(() => cst.getOneChange(csPreImageRequiredCursor),
+                      [ErrorCodes.ChangeStreamHistoryLost, 51770]);
 
 // Test pre-image lookup for an op-style update operation.
 assert.commandWorked(coll.update({_id: "y"}, {$set: {foo: "baz"}}));
@@ -132,6 +138,9 @@ latestChange = cst.assertNextChangesEqual({
     }]
 })[0];
 
+// Add the expected "fullDocumentBeforeChange" and confirm that pre-image is not present.
+latestChange.fullDocumentBeforeChange = null;
+
 // The "whenAvailable" cursor returns an event without the pre-image.
 assertChangeStreamEventEq(cst.getOneChange(csPreImageWhenAvailableCursor), latestChange);
 
@@ -141,6 +150,10 @@ latestChange = cst.getOneChange(csNoPreImages);
 assert.eq(latestChange.operationType, "delete");
 assert(!latestChange.hasOwnProperty("fullDocument"));
 assert(!latestChange.hasOwnProperty("fullDocumentBeforeChange"));
+
+// Add the expected "fullDocumentBeforeChange" and confirm that pre-image is not present.
+latestChange.fullDocumentBeforeChange = null;
+
 // The "whenAvailable" cursor returns an event without the pre-image.
 assert.docEq(latestChange, cst.getOneChange(csPreImageWhenAvailableCursor));
 

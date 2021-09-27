@@ -47,6 +47,7 @@ public:
     static constexpr StringData kStageName = "$_internalChangeStreamAddPreImage"_sd;
     static constexpr StringData kFullDocumentBeforeChangeFieldName =
         DocumentSourceChangeStream::kFullDocumentBeforeChangeField;
+    static constexpr StringData kPreImageIdFieldName = DocumentSourceChangeStream::kPreImageIdField;
 
     /**
      * Creates a DocumentSourceChangeStreamAddPreImage stage.
@@ -58,6 +59,11 @@ public:
     static boost::intrusive_ptr<DocumentSourceChangeStreamAddPreImage> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
+    // Retrieves the pre-image document given the specified 'preImageId'. Returns boost::none if no
+    // such pre-image is available.
+    static boost::optional<Document> lookupPreImage(boost::intrusive_ptr<ExpressionContext> pExpCtx,
+                                                    const Document& preImageId);
+
     DocumentSourceChangeStreamAddPreImage(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                           FullDocumentBeforeChangeModeEnum mode)
         : DocumentSource(kStageName, expCtx), _fullDocumentBeforeChangeMode(mode) {
@@ -66,11 +72,11 @@ public:
     }
 
     /**
-     * Only modifies a single path: "fullDocumentBeforeChange".
+     * Only modifies: "fullDocumentBeforeChange" and "preImageId".
      */
     GetModPathsReturn getModifiedPaths() const final {
         return {GetModPathsReturn::Type::kFiniteSet,
-                {kFullDocumentBeforeChangeFieldName.toString()},
+                {kFullDocumentBeforeChangeFieldName.toString(), kPreImageIdFieldName.toString()},
                 {}};
     }
 
@@ -97,7 +103,7 @@ public:
     }
 
     DepsTracker::State getDependencies(DepsTracker* deps) const {
-        deps->fields.insert(DocumentSourceChangeStream::kFullDocumentBeforeChangeField.toString());
+        deps->fields.insert(DocumentSourceChangeStream::kPreImageIdField.toString());
         // This stage does not restrict the output fields to a finite set, and has no impact on
         // whether metadata is available or needed.
         return DepsTracker::State::SEE_NEXT;
@@ -116,15 +122,6 @@ private:
      * Performs the lookup to retrieve the full pre-image document for applicable operations.
      */
     GetNextResult doGetNext() final;
-
-    /**
-     * Looks up and returns a pre-image document at the specified opTime in the oplog. Returns
-     * boost::none if the mode is "kWhenAvailable" and no such oplog entry was found. Throws if the
-     * pre-image mode is "kRequired" and no entry was found. Invariants that if an oplog entry with
-     * the given opTime is found, it is a no-op entry with a valid non-empty pre-image document.
-     */
-    boost::optional<Document> lookupPreImage(const Document& inputDoc,
-                                             const repl::OpTime& opTime) const;
 
     Value serializeLegacy(boost::optional<ExplainOptions::Verbosity> explain) const final;
     Value serializeLatest(boost::optional<ExplainOptions::Verbosity> explain) const final;

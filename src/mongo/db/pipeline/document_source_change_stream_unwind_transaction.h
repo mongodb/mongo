@@ -133,6 +133,13 @@ private:
             return _txnOpIndex - 1;
         }
 
+        size_t applyOpsIndex() const {
+            // 'currentApplyOpsIndex' points to the _next_ 'applyOps' index, so we must subtract one
+            // to get the index of the entry being examined right now.
+            invariant(_currentApplyOpsIndex >= 1);
+            return _currentApplyOpsIndex - 1;
+        }
+
         Timestamp clusterTime() const {
             return _clusterTime;
         }
@@ -190,6 +197,9 @@ private:
         // iterate, this iterator will point to the array's "end" sentinel, and '_txnOplogEntries'
         // will be empty.
         typename std::vector<Value>::const_iterator _currentApplyOpsIt;
+
+        // The index of the next entry within the current 'applyOps' array.
+        size_t _currentApplyOpsIndex;
 
         // Our current place within the entire transaction, which may consist of multiple 'applyOps'
         // arrays.

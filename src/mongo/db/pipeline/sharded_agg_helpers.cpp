@@ -1276,17 +1276,23 @@ std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(
     invariant(pipeline->getSources().empty() ||
               !dynamic_cast<DocumentSourceMergeCursors*>(pipeline->getSources().front().get()));
 
+    // Helper to decide whether we should ignore the given shardTargetingPolicy for this namespace.
+    // Certain namespaces are shard-local; that is, they exist independently on every shard. For
+    // these namespaces, a local cursor should always be used.
+    // TODO SERVER-59957: use NamespaceString::isPerShardNamespace instead.
+    auto shouldAlwaysAttachLocalCursorForNamespace = [](const NamespaceString& ns) {
+        return (ns.isLocal() || ns.isConfigDotCacheDotChunks() ||
+                ns.isReshardingLocalOplogBufferCollection() ||
+                ns == NamespaceString::kConfigImagesNamespace ||
+                ns == NamespaceString::kChangeStreamPreImagesNamespace);
+    };
+
     auto catalogCache = Grid::get(expCtx->opCtx)->catalogCache();
     return shardVersionRetry(
         expCtx->opCtx, catalogCache, expCtx->ns, "targeting pipeline to attach cursors"_sd, [&]() {
             auto pipelineToTarget = pipeline->clone();
             if (shardTargetingPolicy == ShardTargetingPolicy::kNotAllowed ||
-                expCtx->ns.isConfigDotCacheDotChunks() || expCtx->ns.db() == "local" ||
-                expCtx->ns.isReshardingLocalOplogBufferCollection()) {
-                // If the db is local, this may be a change stream examining the oplog. We know the
-                // oplog, other local collections, and collections that store the local resharding
-                // oplog buffer won't be sharded. Additionally, each shard has its own complete
-                // copy of any "config.cache.chunks.*" namespace.
+                shouldAlwaysAttachLocalCursorForNamespace(expCtx->ns)) {
                 return expCtx->mongoProcessInterface->attachCursorSourceToPipelineForLocalRead(
                     pipelineToTarget.release());
             }

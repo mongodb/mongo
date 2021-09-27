@@ -35,6 +35,7 @@
 
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/pipeline/change_stream_document_diff_parser.h"
+#include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/document_source_change_stream_add_post_image.h"
 #include "mongo/db/pipeline/document_source_change_stream_check_resumability.h"
@@ -94,7 +95,7 @@ DocumentSourceChangeStreamTransform::DocumentSourceChangeStreamTransform(
       _isIndependentOfAnyCollection(expCtx->ns.isCollectionlessAggregateNS()) {
 
     // If the change stream spec requested a pre-image, make sure that we supply one.
-    _includePreImageOptime =
+    _includePreImageId =
         (_changeStreamSpec.getFullDocumentBeforeChange() != FullDocumentBeforeChangeModeEnum::kOff);
 
     // Extract the resume token or high-water-mark from the spec.
@@ -189,7 +190,6 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
     Value ns = input[repl::OplogEntry::kNssFieldName];
     checkValueType(ns, repl::OplogEntry::kNssFieldName, BSONType::String);
     Value uuid = input[repl::OplogEntry::kUuidFieldName];
-    Value preImageOpTime = input[repl::OplogEntry::kPreImageOpTimeFieldName];
     std::vector<FieldPath> documentKeyFields;
 
     // Deal with CRUD operations and commands.
@@ -353,8 +353,10 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
         invariant(!uuid.missing(), "Saw a CRUD op without a UUID");
     }
 
-    // Extract the txnOpIndex field. This will be missing unless we are unwinding a transaction.
+    // Extract the 'txnOpIndex' and 'applyOpsIndex' fields. These will be missing unless we are
+    // unwinding a transaction.
     auto txnOpIndex = input[DocumentSourceChangeStream::kTxnOpIndexField];
+    auto applyOpsIndex = input[DocumentSourceChangeStream::kApplyOpsIndexField];
 
     // Add some additional fields only relevant to transactions.
     if (!txnOpIndex.missing()) {
@@ -390,13 +392,26 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
         return doc.freeze();
     }
 
-    // Add the post-image, pre-image, namespace, documentKey and other fields as appropriate.
+    // Add the post-image, pre-image id, namespace, documentKey and other fields as appropriate.
     doc.addField(DocumentSourceChangeStream::kFullDocumentField, std::move(fullDocument));
-    if (_includePreImageOptime) {
-        // Set 'kFullDocumentBeforeChangeField' to the pre-image optime. The DSCSAddPreImage
-        // stage will replace this optime with the actual pre-image taken from the oplog.
-        doc.addField(DocumentSourceChangeStream::kFullDocumentBeforeChangeField,
-                     std::move(preImageOpTime));
+
+    // Include pre-image id only for update, replace and delete operations.
+    static const std::set<StringData> preImageOps = {"update", "replace", "delete"};
+    if (_includePreImageId && preImageOps.count(operationType)) {
+        auto preImageOpTime = input[repl::OplogEntry::kPreImageOpTimeFieldName];
+        if (!preImageOpTime.missing()) {
+            // Set 'kPreImageIdField' to the pre-image optime. The DSCSAddPreImage stage will use
+            // this optime in order to fetch the pre-image from the oplog.
+            doc.addField(DocumentSourceChangeStream::kPreImageIdField, std::move(preImageOpTime));
+        } else {
+            // Set 'kPreImageIdField' to the 'ChangeStreamPreImageId'. The DSCSAddPreImage stage
+            // will use the id in order to fetch the pre-image from the pre-images collection.
+            const auto preImageId =
+                ChangeStreamPreImageId(uuid.getUuid(),
+                                       ts.getTimestamp(),
+                                       applyOpsIndex.missing() ? 0 : applyOpsIndex.getLong());
+            doc.addField(DocumentSourceChangeStream::kPreImageIdField, Value(preImageId.toBSON()));
+        }
     }
     doc.addField(DocumentSourceChangeStream::kNamespaceField,
                  operationType == DocumentSourceChangeStream::kDropDatabaseOpType
@@ -433,8 +448,9 @@ DepsTracker::State DocumentSourceChangeStreamTransform::getDependencies(DepsTrac
     deps->fields.insert(repl::OplogEntry::kTxnNumberFieldName.toString());
     deps->fields.insert(DocumentSourceChangeStream::kTxnOpIndexField.toString());
 
-    if (_includePreImageOptime) {
+    if (_includePreImageId) {
         deps->fields.insert(repl::OplogEntry::kPreImageOpTimeFieldName.toString());
+        deps->fields.insert(DocumentSourceChangeStream::kApplyOpsIndexField.toString());
     }
     return DepsTracker::State::EXHAUSTIVE_ALL;
 }

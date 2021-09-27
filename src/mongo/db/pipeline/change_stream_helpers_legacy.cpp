@@ -32,13 +32,13 @@
 #include "mongo/db/pipeline/change_stream_helpers_legacy.h"
 
 #include "mongo/db/pipeline/document_source_change_stream_add_post_image.h"
+#include "mongo/db/pipeline/document_source_change_stream_add_pre_image.h"
 #include "mongo/db/pipeline/document_source_change_stream_check_invalidate.h"
 #include "mongo/db/pipeline/document_source_change_stream_check_resumability.h"
 #include "mongo/db/pipeline/document_source_change_stream_check_topology_change.h"
 #include "mongo/db/pipeline/document_source_change_stream_close_cursor.h"
 #include "mongo/db/pipeline/document_source_change_stream_ensure_resume_token_present.h"
 #include "mongo/db/pipeline/document_source_change_stream_handle_topology_change.h"
-#include "mongo/db/pipeline/document_source_change_stream_lookup_pre_image.h"
 #include "mongo/db/pipeline/document_source_change_stream_oplog_match.h"
 #include "mongo/db/pipeline/document_source_change_stream_transform.h"
 #include "mongo/db/pipeline/document_source_change_stream_unwind_transaction.h"
@@ -120,6 +120,42 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildPipeline(
     }
 
     return stages;
+}
+
+boost::optional<Document> legacyLookupPreImage(boost::intrusive_ptr<ExpressionContext> pExpCtx,
+                                               const Document& preImageId) {
+    // We need the oplog's UUID for lookup, so obtain the collection info via MongoProcessInterface.
+    auto localOplogInfo = pExpCtx->mongoProcessInterface->getCollectionOptions(
+        pExpCtx->opCtx, NamespaceString::kRsOplogNamespace);
+
+    // Extract the UUID from the collection information. We should always have a valid uuid here.
+    auto oplogUUID = invariantStatusOK(UUID::parse(localOplogInfo["uuid"]));
+
+    // Look up the pre-image oplog entry using the opTime as the query filter.
+    const auto opTime = repl::OpTime::parse(preImageId.toBson());
+    auto lookedUpDoc =
+        pExpCtx->mongoProcessInterface->lookupSingleDocument(pExpCtx,
+                                                             NamespaceString::kRsOplogNamespace,
+                                                             oplogUUID,
+                                                             Document{opTime.asQuery()},
+                                                             boost::none);
+
+    // Return boost::none to signify that we failed to find the pre-image.
+    if (!lookedUpDoc) {
+        return boost::none;
+    }
+
+    // If we had an optime to look up, and we found an oplog entry with that timestamp, then we
+    // should always have a valid no-op entry containing a valid, non-empty pre-image document.
+    auto opLogEntry = uassertStatusOK(repl::OplogEntry::parse(lookedUpDoc->toBson()));
+    tassert(5868901,
+            "Oplog entry type must be a no-op",
+            opLogEntry.getOpType() == repl::OpTypeEnum::kNoop);
+    tassert(5868902,
+            "Oplog entry must contait a non-empty pre-image document",
+            !opLogEntry.getObject().isEmpty());
+
+    return Document{opLogEntry.getObject().getOwned()};
 }
 }  // namespace change_stream_legacy
 

@@ -60,7 +60,7 @@ assert.throwsWithCode(function() {
 
     return assert.soon(() => wholeDBStream.hasNext() &&
                            wholeDBStream.next().documentKey._id === "last_change_sentinel");
-}, 51770);
+}, [ErrorCodes.ChangeStreamHistoryLost, 51770]);
 
 // Confirm that attempting to open a whole-cluster stream on with mode "required" fails.
 assert.throwsWithCode(function() {
@@ -72,7 +72,7 @@ assert.throwsWithCode(function() {
 
     return assert.soon(() => wholeClusterStream.hasNext() &&
                            wholeClusterStream.next().documentKey._id == "last_change_sentinel");
-}, 51770);
+}, [ErrorCodes.ChangeStreamHistoryLost, 51770]);
 
 // However, if we open a whole-db or whole-cluster stream that filters for only the namespace with
 // pre-images, then the cursor can proceed. This is because the $match gets moved ahead of the

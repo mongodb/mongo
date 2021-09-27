@@ -32,9 +32,11 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/pipeline/document_source_change_stream_lookup_pre_image.h"
+#include "mongo/db/pipeline/document_source_change_stream_add_pre_image.h"
 
 #include "mongo/bson/simple_bsonelement_comparator.h"
+#include "mongo/db/pipeline/change_stream_helpers_legacy.h"
+#include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/transaction_history_iterator.h"
 #include "mongo/util/intrusive_counter.h"
 
@@ -46,7 +48,7 @@ REGISTER_INTERNAL_DOCUMENT_SOURCE(
     LiteParsedDocumentSourceChangeStreamInternal::parse,
     DocumentSourceChangeStreamAddPreImage::createFromBson,
     feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV());
-}
+}  // namespace
 
 constexpr StringData DocumentSourceChangeStreamAddPreImage::kStageName;
 constexpr StringData DocumentSourceChangeStreamAddPreImage::kFullDocumentBeforeChangeFieldName;
@@ -90,67 +92,77 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamAddPreImage::doGetNext()
     // If a pre-image is available, the transform stage will have populated it in the event's
     // 'fullDocumentBeforeChange' field. If this field is missing and the pre-imaging mode is
     // 'required', we throw an exception. Otherwise, we pass along the document unmodified.
-    auto preImageOpTimeVal = input.getDocument()[kFullDocumentBeforeChangeFieldName];
-    if (preImageOpTimeVal.missing()) {
+    auto preImageId = input.getDocument()[kPreImageIdFieldName];
+    if (preImageId.missing()) {
         uassert(51770,
                 str::stream()
                     << "Change stream was configured to require a pre-image for all update, delete "
-                       "and replace events, but no pre-image optime was recorded for event: "
+                       "and replace events, but pre-image id was not available for event: "
                     << input.getDocument().toString(),
                 _fullDocumentBeforeChangeMode != FullDocumentBeforeChangeModeEnum::kRequired);
         return input;
     }
+    tassert(5868900,
+            "Expected pre-image id field to be a document",
+            preImageId.getType() == BSONType::Object);
 
-    // Look up the pre-image using the optime. This may return boost::none if it was not found.
-    auto preImageOpTime = repl::OpTime::parse(preImageOpTimeVal.getDocument().toBson());
-    auto preImageDoc = lookupPreImage(input.getDocument(), preImageOpTime);
+    // Obtain the pre-image document, if available, given the specified preImageId.
+    auto preImageDoc = lookupPreImage(pExpCtx, preImageId.getDocument());
+    uassert(
+        ErrorCodes::ChangeStreamHistoryLost,
+        str::stream() << "Change stream was configured to require a pre-image for all update, "
+                         "delete and replace events, but the pre-image was not found for event: "
+                      << input.getDocument().toString(),
+        preImageDoc ||
+            _fullDocumentBeforeChangeMode != FullDocumentBeforeChangeModeEnum::kRequired);
 
-    // Even if no pre-image was found, we have to replace the 'fullDocumentBeforeChange' field.
+    // Even if no pre-image was found, we have to populate the 'fullDocumentBeforeChange' field.
     MutableDocument outputDoc(input.releaseDocument());
-    outputDoc[kFullDocumentBeforeChangeFieldName] = (preImageDoc ? Value(*preImageDoc) : Value());
+    outputDoc[kFullDocumentBeforeChangeFieldName] =
+        (preImageDoc ? Value(*preImageDoc) : Value(BSONNULL));
+
+    // Do not propagate preImageId field further through the pipeline.
+    outputDoc.remove(kPreImageIdFieldName);
 
     return outputDoc.freeze();
 }
 
 boost::optional<Document> DocumentSourceChangeStreamAddPreImage::lookupPreImage(
-    const Document& inputDoc, const repl::OpTime& opTime) const {
-    // We need the oplog's UUID for lookup, so obtain the collection info via MongoProcessInterface.
-    auto localOplogInfo = pExpCtx->mongoProcessInterface->getCollectionOptions(
-        pExpCtx->opCtx, NamespaceString::kRsOplogNamespace);
+    boost::intrusive_ptr<ExpressionContext> pExpCtx, const Document& preImageId) {
+    // If the pre-image id does not contain the nsUUID field, then it is in legacy format. Look
+    // up the pre-image in the oplog.
+    if (preImageId[ChangeStreamPreImageId::kNsUUIDFieldName].missing()) {
+        return change_stream_legacy::legacyLookupPreImage(pExpCtx, preImageId);
+    }
 
-    // Extract the UUID from the collection information. We should always have a valid uuid here.
-    auto oplogUUID = invariantStatusOK(UUID::parse(localOplogInfo["uuid"]));
+    // We need the pre-images UUID for lookup, so obtain the collection info via
+    // MongoProcessInterface.
+    auto preImagesCollectionInfo = pExpCtx->mongoProcessInterface->getCollectionOptions(
+        pExpCtx->opCtx, NamespaceString::kChangeStreamPreImagesNamespace);
 
-    // Look up the pre-image oplog entry using the opTime as the query filter.
-    auto lookedUpDoc =
-        pExpCtx->mongoProcessInterface->lookupSingleDocument(pExpCtx,
-                                                             NamespaceString::kRsOplogNamespace,
-                                                             oplogUUID,
-                                                             Document{opTime.asQuery()},
-                                                             boost::none);
-
-    // Failing to find an oplog entry implies that the pre-image has rolled off the oplog. This is
-    // acceptable if the mode is "kWhenAvailable", but not if the mode is "kRequired".
-    if (!lookedUpDoc) {
-        uassert(
-            ErrorCodes::ChangeStreamHistoryLost,
-            str::stream()
-                << "Change stream was configured to require a pre-image for all update, delete and "
-                   "replace events, but the pre-image was not found in the oplog for event: "
-                << inputDoc.toString(),
-            _fullDocumentBeforeChangeMode != FullDocumentBeforeChangeModeEnum::kRequired);
-
-        // Return boost::none to signify that we (legally) failed to find the pre-image.
+    // Return boost::none if pre-images collection doesn't exist.
+    if (preImagesCollectionInfo.isEmpty()) {
         return boost::none;
     }
 
-    // If we had an optime to look up, and we found an oplog entry with that timestamp, then we
-    // should always have a valid no-op entry containing a valid, non-empty pre-image document.
-    auto opLogEntry = uassertStatusOK(repl::OplogEntry::parse(lookedUpDoc->toBson()));
-    invariant(opLogEntry.getOpType() == repl::OpTypeEnum::kNoop);
-    invariant(!opLogEntry.getObject().isEmpty());
+    // Extract the UUID from the collection information. We should always have a valid uuid here.
+    auto preImagesCollectionUUID = invariantStatusOK(UUID::parse(preImagesCollectionInfo["uuid"]));
 
-    return Document{opLogEntry.getObject().getOwned()};
+    // Look up the pre-image using the pre-image id as the query filter.
+    auto lookedUpDoc = pExpCtx->mongoProcessInterface->lookupSingleDocument(
+        pExpCtx,
+        NamespaceString::kChangeStreamPreImagesNamespace,
+        preImagesCollectionUUID,
+        Document{{"_id", Value(preImageId)}},
+        boost::none);
+
+    // Return boost::none to signify that we failed to find the pre-image.
+    if (!lookedUpDoc) {
+        return boost::none;
+    }
+
+    // Return preImage field from the document.
+    return lookedUpDoc->getField(ChangeStreamPreImage::kPreImageFieldName).getDocument().getOwned();
 }
 
 Value DocumentSourceChangeStreamAddPreImage::serializeLatest(

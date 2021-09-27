@@ -268,6 +268,7 @@ DocumentSourceChangeStreamUnwindTransaction::TransactionOpIterator::TransactionO
 
     // Initialize iterators at the beginning of the transaction.
     _currentApplyOpsIt = _currentApplyOps.getArray().begin();
+    _currentApplyOpsIndex = 0;
     _txnOpIndex = 0;
 }
 
@@ -277,6 +278,7 @@ DocumentSourceChangeStreamUnwindTransaction::TransactionOpIterator::getNextTrans
     while (true) {
         while (_currentApplyOpsIt != _currentApplyOps.getArray().end()) {
             Document doc = (_currentApplyOpsIt++)->getDocument();
+            ++_currentApplyOpsIndex;
             ++_txnOpIndex;
 
             // If the document is relevant, update it with the required txn fields before returning.
@@ -303,6 +305,7 @@ DocumentSourceChangeStreamUnwindTransaction::TransactionOpIterator::getNextTrans
 
         _currentApplyOps = Value(bsonOp["applyOps"]);
         _currentApplyOpsIt = _currentApplyOps.getArray().begin();
+        _currentApplyOpsIndex = 0;
     }
 }
 
@@ -329,6 +332,12 @@ DocumentSourceChangeStreamUnwindTransaction::TransactionOpIterator::_addRequired
     // transaction number. The 'txnOpIndex()' must be called to get the current transaction number.
     newDoc.addField(DocumentSourceChangeStream::kTxnOpIndexField,
                     Value(static_cast<long long>(txnOpIndex())));
+
+    // The 'getNextTransactionOp' updates the '_currentApplyOpsIndex' to point to the next entry in
+    // the '_currentApplyOps' array. The 'applyOpsIndex()' method must be called to get the index of
+    // the current entry.
+    newDoc.addField(DocumentSourceChangeStream::kApplyOpsIndexField,
+                    Value(static_cast<long long>(applyOpsIndex())));
 
     newDoc.addField(repl::OplogEntry::kTimestampFieldName, Value(_clusterTime));
     newDoc.addField(repl::OplogEntry::kSessionIdFieldName, Value(_lsid));

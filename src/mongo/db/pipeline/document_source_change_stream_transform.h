@@ -108,8 +108,8 @@ private:
     // Set to true if this transformation stage can be run on the collectionless namespace.
     bool _isIndependentOfAnyCollection;
 
-    // Set to true if the pre-image optime should be included in output documents.
-    bool _includePreImageOptime = false;
+    // Set to true if the pre-image id should be included in output documents.
+    bool _includePreImageId = false;
 };
 
 }  // namespace mongo
