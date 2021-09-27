@@ -276,7 +276,7 @@ void TraverseStage::close() {
     _children[0]->close();
 }
 
-void TraverseStage::doSaveState() {
+void TraverseStage::doSaveState(bool relinquishCursor) {
     if (_isReadingLeftSide) {
         // If we yield while reading the left side, there is no need to makeOwned() data held in
         // the right side, since we will have to re-open it anyway.
@@ -288,14 +288,14 @@ void TraverseStage::doSaveState() {
         _outFieldOutputAccessor.reset();
     }
 
-    if (!slotsAccessible()) {
+    if (!slotsAccessible() || !relinquishCursor) {
         return;
     }
 
     _outFieldOutputAccessor.makeOwned();
 }
 
-void TraverseStage::doRestoreState() {
+void TraverseStage::doRestoreState(bool relinquishCursor) {
     if (!slotsAccessible()) {
         return;
     }

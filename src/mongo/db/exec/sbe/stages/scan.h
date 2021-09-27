@@ -122,8 +122,8 @@ public:
     size_t estimateCompileTimeSize() const final;
 
 protected:
-    void doSaveState() override;
-    void doRestoreState() override;
+    void doSaveState(bool fullSave) override;
+    void doRestoreState(bool fullSave) override;
     void doDetachFromOperationContext() override;
     void doAttachToOperationContext(OperationContext* opCtx) override;
     void doDetachFromTrialRunTracker() override;
@@ -232,8 +232,8 @@ public:
     size_t estimateCompileTimeSize() const final;
 
 protected:
-    void doSaveState() final;
-    void doRestoreState() final;
+    void doSaveState(bool fullSave) final;
+    void doRestoreState(bool fullSave) final;
     void doDetachFromOperationContext() final;
     void doAttachToOperationContext(OperationContext* opCtx) final;
 

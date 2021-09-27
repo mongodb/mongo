@@ -86,7 +86,7 @@ public:
     size_t estimateCompileTimeSize() const final;
 
 protected:
-    void doSaveState() final;
+    void doSaveState(bool relinquishCursor) final;
 
 private:
     const CheckBoundsParams _params;

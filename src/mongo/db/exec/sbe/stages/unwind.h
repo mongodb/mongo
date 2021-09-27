@@ -68,8 +68,8 @@ public:
     size_t estimateCompileTimeSize() const final;
 
 protected:
-    void doSaveState() final;
-    void doRestoreState() final;
+    void doSaveState(bool relinquishCursor) final;
+    void doRestoreState(bool relinquishCursor) final;
 
 private:
     const value::SlotId _inField;

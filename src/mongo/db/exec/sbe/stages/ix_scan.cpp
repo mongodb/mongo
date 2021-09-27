@@ -155,32 +155,34 @@ value::SlotAccessor* IndexScanStage::getAccessor(CompileCtx& ctx, value::SlotId 
     return ctx.getAccessor(slot);
 }
 
-void IndexScanStage::doSaveState() {
-    if (slotsAccessible()) {
-        if (_recordAccessor) {
-            _recordAccessor->makeOwned();
+void IndexScanStage::doSaveState(bool relinquishCursor) {
+    if (relinquishCursor) {
+        if (slotsAccessible()) {
+            if (_recordAccessor) {
+                _recordAccessor->makeOwned();
+            }
+            if (_recordIdAccessor) {
+                _recordIdAccessor->makeOwned();
+            }
+            for (auto& accessor : _accessors) {
+                accessor.makeOwned();
+            }
         }
-        if (_recordIdAccessor) {
-            _recordIdAccessor->makeOwned();
-        }
-        for (auto& accessor : _accessors) {
-            accessor.makeOwned();
-        }
-    }
 
-    // Seek points are external to the index scan and must be accessible no matter what as long as
-    // the index scan is opened.
-    if (_open) {
-        if (_seekKeyLowHolder) {
-            _seekKeyLowHolder->makeOwned();
+        // Seek points are external to the index scan and must be accessible no matter what as long
+        // as the index scan is opened.
+        if (_open) {
+            if (_seekKeyLowHolder) {
+                _seekKeyLowHolder->makeOwned();
+            }
+            if (_seekKeyHighHolder) {
+                _seekKeyHighHolder->makeOwned();
+            }
         }
-        if (_seekKeyHighHolder) {
-            _seekKeyHighHolder->makeOwned();
-        }
-    }
 
-    if (_cursor) {
-        _cursor->save();
+        if (_cursor) {
+            _cursor->save();
+        }
     }
 
     _coll.reset();
@@ -196,7 +198,7 @@ void IndexScanStage::restoreCollectionAndIndex() {
             indexCatalogEntry && !indexCatalogEntry->isDropped());
 }
 
-void IndexScanStage::doRestoreState() {
+void IndexScanStage::doRestoreState(bool relinquishCursor) {
     invariant(_opCtx);
     invariant(!_coll);
 
@@ -206,7 +208,7 @@ void IndexScanStage::doRestoreState() {
     }
     restoreCollectionAndIndex();
 
-    if (_cursor) {
+    if (_cursor && relinquishCursor) {
         _cursor->restore();
     }
 

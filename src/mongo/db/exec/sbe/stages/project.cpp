@@ -154,8 +154,8 @@ size_t ProjectStage::estimateCompileTimeSize() const {
     return size;
 }
 
-void ProjectStage::doSaveState() {
-    if (!slotsAccessible()) {
+void ProjectStage::doSaveState(bool relinquishCursor) {
+    if (!slotsAccessible() || !relinquishCursor) {
         return;
     }
 

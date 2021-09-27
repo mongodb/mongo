@@ -322,8 +322,8 @@ void MergeJoinStage::close() {
     _outerProjectsBuffer.clear();
 }
 
-void MergeJoinStage::doSaveState() {
-    if (!slotsAccessible()) {
+void MergeJoinStage::doSaveState(bool relinquishCursor) {
+    if (!slotsAccessible() || !relinquishCursor) {
         return;
     }
 

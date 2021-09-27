@@ -161,27 +161,29 @@ value::SlotAccessor* ScanStage::getAccessor(CompileCtx& ctx, value::SlotId slot)
     return ctx.getAccessor(slot);
 }
 
-void ScanStage::doSaveState() {
+void ScanStage::doSaveState(bool fullSave) {
     if (slotsAccessible()) {
-        if (_recordAccessor) {
-            _recordAccessor->makeOwned();
-        }
-        if (_recordIdAccessor) {
-            _recordIdAccessor->makeOwned();
-        }
-        for (auto& [fieldName, accessor] : _fieldAccessors) {
-            accessor->makeOwned();
+        if (fullSave) {
+            if (_recordAccessor) {
+                _recordAccessor->makeOwned();
+            }
+            if (_recordIdAccessor) {
+                _recordIdAccessor->makeOwned();
+            }
+            for (auto& [fieldName, accessor] : _fieldAccessors) {
+                accessor->makeOwned();
+            }
         }
     }
 
-    if (_cursor) {
+    if (_cursor && fullSave) {
         _cursor->save();
     }
 
     _coll.reset();
 }
 
-void ScanStage::doRestoreState() {
+void ScanStage::doRestoreState(bool fullSave) {
     invariant(_opCtx);
     invariant(!_coll);
 
@@ -193,7 +195,7 @@ void ScanStage::doRestoreState() {
     tassert(5777408, "Catalog epoch should be initialized", _catalogEpoch);
     _coll = restoreCollection(_opCtx, *_collName, _collUuid, *_catalogEpoch);
 
-    if (_cursor) {
+    if (_cursor && fullSave) {
         const bool couldRestore = _cursor->restore();
         uassert(ErrorCodes::CappedPositionLost,
                 str::stream()
@@ -617,7 +619,7 @@ value::SlotAccessor* ParallelScanStage::getAccessor(CompileCtx& ctx, value::Slot
     return ctx.getAccessor(slot);
 }
 
-void ParallelScanStage::doSaveState() {
+void ParallelScanStage::doSaveState(bool fullSave) {
     if (slotsAccessible()) {
         if (_recordAccessor) {
             _recordAccessor->makeOwned();
@@ -637,7 +639,7 @@ void ParallelScanStage::doSaveState() {
     _coll.reset();
 }
 
-void ParallelScanStage::doRestoreState() {
+void ParallelScanStage::doRestoreState(bool fullSave) {
     invariant(_opCtx);
     invariant(!_coll);
 
@@ -649,7 +651,7 @@ void ParallelScanStage::doRestoreState() {
     tassert(5777409, "Catalog epoch should be initialized", _catalogEpoch);
     _coll = restoreCollection(_opCtx, *_collName, _collUuid, *_catalogEpoch);
 
-    if (_cursor) {
+    if (_cursor && fullSave) {
         const bool couldRestore = _cursor->restore();
         uassert(ErrorCodes::CappedPositionLost,
                 str::stream()

@@ -188,8 +188,8 @@ size_t CheckBoundsStage::estimateCompileTimeSize() const {
     return size;
 }
 
-void CheckBoundsStage::doSaveState() {
-    if (!slotsAccessible()) {
+void CheckBoundsStage::doSaveState(bool relinquishCursor) {
+    if (!slotsAccessible() || !relinquishCursor) {
         return;
     }
 

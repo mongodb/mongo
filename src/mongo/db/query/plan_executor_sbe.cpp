@@ -120,14 +120,14 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
 }
 
 void PlanExecutorSBE::saveState() {
-    _root->saveState();
+    _root->saveState(true /* relinquish cursor */);
     _yieldPolicy->setYieldable(nullptr);
     _lastGetNext = {};
 }
 
 void PlanExecutorSBE::restoreState(const RestoreContext& context) {
     _yieldPolicy->setYieldable(context.collection());
-    _root->restoreState();
+    _root->restoreState(true /* relinquish cursor */);
 }
 
 void PlanExecutorSBE::detachFromOperationContext() {

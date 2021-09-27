@@ -201,8 +201,8 @@ std::vector<DebugPrinter::Block> UnwindStage::debugPrint() const {
     return ret;
 }
 
-void UnwindStage::doSaveState() {
-    if (!slotsAccessible()) {
+void UnwindStage::doSaveState(bool fullSave) {
+    if (!slotsAccessible() || !fullSave) {
         return;
     }
 
@@ -214,7 +214,7 @@ void UnwindStage::doSaveState() {
     }
 }
 
-void UnwindStage::doRestoreState() {
+void UnwindStage::doRestoreState(bool fullSave) {
     if (!slotsAccessible()) {
         return;
     }

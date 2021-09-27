@@ -63,7 +63,7 @@ public:
     size_t estimateCompileTimeSize() const final;
 
 protected:
-    void doSaveState() final;
+    void doSaveState(bool relinquishCursor) final;
 
 private:
     const value::SlotMap<std::unique_ptr<EExpression>> _projects;

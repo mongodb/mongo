@@ -90,8 +90,8 @@ public:
     size_t estimateCompileTimeSize() const final;
 
 protected:
-    void doSaveState() final;
-    void doRestoreState() final;
+    void doSaveState(bool relinquishCursor) final;
+    void doRestoreState(bool relinquishCursor) final;
 
 private:
     void openInner(value::TypeTags tag, value::Value val);

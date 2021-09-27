@@ -125,7 +125,7 @@ public:
     size_t estimateCompileTimeSize() const final;
 
 protected:
-    void doSaveState() final;
+    void doSaveState(bool relinquishCursor) final;
 
 private:
     std::shared_ptr<SpoolBuffer> _buffer{nullptr};

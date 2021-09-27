@@ -99,8 +99,8 @@ public:
     size_t estimateCompileTimeSize() const final;
 
 protected:
-    void doSaveState() override;
-    void doRestoreState() override;
+    void doSaveState(bool relinquishCursor) override;
+    void doRestoreState(bool relinquishCursor) override;
     void doDetachFromOperationContext() override;
     void doAttachToOperationContext(OperationContext* opCtx) override;
     void doDetachFromTrialRunTracker() override;

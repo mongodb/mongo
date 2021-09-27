@@ -420,8 +420,8 @@ size_t MakeObjStageBase<O>::estimateCompileTimeSize() const {
 }
 
 template <MakeObjOutputType O>
-void MakeObjStageBase<O>::doSaveState() {
-    if (!slotsAccessible()) {
+void MakeObjStageBase<O>::doSaveState(bool relinquishCursor) {
+    if (!slotsAccessible() || !relinquishCursor) {
         return;
     }
 

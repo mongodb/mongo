@@ -34,13 +34,15 @@
 namespace mongo {
 void PlanYieldPolicySBE::saveState(OperationContext* opCtx) {
     for (auto&& root : _yieldingPlans) {
-        root->saveState();
+        // TODO SERVER-60024: Once we pin data across yields, it will no longer be necessary
+        // to pass 'true' here. Similar for the call to restoreState().
+        root->saveState(true /* relinquish cursor */);
     }
 }
 
 void PlanYieldPolicySBE::restoreState(OperationContext* opCtx, const Yieldable*) {
     for (auto&& root : _yieldingPlans) {
-        root->restoreState();
+        root->restoreState(true /* relinquish cursor */);
     }
 }
 }  // namespace mongo
