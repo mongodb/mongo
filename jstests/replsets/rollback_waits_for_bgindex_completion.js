@@ -40,7 +40,8 @@ function CommonOps(node) {
     IndexBuildTest.pauseIndexBuilds(node);
 
     jsTestLog("Starting background index build in parallel shell.");
-    bgIndexThread = IndexBuildTest.startIndexBuild(node, testColl.getFullName(), {x: 1});
+    bgIndexThread = IndexBuildTest.startIndexBuild(
+        node, testColl.getFullName(), {x: 1}, null, [ErrorCodes.InterruptedDueToReplStateChange]);
 
     jsTestLog("Waiting for background index build to start.");
     IndexBuildTest.waitForIndexBuildToStart(testDB, collName, "x_1");
@@ -90,8 +91,11 @@ rollbackTest.transitionToSteadyStateOperations();
 
 // Ensure index build is not running.
 IndexBuildTest.waitForIndexBuildToStop(testDB, collName, "x_1");
-// TODO: SERVER-59687
-bgIndexThread({checkExitSuccess: false});
+
+// Next call will check exit, where it will find that the bgshell encountered
+// ErrorCodes.InterruptedDueToReplStateChange which is expected in the call to
+// IndexBuildTest.startIndexBuild()
+bgIndexThread();
 
 // Check the replica set.
 rollbackTest.stop();
