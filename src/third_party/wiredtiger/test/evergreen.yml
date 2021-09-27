@@ -317,7 +317,7 @@ functions:
         if [ ${is_cmake_build|false} = true ]; then
           . test/evergreen/find_cmake.sh
           cd cmake_build
-          ${test_env_vars|} $CTEST -L check ${smp_command|} -VV 2>&1
+          ${test_env_vars|} $CTEST -L check ${smp_command|} --output-on-failure 2>&1
         else
           cd build_posix
           ${test_env_vars|} ${make_command|make} VERBOSE=1 check ${smp_command|} 2>&1
