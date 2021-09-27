@@ -653,6 +653,11 @@ Status MultiIndexBlock::dumpInsertsFromBulk(
     opCtx->checkForInterrupt();
     invariant(!_buildIsCleanedUp);
     invariant(opCtx->lockState()->isNoop() || !opCtx->lockState()->inAWriteUnitOfWork());
+
+    // Doesn't allow yielding when in a foreground index build.
+    const int32_t kYieldIterations =
+        isBackgroundBuilding() ? internalIndexBuildBulkLoadYieldIterations.load() : 0;
+
     for (size_t i = 0; i < _indexes.size(); i++) {
         if (_indexes[i].bulk == nullptr)
             continue;
@@ -676,6 +681,7 @@ Status MultiIndexBlock::dumpInsertsFromBulk(
                 opCtx,
                 _indexes[i].bulk.get(),
                 dupsAllowed,
+                kYieldIterations,
                 [=](const KeyString::Value& duplicateKey) -> Status {
                     // Do not record duplicates when explicitly ignored. This may be the case on
                     // secondaries.

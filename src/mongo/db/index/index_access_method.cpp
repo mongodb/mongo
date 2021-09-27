@@ -66,6 +66,8 @@ using std::vector;
 
 using IndexVersion = IndexDescriptor::IndexVersion;
 
+MONGO_FAIL_POINT_DEFINE(hangDuringIndexBuildBulkLoadYield);
+
 namespace {
 
 // Reserved RecordId against which multikey metadata keys are indexed.
@@ -603,12 +605,38 @@ int64_t AbstractIndexAccessMethod::BulkBuilderImpl::getKeysInserted() const {
     return _keysInserted;
 }
 
+void AbstractIndexAccessMethod::_yieldBulkLoad(OperationContext* opCtx,
+                                               const NamespaceString& ns) const {
+    // Releasing locks means a new snapshot should be acquired when restored.
+    opCtx->recoveryUnit()->abandonSnapshot();
+
+    auto locker = opCtx->lockState();
+    Locker::LockSnapshot snapshot;
+    if (locker->saveLockStateAndUnlock(&snapshot)) {
+
+        // Track the number of yields in CurOp.
+        CurOp::get(opCtx)->yielded();
+
+        hangDuringIndexBuildBulkLoadYield.executeIf(
+            [&](auto&&) {
+                LOGV2(5180600, "Hanging index build during bulk load yield");
+                hangDuringIndexBuildBulkLoadYield.pauseWhileSet();
+            },
+            [&](auto&& config) { return config.getStringField("namespace") == ns.ns(); });
+
+        locker->restoreLockState(opCtx, snapshot);
+    }
+}
+
 Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
                                              BulkBuilder* bulk,
                                              bool dupsAllowed,
+                                             int32_t yieldIterations,
                                              const KeyHandlerFn& onDuplicateKeyInserted,
                                              const RecordIdHandlerFn& onDuplicateRecord) {
     Timer timer;
+
+    auto ns = _indexCatalogEntry->ns();
 
     std::unique_ptr<BulkBuilder::Sorter::Iterator> it(bulk->done());
 
@@ -625,7 +653,7 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
 
     KeyString::Value previousKey;
 
-    while (it->more()) {
+    for (int64_t i = 1; it->more(); ++i) {
         opCtx->checkForInterrupt();
 
         // Get the next datum and add it to the builder.
@@ -672,6 +700,11 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
             status = onDuplicateKeyInserted(data.first);
             if (!status.isOK())
                 return status;
+        }
+
+        // Starts yielding locks after the first non-zero 'yieldIterations' inserts.
+        if (yieldIterations && i % yieldIterations == 0) {
+            _yieldBulkLoad(opCtx, ns);
         }
 
         // If we're here either it's a dup and we're cool with it or the addKey went just fine.
@@ -763,7 +796,7 @@ void AbstractIndexAccessMethod::getKeys(const BSONObj& obj,
         }
 
         // If the document applies to the filter (which means that it should have never been
-        // indexed), do not supress the error.
+        // indexed), do not suppress the error.
         const MatchExpression* filter = _indexCatalogEntry->getFilterExpression();
         if (mode == GetKeysMode::kRelaxConstraintsUnfiltered && filter &&
             filter->matchesBSON(obj)) {
