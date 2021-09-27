@@ -116,6 +116,9 @@ env.Library(
         '$BUILD_DIR/mongo/unittest/unittest',
         'query_sbe',
     ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/service_context_test_fixture',
+    ],
 )
 
 env.CppUnitTest(

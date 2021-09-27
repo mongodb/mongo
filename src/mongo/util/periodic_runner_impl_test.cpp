@@ -38,7 +38,7 @@
 
 #include "mongo/util/periodic_runner_impl.h"
 
-#include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/concurrency/locker_noop_service_context_test_fixture.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/clock_source_mock.h"
@@ -49,7 +49,7 @@ class Client;
 
 namespace {
 
-class PeriodicRunnerImplTestNoSetup : public ServiceContextTest {
+class PeriodicRunnerImplTestNoSetup : public LockerNoopServiceContextTest {
 public:
     void setUp() override {
         _clockSource = std::make_unique<ClockSourceMock>();

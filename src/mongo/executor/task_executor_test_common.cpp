@@ -35,6 +35,7 @@
 
 #include <memory>
 
+#include "mongo/db/concurrency/locker_noop_client_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/network_interface_mock.h"
@@ -361,6 +362,7 @@ COMMON_EXECUTOR_TEST(EventWaitingWithTimeoutTest) {
 
     auto serviceContext = ServiceContext::make();
 
+    serviceContext->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
     serviceContext->setFastClockSource(std::make_unique<ClockSourceMock>());
     auto mockClock = static_cast<ClockSourceMock*>(serviceContext->getFastClockSource());
 
@@ -383,6 +385,7 @@ COMMON_EXECUTOR_TEST(EventSignalWithTimeoutTest) {
 
     auto serviceContext = ServiceContext::make();
 
+    serviceContext->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
     serviceContext->setFastClockSource(std::make_unique<ClockSourceMock>());
     auto mockClock = static_cast<ClockSourceMock*>(serviceContext->getFastClockSource());
 

@@ -29,8 +29,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/concurrency/locker_noop_service_context_test_fixture.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/stats/operation_resource_consumption_gen.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/unittest/unittest.h"
@@ -49,7 +49,7 @@ ServerParameter* getServerParameter(const std::string& name) {
 }
 }  // namespace
 
-class ResourceConsumptionMetricsTest : public ServiceContextTest {
+class ResourceConsumptionMetricsTest : public LockerNoopServiceContextTest {
 public:
     void setUp() {
         _opCtx = makeOperationContext();

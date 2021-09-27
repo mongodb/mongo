@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/collection_mock.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/db/concurrency/locker_noop_client_observer.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/json.h"
 #include "mongo/db/operation_context_noop.h"
@@ -56,6 +57,9 @@ using std::string;
 class WiredTigerIndexHarnessHelper final : public SortedDataInterfaceHarnessHelper {
 public:
     WiredTigerIndexHarnessHelper() : _dbpath("wt_test"), _conn(nullptr) {
+        auto service = getServiceContext();
+        service->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
+
         const char* config = "create,cache_size=1G,";
         int ret = wiredtiger_open(_dbpath.path().c_str(), nullptr, config, &_conn);
         invariantWTOK(ret);

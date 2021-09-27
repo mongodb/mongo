@@ -33,6 +33,7 @@
 
 #include "mongo/util/producer_consumer_queue.h"
 
+#include "mongo/db/concurrency/locker_noop_client_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/mutex.h"
@@ -135,6 +136,10 @@ std::enable_if_t<requiresMultiProducer && requiresMultiConsumer> runCallbackWith
 
 class ProducerConsumerQueueTest : public unittest::Test {
 public:
+    ProducerConsumerQueueTest() {
+        _serviceCtx->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
+    }
+
     template <bool requiresMultiProducer, bool requiresMultiConsumer, typename Callback>
     void runPermutations(Callback&& callback) {
         runCallbackWithPerms<requiresMultiProducer, requiresMultiConsumer>([&](auto x_, auto y_) {

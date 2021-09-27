@@ -37,6 +37,7 @@
 #include <vector>
 
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/locker_noop_client_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
@@ -457,6 +458,7 @@ namespace mongo {
 void assertFunctionInterruptible(std::function<void(Interruptible* interruptible)> f) {
     const auto service = ServiceContext::make();
     const std::shared_ptr<ClockSourceMock> mockClock = std::make_shared<ClockSourceMock>();
+    service->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
     service->setFastClockSource(std::make_unique<SharedClockSourceAdapter>(mockClock));
     service->setPreciseClockSource(std::make_unique<SharedClockSourceAdapter>(mockClock));
     service->setTickSource(std::make_unique<TickSourceMock<>>());

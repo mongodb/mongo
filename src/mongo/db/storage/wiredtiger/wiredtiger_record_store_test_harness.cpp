@@ -29,6 +29,7 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store_test_harness.h"
 
+#include "mongo/db/concurrency/locker_noop_client_observer.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 
@@ -46,6 +47,9 @@ WiredTigerHarnessHelper::WiredTigerHarnessHelper(StringData extraStrings)
               false,
               false,
               false) {
+    auto service = getServiceContext();
+    service->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
+
     repl::ReplicationCoordinator::set(
         serviceContext(),
         std::make_unique<repl::ReplicationCoordinatorMock>(serviceContext(), repl::ReplSettings()));

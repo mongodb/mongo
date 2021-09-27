@@ -31,6 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/concurrency/locker_noop_client_observer.h"
 #include "mongo/executor/task_executor_cursor.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/unittest/bson_test_util.h"
@@ -46,6 +47,10 @@ namespace {
  */
 class TaskExecutorCursorFixture : public ThreadPoolExecutorTest {
 public:
+    TaskExecutorCursorFixture() {
+        serviceCtx->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
+    }
+
     void setUp() override {
         ThreadPoolExecutorTest::setUp();
 

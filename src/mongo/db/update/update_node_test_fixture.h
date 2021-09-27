@@ -29,8 +29,8 @@
 
 #pragma once
 
+#include "mongo/db/concurrency/locker_noop_service_context_test_fixture.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/update/update_node.h"
 #include "mongo/db/update/v1_log_builder.h"
 #include "mongo/db/update/v2_log_builder.h"
@@ -38,7 +38,7 @@
 
 namespace mongo {
 
-class UpdateNodeTest : public ServiceContextTest {
+class UpdateNodeTest : public LockerNoopServiceContextTest {
 public:
     ~UpdateNodeTest() override = default;
 

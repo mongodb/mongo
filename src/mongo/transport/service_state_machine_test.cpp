@@ -39,9 +39,9 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/client_strand.h"
+#include "mongo/db/concurrency/locker_noop_service_context_test_fixture.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/rpc/op_msg.h"
@@ -68,7 +68,7 @@ namespace {
  * ServiceStateMachine so as to provide a deterministic way to evaluate the state machine
  * implemenation.
  */
-class ServiceStateMachineTest : public ServiceContextTest {
+class ServiceStateMachineTest : public LockerNoopServiceContextTest {
     /**
      * This class stores and synchronizes the shared data between the test fixture and its various
      * wrappers.
