@@ -226,5 +226,26 @@ TEST(FieldPathTest, Concat) {
     checkConcatWorks("$db", "$id");
     checkConcatWorks("$db.$id", "$id.$db");
 }
+
+TEST(FieldPathTest, ConcatFailsIfExceedsMaxDepth) {
+    std::string firstHalfStr;
+    std::string secondHalfStr;
+    int pathLength = 201;
+    int firstHalfMax = 99;
+    int secondHalfMax = pathLength - 1;
+    for (int i = 0; i <= firstHalfMax; ++i) {
+        firstHalfStr.append(std::to_string(pathLength - i));
+        firstHalfStr.append(".");
+    }
+    firstHalfStr.append(std::to_string(firstHalfMax + 1));
+    for (int i = 101; i < secondHalfMax; ++i) {
+        secondHalfStr.append(std::to_string(pathLength - i));
+        secondHalfStr.append(".");
+    }
+    secondHalfStr.append(std::to_string(pathLength));
+    FieldPath firstHalf(firstHalfStr);
+    FieldPath secondHalf(secondHalfStr);
+    ASSERT_THROWS_CODE(firstHalf.concat(secondHalf), AssertionException, ErrorCodes::Overflow);
+}
 }  // namespace
 }  // namespace mongo

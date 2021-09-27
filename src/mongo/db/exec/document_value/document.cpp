@@ -44,6 +44,43 @@ using boost::intrusive_ptr;
 using std::string;
 using std::vector;
 
+namespace {
+/**
+ * Assert that a given field path does not exceed the length limit.
+ */
+void assertFieldPathLengthOK(const FieldPath& path) {
+    uassert(5984700,
+            "Field path exceeds path length limit",
+            path.getPathLength() < BSONDepth::getMaxAllowableDepth());
+}
+void assertFieldPathLengthOK(const std::vector<Position>& path) {
+    uassert(5984701,
+            "Field path exceeds path length limit",
+            path.size() < BSONDepth::getMaxAllowableDepth());
+}
+
+stdx::variant<BSONElement, Value, Document::TraversesArrayTag, stdx::monostate>
+getNestedFieldHelperBSON(BSONElement elt, const FieldPath& fp, size_t level) {
+    if (level == fp.getPathLength()) {
+        if (elt.ok()) {
+            return elt;
+        } else {
+            return stdx::monostate{};
+        }
+    }
+
+    if (elt.type() == BSONType::Array) {
+        return Document::TraversesArrayTag{};
+    } else if (elt.type() == BSONType::Object) {
+        auto subFieldElt = elt.embeddedObject()[fp.getFieldName(level)];
+        return getNestedFieldHelperBSON(subFieldElt, fp, level + 1);
+    }
+
+    // The path continues "past" a scalar, and therefore does not exist.
+    return stdx::monostate{};
+}
+}  // namespace
+
 const DocumentStorage DocumentStorage::kEmptyDoc;
 
 const StringDataSet Document::allMetadataFieldNames{Document::metaFieldTextScore,
@@ -568,6 +605,7 @@ MutableValue MutableDocument::getNestedFieldHelper(const FieldPath& dottedField,
 
 MutableValue MutableDocument::getNestedField(const FieldPath& dottedField) {
     fassert(16601, dottedField.getPathLength());
+    assertFieldPathLengthOK(dottedField);
     return getNestedFieldHelper(dottedField, 0);
 }
 
@@ -583,31 +621,10 @@ MutableValue MutableDocument::getNestedFieldHelper(const vector<Position>& posit
 
 MutableValue MutableDocument::getNestedField(const vector<Position>& positions) {
     fassert(16488, !positions.empty());
+    assertFieldPathLengthOK(positions);
     return getNestedFieldHelper(positions, 0);
 }
 
-namespace {
-stdx::variant<BSONElement, Value, Document::TraversesArrayTag, stdx::monostate>
-getNestedFieldHelperBSON(BSONElement elt, const FieldPath& fp, size_t level) {
-    if (level == fp.getPathLength()) {
-        if (elt.ok()) {
-            return elt;
-        } else {
-            return stdx::monostate{};
-        }
-    }
-
-    if (elt.type() == BSONType::Array) {
-        return Document::TraversesArrayTag{};
-    } else if (elt.type() == BSONType::Object) {
-        auto subFieldElt = elt.embeddedObject()[fp.getFieldName(level)];
-        return getNestedFieldHelperBSON(subFieldElt, fp, level + 1);
-    }
-
-    // The path continues "past" a scalar, and therefore does not exist.
-    return stdx::monostate{};
-}
-}  // namespace
 
 stdx::variant<BSONElement, Value, Document::TraversesArrayTag, stdx::monostate>
 Document::getNestedFieldNonCachingHelper(const FieldPath& dottedField, size_t level) const {
@@ -673,6 +690,7 @@ static Value getNestedFieldHelper(const Document& doc,
 
 const Value Document::getNestedField(const FieldPath& path, vector<Position>* positions) const {
     fassert(16489, path.getPathLength());
+    assertFieldPathLengthOK(path);
     return getNestedFieldHelper(*this, path, positions, 0);
 }
 

@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bson_depth.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -142,7 +143,11 @@ public:
 
 private:
     FieldPath(std::string string, std::vector<size_t> dots)
-        : _fieldPath(std::move(string)), _fieldPathDotPosition(std::move(dots)) {}
+        : _fieldPath(std::move(string)), _fieldPathDotPosition(std::move(dots)) {
+        uassert(ErrorCodes::Overflow,
+                "FieldPath is too long",
+                _fieldPathDotPosition.size() <= BSONDepth::getMaxAllowableDepth());
+    }
 
     static const char prefix = '$';
 
