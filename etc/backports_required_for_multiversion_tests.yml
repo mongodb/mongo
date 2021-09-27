@@ -90,6 +90,8 @@ last-continuous:
       test_file: jstests/sharding/resharding_secondary_recovers_temp_ns_metadata.js
     - ticket: SERVER-57772
       test_file: jstests/sharding/rewrite_state_change_errors.js
+    - ticket: SERVER-59666
+      test_file: jstests/core/timeseries/timeseries_bucket_rename.js
     - ticket: SERVER-59424
       test_file: jstests/sharding/change_stream_show_migration_events.js
 
