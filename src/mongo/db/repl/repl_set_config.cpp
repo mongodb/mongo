@@ -933,6 +933,7 @@ BSONObj ReplSetConfig::toBSON() const {
                                   durationCount<Milliseconds>(_catchUpTakeoverDelay));
 
 
+    std::vector<std::pair<StringData, const ReplSetTagPattern*>> sortedModes;
     BSONObjBuilder gleModes(settingsBuilder.subobjStart(kGetLastErrorModesFieldName));
     for (StringMap<ReplSetTagPattern>::const_iterator mode = _customWriteConcernModes.begin();
          mode != _customWriteConcernModes.end();
@@ -941,9 +942,13 @@ BSONObj ReplSetConfig::toBSON() const {
             // Filter out internal modes
             continue;
         }
-        BSONObjBuilder modeBuilder(gleModes.subobjStart(mode->first));
-        for (ReplSetTagPattern::ConstraintIterator itr = mode->second.constraintsBegin();
-             itr != mode->second.constraintsEnd();
+        sortedModes.emplace_back(mode->first, &mode->second);
+    }
+    std::sort(sortedModes.begin(), sortedModes.end());
+    for (const auto& mode : sortedModes) {
+        BSONObjBuilder modeBuilder(gleModes.subobjStart(mode.first));
+        for (ReplSetTagPattern::ConstraintIterator itr = mode.second->constraintsBegin();
+             itr != mode.second->constraintsEnd();
              itr++) {
             modeBuilder.append(_tagConfig.getTagKey(ReplSetTag(itr->getKeyIndex(), 0)),
                                itr->getMinCount());

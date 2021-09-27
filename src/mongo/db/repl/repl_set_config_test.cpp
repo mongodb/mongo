@@ -1228,6 +1228,49 @@ TEST(ReplSetConfig, toBSONRoundTripAbilityInvalid) {
     ASSERT_TRUE(configA == configB);
 }
 
+TEST(ReplSetConfig, toBSONRoundTripAbilityWithWriteConcernModesOrdered) {
+    // Objects which are the same should serialize identically, even if stored internally as maps.
+    ReplSetConfig configA;
+    ReplSetConfig configB;
+    ASSERT_OK(configA.initialize(
+        BSON("_id"
+             << "rs0"
+             << "version" << 1 << "protocolVersion" << 1 << "members"
+             << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                      << "localhost:12345"
+                                      << "tags"
+                                      << BSON("tag1"
+                                              << "1"
+                                              << "tag2"
+                                              << "2"
+                                              << "tag3"
+                                              << "3"
+                                              << "tag4"
+                                              << "4"
+                                              << "tag5"
+                                              << "5"
+                                              << "tag6"
+                                              << "6"
+                                              << "tag7"
+                                              << "7"
+                                              << "tag8"
+                                              << "8"
+                                              << "tag9"
+                                              << "9")))
+             << "settings"
+             << BSON("heartbeatIntervalMillis"
+                     << 5000 << "heartbeatTimeoutSecs" << 20 << "replicaSetId" << OID::gen()
+                     << "getLastErrorModes"
+                     << BSON("wc2" << BSON("tag1" << 1 << "tag2" << 2) << "wc4" << BSON("tag3" << 3)
+                                   << "wc3" << BSON("tag5" << 5 << "tag4" << 4) << "wc1"
+                                   << BSON("tag6" << 6 << "tag8" << 8 << "tag7" << 7))))));
+    auto bsonA = configA.toBSON();
+    ASSERT_OK(configB.initialize(bsonA));
+    ASSERT_TRUE(configA == configB);
+    auto bsonB = configB.toBSON();
+    ASSERT_BSONOBJ_EQ(bsonA, bsonB);
+}
+
 TEST(ReplSetConfig, CheckIfWriteConcernCanBeSatisfied) {
     ReplSetConfig configA;
     ASSERT_OK(configA.initialize(BSON(

@@ -214,12 +214,18 @@ void SplitHorizon::toBSON(BSONObjBuilder& configBuilder) const {
     if (_forwardMapping.size() == 1)
         return;
 
-    BSONObjBuilder horizonsBson(configBuilder.subobjStart("horizons"));
+    // StringMaps are iterated in arbitrary order, so we sort before returning the horizons.
+    std::vector<std::pair<StringData, std::string>> sortedHorizons;
     for (const auto& horizon : _forwardMapping) {
         // The "__default" horizon should never be emitted in the horizon table.
         if (horizon.first == SplitHorizon::kDefaultHorizon)
             continue;
-        horizonsBson.append(horizon.first, horizon.second.toString());
+        sortedHorizons.emplace_back(horizon.first, horizon.second.toString());
+    }
+    std::sort(sortedHorizons.begin(), sortedHorizons.end());
+    BSONObjBuilder horizonsBson(configBuilder.subobjStart("horizons"));
+    for (const auto& horizon : sortedHorizons) {
+        horizonsBson.append(horizon.first, horizon.second);
     }
 }
 
