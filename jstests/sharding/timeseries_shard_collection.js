@@ -7,6 +7,8 @@
  */
 
 (function() {
+"use strict";
+
 load("jstests/core/timeseries/libs/timeseries.js");
 
 Random.setRandomSeed();
@@ -146,6 +148,153 @@ if (TimeseriesTest.shardedtimeseriesCollectionsEnabled(st.shard0)) {
 
     // Sharding a new timeseries collection.
     metaAndTimeShardKey(true);
+
+    function timeseriesInsert(coll) {
+        let insertCount = 0;
+        for (let i = 10; i < 100; i++) {
+            assert.commandWorked(coll.insert([
+                {hostId: 10, time: ISODate(`19` + i + `-01-01`)},
+                {hostId: 11, time: ISODate(`19` + i + `-01-01`)},
+                {hostId: 12, time: ISODate(`19` + i + `-01-01`)},
+                {hostId: 13, time: ISODate(`19` + i + `-01-01`)},
+                {hostId: 14, time: ISODate(`19` + i + `-01-01`)},
+                {hostId: 15, time: ISODate(`19` + i + `-01-01`)},
+                {hostId: 16, time: ISODate(`19` + i + `-01-01`)},
+                {hostId: 17, time: ISODate(`19` + i + `-01-01`)},
+                {hostId: 18, time: ISODate(`19` + i + `-01-01`)},
+                {hostId: 19, time: ISODate(`19` + i + `-01-01`)}
+            ]));
+            insertCount += 10;
+        }
+        return insertCount;
+    }
+
+    // Shard key on the hashed field.
+    (function hashAndTimeShardKey() {
+        assert.commandWorked(
+            sDB.createCollection('ts', {timeseries: {timeField: 'time', metaField: 'hostId'}}));
+
+        assert.commandWorked(st.s.adminCommand({enableSharding: 'test'}));
+
+        // Only range is allowed on time field.
+        assert.commandFailedWithCode(st.s.adminCommand({
+            shardCollection: 'test.ts',
+            key: {time: 'hashed'},
+            timeseries: {timeField: 'time', metaField: 'hostId'},
+        }),
+                                     ErrorCodes.BadValue);
+
+        let coll = sDB.getCollection('ts');
+        assert.commandWorked(coll.insert([
+            {hostId: 10, time: ISODate(`1901-01-01`)},
+            {hostId: 11, time: ISODate(`1902-01-01`)},
+        ]));
+        assert.commandWorked(coll.createIndex({hostId: 'hashed'}));
+
+        assert.commandWorked(st.s.adminCommand({
+            shardCollection: 'test.ts',
+            key: {hostId: 'hashed'},
+            timeseries: {timeField: 'time', metaField: 'hostId'}
+        }));
+
+        validateBucketsCollectionSharded({
+            collName: 'ts',
+            shardKey: {meta: 'hashed'},
+            timeSeriesParams: {timeField: 'time', metaField: 'hostId'}
+        });
+
+        assert.eq(coll.find().itcount(), 2);  // Validate count after sharding.
+        let insertCount = timeseriesInsert(coll);
+        assert.eq(coll.find().itcount(), insertCount + 2);
+        coll.drop();
+
+        assert.commandWorked(
+            sDB.createCollection('ts', {timeseries: {timeField: 'time', metaField: 'hostId'}}));
+        assert.commandWorked(st.s.adminCommand({enableSharding: 'test'}));
+
+        // Sharding key with hashed meta field and time field.
+        assert.commandWorked(st.s.adminCommand({
+            shardCollection: 'test.ts',
+            key: {hostId: 'hashed', time: 1},
+            timeseries: {timeField: 'time', metaField: 'hostId'},
+            numInitialChunks: 2
+        }));
+
+        coll = sDB.getCollection('ts');
+        assert.eq(coll.find().itcount(), 0);
+        insertCount = timeseriesInsert(coll);
+        assert.eq(coll.find().itcount(), insertCount);
+        coll.drop();
+    })();
+
+    // Test that invalid shard keys fail.
+    (function invalidShardKeyPatterns() {
+        assert.commandWorked(
+            sDB.createCollection('ts', {timeseries: {timeField: 'time', metaField: 'hostId'}}));
+        assert.commandWorked(st.s.adminCommand({enableSharding: 'test'}));
+
+        // No other fields, including _id, are allowed in the shard key pattern
+        assert.commandFailedWithCode(st.s.adminCommand({
+            shardCollection: 'test.ts',
+            key: {_id: 1},
+            timeseries: {timeField: 'time', metaField: 'hostId'},
+        }),
+                                     5914001);
+
+        assert.commandFailedWithCode(st.s.adminCommand({
+            shardCollection: 'test.ts',
+            key: {_id: 1, time: 1},
+            timeseries: {timeField: 'time', metaField: 'hostId'},
+        }),
+                                     5914001);
+
+        assert.commandFailedWithCode(st.s.adminCommand({
+            shardCollection: 'test.ts',
+            key: {_id: 1, hostId: 1},
+            timeseries: {timeField: 'time', metaField: 'hostId'},
+        }),
+                                     5914001);
+
+        assert.commandFailedWithCode(st.s.adminCommand({
+            shardCollection: 'test.ts',
+            key: {a: 1},
+            timeseries: {timeField: 'time', metaField: 'hostId'},
+        }),
+                                     5914001);
+
+        // Shared key where time is not the last field in shard key should fail.
+        assert.commandFailedWithCode(st.s.adminCommand({
+            shardCollection: 'test.ts',
+            key: {time: 1, hostId: 1},
+            timeseries: {timeField: 'time', metaField: 'hostId'}
+        }),
+                                     5914000);
+        sDB.dropDatabase();
+    })();
+
+    (function noMetaFieldTimeseries() {
+        assert.commandWorked(sDB.createCollection('ts', {timeseries: {timeField: 'time'}}));
+        assert.commandWorked(st.s.adminCommand({enableSharding: 'test'}));
+
+        assert.commandFailedWithCode(st.s.adminCommand({
+            shardCollection: 'test.ts',
+            key: {_id: 1},
+            timeseries: {timeField: 'time'},
+        }),
+                                     5914001);
+
+        assert.commandFailedWithCode(st.s.adminCommand({
+            shardCollection: 'test.ts',
+            key: {a: 1},
+            timeseries: {timeField: 'time'},
+        }),
+                                     5914001);
+
+        assert.commandWorked(st.s.adminCommand(
+            {shardCollection: 'test.ts', key: {time: 1}, timeseries: {timeField: 'time'}}));
+
+        sDB.dropDatabase();
+    })();
 
 } else {
     (function timeseriesCollectionsCannotBeSharded() {
