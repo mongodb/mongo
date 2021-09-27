@@ -78,6 +78,12 @@ RangeStatement RangeStatement::parse(RangeSpec spec) {
                     uassert(5733406,
                             "A bounding array must contain either both dates or both numeric types",
                             array[1].isNumber());
+                    // If these values are types of different sizes, output type may not be
+                    // intuitive.
+                    uassert(5876900,
+                            "Upper bound, lower bound, and step must all have the same type",
+                            array[0].type() == array[1].type() &&
+                                array[0].type() == step.getType());
                     return Bounds(std::pair<Value, Value>(Value(array[0]), Value(array[1])));
                 } else if (array[0].type() == mongo::Date) {
                     uassert(5733405,
