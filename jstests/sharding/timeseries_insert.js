@@ -3,7 +3,7 @@
  *
  * @tags: [
  *   requires_fcv_51,
- *   requires_find_command
+ *   requires_find_command,
  * ]
  */
 
@@ -165,16 +165,16 @@ function runTest(getShardKey, insert) {
     // Ensure that after chunk migration all documents are still available.
     assert.docEq(firstBatch, coll.find().sort({_id: 1}).toArray());
 
-    // Insert more documents with the same meta value range. These inserts should modify existing
-    // buckets, hence no new buckets are created.
+    // Insert more documents with the same meta value range. These inserts should create new buckets
+    // because we cannot update any bucket after a chunk migration.
     const secondBatch = generateBatch(numDocs);
     assert.commandWorked(insert(coll, secondBatch));
 
     const thirdBatch = generateBatch(numDocs);
     assert.commandWorked(insert(coll, thirdBatch));
 
-    // Primary shard should still contain only 2 buckets.
-    verifyBucketsOnShard(primaryShard, primaryBuckets);
+    // Primary shard should contain 4 (2 + 2) buckets.
+    verifyBucketsOnShard(primaryShard, primaryBuckets.concat(primaryBuckets));
 
     // During chunk migration, we have moved 2 buckets into the other shard. These migrated buckets
     // cannot be modified, so after insertion of second and third batches, two more buckets are

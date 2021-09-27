@@ -45,7 +45,8 @@ var $config = extendWorkload($config, function($config, $super) {
 
         for (let i = 0; i < 10; i++) {
             // Generate a random timestamp between 'startTime' and largest timestamp we inserted.
-            const timer = this.startTime + Random.rand() * this.numInitialDocs * this.increment;
+            const timer =
+                this.startTime + Math.floor(Random.rand() * this.numInitialDocs * this.increment);
             const doc = {
                 _id: new ObjectId(),
                 t: new Date(timer),
@@ -107,16 +108,14 @@ var $config = extendWorkload($config, function($config, $super) {
         const numBuckets = db[this.bucketPrefix + collName].find({}).itcount();
         const numInitialDocs = db[collName].find().itcount();
 
-        jsTestLog("NumBuckets " + numBuckets + " and numDocs " + numInitialDocs);
-        assert.eq(numInitialDocs, db[this.nonShardCollName].find({}).itcount());
-
+        jsTestLog("NumBuckets " + numBuckets + ", numDocs on sharded cluster" +
+                  db[collName].find().itcount() + "numDocs on unsharded collection " +
+                  db[this.nonShardCollName].find({}).itcount());
         const pipeline = [{$project: {_id: "$_id", m: "$m", t: "$t"}}, {$sort: {m: 1, t: 1}}];
         const diff = DataConsistencyChecker.getDiff(db[collName].aggregate(pipeline),
                                                     db[this.nonShardCollName].aggregate(pipeline));
         assertAlways.eq(
-            diff,
-            {docsWithDifferentContents: [], docsMissingOnFirst: [], docsMissingOnSecond: []},
-            diff);
+            diff, {docsWithDifferentContents: [], docsMissingOnFirst: [], docsMissingOnSecond: []});
 
         // Make sure that queries using various indexes on time-series buckets collection return
         // buckets with all documents.
@@ -151,10 +150,12 @@ var $config = extendWorkload($config, function($config, $super) {
 
         db[collName].drop();
         db[this.nonShardCollName].drop();
+
         assertAlways.commandWorked(
             db.createCollection(collName, {timeseries: {timeField: "t", metaField: "m"}}));
-        // Create indexes to verify index integrity during the teardown state.
         cluster.shardCollection(db[collName], {t: 1}, false);
+
+        // Create indexes to verify index integrity during the teardown state.
         assert.commandWorked(db[this.nonShardCollName].createIndex({t: 1}));
         assert.commandWorked(db[collName].createIndex({m: 1}));
         assert.commandWorked(db[this.nonShardCollName].createIndex({m: 1}));
