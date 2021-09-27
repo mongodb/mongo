@@ -236,6 +236,7 @@ const initialExpectedDocs = [
  * both shards, and ensure we target both shards.
  */
 function runTest(expectedDocs, proportion, planForShards) {
+    jsTestLog("Running test with proportion " + proportion);
     let expectedCount = 1;
     let pipeline = [{$sample: {size: expectedCount}}, projection];
     testPipeline({pipeline, expectedDocs, expectedCount, shardsTargetedCount: 2});
@@ -337,8 +338,9 @@ for (const city of ["Dublin", "Cork", "Galway"]) {
 
 // Test a variety of sample sizes to exercise both Top-K sort and ARHASH plans, where ARHASH is
 // selected for sample sizes of <=1% on the primary, and we don't actually run a trial at all for
-// sample sizes >= 5%. The secondary always picks Top-K when a trial is evaluated.
-for (const proportion of [0.0025, 0.005, 0.01, 0.05]) {
+// sample sizes >= 5%. For this dataset, the non-primary shard always picks Top-K when a trial is
+// evaluated.
+for (const proportion of [0.0025, 0.005, 0.11]) {
     runTest(updatedExpectedDocs, proportion, {
         [primary.shardName]:
             (proportion >= 0.05 ? randomCursor : (proportion <= 0.01 ? arhash : topK)),
