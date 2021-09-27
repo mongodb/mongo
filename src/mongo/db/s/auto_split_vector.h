@@ -38,40 +38,72 @@ namespace mongo {
  * Given a chunk, determines whether it satisfies the requisites to be auto-splitted and - if so -
  * returns the split points (shard keys representing the lower bounds of the new chunks to create).
  *
- * The logic implemented can be summarized as follows: given a maxChunkSize of `x` MB, the algorithm
- * aims to choose the split points so that the resulting chunks' size would be around `x / 2` MB.
- * As it is too expensive to precisely determine the dimension of a chunk, it is assumed a uniform
- * distribution of document sizes, hence the aim is to balance the number of documents per chunk.
+ * The logic implemented can be summarized as follows: given a `maxChunkSize` of `x` MB, the
+ * algorithm aims to choose the split points so that the resulting chunks' size would be around
+ * `maxChunkSize`. As it is too expensive to precisely determine the dimension of a chunk, it is
+ * assumed a uniform distribution of document sizes, hence the aim is to balance the number of
+ * documents per chunk.
  *
- * ALGORITHM DESCRIPTION
+ * ======= ALGORITHM DESCRIPTION =======
  *
  * The split points for a chunk `C` belonging to a collection `coll` are calculated as follows:
  * - `averageDocumentSize` = `totalCollSizeOnShard / numberOfCollDocs`
  * - `maxNumberOfDocsPerChunk` = `maxChunkSize / averageDocumentSize`
- * - `maxNumberOfDocsPerSplittedChunk` = `maxNumberOfDocsPerChunk / 2`
  * - Scan forward the shard key index entries for `coll` that are belonging to chunk `C`:
- * - (1) Choose a split point every `maxNumberOfDocsPerSplittedChunk` scanned keys
- * - (2) To avoid small chunks, remove the last split point and eventually recalculate it as
- * follows:
- * --- (2.1) IF the right-most interval's number of document is at least 90%
- * `maxNumberOfDocsPerChunk`, pick the middle key.
- * --- (2.2) ELSE no last split point (wait for more inserts and next iterations of the splitter).
+ * - (1) Choose a split point every `maxNumberOfDocsPerChunk` scanned keys.
+ * - (2) As it needs to be avoided the creation of small chunks, consider the number of documents
+ * `S` that the right-most chunk would contain given the calculated split points:
+ * --- (2.1) IF `S >= 80% maxNumberOfDocsPerChunk`, return the list of calculated split points.
+ * --- (2.2) ELSE IF `S` documents could be fairly redistributed in the last chunks so that their
+ * size would be at least `67% maxNumberOfDocsPerChunk`: recalculate the last split points (max 3).
+ * --- (2.3) ELSE simply remove the last split point and keep a bigger last chunk.
  *
- * EXAMPLE
+ *
+ * ============== EXAMPLES =============
+ *
+ * ========= EXAMPLE (CASE 2.1) ========
  * `maxChunkSize` = 100MB
  * `averageDocumentSize` = 1MB
  * `maxNumberOfDocsPerChunk` = 100
- * `maxNumberOfDocsPerSplittedChunk` = 50
  *
  * Shard key type: integer
  * Chunk `C` bounds: `[0, maxKey)` . Chunk `C` contains 190 documents with shard keys [0...189].
  *
- * (1) Initially calculated split points: [49, 99, 149].
- * (2) Removing the last split point `149` to avoid small chunks and recalculate:
- * (2.1) Is the interval `[99-189]` eligible to be split? YES, because it contains 90 documents
- * that is equivalent to 90% `maxNumberOfDocsPerChunk`: choose the middle key `134` as split point .
+ * (1) Initially calculated split points: [99].
+ * (2) The last chunk would contain the interval `[99-189]` so `S = 90`
+ * (2.1) `S >= 80% maxChunkSize`, so keep the current split points.
  *
- * Returned split points: [49, 99, 134].
+ * Returned split points: [99].
+ *
+ * ========= EXAMPLE (CASE 2.2) ========
+ * `maxChunkSize` = 100MB
+ * `averageDocumentSize` = 1MB
+ * `maxNumberOfDocsPerChunk` = 100
+ *
+ * Shard key type: integer
+ * Chunk `C` bounds: `[0, maxKey)` . Chunk `C` contains 140 documents with shard keys [0...139].
+ *
+ * (1) Initially calculated split points: [99].
+ * (2) The last chunk would contain the interval `[99-139]` so `S = 40`
+ * (2.2) `S` documents can be redistributed on the last split point by generating chunks of size >=
+ * 67% maxChunkSize. Recalculate.
+ *
+ * Returned split points: [69].
+ *
+ * ========= EXAMPLE (CASE 2.3) ========
+ * `maxChunkSize` = 100MB
+ * `averageDocumentSize` = 1MB
+ * `maxNumberOfDocsPerChunk` = 100
+ *
+ * Shard key type: integer
+ * Chunk `C` bounds: `[0, maxKey)` . Chunk `C` contains 120 documents with shard keys [0...119].
+ *
+ * (1) Initially calculated split points: [99].
+ * (2) The last chunk would contain the interval `[99-119]` so `S = 20`
+ * (2.3) `S` documents can't be redistributed on the last split point by generating chunks of size
+ * >= 67% maxChunkSize. So remove the last split point.
+ *
+ * Returned split points: [].
  */
 std::vector<BSONObj> autoSplitVector(OperationContext* opCtx,
                                      const NamespaceString& nss,

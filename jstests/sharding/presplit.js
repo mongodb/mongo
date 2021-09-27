@@ -1,3 +1,9 @@
+/*
+ * @tags: [
+ *     requires_fcv_51,
+ * ]
+ */
+
 (function() {
 
 load("jstests/sharding/libs/find_chunks_util.js");
@@ -33,7 +39,7 @@ s.adminCommand({shardcollection: "test.foo", key: {_id: 1}});
 
 // Make sure the collection's original chunk got split
 s.printChunks();
-assert.lt(20, findChunksUtil.countChunksForNs(s.config, "test.foo"), "many chunks assertion");
+assert.lte(20, findChunksUtil.countChunksForNs(s.config, "test.foo"), "many chunks assertion");
 assert.eq(num, primary.foo.count());
 
 s.printChangeLog();

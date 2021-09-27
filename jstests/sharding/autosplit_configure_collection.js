@@ -122,19 +122,19 @@ jsTest.log("Testing enableAutoSplitter == true, defaultChunkSize=10 ...");
     assert.eq(configColl.noAutoSplit, false);
     assert.eq(configColl.maxChunkSizeBytes, 10 * 1024 * 1024);
 
-    // Add ~10MB of documents
-    insertDocsAndWaitForSplit(16 * 10);
+    // Add ~20MB of documents
+    insertDocsAndWaitForSplit(16 * 20);
     assert.gte(findChunksUtil.countChunksForNs(st.config, fullNS),
                2,
                "Number of chunks is less then 2, no split have been perfomed");
-    assert.eq(16 * (2 + 1 + 10), db.foo.find().itcount());
+    assert.eq(16 * (2 + 1 + 20), db.foo.find().itcount());
 
     // Add ~10MB of documents
     insertDocsAndWaitForSplit(16 * 10);
     assert.gte(findChunksUtil.countChunksForNs(st.config, fullNS),
                3,
                "Number of chunks is less then 3, no split have been perfomed");
-    assert.eq(16 * (2 + 1 + 10 + 10), db.foo.find().itcount());
+    assert.eq(16 * (2 + 1 + 20 + 10), db.foo.find().itcount());
 }
 
 printjson(db.stats());

@@ -29,8 +29,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
@@ -39,29 +37,14 @@
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/s/split_vector.h"
+#include "mongo/logv2/log.h"
+#include "mongo/platform/random.h"
 
 namespace mongo {
 namespace {
 
 const NamespaceString kNss = NamespaceString("autosplitDB", "coll");
 const std::string kPattern = "_id";
-
-/*
- * Insert the specified number of documents in the test collection, with incremental shard key `_id`
- * starting from `startShardKey`.
- */
-void insertNDocsOf1MB(OperationContext* opCtx, int nDocs, int startShardKey) {
-    DBDirectClient client(opCtx);
-
-    std::string oneMBstr(1024 * 1024, 'a');
-    for (int i = startShardKey; i < startShardKey + 100; i++) {
-        BSONObjBuilder builder;
-        builder.append(kPattern, i);
-        builder.append("str", oneMBstr);
-        BSONObj obj = builder.obj();
-        client.insert(kNss.toString(), obj);
-    }
-}
 
 /*
  * Call the autoSplitVector function of the test collection on a chunk with bounds [0, 100) and with
@@ -72,7 +55,7 @@ std::vector<BSONObj> autoSplit(OperationContext* opCtx, int maxChunkSizeMB) {
                            kNss,
                            BSON(kPattern << 1) /* shard key pattern */,
                            BSON(kPattern << 0) /* min */,
-                           BSON(kPattern << 100) /* max */,
+                           BSON(kPattern << 1000) /* max */,
                            maxChunkSizeMB * 1024 * 1024 /* max chunk size in bytes*/);
 }
 
@@ -81,7 +64,6 @@ public:
     /*
      * Before each test case:
      * - Creates a sharded collection with shard key `_id`
-     * - Inserts 100 documents of ~1MB size (shard keys [0...99])
      */
     void setUp() {
         ShardServerTestFixture::setUp();
@@ -97,88 +79,57 @@ public:
 
         DBDirectClient client(opCtx);
         client.createIndex(kNss.ns(), BSON(kPattern << 1));
+    }
 
-        int nDocs = 100;
-        int startShardKey = 0;
-        insertNDocsOf1MB(opCtx, nDocs, startShardKey);
-        ASSERT_EQUALS(100ULL, client.count(kNss));
+    /*
+     * Insert the specified number of documents in the test collection, with incremental shard key
+     * `_id` starting from `_nextShardKey`.
+     */
+    void insertNDocsOf1MB(OperationContext* opCtx, int nDocs) {
+        DBDirectClient client(opCtx);
+
+        std::string oneMBstr(1024 * 1024, 'a');
+        for (int i = 0; i < nDocs; i++) {
+            BSONObjBuilder builder;
+            builder.append(kPattern, _nextShardKey++);
+            builder.append("str", oneMBstr);
+            BSONObj obj = builder.obj();
+            client.insert(kNss.toString(), obj);
+        }
+    }
+
+    /*
+     * Get the number of documents inserted until now.
+     */
+    int getInsertedSize() {
+        return _nextShardKey + 1;
+    }
+
+private:
+    int _nextShardKey = 0;
+};
+
+class AutoSplitVectorTest10MB : public AutoSplitVectorTest {
+    /*
+     * Before each test case:
+     * - Creates a sharded collection with shard key `_id`
+     * - Inserts `10` documents of ~1MB size (shard keys [0...9])
+     */
+    void setUp() {
+        AutoSplitVectorTest::setUp();
+
+        auto opCtx = operationContext();
+
+        DBDirectClient client(opCtx);
+        client.createIndex(kNss.ns(), BSON(kPattern << 1));
+
+        insertNDocsOf1MB(opCtx, 10 /* nDocs */);
+        ASSERT_EQUALS(10, client.count(kNss));
     }
 };
 
-// No split points if estimated data size < max chunk size
-TEST_F(AutoSplitVectorTest, NoSplitIfDataLessThanMaxChunkSize) {
-    std::vector<BSONObj> splitKeys = autoSplit(operationContext(), 101 /* maxChunkSizeMB */);
-    ASSERT_EQ(splitKeys.size(), 0);
-}
-
-// No split points if max chunk size >> actual chunk size
-TEST_F(AutoSplitVectorTest, NoSplitPoints) {
-    std::vector<BSONObj> splitKeys = autoSplit(operationContext(), 256 /* maxChunkSizeMB */);
-    ASSERT_EQUALS(splitKeys.size(), 0UL);
-}
-
-// Split point exactly in the middle in case of chunk size == maxChunkSize
-TEST_F(AutoSplitVectorTest, SplitAtHalfChunkSizeIsMaxChunkSize) {
-    std::vector<BSONObj> splitKeys = autoSplit(operationContext(), 100 /* maxChunkSizeMB */);
-    BSONObj expectedSplitPoint = BSON(kPattern << 49);
-    ASSERT_EQ(splitKeys.size(), 1);
-    ASSERT_BSONOBJ_EQ(splitKeys.at(0), expectedSplitPoint);
-}
-
-/*
- * Check that the number of resulting chunks is equal to `(chunkSize / maxChunkSize) * 2`.
- *
- * `maxChunkSize` = 20MB
- * `chunkSize` = 100MB
- * Expected number of chunks: 10. Expected number of split points: 9.
- */
-TEST_F(AutoSplitVectorTest, SplitAtHalfMaxChunkSize) {
-    std::vector<BSONObj> splitKeys = autoSplit(operationContext(), 20 /* maxChunkSizeMB */);
-    ASSERT_EQ(splitKeys.size(), 9);
-    auto expectedSplitPoint = 9;
-    for (const auto& splitPoint : splitKeys) {
-        ASSERT_EQ(splitPoint.getIntField(kPattern), expectedSplitPoint);
-        expectedSplitPoint += 10;
-    }
-}
-
-/*
- * Check that a bigger last chunk is kept if its size is less than 90% maxChunkSize.
- *
- * `maxChunkSize` = 80MB
- * `chunkSize` = 100MB
- * Expected number of chunks: 2. Expected number of split points: 1.
- */
-TEST_F(AutoSplitVectorTest, AvoidCreatingSmallChunks) {
-    std::vector<BSONObj> splitKeys = autoSplit(operationContext(), 80 /* maxChunkSizeMB */);
-    BSONObj expectedSplitPoint = BSON(kPattern << 39);
-    ASSERT_EQ(splitKeys.size(), 1);
-    ASSERT_BSONOBJ_EQ(splitKeys.at(0), expectedSplitPoint);
-}
-
-/*
- * Choose fairly the last split point if the last chunk size would be greater or equal than 90%
- * maxChunkSize.
- *
- * `maxChunkSize` = 110MB
- * `chunkSize` = 100MB
- * Expected number of chunks: 2. Expected number of split points: 1.
- */
-TEST_F(AutoSplitVectorTest, FairLastSplitPoint) {
-    {
-        // Increase collection size so that the auto splitter can actually be triggered. Use a
-        // different range to don't interfere with the chunk getting splitted.
-        insertNDocsOf1MB(operationContext(), 20 /* nDocs */, 1024 /* startShardKey */);
-    }
-
-    std::vector<BSONObj> splitKeys = autoSplit(operationContext(), 110 /* maxChunkSizeMB */);
-    BSONObj expectedSplitPoint = BSON(kPattern << 51);
-    ASSERT_EQ(splitKeys.size(), 1);
-    ASSERT_BSONOBJ_EQ(splitKeys.at(0), expectedSplitPoint);
-}
-
 // Throw exception upon calling autoSplitVector on dropped/unexisting collection
-TEST_F(AutoSplitVectorTest, NoCollection) {
+TEST_F(AutoSplitVectorTest10MB, NoCollection) {
     ASSERT_THROWS_CODE(autoSplitVector(operationContext(),
                                        NamespaceString("dummy", "collection"),
                                        BSON(kPattern << 1) /* shard key pattern */,
@@ -187,6 +138,110 @@ TEST_F(AutoSplitVectorTest, NoCollection) {
                                        1 * 1024 * 1024 /* max chunk size in bytes*/),
                        DBException,
                        ErrorCodes::NamespaceNotFound);
+}
+
+// No split points if estimated `data size < max chunk size`
+TEST_F(AutoSplitVectorTest10MB, NoSplitIfDataLessThanMaxChunkSize) {
+    std::vector<BSONObj> splitKeys = autoSplit(operationContext(), 11 /* maxChunkSizeMB */);
+    ASSERT_EQ(splitKeys.size(), 0);
+}
+
+// Do not split in case of `chunk size == maxChunkSize`
+TEST_F(AutoSplitVectorTest10MB, NoSplitIfDataEqualMaxChunkSize) {
+    std::vector<BSONObj> splitKeys = autoSplit(operationContext(), 10 /* maxChunkSizeMB */);
+    ASSERT_EQ(splitKeys.size(), 0);
+}
+
+// No split points if `chunk size > max chunk size` but threshold not reached
+TEST_F(AutoSplitVectorTest10MB, NoSplitIfDataLessThanThreshold) {
+    const auto surplus = 2;
+    {
+        // Increase collection size so that the auto splitter can actually be triggered. Use a
+        // different range to don't interfere with the chunk getting splitted.
+        insertNDocsOf1MB(operationContext(), surplus /* nDocs */);
+    }
+    std::vector<BSONObj> splitKeys = autoSplit(operationContext(), 10 /* maxChunkSizeMB */);
+    ASSERT_EQ(splitKeys.size(), 0);
+}
+
+// One split point if `chunk size > max chunk size` and threshold reached
+TEST_F(AutoSplitVectorTest10MB, SplitIfDataSlightlyMoreThanThreshold) {
+    const auto surplus = 4;
+    insertNDocsOf1MB(operationContext(), surplus /* nDocs */);
+    std::vector<BSONObj> splitKeys = autoSplit(operationContext(), 10 /* maxChunkSizeMB */);
+    ASSERT_EQ(splitKeys.size(), 1);
+    ASSERT_EQ(6, splitKeys.front().getIntField(kPattern));
+}
+
+// Split points if `data size > max chunk size * 2` and threshold reached
+TEST_F(AutoSplitVectorTest10MB, SplitIfDataMoreThanThreshold) {
+    const auto surplus = 13;
+    insertNDocsOf1MB(operationContext(), surplus /* nDocs */);
+    std::vector<BSONObj> splitKeys = autoSplit(operationContext(), 10 /* maxChunkSizeMB */);
+    ASSERT_EQ(splitKeys.size(), 2);
+    ASSERT_EQ(6, splitKeys.front().getIntField(kPattern));
+    ASSERT_EQ(13, splitKeys.back().getIntField(kPattern));
+}
+
+// Split points are not recalculated if the right-most chunk is at least `80% maxChunkSize`
+TEST_F(AutoSplitVectorTest10MB, NoRecalculateIfBigLastChunk) {
+    const auto surplus = 8;
+    insertNDocsOf1MB(operationContext(), surplus /* nDocs */);
+    std::vector<BSONObj> splitKeys = autoSplit(operationContext(), 10 /* maxChunkSizeMB */);
+    ASSERT_EQ(splitKeys.size(), 1);
+    ASSERT_EQ(9, splitKeys.front().getIntField(kPattern));
+}
+
+class RepositionLastSplitPointsTest : public AutoSplitVectorTest {
+public:
+    /*
+     * Tests that last split points are properly repositioned in case the surplus allows so or not
+     * repositioned otherwise.
+     */
+    void checkRepositioning(int maxDocsPerChunk, int surplus, int nSplitPoints) {
+        ASSERT(surplus >= 0 && surplus < maxDocsPerChunk);
+
+        const auto maxDocsPerNewChunk =
+            maxDocsPerChunk - ((maxDocsPerChunk - surplus) / (nSplitPoints + 1));
+        bool mustReposition =
+            surplus >= maxDocsPerChunk - maxDocsPerNewChunk && surplus < maxDocsPerChunk * 0.8;
+
+        int toInsert = (maxDocsPerChunk * nSplitPoints) - getInsertedSize() + surplus;
+        insertNDocsOf1MB(operationContext(), toInsert);
+
+        int expectedChunkSize =
+            mustReposition ? getInsertedSize() / (nSplitPoints + 1) : maxDocsPerChunk;
+        std::vector<BSONObj> splitKeys =
+            autoSplit(operationContext(), maxDocsPerChunk /* maxChunkSizeMB */);
+
+        int approximateNextMin = expectedChunkSize;
+        for (const auto& splitKey : splitKeys) {
+            int _id = splitKey.getIntField(kPattern);
+            // Expect an approximate match due to integers rounding in the split points algorithm.
+            ASSERT(_id >= approximateNextMin - 2 && _id <= approximateNextMin + 2);
+            approximateNextMin = _id + expectedChunkSize;
+        }
+    }
+};
+
+// Test that last split points are recalculated fairly (if the surplus allows so)
+TEST_F(RepositionLastSplitPointsTest, RandomRepositioningTest) {
+    PseudoRandom random(SecureRandom().nextInt64());
+    // Avoid small sizes already checked in other test cases.
+    // Random maxDocsPerChunk in interval: [10, 110).
+    int maxDocsPerChunk = random.nextInt32(100) + 10;
+    // Random surplus in interval: [0, maxDocsPerChunk).
+    int surplus = random.nextInt32(maxDocsPerChunk);
+
+    LOGV2(6000900,
+          "RandomRepositioningTest parameters",
+          "maxDocsPerChunk"_attr = maxDocsPerChunk,
+          "surplus"_attr = surplus);
+
+    for (int nSplitPointsToReposition = 1; nSplitPointsToReposition < 4;
+         nSplitPointsToReposition++) {
+        checkRepositioning(maxDocsPerChunk, surplus, nSplitPointsToReposition);
+    }
 }
 
 }  // namespace

@@ -159,8 +159,8 @@ runCase({
 runCase({
     docSize: 510 * 1024,
     stages: [
-        {numDocsToInsert: 10, expectedNumChunks: 5},
-        {numDocsToInsert: 10, expectedNumChunks: 10},
+        {numDocsToInsert: 10, expectedNumChunks: 4},
+        {numDocsToInsert: 10, expectedNumChunks: 9},
     ],
 });
 
@@ -168,8 +168,8 @@ runCase({
 runCase({
     docSize: 514 * 1024,
     stages: [
+        {numDocsToInsert: 10, expectedNumChunks: 6},
         {numDocsToInsert: 10, expectedNumChunks: 9},
-        {numDocsToInsert: 10, expectedNumChunks: 14},
     ],
 });
 

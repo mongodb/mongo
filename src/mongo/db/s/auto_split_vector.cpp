@@ -51,6 +51,8 @@ namespace {
 
 constexpr int estimatedAdditionalBytesPerItemInBSONArray{2};
 
+constexpr int kMaxSplitPointsToReposition{3};
+
 BSONObj prettyKey(const BSONObj& keyPattern, const BSONObj& key) {
     return key.replaceFieldNames(keyPattern).clientReadable();
 }
@@ -212,9 +214,8 @@ std::vector<BSONObj> autoSplitVector(OperationContext* opCtx,
         // keys each chunk should contain
         const long long avgDocSize = dataSize / totalLocalCollDocuments;
 
-        // Split at half the max chunk size
+        // Split at max chunk size
         long long maxDocsPerChunk = maxChunkSizeBytes / avgDocSize;
-        long long maxDocsPerSplittedChunk = maxDocsPerChunk / 2;
 
         BSONObj currentKey;               // Last key seen during the index scan
         long long numScannedKeys = 1;     // minKeyInOriginalChunk has already been scanned
@@ -234,11 +235,11 @@ std::vector<BSONObj> autoSplitVector(OperationContext* opCtx,
 
         Timer timer;  // To measure time elapsed while searching split points
 
-        // Traverse the index and add the maxDocsPerSplittedChunk-th key to the result vector
+        // Traverse the index and add the maxDocsPerChunk-th key to the result vector
         while (forwardIdxScanner->getNext(&currentKey, nullptr) == PlanExecutor::ADVANCED) {
             numScannedKeys++;
 
-            if (numScannedKeys > maxDocsPerSplittedChunk) {
+            if (numScannedKeys > maxDocsPerChunk) {
                 currentKey = orderShardKeyFields(keyPattern, currentKey);
 
                 if (currentKey.woCompare(lastSplitPoint) == 0) {
@@ -269,35 +270,44 @@ std::vector<BSONObj> autoSplitVector(OperationContext* opCtx,
             }
         }
 
-        // Avoid creating small chunks by choosing more fairly the last split point:
-        // - Remove the last found split point
-        // -- IF the right-most new chunk would be at least 90% full, further split by adding its
-        // the middle key as last split point
-        // -- ELSE keep a bigger last chunk (maxDocsPerSplittedChunk <= size < 90% maxDocsPerChunk)
-        if (!splitKeys.empty() && !reachedMaxBSONSize) {
-            splitKeys.pop_back();
+        // Avoid creating small chunks by fairly recalculating the last split points if the last
+        // chunk would be too small (containing less than `80% maxDocsPerChunk` documents).
+        bool lastChunk80PercentFull = numScannedKeys >= maxDocsPerChunk * 0.8;
+        if (!lastChunk80PercentFull && !splitKeys.empty() && !reachedMaxBSONSize) {
+            // Eventually recalculate the last split points (at most `kMaxSplitPointsToReposition`).
+            int nSplitPointsToReposition = splitKeys.size() > kMaxSplitPointsToReposition
+                ? kMaxSplitPointsToReposition
+                : splitKeys.size();
 
-            const auto lastChunkNumberOfDocs = numScannedKeys + maxDocsPerSplittedChunk;
-            if (lastChunkNumberOfDocs >= maxDocsPerChunk * 0.9) {
-                auto lastSplitPointDistanceFromLastKey = lastChunkNumberOfDocs / 2;
+            // Equivalent to: (nSplitPointsToReposition * maxDocsPerChunk + numScannedKeys) divided
+            // by the number of reshuffled chunks (nSplitPointsToReposition + 1).
+            const auto maxDocsPerNewChunk = maxDocsPerChunk -
+                ((maxDocsPerChunk - numScannedKeys) / (nSplitPointsToReposition + 1));
 
-                auto backwardIdxScanner =
+            if (numScannedKeys < maxDocsPerChunk - maxDocsPerNewChunk) {
+                // If the surplus is not too much, simply keep a bigger last chunk.
+                // The surplus is considered enough if repositioning the split points would imply
+                // generating chunks with a number of documents lower than `67% maxDocsPerChunk`.
+                splitKeys.pop_back();
+            } else {
+                // Fairly recalculate the last `nSplitPointsToReposition` split points.
+                splitKeys.erase(splitKeys.end() - nSplitPointsToReposition, splitKeys.end());
+
+                auto forwardIdxScanner =
                     InternalPlanner::indexScan(opCtx,
                                                &collection.getCollection(),
                                                shardKeyIdx,
+                                               splitKeys.empty() ? minKeyElement : splitKeys.back(),
                                                maxKey,
-                                               minKey,
-                                               BoundInclusion::kIncludeEndKeyOnly,
+                                               BoundInclusion::kIncludeStartKeyOnly,
                                                PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                                               InternalPlanner::BACKWARD);
+                                               InternalPlanner::FORWARD);
 
                 numScannedKeys = 0;
-                while (backwardIdxScanner->getNext(&currentKey, nullptr) ==
-                       PlanExecutor::ADVANCED) {
-                    if (++numScannedKeys == lastSplitPointDistanceFromLastKey) {
-                        const auto previousSplitPoint =
-                            splitKeys.empty() ? minKeyElement : splitKeys.back();
 
+                auto previousSplitPoint = splitKeys.empty() ? minKeyElement : splitKeys.back();
+                while (forwardIdxScanner->getNext(&currentKey, nullptr) == PlanExecutor::ADVANCED) {
+                    if (++numScannedKeys >= maxDocsPerNewChunk) {
                         currentKey = orderShardKeyFields(keyPattern, currentKey);
 
                         const auto compareWithPreviousSplitPoint =
@@ -311,11 +321,16 @@ std::vector<BSONObj> autoSplitVector(OperationContext* opCtx,
                             }
 
                             splitKeys.push_back(currentKey.getOwned());
+                            previousSplitPoint = splitKeys.back();
+                            numScannedKeys = 0;
+
+                            if (--nSplitPointsToReposition == 0) {
+                                break;
+                            }
                         } else if (compareWithPreviousSplitPoint == 0) {
-                            // Do not add again the same split point in case of frequent shard key.
+                            // Don't add again the same split point in case of frequent shard key.
                             tooFrequentKeys.insert(currentKey.getOwned());
                         }
-                        break;
                     }
                 }
             }
