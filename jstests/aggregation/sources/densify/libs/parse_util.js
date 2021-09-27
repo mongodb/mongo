@@ -149,45 +149,41 @@ let parseUtil = (function(db, coll, stageName, options = {}) {
 
         // Positive test cases
         assert.commandWorked(run({[stageName]: {field: "a", range: {step: 1.0, bounds: [1, 2]}}}));
-        // TODO SERVER-57337: Enable this parsing test.
-        /* assert.commandWorked(run({
-         *     [stageName]: {
-         *         field: "a",
-         *         range: {
-         *             step: 1.0,
-         *             bounds: [new Date("2020-01-01"), new Date("2021-01-01")],
-         *             unit: "second"
-         *         }
-         *     }
-         * })); */
-        // TODO SERVER-57337 SERVER-57344: Enable this parsing test.
-        /* assert.commandWorked(run({
-         *     [stageName]: {
-         *         field: "a",
-         *         partitionByFields: ["b", "c"],
-         *         range: {
-         *             step: 1.0,
-         *             bounds: [new Date("2020-01-01"), new Date("2021-01-01")],
-         *             unit: "second"
-         *         }
-         *     }
-         * })); */
-        // TODO SERVER-57337 SERVER-57344: Enable this parsing test.
-        /* assert.commandWorked(run({
-         *     [stageName]: {
-         *         field: "a",
-         *         partitionByFields: ["b", "c"],
-         *         range: {step: 1.0, bounds: "partition", unit: "second"}
-         *     }
-         * })); */
-        // TODO SERVER-57337 SERVER-57344: Enable this parsing test.
-        /* assert.commandWorked(run({
-         *     [stageName]: {
-         *         field: "a",
-         *         partitionByFields: ["b", "c"],
-         *         range: {step: 1.0, bounds: "full", unit: "second"}
-         *     }
-         * })); */
+        assert.commandWorked(run({
+            [stageName]: {
+                field: "a",
+                range: {
+                    step: 1.0,
+                    bounds: [new Date("2020-01-01"), new Date("2021-01-01")],
+                    unit: "day"
+                }
+            }
+        }));
+        assert.commandWorked(run({
+            [stageName]: {
+                field: "a",
+                partitionByFields: ["b", "c"],
+                range: {
+                    step: 1.0,
+                    bounds: [new Date("2020-01-01"), new Date("2021-01-01")],
+                    unit: "week"
+                }
+            }
+        }));
+        assert.commandWorked(run({
+            [stageName]: {
+                field: "a",
+                partitionByFields: ["b", "c"],
+                range: {step: 1.0, bounds: "partition", unit: "second"}
+            }
+        }));
+        assert.commandWorked(run({
+            [stageName]: {
+                field: "a",
+                partitionByFields: ["b", "c"],
+                range: {step: 1.0, bounds: "full", unit: "second"}
+            }
+        }));
         assert.commandWorked(run({
             [stageName]:
                 {field: "a", partitionByFields: ["b", "c"], range: {step: 1.0, bounds: "full"}}

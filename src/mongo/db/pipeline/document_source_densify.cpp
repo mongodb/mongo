@@ -38,10 +38,10 @@ using boost::intrusive_ptr;
 using boost::optional;
 using std::list;
 using SortPatternPart = mongo::SortPattern::SortPatternPart;
-using NumericBounds = mongo::RangeStatement::NumericBounds;
-using DateBounds = mongo::RangeStatement::DateBounds;
+using ExplicitBounds = mongo::RangeStatement::ExplicitBounds;
 using Full = mongo::RangeStatement::Full;
 using Partition = mongo::RangeStatement::Partition;
+using DensifyValue = mongo::DensifyValue;
 
 namespace mongo {
 
@@ -210,28 +210,13 @@ list<intrusive_ptr<DocumentSource>> create(const intrusive_ptr<ExpressionContext
 }
 }  // namespace document_source_densify
 
-namespace {
-Value addValues(Value lhs, Value rhs) {
-    return uassertStatusOK(ExpressionAdd::apply(lhs, rhs));
-}
-
-Value subtractValues(Value lhs, Value rhs) {
-    return uassertStatusOK(ExpressionSubtract::apply(lhs, rhs));
-}
-
-Value floorValue(Value operand) {
-    return uassertStatusOK(ExpressionFloor::apply(operand));
-}
-}  // namespace
-
-DocumentSourceInternalDensify::DocGenerator::DocGenerator(
-    DocumentSourceInternalDensify::DensifyValueType min,
-    RangeStatement range,
-    FieldPath fieldName,
-    boost::optional<Document> includeFields,
-    boost::optional<Document> finalDoc,
-    ValueComparator comp,
-    size_t* counter)
+DocumentSourceInternalDensify::DocGenerator::DocGenerator(DensifyValue min,
+                                                          RangeStatement range,
+                                                          FieldPath fieldName,
+                                                          boost::optional<Document> includeFields,
+                                                          boost::optional<Document> finalDoc,
+                                                          ValueComparator comp,
+                                                          size_t* counter)
     : _comp(std::move(comp)),
       _range(std::move(range)),
       _path(std::move(fieldName.fullPath())),
@@ -267,35 +252,26 @@ DocumentSourceInternalDensify::DocGenerator::DocGenerator(
 
     tassert(
         5733305, "DocGenerator step must be positive", _comp.evaluate(_range.getStep() > Value(0)));
-    stdx::visit(
-        visit_helper::Overloaded{
-            [&](const Value val) {
-                tassert(5733304,
-                        "DocGenerator all values must be same type",
-                        stdx::holds_alternative<NumericBounds>(_range.getBounds()));
-                NumericBounds bounds = stdx::get<NumericBounds>(_range.getBounds());
-                tassert(5733303,
-                        "DocGenerator min must be lower or equal to max",
-                        _comp.evaluate(bounds.second >= val));
-                tassert(
-                    5733506, "Unit must not be specified with non-date values", !_range.getUnit());
-            },
-            [&](const Date_t dateMin) {
-                tassert(5733500,
-                        "DocGenerator all values must be same type",
-                        stdx::holds_alternative<DateBounds>(_range.getBounds()));
-                DateBounds bounds = stdx::get<DateBounds>(_range.getBounds());
-                tassert(5733501, "Unit must be specified with a date step", _range.getUnit());
-                Value floorStep = floorValue(_range.getStep());
-                tassert(5733505,
-                        "Step must be an integer for date densification",
-                        _comp.evaluate(floorStep == _range.getStep()));
-                tassert(5733502,
-                        "DocGenerator min must be lower or equal to max",
-                        bounds.second >= dateMin);
-            },
-        },
-        _min);
+
+    tassert(5733700,
+            "DocGenerator must be passed a range with ExplicitBounds",
+            stdx::holds_alternative<ExplicitBounds>(_range.getBounds()));
+    ExplicitBounds bounds = stdx::get<ExplicitBounds>(_range.getBounds());
+    tassert(5733304,
+            "DocGenerator all values must be same type",
+            bounds.first.isSameTypeAs(bounds.second) && bounds.first.isSameTypeAs(_min));
+
+    if (_min.isDate()) {
+        // Extra checks for date step + unit.
+        tassert(5733501, "Unit must be specified with a date step", _range.getUnit());
+        tassert(5733505,
+                "Step must be representable as an integer for date densification",
+                _range.getStep().integral());
+    } else {
+        tassert(5733506, "Unit must not be specified with non-date values", !_range.getUnit());
+    }
+
+    tassert(5733303, "DocGenerator min must be lower or equal to max", _min <= bounds.second);
 }
 
 Document DocumentSourceInternalDensify::DocGenerator::getNextDocument() {
@@ -309,37 +285,17 @@ Document DocumentSourceInternalDensify::DocGenerator::getNextDocument() {
         return _finalDoc.get();
     }
     // Assume all types have been checked at this point and we are in a valid state.
-    Value valueToAdd;
-    stdx::visit(
-        visit_helper::Overloaded{
-            [&](Value val) {
-                valueToAdd = val;
-                Value nextValue = addValues(val, _range.getStep());
-                NumericBounds bounds = stdx::get<NumericBounds>(_range.getBounds());
-                if (_comp.evaluate(nextValue > bounds.second)) {
-                    _state =
-                        _finalDoc ? GeneratorState::kReturningFinalDocument : GeneratorState::kDone;
-                }
-                _min = nextValue;
-            },
-            [&](Date_t dateVal) {
-                valueToAdd = Value(dateVal);
-                dateVal = dateAdd(dateVal,
-                                  _range.getUnit().get(),
-                                  _range.getStep().getDouble(),
-                                  TimeZoneDatabase::utcZone());
-                DateBounds bounds = stdx::get<DateBounds>(_range.getBounds());
-                if (dateVal > bounds.second) {
-                    _state =
-                        _finalDoc ? GeneratorState::kReturningFinalDocument : GeneratorState::kDone;
-                }
-                _min = dateVal;
-            },
-        },
-        _min);
+    DensifyValue valueToAdd = _min;
+    DensifyValue nextValue = _min.increment(_range);
+    ExplicitBounds bounds = stdx::get<ExplicitBounds>(_range.getBounds());
+
+    if (bounds.second <= nextValue) {
+        _state = _finalDoc ? GeneratorState::kReturningFinalDocument : GeneratorState::kDone;
+    }
+    _min = nextValue;
 
     MutableDocument retDoc(_includeFields);
-    retDoc.setNestedField(_path, valueToAdd);
+    retDoc.setNestedField(_path, valueToAdd.toValue());
     ++(*_counter);
     return retDoc.freeze();
 }
@@ -348,27 +304,32 @@ bool DocumentSourceInternalDensify::DocGenerator::done() const {
     return _state == GeneratorState::kDone;
 }
 
-DocumentSource::GetNextResult DocumentSourceInternalDensify::densifyAfterEOF(NumericBounds bounds) {
+DocumentSource::GetNextResult DocumentSourceInternalDensify::densifyExplicitRangeAfterEOF() {
+    tassert(5734403,
+            "Expected explicit range in order to densify after last document.",
+            stdx::holds_alternative<ExplicitBounds>(_range.getBounds()));
+    auto bounds = stdx::get<ExplicitBounds>(_range.getBounds());
     // Once we have hit an EOF, if the last seen value (_current) plus the step is greater
     // than or equal to the rangeMax, that means we have finished densifying
     // over the explicit range so we just return an EOF. Otherwise, we finish
     // densifying over the rest of the range.
     if (!_current) {
         // We've seen no documents yet.
-        auto bounds = _range.getBounds();
-        tassert(5734403,
-                "Expected numeric explicit range",
-                stdx::holds_alternative<NumericBounds>(bounds));
-        auto lowerBound = stdx::get<NumericBounds>(bounds).first;
+        auto lowerBound = bounds.first;
         _current = lowerBound;
-        createDocGenerator(lowerBound, _range);
-    } else if (compareValues(addValues(stdx::get<Value>(*_current), _range.getStep()) >=
-                             bounds.second)) {
+        createDocGenerator(lowerBound,
+                           RangeStatement(_range.getStep(),
+                                          ExplicitBounds(bounds.first, bounds.second),
+                                          _range.getUnit()));
+    } else if (_current->increment(_range) >= bounds.second) {
         _densifyState = DensifyState::kDensifyDone;
         return DocumentSource::GetNextResult::makeEOF();
     } else {
-        auto lowerBound = addValues(stdx::get<Value>(*_current), _range.getStep());
-        createDocGenerator(lowerBound, _range);
+        auto lowerBound = _current->increment(_range);
+        createDocGenerator(lowerBound,
+                           RangeStatement(_range.getStep(),
+                                          ExplicitBounds(bounds.first, bounds.second),
+                                          _range.getUnit()));
     }
     _densifyState = DensifyState::kHaveGenerator;
     auto generatedDoc = _docGenerator->getNextDocument();
@@ -379,31 +340,29 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::densifyAfterEOF(Num
     return generatedDoc;
 }
 
-DocumentSource::GetNextResult DocumentSourceInternalDensify::processDocAboveMinBound(
-    Value val, NumericBounds bounds, Document doc) {
+DocumentSource::GetNextResult DocumentSourceInternalDensify::processDocAboveExplicitMinBound(
+    Document doc) {
+    auto bounds = stdx::get<ExplicitBounds>(_range.getBounds());
+    auto val = getDensifyValue(doc);
     // If we are above the range, there must be more left to densify.
     // Otherwise the state would be kDoneDensify and this function would not be reached.
     tassert(8423306,
             "Cannot be in this state if _current is greater than the upper bound.",
-            compareValues(stdx::get<Value>(*_current) <= bounds.second));
+            *_current < bounds.second);
     // _current is the last seen value, don't generate it again.
-    Value lowerBound = addValues(stdx::get<Value>(*_current), _range.getStep());
+    DensifyValue lowerBound = _current->increment(_range);
 
-    auto rem = valOffsetFromStep(val, stdx::get<Value>(*_current), _range.getStep());
-    // If val is on the step we need to subtract the step to avoid returning the doc twice.
-    if (compareValues(rem == Value(0))) {
-        // If val is the next value to be generated, just return it.
-        if (compareValues(val == lowerBound)) {
-            setPartitionValue(doc);
-            _current = lowerBound;
-            return doc;
-        }
-        val = subtractValues(val, _range.getStep());
+    // If val is the next value to be generated, just return it.
+    if (val == lowerBound) {
+        setPartitionValue(doc);
+        _current = lowerBound;
+        return doc;
     }
-    Value upperBound = (compareValues(val <= bounds.second)) ? val : bounds.second;
+
+    DensifyValue upperBound = (val < bounds.second) ? val : bounds.second;
     createDocGenerator(
         lowerBound,
-        RangeStatement(_range.getStep(), NumericBounds(lowerBound, upperBound), _range.getUnit()),
+        RangeStatement(_range.getStep(), ExplicitBounds(lowerBound, upperBound), _range.getUnit()),
         _partitionExpr ? boost::make_optional<Document>(getDensifyPartition(doc).getDocument())
                        : boost::none,
         doc);
@@ -417,18 +376,20 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::processDocAboveMinB
 }
 
 DocumentSource::GetNextResult DocumentSourceInternalDensify::processFirstDocForExplicitRange(
-    Value val, NumericBounds bounds, Document doc) {
+    Document doc) {
+    auto bounds = stdx::get<ExplicitBounds>(_range.getBounds());
+    auto val = getDensifyValue(doc);
     // For the first document in a partition, '_current' is the minimum value - step.
     if (!_current) {
-        _current = subtractValues(bounds.first, _range.getStep());
+        _current = bounds.first.decrement(_range);
     }
-    auto where = processRange(val, stdx::get<Value>(*_current), bounds);
+    auto where = getPositionRelativeToRange(val);
     switch (where) {
         case ValComparedToRange::kInside: {
-            return processDocAboveMinBound(val, bounds, doc);
+            return processDocAboveExplicitMinBound(doc);
         }
         case ValComparedToRange::kAbove: {
-            return processDocAboveMinBound(val, bounds, doc);
+            return processDocAboveExplicitMinBound(doc);
         }
         case ValComparedToRange::kRangeMin: {
             _densifyState = DensifyState::kNeedGen;
@@ -444,9 +405,9 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::processFirstDocForE
 }
 
 /** Checks if the generator is done, changes states accordingly. */
-void DocumentSourceInternalDensify::resetDocGen(NumericBounds bounds) {
+void DocumentSourceInternalDensify::resetDocGen(ExplicitBounds bounds) {
     if (_docGenerator->done()) {
-        if (compareValues(stdx::get<Value>(*_current) >= bounds.second) && !_partitionExpr) {
+        if (*_current >= bounds.second && !_partitionExpr) {
             _densifyState = DensifyState::kDensifyDone;
         } else if (_partitionExpr && _eof) {
             _densifyState = DensifyState::kFinishingDensify;
@@ -457,15 +418,15 @@ void DocumentSourceInternalDensify::resetDocGen(NumericBounds bounds) {
     }
 }
 
-
-DocumentSourceInternalDensify::ValComparedToRange DocumentSourceInternalDensify::processRange(
-    Value val, Value current, NumericBounds bounds) {
-    int comparison = compareValues(val, current);
+DocumentSourceInternalDensify::ValComparedToRange
+DocumentSourceInternalDensify::getPositionRelativeToRange(DensifyValue val) {
+    auto bounds = stdx::get<ExplicitBounds>(_range.getBounds());
+    int comparison = DensifyValue::compare(val, bounds.first);
     if (comparison < 0) {
         return DocumentSourceInternalDensify::ValComparedToRange::kBelow;
     } else if (comparison == 0) {
         return DocumentSourceInternalDensify::ValComparedToRange::kRangeMin;
-    } else if (compareValues(val <= bounds.second)) {
+    } else if (val < bounds.second) {
         return DocumentSourceInternalDensify::ValComparedToRange::kInside;
     } else {
         return DocumentSourceInternalDensify::ValComparedToRange::kAbove;
@@ -474,26 +435,26 @@ DocumentSourceInternalDensify::ValComparedToRange DocumentSourceInternalDensify:
 
 
 DocumentSource::GetNextResult DocumentSourceInternalDensify::finishDensifyingPartitionedInputHelper(
-    Value max, boost::optional<Value> minOverride) {
+    DensifyValue max, boost::optional<DensifyValue> minOverride) {
     while (_partitionTable.size() != 0) {
         auto firstPartitionKeyVal = _partitionTable.begin();
         Value firstPartition = firstPartitionKeyVal->first;
-        DensifyValueType firstPartitionVal = firstPartitionKeyVal->second;
+        DensifyValue firstPartitionVal = firstPartitionKeyVal->second;
         // We've already seen the stored value, we want to start generating on the next
         // one.
-        auto valToGenerate = addValues(stdx::get<Value>(firstPartitionVal), _range.getStep());
+        auto valToGenerate = firstPartitionVal.increment(_range);
         // If the valToGenerate is > max seen, skip this partition. It is done.
-        if (compareValues(valToGenerate, max) > 0) {
+        if (valToGenerate >= max) {
             _partitionTable.erase(firstPartitionKeyVal);
             continue;
         }
         // If the valToGenerate is < 'minOverride', use the override instead.
-        if (minOverride && compareValues(valToGenerate, *minOverride) < 0) {
+        if (minOverride && valToGenerate < *minOverride) {
             valToGenerate = *minOverride;
         }
         createDocGenerator(
             valToGenerate,
-            RangeStatement(_range.getStep(), NumericBounds(valToGenerate, max), _range.getUnit()),
+            RangeStatement(_range.getStep(), ExplicitBounds(valToGenerate, max), _range.getUnit()),
             firstPartition.getDocument(),
             boost::none  // final doc.
         );
@@ -505,7 +466,7 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::finishDensifyingPar
             _docGenerator = boost::none;
             _densifyState = DensifyState::kFinishingDensify;
         }
-        return DocumentSource::GetNextResult(std::move(nextDoc));
+        return nextDoc;
     }
     _densifyState = DensifyState::kDensifyDone;
     return DocumentSource::GetNextResult::makeEOF();
@@ -516,31 +477,27 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::finishDensifyingPar
         _densifyState = DensifyState::kDensifyDone;
         return DocumentSource::GetNextResult::makeEOF();
     }
-    return stdx::visit(visit_helper::Overloaded{[&](Full) {
-                                                    // Densify between partitions's last seen value
-                                                    // and global max.
-                                                    return finishDensifyingPartitionedInputHelper(
-                                                        stdx::get<Value>(*_globalMax));
-                                                },
-                                                [&](Partition) {
-                                                    // Partition bounds don't do any extra work
-                                                    // after EOF;
-                                                    MONGO_UNREACHABLE;
-                                                    return DocumentSource::GetNextResult::makeEOF();
-                                                },
-                                                [&](DateBounds bounds) {
-                                                    // Not implemented.
-                                                    MONGO_UNREACHABLE;
-                                                    return DocumentSource::GetNextResult::makeEOF();
-                                                },
-                                                [&](NumericBounds bounds) {
-                                                    // Densify between partitions's last seen value
-                                                    // and global max. Use the override for the
-                                                    // global min.
-                                                    return finishDensifyingPartitionedInputHelper(
-                                                        bounds.second, bounds.first);
-                                                }},
-                       _range.getBounds());
+    return stdx::visit(
+        visit_helper::Overloaded{
+            [&](Full) {
+                // Densify between partitions's last seen value and global max.
+                tassert(5733707, "_current must be set if partitionTable is non-empty", _current);
+                return finishDensifyingPartitionedInputHelper(
+                    _globalMax->isOnStepRelativeTo(*_current, _range)
+                        ? _globalMax->increment(_range)
+                        : *_globalMax);
+            },
+            [&](Partition) {
+                // Partition bounds don't do any extra work after EOF;
+                MONGO_UNREACHABLE_TASSERT(5733704);
+                return DocumentSource::GetNextResult::makeEOF();
+            },
+            [&](ExplicitBounds bounds) {
+                // Densify between partitions's last seen value and global max. Use the override for
+                // the global min.
+                return finishDensifyingPartitionedInputHelper(bounds.second, bounds.first);
+            }},
+        _range.getBounds());
 }
 
 DocumentSource::GetNextResult DocumentSourceInternalDensify::handleSourceExhausted() {
@@ -560,59 +517,39 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::handleSourceExhaust
                 _densifyState = DensifyState::kDensifyDone;
                 return DocumentSource::GetNextResult::makeEOF();
             },
-            [&](RangeStatement::DateBounds bounds) {
-                // TODO SERVER-57340 and SERVER-57342
-                tasserted(5734000, "Type of densify should not be explicit date bounds");
-                return DocumentSource::GetNextResult::makeEOF();
-            },
-            [&](RangeStatement::NumericBounds bounds) {
+            [&](RangeStatement::ExplicitBounds bounds) {
                 if (_partitionExpr) {
                     return finishDensifyingPartitionedInput();
                 }
-                return densifyAfterEOF(bounds);
+                return densifyExplicitRangeAfterEOF();
             },
         },
         _range.getBounds());
 }
 
 
-int DocumentSourceInternalDensify::compareToNextStep(const Value& val) {
-    Value currentPlusStep = addValues(stdx::get<Value>(*_current), _range.getStep());
-    return compareValues(currentPlusStep, val);
-}
-
-DocumentSource::GetNextResult DocumentSourceInternalDensify::handleNeedGen(Document currentDoc,
-                                                                           Value max) {
-    // Note that max is not the global max, its only the max up to the current document.
-    auto compRes = compareToNextStep(max);
+DocumentSource::GetNextResult DocumentSourceInternalDensify::handleNeedGen(Document currentDoc) {
+    auto val = getDensifyValue(currentDoc);
+    auto nextValToGenerate = _current->increment(_range);
 
     // If the current value is the next value to be generated, save it as the current (last seen)
     // value.
-    if (compRes == 0) {
+    if (val == nextValToGenerate) {
         setPartitionValue(currentDoc);
-        _current = max;
+        _current = val;
     }
-    // If the current value is before the next generated step, don't save it so we can correctly
-    // generate the next value later.
-    if (compRes >= 0) {
+    // If we don't need to create a generator (no intervening documents to generate before
+    // outputting currentDoc), then don't create a generator or update _current.
+    if (val <= nextValToGenerate) {
         return currentDoc;
     }
 
     // Falling through the above conditions means the currentDoc is strictly greater than the last
     // seen document plus the step value.
-
-    // This line checks if we are aligned on the step by checking if the current
-    // value in the document minus the min is divisible by the step. If it is we
-    // subtract step from max. This is neccessary so we don't generate the final
-    // document twice.
-    auto offsetFromStep = valOffsetFromStep(max, stdx::get<Value>(*_current), _range.getStep());
-    auto maxAdjusted =
-        compareValues(offsetFromStep == Value(0)) ? subtractValues(max, _range.getStep()) : max;
-
-    Value newCurrent = addValues(stdx::get<Value>(*_current), _range.getStep());
+    auto newCurrent = _current->increment(_range);
     createDocGenerator(
-        DensifyValueType(newCurrent),
-        RangeStatement(_range.getStep(), NumericBounds(newCurrent, maxAdjusted), _range.getUnit()),
+        newCurrent,
+        RangeStatement(_range.getStep(), ExplicitBounds(newCurrent, val), _range.getUnit()),
         _partitionExpr
             ? boost::make_optional<Document>(getDensifyPartition(currentDoc).getDocument())
             : boost::none,
@@ -632,23 +569,25 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::handleNeedGen(Docum
 }
 
 DocumentSource::GetNextResult DocumentSourceInternalDensify::handleNeedGenExplicit(
-    Document currentDoc, Value val, NumericBounds bounds) {
-    auto where = processRange(val, stdx::get<Value>(*_current), bounds);
+    Document currentDoc) {
+    auto bounds = stdx::get<ExplicitBounds>(_range.getBounds());
+    auto val = getDensifyValue(currentDoc);
+    auto where = getPositionRelativeToRange(val);
     switch (where) {
         case ValComparedToRange::kInside: {
-            auto nextStep = addValues(stdx::get<Value>(*_current), _range.getStep());
-            if (compareValues(val == nextStep)) {
+            auto nextStep = _current->increment(_range);
+            if (val == nextStep) {
                 _current = val;
                 setPartitionValue(currentDoc);
                 return currentDoc;
-            } else if (compareValues(val < nextStep)) {
+            } else if (val < nextStep) {
                 return currentDoc;
             }
-            return processDocAboveMinBound(val, bounds, currentDoc);
+            return processDocAboveExplicitMinBound(currentDoc);
         }
         case ValComparedToRange::kAbove: {
-            auto nextStep = addValues(stdx::get<Value>(*_current), _range.getStep());
-            if (compareValues(nextStep > bounds.second)) {
+            auto nextStep = _current->increment(_range);
+            if (nextStep >= bounds.second) {
                 _current = nextStep;
                 // If we are partitioning other partitions may still need to densify.
                 setPartitionValue(currentDoc);
@@ -657,7 +596,7 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::handleNeedGenExplic
                 }
                 return currentDoc;
             }
-            return processDocAboveMinBound(val, bounds, currentDoc);
+            return processDocAboveExplicitMinBound(currentDoc);
         }
         case ValComparedToRange::kRangeMin: {
             setPartitionValue(currentDoc);
@@ -669,7 +608,7 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::handleNeedGenExplic
             _densifyState = DensifyState::kUninitializedOrBelowRange;
             return currentDoc;
         }
-        default: { MONGO_UNREACHABLE; }
+        default: { MONGO_UNREACHABLE_TASSERT(5733705); }
     }
 }
 boost::intrusive_ptr<DocumentSource> DocumentSourceInternalDensify::createFromBson(
@@ -738,7 +677,7 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::doGetNext() {
                 return nextDoc;
             }
 
-            Value val = getDensifyValue(doc);
+            auto val = getDensifyValue(doc);
 
             // If we have partitions specified, setup the partition expression and table.
             if (_partitions.size() != 0 && !_partitionExpr) {
@@ -760,13 +699,7 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::doGetNext() {
                         _densifyState = DensifyState::kNeedGen;
                         return nextDoc;
                     },
-                    [&](DateBounds bounds) {
-                        tasserted(5733412, "Type of densify should not be date bounds");
-                        return DocumentSource::GetNextResult::makeEOF();
-                    },
-                    [&](NumericBounds bounds) {
-                        return processFirstDocForExplicitRange(val, bounds, doc);
-                    }},
+                    [&](ExplicitBounds bounds) { return processFirstDocForExplicitRange(doc); }},
                 _range.getBounds());
         }
         case DensifyState::kNeedGen: {
@@ -785,7 +718,7 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::doGetNext() {
                 // The densify field is not present, let document pass unmodified.
                 return nextDoc;
             }
-            Value val = getDensifyValue(currentDoc);
+            auto val = getDensifyValue(currentDoc);
 
             return stdx::visit(
                 visit_helper::Overloaded{
@@ -801,16 +734,15 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::doGetNext() {
                             if (foundPartitionVal == _partitionTable.end()) {
                                 // _current represents the last value seen. We want to generate
                                 // _globalMin, so pretend we've seen the value before that.
-                                _current =
-                                    subtractValues(stdx::get<Value>(*_globalMin), _range.getStep());
+                                _current = _globalMin->decrement(_range);
                                 // Insert the new partition into the table.
                                 setPartitionValue(currentDoc);
-                                return handleNeedGen(currentDoc, val);
+                                return handleNeedGen(currentDoc);
                             }
                             // Otherwise densify between the last seen value and this one.
                             _current = foundPartitionVal->second;
                         }
-                        return handleNeedGen(currentDoc, val);
+                        return handleNeedGen(currentDoc);
                     },
                     [&](Partition) {
                         // If we haven't seen this partition before, add it to the table then
@@ -823,28 +755,24 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::doGetNext() {
                         }
                         // Reset current to be the last value in this partition.
                         _current = foundPartitionVal->second;
-                        return handleNeedGen(currentDoc, val);
+                        return handleNeedGen(currentDoc);
                     },
-                    [&](DateBounds bounds) {
-                        MONGO_UNREACHABLE;
-                        return DocumentSource::GetNextResult::makeEOF();
-                    },
-                    [&](NumericBounds bounds) {
+                    [&](ExplicitBounds bounds) {
                         if (_partitionExpr) {
-                            // If we haven't seen this partition before, add it to the table then
-                            // check where it is in the range.
+                            // If we haven't seen this partition before, add it to the table
+                            // then check where it is in the range.
                             auto partitionVal = getDensifyPartition(currentDoc);
                             auto foundPartitionVal = _partitionTable.find(partitionVal);
                             if (foundPartitionVal == _partitionTable.end()) {
                                 setPartitionValue(currentDoc);
                                 // This partition has seen no values.
                                 _current = boost::none;
-                                return processFirstDocForExplicitRange(val, bounds, currentDoc);
+                                return processFirstDocForExplicitRange(currentDoc);
                             }
                             // Otherwise reset current to be the last value in this partition.
                             _current = foundPartitionVal->second;
                         }
-                        return handleNeedGenExplicit(nextDoc.getDocument(), val, bounds);
+                        return handleNeedGenExplicit(nextDoc.getDocument());
                     }},
                 _range.getBounds());
         }
@@ -856,54 +784,50 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::doGetNext() {
             auto generatedDoc = _docGenerator->getNextDocument();
 
             return stdx::visit(
-                visit_helper::Overloaded{
-                    [&](Full) {
-                        if (_docGenerator->done()) {
-                            _docGenerator = boost::none;
-                            if (_eof && _partitionExpr) {
-                                _densifyState = DensifyState::kFinishingDensify;
-                            } else {
-                                _densifyState = DensifyState::kNeedGen;
-                            }
-                        }
-                        // The generator's final document may not be on the step.
-                        auto genDensifyVal = getDensifyValue(generatedDoc);
-                        if (compareToNextStep(genDensifyVal) == 0) {
-                            _current = genDensifyVal;
-                            setPartitionValue(generatedDoc);
-                        }
-                        return GetNextResult(std::move(generatedDoc));
-                    },
-                    [&](Partition) {
-                        if (_docGenerator->done()) {
-                            _docGenerator = boost::none;
-                            _densifyState = DensifyState::kNeedGen;
-                        }
-                        // The generator's final document may not be on the step.
-                        auto genDensifyVal = getDensifyValue(generatedDoc);
-                        if (compareToNextStep(genDensifyVal) == 0) {
-                            _current = genDensifyVal;
-                            setPartitionValue(generatedDoc);
-                        }
-                        return GetNextResult(std::move(generatedDoc));
-                    },
-                    [&](DateBounds bounds) {
-                        MONGO_UNREACHABLE;
-                        return DocumentSource::GetNextResult::makeEOF();
-                    },
-                    [&](NumericBounds bounds) {
-                        auto val = getDensifyValue(generatedDoc);
-                        // Only want to update the rangeMin if the value - current is divisible by
-                        // the step.
-                        auto rem =
-                            valOffsetFromStep(val, stdx::get<Value>(*_current), _range.getStep());
-                        if (compareValues(rem == Value(0))) {
-                            _current = val;
-                            setPartitionValue(generatedDoc);
-                        }
-                        resetDocGen(bounds);
-                        return GetNextResult(std::move(generatedDoc));
-                    }},
+                visit_helper::Overloaded{[&](Full) {
+                                             if (_docGenerator->done()) {
+                                                 _docGenerator = boost::none;
+                                                 if (_eof && _partitionExpr) {
+                                                     _densifyState =
+                                                         DensifyState::kFinishingDensify;
+                                                 } else {
+                                                     _densifyState = DensifyState::kNeedGen;
+                                                 }
+                                             }
+                                             // The generator's final document may not be on the
+                                             // step.
+                                             auto genDensifyVal = getDensifyValue(generatedDoc);
+                                             if (genDensifyVal == _current->increment(_range)) {
+                                                 _current = genDensifyVal;
+                                                 setPartitionValue(generatedDoc);
+                                             }
+                                             return generatedDoc;
+                                         },
+                                         [&](Partition) {
+                                             if (_docGenerator->done()) {
+                                                 _docGenerator = boost::none;
+                                                 _densifyState = DensifyState::kNeedGen;
+                                             }
+                                             // The generator's final document may not be on the
+                                             // step.
+                                             auto genDensifyVal = getDensifyValue(generatedDoc);
+                                             if (genDensifyVal == _current->increment(_range)) {
+                                                 _current = genDensifyVal;
+                                                 setPartitionValue(generatedDoc);
+                                             }
+                                             return generatedDoc;
+                                         },
+                                         [&](ExplicitBounds bounds) {
+                                             auto val = getDensifyValue(generatedDoc);
+                                             // Only want to update the rangeMin if the value -
+                                             // current is divisible by the step.
+                                             if (val.isOnStepRelativeTo(*_current, _range)) {
+                                                 _current = val;
+                                                 setPartitionValue(generatedDoc);
+                                             }
+                                             resetDocGen(bounds);
+                                             return generatedDoc;
+                                         }},
                 _range.getBounds());
         }
         case DensifyState::kFinishingDensify: {
@@ -924,7 +848,77 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::doGetNext() {
             }
             return doc;
         }
-        default: { MONGO_UNREACHABLE; }
-    }
+        default: { MONGO_UNREACHABLE_TASSERT(5733706); }
+    }  // namespace mongo
+}
+
+DensifyValue DensifyValue::increment(const RangeStatement& range) const {
+    return stdx::visit(
+        visit_helper::Overloaded{
+            [&](Value val) {
+                return DensifyValue(uassertStatusOK(ExpressionAdd::apply(val, range.getStep())));
+            },
+            [&](Date_t date) {
+                return DensifyValue(
+                    dateAdd(date, range.getUnit().get(), range.getStep().getDouble(), timezone()));
+            }},
+        _value);
+}
+
+DensifyValue DensifyValue::decrement(const RangeStatement& range) const {
+    return stdx::visit(
+        visit_helper::Overloaded{
+            [&](Value val) {
+                return DensifyValue(
+                    uassertStatusOK(ExpressionSubtract::apply(val, range.getStep())));
+            },
+            [&](Date_t date) {
+                return DensifyValue(
+                    dateAdd(date, range.getUnit().get(), -range.getStep().getDouble(), timezone()));
+            }},
+        _value);
+}
+
+bool DensifyValue::isOnStepRelativeTo(DensifyValue base, RangeStatement range) const {
+    return stdx::visit(
+        visit_helper::Overloaded{
+            [&](Value val) {
+                Value diff = uassertStatusOK(ExpressionSubtract::apply(val, base.getNumber()));
+                Value remainder = uassertStatusOK(ExpressionMod::apply(diff, range.getStep()));
+                return remainder.getDouble() == 0.0;
+            },
+            [&](Date_t date) {
+                auto unit = range.getUnit().get();
+                double step = range.getStep().getDouble();
+                auto baseDate = base.getDate();
+
+                // Months, quarters and years have variable lengths depending on leap days
+                // and days-in-a-month, so a step is not a constant number of milliseconds
+                // across all dates. For these units, we need to iterate through rather than
+                // performing a calculation with modulo.
+                if (unit == TimeUnit::month || unit == TimeUnit::quarter ||
+                    unit == TimeUnit::year) {
+
+                    Date_t steppedDate = baseDate;
+                    // TODO SERVER-60202: Could be sped up with binary search rather than stepping
+                    // sequentially.
+                    while (steppedDate < date) {
+                        steppedDate = dateAdd(steppedDate, unit, step, timezone());
+                    }
+                    return steppedDate == date;
+                } else {
+                    // Steps with units smaller than one month are always constant sized
+                    // (because unix time does not have leap seconds), so we can perform
+                    // modulo arithmetic.
+                    auto testMillis = date.toMillisSinceEpoch();
+                    auto baseMillis = baseDate.toMillisSinceEpoch();
+                    auto stepDurationInMillis =
+                        dateAdd(Date_t::fromMillisSinceEpoch(0), unit, step, timezone())
+                            .toMillisSinceEpoch();
+                    auto diff = testMillis - baseMillis;
+                    return diff % stepDurationInMillis == 0;
+                }
+            }},
+        _value);
 }
 }  // namespace mongo

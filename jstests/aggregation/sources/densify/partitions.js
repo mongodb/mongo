@@ -53,6 +53,34 @@ function testOne() {
     coll.drop();
 }
 
+function testOneDates() {
+    coll.drop();
+
+    const testDocs = [
+        {val: new Date(2021, 0, 1), partition: 0},
+        {val: new Date(2021, 0, 3), partition: 0},
+        {val: new Date(2021, 0, 1), partition: 1},
+        {val: new Date(2021, 0, 3), partition: 1}
+    ];
+    assert.commandWorked(coll.insert(testDocs));
+
+    let result = coll.aggregate([
+        {$project: {_id: 0}},
+        {
+            $densify: {
+                field: "val",
+                partitionByFields: ["partition"],
+                range: {step: 1, unit: "day", bounds: "partition"}
+            }
+        }
+    ]);
+    const resultArray = result.toArray();
+    const testExpected = testDocs.concat(
+        [{val: new Date(2021, 0, 2), partition: 0}, {val: new Date(2021, 0, 2), partition: 1}]);
+    assert(arrayEq(resultArray, testExpected), buildErrorString(resultArray, testExpected));
+    coll.drop();
+}
+
 // Same as test one, but partitions are interleaved.
 function testTwo() {
     coll.drop();
@@ -262,6 +290,38 @@ function fullTestTwo(stepVal = 2) {
     assert(arrayEq(resultArray, testExpected), buildErrorString(resultArray, testExpected));
 }
 
+// Test partitioning with dates with full where partitions need to be densified at the end.
+// Three partitions, each with only one document.
+function fullTestTwoDates(stepVal = 2) {
+    coll.drop();
+    let testDocs = [];
+    let testExpected = [];
+    // Add an initial document.
+    testDocs.push({val: new Date(2021, 0, 1), part: 0});
+    testDocs.push({val: new Date(2021, 0, 1), part: 1});
+    testDocs.push({val: new Date(2031, 0, 1), part: 2});
+    testDocs.push({val: new Date(2025, 0, 1), part: 3});
+    for (let densifyVal = 0; densifyVal < 11; densifyVal += stepVal) {
+        for (let partitionVal = 0; partitionVal <= 3; partitionVal++) {
+            testExpected.push({val: new Date(2021 + densifyVal, 0, 1), part: partitionVal});
+        }
+    }
+    assert.commandWorked(coll.insert(testDocs));
+    let result = coll.aggregate([
+        {$project: {_id: 0}},
+        {
+            $densify: {
+                field: "val",
+                range: {step: stepVal, unit: "year", bounds: "full"},
+                partitionByFields: ["part"]
+            }
+        },
+        {$sort: {val: 1, part: 1}}
+    ]);
+    const resultArray = result.toArray();
+    assert(arrayEq(resultArray, testExpected), buildErrorString(resultArray, testExpected));
+}
+
 // Same as above, but with extra documents in the middle of each partition somewhere.
 function fullTestThree(stepVal = 2) {
     coll.drop();
@@ -306,8 +366,6 @@ function rangeTestOne() {
         {val: 4, partition: 1},
         {val: 2, partition: 0},
         {val: 2, partition: 1},
-        {val: 3, partition: 0},
-        {val: 3, partition: 1}
     ];
     assert.commandWorked(coll.insert(testDocs));
 
@@ -316,6 +374,37 @@ function rangeTestOne() {
         {
             $densify:
                 {field: "val", partitionByFields: ["partition"], range: {step: 1, bounds: [2, 3]}}
+        }
+    ]);
+    const resultArray = result.toArray();
+    assert(arrayEq(resultArray, expectedDocs), buildErrorString(resultArray, expectedDocs));
+    coll.drop();
+}
+
+// Upper bound on range which is off-step from lower bound.
+function rangeTestThree() {
+    coll.drop();
+
+    const testDocs = [
+        {val: 0, partition: 0},
+        {val: 10, partition: 1},
+    ];
+
+    const expectedDocs = [
+        {val: 0, partition: 0},
+        {val: 10, partition: 1},
+        {val: 2, partition: 0},
+        {val: 2, partition: 1},
+        {val: 4, partition: 0},
+        {val: 4, partition: 1},
+    ];
+    assert.commandWorked(coll.insert(testDocs));
+
+    let result = coll.aggregate([
+        {$project: {_id: 0}},
+        {
+            $densify:
+                {field: "val", partitionByFields: ["partition"], range: {step: 2, bounds: [2, 5]}}
         }
     ]);
     const resultArray = result.toArray();
@@ -334,7 +423,7 @@ function rangeTestTwo() {
     testExpected.push({val: 5, part: 1});
     testDocs.push({val: 10, part: 2});
     testExpected.push({val: 10, part: 2});
-    for (let densifyVal = 4; densifyVal <= 8; densifyVal += 2) {
+    for (let densifyVal = 4; densifyVal < 8; densifyVal += 2) {
         for (let partitionVal = 0; partitionVal <= 2; partitionVal++) {
             testExpected.push({val: densifyVal, part: partitionVal});
         }
@@ -343,6 +432,38 @@ function rangeTestTwo() {
     let result = coll.aggregate([
         {$project: {_id: 0}},
         {$densify: {field: "val", range: {step: 2, bounds: [4, 8]}, partitionByFields: ["part"]}},
+        {$sort: {val: 1, part: 1}}
+    ]);
+    const resultArray = result.toArray();
+    assert(arrayEq(resultArray, testExpected), buildErrorString(resultArray, testExpected));
+}
+
+function rangeTestTwoDates() {
+    coll.drop();
+    let testDocs = [];
+    let testExpected = [];
+    testDocs.push({val: new Date(2021, 0, 1), part: 0});
+    testExpected.push({val: new Date(2021, 0, 1), part: 0});
+    testDocs.push({val: new Date(2021, 5, 1), part: 1});
+    testExpected.push({val: new Date(2021, 5, 1), part: 1});
+    testDocs.push({val: new Date(2021, 10, 1), part: 2});
+    testExpected.push({val: new Date(2021, 10, 1), part: 2});
+    for (let densifyVal = 4; densifyVal < 8; densifyVal += 2) {
+        for (let partitionVal = 0; partitionVal <= 2; partitionVal++) {
+            testExpected.push({val: new Date(2021, densifyVal, 1), part: partitionVal});
+        }
+    }
+    assert.commandWorked(coll.insert(testDocs));
+    let result = coll.aggregate([
+        {$project: {_id: 0}},
+        {
+            $densify: {
+                field: "val",
+                range:
+                    {step: 2, unit: "month", bounds: [new Date(2021, 4, 1), new Date(2021, 8, 1)]},
+                partitionByFields: ["part"]
+            }
+        },
         {$sort: {val: 1, part: 1}}
     ]);
     const resultArray = result.toArray();
@@ -388,5 +509,10 @@ fullTestTwo();
 fullTestThree();
 rangeTestOne();
 rangeTestTwo();
+rangeTestThree();
 fullTestFour();
+
+testOneDates();
+fullTestTwoDates();
+rangeTestTwoDates();
 })();

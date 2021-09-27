@@ -41,14 +41,14 @@
 namespace mongo {
 namespace {
 
-using DateBounds = RangeStatement::DateBounds;
-using NumericBounds = RangeStatement::NumericBounds;
+using ExplicitBounds = RangeStatement::ExplicitBounds;
 using Full = RangeStatement::Full;
 using GenClass = DocumentSourceInternalDensify::DocGenerator;
 using DensifyFullNumericTest = AggregationContextFixture;
 using DensifyExplicitNumericTest = AggregationContextFixture;
 using DensifyPartitionNumericTest = AggregationContextFixture;
 using DensifyCloneTest = AggregationContextFixture;
+using DensifyStepTest = AggregationContextFixture;
 
 MONGO_INITIALIZER_GENERAL(turnOnDensifyFlag,
                           ("AllFailPointsRegistered", "EndServerParameterRegistration"),
@@ -78,7 +78,7 @@ DEATH_TEST(DensifyGeneratorTest, ErrorsIfMinOverMax, "lower or equal to max") {
     size_t counter = 0;
     ASSERT_THROWS_CODE(
         GenClass(Value(1),
-                 RangeStatement(Value(1), NumericBounds(Value(1), Value(0)), boost::none),
+                 RangeStatement(Value(1), ExplicitBounds(Value(1), Value(0)), boost::none),
                  "path",
                  doc,
                  doc,
@@ -93,7 +93,7 @@ DEATH_TEST(DensifyGeneratorTest, ErrorsIfStepIsZero, "be positive") {
     size_t counter = 0;
     ASSERT_THROWS_CODE(
         GenClass(Value(0),
-                 RangeStatement(Value(0), NumericBounds(Value(0), Value(1)), boost::none),
+                 RangeStatement(Value(0), ExplicitBounds(Value(0), Value(1)), boost::none),
                  "path",
                  doc,
                  doc,
@@ -108,7 +108,7 @@ DEATH_TEST(DensifyGeneratorTest, ErrorsOnMixedValues, "same type") {
     size_t counter = 0;
     ASSERT_THROWS_CODE(
         GenClass(Date_t::max(),
-                 RangeStatement(Value(1), NumericBounds(Value(0), Value(1)), boost::none),
+                 RangeStatement(Value(1), ExplicitBounds(Value(0), Value(1)), boost::none),
                  "path",
                  doc,
                  doc,
@@ -123,7 +123,7 @@ DEATH_TEST(DensifyGeneratorTest, ErrorsIfFieldExistsInDocument, "cannot include 
     size_t counter = 0;
     ASSERT_THROWS_CODE(
         GenClass(Value(0),
-                 RangeStatement(Value(1), NumericBounds(Value(0), Value(1)), boost::none),
+                 RangeStatement(Value(1), ExplicitBounds(Value(0), Value(1)), boost::none),
                  "path",
                  doc,
                  doc,
@@ -142,7 +142,7 @@ DEATH_TEST(DensifyGeneratorTest, ErrorsIfFieldExistsButIsArray, "cannot include 
     size_t counter = 0;
     ASSERT_THROWS_CODE(
         GenClass(Value(0),
-                 RangeStatement(Value(1), NumericBounds(Value(0), Value(1)), boost::none),
+                 RangeStatement(Value(1), ExplicitBounds(Value(0), Value(1)), boost::none),
                  "arr",
                  preservedFields,
                  doc,
@@ -161,7 +161,7 @@ TEST(DensifyGeneratorTest, ErrorsIfFieldIsInArray) {
     size_t counter = 0;
     ASSERT_THROWS_CODE(
         GenClass(Value(0),
-                 RangeStatement(Value(1), NumericBounds(Value(0), Value(1)), boost::none),
+                 RangeStatement(Value(1), ExplicitBounds(Value(0), Value(1)), boost::none),
                  "arr.path",
                  preservedFields,
                  doc,
@@ -176,7 +176,7 @@ TEST(DensifyGeneratorTest, ErrorsIfPrefixOfFieldExists) {
     size_t counter = 0;
     ASSERT_THROWS_CODE(
         GenClass(Value(1),
-                 RangeStatement(Value(1), NumericBounds(Value(1), Value(1)), boost::none),
+                 RangeStatement(Value(1), ExplicitBounds(Value(1), Value(1)), boost::none),
                  "a.b",
                  doc,
                  doc,
@@ -191,7 +191,7 @@ TEST(DensifyGeneratorTest, GeneratesNumericDocumentCorrectly) {
     size_t counter = 0;
     auto generator =
         GenClass(Value(1),
-                 RangeStatement(Value(1), NumericBounds(Value(1), Value(1)), boost::none),
+                 RangeStatement(Value(1), ExplicitBounds(Value(1), Value(1)), boost::none),
                  "a",
                  Document(),
                  doc,
@@ -209,7 +209,7 @@ TEST(DensifyGeneratorTest, GeneratesNumericDocumentCorrectlyWithoutFinalDoc) {
     size_t counter = 0;
     auto generator =
         GenClass(Value(1),
-                 RangeStatement(Value(1), NumericBounds(Value(1), Value(1)), boost::none),
+                 RangeStatement(Value(1), ExplicitBounds(Value(1), Value(1)), boost::none),
                  "a",
                  Document(),
                  boost::none,
@@ -227,7 +227,7 @@ TEST(DensifyGeneratorTest, PreservesIncludeFields) {
     size_t counter = 0;
     auto generator =
         GenClass(Value(1),
-                 RangeStatement(Value(1), NumericBounds(Value(1), Value(1)), boost::none),
+                 RangeStatement(Value(1), ExplicitBounds(Value(1), Value(1)), boost::none),
                  "a",
                  preserveFields,
                  doc,
@@ -246,13 +246,13 @@ TEST(DensifyGeneratorTest, GeneratesNumberOfNumericDocumentsCorrectly) {
     size_t counter = 0;
     auto generator =
         GenClass(Value(0),
-                 RangeStatement(Value(2), NumericBounds(Value(0), Value(10)), boost::none),
+                 RangeStatement(Value(2), ExplicitBounds(Value(0), Value(10)), boost::none),
                  "a",
                  Document(),
                  doc,
                  ValueComparator(),
                  &counter);
-    for (int curVal = 0; curVal <= 10; curVal += 2) {
+    for (int curVal = 0; curVal < 10; curVal += 2) {
         ASSERT_FALSE(generator.done());
         Document nextDoc{{"a", curVal}};
         ASSERT_DOCUMENT_EQ(nextDoc, generator.getNextDocument());
@@ -268,13 +268,13 @@ TEST(DensifyGeneratorTest, WorksWithNonIntegerStepAndPreserveFields) {
     size_t counter = 0;
     auto generator =
         GenClass(Value(0),
-                 RangeStatement(Value(1.3), NumericBounds(Value(0), Value(10)), boost::none),
+                 RangeStatement(Value(1.3), ExplicitBounds(Value(0), Value(10)), boost::none),
                  "a",
                  preserveFields,
                  doc,
                  ValueComparator(),
                  &counter);
-    for (double curVal = 0; curVal <= 10; curVal += 1.3) {
+    for (double curVal = 0; curVal < 10; curVal += 1.3) {
         ASSERT_FALSE(generator.done());
         Document nextDoc{{"b", 1}, {"c", 1}, {"a", curVal}};
         ASSERT_DOCUMENT_EQ(nextDoc, generator.getNextDocument());
@@ -289,13 +289,13 @@ TEST(DensifyGeneratorTest, GeneratesOffsetFromMaxDocsCorrectly) {
     size_t counter = 0;
     auto generator =
         GenClass(Value(1),
-                 RangeStatement(Value(2), NumericBounds(Value(1), Value(11)), boost::none),
+                 RangeStatement(Value(2), ExplicitBounds(Value(1), Value(11)), boost::none),
                  "a",
                  Document(),
                  doc,
                  ValueComparator(),
                  &counter);
-    for (int curVal = 1; curVal <= 11; curVal += 2) {
+    for (int curVal = 1; curVal < 11; curVal += 2) {
         ASSERT_FALSE(generator.done());
         Document nextDoc{{"a", curVal}};
         ASSERT_DOCUMENT_EQ(nextDoc, generator.getNextDocument());
@@ -311,13 +311,13 @@ TEST(DensifyGeneratorTest, GeneratesAtDottedPathCorrectly) {
     size_t counter = 0;
     auto generator =
         GenClass(Value(1),
-                 RangeStatement(Value(2), NumericBounds(Value(1), Value(11)), boost::none),
+                 RangeStatement(Value(2), ExplicitBounds(Value(1), Value(11)), boost::none),
                  "a.c",
                  preservedFields,
                  doc,
                  ValueComparator(),
                  &counter);
-    for (int curVal = 1; curVal <= 11; curVal += 2) {
+    for (int curVal = 1; curVal < 11; curVal += 2) {
         ASSERT_FALSE(generator.done());
         Document nextDoc{{"a", Document{{"b", 1}, {"c", curVal}}}};
         ASSERT_DOCUMENT_EQ(nextDoc, generator.getNextDocument());
@@ -329,13 +329,13 @@ TEST(DensifyGeneratorTest, GeneratesAtDottedPathCorrectly) {
     // Test deeply nested fields.
     Document secondPreservedFields{{"a", Document{{"b", 1}}}};
     generator = GenClass(Value(1),
-                         RangeStatement(Value(2), NumericBounds(Value(1), Value(11)), boost::none),
+                         RangeStatement(Value(2), ExplicitBounds(Value(1), Value(11)), boost::none),
                          "a.c.d",
                          secondPreservedFields,
                          doc,
                          ValueComparator(),
                          &counter);
-    for (int curVal = 1; curVal <= 11; curVal += 2) {
+    for (int curVal = 1; curVal < 11; curVal += 2) {
         ASSERT_FALSE(generator.done());
         Document nextDoc{{"a", Document{{"b", 1}, {"c", Document{{"d", curVal}}}}}};
         ASSERT_DOCUMENT_EQ(nextDoc, generator.getNextDocument());
@@ -349,8 +349,8 @@ DEATH_TEST(DensifyGeneratorTest, FailsIfDatesAndUnitNotProvided, "date step") {
     size_t counter = 0;
     ASSERT_THROWS_CODE(GenClass(makeDate("2021-01-01T00:00:00.000Z"),
                                 RangeStatement(Value(1),
-                                               DateBounds(makeDate("2021-01-01T00:00:00.000Z"),
-                                                          makeDate("2021-01-01T00:00:02.000Z")),
+                                               ExplicitBounds(makeDate("2021-01-01T00:00:00.000Z"),
+                                                              makeDate("2021-01-01T00:00:02.000Z")),
                                                boost::none),
                                 "a",
                                 Document(),
@@ -365,7 +365,7 @@ DEATH_TEST(DensifyGeneratorTest, FailsIfNumberAndUnitProvided, "non-date") {
     size_t counter = 0;
     ASSERT_THROWS_CODE(
         GenClass(Value(1),
-                 RangeStatement(Value(1), NumericBounds(Value(1), Value(10)), TimeUnit::second),
+                 RangeStatement(Value(1), ExplicitBounds(Value(1), Value(10)), TimeUnit::second),
                  "a",
                  Document(),
                  Document(),
@@ -379,8 +379,8 @@ DEATH_TEST(DensifyGeneratorTest, DateMinMustBeLessThanMax, "lower or equal to") 
     size_t counter = 0;
     ASSERT_THROWS_CODE(GenClass(makeDate("2021-01-01T00:00:02.000Z"),
                                 RangeStatement(Value(1),
-                                               DateBounds(makeDate("2021-01-01T00:00:02.000Z"),
-                                                          makeDate("2021-01-01T00:00:01.000Z")),
+                                               ExplicitBounds(makeDate("2021-01-01T00:00:02.000Z"),
+                                                              makeDate("2021-01-01T00:00:01.000Z")),
                                                TimeUnit::second),
                                 "a",
                                 Document(),
@@ -395,8 +395,8 @@ DEATH_TEST(DensifyGeneratorTest, DateStepMustBeInt, "integer") {
     size_t counter = 0;
     ASSERT_THROWS_CODE(GenClass(makeDate("2021-01-01T00:00:00.000Z"),
                                 RangeStatement(Value(1.5),
-                                               DateBounds(makeDate("2021-01-01T00:00:00.000Z"),
-                                                          makeDate("2021-01-01T00:00:01.000Z")),
+                                               ExplicitBounds(makeDate("2021-01-01T00:00:00.000Z"),
+                                                              makeDate("2021-01-01T00:00:01.000Z")),
                                                TimeUnit::second),
                                 "a",
                                 Document(),
@@ -413,15 +413,15 @@ TEST(DensifyGeneratorTest, GeneratesDatesBySecondCorrectly) {
     std::string dateBase = "2021-01-01T00:00:";
     auto generator = GenClass(makeDate("2021-01-01T00:00:01.000Z"),
                               RangeStatement(Value(2),
-                                             DateBounds(makeDate("2021-01-01T00:00:01.000Z"),
-                                                        makeDate("2021-01-01T00:00:11.000Z")),
+                                             ExplicitBounds(makeDate("2021-01-01T00:00:01.000Z"),
+                                                            makeDate("2021-01-01T00:00:11.000Z")),
                                              TimeUnit::second),
                               "a",
                               Document(),
                               doc,
                               ValueComparator(),
                               &counter);
-    for (int curVal = 1; curVal <= 11; curVal += 2) {
+    for (int curVal = 1; curVal < 11; curVal += 2) {
         auto appendStr = std::to_string(curVal);
         appendStr.insert(appendStr.begin(), 2 - appendStr.length(), '0');
         ASSERT_FALSE(generator.done());
@@ -439,15 +439,15 @@ TEST(DensifyGeneratorTest, GeneratesDatesByHourCorrectly) {
     std::string dateBase = "2021-01-01T";
     auto generator = GenClass(makeDate("2021-01-01T01:00:00.000Z"),
                               RangeStatement(Value(2),
-                                             DateBounds(makeDate("2021-01-01T01:00:00.000Z"),
-                                                        makeDate("2021-01-01T15:00:00.000Z")),
+                                             ExplicitBounds(makeDate("2021-01-01T01:00:00.000Z"),
+                                                            makeDate("2021-01-01T15:00:00.000Z")),
                                              TimeUnit::hour),
                               "a",
                               Document(),
                               doc,
                               ValueComparator(),
                               &counter);
-    for (int curVal = 1; curVal <= 15; curVal += 2) {
+    for (int curVal = 1; curVal < 15; curVal += 2) {
         auto appendStr = std::to_string(curVal);
         appendStr.insert(appendStr.begin(), 2 - appendStr.length(), '0');
         ASSERT_FALSE(generator.done());
@@ -465,15 +465,15 @@ TEST(DensifyGeneratorTest, GeneratesDatesByMonthCorrectly) {
     std::string dateBase = "2021-";
     auto generator = GenClass(makeDate("2021-01-01T01:00:00.000Z"),
                               RangeStatement(Value(2),
-                                             DateBounds(makeDate("2021-01-01T00:00:00.000Z"),
-                                                        makeDate("2021-10-01T00:00:00.000Z")),
+                                             ExplicitBounds(makeDate("2021-01-01T00:00:00.000Z"),
+                                                            makeDate("2021-10-01T00:00:00.000Z")),
                                              TimeUnit::month),
                               "a",
                               Document(),
                               doc,
                               ValueComparator(),
                               &counter);
-    for (int curVal = 1; curVal <= 10; curVal += 2) {
+    for (int curVal = 1; curVal < 10; curVal += 2) {
         auto appendStr = std::to_string(curVal);
         appendStr.insert(appendStr.begin(), 2 - appendStr.length(), '0');
         ASSERT_FALSE(generator.done());
@@ -725,7 +725,7 @@ TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeStar
         getExpCtx(),
         "a",
         std::list<FieldPath>(),
-        RangeStatement(Value(2), NumericBounds(Value(5), Value(15)), boost::none));
+        RangeStatement(Value(2), ExplicitBounds(Value(5), Value(15)), boost::none));
     auto source = DocumentSourceMock::createForTest(
         {"{a: 0}", "{a: 1}", "{a: 8}", "{a: 13}", "{a: 19}"}, getExpCtx());
     densify.setSource(source.get());
@@ -764,10 +764,6 @@ TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeStar
 
     next = densify.getNext();
     ASSERT(next.isAdvanced());
-    ASSERT_EQUALS(15, next.getDocument().getField("a").getDouble());
-
-    next = densify.getNext();
-    ASSERT(next.isAdvanced());
     ASSERT_EQUALS(19, next.getDocument().getField("a").getDouble());
 
     next = densify.getNext();
@@ -778,12 +774,13 @@ TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeStar
 }
 
 
-TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeStepStartinOnMinRange) {
+TEST_F(DensifyExplicitNumericTest,
+       CorrectlyDensifiesForNumericExplicitRangeStepStartingOnMinRange) {
     auto densify = DocumentSourceInternalDensify(
         getExpCtx(),
         "a",
         std::list<FieldPath>(),
-        RangeStatement(Value(1), NumericBounds(Value(0), Value(4)), boost::none));
+        RangeStatement(Value(1), ExplicitBounds(Value(0), Value(5)), boost::none));
     auto source = DocumentSourceMock::createForTest(
         {"{a: 0}", "{a: 1}", "{a: 8}", "{a: 13}", "{a: 19}"}, getExpCtx());
     densify.setSource(source.get());
@@ -832,7 +829,7 @@ TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeStar
         getExpCtx(),
         "a",
         std::list<FieldPath>(),
-        RangeStatement(Value(1), NumericBounds(Value(0), Value(4)), boost::none));
+        RangeStatement(Value(1), ExplicitBounds(Value(0), Value(4)), boost::none));
     auto source =
         DocumentSourceMock::createForTest({"{a: 1}", "{a: 2}", "{a: 4}", "{a: 6}"}, getExpCtx());
     densify.setSource(source.get());
@@ -873,7 +870,7 @@ TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeOnly
         getExpCtx(),
         "a",
         std::list<FieldPath>(),
-        RangeStatement(Value(1), NumericBounds(Value(0), Value(4)), boost::none));
+        RangeStatement(Value(1), ExplicitBounds(Value(0), Value(4)), boost::none));
     auto source = DocumentSourceMock::createForTest({"{a: 1}"}, getExpCtx());
     densify.setSource(source.get());
 
@@ -894,10 +891,6 @@ TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeOnly
     ASSERT_EQUALS(3, next.getDocument().getField("a").getDouble());
 
     next = densify.getNext();
-    ASSERT(next.isAdvanced());
-    ASSERT_EQUALS(4, next.getDocument().getField("a").getDouble());
-
-    next = densify.getNext();
     ASSERT_FALSE(next.isAdvanced());
 
     next = densify.getNext();
@@ -909,8 +902,8 @@ TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeStar
         getExpCtx(),
         "a",
         std::list<FieldPath>(),
-        RangeStatement(Value(1), NumericBounds(Value(0), Value(4)), boost::none));
-    auto source = DocumentSourceMock::createForTest({"{a: 5}", "{a: 6}"}, getExpCtx());
+        RangeStatement(Value(1), ExplicitBounds(Value(0), Value(5)), boost::none));
+    auto source = DocumentSourceMock::createForTest({"{a: 6}", "{a: 7}"}, getExpCtx());
     densify.setSource(source.get());
 
     auto next = densify.getNext();
@@ -935,11 +928,11 @@ TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeStar
 
     next = densify.getNext();
     ASSERT(next.isAdvanced());
-    ASSERT_EQUALS(5, next.getDocument().getField("a").getDouble());
+    ASSERT_EQUALS(6, next.getDocument().getField("a").getDouble());
 
     next = densify.getNext();
     ASSERT(next.isAdvanced());
-    ASSERT_EQUALS(6, next.getDocument().getField("a").getDouble());
+    ASSERT_EQUALS(7, next.getDocument().getField("a").getDouble());
 
     next = densify.getNext();
     ASSERT_FALSE(next.isAdvanced());
@@ -953,7 +946,7 @@ TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeStar
         getExpCtx(),
         "a",
         std::list<FieldPath>(),
-        RangeStatement(Value(2), NumericBounds(Value(0), Value(4)), boost::none));
+        RangeStatement(Value(2), ExplicitBounds(Value(0), Value(4)), boost::none));
     auto source = DocumentSourceMock::createForTest({"{a: 1}", "{a: 6}"}, getExpCtx());
     densify.setSource(source.get());
 
@@ -968,10 +961,6 @@ TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeStar
     next = densify.getNext();
     ASSERT(next.isAdvanced());
     ASSERT_EQUALS(2, next.getDocument().getField("a").getDouble());
-
-    next = densify.getNext();
-    ASSERT(next.isAdvanced());
-    ASSERT_EQUALS(4, next.getDocument().getField("a").getDouble());
 
     next = densify.getNext();
     ASSERT(next.isAdvanced());
@@ -990,7 +979,7 @@ TEST_F(DensifyExplicitNumericTest,
         getExpCtx(),
         "a",
         std::list<FieldPath>(),
-        RangeStatement(Value(1), NumericBounds(Value(0), Value(4)), boost::none));
+        RangeStatement(Value(1), ExplicitBounds(Value(0), Value(4)), boost::none));
     auto source = DocumentSourceMock::createForTest({"{a: 1}", "{a: 1}", "{a: 6}"}, getExpCtx());
     densify.setSource(source.get());
 
@@ -1016,10 +1005,6 @@ TEST_F(DensifyExplicitNumericTest,
 
     next = densify.getNext();
     ASSERT(next.isAdvanced());
-    ASSERT_EQUALS(4, next.getDocument().getField("a").getDouble());
-
-    next = densify.getNext();
-    ASSERT(next.isAdvanced());
     ASSERT_EQUALS(6, next.getDocument().getField("a").getDouble());
 
     next = densify.getNext();
@@ -1034,7 +1019,7 @@ TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeWith
         getExpCtx(),
         "a",
         std::list<FieldPath>(),
-        RangeStatement(Value(1), NumericBounds(Value(0), Value(20)), boost::none));
+        RangeStatement(Value(1), ExplicitBounds(Value(0), Value(20)), boost::none));
     auto source = DocumentSourceMock::createForTest(
         {"{a: 1}", "{a: 7}", "{a: 7}", "{a: 7}", "{a: 15}"}, getExpCtx());
     densify.setSource(source.get());
@@ -1061,7 +1046,7 @@ TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeWith
     ASSERT(next.isAdvanced());
     ASSERT_EQUALS(7, next.getDocument().getField("a").getDouble());
 
-    for (int i = 8; i <= 20; ++i) {
+    for (int i = 8; i < 20; ++i) {
         next = densify.getNext();
         ASSERT(next.isAdvanced());
         ASSERT_EQUALS(i, next.getDocument().getField("a").getDouble());
@@ -1079,7 +1064,7 @@ TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeAfte
         getExpCtx(),
         "a",
         std::list<FieldPath>(),
-        RangeStatement(Value(1), NumericBounds(Value(2), Value(5)), boost::none));
+        RangeStatement(Value(1), ExplicitBounds(Value(2), Value(6)), boost::none));
     auto source = DocumentSourceMock::createForTest({"{a: 0}"}, getExpCtx());
     densify.setSource(source.get());
 
@@ -1115,7 +1100,7 @@ TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeWhen
         getExpCtx(),
         "a",
         std::list<FieldPath>(),
-        RangeStatement(Value(1), NumericBounds(Value(0), Value(4)), boost::none));
+        RangeStatement(Value(1), ExplicitBounds(Value(0), Value(5)), boost::none));
     auto source = DocumentSourceMock::createForTest({"{b: 2}", "{b: 6}", "{a: 1}"}, getExpCtx());
     densify.setSource(source.get());
 
@@ -1159,7 +1144,7 @@ TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeStep
         getExpCtx(),
         "a",
         std::list<FieldPath>(),
-        RangeStatement(Value(6), NumericBounds(Value(0), Value(4)), boost::none));
+        RangeStatement(Value(6), ExplicitBounds(Value(0), Value(4)), boost::none));
     auto source = DocumentSourceMock::createForTest({"{a: 1}", "{a: 6}"}, getExpCtx());
     densify.setSource(source.get());
 
@@ -1187,7 +1172,7 @@ TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeHitE
         getExpCtx(),
         "a",
         std::list<FieldPath>(),
-        RangeStatement(Value(2), NumericBounds(Value(0), Value(3)), boost::none));
+        RangeStatement(Value(2), ExplicitBounds(Value(0), Value(3)), boost::none));
     auto source = DocumentSourceMock::createForTest({"{a: 0}", "{a: 2}"}, getExpCtx());
     densify.setSource(source.get());
 
@@ -1211,19 +1196,19 @@ TEST_F(DensifyExplicitNumericTest, DensificationForNumericValuesErrorsIfFieldIsN
         getExpCtx(),
         "a",
         std::list<FieldPath>(),
-        RangeStatement(Value(6), NumericBounds(Value(0), Value(4)), boost::none));
+        RangeStatement(Value(6), ExplicitBounds(Value(0), Value(4)), boost::none));
     auto source =
         DocumentSourceMock::createForTest({"{a: \"should be numeric\"}", "{a: 6}"}, getExpCtx());
     densify.setSource(source.get());
     ASSERT_THROWS_CODE(densify.getNext(), AssertionException, 5733201);
 }
 
-TEST_F(DensifyExplicitNumericTest, DensifiesOnImmediateEOF) {
+TEST_F(DensifyExplicitNumericTest, DensifiesOnImmediateEOFExplictRange) {
     auto densify = DocumentSourceInternalDensify(
         getExpCtx(),
         "a",
         std::list<FieldPath>(),
-        RangeStatement(Value(1), NumericBounds(Value(0), Value(1)), boost::none));
+        RangeStatement(Value(1), ExplicitBounds(Value(0), Value(2)), boost::none));
     auto source = DocumentSourceMock::createForTest({}, getExpCtx());
     densify.setSource(source.get());
     auto next = densify.getNext();
@@ -1236,7 +1221,7 @@ TEST_F(DensifyExplicitNumericTest, DensifiesOnImmediateEOF) {
     ASSERT_FALSE(next.isAdvanced());
 }
 
-TEST_F(DensifyFullNumericTest, DensifiesOnImmediateEOF) {
+TEST_F(DensifyFullNumericTest, DensifiesOnImmediateEOFExplicitRange) {
     auto densify = DocumentSourceInternalDensify(
         getExpCtx(), "a", std::list<FieldPath>(), RangeStatement(Value(3), Full(), boost::none));
     auto source = DocumentSourceMock::createForTest({}, getExpCtx());
@@ -1245,7 +1230,7 @@ TEST_F(DensifyFullNumericTest, DensifiesOnImmediateEOF) {
     ASSERT_FALSE(next.isAdvanced());
 }
 
-TEST_F(DensifyPartitionNumericTest, DensifiesOnImmediateEOF) {
+TEST_F(DensifyPartitionNumericTest, DensifiesOnImmediateEOFExplicitRange) {
     auto densify = DocumentSourceInternalDensify(
         getExpCtx(), "a", std::list<FieldPath>(), RangeStatement(Value(3), Full(), boost::none));
     auto source = DocumentSourceMock::createForTest({}, getExpCtx());
@@ -1261,10 +1246,59 @@ TEST_F(DensifyCloneTest, InternalDesnifyCanBeCloned) {
         getExpCtx(),
         "a",
         std::list<FieldPath>(),
-        RangeStatement(Value(2), NumericBounds(Value(0), Value(3)), boost::none)));
+        RangeStatement(Value(2), ExplicitBounds(Value(0), Value(3)), boost::none)));
     auto pipe = Pipeline::create(sources, getExpCtx());
     auto clonedPipe = pipe->clone();
 }
 
+TEST(DensifyStepTest, InternalDensifyIsOnStepWithNumbers) {
+    auto range = RangeStatement(Value(2), Full(), boost::none);
+    ASSERT_TRUE(DensifyValue(Value(5)).isOnStepRelativeTo(Value(1), range));
+}
+
+TEST(DensifyStepTest, InternalDensifyIsOffStepWithNumbers) {
+    auto range = RangeStatement(Value(2), Full(), boost::none);
+    ASSERT_FALSE(DensifyValue(Value(5)).isOnStepRelativeTo(Value(2), range));
+}
+
+TEST(DensifyStepTest, InternalDensifyIsOnStepWithSmallDateStep) {
+    auto range = RangeStatement(Value(2), Full(), TimeUnit::second);
+    auto val = DensifyValue(makeDate("2021-01-01T00:00:05.000Z"));
+    auto base = DensifyValue(makeDate("2021-01-01T00:00:01.000Z"));
+
+    ASSERT_TRUE(val.isOnStepRelativeTo(base, range));
+}
+
+TEST(DensifyStepTest, InternalDensifyIsOffStepWithSmallDateStep) {
+    auto range = RangeStatement(Value(2), Full(), TimeUnit::second);
+    auto val = DensifyValue(makeDate("2021-01-01T00:00:05.000Z"));
+    auto base = DensifyValue(makeDate("2021-01-01T00:00:02.000Z"));
+
+    ASSERT_FALSE(val.isOnStepRelativeTo(base, range));
+}
+
+TEST(DensifyStepTest, InternalDensifyIsOnStepWithLargeDateStep) {
+    auto range = RangeStatement(Value(2), Full(), TimeUnit::month);
+    auto val = DensifyValue(makeDate("2021-05-01T00:00:00.000Z"));
+    auto base = DensifyValue(makeDate("2021-01-01T00:00:00.000Z"));
+
+    ASSERT_TRUE(val.isOnStepRelativeTo(base, range));
+}
+
+TEST(DensifyStepTest, InternalDensifyIsOffStepWithLargeDateStep) {
+    auto range = RangeStatement(Value(3), Full(), TimeUnit::month);
+    auto val = DensifyValue(makeDate("2021-05-01T00:00:00.000Z"));
+    auto base = DensifyValue(makeDate("2021-01-01T00:00:00.000Z"));
+
+    ASSERT_FALSE(val.isOnStepRelativeTo(base, range));
+}
+
+TEST(DensifyStepTest, InternalDensifyIsOffStepForDaysWithLargeDateStep) {
+    auto range = RangeStatement(Value(2), Full(), TimeUnit::month);
+    auto val = DensifyValue(makeDate("2021-05-03T00:00:00.000Z"));
+    auto base = DensifyValue(makeDate("2021-01-01T00:00:00.000Z"));
+
+    ASSERT_FALSE(val.isOnStepRelativeTo(base, range));
+}
 }  // namespace
 }  // namespace mongo
