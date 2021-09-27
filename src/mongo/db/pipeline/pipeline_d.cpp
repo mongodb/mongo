@@ -120,6 +120,13 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> extractSbeCompatibleGr
     // which requires stages to be wrapped in an interface.
     std::vector<std::unique_ptr<InnerPipelineStageInterface>> groupsForPushdown;
 
+    // Bail out early if we didn't enble $group pushdown.
+    if (!feature_flags::gFeatureFlagSBEGroupPushdown.isEnabled(
+            serverGlobalParams.featureCompatibility) ||
+        !cq->getEnableSlotBasedExecutionEngine()) {
+        return {};
+    }
+
     // In case that we have a top $or for $match stage, it triggers the tripwire assertion 5842500
     // because subplanning does not expect that the base query has pushed down $group stage(s) but
     // it does when $group stage exist in pipeline.
@@ -131,6 +138,12 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> extractSbeCompatibleGr
         return {};
     }
 
+    // Verify that we are already under a collection lock. We avoid taking locks ourselves in this
+    // function because double-locking forces any PlanExecutor we create to adopt a NO_YIELD policy.
+    tassert(6025300,
+            "collection lock must be held before pushing down $group",
+            expCtx->opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_IS));
+
     const auto indexCatalog = collection->getIndexCatalog();
     const auto isSingleIndex =
         indexCatalog ? indexCatalog->numIndexesTotal(expCtx->opCtx) == 1 : false;
@@ -139,10 +152,7 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> extractSbeCompatibleGr
     auto css = CollectionShardingState::get(expCtx->opCtx, collection->ns());
     const auto isSharded = css && css->getCollectionDescription(expCtx->opCtx).isSharded();
 
-    if (!feature_flags::gFeatureFlagSBEGroupPushdown.isEnabled(
-            serverGlobalParams.featureCompatibility) ||
-        !cq->getEnableSlotBasedExecutionEngine() || expCtx->allowDiskUse || isSharded ||
-        !isSingleIndex || queryNeedsSubplanning) {
+    if (expCtx->allowDiskUse || isSharded || !isSingleIndex || queryNeedsSubplanning) {
         return {};
     }
 
