@@ -8870,10 +8870,6 @@ buildvariants:
     test_flags: >-
       --mongodSetParameters="{storeFindAndModifyImagesInSideCollection: true}"
       --excludeWithAnyTags=requires_mmapv1,requires_storing_fam_images_in_oplog
-    push_path: linux
-    push_bucket: downloads.10gen.com
-    push_name: linux
-    push_arch: x86_64-enterprise-rhel62
     mh_target: dist-mh
     compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     multiversion_platform: rhel62
@@ -8965,9 +8961,6 @@ buildvariants:
   - name: package
     distros:
     - ubuntu1604-packer
-  - name: .publish
-    distros:
-    - rhel62-small
 
 - name: enterprise-rhel-62-64-bit-large-txns-format
   display_name: "Enterprise RHEL 6.2 (large transactions format)"
