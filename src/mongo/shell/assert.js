@@ -579,6 +579,24 @@ assert = (function() {
         return error;
     };
 
+    assert.throwsWithCode = function(func, expectedCode, params, msg) {
+        if (arguments.length < 2) {
+            throw new Error("assert.throwsWithCode expects at least 2 arguments");
+        }
+        // Remove the 'code' parameter, and any undefined parameters, from the list of arguments.
+        // Use .apply() to preserve the length of the 'arguments' object.
+        const newArgs = [func, params, msg].filter(element => element !== undefined);
+        const error = assert.throws.apply(null, newArgs);
+        if (!Array.isArray(expectedCode)) {
+            expectedCode = [expectedCode];
+        }
+        if (!expectedCode.some((ec) => error.code == ec)) {
+            doassert(_buildAssertionMessage(
+                msg,
+                "[" + tojson(error.code) + "] != [" + tojson(expectedCode) + "] are not equal"));
+        }
+    };
+
     assert.doesNotThrow = function(func, params, msg) {
         _validateAssertionMessage(msg);
 

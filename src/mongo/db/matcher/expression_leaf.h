@@ -367,13 +367,6 @@ public:
         return _remainder;
     }
 
-    static long long truncateToLong(const BSONElement& element) {
-        if (element.type() == BSONType::NumberDecimal) {
-            return element.numberDecimal().toLong(Decimal128::kRoundTowardZero);
-        }
-        return element.numberLong();
-    }
-
 private:
     ExpressionOptimizerFunc getOptimizer() const final {
         return [](std::unique_ptr<MatchExpression> expression) { return expression; };

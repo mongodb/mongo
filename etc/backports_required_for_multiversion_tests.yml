@@ -169,6 +169,8 @@ all:
     test_file: jstests/replsets/catchup_takeover_with_higher_config.js
   - ticket: SERVER-58203
     test_file: jstests/sharding/query/pipeline_length_limit.js
+  - ticket: SERVER-57321
+    test_file: jstests/core/mod_special_values.js
 
 suites:
 

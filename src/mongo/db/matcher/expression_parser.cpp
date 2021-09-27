@@ -485,22 +485,29 @@ StatusWithMatchExpression parseMOD(StringData name, BSONElement elem) {
 
     if (!iter.more())
         return {Status(ErrorCodes::BadValue, "malformed mod, not enough elements")};
-    auto divisor = iter.next();
-    if (!divisor.isNumber())
+    auto divisorElement = iter.next();
+    if (!divisorElement.isNumber())
         return {Status(ErrorCodes::BadValue, "malformed mod, divisor not a number")};
 
     if (!iter.more())
         return {Status(ErrorCodes::BadValue, "malformed mod, not enough elements")};
-    auto remainder = iter.next();
-    if (!remainder.isNumber())
+    auto remainderElement = iter.next();
+    if (!remainderElement.isNumber())
         return {Status(ErrorCodes::BadValue, "malformed mod, remainder not a number")};
 
     if (iter.more())
         return {Status(ErrorCodes::BadValue, "malformed mod, too many elements")};
 
-    return {std::make_unique<ModMatchExpression>(name,
-                                                 ModMatchExpression::truncateToLong(divisor),
-                                                 ModMatchExpression::truncateToLong(remainder))};
+    long long divisor;
+    if (auto status = divisorElement.tryCoerce(&divisor); !status.isOK()) {
+        return status.withContext("malformed mod, divisor value is invalid"_sd);
+    }
+
+    long long remainder;
+    if (auto status = remainderElement.tryCoerce(&remainder); !status.isOK()) {
+        return status.withContext("malformed mod, remainder value is invalid"_sd);
+    }
+    return {std::make_unique<ModMatchExpression>(name, divisor, remainder)};
 }
 
 StatusWithMatchExpression parseRegexDocument(StringData name, const BSONObj& doc) {
