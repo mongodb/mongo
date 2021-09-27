@@ -2003,50 +2003,44 @@ __wt_page_swap_func(WT_SESSION_IMPL *session, WT_REF *held, WT_REF *want, uint32
  *     Return if the cursor is pointing to a page with deleted records and can be skipped for cursor
  *     traversal.
  */
-static inline bool
-__wt_btcur_skip_page(WT_CURSOR_BTREE *cbt)
+static inline int
+__wt_btcur_skip_page(WT_SESSION_IMPL *session, WT_REF *ref, void *context, bool *skipp)
 {
     WT_ADDR_COPY addr;
-    WT_PAGE *page;
-    WT_REF *ref;
-    WT_SESSION_IMPL *session;
     uint8_t previous_state;
-    bool can_skip;
 
-    session = CUR2S(cbt);
-    ref = cbt->ref;
-    page = cbt->ref == NULL ? NULL : cbt->ref->page;
+    WT_UNUSED(context);
 
-    if (page == NULL)
-        return false;
-
-    previous_state = ref->state;
-    can_skip = false;
+    *skipp = false; /* Default to reading */
 
     /*
      * Determine if all records on the page have been deleted and all the tombstones are visible to
      * our transaction. If so, we can avoid reading the records on the page and move to the next
      * page. We base this decision on the aggregate stop point added to the page during the last
-     * reconciliation. We can skip this test if the page has been modified since it was reconciled
-     * or the underlying cursor is configured to ignore tombstones.
+     * reconciliation. We can skip this test if the page has been modified since it was reconciled.
+     * We also skip this test on an internal page, as we rely on reconciliation to mark the internal
+     * page dirty. There could be a period of time when the internal page is marked clean but the
+     * leaf page is dirty and has newer data than let on by the internal page's aggregated
+     * information.
      *
      * We are making these decisions while holding a lock for the page as checkpoint or eviction can
-     * make changes to the data structures (i.e., aggregate timestamps) we are reading.
+     * make changes to the data structures (i.e., aggregate timestamps) we are reading. It is okay
+     * if the page is not in memory, or gets evicted before we lock it. In such a case, we can forgo
+     * checking if the page has been modified. So, only do a page modified check if the page was in
+     * memory before locking.
      */
-    if (session->txn->isolation == WT_ISO_SNAPSHOT && !__wt_page_is_modified(page) &&
-      !F_ISSET(&cbt->iface, WT_CURSTD_IGNORE_TOMBSTONE) && previous_state == WT_REF_MEM) {
+    if (F_ISSET(ref, WT_REF_FLAG_INTERNAL))
+        return (0);
 
-        /* We only try to lock the page once. */
-        if (!WT_REF_CAS_STATE(session, ref, previous_state, WT_REF_LOCKED))
-            return false;
+    WT_REF_LOCK(session, ref, &previous_state);
+    if ((previous_state == WT_REF_DISK || previous_state == WT_REF_DELETED ||
+          (previous_state == WT_REF_MEM && !__wt_page_is_modified(ref->page))) &&
+      __wt_ref_addr_copy(session, ref, &addr) && addr.ta.newest_stop_txn != WT_TXN_MAX &&
+      addr.ta.newest_stop_ts != WT_TS_MAX &&
+      __wt_txn_visible(session, addr.ta.newest_stop_txn, addr.ta.newest_stop_ts))
+        *skipp = true;
 
-        if (__wt_ref_addr_copy(session, ref, &addr) &&
-          __wt_txn_visible(session, addr.ta.newest_stop_txn, addr.ta.newest_stop_ts) &&
-          __wt_txn_visible(session, addr.ta.newest_stop_txn, addr.ta.newest_stop_durable_ts))
-            can_skip = true;
+    WT_REF_UNLOCK(ref, previous_state);
 
-        WT_REF_SET_STATE(ref, previous_state);
-    }
-
-    return (can_skip);
+    return (0);
 }
