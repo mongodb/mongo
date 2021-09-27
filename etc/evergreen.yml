@@ -7315,7 +7315,7 @@ buildvariants:
 - &linux-64-debug-required-template
   name: linux-64-debug-required
   display_name: "! Shared Library Linux DEBUG"
-  batchtime: 240 # 4 hours
+  cron: "0 */4 * * *" # Every 4 hours starting at midnight
   run_on:
   - rhel80-medium
   expansions:
@@ -7376,7 +7376,7 @@ buildvariants:
 - <<: *linux-64-debug-required-template
   name: linux-64-debug-wtdevelop
   display_name: "~ Linux DEBUG WiredTiger develop"
-  batchtime: 240 # 4 hours
+  cron: "0 */4 * * *" # Every 4 hours starting at midnight
   modules:
   - wtdevelop
   expansions:
@@ -7550,7 +7550,7 @@ buildvariants:
   display_name: TLA+
   run_on:
   - ubuntu1804-build
-  batchtime: 10080 # 7 days
+  cron: "0 0 * * 0" # Every week starting 00:00 on Sunday
   stepback: false
   expansions:
     timeout_secs: 345600 # 4 days
@@ -7837,7 +7837,7 @@ buildvariants:
 - &enterprise-ubuntu2104-dynamic-gcc11-debug-experimental-template
   name: enterprise-ubuntu2104-dynamic-gcc11-debug-experimental
   display_name: "~ Shared Library Enterprise Ubuntu 21.04 GCC11 DEBUG"
-  batchtime: 1440 # 1 day
+  cron: "0 0 * * *" # Every day starting at 00:00
   modules:
   - enterprise
   run_on:
@@ -8222,7 +8222,7 @@ buildvariants:
 
 - name: stm-hourly-cron
   display_name: "~ STM Hourly Cron"
-  batchtime: 60
+  cron: "0 * * * *" # Every hour
   run_on:
     - rhel80-small
   stepback: false
@@ -8245,7 +8245,7 @@ buildvariants:
 
 - name: windows-debug-suggested
   display_name: "* Windows DEBUG"
-  batchtime: 240 # 4 hours
+  cron: "0 */4 * * *" # Every 4 hours starting at midnight
   run_on:
   - windows-vsCurrent-small
   expansions:
@@ -8313,7 +8313,7 @@ buildvariants:
 - &enterprise-windows-required-template
   name: enterprise-windows-required
   display_name: "! Enterprise Windows"
-  batchtime: 240 # 4 hours
+  cron: "0 */4 * * *" # Every 4 hours starting at midnight
   modules:
   - enterprise
   run_on:
@@ -8360,7 +8360,7 @@ buildvariants:
 - <<: *enterprise-windows-required-template
   name: enterprise-windows-all-feature-flags-required
   display_name: "! Enterprise Windows (all feature flags)"
-  batchtime: 240 # 4 hours
+  cron: "0 */4 * * *" # Every 4 hours starting at midnight
   expansions:
     burn_in_tests_build_variant: enterprise-windows-suggested
     exe: ".exe"
@@ -8405,7 +8405,7 @@ buildvariants:
 - &enterprise-windows-suggested-template
   name: enterprise-windows-suggested
   display_name: "* Enterprise Windows"
-  batchtime: 240 # 4 hours
+  cron: "0 */4 * * *" # Every 4 hours starting at midnight
   modules:
     - enterprise
   run_on:
@@ -8471,7 +8471,7 @@ buildvariants:
 - <<: *enterprise-windows-suggested-template
   name: enterprise-windows-all-feature-flags-suggested
   display_name: "* Enterprise Windows (all feature flags)"
-  batchtime: 240 # 4 hours
+  cron: "0 */4 * * *" # Every 4 hours starting at midnight
   expansions:
     exe: ".exe"
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug msi archive-mh archive-mh-debug
@@ -8545,7 +8545,7 @@ buildvariants:
 - <<: *enterprise-windows-nopush-template
   name: enterprise-windows-wtdevelop
   display_name: "~ Enterprise Windows WiredTiger develop"
-  batchtime: 240 # 4 hours
+  cron: "0 */4 * * *" # Every 4 hours starting at midnight
   modules:
   - enterprise
   - wtdevelop
@@ -8814,7 +8814,7 @@ buildvariants:
 - &macos-debug-template
   name: macos-debug-suggested
   display_name: "* Shared Library macOS DEBUG"
-  batchtime: 240 # 4 hours
+  cron: "0 */4 * * *" # Every 4 hours starting at midnight
   run_on:
   - macos-1014
   expansions: &macos-debug-expansions
@@ -8954,7 +8954,7 @@ buildvariants:
   display_name: "Embedded SDK - macOS"
   run_on:
   - macos-1014
-  batchtime: 10080 # 7 days
+  cron: "0 0 * * 0" # Every week starting 00:00 on Sunday
   expansions:
     test_flags: --excludeWithAnyTags=uses_transactions,incompatible_with_macos
     cmake_path: /Applications/cmake-3.11.0-Darwin-x86_64/CMake.app/Contents/bin/cmake
@@ -9004,7 +9004,7 @@ buildvariants:
 
 - name: enterprise-rhel-80-64-bit
   display_name: "Enterprise RHEL 8.0"
-  batchtime: 1440 # 1 day
+  cron: "0 0 * * *" # Every day starting at 00:00
   modules:
   - enterprise
   run_on:
@@ -9115,7 +9115,7 @@ buildvariants:
 - &enterprise-rhel-80-64-bit-dynamic-required-template
   name: enterprise-rhel-80-64-bit-dynamic-required
   display_name: "! Shared Library Enterprise RHEL 8.0"
-  batchtime: 240 # 4 hour
+  cron: "0 */4 * * *" # Every 4 hours starting at midnight
   modules:
   - enterprise
   run_on:
@@ -9240,7 +9240,7 @@ buildvariants:
 - &enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-template
   name: enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required
   display_name: "! Shared Library Enterprise RHEL 8.0 (all feature flags)"
-  batchtime: 240 # 4 hour
+  cron: "0 */4 * * *" # Every 4 hours starting at midnight
   stepback: false
   modules:
   - enterprise
@@ -9363,7 +9363,7 @@ buildvariants:
 - &enterprise-rhel-80-64-bit-dynamic-sbe-engine
   name: enterprise-rhel-80-64-bit-dynamic-sbe-engine
   display_name: "Shared Library Enterprise RHEL 8.0 (SBE Engine)"
-  batchtime: 1440 # 1 day
+  cron: "0 0 * * *" # Every day starting at 00:00
   stepback: false
   modules:
   - enterprise
@@ -9489,7 +9489,7 @@ buildvariants:
   - enterprise
   run_on:
   - rhel80-small
-  batchtime: 10080 # 7 days
+  cron: "0 0 * * 0" # Every week starting 00:00 on Sunday
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     compile_flags: >-
@@ -9606,7 +9606,7 @@ buildvariants:
   display_name: "RHEL 8.0 Shared Library (No SSL)"
   run_on:
   - rhel80-small
-  batchtime: 1440 # 1 day
+  cron: "0 0 * * *" # Every day starting at 00:00
   expansions:
     compile_flags: >-
       -j$(grep -c ^processor /proc/cpuinfo)
@@ -9632,7 +9632,7 @@ buildvariants:
     - enterprise
   run_on:
     - rhel80-medium
-  batchtime: 10080 # 7 days
+  cron: "0 0 * * 0" # Every week starting 00:00 on Sunday
   stepback: false
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
@@ -9695,7 +9695,7 @@ buildvariants:
 # are spending when we split tasks into multiple sub-tasks.
 - name: enterprise-rhel-80-64-bit-single-task-baseline
   display_name: "Enterprise RHEL 8.0 (Single Task Baseline)"
-  batchtime: 10080  # 1 week.
+  cron: "0 0 * * 0" # Every week starting 00:00 on Sunday
   modules:
     - enterprise
   run_on:
@@ -9829,7 +9829,7 @@ buildvariants:
 - &enterprise-rhel-80-64-bit-suggested-template
   name: enterprise-rhel-80-64-bit-suggested
   display_name: "* Enterprise RHEL 8.0"
-  batchtime: 240 # 4 hours
+  cron: "0 */4 * * *" # Every 4 hours starting at midnight
   modules:
   - enterprise
   run_on:
@@ -9944,7 +9944,7 @@ buildvariants:
 - <<: *enterprise-rhel-70-64-bit-template
   name: enterprise-rhel-70-64-bit-kitchen-sink
   display_name: "~ Enterprise RHEL 7.0"
-  batchtime: 1440 # 1 day
+  cron: "0 0 * * *" # Every day starting at 00:00
   expansions:
     <<: *enterprise-rhel-70-64-bit-expansions-template
     compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
@@ -9957,7 +9957,7 @@ buildvariants:
 - <<: *enterprise-rhel-70-64-bit-template
   name: hot_backups-rhel-70-64-bit
   display_name: "hot_backups RHEL 7.0"
-  batchtime: 1440  # 1 day
+  cron: "0 0 * * *" # Every day starting at 00:00
   run_on:
   - rhel70
   expansions:
@@ -9974,7 +9974,7 @@ buildvariants:
 - <<: *enterprise-rhel-70-64-bit-template
   name: enterprise-rhel-70-64-bit-no-libunwind
   display_name: "~ Enterprise RHEL 7.0 (no-libunwind)"
-  batchtime: 10080  # 1 week
+  cron: "0 0 * * 0" # Every week starting 00:00 on Sunday
   run_on:
   - rhel70
   expansions:
@@ -10014,7 +10014,7 @@ buildvariants:
 
 - name: ubuntu1804-debug-suggested
   display_name: "* Shared Library Ubuntu 18.04 DEBUG"
-  batchtime: 240 # 4 hours
+  cron: "0 */4 * * *" # Every 4 hours starting at midnight
   run_on:
   - ubuntu1804-test
   expansions:
@@ -10241,7 +10241,7 @@ buildvariants:
   - enterprise
   run_on:
   - rhel81-power8-small
-  batchtime: 10080 # 7 days
+  cron: "0 0 * * 0" # Every week starting 00:00 on Sunday
   stepback: false
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
@@ -10292,7 +10292,7 @@ buildvariants:
   - enterprise
   run_on:
   - rhel72-zseries-test
-  batchtime: 10080 # 7 days
+  cron: "0 0 * * 0" # Every week starting 00:00 on Sunday
   stepback: false
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
@@ -10322,7 +10322,7 @@ buildvariants:
   - enterprise
   run_on:
   - rhel72-zseries-test
-  batchtime: 525600 # 365 days
+  cron: "0 0 1 1 *" # Every year starting 1/1 at 00:00
   stepback: false
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
@@ -10373,7 +10373,7 @@ buildvariants:
   - enterprise
   run_on:
   - rhel72-zseries-test
-  batchtime: 525600 # 365 days
+  cron: "0 0 1 1 *" # Every year starting 1/1 at 00:00
   stepback: false
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
@@ -10403,7 +10403,7 @@ buildvariants:
 
 - name: rhel-72-s390x
   display_name: RHEL 7.2 s390x
-  batchtime: 525600 # 365 days
+  cron: "0 0 1 1 *" # Every year starting 1/1 at 00:00
   run_on:
   - rhel72-zseries-test
   expansions:
@@ -10435,7 +10435,7 @@ buildvariants:
 
 - name: enterprise-ubuntu-dynamic-1804-clang-tidy-required
   display_name: "! Enterprise Clang Tidy"
-  batchtime: 240 # 4 hours
+  cron: "0 */4 * * *" # Every 4 hours starting at midnight
   modules:
   - enterprise
   run_on:
@@ -10982,7 +10982,7 @@ buildvariants:
   - enterprise
   run_on:
   - rhel72-zseries-test
-  batchtime: 525600 # 365 days
+  cron: "0 0 1 1 *" # Every year starting 1/1 at 00:00
   stepback: false
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
@@ -11474,7 +11474,7 @@ buildvariants:
 - &ubuntu1804-debug-aubsan-lite-required-template
   name: ubuntu1804-debug-aubsan-lite-required
   display_name: "! Shared Library {A,UB}SAN Enterprise Ubuntu 18.04 DEBUG"
-  batchtime: 240 # 4 hours
+  cron: "0 */4 * * *" # Every 4 hours starting at midnight
   modules:
   - enterprise
   run_on:
@@ -11513,7 +11513,7 @@ buildvariants:
 - <<: *ubuntu1804-debug-aubsan-lite-required-template
   name: ubuntu1804-debug-aubsan-lite-all-feature-flags-required
   display_name: "! Shared Library {A,UB}SAN Enterprise Ubuntu 18.04 DEBUG (all feature flags)"
-  batchtime: 240 # 4 hours
+  cron: "0 */4 * * *" # Every 4 hours starting at midnight
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     lang_environment: LANG=C
@@ -11610,7 +11610,7 @@ buildvariants:
 
 - name: enterprise-ubuntu-unoptimized-1804-64-bit
   display_name: "~ Enterprise Ubuntu 18.04 (without Diagnostic Latches)"
-  batchtime: 1440 # 1 day
+  cron: "0 0 * * *" # Every day starting at 00:00
   modules:
   - enterprise
   expansions:
@@ -11634,7 +11634,7 @@ buildvariants:
 
 - name: enterprise-ubuntu-fixed-service-executor-1804-64-bit
   display_name: "~ Enterprise Ubuntu 18.04 (with FixedServiceExecutor)"
-  batchtime: 1440 # 1 day
+  cron: "0 0 * * *" # Every day starting at 00:00
   run_on:
     - ubuntu1804-test
   modules:
@@ -11667,7 +11667,7 @@ buildvariants:
 
 - name: enterprise-ubuntu-sdam-replica-set-monitor-1804-64-bit
   display_name: "~ Enterprise Ubuntu 18.04 (with SdamReplicaSetMonitor)"
-  batchtime: 1440 # 1 day
+  cron: "0 0 * * *" # Every day starting at 00:00
   run_on:
     - ubuntu1804-test
   modules:
@@ -11699,7 +11699,7 @@ buildvariants:
 
 - name: enterprise-ubuntu-task-executor-pool-size-1804-64-bit
   display_name: "~ Enterprise Ubuntu 18.04 (with {taskExecutorPoolSize: 4})"
-  batchtime: 1440 # 1 day
+  cron: "0 0 * * *" # Every day starting at 00:00
   run_on:
     - ubuntu1804-test
   modules:
@@ -11729,7 +11729,7 @@ buildvariants:
 
 - name: enterprise-ubuntu-sharding-task-executor-pool-rsm-matchPrimary-1804-64-bit
   display_name: "~ Enterprise Ubuntu 18.04 (with {ShardingTaskExecutorPoolReplicaSetMatching: \"matchPrimaryNode\"})"
-  batchtime: 1440 # 1 day
+  cron: "0 0 * * *" # Every day starting at 00:00
   run_on:
     - ubuntu1804-test
   modules:
@@ -11760,7 +11760,7 @@ buildvariants:
 
 - name: enterprise-ubuntu-sharding-task-executor-pool-rsm-matchBusiest-1804-64-bit
   display_name: "~ Enterprise Ubuntu 18.04 (with {ShardingTaskExecutorPoolReplicaSetMatching: \"matchBusiestNode\"})"
-  batchtime: 1440 # 1 day
+  cron: "0 0 * * *" # Every day starting at 00:00
   run_on:
     - ubuntu1804-test
   modules:
@@ -11791,7 +11791,7 @@ buildvariants:
 
 - name: enterprise-ubuntu-sharding-task-executor-pool-rsm-disabled-1804-64-bit
   display_name: "~ Enterprise Ubuntu 18.04 (with {ShardingTaskExecutorPoolReplicaSetMatching: \"disabled\"})"
-  batchtime: 1440 # 1 day
+  cron: "0 0 * * *" # Every day starting at 00:00
   run_on:
     - ubuntu1804-test
   modules:
@@ -11844,7 +11844,7 @@ buildvariants:
     - enterprise
   run_on:
     - rhel80-small
-  batchtime: 10080 # 7 days
+  cron: "0 0 * * 0" # Every week starting 00:00 on Sunday
   stepback: false
   expansions:
     selected_tests_buildvariants: enterprise-windows-required linux-64-debug-required enterprise-ubuntu-dynamic-1604-clang ubuntu1804-debug-aubsan-lite-required
@@ -11854,7 +11854,7 @@ buildvariants:
 - <<: *enterprise-rhel-80-64-bit-dynamic-required-template
   name: commit-queue
   display_name: "~ Commit Queue"
-  batchtime: 10080 # 7 days
+  cron: "0 0 * * 0" # Every week starting 00:00 on Sunday
   stepback: false
   tasks:
   - name: compile_test_and_package_parallel_core_stream_TG
@@ -11876,7 +11876,7 @@ buildvariants:
 
 - name: live-record
   display_name: "~ RHEL 8.0 Shared Library (with UndoDB live-record)"
-  batchtime: 1440 # 1 day
+  cron: "0 0 * * *" # Every day starting at 00:00
   stepback: false
   modules:
   - enterprise
@@ -11956,7 +11956,7 @@ buildvariants:
 - <<: *enterprise-rhel-80-64-bit-dynamic-sbe-engine
   name: enterprise-rhel-80-64-bit-dynamic-sbe-engine-query-patch-only
   display_name: "~ Shared Library Enterprise RHEL 8.0 Query Patch Only (SBE Execution Engine)"
-  batchtime: 10080 # 7 days. This is a patch-only variant but we run on mainline to pick up task history.
+  cron: "0 0 * * 0" # Every week starting 00:00 on Sunday . This is a patch-only variant but we run on mainline to pick up task history.
   expansions:
     <<: *enterprise-rhel-80-64-bit-dynamic-sbe-engine-expansions
     jstestfuzz_num_generated_files: 20
@@ -11972,7 +11972,7 @@ buildvariants:
 - <<: *enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-template
   name: enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-query-patch-only
   display_name: "~ Shared Library Enterprise RHEL 8.0 Query Patch Only (all feature flags)"
-  batchtime: 10080 # 7 days. This is a patch-only variant but we run on mainline to pick up task history.
+  cron: "0 0 * * 0" # Every week starting 00:00 on Sunday . This is a patch-only variant but we run on mainline to pick up task history.
   expansions:
     <<: *enterprise-rhel-80-64-bit-dynamic-all-feature-flags-expansions
     jstestfuzz_num_generated_files: 20
