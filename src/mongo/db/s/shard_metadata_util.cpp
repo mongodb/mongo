@@ -85,6 +85,14 @@ NamespaceString getShardChunksNss(const NamespaceString& collectionNss,
     return NamespaceString{ChunkType::ShardNSPrefix + chunksNsPostfix};
 }
 
+Status setPersistedRefreshFlags(OperationContext* opCtx, const NamespaceString& nss) {
+    return updateShardCollectionsEntry(
+        opCtx,
+        BSON(ShardCollectionType::kNssFieldName << nss.ns()),
+        BSON("$set" << BSON(ShardCollectionType::kRefreshingFieldName << true)),
+        false /*upsert*/);
+}
+
 }  // namespace
 
 QueryAndSort createShardChunkDiffQuery(const ChunkVersion& collectionVersion) {
@@ -448,6 +456,8 @@ void updateTimestampOnShardCollections(OperationContext* opCtx,
 }
 
 Status dropChunksAndDeleteCollectionsEntry(OperationContext* opCtx, const NamespaceString& nss) {
+    // Retrieve the collection entry from 'config.cache.collections' if available, otherwise return
+    // immediately
     const auto statusWithCollectionEntry = readShardCollectionsEntry(opCtx, nss);
     if (!statusWithCollectionEntry.isOK()) {
         const auto status = statusWithCollectionEntry.getStatus();
@@ -465,9 +475,17 @@ Status dropChunksAndDeleteCollectionsEntry(OperationContext* opCtx, const Namesp
     const auto& collectionEntry = statusWithCollectionEntry.getValue();
 
     try {
-        DBDirectClient client(opCtx);
+        // Mark the collection entry as refreshing to indicate that the persisted metadata is about
+        // to be dropped
+        if (!collectionEntry.getRefreshing()) {
+            uassertStatusOK(setPersistedRefreshFlags(opCtx, nss));
+        }
 
-        // Delete the collection entry from config.cache.collections
+        // Drop the 'config.cache.chunks.<ns/uuid>' collection
+        dropChunks(opCtx, nss, collectionEntry.getUuid(), collectionEntry.getSupportingLongName());
+
+        // Delete the collection entry from 'config.cache.collections'
+        DBDirectClient client(opCtx);
         auto deleteCommandResponse = client.runCommand([&] {
             write_ops::DeleteCommandRequest deleteOp(
                 NamespaceString::kShardConfigCollectionsNamespace);
@@ -481,17 +499,6 @@ Status dropChunksAndDeleteCollectionsEntry(OperationContext* opCtx, const Namesp
         }());
         uassertStatusOK(
             getStatusFromWriteCommandResponse(deleteCommandResponse->getCommandReply()));
-
-        // Drop the corresponding config.cache.chunks.<ns/uuid> collection
-        const auto chunksNss = getShardChunksNss(
-            nss, collectionEntry.getUuid(), collectionEntry.getSupportingLongName());
-        BSONObj result;
-        if (!client.dropCollection(chunksNss.ns(), kLocalWriteConcern, &result)) {
-            auto status = getStatusFromCommandResult(result);
-            if (status != ErrorCodes::NamespaceNotFound) {
-                uassertStatusOK(status);
-            }
-        }
     } catch (const DBException& ex) {
         LOGV2_ERROR(5966301,
                     "Failed to drop chunks and collection entry",
@@ -509,6 +516,23 @@ Status dropChunksAndDeleteCollectionsEntry(OperationContext* opCtx, const Namesp
 
     return Status::OK();
 }
+
+void dropChunks(OperationContext* opCtx,
+                const NamespaceString& nss,
+                const UUID& uuid,
+                SupportingLongNameStatusEnum supportingLongName) {
+    const auto chunksNss = getShardChunksNss(nss, uuid, supportingLongName);
+
+    DBDirectClient client(opCtx);
+    BSONObj result;
+    if (!client.dropCollection(chunksNss.ns(), kLocalWriteConcern, &result)) {
+        auto status = getStatusFromCommandResult(result);
+        if (status != ErrorCodes::NamespaceNotFound) {
+            uassertStatusOK(status);
+        }
+    }
+}
+
 Status deleteDatabasesEntry(OperationContext* opCtx, StringData dbName) {
     try {
         DBDirectClient client(opCtx);

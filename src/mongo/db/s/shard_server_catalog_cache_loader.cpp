@@ -70,6 +70,34 @@ MONGO_FAIL_POINT_DEFINE(hangCollectionFlush);
 AtomicWord<unsigned long long> taskIdGenerator{0};
 
 /**
+ * Drops all chunks from the persisted metadata whether the collection's epoch has changed.
+ */
+void dropChunksIfEpochChanged(OperationContext* opCtx,
+                              const ChunkVersion& maxLoaderVersion,
+                              const OID& currentEpoch,
+                              const NamespaceString& nss,
+                              const UUID& uuid,
+                              SupportingLongNameStatusEnum supportingLongName) {
+    if (maxLoaderVersion == ChunkVersion::UNSHARDED() || maxLoaderVersion.epoch() == currentEpoch) {
+        return;
+    }
+
+    // Drop the 'config.cache.chunks.<ns/uuid>' collection
+    dropChunks(opCtx, nss, uuid, supportingLongName);
+
+    if (MONGO_unlikely(hangPersistCollectionAndChangedChunksAfterDropChunks.shouldFail())) {
+        LOGV2(22093, "Hit hangPersistCollectionAndChangedChunksAfterDropChunks failpoint");
+        hangPersistCollectionAndChangedChunksAfterDropChunks.pauseWhileSet(opCtx);
+    }
+
+    LOGV2(5990400,
+          "Dropped chunks cache due to epoch change",
+          "namespace"_attr = nss,
+          "currentEpoch"_attr = currentEpoch,
+          "previousEpoch"_attr = maxLoaderVersion.epoch());
+}
+
+/**
  * Takes a CollectionAndChangedChunks object and persists the changes to the shard's metadata
  * collections.
  *
@@ -79,26 +107,14 @@ Status persistCollectionAndChangedChunks(OperationContext* opCtx,
                                          const NamespaceString& nss,
                                          const CollectionAndChangedChunks& collAndChunks,
                                          const ChunkVersion& maxLoaderVersion) {
-    // If the collection's epoch has changed, delete the collections entry and drop all chunks from
-    // the persisted cache.
-    if (maxLoaderVersion != ChunkVersion::UNSHARDED() &&
-        maxLoaderVersion.epoch() != collAndChunks.epoch) {
-        auto status = dropChunksAndDeleteCollectionsEntry(opCtx, nss);
-
-        if (MONGO_unlikely(hangPersistCollectionAndChangedChunksAfterDropChunks.shouldFail())) {
-            LOGV2(22093, "Hit hangPersistCollectionAndChangedChunksAfterDropChunks failpoint");
-            hangPersistCollectionAndChangedChunksAfterDropChunks.pauseWhileSet(opCtx);
-        }
-
-        if (!status.isOK()) {
-            return status;
-        }
-
-        LOGV2(5836200,
-              "Dropped collection and chunks cache due to epoch change",
-              "namespace"_attr = nss,
-              "currentEpoch"_attr = collAndChunks.epoch,
-              "previousEpoch"_attr = maxLoaderVersion.epoch());
+    // Retrieve the collection entry from 'config.cache.collections' if it exists
+    boost::optional<ShardCollectionType> collectionEntry{boost::none};
+    const auto statusWithCollectionEntry{readShardCollectionsEntry(opCtx, nss)};
+    if (statusWithCollectionEntry.getStatus() != ErrorCodes::NamespaceNotFound) {
+        uassertStatusOKWithContext(statusWithCollectionEntry,
+                                   str::stream()
+                                       << "Failed to read persisted collection entry for " << nss);
+        collectionEntry = statusWithCollectionEntry.getValue();
     }
 
     // Set the collection entry.
@@ -129,6 +145,23 @@ Status persistCollectionAndChangedChunks(OperationContext* opCtx,
     }
 
     // Update the chunks.
+    if (collectionEntry) {
+        // A collection entry already existed in the local cache, so drop the corresponding chunks
+        // collection if the epoch of the persisted collection metadata does not match that of the
+        // fresh collection metadata returned by the config server (for example, the collection has
+        // been dropped and then recreated with the same namespace).
+        try {
+            dropChunksIfEpochChanged(opCtx,
+                                     maxLoaderVersion,
+                                     collAndChunks.epoch,
+                                     collectionEntry->getNss(),
+                                     collectionEntry->getUuid(),
+                                     collectionEntry->getSupportingLongName());
+        } catch (const DBException& ex) {
+            return ex.toStatus();
+        }
+    }
+
     status = updateShardChunks(opCtx,
                                nss,
                                *collAndChunks.uuid,
@@ -716,19 +749,22 @@ void ShardServerCatalogCacheLoader::_waitForTasksToCompleteAndRenameChunks(
     //  - kImplicitlyEnabled or kExplicitlyEnabled: NS-based chunks collection to be converted to
     //    UUID-based one
     //  - kDisabled: UUID-based chunks collection to be converted to NS-based one
-    const auto [fromChunksNss, toChunksNss] = [&] {
-        if (supportingLongName == SupportingLongNameStatusEnum::kDisabled) {
-            return std::make_tuple(NamespaceString{ChunkType::ShardNSPrefix + uuid.toString()},
-                                   NamespaceString{ChunkType::ShardNSPrefix + nss.toString()});
-        } else {
-            return std::make_tuple(NamespaceString{ChunkType::ShardNSPrefix + nss.toString()},
-                                   NamespaceString{ChunkType::ShardNSPrefix + uuid.toString()});
-        }
-    }();
+    const auto fromChunksNss = supportingLongName == SupportingLongNameStatusEnum::kDisabled
+        ? NamespaceString{ChunkType::ShardNSPrefix + uuid.toString()}
+        : NamespaceString{ChunkType::ShardNSPrefix + nss.toString()};
+    const auto toChunksNss = supportingLongName == SupportingLongNameStatusEnum::kDisabled
+        ? NamespaceString{ChunkType::ShardNSPrefix + nss.toString()}
+        : NamespaceString{ChunkType::ShardNSPrefix + uuid.toString()};
 
-    if (!CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, toChunksNss)) {
-        uassertStatusOK(renameCollection(opCtx, fromChunksNss, toChunksNss, {}));
-    }
+    // Before renaming the collection, ensure the target collection doesn't already exist. Otherwise
+    // the inconsistent data cleanup mechanism (based on the collection 'refresh' flag) did not work
+    // as expected.
+    invariant(!CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, toChunksNss),
+              str::stream() << "Cannot rename collection '" << fromChunksNss << "' to '"
+                            << toChunksNss
+                            << "' as the locally persisted data looks inconsistent (a target "
+                               "collection with the same name already exists)");
+    uassertStatusOK(renameCollection(opCtx, fromChunksNss, toChunksNss, {}));
 
     // Update the support for long name of the specific shard collection to allow cache access
     // using the correct namespace, i.e., by collection namespace or UUID.
@@ -876,7 +912,9 @@ ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
     }
 
     // After finding metadata remotely, we must have found metadata locally.
-    invariant(!collAndChunks.changedChunks.empty());
+    invariant(!collAndChunks.changedChunks.empty(),
+              str::stream() << "No chunks metadata found for collection '" << nss
+                            << "' despite the config server returned actual information");
 
     return swCollectionAndChangedChunks;
 };
