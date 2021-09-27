@@ -1,5 +1,6 @@
 /*
- * Ensures that error is reported when overlappping range is submitted for deletion.
+ * Ensures that error is reported when overlapping range is submitted for deletion.
+ * @tags: [assumes_balancer_off]
  */
 
 (function() {
@@ -13,7 +14,8 @@ const collName = "foo";
 const ns = dbName + "." + collName;
 
 // Create 2 shards with 3 replicas each.
-let st = new ShardingTest({shards: {rs0: {nodes: 3}, rs1: {nodes: 3}}});
+let st =
+    new ShardingTest({shards: {rs0: {nodes: 3}, rs1: {nodes: 3}}, other: {enableBalancer: false}});
 
 (() => {
     jsTestLog("Test simple shard key");
