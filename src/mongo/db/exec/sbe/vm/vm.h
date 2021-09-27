@@ -340,6 +340,7 @@ enum class Builtin : uint8_t {
     log10,
     sqrt,
     addToArray,       // agg function to append to an array
+    mergeObjects,     // agg function to merge BSON documents
     addToSet,         // agg function to append to a set
     collAddToSet,     // agg function to append to a set (with collation)
     doubleDoubleSum,  // special double summation
@@ -902,6 +903,7 @@ private:
     std::tuple<bool, value::TypeTags, value::Value> builtinLog10(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinSqrt(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinAddToArray(ArityType arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinMergeObjects(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinAddToSet(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinCollAddToSet(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinDoubleDoubleSum(ArityType arity);

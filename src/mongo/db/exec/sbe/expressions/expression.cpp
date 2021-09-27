@@ -403,6 +403,7 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
     {"log10", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::log10, false}},
     {"sqrt", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::sqrt, false}},
     {"addToArray", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::addToArray, true}},
+    {"mergeObjects", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::mergeObjects, true}},
     {"addToSet", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::addToSet, true}},
     {"collAddToSet", BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::collAddToSet, true}},
     {"doubleDoubleSum",

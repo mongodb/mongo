@@ -1091,6 +1091,91 @@ TEST_F(SbeStageBuilderGroupTest, PushAccumulatorTranslationExpressionInvalid) {
         AssertionException);
 }
 
+TEST_F(SbeStageBuilderGroupTest, MergeObjectsAccumulatorTranslationNoDocs) {
+    auto docs = std::vector<BSONArray>{BSONArray{}};
+    runGroupAggregationTest("{_id: null, x: {$mergeObjects: '$a'}}",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << BSONNULL << "x" << BSONObj{})));
+}
+
+TEST_F(SbeStageBuilderGroupTest, MergeObjectsAccumulatorTranslationSingleDoc) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << BSON("b" << 1)))};
+    runGroupAggregationTest("{_id: null, x: {$mergeObjects: '$a'}}",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << BSONNULL << "x" << BSON("b" << 1))));
+}
+
+TEST_F(SbeStageBuilderGroupTest, MergeObjectsAccumulatorTranslationNonExistentField) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("_id" << 1 << "a" << BSON("c" << 1)))};
+    runGroupAggregationTest("{_id: null, x: {$mergeObjects: '$b'}}",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << BSONNULL << "x" << BSONObj{})));
+}
+
+TEST_F(SbeStageBuilderGroupTest, MergeObjectsAccumulatorTranslationNonObject) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("_id" << 1 << "a" << 1))};
+
+    ASSERT_THROWS(runGroupAggregationTest("{_id: null, x: {$mergeObjects: 'a'}", docs, BSONArray{}),
+                  AssertionException);
+}
+
+TEST_F(SbeStageBuilderGroupTest, MergeObjectsAccumulatorTranslationDisjointDocs) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("_id" << 1 << "a" << BSON("c" << 1))),
+                                       BSON_ARRAY(BSON("_id" << 1 << "a" << BSON("b" << 1)))};
+    runGroupAggregationTest(
+        "{_id: null, x: {$mergeObjects: '$a'}}",
+        docs,
+        BSON_ARRAY(BSON("_id" << BSONNULL << "x" << BSON("c" << 1 << "b" << 1))));
+}
+
+TEST_F(SbeStageBuilderGroupTest, MergeObjectsAccumulatorTranslationIntersectingDocs) {
+    auto docs =
+        std::vector<BSONArray>{BSON_ARRAY(BSON("_id" << 1 << "a" << BSON("c" << 1 << "d" << 1))),
+                               BSON_ARRAY(BSON("_id" << 1 << "a" << BSON("b" << 1 << "d" << 4))),
+                               BSON_ARRAY(BSON("_id" << 1 << "a"
+                                                     << BSON("c"
+                                                             << "hello")))};
+    runGroupAggregationTest("{_id: null, x: {$mergeObjects: '$a'}}",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << BSONNULL << "x"
+                                                  << BSON("c"
+                                                          << "hello"
+                                                          << "d" << 4 << "b" << 1))));
+}
+
+TEST_F(SbeStageBuilderGroupTest, MergeObjectsAccumulatorTranslationIntersectingEmbeddedDocs) {
+    auto docs = std::vector<BSONArray>{
+        BSON_ARRAY(BSON("_id" << 1 << "a" << BSON("c" << 1 << "d" << 1 << "e" << BSON("f" << 5)))),
+        BSON_ARRAY(BSON("_id" << 1 << "a" << BSON("b" << 1 << "d" << 4 << "e" << BSON("g" << 6))))};
+    runGroupAggregationTest(
+        "{_id: null, x: {$mergeObjects: '$a'}}",
+        docs,
+        BSON_ARRAY(BSON("_id" << BSONNULL << "x"
+                              << BSON("c" << 1 << "d" << 4 << "e" << BSON("g" << 6) << "b" << 1))));
+}
+
+TEST_F(SbeStageBuilderGroupTest, MergeObjectsAccumulatorAccumulatorTranslationMissingField) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("_id" << 1 << "a" << BSON("c" << 1))),
+                                       BSON_ARRAY(BSON("_id" << 1 << "a" << BSON("b" << 1))),
+                                       BSON_ARRAY(BSON("_id" << 1 << "b" << BSON("d" << 1)))};
+    runGroupAggregationTest(
+        "{_id: null, x: {$mergeObjects: '$a'}}",
+        docs,
+        BSON_ARRAY(BSON("_id" << BSONNULL << "x" << BSON("c" << 1 << "b" << 1))));
+}
+
+TEST_F(SbeStageBuilderGroupTest, MergeObjectsAccumulatorTranslationSomeNull) {
+    auto docs = std::vector<BSONArray>{
+        BSON_ARRAY(BSON("_id" << 1 << "a" << BSONNULL)),
+        BSON_ARRAY(BSON("_id" << 1 << "a" << BSON("b" << BSONNULL << "d" << BSONNULL))),
+        BSON_ARRAY(BSON("_id" << 1 << "a" << BSON("d" << 1)))};
+    runGroupAggregationTest(
+        "{_id: null, x: {$mergeObjects: '$a'}}",
+        docs,
+        BSON_ARRAY(BSON("_id" << BSONNULL << "x" << BSON("b" << BSONNULL << "d" << 1))));
+}
+
+
 class AccumulatorSBEIncompatible final : public AccumulatorState {
 public:
     static constexpr auto kName = "$incompatible"_sd;

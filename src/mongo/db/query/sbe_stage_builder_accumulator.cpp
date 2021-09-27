@@ -240,6 +240,33 @@ std::pair<std::vector<std::unique_ptr<sbe::EExpression>>, EvalStage> buildAccumu
     aggs.push_back(makeFunction("addToArray", std::move(arg)));
     return {std::move(aggs), std::move(inputStage)};
 }
+
+std::pair<std::vector<std::unique_ptr<sbe::EExpression>>, EvalStage> buildAccumulatorMergeObjects(
+    StageBuilderState& state,
+    const AccumulationExpression& expr,
+    std::unique_ptr<sbe::EExpression> arg,
+    EvalStage inputStage,
+    PlanNodeId planNodeId) {
+    std::vector<std::unique_ptr<sbe::EExpression>> aggs;
+
+    auto filterExpr = makeLocalBind(
+        state.frameIdGenerator,
+        [](sbe::EVariable input) {
+            return makeBinaryOp(
+                sbe::EPrimBinary::logicOr,
+                generateNullOrMissing(input),
+                makeBinaryOp(sbe::EPrimBinary::logicOr,
+                             makeFunction("isObject", input.clone()),
+                             sbe::makeE<sbe::EFail>(ErrorCodes::Error{5911200},
+                                                    "$mergeObjects only supports objects")));
+        },
+        arg->clone());
+
+    inputStage = makeFilter<false>(std::move(inputStage), std::move(filterExpr), planNodeId);
+
+    aggs.push_back(makeFunction("mergeObjects", std::move(arg)));
+    return {std::move(aggs), std::move(inputStage)};
+}
 };  // namespace
 
 std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> buildArgument(
@@ -276,6 +303,7 @@ std::pair<std::vector<std::unique_ptr<sbe::EExpression>>, EvalStage> buildAccumu
         {AccumulatorAddToSet::kName, &buildAccumulatorAddToSet},
         {AccumulatorSum::kName, &buildAccumulatorSum},
         {AccumulatorPush::kName, &buildAccumulatorPush},
+        {AccumulatorMergeObjects::kName, &buildAccumulatorMergeObjects},
     };
 
     auto accExprName = acc.expr.name;
@@ -313,6 +341,7 @@ std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> buildFinalize(
         {AccumulatorAddToSet::kName, nullptr},
         {AccumulatorSum::kName, &buildFinalizeSum},
         {AccumulatorPush::kName, nullptr},
+        {AccumulatorMergeObjects::kName, nullptr},
     };
 
     auto accExprName = acc.expr.name;
