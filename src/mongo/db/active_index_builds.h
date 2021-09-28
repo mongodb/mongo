@@ -96,6 +96,11 @@ public:
     Status registerIndexBuild(std::shared_ptr<ReplIndexBuildState> replIndexBuildState);
 
     /**
+     * Get the number of in-progress index builds.
+     */
+    size_t getActiveIndexBuilds();
+
+    /**
      * When _sleepForTest is true, this function will sleep for 100ms and then check the value
      * of _sleepForTest again.
      */

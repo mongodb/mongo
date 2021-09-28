@@ -54,6 +54,7 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/scoped_counter.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -682,9 +683,12 @@ void IndexBuildsCoordinatorMongod::_waitForNextIndexBuildActionAndCommit(
         invariant(!opCtx->lockState()->isLocked(),
                   str::stream() << "holding locks while waiting for commit or abort: "
                                 << replState->buildUUID);
-        // Future wait can be interrupted.
-        const auto nextAction = _drainSideWritesUntilNextActionIsAvailable(opCtx, replState);
 
+        auto const nextAction = [&] {
+            const ScopedCounter counter{activeIndexBuildsSSS.waitForCommitQuorum};
+            // Future wait can be interrupted.
+            return _drainSideWritesUntilNextActionIsAvailable(opCtx, replState);
+        }();
         LOGV2(3856204,
               "Index build: received signal",
               "buildUUID"_attr = replState->buildUUID,

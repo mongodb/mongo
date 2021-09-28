@@ -42,6 +42,7 @@
 #include "mongo/db/catalog/index_build_oplog_entry.h"
 #include "mongo/db/catalog/index_builds.h"
 #include "mongo/db/catalog/index_builds_manager.h"
+#include "mongo/db/commands/server_status.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/rebuild_indexes.h"
@@ -465,6 +466,51 @@ public:
     static int getNumIndexesTotal(OperationContext* opCtx, const CollectionPtr& collection);
 
     bool supportsResumableIndexBuilds() const;
+
+    class ActiveIndexBuildsSSS : public ServerStatusSection {
+    public:
+        ActiveIndexBuildsSSS();
+
+        bool includeByDefault() const final {
+            return true;
+        }
+
+        void addRequiredPrivileges(std::vector<Privilege>* out) final {}
+
+        BSONObj generateSection(OperationContext* opCtx,
+                                const BSONElement& configElement) const final {
+            BSONObjBuilder indexBuilds;
+            BSONObjBuilder phases;
+
+            indexBuilds.append(
+                "total",
+                static_cast<int>(
+                    IndexBuildsCoordinator::get(opCtx)->activeIndexBuilds.getActiveIndexBuilds()));
+
+            phases.append("scanCollection", scanCollection.loadRelaxed());
+            phases.append("drainSideWritesTable", drainSideWritesTable.loadRelaxed());
+            phases.append("drainSideWritesTablePreCommit",
+                          drainSideWritesTablePreCommit.loadRelaxed());
+            phases.append("waitForCommitQuorum", waitForCommitQuorum.loadRelaxed());
+            phases.append("drainSideWritesTableOnCommit",
+                          drainSideWritesTableOnCommit.loadRelaxed());
+            phases.append("processConstraintsViolatonTableOnCommit",
+                          processConstraintsViolatonTableOnCommit.loadRelaxed());
+            phases.append("commit", commit.loadRelaxed());
+
+            indexBuilds.append("phases", phases.obj());
+
+            return indexBuilds.obj();
+        }
+
+        AtomicWord<int> scanCollection;
+        AtomicWord<int> drainSideWritesTable;
+        AtomicWord<int> drainSideWritesTablePreCommit;
+        AtomicWord<int> waitForCommitQuorum;
+        AtomicWord<int> drainSideWritesTableOnCommit;
+        AtomicWord<int> processConstraintsViolatonTableOnCommit;
+        AtomicWord<int> commit;
+    } activeIndexBuildsSSS;
 
 private:
     /**
