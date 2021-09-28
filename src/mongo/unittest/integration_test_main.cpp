@@ -39,6 +39,7 @@
 #include "mongo/base/initializer.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/db/concurrency/locker_noop_client_observer.h"
 #include "mongo/db/server_options_base.h"
 #include "mongo/db/server_options_helpers.h"
 #include "mongo/db/service_context.h"
@@ -82,7 +83,9 @@ int main(int argc, char** argv) {
     TestingProctor::instance().setEnabled(true);
     runGlobalInitializersOrDie(std::vector<std::string>(argv, argv + argc));
     setTestCommandsEnabled(true);
-    setGlobalServiceContext(ServiceContext::make());
+    auto serviceContextHolder = ServiceContext::make();
+    serviceContextHolder->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
+    setGlobalServiceContext(std::move(serviceContextHolder));
     quickExit(unittest::Suite::run(std::vector<std::string>(), "", "", 1));
 }
 

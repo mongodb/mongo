@@ -32,6 +32,7 @@
 
 #include "mongo/executor/task_executor.h"
 
+#include "mongo/db/concurrency/locker_noop_client_observer.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/network_interface_thread_pool.h"
@@ -46,6 +47,11 @@ namespace {
 
 class TaskExecutorFixture : public mongo::unittest::Test {
 public:
+    TaskExecutorFixture() {
+        _serviceCtx = ServiceContext::make();
+        _serviceCtx->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
+    }
+
     void setUp() override {
         std::shared_ptr<NetworkInterface> net = makeNetworkInterface("TaskExecutorTest");
         auto tp = std::make_unique<NetworkInterfaceThreadPool>(net.get());
@@ -73,7 +79,7 @@ public:
         return false;
     }
 
-    ServiceContext::UniqueServiceContext _serviceCtx = ServiceContext::make();
+    ServiceContext::UniqueServiceContext _serviceCtx;
     std::shared_ptr<ThreadPoolTaskExecutor> _executor;
 };
 

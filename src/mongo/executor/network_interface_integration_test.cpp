@@ -37,6 +37,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/client/connection_string.h"
+#include "mongo/db/concurrency/locker_noop_client_observer.h"
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_integration_fixture.h"
@@ -529,6 +530,7 @@ TEST_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadlineSooner) {
     constexpr auto requestTimeout = Milliseconds{1000};
 
     auto serviceContext = ServiceContext::make();
+    serviceContext->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
     auto client = serviceContext->makeClient("NetworkClient");
     auto opCtx = client->makeOperationContext();
     opCtx->setDeadlineAfterNowBy(opCtxDeadline, ErrorCodes::ExceededTimeLimit);
@@ -564,6 +566,7 @@ TEST_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadlineLater) {
     constexpr auto requestTimeout = Milliseconds{600};
 
     auto serviceContext = ServiceContext::make();
+    serviceContext->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
     auto client = serviceContext->makeClient("NetworkClient");
     auto opCtx = client->makeOperationContext();
     opCtx->setDeadlineAfterNowBy(opCtxDeadline, ErrorCodes::ExceededTimeLimit);
