@@ -73,6 +73,12 @@ assertResultsMatchWithAndWithoutPushdown(coll,
                                          [{_id: "a", s: 15}, {_id: "b", s: 30}, {_id: "c", s: 5}],
                                          1);
 
+// The subexpression '$not' is not translated to $coerceToolBool and thus is SBE compatible.
+assertResultsMatchWithAndWithoutPushdown(coll,
+                                         [{$group: {_id: "$item", c: {$sum: {$not: "$price"}}}}],
+                                         [{_id: "a", c: 0}, {_id: "b", c: 0}, {_id: "c", c: 0}],
+                                         1);
+
 // Two group stages both get pushed down.
 assertResultsMatchWithAndWithoutPushdown(
     coll,
@@ -124,6 +130,17 @@ assert.commandWorked(coll.dropIndex({item: 1}));
 explain = coll.explain().aggregate([
     {$group: {_id: "$item", s: {$sum: "$price"}}},
     {$group: {_id: "$quantity", c: {$stdDevPop: "$price"}}}
+]);
+
+assert.neq(null, getAggPlanStage(explain, "GROUP"), explain);
+assert(explain.stages[1].hasOwnProperty("$group"));
+
+// Another case of supported group and then a group with no supported accumulators. A boolean
+// expression may be translated to an internal expression $coerceToBool which is not supported by
+// SBE.
+explain = coll.explain().aggregate([
+    {$group: {_id: "$item", s: {$sum: "$price"}}},
+    {$group: {_id: "$quantity", c: {$sum: {$and: ["$a", true]}}}}
 ]);
 
 assert.neq(null, getAggPlanStage(explain, "GROUP"), explain);

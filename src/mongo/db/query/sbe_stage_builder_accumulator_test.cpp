@@ -48,7 +48,12 @@ protected:
         BSONObj namedSpec = BSON("$group" << groupSpec);
         BSONElement specElement = namedSpec.firstElement();
 
-        return DocumentSourceGroup::createFromBson(specElement, expCtx);
+        auto docSrcGrp = DocumentSourceGroup::createFromBson(specElement, expCtx);
+        // $group may end up being incompatible with SBE after optimize(). We call 'optimize()' to
+        // reveal such cases.
+        docSrcGrp->optimize();
+
+        return docSrcGrp;
     }
 
     std::pair<sbe::value::TypeTags, sbe::value::Value> sortResults(sbe::value::TypeTags tag,
@@ -199,11 +204,24 @@ protected:
                       << " but got: " << std::make_pair(resObjTag, resObjVal);
     }
 
+    void runSbeIncompatibleGroupSpecTest(const BSONObj& groupSpec,
+                                         boost::intrusive_ptr<ExpressionContext>& expCtx) {
+        expCtx->sbeCompatible = true;
+        // When we parse and optimize the 'groupSpec' to build a DocumentSourceGroup, those
+        // accumulation expressions or '_id' expression that are not supported by SBE will flip the
+        // 'sbeCompatible()' flag in the 'groupStage' to false.
+        auto docSrc = createDocumentSourceGroup(expCtx, groupSpec);
+        auto groupStage = dynamic_cast<DocumentSourceGroup*>(docSrc.get());
+        ASSERT(groupStage != nullptr);
+
+        ASSERT_EQ(false, groupStage->sbeCompatible()) << "group spec: " << groupSpec;
+    }
+
     void runSbeGroupCompatibleFlagTest(const std::vector<BSONObj>& groupSpecs,
                                        boost::intrusive_ptr<ExpressionContext>& expCtx) {
         expCtx->sbeCompatible = true;
         for (const auto& groupSpec : groupSpecs) {
-            // When we parse the groupSpec to build the DocumentSourceGroup, those
+            // When we parse and optimize the groupSpec to build the DocumentSourceGroup, those
             // AccumulationExpressions or _id expression that are not supported by SBE will flip the
             // sbeGroupCompatible flag in the expCtx to false.
             auto [querySolution, groupStage] =
@@ -1095,7 +1113,6 @@ REGISTER_ACCUMULATOR(
     genericParseSBEUnsupportedSingleExpressionAccumulator<AccumulatorSBEIncompatible>);
 
 TEST_F(SbeStageBuilderGroupTest, SbeGroupCompatibleFlag) {
-    std::vector<BSONArray> docs;
     std::vector<std::string> testCases = {
         // TODO (SERVER-XXXX): Uncomment the following two test cases when we support pushdown of
         // accumlators to SBE.
@@ -1116,6 +1133,7 @@ TEST_F(SbeStageBuilderGroupTest, SbeGroupCompatibleFlag) {
         // R"(_id: null, agg: {$stdDevPop: "$item"})",
         // R"(_id: null, agg: {$stdDevSamp: "$item"})",
         R"(_id: null, agg: {$sum: "$item"})",
+        R"(_id: null, agg: {$sum: {$not: "$item"}})",
         // R"(_id: {a: "$a", b: "$b"})",
         // All supported case.
         // R"(_id: null, agg1: {$sum: "$item"}, agg2: {$max: "$item"}, agg3: {$avg: "$quantity"})",
@@ -1136,6 +1154,23 @@ TEST_F(SbeStageBuilderGroupTest, SbeGroupCompatibleFlag) {
         groupSpecs.push_back(groupSpec);
     }
     runSbeGroupCompatibleFlagTest(groupSpecs, expCtx);
+}
+
+TEST_F(SbeStageBuilderGroupTest, SbeIncompatibleExpressionInGroup) {
+    std::vector<std::string> testCases = {
+        R"(_id: {$and: ["$a", true]})",
+        R"(_id: {$or: ["$a", false]})",
+        R"(_id: null, x: {$sum: {$and: ["$a", true]}})",
+        R"(_id: null, x: {$sum: {$or: ["$a", false]}})",
+        R"(_id: null, x: {$sum: {$add: ["$b", {$and: ["$a", true]}]}})",
+        R"(_id: null, x: {$sum: {$add: ["$b", {$or: ["$a", false]}]}})",
+    };
+
+    boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContextForTest());
+    for (auto testCase : testCases) {
+        auto groupSpec = fromjson(fmt::sprintf("{%s}", testCase));
+        runSbeIncompatibleGroupSpecTest({groupSpec}, expCtx);
+    }
 }
 
 }  // namespace mongo

@@ -843,7 +843,9 @@ intrusive_ptr<ExpressionCoerceToBool> ExpressionCoerceToBool::create(
 
 ExpressionCoerceToBool::ExpressionCoerceToBool(ExpressionContext* const expCtx,
                                                intrusive_ptr<Expression> pExpression)
-    : Expression(expCtx, {std::move(pExpression)}), pExpression(_children[0]) {}
+    : Expression(expCtx, {std::move(pExpression)}), pExpression(_children[0]) {
+    expCtx->sbeCompatible = false;
+}
 
 intrusive_ptr<Expression> ExpressionCoerceToBool::optimize() {
     /* optimize the operand */
