@@ -17,9 +17,6 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
     _CONFIGSVR_REPLSET_NAME = "config-rs"
     _SHARD_REPLSET_NAME_PREFIX = "shard-rs"
 
-    _CONFIGSVR_SHARD_LOGGING_PREFIX = "configsvr"
-    _RS_SHARD_LOGGING_PREFIX = "shard"
-
     AWAIT_SHARDING_INITIALIZATION_TIMEOUT_SECS = 60
 
     def __init__(  # pylint: disable=too-many-arguments,too-many-locals
@@ -27,7 +24,7 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
             mongod_executable=None, mongod_options=None, dbpath_prefix=None, preserve_dbpath=False,
             num_shards=1, num_rs_nodes_per_shard=1, num_mongos=1, enable_sharding=None,
             enable_balancer=True, enable_autosplit=True, auth_options=None, configsvr_options=None,
-            shard_options=None):
+            shard_options=None, cluster_logging_prefix=None):
         """Initialize ShardedClusterFixture with different options for the cluster processes."""
 
         interface.Fixture.__init__(self, logger, job_num, fixturelib, dbpath_prefix=dbpath_prefix)
@@ -57,6 +54,13 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
             self.fixturelib.default_if_none(configsvr_options, {}))
         self.shard_options = self.fixturelib.make_historic(
             self.fixturelib.default_if_none(shard_options, {}))
+
+        # The logging prefix used in cluster to cluster replication.
+        self.cluster_logging_prefix = "" if cluster_logging_prefix is None else f"{cluster_logging_prefix}:"
+
+        self.configsvr_shard_logging_prefix = f"{self.cluster_logging_prefix}configsvr"
+        self.rs_shard_logging_prefix = f"{self.cluster_logging_prefix}shard"
+        self.mongos_logging_prefix = f"{self.cluster_logging_prefix}mongos"
 
         if self.num_rs_nodes_per_shard is None:
             raise TypeError("num_rs_nodes_per_shard must be an integer but found None")
@@ -253,7 +257,7 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
     def get_configsvr_logger(self):
         """Return a new logging.Logger instance used for a config server shard."""
         return self.fixturelib.new_fixture_node_logger(self.__class__.__name__, self.job_num,
-                                                       self._CONFIGSVR_SHARD_LOGGING_PREFIX)
+                                                       self.configsvr_shard_logging_prefix)
 
     def get_configsvr_kwargs(self):
         """Return args to create replicaset.ReplicaSetFixture configured as the config server."""
@@ -278,7 +282,7 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
             "mongod_options": mongod_options, "mongod_executable": self.mongod_executable,
             "preserve_dbpath": preserve_dbpath, "num_nodes": num_nodes,
             "auth_options": auth_options, "replset_config_options": replset_config_options,
-            "shard_logging_prefix": self._CONFIGSVR_SHARD_LOGGING_PREFIX, **configsvr_options
+            "shard_logging_prefix": self.configsvr_shard_logging_prefix, **configsvr_options
         }
 
     def install_configsvr(self, configsvr):
@@ -287,7 +291,7 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
 
     def _get_rs_shard_logging_prefix(self, index):
         """Return replica set shard logging prefix."""
-        return f"{self._RS_SHARD_LOGGING_PREFIX}{index}"
+        return f"{self.rs_shard_logging_prefix}{index}"
 
     def get_rs_shard_logger(self, index):
         """Return a new logging.Logger instance used for a replica set shard."""
@@ -328,7 +332,7 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
 
     def get_mongos_logger(self, index, total):
         """Return a new logging.Logger instance used for a mongos."""
-        logger_name = "mongos" if total == 1 else f"mongos{index}"
+        logger_name = self.mongos_logging_prefix if total == 1 else f"{self.mongos_logging_prefix}{index}"
         return self.fixturelib.new_fixture_node_logger(self.__class__.__name__, self.job_num,
                                                        logger_name)
 
