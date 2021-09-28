@@ -11,6 +11,12 @@ load("jstests/libs/fail_point_util.js");
 const mongodOptions = {};
 const conn = MongoRunner.runMongod(mongodOptions);
 
+if (!IndexBuildTest.supportsTwoPhaseIndexBuild(conn)) {
+    jsTest.log("Not running because two phase index builds are not supported.");
+    MongoRunner.stopMongod(conn);
+    return;
+}
+
 TestData.dbName = jsTestName();
 TestData.collName = "coll";
 
