@@ -346,6 +346,7 @@ if not has_option('noshell') and usemozjs:
             "default",
             "dist",
             "dist-test",
+            "serverless-test",
             "shell",
             "integration-tests",
         ],

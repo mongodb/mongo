@@ -5096,6 +5096,35 @@ if get_option('legacy-tarball') == 'true':
 
 module_sconscripts = moduleconfig.get_module_sconscripts(mongo_modules)
 
+# This generates a numeric representation of the version string so that
+# you can easily compare versions of MongoDB without having to parse
+# the version string.
+#
+# Examples:
+# 5.1.1-123 =>        ['5', '1', '1', '123', None, None] =>          [5, 1, 2, -100]
+# 5.1.1-rc2 =>        ['5', '1', '1', 'rc2', 'rc', '2'] =>           [5, 1, 1, -23]
+# 5.1.1-rc2-123 =>    ['5', '1', '1', 'rc2-123', 'rc', '2'] =>       [5, 1, 1, -23]
+# 5.1.0-alpha-123 =>  ['5', '1', '0', 'alpha-123', 'alpha', ''] =>   [5, 1, 0, -50]
+# 5.1.0-alpha1-123 => ['5', '1', '0', 'alpha1-123', 'alpha', '1'] => [5, 1, 0, -49]
+# 5.1.1 =>            ['5', '1', '1', '', None, None] =>             [5, 1, 1, 0]
+
+version_parts = [ x for x in re.match(r'^(\d+)\.(\d+)\.(\d+)-?((?:(rc|alpha)(\d?))?.*)?',
+    env['MONGO_VERSION']).groups() ]
+version_extra = version_parts[3] if version_parts[3] else ""
+if version_parts[4] == 'rc':
+    version_parts[3] = int(version_parts[5]) + -25
+elif version_parts[4] == 'alpha':
+        if version_parts[5] == '':
+            version_parts[3] = -50
+        else:
+            version_parts[3] = int(version_parts[5]) + -50
+elif version_parts[3]:
+    version_parts[2] = int(version_parts[2]) + 1
+    version_parts[3] = -100
+else:
+    version_parts[3] = 0
+version_parts = [ int(x) for x in version_parts[:4]]
+
 # The following symbols are exported for use in subordinate SConscript files.
 # Ideally, the SConscript files would be purely declarative.  They would only
 # import build environment objects, and would contain few or no conditional
@@ -5121,6 +5150,8 @@ Export([
     'use_system_version_of_library',
     'use_vendored_libunwind',
     'usemozjs',
+    'version_extra',
+    'version_parts',
     'wiredtiger',
 ])
 

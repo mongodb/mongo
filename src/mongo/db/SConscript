@@ -2317,6 +2317,8 @@ env.Program(
         "default",
         "dist",
         "dist-test",
+        "serverless",
+        "serverless-test",
         "servers",
         "integration-tests",
     ],
