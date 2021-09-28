@@ -121,6 +121,7 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
                                                BSONObjBuilder* oplogEntryBuilder) {
 
     bool isView = !coll;
+    bool isTimeseries = coll && coll->getTimeseriesOptions() != boost::none;
 
     CollModRequest cmr;
 
@@ -177,9 +178,11 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
             if (cmr.indexExpireAfterSeconds.eoo() && cmr.indexHidden.eoo()) {
                 return Status(ErrorCodes::InvalidOptions, "no expireAfterSeconds or hidden field");
             }
-            if (!cmr.indexExpireAfterSeconds.eoo() && !cmr.indexExpireAfterSeconds.isNumber()) {
+            if (!cmr.indexExpireAfterSeconds.eoo() && isTimeseries) {
                 return Status(ErrorCodes::InvalidOptions,
-                              "expireAfterSeconds field must be a number");
+                              "TTL indexes are not supported for time-series collections. "
+                              "Please refer to the documentation and use the top-level "
+                              "'expireAfterSeconds' option instead");
             }
             if (!cmr.indexHidden.eoo() && !cmr.indexHidden.isBoolean()) {
                 return Status(ErrorCodes::InvalidOptions, "hidden field must be a boolean");
@@ -251,7 +254,7 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
                     return Status(ErrorCodes::BadValue, "can't hide _id index");
                 }
             }
-        } else if (fieldName == "validator" && !isView) {
+        } else if (fieldName == "validator" && !isView && !isTimeseries) {
             // If the feature compatibility version is not kLatest, and we are validating features
             // as primary, ban the use of new agg features introduced in kLatest to prevent them
             // from being persisted in the catalog.
@@ -271,13 +274,13 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
             if (!cmr.collValidator->isOK()) {
                 return cmr.collValidator->getStatus();
             }
-        } else if (fieldName == "validationLevel" && !isView) {
+        } else if (fieldName == "validationLevel" && !isView && !isTimeseries) {
             try {
                 cmr.collValidationLevel = ValidationLevel_parse({"validationLevel"}, e.String());
             } catch (const DBException& exc) {
                 return exc.toStatus();
             }
-        } else if (fieldName == "validationAction" && !isView) {
+        } else if (fieldName == "validationAction" && !isView && !isTimeseries) {
             try {
                 cmr.collValidationAction = ValidationAction_parse({"validationAction"}, e.String());
             } catch (const DBException& exc) {
@@ -301,12 +304,7 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
                 return Status(ErrorCodes::InvalidOptions, "'viewOn' option must be a string");
             }
             cmr.viewOn = e.str();
-        } else if (fieldName == "recordPreImages") {
-            if (isView) {
-                return {ErrorCodes::InvalidOptions,
-                        str::stream() << "option not supported on a view: " << fieldName};
-            }
-
+        } else if (fieldName == "recordPreImages" && !isView && !isTimeseries) {
             cmr.recordPreImages = e.trueValue();
         } else if (fieldName == "expireAfterSeconds") {
             if (coll->getRecordStore()->keyFormat() != KeyFormat::String) {
@@ -331,16 +329,21 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
             }
 
             cmr.clusteredIndexExpireAfterSeconds = e;
-        } else if (fieldName == "timeseries" && !isView) {
-            auto tsOptions = coll->getTimeseriesOptions();
-            if (!tsOptions) {
+        } else if (fieldName == "timeseries") {
+            if (!isTimeseries) {
                 return Status(ErrorCodes::InvalidOptions,
-                              str::stream() << "option only supported on a timeseries collection: "
+                              str::stream() << "option only supported on a time-series collection: "
                                             << fieldName);
             }
 
             cmr.timeseries = e;
         } else {
+            if (isTimeseries) {
+                return Status(ErrorCodes::InvalidOptions,
+                              str::stream() << "option not supported on a time-series collection: "
+                                            << fieldName);
+            }
+
             if (isView) {
                 return Status(ErrorCodes::InvalidOptions,
                               str::stream() << "option not supported on a view: " << fieldName);
