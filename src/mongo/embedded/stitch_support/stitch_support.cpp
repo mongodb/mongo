@@ -34,6 +34,7 @@
 #include "api_common.h"
 #include "mongo/base/initializer.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/concurrency/locker_noop_client_observer.h"
 #include "mongo/db/exec/projection_executor.h"
 #include "mongo/db/exec/projection_executor_builder.h"
 #include "mongo/db/matcher/matcher.h"
@@ -124,6 +125,7 @@ ServiceContext* initialize() {
     uassertStatusOKWithContext(status, "Global initialization failed");
     setGlobalServiceContext(ServiceContext::make());
     auto serviceContext = getGlobalServiceContext();
+    serviceContext->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
 
     return serviceContext;
 }
