@@ -85,29 +85,31 @@ void _openCursor(WT_SESSION* session,
                  const char* config,
                  WT_CURSOR** cursorOut) {
     int ret = session->open_cursor(session, uri.c_str(), nullptr, config, cursorOut);
+    if (ret == 0) {
+        return;
+    }
+
+    auto status = wtRCToStatus(ret);
+
     if (ret == EBUSY) {
-        // This can only happen when trying to open a cursor on the oplog and it is currently locked
-        // by a verify or salvage, because we don't employ database locks to protect the oplog.
-        throw WriteConflictException();
+        // This may happen when there is an ongoing full validation, with a call to WT::verify.
+        // Other operations which may trigger this include salvage, rollback_to_stable, upgrade,
+        // alter, or if there is a bulk cursor open. Mongo (currently) does not run any of
+        // these operations concurrently with this code path, except for validation.
+
+        uassertStatusOK(status);
+    } else if (ret == ENOENT) {
+        uasserted(ErrorCodes::CursorNotFound,
+                  str::stream() << "Failed to open a WiredTiger cursor. Reason: " << status
+                                << ", uri: " << uri << ", config: " << config);
     }
 
-    if (ret != 0) {
-        auto status = wtRCToStatus(ret);
-        std::string cursorErrMsg = str::stream()
-            << "Failed to open a WiredTiger cursor. Reason: " << status << ", uri: " << uri
-            << ", config: " << config;
-
-        if (ret == ENOENT) {
-            uasserted(ErrorCodes::CursorNotFound, cursorErrMsg);
-        }
-
-        LOGV2_FATAL_NOTRACE(50882,
-                            "Failed to open WiredTiger cursor. This may be due to data corruption",
-                            "uri"_attr = uri,
-                            "config"_attr = config,
-                            "error"_attr = status,
-                            "message"_attr = kWTRepairMsg);
-    }
+    LOGV2_FATAL_NOTRACE(50882,
+                        "Failed to open WiredTiger cursor. This may be due to data corruption",
+                        "uri"_attr = uri,
+                        "config"_attr = config,
+                        "error"_attr = status,
+                        "message"_attr = kWTRepairMsg);
 }
 }  // namespace
 
