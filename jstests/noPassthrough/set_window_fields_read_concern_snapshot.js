@@ -1,5 +1,10 @@
 /**
  * Test that $setWindowFields is not supported with readConcern snapshot and in transactions.
+ * @tags: [
+ *   requires_replication,
+ *   uses_transactions,
+ *   uses_snapshot_read_concern,
+ * ]
  */
 (function() {
 "use strict";
