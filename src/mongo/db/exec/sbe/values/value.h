@@ -1215,8 +1215,8 @@ inline SortSpec* getSortSpecView(Value val) noexcept {
 struct BsonRegex {
     explicit BsonRegex(const char* rawValue) {
         pattern = rawValue;
-        // Add sizeof(char) to account for the NULL byte after 'pattern'.
-        flags = pattern.rawData() + pattern.size() + sizeof(char);
+        // Add one to account for the NULL byte after 'pattern'.
+        flags = rawValue + (pattern.size() + 1);
     }
 
     size_t byteSize() const {

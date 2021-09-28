@@ -7981,7 +7981,7 @@ buildvariants:
   display_name: "~ Shared Library Enterprise Ubuntu 21.04 GCC11 C++20 DEBUG"
   expansions:
     <<: *enterprise-ubuntu2104-dynamic-gcc11-debug-experimental-expansions
-    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --link-model=dynamic CC=/usr/bin/gcc-11 CXX=/usr/bin/g++-11 --disable-warnings-as-errors --cxx-std=20
+    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --link-model=dynamic CC=/usr/bin/gcc-11 CXX=/usr/bin/g++-11 --cxx-std=20
 
 - <<: *enterprise-ubuntu2104-dynamic-gcc11-debug-experimental-template
   name: enterprise-ubuntu2104-dynamic-clang12-cxx20-debug-experimental
