@@ -8111,8 +8111,9 @@ buildvariants:
   - amazon2-test
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
+    # TODO BUILD-13887 should fix uses_pykmip incompatibility.
     test_flags: >-
-      --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux
+      --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,uses_pykmip
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
@@ -8227,7 +8228,8 @@ buildvariants:
     push_name: linux
     push_arch: aarch64-enterprise-amazon2
     compile_flags: --ssl MONGO_DISTMOD=amazon2 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool
+    # TODO BUILD-13887 should fix uses_pykmip incompatibility.
+    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,uses_pykmip
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: aarch64
