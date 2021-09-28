@@ -242,10 +242,11 @@ void* systemAllocate(std::size_t bytes) {
     }
 
     if (mlock(ptr, bytes) != 0) {
+        const int err = errno;
         auto str = errnoWithPrefix(
             "Failed to mlock: Cannot allocate locked memory. For more details see: "
             "https://dochub.mongodb.org/core/cannot-allocate-locked-memory");
-        LOGV2_FATAL(23715, "{str}", "str"_attr = str);
+        LOGV2_FATAL(23715, "{str}", "str"_attr = str, "errno"_attr = err);
         fassertFailed(28832);
     }
 
