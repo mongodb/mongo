@@ -86,6 +86,24 @@ void extractAllElementsAlongBucketPath(const BSONObj& obj,
  */
 bool haveArrayAlongBucketDataPath(const BSONObj& bucketObj, StringData path);
 
+// Indicates the truthy outcome of a decision-making process. The 'Undecided' value is for internal
+// use only, and should not be returned to a caller outside this namespace.
+enum class Decision { Yes, Maybe, No, Undecided };
+std::ostream& operator<<(std::ostream& s, const Decision& i);
+
+/**
+ * Identifies if measurements in the given bucket contains array data in 'userField'.
+ *
+ * This function is meant to be used as an optimized check in indexing to see if we must examine the
+ * full 'data.'-prefixed field contents. The function guarantees that if it returns Yes there is
+ * definitely an array, and if it returns No there is definitely not an array. If it returns Maybe,
+ * the caller must scan the actual data. It should never return Undecided.
+ *
+ * The 'userField' should be specified without any bucket field prefix. That is, if the
+ * user defines an index on 'a.b.c', 'userField' should be 'a.b.c' and not 'data.a.b.c',
+ * 'control.min.a.b.c', etc.
+ */
+Decision fieldContainsArrayData(const BSONObj& bucketObj, StringData userField);
 }  // namespace dotted_path_support
 }  // namespace timeseries
 }  // namespace mongo

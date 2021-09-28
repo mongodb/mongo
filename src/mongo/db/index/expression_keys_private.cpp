@@ -358,27 +358,43 @@ using std::vector;
 void ExpressionKeysPrivate::validateDocumentCommon(const CollectionPtr& collection,
                                                    const BSONObj& obj,
                                                    const BSONObj& keyPattern) {
-    // If we have a timeseries collection, check that indexed metric fields do not have array values
+    // If we have a timeseries collection, check that indexed metric fields do not have expanded
+    // array values
     if (feature_flags::gTimeseriesMetricIndexes.isEnabledAndIgnoreFCV() &&
         collection->getTimeseriesOptions()) {
+        // Each user metric field will be included twice, as both control.min.<field> and
+        // control.max.<field>, so we'll want to keep track that we've checked data.<field> to avoid
+        // scanning it twice.
+        StringSet userFieldsChecked;
+
         for (const auto& keyElem : keyPattern) {
             if (keyElem.isNumber()) {
                 StringData field = keyElem.fieldName();
-                StringData dataField;
+                StringData userField;
                 if (field.startsWith(timeseries::kControlMaxFieldNamePrefix)) {
-                    dataField = field.substr(timeseries::kControlMaxFieldNamePrefix.size());
+                    userField = field.substr(timeseries::kControlMaxFieldNamePrefix.size());
                 } else if (field.startsWith(timeseries::kControlMinFieldNamePrefix)) {
-                    dataField = field.substr(timeseries::kControlMinFieldNamePrefix.size());
+                    userField = field.substr(timeseries::kControlMinFieldNamePrefix.size());
                 }
 
-                if (!dataField.empty()) {
-                    // We are in fact dealing with a metric field. Go ahead and examine individual
-                    // values to check for array values.
-                    uassert(5930501,
-                            str::stream() << "Indexed measurement field contains an array value: "
-                                          << redact(obj),
-                            !timeseries::dotted_path_support::haveArrayAlongBucketDataPath(
-                                obj, std::string(timeseries::kDataFieldNamePrefix) + dataField));
+                if (!userField.empty() && !userFieldsChecked.contains(userField)) {
+                    namespace tdps = timeseries::dotted_path_support;
+                    // We are in fact dealing with a metric field. First let's check the min and max
+                    // values to see if we can conclude that there are no arrays present in the
+                    // data.
+                    auto decision = tdps::fieldContainsArrayData(obj, userField);
+                    if (decision != tdps::Decision::No) {
+                        // Go ahead and look closer
+                        uassert(5930501,
+                                str::stream()
+                                    << "Indexed measurement field contains an array value: "
+                                    << redact(obj),
+                                decision == tdps::Decision::Maybe &&
+                                    !tdps::haveArrayAlongBucketDataPath(
+                                        obj,
+                                        std::string(timeseries::kDataFieldNamePrefix) + userField));
+                    }
+                    userFieldsChecked.emplace(userField);
                 }
             }
         }
