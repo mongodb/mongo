@@ -207,15 +207,12 @@ bool getS2BucketGeoKeys(const BSONObj& document,
                 GeometryContainer container;
                 auto status = container.parseFromStorage(*i, false);
                 uassert(183934,
-                        str::stream() << "Can't extract geo keys: " << redact(document) << "  "
-                                      << status.reason(),
+                        str::stream() << "Can't extract geo keys: " << status.reason(),
                         status.isOK());
-                uassert(
-                    183493,
-                    str::stream()
-                        << "Time-series collections '2dsphere' indexes only support point data: "
-                        << redact(document),
-                    container.isPoint());
+                uassert(183493,
+                        str::stream()
+                            << "Time-series collections '2dsphere' indexes only support point data",
+                        container.isPoint());
 
                 auto point = container.getPoint();
                 BSONArrayBuilder pointData(coordinates.subarrayStart());
@@ -227,14 +224,11 @@ bool getS2BucketGeoKeys(const BSONObj& document,
 
         vector<S2CellId> cells;
         Status status = S2GetKeysForElement(geometry.firstElement(), params, &cells);
-        uassert(167551,
-                str::stream() << "Can't extract geo keys: " << redact(document) << "  "
-                              << status.reason(),
-                status.isOK());
+        uassert(
+            167551, str::stream() << "Can't extract geo keys: " << status.reason(), status.isOK());
 
         uassert(167561,
-                str::stream() << "Unable to generate keys for (likely malformed) geometry: "
-                              << redact(document),
+                str::stream() << "Unable to generate keys for (likely malformed) geometry",
                 cells.size() > 0);
 
         for (vector<S2CellId>::const_iterator it = cells.begin(); it != cells.end(); ++it) {
@@ -387,8 +381,7 @@ void ExpressionKeysPrivate::validateDocumentCommon(const CollectionPtr& collecti
                         // Go ahead and look closer
                         uassert(5930501,
                                 str::stream()
-                                    << "Indexed measurement field contains an array value: "
-                                    << redact(obj),
+                                    << "Indexed measurement field contains an array value",
                                 decision == tdps::Decision::Maybe &&
                                     !tdps::haveArrayAlongBucketDataPath(
                                         obj,
