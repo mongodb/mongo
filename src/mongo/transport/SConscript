@@ -207,7 +207,19 @@ tlEnv.CppUnitTest(
     ],
 )
 
-tlEnv.CppIntegrationTest(
+tlEnvTest = tlEnv.Clone()
+tlEnvTest.Append(
+    # TODO(SERVER-54659): Work around casted nullptrs in
+    # asio/impl/connect.hpp, which has an open PR upstream
+    # https://github.com/chriskohlhoff/asio/pull/882, and will
+    # hopefully arrive in a future released version to which we will
+    # upgrade per SERVER-54569.
+    CCFLAGS=[] if env.TargetOSIs('windows') else [
+        '-Wno-nonnull',
+    ],
+)
+
+tlEnvTest.CppIntegrationTest(
     target='transport_integration_test',
     source=[
         'transport_layer_asio_integration_test.cpp',
