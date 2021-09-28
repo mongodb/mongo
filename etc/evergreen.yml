@@ -255,6 +255,7 @@ variables:
 # variants
 - &enterprise-windows-nopush-template
   name: enterprise-windows-nopush-template
+  cron: "0 0 * * *" # Every day starting at 00:00
   run_on:
   - windows-vsCurrent-small
   modules:
@@ -7281,6 +7282,7 @@ buildvariants:
 - name: linux-64-repeated-execution
   stepback: false
   display_name: ~ Linux Repeated Execution
+  cron: "0 0 * * *" # Every day starting at 00:00
   run_on:
   - rhel80-small
   expansions:
@@ -7388,6 +7390,7 @@ buildvariants:
 
 - name: linux-64-duroff
   display_name: Linux (No Journal)
+  cron: "0 0 * * *" # Every day starting at 00:00
   run_on:
   - rhel80-small
   expansions: &linux-64-required-duroff-expansions
@@ -7419,6 +7422,7 @@ buildvariants:
 
 - name: ubuntu1804
   display_name: Ubuntu 18.04
+  cron: "0 0 * * *" # Every day starting at 00:00
   run_on:
   - ubuntu1804-test
   expansions:
@@ -7476,6 +7480,7 @@ buildvariants:
 
 - name: enterprise-ubuntu1804-64
   display_name: Enterprise Ubuntu 18.04
+  cron: "0 0 * * *" # Every day starting at 00:00
   modules:
   - enterprise
   run_on:
@@ -7612,6 +7617,7 @@ buildvariants:
 
 - name: ubuntu1804-arm64
   display_name: Ubuntu 18.04 arm64
+  cron: "0 0 * * *" # Every day starting at 00:00
   run_on:
   - ubuntu1804-arm64-build
   expansions:
@@ -7698,6 +7704,7 @@ buildvariants:
 
 - name: enterprise-ubuntu2004-64
   display_name: Enterprise Ubuntu 20.04
+  cron: "0 0 * * *" # Every day starting at 00:00
   modules:
   - enterprise
   run_on:
@@ -7750,6 +7757,7 @@ buildvariants:
 
 - name: enterprise-ubuntu2004-arm64
   display_name: Enterprise Ubuntu 20.04 arm64
+  cron: "0 0 * * *" # Every day starting at 00:00
   modules:
   - enterprise
   run_on:
@@ -7802,6 +7810,7 @@ buildvariants:
 
 - name: ubuntu2004-arm64
   display_name: Ubuntu 20.04 arm64
+  cron: "0 0 * * *" # Every day starting at 00:00
   run_on:
   - ubuntu2004-arm64-large
   expansions:
@@ -7940,6 +7949,7 @@ buildvariants:
 
 - name: amazon
   display_name: Amazon Linux
+  cron: "0 0 * * *" # Every day starting at 00:00
   run_on:
   - amazon1-2018-test
   expansions:
@@ -7994,6 +8004,7 @@ buildvariants:
 
 - name: enterprise-amazon2
   display_name: "Enterprise Amazon Linux 2"
+  cron: "0 0 * * *" # Every day starting at 00:00
   modules:
   - enterprise
   run_on:
@@ -8049,6 +8060,7 @@ buildvariants:
 
 - name: amazon2
   display_name: Amazon Linux 2
+  cron: "0 0 * * *" # Every day starting at 00:00
   run_on:
   - amazon2-test
   expansions:
@@ -8103,6 +8115,7 @@ buildvariants:
 
 - name: enterprise-amazon2-arm64
   display_name: "Enterprise Amazon Linux 2 arm64"
+  cron: "0 0 * * *" # Every day starting at 00:00
   modules:
   - enterprise
   run_on:
@@ -8158,6 +8171,7 @@ buildvariants:
 
 - name: amazon2-arm64
   display_name: Amazon Linux 2 arm64
+  cron: "0 0 * * *" # Every day starting at 00:00
   run_on:
   - amazon2-arm64-small
   expansions:
@@ -8209,6 +8223,7 @@ buildvariants:
   modules:
   - enterprise
   display_name: "~ STM Daily Cron"
+  cron: "0 0 * * *" # Every day starting at 00:00
   run_on:
   - rhel80-small
   expansions:
@@ -8233,6 +8248,7 @@ buildvariants:
   modules:
   - enterprise
   display_name: "~ Security Daily Cron"
+  cron: "0 0 * * *" # Every day starting at 00:00
   run_on:
   - rhel80-small
   stepback: false
@@ -8536,6 +8552,7 @@ buildvariants:
 - <<: *enterprise-windows-nopush-template
   name: enterprise-windows-benchmarks
   display_name: "~ Enterprise Windows (Benchmarks)"
+  cron: "0 0 * * *" # Every day starting at 00:00
   tasks:
   - name: compile_benchmarks
     distros:
@@ -8555,6 +8572,7 @@ buildvariants:
 
 - name: enterprise-windows-inmem
   display_name: Enterprise Windows (inMemory)
+  cron: "0 0 * * *" # Every day starting at 00:00
   modules:
   - enterprise
   run_on:
@@ -8602,6 +8620,7 @@ buildvariants:
 
 - name: windows
   display_name: Windows
+  cron: "0 0 * * *" # Every day starting at 00:00
   run_on:
   - windows-vsCurrent-small
   expansions:
@@ -8662,6 +8681,7 @@ buildvariants:
 
 - name: enterprise-windows
   display_name: "Enterprise Windows"
+  cron: "0 0 * * *" # Every day starting at 00:00
   modules:
     - enterprise
   run_on:
@@ -8726,6 +8746,7 @@ buildvariants:
 
 - name: enterprise-windows-debug-unoptimized
   display_name: Enterprise Windows DEBUG (Unoptimized)
+  cron: "0 0 * * *" # Every day starting at 00:00
   modules:
   - enterprise
   run_on:
@@ -8762,6 +8783,7 @@ buildvariants:
 
 - name: macos
   display_name: macOS
+  cron: "0 0 * * *" # Every day starting at 00:00
   run_on:
   - macos-1014
   expansions:
@@ -8843,6 +8865,7 @@ buildvariants:
 
 - name: enterprise-macos
   display_name: Enterprise macOS
+  cron: "0 0 * * *" # Every day starting at 00:00
   modules:
   - enterprise
   run_on:
@@ -8880,6 +8903,7 @@ buildvariants:
 
 - name: enterprise-macos-xcode-current
   display_name: "~ Enterprise macOS Xcode Current"
+  cron: "0 0 * * *" # Every day starting at 00:00
   modules:
   - enterprise
   run_on:
@@ -8907,6 +8931,7 @@ buildvariants:
 
 - name: enterprise-macos-rosetta-2
   display_name: "Enterprise macOS Via Rosetta 2"
+  cron: "0 0 * * *" # Every day starting at 00:00
   modules:
   - enterprise
   run_on:
@@ -8979,6 +9004,7 @@ buildvariants:
 
 - name: embedded-sdk-ubuntu-1804-x86_64
   display_name: "Embedded SDK - Ubuntu 18.04 x86_64"
+  cron: "0 0 * * *" # Every day starting at 00:00
   run_on:
   - ubuntu1804-build
   expansions:
@@ -9559,6 +9585,7 @@ buildvariants:
 - &enterprise-rhel-80-64-bit-multiversion-template
   name: enterprise-rhel-80-64-bit-multiversion
   display_name: "Enterprise RHEL 8.0 (implicit multiversion)"
+  cron: "0 0 * * *" # Every day starting at 00:00
   modules:
   - enterprise
   run_on:
@@ -9593,6 +9620,7 @@ buildvariants:
 - <<: *enterprise-rhel-80-64-bit-multiversion-template
   name: enterprise-rhel-80-64-bit-multiversion-all-feature-flags
   display_name: "Enterprise RHEL 8.0 (implicit multiversion & all feature flags)"
+  cron: "0 0 * * *" # Every day starting at 00:00
   expansions:
     <<: *enterprise-rhel-80-64-bit-multiversion-expansions-template
     # TODO (SERVER-55857): Remove 'requires_fcv_51' once tests are filtered out using the
@@ -9737,6 +9765,7 @@ buildvariants:
 - &enterprise-rhel-70-64-bit-template
   name: enterprise-rhel-70-64-bit
   display_name: "Enterprise RHEL 7.0"
+  cron: "0 0 * * *" # Every day starting at 00:00
   modules:
   - enterprise
   run_on:
@@ -9807,6 +9836,7 @@ buildvariants:
 
 - name: ubi8
   display_name: "UBI 8"
+  cron: "0 0 * * *" # Every day starting at 00:00
   run_on:
   - ubi8
   expansions:
@@ -9888,6 +9918,7 @@ buildvariants:
 
 - name: enterprise-rhel-82-arm64
   display_name: "Enterprise RHEL 8.2 arm64"
+  cron: "0 0 * * *" # Every day starting at 00:00
   modules:
   - enterprise
   run_on:
@@ -10050,6 +10081,7 @@ buildvariants:
 
 - name: ubuntu1804-container
   display_name: "Ubuntu 18.04 Container"
+  cron: "0 0 * * *" # Every day starting at 00:00
   run_on:
   - ubuntu1804-container-server
   expansions:
@@ -10071,6 +10103,7 @@ buildvariants:
 
 - name: rhel70
   display_name: RHEL 7.0
+  cron: "0 0 * * *" # Every day starting at 00:00
   run_on:
   - rhel70-small
   expansions:
@@ -10122,6 +10155,7 @@ buildvariants:
 
 - name: rhel80
   display_name: RHEL 8.0
+  cron: "0 0 * * *" # Every day starting at 00:00
   run_on:
   - rhel80-build
   expansions:
@@ -10173,6 +10207,7 @@ buildvariants:
 
 - name: rhel-82-arm64
   display_name: RHEL 8.2 arm64
+  cron: "0 0 * * *" # Every day starting at 00:00
   run_on:
   - rhel82-arm64-small
   expansions:
@@ -10222,6 +10257,7 @@ buildvariants:
 # This variant compiles on RHEL 7.0 and runs tests on RHEL 7.6
 - name: rhel76_compile_rhel70
   display_name: RHEL 7.0/7.6 Cross-ABI
+  cron: "0 0 * * *" # Every day starting at 00:00
   run_on:
   - rhel76-test
   expansions:
@@ -10461,6 +10497,7 @@ buildvariants:
 
 - name: enterprise-suse12-64
   display_name: Enterprise SLES 12
+  cron: "0 0 * * *" # Every day starting at 00:00
   modules:
   - enterprise
   run_on:
@@ -10507,6 +10544,7 @@ buildvariants:
 
 - name: suse12
   display_name: SUSE 12
+  cron: "0 0 * * *" # Every day starting at 00:00
   run_on:
   - suse12-test
   expansions:
@@ -10557,6 +10595,7 @@ buildvariants:
 
 - name: enterprise-suse15-64
   display_name: Enterprise SLES 15
+  cron: "0 0 * * *" # Every day starting at 00:00
   modules:
   - enterprise
   run_on:
@@ -10598,6 +10637,7 @@ buildvariants:
 
 - name: suse15
   display_name: SUSE 15
+  cron: "0 0 * * *" # Every day starting at 00:00
   run_on:
   - suse15-test
   expansions:
@@ -10651,6 +10691,7 @@ buildvariants:
 
 - name: enterprise-debian92-64
   display_name: Enterprise Debian 9.2
+  cron: "0 0 * * *" # Every day starting at 00:00
   modules:
   - enterprise
   run_on:
@@ -10698,6 +10739,7 @@ buildvariants:
 
 - name: debian92
   display_name: Debian 9.2
+  cron: "0 0 * * *" # Every day starting at 00:00
   run_on:
   - debian92-test
   expansions:
@@ -10749,6 +10791,7 @@ buildvariants:
 
 - name: enterprise-debian10-64
   display_name: Enterprise Debian 10
+  cron: "0 0 * * *" # Every day starting at 00:00
   modules:
   - enterprise
   run_on:
@@ -10798,6 +10841,7 @@ buildvariants:
 
 - name: debian10
   display_name: Debian 10
+  cron: "0 0 * * *" # Every day starting at 00:00
   run_on:
   - debian10-test
   expansions:
@@ -10855,6 +10899,7 @@ buildvariants:
 
 - name: enterprise-rhel-80-benchmarks
   display_name: Enterprise RHEL 8.0 (Benchmarks)
+  cron: "0 0 * * *" # Every day starting at 00:00
   modules:
   - enterprise
   run_on:
@@ -10867,6 +10912,7 @@ buildvariants:
 
 - name: enterprise-rhel-80-64-bit-inmem
   display_name: Enterprise RHEL 8.0 (inMemory)
+  cron: "0 0 * * *" # Every day starting at 00:00
   modules:
   - enterprise
   run_on:
@@ -10930,6 +10976,7 @@ buildvariants:
 
 - name: linux-64-ephemeralForTest
   display_name: Linux (ephemeralForTest)
+  cron: "0 0 * * *" # Every day starting at 00:00
   run_on:
   - rhel80-medium
   expansions:
@@ -11020,6 +11067,7 @@ buildvariants:
 - &ubuntu1804-debug-asan-template
   name: ubuntu1804-debug-asan
   display_name: ~ ASAN Enterprise Ubuntu 18.04 DEBUG
+  cron: "0 0 * * *" # Every day starting at 00:00
   modules:
   - enterprise
   run_on:
@@ -11095,6 +11143,7 @@ buildvariants:
 - <<: *ubuntu1804-debug-asan-template
   name: ubuntu1804-debug-asan-all-feature-flags
   display_name: "~ Shared Library ASAN Enterprise Ubuntu 18.04 DEBUG (all feature flags)"
+  cron: "0 0 * * *" # Every day starting at 00:00
   modules:
   - enterprise
   run_on:
@@ -11169,6 +11218,7 @@ buildvariants:
 - <<: *ubuntu1804-debug-asan-template
   name: ubuntu1804-debug-asan-sbe-engine
   display_name: ~ ASAN Enterprise Ubuntu 18.04 DEBUG (SBE Engine)
+  cron: "0 0 * * *" # Every day starting at 00:00
   modules:
   - enterprise
   run_on:
@@ -11242,6 +11292,7 @@ buildvariants:
 
 - name: ubuntu1804-asan
   display_name: ~ ASAN Ubuntu 18.04
+  cron: "0 0 * * *" # Every day starting at 00:00
   run_on:
   - ubuntu1804-build
   stepback: true
@@ -11266,6 +11317,7 @@ buildvariants:
 - &ubuntu1804-debug-ubsan-template
   name: ubuntu1804-debug-ubsan
   display_name: ~ UBSAN Enterprise Ubuntu 18.04 DEBUG
+  cron: "0 0 * * *" # Every day starting at 00:00
   modules:
   - enterprise
   run_on:
@@ -11335,6 +11387,7 @@ buildvariants:
 - <<: *ubuntu1804-debug-ubsan-template
   name: ubuntu1804-debug-ubsan-all-feature-flags
   display_name: "~ Shared Library UBSAN Enterprise Ubuntu 18.04 DEBUG (all feature flags)"
+  cron: "0 0 * * *" # Every day starting at 00:00
   modules:
   - enterprise
   run_on:
@@ -11406,6 +11459,7 @@ buildvariants:
 - <<: *ubuntu1804-debug-ubsan-template
   name: ubuntu1804-debug-ubsan-sbe-engine
   display_name: ~ UBSAN Enterprise Ubuntu 18.04 DEBUG (SBE Engine)
+  cron: "0 0 * * *" # Every day starting at 00:00
   modules:
   - enterprise
   run_on:
@@ -11552,6 +11606,7 @@ buildvariants:
 
 - name: ubuntu1804-debug-aubsan-lite_fuzzer
   display_name: "{A,UB}SAN Enterprise Ubuntu 18.04 FUZZER"
+  cron: "0 0 * * *" # Every day starting at 00:00
   modules:
   - enterprise
   run_on:
@@ -11576,6 +11631,7 @@ buildvariants:
 
 - name: enterprise-ubuntu2004-debug-tsan
   display_name: ~ TSAN Enterprise Ubuntu 20.04 DEBUG (ephemeralForTest)
+  cron: "0 0 * * *" # Every day starting at 00:00
   modules:
     - enterprise
   run_on:
@@ -11622,6 +11678,7 @@ buildvariants:
 
 - name: enterprise-ubuntu-no-latch-1804-64-bit
   display_name: "~ Enterprise Ubuntu 18.04 DEBUG (Unoptimized)"
+  cron: "0 0 * * *" # Every day starting at 00:00
   modules:
   - enterprise
   expansions:
@@ -11822,6 +11879,7 @@ buildvariants:
 
 - name: shared-scons-cache-pruning
   display_name: "Shared SCons Cache Pruning"
+  cron: "0 0 * * *" # Every day starting at 00:00
   run_on:
   - ubuntu1604-test
   stepback: false
@@ -11830,6 +11888,7 @@ buildvariants:
 
 - name: windows-shared-scons-cache-pruning
   display_name: "Windows shared SCons Cache Pruning"
+  cron: "0 0 * * *" # Every day starting at 00:00
   run_on:
   - windows-vsCurrent-small
   stepback: false
@@ -11940,6 +11999,7 @@ buildvariants:
 
 - name: windows-dynamic-visibility-test
   display_name: "~ Shared Library Windows (visibility test)"
+  cron: "0 0 * * *" # Every day starting at 00:00
   expansions:
     compile_flags: CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --win-version-min=win10
     python: '/cygdrive/c/python/python37/python.exe'
