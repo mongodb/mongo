@@ -34,10 +34,11 @@
 #include "test_harness/test.h"
 
 #include "base_test.cxx"
-#include "example_test.cxx"
 #include "burst_inserts.cxx"
+#include "example_test.cxx"
 #include "hs_cleanup.cxx"
 #include "search_near_01.cxx"
+#include "search_near_02.cxx"
 
 std::string
 parse_configuration_from_file(const std::string &filename)
@@ -73,7 +74,7 @@ print_help()
     std::cout << "\trun -C [WIREDTIGER_OPEN_CONFIGURATION]" << std::endl;
     std::cout << "\trun -c [TEST_FRAMEWORK_CONFIGURATION]" << std::endl;
     std::cout << "\trun -f [FILE]" << std::endl;
-    std::cout << "\trun -l [TRACEL_LEVEL]" << std::endl;
+    std::cout << "\trun -l [TRACE_LEVEL]" << std::endl;
     std::cout << "\trun -t [TEST_NAME]" << std::endl;
     std::cout << std::endl;
     std::cout << "DESCRIPTION" << std::endl;
@@ -114,6 +115,8 @@ run_test(const std::string &test_name, const std::string &config, const std::str
         base_test(test_harness::test_args{config, test_name, wt_open_config}).run();
     else if (test_name == "example_test")
         example_test(test_harness::test_args{config, test_name, wt_open_config}).run();
+    else if (test_name == "search_near_02")
+        search_near_02(test_harness::test_args{config, test_name, wt_open_config}).run();
     else if (test_name == "hs_cleanup")
         hs_cleanup(test_harness::test_args{config, test_name, wt_open_config}).run();
     else if (test_name == "burst_inserts")
@@ -142,8 +145,8 @@ main(int argc, char *argv[])
 {
     std::string cfg, config_filename, current_cfg, current_test_name, test_name, wt_open_config;
     int64_t error_code = 0;
-    const std::vector<std::string> all_tests = {
-      "base_test", "burst_inserts", "example_test", "hs_cleanup", "search_near_01"};
+    const std::vector<std::string> all_tests = {"base_test", "burst_inserts", "example_test",
+      "hs_cleanup", "search_near_01", "search_near_02"};
 
     /* Set the program name for error messages. */
     (void)testutil_set_progname(argv);
