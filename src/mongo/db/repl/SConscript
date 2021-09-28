@@ -1718,18 +1718,11 @@ env.CppUnitTest(
     ]
 )
 
-env.CppUnitTest(
-    target='db_repl_cloners_test',
+env.Library(
+    target='cloner_test_fixtures',
     source=[
-        'all_database_cloner_test.cpp',
         'cloner_test_fixture.cpp',
-        'collection_cloner_test.cpp',
-        'database_cloner_test.cpp',
         'initial_sync_cloner_test_fixture.cpp',
-        'initial_sync_shared_data_test.cpp',
-        'tenant_all_database_cloner_test.cpp',
-        'tenant_collection_cloner_test.cpp',
-        'tenant_database_cloner_test.cpp',
         'tenant_cloner_test_fixture.cpp',
     ],
     LIBDEPS=[
@@ -1739,11 +1732,28 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
         '$BUILD_DIR/mongo/dbtests/mocklib',
         '$BUILD_DIR/mongo/util/clock_source_mock',
-        'initial_sync_cloners',
         'repl_server_parameters',
         'repl_sync_shared_data',
         'replmocks',
         'storage_interface_impl',
+    ],
+)
+
+env.CppUnitTest(
+    target='db_repl_cloners_test',
+    source=[
+        'all_database_cloner_test.cpp',
+        'collection_cloner_test.cpp',
+        'database_cloner_test.cpp',
+        'initial_sync_shared_data_test.cpp',
+        'tenant_all_database_cloner_test.cpp',
+        'tenant_collection_cloner_test.cpp',
+        'tenant_database_cloner_test.cpp',
+    ],
+    LIBDEPS=[
+        # Required for service context test fixture
+        'cloner_test_fixtures',
+        'initial_sync_cloners',
         'tenant_migration_cloners'
     ],
 )

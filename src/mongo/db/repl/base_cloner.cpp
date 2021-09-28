@@ -265,6 +265,8 @@ void BaseCloner::setStopAfterStage_forTest(std::string stage) {
 
 BaseCloner::AfterStageBehavior BaseCloner::runStages() {
     AfterStageBehavior afterStageBehavior = kContinueNormally;
+    if (_stopAfterStage == "preStage")
+        return kSkipRemainingStages;
     for (auto* stage : getStages()) {
         {
             stdx::lock_guard<ReplSyncSharedData> lk(*_sharedData);
