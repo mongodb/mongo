@@ -2848,13 +2848,4 @@ std::vector<BSONObj> IndexBuildsCoordinator::normalizeIndexSpecs(
     return normalSpecs;
 }
 
-bool IndexBuildsCoordinator::supportsResumableIndexBuilds() const {
-    auto serviceContext = getGlobalServiceContext();
-    invariant(serviceContext);
-
-    auto storageEngine = serviceContext->getStorageEngine();
-    invariant(storageEngine);
-
-    return storageEngine->supportsResumableIndexBuilds();
-}
 }  // namespace mongo

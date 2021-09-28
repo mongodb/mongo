@@ -465,8 +465,6 @@ public:
      */
     static int getNumIndexesTotal(OperationContext* opCtx, const CollectionPtr& collection);
 
-    bool supportsResumableIndexBuilds() const;
-
     class ActiveIndexBuildsSSS : public ServerStatusSection {
     public:
         ActiveIndexBuildsSSS();
