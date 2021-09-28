@@ -32,6 +32,7 @@
 #include "mongo/db/storage/record_store_test_harness.h"
 
 
+#include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/unittest/unittest.h"
@@ -411,7 +412,7 @@ TEST(RecordStoreTestHarness, ClusteredRecordStore) {
     const auto harnessHelper = newRecordStoreHarnessHelper();
     const std::string ns = "test.system.buckets.a";
     CollectionOptions options;
-    options.clusteredIndex = true;
+    options.clusteredIndex = clustered_util::makeCanonicalClusteredInfoForLegacyFormat();
     std::unique_ptr<RecordStore> rs = harnessHelper->newNonCappedRecordStore(ns, options);
     invariant(rs->keyFormat() == KeyFormat::String);
 
@@ -516,7 +517,7 @@ TEST(RecordStoreTestHarness, ClusteredRecordStoreSeekNear) {
     const auto harnessHelper = newRecordStoreHarnessHelper();
     const std::string ns = "test.system.buckets.a";
     CollectionOptions options;
-    options.clusteredIndex = true;
+    options.clusteredIndex = clustered_util::makeCanonicalClusteredInfoForLegacyFormat();
     std::unique_ptr<RecordStore> rs = harnessHelper->newNonCappedRecordStore(ns, options);
     invariant(rs->keyFormat() == KeyFormat::String);
 

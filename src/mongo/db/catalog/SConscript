@@ -15,6 +15,20 @@ env.SConscript(
 )
 
 env.Library(
+    target='clustered_collection_options',
+    source=[
+        'clustered_collection_options.idl',
+        'clustered_collection_util.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/namespace_string',
+        '$BUILD_DIR/mongo/idl/basic_types',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+    ],
+)
+
+env.Library(
     target='collection_options',
     source=[
         'collection_options.cpp',
@@ -29,6 +43,7 @@ env.Library(
         '$BUILD_DIR/mongo/idl/basic_types',
         '$BUILD_DIR/mongo/idl/feature_flag',
         '$BUILD_DIR/mongo/idl/idl_parser',
+        'clustered_collection_options',
     ],
 )
 
@@ -352,6 +367,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/views/views_mongod',
         'catalog_helpers',
         'catalog_stats',
+        'clustered_collection_options',
         'collection',
         'collection_options',
         'database_holder',
@@ -460,6 +476,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/ttl_collection_cache',
         '$BUILD_DIR/mongo/db/views/views',
         '$BUILD_DIR/mongo/db/write_ops',
+        'clustered_collection_options',
         'collection',
         'collection_options',
         'database_holder',

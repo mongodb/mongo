@@ -37,6 +37,7 @@
 #include <memory>
 
 #include "mongo/client/dbclient_cursor.h"
+#include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
@@ -180,7 +181,8 @@ public:
 
             WriteUnitOfWork wuow(&_opCtx);
             CollectionOptions collOptions;
-            collOptions.clusteredIndex = true;
+            collOptions.clusteredIndex =
+                clustered_util::makeCanonicalClusteredInfoForLegacyFormat();
             const bool createIdIndex = false;
             db->createCollection(&_opCtx, ns, collOptions, createIdIndex);
             wuow.commit();

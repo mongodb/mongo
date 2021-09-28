@@ -242,6 +242,7 @@ env.Library(
         'record_store_test_updatewithdamages.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/catalog/clustered_collection_options',
         '$BUILD_DIR/mongo/db/catalog/collection_options',
         '$BUILD_DIR/mongo/db/record_id_helpers',
         '$BUILD_DIR/mongo/db/service_context',

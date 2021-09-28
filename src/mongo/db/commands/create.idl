@@ -35,6 +35,7 @@ imports:
     - "mongo/db/auth/access_checks.idl"
     - "mongo/db/auth/action_type.idl"
     - "mongo/db/catalog/collection_options.idl"
+    - "mongo/db/catalog/clustered_collection_options.idl"
     - "mongo/db/timeseries/timeseries.idl"
 
 structs:
@@ -168,8 +169,12 @@ commands:
                 type: TimeseriesOptions
                 optional: true
             clusteredIndex:
-                description: "Specifies whether this collection should be clustered on _id."
-                type: safeBool
+                description: "Specifies whether this collection should have a clusteredIndex.
+                    Boolean is accepted as the legacy clustered index format for specific internal
+                    collections - and implies clustering by _id. Otherwise, clusters according to
+                    the ClusteredIndexSpec."
+                type:
+                    variant: [safeBool, ClusteredIndexSpec]
                 optional: true
             expireAfterSeconds:
                 description: "The number of seconds after which old data should be deleted."

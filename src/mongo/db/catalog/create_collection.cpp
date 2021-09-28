@@ -37,6 +37,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_key_validate.h"
@@ -52,6 +53,7 @@
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/idl/command_generic_argument.h"
@@ -63,6 +65,40 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(failTimeseriesViewCreation);
 MONGO_FAIL_POINT_DEFINE(failPreimagesCollectionCreation);
+
+using IndexVersion = IndexDescriptor::IndexVersion;
+
+Status validateClusteredIndexSpec(OperationContext* opCtx,
+                                  const ClusteredIndexSpec& spec,
+                                  boost::optional<int64_t> expireAfterSeconds) {
+    if (!spec.getUnique()) {
+        return Status(ErrorCodes::Error(5979700),
+                      "The clusteredIndex option requires unique: true to be specified");
+    }
+
+    if (SimpleBSONObjComparator::kInstance.evaluate(spec.getKey() != BSON("_id" << 1))) {
+        return Status(ErrorCodes::Error(5979701),
+                      "The clusteredIndex option is only supported for key: {_id: 1}");
+    }
+
+    if (expireAfterSeconds) {
+        // Not included in the indexSpec itself.
+        auto status = index_key_validate::validateExpireAfterSeconds(*expireAfterSeconds);
+        if (!status.isOK()) {
+            return status;
+        }
+    }
+
+    auto versionAsInt = spec.getV();
+    const IndexVersion indexVersion = static_cast<IndexVersion>(versionAsInt);
+    if (indexVersion != IndexVersion::kV2) {
+        return {ErrorCodes::Error(5979704),
+                str::stream() << "Invalid clusteredIndex specification " << spec.toBSON()
+                              << "; cannot create a clusteredIndex with v=" << versionAsInt};
+    }
+
+    return Status::OK();
+}
 
 void _createSystemDotViewsIfNecessary(OperationContext* opCtx, const Database* db) {
     // Create 'system.views' in a separate WUOW if it does not exist.
@@ -257,7 +293,9 @@ Status _createTimeseries(OperationContext* opCtx,
                     index_key_validate::validateExpireAfterSeconds(*expireAfterSeconds));
                 bucketsOptions.expireAfterSeconds = expireAfterSeconds;
             }
-            bucketsOptions.clusteredIndex = true;
+
+            bucketsOptions.clusteredIndex =
+                clustered_util::makeCanonicalClusteredInfoForLegacyFormat();
 
             if (auto coll =
                     CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, bucketsNs)) {
@@ -387,15 +425,36 @@ Status _createCollection(OperationContext* opCtx,
                           str::stream() << "A view already exists. NS: " << nss);
         }
 
-        if (collectionOptions.clusteredIndex && !nss.isTimeseriesBucketsCollection()) {
-            return Status(
-                ErrorCodes::InvalidOptions,
-                "The 'clusteredIndex' option is only supported on time-series buckets collections");
-        }
 
-        if (collectionOptions.clusteredIndex && idIndex && !idIndex->isEmpty()) {
-            return Status(ErrorCodes::InvalidOptions,
-                          "The 'clusteredIndex' option is not supported with the 'idIndex' option");
+        if (auto clusteredIndex = collectionOptions.clusteredIndex) {
+            bool clusteredIndexesEnabled =
+                feature_flags::gClusteredIndexes.isEnabled(serverGlobalParams.featureCompatibility);
+            if (!clusteredIndexesEnabled && !clustered_util::requiresLegacyFormat(nss)) {
+                // The 'clusteredIndex' option is only supported in legacy format for specific
+                // internal collections when the gClusteredIndexes flag is disabled.
+                return Status(ErrorCodes::InvalidOptions,
+                              str::stream()
+                                  << "The 'clusteredIndex' option is not supported for namespace "
+                                  << nss);
+            }
+
+            if ((nss.isTimeseriesBucketsCollection()) != (clusteredIndex->getLegacyFormat())) {
+                return Status(ErrorCodes::Error(5979703),
+                              "The 'clusteredIndex' legacy format {clusteredIndex: <bool>} is only "
+                              "supported for specific internal collections and vice versa");
+            }
+
+            if (idIndex && !idIndex->isEmpty()) {
+                return Status(
+                    ErrorCodes::InvalidOptions,
+                    "The 'clusteredIndex' option is not supported with the 'idIndex' option");
+            }
+
+            auto clusteredIndexStatus = validateClusteredIndexSpec(
+                opCtx, clusteredIndex->getIndexSpec(), collectionOptions.expireAfterSeconds);
+            if (!clusteredIndexStatus.isOK()) {
+                return clusteredIndexStatus;
+            }
         }
 
 

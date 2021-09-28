@@ -31,6 +31,7 @@
 
 #include <cstdint>
 
+#include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_validation.h"
 #include "mongo/db/catalog/index_catalog.h"
@@ -73,7 +74,7 @@ public:
 
         CollectionOptions options;
         if (clustered) {
-            options.clusteredIndex = true;
+            options.clusteredIndex = clustered_util::makeCanonicalClusteredInfoForLegacyFormat();
         }
 
         const bool createIdIndex = !clustered;
