@@ -71,7 +71,6 @@ public:
         bob.append("readOnly", storageGlobalParams.readOnly);
         bob.append("persistent", !engine->isEphemeral());
         bob.append("backupCursorOpen", backupCursorHooks->isBackupCursorOpen());
-        bob.append("supportsResumableIndexBuilds", engine->supportsResumableIndexBuilds());
 
         return bob.obj();
     }
