@@ -2974,6 +2974,18 @@ def doConfigure(myenv):
         # only) flag that turns it on.
         AddToCXXFLAGSIfSupported(myenv, "-Wunused-exception-parameter")
 
+        # TODO(SERVER-60151): Avoid the dilemma identified in
+        # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=100493. Unfortunately,
+        # we don't have a more targeted warning suppression we can use
+        # other than disabling all deprecation warnings. We will
+        # revisit this once we are fully on C++20 and can commit the
+        # C++20 style code.
+        #
+        # TODO(SERVER-60175): In fact we will want to explicitly opt
+        # in to -Wdeprecated, since clang doesn't include it in -Wall.
+        if get_option('cxx-std') == "20":
+            AddToCXXFLAGSIfSupported(myenv, '-Wno-deprecated')
+
         # Check if we can set "-Wnon-virtual-dtor" when "-Werror" is set. The only time we can't set it is on
         # clang 3.4, where a class with virtual function(s) and a non-virtual destructor throws a warning when
         # it shouldn't.
