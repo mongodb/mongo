@@ -297,6 +297,10 @@ Status _collModInternal(OperationContext* opCtx,
 
     CollModRequest cmr = statusW.getValue();
 
+    if (!serverGlobalParams.quiet.load()) {
+        log() << "CMD: collMod: " << cmdObj;
+    }
+
     WriteUnitOfWork wunit(opCtx);
 
     // Handle collMod on a view and return early. The View Catalog handles the creation of oplog
