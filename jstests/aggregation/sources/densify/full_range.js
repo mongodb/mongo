@@ -50,6 +50,33 @@ for (let i = 0; i < densifyUnits.length; i++) {
         insertDocumentsOnPredicate(
             {base, min: 0, max: 50, pred: i => i % 3 == 0 || i % 7 == 0, addFunc: add, coll: coll});
         runDensifyFullTest();
+
+        // Lots of off-step documents with nulls sprinkled in to confirm that a null value is
+        // treated the same as a missing value.
+        coll.drop();
+        insertDocumentsOnPredicate(
+            {base, min: 0, max: 10, pred: i => i % 3 == 0 || i % 7 == 0, addFunc: add, coll: coll});
+        coll.insert({val: null});
+        insertDocumentsOnPredicate({
+            base,
+            min: 10,
+            max: 20,
+            pred: i => i % 3 == 0 || i % 7 == 0,
+            addFunc: add,
+            coll: coll
+        });
+        coll.insert({val: null});
+        coll.insert({blah: base});  // Missing "val" key.
+        insertDocumentsOnPredicate({
+            base,
+            min: 20,
+            max: 25,
+            pred: i => i % 3 == 0 || i % 7 == 0,
+            addFunc: add,
+            coll: coll
+        });
+
+        runDensifyFullTest();
     }
 }
 })();

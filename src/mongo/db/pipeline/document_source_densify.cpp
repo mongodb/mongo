@@ -672,8 +672,8 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::doGetNext() {
             }
 
             auto doc = nextDoc.getDocument();
-            if (doc.getNestedField(_field).missing()) {
-                // The densify field is not present, let document pass unmodified.
+            if (doc.getNestedField(_field).nullish()) {
+                // The densify field is not present or null, let document pass unmodified.
                 return nextDoc;
             }
 
@@ -714,8 +714,8 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::doGetNext() {
             }
 
             auto currentDoc = nextDoc.getDocument();
-            if (currentDoc.getNestedField(_field).missing()) {
-                // The densify field is not present, let document pass unmodified.
+            if (currentDoc.getNestedField(_field).nullish()) {
+                // The densify field is not present or null, let document pass unmodified.
                 return nextDoc;
             }
             auto val = getDensifyValue(currentDoc);

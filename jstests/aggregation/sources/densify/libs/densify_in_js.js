@@ -91,7 +91,20 @@ function densifyInJS(stage, docs) {
     const {step, bounds, unit} = stage.range;
     const stream = [];
 
-    docs.sort((a, b) => a[field] - b[field]);
+    // $densify is translated into a $sort on `field` and then $internalDensify, so replicate that
+    // behavior here by sorting the array of documents by the field.
+    docs.sort((a, b) => {
+        if (a[field] == null && b[field] == null) {
+            return 0;
+        } else if (a[field] == null) {  // null << any value.
+            return -1;
+        } else if (b[field] == null) {
+            return 1;
+        } else {
+            return a[field] - b[field];
+        }
+    });
+    const docsWithoutNulls = docs.filter(doc => doc[field] != null);
 
     const {add, sub, getNextStepFromBase} = getArithmeticFunctionsForUnit(unit);
 
@@ -110,27 +123,35 @@ function densifyInJS(stage, docs) {
         if (docs.length == 0) {
             return stream;
         }
-        return densifyInJS({
-            field: stage.field,
-            range: {step, unit, bounds: [docs[0][field], docs[docs.length - 1][field]]}
-        },
+        const minValue = docsWithoutNulls[0][field];
+        const maxValue = docsWithoutNulls[docsWithoutNulls.length - 1][field];
+        return densifyInJS({field: stage.field, range: {step, unit, bounds: [minValue, maxValue]}},
                            docs);
 
     } else if (bounds === "partition") {
         throw new Error("Partitioning not supported by JS densify.");
     } else if (bounds.length == 2) {
         const [lower, upper] = bounds;
-        let currentVal =
-            docs.length > 0 ? Math.min(docs[0][field], sub(lower, step)) : sub(lower, step);
+        let currentVal = docsWithoutNulls.length > 0
+            ? Math.min(docsWithoutNulls[0], sub(lower, step))
+            : sub(lower, step);
         for (let i = 0; i < docs.length; i++) {
             const nextVal = docs[i][field];
+            if (nextVal === null || nextVal === undefined) {
+                // If the next value in the stream is missing or null, let the doc pass through
+                // without modifying anything else.
+                stream.push(docs[i]);
+                continue;
+            }
             stream.push(...generateDocuments(getNextStepFromBase(currentVal, lower, step),
                                              nextVal,
                                              (val) => val >= lower && val < upper));
             stream.push(docs[i]);
             currentVal = nextVal;
         }
-        const lastVal = docs.length > 0 ? docs[docs.length - 1][field] : sub(lower, step);
+        const lastVal = docsWithoutNulls.length > 0
+            ? docsWithoutNulls[docsWithoutNulls.length - 1][field]
+            : sub(lower, step);
         if (lastVal < upper) {
             stream.push(...generateDocuments(getNextStepFromBase(currentVal, lower, step), upper));
         }
@@ -161,6 +182,10 @@ const densifyUnits = [null, "millisecond", "second", "day", "month", "quarter", 
 
 const interestingSteps = [1, 2, 3, 4, 5, 7, 11, 13];
 
+function buildErrorString(found, expected) {
+    return "Expected:\n" + tojson(expected) + "\nGot:\n" + tojson(found);
+}
+
 function testDensifyStage(stage, coll, msg) {
     if (stage.range.unit === null) {
         delete stage.range.unit;
@@ -168,5 +193,5 @@ function testDensifyStage(stage, coll, msg) {
     const result = coll.aggregate([{"$densify": stage}]).toArray();
     const expected = densifyInJS(stage, coll.find({}).toArray());
     const newMsg = (msg || "") + " | stage: " + tojson(stage);
-    assert.eq(expected, result, newMsg);
+    assert(arrayEq(expected, result), newMsg + buildErrorString(result, expected));
 }
