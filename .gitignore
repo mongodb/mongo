@@ -211,3 +211,11 @@ resmoke.ini
 default.profraw
 /corpora
 /corpora-merged
+
+# RPM build temps
+/distsrc.tar
+/selinux/tmp
+/dst
+/rpmbuild
+/repo
+/rpm/tmp

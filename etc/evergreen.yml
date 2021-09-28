@@ -1441,6 +1441,30 @@ functions:
         args:
           - "./src/evergreen/powercycle_setup_host.sh"
 
+  "run selinux tests":
+    - command: host.create
+      params:
+        provider: ec2
+        distro: ${distro}
+        timeout_teardown_secs: 86400 # 1 day
+    - command: host.list
+      params:
+        wait: true
+        timeout_seconds: 900 # 15 min
+        num_hosts: 1
+        path: src/hosts.yml
+    - *f_expansions_write
+    - command: subprocess.exec
+      type: test
+      params:
+        binary: bash
+        args:
+          - "./src/evergreen/selinux_run_test.sh"
+        env:
+          test_list: ${test_list}
+          user: ec2-user
+
+
   ### Process & archive remote EC2 artifacts ###
   "save powercycle artifacts": &save_powercycle_artifacts
     command: subprocess.exec
@@ -6047,6 +6071,69 @@ tasks:
   - func: "run powercycle test"
     timeout_secs: 1800 # 30 minute timeout for no output
 
+
+- name: selinux_rhel8_org
+  tags: []
+  depends_on:
+  - name: package
+  commands:
+  - command: manifest.load
+  - func: "git get project and add git tag"
+  - *f_expansions_write
+  - func: "set up venv"
+  - func: "fetch packages"
+  - func: "run selinux tests"
+    vars:
+      distro: rhel80-selinux
+      test_list: jstests/selinux/*.js
+
+- name: selinux_rhel8_enterprise
+  tags: []
+  depends_on:
+  - name: package
+  commands:
+  - command: manifest.load
+  - func: "git get project and add git tag"
+  - *f_expansions_write
+  - func: "set up venv"
+  - func: "fetch packages"
+  - func: "run selinux tests"
+    vars:
+      distro: rhel80-selinux
+      test_list: jstests/selinux/*.js src/mongo/db/modules/enterprise/jstests/selinux/*.js
+
+- name: selinux_rhel7_org
+  tags: []
+  depends_on:
+  - name: package
+  commands:
+  - command: manifest.load
+  - func: "git get project and add git tag"
+  - *f_expansions_write
+  - func: "set up venv"
+  - func: "fetch packages"
+  - func: "run selinux tests"
+    vars:
+      user: root
+      distro: rhel76-selinux
+      test_list: jstests/selinux/*.js
+
+- name: selinux_rhel7_enterprise
+  tags: []
+  depends_on:
+  - name: package
+  commands:
+  - command: manifest.load
+  - func: "git get project and add git tag"
+  - *f_expansions_write
+  - func: "set up venv"
+  - func: "fetch packages"
+  - func: "run selinux tests"
+    vars:
+      user: root
+      distro: rhel76-selinux
+      test_list: jstests/selinux/*.js src/mongo/db/modules/enterprise/jstests/selinux/*.js
+
 - name: idl_tests
   tags: []
   depends_on:
@@ -9136,6 +9223,7 @@ buildvariants:
   - name: test_packages
     distros:
     - ubuntu2004-package
+  - name: selinux_rhel8_enterprise
   - name: .publish
 
 - &enterprise-rhel-80-64-bit-dynamic-required-template
@@ -9830,6 +9918,7 @@ buildvariants:
   - name: test_packages
     distros:
     - ubuntu2004-package
+  - name: selinux_rhel7_enterprise
   - name: .publish
     distros:
     - rhel70-small
@@ -9912,6 +10001,7 @@ buildvariants:
   - name: test_packages
     distros:
     - ubuntu2004-package
+  - name: selinux_rhel8_enterprise
   - name: .publish
     distros:
     - rhel80-small
@@ -9967,6 +10057,7 @@ buildvariants:
   - name: test_packages
     distros:
     - ubuntu2004-package
+  - name: selinux_rhel8_org
   - name: .publish
     distros:
     - rhel80-small
@@ -10149,6 +10240,7 @@ buildvariants:
   - name: test_packages
     distros:
     - ubuntu2004-package
+  - name: selinux_rhel7_org
   - name: .publish
     distros:
     - rhel70-small
