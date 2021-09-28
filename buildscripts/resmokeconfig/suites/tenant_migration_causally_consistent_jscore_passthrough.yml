@@ -176,6 +176,9 @@ selector:
   - assumes_read_preference_unchanged
   - does_not_support_causal_consistency
   - requires_collstats
+  # Full validation can cause ongoing queries to fail. This can affect the tenant migration
+  # process.
+  - uses_full_validation
   - tenant_migration_incompatible
 
 executor:

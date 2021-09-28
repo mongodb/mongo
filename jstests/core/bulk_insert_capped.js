@@ -11,6 +11,7 @@
  *   # The "max" option of a capped collection can be temporarily exceeded
  *   # before a txn is committed.
  *   does_not_support_transactions,
+ *   uses_full_validation,
  * ]
  */
 

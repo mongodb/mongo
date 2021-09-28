@@ -111,6 +111,9 @@ selector:
   - requires_emptycapped
   # Multi-updates that conflict with tenant migration are not retried by inject_tenant_prefix.js.
   - requires_multi_updates
+  # Full validation can cause ongoing queries to fail. This can affect the tenant migration
+  # process.
+  - uses_full_validation
   - tenant_migration_incompatible
 
 executor:

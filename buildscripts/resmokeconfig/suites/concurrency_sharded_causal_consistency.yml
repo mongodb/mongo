@@ -115,8 +115,8 @@ executor:
   hooks:
   - class: CheckReplDBHashInBackground
   - class: CheckReplDBHash
-  - class: ValidateCollections
   - class: CheckOrphansDeleted
+  - class: ValidateCollections # Validation can interfere with other operations, so this goes last.
   - class: CleanupConcurrencyWorkloads
   fixture:
     class: ShardedClusterFixture

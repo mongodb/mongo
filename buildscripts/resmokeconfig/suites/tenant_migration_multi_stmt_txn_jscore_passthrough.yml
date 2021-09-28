@@ -346,6 +346,9 @@ selector:
   # that use API parameters cannot be run with transactions.
   - uses_api_parameters
   - does_not_support_transactions
+  # Full validation can cause ongoing queries to fail. This can affect the tenant migration
+  # process.
+  - uses_full_validation
 
 executor:
   archive:

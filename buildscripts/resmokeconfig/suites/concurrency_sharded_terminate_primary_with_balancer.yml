@@ -202,8 +202,8 @@ executor:
     wait_for_mongos_retarget: true
     terminate: true
   - class: CheckReplDBHash
-  - class: ValidateCollections
   - class: CheckOrphansDeleted
+  - class: ValidateCollections # Validation can interfere with other operations, so this goes last.
   - class: CleanupConcurrencyWorkloads
   fixture:
     class: ShardedClusterFixture

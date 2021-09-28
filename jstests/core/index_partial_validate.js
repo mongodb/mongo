@@ -1,5 +1,8 @@
 // Tests that the validate command works with partial indexes and a document that does not have
 // an indexed field. For details, see SERVER-23730.
+// @tags: [
+//   uses_full_validation,
+// ]
 'use strict';
 
 (function() {

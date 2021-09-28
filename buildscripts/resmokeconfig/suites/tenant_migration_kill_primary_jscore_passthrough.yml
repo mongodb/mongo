@@ -215,6 +215,9 @@ selector:
   - does_not_support_stepdowns
   - assumes_read_concern_unchanged
   - assumes_write_concern_unchanged
+  # Full validation can cause ongoing queries to fail. This can affect the tenant migration
+  # process.
+  - uses_full_validation
 
 executor:
   archive:

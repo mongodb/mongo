@@ -6,6 +6,7 @@
 //     # Builds index in the background
 //     requires_background_index,
 //
+//     uses_full_validation,
 // ]
 
 // Test partial index creation and drops.

@@ -1,5 +1,8 @@
 // Test that update operations correctly fail if they violate the "ambiguous field name in array"
 // constraint for indexes. This is designed to reproduce SERVER-37058.
+// @tags: [
+//   uses_full_validation,
+// ]
 (function() {
 "use strict";
 

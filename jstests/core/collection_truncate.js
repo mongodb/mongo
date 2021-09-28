@@ -3,6 +3,7 @@
 //   requires_non_retryable_commands,
 //   uses_testing_only_commands,
 //   requires_emptycapped,
+//   uses_full_validation,
 // ]
 
 // SERVER-15033 truncate on a regular collection
