@@ -33,6 +33,7 @@
 
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/platform/basic.h"
+#include "mongo/s/concurrency/locker_mongos_client_observer.h"
 #include "mongo/s/mongos_topology_coordinator.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source_mock.h"
@@ -46,6 +47,11 @@ namespace {
 
 class MongosTopoCoordTest : public ServiceContextTest {
 public:
+    MongosTopoCoordTest() {
+        auto service = getServiceContext();
+        service->registerClientObserver(std::make_unique<LockerMongosClientObserver>());
+    }
+
     virtual void setUp() {
         _topo = std::make_unique<MongosTopologyCoordinator>();
 

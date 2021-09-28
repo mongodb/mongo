@@ -36,6 +36,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/s/concurrency/locker_mongos_client_observer.h"
 #include "mongo/s/query/router_stage_mock.h"
 #include "mongo/unittest/unittest.h"
 
@@ -45,7 +46,11 @@ namespace {
 
 class ClusterClientCursorImplTest : public ServiceContextTest {
 protected:
-    ClusterClientCursorImplTest() : _opCtx(makeOperationContext()) {}
+    ClusterClientCursorImplTest() {
+        auto service = getServiceContext();
+        service->registerClientObserver(std::make_unique<LockerMongosClientObserver>());
+        _opCtx = makeOperationContext();
+    }
 
     ServiceContext::UniqueOperationContext _opCtx;
 };

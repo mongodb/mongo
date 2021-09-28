@@ -33,7 +33,7 @@
 #include "mongo/db/auth/security_token.h"
 #include "mongo/db/auth/security_token_gen.h"
 #include "mongo/db/client.h"
-#include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/concurrency/locker_noop_service_context_test_fixture.h"
 #include "mongo/rpc/op_msg_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -45,7 +45,7 @@ namespace {
 constexpr auto kPingFieldName = "ping"_sd;
 constexpr auto kTenantFieldName = "tenant"_sd;
 
-class SecurityTokenMetadataTest : public ServiceContextTest {};
+class SecurityTokenMetadataTest : public LockerNoopServiceContextTest {};
 
 TEST_F(SecurityTokenMetadataTest, SecurityTokenNotAccepted) {
     const auto kPingBody = BSON(kPingFieldName << 1);

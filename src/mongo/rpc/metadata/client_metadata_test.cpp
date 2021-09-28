@@ -41,6 +41,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/locker_noop_client_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/s/is_mongos.h"
@@ -344,6 +345,7 @@ TEST(ClientMetadataTest, TestMongoSAppend) {
 
 TEST(ClientMetadataTest, TestInvalidDocWhileSettingOpCtxMetadata) {
     auto svcCtx = ServiceContext::make();
+    svcCtx->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
     auto client = svcCtx->makeClient("ClientMetadataTest");
     auto opCtx = client->makeOperationContext();
     // metadataElem is of BSON type int
@@ -363,6 +365,7 @@ TEST(ClientMetadataTest, TestInvalidDocWhileSettingOpCtxMetadata) {
 
 TEST(ClientMetadataTest, TestEooElemAsValueToSetOpCtxMetadata) {
     auto svcCtx = ServiceContext::make();
+    svcCtx->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
     auto client = svcCtx->makeClient("ClientMetadataTest");
     auto opCtx = client->makeOperationContext();
     // metadataElem is of BSON type eoo

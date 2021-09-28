@@ -33,6 +33,7 @@
 #include "mongo/db/hasher.h"
 #include "mongo/db/json.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/s/concurrency/locker_mongos_client_observer.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/unittest/death_test.h"
 
@@ -41,6 +42,13 @@ namespace {
 
 class ShardKeyPatternTest : public ServiceContextTest {
 protected:
+    ShardKeyPatternTest() {
+        auto service = getServiceContext();
+        service->registerClientObserver(std::make_unique<LockerMongosClientObserver>());
+        _opCtxHolder = makeOperationContext();
+        _opCtx = _opCtxHolder.get();
+    }
+
     BSONObj queryKey(const ShardKeyPattern& pattern, const BSONObj& query) {
         const NamespaceString nss("foo");
 
@@ -50,8 +58,8 @@ protected:
         return status.getValue();
     }
 
-    ServiceContext::UniqueOperationContext _opCtxHolder{makeOperationContext()};
-    OperationContext* const _opCtx{_opCtxHolder.get()};
+    ServiceContext::UniqueOperationContext _opCtxHolder;
+    OperationContext* _opCtx;
 };
 
 TEST_F(ShardKeyPatternTest, SingleFieldShardKeyPatternsValidityCheck) {

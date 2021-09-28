@@ -31,6 +31,7 @@
 
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/s/concurrency/locker_mongos_client_observer.h"
 #include "mongo/s/mock_ns_targeter.h"
 #include "mongo/s/session_catalog_router.h"
 #include "mongo/s/transaction_router.h"
@@ -70,8 +71,15 @@ void sortByEndpoint(std::vector<TargetedWrite*>* writes) {
 
 class WriteOpTest : public ServiceContextTest {
 protected:
-    const ServiceContext::UniqueOperationContext _opCtxHolder{makeOperationContext()};
-    OperationContext* const _opCtx{_opCtxHolder.get()};
+    WriteOpTest() {
+        auto service = getServiceContext();
+        service->registerClientObserver(std::make_unique<LockerMongosClientObserver>());
+        _opCtxHolder = makeOperationContext();
+        _opCtx = _opCtxHolder.get();
+    }
+
+    ServiceContext::UniqueOperationContext _opCtxHolder;
+    OperationContext* _opCtx;
 };
 
 // Test of basic error-setting on write op

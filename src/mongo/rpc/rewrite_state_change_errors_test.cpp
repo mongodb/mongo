@@ -32,6 +32,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/concurrency/locker_noop_client_observer.h"
 #include "mongo/db/service_context.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/op_msg.h"
@@ -43,6 +44,13 @@ namespace {
 
 class RewriteStateChangeErrorsTest : public unittest::Test {
 public:
+    RewriteStateChangeErrorsTest() {
+        sc = ServiceContext::make();
+        sc->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
+        cc = sc->makeClient("test", nullptr);
+        opCtx = sc->makeOperationContext(cc.get());
+    }
+
     void setUp() override {
         _savedIsMongos = isMongos();
         setMongos(true);  // whole feature only happens on mongos
@@ -89,9 +97,9 @@ public:
         {ErrorCodes::BadValue, ErrorCodes::BadValue},
     };
 
-    ServiceContext::UniqueServiceContext sc = ServiceContext::make();
-    ServiceContext::UniqueClient cc = sc->makeClient("test", nullptr);
-    ServiceContext::UniqueOperationContext opCtx = sc->makeOperationContext(cc.get());
+    ServiceContext::UniqueServiceContext sc;
+    ServiceContext::UniqueClient cc;
+    ServiceContext::UniqueOperationContext opCtx;
 
 private:
     bool _savedIsMongos;

@@ -35,6 +35,7 @@
 #include "mongo/db/logical_session_cache_noop.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/s/concurrency/locker_mongos_client_observer.h"
 #include "mongo/s/query/cluster_client_cursor_mock.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/unittest/unittest.h"
@@ -48,7 +49,10 @@ const NamespaceString nss("test.collection");
 
 class ClusterCursorManagerTest : public ServiceContextTest {
 protected:
-    ClusterCursorManagerTest() : _opCtx(makeOperationContext()), _manager(&_clockSourceMock) {
+    ClusterCursorManagerTest() : _manager(&_clockSourceMock) {
+        auto service = getServiceContext();
+        service->registerClientObserver(std::make_unique<LockerMongosClientObserver>());
+        _opCtx = makeOperationContext();
         LogicalSessionCache::set(getServiceContext(), std::make_unique<LogicalSessionCacheNoop>());
     }
 
