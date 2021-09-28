@@ -312,7 +312,7 @@ StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNames
         // If 'ns' refers to a view namespace, then we resolve its definition.
         auto resolveViewDefinition = [&](const NamespaceString& ns,
                                          std::shared_ptr<const ViewCatalog> vcp) -> Status {
-            auto resolvedView = vcp->resolveView(opCtx, ns);
+            auto resolvedView = vcp->resolveView(opCtx, ns, boost::none);
             if (!resolvedView.isOK()) {
                 return resolvedView.getStatus().withContext(
                     str::stream() << "Failed to resolve view '" << involvedNs.ns());
@@ -417,7 +417,7 @@ Status collatorCompatibleWithPipeline(OperationContext* opCtx,
         }
         if (!CollatorInterface::collatorsMatch(view->defaultCollator(), collator)) {
             return {ErrorCodes::OptionNotSupportedOnView,
-                    str::stream() << "Cannot override default collation of view "
+                    str::stream() << "Cannot override a view's default collation"
                                   << potentialViewNs.ns()};
         }
     }
@@ -681,16 +681,23 @@ Status runAggregate(OperationContext* opCtx,
             if (!request.getCollation().get_value_or(BSONObj()).isEmpty()) {
                 invariant(collatorToUse);  // Should already be resolved at this point.
                 if (!CollatorInterface::collatorsMatch(ctx->getView()->defaultCollator(),
-                                                       collatorToUse->get())) {
+                                                       collatorToUse->get()) &&
+                    !ctx->getView()->timeseries()) {
+
                     return {ErrorCodes::OptionNotSupportedOnView,
                             "Cannot override a view's default collation"};
                 }
             }
 
-
+            // Queries on timeseries views may specify non-default collation whereas queries
+            // on all other types of views must match the default collator (the collation use
+            // to originally create that collections). Thus in the case of operations on TS
+            // views, we use the request's collation.
+            auto timeSeriesCollator =
+                ctx->getView()->timeseries() ? request.getCollation() : boost::none;
             auto resolvedView = uassertStatusOK(DatabaseHolder::get(opCtx)
                                                     ->getViewCatalog(opCtx, nss.db())
-                                                    ->resolveView(opCtx, nss));
+                                                    ->resolveView(opCtx, nss, timeSeriesCollator));
 
             // With the view & collation resolved, we can relinquish locks.
             ctx.reset();

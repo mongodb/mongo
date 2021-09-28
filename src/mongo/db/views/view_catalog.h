@@ -136,8 +136,15 @@ public:
      * Resolve the views on 'nss', transforming the pipeline appropriately. This function returns a
      * fully-resolved view definition containing the backing namespace, the resolved pipeline and
      * the collation to use for the operation.
+     *
+     * With SERVER-54597, we allow queries on timeseries collections *only* to specify non-default
+     * collations. So in the case of queries on timeseries collections, we create a ResolvedView
+     * with the request's collation (timeSeriesCollator) rather than the collection's default
+     * collator.
      */
-    StatusWith<ResolvedView> resolveView(OperationContext* opCtx, const NamespaceString& nss) const;
+    StatusWith<ResolvedView> resolveView(OperationContext* opCtx,
+                                         const NamespaceString& nss,
+                                         boost::optional<BSONObj> timeseriesCollator) const;
 
     /**
      * Usage statistics about this view catalog.

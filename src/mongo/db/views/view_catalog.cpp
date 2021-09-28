@@ -714,8 +714,10 @@ std::shared_ptr<const ViewDefinition> ViewCatalog::lookupWithoutValidatingDurabl
     return _lookup(opCtx, ns, ViewCatalogLookupBehavior::kAllowInvalidDurableViews);
 }
 
-StatusWith<ResolvedView> ViewCatalog::resolveView(OperationContext* opCtx,
-                                                  const NamespaceString& nss) const {
+StatusWith<ResolvedView> ViewCatalog::resolveView(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    boost::optional<BSONObj> timeSeriesCollator) const {
     _requireValidCatalog();
 
     // Keep looping until the resolution completes. If the catalog is invalidated during the
@@ -765,8 +767,13 @@ StatusWith<ResolvedView> ViewCatalog::resolveView(OperationContext* opCtx,
             resolvedNss = &view->viewOn();
             dependencyChain.push_back(*resolvedNss);
             if (!collation) {
-                collation = view->defaultCollator() ? view->defaultCollator()->getSpec().toBSON()
-                                                    : CollationSpec::kSimpleSpec;
+                if (timeSeriesCollator) {
+                    collation = *timeSeriesCollator;
+                } else {
+                    collation = view->defaultCollator()
+                        ? view->defaultCollator()->getSpec().toBSON()
+                        : CollationSpec::kSimpleSpec;
+                }
             }
 
             // Prepend the underlying view's pipeline to the current working pipeline.

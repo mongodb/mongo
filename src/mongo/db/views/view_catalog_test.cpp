@@ -673,7 +673,7 @@ TEST_F(ViewCatalogFixture, ResolveViewCorrectPipeline) {
     ASSERT_OK(createView(operationContext(), view3, view2, pipeline3.arr(), emptyCollation));
 
     Lock::DBLock dbLock(operationContext(), "db", MODE_IX);
-    auto resolvedView = getViewCatalog()->resolveView(operationContext(), view3);
+    auto resolvedView = getViewCatalog()->resolveView(operationContext(), view3, boost::none);
     ASSERT(resolvedView.isOK());
 
     std::vector<BSONObj> expected = {BSON("$match" << BSON("foo" << 1)),
@@ -693,8 +693,8 @@ TEST_F(ViewCatalogFixture, ResolveViewOnCollectionNamespace) {
     const NamespaceString collectionNamespace("db.coll");
 
     Lock::DBLock dbLock(operationContext(), "db", MODE_IS);
-    auto resolvedView =
-        uassertStatusOK(getViewCatalog()->resolveView(operationContext(), collectionNamespace));
+    auto resolvedView = uassertStatusOK(
+        getViewCatalog()->resolveView(operationContext(), collectionNamespace, boost::none));
 
     ASSERT_EQ(resolvedView.getNamespace(), collectionNamespace);
     ASSERT_EQ(resolvedView.getPipeline().size(), 0U);
@@ -717,7 +717,7 @@ TEST_F(ViewCatalogFixture, ResolveViewCorrectlyExtractsDefaultCollation) {
     ASSERT_OK(createView(operationContext(), view2, view1, pipeline2.arr(), collation));
 
     Lock::DBLock dbLock(operationContext(), "db", MODE_IS);
-    auto resolvedView = getViewCatalog()->resolveView(operationContext(), view2);
+    auto resolvedView = getViewCatalog()->resolveView(operationContext(), view2, boost::none);
     ASSERT(resolvedView.isOK());
 
     ASSERT_EQ(resolvedView.getValue().getNamespace(), viewOn);
