@@ -6,75 +6,70 @@
 (function() {
 'use strict';
 
-TestData.disableImplicitSessions = true;
+function runTest(downgradeFCV) {
+    TestData.disableImplicitSessions = true;
 
-const rst = new ReplSetTest({nodes: 1, nodeOptions: {setParameter: {maxSessions: 1}}});
+    const st = new ShardingTest({shards: 1});
+    const shard0Rst = st.rs0;
+    const shard0Primary = shard0Rst.getPrimary();
 
-rst.startSet();
-rst.initiate();
+    const kDbName = "testDb";
+    const kCollName = "testColl";
+    const testDB = shard0Primary.getDB(kDbName);
 
-const kDbName = "testDb";
-const kCollName = "testColl";
-const primary = rst.getPrimary();
-const testDB = primary.getDB(kDbName);
+    const sessionUUID = UUID();
+    const lsid0 = {id: sessionUUID, txnNumber: NumberLong(35), stmtId: NumberInt(0)};
+    const txnNumber0 = NumberLong(0);
+    const lsid1 = {id: sessionUUID, txnUUID: UUID()};
+    const txnNumber1 = NumberLong(35);
 
-const sessionUUID = UUID();
-const lsid0 = {
-    id: sessionUUID,
-    txnNumber: NumberLong(35),
-    stmtId: NumberInt(0)
-};
-const txnNumber0 = NumberLong(0);
-const lsid1 = {
-    id: sessionUUID,
-    txnUUID: UUID()
-};
-const txnNumber1 = NumberLong(35);
+    assert.commandWorked(shard0Primary.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
 
-assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+    assert.commandFailedWithCode(testDB.runCommand({
+        insert: kCollName,
+        documents: [{x: 0}],
+        lsid: lsid0,
+        txnNumber: txnNumber0,
+        startTransaction: true,
+        autocommit: false
+    }),
+                                 ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(testDB.runCommand({
+        insert: kCollName,
+        documents: [{x: 1}],
+        lsid: lsid1,
+        txnNumber: txnNumber1,
+        startTransaction: true,
+        autocommit: false
+    }),
+                                 ErrorCodes.InvalidOptions);
 
-assert.commandFailedWithCode(testDB.runCommand({
-    insert: kCollName,
-    documents: [{x: 0}],
-    lsid: lsid0,
-    txnNumber: txnNumber0,
-    startTransaction: true,
-    autocommit: false
-}),
-                             ErrorCodes.InvalidOptions);
-assert.commandFailedWithCode(testDB.runCommand({
-    insert: kCollName,
-    documents: [{x: 1}],
-    lsid: lsid1,
-    txnNumber: txnNumber1,
-    startTransaction: true,
-    autocommit: false
-}),
-                             ErrorCodes.InvalidOptions);
+    assert.commandWorked(shard0Primary.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
 
-assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
+    assert.commandWorked(testDB.runCommand({
+        insert: kCollName,
+        documents: [{x: 0}],
+        lsid: lsid0,
+        txnNumber: txnNumber0,
+        startTransaction: true,
+        autocommit: false
+    }));
+    assert.commandWorked(testDB.adminCommand(
+        {commitTransaction: 1, lsid: lsid0, txnNumber: txnNumber0, autocommit: false}));
 
-assert.commandWorked(testDB.runCommand({
-    insert: kCollName,
-    documents: [{x: 0}],
-    lsid: lsid0,
-    txnNumber: txnNumber0,
-    startTransaction: true,
-    autocommit: false
-}));
-assert.commandWorked(testDB.adminCommand(
-    {commitTransaction: 1, lsid: lsid0, txnNumber: txnNumber0, autocommit: false}));
+    assert.commandWorked(testDB.runCommand({
+        insert: kCollName,
+        documents: [{x: 1}],
+        lsid: lsid1,
+        txnNumber: txnNumber1,
+        startTransaction: true,
+        autocommit: false
+    }));
+    assert.commandWorked(testDB.adminCommand(
+        {commitTransaction: 1, lsid: lsid1, txnNumber: txnNumber1, autocommit: false}));
 
-assert.commandWorked(testDB.runCommand({
-    insert: kCollName,
-    documents: [{x: 1}],
-    lsid: lsid1,
-    txnNumber: txnNumber1,
-    startTransaction: true,
-    autocommit: false
-}));
-assert.commandWorked(testDB.adminCommand(
-    {commitTransaction: 1, lsid: lsid1, txnNumber: txnNumber1, autocommit: false}));
+    st.stop();
+}
 
-rst.stopSet();
+runFeatureFlagMultiversionTest('featureFlagInternalTransactions', runTest);
 })();

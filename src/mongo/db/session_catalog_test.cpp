@@ -50,6 +50,16 @@ namespace {
 
 class SessionCatalogTest : public ServiceContextTest {
 protected:
+    void setUp() final {
+        ServiceContextTest::setUp();
+        serverGlobalParams.clusterRole = ClusterRole::ShardServer;
+    }
+
+    void tearDown() final {
+        serverGlobalParams.clusterRole = ClusterRole::None;
+        ServiceContextTest::tearDown();
+    }
+
     SessionCatalog* catalog() {
         return SessionCatalog::get(getServiceContext());
     }
@@ -122,6 +132,19 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, CheckoutAndReleaseSessionWithTxnUUID)
 TEST_F(SessionCatalogTestWithDefaultOpCtx,
        CannotCheckoutSessionWithParentSessionIfFeatureFlagIsNotEnabled) {
     RAIIServerParameterControllerForTest controller{"featureFlagInternalTransactions", false};
+
+    _opCtx->setLogicalSessionId(makeLogicalSessionIdWithTxnNumberForTest());
+    ASSERT_THROWS_CODE(OperationContextSession(_opCtx), DBException, ErrorCodes::InvalidOptions);
+
+    _opCtx->setLogicalSessionId(makeLogicalSessionIdWithTxnUUIDForTest());
+    ASSERT_THROWS_CODE(OperationContextSession(_opCtx), DBException, ErrorCodes::InvalidOptions);
+
+    ASSERT_EQ(0UL, catalog()->size());
+}
+
+TEST_F(SessionCatalogTestWithDefaultOpCtx,
+       CannotCheckoutSessionWithParentSessionIfNotRunningInShardedCluster) {
+    serverGlobalParams.clusterRole = ClusterRole::None;
 
     _opCtx->setLogicalSessionId(makeLogicalSessionIdWithTxnNumberForTest());
     ASSERT_THROWS_CODE(OperationContextSession(_opCtx), DBException, ErrorCodes::InvalidOptions);

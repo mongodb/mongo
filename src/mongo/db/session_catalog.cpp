@@ -40,6 +40,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/is_mongos.h"
 
 namespace mongo {
 namespace {
@@ -80,6 +81,9 @@ SessionCatalog::ScopedCheckedOutSession SessionCatalog::_checkOutSessionWithPare
             "Internal transactions are not enabled",
             feature_flags::gFeatureFlagInternalTransactions.isEnabled(
                 serverGlobalParams.featureCompatibility));
+    uassert(ErrorCodes::InvalidOptions,
+            "Internal transactions are only supported in sharded clusters",
+            isMongos() || serverGlobalParams.clusterRole != ClusterRole::None);
 
     if (killToken) {
         invariant(killToken->lsidToKill == lsid);

@@ -678,6 +678,7 @@ env.Library(
         'logical_session_id_helpers',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/s/is_mongos',
         'internal_transactions_feature_flag',
         'service_context',
     ]
@@ -1554,6 +1555,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/s/sharding_api_d',
+        '$BUILD_DIR/mongo/s/is_mongos',
         'internal_transactions_feature_flag',
     ]
 )
