@@ -36,10 +36,16 @@
 
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
 
-
+#include "mongo/db/concurrency/locker_noop_client_observer.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo::sbe {
+
+PlanStageTestFixture::PlanStageTestFixture() {
+    auto service = getServiceContext();
+    service->registerClientObserver(
+        std::make_unique<LockerNoopClientObserverWithReplacementPolicy>());
+}
 
 void PlanStageTestFixture::assertValuesEqual(value::TypeTags lhsTag,
                                              value::Value lhsVal,

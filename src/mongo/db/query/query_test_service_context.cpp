@@ -33,6 +33,7 @@
 
 #include <memory>
 
+#include "mongo/db/concurrency/locker_noop_client_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_factory_mock.h"
 
@@ -40,6 +41,8 @@ namespace mongo {
 
 QueryTestServiceContext::QueryTestServiceContext()
     : _service(ServiceContext::make()), _client(_service->makeClient("query_test")) {
+    _service->registerClientObserver(
+        std::make_unique<LockerNoopClientObserverWithReplacementPolicy>());
     CollatorFactoryInterface::set(getServiceContext(), std::make_unique<CollatorFactoryMock>());
 }
 

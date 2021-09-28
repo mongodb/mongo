@@ -33,6 +33,7 @@
 
 #include "mongo/s/sharding_test_fixture_common.h"
 
+#include "mongo/db/concurrency/locker_noop_client_observer.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_changelog.h"
 #include "mongo/s/write_ops/batched_command_request.h"
@@ -44,7 +45,11 @@ using executor::NetworkTestEnv;
 using executor::RemoteCommandRequest;
 using unittest::assertGet;
 
-ShardingTestFixtureCommon::ShardingTestFixtureCommon() = default;
+ShardingTestFixtureCommon::ShardingTestFixtureCommon() {
+    auto service = getServiceContext();
+    service->registerClientObserver(
+        std::make_unique<LockerNoopClientObserverWithReplacementPolicy>());
+}
 
 ShardingTestFixtureCommon::~ShardingTestFixtureCommon() {
     invariant(!_opCtxHolder,

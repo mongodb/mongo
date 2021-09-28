@@ -47,11 +47,31 @@ public:
 
     void onDestroyClient(Client* client) final {}
 
-    void onCreateOperationContext(OperationContext* opCtx) final {
+    void onCreateOperationContext(OperationContext* opCtx) override {
         opCtx->setLockState(std::make_unique<LockerNoop>());
     }
 
     void onDestroyOperationContext(OperationContext* opCtx) final {}
+};
+
+/**
+ * Unlike LockerNoopClientObserver, this ClientObserver will not overwrite any existing Lockers on
+ * the OperationContext.
+ *
+ * This class is suitable for test fixtures that may be used in executables with LockerImpl service
+ * hooks installed.
+ */
+class LockerNoopClientObserverWithReplacementPolicy : public LockerNoopClientObserver {
+public:
+    LockerNoopClientObserverWithReplacementPolicy() = default;
+    ~LockerNoopClientObserverWithReplacementPolicy() = default;
+
+    void onCreateOperationContext(OperationContext* opCtx) final {
+        if (opCtx->lockState()) {
+            return;
+        }
+        LockerNoopClientObserver::onCreateOperationContext(opCtx);
+    }
 };
 
 }  // namespace mongo

@@ -82,7 +82,7 @@ using MakeStageFn = std::function<std::pair<T, std::unique_ptr<PlanStage>>(
  */
 class PlanStageTestFixture : public ServiceContextTest {
 public:
-    PlanStageTestFixture() = default;
+    PlanStageTestFixture();
 
     void setUp() override {
         ServiceContextTest::setUp();

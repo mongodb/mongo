@@ -32,6 +32,7 @@
 #include <boost/intrusive_ptr.hpp>
 #include <memory>
 
+#include "mongo/db/concurrency/locker_noop_client_observer.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/temp_dir.h"
@@ -47,8 +48,12 @@ public:
     AggregationContextFixture()
         : AggregationContextFixture(NamespaceString("unittests.pipeline_test")) {}
 
-    AggregationContextFixture(NamespaceString nss)
-        : _expCtx(new ExpressionContextForTest(_opCtx.get(), nss)) {
+    AggregationContextFixture(NamespaceString nss) {
+        auto service = getServiceContext();
+        service->registerClientObserver(
+            std::make_unique<LockerNoopClientObserverWithReplacementPolicy>());
+        _opCtx = makeOperationContext();
+        _expCtx = make_intrusive<ExpressionContextForTest>(_opCtx.get(), nss);
         unittest::TempDir tempDir("AggregationContextFixture");
         _expCtx->tempDir = tempDir.path();
     }
@@ -66,7 +71,7 @@ public:
     }
 
 private:
-    ServiceContext::UniqueOperationContext _opCtx = makeOperationContext();
+    ServiceContext::UniqueOperationContext _opCtx;
     boost::intrusive_ptr<ExpressionContextForTest> _expCtx;
 };
 }  // namespace mongo
