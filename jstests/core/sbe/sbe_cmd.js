@@ -17,6 +17,18 @@ if (!isSBEEnabled) {
     return;
 }
 
+// The sbe command requires lock-free reads, so determine if they're enabled before proceeding:
+// (1) ephemeralForTest automatically uses enableMajorityReadConcern=false, which disables lock-free
+// reads.
+// (2) lock-free reads are only supported in server versions 4.9+.
+const maxWireVersion = assert.commandWorked(db.runCommand({isMaster: 1})).maxWireVersion;
+const isLockFreeReadsEnabled = jsTest.options().storageEngine !== "ephemeralForTest" &&
+    maxWireVersion >= 12 /* WIRE_VERSION_49 */;
+if (!isLockFreeReadsEnabled) {
+    jsTestLog("Skipping test because lock-free reads are not enabled.");
+    return;
+}
+
 const coll = db.jstests_sbe_cmd;
 coll.drop();
 
