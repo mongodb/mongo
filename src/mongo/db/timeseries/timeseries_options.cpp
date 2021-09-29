@@ -125,14 +125,12 @@ BSONObj generateViewPipeline(const TimeseriesOptions& options, bool asArray) {
             asArray,
             BSON("$_internalUnpackBucket" << BSON(
                      "timeField" << options.getTimeField() << "metaField" << *options.getMetaField()
-                                 << "bucketMaxSpanSeconds" << *options.getBucketMaxSpanSeconds()
-                                 << "exclude" << BSONArray())));
+                                 << "bucketMaxSpanSeconds" << *options.getBucketMaxSpanSeconds())));
     }
-    return wrapInArrayIf(
-        asArray,
-        BSON("$_internalUnpackBucket" << BSON(
-                 "timeField" << options.getTimeField() << "bucketMaxSpanSeconds"
-                             << *options.getBucketMaxSpanSeconds() << "exclude" << BSONArray())));
+    return wrapInArrayIf(asArray,
+                         BSON("$_internalUnpackBucket" << BSON(
+                                  "timeField" << options.getTimeField() << "bucketMaxSpanSeconds"
+                                              << *options.getBucketMaxSpanSeconds())));
 }
 
 bool optionsAreEqual(const TimeseriesOptions& option1, const TimeseriesOptions& option2) {
