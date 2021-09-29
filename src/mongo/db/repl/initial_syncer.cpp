@@ -271,6 +271,10 @@ bool InitialSyncer::_isActive_inlock() const {
     return State::kRunning == _state || State::kShuttingDown == _state;
 }
 
+std::string InitialSyncer::getInitialSyncMethod() const {
+    return "logical";
+}
+
 Status InitialSyncer::startup(OperationContext* opCtx,
                               std::uint32_t initialSyncMaxAttempts) noexcept {
     invariant(opCtx);

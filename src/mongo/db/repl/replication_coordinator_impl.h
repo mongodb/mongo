@@ -1127,8 +1127,20 @@ private:
     /**
      * Start replicating data, and does an initial sync if needed first.
      */
-    void _startDataReplication(OperationContext* opCtx,
-                               std::function<void()> startCompleted = nullptr);
+    void _startDataReplication(OperationContext* opCtx);
+
+    /**
+     * Start initial sync.
+     */
+    void _startInitialSync(OperationContext* opCtx,
+                           InitialSyncerInterface::OnCompletionFn onCompletionFn,
+                           bool fallbackToLogical = false);
+
+
+    /**
+     * Function to be called on completion of initial sync.
+     */
+    void _initialSyncerCompletionFunction(const StatusWith<OpTimeAndWallTime>& opTimeStatus);
 
     /**
      * Finishes the work of processReplSetInitiate() in the event of a successful quorum check.
@@ -1720,6 +1732,8 @@ private:
 
     // This should be set during sharding initialization.
     boost::optional<bool> _wasCWWCSetOnConfigServerOnStartup;
+
+    InitialSyncerInterface::OnCompletionFn _onCompletion;
 };
 
 }  // namespace repl

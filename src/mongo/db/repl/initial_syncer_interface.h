@@ -116,6 +116,11 @@ public:
      * Cancels the current initial sync attempt if the initial syncer is active.
      */
     virtual void cancelCurrentAttempt() = 0;
+
+    /**
+     * Returns the initial sync method that this initial syncer is using.
+     */
+    virtual std::string getInitialSyncMethod() const = 0;
 };
 
 }  // namespace repl

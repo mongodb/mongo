@@ -699,83 +699,10 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
     LOGV2_DEBUG(4280511, 1, "Set local replica set config");
 }
 
-void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx,
-                                                       std::function<void()> startCompleted) {
-    if (_startedSteadyStateReplication.swap(true)) {
-        // This is not the first call.
-        return;
-    }
-
-    // Check to see if we need to do an initial sync.
-    const auto lastOpTime = getMyLastAppliedOpTime();
-    const auto needsInitialSync =
-        lastOpTime.isNull() || _externalState->isInitialSyncFlagSet(opCtx);
-    if (!needsInitialSync) {
-        LOGV2_DEBUG(4280512, 1, "No initial sync required. Attempting to begin steady replication");
-        // Start steady replication, since we already have data.
-        // ReplSetConfig has been installed, so it's either in STARTUP2 or REMOVED.
-        auto memberState = getMemberState();
-        invariant(memberState.startup2() || memberState.removed());
-        invariant(setFollowerMode(MemberState::RS_RECOVERING));
-        // Set an initial sync ID, in case we were upgraded or restored from backup without doing
-        // an initial sync.
-        _replicationProcess->getConsistencyMarkers()->setInitialSyncIdIfNotSet(opCtx);
-        _externalState->startSteadyStateReplication(opCtx, this);
-        return;
-    }
-
-    LOGV2_DEBUG(4280513, 1, "Initial sync required. Attempting to start initial sync...");
-    // Do initial sync.
-    if (!_externalState->getTaskExecutor()) {
-        LOGV2(21323, "Not running initial sync during test");
-        return;
-    }
-
-    auto onCompletion = [this, startCompleted](const StatusWith<OpTimeAndWallTime>& opTimeStatus) {
-        {
-            stdx::lock_guard<Latch> lock(_mutex);
-            if (opTimeStatus == ErrorCodes::CallbackCanceled) {
-                LOGV2(21324,
-                      "Initial Sync has been cancelled: {error}",
-                      "Initial Sync has been cancelled",
-                      "error"_attr = opTimeStatus.getStatus());
-                return;
-            } else if (!opTimeStatus.isOK()) {
-                if (_inShutdown) {
-                    LOGV2(21325,
-                          "Initial Sync failed during shutdown due to {error}",
-                          "Initial Sync failed during shutdown",
-                          "error"_attr = opTimeStatus.getStatus());
-                    return;
-                } else {
-                    LOGV2_ERROR(21416,
-                                "Initial sync failed, shutting down now. Restart the server "
-                                "to attempt a new initial sync");
-                    fassertFailedWithStatusNoTrace(40088, opTimeStatus.getStatus());
-                }
-            }
-
-            const auto lastApplied = opTimeStatus.getValue();
-            _setMyLastAppliedOpTimeAndWallTime(lock, lastApplied, false);
-
-            _topCoord->resetMaintenanceCount();
-        }
-
-        if (startCompleted) {
-            startCompleted();
-        }
-        // Transition from STARTUP2 to RECOVERING and start the producer and the applier.
-        // If the member state is REMOVED, this will do nothing until we receive a config with
-        // ourself in it.
-        const auto memberState = getMemberState();
-        invariant(memberState.startup2() || memberState.removed());
-        invariant(setFollowerMode(MemberState::RS_RECOVERING));
-        auto opCtxHolder = cc().makeOperationContext();
-        _externalState->startSteadyStateReplication(opCtxHolder.get(), this);
-        // This log is used in tests to ensure we made it to this point.
-        LOGV2_DEBUG(4853000, 1, "initial sync complete.");
-    };
-
+void ReplicationCoordinatorImpl::_startInitialSync(
+    OperationContext* opCtx,
+    InitialSyncerInterface::OnCompletionFn onCompletion,
+    bool fallbackToLogical) {
     std::shared_ptr<InitialSyncerInterface> initialSyncerCopy;
     try {
         {
@@ -799,7 +726,8 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx,
                     onCompletion);
             };
 
-            if (repl::feature_flags::gFileCopyBasedInitialSync.isEnabledAndIgnoreFCV()) {
+            if (repl::feature_flags::gFileCopyBasedInitialSync.isEnabledAndIgnoreFCV() &&
+                !fallbackToLogical) {
                 auto swInitialSyncer = createInitialSyncer(initialSyncMethod);
                 if (swInitialSyncer.getStatus().code() == ErrorCodes::NotImplemented &&
                     initialSyncMethod != "logical") {
@@ -832,6 +760,104 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx,
         }
         fassertFailedWithStatusNoTrace(40354, status);
     }
+}
+
+void ReplicationCoordinatorImpl::_initialSyncerCompletionFunction(
+    const StatusWith<OpTimeAndWallTime>& opTimeStatus) {
+    {
+        stdx::unique_lock<Latch> lock(_mutex);
+        if (opTimeStatus == ErrorCodes::CallbackCanceled) {
+            LOGV2(21324,
+                  "Initial Sync has been cancelled: {error}",
+                  "Initial Sync has been cancelled",
+                  "error"_attr = opTimeStatus.getStatus());
+            return;
+        } else if (opTimeStatus == ErrorCodes::InvalidSyncSource &&
+                   _initialSyncer->getInitialSyncMethod() != "logical") {
+            LOGV2(5780600,
+                  "Falling back to logical initial sync: {error}",
+                  "Falling back to logical initial sync",
+                  "error"_attr = opTimeStatus.getStatus());
+            lock.unlock();
+            clearSyncSourceDenylist();
+            _scheduleWorkAt(_replExecutor->now(),
+                            [=](const mongo::executor::TaskExecutor::CallbackArgs& cbData) {
+                                _startInitialSync(
+                                    cc().makeOperationContext().get(),
+                                    [this](const StatusWith<OpTimeAndWallTime>& opTimeStatus) {
+                                        _initialSyncerCompletionFunction(opTimeStatus);
+                                    },
+                                    true /* fallbackToLogical */);
+                            });
+            return;
+        } else if (!opTimeStatus.isOK()) {
+            if (_inShutdown) {
+                LOGV2(21325,
+                      "Initial Sync failed during shutdown due to {error}",
+                      "Initial Sync failed during shutdown",
+                      "error"_attr = opTimeStatus.getStatus());
+                return;
+            } else {
+                LOGV2_ERROR(21416,
+                            "Initial sync failed, shutting down now. Restart the server "
+                            "to attempt a new initial sync");
+                fassertFailedWithStatusNoTrace(40088, opTimeStatus.getStatus());
+            }
+        }
+
+
+        const auto lastApplied = opTimeStatus.getValue();
+        _setMyLastAppliedOpTimeAndWallTime(lock, lastApplied, false);
+
+        _topCoord->resetMaintenanceCount();
+    }
+
+    // Transition from STARTUP2 to RECOVERING and start the producer and the applier.
+    // If the member state is REMOVED, this will do nothing until we receive a config with
+    // ourself in it.
+    const auto memberState = getMemberState();
+    invariant(memberState.startup2() || memberState.removed());
+    invariant(setFollowerMode(MemberState::RS_RECOVERING));
+    auto opCtxHolder = cc().makeOperationContext();
+    _externalState->startSteadyStateReplication(opCtxHolder.get(), this);
+    // This log is used in tests to ensure we made it to this point.
+    LOGV2_DEBUG(4853000, 1, "initial sync complete.");
+}
+
+void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx) {
+    if (_startedSteadyStateReplication.swap(true)) {
+        // This is not the first call.
+        return;
+    }
+
+    // Check to see if we need to do an initial sync.
+    const auto lastOpTime = getMyLastAppliedOpTime();
+    const auto needsInitialSync =
+        lastOpTime.isNull() || _externalState->isInitialSyncFlagSet(opCtx);
+    if (!needsInitialSync) {
+        LOGV2_DEBUG(4280512, 1, "No initial sync required. Attempting to begin steady replication");
+        // Start steady replication, since we already have data.
+        // ReplSetConfig has been installed, so it's either in STARTUP2 or REMOVED.
+        auto memberState = getMemberState();
+        invariant(memberState.startup2() || memberState.removed());
+        invariant(setFollowerMode(MemberState::RS_RECOVERING));
+        // Set an initial sync ID, in case we were upgraded or restored from backup without doing
+        // an initial sync.
+        _replicationProcess->getConsistencyMarkers()->setInitialSyncIdIfNotSet(opCtx);
+        _externalState->startSteadyStateReplication(opCtx, this);
+        return;
+    }
+
+    LOGV2_DEBUG(4280513, 1, "Initial sync required. Attempting to start initial sync...");
+    // Do initial sync.
+    if (!_externalState->getTaskExecutor()) {
+        LOGV2(21323, "Not running initial sync during test");
+        return;
+    }
+
+    _startInitialSync(opCtx, [this](const StatusWith<OpTimeAndWallTime>& opTimeStatus) {
+        _initialSyncerCompletionFunction(opTimeStatus);
+    });
 }
 
 void ReplicationCoordinatorImpl::startup(OperationContext* opCtx,
