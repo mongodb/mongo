@@ -36,6 +36,7 @@ namespace mongo {
 
 WiredTigerHarnessHelper::WiredTigerHarnessHelper(StringData extraStrings)
     : _dbpath("wt_test"),
+      _lockerNoopClientObserverRegisterer(getServiceContext()),
       _engine(kWiredTigerEngineName,
               _dbpath.path(),
               &_cs,
