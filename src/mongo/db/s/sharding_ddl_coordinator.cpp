@@ -219,6 +219,7 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
                          status.isA<ErrorCategory::RetriableError>() ||
                          status.isA<ErrorCategory::CancellationError>() ||
                          status.isA<ErrorCategory::ExceededTimeLimitError>() ||
+                         status.isA<ErrorCategory::WriteConcernError>() ||
                          status == ErrorCodes::Interrupted || status == ErrorCodes::LockBusy ||
                          status == ErrorCodes::CommandNotFound) &&
                         !token.isCanceled()) {
