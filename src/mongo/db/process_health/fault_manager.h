@@ -83,15 +83,24 @@ public:
                           std::shared_ptr<executor::TaskExecutor> taskExecutor);
     virtual ~FaultManager();
 
+    // Start periodic health checks, invoke it once during server startup.
+    // It is unsafe to start health checks immediately during ServiceContext creation
+    // because some ServiceContext fields might not be initialized yet.
+    // Health checks cannot be stopped but could be effectively disabled with health-checker
+    // specific flags.
+    void startPeriodicHealthChecks();
+
     static FaultManager* get(ServiceContext* svcCtx);
 
+    // Replace the FaultManager for the 'svcCtx'. This functionality
+    // is exposed for testing and initial bootstrap.
     static void set(ServiceContext* svcCtx, std::unique_ptr<FaultManager> newFaultManager);
 
     // Returns the current fault state for the server.
-    virtual FaultState getFaultState() const;
+    FaultState getFaultState() const;
 
     // Returns the current fault, if any. Otherwise returns an empty pointer.
-    virtual FaultConstPtr currentFault() const;
+    FaultConstPtr currentFault() const;
 
 protected:
     // Starts the health check sequence and updates the internal state on completion.
@@ -121,7 +130,7 @@ protected:
     // State transition should be triggered by events above.
     Status transitionToState(FaultState newState);
 
-    void schedulePeriodicHealthCheckThread();
+    void schedulePeriodicHealthCheckThread(bool immediately = false);
 
 private:
     // State machine related.

@@ -81,11 +81,9 @@ void FaultManager::set(ServiceContext* svcCtx, std::unique_ptr<FaultManager> new
 
 FaultManager::FaultManager(ServiceContext* svcCtx,
                            std::shared_ptr<executor::TaskExecutor> taskExecutor)
-    : _svcCtx(svcCtx), _taskExecutor(taskExecutor) {
-    schedulePeriodicHealthCheckThread();
-}
+    : _svcCtx(svcCtx), _taskExecutor(taskExecutor) {}
 
-void FaultManager::schedulePeriodicHealthCheckThread() {
+void FaultManager::schedulePeriodicHealthCheckThread(bool immediately) {
     if (!feature_flags::gFeatureFlagHealthMonitoring.isEnabled(
             serverGlobalParams.featureCompatibility)) {
         return;
@@ -93,15 +91,17 @@ void FaultManager::schedulePeriodicHealthCheckThread() {
 
     auto lk = stdx::lock_guard(_mutex);
 
-    auto periodicThreadCbHandleStatus = _taskExecutor->scheduleWorkAt(
-        _taskExecutor->now() + kPeriodicHealthCheckInterval,
-        [=](const mongo::executor::TaskExecutor::CallbackArgs& cbData) {
-            if (!cbData.status.isOK()) {
-                return;
-            }
+    const auto cb = [this](const mongo::executor::TaskExecutor::CallbackArgs& cbData) {
+        if (!cbData.status.isOK()) {
+            return;
+        }
 
-            healthCheck();
-        });
+        healthCheck();
+    };
+
+    auto periodicThreadCbHandleStatus = immediately
+        ? _taskExecutor->scheduleWork(cb)
+        : _taskExecutor->scheduleWorkAt(_taskExecutor->now() + kPeriodicHealthCheckInterval, cb);
 
     uassert(5936101,
             "Failed to initialize periodic health check work.",
@@ -113,6 +113,15 @@ FaultManager::~FaultManager() {
     if (_periodicHealthCheckCbHandle) {
         _taskExecutor->cancel(*_periodicHealthCheckCbHandle);
     }
+}
+
+void FaultManager::startPeriodicHealthChecks() {
+    invariant(getFaultState() == FaultState::kStartupCheck);
+    {
+        auto lk = stdx::lock_guard(_mutex);
+        invariant(!_periodicHealthCheckCbHandle);
+    }
+    schedulePeriodicHealthCheckThread(true /* immediately */);
 }
 
 FaultState FaultManager::getFaultState() const {
