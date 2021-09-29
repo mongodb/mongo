@@ -580,6 +580,7 @@ SingleWriteResult makeWriteResultForInsertOrDeleteRetry() {
     res.setNModified(0);
     return res;
 }
+
 }  // namespace
 
 WriteResult performInserts(OperationContext* opCtx,
@@ -783,28 +784,6 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
                 "Cannot perform an upsert on a time-series collection",
                 !updateRequest->isUpsert());
 
-        // Get the original update query and check that it only depends on the metaField.
-        const auto& updateQuery = updateRequest->getQuery();
-        uassert(ErrorCodes::InvalidOptions,
-                str::stream() << "Cannot perform an update on a time-series collection "
-                                 "when querying on a field that is not the metaField '"
-                              << *metaField << "'",
-                timeseries::queryOnlyDependsOnMetaField(opCtx,
-                                                        ns,
-                                                        updateQuery,
-                                                        *metaField,
-                                                        *updateRequest->getLegacyRuntimeConstants(),
-                                                        updateRequest->getLetParameters()));
-
-        // Get the original set of modifications to apply and check that they only
-        // modify the metaField.
-        const auto& updateMod = updateRequest->getUpdateModification();
-        uassert(ErrorCodes::InvalidOptions,
-                str::stream() << "Cannot perform an update on a time-series collection which "
-                                 "updates a field that is not the metaField '"
-                              << *metaField << "'",
-                timeseries::updateOnlyModifiesMetaField(opCtx, updateMod, *metaField));
-
         // Only translate the hint (if there is one) if it is specified with an index specification
         // document.
         if (!updateRequest->getHint().isEmpty() &&
@@ -814,8 +793,9 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
                     *timeseriesOptions, updateRequest->getHint())));
         }
 
-        updateRequest->setQuery(timeseries::translateQuery(updateQuery, *metaField));
-        updateRequest->setUpdateModification(timeseries::translateUpdate(updateMod, *metaField));
+        updateRequest->setQuery(timeseries::translateQuery(updateRequest->getQuery(), *metaField));
+        updateRequest->setUpdateModification(
+            timeseries::translateUpdate(updateRequest->getUpdateModification(), *metaField));
 
         documentCounter =
             timeseries::numMeasurementsForBucketCounter(timeseriesOptions->getTimeField());
@@ -1141,16 +1121,6 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
                 "does not have a metaField",
                 timeseriesOptions->getMetaField() || request.getQuery().isEmpty());
 
-        uassert(ErrorCodes::InvalidOptions,
-                str::stream() << "Cannot perform a delete on a time-series collection "
-                                 "when querying on a field that is not the metaField '"
-                              << timeseriesOptions->getMetaField() << "'",
-                timeseries::queryOnlyDependsOnMetaField(opCtx,
-                                                        ns,
-                                                        request.getQuery(),
-                                                        timeseriesOptions->getMetaField(),
-                                                        runtimeConstants,
-                                                        letParams));
         uassert(ErrorCodes::IllegalOperation,
                 "Cannot perform a non-multi delete on a time-series collection",
                 request.getMulti());
