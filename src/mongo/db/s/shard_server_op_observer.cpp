@@ -575,11 +575,8 @@ void ShardServerOpObserver::onCreateCollection(OperationContext* opCtx,
             "CreateCollectionCoordinator",
             oss._allowCollectionCreation);
 
-    // If the check above passes, this means the caller is responsible to eventially set the shard
-    // version for the collection
-    //
-    // TODO (SERVER-55284): Delete the lines below once all usages of
-    // ScopedAllowImplicitCollectionCreate_UNSAFE have been removed
+    // If the check above passes, this means the collection doesn't exist and is being created and
+    // that the caller will be responsible to eventially set the proper shard version
     auto* const csr = CollectionShardingRuntime::get(opCtx, collectionName);
     if (!csr->getCurrentMetadataIfKnown()) {
         csr->setFilteringMetadata(opCtx, CollectionMetadata());

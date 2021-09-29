@@ -69,12 +69,12 @@ public:
     static bool isOperationVersioned(OperationContext* opCtx);
 
     /**
-     * Instantiating this object on the stack indicates to the storage execution subsystem that it
-     * is allowed to create a collection in this context and that the caller is responsible for
-     * notifying the shard Sharding sybsystem of the collection creation.
+     * NOTE: DO NOT ADD any new usages of this class without including someone from the Sharding
+     * Team on the code review.
      *
-     * DO NOT add any new usages of this class without including someone from the Sharding Team on
-     * the code review.
+     * Instantiating this object on the stack indicates to the storage execution subsystem that it
+     * is allowed to create any collection in this context and that the caller will be responsible
+     * for notifying the shard Sharding sybsystem of the collection creation.
      */
     class ScopedAllowImplicitCollectionCreate_UNSAFE {
     public:
