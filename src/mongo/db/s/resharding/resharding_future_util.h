@@ -31,6 +31,7 @@
 
 #include <vector>
 
+#include "mongo/db/cancelable_operation_context.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/future.h"
@@ -165,6 +166,25 @@ private:
 
     unique_function<void(const Status&)> _onTransientError;
     unique_function<void(const Status&)> _onUnrecoverableError;
+};
+
+/**
+ * Wrapper class around CancelableOperationContextFactory which uses resharding::WithAutomaticRetry
+ * to ensure all cancelable operations will be retried if able upon failure.
+ */
+class RetryingCancelableOperationContextFactory {
+public:
+    RetryingCancelableOperationContextFactory(CancellationToken cancelToken, ExecutorPtr executor)
+        : _factory{std::move(cancelToken), std::move(executor)} {}
+
+    template <typename BodyCallable>
+    decltype(auto) withAutomaticRetry(BodyCallable&& body) const {
+        return resharding::WithAutomaticRetry([this, body]() { return body(_factory); });
+    }
+
+
+private:
+    const CancelableOperationContextFactory _factory;
 };
 
 }  // namespace resharding
