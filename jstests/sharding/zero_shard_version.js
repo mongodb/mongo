@@ -112,13 +112,6 @@ st.configRS.awaitLastOpCommitted();
 checkShardMajorVersion(st.rs0.getPrimary(), 0);
 checkShardMajorVersion(st.rs1.getPrimary(), 2);
 
-// mongos2 still thinks that { x: 1 } belong to st.shard0.shardName, but should be able to
-// refresh it's metadata correctly.
-assert.neq(null, testDB_s2.user.findOne({x: 1}));
-
-checkShardMajorVersion(st.rs0.getPrimary(), 2);
-checkShardMajorVersion(st.rs1.getPrimary(), 2);
-
 // Set shard metadata to 2|0|b
 assert.neq(null, testDB_s2.user.findOne({x: -11}));
 

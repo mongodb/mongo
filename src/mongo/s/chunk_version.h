@@ -188,7 +188,8 @@ public:
     }
 
     bool operator==(const ChunkVersion& otherVersion) const {
-        return otherVersion.epoch() == epoch() && otherVersion._combined == _combined;
+        return otherVersion.epoch() == epoch() && otherVersion.getTimestamp() == getTimestamp() &&
+            otherVersion._combined == _combined;
     }
 
     bool operator!=(const ChunkVersion& otherVersion) const {
@@ -200,13 +201,22 @@ public:
         return epoch() == other.epoch() && majorVersion() == other.majorVersion();
     }
 
+    // Unsharded timestamp cannot be compared with other timestamps
+    bool isNotComparableWith(const ChunkVersion& other) const {
+        return *this == UNSHARDED() || other == UNSHARDED() || *this == IGNORED() ||
+            other == IGNORED();
+    }
+
     /**
-     * Returns true if both versions are comparable (i.e. same epochs) and the current version is
-     * older than the other one. Returns false otherwise.
+     * Returns true if both versions are comparable (i.e. neither version is UNSHARDED) and the
+     * current version is older than the other one. Returns false otherwise.
      */
     bool isOlderThan(const ChunkVersion& otherVersion) const {
-        if (otherVersion._epoch != _epoch)
+        if (this->isNotComparableWith(otherVersion))
             return false;
+
+        if (getTimestamp() != otherVersion.getTimestamp())
+            return getTimestamp() < otherVersion.getTimestamp();
 
         if (majorVersion() != otherVersion.majorVersion())
             return majorVersion() < otherVersion.majorVersion();

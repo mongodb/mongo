@@ -180,11 +180,8 @@ void MetadataManager::setFilteringMetadata(CollectionMetadata remoteMetadata) {
 
     const auto remoteCollVersion = remoteMetadata.getCollVersion();
     const auto activeCollVersion = activeMetadata.getCollVersion();
-    // Do nothing if the remote version is older than the current active one,
-    // or it is the same and there was not an update on the metadata format.
-    if (remoteCollVersion.isOlderThan(activeCollVersion) ||
-        (remoteCollVersion == activeCollVersion &&
-         remoteCollVersion.getTimestamp() == activeCollVersion.getTimestamp())) {
+    // Do nothing if the remote version is older than or equal to the current active one
+    if (remoteCollVersion.isOlderOrEqualThan(activeCollVersion)) {
         LOGV2_DEBUG(21984,
                     1,
                     "Ignoring incoming metadata update {activeMetadata} for {namespace} because "

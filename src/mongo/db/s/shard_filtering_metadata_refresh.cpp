@@ -232,11 +232,9 @@ void onShardVersionMismatch(OperationContext* opCtx,
             // Check if the current shard version is fresh enough
             if (shardVersionReceived) {
                 const auto currentShardVersion = metadata->getShardVersion();
-                // Don't need to remotely reload if we're in the same epoch and the requested
-                // version is smaller than the known one. This means that the remote side is behind.
-                if (shardVersionReceived->isOlderThan(currentShardVersion) ||
-                    (*shardVersionReceived == currentShardVersion &&
-                     shardVersionReceived->getTimestamp() == currentShardVersion.getTimestamp())) {
+                // Don't need to remotely reload if the requested version is smaller than the known
+                // one. This means that the remote side is behind.
+                if (shardVersionReceived->isOlderOrEqualThan(currentShardVersion)) {
                     return;
                 }
             }
@@ -432,9 +430,7 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
         if (optMetadata) {
             const auto& metadata = *optMetadata;
             if (metadata.isSharded() &&
-                (cm.getVersion().isOlderThan(metadata.getCollVersion()) ||
-                 (cm.getVersion() == metadata.getCollVersion() &&
-                  cm.getVersion().getTimestamp() == metadata.getCollVersion().getTimestamp()))) {
+                (cm.getVersion().isOlderOrEqualThan(metadata.getCollVersion()))) {
                 LOGV2_DEBUG(
                     22063,
                     1,
@@ -466,9 +462,7 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
         if (optMetadata) {
             const auto& metadata = *optMetadata;
             if (metadata.isSharded() &&
-                (cm.getVersion().isOlderThan(metadata.getCollVersion()) ||
-                 (cm.getVersion() == metadata.getCollVersion() &&
-                  cm.getVersion().getTimestamp() == metadata.getCollVersion().getTimestamp()))) {
+                (cm.getVersion().isOlderOrEqualThan(metadata.getCollVersion()))) {
                 LOGV2_DEBUG(
                     22064,
                     1,

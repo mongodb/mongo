@@ -142,6 +142,7 @@ TEST(ChunkVersionComparison, EqualityOperators) {
 TEST(ChunkVersionComparison, OlderThan) {
     OID epoch = OID::gen();
     Timestamp timestamp(1);
+    Timestamp newerTimestamp(2);
 
     ASSERT(ChunkVersion(3, 1, epoch, timestamp).isOlderThan(ChunkVersion(4, 1, epoch, timestamp)));
     ASSERT(!ChunkVersion(4, 1, epoch, timestamp).isOlderThan(ChunkVersion(3, 1, epoch, timestamp)));
@@ -149,12 +150,13 @@ TEST(ChunkVersionComparison, OlderThan) {
     ASSERT(ChunkVersion(3, 1, epoch, timestamp).isOlderThan(ChunkVersion(3, 2, epoch, timestamp)));
     ASSERT(!ChunkVersion(3, 2, epoch, timestamp).isOlderThan(ChunkVersion(3, 1, epoch, timestamp)));
 
-    ASSERT(!ChunkVersion(3, 1, epoch, timestamp).isOlderThan(ChunkVersion(4, 1, OID(), timestamp)));
-    ASSERT(!ChunkVersion(4, 1, OID(), timestamp).isOlderThan(ChunkVersion(3, 1, epoch, timestamp)));
+    ASSERT(ChunkVersion(3, 1, epoch, timestamp)
+               .isOlderThan(ChunkVersion(3, 1, OID::gen(), newerTimestamp)));
+    ASSERT(!ChunkVersion(3, 1, epoch, newerTimestamp)
+                .isOlderThan(ChunkVersion(3, 1, OID::gen(), timestamp)));
 
-    ASSERT(ChunkVersion(3, 2, epoch, timestamp).isOlderThan(ChunkVersion(4, 1, epoch, timestamp)));
-
-    ASSERT(!ChunkVersion(3, 1, epoch, timestamp).isOlderThan(ChunkVersion(3, 1, epoch, timestamp)));
+    ASSERT(!ChunkVersion::UNSHARDED().isOlderThan(ChunkVersion(3, 1, epoch, timestamp)));
+    ASSERT(!ChunkVersion(3, 1, epoch, timestamp).isOlderThan(ChunkVersion::UNSHARDED()));
 }
 
 TEST(ChunkVersionConstruction, CreateWithLargeValues) {

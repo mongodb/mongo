@@ -979,7 +979,7 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
                           << " neither by recipient " << toShard,
             currentChunk.getShard() == fromShard);
 
-    if (migratedChunk.getVersion().epoch() != currentChunk.getVersion().epoch() ||
+    if (migratedChunk.getVersion().isNotComparableWith(currentChunk.getVersion()) ||
         migratedChunk.getVersion().isOlderThan(currentChunk.getVersion())) {
         return {ErrorCodes::ConflictingOperationInProgress,
                 str::stream()

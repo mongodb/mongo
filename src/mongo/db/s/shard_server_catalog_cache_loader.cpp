@@ -869,7 +869,7 @@ ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
             "newSupportingLongName"_attr = collAndChunks.supportingLongName);
     }
 
-    if ((collAndChunks.epoch != maxLoaderVersion.epoch()) ||
+    if (collAndChunks.changedChunks.back().getVersion().isNotComparableWith(maxLoaderVersion) ||
         maxLoaderVersion.isOlderThan(collAndChunks.changedChunks.back().getVersion())) {
         _ensureMajorityPrimaryAndScheduleCollAndChunksTask(
             opCtx,
