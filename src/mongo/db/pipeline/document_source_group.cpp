@@ -255,17 +255,14 @@ void DocumentSourceGroup::doDispose() {
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceGroup::optimize() {
-    // Maybe another pipeline stage follows this stage. So, we must leave 'expCtx->sbeCompatible'
-    // flag unchanged after this function is done so that the current stage's compatibility flag
-    // does not affect the following stage. We call optimize() on each stage twice. Once in the
-    // initial pipeline optimization phase and once in late optimization phase right before getting
-    // an executor. See 'mongo::runAggregate()' and 'PipelineD::buildInnerQueryExecutorGeneric()'.
+    // Optimizing a 'DocumentSourceGroup' might modify its expressions to become incompatible with
+    // SBE. We temporarily highjack the context's 'sbeCompatible' flag to communicate the situation
+    // back to the 'DocumentSourceGroup'. Notice, that while a particular 'DocumentSourceGroup'
+    // might become incompatible with SBE, other groups in the pipeline and the collection access
+    // could be still eligible for lowering to SBE, thus we must reset the context's 'sbeCompatible'
+    // flag back to its original value at the end of the 'optimize()' call.
     //
-    // TODO SERVER-XXXXX: It's hard to track expCtx's sbeCompatible flag because it's shared among
-    // all pipeline stages and expressions. Instead, we should use a compatibility flag per each
-    // pipeline stage and a compatibility flag per each expression. Conceptually, a pipeline stage
-    // is compatible with SBE iff it's compatible with SBE and all its expressions are
-    // compatible with SBE.
+    // TODO SERVER-XXXXX: replace this hack with a proper per-stage tracking of SBE compatibility.
     auto expCtx = _idExpressions[0]->getExpressionContext();
     auto orgSbeCompatible = expCtx->sbeCompatible;
     expCtx->sbeCompatible = true;

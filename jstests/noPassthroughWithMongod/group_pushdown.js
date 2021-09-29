@@ -165,7 +165,7 @@ assertNoGroupPushdown(coll,
                       [{_id: "a", quantity: 7}, {_id: "b", quantity: 10}]);
 
 // $bucketAuto/$bucket/$sortByCount are sugared $group stages which are not compatible with SBE.
-// TODO SERVER-60203: When we support pushdown of these stages, change these assertions to check
+// TODO SERVER-60300: When we support pushdown of these stages, change these assertions to check
 // that they are pushed down.
 assertNoGroupPushdown(
     coll,
