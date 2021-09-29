@@ -182,6 +182,11 @@ void ParsedUpdate::parseUpdate() {
     _driver.setCollator(_expCtx->getCollator());
     _driver.setLogOp(true);
     _driver.setFromOplogApplication(_request->isFromOplogApplication());
+    // Time-series operations will not result in any documents with dots or dollars fields.
+    if (auto source = _request->source(); source == OperationSource::kTimeseriesInsert ||
+        source == OperationSource::kTimeseriesUpdate) {
+        _driver.setSkipDotsDollarsCheck(true);
+    }
 
     _driver.parse(_request->getUpdateModification(),
                   _arrayFilters,

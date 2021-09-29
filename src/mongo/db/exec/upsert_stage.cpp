@@ -283,7 +283,7 @@ void UpsertStage::_assertDocumentToBeInsertedIsValid(const mb::Document& documen
             serverGlobalParams.featureCompatibility.isVersionInitialized() &&
             serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
                 multiversion::FeatureCompatibilityVersion::kFullyDowngradedTo_5_0);
-        storage_validation::storageValid(document,
+        storage_validation::scanDocument(document,
                                          allowTopLevelDollarPrefixes,
                                          true, /* Should validate for storage */
                                          &containsDotsAndDollarsField);

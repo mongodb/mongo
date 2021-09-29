@@ -174,6 +174,10 @@ public:
         _fromOplogApplication = fromOplogApplication;
     }
 
+    void setSkipDotsDollarsCheck(bool skipDotsDollarsCheck) {
+        _skipDotsDollarsCheck = skipDotsDollarsCheck;
+    }
+
     mutablebson::Document& getDocument() {
         return _objDoc;
     }
@@ -236,6 +240,10 @@ private:
 
     // True if this update comes from an oplog application.
     bool _fromOplogApplication = false;
+
+    // True if this update is guaranteed not to contain dots or dollars fields and should skip the
+    // check.
+    bool _skipDotsDollarsCheck = false;
 
     boost::intrusive_ptr<ExpressionContext> _expCtx;
 

@@ -133,7 +133,7 @@ UpdateStage::UpdateStage(ExpressionContext* expCtx,
       _idReturning(WorkingSet::INVALID_ID),
       _updatedRecordIds(params.request->isMulti() ? new RecordIdSet() : nullptr) {
 
-    // Should the modifiers validate their embedded docs via storage_validation::storageValid()?
+    // Should the modifiers validate their embedded docs via storage_validation::scanDocument()?
     // Only user updates should be checked. Any system or replication stuff should pass through.
     const auto request = _params.request;
 

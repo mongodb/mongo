@@ -72,7 +72,7 @@ void UnsetNode::validateUpdate(mutablebson::ConstElement updatedElement,
     const uint32_t recursionLevelForCheck = 0;
 
     if (leftSibling.ok()) {
-        storage_validation::storageValid(leftSibling,
+        storage_validation::scanDocument(leftSibling,
                                          doRecursiveCheck,
                                          recursionLevelForCheck,
                                          false, /* allowTopLevelDollarPrefixedFields */
@@ -81,7 +81,7 @@ void UnsetNode::validateUpdate(mutablebson::ConstElement updatedElement,
     }
 
     if (rightSibling.ok()) {
-        storage_validation::storageValid(rightSibling,
+        storage_validation::scanDocument(rightSibling,
                                          doRecursiveCheck,
                                          recursionLevelForCheck,
                                          false, /* allowTopLevelDollarPrefixedFields */

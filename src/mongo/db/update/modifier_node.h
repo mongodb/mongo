@@ -103,7 +103,7 @@ protected:
     /**
      * ModifierNode::apply() calls this method after it finishes applying its update to validate
      * that no changes resulted in an invalid document. See the implementation of
-     * storage_validation::storageValid() for more detail about document validation requirements.
+     * storage_validation::scanDocument() for more detail about document validation requirements.
      * Most ModifierNode child classes can use the default implementation of this method.
      *
      * - 'updatedElement' is the element that was set by either updateExistingElement() or

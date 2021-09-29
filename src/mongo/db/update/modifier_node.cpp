@@ -375,7 +375,7 @@ void ModifierNode::validateUpdate(mutablebson::ConstElement updatedElement,
                                   bool* containsDotsAndDollarsField) const {
     const bool doRecursiveCheck = true;
 
-    storage_validation::storageValid(updatedElement,
+    storage_validation::scanDocument(updatedElement,
                                      doRecursiveCheck,
                                      recursionLevel,
                                      false, /* allowTopLevelDollarPrefixedFields */

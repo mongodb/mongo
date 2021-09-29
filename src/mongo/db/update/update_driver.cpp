@@ -271,6 +271,7 @@ Status UpdateDriver::update(OperationContext* opCtx,
     applyParams.matchedField = matchedField;
     applyParams.insert = isInsert;
     applyParams.fromOplogApplication = _fromOplogApplication;
+    applyParams.skipDotsDollarsCheck = _skipDotsDollarsCheck;
     applyParams.validateForStorage = validateForStorage;
     applyParams.indexData = _indexedFields;
     applyParams.modifiedPaths = modifiedPaths;

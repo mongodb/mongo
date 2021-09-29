@@ -70,7 +70,7 @@ void ArrayCullingNode::validateUpdate(mutablebson::ConstElement updatedElement,
     // override validateUpdate to not validate storage constraints but we still want to know if
     // there is any field name containing '.'/'$'.
     bool doRecursiveCheck = true;
-    storage_validation::storageValid(updatedElement,
+    storage_validation::scanDocument(updatedElement,
                                      doRecursiveCheck,
                                      recursionLevel,
                                      false, /* allowTopLevelDollarPrefixedFields */
