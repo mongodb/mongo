@@ -44,7 +44,7 @@ namespace {
 
 const StringData idFieldName = "_id"_sd;
 
-void storageValidChildren(mutablebson::ConstElement elem,
+void scanDocumentChildren(mutablebson::ConstElement elem,
                           const bool deep,
                           std::uint32_t recursionLevel,
                           const bool allowTopLevelDollarPrefixes,
@@ -56,7 +56,7 @@ void storageValidChildren(mutablebson::ConstElement elem,
 
     auto curr = elem.leftChild();
     while (curr.ok()) {
-        storageValid(curr,
+        scanDocument(curr,
                      deep,
                      recursionLevel + 1,
                      allowTopLevelDollarPrefixes,
@@ -149,7 +149,7 @@ Status storageValidIdField(const mongo::BSONElement& element) {
     return Status::OK();
 }
 
-void storageValid(const mutablebson::Document& doc,
+void scanDocument(const mutablebson::Document& doc,
                   const bool allowTopLevelDollarPrefixes,
                   const bool shouldValidate,
                   bool* containsDotsAndDollarsField) {
@@ -159,7 +159,7 @@ void storageValid(const mutablebson::Document& doc,
             if (currElem.getType() == BSONType::Object) {
                 // We need to recursively validate the _id field while ensuring we disallow
                 // top-level $-prefix fields in the _id object.
-                storageValid(currElem,
+                scanDocument(currElem,
                              true /* deep */,
                              0 /* recursionLevel - forces _id fields to be treated as top-level. */,
                              false /* Top-level _id fields cannot be $-prefixed. */,
@@ -172,7 +172,7 @@ void storageValid(const mutablebson::Document& doc,
             // Validate this child element.
             const auto deep = true;
             const uint32_t recursionLevel = 1;
-            storageValid(currElem,
+            scanDocument(currElem,
                          deep,
                          recursionLevel,
                          allowTopLevelDollarPrefixes,
@@ -184,7 +184,7 @@ void storageValid(const mutablebson::Document& doc,
     }
 }
 
-void storageValid(mutablebson::ConstElement elem,
+void scanDocument(mutablebson::ConstElement elem,
                   const bool deep,
                   std::uint32_t recursionLevel,
                   const bool allowTopLevelDollarPrefixes,
@@ -229,7 +229,7 @@ void storageValid(mutablebson::ConstElement elem,
     if (deep) {
 
         // Check children if there are any.
-        storageValidChildren(elem,
+        scanDocumentChildren(elem,
                              deep,
                              recursionLevel,
                              allowTopLevelDollarPrefixes,

@@ -105,11 +105,14 @@ UpdateExecutor::ApplyResult ObjectReplaceExecutor::applyReplacementUpdate(
 
     ApplyResult ret;
 
-    // Validate for storage and check if the document contains any '.'/'$' field name.
-    storage_validation::storageValid(applyParams.element.getDocument(),
-                                     allowTopLevelDollarPrefixedFields,
-                                     applyParams.validateForStorage,
-                                     &ret.containsDotsAndDollarsField);
+    if (!applyParams.skipDotsDollarsCheck || applyParams.validateForStorage) {
+        // Validate for storage and check if the document contains any '.'/'$' field name. We pass
+        // 'containsDotsAndDollarsField' unconditionally for now.
+        storage_validation::scanDocument(applyParams.element.getDocument(),
+                                         allowTopLevelDollarPrefixedFields,
+                                         applyParams.validateForStorage,
+                                         &ret.containsDotsAndDollarsField);
+    }
 
     // Check immutable paths.
     for (auto path = applyParams.immutablePaths.begin(); path != applyParams.immutablePaths.end();

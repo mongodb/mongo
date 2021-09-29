@@ -86,6 +86,10 @@ public:
         // replication.
         bool fromOplogApplication = false;
 
+        // If true, it is guaranteed that the document doesn't contain dots or dollars fields and
+        // should skip the check.
+        bool skipDotsDollarsCheck = false;
+
         // If true, UpdateNode::apply ensures that modified elements do not violate depth or DBRef
         // constraints.
         bool validateForStorage = true;
