@@ -983,7 +983,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinDoubleDoubleSum
     auto [sumTag, sum] = arr->getAt(AggSumValueElems::kNonDecimalTotalSum);
     auto [addendTag, addend] = arr->getAt(AggSumValueElems::kNonDecimalTotalAddend);
     tassert(5755323,
-            "The sum and addend must be NumbetDouble",
+            "The sum and addend must be NumberDouble",
             sumTag == addendTag && sumTag == value::TypeTags::NumberDouble);
 
     // We're guaranteed to always have a valid nonDecimalTotal value.
@@ -1033,6 +1033,49 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinDoubleDoubleSum
         auto [tag, val] = value::makeCopyDecimal(decimalTotal.add(nonDecimalTotal.getDecimal()));
         return {true, tag, val};
     }
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggStdDev(ArityType arity) {
+    auto [_, fieldTag, fieldValue] = getFromStack(1);
+    // Move the incoming accumulator state from the stack. Given that we are now the owner of the
+    // state we are free to do any in-place update as we see fit.
+    auto [accTag, accValue] = moveOwnedFromStack(0);
+    value::ValueGuard guard{accTag, accValue};
+
+    // Initialize the accumulator.
+    if (accTag == value::TypeTags::Nothing) {
+        auto [newAccTag, newAccValue] = value::makeNewArray();
+        value::ValueGuard newGuard{newAccTag, newAccValue};
+        auto arr = value::getArrayView(newAccValue);
+        arr->reserve(AggStdDevValueElems::kSizeOfArray);
+
+        // The order of the following three elements should match to 'AggStdDevValueElems'.
+        arr->push_back(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(0));
+        arr->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.0));
+        arr->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.0));
+        aggStdDevImpl(arr, fieldTag, fieldValue);
+        newGuard.reset();
+        return {true, newAccTag, newAccValue};
+    }
+    tassert(5755210, "The result slot must be Array-typed", accTag == value::TypeTags::Array);
+
+    aggStdDevImpl(value::getArrayView(accValue), fieldTag, fieldValue);
+    guard.reset();
+    return {true, accTag, accValue};
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinStdDevPopFinalize(
+    ArityType arity) {
+    auto [_, fieldTag, fieldValue] = getFromStack(0);
+
+    return aggStdDevFinalizeImpl(fieldValue, false /* isSamp */);
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinStdDevSampFinalize(
+    ArityType arity) {
+    auto [_, fieldTag, fieldValue] = getFromStack(0);
+
+    return aggStdDevFinalizeImpl(fieldValue, true /* isSamp */);
 }
 
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::aggMin(value::TypeTags accTag,
@@ -3779,6 +3822,12 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builti
             return builtinAggDoubleDoubleSum(arity);
         case Builtin::doubleDoubleSumFinalize:
             return builtinDoubleDoubleSumFinalize(arity);
+        case Builtin::aggStdDev:
+            return builtinAggStdDev(arity);
+        case Builtin::stdDevPopFinalize:
+            return builtinStdDevPopFinalize(arity);
+        case Builtin::stdDevSampFinalize:
+            return builtinStdDevSampFinalize(arity);
         case Builtin::bitTestZero:
             return builtinBitTestZero(arity);
         case Builtin::bitTestMask:

@@ -362,6 +362,9 @@ enum class Builtin : uint8_t {
     doubleDoubleSum,  // special double summation
     aggDoubleDoubleSum,
     doubleDoubleSumFinalize,
+    aggStdDev,
+    stdDevPopFinalize,
+    stdDevSampFinalize,
     bitTestZero,      // test bitwise mask & value is zero
     bitTestMask,      // test bitwise mask & value is mask
     bitTestPosition,  // test BinData with a bit position list
@@ -440,6 +443,28 @@ enum AggSumValueElems {
     kDecimalTotal,
     // This is actually not an index but represents the maximum number of elements.
     kMaxSizeOfArray
+};
+
+/**
+ * This enum defines indices into an 'Array' that accumulates $stdDevPop and $stdDevSamp results.
+ *
+ * The array contains 3 elements:
+ * - The element at index `kCount` keeps track of the total number of values processd
+ * - The elements at index `kRunningMean` keeps track of the mean of all the values that have been
+ * processed.
+ * - The elements at index `kRunningM2` keeps track of running M2 value (defined within:
+ * https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Welford's_online_algorithm)
+ * for all the values that have been processed.
+ *
+ * See 'aggStdDevImpl()'/'aggStdDev()'/'stdDevPopFinalize() / stdDevSampFinalize()' for more
+ * details.
+ */
+enum AggStdDevValueElems {
+    kCount,
+    kRunningMean,
+    kRunningM2,
+    // This is actually not an index but represents the number of elements stored
+    kSizeOfArray
 };
 
 using SmallArityType = uint8_t;
@@ -806,6 +831,13 @@ private:
 
     void aggDoubleDoubleSumImpl(value::Array* arr, value::TypeTags rhsTag, value::Value rhsValue);
 
+    // This is an implementation of the following algorithm:
+    // https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Welford's_online_algorithm
+    void aggStdDevImpl(value::Array* arr, value::TypeTags rhsTag, value::Value rhsValue);
+
+    std::tuple<bool, value::TypeTags, value::Value> aggStdDevFinalizeImpl(value::Value fieldValue,
+                                                                          bool isSamp);
+
     std::tuple<bool, value::TypeTags, value::Value> aggMin(value::TypeTags accTag,
                                                            value::Value accValue,
                                                            value::TypeTags fieldTag,
@@ -925,6 +957,9 @@ private:
     std::tuple<bool, value::TypeTags, value::Value> builtinDoubleDoubleSum(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinAggDoubleDoubleSum(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinDoubleDoubleSumFinalize(ArityType arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinAggStdDev(ArityType arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinStdDevPopFinalize(ArityType arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinStdDevSampFinalize(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinBitTestZero(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinBitTestMask(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinBitTestPosition(ArityType arity);

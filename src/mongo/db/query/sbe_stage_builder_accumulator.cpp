@@ -241,6 +241,45 @@ std::pair<std::vector<std::unique_ptr<sbe::EExpression>>, EvalStage> buildAccumu
     return {std::move(aggs), std::move(inputStage)};
 }
 
+std::pair<std::vector<std::unique_ptr<sbe::EExpression>>, EvalStage> buildAccumulatorStdDev(
+    StageBuilderState& state,
+    const AccumulationExpression& expr,
+    std::unique_ptr<sbe::EExpression> arg,
+    EvalStage inputStage,
+    PlanNodeId planNodeId) {
+    std::vector<std::unique_ptr<sbe::EExpression>> aggs;
+    aggs.push_back(makeFunction("aggStdDev", std::move(arg)));
+    return {std::move(aggs), std::move(inputStage)};
+}
+
+std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> buildFinalizeStdDevPop(
+    StageBuilderState& state,
+    const AccumulationExpression& expr,
+    const sbe::value::SlotVector& stdDevSlots,
+    EvalStage inputStage,
+    PlanNodeId planNodeId) {
+    tassert(5755204,
+            str::stream() << "Expected one input slot for finalization of stdDevPop, got: "
+                          << stdDevSlots.size(),
+            stdDevSlots.size() == 1);
+    auto stdDevPopFinalize = makeFunction("stdDevPopFinalize", makeVariable(stdDevSlots[0]));
+    return {std::move(stdDevPopFinalize), std::move(inputStage)};
+}
+
+std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> buildFinalizeStdDevSamp(
+    StageBuilderState& state,
+    const AccumulationExpression& expr,
+    const sbe::value::SlotVector& stdDevSlots,
+    EvalStage inputStage,
+    PlanNodeId planNodeId) {
+    tassert(5755209,
+            str::stream() << "Expected one input slot for finalization of stdDevSamp, got: "
+                          << stdDevSlots.size(),
+            stdDevSlots.size() == 1);
+    auto stdDevSampFinalize = makeFunction("stdDevSampFinalize", makeVariable(stdDevSlots[0]));
+    return {std::move(stdDevSampFinalize), std::move(inputStage)};
+}
+
 std::pair<std::vector<std::unique_ptr<sbe::EExpression>>, EvalStage> buildAccumulatorMergeObjects(
     StageBuilderState& state,
     const AccumulationExpression& expr,
@@ -304,6 +343,8 @@ std::pair<std::vector<std::unique_ptr<sbe::EExpression>>, EvalStage> buildAccumu
         {AccumulatorSum::kName, &buildAccumulatorSum},
         {AccumulatorPush::kName, &buildAccumulatorPush},
         {AccumulatorMergeObjects::kName, &buildAccumulatorMergeObjects},
+        {AccumulatorStdDevPop::kName, &buildAccumulatorStdDev},
+        {AccumulatorStdDevSamp::kName, &buildAccumulatorStdDev},
     };
 
     auto accExprName = acc.expr.name;
@@ -342,6 +383,8 @@ std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> buildFinalize(
         {AccumulatorSum::kName, &buildFinalizeSum},
         {AccumulatorPush::kName, nullptr},
         {AccumulatorMergeObjects::kName, nullptr},
+        {AccumulatorStdDevPop::kName, &buildFinalizeStdDevPop},
+        {AccumulatorStdDevSamp::kName, &buildFinalizeStdDevSamp},
     };
 
     auto accExprName = acc.expr.name;

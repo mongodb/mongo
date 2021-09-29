@@ -423,6 +423,12 @@ void addNonDecimal(TypeTags tag, Value val, DoubleDoubleSummation& nonDecimalTot
             MONGO_UNREACHABLE_TASSERT(5755316);
     }
 }
+
+void setStdDevArray(value::Value count, value::Value mean, value::Value m2, Array* arr) {
+    arr->setAt(AggStdDevValueElems::kCount, value::TypeTags::NumberInt64, count);
+    arr->setAt(AggStdDevValueElems::kRunningMean, value::TypeTags::NumberDouble, mean);
+    arr->setAt(AggStdDevValueElems::kRunningM2, value::TypeTags::NumberDouble, m2);
+}
 }  // namespace
 
 void ByteCode::aggDoubleDoubleSumImpl(value::Array* arr,
@@ -494,6 +500,82 @@ void ByteCode::aggDoubleDoubleSumImpl(value::Array* arr,
 
         setDecimalTotal(nonDecimalTotalTag, nonDecimalTotal, decimalTotal, arr);
     }
+}
+
+void ByteCode::aggStdDevImpl(value::Array* arr, value::TypeTags rhsTag, value::Value rhsValue) {
+    if (!isNumber(rhsTag)) {
+        return;
+    }
+
+    auto [countTag, countVal] = arr->getAt(AggStdDevValueElems::kCount);
+    tassert(5755201, "The count must be of type NumberInt64", countTag == TypeTags::NumberInt64);
+
+    auto [meanTag, meanVal] = arr->getAt(AggStdDevValueElems::kRunningMean);
+    auto [m2Tag, m2Val] = arr->getAt(AggStdDevValueElems::kRunningM2);
+    tassert(5755202,
+            "The mean and m2 must be of type Double",
+            m2Tag == meanTag && meanTag == TypeTags::NumberDouble);
+
+    double inputDouble = 0.0;
+    // Within our query execution engine, $stdDevPop and $stdDevSamp do not maintain the precision
+    // of decimal types and converts all values to double. We do this here by converting
+    // NumberDecimal to Decimal128 and then extract a double value from it.
+    if (rhsTag == value::TypeTags::NumberDecimal) {
+        auto decimal = value::bitcastTo<Decimal128>(rhsValue);
+        inputDouble = decimal.toDouble();
+    } else {
+        inputDouble = numericCast<double>(rhsTag, rhsValue);
+    }
+    auto curVal = value::bitcastFrom<double>(inputDouble);
+
+    auto count = value::bitcastTo<int64_t>(countVal);
+    tassert(5755211,
+            "The total number of elements must be less than INT64_MAX",
+            ++count < std::numeric_limits<int64_t>::max());
+    auto newCountVal = value::bitcastFrom<int64_t>(count);
+
+    auto [deltaOwned, deltaTag, deltaVal] =
+        genericSub(value::TypeTags::NumberDouble, curVal, value::TypeTags::NumberDouble, meanVal);
+    auto [deltaDivCountOwned, deltaDivCountTag, deltaDivCountVal] =
+        genericDiv(deltaTag, deltaVal, value::TypeTags::NumberInt64, newCountVal);
+    auto [newMeanOwned, newMeanTag, newMeanVal] =
+        genericAdd(meanTag, meanVal, deltaDivCountTag, deltaDivCountVal);
+    auto [newDeltaOwned, newDeltaTag, newDeltaVal] =
+        genericSub(value::TypeTags::NumberDouble, curVal, newMeanTag, newMeanVal);
+    auto [deltaMultNewDeltaOwned, deltaMultNewDeltaTag, deltaMultNewDeltaVal] =
+        genericMul(deltaTag, deltaVal, newDeltaTag, newDeltaVal);
+    auto [newM2Owned, newM2Tag, newM2Val] =
+        genericAdd(m2Tag, m2Val, deltaMultNewDeltaTag, deltaMultNewDeltaVal);
+
+    return setStdDevArray(newCountVal, newMeanVal, newM2Val, arr);
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::aggStdDevFinalizeImpl(
+    value::Value fieldValue, bool isSamp) {
+    auto arr = value::getArrayView(fieldValue);
+
+    auto [countTag, countVal] = arr->getAt(AggStdDevValueElems::kCount);
+    tassert(5755207, "The count must be a NumberInt64", countTag == value::TypeTags::NumberInt64);
+
+    auto count = value::bitcastTo<int64_t>(countVal);
+
+    if (count == 0) {
+        return {true, value::TypeTags::Null, 0};
+    }
+
+    if (isSamp && count == 1) {
+        return {true, value::TypeTags::Null, 0};
+    }
+
+    auto [m2Tag, m2] = arr->getAt(AggStdDevValueElems::kRunningM2);
+    tassert(5755208,
+            "The m2 value must be of type NumberDouble",
+            m2Tag == value::TypeTags::NumberDouble);
+    auto m2Double = value::bitcastTo<double>(m2);
+    auto variance = isSamp ? (m2Double / (count - 1)) : (m2Double / count);
+    auto stdDev = sqrt(variance);
+
+    return {true, value::TypeTags::NumberDouble, value::bitcastFrom<double>(stdDev)};
 }
 
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::genericSub(value::TypeTags lhsTag,
