@@ -290,7 +290,7 @@ variables:
   - name: external_auth_aws
   - name: external_auth_windows
     distros:
-    - windows-64-2016
+    - windows-2016-dc
   - name: .jscore .common !.sharding
   - name: .jstestfuzz .common
   - name: .logical_session_cache
@@ -8552,7 +8552,7 @@ buildvariants:
     - name: external_auth_aws
     - name: external_auth_windows
       distros:
-        - windows-64-2016
+        - windows-2016-dc
     - name: .jscore .common !.sharding
     - name: jsCore_auth
     - name: jsCore_ese
@@ -8614,7 +8614,7 @@ buildvariants:
     - name: external_auth_aws
     - name: external_auth_windows
       distros:
-        - windows-64-2016
+        - windows-2016-dc
     - name: .jscore .common !.sharding
     - name: jsCore_auth
     - name: jsCore_ese
