@@ -9087,6 +9087,8 @@ pcre_uchar cworkspace[COMPILE_WORK_SIZE];
 similar way to cworkspace, it can be expanded using malloc() if necessary. */
 
 named_group named_groups[NAMED_GROUP_LIST_SIZE];
+cd->named_groups = named_groups;
+cd->named_group_list_size = NAMED_GROUP_LIST_SIZE;
 
 /* Set this early so that early errors get offset 0. */
 
@@ -9360,8 +9362,6 @@ cd->hwm = cworkspace;
 cd->iscondassert = FALSE;
 cd->start_workspace = cworkspace;
 cd->workspace_size = COMPILE_WORK_SIZE;
-cd->named_groups = named_groups;
-cd->named_group_list_size = NAMED_GROUP_LIST_SIZE;
 cd->start_pattern = (const pcre_uchar *)pattern;
 cd->end_pattern = (const pcre_uchar *)(pattern + STRLEN_UC((const pcre_uchar *)pattern));
 cd->req_varyopt = 0;
@@ -9472,6 +9472,7 @@ if (cd->names_found > 0)
     add_name(cd, ng->name, ng->length, ng->number);
   if (cd->named_group_list_size > NAMED_GROUP_LIST_SIZE)
     (PUBL(free))((void *)cd->named_groups);
+  cd->named_group_list_size = 0;   /* So we don't free it twice */   
   }
 
 /* Set up a starting, non-extracting bracket, then compile the expression. On
@@ -9622,6 +9623,8 @@ if (errorcode != 0)
   {
   (PUBL(free))(re);
   PCRE_EARLY_ERROR_RETURN:
+  if (cd->named_group_list_size > NAMED_GROUP_LIST_SIZE)
+    (PUBL(free))((void *)cd->named_groups);
   *erroroffset = (int)(ptr - (const pcre_uchar *)pattern);
   PCRE_EARLY_ERROR_RETURN2:
   *errorptr = find_error_text(errorcode);
