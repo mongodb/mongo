@@ -758,7 +758,7 @@ for (;;)
     md->mark = NULL;    /* In case previously set by assertion */
     RMATCH(eptr, ecode + PRIV(OP_lengths)[*ecode] + ecode[1], offset_top, md,
       eptrb, RM55);
-    if ((rrc == MATCH_MATCH || rrc == MATCH_ACCEPT) &&
+    if ((rrc == MATCH_MATCH || rrc == MATCH_ACCEPT || rrc == MATCH_KETRPOS) &&
          md->mark == NULL) md->mark = ecode + 2;
 
     /* A return of MATCH_SKIP_ARG means that matching failed at SKIP with an
