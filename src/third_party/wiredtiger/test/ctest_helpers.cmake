@@ -153,14 +153,21 @@ function(define_test_variants target)
         1
         "DEFINE_TEST"
         ""
-        ""
-        "VARIANTS;LABELS"
+        "DIR_NAME"
+        "VARIANTS;LABELS;CMDS"
     )
     if (NOT "${DEFINE_TEST_UNPARSED_ARGUMENTS}" STREQUAL "")
-        message(FATAL_ERROR "Unknown arguments to define_test_variants: ${DEFINE_TEST_VARIANTS_UNPARSED_ARGUMENTS}")
+        message(FATAL_ERROR "Unknown arguments to define_test_variants: ${DEFINE_TEST_UNPARSED_ARGUMENTS}")
     endif()
     if ("${DEFINE_TEST_VARIANTS}" STREQUAL "")
         message(FATAL_ERROR "Need at least one variant for define_test_variants")
+    endif()
+
+    set(dir_prefix)
+    if(DEFINE_TEST_DIR_NAME)
+        set(dir_prefix ${CMAKE_CURRENT_BINARY_DIR}/${DEFINE_TEST_DIR_NAME})
+    else()
+        set(dir_prefix ${CMAKE_CURRENT_BINARY_DIR})
     endif()
 
     set(defined_tests)
@@ -182,17 +189,23 @@ function(define_test_variants target)
         endif()
         # Create a variant directory to run the test in.
         add_custom_command(OUTPUT ${curr_variant_name}_test_dir
-            COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/${curr_variant_name}_test_dir
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${dir_prefix}/${curr_variant_name}_test_dir
         )
         add_custom_target(create_dir_${curr_variant_name} DEPENDS ${curr_variant_name}_test_dir)
         # Ensure the variant target is created prior to building the test.
         add_dependencies(${target} create_dir_${curr_variant_name})
+        set(test_cmd)
+        if(DEFINE_TEST_CMDS)
+            set(test_cmd ${DEFINE_TEST_CMDS})
+        else()
+            set(test_cmd $<TARGET_FILE:${target}>)
+        endif()
         add_test(
             NAME ${curr_variant_name}
-            COMMAND $<TARGET_FILE:${target}> ${variant_args}
+            COMMAND ${test_cmd} ${variant_args}
             # Run each variant in its own subdirectory, allowing us to execute variants in
             # parallel.
-            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/${curr_variant_name}_test_dir
+            WORKING_DIRECTORY ${dir_prefix}/${curr_variant_name}_test_dir
         )
         list(APPEND defined_tests ${curr_variant_name})
     endforeach()
@@ -201,13 +214,14 @@ function(define_test_variants target)
     endif()
 endfunction()
 
-macro(define_c_test)
+function(define_c_test)
     cmake_parse_arguments(
+        PARSE_ARGV
+        0
         "C_TEST"
-        "SMOKE"
-        "TARGET;DIR_NAME;DEPENDS"
-        "SOURCES;FLAGS;ARGUMENTS"
-        ${ARGN}
+        ""
+        "TARGET;DIR_NAME;DEPENDS;EXEC_SCRIPT"
+        "SOURCES;FLAGS;ARGUMENTS;VARIANTS"
     )
     if (NOT "${C_TEST_UNPARSED_ARGUMENTS}" STREQUAL "")
         message(FATAL_ERROR "Unknown arguments to define_c_test: ${C_TEST_UNPARSED_ARGUMENTS}")
@@ -220,6 +234,10 @@ macro(define_c_test)
     endif()
     if ("${C_TEST_DIR_NAME}" STREQUAL "")
         message(FATAL_ERROR "No directory given to define_c_test")
+    endif()
+
+    if("${C_TEST_ARGUMENTS}" AND "${C_TEST_VARIANTS}")
+        message(FATAL_ERROR "Can't pass both ARGUMENTS and VARIANTS, use only one")
     endif()
 
     # Check that the csuite dependencies are enabled before compiling and creating the test.
@@ -236,35 +254,40 @@ macro(define_c_test)
             # Which while technically valid breaks assumptions in our testing utilities. Wrap the execution in powershell to avoid this.
             set(exec_wrapper "powershell.exe")
         endif()
-        if (C_TEST_SMOKE)
-            # csuite test comes with a smoke execution wrapper.
+        set(test_cmd)
+        if (C_TEST_EXEC_SCRIPT)
+            # Define the c test to be executed with a script, rather than invoking the binary directly.
             create_test_executable(${C_TEST_TARGET}
                 SOURCES ${C_TEST_SOURCES}
-                ADDITIONAL_FILES ${CMAKE_CURRENT_SOURCE_DIR}/${C_TEST_DIR_NAME}/smoke.sh
+                ADDITIONAL_FILES ${C_TEST_EXEC_SCRIPT}
                 BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/${C_TEST_DIR_NAME}
                 ${additional_executable_args}
             )
-            add_test(NAME ${C_TEST_TARGET}
-                COMMAND ${exec_wrapper} ${CMAKE_CURRENT_BINARY_DIR}/${C_TEST_DIR_NAME}/smoke.sh ${C_TEST_ARGUMENTS} $<TARGET_FILE:${C_TEST_TARGET}>
-                WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/${C_TEST_DIR_NAME}
-            )
+            get_filename_component(exec_script_basename ${C_TEST_EXEC_SCRIPT} NAME)
+            set(test_cmd ${exec_wrapper} ${exec_script_basename})
         else()
             create_test_executable(${C_TEST_TARGET}
                 SOURCES ${C_TEST_SOURCES}
                 BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/${C_TEST_DIR_NAME}
                 ${additional_executable_args}
             )
-            # Take a CMake-based path and convert it to a platform-specfic path (/ for Unix, \ for Windows).
-            set(wt_test_home_dir ${CMAKE_CURRENT_BINARY_DIR}/${C_TEST_DIR_NAME}/WT_HOME_${C_TEST_TARGET})
-            file(TO_NATIVE_PATH "${wt_test_home_dir}" wt_test_home_dir)
-            # Ensure each DB home directory is run under the tests working directory.
-            set(command_args -h ${wt_test_home_dir})
-            list(APPEND command_args ${C_TEST_ARGUMENTS})
+            set(test_cmd ${exec_wrapper} $<TARGET_FILE:${C_TEST_TARGET}>)
+        endif()
+        # Define the ctest target.
+        if(C_TEST_VARIANTS)
+            # If we want to define multiple variant executions of the test script/binary.
+            define_test_variants(${C_TEST_TARGET}
+                VARIANTS ${C_TEST_VARIANTS}
+                CMDS ${test_cmd}
+                DIR_NAME ${C_TEST_DIR_NAME}
+                LABELS "check;csuite"
+            )
+        else()
             add_test(NAME ${C_TEST_TARGET}
-                COMMAND ${exec_wrapper} $<TARGET_FILE:${C_TEST_TARGET}> ${command_args}
+                COMMAND ${test_cmd} ${C_TEST_ARGUMENTS}
                 WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/${C_TEST_DIR_NAME}
             )
+            set_tests_properties(${C_TEST_TARGET} PROPERTIES LABELS "check;csuite")
         endif()
-        list(APPEND c_tests ${C_TEST_TARGET})
     endif()
-endmacro(define_c_test)
+endfunction(define_c_test)
