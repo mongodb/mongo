@@ -110,6 +110,8 @@ namespace {
  *       QuerySolution with the 'postMultiPlan' QuerySolutionNode when the PlanCache is involved in
  *       the query. This will be resolved when SERVER-58429 is complete.
  *    3. $match stage does not have $or and thus, does not need subplanning.
+ *    4. When the DocumentSourceGroup has 'doingMerge=false', this will change when we implement
+ *       hash table spilling in SERVER-58436.
  */
 std::vector<std::unique_ptr<InnerPipelineStageInterface>> extractSbeCompatibleGroupsForPushdown(
     const intrusive_ptr<ExpressionContext>& expCtx,
@@ -119,13 +121,6 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> extractSbeCompatibleGr
     // We will eventually use the extracted group stages to populate 'CanonicalQuery::pipeline'
     // which requires stages to be wrapped in an interface.
     std::vector<std::unique_ptr<InnerPipelineStageInterface>> groupsForPushdown;
-
-    // Bail out early if we didn't enble $group pushdown.
-    if (!feature_flags::gFeatureFlagSBEGroupPushdown.isEnabled(
-            serverGlobalParams.featureCompatibility) ||
-        !cq->getEnableSlotBasedExecutionEngine()) {
-        return {};
-    }
 
     // In case that we have a top $or for $match stage, it triggers the tripwire assertion 5842500
     // because subplanning does not expect that the base query has pushed down $group stage(s) but
@@ -138,21 +133,14 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> extractSbeCompatibleGr
         return {};
     }
 
-    // Verify that we are already under a collection lock. We avoid taking locks ourselves in this
-    // function because double-locking forces any PlanExecutor we create to adopt a NO_YIELD policy.
-    tassert(6025300,
-            "collection lock must be held before pushing down $group",
-            expCtx->opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_IS));
-
     const auto indexCatalog = collection->getIndexCatalog();
     const auto isSingleIndex =
         indexCatalog ? indexCatalog->numIndexesTotal(expCtx->opCtx) == 1 : false;
 
-    // TODO: Don't split the pipeline if the collection is sharded until SERVER-59070 is done.
-    auto css = CollectionShardingState::get(expCtx->opCtx, collection->ns());
-    const auto isSharded = css && css->getCollectionDescription(expCtx->opCtx).isSharded();
-
-    if (expCtx->allowDiskUse || isSharded || !isSingleIndex || queryNeedsSubplanning) {
+    if (!feature_flags::gFeatureFlagSBEGroupPushdown.isEnabled(
+            serverGlobalParams.featureCompatibility) ||
+        !cq->getEnableSlotBasedExecutionEngine() || expCtx->allowDiskUse || !isSingleIndex ||
+        queryNeedsSubplanning) {
         return {};
     }
 
@@ -160,8 +148,9 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> extractSbeCompatibleGr
 
     for (auto itr = sources.begin(); itr != sources.end();) {
         auto groupStage = dynamic_cast<DocumentSourceGroup*>(itr->get());
-        if (!(groupStage && groupStage->sbeCompatible())) {
+        if (!(groupStage && groupStage->sbeCompatible()) || groupStage->doingMerge()) {
             // Only pushdown a prefix of group stages that are supported by sbe.
+            // TODO: SERVER-59070 remove the 'doingMerge' check when we support merging.
             break;
         }
         groupsForPushdown.push_back(std::make_unique<InnerPipelineStageImpl>(groupStage));

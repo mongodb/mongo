@@ -186,4 +186,14 @@ assertNoGroupPushdown(
     coll,
     [{$sortByCount: "$item"}],
     [{"_id": "a", "count": 2}, {"_id": "b", "count": 2}, {"_id": "c", "count": 1}]);
+
+// When in a sharded environment or we are spilling $doingMerge is set to true. We should bail out
+// and not push down $group stages and the suffix of the pipeline when we encounter a $group stage
+// with this flag set.
+explain = coll.explain().aggregate([
+    {$group: {_id: "$item", s: {$sum: "$price"}}},
+    {$group: {_id: "$a", s: {$sum: "$b"}, $doingMerge: true}}
+]);
+assert.neq(null, getAggPlanStage(explain, "GROUP"), explain);
+assert(explain.stages[1].hasOwnProperty("$group"));
 })();
