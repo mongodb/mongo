@@ -7651,6 +7651,7 @@ buildvariants:
 
 - name: enterprise-ubuntu1804-arm64
   display_name: Enterprise Ubuntu 18.04 arm64
+  cron: "0 0 * * *" # Every day starting at 00:00
   modules:
   - enterprise
   run_on:
@@ -7740,6 +7741,7 @@ buildvariants:
 
 - name: ubuntu2004
   display_name: Ubuntu 20.04
+  cron: "0 0 * * *" # Every day starting at 00:00
   run_on:
   - ubuntu2004-small
   expansions:
@@ -7980,6 +7982,7 @@ buildvariants:
 
 - name: enterprise-linux-64-amazon-ami
   display_name: "Enterprise Amazon Linux"
+  cron: "0 0 * * *" # Every day starting at 00:00
   modules:
   - enterprise
   run_on:
