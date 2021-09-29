@@ -842,8 +842,9 @@ TimeseriesTest.run((insert) => {
             u: {$set: {[metaFieldName]: "a"}},
             multi: true
         }],
-        resultDocList: [{_id: 1, [timeFieldName]: dateTime, [metaFieldName]: "a"}, doc2, doc3],
-        n: 1
+        resultDocList: [doc1, doc2, doc3],
+        n: 0,
+        failCode: ErrorCodes.InvalidOptions,
     });
 
     // Query for documents using $jsonSchema with a field that is not the metaField required.
@@ -1031,23 +1032,6 @@ TimeseriesTest.run((insert) => {
         failCode: ErrorCodes.InvalidOptions,
     });
 
-    // Use a variable defined in the let option in the query to modify the metaField.
-    testUpdate({
-        initialDocList: [doc1, doc4, doc5],
-        updateList: [{
-            q: {$expr: {$eq: ["$" + metaFieldName + ".a", "$$oldVal"]}},
-            u: {$set: {[metaFieldName]: "aaa"}},
-            multi: true,
-        }],
-        letDoc: {oldVal: "A"},
-        resultDocList: [
-            {_id: 1, [timeFieldName]: dateTime, [metaFieldName]: "aaa"},
-            {_id: 4, [timeFieldName]: dateTime, [metaFieldName]: "aaa", f: "F"},
-            {_id: 5, [timeFieldName]: dateTime, [metaFieldName]: "aaa"}
-        ],
-        n: 3,
-    });
-
     // Variables defined in the let option can only be used in the update if the update is an
     // pipeline update. Since this update is an update document, the literal name of the variable
     // will be used in the update instead of the variable's value.
@@ -1061,30 +1045,6 @@ TimeseriesTest.run((insert) => {
         letDoc: {myVar: "aaa"},
         resultDocList: [{_id: 1, [timeFieldName]: dateTime, [metaFieldName]: "$$myVar"}],
         n: 1,
-    });
-
-    // Use variables defined in the let option in the query to modify the metaField multiple times.
-    testUpdate({
-        initialDocList: [doc1, doc4, doc5],
-        updateList: [
-            {
-                q: {$expr: {$eq: ["$" + metaFieldName + ".a", "$$val1"]}},
-                u: {$set: {[metaFieldName]: "aaa"}},
-                multi: true,
-            },
-            {
-                q: {$expr: {$eq: ["$" + metaFieldName, "$$val2"]}},
-                u: {$set: {[metaFieldName]: "bbb"}},
-                multi: true,
-            }
-        ],
-        letDoc: {val1: "A", val2: "aaa"},
-        resultDocList: [
-            {_id: 1, [timeFieldName]: dateTime, [metaFieldName]: "bbb"},
-            {_id: 4, [timeFieldName]: dateTime, [metaFieldName]: "bbb", f: "F"},
-            {_id: 5, [timeFieldName]: dateTime, [metaFieldName]: "bbb"}
-        ],
-        n: 6,
     });
 
     /************************** Tests updating with an update pipeline **************************/

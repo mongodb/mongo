@@ -182,34 +182,6 @@ TimeseriesTest.run((insert) => {
                    collation: {locale: "de@collation=phonebook"}
                }]);
 
-    // Query on the metaField using let.
-    testDelete(
-        [nestedObjA, nestedObjB, nestedObjC],
-        [nestedObjA, nestedObjC],
-        1,
-        [{q: {"$expr": {"$eq": ["$" + metaFieldName + ".b.a", "$$targetFieldValue"]}}, limit: 0}],
-        {letDoc: {targetFieldValue: "A"}});
-
-    const nestedObjD = {
-        [timeFieldName]: ISODate(),
-        "measurement": {"A": "cpu"},
-        [metaFieldName]: {d: metaFieldName}
-    };
-
-    // Query on the metaField using let and the metaField as a variable.
-    testDelete(
-        [nestedObjA, nestedObjB, nestedObjC, nestedObjD],
-        [nestedObjA, nestedObjB, nestedObjD],
-        1,
-        [{q: {"$expr": {"$eq": ["$" + metaFieldName + ".d", "$$" + metaFieldName]}}, limit: 0}],
-        {letDoc: {[metaFieldName]: "D"}});
-
-    // Query on the metaField for documents with the metaField as a field value.
-    testDelete([nestedObjA, nestedObjB, nestedObjC, nestedObjD],
-               [nestedObjA, nestedObjB, nestedObjC],
-               1,
-               [{q: {"$expr": {"$eq": ["$" + metaFieldName + ".d", metaFieldName]}}, limit: 0}]);
-
     const dollarObjA = {
         [timeFieldName]: ISODate(),
         "measurement": {"A": "cpu"},
@@ -219,14 +191,6 @@ TimeseriesTest.run((insert) => {
     // Query on the metaField for documents with "$" + the metaField as a field value.
     testDelete([dollarObjA], [], 1, [{q: {[metaFieldName]: {b: "$" + metaFieldName}}, limit: 0}]);
 
-    // Query on the metaField for documents with "$" + the metaField as a field value using
-    // $literal.
-    testDelete(
-        [dollarObjA], [], 1, [{
-            q: {"$expr": {"$eq": ["$" + metaFieldName + ".b", {"$literal": "$" + metaFieldName}]}},
-            limit: 0
-        }]);
-
     // Query for documents using $jsonSchema with the metaField required.
     testDelete([nestedObjA, nestedObjB, nestedObjC],
                [],
@@ -235,9 +199,10 @@ TimeseriesTest.run((insert) => {
 
     // Query for documents using $jsonSchema with the metaField in dot notation required.
     testDelete([nestedObjA, nestedObjB, nestedObjC],
-               [nestedObjB, nestedObjC],
-               1,
-               [{q: {"$jsonSchema": {"required": [metaFieldName + ".a"]}}, limit: 0}]);
+               [nestedObjA, nestedObjB, nestedObjC],
+               0,
+               [{q: {"$jsonSchema": {"required": [metaFieldName + ".a"]}}, limit: 0}],
+               {expectedErrorCode: ErrorCodes.InvalidOptions});
 
     // Query for documents using $jsonSchema with a field that is not the metaField required.
     testDelete([nestedObjA, nestedObjB, nestedObjC],
