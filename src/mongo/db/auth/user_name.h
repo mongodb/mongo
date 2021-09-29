@@ -50,8 +50,22 @@ namespace mongo {
  */
 class UserName {
 public:
-    UserName() : _splitPoint(0) {}
-    UserName(StringData user, StringData dbname);
+    UserName() = default;
+
+    template <typename User, typename DB>
+    UserName(User user, DB db) {
+        if constexpr (std::is_same_v<User, std::string>) {
+            _user = std::move(user);
+        } else {
+            _user = StringData(user).toString();
+        }
+
+        if constexpr (std::is_same_v<DB, std::string>) {
+            _db = std::move(db);
+        } else {
+            _db = StringData(db).toString();
+        }
+    }
 
     /**
      * Parses a string of the form "db.username" into a UserName object.
@@ -83,67 +97,91 @@ public:
     /**
      * Gets the user part of a UserName.
      */
-    StringData getUser() const {
-        return StringData(_fullName.data(), _splitPoint);
+    const std::string& getUser() const {
+        return _user;
     }
 
     /**
      * Gets the database name part of a UserName.
      */
-    StringData getDB() const {
-        if (_fullName.empty()) {
-            return _fullName;
-        }
-
-        const auto offset = _splitPoint + 1;
-        invariant(offset <= _fullName.size());
-        return StringData(_fullName.data() + offset, _fullName.size() - offset);
+    const std::string& getDB() const {
+        return _db;
     }
 
     /**
      * Gets the full unique name of a user as a string, formatted as "user@db".
      */
-    const std::string& getFullName() const {
-        return _fullName;
+    std::string getDisplayName() const {
+        if (empty()) {
+            return "";
+        }
+        return str::stream() << _user << "@" << _db;
+    }
+
+    /**
+     * Predict name length without actually forming string.
+     */
+    std::size_t getDisplayNameLength() const {
+        if (empty()) {
+            return 0;
+        }
+        return _db.size() + 1 + _user.size();
     }
 
     /**
      * Gets the full unambiguous unique name of a user as a string, formatted as "db.user"
      */
     std::string getUnambiguousName() const {
-        return str::stream() << getDB() << "." << getUser();
+        if (empty()) {
+            return "";
+        }
+        return str::stream() << _db << "." << _user;
     }
 
     /**
-     * Stringifies the object, for logging/debugging.
+     * True if the username and dbname have not been set.
      */
-    std::string toString() const {
-        return getFullName();
+    bool empty() const {
+        return _db.empty() && _user.empty();
     }
 
     bool operator==(const UserName& rhs) const {
-        return _splitPoint == rhs._splitPoint && getFullName() == rhs.getFullName();
+        return (_user == rhs._user) && (_db == rhs._db);
     }
 
     bool operator!=(const UserName& rhs) const {
-        return _splitPoint != rhs._splitPoint || getFullName() != rhs.getFullName();
+        return !(*this == rhs);
     }
 
     bool operator<(const UserName& rhs) const {
-        return getUser() < rhs.getUser() || (getUser() == rhs.getUser() && getDB() < rhs.getDB());
+        return (_user < rhs._user) || ((_user == rhs._user) && (_db < rhs._db));
     }
 
     template <typename H>
     friend H AbslHashValue(H h, const UserName& userName) {
-        return H::combine(std::move(h), userName.getFullName());
+        auto state = H::combine(std::move(h), userName._db);
+        state = H::combine(std::move(state), '.');
+        return H::combine(std::move(state), userName._user);
     }
 
 private:
-    std::string _fullName;  // The full name, stored as a string.  "user@db".
-    size_t _splitPoint;     // The index of the "@" separating the user and db name parts.
+    std::string _user;
+    std::string _db;
 };
 
-std::ostream& operator<<(std::ostream& os, const UserName& name);
+static inline std::ostream& operator<<(std::ostream& os, const UserName& user) {
+    if (!user.empty()) {
+        os << user.getUser() << '@' << user.getDB();
+    }
+    return os;
+}
+
+static inline StringBuilder& operator<<(StringBuilder& os, const UserName& user) {
+    if (!user.empty()) {
+        os << user.getUser() << '@' << user.getDB();
+    }
+    return os;
+}
 
 /**
  * Iterator over an unspecified container of UserName objects.

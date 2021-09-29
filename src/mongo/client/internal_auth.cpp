@@ -104,8 +104,8 @@ BSONObj getInternalAuthParams(size_t idx, StringData mechanism) {
 
     auto password = internalAuthKeys.at(idx);
     if (mechanism == kMechanismScramSha1) {
-        password = mongo::createPasswordDigest(
-            internalSecurity.user->getName().getUser().toString(), password);
+        password =
+            mongo::createPasswordDigest(internalSecurity.user->getName().getUser(), password);
     }
 
     return BSON(saslCommandMechanismFieldName
@@ -131,8 +131,11 @@ std::string getInternalAuthDB() {
         return getBSONString(internalAuthParams, saslCommandUserDBFieldName);
     }
 
-    auto isu = internalSecurity.user;
-    return isu ? isu->getName().getDB().toString() : "admin";
+    if (auto isu = internalSecurity.user) {
+        return isu->getName().getDB();
+    }
+
+    return "admin";
 }
 
 }  // namespace auth

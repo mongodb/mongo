@@ -521,6 +521,7 @@ env.CppUnitTest(
     source=[
         'action_set_test.cpp',
         'address_restriction_test.cpp',
+        'auth_identifier_test.cpp',
         'authorization_contract_test.cpp',
         'auth_op_observer_test.cpp',
         'authorization_manager_test.cpp',

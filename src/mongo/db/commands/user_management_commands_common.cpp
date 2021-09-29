@@ -90,8 +90,7 @@ Status checkAuthorizedToGrantRoles(AuthorizationSession* authzSession,
         if (!authzSession->isAuthorizedForActionsOnResource(
                 ResourcePattern::forDatabaseName(roles[i].getDB()), ActionType::grantRole)) {
             return Status(ErrorCodes::Unauthorized,
-                          str::stream()
-                              << "Not authorized to grant role: " << roles[i].getFullName());
+                          str::stream() << "Not authorized to grant role: " << roles[i]);
         }
     }
 
@@ -116,8 +115,7 @@ Status checkAuthorizedToRevokeRoles(AuthorizationSession* authzSession,
         if (!authzSession->isAuthorizedForActionsOnResource(
                 ResourcePattern::forDatabaseName(roles[i].getDB()), ActionType::revokeRole)) {
             return Status(ErrorCodes::Unauthorized,
-                          str::stream()
-                              << "Not authorized to revoke role: " << roles[i].getFullName());
+                          str::stream() << "Not authorized to revoke role: " << roles[i]);
         }
     }
     return Status::OK();
@@ -201,16 +199,15 @@ void checkAuthForTypedCommand(Client* client, const UpdateUserCommand& request) 
     auto* as = AuthorizationSession::get(client);
 
     UserName userName(request.getCommandParameter(), dbname);
-    uassert(
-        ErrorCodes::Unauthorized,
-        str::stream() << "Not authorized to change password of user: " << userName.getFullName(),
-        (request.getPwd() == boost::none) || isAuthorizedToChangeOwnPasswordAsUser(as, userName) ||
-            as->isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(dbname),
-                                                 ActionType::changePassword));
+    uassert(ErrorCodes::Unauthorized,
+            str::stream() << "Not authorized to change password of user: " << userName,
+            (request.getPwd() == boost::none) ||
+                isAuthorizedToChangeOwnPasswordAsUser(as, userName) ||
+                as->isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(dbname),
+                                                     ActionType::changePassword));
 
     uassert(ErrorCodes::Unauthorized,
-            str::stream() << "Not authorized to change customData of user: "
-                          << userName.getFullName(),
+            str::stream() << "Not authorized to change customData of user: " << userName,
             (request.getCustomData() == boost::none) ||
                 isAuthorizedToChangeOwnCustomDataAsUser(as, userName) ||
                 as->isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(dbname),

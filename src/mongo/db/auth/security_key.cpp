@@ -83,8 +83,8 @@ public:
                         "error"_attr = swSaslPassword.getStatus());
             return boost::none;
         }
-        const auto passwordDigest = mongo::createPasswordDigest(
-            internalSecurity.user->getName().getUser().toString(), password);
+        const auto passwordDigest =
+            mongo::createPasswordDigest(internalSecurity.user->getName().getUser(), password);
 
         User::CredentialData credentials;
         if (!_copyCredentials(

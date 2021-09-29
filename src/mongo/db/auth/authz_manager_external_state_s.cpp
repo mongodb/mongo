@@ -150,7 +150,7 @@ Status AuthzManagerExternalStateMongos::getUserDescription(OperationContext* opC
         std::vector<BSONElement> foundUsers = cmdResult["users"].Array();
         if (foundUsers.size() == 0) {
             return Status(ErrorCodes::UserNotFound,
-                          "User \"" + userName.toString() + "\" not found");
+                          str::stream() << "User \"" << userName << "\" not found");
         }
 
         if (foundUsers.size() > 1) {

@@ -3088,7 +3088,7 @@ Status _validatePeerRoles(const stdx::unordered_set<RoleName>& embeddedRoles, SS
 
     auto allowedRoles = it->second;
     // See TLSCATrustsSetParameter::set() for a description of tlsCATrusts format.
-    if (allowedRoles.count(RoleName("", ""))) {
+    if (allowedRoles.count(RoleName())) {
         // CA is authorized for all role assignments.
         return Status::OK();
     }
@@ -3099,7 +3099,7 @@ Status _validatePeerRoles(const stdx::unordered_set<RoleName>& embeddedRoles, SS
             !allowedRoles.count(RoleName("", role.getDB()))) {
             return {ErrorCodes::BadValue,
                     str::stream() << "CA: " << sha256.toHexString()
-                                  << " is not authorized to grant role " << role.toString()
+                                  << " is not authorized to grant role " << role
                                   << " due to tlsCATrusts parameter"};
         }
     }

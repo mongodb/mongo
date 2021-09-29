@@ -441,7 +441,7 @@ StatusWith<ResolvedRoleData> AuthzManagerExternalStateLocal::resolveRoles(
                 if (elem.type() != Array) {
                     return {ErrorCodes::BadValue,
                             str::stream()
-                                << "Invalid 'roles' field in role document '" << role.getFullName()
+                                << "Invalid 'roles' field in role document '" << role
                                 << "', expected an array but found " << typeName(elem.type())};
                 }
                 for (const auto& subroleElem : elem.Obj()) {
@@ -461,8 +461,8 @@ StatusWith<ResolvedRoleData> AuthzManagerExternalStateLocal::resolveRoles(
             if (processPrivs && (elem = roleDoc["privileges"])) {
                 if (elem.type() != Array) {
                     return {ErrorCodes::UnsupportedFormat,
-                            str::stream() << "Invalid 'privileges' field in role document '"
-                                          << role.getFullName() << "'"};
+                            str::stream()
+                                << "Invalid 'privileges' field in role document '" << role << "'"};
                 }
                 for (const auto& privElem : elem.Obj()) {
                     auto priv = Privilege::fromBSON(privElem);
@@ -475,7 +475,7 @@ StatusWith<ResolvedRoleData> AuthzManagerExternalStateLocal::resolveRoles(
                     return {ErrorCodes::UnsupportedFormat,
                             str::stream()
                                 << "Invalid 'authenticationRestrictions' field in role document '"
-                                << role.getFullName() << "'"};
+                                << role << "'"};
                 }
                 inheritedRestrictions.push_back(
                     uassertStatusOK(parseAuthenticationRestriction(BSONArray(elem.Obj()))));
@@ -589,8 +589,7 @@ Status AuthzManagerExternalStateLocal::getRolesDescription(
             result->push_back(roleBuilder.obj());
         } catch (const AssertionException& ex) {
             return {ex.code(),
-                    str::stream() << "Failed fetching role '" << role.getFullName()
-                                  << "': " << ex.reason()};
+                    str::stream() << "Failed fetching role '" << role << "': " << ex.reason()};
         }
     }
 

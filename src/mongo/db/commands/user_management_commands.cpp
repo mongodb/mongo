@@ -148,7 +148,7 @@ Status checkOkayToGrantRolesToRole(OperationContext* opCtx,
     for (const auto& roleToAdd : rolesToAdd) {
         if (roleToAdd == role) {
             return {ErrorCodes::InvalidRoleModification,
-                    str::stream() << "Cannot grant role " << role.getFullName() << " to itself."};
+                    str::stream() << "Cannot grant role " << role << " to itself."};
         }
 
         if (role.getDB() != "admin" && roleToAdd.getDB() != role.getDB()) {
@@ -161,21 +161,20 @@ Status checkOkayToGrantRolesToRole(OperationContext* opCtx,
     auto status = authzManager->rolesExist(opCtx, rolesToAdd);
     if (!status.isOK()) {
         return {status.code(),
-                str::stream() << "Cannot grant roles to '" << role.toString()
-                              << "': " << status.reason()};
+                str::stream() << "Cannot grant roles to '" << role << "': " << status.reason()};
     }
 
     auto swData = authzManager->resolveRoles(
         opCtx, rolesToAdd, AuthorizationManager::ResolveRoleOption::kRoles);
     if (!swData.isOK()) {
         return {swData.getStatus().code(),
-                str::stream() << "Cannot grant roles to '" << role.toString()
+                str::stream() << "Cannot grant roles to '" << role
                               << "': " << swData.getStatus().reason()};
     }
 
     if (sequenceContains(swData.getValue().roles.get(), role)) {
         return {ErrorCodes::InvalidRoleModification,
-                str::stream() << "Granting roles to " << role.getFullName()
+                str::stream() << "Granting roles to " << role
                               << " would introduce a cycle in the role graph"};
     }
 
@@ -414,8 +413,7 @@ Status updateRoleDocument(OperationContext* opCtx, const RoleName& role, const B
         return status;
     }
     if (status.code() == ErrorCodes::NoMatchingDocument) {
-        return Status(ErrorCodes::RoleNotFound,
-                      str::stream() << "Role " << role.getFullName() << " not found");
+        return Status(ErrorCodes::RoleNotFound, str::stream() << "Role " << role << " not found");
     }
     if (status.code() == ErrorCodes::UnknownError) {
         return Status(ErrorCodes::RoleModificationFailed, status.reason());
@@ -476,8 +474,7 @@ Status updatePrivilegeDocument(OperationContext* opCtx,
         return {ErrorCodes::UserModificationFailed, status.reason()};
     }
     if (status.code() == ErrorCodes::NoMatchingDocument) {
-        return {ErrorCodes::UserNotFound,
-                str::stream() << "User " << user.getFullName() << " not found"};
+        return {ErrorCodes::UserNotFound, str::stream() << "User " << user << " not found"};
     }
     return status;
 }
@@ -1228,7 +1225,7 @@ void CmdUMCTyped<DropUserCommand>::Invocation::typedRun(OperationContext* opCtx)
     uassertStatusOK(status);
 
     uassert(ErrorCodes::UserNotFound,
-            str::stream() << "User '" << userName.getFullName() << "' not found",
+            str::stream() << "User '" << userName << "' not found",
             numMatched > 0);
 }
 
@@ -1598,7 +1595,7 @@ void CmdUMCTyped<GrantPrivilegesToRoleCommand>::Invocation::typedRun(OperationCo
             !cmd.getPrivileges().empty());
 
     uassert(ErrorCodes::BadValue,
-            str::stream() << roleName.getFullName() << " is a built-in role and cannot be modified",
+            str::stream() << roleName << " is a built-in role and cannot be modified",
             !auth::isBuiltinRole(roleName));
 
     auto* client = opCtx->getClient();
@@ -1647,7 +1644,7 @@ void CmdUMCTyped<RevokePrivilegesFromRoleCommand>::Invocation::typedRun(Operatio
             !cmd.getPrivileges().empty());
 
     uassert(ErrorCodes::BadValue,
-            str::stream() << roleName.getFullName() << " is a built-in role and cannot be modified",
+            str::stream() << roleName << " is a built-in role and cannot be modified",
             !auth::isBuiltinRole(roleName));
 
     auto* client = opCtx->getClient();
@@ -1701,7 +1698,7 @@ void CmdUMCTyped<GrantRolesToRoleCommand>::Invocation::typedRun(OperationContext
             !cmd.getRoles().empty());
 
     uassert(ErrorCodes::BadValue,
-            str::stream() << roleName.getFullName() << " is a built-in role and cannot be modified",
+            str::stream() << roleName << " is a built-in role and cannot be modified",
             !auth::isBuiltinRole(roleName));
 
     auto rolesToAdd = auth::resolveRoleNames(cmd.getRoles(), dbname);
@@ -1741,7 +1738,7 @@ void CmdUMCTyped<RevokeRolesFromRoleCommand>::Invocation::typedRun(OperationCont
             !cmd.getRoles().empty());
 
     uassert(ErrorCodes::BadValue,
-            str::stream() << roleName.getFullName() << " is a built-in role and cannot be modified",
+            str::stream() << roleName << " is a built-in role and cannot be modified",
             !auth::isBuiltinRole(roleName));
 
     auto rolesToRemove = auth::resolveRoleNames(cmd.getRoles(), dbname);
@@ -1842,7 +1839,7 @@ void CmdUMCTyped<DropRoleCommand>::Invocation::typedRun(OperationContext* opCtx)
     RoleName roleName(cmd.getCommandParameter(), dbname);
 
     uassert(ErrorCodes::BadValue,
-            str::stream() << roleName.getFullName() << " is a built-in role and cannot be modified",
+            str::stream() << roleName << " is a built-in role and cannot be modified",
             !auth::isBuiltinRole(roleName));
 
     auto* client = opCtx->getClient();
@@ -1868,8 +1865,8 @@ void CmdUMCTyped<DropRoleCommand>::Invocation::typedRun(OperationContext* opCtx)
                                   BSON("$pull" << BSON("roles" << roleName.toBSON())));
         if (!swCount.isOK()) {
             return useDefaultCode(swCount.getStatus(), ErrorCodes::UserModificationFailed)
-                .withContext(str::stream() << "Failed to remove role " << roleName.getFullName()
-                                           << " from all users");
+                .withContext(str::stream()
+                             << "Failed to remove role " << roleName << " from all users");
         }
 
         // Remove this role from all other roles
@@ -1878,15 +1875,15 @@ void CmdUMCTyped<DropRoleCommand>::Invocation::typedRun(OperationContext* opCtx)
                              BSON("$pull" << BSON("roles" << roleName.toBSON())));
         if (!swCount.isOK()) {
             return useDefaultCode(swCount.getStatus(), ErrorCodes::RoleModificationFailed)
-                .withContext(str::stream() << "Failed to remove role " << roleName.getFullName()
-                                           << " from all users");
+                .withContext(str::stream()
+                             << "Failed to remove role " << roleName << " from all users");
         }
 
         // Finally, remove the actual role document
         swCount = txn.remove(AuthorizationManager::rolesCollectionNamespace, roleName.toBSON());
         if (!swCount.isOK()) {
-            return swCount.getStatus().withContext(str::stream() << "Failed to remove role "
-                                                                 << roleName.getFullName());
+            return swCount.getStatus().withContext(str::stream()
+                                                   << "Failed to remove role " << roleName);
         }
 
         return Status::OK();

@@ -532,7 +532,7 @@ StatusWith<UserHandle> AuthorizationManagerImpl::reacquireUser(OperationContext*
     auto ret = std::move(swUserHandle.getValue());
     if (user->getID() != ret->getID()) {
         return {ErrorCodes::UserNotFound,
-                str::stream() << "User id from privilege document '" << userName.toString()
+                str::stream() << "User id from privilege document '" << userName
                               << "' does not match user id in session."};
     }
 
@@ -629,7 +629,7 @@ void AuthorizationManagerImpl::_pinnedUsersThreadRoutine() noexcept try {
                 if (status != ErrorCodes::UserNotFound) {
                     LOGV2_WARNING(20239,
                                   "Unable to fetch pinned user",
-                                  "user"_attr = userName.toString(),
+                                  "user"_attr = userName,
                                   "error"_attr = status);
                 } else {
                     LOGV2_DEBUG(20233, 2, "Pinned user not found", "user"_attr = userName);

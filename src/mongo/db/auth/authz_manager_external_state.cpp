@@ -57,7 +57,7 @@ Status AuthzManagerExternalState::makeRoleNotFoundStatus(
         sb << 's';
     }
     for (const auto& unknownRole : unknownRoles) {
-        sb << delim << ' ' << unknownRole.toString();
+        sb << delim << ' ' << unknownRole;
         delim = ',';
     }
     return {ErrorCodes::RoleNotFound, sb.str()};

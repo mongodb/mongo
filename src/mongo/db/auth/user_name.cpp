@@ -38,17 +38,6 @@
 
 namespace mongo {
 
-UserName::UserName(StringData user, StringData dbname) {
-    _fullName.resize(user.size() + dbname.size() + 1);
-    std::string::iterator iter =
-        std::copy(user.rawData(), user.rawData() + user.size(), _fullName.begin());
-    *iter = '@';
-    ++iter;
-    iter = std::copy(dbname.rawData(), dbname.rawData() + dbname.size(), iter);
-    dassert(iter == _fullName.end());
-    _splitPoint = user.size();
-}
-
 /**
  * Don't change the logic of this function as it will break stable API version 1.
  */
@@ -82,18 +71,15 @@ UserName UserName::parseFromVariant(const stdx::variant<std::string, BSONObj>& h
  */
 UserName UserName::parseFromBSONObj(const BSONObj& obj) {
     std::bitset<2> usedFields;
-    const auto kUserNameFieldName = AuthorizationManager::USER_NAME_FIELD_NAME;
-    const auto kUserDbFieldName = AuthorizationManager::USER_DB_FIELD_NAME;
-    const size_t kUserNameFieldBit = 0;
-    const size_t kUserDbFieldBit = 1;
+    constexpr auto kUserNameFieldName = AuthorizationManager::USER_NAME_FIELD_NAME;
+    constexpr auto kUserDbFieldName = AuthorizationManager::USER_DB_FIELD_NAME;
+    constexpr size_t kUserNameFieldBit = 0;
+    constexpr size_t kUserDbFieldBit = 1;
     StringData userName, userDb;
 
     for (const auto& element : obj) {
         const auto fieldName = element.fieldNameStringData();
 
-        uassert(ErrorCodes::BadValue,
-                str::stream() << "username contains an unknown field named: '" << fieldName,
-                fieldName == kUserNameFieldName || fieldName == kUserDbFieldName);
 
         uassert(ErrorCodes::BadValue,
                 str::stream() << "username must contain a string field named: " << fieldName,
@@ -114,18 +100,19 @@ UserName UserName::parseFromBSONObj(const BSONObj& obj) {
 
             usedFields.set(kUserDbFieldBit);
             userDb = element.valueStringData();
+        } else {
+            uasserted(ErrorCodes::BadValue,
+                      str::stream() << "username contains an unknown field named: '" << fieldName);
         }
     }
 
-    if (!usedFields[kUserNameFieldBit]) {
-        uasserted(ErrorCodes::BadValue,
-                  str::stream() << "username must contain a field named: " << kUserNameFieldName);
-    }
+    uassert(ErrorCodes::BadValue,
+            str::stream() << "username must contain a field named: " << kUserNameFieldName,
+            usedFields[kUserNameFieldBit]);
 
-    if (!usedFields[kUserDbFieldBit]) {
-        uasserted(ErrorCodes::BadValue,
-                  str::stream() << "username must contain a field named: " << kUserDbFieldName);
-    }
+    uassert(ErrorCodes::BadValue,
+            str::stream() << "username must contain a field named: " << kUserDbFieldName,
+            usedFields[kUserDbFieldBit]);
 
     return UserName(userName, userDb);
 }
@@ -166,10 +153,6 @@ BSONObj UserName::toBSON() const {
     BSONObjBuilder ret;
     appendToBSON(&ret);
     return ret.obj();
-}
-
-std::ostream& operator<<(std::ostream& os, const UserName& name) {
-    return os << name.getFullName();
 }
 
 }  // namespace mongo

@@ -1113,7 +1113,7 @@ void OpDebug::appendUserInfo(const CurOp& c,
     }
     allUsers.doneFast();
 
-    builder.append("user", bestUser.getUser().empty() ? "" : bestUser.getFullName());
+    builder.append("user", bestUser.getUser().empty() ? "" : bestUser.getDisplayName());
 }
 
 std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requestedFields,

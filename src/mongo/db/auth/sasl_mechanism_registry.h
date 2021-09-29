@@ -166,7 +166,7 @@ public:
      * authentication mechanisms
      */
     bool isClusterMember() const {
-        return _principalName == internalSecurity.user->getName().getUser().toString() &&
+        return _principalName == internalSecurity.user->getName().getUser() &&
             getAuthenticationDatabase() == internalSecurity.user->getName().getDB();
     };
 

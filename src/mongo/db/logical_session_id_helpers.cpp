@@ -58,7 +58,7 @@ SHA256Block getLogicalSessionUserDigestForLoggedInUser(const OperationContext* o
 
         uassert(ErrorCodes::BadValue,
                 "Username too long to use with logical sessions",
-                user->getName().getFullName().length() < kMaximumUserNameLengthForLogicalSessions);
+                user->getName().getDisplayNameLength() < kMaximumUserNameLengthForLogicalSessions);
 
         return user->getDigest();
     } else {
@@ -71,7 +71,7 @@ SHA256Block getLogicalSessionUserDigestFor(StringData user, StringData db) {
         return kNoAuthDigest;
     }
     const UserName un(user, db);
-    const auto& fn = un.getFullName();
+    auto fn = un.getDisplayName();
     return SHA256Block::computeHash({ConstDataRange(fn.c_str(), fn.size())});
 }
 
@@ -153,7 +153,7 @@ LogicalSessionRecord makeLogicalSessionRecord(OperationContext* opCtx, Date_t la
         invariant(user);
 
         id.setUid(user->getDigest());
-        lsr.setUser(StringData(user->getName().toString()));
+        lsr.setUser(StringData(user->getName().getDisplayName()));
     } else {
         id.setUid(kNoAuthDigest);
     }
@@ -191,7 +191,7 @@ LogicalSessionRecord makeLogicalSessionRecord(OperationContext* opCtx,
         invariant(user);
 
         if (user->getDigest() == lsid.getUid()) {
-            lsr.setUser(StringData(user->getName().toString()));
+            lsr.setUser(StringData(user->getName().getDisplayName()));
         }
     }
 

@@ -49,8 +49,22 @@ namespace mongo {
  */
 class RoleName {
 public:
-    RoleName() : _splitPoint(0) {}
-    RoleName(StringData role, StringData dbname);
+    RoleName() = default;
+
+    template <typename Role, typename DB>
+    RoleName(Role role, DB db) {
+        if constexpr (std::is_same_v<Role, std::string>) {
+            _role = std::move(role);
+        } else {
+            _role = StringData(role).toString();
+        }
+
+        if constexpr (std::is_same_v<DB, std::string>) {
+            _db = std::move(db);
+        } else {
+            _db = StringData(db).toString();
+        }
+    }
 
     // Added for IDL support
     static RoleName parseFromBSON(const BSONElement& elem);
@@ -62,19 +76,19 @@ public:
     /**
      * Gets the name of the role excluding the "@dbname" component.
      */
-    StringData getRole() const {
-        return StringData(_fullName).substr(0, _splitPoint);
+    const std::string& getRole() const {
+        return _role;
     }
 
     /**
      * Gets the database name part of a role name.
      */
-    StringData getDB() const {
-        return StringData(_fullName).substr(_splitPoint + 1);
+    const std::string& getDB() const {
+        return _db;
     }
 
     bool empty() const {
-        return _fullName.empty();
+        return _role.empty() && _db.empty();
     }
 
     /**
@@ -82,33 +96,41 @@ public:
      *
      * Allowed for keys in non-persistent data structures, such as std::map.
      */
-    const std::string& getFullName() const {
-        return _fullName;
+    std::string getDisplayName() const {
+        if (empty()) {
+            return "";
+        }
+        return str::stream() << _role << '@' << _db;
     }
 
     /**
-     * Stringifies the object, for logging/debugging.
+     * Gets the full unambiguous unique name of a user as a string, formatted as "db.role"
      */
-    const std::string& toString() const {
-        return getFullName();
+    std::string getUnambiguousName() const {
+        if (empty()) {
+            return "";
+        }
+        return str::stream() << _db << '.' << _role;
     }
 
     template <typename H>
     friend H AbslHashValue(H h, const RoleName& rname) {
-        return H::combine(std::move(h), rname.getFullName());
+        auto state = H::combine(std::move(h), rname._db);
+        state = H::combine(std::move(state), '.');
+        return H::combine(std::move(state), rname._role);
     }
 
 private:
-    std::string _fullName;  // The full name, stored as a string.  "role@db".
-    size_t _splitPoint;     // The index of the "@" separating the role and db name parts.
+    std::string _role;
+    std::string _db;
 };
 
 static inline bool operator==(const RoleName& lhs, const RoleName& rhs) {
-    return lhs.getFullName() == rhs.getFullName();
+    return (lhs.getRole() == rhs.getRole()) && (lhs.getDB() == rhs.getDB());
 }
 
 static inline bool operator!=(const RoleName& lhs, const RoleName& rhs) {
-    return lhs.getFullName() != rhs.getFullName();
+    return (lhs.getRole() != rhs.getRole()) || (lhs.getDB() != rhs.getDB());
 }
 
 static inline bool operator<(const RoleName& lhs, const RoleName& rhs) {
@@ -118,8 +140,19 @@ static inline bool operator<(const RoleName& lhs, const RoleName& rhs) {
     return lhs.getDB() < rhs.getDB();
 }
 
-std::ostream& operator<<(std::ostream& os, const RoleName& name);
+static inline std::ostream& operator<<(std::ostream& os, const RoleName& role) {
+    if (!role.empty()) {
+        os << role.getRole() << '@' << role.getDB();
+    }
+    return os;
+}
 
+static inline StringBuilder& operator<<(StringBuilder& os, const RoleName& role) {
+    if (!role.empty()) {
+        os << role.getRole() << '@' << role.getDB();
+    }
+    return os;
+}
 
 /**
  * Iterator over an unspecified container of RoleName objects.

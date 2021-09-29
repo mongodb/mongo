@@ -41,7 +41,7 @@ namespace {
 constexpr auto kDiagnosticLogLevel = 3;
 
 Status crossVerifyUserNames(const UserName& oldUser, const UserName& newUser) noexcept {
-    if (oldUser.getFullName().empty()) {
+    if (oldUser.empty()) {
         return Status::OK();
     }
 
@@ -53,7 +53,7 @@ Status crossVerifyUserNames(const UserName& oldUser, const UserName& newUser) no
             return {ErrorCodes::ProtocolError,
                     str::stream()
                         << "Attempt to switch database target during SASL authentication from "
-                        << oldUser.toString() << " to " << newUser.toString()};
+                        << oldUser << " to " << newUser};
         }
     }
 
@@ -65,7 +65,7 @@ Status crossVerifyUserNames(const UserName& oldUser, const UserName& newUser) no
     if (oldUser.getUser() != newUser.getUser()) {
         return {ErrorCodes::ProtocolError,
                 str::stream() << "Attempt to switch user during SASL authentication from "
-                              << oldUser.toString() << " to " << newUser.toString()};
+                              << oldUser << " to " << newUser};
     }
 
     return Status::OK();

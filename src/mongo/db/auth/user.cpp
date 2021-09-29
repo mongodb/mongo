@@ -47,7 +47,7 @@ namespace mongo {
 namespace {
 
 SHA256Block computeDigest(const UserName& name) {
-    const auto& fn = name.getFullName();
+    auto fn = name.getDisplayName();
     return SHA256Block::computeHash({ConstDataRange(fn.c_str(), fn.size())});
 };
 
