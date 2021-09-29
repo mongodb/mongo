@@ -877,6 +877,58 @@ std::unique_ptr<MatchExpression> matchRewriteTo(
     return nullptr;
 }
 
+/**
+ * Attempt to rewrite a reference to the 'to' field such that, when evaluated over an oplog
+ * document, it produces the expected change stream value for the field.
+ */
+boost::intrusive_ptr<Expression> exprRewriteTo(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const ExpressionFieldPath* expr,
+    bool allowInexact) {
+    auto fieldPath = expr->getFieldPathWithoutCurrentPrefix();
+
+    // This function should only be called on the 'to' field.
+    tassert(5942200,
+            str::stream() << "Unexpected field path" << fieldPath.fullPathWithPrefix(),
+            fieldPath.getFieldName(0) == DocumentSourceChangeStream::kRenameTargetNssField);
+
+    std::ostringstream condRename;
+
+    // Create a case to verify if the 'op' type is command and '$o.to' field is present.
+    condRename
+        << "{$cond: {if: {$and: [{$eq: ['$op', 'c']}, {$ne: ['$o.to', '$$REMOVE']}]}, then: ";
+
+    // Expression to extract the db component from the 'to' field.
+    const auto dbNameExpr = "{$substrBytes: ['$o.to', 0, {$indexOfBytes: ['$o.to', '.']}]}";
+
+    // Expression to extract the collection component from the 'to' field.
+    const auto collNameExpr =
+        "{$substrBytes: ['$o.to', {$add: [{$indexOfBytes: ['$o.to', '.']}, 1]}, -1]}";
+
+    const auto& fullPath = fieldPath.fullPath();
+
+    if (fullPath == "to") {
+        // If there is no sub-field path, then return the full 'to' object.
+        condRename << "{db: " << dbNameExpr << ", coll: " << collNameExpr << "}";
+    } else if (fullPath == "to.db") {
+        // If the sub-path contains 'db', then return only the 'db' component.
+        condRename << dbNameExpr;
+    } else if (fullPath == "to.coll") {
+        // If the sub-path contains 'coll', then return only the 'coll' component.
+        condRename << collNameExpr;
+    } else {
+        // Any other field path, should match nothing.
+        return ExpressionConstant::create(expCtx.get(), Value());
+    }
+
+    // The default case, if this is not a rename command.
+    condRename << ", else: '$$REMOVE' }}";
+
+    // Parse the expression BSON object into an Expression and return it.
+    return Expression::parseExpression(
+        expCtx.get(), fromjson(condRename.str()), expCtx->variablesParseState);
+}
+
 // Map of fields names for which a simple rename is sufficient when rewriting.
 StringMap<std::string> renameRegistry = {
     {"clusterTime", "ts"}, {"lsid", "lsid"}, {"txnNumber", "txnNumber"}};
@@ -892,7 +944,8 @@ StringMap<MatchExpressionRewrite> matchRewriteRegistry = {
 // Map of field names to corresponding agg Expression rewrite functions.
 StringMap<AggExpressionRewrite> exprRewriteRegistry = {{"operationType", exprRewriteOperationType},
                                                        {"documentKey", exprRewriteDocumentKey},
-                                                       {"ns", exprRewriteNs}};
+                                                       {"ns", exprRewriteNs},
+                                                       {"to", exprRewriteTo}};
 
 // Traverse the Expression tree and rewrite as many of them as possible. Note that the rewrite is
 // performed in-place; that is, the Expression passed into the function is mutated by it.
