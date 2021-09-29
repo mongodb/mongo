@@ -99,6 +99,9 @@ if not get_option('ssl') == 'off':
                 '$BUILD_DIR/mongo/base',
                 'ssl_options',
             ],
+            LIBDEPS_PRIVATE=[
+                '$BUILD_DIR/mongo/crypto/symmetric_crypto'
+            ]
         );
 
     env.Library(

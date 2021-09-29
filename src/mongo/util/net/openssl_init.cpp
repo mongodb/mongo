@@ -162,7 +162,7 @@ void setupFIPS() {
 #endif
 }
 
-MONGO_INITIALIZER(SetupOpenSSL)(InitializerContext*) {
+MONGO_INITIALIZER_GENERAL(SetupOpenSSL, (), ("CryptographyInitialized"))(InitializerContext*) {
     SSL_library_init();
     SSL_load_error_strings();
     ERR_load_crypto_strings();

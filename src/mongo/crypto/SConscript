@@ -69,7 +69,6 @@ if get_option('ssl') == 'on':
                 ],
                 LIBDEPS=[
                     '$BUILD_DIR/mongo/base/secure_allocator',
-                    '$BUILD_DIR/mongo/util/net/openssl_init' if 'openssl' in env['MONGO_CRYPTO'] else '',
                     '$BUILD_DIR/mongo/util/secure_zero_memory',
                 ],
     )
