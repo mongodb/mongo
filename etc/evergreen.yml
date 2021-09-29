@@ -648,6 +648,15 @@ functions:
       args:
         - "./src/evergreen/functions/system_resource_info_collect.sh"
 
+  "collect ulimit info": &collect_ulimit_info
+    command: subprocess.exec
+    params:
+      background: true
+      system_log: true
+      binary: bash
+      args:
+        - "./src/evergreen/functions/ulimit_info_collect.sh"
+
   # Run a monitor process as a background, system task to periodically
   # display how many threads interesting processes are using.
   "monitor process threads": &monitor_process_threads
@@ -877,6 +886,7 @@ functions:
   - *run_diskstats
   - *monitor_process_threads
   - *collect_system_resource_info
+  - *collect_ulimit_info
 
   "do non-compile setup":
   - command: manifest.load
