@@ -87,7 +87,6 @@ Status _dropView(OperationContext* opCtx,
     // Validates the view or throws an "invalid view" error.
     ViewCatalog::get(db)->lookup(opCtx, collectionName);
 
-    Lock::CollectionLock collLock(opCtx, collectionName, MODE_IX);
     // Operations all lock system.views in the end to prevent deadlock.
     Lock::CollectionLock systemViewsLock(opCtx, db->getSystemViewsName(), MODE_X);
 
@@ -378,6 +377,9 @@ Status _dropCollection(OperationContext* opCtx,
                 return dropTimeseries(view->viewOn(), true);
             }
 
+            // Take a MODE_X lock when dropping a view. This is to prevent a concurrent create
+            // collection on the same namespace that will reserve an OpTime before this drop.
+            Lock::CollectionLock viewLock(opCtx, collectionName, MODE_X);
             return _dropView(opCtx, db, collectionName, reply);
         });
     } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
@@ -456,6 +458,7 @@ Status dropCollectionForApplyOps(OperationContext* opCtx,
 
         DropReply unusedReply;
         if (!coll) {
+            Lock::CollectionLock viewLock(opCtx, collectionName, MODE_IX);
             return _dropView(opCtx, db, collectionName, &unusedReply);
         } else {
             return _dropCollectionForApplyOps(
