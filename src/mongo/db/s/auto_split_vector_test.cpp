@@ -102,7 +102,7 @@ public:
      * Get the number of documents inserted until now.
      */
     int getInsertedSize() {
-        return _nextShardKey + 1;
+        return _nextShardKey;
     }
 
 private:
