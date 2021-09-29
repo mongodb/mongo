@@ -44,6 +44,7 @@ namespace mongo {
 namespace {
 constexpr auto kAnotherOperationInProgress = "Another operation is in progress";
 constexpr auto kNoOperationInProgress = "No operation is in progress";
+constexpr auto kMetricsSetBeforeRestore = "Expected metrics to be 0 prior to restore";
 
 constexpr auto kTotalOps = "countReshardingOperations";
 constexpr auto kSuccessfulOps = "countReshardingSuccessful";
@@ -564,16 +565,10 @@ void ReshardingMetrics::onDocumentsCopied(int64_t documents, int64_t bytes) noex
     invariant(checkState(*_currentOp->recipientState,
                          {RecipientStateEnum::kCloning, RecipientStateEnum::kError}));
 
-    onDocumentsCopiedForCurrentOp(documents, bytes);
-    _cumulativeOp->documentsCopied += documents;
-    _cumulativeOp->bytesCopied += bytes;
-}
-
-void ReshardingMetrics::onDocumentsCopiedForCurrentOp(int64_t documents, int64_t bytes) noexcept {
-    invariant(_currentOp, kNoOperationInProgress);
-
     _currentOp->documentsCopied += documents;
     _currentOp->bytesCopied += bytes;
+    _cumulativeOp->documentsCopied += documents;
+    _cumulativeOp->bytesCopied += bytes;
 }
 
 void ReshardingMetrics::gotInserts(int n) noexcept {
@@ -654,14 +649,8 @@ void ReshardingMetrics::onOplogEntriesFetched(int64_t entries) noexcept {
         *_currentOp->recipientState,
         {RecipientStateEnum::kCloning, RecipientStateEnum::kApplying, RecipientStateEnum::kError}));
 
-    onOplogEntriesFetchedForCurrentOp(entries);
-    _cumulativeOp->oplogEntriesFetched += entries;
-}
-
-void ReshardingMetrics::onOplogEntriesFetchedForCurrentOp(int64_t entries) noexcept {
-    invariant(_currentOp, kNoOperationInProgress);
-
     _currentOp->oplogEntriesFetched += entries;
+    _cumulativeOp->oplogEntriesFetched += entries;
 }
 
 void ReshardingMetrics::onOplogEntriesApplied(int64_t entries) noexcept {
@@ -672,14 +661,24 @@ void ReshardingMetrics::onOplogEntriesApplied(int64_t entries) noexcept {
     invariant(checkState(*_currentOp->recipientState,
                          {RecipientStateEnum::kApplying, RecipientStateEnum::kError}));
 
-    onOplogEntriesAppliedForCurrentOp(entries);
+    _currentOp->oplogEntriesApplied += entries;
     _cumulativeOp->oplogEntriesApplied += entries;
 }
 
-void ReshardingMetrics::onOplogEntriesAppliedForCurrentOp(int64_t entries) noexcept {
+void ReshardingMetrics::restoreForCurrentOp(int64_t documentCountCopied,
+                                            int64_t documentBytesCopied,
+                                            int64_t oplogEntriesFetched,
+                                            int64_t oplogEntriesApplied) noexcept {
     invariant(_currentOp, kNoOperationInProgress);
+    invariant(_currentOp->documentsCopied == 0, kMetricsSetBeforeRestore);
+    invariant(_currentOp->bytesCopied == 0, kMetricsSetBeforeRestore);
+    invariant(_currentOp->oplogEntriesFetched == 0, kMetricsSetBeforeRestore);
+    invariant(_currentOp->oplogEntriesApplied == 0, kMetricsSetBeforeRestore);
 
-    _currentOp->oplogEntriesApplied += entries;
+    _currentOp->documentsCopied = documentCountCopied;
+    _currentOp->bytesCopied = documentBytesCopied;
+    _currentOp->oplogEntriesFetched = oplogEntriesFetched;
+    _currentOp->oplogEntriesApplied = oplogEntriesApplied;
 }
 
 void ReshardingMetrics::onWriteDuringCriticalSection(int64_t writes) noexcept {

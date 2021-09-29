@@ -84,8 +84,6 @@ public:
     void setDocumentsToCopyForCurrentOp(int64_t documents, int64_t bytes) noexcept;
     // Allows updating metrics on "documents to copy" so long as the recipient is in cloning state.
     void onDocumentsCopied(int64_t documents, int64_t bytes) noexcept;
-    // Allows updating metrics on "documents to copy".
-    void onDocumentsCopiedForCurrentOp(int64_t documents, int64_t bytes) noexcept;
 
     // Allows updating metrics on "opcounters";
     void gotInserts(int n) noexcept;
@@ -116,9 +114,12 @@ public:
     // Allows updating "oplog entries to apply" metrics when the recipient is in applying state.
     void onOplogEntriesFetched(int64_t entries) noexcept;
     // Allows restoring "oplog entries to apply" metrics.
-    void onOplogEntriesFetchedForCurrentOp(int64_t entries) noexcept;
     void onOplogEntriesApplied(int64_t entries) noexcept;
-    void onOplogEntriesAppliedForCurrentOp(int64_t entries) noexcept;
+
+    void restoreForCurrentOp(int64_t documentCountCopied,
+                             int64_t documentBytesCopied,
+                             int64_t oplogEntriesFetched,
+                             int64_t oplogEntriesApplied) noexcept;
 
     // Allows tracking writes during a critical section when the donor's state is either of
     // "donating-oplog-entries" or "blocking-writes".
