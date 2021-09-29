@@ -37,6 +37,7 @@
 
 #include "mongo/base/init.h"
 #include "mongo/base/initializer.h"
+#include "mongo/db/concurrency/locker_noop_client_observer.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -482,7 +483,9 @@ int bridgeMain(int argc, char** argv) {
     runGlobalInitializersOrDie(std::vector<std::string>(argv, argv + argc));
     startSignalProcessingThread(LogFileStatus::kNoLogFileToRotate);
 
-    setGlobalServiceContext(ServiceContext::make());
+    auto serviceContextHolder = ServiceContext::make();
+    serviceContextHolder->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
+    setGlobalServiceContext(std::move(serviceContextHolder));
     auto serviceContext = getGlobalServiceContext();
 
     serviceContext->setServiceEntryPoint(std::make_unique<ServiceEntryPointBridge>(serviceContext));
