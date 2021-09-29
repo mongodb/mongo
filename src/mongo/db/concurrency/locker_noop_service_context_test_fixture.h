@@ -35,17 +35,31 @@
 namespace mongo {
 
 /**
+ * Registers the LockerNoopClientObserver with the provided ServiceContext on construction.
+ */
+class LockerNoopClientObserverRegisterer {
+    LockerNoopClientObserverRegisterer(const LockerNoopClientObserverRegisterer&) = delete;
+    LockerNoopClientObserverRegisterer& operator=(const LockerNoopClientObserverRegisterer&) =
+        delete;
+
+public:
+    explicit LockerNoopClientObserverRegisterer(ServiceContext* service) {
+        service->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
+    }
+};
+
+/**
  * Test fixture for tests that require a properly initialized global service context
  * and a stub Locker implementation whenever an OperationContext is requested.
  */
 class LockerNoopServiceContextTest : public ServiceContextTest {
 protected:
-    LockerNoopServiceContextTest() {
-        auto service = getServiceContext();
-        service->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
-    }
+    LockerNoopServiceContextTest() : _lockerNoopClientObserverRegisterer(getServiceContext()) {}
 
     ~LockerNoopServiceContextTest() = default;
+
+private:
+    LockerNoopClientObserverRegisterer _lockerNoopClientObserverRegisterer;
 };
 
 }  // namespace mongo
