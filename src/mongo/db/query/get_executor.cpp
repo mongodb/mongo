@@ -647,8 +647,15 @@ public:
             auto result = makeResult();
             // Only one possible plan. Run it. Build the stages from the solution.
             solutions[0]->extendWith(std::move(postMultiPlan));
-            auto root = buildExecutableTree(*solutions[0]);
-            result->emplace(std::move(root), std::move(solutions[0]));
+
+            // For performance reasons when executing $group plans, we need to eliminate a redundant
+            // PROJECTION_SIMPLE node if its required fields are a super set of the postMultiPlan's
+            // dependency set.
+            auto optimizedSoln =
+                QueryPlannerAnalysis::removeProjectSimpleBelowGroup(std::move(solutions[0]));
+
+            auto root = buildExecutableTree(*optimizedSoln);
+            result->emplace(std::move(root), std::move(optimizedSoln));
 
             LOGV2_DEBUG(20926,
                         2,

@@ -197,6 +197,10 @@ void QuerySolution::setRoot(std::unique_ptr<QuerySolutionNode> root) {
     assignNodeIds(idGenerator, *_root);
 }
 
+std::unique_ptr<QuerySolutionNode> QuerySolution::extractRoot() {
+    return std::move(_root);
+}
+
 //
 // CollectionScanNode
 //

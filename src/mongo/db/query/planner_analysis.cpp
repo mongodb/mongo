@@ -553,7 +553,60 @@ bool canUseSimpleSort(const QuerySolutionNode& solnRoot,
         !(plannerParams.options & QueryPlannerParams::PRESERVE_RECORD_ID);
 }
 
+void removeProjectSimpleBelowGroupRecursive(QuerySolutionNode* solnRoot) {
+    if (solnRoot == nullptr) {
+        return;
+    }
+
+    // Look for a GROUP => PROJECTION_SIMPLE where the dependency set of the PROJECTION_SIMPLE
+    // is a super set of the dependency set of the GROUP. If so, the projection isn't needed and
+    // it can be elminated.
+    if (solnRoot->getType() == StageType::STAGE_GROUP) {
+        auto groupNode = static_cast<GroupNode*>(solnRoot);
+
+        auto projectNodeCandidate = groupNode->children[0];
+        if (projectNodeCandidate->getType() != StageType::STAGE_PROJECTION_SIMPLE) {
+            // There's no PROJECTION_SIMPLE sitting below root and we don't expect another pattern
+            // in the sub-tree, so bail out of the recursion. If we ran into a case of a computed
+            // projection, it would have type PROJECTION_DEFAULT.
+            return;
+        }
+
+        // Check to see if the projectNode's field set is a super set of the groupNodes.
+        auto projectNode = static_cast<ProjectionNodeSimple*>(projectNodeCandidate);
+        auto projectFields = projectNode->proj.getRequiredFields();
+        if (!std::any_of(projectFields.begin(), projectFields.end(), [groupNode](auto&& fld) {
+                return groupNode->requiredFields.contains(fld);
+            })) {
+            // The dependency set of the GROUP stage is wider than the projectNode field set.
+            return;
+        };
+
+        // Attach the projectNode's child to the groupNode's child.
+        groupNode->children[0] = projectNode->children[0];
+        projectNode->children[0] = nullptr;
+
+        // Get rid of the project simple node.
+        delete projectNode;
+    } else {
+        // Keep traversing the tree in search of a GROUP stage.
+        for (size_t i = 0; i < solnRoot->children.size(); ++i) {
+            removeProjectSimpleBelowGroupRecursive(solnRoot->children[i]);
+        }
+    }
+}
 }  // namespace
+
+// static
+std::unique_ptr<QuerySolution> QueryPlannerAnalysis::removeProjectSimpleBelowGroup(
+    std::unique_ptr<QuerySolution> soln) {
+    auto root = soln->extractRoot();
+
+    removeProjectSimpleBelowGroupRecursive(root.get());
+
+    soln->setRoot(std::move(root));
+    return soln;
+}
 
 // static
 void QueryPlannerAnalysis::analyzeGeo(const QueryPlannerParams& params,

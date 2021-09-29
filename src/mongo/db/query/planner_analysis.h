@@ -112,6 +112,15 @@ public:
     static bool explodeForSort(const CanonicalQuery& query,
                                const QueryPlannerParams& params,
                                QuerySolutionNode** solnRoot);
+
+    /**
+     * Walks the QuerySolutionNode tree rooted in 'soln', and looks for a ProjectionNodeSimple that
+     * is a child of GroupNode, and has a dependency set that's a super set of the the dependency
+     * set of the GroupNode. If that condition is met the ProjectionNodeSimple is redundant and can
+     * thus be elimiated. Otherwise, this is a noop.
+     */
+    static std::unique_ptr<QuerySolution> removeProjectSimpleBelowGroup(
+        std::unique_ptr<QuerySolution> soln);
 };
 
 }  // namespace mongo

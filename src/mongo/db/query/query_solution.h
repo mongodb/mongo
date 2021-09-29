@@ -376,6 +376,11 @@ public:
      */
     void setRoot(std::unique_ptr<QuerySolutionNode> root);
 
+    /**
+     * Extracts the root of the QuerySolutionNode rooted at `_root`.
+     */
+    std::unique_ptr<QuerySolutionNode> extractRoot();
+
     // There are two known scenarios in which a query solution might potentially block:
     //
     // Sort stage:
@@ -1268,13 +1273,27 @@ struct TextMatchNode : public QuerySolutionNodeWithSortSet {
 
 struct GroupNode : public QuerySolutionNode {
     GroupNode(std::unique_ptr<QuerySolutionNode> child,
-              StringMap<boost::intrusive_ptr<Expression>> groupByExpressions,
-              std::vector<AccumulationStatement> accumulators,
-              bool doingMerge)
+              StringMap<boost::intrusive_ptr<Expression>> groupByExprs,
+              std::vector<AccumulationStatement> accs,
+              bool merging)
         : QuerySolutionNode(std::move(child)),
-          groupByExpressions(std::move(groupByExpressions)),
-          accumulators(std::move(accumulators)),
-          doingMerge(doingMerge) {}
+          groupByExpressions(std::move(groupByExprs)),
+          accumulators(std::move(accs)),
+          doingMerge(merging) {
+        // Use the DepsTracker to extract the fields that the 'groupByExpressions' and accumulator
+        // expressions depend on.
+        for (auto&& [field, expr] : groupByExpressions) {
+            for (auto& groupByExprField : expr->getDependencies().fields) {
+                requiredFields.insert(groupByExprField);
+            }
+        }
+        for (auto&& acc : accumulators) {
+            auto argExpr = acc.expr.argument;
+            for (auto& argExprField : argExpr->getDependencies().fields) {
+                requiredFields.insert(argExprField);
+            }
+        }
+    }
 
     StageType getType() const override {
         return STAGE_GROUP;
@@ -1302,6 +1321,11 @@ struct GroupNode : public QuerySolutionNode {
     StringMap<boost::intrusive_ptr<Expression>> groupByExpressions;
     std::vector<AccumulationStatement> accumulators;
     bool doingMerge;
+
+    // Carries the fields this GroupNode depends on. Namely, 'requiredFields' contains the union of
+    // the fields in the 'groupByExpressions' and the fields in the input Expressions of the
+    // 'accumulators'.
+    StringSet requiredFields;
 };
 
 struct SentinelNode : public QuerySolutionNode {
