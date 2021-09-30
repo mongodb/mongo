@@ -2171,10 +2171,6 @@ tasks:
         targets: install-unittests install-unittests-debug
         compiling_for_test: true
 
-## A copy of the compile_unittests task for the recorded unittest taskgroup ##
-- <<: *compile_unittests
-  name: compile_unittests_for_recorded_unittest
-
 ## run_unittests ##
 - name: run_unittests
   tags: []
@@ -7100,12 +7096,6 @@ task_groups:
   tasks:
   - compile_unittests
   - run_unittests
-
-- <<: *compile_task_group_template
-  name: compile_test_and_package_parallel_unittest_stream_with_recording_TG
-  tasks:
-    - compile_unittests_for_recorded_unittest
-    - run_unittests_with_recording
 
 - <<: *compile_task_group_template
   name: compile_test_and_package_parallel_dbtest_stream_TG

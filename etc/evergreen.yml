@@ -7235,11 +7235,11 @@ task_groups:
   - compile_unittests
   - run_unittests
 
-- <<: *compile_task_group_template
-  name: compile_test_and_package_parallel_unittest_stream_with_recording_TG
-  tasks:
-    - compile_unittests_for_recorded_unittest
-    - run_unittests_with_recording
+#- <<: *compile_task_group_template
+#  name: compile_test_and_package_parallel_unittest_stream_with_recording_TG
+#  tasks:
+#    - compile_unittests_for_recorded_unittest
+#    - run_unittests_with_recording
 
 - <<: *compile_task_group_template
   name: compile_test_and_package_parallel_dbtest_stream_TG
@@ -9266,9 +9266,9 @@ buildvariants:
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:
       - rhel80-xlarge
-  - name: compile_test_and_package_parallel_unittest_stream_with_recording_TG
-    distros:
-      - rhel80-xlarge
+#  - name: compile_test_and_package_parallel_unittest_stream_with_recording_TG
+#    distros:
+#      - rhel80-xlarge
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
       - rhel80-xlarge
@@ -9569,9 +9569,9 @@ buildvariants:
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
       - rhel80-xlarge
-  - name: compile_test_and_package_parallel_unittest_stream_with_recording_TG
-    distros:
-      - rhel80-xlarge
+#  - name: compile_test_and_package_parallel_unittest_stream_with_recording_TG
+#    distros:
+#      - rhel80-xlarge
   - name: disk_wiredtiger
   - name: initial_sync_fuzzer_gen
   - name: jsCore
