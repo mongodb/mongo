@@ -484,6 +484,9 @@ env.Library(
         '$BUILD_DIR/mongo/util/periodic_runner',
         'write_concern_options',
     ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/util/processinfo',
+    ],
 )
 
 env.Library(
