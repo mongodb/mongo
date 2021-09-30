@@ -109,9 +109,6 @@ private:
          * Note: statusWithCollectionAndChangedChunks must always be NamespaceNotFound or
          * OK, otherwise the constructor will invariant because there is no task to complete.
          *
-         * if 'metadataFormatChanged' is true, this task updates the persistent
-         * metadata format of the collection and its chunks. This specific kind
-         * of task doesn't have changed chunks.
          *
          * 'collectionAndChangedChunks' is only initialized if 'dropped' is false.
          * 'minimumQueryVersion' sets 'minQueryVersion'.
@@ -121,8 +118,7 @@ private:
         CollAndChunkTask(
             StatusWith<CollectionAndChangedChunks> statusWithCollectionAndChangedChunks,
             ChunkVersion minimumQueryVersion,
-            long long currentTerm,
-            bool metadataFormatChanged = false);
+            long long currentTerm);
 
         // Always-incrementing task number to uniquely identify different tasks
         uint64_t taskNum;
@@ -144,10 +140,6 @@ private:
         // Indicates whether the collection metadata must be cleared.
         bool dropped{false};
 
-        // Indicates whether the collection metadata and all its chunks must be updated due to a
-        // metadata format change.
-        bool updateMetadataFormat{false};
-
         // The term in which the loader scheduled this task.
         uint32_t termCreated;
 
@@ -161,20 +153,9 @@ private:
                << (minQueryVersion.isSet() ? minQueryVersion.toString() : "(unset)")
                << ", maxQueryVersion: "
                << (maxQueryVersion.isSet() ? maxQueryVersion.toString() : "(unset)")
-               << ", dropped: " << dropped << ", updateMetadataFormat: " << updateMetadataFormat
-               << ", termCreated: " << termCreated;
+               << ", dropped: " << dropped << ", termCreated: " << termCreated;
             return ss.str();
         }
-    };
-
-    /* This class represents the results of a _getEnqueuedMetadata call. It contains information
-     * about:
-     *	- Whether we must patch up the metadata results that are sent back to the CatalogCache.
-     *	- The Collection and the changed chunks.
-     */
-    struct EnqueuedMetadataResults {
-        bool mustPatchUpMetadataResults{false};
-        CollectionAndChangedChunks collAndChangedChunks;
     };
 
     /**
@@ -248,7 +229,7 @@ private:
          * Iterates over the task list to retrieve the enqueued metadata. Only retrieves
          * collects data from tasks that have terms matching the specified 'term'.
          */
-        EnqueuedMetadataResults getEnqueuedMetadataForTerm(long long term) const;
+        CollectionAndChangedChunks getEnqueuedMetadataForTerm(long long term) const;
 
 
     private:
@@ -433,7 +414,7 @@ private:
      *
      * Only run on the shard primary.
      */
-    std::pair<bool, EnqueuedMetadataResults> _getEnqueuedMetadata(
+    std::pair<bool, CollectionAndChangedChunks> _getEnqueuedMetadata(
         const NamespaceString& nss, const ChunkVersion& catalogCacheSinceVersion, long long term);
 
     /**

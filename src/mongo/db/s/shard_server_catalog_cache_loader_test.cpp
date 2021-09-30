@@ -440,23 +440,6 @@ TEST_F(ShardServerCatalogCacheLoaderTest, PrimaryLoadFromShardedAndFindMixedChun
     }
 }
 
-TEST_F(ShardServerCatalogCacheLoaderTest, PrimaryLoadFromShardedAndFindDbMetadataFormatChanged) {
-    const std::string dbName("dbName");
-    DatabaseVersion version(UUID::gen(), Timestamp());
-    DatabaseType dbType(dbName, kShardId, true /* sharded */, version);
-
-    _remoteLoaderMock->setDatabaseRefreshReturnValue(dbType);
-    auto newDbType = _shardLoader->getDatabase(dbName).get();
-    ASSERT_EQUALS(dbType.getVersion().getUuid(), newDbType.getVersion().getUuid());
-    ASSERT_EQUALS(dbType.getVersion().getTimestamp(), newDbType.getVersion().getTimestamp());
-
-    dbType.setVersion(DatabaseVersion(UUID::gen(), Timestamp(42)));
-    _remoteLoaderMock->setDatabaseRefreshReturnValue(dbType);
-    newDbType = _shardLoader->getDatabase(dbName).get();
-    ASSERT_EQUALS(dbType.getVersion().getUuid(), newDbType.getVersion().getUuid());
-    ASSERT_EQUALS(dbType.getVersion().getTimestamp(), newDbType.getVersion().getTimestamp());
-}
-
 TEST_F(ShardServerCatalogCacheLoaderTest, TimeseriesFieldsAreProperlyPropagatedOnSSCCL) {
     ChunkVersion collectionVersion(1, 0, OID::gen(), Timestamp());
 

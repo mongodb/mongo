@@ -213,13 +213,6 @@ void updateSupportingLongNameOnShardCollections(OperationContext* opCtx,
                                                 SupportingLongNameStatusEnum supportingLongName);
 
 /**
- * Adds/removes the timestamp of the 'nss' entry in config.cache.collections
- */
-void updateTimestampOnShardCollections(OperationContext* opCtx,
-                                       const NamespaceString& nss,
-                                       const boost::optional<Timestamp>& timestamp);
-
-/**
  * Deletes locally persisted chunk metadata associated with 'nss': drops the chunks collection
  * and removes the collections collection entry.
  *

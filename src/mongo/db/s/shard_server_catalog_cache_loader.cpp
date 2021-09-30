@@ -414,25 +414,6 @@ void forcePrimaryDatabaseRefreshAndWaitForReplication(OperationContext* opCtx, S
     uassertStatusOK(repl::ReplicationCoordinator::get(opCtx)->waitUntilOpTimeForRead(
         opCtx, {LogicalTime::fromOperationTime(cmdResponse.response), boost::none}));
 }
-
-/**
- * if 'mustPatchUpMetadataResults' is true, it sets the current 'timestamp' to all 'changedChunks'.
- * Does nothing otherwise.
- */
-void patchUpChangedChunksIfNeeded(bool mustPatchUpMetadataResults,
-                                  const Timestamp& timestamp,
-                                  std::vector<ChunkType>& changedChunks) {
-
-    if (!mustPatchUpMetadataResults)
-        return;
-
-    std::for_each(changedChunks.begin(), changedChunks.end(), [&timestamp](ChunkType& chunk) {
-        const ChunkVersion version = chunk.getVersion();
-        chunk.setVersion(ChunkVersion(
-            version.majorVersion(), version.minorVersion(), version.epoch(), timestamp));
-    });
-}
-
 }  // namespace
 
 ShardServerCatalogCacheLoader::ShardServerCatalogCacheLoader(
@@ -850,16 +831,6 @@ ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
         _waitForTasksToCompleteAndRenameChunks(
             opCtx, nss, *collAndChunks.uuid, collAndChunks.supportingLongName);
 
-        // This task will update the metadata format of the collection and all its chunks.
-        // It doesn't apply the changes of the ChangedChunks, we will do that in the next task
-        _ensureMajorityPrimaryAndScheduleCollAndChunksTask(
-            opCtx,
-            nss,
-            CollAndChunkTask{swCollectionAndChangedChunks,
-                             maxLoaderVersion,
-                             termScheduled,
-                             true /* metadataFormatChanged */});
-
         LOGV2_FOR_CATALOG_REFRESH(
             5857500,
             1,
@@ -968,10 +939,8 @@ StatusWith<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_getLoader
 
     // Get the enqueued metadata first. Otherwise we could miss data between reading persisted and
     // enqueued, if an enqueued task finished after the persisted read but before the enqueued read.
-
-    auto [tasksAreEnqueued, enqueuedMetadata] =
+    auto [tasksAreEnqueued, enqueued] =
         _getEnqueuedMetadata(nss, catalogCacheSinceVersion, expectedTerm);
-    CollectionAndChangedChunks& enqueued = enqueuedMetadata.collAndChangedChunks;
 
     auto swPersisted =
         getIncompletePersistedMetadataSinceVersion(opCtx, nss, catalogCacheSinceVersion);
@@ -984,8 +953,7 @@ StatusWith<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_getLoader
         persisted = std::move(swPersisted.getValue());
     }
 
-    bool lastTaskIsADrop = tasksAreEnqueued && enqueued.changedChunks.empty() &&
-        !enqueuedMetadata.mustPatchUpMetadataResults;
+    bool lastTaskIsADrop = tasksAreEnqueued && enqueued.changedChunks.empty();
 
     LOGV2_FOR_CATALOG_REFRESH(
         24111,
@@ -1021,17 +989,11 @@ StatusWith<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_getLoader
         // - the epoch changed in the enqueued metadata.
         // Whichever the cause, the persisted metadata is out-dated/non-existent. Return enqueued
         // results.
-        patchUpChangedChunksIfNeeded(enqueuedMetadata.mustPatchUpMetadataResults,
-                                     enqueued.creationTime,
-                                     enqueued.changedChunks);
         return enqueued;
     } else {
 
         // There can be overlap between persisted and enqueued metadata because enqueued work can
         // be applied while persisted was read. We must remove this overlap.
-        // Note also that the enqueued changed Chunks set may be empty (e.g. there is only one
-        // update metadata format task)
-
         if (!enqueued.changedChunks.empty()) {
             const ChunkVersion minEnqueuedVersion = enqueued.changedChunks.front().getVersion();
 
@@ -1050,11 +1012,6 @@ StatusWith<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_getLoader
                                            enqueued.changedChunks.end());
         }
 
-        // We may need to patch up the changed chunks because there was a metadata format change
-        patchUpChangedChunksIfNeeded(enqueuedMetadata.mustPatchUpMetadataResults,
-                                     enqueued.creationTime,
-                                     persisted.changedChunks);
-
         // The collection info in enqueued metadata may be more recent than the persisted metadata
         persisted.creationTime = enqueued.creationTime;
         persisted.timeseriesFields = std::move(enqueued.timeseriesFields);
@@ -1068,30 +1025,29 @@ StatusWith<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_getLoader
     }
 }
 
-std::pair<bool, ShardServerCatalogCacheLoader::EnqueuedMetadataResults>
-ShardServerCatalogCacheLoader::_getEnqueuedMetadata(const NamespaceString& nss,
-                                                    const ChunkVersion& catalogCacheSinceVersion,
-                                                    const long long term) {
+std::pair<bool, CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_getEnqueuedMetadata(
+    const NamespaceString& nss,
+    const ChunkVersion& catalogCacheSinceVersion,
+    const long long term) {
     stdx::unique_lock<Latch> lock(_mutex);
     auto taskListIt = _collAndChunkTaskLists.find(nss);
 
     if (taskListIt == _collAndChunkTaskLists.end()) {
-        return std::make_pair(false, EnqueuedMetadataResults());
+        return std::make_pair(false, CollectionAndChangedChunks());
     } else if (!taskListIt->second.hasTasksFromThisTerm(term)) {
         // If task list does not have a term that matches, there's no valid task data to collect.
-        return std::make_pair(false, EnqueuedMetadataResults());
+        return std::make_pair(false, CollectionAndChangedChunks());
     }
 
     // Only return task data of tasks scheduled in the same term as the given 'term': older term
     // task data is no longer valid.
-    EnqueuedMetadataResults enqueuedMetadata = taskListIt->second.getEnqueuedMetadataForTerm(term);
-    CollectionAndChangedChunks& collAndChunks = enqueuedMetadata.collAndChangedChunks;
+    CollectionAndChangedChunks collAndChunks = taskListIt->second.getEnqueuedMetadataForTerm(term);
 
     // Return all the results if 'catalogCacheSinceVersion's epoch does not match. Otherwise, trim
     // the results to be GTE to 'catalogCacheSinceVersion'.
 
     if (collAndChunks.epoch != catalogCacheSinceVersion.epoch()) {
-        return std::make_pair(true, std::move(enqueuedMetadata));
+        return std::make_pair(true, std::move(collAndChunks));
     }
 
     auto changedChunksIt = collAndChunks.changedChunks.begin();
@@ -1101,7 +1057,7 @@ ShardServerCatalogCacheLoader::_getEnqueuedMetadata(const NamespaceString& nss,
     }
     collAndChunks.changedChunks.erase(collAndChunks.changedChunks.begin(), changedChunksIt);
 
-    return std::make_pair(true, std::move(enqueuedMetadata));
+    return std::make_pair(true, std::move(collAndChunks));
 }
 
 void ShardServerCatalogCacheLoader::_ensureMajorityPrimaryAndScheduleCollAndChunksTask(
@@ -1318,8 +1274,7 @@ void ShardServerCatalogCacheLoader::_updatePersistedCollAndChunksMetadata(
     stdx::unique_lock<Latch> lock(_mutex);
 
     const CollAndChunkTask& task = _collAndChunkTaskLists[nss].front();
-    invariant(task.dropped || task.updateMetadataFormat ||
-              !task.collectionAndChangedChunks->changedChunks.empty());
+    invariant(task.dropped || !task.collectionAndChangedChunks->changedChunks.empty());
 
     // If this task is from an old term and no longer valid, do not execute and return true so that
     // the task gets removed from the task list
@@ -1336,12 +1291,6 @@ void ShardServerCatalogCacheLoader::_updatePersistedCollAndChunksMetadata(
             dropChunksAndDeleteCollectionsEntry(opCtx, nss),
             str::stream() << "Failed to clear persisted chunk metadata for collection '" << nss.ns()
                           << "'. Will be retried.");
-        return;
-    }
-
-    if (task.updateMetadataFormat) {
-        updateTimestampOnShardCollections(
-            opCtx, nss, task.collectionAndChangedChunks->creationTime);
         return;
     }
 
@@ -1445,42 +1394,23 @@ ShardServerCatalogCacheLoader::_getCompletePersistedMetadataForSecondarySinceVer
 ShardServerCatalogCacheLoader::CollAndChunkTask::CollAndChunkTask(
     StatusWith<CollectionAndChangedChunks> statusWithCollectionAndChangedChunks,
     ChunkVersion minimumQueryVersion,
-    long long currentTerm,
-    bool metadataFormatChanged)
+    long long currentTerm)
     : taskNum(taskIdGenerator.fetchAndAdd(1)),
       minQueryVersion(std::move(minimumQueryVersion)),
-      updateMetadataFormat(metadataFormatChanged),
       termCreated(currentTerm) {
     if (statusWithCollectionAndChangedChunks.isOK()) {
-        if (updateMetadataFormat) {
-            // An update metadata format doesn't handle the ChangedChunks: if
-            // there are any and they are newer than what we have locally, they
-            // will be handled by another task. Despite of that, we still need
-            // a valid CollectionAndChangedChunks object to get the information
-            // of the collection.
-            collectionAndChangedChunks = std::move(statusWithCollectionAndChangedChunks.getValue());
-            collectionAndChangedChunks->changedChunks.clear();
-            // Propagating the Timestamp to the maxQueryVersion, so 'getHighestVersionEnqueued'
-            // returns a version with the new format.
-            maxQueryVersion = ChunkVersion(minQueryVersion.majorVersion(),
-                                           minQueryVersion.minorVersion(),
-                                           minQueryVersion.epoch(),
-                                           collectionAndChangedChunks->creationTime);
-        } else {
-            collectionAndChangedChunks = std::move(statusWithCollectionAndChangedChunks.getValue());
-            invariant(!collectionAndChangedChunks->changedChunks.empty());
-            const auto highestVersion =
-                collectionAndChangedChunks->changedChunks.back().getVersion();
-            // Note that due to the way Phase 1 of the FCV upgrade writes timestamps to chunks
-            // (non-atomically), it is possible that chunks exist with timestamps, but the
-            // corresponding config.collections entry doesn't. In this case, the chunks timestamp
-            // should be ignored when computing the max query version and we should use the
-            // timestamp that comes from config.collections.
-            maxQueryVersion = ChunkVersion(highestVersion.majorVersion(),
-                                           highestVersion.minorVersion(),
-                                           highestVersion.epoch(),
-                                           collectionAndChangedChunks->creationTime);
-        }
+        collectionAndChangedChunks = std::move(statusWithCollectionAndChangedChunks.getValue());
+        invariant(!collectionAndChangedChunks->changedChunks.empty());
+        const auto highestVersion = collectionAndChangedChunks->changedChunks.back().getVersion();
+        // Note that due to the way Phase 1 of the FCV upgrade writes timestamps to chunks
+        // (non-atomically), it is possible that chunks exist with timestamps, but the
+        // corresponding config.collections entry doesn't. In this case, the chunks timestamp
+        // should be ignored when computing the max query version and we should use the
+        // timestamp that comes from config.collections.
+        maxQueryVersion = ChunkVersion(highestVersion.majorVersion(),
+                                       highestVersion.minorVersion(),
+                                       highestVersion.epoch(),
+                                       collectionAndChangedChunks->creationTime);
     } else {
         invariant(statusWithCollectionAndChangedChunks == ErrorCodes::NamespaceNotFound);
         dropped = true;
@@ -1598,13 +1528,10 @@ ShardServerCatalogCacheLoader::CollAndChunkTaskList::getLastSupportingLongNameEn
                                           : SupportingLongNameStatusEnum::kDisabled;
 }
 
-ShardServerCatalogCacheLoader::EnqueuedMetadataResults
+CollectionAndChangedChunks
 ShardServerCatalogCacheLoader::CollAndChunkTaskList::getEnqueuedMetadataForTerm(
     const long long term) const {
-    EnqueuedMetadataResults enqueuedMetadata;
-
-    CollectionAndChangedChunks& collAndChunks = enqueuedMetadata.collAndChangedChunks;
-    bool& mustPatchUpMetadataResults = enqueuedMetadata.mustPatchUpMetadataResults;
+    CollectionAndChangedChunks collAndChunks;
     for (const auto& task : _tasks) {
         if (task.termCreated != term) {
             // Task data is no longer valid. Go on to the next task in the list.
@@ -1615,17 +1542,10 @@ ShardServerCatalogCacheLoader::CollAndChunkTaskList::getEnqueuedMetadataForTerm(
             // The current task is a drop -> the aggregated results aren't interesting so we
             // overwrite the CollAndChangedChunks and unset the flag
             collAndChunks = CollectionAndChangedChunks();
-            mustPatchUpMetadataResults = false;
         } else if (task.collectionAndChangedChunks->epoch != collAndChunks.epoch) {
-            // The current task has a new epoch  -> the aggregated results aren't interesting so we
-            // overwrite them. The task may be an update metadata format task, so propagate the flag
+            // The current task has a new epoch -> the aggregated results aren't interesting so we
+            // overwrite them
             collAndChunks = *task.collectionAndChangedChunks;
-            mustPatchUpMetadataResults = task.updateMetadataFormat;
-        } else if (task.updateMetadataFormat) {
-            // The current task is an update task -> we only update the Timestamp of the aggregated
-            // results and set the flag
-            collAndChunks.creationTime = task.collectionAndChangedChunks->creationTime;
-            mustPatchUpMetadataResults = true;
         } else {
             // The current task is not a drop neither an update and the epochs match -> we add its
             // results to the aggregated results
@@ -1657,7 +1577,7 @@ ShardServerCatalogCacheLoader::CollAndChunkTaskList::getEnqueuedMetadataForTerm(
             collAndChunks.timeseriesFields = task.collectionAndChangedChunks->timeseriesFields;
         }
     }
-    return enqueuedMetadata;
+    return collAndChunks;
 }
 
 }  // namespace mongo

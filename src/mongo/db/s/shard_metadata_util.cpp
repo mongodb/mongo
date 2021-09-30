@@ -435,26 +435,6 @@ void updateSupportingLongNameOnShardCollections(OperationContext* opCtx,
     uassertStatusOK(getStatusFromWriteCommandReply(commandResponse->getCommandReply()));
 }
 
-void updateTimestampOnShardCollections(OperationContext* opCtx,
-                                       const NamespaceString& nss,
-                                       const boost::optional<Timestamp>& timestamp) {
-    write_ops::UpdateCommandRequest clearFields(
-        NamespaceString::kShardConfigCollectionsNamespace, [&] {
-            write_ops::UpdateOpEntry u;
-            u.setQ(BSON(ShardCollectionType::kNssFieldName << nss.ns()));
-            BSONObj updateOp = (timestamp)
-                ? BSON("$set" << BSON(CollectionType::kTimestampFieldName << *timestamp))
-                : BSON("$unset" << BSON(CollectionType::kTimestampFieldName << ""));
-            u.setU(write_ops::UpdateModification::parseFromClassicUpdate(updateOp));
-            return std::vector{u};
-        }());
-
-    DBDirectClient client(opCtx);
-    const auto commandResult = client.runCommand(clearFields.serialize({}));
-
-    uassertStatusOK(getStatusFromWriteCommandResponse(commandResult->getCommandReply()));
-}
-
 Status dropChunksAndDeleteCollectionsEntry(OperationContext* opCtx, const NamespaceString& nss) {
     // Retrieve the collection entry from 'config.cache.collections' if available, otherwise return
     // immediately
