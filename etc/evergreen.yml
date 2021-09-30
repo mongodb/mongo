@@ -2623,7 +2623,6 @@ tasks:
       vars:
         targets: install-stitch-support install-stitch-support-debug install-stitch-support-dev
         task_compile_flags: >-
-          --dbg=off
           --link-model=dynamic-sdk
           --enable-free-mon=off
           --ssl=off
@@ -2657,7 +2656,6 @@ tasks:
         targets: install-stitch-support-test
         compiling_for_test: true
         task_compile_flags: >-
-          --dbg=off
           --enable-free-mon=off
           --ssl=off
           --enable-http-client=off
