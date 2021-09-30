@@ -1,5 +1,9 @@
 /**
  * Tests that time-series inserts respect {ordered: false}.
+ *
+ * @tags: [
+ *   requires_sharding,
+ * ]
  */
 (function() {
 'use strict';
