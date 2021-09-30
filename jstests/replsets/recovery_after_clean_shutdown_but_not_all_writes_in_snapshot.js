@@ -65,9 +65,6 @@ assert.commandWorked(primaryDB[collNoStableCreation].runCommand("create", w1));
         primaryDB[coll].insert({_id: "insertedAfterSnapshottingDisabled"}, w1)));
 rst.awaitReplication();
 
-jsTestLog("Checking collection counts after snapshotting has been disabled");
-rst.checkCollectionCounts();
-
 // Perform a clean shutdown and restart. Note that the 'disableSnapshotting' failpoint will be
 // unset on each node following the restart.
 nodes.forEach(node => rst.restart(node));
@@ -80,8 +77,5 @@ assert.commandWorked(
     primaryDB[collCreatedAfterRestart].insert({_id: "insertedAfterRestart", wMajority}));
 
 // Fast metadata count should be correct after restart in the face of a clean shutdown.
-jsTestLog("Checking collection counts after clean restart of all nodes");
-rst.checkCollectionCounts();
-
 rst.stopSet();
 }());

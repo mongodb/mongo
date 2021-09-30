@@ -218,7 +218,9 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
                 node.preserve_dbpath = preserve_dbpaths[i]
 
     def _validate_collections(self, test_report):
-        validate_test_case = validate.ValidateCollections(self._hook.logger, self.fixture)
+        validate_test_case = validate.ValidateCollections(
+            self._hook.logger, self.fixture,
+            {'global_vars': {'TestData': {'skipEnforceFastCountOnValidate': True}}})
         validate_test_case.before_suite(test_report)
         validate_test_case.before_test(self, test_report)
         validate_test_case.after_test(self, test_report)

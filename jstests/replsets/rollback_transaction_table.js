@@ -230,7 +230,6 @@ assert.eq(upstream.getDB("config").transactions.find().itcount(), 2);
 // Confirm the nodes are consistent.
 replTest.checkOplogs();
 replTest.checkReplicatedDataHashes(testName);
-replTest.checkCollectionCounts();
 
 replTest.stopSet();
 }());
