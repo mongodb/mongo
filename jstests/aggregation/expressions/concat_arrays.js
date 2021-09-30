@@ -1,10 +1,17 @@
 // Confirm correctness of $concatArrays expression evaluation.
 
+// When SBE is enabled, we expect that each $concatArrays expression will be pushed down into the
+// query layer. This does not happen when we wrap aggregations in facets, so we prevent this
+// test from running in the 'aggregation_facet_unwind_passthrough' suite.
+// @tags: [
+//   do_not_wrap_aggregations_in_facets,
+// ]
 (function() {
 "use strict";
 
 load("jstests/aggregation/extras/utils.js");        // For assertArrayEq.
 load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
+load("jstests/libs/sbe_util.js");                   // For checkSBEEnabled.
 
 const coll = db.projection_expr_concat_arrays;
 coll.drop();
@@ -101,6 +108,7 @@ runAndAssertNull([
 
 // Confirm edge case where if null precedes non-array input, null is returned.
 runAndAssertNull(["$int_arr", "$null_val", "$int_val"]);
+runAndAssertNull(["$null_val", null, "$null_val"]);
 
 //
 // Confirm error cases.
@@ -117,13 +125,16 @@ runAndAssertThrows(["$int_arr", "$int_val"]);
 runAndAssertThrows(["$dbl_arr", "$dbl_val"]);
 
 // Confirm edge case where if invalid input precedes null or missing inputs, the command fails.
-runAndAssertThrows(["$int_arr", "$dbl_val", "$null_val"]);
-runAndAssertThrows(["$int_arr", "some_string_value", "$null_val"]);
+// Note that when the SBE engine is enabled, null will be returned before invalid input because
+// we check if any values are null before checking whether all values are arrays.
+let evalFn = checkSBEEnabled(db) ? runAndAssertNull : runAndAssertThrows;
+evalFn(["$int_arr", "$dbl_val", "$null_val"]);
+evalFn(["$int_arr", "some_string_value", "$null_val"]);
+evalFn(["$dbl_val", "$null_val"]);
+evalFn(["$int_arr", "$int_val", "$not_a_field"]);
+evalFn(["$int_val", "$not_a_field"]);
+evalFn(["$int_val", "$not_a_field", "$null_val"]);
 runAndAssertThrows(["$int_arr", 32]);
-runAndAssertThrows(["$dbl_val", "$null_val"]);
-runAndAssertThrows(["$int_arr", "$int_val", "$not_a_field"]);
-runAndAssertThrows(["$int_val", "$not_a_field"]);
-runAndAssertThrows(["$int_val", "$not_a_field", "$null_val"]);
 
 // Clear collection.
 assert(coll.drop());
