@@ -66,6 +66,10 @@ StatusWith<BSONObj> makePrepareOkResponse(const Timestamp& timestamp) {
 
 const StatusWith<BSONObj> kPrepareOk = makePrepareOkResponse(kDummyPrepareTimestamp);
 const StatusWith<BSONObj> kPrepareOkNoTimestamp = BSON("ok" << 1);
+const StatusWith<BSONObj> kTxnRetryCounterTooOld =
+    BSON("ok" << 0 << "code" << ErrorCodes::TxnRetryCounterTooOld << "errmsg"
+              << "txnRetryCounter is too old"
+              << "txnRetryCounter" << 1);
 
 /**
  * Searches for a client matching the name and mark the operation context as killed.
@@ -866,7 +870,8 @@ TEST_F(TransactionCoordinatorTest, RunCommitProducesAbortDecisionOnAbortAndCommi
         coordinator.onCompletion().get(), AssertionException, ErrorCodes::NoSuchTransaction);
 }
 
-TEST_F(TransactionCoordinatorTest, RunCommitProducesAbortDecisionOnCommitAndAbortResponses) {
+TEST_F(TransactionCoordinatorTest,
+       RunCommitProducesAbortDecisionOnCommitAndAbortResponsesNoSuchTransaction) {
     TransactionCoordinator coordinator(
         operationContext(),
         _lsid,
@@ -886,6 +891,30 @@ TEST_F(TransactionCoordinatorTest, RunCommitProducesAbortDecisionOnCommitAndAbor
         commitDecisionFuture.get(), AssertionException, ErrorCodes::NoSuchTransaction);
     ASSERT_THROWS_CODE(
         coordinator.onCompletion().get(), AssertionException, ErrorCodes::NoSuchTransaction);
+}
+
+TEST_F(TransactionCoordinatorTest,
+       RunCommitProducesAbortDecisionOnCommitAndAbortResponsesTxnRetryCounterTooOld) {
+    TransactionCoordinator coordinator(
+        operationContext(),
+        _lsid,
+        _txnNumber,
+        std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
+        Date_t::max());
+    coordinator.runCommit(operationContext(), kTwoShardIdList);
+    auto commitDecisionFuture = coordinator.getDecision();
+
+    onCommands(
+        {[&](const executor::RemoteCommandRequest& request) { return kPrepareOk; },
+         [&](const executor::RemoteCommandRequest& request) { return kTxnRetryCounterTooOld; }});
+
+    assertAbortSentAndRespondWithSuccess();
+    assertAbortSentAndRespondWithSuccess();
+
+    ASSERT_THROWS_CODE(
+        commitDecisionFuture.get(), AssertionException, ErrorCodes::TxnRetryCounterTooOld);
+    ASSERT_THROWS_CODE(
+        coordinator.onCompletion().get(), AssertionException, ErrorCodes::TxnRetryCounterTooOld);
 }
 
 TEST_F(TransactionCoordinatorTest, RunCommitProducesAbortDecisionOnSingleAbortResponseOnly) {

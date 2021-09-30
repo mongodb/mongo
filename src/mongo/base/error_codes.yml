@@ -451,7 +451,7 @@ error_codes:
 
     - {code: 355, name: InterruptedDueToStorageChange,categories: [Interruption,CancellationError]}
 
-    - {code: 356, name: TxnRetryCounterTooOld, extra: TxnRetryCounterTooOldInfo}
+    - {code: 356, name: TxnRetryCounterTooOld, extra: TxnRetryCounterTooOldInfo, categories: [VoteAbortError]}
 
     - {code: 357, name: InvalidBSONType}
 
