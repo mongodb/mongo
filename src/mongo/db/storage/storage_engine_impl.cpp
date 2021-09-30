@@ -995,6 +995,13 @@ StatusWith<Timestamp> StorageEngineImpl::recoverToStableTimestamp(OperationConte
 
     auto state = catalog::closeCatalog(opCtx);
 
+    // SERVER-58311: Reset the recovery unit to unposition storage engine cursors. This allows WT to
+    // assert it has sole access when performing rollback_to_stable().
+    auto recovUnit = opCtx->releaseRecoveryUnit();
+    recovUnit.reset();
+    opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(newRecoveryUnit()),
+                           WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+
     StatusWith<Timestamp> swTimestamp = _engine->recoverToStableTimestamp(opCtx);
     if (!swTimestamp.isOK()) {
         return swTimestamp;
