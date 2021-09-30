@@ -216,6 +216,20 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    bool setExpectedDbVersion(OperationContext* opCtx,
+                              const NamespaceString& nss,
+                              DatabaseVersion dbVersion) override {
+        MONGO_UNREACHABLE;
+    }
+
+    void unsetExpectedDbVersion(OperationContext* opCtx, const NamespaceString& nss) override {
+        MONGO_UNREACHABLE;
+    }
+
+    void checkOnPrimaryShardForDb(OperationContext* opCtx, const NamespaceString& nss) override {
+        MONGO_UNREACHABLE;
+    }
+
     std::unique_ptr<ResourceYielder> getResourceYielder() const override {
         return nullptr;
     }

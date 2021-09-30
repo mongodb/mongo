@@ -107,6 +107,11 @@ void OperationShardingState::initializeClientRoutingVersions(
     }
 }
 
+void OperationShardingState::unsetExpectedDbVersion_Only_For_Aggregation_Local_Reads(
+    const StringData& dbName) {
+    _databaseVersions.erase(dbName);
+}
+
 bool OperationShardingState::hasShardVersion(const NamespaceString& nss) const {
     return _shardVersions.find(nss.ns()) != _shardVersions.end();
 }

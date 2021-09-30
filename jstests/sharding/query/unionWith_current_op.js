@@ -1,6 +1,10 @@
 /**
  * Tests to verify that the current op output shows all the sub-pipelines of a $unionWith. In this
  * test we also validate that current op shows the expected stages and comment.
+ *
+ * In 5.1, new behavior was introduced regarding reading from an unsharded collection on the primary
+ * shard. This behavior affects which operations are logged.
+ *  @tags: [ requires_fcv_51 ]
  */
 (function() {
 "use strict";
@@ -127,25 +131,6 @@ runTest({
 });
 
 // Test that the current op shows all the sub-pipelines when a sharded collection unions with an
-// unsharded collection. Also validate that the 'comment' is attached to all the related
-// operations.
-runTest({
-    command: {
-        aggregate: shardedColl1.getName(),
-        pipeline: [
-            {$match: {p: null}},
-            {$unionWith: {coll: unshardedColl.getName(), pipeline: [{$group: {_id: "$x"}}]}}
-        ],
-        cursor: {}
-    },
-    expectedRunningOps: [
-        {coll: shardedColl1, count: 1, stages: ['$mergeCursors', '$unionWith']},
-        {coll: unshardedColl, count: 1, stages: ['$group']}
-    ],
-    collToPause: unshardedColl
-});
-
-// Test that the current op shows all the sub-pipelines when a sharded collection unions with an
 // unsharded collection which in-turn unions with another sharded collection. Also validate that
 // the 'comment' is attached to all the related operations.
 runTest({
@@ -161,13 +146,15 @@ runTest({
                             {coll: shardedColl2.getName(), pipeline: [{$group: {_id: "$x"}}]}
                     }]
                 }
-            }
+            },
+            {$_internalSplitPipeline: {mergeType: "primaryShard"}}
         ],
         cursor: {}
     },
     expectedRunningOps: [
         {coll: shardedColl1, count: 1, stages: ['$mergeCursors', '$unionWith']},
-        {coll: unshardedColl, count: 1, stages: ['$unionWith']},
+        // the $unionWith on the unsharded collection is run on the primary shard and can be
+        // executed as a local read, which will not be logged.
         {coll: shardedColl2, count: 2, stages: ['$group']}
     ],
     collToPause: shardedColl2

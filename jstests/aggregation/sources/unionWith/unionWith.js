@@ -4,8 +4,9 @@
 
 (function() {
 "use strict";
-load("jstests/aggregation/extras/utils.js");  // arrayEq
-load("jstests/libs/fixture_helpers.js");      // For FixtureHelpers.
+load("jstests/aggregation/extras/utils.js");       // For arrayEq.
+load("jstests/libs/collection_drop_recreate.js");  // For assertDropAndRecreateCollection.
+load("jstests/libs/fixture_helpers.js");           // For FixtureHelpers.
 
 const testDB = db.getSiblingDB(jsTestName());
 const collA = testDB.A;
@@ -291,14 +292,31 @@ checkResults(testDB.runCommand({
 checkResults(testDB.runCommand({
     aggregate: collA.getName(),
     pipeline:
-        [{$unionWith: {coll: "nonExistentCollectionAlpha", pipeline: [{"$addFields": {ted: 5}}]}}],
+        [{$unionWith: {coll: "nonExistentCollectionBeta", pipeline: [{"$addFields": {ted: 5}}]}}],
     cursor: {}
 }),
              resSet);
 checkResults(testDB.runCommand({
-    aggregate: "nonExistentCollectionAlpha",
+    aggregate: "nonExistentCollectionCharlie",
     pipeline: [{$unionWith: collA.getName()}],
     cursor: {}
 }),
              resSet);
+
+// Test that $unionWith on an empty collection succeeds.
+assertDropAndRecreateCollection(testDB, "emptyCollection");
+checkResults(
+    testDB.runCommand(
+        {aggregate: "emptyCollection", pipeline: [{$unionWith: collA.getName()}], cursor: {}}),
+    resSet);
+checkResults(testDB.runCommand({
+    aggregate: collA.getName(),
+    pipeline: [{$unionWith: {coll: "emptyCollection", pipeline: [{"$addFields": {ted: 5}}]}}],
+    cursor: {}
+}),
+             resSet);
+checkResults(
+    testDB.runCommand(
+        {aggregate: "emptyCollection", pipeline: [{$unionWith: collA.getName()}], cursor: {}}),
+    resSet);
 })();

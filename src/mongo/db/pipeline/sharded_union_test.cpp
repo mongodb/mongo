@@ -365,7 +365,7 @@ TEST_F(ShardedUnionTest, AvoidsSplittingSubPipelineIfRefreshedDistributionDoesNo
 TEST_F(ShardedUnionTest, IncorporatesViewDefinitionAndRetriesWhenViewErrorReceived) {
     // Sharded by {_id: 1}, [MinKey, 0) on shard "0", [0, MaxKey) on shard "1".
     auto shards = setupNShards(2);
-    loadRoutingTableWithTwoChunksAndTwoShards(kTestAggregateNss);
+    auto cm = loadRoutingTableWithTwoChunksAndTwoShards(kTestAggregateNss);
 
     NamespaceString nsToUnionWith(expCtx()->ns.db(), "view");
     // Mock out the view namespace as emtpy for now - this is what it would be when parsing in a
@@ -392,18 +392,44 @@ TEST_F(ShardedUnionTest, IncorporatesViewDefinitionAndRetriesWhenViewErrorReceiv
         ASSERT(unionWith->getNext().isEOF());
     });
 
-    // Mock out one error response, then expect a refresh of the sharding catalog for that
-    // namespace, then mock out a successful response.
+    // Mock the expected config server queries.
+    const OID epoch = OID::gen();
+    const UUID uuid = UUID::gen();
+    const ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
+
+    const Timestamp timestamp;
+    ChunkVersion version(1, 0, epoch, timestamp);
+
+    ChunkType chunk1(*cm.getUUID(),
+                     {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << 0)},
+                     version,
+                     {"0"});
+    chunk1.setName(OID::gen());
+    version.incMinor();
+
+    ChunkType chunk2(*cm.getUUID(),
+                     {BSON("_id" << 0), shardKeyPattern.getKeyPattern().globalMax()},
+                     version,
+                     {"1"});
+    chunk2.setName(OID::gen());
+    version.incMinor();
+
+    expectCollectionAndChunksAggregation(
+        kTestAggregateNss, epoch, timestamp, uuid, shardKeyPattern, {chunk1, chunk2});
+
+    // Mock out the sharded view error responses from both shards.
+    std::vector<BSONObj> viewPipeline = {fromjson("{$group: {_id: '$groupKey'}}"),
+                                         // Prevent the $match from being pushed into the shards
+                                         // where it would not execute in this mocked environment.
+                                         fromjson("{$_internalInhibitOptimization: {}}"),
+                                         fromjson("{$match: {_id: 'unionResult'}}")};
     onCommand([&](const executor::RemoteCommandRequest& request) {
         return createErrorCursorResponse(
-            Status{ResolvedView{expectedBackingNs,
-                                {fromjson("{$group: {_id: '$groupKey'}}"),
-                                 // Prevent the $match from being pushed into the shards where it
-                                 // would not execute in this mocked environment.
-                                 fromjson("{$_internalInhibitOptimization: {}}"),
-                                 fromjson("{$match: {_id: 'unionResult'}}")},
-                                BSONObj()},
-                   "It was a view!"_sd});
+            Status{ResolvedView{expectedBackingNs, viewPipeline, BSONObj()}, "It was a view!"_sd});
+    });
+    onCommand([&](const executor::RemoteCommandRequest& request) {
+        return createErrorCursorResponse(
+            Status{ResolvedView{expectedBackingNs, viewPipeline, BSONObj()}, "It was a view!"_sd});
     });
 
     // That error should be incorporated, then we should target both shards. The results should be

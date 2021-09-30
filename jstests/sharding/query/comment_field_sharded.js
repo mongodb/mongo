@@ -149,14 +149,20 @@ function runCommentParamTest({
     // Verify that profile entry has 'comment' field.
     expectedProfilerEntries =
         expectedProfilerEntries ? expectedProfilerEntries : expectedRunningOps;
+    let expectedProfilerEntriesList = expectedProfilerEntries;
+    if (!Array.isArray(expectedProfilerEntriesList)) {
+        expectedProfilerEntriesList = [expectedProfilerEntriesList];
+    }
     const profileFilter = {"command.comment": commentObj};
-    assert.eq(shard0DB.system.profile.find(profileFilter).itcount() +
-                  shard1DB.system.profile.find(profileFilter).itcount(),
-              expectedProfilerEntries,
-              () => tojson({
-                  [st.shard0.name]: shard0DB.system.profile.find().toArray(),
-                  [st.shard1.name]: shard1DB.system.profile.find().toArray()
-              }));
+    const foundProfilerEntriesCount = shard0DB.system.profile.find(profileFilter).itcount() +
+        shard1DB.system.profile.find(profileFilter).itcount();
+    assert(expectedProfilerEntriesList.includes(foundProfilerEntriesCount),
+           () => 'Expected count of profiler entries to be in ' +
+               tojson(expectedProfilerEntriesList) + ' but found' + foundProfilerEntriesCount +
+               ' instead. ' + tojson({
+                     [st.shard0.name]: shard0DB.system.profile.find().toArray(),
+                     [st.shard1.name]: shard1DB.system.profile.find().toArray()
+                 }));
 
     // Run the 'checkLog' only for commands with uuid so that the we know the log line belongs to
     // current operation.
@@ -183,7 +189,7 @@ function runCommentParamTest({
                  ? expectedRunningOps
                  : 0) +  // For 'update' and 'delete' commands we also log an additional line
                          // for the entire operation.
-                expectedProfilerEntries +
+                foundProfilerEntriesCount +
                 1  // +1 to account for log line on mongos.
         );
     }
@@ -560,7 +566,9 @@ runCommentParamTest({
         cursor: {}
     },
     expectedRunningOps: 2,
-    expectedProfilerEntries: 6
+    // If the $unionWith runs on the primary and the primary supports it, the aggregate for the
+    // inner pipeline can be done as a local read and will not be logged.
+    expectedProfilerEntries: [5, 6]
 });
 
 // For aggregate command with a $unionWith stage, where an unsharded collection unions with a

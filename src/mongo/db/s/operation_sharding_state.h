@@ -111,6 +111,11 @@ public:
                                          const boost::optional<DatabaseVersion>& dbVersion);
 
     /**
+     * Removes the databaseVersion stored for the given namespace.
+     */
+    void unsetExpectedDbVersion_Only_For_Aggregation_Local_Reads(const StringData& dbName);
+
+    /**
      * Returns whether or not there is a shard version for the namespace associated with this
      * operation.
      */

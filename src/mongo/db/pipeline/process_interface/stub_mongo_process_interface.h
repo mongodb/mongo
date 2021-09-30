@@ -267,6 +267,20 @@ public:
         // Do nothing.
     }
 
+    void unsetExpectedDbVersion(OperationContext* opCtx, const NamespaceString& nss) override {
+        // Do nothing.
+    }
+
+    bool setExpectedDbVersion(OperationContext* opCtx,
+                              const NamespaceString& nss,
+                              DatabaseVersion dbVersion) override {
+        return false;
+    }
+
+    void checkOnPrimaryShardForDb(OperationContext* opCtx, const NamespaceString& nss) override {
+        // Do nothing.
+    }
+
     std::unique_ptr<TemporaryRecordStore> createTemporaryRecordStore(
         const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
         MONGO_UNREACHABLE;

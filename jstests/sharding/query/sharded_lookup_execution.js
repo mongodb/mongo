@@ -13,8 +13,9 @@
 
 load("jstests/aggregation/extras/utils.js");  // For arrayEq.
 load("jstests/libs/profiler.js");             // For profilerHas*OrThrow helper functions.
+load("jstests/libs/log.js");                  // For findMatchingLogLines.
 
-const st = new ShardingTest({shards: 2, mongos: 2});
+const st = new ShardingTest({shards: [{verbose: 3}, {verbose: 3}], mongos: 2});
 const testName = "sharded_lookup";
 
 const mongosDB = st.s0.getDB(testName);
@@ -36,6 +37,11 @@ const updatesColl = mongosDB.updates;
 // date information about its sharding state, but 'mongosDB' may have stale information.
 const freshMongos = st.s1;
 const freshReviews = freshMongos.getDB(testName)[reviewsColl.getName()];
+
+function getLocalReadCount(node, ns, comment) {
+    const log = assert.commandWorked(node.adminCommand({getLog: "global"})).log;
+    return [...findMatchingLogLines(log, {id: 5837600, ns, comment: {comment: comment}})].length;
+}
 
 function assertLookupExecution(pipeline, opts, expected) {
     assert.commandWorked(ordersColl.insert([
@@ -107,6 +113,15 @@ function assertLookupExecution(pipeline, opts, expected) {
             },
             numExpectedMatches: expected.subpipelineExec[i]
         });
+
+        if (expected.subpipelineLocalExec) {
+            const node = i == 0 ? st.shard0 : st.shard1;
+            const localReadCount = getLocalReadCount(node, reviewsColl.getFullName(), opts.comment);
+            assert.eq(expected.subpipelineLocalExec[i],
+                      localReadCount,
+                      "expected to find " + expected.subpipelineLocalExec[i] +
+                          ' local reads but found ' + localReadCount + ' instead.');
+        }
 
         // If there is a nested $lookup within the top-level $lookup subpipeline, confirm that
         // execution is as expected.
@@ -322,10 +337,11 @@ assertLookupExecution(pipeline, {comment: "sharded_to_sharded_to_unsharded"}, {
     // stage, target the shard that holds the relevant data for the sharded foreign collection.
     subpipelineExec: [0, 2],
     // When executing the subpipeline, the nested $lookup stage will stay on the merging half of the
-    // pipeline and execute on the merging node, sending requests over the network to execute
-    // the nested $lookup subpipeline on the primary shard (where the unsharded 'updates'
-    // collection is stored).
-    nestedExec: [3, 0]
+    // pipeline and execute on the merging node, sending requests to execute the nested subpipelines
+    // on the primary shard (where the unsharded 'updates' collection is stored). The $lookup on the
+    // non-primary shard would need to send requests over the network (not needed in this case due
+    // to the initial $match on customer); the rest are done via local reads and are not logged.
+    nestedExec: [0, 0]
 });
 
 // Test sharded local collection and sharded foreign collection with a targeted top-level $lookup
@@ -654,39 +670,37 @@ assertLookupExecution(pipeline, {comment: "sharded_to_sharded_cache"}, {
     subpipelineExec: [2, 2]
 });
 
-// TODO SERVER-58376: Enable tests once cacheing works with unsharded 'from' collections in sharded
-// environments.
-/*
 // Test unsharded local collection and unsharded foreign collection.
-assertLookupExecution(pipeline, {comment: "sharded_to_sharded_cache"}, {
+assertLookupExecution(pipeline, {comment: "unsharded_to_unsharded_cache"}, {
     results: expectedRes,
     // Because the local collection is unsharded, the $lookup stage is executed on the primary
     // shard of the database.
     toplevelExec: [1, 0],
-    // Because the foreign collection is unsharded, the node executing the $lookup will open a
-    // cursor on the primary shard for the first iteration of $lookup. The $group stage in the
-    // subpipeline is non-correlated so the $lookup will only need to send the subpipeline to each
-    // shard once to populate the cache, and will perform local queries against the cache in
-    // subsequent iterations.
-    subpipelineExec: [1, 0]
+    // Because the foreign collection is unsharded, the node executing the $lookup can do a local
+    // read on the foreign coll during the first iteration of $lookup. The $group stage in the
+    // subpipeline is non-correlated so the $lookup will only need to do the local read once to
+    // populate the cache, and will perform local queries against the cache in subsequent
+    // iterations.
+    subpipelineLocalExec: [1, 0],
+    subpipelineExec: [0, 0]
 });
 
 // Test sharded local collection and unsharded foreign collection.
 st.shardColl(ordersColl, {_id: 1}, {_id: 1}, {_id: 1}, mongosDB.getName());
 
-assertLookupExecution(pipeline, {comment: "sharded_to_sharded_cache"}, {
+assertLookupExecution(pipeline, {comment: "sharded_to_unsharded_cache"}, {
     results: expectedRes,
-    // The 'orders' collection is sharded, so the top-level stage $lookup is executed in parallel on
-    // every shard that contains the local collection.
-    toplevelExec: [1, 1],
-    // Because the foreign collection is unsharded, the node executing the $lookup will open a
-    // cursor on the primary shard for the first iteration of $lookup. The $group stage in the
-    // subpipeline is non-correlated so the $lookup will only need to send the subpipeline to each
-    // shard once to populate the cache, and will perform local queries against the cache in
-    // subsequent iterations.
-    subpipelineExec: [1, 0]
+    // The 'orders' collection is sharded, but the foreign collection is not, so the $lookup stays
+    // on the merging half of the split pipeline and executes on the primary only.
+    toplevelExec: [1, 0],
+    // Because the foreign collection is unsharded, the node executing the $lookup can do a local
+    // read on the foreign coll during the first iteration of $lookup. The $group stage in the
+    // subpipeline is non-correlated so the $lookup will only need to do the local read once to
+    // populate the cache, and will perform local queries against the cache in subsequent
+    // iterations.
+    subpipelineLocalExec: [1, 0],
+    subpipelineExec: [0, 0]
 });
-*/
 
 // Test sharded local collection and unsharded foreign collection is directed to the primary only.
 st.shardColl(ordersColl, {_id: 1}, {_id: 1}, {_id: 1}, mongosDB.getName());
@@ -712,9 +726,11 @@ assertLookupExecution(pipeline, {comment: "sharded_to_unsharded"}, {
     // The 'orders' collection is sharded, but the foreign collection is unsharded, so the $lookup
     // will stay on the merging part of the split pipeline and be sent to the primary only.
     toplevelExec: [1, 0],
-    // For every document that flows through the $lookup stage, the primary will issue subpipeline
-    // queries only to itself, since the foreign collection exists only on the primary.
-    subpipelineExec: [4, 0]
+    // Since it is unsharded, the foreign collection exists on the primary shard where the $lookup
+    // is executing. So, the $lookup can perform local reads into the foreign collection to execute
+    // the subpipelines.
+    subpipelineLocalExec: [4, 0],
+    subpipelineExec: [0, 0]
 });
 
 // Test sharded local collection and sharded foreign collection that becomes unsharded.
@@ -736,7 +752,9 @@ assertLookupExecution(pipeline, {comment: "foreign_becomes_unsharded", batchSize
     toplevelExec: [1, 1],
     // For every document that flows through the $lookup stage, each node will send the subpipelines
     // to execute on the primary shard, since the foreign collection exists only on the primary.
-    subpipelineExec: [4, 0]
+    // The primary shard can execute those subpipelines as local reads.
+    subpipelineLocalExec: [2, 0],
+    subpipelineExec: [2, 0]
 });
 
 // Test sharded local collection and unsharded foreign collection that becomes sharded.

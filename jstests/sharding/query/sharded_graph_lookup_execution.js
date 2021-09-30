@@ -299,11 +299,13 @@ assertGraphLookupExecution(pipeline, {comment: "sharded_to_sharded_to_unsharded"
         collName: airportsColl.getName(),
         fromCollName: airfieldsColl.getName(),
         // When executing the subpipeline, the nested $graphLookup stage will stay on the merging
-        // half of the pipeline and execute on the merging node, sending requests over the network
-        // to execute the nested $matches on the primary shard (where the unsharded 'airfields'
-        // collection is). The $graphLookups cannot share a cache because they run indepedently.
+        // half of the pipeline and execute on the merging node, sending requests to execute the
+        // nested $matches on the primary shard (where the unsharded 'airfields' collection is).
+        // Only the $graphLookup on the non-primary shard needs to send requests over the network;
+        // the rest can be done via a local read and are not logged. The $graphLookups cannot share
+        // a cache because they run indepedently.
         toplevelExec: [0, 0],
-        recursiveMatchExec: [6, 0]
+        recursiveMatchExec: [2, 0]
     }
 ]);
 

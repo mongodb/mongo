@@ -139,6 +139,14 @@ public:
                                  const NamespaceString& nss,
                                  boost::optional<ChunkVersion> chunkVersion) final;
 
+    bool setExpectedDbVersion(OperationContext* opCtx,
+                              const NamespaceString& nss,
+                              DatabaseVersion dbVersion) final;
+
+    void unsetExpectedDbVersion(OperationContext* opCtx, const NamespaceString& nss) final;
+
+    void checkOnPrimaryShardForDb(OperationContext* opCtx, const NamespaceString& nss) final;
+
 private:
     // If the current operation is versioned, then we attach the DB version to the command object;
     // otherwise, it is returned unmodified. Used when running internal commands, as the parent
