@@ -106,7 +106,6 @@ protected:
                                                 PlanYieldPolicy::YieldPolicy::NO_YIELD,
                                                 QueryPlannerParams::RETURN_OWNED_DATA));
 
-        exec->saveState();
         _source = DocumentSourceCursor::create(
             _coll, std::move(exec), _ctx, DocumentSourceCursor::CursorType::kRegular);
     }
