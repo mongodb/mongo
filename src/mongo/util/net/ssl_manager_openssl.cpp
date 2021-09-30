@@ -3509,8 +3509,10 @@ void SSLManagerOpenSSL::_getX509CertInfo(UniqueX509& x509,
     info->issuer = convertX509ToSSLX509Name(X509_get_issuer_name(x509.get()));
 
     info->thumbprint.resize(kSHA1HashBytes);
-    X509_digest(
+    int result = X509_digest(
         x509.get(), EVP_sha1(), reinterpret_cast<unsigned char*>(info->thumbprint.data()), nullptr);
+    uassert(6014700, "X509 digest failed", result == 1);
+
     info->hexEncodedThumbprint = hexblob::encode(info->thumbprint.data(), info->thumbprint.size());
 
     auto notBeforeMillis = convertASN1ToMillis(X509_get_notBefore(x509.get()));
