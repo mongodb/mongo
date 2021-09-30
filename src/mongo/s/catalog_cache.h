@@ -152,7 +152,7 @@ class CatalogCache {
 
 public:
     CatalogCache(ServiceContext* service, CatalogCacheLoader& cacheLoader);
-    ~CatalogCache();
+    virtual ~CatalogCache();
 
     /**
      * Blocking method that ensures the specified database is in the cache, loading it if necessary,
@@ -186,9 +186,9 @@ public:
      * guaranteed to never return StaleClusterTime, because the latest routing information should
      * always be available.
      */
-    StatusWith<ChunkManager> getCollectionRoutingInfo(OperationContext* opCtx,
-                                                      const NamespaceString& nss,
-                                                      bool allowLocks = false);
+    virtual StatusWith<ChunkManager> getCollectionRoutingInfo(OperationContext* opCtx,
+                                                              const NamespaceString& nss,
+                                                              bool allowLocks = false);
 
     /**
      * Same as getDatbase above, but in addition forces the database entry to be refreshed.
