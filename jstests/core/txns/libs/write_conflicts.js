@@ -56,6 +56,11 @@ var WriteConflictHelpers = (function() {
         assert.commandWorked(session1.commitTransaction_forTesting());
         assert.commandFailedWithCode(session2.commitTransaction_forTesting(),
                                      ErrorCodes.NoSuchTransaction);
+
+        session2.startTransaction();
+        assert.commandWorked(session2Coll.runCommand(
+            {find: collName}));  // Start finalizing transaction with a no-op.
+        assert.commandWorked(session2.commitTransaction_forTesting());
     }
 
     /**
@@ -91,6 +96,11 @@ var WriteConflictHelpers = (function() {
         assert.commandFailedWithCode(res, ErrorCodes.WriteConflict);
         assert.commandFailedWithCode(session1.commitTransaction_forTesting(),
                                      ErrorCodes.NoSuchTransaction);
+
+        session1.startTransaction();
+        assert.commandWorked(session1Coll.runCommand(
+            {find: collName}));  // Start finalizing transaction with a no-op.
+        assert.commandWorked(session1.commitTransaction_forTesting());
     }
 
     /**
