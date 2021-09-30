@@ -116,7 +116,7 @@ const isShardedLookupEnabled = getShardedLookupParam.hasOwnProperty("featureFlag
 
 // Now run a getMore for each of the test cases. The collection has become sharded mid-iteration, so
 // we should observe the error code associated with the test case.
-// TODO SERVER-52324: When the feature flag is enabled, assert that the command works and has
+// TODO SERVER-60018: When the feature flag is removed, assert that the command works and has
 // expected results.
 if (!isShardedLookupEnabled) {
     for (let testCase of testCases) {
@@ -131,7 +131,7 @@ if (!isShardedLookupEnabled) {
 // Run both test cases again. The fresh mongos knows that the foreign collection is sharded now, so
 // both tests will fail on the mongos with error code 28769 without ever reaching the shard if the
 // 'featureFlagShardedLookup' flag is disabled.
-// TODO SERVER-52324: When the feature flag is enabled, assert that the command works and has
+// TODO SERVER-60018: When the feature flag is removed, assert that the command works and has
 // expected results.
 if (!isShardedLookupEnabled) {
     for (let testCase of testCases) {
@@ -145,7 +145,7 @@ if (!isShardedLookupEnabled) {
 // Run the test cases through the stale mongos. It should still believe that the foreign collection
 // is unsharded, and so it will send the aggregate command to the shard, where it will hit an error
 // as soon as it attempts to access the foreign collection.
-// TODO SERVER-52324: When the feature flag is enabled, assert that the command works and has
+// TODO SERVER-60018: When the feature flag is removed, assert that the command works and has
 // expected results.
 if (!isShardedLookupEnabled) {
     for (let testCase of testCases) {
@@ -187,7 +187,7 @@ for (let testCase of testCases) {
 // ... and a single StaleConfig exception for the foreign namespace. Note that the 'ns' field of the
 // profiler entry is the source collection in both cases, because the $lookup's parent aggregation
 // produces the profiler entry, and it is always running on the source collection.
-// TODO SERVER-52324: When the feature flag is enabled, remove the check and ensure the results are
+// TODO SERVER-60018: When the feature flag is removed, remove the check and ensure the results are
 // expected.
 if (!isShardedLookupEnabled) {
     profilerHasSingleMatchingEntryOrThrow({

@@ -64,7 +64,7 @@ assert.eq(baseColl.aggregate(lookupUnderUnionPipeline).toArray(), expectedResult
 
 // Test that a $lookup with a sub-pipeline containing a $unionWith on a sharded collection correctly
 // fails if the 'featureFlagShardedLookup' is disabled.
-// TODO SERVER-52324: When the feature flag is enabled, assert that the command works and has
+// TODO SERVER-60018: When the feature flag is removed, assert that the command works and has
 // expected results.
 const getShardedLookupParam = mongosDB.adminCommand({getParameter: 1, featureFlagShardedLookup: 1});
 const isShardedLookupEnabled = getShardedLookupParam.hasOwnProperty("featureFlagShardedLookup") &&
@@ -83,7 +83,7 @@ assert.commandWorked(
 
 // Test that $lookup from a sharded collection is disallowed even within a $unionWith pipeline
 // if the 'featureFlagShardedLookup' is disabled.
-// TODO SERVER-52324: When the feature flag is enabled, assert that the command works and has
+// TODO SERVER-60018: When the feature flag is removed, assert that the command works and has
 // expected results.
 if (!isShardedLookupEnabled) {
     assert.commandFailedWithCode(
@@ -115,7 +115,7 @@ const deepLookupPipeline = [{
         as: "result"
     }
 }];
-// TODO SERVER-52324: When the feature flag is enabled, assert that the command works and has
+// TODO SERVER-60018: When the feature flag is removed, assert that the command works and has
 // expected results.
 if (!isShardedLookupEnabled) {
     assert.commandFailedWithCode(

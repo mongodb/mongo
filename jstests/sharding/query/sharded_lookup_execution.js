@@ -5,7 +5,7 @@
  * contains a nested $lookup stage. This also includes tests when the mongos has stale information
  * about the foreign collection.
  *
- * @tags: [requires_fcv_51, featureFlagShardedLookup]
+ * @tags: [requires_fcv_51]
  */
 
 (function() {

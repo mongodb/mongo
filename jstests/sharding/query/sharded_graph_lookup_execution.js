@@ -3,7 +3,7 @@
  * include when the local collection is sharded and unsharded, when the $graphLookup can target
  * shards or is scatter-gather, and when the $graphLookup is not top-level.
  *
- * @tags: [requires_fcv_51, featureFlagShardedLookup]
+ * @tags: [requires_fcv_51]
  */
 
 (function() {

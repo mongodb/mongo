@@ -1,9 +1,7 @@
 /**
  * Tests that $merge cannot be used within a $lookup pipeline.
  *
- * @tags: [
- *   featureFlagShardedLookup
- * ]
+ * @tags: [requires_fcv_51]
  */
 (function() {
 "use strict";

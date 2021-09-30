@@ -3,7 +3,7 @@
 (function() {
 "use strict";
 
-// TODO SERVER-52324: When the feature flag is enabled, remove this test file.
+// TODO SERVER-60018: When the feature flag is removed, remove this test file.
 
 const st = new ShardingTest({shards: 2, mongos: 1});
 const testName = "lookup_sharded";

@@ -1,5 +1,5 @@
 // Tests that $lookup and its subpipelines obey the read preference specified by the user.
-// @tags: [requires_majority_read_concern, requires_fcv_51, featureFlagShardedLookup]
+// @tags: [requires_majority_read_concern, requires_fcv_51]
 (function() {
 'use strict';
 

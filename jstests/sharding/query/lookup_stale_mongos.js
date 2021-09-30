@@ -4,10 +4,7 @@
  * when it's not, and likewise when mongos thinks the collection is unsharded but is actually
  * sharded.
  *
- * @tags: [
- *  requires_fcv_51,
- *  featureFlagShardedLookup
- * ]
+ * @tags: [requires_fcv_51]
  */
 (function() {
 "use strict";
