@@ -2943,9 +2943,13 @@ public:
 class ExpressionSplit final : public ExpressionFixedArity<ExpressionSplit, 2> {
 public:
     explicit ExpressionSplit(ExpressionContext* const expCtx)
-        : ExpressionFixedArity<ExpressionSplit, 2>(expCtx) {}
+        : ExpressionFixedArity<ExpressionSplit, 2>(expCtx) {
+        expCtx->sbeCompatible = false;
+    }
     ExpressionSplit(ExpressionContext* const expCtx, ExpressionVector&& children)
-        : ExpressionFixedArity<ExpressionSplit, 2>(expCtx, std::move(children)) {}
+        : ExpressionFixedArity<ExpressionSplit, 2>(expCtx, std::move(children)) {
+        expCtx->sbeCompatible = false;
+    }
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
