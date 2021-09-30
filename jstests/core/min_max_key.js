@@ -92,4 +92,12 @@ assert.commandWorked(coll.createIndex({a: 1}));
 
 testQueriesWithMinOrMaxKey();
 testTypeBracketedQueries();
+
+// Verify that minKey/maxKey comparisons follow woCompare semantics on subobject comparison.
+assert(coll.drop());
+assert.commandWorked(coll.insert({outer: {a: {b: MinKey}}}));
+assert.eq(coll.find({outer: {$lt: {a: {c: 1}}}}).itcount(), 1);
+assert(coll.drop());
+assert.commandWorked(coll.insert({outer: {a: {b: MaxKey}}}));
+assert.eq(coll.find({outer: {$gte: {a: {c: 1}}}}).itcount(), 1);
 }());

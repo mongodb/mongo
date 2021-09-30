@@ -1071,13 +1071,22 @@ std::pair<TypeTags, Value> compareValue(TypeTags lhsTag,
         auto lhsObj = ObjectEnumerator{lhsTag, lhsValue};
         auto rhsObj = ObjectEnumerator{rhsTag, rhsValue};
         while (!lhsObj.atEnd() && !rhsObj.atEnd()) {
+            // To match BSONElement::woCompare() semantics, we first compare the canonical types of
+            // the elements. If they do not match, we return their difference.
+            auto [lhsTag, lhsVal] = lhsObj.getViewOfValue();
+            auto [rhsTag, rhsVal] = rhsObj.getViewOfValue();
+
+
+            if (auto result = canonicalizeBSONType(tagToType(lhsTag)) -
+                    canonicalizeBSONType(tagToType(rhsTag));
+                result != 0) {
+                return {TypeTags::NumberInt32, bitcastFrom<int32_t>(compareHelper(result, 0))};
+            }
+
             auto fieldCmp = lhsObj.getFieldName().compare(rhsObj.getFieldName());
             if (fieldCmp != 0) {
                 return {TypeTags::NumberInt32, bitcastFrom<int32_t>(compareHelper(fieldCmp, 0))};
             }
-
-            auto [lhsTag, lhsVal] = lhsObj.getViewOfValue();
-            auto [rhsTag, rhsVal] = rhsObj.getViewOfValue();
 
             auto [tag, val] = compareValue(lhsTag, lhsVal, rhsTag, rhsVal, comparator);
             if (tag != TypeTags::NumberInt32 || bitcastTo<int32_t>(val) != 0) {

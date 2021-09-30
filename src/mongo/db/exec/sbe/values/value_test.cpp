@@ -36,6 +36,23 @@ namespace mongo::sbe {
 
 class SbeValueTest : public SbeStageBuilderTestFixture {};
 
+TEST_F(SbeValueTest, CompareTwoObjectsWithSubobjectsOfDifferentTypesWithDifferentFieldNames) {
+    auto lhsObj = BSON("a" << kMinBSONKey);
+    auto rhsObj = BSON("a" << BSON("c" << 1));
+    auto [lhsTag, lhsVal] = value::copyValue(value::TypeTags::bsonObject,
+                                             value::bitcastFrom<const char*>(lhsObj.objdata()));
+    value::ValueGuard lhsGuard{lhsTag, lhsVal};
+
+    auto [rhsTag, rhsVal] = value::copyValue(value::TypeTags::bsonObject,
+                                             value::bitcastFrom<const char*>(rhsObj.objdata()));
+    value::ValueGuard rhsGuard{rhsTag, rhsVal};
+
+    // LHS should compare less than RHS.
+    auto [cmpTag, cmpVal] = value::compareValue(lhsTag, lhsVal, rhsTag, rhsVal);
+    ASSERT_EQ(cmpTag, value::TypeTags::NumberInt32);
+    ASSERT_EQ(value::bitcastTo<int32_t>(cmpVal), -1);
+}
+
 TEST_F(SbeValueTest, CompareTwoArraySets) {
     using ValueFnType = void(value::ArraySet*);
     using AssertFnType = void(value::TypeTags, value::Value, value::TypeTags, value::Value);
