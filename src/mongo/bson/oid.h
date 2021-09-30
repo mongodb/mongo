@@ -85,8 +85,8 @@ public:
 
     enum { kOIDSize = 12, kTimestampSize = 4, kInstanceUniqueSize = 5, kIncrementSize = 3 };
 
-    /** init from a 24 char hex std::string */
-    explicit OID(const std::string& s) {
+    /** init from a 24 char hex string */
+    explicit OID(StringData s) {
         init(s);
     }
 
@@ -141,31 +141,24 @@ public:
     }
 
     /**
+     * This method creates and initializes an OID from a string,
+     * returning a bad Status on failure.
+     */
+    static StatusWith<OID> parse(StringData input);
+
+    /**
      * This method creates and initializes an OID from a string, throwing a BadValue exception if
      * the string is not a valid OID.
      */
     static OID createFromString(StringData input) {
-        uassert(ErrorCodes::BadValue,
-                str::stream() << "Invalid string length for parsing to OID, expected 24 but found "
-                              << input.size(),
-                input.size() == 24);
-        for (auto digit : input) {
-            uassert(ErrorCodes::BadValue,
-                    str::stream() << "Invalid character found in hex string: " << digit,
-                    ('0' <= digit && digit <= '9') || ('a' <= digit && digit <= 'f') ||
-                        ('A' <= digit && digit <= 'F'));
-        }
-
-        OID result;
-        result.init(input.toString());
-        return result;
+        return uassertStatusOK(parse(input));
     }
 
     /** sets the contents to a new oid / randomized value */
     void init();
 
     /** init from a 24 char hex std::string */
-    void init(const std::string& s);
+    void init(StringData s);
 
     /** Set to the min/max OID that could be generated at given timestamp. */
     void init(Date_t date, bool max = false);

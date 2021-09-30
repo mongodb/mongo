@@ -51,6 +51,11 @@ const std::size_t kTimestampOffset = 0;
 const std::size_t kInstanceUniqueOffset = kTimestampOffset + OID::kTimestampSize;
 const std::size_t kIncrementOffset = kInstanceUniqueOffset + OID::kInstanceUniqueSize;
 OID::InstanceUnique _instanceUnique;
+
+bool isHexit(char c) {
+    return ((c >= '0') && (c <= '9')) || ((c >= 'a') && (c <= 'f')) || ((c >= 'A') && (c <= 'F'));
+}
+
 }  // namespace
 
 MONGO_INITIALIZER_GENERAL(OIDGeneration, (), ("default"))
@@ -147,10 +152,27 @@ void OID::initFromTermNumber(int64_t term) {
     _view().write<BigEndian<int64_t>>(term, kInstanceUniqueOffset);
 }
 
-void OID::init(const std::string& s) {
-    verify(s.size() == 24);
-    std::string blob = hexblob::decode(StringData(s).substr(0, 2 * kOIDSize));
+void OID::init(StringData s) {
+    verify(s.size() == (2 * kOIDSize));
+    std::string blob = hexblob::decode(s.substr(0, 2 * kOIDSize));
     std::copy(blob.begin(), blob.end(), _data);
+}
+
+StatusWith<OID> OID::parse(StringData input) {
+    if (input.size() != (2 * kOIDSize)) {
+        return {ErrorCodes::BadValue,
+                str::stream() << "Invalid string length for parsing to OID, expected "
+                              << (2 * kOIDSize) << " but found " << input.size()};
+    }
+
+    for (char c : input) {
+        if (!isHexit(c)) {
+            return {ErrorCodes::BadValue,
+                    str::stream() << "Invalid character found in hex string: " << c};
+        }
+    }
+
+    return OID(input);
 }
 
 void OID::init(Date_t date, bool max) {
