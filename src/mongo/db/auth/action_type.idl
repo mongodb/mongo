@@ -123,6 +123,7 @@ enums:
            logRotate :  "logRotate"
            moveChunk :  "moveChunk"
            netstat :  "netstat"
+           oidReset :  "oidReset"    # machine ID reset via the features command
            operationMetrics :  "operationMetrics"
            planCacheIndexFilter :  "planCacheIndexFilter"  # view/update index filters
            planCacheRead :  "planCacheRead"         # view contents of plan cache

@@ -90,7 +90,15 @@ public:
 // { features: 1 }
 using FeaturesCmd = GenericTC<FeaturesCommand, false>;
 template <>
-void FeaturesCmd::Invocation::doCheckAuthorization(OperationContext*) const {}
+void FeaturesCmd::Invocation::doCheckAuthorization(OperationContext* opCtx) const {
+    if (request().getOidReset().value_or(false)) {
+        auto* as = AuthorizationSession::get(opCtx->getClient());
+        uassert(ErrorCodes::Unauthorized,
+                "Not authorized to reset machine identifier",
+                as->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                     ActionType::oidReset));
+    }
+}
 template <>
 FeaturesReply FeaturesCmd::Invocation::typedRun(OperationContext*) {
     FeaturesReply reply;
@@ -98,7 +106,7 @@ FeaturesReply FeaturesCmd::Invocation::typedRun(OperationContext*) {
         reply.setJs(FeaturesReplyJS(engine->utf8Ok()));
     }
 
-    if (auto optReset = request().getOidReset(); optReset && *optReset) {
+    if (request().getOidReset().value_or(false)) {
         reply.setOidMachineOld(static_cast<long>(OID::getMachineId()));
         OID::regenMachineId();
     }

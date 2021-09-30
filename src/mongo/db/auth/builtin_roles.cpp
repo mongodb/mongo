@@ -212,6 +212,7 @@ MONGO_INITIALIZER(AuthorizationBuiltinRoles)(InitializerContext* context) {
         << ActionType::connPoolSync
         << ActionType::dropConnections
         << ActionType::logRotate
+        << ActionType::oidReset
         << ActionType::setParameter
         << ActionType::shutdown
         << ActionType::touch
