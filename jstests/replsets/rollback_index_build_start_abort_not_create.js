@@ -8,7 +8,8 @@
 // For RollbackIndexBuildsTest
 load('jstests/replsets/libs/rollback_index_builds_test.js');
 
-const rollbackIndexTest = new RollbackIndexBuildsTest();
+const rollbackIndexTest = new RollbackIndexBuildsTest(
+    [ErrorCodes.InterruptedDueToReplStateChange, ErrorCodes.Interrupted]);
 
 const schedule = [
     // Create the collection

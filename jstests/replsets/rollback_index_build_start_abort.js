@@ -7,7 +7,7 @@
 // for RollbackIndexBuildTest
 load('jstests/replsets/libs/rollback_index_builds_test.js');
 
-const rollbackIndexTest = new RollbackIndexBuildsTest();
+const rollbackIndexTest = new RollbackIndexBuildsTest([ErrorCodes.Interrupted]);
 
 // Build a schedule of operations interleaving rollback and an index build.
 const rollbackOps = ["holdStableTimestamp", "transitionToRollback"];

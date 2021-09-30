@@ -8,7 +8,7 @@ load("jstests/noPassthrough/libs/index_build.js");  // for IndexBuildTest
 load('jstests/replsets/libs/rollback_test.js');     // for RollbackTest
 
 class RollbackIndexBuildsTest {
-    constructor() {
+    constructor(expectedErrors) {
         jsTestLog("Set up a Rollback Test.");
         const replTest = new ReplSetTest({
             name: jsTestName(),
@@ -21,6 +21,7 @@ class RollbackIndexBuildsTest {
         config.settings = {chainingAllowed: false};
         replTest.initiateWithHighElectionTimeout(config);
         this.rollbackTest = new RollbackTest(jsTestName(), replTest);
+        this.expectedErrors = expectedErrors;
     }
 
     // Given two ordered arrays, returns all permutations of the two using all elements of each.
@@ -111,10 +112,12 @@ class RollbackIndexBuildsTest {
                         }
                         IndexBuildTest.pauseIndexBuilds(primary);
 
-                        // This test create indexes with majority of nodes not available for
+                        var errcodes = self.expectedErrors ? self.expectedErrors : [];
+                        // This test creates indexes with majority of nodes not available for
                         // replication. So, disabling index build commit quorum.
                         indexBuilds.push(IndexBuildTest.startIndexBuild(
-                            primary, collection.getFullName(), indexSpec, {}, [], 0));
+                            primary, collection.getFullName(), indexSpec, {}, errcodes, 0));
+
                         IndexBuildTest.waitForIndexBuildToStart(primaryDB, collName, "a_1");
                         break;
                     case "commit":
@@ -135,8 +138,9 @@ class RollbackIndexBuildsTest {
                 }
             });
 
-            // TODO: SERVER-59685
-            indexBuilds.forEach(indexBuild => indexBuild({checkExitSuccess: false}));
+            // Check for success -- any expected Error failures were passed
+            // as parameters to the startIndexBuild() call
+            indexBuilds.forEach(indexBuild => indexBuild({checkExitSuccess: true}));
 
             if (!transitionedToSteadyState) {
                 self.rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
