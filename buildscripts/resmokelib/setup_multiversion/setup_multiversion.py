@@ -245,6 +245,9 @@ class SetupMultiversion(Subcommand):
             # TODO (SERVER-59675): Remove the check for 500 once evergreen returns 404 instead.
             if not (err.response.status_code == 500 or err.response.status_code == 404):
                 raise
+        except StopIteration:
+            return urls
+
         buildvariant_name = self.get_buildvariant_name(version)
         LOGGER.debug("Found buildvariant.", buildvariant_name=buildvariant_name)
 
