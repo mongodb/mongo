@@ -775,7 +775,7 @@ def remote_handler(options, task_config, root_dir):
 
     print_uptime()
     LOGGER.info("Operations to perform %s", options.remote_operations)
-    host = "localhost"
+    host = options.host if options.host else "localhost"
     host_port = "{}:{}".format(host, options.port)
 
     mongod_options = task_config.mongod_options
@@ -1291,19 +1291,6 @@ def resmoke_client(  # pylint: disable=too-many-arguments
     return ret, output
 
 
-def setup_ssh_tunnel(  # pylint: disable=too-many-arguments
-        mongod_host, secret_port, standard_port, ssh_connection_options, ssh_options,
-        ssh_user_host):
-    """Establish ssh connection with tunnel options in the background."""
-
-    ssh_tunnel_opts = f"-L {secret_port}:{mongod_host}:{secret_port} -L {standard_port}:{mongod_host}:{standard_port}"
-    ssh_tunnel_cmd = f"ssh -N {ssh_tunnel_opts} {ssh_connection_options} {ssh_options} {ssh_user_host}"
-    LOGGER.info("Tunneling mongod connections through ssh to get around firewall")
-    LOGGER.info(ssh_tunnel_cmd)
-    Processes.create(ssh_tunnel_cmd)
-    LOGGER.info("The connection is not terminated because the host can be shut down at anytime")
-
-
 def get_remote_python():
     """Return remote python."""
 
@@ -1542,13 +1529,10 @@ def main(parser_actions, options):  # pylint: disable=too-many-branches,too-many
         if ret:
             local_exit(ret)
 
-        setup_ssh_tunnel(mongod_host, secret_port, standard_port, ssh_connection_options,
-                         ssh_options, ssh_user_host)
-
         # Optionally validate canary document locally.
         if validate_canary_local:
             mongo = pymongo.MongoClient(**get_mongo_client_args(
-                host="localhost", port=secret_port, server_selection_timeout_ms=one_hour_ms,
+                host=mongod_host, port=secret_port, server_selection_timeout_ms=one_hour_ms,
                 socket_timeout_ms=one_hour_ms))
             ret = mongo_validate_canary(mongo, powercycle_constants.DB_NAME,
                                         powercycle_constants.COLLECTION_NAME, canary_doc)
@@ -1557,7 +1541,7 @@ def main(parser_actions, options):  # pylint: disable=too-many-branches,too-many
                 local_exit(ret)
 
         # Run local validation of collections.
-        host_port = f"localhost:{secret_port}"
+        host_port = f"{mongod_host}:{secret_port}"
         new_config_file = NamedTempFile.create(suffix=".yml", directory="tmp")
         temp_client_files.append(new_config_file)
         validation_test_data = {"skipValidationOnNamespaceNotFound": True}
@@ -1607,7 +1591,7 @@ def main(parser_actions, options):  # pylint: disable=too-many-branches,too-many
         boot_time_after_recovery = get_boot_datetime(output)
 
         # Start CRUD clients
-        host_port = f"localhost:{standard_port}"
+        host_port = f"{mongod_host}:{standard_port}"
         for i in range(num_crud_clients):
             crud_config_file = NamedTempFile.create(suffix=".yml", directory="tmp")
             crud_test_data["collectionName"] = f"{powercycle_constants.COLLECTION_NAME}-{i}"
@@ -1637,7 +1621,7 @@ def main(parser_actions, options):  # pylint: disable=too-many-branches,too-many
         crash_canary = {}
         canary_doc = {"x": time.time()}
         orig_canary_doc = copy.deepcopy(canary_doc)
-        mongo = pymongo.MongoClient(**get_mongo_client_args(host="localhost", port=standard_port,
+        mongo = pymongo.MongoClient(**get_mongo_client_args(host=mongod_host, port=standard_port,
                                                             server_selection_timeout_ms=one_hour_ms,
                                                             socket_timeout_ms=one_hour_ms))
         crash_canary["function"] = mongo_insert_canary
