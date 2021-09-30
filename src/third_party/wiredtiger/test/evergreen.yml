@@ -2382,6 +2382,10 @@ tasks:
       - func: "random abort test"
         vars:
           random_abort_args: -t 40
+      # random-abort - run compaction
+      - func: "random abort test"
+        vars:
+          random_abort_args: -c -t 60
 
       # truncated-log
       - func: "truncated log test"
@@ -2393,6 +2397,12 @@ tasks:
       - func: "format test"
         vars:
           extra_args: file_type=row
+
+      # format test for stressing compaction code path
+      - func: "format test"
+        vars:
+          times: 3
+          extra_args: file_type=row compaction=1 verify=1 runs.timer=3 ops.pct.delete=30
 
       #FIXME-WT-5270: Add wtperf testing from Jenkin "wiredtiger-test-check-long" after fixing WT-5270
 
