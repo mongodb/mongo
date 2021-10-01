@@ -4,6 +4,7 @@
  * number of documents remain the same at the end. This test also checks that indexes on the
  * time-series buckets collection remain consistent after the test run.
  * @tags: [
+ *  requires_fcv_50,
  *  requires_sharding,
  *  assumes_balancer_off,
  *  requires_non_retryable_writes,
