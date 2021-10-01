@@ -111,94 +111,6 @@ modify_build(void)
 }
 
 /*
- * slow_apply_api --
- *     Apply a set of modification changes using a different algorithm.
- */
-static void
-slow_apply_api(WT_ITEM *orig)
-{
-    static WT_ITEM _tb;
-    WT_ITEM *ta, *tb, *tmp, _tmp;
-    size_t len, size;
-    int i;
-
-    ta = orig;
-    tb = &_tb;
-
-    /* Mess up anything not initialized in the buffers. */
-    if ((ta->memsize - ta->size) > 0)
-        memset((uint8_t *)ta->mem + ta->size, 0xff, ta->memsize - ta->size);
-
-    if (tb->memsize > 0)
-        memset((uint8_t *)tb->mem, 0xff, tb->memsize);
-
-    /*
-     * Process the entries to figure out how large a buffer we need. This is a bit pessimistic
-     * because we're ignoring replacement bytes, but it's a simpler calculation.
-     */
-    for (size = ta->size, i = 0; i < nentries; ++i) {
-        if (entries[i].offset >= size)
-            size = entries[i].offset;
-        size += entries[i].data.size;
-    }
-
-    testutil_check(__wt_buf_grow(NULL, ta, size));
-    testutil_check(__wt_buf_grow(NULL, tb, size));
-
-#if DEBUG
-    show(ta, "slow-apply start");
-#endif
-    /*
-     * From the starting buffer, create a new buffer b based on changes in the entries array. We're
-     * doing a brute force solution here to test the faster solution implemented in the library.
-     */
-    for (i = 0; i < nentries; ++i) {
-        /* Take leading bytes from the original, plus any gap bytes. */
-        if (entries[i].offset >= ta->size) {
-            memcpy(tb->mem, ta->mem, ta->size);
-            if (entries[i].offset > ta->size)
-                memset((uint8_t *)tb->mem + ta->size, '\0', entries[i].offset - ta->size);
-        } else if (entries[i].offset > 0)
-            memcpy(tb->mem, ta->mem, entries[i].offset);
-        tb->size = entries[i].offset;
-
-        /* Take replacement bytes. */
-        if (entries[i].data.size > 0) {
-            memcpy((uint8_t *)tb->mem + tb->size, entries[i].data.data, entries[i].data.size);
-            tb->size += entries[i].data.size;
-        }
-
-        /* Take trailing bytes from the original. */
-        len = entries[i].offset + entries[i].size;
-        if (ta->size > len) {
-            memcpy((uint8_t *)tb->mem + tb->size, (uint8_t *)ta->mem + len, ta->size - len);
-            tb->size += ta->size - len;
-        }
-        testutil_assert(tb->size <= size);
-
-        /* Swap the buffers and do it again. */
-        tmp = ta;
-        ta = tb;
-        tb = tmp;
-    }
-    ta->data = ta->mem;
-    tb->data = tb->mem;
-
-    /*
-     * The final results may not be in the original buffer, in which case we swap them back around.
-     */
-    if (ta != orig) {
-        _tmp = *ta;
-        *ta = *tb;
-        *tb = _tmp;
-    }
-
-#if DEBUG
-    show(ta, "slow-apply finish");
-#endif
-}
-
-/*
  * compare --
  *     Compare two results.
  */
@@ -249,6 +161,7 @@ modify_run(TEST_OPTS *opts)
     WT_CURSOR *cursor, _cursor;
     WT_DECL_RET;
     WT_ITEM *localA, _localA, *localB, _localB;
+    WT_ITEM modtmp;
     WT_SESSION_IMPL *session;
     size_t len;
     int i, j;
@@ -264,7 +177,6 @@ modify_run(TEST_OPTS *opts)
     /* Set up replacement information. */
     modify_repl_init();
 
-    /* We need three WT_ITEMs, one of them part of a fake cursor. */
     localA = &_localA;
     memset(&_localA, 0, sizeof(_localA));
     localB = &_localB;
@@ -273,6 +185,7 @@ modify_run(TEST_OPTS *opts)
     memset(&_cursor, 0, sizeof(_cursor));
     cursor->session = (WT_SESSION *)session;
     cursor->value_format = "u";
+    memset(&modtmp, 0, sizeof(modtmp));
 
 #define NRUNS 10000
     for (i = 0; i < NRUNS; ++i) {
@@ -295,7 +208,7 @@ modify_run(TEST_OPTS *opts)
             modify_build();
             testutil_check(__wt_buf_set(session, &cursor->value, localA->data, localA->size));
             testutil_check(__wt_modify_apply_api(cursor, entries, nentries));
-            slow_apply_api(localA);
+            testutil_modify_apply(localA, &modtmp, entries, nentries);
             compare(localB, localA, &cursor->value);
 
             /*
@@ -324,6 +237,7 @@ modify_run(TEST_OPTS *opts)
     __wt_buf_free(session, localA);
     __wt_buf_free(session, localB);
     __wt_buf_free(session, &cursor->value);
+    __wt_buf_free(session, &modtmp);
 }
 
 int
