@@ -276,7 +276,7 @@ variables:
   - name: external_auth
   - name: external_auth_windows
     distros:
-    - windows-64-2016
+    - windows-2016-dc
   - name: jsCore
   - name: jsCore_ese
   - name: jsCore_decimal
@@ -7581,7 +7581,7 @@ buildvariants:
   - name: external_auth
   - name: external_auth_windows
     distros:
-    - windows-64-2016
+    - windows-2016-dc
   - name: jsCore
   - name: jsCore_ese
   - name: jsCore_decimal
