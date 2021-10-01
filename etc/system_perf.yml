@@ -921,6 +921,7 @@ tasks:
 buildvariants:
   - name: task_generation
     display_name: Task Generation
+    cron: "0 0 1 1 *" # Every year starting 1/1 at 00:00
     modules: *modules
     expansions:
       platform: linux
@@ -934,7 +935,7 @@ buildvariants:
     name: compile-amazon2
     display_name: Compile
     modules: *modules
-    batchtime: 2880 # 48 hours
+    cron: "0 0 * * 0,2,4" # 00:00 on Sunday,Tuesday,Thursday
     expansions: &compile-expansions
       platform: linux
       project_dir: &project_dir dsi
@@ -955,7 +956,7 @@ buildvariants:
 
   - name: linux-standalone
     display_name: Linux Standalone
-    batchtime: 2880  # 48 hours
+    cron: "0 0 * * 0,2,4" # 00:00 on Sunday,Tuesday,Thursday
     modules: *modules
     expansions:
       mongodb_setup: standalone
@@ -990,7 +991,7 @@ buildvariants:
   - name: compile-rhel70
     display_name: Compile for Atlas-like
     modules: *modules
-    batchtime: 2880 # 48 hours
+    cron: "0 0 * * 0,2,4" # 00:00 on Sunday,Tuesday,Thursday
     expansions:
       <<: *compile-expansions
       compile_flags: >-
@@ -1008,7 +1009,7 @@ buildvariants:
 
   - name: linux-1-node-replSet
     display_name: Linux 1-Node ReplSet
-    batchtime: 10080 # 7 days
+    cron: "0 0 * * 4" # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: single-replica
@@ -1052,7 +1053,7 @@ buildvariants:
 
   - name: linux-standalone-audit
     display_name: Linux Standalone Audit
-    batchtime: 10080 # 7 days
+    cron: "0 0 * * 4" # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: standalone-audit
@@ -1073,7 +1074,7 @@ buildvariants:
 
   - name: linux-1-node-replSet-fle
     display_name: Linux 1-Node ReplSet FLE
-    batchtime: 5760  # 4 days
+    cron: "0 0 * * 0,4" # 00:00 on Sunday,Thursday
     modules: *modules
     expansions:
       mongodb_setup: single-replica-fle
@@ -1094,7 +1095,7 @@ buildvariants:
 
   - name: linux-1-node-replSet-cwrwc
     display_name: Linux 1-Node ReplSet CWRWC
-    batchtime: 5760  # 4 days
+    cron: "0 0 * * 0,4" # 00:00 on Sunday,Thursday
     modules: *modules
     expansions:
       mongodb_setup: single-replica-cwrwc
@@ -1114,7 +1115,7 @@ buildvariants:
 
   - name: linux-1-node-replSet-ese-cbc
     display_name: Linux 1-Node ReplSet ESE CBC
-    batchtime: 5760  # 4 days
+    cron: "0 0 * * 0,4" # 00:00 on Sunday,Thursday
     modules: *modules
     expansions:
       mongodb_setup: single-replica-ese-cbc
@@ -1135,7 +1136,7 @@ buildvariants:
 
   - name: linux-1-node-replSet-ese-gcm
     display_name: Linux 1-Node ReplSet ESE GCM
-    batchtime: 5760  # 4 days
+    cron: "0 0 * * 0,4" # 00:00 on Sunday,Thursday
     modules: *modules
     expansions:
       mongodb_setup: single-replica-ese-gcm
@@ -1156,7 +1157,7 @@ buildvariants:
 
   - name: linux-1-node-15gbwtcache
     display_name: Linux 1-Node ReplSet 15 GB WiredTiger Cache
-    batchtime: 2880  # 48 hours
+    cron: "0 0 * * 0,2,4" # 00:00 on Sunday,Tuesday,Thursday
     modules: *modules
     expansions:
       mongodb_setup: single-replica-15gbwtcache
@@ -1176,7 +1177,7 @@ buildvariants:
 
   - name: linux-3-node-1dayhistory-15gbwtcache
     display_name: Linux 3-Node ReplSet 1 Day History 15 GB WiredTiger Cache
-    batchtime: 5760  # 4 days
+    cron: "0 0 * * 0,4" # 00:00 on Sunday,Thursday
     modules: *modules
     expansions:
       mongodb_setup: replica-1dayhistory-15gbwtcache
@@ -1197,7 +1198,7 @@ buildvariants:
 
   - name: linux-3-shard
     display_name: Linux 3-Shard Cluster
-    batchtime: 10080 # 7 days
+    cron: "0 0 * * 4" # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: shard
@@ -1227,7 +1228,7 @@ buildvariants:
 
   - name: linux-shard-lite-audit
     display_name: Linux Shard Lite Cluster Audit
-    batchtime: 5760  # 4 days
+    cron: "0 0 * * 0,4" # 00:00 on Sunday,Thursday
     modules: *modules
     expansions:
       mongodb_setup: shard-lite-audit
@@ -1244,7 +1245,7 @@ buildvariants:
 
   - name: linux-shard-lite
     display_name: Linux Shard Lite Cluster
-    batchtime: 5760  # 4 days
+    cron: "0 0 * * 0,4" # 00:00 on Sunday,Thursday
     modules: *modules
     expansions:
       mongodb_setup: shard-lite
@@ -1281,7 +1282,7 @@ buildvariants:
 
   - name: linux-shard-lite-cwrwc
     display_name: Linux Shard Lite Cluster CWRWC
-    batchtime: 10080 # 7 days
+    cron: "0 0 * * 4" # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: shard-lite-cwrwc
@@ -1301,7 +1302,7 @@ buildvariants:
 
   - name: linux-shard-lite-read-concern-available
     display_name: Linux Shard Lite ReadConcern Available
-    batchtime: 10080 # 7 days
+    cron: "0 0 * * 4" # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: shard-lite-read-concern-available
@@ -1321,7 +1322,7 @@ buildvariants:
 
   - name: linux-shard-lite-all-feature-flags
     display_name: Linux Shard Lite (all feature flags)
-    batchtime: 10080  # 7 days
+    cron: "0 0 * * 4" # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: shard-lite-all-feature-flags
@@ -1339,7 +1340,7 @@ buildvariants:
 
   - name: linux-shard-single
     display_name: Linux Shard Single
-    batchtime: 5760  # 4 days
+    cron: "0 0 * * 0,4" # 00:00 on Sunday,Thursday
     modules: *modules
     expansions:
       mongodb_setup: shard-single
@@ -1357,7 +1358,7 @@ buildvariants:
 
   - name: linux-3-node-replSet
     display_name: Linux 3-Node ReplSet
-    batchtime: 2880  # 48 hours
+    cron: "0 0 * * 0,2,4" # 00:00 on Sunday,Tuesday,Thursday
     modules: *modules
     expansions:
       mongodb_setup: replica
@@ -1407,7 +1408,7 @@ buildvariants:
 
   - name: linux-3-node-replSet-last-continuous-fcv
     display_name: Linux 3-Node ReplSet (Last Continuous FCV)
-    batchtime: 10080 # 7 days
+    cron: "0 0 * * 4" # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: replica-last-continuous-fcv
@@ -1457,7 +1458,7 @@ buildvariants:
 
   - name: linux-3-node-replSet-last-lts-fcv
     display_name: Linux 3-Node ReplSet (Last LTS FCV)
-    batchtime: 10080  # 7 days
+    cron: "0 0 * * 4" # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: replica-last-lts-fcv
@@ -1509,7 +1510,7 @@ buildvariants:
   # history even though the display name is "all feature flags"
   - name: linux-3-node-replSet-disabled-feature-flags
     display_name: Linux 3-Node ReplSet (all feature flags)
-    batchtime: 10080  # 7 days
+    cron: "0 0 * * 4" # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: replica-all-feature-flags
@@ -1559,7 +1560,7 @@ buildvariants:
 
   - name: linux-3-node-replSet-noflowcontrol
     display_name: Linux 3-Node ReplSet (Flow Control off)
-    batchtime: 10080  # 7 days
+    cron: "0 0 * * 4" # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: replica-noflowcontrol
@@ -1589,7 +1590,7 @@ buildvariants:
 
   - name: linux-3-node-replSet-ssl
     display_name: Linux 3-Node ReplSet (SSL)
-    batchtime: 10080 # 7 days
+    cron: "0 0 * * 4" # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: replica-ssl
@@ -1609,7 +1610,7 @@ buildvariants:
 
   - name: linux-3-node-replSet-maintenance-events
     display_name: Linux 3-Node ReplSet (Maintenance Events)
-    batchtime: 5760  # 4 days
+    cron: "0 0 * * 0,4" # 00:00 on Sunday,Thursday
     modules: *modules
     expansions:
       mongodb_setup: replica-maintenance-events
@@ -1637,7 +1638,7 @@ buildvariants:
 
   - name: linux-3-node-replSet-initialsync
     display_name: Linux 3-Node ReplSet Initial Sync
-    batchtime: 2880  # 48 hours
+    cron: "0 0 * * 0,2,4" # 00:00 on Sunday,Tuesday,Thursday
     modules: *modules
     expansions:
       mongodb_setup: replica-2node
@@ -1658,7 +1659,7 @@ buildvariants:
 
   - name: linux-replSet-initialsync-logkeeper
     display_name: Linux ReplSet Initial Sync LogKeeper
-    batchtime: 10080 # 7 days
+    cron: "0 0 * * 4" # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: initialsync-logkeeper
@@ -1681,7 +1682,7 @@ buildvariants:
   # patch builds.
   #- name: linux-replSet-initialsync-logkeeper-snapshot-update
   #  display_name: Linux ReplSet Initial Sync LogKeeper Snapshot Update
-  #  batchtime: 10080 # 7 days
+  #  cron: "0 0 * * 4" # 00:00 on Thursday
   #  modules: *modules
   #  expansions:
   #    mongodb_setup: initialsync-logkeeper
@@ -1703,7 +1704,7 @@ buildvariants:
 
   - name: linux-replSet-audit
     display_name: Linux 3-Node ReplSet Audit
-    batchtime: 10080 # 7 days
+    cron: "0 0 * * 4" # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: replica-audit
@@ -1722,7 +1723,7 @@ buildvariants:
 
   - name: linux-replSet-auth-delay
     display_name: Linux 3-Node ReplSet (Auth Delay)
-    batchtime: 10080 # 7 days
+    cron: "0 0 * * 4" # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: replica-auth-cluster-delay
@@ -1740,7 +1741,7 @@ buildvariants:
 
   - name: atlas-like-M60
     display_name: M60-Like 3-Node ReplSet
-    batchtime: 5760  # 4 days
+    cron: "0 0 * * 0,4" # 00:00 on Sunday,Thursday
     modules: *modules
     expansions:
       mongodb_setup: atlas-like-replica
@@ -1783,7 +1784,7 @@ buildvariants:
 
   - name: renew-ssl-cert
     display_name: Renew SSL Cert
-    batchtime: 10080 # 7 days
+    cron: "0 0 * * 4" # 00:00 on Thursday
     modules: *modules
     run_on:  # Certbot with route53 plugin is installed on RHEL80
       - "rhel80-small"
