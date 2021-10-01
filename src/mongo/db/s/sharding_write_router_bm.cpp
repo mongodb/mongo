@@ -33,6 +33,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/concurrency/locker_noop_client_observer.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/catalog_cache_loader_mock.h"
@@ -177,6 +178,7 @@ static void BM_InsertGetDestinedRecipient(benchmark::State& state) {
 
     auto serviceContext = ServiceContext::make();
     const auto client = serviceContext->makeClient("test");
+    serviceContext->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
     const auto opCtx = client->makeOperationContext();
 
     const auto catalogCache = createCatalogCacheMock(opCtx.get());
@@ -196,6 +198,7 @@ static void BM_UpdateGetDestinedRecipient(benchmark::State& state) {
 
     auto serviceContext = ServiceContext::make();
     const auto client = serviceContext->makeClient("test");
+    serviceContext->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
     const auto opCtx = client->makeOperationContext();
 
     const auto catalogCache = createCatalogCacheMock(opCtx.get());
@@ -213,6 +216,7 @@ static void BM_UnshardedDestinedRecipient(benchmark::State& state) {
 
     auto serviceContext = ServiceContext::make();
     const auto client = serviceContext->makeClient("test");
+    serviceContext->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
     const auto opCtx = client->makeOperationContext();
 
     const auto catalogCache = CatalogCacheMock::make();
