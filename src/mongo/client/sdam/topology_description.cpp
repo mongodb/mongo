@@ -93,6 +93,10 @@ const boost::optional<OID>& TopologyDescription::getMaxElectionId() const {
     return _maxElectionId;
 }
 
+const ElectionIdSetVersionPair TopologyDescription::getMaxElectionIdSetVersionPair() const {
+    return ElectionIdSetVersionPair{getMaxElectionId(), getMaxSetVersion()};
+}
+
 const std::vector<ServerDescriptionPtr>& TopologyDescription::getServers() const {
     return _servers;
 }

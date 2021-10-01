@@ -285,6 +285,10 @@ const boost::optional<mongo::OID>& ServerDescription::getElectionId() const {
     return _electionId;
 }
 
+const ElectionIdSetVersionPair ServerDescription::getElectionIdSetVersionPair() const {
+    return ElectionIdSetVersionPair{getElectionId(), getSetVersion()};
+}
+
 const boost::optional<HostAndPort>& ServerDescription::getPrimary() const {
     return _primary;
 }
