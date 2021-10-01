@@ -685,6 +685,11 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalLastVoteDocument(
 
         Status status =
             writeConflictRetry(opCtx, "save replica set lastVote", lastVoteCollectionName, [&] {
+                // Writes to non-replicated collections do not need concurrency control with the
+                // OplogApplier that never accesses them. Skip taking the PBWM.
+                ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(
+                    opCtx->lockState());
+
                 AutoGetCollection coll(opCtx, NamespaceString(lastVoteCollectionName), MODE_IX);
                 WriteUnitOfWork wunit(opCtx);
 
