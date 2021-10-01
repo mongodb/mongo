@@ -107,8 +107,7 @@ modules:
   - name: YCSB
     repo: git@github.com:mongodb-labs/YCSB.git
     prefix: ../../src
-    branch: master
-    ref: 4e7287880c04514cad2df5761b9511c940a33059
+    branch: production
   - name: benchmarks
     repo: git@github.com:mongodb-labs/benchmarks.git
     prefix: ../../src
@@ -1166,3 +1165,5 @@ buildvariants:
       - name: secondary_reads
       # - name: tpcc # TPCC with SSL currently broken https://jira.mongodb.org/browse/TIG-1681
       - name: linkbench
+      - name: tpcc
+      - name: linkbench2
