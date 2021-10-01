@@ -486,7 +486,7 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkSplit(
     // migrations
     // TODO(SERVER-25359): Replace with a collection-specific lock map to allow splits/merges/
     // move chunks on different collections to proceed in parallel
-    Lock::ExclusiveLock lk(opCtx->lockState(), _kChunkOpLock);
+    Lock::ExclusiveLock lk(opCtx, opCtx->lockState(), _kChunkOpLock);
 
     // Get the max chunk version for this namespace.
     auto swCollVersion = getCollectionVersion(opCtx, nss);
@@ -706,7 +706,7 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunksMerge(
     // migrations
     // TODO(SERVER-25359): Replace with a collection-specific lock map to allow splits/merges/
     // move chunks on different collections to proceed in parallel
-    Lock::ExclusiveLock lk(opCtx->lockState(), _kChunkOpLock);
+    Lock::ExclusiveLock lk(opCtx, opCtx->lockState(), _kChunkOpLock);
 
     // 1. Retrieve the initial collection version info to build up the logging info.
     auto swCollVersion = getCollectionVersion(opCtx, nss);
@@ -887,7 +887,7 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
     // TODO(SERVER-25359): Replace with a collection-specific lock map to allow splits/merges/
     // move chunks on different collections to proceed in parallel.
     // (Note: This is not needed while we have a global lock, taken here only for consistency.)
-    Lock::ExclusiveLock lk(opCtx->lockState(), _kChunkOpLock);
+    Lock::ExclusiveLock lk(opCtx, opCtx->lockState(), _kChunkOpLock);
 
     if (!validAfter) {
         return {ErrorCodes::IllegalOperation, "chunk operation requires validAfter timestamp"};
@@ -1140,7 +1140,7 @@ void ShardingCatalogManager::clearJumboFlag(OperationContext* opCtx,
     // TODO(SERVER-25359): Replace with a collection-specific lock map to allow splits/merges/
     // move chunks on different collections to proceed in parallel.
     // (Note: This is not needed while we have a global lock, taken here only for consistency.)
-    Lock::ExclusiveLock lk(opCtx->lockState(), _kChunkOpLock);
+    Lock::ExclusiveLock lk(opCtx, opCtx->lockState(), _kChunkOpLock);
 
     auto findCollResponse = uassertStatusOK(
         configShard->exhaustiveFindOnConfig(opCtx,
@@ -1263,7 +1263,7 @@ void ShardingCatalogManager::ensureChunkVersionIsGreaterThan(OperationContext* o
     // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk operations.
     // TODO (SERVER-25359): Replace with a collection-specific lock map to allow splits/merges/
     // move chunks on different collections to proceed in parallel.
-    Lock::ExclusiveLock lk(opCtx->lockState(), _kChunkOpLock);
+    Lock::ExclusiveLock lk(opCtx, opCtx->lockState(), _kChunkOpLock);
 
     const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
@@ -1435,7 +1435,7 @@ void ShardingCatalogManager::bumpMultipleCollectionVersionsAndChangeMetadataInTx
 
     // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
     // migrations
-    Lock::ExclusiveLock lk(opCtx->lockState(), _kChunkOpLock);
+    Lock::ExclusiveLock lk(opCtx, opCtx->lockState(), _kChunkOpLock);
 
     withTransaction(opCtx,
                     NamespaceString::kConfigReshardingOperationsNamespace,
@@ -1475,7 +1475,7 @@ void ShardingCatalogManager::splitOrMarkJumbo(OperationContext* opCtx,
             // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk operations.
             // TODO (SERVER-25359): Replace with a collection-specific lock map to allow
             // splits/merges/ move chunks on different collections to proceed in parallel.
-            Lock::ExclusiveLock lk(opCtx->lockState(), _kChunkOpLock);
+            Lock::ExclusiveLock lk(opCtx, opCtx->lockState(), _kChunkOpLock);
 
             const auto findCollResponse = uassertStatusOK(configShard->exhaustiveFindOnConfig(
                 opCtx,
@@ -1535,7 +1535,7 @@ void ShardingCatalogManager::setAllowMigrationsAndBumpOneChunk(
     {
         // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
         // migrations
-        Lock::ExclusiveLock lk(opCtx->lockState(), _kChunkOpLock);
+        Lock::ExclusiveLock lk(opCtx, opCtx->lockState(), _kChunkOpLock);
 
         const auto cm = uassertStatusOK(
             Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx,
