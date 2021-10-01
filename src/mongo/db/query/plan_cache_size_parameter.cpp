@@ -1,0 +1,95 @@
+/**
+ *    Copyright (C) 2021-present MongoDB, Inc.
+ *
+ *    This program is free software: you can redistribute it and/or modify
+ *    it under the terms of the Server Side Public License, version 1,
+ *    as published by MongoDB, Inc.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    Server Side Public License for more details.
+ *
+ *    You should have received a copy of the Server Side Public License
+ *    along with this program. If not, see
+ *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the Server Side Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
+ */
+
+#include "mongo/db/query/plan_cache_size_parameter.h"
+
+#include <pcrecpp.h>
+
+#include "mongo/db/client.h"
+#include "mongo/db/query/query_knobs_gen.h"
+
+namespace mongo::plan_cache_util {
+
+StatusWith<PlanCacheSizeUnits> parseUnitString(const std::string& strUnit) {
+    if (strUnit.empty()) {
+        return Status(ErrorCodes::Error{6007010}, "Unit value cannot be empty");
+    }
+
+    if (strUnit[0] == '%') {
+        return PlanCacheSizeUnits::kPercent;
+    } else if (strUnit[0] == 'M' || strUnit[0] == 'm') {
+        return PlanCacheSizeUnits::kMB;
+    } else if (strUnit[0] == 'G' || strUnit[0] == 'g') {
+        return PlanCacheSizeUnits::kGB;
+    }
+
+    return Status(ErrorCodes::Error{6007011}, "Incorrect unit value");
+}
+
+StatusWith<PlanCacheSizeParameter> PlanCacheSizeParameter::parse(const std::string& str) {
+    pcrecpp::RE_Options opt;
+    opt.set_caseless(true);
+    // Looks for a floating point number with followed by a unit suffix (MB, GB, %).
+    pcrecpp::RE re("\\s*(\\d+\\.?\\d*)\\s*(MB|GB|%)\\s*", opt);
+
+    double size{};
+    std::string strUnit{};
+    if (!re.FullMatch(str, &size, &strUnit)) {
+        return {ErrorCodes::Error{6007012}, "Unable to parse plan cache size string"};
+    }
+
+    auto statusWithUnit = parseUnitString(strUnit);
+    if (!statusWithUnit.isOK()) {
+        return statusWithUnit.getStatus();
+    }
+
+    return PlanCacheSizeParameter{size, statusWithUnit.getValue()};
+}
+
+Status onPlanCacheSizeUpdate(const std::string& str) {
+    auto newSize = PlanCacheSizeParameter::parse(str);
+    if (!newSize.isOK()) {
+        return newSize.getStatus();
+    }
+
+    auto serviceCtx = Client::getCurrent()->getServiceContext();
+    tassert(6007013, "ServiceContext must be non null", serviceCtx);
+
+    auto updater = sbePlanCacheSizeUpdaterDecoration(serviceCtx).get();
+    tassert(6007014, "Plan cache size updater must be non null", serviceCtx);
+    updater->update(serviceCtx, newSize.getValue());
+
+    return Status::OK();
+}
+
+const Decorable<ServiceContext>::Decoration<std::unique_ptr<PlanCacheSizeUpdater>>
+    sbePlanCacheSizeUpdaterDecoration =
+        ServiceContext::declareDecoration<std::unique_ptr<PlanCacheSizeUpdater>>();
+
+}  // namespace mongo::plan_cache_util

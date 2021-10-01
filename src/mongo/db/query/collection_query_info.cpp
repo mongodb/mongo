@@ -78,8 +78,7 @@ CoreIndexInfo indexInfoFromIndexCatalogEntry(const IndexCatalogEntry& ice) {
 }
 
 std::shared_ptr<PlanCache> makePlanCache() {
-    return std::make_shared<PlanCache>(
-        PlanCache::BudgetTracker(internalQueryCacheMaxEntriesPerCollection.load()));
+    return std::make_shared<PlanCache>(internalQueryCacheMaxEntriesPerCollection.load());
 }
 
 }  // namespace

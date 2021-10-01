@@ -34,33 +34,52 @@
 
 using namespace mongo;
 
+/**
+ * Tests LRU Key Value store with 2 budget estimators:
+ * - trivial one gives a constant estimation for every entry;
+ * - non-trivial one calculates an estimation basing on the entry's data.
+ */
 namespace {
 
 //
 // Convenience types and functions.
 //
 
-struct BudgetEstimator {
+struct TrivialBudgetEstimator {
     size_t operator()(int) {
         return 1;
     }
 };
 
-using TestKeyValue = LRUKeyValue<int, int, BudgetEstimator>;
-using BudgetTracker = LRUBudgetTracker<int, BudgetEstimator>;
+using TestKeyValue = LRUKeyValue<int, int, TrivialBudgetEstimator>;
 
-void assertInKVStore(TestKeyValue& cache, int key, int value) {
-    int* cachedValue = nullptr;
+struct NonTrivialEntry {
+    NonTrivialEntry(size_t key, size_t budgetSize) : key{key}, budgetSize{budgetSize} {}
+
+    const size_t key;
+    const size_t budgetSize;
+};
+
+struct NonTrivialBudgetEstimator {
+    size_t operator()(const NonTrivialEntry& value) {
+        return value.budgetSize;
+    }
+};
+
+using NonTrivialTestKeyValue = LRUKeyValue<size_t, NonTrivialEntry, NonTrivialBudgetEstimator>;
+
+template <typename Key, typename Value, typename Estimator>
+void assertInKVStore(LRUKeyValue<Key, Value, Estimator>& cache, Key key, Value value) {
     ASSERT_TRUE(cache.hasKey(key));
-    Status s = cache.get(key, &cachedValue);
+    auto s = cache.get(key);
     ASSERT_OK(s);
-    ASSERT_EQUALS(*cachedValue, value);
+    ASSERT_EQUALS(*s.getValue(), value);
 }
 
-void assertNotInKVStore(TestKeyValue& cache, int key) {
-    int* cachedValue = nullptr;
+template <typename Key, typename Value, typename Estimator>
+void assertNotInKVStore(LRUKeyValue<Key, Value, Estimator>& cache, Key key) {
     ASSERT_FALSE(cache.hasKey(key));
-    Status s = cache.get(key, &cachedValue);
+    auto s = cache.get(key);
     ASSERT_NOT_OK(s);
 }
 
@@ -68,7 +87,7 @@ void assertNotInKVStore(TestKeyValue& cache, int key) {
  * Test that we can add an entry and get it back out.
  */
 TEST(LRUKeyValueTest, BasicAddGet) {
-    TestKeyValue cache{BudgetTracker(100)};
+    TestKeyValue cache{100};
     cache.add(1, new int(2));
     assertInKVStore(cache, 1, 2);
 }
@@ -78,17 +97,16 @@ TEST(LRUKeyValueTest, BasicAddGet) {
  * that at the very least we don't blow up.
  */
 TEST(LRUKeyValueTest, SizeZeroCache) {
-    TestKeyValue cache{BudgetTracker(0)};
+    TestKeyValue cache{0};
     cache.add(1, new int(2));
     assertNotInKVStore(cache, 1);
 }
 
 /**
- * Make sure eviction and promotion work properly with
- * a kv-store of size 1.
+ * Make sure eviction and promotion work properly with a kv-store of size 1.
  */
 TEST(LRUKeyValueTest, SizeOneCache) {
-    TestKeyValue cache{BudgetTracker(1)};
+    TestKeyValue cache{1};
     cache.add(0, new int(0));
     assertInKVStore(cache, 0, 0);
 
@@ -105,10 +123,10 @@ TEST(LRUKeyValueTest, SizeOneCache) {
  */
 TEST(LRUKeyValueTest, EvictionTest) {
     int maxSize = 10;
-    TestKeyValue cache{BudgetTracker(maxSize)};
+    TestKeyValue cache{static_cast<size_t>(maxSize)};
     for (int i = 0; i < maxSize; ++i) {
-        std::unique_ptr<int> evicted = cache.add(i, new int(i));
-        ASSERT(nullptr == evicted.get());
+        auto nEvicted = cache.add(i, new int(i));
+        ASSERT_EQ(0, nEvicted);
     }
     ASSERT_EQUALS(cache.size(), (size_t)maxSize);
 
@@ -122,10 +140,9 @@ TEST(LRUKeyValueTest, EvictionTest) {
     }
 
     // Adding another entry causes an eviction.
-    std::unique_ptr<int> evicted = cache.add(maxSize + 1, new int(maxSize + 1));
+    auto nEvicted = cache.add(maxSize + 1, new int(maxSize + 1));
     ASSERT_EQUALS(cache.size(), (size_t)maxSize);
-    ASSERT(nullptr != evicted.get());
-    ASSERT_EQUALS(*evicted, evictKey);
+    ASSERT_EQ(1ul, nEvicted);
 
     // Check that the least recently accessed has been evicted.
     for (int i = 0; i < maxSize; ++i) {
@@ -138,6 +155,54 @@ TEST(LRUKeyValueTest, EvictionTest) {
 }
 
 /**
+ * Eviction test with non-trivial budget estimator.
+ */
+TEST(LRUKeyValueTest, EvictionTestWithNonTrivialEstimator) {
+    constexpr size_t maxSize = 55;
+    NonTrivialTestKeyValue cache{maxSize};
+    size_t item = 0;
+    // Adding entries {0, 1}, {1, 2} ... {9, 10} to the LRU store.
+    for (; cache.size() + (item + 1) <= maxSize; ++item) {
+        auto nEvicted = cache.add(item, new NonTrivialEntry{item, item + 1});
+        ASSERT_EQ(0, nEvicted);
+    }
+    ASSERT_EQ(10u, item);
+    ASSERT_EQ(maxSize, cache.size());
+
+    size_t currentSize = maxSize;
+
+    // The first 4 values should be evicted to cover the incloming entry with size = 7.
+    constexpr size_t expectedToBeEvicted = 4;
+    constexpr size_t sizeOfExpectedToBeEvictedItems = 1 + 2 + 3 + 4;
+
+    constexpr size_t newItemKey = 17;
+    constexpr size_t newItemSize = 7;
+
+    currentSize += newItemSize - sizeOfExpectedToBeEvictedItems;
+
+    auto nEvicted = cache.add(newItemKey, new NonTrivialEntry{newItemKey, newItemSize});
+
+    ASSERT_EQ(expectedToBeEvicted, nEvicted);
+    ASSERT_EQ(currentSize, cache.size());
+}
+
+TEST(LRUKeyValueTest, AddAnEntryWithBiggetThanBudgetSize) {
+    constexpr size_t maxSize = 55;
+    NonTrivialTestKeyValue cache{maxSize};
+    size_t item = 0;
+    for (; cache.size() + (item + 1) <= maxSize; ++item) {
+        auto nEvicted = cache.add(item, new NonTrivialEntry{item, item + 1});
+        ASSERT_EQ(0, nEvicted);
+    }
+    ASSERT_EQ(10u, item);
+    ASSERT_EQ(maxSize, cache.size());
+
+    auto nEvicted = cache.add(17, new NonTrivialEntry(15, 57));
+    ASSERT_EQ(item + 1, nEvicted);  // all entries including the one just added must be evicted
+    ASSERT_EQ(0ul, cache.size());   // the LRU store must be empty now
+}
+
+/**
  * Fill up a size 10 kv-store with 10 entries. Call get()
  * on a single entry to promote it to most recently
  * accessed. Then cause 9 evictions and make sure only
@@ -145,10 +210,10 @@ TEST(LRUKeyValueTest, EvictionTest) {
  */
 TEST(LRUKeyValueTest, PromotionTest) {
     int maxSize = 10;
-    TestKeyValue cache{BudgetTracker(maxSize)};
+    TestKeyValue cache{static_cast<size_t>(maxSize)};
     for (int i = 0; i < maxSize; ++i) {
-        std::unique_ptr<int> evicted = cache.add(i, new int(i));
-        ASSERT(nullptr == evicted.get());
+        auto nEvicted = cache.add(i, new int(i));
+        ASSERT_EQ(0, nEvicted);
     }
     ASSERT_EQUALS(cache.size(), (size_t)maxSize);
 
@@ -158,8 +223,8 @@ TEST(LRUKeyValueTest, PromotionTest) {
 
     // Evict all but one of the original entries.
     for (int i = maxSize; i < (maxSize + maxSize - 1); ++i) {
-        std::unique_ptr<int> evicted = cache.add(i, new int(i));
-        ASSERT(nullptr != evicted.get());
+        auto nEvicted = cache.add(i, new int(i));
+        ASSERT_GT(nEvicted, 0);
     }
     ASSERT_EQUALS(cache.size(), (size_t)maxSize);
 
@@ -178,7 +243,7 @@ TEST(LRUKeyValueTest, PromotionTest) {
  * in the kv-store deletes the existing entry.
  */
 TEST(LRUKeyValueTest, ReplaceKeyTest) {
-    TestKeyValue cache{BudgetTracker(10)};
+    TestKeyValue cache{10};
     cache.add(4, new int(4));
     assertInKVStore(cache, 4, 4);
     cache.add(4, new int(5));
@@ -189,7 +254,7 @@ TEST(LRUKeyValueTest, ReplaceKeyTest) {
  * Test iteration over the kv-store.
  */
 TEST(LRUKeyValueTest, IterationTest) {
-    TestKeyValue cache{BudgetTracker(2)};
+    TestKeyValue cache{2};
     cache.add(1, new int(1));
     cache.add(2, new int(2));
 

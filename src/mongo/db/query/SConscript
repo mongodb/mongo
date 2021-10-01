@@ -227,10 +227,13 @@ env.Library(
     source=[
         'query_knobs.idl',
         'query_feature_flags.idl',
+        'plan_cache_size_parameter.cpp',
     ],
     LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/service_context",
         '$BUILD_DIR/mongo/idl/feature_flag',
-        '$BUILD_DIR/mongo/idl/server_parameter'
+        '$BUILD_DIR/mongo/idl/server_parameter',
+        '$BUILD_DIR/third_party/shim_pcrecpp',
     ]
 )
 
@@ -335,6 +338,7 @@ env.CppUnitTest(
         'map_reduce_output_format_test.cpp',
         "parsed_distinct_test.cpp",
         "plan_cache_indexability_test.cpp",
+        "plan_cache_size_parameter_test.cpp",
         "plan_cache_test.cpp",
         "plan_ranker_test.cpp",
         "planner_access_test.cpp",

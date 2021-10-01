@@ -27,23 +27,99 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
 #include "mongo/db/query/sbe_plan_cache.h"
 
+#include "mongo/db/query/plan_cache_size_parameter.h"
 #include "mongo/db/server_options.h"
+#include "mongo/logv2/log.h"
+#include "mongo/util/processinfo.h"
 
-namespace mongo {
-namespace sbe {
+namespace mongo::sbe {
 namespace {
+
 const auto sbePlanCacheDecoration =
     ServiceContext::declareDecoration<std::unique_ptr<sbe::PlanCache>>();
 
+size_t convertToSizeInBytes(const plan_cache_util::PlanCacheSizeParameter& param) {
+    constexpr size_t kBytesInMB = 1014 * 1024;
+    constexpr size_t kMBytesInGB = 1014;
+
+    double sizeInMB = param.size;
+
+    switch (param.units) {
+        case plan_cache_util::PlanCacheSizeUnits::kPercent:
+            sizeInMB *= ProcessInfo::getMemSizeMB() / 100.0;
+            break;
+        case plan_cache_util::PlanCacheSizeUnits::kMB:
+            break;
+        case plan_cache_util::PlanCacheSizeUnits::kGB:
+            sizeInMB *= kMBytesInGB;
+            break;
+    }
+
+    return static_cast<size_t>(sizeInMB * kBytesInMB);
+}
+
+/**
+ * Sets upper size limit on the PlanCache size to 500GB or 25% of the system's memory, whichever is
+ * smaller.
+ */
+size_t capPlanCacheSize(size_t planCacheSize) {
+    constexpr size_t kBytesInGB = 1024 * 1024 * 1024;
+
+    // Maximum size of the plan cache expressed in bytes.
+    constexpr size_t kMaximumPlanCacheSize = 500 * kBytesInGB;
+
+    // Maximum size of the plan cache expressed as a share of the memory available to the process.
+    const plan_cache_util::PlanCacheSizeParameter limitToProcessSize{
+        25, plan_cache_util::PlanCacheSizeUnits::kPercent};
+    const size_t limitToProcessSizeInBytes = convertToSizeInBytes(limitToProcessSize);
+
+    // The size will be capped by the minimum of the two values defined above.
+    const size_t maxPlanCacheSize = std::min(kMaximumPlanCacheSize, limitToProcessSizeInBytes);
+
+    if (planCacheSize > maxPlanCacheSize) {
+        planCacheSize = maxPlanCacheSize;
+        LOGV2_DEBUG(6007000,
+                    1,
+                    "The plan cache size has been capped",
+                    "maxPlanCacheSize"_attr = maxPlanCacheSize);
+    }
+
+    return planCacheSize;
+}
+
+size_t getPlanCacheSizeInBytes(const plan_cache_util::PlanCacheSizeParameter& param) {
+    size_t planCacheSize = convertToSizeInBytes(param);
+    return capPlanCacheSize(planCacheSize);
+}
+
+class PlanCacheSizeUpdaterImpl final : public plan_cache_util::PlanCacheSizeUpdater {
+public:
+    void update(ServiceContext* serviceCtx,
+                plan_cache_util::PlanCacheSizeParameter parameter) final {
+        if (feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
+            auto size = getPlanCacheSizeInBytes(parameter);
+            auto& globalPlanCache = sbePlanCacheDecoration(serviceCtx);
+            globalPlanCache->reset(size);
+        }
+    }
+};
+
 ServiceContext::ConstructorActionRegisterer planCacheRegisterer{
     "PlanCacheRegisterer", [](ServiceContext* serviceCtx) {
-        // Max memory size in bytes of the PlanCache.
-        constexpr size_t kQueryCacheMaxSizeInBytes = 100 * 1024 * 1024;
+        plan_cache_util::sbePlanCacheSizeUpdaterDecoration(serviceCtx) =
+            std::make_unique<PlanCacheSizeUpdaterImpl>();
+
         if (feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
+            auto status = plan_cache_util::PlanCacheSizeParameter::parse(planCacheSize.get());
+            uassertStatusOK(status);
+
+            auto size = getPlanCacheSizeInBytes(status.getValue());
             auto& globalPlanCache = sbePlanCacheDecoration(serviceCtx);
-            globalPlanCache = std::make_unique<sbe::PlanCache>(kQueryCacheMaxSizeInBytes);
+            globalPlanCache = std::make_unique<sbe::PlanCache>(size);
         }
     }};
 
@@ -71,6 +147,4 @@ uint32_t PlanCacheKey::queryHash() const {
 uint32_t PlanCacheKey::planCacheKeyHash() const {
     return static_cast<uint32_t>(PlanCacheKeyHasher{}(*this));
 }
-
-}  // namespace sbe
-}  // namespace mongo
+}  // namespace mongo::sbe

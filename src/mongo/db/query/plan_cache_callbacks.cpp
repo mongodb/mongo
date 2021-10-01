@@ -39,14 +39,6 @@ void logInactiveCacheEntry(const std::string& key) {
         20936, 2, "Not using cached entry since it is inactive", "cacheKey"_attr = redact(key));
 }
 
-void logCacheEviction(NamespaceString nss, std::string&& evictedEntry) {
-    LOGV2_DEBUG(20942,
-                1,
-                "Plan cache maximum size exceeded - removed least recently used entry",
-                "namespace"_attr = nss,
-                "evictedEntry"_attr = redact(evictedEntry));
-}
-
 void logCreateInactiveCacheEntry(std::string&& query,
                                  std::string&& queryHash,
                                  std::string&& planCacheKey,

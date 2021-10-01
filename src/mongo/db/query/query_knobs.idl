@@ -29,6 +29,7 @@
 global:
   cpp_namespace: "mongo"
   cpp_includes:
+    - "mongo/db/query/plan_cache_size_parameter.h"
     - "mongo/platform/atomic_proxy.h"
     - "mongo/platform/atomic_word.h"
 
@@ -139,6 +140,18 @@ server_parameters:
     cpp_vartype: AtomicWord<bool>
     default: false
 
+  planCacheSize:
+    description: "The maximum amount of memory that the system will allocate for the plan cache.
+      It takes value value in one of the two formats: 
+      1. <number>% indicates a percentage of the physical memory available to the process. E.g.: 15%.
+      2. <number>(MB|GB), indicates the amount of memory in MB or GB. E.g.: 1.5GB, 100MB.
+      The defualt value is 5% which means 5% of the physical memory available to the process."
+    set_at: [ startup, runtime ]
+    cpp_varname: "planCacheSize"
+    cpp_vartype: synchronized_value<std::string>
+    default: "5%"
+    on_update: plan_cache_util::onPlanCacheSizeUpdate
+    
   #
   # Parsing
   #

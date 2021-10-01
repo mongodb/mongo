@@ -77,7 +77,6 @@ class PlanCacheCallbacks {
 public:
     virtual ~PlanCacheCallbacks() = default;
 
-    virtual void onCacheEviction(const PlanCacheEntryBase<CachedPlanType>& entry) const = 0;
     virtual void onCreateInactiveCacheEntry(const KeyType& key,
                                             const PlanCacheEntryBase<CachedPlanType>* oldEntry,
                                             size_t newWorks) const = 0;
@@ -104,10 +103,6 @@ template <typename KeyType, typename CachedPlanType>
 class PlanCacheLoggingCallbacks : public PlanCacheCallbacks<KeyType, CachedPlanType> {
 public:
     PlanCacheLoggingCallbacks(const CanonicalQuery& cq) : _cq{cq} {}
-
-    void onCacheEviction(const PlanCacheEntryBase<CachedPlanType>& entry) const final {
-        log_detail::logCacheEviction(_cq.nss(), entry.debugString());
-    }
 
     void onCreateInactiveCacheEntry(const KeyType& key,
                                     const PlanCacheEntryBase<CachedPlanType>* oldEntry,

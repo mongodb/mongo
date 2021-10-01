@@ -242,7 +242,6 @@ private:
 
 public:
     using Entry = PlanCacheEntryBase<CachedPlanType>;
-    using BudgetTracker = LRUBudgetTracker<Entry, BudgetEstimator>;
 
     // We have three states for a cache entry to be in. Rather than just 'present' or 'not
     // present', we use a notion of 'inactive entries' as a way of remembering how performant our
@@ -271,9 +270,7 @@ public:
         std::unique_ptr<CachedPlanHolder<CachedPlanType>> cachedPlanHolder;
     };
 
-    PlanCacheBase(size_t size) : PlanCacheBase(BudgetTracker(size)) {}
-
-    PlanCacheBase(BudgetTracker&& budgetTracker) : _cache{std::move(budgetTracker)} {}
+    PlanCacheBase(size_t size) : _cache{size} {}
 
     ~PlanCacheBase() = default;
 
@@ -345,9 +342,13 @@ public:
                                        true /* isNewEntryActive  */,
                                        true /* shouldBeCreated  */);
             } else {
-                Entry* oldEntry = nullptr;
-                Status cacheStatus = _cache.get(key, &oldEntry);
-                invariant(cacheStatus.isOK() || cacheStatus == ErrorCodes::NoSuchKey);
+                auto oldEntryWithStatus = _cache.get(key);
+                tassert(6007020,
+                        "LRU store must get value or NoSuchKey error code",
+                        oldEntryWithStatus.isOK() ||
+                            oldEntryWithStatus.getStatus() == ErrorCodes::NoSuchKey);
+                Entry* oldEntry =
+                    oldEntryWithStatus.isOK() ? oldEntryWithStatus.getValue() : nullptr;
 
                 const auto newState = getNewEntryState(
                     key,
@@ -382,11 +383,7 @@ public:
                                     newWorks,
                                     callbacks));
 
-        auto evictedEntry = _cache.add(key, newEntry.release());
-
-        if (evictedEntry && callbacks) {
-            callbacks->onCacheEviction(*evictedEntry);
-        }
+        [[maybe_unused]] auto numEvicted = _cache.add(key, newEntry.release());
 
         return Status::OK();
     }
@@ -403,14 +400,15 @@ public:
         }
 
         stdx::lock_guard<Latch> cacheLock(_cacheMutex);
-        Entry* entry = nullptr;
-        Status cacheStatus = _cache.get(key, &entry);
-        if (!cacheStatus.isOK()) {
-            invariant(cacheStatus == ErrorCodes::NoSuchKey);
+        auto entry = _cache.get(key);
+        if (!entry.isOK()) {
+            tassert(6007021,
+                    "Unexpected error code from LRU store",
+                    entry.getStatus() == ErrorCodes::NoSuchKey);
             return;
         }
-        invariant(entry);
-        entry->isActive = false;
+        tassert(6007022, "LRU store must get a value or an error code", entry.getValue());
+        entry.getValue()->isActive = false;
     }
 
     /**
@@ -422,17 +420,18 @@ public:
      */
     GetResult get(const KeyType& key) const {
         stdx::lock_guard<Latch> cacheLock(_cacheMutex);
-        Entry* entry = nullptr;
-        Status cacheStatus = _cache.get(key, &entry);
-        if (!cacheStatus.isOK()) {
-            invariant(cacheStatus == ErrorCodes::NoSuchKey);
+        auto entry = _cache.get(key);
+        if (!entry.isOK()) {
+            tassert(6007023,
+                    "Unexpected error code from LRU store",
+                    entry.getStatus() == ErrorCodes::NoSuchKey);
             return {CacheEntryState::kNotPresent, nullptr};
         }
-        invariant(entry);
+        tassert(6007024, "LRU store must get a value or an error code", entry.getValue());
 
-        auto state =
-            entry->isActive ? CacheEntryState::kPresentActive : CacheEntryState::kPresentInactive;
-        return {state, std::make_unique<CachedPlanHolder<CachedPlanType>>(*entry)};
+        auto state = entry.getValue()->isActive ? CacheEntryState::kPresentActive
+                                                : CacheEntryState::kPresentInactive;
+        return {state, std::make_unique<CachedPlanHolder<CachedPlanType>>(*entry.getValue())};
     }
 
     /**
@@ -468,20 +467,28 @@ public:
     }
 
     /**
+     * Reset the cache with new cache size. If the cache size is set to a smaller value than before,
+     * enough entries are evicted in order to ensure that the cache fits within the new budget.
+     */
+    void reset(size_t size) {
+        stdx::lock_guard<Latch> cacheLock(_cacheMutex);
+        [[maybe_unused]] auto numEvicted = _cache.reset(size);
+    }
+
+    /**
      * Returns a copy of a cache entry, looked up by the plan cache key.
      *
      * If there is no entry in the cache for the 'query', returns an error Status.
      */
     StatusWith<std::unique_ptr<Entry>> getEntry(const KeyType& key) const {
         stdx::lock_guard<Latch> cacheLock(_cacheMutex);
-        Entry* entry;
-        Status cacheStatus = _cache.get(key, &entry);
-        if (!cacheStatus.isOK()) {
-            return cacheStatus;
+        auto entry = _cache.get(key);
+        if (!entry.isOK()) {
+            return entry.getStatus();
         }
-        invariant(entry);
+        invariant(entry.getValue());
 
-        return std::unique_ptr<Entry>(entry->clone());
+        return std::unique_ptr<Entry>(entry.getValue()->clone());
     }
 
     /**
