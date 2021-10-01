@@ -1,5 +1,11 @@
 /**
  * Tests the scenario where a chunk is being moved to a shard that is about to be removed.
+ *
+ * SERVER-32553 `removeShard` command is not idempotent for the purposes of the
+ * sharding continuous config stepdown suite.
+ * @tags: [
+ *   does_not_support_stepdowns,
+ * ]
  */
 (function() {
 "use strict";
