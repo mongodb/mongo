@@ -301,8 +301,8 @@ void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
     // migrations. Take _kZoneOpLock in exclusive mode to prevent concurrent zone operations.
     // TODO(SERVER-25359): Replace with a collection-specific lock map to allow splits/merges/
     // move chunks on different collections to proceed in parallel.
-    Lock::ExclusiveLock chunkLk(opCtx->lockState(), _kChunkOpLock);
-    Lock::ExclusiveLock zoneLk(opCtx->lockState(), _kZoneOpLock);
+    Lock::ExclusiveLock chunkLk(opCtx, opCtx->lockState(), _kChunkOpLock);
+    Lock::ExclusiveLock zoneLk(opCtx, opCtx->lockState(), _kZoneOpLock);
 
     Timer executionTimer, totalTimer;
     const auto newEpoch = OID::gen();
@@ -470,8 +470,8 @@ void ShardingCatalogManager::renameShardedMetadata(
     // migrations. Take _kZoneOpLock in exclusive mode to prevent concurrent zone operations.
     // TODO(SERVER-25359): Replace with a collection-specific lock map to allow splits/merges/
     // move chunks on different collections to proceed in parallel.
-    Lock::ExclusiveLock chunkLk(opCtx->lockState(), _kChunkOpLock);
-    Lock::ExclusiveLock zoneLk(opCtx->lockState(), _kZoneOpLock);
+    Lock::ExclusiveLock chunkLk(opCtx, opCtx->lockState(), _kChunkOpLock);
+    Lock::ExclusiveLock zoneLk(opCtx, opCtx->lockState(), _kZoneOpLock);
 
     std::string logMsg = str::stream() << from << " to " << to;
     if (optFromCollType) {
