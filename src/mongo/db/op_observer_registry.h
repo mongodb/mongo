@@ -88,6 +88,14 @@ public:
         }
     }
 
+    virtual void onAbortIndexBuildSinglePhase(OperationContext* opCtx,
+                                              const NamespaceString& nss) override {
+        ReservedTimes times{opCtx};
+        for (auto& o : _observers) {
+            o->onAbortIndexBuildSinglePhase(opCtx, nss);
+        }
+    }
+
     virtual void onCommitIndexBuild(OperationContext* opCtx,
                                     const NamespaceString& nss,
                                     CollectionUUID collUUID,

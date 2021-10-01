@@ -1590,8 +1590,10 @@ void IndexBuildsCoordinator::createIndex(OperationContext* opCtx,
     }
 
     ScopeGuard abortOnExit([&] {
-        _indexBuildsManager.abortIndexBuild(
-            opCtx, collection, buildUUID, MultiIndexBlock::kNoopOnCleanUpFn);
+        // A timestamped transaction is needed to perform a catalog write that removes the index
+        // entry when aborting the single-phase index build for tenant migrations only.
+        auto onCleanUpFn = MultiIndexBlock::makeTimestampedOnCleanUpFn(opCtx, collection.get());
+        _indexBuildsManager.abortIndexBuild(opCtx, collection, buildUUID, onCleanUpFn);
     });
     uassertStatusOK(_indexBuildsManager.startBuildingIndex(opCtx, collection.get(), buildUUID));
 
