@@ -571,6 +571,10 @@ private:
         auto command = _execContext->getCommand();
         auto& request = _execContext->getRequest();
 
+        if (command &&
+            (command->getName() == "aggregate" || command->getName() == "getMore" ||
+             command->getName() == "killCursors"))
+            std::cout << "Ahoo --> new Request: " << request.body << std::endl;
         const auto apiParamsFromClient = initializeAPIParameters(request.body, command);
         Client* client = opCtx->getClient();
 
@@ -1865,6 +1869,9 @@ DbResponse makeCommandResponse(std::shared_ptr<HandleRequest::ExecutionContext> 
         }
     }
 
+    if (c &&
+        (c->getName() == "aggregate" || c->getName() == "getMore" || c->getName() == "killCursors"))
+        std::cout << "Ahoo ==> Reply: " << replyBuilder->getBodyBuilder().asTempObj() << std::endl;
     dbResponse.response = replyBuilder->done();
     CurOp::get(opCtx)->debug().responseLength = dbResponse.response.header().dataLen();
 
