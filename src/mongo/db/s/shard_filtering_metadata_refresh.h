@@ -103,27 +103,4 @@ Status onDbVersionMismatchNoExcept(
 
 void forceDatabaseRefresh(OperationContext* opCtx, StringData dbName);
 
-/**
- * RAII-style class that enters the migration critical section and refresh the filtering
- * metadata for the specified collection. The critical section is released when this object
- * goes out of scope.
- */
-class ScopedShardVersionCriticalSection {
-    ScopedShardVersionCriticalSection(const ScopedShardVersionCriticalSection&) = delete;
-    ScopedShardVersionCriticalSection& operator=(const ScopedShardVersionCriticalSection&) = delete;
-
-public:
-    ScopedShardVersionCriticalSection(OperationContext* opCtx, NamespaceString nss, BSONObj reason);
-    ~ScopedShardVersionCriticalSection();
-
-    void enterCommitPhase();
-
-private:
-    void _cleanup();
-
-    OperationContext* const _opCtx;
-    const NamespaceString _nss;
-    const BSONObj _reason;
-};
-
 }  // namespace mongo
