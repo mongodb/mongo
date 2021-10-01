@@ -109,6 +109,7 @@ class MultiversionGenTaskService:
 
         commands = [
             FunctionCall("git get project no modules"),
+            FunctionCall("add git tag"),
             FunctionCall("do setup"),
             # Fetch and download the proper mongod binaries before running multiversion tests.
             FunctionCall("configure evergreen api credentials"),

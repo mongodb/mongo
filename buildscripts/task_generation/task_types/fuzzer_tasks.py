@@ -143,6 +143,7 @@ class FuzzerGenTaskService:
 
         if params.require_multiversion:
             commands += [FunctionCall("git get project no modules")]
+            commands += [FunctionCall("add git tag")]
 
         commands += [
             timeout_info.cmd,
