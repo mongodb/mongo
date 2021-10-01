@@ -605,6 +605,11 @@ void ShardServerOpObserver::onStartIndexBuildSinglePhase(OperationContext* opCtx
     abortOngoingMigrationIfNeeded(opCtx, nss);
 }
 
+void ShardServerOpObserver::onAbortIndexBuildSinglePhase(OperationContext* opCtx,
+                                                         const NamespaceString& nss) {
+    abortOngoingMigrationIfNeeded(opCtx, nss);
+}
+
 void ShardServerOpObserver::onDropIndex(OperationContext* opCtx,
                                         const NamespaceString& nss,
                                         OptionalCollectionUUID uuid,

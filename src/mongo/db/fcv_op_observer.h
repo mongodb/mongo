@@ -83,6 +83,8 @@ public:
 
     void onStartIndexBuildSinglePhase(OperationContext* opCtx, const NamespaceString& nss) final {}
 
+    void onAbortIndexBuildSinglePhase(OperationContext* opCtx, const NamespaceString& nss) final {}
+
     void onCommitIndexBuild(OperationContext* opCtx,
                             const NamespaceString& nss,
                             CollectionUUID collUUID,
