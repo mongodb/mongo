@@ -47,6 +47,8 @@ public:
     static constexpr auto SET_NAME = "set";
     static constexpr int NUM_ITERATIONS = 1000;
 
+    static inline const OID kOidOne{"000000000000000000000001"};
+
     struct TagSets {
         static inline const auto eastProduction = BSON("dc"
                                                        << "east"
@@ -191,6 +193,8 @@ TEST_F(ServerSelectorTestFixture, ShouldNotThrowWireErrorIfOnlyOneServerUnknown)
                        .withHost(HostAndPort("s1"))
                        .withMinWireVersion(WireVersion::SUPPORTS_OP_MSG)
                        .withMaxWireVersion(WireVersion::LATEST_WIRE_VERSION)
+                       .withElectionId(kOidOne)
+                       .withSetVersion(100)
                        .instance();
     stateMachine.onServerDescription(*topologyDescription, primary);
 
@@ -227,6 +231,8 @@ TEST_F(ServerSelectorTestFixture, ShouldBeAbleToSelectWithMaxStalenessFromCloned
                        .withHost(HostAndPort("s0"))
                        .withMinWireVersion(WireVersion::SUPPORTS_OP_MSG)
                        .withMaxWireVersion(WireVersion::LATEST_WIRE_VERSION)
+                       .withElectionId(kOidOne)
+                       .withSetVersion(100)
                        .instance();
     stateMachine.onServerDescription(*topologyDescription, primary);
     topologyDescription = TopologyDescription::clone(*topologyDescription);
@@ -257,6 +263,8 @@ TEST_F(ServerSelectorTestFixture, ShouldSelectRandomlyWhenMultipleOptionsAreAvai
                        .withHost(HostAndPort("s3"))
                        .withMinWireVersion(WireVersion::SUPPORTS_OP_MSG)
                        .withMaxWireVersion(WireVersion::LATEST_WIRE_VERSION)
+                       .withElectionId(kOidOne)
+                       .withSetVersion(100)
                        .instance();
     stateMachine.onServerDescription(*topologyDescription, primary);
 
@@ -312,6 +320,8 @@ TEST_F(ServerSelectorTestFixture, ShouldNotSelectExcludedHostsNearest) {
                         .withHost(HostAndPort("s3"))
                         .withMinWireVersion(WireVersion::SUPPORTS_OP_MSG)
                         .withMaxWireVersion(WireVersion::LATEST_WIRE_VERSION)
+                        .withElectionId(kOidOne)
+                        .withSetVersion(100)
                         .instance();
     stateMachine.onServerDescription(*topologyDescription, s0);
 
@@ -336,6 +346,8 @@ TEST_F(ServerSelectorTestFixture, ShouldNotSelectExcludedHostsNearest) {
                         .withMaxWireVersion(WireVersion::LATEST_WIRE_VERSION)
                         .withLastUpdateTime(Date_t::now())
                         .withLastWriteDate(Date_t::now())
+                        .withElectionId(kOidOne)
+                        .withSetVersion(100)
                         .instance();
     stateMachine.onServerDescription(*topologyDescription, s2);
 
@@ -348,6 +360,8 @@ TEST_F(ServerSelectorTestFixture, ShouldNotSelectExcludedHostsNearest) {
                         .withMaxWireVersion(WireVersion::LATEST_WIRE_VERSION)
                         .withLastUpdateTime(Date_t::now())
                         .withLastWriteDate(Date_t::now())
+                        .withElectionId(kOidOne)
+                        .withSetVersion(100)
                         .instance();
     stateMachine.onServerDescription(*topologyDescription, s3);
 
@@ -388,6 +402,8 @@ TEST_F(ServerSelectorTestFixture, ShouldNotSelectWhenPrimaryExcludedAndPrimaryOn
                         .withHost(HostAndPort("s1"))
                         .withMinWireVersion(WireVersion::SUPPORTS_OP_MSG)
                         .withMaxWireVersion(WireVersion::LATEST_WIRE_VERSION)
+                        .withElectionId(kOidOne)
+                        .withSetVersion(100)
                         .instance();
     stateMachine.onServerDescription(*topologyDescription, s0);
 
@@ -400,6 +416,8 @@ TEST_F(ServerSelectorTestFixture, ShouldNotSelectWhenPrimaryExcludedAndPrimaryOn
                         .withMaxWireVersion(WireVersion::LATEST_WIRE_VERSION)
                         .withLastUpdateTime(Date_t::now())
                         .withLastWriteDate(Date_t::now())
+                        .withElectionId(kOidOne)
+                        .withSetVersion(100)
                         .instance();
     stateMachine.onServerDescription(*topologyDescription, s1);
 
@@ -443,6 +461,8 @@ TEST_F(ServerSelectorTestFixture, ShouldFilterByLastWriteTime) {
                         .withMaxWireVersion(WireVersion::LATEST_WIRE_VERSION)
                         .withLastUpdateTime(now)
                         .withLastWriteDate(d0)
+                        .withElectionId(kOidOne)
+                        .withSetVersion(100)
                         .instance();
     stateMachine.onServerDescription(*topologyDescription, s0);
 
@@ -456,6 +476,8 @@ TEST_F(ServerSelectorTestFixture, ShouldFilterByLastWriteTime) {
                         .withMaxWireVersion(WireVersion::LATEST_WIRE_VERSION)
                         .withLastUpdateTime(now)
                         .withLastWriteDate(d1)
+                        .withElectionId(kOidOne)
+                        .withSetVersion(100)
                         .instance();
     stateMachine.onServerDescription(*topologyDescription, s1);
 
@@ -510,6 +532,8 @@ TEST_F(ServerSelectorTestFixture, ShouldSelectPreferredIfAvailable) {
                         .withMaxWireVersion(WireVersion::LATEST_WIRE_VERSION)
                         .withLastWriteDate(d0)
                         .withTag("tag", "primary")
+                        .withElectionId(kOidOne)
+                        .withSetVersion(100)
                         .instance();
     stateMachine.onServerDescription(*topologyDescription, s0);
 
@@ -524,6 +548,8 @@ TEST_F(ServerSelectorTestFixture, ShouldSelectPreferredIfAvailable) {
                         .withMaxWireVersion(WireVersion::LATEST_WIRE_VERSION)
                         .withLastWriteDate(d0)
                         .withTag("tag", "secondary")
+                        .withElectionId(kOidOne)
+                        .withSetVersion(100)
                         .instance();
     stateMachine.onServerDescription(*topologyDescription, s1);
 
@@ -565,6 +591,8 @@ TEST_F(ServerSelectorTestFixture, ShouldSelectTaggedSecondaryIfPreferredPrimaryN
                         .withMaxWireVersion(WireVersion::LATEST_WIRE_VERSION)
                         .withLastWriteDate(d0)
                         .withTag("tag", "primary")
+                        .withElectionId(kOidOne)
+                        .withSetVersion(100)
                         .instance();
     stateMachine.onServerDescription(*topologyDescription, s0);
 
@@ -588,6 +616,8 @@ TEST_F(ServerSelectorTestFixture, ShouldSelectTaggedSecondaryIfPreferredPrimaryN
                         .withMaxWireVersion(WireVersion::LATEST_WIRE_VERSION)
                         .withLastWriteDate(d0)
                         .withTag("tag", "secondary")
+                        .withElectionId(kOidOne)
+                        .withSetVersion(100)
                         .instance();
     stateMachine.onServerDescription(*topologyDescription, s1);
 
@@ -602,6 +632,8 @@ TEST_F(ServerSelectorTestFixture, ShouldSelectTaggedSecondaryIfPreferredPrimaryN
                         .withMinWireVersion(WireVersion::SUPPORTS_OP_MSG)
                         .withMaxWireVersion(WireVersion::LATEST_WIRE_VERSION)
                         .withLastWriteDate(d0)
+                        .withElectionId(kOidOne)
+                        .withSetVersion(100)
                         .instance();
     stateMachine.onServerDescription(*topologyDescription, s2);
 

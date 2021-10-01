@@ -41,6 +41,8 @@ protected:
     static inline const auto kReplicaSetName = "replica_set";
     static inline const auto kLocalServer = HostAndPort("localhost:123");
     static inline const auto kLocalServer2 = HostAndPort("localhost:456");
+    static inline const OID kOidOne{"000000000000000000000001"};
+    static inline const OID kOidTwo{"000000000000000000000002"};
 
     static inline const auto kNotUsedMs = Milliseconds(100);
     static inline const auto kFiveHundredMs = Milliseconds(500);
@@ -106,6 +108,8 @@ protected:
             serverDescriptionBuilder.withSetName(kReplicaSetName);
         }
 
+        serverDescriptionBuilder.withElectionId(kOidOne).withSetVersion(100);
+
         const auto serverDescription = serverDescriptionBuilder.instance();
 
         // simulate the ServerDescription being received
@@ -160,6 +164,8 @@ TEST_F(TopologyStateMachineTestFixture, ShouldRemoveServerDescriptionIfNotInHost
                                  .withType(ServerType::kRSPrimary)
                                  .withPrimary(primary)
                                  .withHost(primary)
+                                 .withElectionId(kOidOne)
+                                 .withSetVersion(100)
                                  .instance();
 
     ASSERT_EQUALS(static_cast<size_t>(2), topologyDescription->getServers().size());
@@ -237,6 +243,8 @@ TEST_F(TopologyStateMachineTestFixture,
                                         .withHost(otherMember)
                                         .withSetName(kReplicaSetName)
                                         .withType(ServerType::kRSPrimary)
+                                        .withElectionId(kOidOne)
+                                        .withSetVersion(100)
                                         .instance();
     stateMachine.onServerDescription(*topologyDescription, primaryDescription);
     ASSERT_EQUALS(topologyDescription->getType(), TopologyType::kReplicaSetWithPrimary);
@@ -274,6 +282,8 @@ TEST_F(TopologyStateMachineTestFixture,
                                   .withHost(serverAddress)
                                   .withSetName(*topologyDescription->getSetName())
                                   .withType(ServerType::kRSPrimary)
+                                  .withElectionId(kOidOne)
+                                  .withSetVersion(100)
                                   .instance();
 
     auto serverDescription = ServerDescriptionBuilder()
@@ -337,6 +347,8 @@ TEST_F(TopologyStateMachineTestFixture,
                                  .withHost(primary)
                                  .withHost(secondary)
                                  .withHost(newHost)
+                                 .withElectionId(kOidOne)
+                                 .withSetVersion(100)
                                  .instance();
 
     ASSERT_EQUALS(static_cast<size_t>(2), topologyDescription->getServers().size());
@@ -361,6 +373,7 @@ TEST_F(TopologyStateMachineTestFixture, ShouldSaveNewMaxSetVersion) {
                                  .withMe(primary)
                                  .withAddress(primary)
                                  .withHost(primary)
+                                 .withElectionId(kOidOne)
                                  .withSetVersion(100)
                                  .instance();
 
@@ -373,6 +386,7 @@ TEST_F(TopologyStateMachineTestFixture, ShouldSaveNewMaxSetVersion) {
                                                      .withMe(primary)
                                                      .withAddress(primary)
                                                      .withHost(primary)
+                                                     .withElectionId(kOidOne)
                                                      .withSetVersion(200)
                                                      .instance();
 
@@ -385,9 +399,6 @@ TEST_F(TopologyStateMachineTestFixture, ShouldSaveNewMaxElectionId) {
     auto topologyDescription = std::make_shared<TopologyDescription>(kTwoSeedConfig);
     TopologyStateMachine stateMachine(kTwoSeedConfig);
 
-    const OID oidOne(std::string("000000000000000000000001"));
-    const OID oidTwo(std::string("000000000000000000000002"));
-
     auto serverDescription = ServerDescriptionBuilder()
                                  .withType(ServerType::kRSPrimary)
                                  .withPrimary(primary)
@@ -395,11 +406,11 @@ TEST_F(TopologyStateMachineTestFixture, ShouldSaveNewMaxElectionId) {
                                  .withAddress(primary)
                                  .withHost(primary)
                                  .withSetVersion(1)
-                                 .withElectionId(oidOne)
+                                 .withElectionId(kOidOne)
                                  .instance();
 
     stateMachine.onServerDescription(*topologyDescription, serverDescription);
-    ASSERT_EQUALS(oidOne, topologyDescription->getMaxElectionId());
+    ASSERT_EQUALS(kOidOne, topologyDescription->getMaxElectionId());
 
     auto serverDescriptionEvenBiggerElectionId = ServerDescriptionBuilder()
                                                      .withType(ServerType::kRSPrimary)
@@ -408,11 +419,11 @@ TEST_F(TopologyStateMachineTestFixture, ShouldSaveNewMaxElectionId) {
                                                      .withAddress(primary)
                                                      .withHost(primary)
                                                      .withSetVersion(1)
-                                                     .withElectionId(oidTwo)
+                                                     .withElectionId(kOidTwo)
                                                      .instance();
 
     stateMachine.onServerDescription(*topologyDescription, serverDescriptionEvenBiggerElectionId);
-    ASSERT_EQUALS(oidTwo, topologyDescription->getMaxElectionId());
+    ASSERT_EQUALS(kOidTwo, topologyDescription->getMaxElectionId());
 }
 
 // The following two tests (ShouldNotUpdateToplogyType, ShouldUpdateToCorrectToplogyType) assert
@@ -537,9 +548,6 @@ TEST_F(TopologyStateMachineTestFixture, ShouldMarkStalePrimaryAsUnknown) {
     auto topologyDescription =
         std::make_shared<TopologyDescription>(kTwoSeedReplicaSetNoPrimaryConfig);
 
-    const OID oidOne(std::string("000000000000000000000001"));
-    const OID oidTwo(std::string("000000000000000000000002"));
-
     auto freshServerDescription = ServerDescriptionBuilder()
                                       .withType(ServerType::kRSPrimary)
                                       .withSetName(*topologyDescription->getSetName())
@@ -549,7 +557,7 @@ TEST_F(TopologyStateMachineTestFixture, ShouldMarkStalePrimaryAsUnknown) {
                                       .withHost(freshPrimary)
                                       .withHost(stalePrimary)
                                       .withSetVersion(1)
-                                      .withElectionId(oidTwo)
+                                      .withElectionId(kOidTwo)
                                       .instance();
 
     auto secondaryServerDescription = ServerDescriptionBuilder()
@@ -576,7 +584,7 @@ TEST_F(TopologyStateMachineTestFixture, ShouldMarkStalePrimaryAsUnknown) {
                                       .withHost(stalePrimary)
                                       .withHost(freshPrimary)
                                       .withSetVersion(1)
-                                      .withElectionId(oidOne)
+                                      .withElectionId(kOidOne)
                                       .instance();
 
     stateMachine.onServerDescription(*topologyDescription, staleServerDescription);
