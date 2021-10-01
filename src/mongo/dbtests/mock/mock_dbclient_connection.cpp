@@ -49,7 +49,6 @@ MockDBClientConnection::MockDBClientConnection(MockRemoteDBServer* remoteServer,
       _sockCreationTime(mongo::curTimeMicros64()) {
     invariant(remoteServer);
     _remoteServerInstanceID = remoteServer->getInstanceID();
-    _setServerRPCProtocols(rpc::supports::kAll);
     _callIter = _mockCallResponses.begin();
     _recvIter = _mockRecvResponses.begin();
 }
@@ -62,7 +61,6 @@ bool MockDBClientConnection::connect(const char* hostName,
     _serverAddress = _remoteServer->getServerHostAndPort();
     if (_remoteServer->isRunning()) {
         _remoteServerInstanceID = _remoteServer->getInstanceID();
-        _setServerRPCProtocols(rpc::supports::kAll);
         return true;
     }
 

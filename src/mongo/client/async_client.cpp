@@ -113,8 +113,9 @@ void AsyncDBClient::_parseIsMasterResponse(BSONObj request,
     auto responseBody = response->getCommandReply();
     uassertStatusOK(getStatusFromCommandResult(responseBody));
 
-    auto protocolSet = uassertStatusOK(rpc::parseProtocolSetFromIsMasterReply(responseBody));
-    auto validateStatus = rpc::validateWireVersion(wireSpec->outgoing, protocolSet.version);
+    auto replyWireVersion =
+        uassertStatusOK(wire_version::parseWireVersionFromHelloReply(responseBody));
+    auto validateStatus = wire_version::validateWireVersion(wireSpec->outgoing, replyWireVersion);
     if (!validateStatus.isOK()) {
         LOGV2_WARNING(23741,
                       "Remote host has incompatible wire version: {error}",
@@ -128,7 +129,7 @@ void AsyncDBClient::_parseIsMasterResponse(BSONObj request,
     auto& egressTagManager = executor::EgressTagCloserManager::get(_svcCtx);
     // Tag outgoing connection so it can be kept open on FCV upgrade if it is not to a
     // server with a lower binary version.
-    if (protocolSet.version.maxWireVersion >= wireSpec->outgoing.maxWireVersion) {
+    if (replyWireVersion.maxWireVersion >= wireSpec->outgoing.maxWireVersion) {
         pauseBeforeMarkKeepOpen.pauseWhileSet();
         egressTagManager.mutateTags(
             _peer, [](transport::Session::TagMask tags) { return transport::Session::kKeepOpen; });
@@ -139,12 +140,6 @@ void AsyncDBClient::_parseIsMasterResponse(BSONObj request,
             return tags & ~transport::Session::kPending;
         });
     }
-
-    auto clientProtocols = rpc::computeProtocolSet(wireSpec->outgoing);
-    invariant(clientProtocols != rpc::supports::kNone);
-    boost::optional<rpc::Protocol> protocol =
-        uassertStatusOK(rpc::negotiate(protocolSet.protocolSet, clientProtocols));
-    invariant(protocol && *protocol == rpc::Protocol::kOpMsg);
 
     _compressorManager.clientFinish(responseBody);
 }

@@ -29,12 +29,11 @@ if wiredtiger:
 
 protoEnv.Library(
     target=[
-        'protocol',
+        'message',
     ],
     source=[
         'message.cpp',
         'op_msg.cpp',
-        'protocol.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -70,8 +69,8 @@ env.Library(
         '$BUILD_DIR/mongo/idl/basic_types',
         '$BUILD_DIR/mongo/s/common_s',
         '$BUILD_DIR/mongo/util/net/network',
+        'message',
         'metadata',
-        'protocol',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/idl/server_parameter',
@@ -89,9 +88,9 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
         '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/rpc/protocol',
         '$BUILD_DIR/mongo/s/is_mongos',
         '$BUILD_DIR/third_party/shim_pcrecpp',
+        'message',
     ],
 )
 
@@ -103,7 +102,7 @@ env.CppLibfuzzerTest(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/ops/write_ops_parsers',
         '$BUILD_DIR/mongo/transport/message_compressor',
-        'protocol',
+        'message',
         'rpc',
     ],
 )
@@ -184,7 +183,6 @@ if wiredtiger:
             'metadata_test.cpp',
             'object_check_test.cpp',
             'op_msg_test.cpp',
-            'protocol_test.cpp',
             'reply_builder_test.cpp',
             'rewrite_state_change_errors_test.cpp',
         ],
@@ -209,6 +207,6 @@ env.CppIntegrationTest(
         '$BUILD_DIR/mongo/client/clientdriver_network',
         '$BUILD_DIR/mongo/transport/transport_layer_egress_init',
         '$BUILD_DIR/mongo/util/version_impl',
-        'protocol',
+        'message',
     ],
 )

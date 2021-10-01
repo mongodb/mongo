@@ -30,7 +30,6 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/rpc/protocol.h"
 
 namespace mongo {
 class BSONObj;

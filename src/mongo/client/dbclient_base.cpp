@@ -117,18 +117,6 @@ enum QueryOptions DBClientBase::_lookupAvailableOptions() {
     return QueryOptions(0);
 }
 
-rpc::ProtocolSet DBClientBase::getClientRPCProtocols() const {
-    return rpc::supports::kOpMsgOnly;
-}
-
-rpc::ProtocolSet DBClientBase::getServerRPCProtocols() const {
-    return _serverRPCProtocols;
-}
-
-void DBClientBase::_setServerRPCProtocols(rpc::ProtocolSet protocols) {
-    _serverRPCProtocols = std::move(protocols);
-}
-
 void DBClientBase::setRequestMetadataWriter(rpc::RequestMetadataWriter writer) {
     _metadataWriter = std::move(writer);
 }
@@ -221,16 +209,8 @@ void appendMetadata(OperationContext* opCtx,
 }  // namespace
 
 DBClientBase* DBClientBase::runFireAndForgetCommand(OpMsgRequest request) {
-    // Make sure to reconnect if needed before building our request, since the request depends on
-    // the negotiated protocol which can change due to a reconnect.
+    // Make sure to reconnect if needed before building our request.
     checkConnection();
-
-    if (uassertStatusOK(rpc::negotiate(getClientRPCProtocols(), getServerRPCProtocols())) !=
-        rpc::Protocol::kOpMsg) {
-        // Other protocols don't support fire-and-forget. Downgrade to two-way command and throw
-        // away reply.
-        return runCommandWithTarget(request).second;
-    }
 
     auto opCtx = haveClient() ? cc().getOperationContext() : nullptr;
     appendMetadata(opCtx, _metadataWriter, _apiParameters, request);
@@ -242,8 +222,7 @@ DBClientBase* DBClientBase::runFireAndForgetCommand(OpMsgRequest request) {
 
 std::pair<rpc::UniqueReply, DBClientBase*> DBClientBase::runCommandWithTarget(
     OpMsgRequest request) {
-    // Make sure to reconnect if needed before building our request, since the request depends on
-    // the negotiated protocol which can change due to a reconnect.
+    // Make sure to reconnect if needed before building our request.
     checkConnection();
 
     // call() oddly takes this by pointer, so we need to put it on the stack.
@@ -251,9 +230,6 @@ std::pair<rpc::UniqueReply, DBClientBase*> DBClientBase::runCommandWithTarget(
 
     auto opCtx = haveClient() ? cc().getOperationContext() : nullptr;
     appendMetadata(opCtx, _metadataWriter, _apiParameters, request);
-    rpc::Protocol protocol =
-        uassertStatusOK(rpc::negotiate(getClientRPCProtocols(), getServerRPCProtocols()));
-    invariant(protocol == rpc::Protocol::kOpMsg);
     auto requestMsg = request.serialize();
 
     Message replyMsg;

@@ -33,6 +33,7 @@
 #include "mongo/db/audit.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/ops/write_ops.h"
+#include "mongo/db/wire_version.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 
 namespace mongo {

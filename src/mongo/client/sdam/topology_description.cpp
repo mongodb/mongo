@@ -176,7 +176,7 @@ void TopologyDescription::removeServerDescription(const HostAndPort& HostAndPort
 }
 
 void TopologyDescription::checkWireCompatibilityVersions() {
-    const WireVersionInfo supportedWireVersion = {BATCH_COMMANDS, LATEST_WIRE_VERSION};
+    const WireVersionInfo supportedWireVersion = {SUPPORTS_OP_MSG, LATEST_WIRE_VERSION};
     std::ostringstream errorOss;
 
     _compatible = true;

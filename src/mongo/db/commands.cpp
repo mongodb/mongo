@@ -60,7 +60,6 @@
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
-#include "mongo/rpc/protocol.h"
 #include "mongo/rpc/rewrite_state_change_errors.h"
 #include "mongo/rpc/write_concern_error_detail.h"
 #include "mongo/s/stale_exception.h"

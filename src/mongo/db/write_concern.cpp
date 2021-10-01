@@ -51,7 +51,6 @@
 #include "mongo/db/transaction_validation.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
-#include "mongo/rpc/protocol.h"
 #include "mongo/util/fail_point.h"
 
 namespace mongo {

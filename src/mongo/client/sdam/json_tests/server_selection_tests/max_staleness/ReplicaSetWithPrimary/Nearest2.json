@@ -13,7 +13,7 @@
             "$numberLong": "125002"
           }
         },
-        "maxWireVersion": 5
+        "maxWireVersion": 6
       },
       {
         "address": "b:27017",
@@ -25,7 +25,7 @@
             "$numberLong": "2"
           }
         },
-        "maxWireVersion": 5
+        "maxWireVersion": 6
       },
       {
         "address": "c:27017",
@@ -37,7 +37,7 @@
             "$numberLong": "1"
           }
         },
-        "maxWireVersion": 5
+        "maxWireVersion": 6
       }
     ]
   },
@@ -56,7 +56,7 @@
           "$numberLong": "125002"
         }
       },
-      "maxWireVersion": 5
+      "maxWireVersion": 6
     },
     {
       "address": "b:27017",
@@ -68,7 +68,7 @@
           "$numberLong": "2"
         }
       },
-      "maxWireVersion": 5
+      "maxWireVersion": 6
     }
   ],
   "in_latency_window": [
@@ -82,7 +82,7 @@
           "$numberLong": "2"
         }
       },
-      "maxWireVersion": 5
+      "maxWireVersion": 6
     }
   ]
 }

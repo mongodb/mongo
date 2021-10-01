@@ -552,7 +552,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/executor/task_executor_interface',
-        "$BUILD_DIR/mongo/rpc/protocol",
+        "$BUILD_DIR/mongo/rpc/message",
         "$BUILD_DIR/mongo/util/net/network",
         'client_out_of_line_executor',
         'service_context',
@@ -1986,6 +1986,9 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
     ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/bson/util/bson_extract',
+    ],
 )
 
 asioEnv = env.Clone()
@@ -2044,7 +2047,7 @@ env.Library(
         '$BUILD_DIR/mongo/base',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/rpc/protocol',
+        '$BUILD_DIR/mongo/rpc/message',
         "$BUILD_DIR/mongo/rpc/rpc",
     ],
 )
@@ -2056,7 +2059,7 @@ env.Program(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/rpc/protocol',
+        '$BUILD_DIR/mongo/rpc/message',
         '$BUILD_DIR/mongo/util/signal_handlers',
         'traffic_reader',
     ],
@@ -2425,6 +2428,7 @@ if wiredtiger:
             'update_index_data_test.cpp',
             'vector_clock_mongod_test.cpp',
             'vector_clock_test.cpp',
+            'wire_version_test.cpp',
             'write_concern_options_test.cpp',
             'error_labels_test.cpp',
             'commands_test_example.idl',
@@ -2541,7 +2545,7 @@ asioEnv.CppIntegrationTest(
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/clientdriver_network',
         '$BUILD_DIR/mongo/executor/network_interface_fixture',
-        '$BUILD_DIR/mongo/rpc/protocol',
+        '$BUILD_DIR/mongo/rpc/message',
         '$BUILD_DIR/mongo/transport/transport_layer_egress_init',
         '$BUILD_DIR/mongo/util/version_impl',
     ],

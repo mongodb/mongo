@@ -291,7 +291,7 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(WireSpec, ("EndStartupOptionHandling"))(Ini
     WireSpec::Specification spec;
     spec.incomingInternalClient.minWireVersion = RELEASE_2_4_AND_BEFORE;
     spec.incomingInternalClient.maxWireVersion = LATEST_WIRE_VERSION;
-    spec.outgoing.minWireVersion = RELEASE_2_4_AND_BEFORE;
+    spec.outgoing.minWireVersion = SUPPORTS_OP_MSG;
     spec.outgoing.maxWireVersion = LATEST_WIRE_VERSION;
     spec.isInternalClient = true;
 

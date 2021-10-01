@@ -29,31 +29,26 @@
 
 #pragma once
 
-#include <cstdint>
-#include <string>
-#include <type_traits>
+#include <fmt/format.h>
 
-#include "mongo/base/status_with.h"
-#include "mongo/db/wire_version.h"
 #include "mongo/rpc/message.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
-class BSONObj;
-class OperationContext;
 namespace rpc {
 
 /**
- * Bit flags representing support for a particular RPC protocol.
- * This is just an internal representation, and is never transmitted over the wire. It should
- * never be used for any other feature detection in favor of max/min wire version.
+ * Bit flags representing support for a particular RPC protocol. This is just an internal
+ * representation, and is never transmitted over the wire. It should never be used for any other
+ * feature detection in favor of max/min wire version.
  *
- * A new protocol must be added as the highest order bit flag so that it is prioritized in
- * negotiation.
+ * The system only currently offers full support for the OP_MSG protocol. However, it can continue
+ * to handle OP_QUERY in some limited cases, in particular for the hello/isMaster command sent by
+ * clients on connection open.
  */
 enum class Protocol : std::uint64_t {
-
     /**
-     * The pre-3.2 OP_QUERY on db.$cmd protocol
+     * The pre-3.6 OP_QUERY on db.$cmd protocol
      */
     kOpQuery = 1 << 0,
 
@@ -63,79 +58,18 @@ enum class Protocol : std::uint64_t {
     kOpMsg = 1 << 1,
 };
 
-/**
- * Bitfield representing a set of supported RPC protocols.
- */
-using ProtocolSet = std::underlying_type<Protocol>::type;
-
-/**
- * This namespace contains predefined bitfields for common levels of protocol support.
- */
-namespace supports {
-
-const ProtocolSet kNone = ProtocolSet{0};
-const ProtocolSet kOpQueryOnly = static_cast<ProtocolSet>(Protocol::kOpQuery);
-const ProtocolSet kOpMsgOnly = static_cast<ProtocolSet>(Protocol::kOpMsg);
-const ProtocolSet kAll = kOpQueryOnly | kOpMsgOnly;
-
-}  // namespace supports
-
-Protocol protocolForMessage(const Message& message);
-
-/**
- * Returns the protocol used to initiate the current operation.
- */
-Protocol getOperationProtocol(OperationContext* opCtx);
-
-/**
- * Sets the protocol used to initiate the current operation.
- */
-void setOperationProtocol(OperationContext* opCtx, Protocol protocol);
-
-/**
- * Returns the newest protocol supported by two parties.
- */
-StatusWith<Protocol> negotiate(ProtocolSet fst, ProtocolSet snd);
-
-/**
- * Converts a ProtocolSet to a string. Currently only the predefined ProtocolSets in the
- * 'supports' namespace are supported.
- *
- * This intentionally does not conform to the STL 'to_string' convention so that it will
- * not conflict with the to_string overload for uint64_t.
- */
-StatusWith<StringData> toString(ProtocolSet protocols);
-
-/**
- * Parses a ProtocolSet from a string. Currently only the predefined ProtocolSets in the
- * 'supports' namespace are supported
- */
-StatusWith<ProtocolSet> parseProtocolSet(StringData repr);
-
-/**
- * Validates client and server wire version. The server is returned from isMaster, and the client is
- * from WireSpec.instance().
- */
-Status validateWireVersion(WireVersionInfo client, WireVersionInfo server);
-
-/**
- * Struct to pass around information about protocol set and wire version.
- */
-struct ProtocolSetAndWireVersionInfo {
-    ProtocolSet protocolSet;
-    WireVersionInfo version;
-};
-
-/**
- * Determines the ProtocolSet of a remote server from an isMaster reply.
- */
-StatusWith<ProtocolSetAndWireVersionInfo> parseProtocolSetFromIsMasterReply(
-    const BSONObj& isMasterReply);
-
-/**
- * Computes supported protocols from wire versions.
- */
-ProtocolSet computeProtocolSet(WireVersionInfo version);
+inline Protocol protocolForMessage(const Message& message) {
+    switch (message.operation()) {
+        case mongo::dbMsg:
+            return Protocol::kOpMsg;
+        case mongo::dbQuery:
+            return Protocol::kOpQuery;
+        default:
+            uasserted(ErrorCodes::UnsupportedFormat,
+                      fmt::format("Received a reply message with unexpected opcode: {}",
+                                  message.operation()));
+    }
+}
 
 }  // namespace rpc
 }  // namespace mongo

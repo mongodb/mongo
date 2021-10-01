@@ -9,7 +9,7 @@
 (function() {
 "use strict";
 
-// For getLatestProfilerEntry and getProfilerProtocolStringForCommand
+// For 'getLatestProfilerEntry()'.
 load("jstests/libs/profiler.js");
 const conn = MongoRunner.runMongod();
 const testDB = conn.getDB("profile_agg");

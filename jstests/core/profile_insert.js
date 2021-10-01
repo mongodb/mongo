@@ -9,7 +9,7 @@
 (function() {
 "use strict";
 
-// For getLatestProfilerEntry and getProfilerProtocolStringForCommand
+// For 'getLatestProfilerEntry()'.
 load("jstests/libs/profiler.js");
 
 var testDB = db.getSiblingDB("profile_insert");
@@ -31,9 +31,7 @@ assert.eq(profileObj.op, "insert", tojson(profileObj));
 assert.eq(profileObj.ninserted, 1, tojson(profileObj));
 assert.eq(profileObj.keysInserted, 1, tojson(profileObj));
 assert.eq(profileObj.command.ordered, true, tojson(profileObj));
-assert.eq(profileObj.protocol,
-          getProfilerProtocolStringForCommand(testDB.getMongo()),
-          tojson(profileObj));
+assert.eq(profileObj.protocol, "op_msg", tojson(profileObj));
 assert(profileObj.hasOwnProperty("responseLength"), tojson(profileObj));
 
 assert(profileObj.hasOwnProperty("numYield"), tojson(profileObj));

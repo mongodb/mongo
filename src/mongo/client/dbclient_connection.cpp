@@ -269,9 +269,6 @@ Status DBClientConnection::connect(const HostAndPort& serverAddress,
         return connectStatus;
     }
 
-    // Clear the auto-detected protocols from any previous connection.
-    _setServerRPCProtocols(rpc::supports::kOpMsgOnly);
-
     // NOTE: If the 'applicationName' parameter is a view of the '_applicationName' member, as
     // happens, for instance, in the call to DBClientConnection::connect from
     // DBClientConnection::_checkConnection then the following line will invalidate the
@@ -297,9 +294,9 @@ Status DBClientConnection::connect(const HostAndPort& serverAddress,
         return isMasterStatus;
     }
 
-    auto swProtocolSet = rpc::parseProtocolSetFromIsMasterReply(swIsMasterReply.data);
-    if (!swProtocolSet.isOK()) {
-        return swProtocolSet.getStatus();
+    auto replyWireVersion = wire_version::parseWireVersionFromHelloReply(swIsMasterReply.data);
+    if (!replyWireVersion.isOK()) {
+        return replyWireVersion.getStatus();
     }
 
     {
@@ -329,7 +326,7 @@ Status DBClientConnection::connect(const HostAndPort& serverAddress,
 
     auto wireSpec = WireSpec::instance().get();
     auto validateStatus =
-        rpc::validateWireVersion(wireSpec->outgoing, swProtocolSet.getValue().version);
+        wire_version::validateWireVersion(wireSpec->outgoing, replyWireVersion.getValue());
     if (!validateStatus.isOK()) {
         LOGV2_WARNING(20126,
                       "Remote host has incompatible wire version: {error}",
@@ -337,15 +334,6 @@ Status DBClientConnection::connect(const HostAndPort& serverAddress,
                       "error"_attr = validateStatus);
 
         return validateStatus;
-    }
-
-    _setServerRPCProtocols(swProtocolSet.getValue().protocolSet);
-
-    auto negotiatedProtocol =
-        rpc::negotiate(getServerRPCProtocols(), rpc::computeProtocolSet(wireSpec->outgoing));
-
-    if (!negotiatedProtocol.isOK()) {
-        return negotiatedProtocol.getStatus();
     }
 
     if (_hook) {

@@ -52,17 +52,6 @@ function getLatestProfilerEntry(profileDB, filter) {
     return getNLatestProfilerEntries(profileDB, 1, filter)[0];
 }
 
-// Returns a string representing the wire protocol used for commands run on the given connection.
-// This string matches the system.profile "protocol" field when commands are profiled.
-function getProfilerProtocolStringForCommand(conn) {
-    const protocols = conn.getClientRPCProtocols();
-    if ("all" === protocols || /Msg/.test(protocols))
-        return "op_msg";
-    if (/Query/.test(protocols))
-        return "op_query";
-    doassert(`Unknown prototocol string ${protocols}`);
-}
-
 /**
  * Throws an assertion if the profiler contains more than 'maxExpectedMatches' entries matching
  * "filter", or if there are no matches. Optional arguments "errorMsgFilter" and "errorMsgProj"

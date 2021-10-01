@@ -257,7 +257,7 @@ if not has_option('noshell') and usemozjs:
             "$BUILD_DIR/mongo/executor/network_interface_factory",
             "$BUILD_DIR/mongo/executor/network_interface_thread_pool",
             "$BUILD_DIR/mongo/executor/thread_pool_task_executor",
-            "$BUILD_DIR/mongo/rpc/protocol",
+            "$BUILD_DIR/mongo/rpc/message",
             "$BUILD_DIR/mongo/scripting/scripting",
             "$BUILD_DIR/mongo/transport/message_compressor",
             "$BUILD_DIR/mongo/transport/message_compressor_options_client",

@@ -9,7 +9,7 @@
 (function() {
 "use strict";
 
-// For getLatestProfilerEntry and getProfilerProtocolStringForCommand
+// For 'getLatestProfilerEntry()'.
 load("jstests/libs/profiler.js");
 
 var testDB = db.getSiblingDB("profile_count");
@@ -33,7 +33,7 @@ var profileObj = getLatestProfilerEntry(testDB);
 
 assert.eq(profileObj.ns, coll.getFullName(), tojson(profileObj));
 assert.eq(profileObj.op, "command", tojson(profileObj));
-assert.eq(profileObj.protocol, getProfilerProtocolStringForCommand(conn), tojson(profileObj));
+assert.eq(profileObj.protocol, "op_msg", tojson(profileObj));
 assert.eq(profileObj.command.count, coll.getName(), tojson(profileObj));
 assert.eq(profileObj.command.collation, {locale: "fr"}, tojson(profileObj));
 assert.eq(profileObj.planSummary, "RECORD_STORE_FAST_COUNT", tojson(profileObj));

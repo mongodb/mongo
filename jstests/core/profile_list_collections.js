@@ -9,7 +9,7 @@
 (function() {
 "use strict";
 
-// For getLatestProfilerEntry and getProfilerProtocolStringForCommand.
+// For 'getLatestProfilerEntry()'.
 load("jstests/libs/profiler.js");
 
 var testDB = db.getSiblingDB("profile_list_collections");

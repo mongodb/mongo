@@ -61,8 +61,6 @@ struct MongoBase : public BaseInfo {
         MONGO_DECLARE_JS_FUNCTION(getDataKeyCollection);
         MONGO_DECLARE_JS_FUNCTION(encrypt);
         MONGO_DECLARE_JS_FUNCTION(decrypt);
-        MONGO_DECLARE_JS_FUNCTION(getClientRPCProtocols);
-        MONGO_DECLARE_JS_FUNCTION(getServerRPCProtocols);
         MONGO_DECLARE_JS_FUNCTION(insert);
         MONGO_DECLARE_JS_FUNCTION(isReplicaSetConnection);
         MONGO_DECLARE_JS_FUNCTION(_markNodeAsFailed);

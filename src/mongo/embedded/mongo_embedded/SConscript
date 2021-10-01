@@ -69,7 +69,7 @@ mongoEmbeddedTargets = mongoEmbeddedEnv.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/embedded/embedded',
-        '$BUILD_DIR/mongo/rpc/protocol',
+        '$BUILD_DIR/mongo/rpc/message',
         '$BUILD_DIR/mongo/transport/transport_layer_mock',
     ],
     AIB_COMPONENT='embedded',
@@ -96,7 +96,7 @@ if get_option('link-model') != 'dynamic-sdk':
             '$BUILD_DIR/mongo/base',
             '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
             '$BUILD_DIR/mongo/db/server_options_core',
-            '$BUILD_DIR/mongo/rpc/protocol',
+            '$BUILD_DIR/mongo/rpc/message',
             '$BUILD_DIR/mongo/unittest/unittest',
             '$BUILD_DIR/mongo/util/net/network',
             '$BUILD_DIR/mongo/util/options_parser/options_parser',

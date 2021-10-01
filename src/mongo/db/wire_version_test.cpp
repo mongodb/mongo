@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2021-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,146 +27,78 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/base/status.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/wire_version.h"
-#include "mongo/rpc/protocol.h"
-#include "mongo/unittest/unittest.h"
-
 #include <vector>
 
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/wire_version.h"
+#include "mongo/unittest/unittest.h"
+
+namespace mongo {
 namespace {
 
-using mongo::WireVersion;
-using mongo::WireVersionInfo;
-using namespace mongo::rpc;
-using mongo::BSONObj;
-using mongo::unittest::assertGet;
+TEST(WireVersionTest, ParseWireVersionFromHelloReply) {
+    std::vector<std::pair<WireVersion, WireVersion>> minMaxWireVersions{
+        {WireVersion::RELEASE_2_4_AND_BEFORE, WireVersion::LATEST_WIRE_VERSION},
+        {WireVersion::SUPPORTS_OP_MSG, WireVersion::LATEST_WIRE_VERSION},
+        {WireVersion::LATEST_WIRE_VERSION, WireVersion::LATEST_WIRE_VERSION},
+        {WireVersion::RELEASE_2_4_AND_BEFORE, WireVersion::LAST_CONT_WIRE_VERSION},
+        {WireVersion::RELEASE_2_4_AND_BEFORE, WireVersion::LAST_LTS_WIRE_VERSION},
+        {WireVersion::RELEASE_2_4_AND_BEFORE, WireVersion::SUPPORTS_OP_MSG},
+        {WireVersion::RELEASE_2_4_AND_BEFORE, WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN}};
 
-using std::vector;
-
-// Checks if negotiation of the first to protocol sets results in the 'proto'
-const auto assert_negotiated = [](ProtocolSet fst, ProtocolSet snd, Protocol proto) {
-    auto negotiated = negotiate(fst, snd);
-    ASSERT_TRUE(negotiated.isOK());
-    ASSERT_TRUE(negotiated.getValue() == proto);
-};
-
-TEST(Protocol, SuccessfulNegotiation) {
-    assert_negotiated(supports::kAll, supports::kAll, Protocol::kOpMsg);
-    assert_negotiated(supports::kAll, supports::kOpMsgOnly, Protocol::kOpMsg);
-    assert_negotiated(supports::kAll, supports::kOpQueryOnly, Protocol::kOpQuery);
-}
-
-// Checks that negotiation fails
-const auto assert_not_negotiated = [](ProtocolSet fst, ProtocolSet snd) {
-    auto proto = negotiate(fst, snd);
-    ASSERT_TRUE(!proto.isOK());
-    ASSERT_TRUE(proto.getStatus().code() == mongo::ErrorCodes::RPCProtocolNegotiationFailed);
-};
-
-TEST(Protocol, FailedNegotiation) {
-    assert_not_negotiated(supports::kOpQueryOnly, supports::kOpMsgOnly);
-    assert_not_negotiated(supports::kAll, supports::kNone);
-    assert_not_negotiated(supports::kOpQueryOnly, supports::kNone);
-    assert_not_negotiated(supports::kOpMsgOnly, supports::kNone);
-}
-
-/*
- * Tests the following:
- * - Replies from MongoDB 2.4 and older reply with supports::kOpQueryOnly
- * - Replies from versions of MongoDB older than 3.6 returns supports::kOpQueryOnly
- * - Replies from MongoDB 3.6 reply with supports::kAll
- * - Replies from latest, last-continuous, and last-lts versions of MongoDB returns supports::kAll
- */
-TEST(Protocol, parseProtocolSetFromIsMasterReply) {
-    {
-        // latest version of MongoDB (mongod)
-        auto latestMongod =
-            BSON("maxWireVersion" << static_cast<int>(WireVersion::LATEST_WIRE_VERSION)
-                                  << "minWireVersion"
-                                  << static_cast<int>(WireVersion::RELEASE_2_4_AND_BEFORE));
-
-        ASSERT_EQ(assertGet(parseProtocolSetFromIsMasterReply(latestMongod)).protocolSet,
-                  supports::kAll);
-    }
-    {
-        // last continuous version of MongoDB (mongod)
-        auto lastContMongod =
-            BSON("maxWireVersion" << static_cast<int>(WireVersion::LAST_CONT_WIRE_VERSION)
-                                  << "minWireVersion"
-                                  << static_cast<int>(WireVersion::RELEASE_2_4_AND_BEFORE));
-
-        ASSERT_EQ(assertGet(parseProtocolSetFromIsMasterReply(lastContMongod)).protocolSet,
-                  supports::kAll);
-    }
-    {
-        // last LTS version of MongoDB (mongod)
-        auto lastLtsMongod =
-            BSON("maxWireVersion" << static_cast<int>(WireVersion::LAST_LTS_WIRE_VERSION)
-                                  << "minWireVersion"
-                                  << static_cast<int>(WireVersion::RELEASE_2_4_AND_BEFORE));
-
-        ASSERT_EQ(assertGet(parseProtocolSetFromIsMasterReply(lastLtsMongod)).protocolSet,
-                  supports::kAll);
-    }
-    {
-        // MongoDB 3.6
-        auto mongod36 =
-            BSON("maxWireVersion" << static_cast<int>(WireVersion::SUPPORTS_OP_MSG)  //
-                                  << "minWireVersion"
-                                  << static_cast<int>(WireVersion::RELEASE_2_4_AND_BEFORE));
-
-        ASSERT_EQ(assertGet(parseProtocolSetFromIsMasterReply(mongod36)).protocolSet,
-                  supports::kAll);
-    }
-    {
-        // MongoDB 3.2 (mongod)
-        auto mongod32 =
-            BSON("maxWireVersion" << static_cast<int>(WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN)
-                                  << "minWireVersion"
-                                  << static_cast<int>(WireVersion::RELEASE_2_4_AND_BEFORE));
-
-        ASSERT_EQ(assertGet(parseProtocolSetFromIsMasterReply(mongod32)).protocolSet,
-                  supports::kOpQueryOnly);  // This used to also include OP_COMMAND.
-    }
-    {
-        // MongoDB 3.2 (mongos)
-        auto mongos32 =
-            BSON("maxWireVersion" << static_cast<int>(WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN)
-                                  << "minWireVersion"
-                                  << static_cast<int>(WireVersion::RELEASE_2_4_AND_BEFORE) << "msg"
-                                  << "isdbgrid");
-
-        ASSERT_EQ(assertGet(parseProtocolSetFromIsMasterReply(mongos32)).protocolSet,
-                  supports::kOpQueryOnly);
-    }
-    {
-        // MongoDB 2.4 and earlier do not have maxWireVersion/minWireVersion in their 'isMaster'
-        // replies.
-        auto mongod24 = BSONObj();
-        ASSERT_EQ(assertGet(parseProtocolSetFromIsMasterReply(mongod24)).protocolSet,
-                  supports::kOpQueryOnly);
+    for (auto&& wireVersions : minMaxWireVersions) {
+        auto helloCmdReply =
+            BSON("maxWireVersion" << wireVersions.second << "minWireVersion" << wireVersions.first);
+        auto parsedWireVersions =
+            unittest::assertGet(wire_version::parseWireVersionFromHelloReply(helloCmdReply));
+        ASSERT_EQ(parsedWireVersions.minWireVersion, wireVersions.first);
+        ASSERT_EQ(parsedWireVersions.maxWireVersion, wireVersions.second);
     }
 }
 
-#define VALIDATE_WIRE_VERSION(macro, clientMin, clientMax, serverMin, serverMax)            \
-    do {                                                                                    \
-        auto msg = BSON("minWireVersion" << static_cast<int>(serverMin) << "maxWireVersion" \
-                                         << static_cast<int>(serverMax));                   \
-        auto swReply = parseProtocolSetFromIsMasterReply(msg);                              \
-        ASSERT_OK(swReply.getStatus());                                                     \
-        macro(validateWireVersion({clientMin, clientMax}, swReply.getValue().version));     \
+TEST(WireVersionTest, ParseWireVersionFromHelloReply24AndEarlier) {
+    // MongoDB 2.4 and earlier do not have maxWireVersion/minWireVersion in their 'isMaster'
+    // replies. The absence of a wire version is interpreted as the min and max wire versions both
+    // being 0.
+    BSONObj mongod24{};
+    auto parsedWireVersions =
+        unittest::assertGet(wire_version::parseWireVersionFromHelloReply(mongod24));
+    ASSERT_EQ(parsedWireVersions.minWireVersion, WireVersion::RELEASE_2_4_AND_BEFORE);
+    ASSERT_EQ(parsedWireVersions.maxWireVersion, WireVersion::RELEASE_2_4_AND_BEFORE);
+}
+
+TEST(WireVersionTest, ParseWireVersionFromHelloReplyErrorOnBadWireVersions) {
+    std::vector<std::pair<long long, long long>> badWireVersions{
+        {WireVersion::RELEASE_2_4_AND_BEFORE, -1},
+        {-1, WireVersion::LATEST_WIRE_VERSION},
+        {WireVersion::RELEASE_2_4_AND_BEFORE,
+         static_cast<long long>(std::numeric_limits<int>::max()) + 1},
+        {static_cast<long long>(std::numeric_limits<int>::max()) + 1,
+         WireVersion::LATEST_WIRE_VERSION}};
+
+    for (auto&& wireVersions : badWireVersions) {
+        auto helloCmdReply =
+            BSON("maxWireVersion" << wireVersions.second << "minWireVersion" << wireVersions.first);
+        auto parsedWireVersions = wire_version::parseWireVersionFromHelloReply(helloCmdReply);
+        ASSERT_EQ(parsedWireVersions.getStatus(), ErrorCodes::IncompatibleServerVersion);
+    }
+}
+
+#define VALIDATE_WIRE_VERSION(macro, clientMin, clientMax, serverMin, serverMax)              \
+    do {                                                                                      \
+        auto msg = BSON("minWireVersion" << static_cast<int>(serverMin) << "maxWireVersion"   \
+                                         << static_cast<int>(serverMax));                     \
+        auto swReply = wire_version::parseWireVersionFromHelloReply(msg);                     \
+        ASSERT_OK(swReply.getStatus());                                                       \
+        macro(wire_version::validateWireVersion({clientMin, clientMax}, swReply.getValue())); \
     } while (0);
 
-TEST(Protocol, validateWireVersion) {
+TEST(WireVersionTest, ValidateWireVersion) {
     // Min, max FCV version pairs representing valid WireVersion ranges for variable binary
     // versions used to communicate with the MongoD 'latest' binary version.
 
     // MongoD 'latest' binary
-    vector<WireVersionInfo> mongoDLatestBinaryRanges = {
+    std::vector<WireVersionInfo> mongoDLatestBinaryRanges = {
         // upgraded FCV
         {WireVersion::LATEST_WIRE_VERSION, WireVersion::LATEST_WIRE_VERSION},
         // downgraded 'last-cont' FCV
@@ -175,7 +107,7 @@ TEST(Protocol, validateWireVersion) {
         {WireVersion::LAST_LTS_WIRE_VERSION, WireVersion::LATEST_WIRE_VERSION}};
 
     // MongoS binary versions
-    vector<WireVersionInfo> mongoSBinaryRanges = {
+    std::vector<WireVersionInfo> mongoSBinaryRanges = {
         // 'latest' binary
         {WireVersion::LATEST_WIRE_VERSION, WireVersion::LATEST_WIRE_VERSION},
         // 'last-cont' binary
@@ -318,20 +250,20 @@ TEST(Protocol, validateWireVersion) {
 }
 
 // A mongos is unable to communicate with a fully upgraded cluster with a higher wire version.
-TEST(Protocol, validateWireVersionFailsForUpgradedServerNode) {
+TEST(WireVersionTest, ValidateWireVersionFailsForUpgradedServerNode) {
     // Server is fully upgraded to the latest wire version.
     auto msg = BSON("minWireVersion" << static_cast<int>(WireVersion::LATEST_WIRE_VERSION)
                                      << "maxWireVersion"
                                      << static_cast<int>(WireVersion::LATEST_WIRE_VERSION));
-    auto swReply = parseProtocolSetFromIsMasterReply(msg);
+    auto swReply = wire_version::parseWireVersionFromHelloReply(msg);
     ASSERT_OK(swReply.getStatus());
 
     // The client (this mongos server) only has the previous wire version.
     ASSERT_EQUALS(mongo::ErrorCodes::IncompatibleWithUpgradedServer,
-                  validateWireVersion(
+                  wire_version::validateWireVersion(
                       {WireVersion::LATEST_WIRE_VERSION - 1, WireVersion::LATEST_WIRE_VERSION - 1},
-                      swReply.getValue().version)
-                      .code());
+                      swReply.getValue()));
 }
 
 }  // namespace
+}  // namespace mongo

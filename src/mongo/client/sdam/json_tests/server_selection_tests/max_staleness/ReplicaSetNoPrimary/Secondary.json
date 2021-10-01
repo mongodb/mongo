@@ -8,7 +8,7 @@
         "type": "RSSecondary",
         "avg_rtt_ms": 5,
         "lastUpdateTime": 0,
-        "maxWireVersion": 5,
+        "maxWireVersion": 6,
         "lastWrite": {
           "lastWriteDate": {
             "$numberLong": "125002"
@@ -23,7 +23,7 @@
         "type": "RSSecondary",
         "avg_rtt_ms": 5,
         "lastUpdateTime": 0,
-        "maxWireVersion": 5,
+        "maxWireVersion": 6,
         "lastWrite": {
           "lastWriteDate": {
             "$numberLong": "2"
@@ -38,7 +38,7 @@
         "type": "RSSecondary",
         "avg_rtt_ms": 5,
         "lastUpdateTime": 0,
-        "maxWireVersion": 5,
+        "maxWireVersion": 6,
         "lastWrite": {
           "lastWriteDate": {
             "$numberLong": "1"
@@ -53,7 +53,7 @@
         "type": "RSSecondary",
         "avg_rtt_ms": 5,
         "lastUpdateTime": 0,
-        "maxWireVersion": 5,
+        "maxWireVersion": 6,
         "lastWrite": {
           "lastWriteDate": {
             "$numberLong": "2"
@@ -80,7 +80,7 @@
       "type": "RSSecondary",
       "avg_rtt_ms": 5,
       "lastUpdateTime": 0,
-      "maxWireVersion": 5,
+      "maxWireVersion": 6,
       "lastWrite": {
         "lastWriteDate": {
           "$numberLong": "2"
@@ -97,7 +97,7 @@
       "type": "RSSecondary",
       "avg_rtt_ms": 5,
       "lastUpdateTime": 0,
-      "maxWireVersion": 5,
+      "maxWireVersion": 6,
       "lastWrite": {
         "lastWriteDate": {
           "$numberLong": "2"

@@ -8,7 +8,7 @@
 (function() {
 "use strict";
 
-// For getLatestProfilerEntry and getProfilerProtocolStringForCommand
+// For 'getLatestProfilerEntry()'.
 load("jstests/libs/profiler.js");
 
 const testDB = db.getSiblingDB("profile_agg");
@@ -37,9 +37,7 @@ assert.eq(profileObj.nreturned, 8, tojson(profileObj));
 assert.eq(profileObj.keysExamined, 8, tojson(profileObj));
 assert.eq(profileObj.docsExamined, 8, tojson(profileObj));
 assert.eq(profileObj.planSummary, "IXSCAN { a: 1 }", tojson(profileObj));
-assert.eq(profileObj.protocol,
-          getProfilerProtocolStringForCommand(testDB.getMongo()),
-          tojson(profileObj));
+assert.eq(profileObj.protocol, "op_msg", tojson(profileObj));
 assert.eq(profileObj.command.aggregate, coll.getName(), tojson(profileObj));
 assert.eq(profileObj.command.collation, {locale: "fr"}, tojson(profileObj));
 assert.eq(profileObj.command.comment, "agg_comment", tojson(profileObj));

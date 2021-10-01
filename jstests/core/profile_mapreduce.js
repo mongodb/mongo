@@ -11,7 +11,7 @@
 (function() {
 "use strict";
 
-// For getLatestProfilerEntry and getProfilerProtocolStringForCommand
+// For 'getLatestProfilerEntry()'.
 load("jstests/libs/profiler.js");
 
 const testDB = db.getSiblingDB("profile_mapreduce");
@@ -48,7 +48,7 @@ assert.eq(profileObj.op, "command", tojson(profileObj));
 assert.eq(profileObj.keysExamined, 3, tojson(profileObj));
 assert.eq(profileObj.docsExamined, 3, tojson(profileObj));
 assert.eq(profileObj.planSummary, "IXSCAN { a: 1 }", tojson(profileObj));
-assert.eq(profileObj.protocol, getProfilerProtocolStringForCommand(conn), tojson(profileObj));
+assert.eq(profileObj.protocol, "op_msg", tojson(profileObj));
 assert.eq(coll.getName(), profileObj.command.mapreduce, tojson(profileObj));
 assert.eq({locale: "fr"}, profileObj.command.collation, tojson(profileObj));
 assert(profileObj.hasOwnProperty("responseLength"), tojson(profileObj));

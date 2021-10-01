@@ -8,7 +8,7 @@
 (function() {
 "use strict";
 
-// For getLatestProfilerEntry and getProfilerProtocolStringForCommand
+// For 'getLatestProfilerEntry()'.
 load("jstests/libs/profiler.js");
 
 var testDB = db.getSiblingDB("profile_distinct");
@@ -36,7 +36,7 @@ assert.eq(profileObj.keysExamined, 5, tojson(profileObj));
 assert.eq(profileObj.docsExamined, 5, tojson(profileObj));
 assert.eq(profileObj.planSummary, "IXSCAN { b: 1 }", tojson(profileObj));
 assert(profileObj.execStats.hasOwnProperty("stage"), tojson(profileObj));
-assert.eq(profileObj.protocol, getProfilerProtocolStringForCommand(conn), tojson(profileObj));
+assert.eq(profileObj.protocol, "op_msg", tojson(profileObj));
 assert.eq(coll.getName(), profileObj.command.distinct, tojson(profileObj));
 assert.eq(profileObj.command.collation, {locale: "fr"}, tojson(profileObj));
 assert(profileObj.hasOwnProperty("responseLength"), tojson(profileObj));

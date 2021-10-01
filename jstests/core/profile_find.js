@@ -8,7 +8,7 @@
 (function() {
 "use strict";
 
-// For getLatestProfilerEntry and getProfilerProtocolStringForCommand
+// For 'getLatestProfilerEntry()'.
 load("jstests/libs/profiler.js");
 
 var testDB = db.getSiblingDB("profile_find");
@@ -41,7 +41,7 @@ assert.eq(profileObj.planSummary, "IXSCAN { a: 1 }", profileObj);
 assert(profileObj.execStats.hasOwnProperty("stage"), profileObj);
 assert.eq(profileObj.command.filter, {a: 1}, profileObj);
 assert.eq(profileObj.command.limit, 1, profileObj);
-assert.eq(profileObj.protocol, getProfilerProtocolStringForCommand(testDB.getMongo()), profileObj);
+assert.eq(profileObj.protocol, "op_msg", profileObj);
 
 assert.eq(profileObj.command.collation, {locale: "fr"});
 assert.eq(profileObj.cursorExhausted, true, profileObj);

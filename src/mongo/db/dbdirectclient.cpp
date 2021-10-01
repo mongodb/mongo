@@ -74,9 +74,7 @@ private:
 }  // namespace
 
 
-DBDirectClient::DBDirectClient(OperationContext* opCtx) : _opCtx(opCtx) {
-    _setServerRPCProtocols(rpc::supports::kAll);
-}
+DBDirectClient::DBDirectClient(OperationContext* opCtx) : _opCtx(opCtx) {}
 
 void DBDirectClient::_auth(const BSONObj& params) {
     uasserted(2625701, "DBDirectClient should not authenticate");

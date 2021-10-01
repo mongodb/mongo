@@ -13,7 +13,7 @@
             "$numberLong": "125002"
           }
         },
-        "maxWireVersion": 5,
+        "maxWireVersion": 6,
         "tags": {
           "data_center": "tokyo"
         }
@@ -28,7 +28,7 @@
             "$numberLong": "1"
           }
         },
-        "maxWireVersion": 5,
+        "maxWireVersion": 6,
         "tags": {
           "data_center": "nyc"
         }
@@ -58,7 +58,7 @@
           "$numberLong": "125002"
         }
       },
-      "maxWireVersion": 5,
+      "maxWireVersion": 6,
       "tags": {
         "data_center": "tokyo"
       }
@@ -75,7 +75,7 @@
           "$numberLong": "125002"
         }
       },
-      "maxWireVersion": 5,
+      "maxWireVersion": 6,
       "tags": {
         "data_center": "tokyo"
       }

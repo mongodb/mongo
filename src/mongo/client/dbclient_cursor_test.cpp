@@ -49,7 +49,6 @@ namespace {
 class DBClientConnectionForTest : public DBClientConnection {
 public:
     DBClientConnectionForTest() {
-        _setServerRPCProtocols(rpc::supports::kAll);       // allow all protocol types by default.
         _serverAddress = HostAndPort("localhost", 27017);  // dummy server address.
     }
 
@@ -82,10 +81,6 @@ public:
     // No-op.
     void killCursor(const NamespaceString& ns, long long cursorID) override {
         LOGV2(20131, "Killing cursor in DBClientConnectionForTest");
-    }
-
-    void setSupportedProtocols(rpc::ProtocolSet protocols) {
-        _setServerRPCProtocols(protocols);
     }
 
     void setCallResponse(Message reply) {

@@ -50,7 +50,6 @@
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/rpc/op_msg.h"
-#include "mongo/rpc/protocol.h"
 #include "mongo/rpc/unique_message.h"
 #include "mongo/transport/message_compressor_manager.h"
 #include "mongo/transport/session.h"
@@ -98,9 +97,6 @@ public:
     virtual std::string toString() const = 0;
 
     virtual std::string getServerAddress() const = 0;
-
-    rpc::ProtocolSet getClientRPCProtocols() const;
-    rpc::ProtocolSet getServerRPCProtocols() const;
 
     /**
      * Reconnect if needed and allowed.
@@ -757,11 +753,6 @@ protected:
     virtual void _auth(const BSONObj& params);
 
     /**
-     * Should be set by subclasses during connection.
-     */
-    void _setServerRPCProtocols(rpc::ProtocolSet serverProtocols);
-
-    /**
      * Controls how chatty the client is about network errors & such. See log.h.
      */
     const logv2::LogSeverity _logLevel;
@@ -780,9 +771,6 @@ private:
                                       int options);
 
     auth::RunCommandHook _makeAuthRunCommandHook();
-
-    // The rpc protocol the remote server(s) support.
-    rpc::ProtocolSet _serverRPCProtocols{rpc::supports::kOpMsgOnly};
 
     rpc::RequestMetadataWriter _metadataWriter;
     rpc::ReplyMetadataReader _metadataReader;

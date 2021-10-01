@@ -81,9 +81,6 @@ Message assembleCommandRequest(DBClientBase* cli,
         request.body = bodyBob.obj();
     }
 
-    rpc::Protocol protocol =
-        uassertStatusOK(rpc::negotiate(cli->getClientRPCProtocols(), cli->getServerRPCProtocols()));
-    invariant(protocol == rpc::Protocol::kOpMsg);
     return request.serialize();
 }
 

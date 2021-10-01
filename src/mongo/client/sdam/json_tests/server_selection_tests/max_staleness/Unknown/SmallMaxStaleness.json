@@ -6,7 +6,7 @@
       {
         "address": "a:27017",
         "type": "Unknown",
-        "maxWireVersion": 5
+        "maxWireVersion": 6
       }
     ]
   },
