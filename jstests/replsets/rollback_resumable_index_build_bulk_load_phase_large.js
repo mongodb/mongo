@@ -3,7 +3,6 @@
  * phase completes properly after being interrupted for rollback during the bulk load phase.
  *
  * @tags: [
- *   requires_fcv_51,
  *   requires_majority_read_concern,
  *   requires_persistence,
  * ]

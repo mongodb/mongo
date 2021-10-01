@@ -87,13 +87,8 @@ const RollbackResumableIndexBuildTest = class {
         // their locks between the rollback end and start failpoints.
         assert.commandWorked(
             originalPrimary.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 0}));
-        // TODO (SERVER-59042): Remove special handling of index build bulk load lock yielding for
-        // multiversion tests after backports.
-        let res = originalPrimary.adminCommand(
-            {setParameter: 1, internalIndexBuildBulkLoadYieldIterations: 1});
-        if (res.ok || !res.errmsg.includes("unrecognized parameter")) {
-            assert.commandWorked(res);
-        }
+        assert.commandWorked(originalPrimary.adminCommand(
+            {setParameter: 1, internalIndexBuildBulkLoadYieldIterations: 1}));
         assert.commandWorked(
             originalPrimary.adminCommand({setParameter: 1, maxIndexBuildDrainBatchSize: 1}));
 
