@@ -1142,6 +1142,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
 
 // Checks if the given query can be executed with the SBE engine.
 inline bool isQuerySbeCompatible(OperationContext* opCtx,
+                                 const CollectionPtr* collection,
                                  const CanonicalQuery* const cq,
                                  size_t plannerOptions) {
     invariant(cq);
@@ -1160,9 +1161,14 @@ inline bool isQuerySbeCompatible(OperationContext* opCtx,
     // Queries against a time-series collection are not currently supported by SBE.
     const bool isQueryNotAgainstTimeseriesCollection = !(cq->nss().isTimeseriesBucketsCollection());
 
+    // Queries against a clustered collection are not currently supported by SBE.
+    tassert(6038600, "Expected CollectionPtr to not be nullptr", collection);
+    const bool isQueryNotAgainstClusteredCollection =
+        !(collection->get() && collection->get()->isClustered());
+
     return allExpressionsSupported && isNotCount && doesNotContainMetadataRequirements &&
-        isQueryNotAgainstTimeseriesCollection && doesNotSortOnMetaOrPathWithNumericComponents &&
-        isNotOplog;
+        isQueryNotAgainstTimeseriesCollection && isQueryNotAgainstClusteredCollection &&
+        doesNotSortOnMetaOrPathWithNumericComponents && isNotOplog;
 }
 }  // namespace
 
@@ -1174,7 +1180,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     size_t plannerOptions) {
     return !canonicalQuery->getForceClassicEngine() &&
-            isQuerySbeCompatible(opCtx, canonicalQuery.get(), plannerOptions)
+            isQuerySbeCompatible(opCtx, collection, canonicalQuery.get(), plannerOptions)
         ? getSlotBasedExecutor(opCtx,
                                collection,
                                std::move(canonicalQuery),
