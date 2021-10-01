@@ -2,6 +2,7 @@
 //   does_not_support_stepdowns,
 //   requires_getmore,
 //   requires_profiling,
+//   requires_fcv_51,
 // ]
 
 // Confirms that profiled getMore execution contains all expected metrics with proper values.
