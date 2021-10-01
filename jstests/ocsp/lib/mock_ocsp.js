@@ -69,10 +69,11 @@ class MockOCSPServer {
             this.python,
             "-u",
             OCSP_PROGRAM,
-            "-p=" + this.port,
+            "--port=" + this.port,
             "--ca_file=" + this.ca_file,
             "--ocsp_responder_cert=" + this.ocsp_cert_file,
             "--ocsp_responder_key=" + this.ocsp_cert_key,
+            "--verbose",
         ];
 
         if (this.fault_type) {
@@ -113,6 +114,16 @@ class MockOCSPServer {
      * Stop the web server
      */
     stop() {
-        stopMongoProgramByPid(this.pid);
+        if (!this.pid) {
+            print("Not stopping Mock OCSP Server, it was never started");
+            return;
+        }
+
+        print("Stopping Mock OCSP Server");
+
+        const kSIGINT = 2;
+        stopMongoProgramByPid(this.pid, kSIGINT);
+
+        print("Mock OCSP Server stop complete");
     }
 }

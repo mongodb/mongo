@@ -4,13 +4,21 @@ Python script to interface as a mock OCSP responder.
 """
 
 import argparse
+import atexit
 import logging
+import time
 import sys
 import os
 
 sys.path.append(os.path.join(os.getcwd() ,'src', 'third_party', 'mock_ocsp_responder'))
 
 import mock_ocsp_responder
+
+logger = logging.getLogger(__name__)
+
+@atexit.register
+def on_exit():
+    logger.debug('Mock OCSP Responder is exiting')
 
 def main():
     """Main entry point"""
@@ -35,15 +43,16 @@ def main():
     parser.add_argument('--response_delay_seconds', type=int, default=0, help="Delays the response by this number of seconds")
 
     args = parser.parse_args()
-    if args.verbose:
-        logging.basicConfig(level=logging.DEBUG)
 
-    print('Initializing OCSP Responder')
+    level=logging.DEBUG if args.verbose else logging.INFO
+    logging.basicConfig(level=level, format="%(asctime)s %(levelname)s %(module)s: %(message)s")
+    logging.Formatter.converter = time.gmtime
+
+    logger.info('Initializing OCSP Responder')
     mock_ocsp_responder.init_responder(issuer_cert=args.ca_file, responder_cert=args.ocsp_responder_cert, responder_key=args.ocsp_responder_key, fault=args.fault, next_update_seconds=args.next_update_seconds, response_delay_seconds=args.response_delay_seconds)
 
+    logger.debug('Mock OCSP Responder will be started on port %s' % (str(args.port)))
     mock_ocsp_responder.init(port=args.port, debug=args.verbose, host=args.bind_ip)
-
-    print('Mock OCSP Responder is running on port %s' % (str(args.port)))
 
 if __name__ == '__main__':
     main()
