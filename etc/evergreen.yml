@@ -506,17 +506,16 @@ functions:
     params:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
-      remote_file: ${project}/${build_variant}/${revision}/mongodb-mongo-venv/${build_id}.tgz
+      remote_file: ${project}/${build_variant}/${revision}/venv/${build_id}.tgz
       bucket: mciuploads
-      # Python venv is not relocatable and should be placed in /data/mci
-      extract_to: ".."
+      extract_to: "."
 
-  "add symlinks back to venv": &add_symlinks_back_to_venv
+  "adjust venv": &adjust_venv
     command: subprocess.exec
     params:
       binary: bash
       args:
-        - "src/evergreen/functions/venv_symlinks_add_back.sh"
+        - "src/evergreen/functions/venv_adjust.sh"
 
   "fetch packages": &fetch_packages
     command: s3.get
@@ -876,7 +875,7 @@ functions:
   - *kill_processes
   - *cleanup_environment
   - *fetch_venv
-  - *add_symlinks_back_to_venv
+  - *adjust_venv
   - *fetch_binaries
   - *extract_binaries
   - *check_binary_version
@@ -1117,7 +1116,7 @@ functions:
     - *kill_processes
     - *cleanup_environment
     - *fetch_venv
-    - *add_symlinks_back_to_venv
+    - *adjust_venv
     - *f_expansions_write
     - *configure_evergreen_api_credentials
 
@@ -2126,22 +2125,23 @@ tasks:
 
     - command: archive.targz_pack
       params:
-        target: "mongodb-mongo-venv.tgz"
-        source_dir: ".."
+        target: "venv.tgz"
+        source_dir: "./"
         include:
-          - "./mongodb-mongo-venv/**"
+          - "./venv/**"
+          - "./venv_readme.txt"
 
     - command: s3.put
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        local_file: mongodb-mongo-venv.tgz
-        remote_file: ${project}/${build_variant}/${revision}/mongodb-mongo-venv/${build_id}.tgz
+        local_file: venv.tgz
+        remote_file: ${project}/${build_variant}/${revision}/venv/${build_id}.tgz
         bucket: mciuploads
         permissions: private
         visibility: signed
         content_type: application/tar
-        display_name: Python venv (see included README.txt)
+        display_name: Python venv (see included venv_readme.txt)
 
 - name: archive_dist_test_debug
   tags: []
