@@ -1,8 +1,8 @@
 """Module for retrieving the configuration of resmoke.py test suites."""
-
 import collections
-import optparse
 import os
+
+from typing import List, Dict
 
 import buildscripts.resmokelib.utils.filesystem as fs
 from buildscripts.resmokelib import config as _config
@@ -11,27 +11,41 @@ from buildscripts.resmokelib import utils
 from buildscripts.resmokelib.testing import suite as _suite
 from buildscripts.resmokelib.utils import load_yaml_file
 
+SuiteName = str
 
-def get_named_suites():
-    """Return a sorted list of the suites names."""
-    # Skip "with_*server" and "no_server" because they do not define any test files to run.
-    executor_only = {"with_server", "with_external_server", "no_server"}
-    names = [name for name in _config.NAMED_SUITES.keys() if name not in executor_only]
-    names += MatrixSuiteConfig.get_all_suite_names()
-    names.sort()
-    return names
+_NAMED_SUITES = None
 
 
-def get_named_suites_with_root_level_key(root_level_key):
-    """Return the suites that contain the given root_level_key and their values."""
-    all_suite_names = get_named_suites()
+def get_named_suites() -> List[SuiteName]:
+    """Return a list of the suites names."""
+    global _NAMED_SUITES  # pylint: disable=global-statement
+
+    if _NAMED_SUITES is None:
+        # Skip "with_*server" and "no_server" because they do not define any test files to run.
+        executor_only = {"with_server", "with_external_server", "no_server"}
+
+        explicit_suite_names = [
+            name for name in ExplicitSuiteConfig.get_named_suites() if name not in executor_only
+        ]
+        composed_suite_names = MatrixSuiteConfig.get_named_suites()
+        _NAMED_SUITES = explicit_suite_names + composed_suite_names
+        _NAMED_SUITES.sort()
+    return _NAMED_SUITES
+
+
+def get_suite_files() -> List[str]:
+    """Get the physical files defining these suites for parsing comments."""
+    return ExplicitSuiteConfig.get_suite_files() + MatrixSuiteConfig.get_suite_files()
+
+
+def burn_in_multiversion_suites():
+    """Return the suites that should run in burn_in_multiversion."""
     suites_to_return = []
 
-    for suite in all_suite_names:
-        suite_config = _get_suite_config(suite)
-        if root_level_key in suite_config.keys() and suite_config[root_level_key]:
-            suites_to_return.append(
-                {"origin": suite, "multiversion_name": suite_config[root_level_key]})
+    for suite_name in get_named_suites():
+        multiversion_name = get_suite(suite_name).burn_in_multiversion_task_name()
+        if multiversion_name is not None:
+            suites_to_return.append({"origin": suite_name, "multiversion_name": multiversion_name})
     return suites_to_return
 
 
@@ -50,13 +64,11 @@ def create_test_membership_map(fail_on_missing_selector=False, test_kind=None):
         test_kind = frozenset(test_kind)
 
     test_membership = collections.defaultdict(list)
-    suite_names = get_named_suites()
-    for suite_name in suite_names:
+    for suite_name in get_named_suites():
         try:
-            suite_config = _get_suite_config(suite_name)
-            if test_kind and suite_config.get("test_kind") not in test_kind:
+            suite = get_suite(suite_name)
+            if test_kind and suite.get_test_kind_config() not in test_kind:
                 continue
-            suite = _suite.Suite(suite_name, suite_config)
         except IOError as err:
             # We ignore errors from missing files referenced in the test suite's "selector"
             # section. Certain test suites (e.g. unittests.yml) have a dedicated text file to
@@ -74,11 +86,11 @@ def create_test_membership_map(fail_on_missing_selector=False, test_kind=None):
     return test_membership
 
 
-def get_suites(suite_files, test_files):
+def get_suites(suite_names_or_paths, test_files):
     """Retrieve the Suite instances based on suite configuration files and override parameters.
 
     Args:
-        suite_files: A list of file paths pointing to suite YAML configuration files. For the suites
+        suite_names_or_paths: A list of file paths pointing to suite YAML configuration files. For the suites
             defined in 'buildscripts/resmokeconfig/suites/' and matrix suites, a shorthand name consisting
             of the filename without the extension can be used.
         test_files: A list of file paths pointing to test files overriding the roots for the suites.
@@ -94,7 +106,7 @@ def get_suites(suite_files, test_files):
         suite_roots = _make_suite_roots(test_files)
 
     suites = []
-    for suite_filename in suite_files:
+    for suite_filename in suite_names_or_paths:
         suite_config = _get_suite_config(suite_filename)
         if suite_roots:
             # Override the suite's default test files with those passed in from the command line.
@@ -104,50 +116,78 @@ def get_suites(suite_files, test_files):
     return suites
 
 
-def get_suite(suite_file):
-    """Retrieve the Suite instance corresponding to a suite configuration file."""
-    suite_config = _get_suite_config(suite_file)
-    return _suite.Suite(suite_file, suite_config)
-
-
 def _make_suite_roots(files):
     return {"selector": {"roots": files}}
 
 
-def _get_suite_config(suite_path):
+def _get_suite_config(suite_name_or_path):
     """Attempt to read YAML configuration from 'suite_path' for the suite."""
-    return SuiteFinder.get_config_obj(suite_path)
+    return SuiteFinder.get_config_obj(suite_name_or_path)
 
 
-class SuiteConfigInterface(object):
+class SuiteConfigInterface:
     """Interface for suite configs."""
 
-    def __init__(self, yaml_path=None):
-        """Initialize the suite config interface."""
-        self.yaml_path = yaml_path
+    @classmethod
+    def get_config_obj(cls, suite_name):
+        """Get the config object given the suite name, which can be a path."""
+        pass
+
+    @classmethod
+    def get_named_suites(cls):
+        """Populate the named suites by scanning `config_dir`."""
+        pass
+
+    @classmethod
+    def get_suite_files(cls):
+        """Get the physical files defining these suites for parsing comments."""
+        pass
 
 
 class ExplicitSuiteConfig(SuiteConfigInterface):
     """Class for storing the resmoke.py suite YAML configuration."""
 
-    @staticmethod
-    def get_config_obj(pathname):
+    @classmethod
+    def get_config_obj(cls, suite_name):
         """Get the suite config object in the given file."""
         # Named executors or suites are specified as the basename of the file, without the .yml
         # extension.
-        if not fs.is_yaml_file(pathname) and not os.path.dirname(pathname):
-            if pathname not in _config.NAMED_SUITES:  # pylint: disable=unsupported-membership-test
-                # Expand 'pathname' to full path.
+        if not fs.is_yaml_file(suite_name) and not os.path.dirname(suite_name):
+            named_suites = cls.get_named_suites()
+            if suite_name not in named_suites:  # pylint: disable=unsupported-membership-test
                 return None
-            pathname = _config.NAMED_SUITES[pathname]  # pylint: disable=unsubscriptable-object
+            suite_name = named_suites[suite_name]  # pylint: disable=unsubscriptable-object
 
-        if not fs.is_yaml_file(pathname) or not os.path.isfile(pathname):
-            raise optparse.OptionValueError("Expected a suite YAML config, but got '%s'" % pathname)
-        return utils.load_yaml_file(pathname)
+        if not fs.is_yaml_file(suite_name) or not os.path.isfile(suite_name):
+            raise ValueError("Expected a suite YAML config, but got '%s'" % suite_name)
+        return utils.load_yaml_file(suite_name)
+
+    @classmethod
+    def get_named_suites(cls) -> Dict[str, str]:
+        """Populate the named suites by scanning config_dir/suites."""
+        named_suites = {}
+
+        suites_dir = os.path.join(_config.CONFIG_DIR, "suites")
+        root = os.path.abspath(suites_dir)
+        files = os.listdir(root)
+        for filename in files:
+            (short_name, ext) = os.path.splitext(filename)
+            if ext in (".yml", ".yaml"):
+                pathname = os.path.join(root, filename)
+                named_suites[short_name] = pathname
+
+        return named_suites
+
+    @classmethod
+    def get_suite_files(cls):
+        """Get the suite files."""
+        return cls.get_named_suites()
 
 
 class MatrixSuiteConfig(SuiteConfigInterface):
     """Class for storing the resmoke.py suite YAML configuration."""
+
+    _all_mappings = None
 
     @staticmethod
     def get_all_yamls(target_dir):
@@ -162,8 +202,7 @@ class MatrixSuiteConfig(SuiteConfigInterface):
                 pathname = os.path.join(root, filename)
 
                 if not fs.is_yaml_file(pathname) or not os.path.isfile(pathname):
-                    raise optparse.OptionValueError(
-                        "Expected a suite YAML config, but got '%s'" % pathname)
+                    raise ValueError("Expected a suite YAML config, but got '%s'" % pathname)
                 all_files[short_name] = load_yaml_file(pathname)
         return all_files
 
@@ -172,10 +211,10 @@ class MatrixSuiteConfig(SuiteConfigInterface):
         return os.path.join(_config.CONFIG_DIR, "matrix_suites")
 
     @classmethod
-    def get_config_obj(cls, suite_path):
+    def get_config_obj(cls, suite_name):
         """Get the suite config object in the given file."""
         suites_dir = cls._get_suites_dir()
-        matrix_suite = cls.parse_mappings_file(suites_dir, suite_path)
+        matrix_suite = cls.parse_mappings_file(suites_dir, suite_name)
         if not matrix_suite:
             return None
 
@@ -228,32 +267,40 @@ class MatrixSuiteConfig(SuiteConfigInterface):
         """Get the mapping object for a given suite name and directory to search for suite mappings."""
         all_matrix_suites = cls.get_all_mappings(suites_dir)
 
-        if suite_name in all_matrix_suites:
-            return all_matrix_suites[suite_name]
+        if suite_name in all_matrix_suites.keys():
+            return all_matrix_suites[suite_name]  # pylint: disable=unsubscriptable-object
         return None
 
     @classmethod
-    def get_all_suite_names(cls):
+    def get_named_suites(cls):
         """Get a list of all suite names."""
         suites_dir = cls._get_suites_dir()
         all_mappings = cls.get_all_mappings(suites_dir)
-        return all_mappings.keys()
+        return list(all_mappings.keys())
 
     @classmethod
-    def get_all_mappings(cls, suites_dir):
-        """Get a dictionary of all suite mapping files keyed by the suite name."""
-        mappings_dir = os.path.join(suites_dir, "mappings")
-        mappings_files = cls.get_all_yamls(mappings_dir)
+    def get_suite_files(cls):
+        """Get the physical files defining these suites for parsing comments."""
+        mappings_dir = os.path.join(cls._get_suites_dir(), "mappings")
+        return cls.get_all_yamls(mappings_dir)
 
-        all_matrix_suites = {}
-        for _, suite_config_file in mappings_files.items():
-            for suite_config in suite_config_file:
-                if "suite_name" in suite_config and "base_suite" in suite_config:
-                    all_matrix_suites[suite_config["suite_name"]] = suite_config
-                else:
-                    raise ValueError("Invalid suite configuration, missing required keys. ",
-                                     suite_config)
-        return all_matrix_suites
+    @classmethod
+    def get_all_mappings(cls, suites_dir) -> Dict[str, str]:
+        """Get a dictionary of all suite mapping files keyed by the suite name."""
+        if cls._all_mappings is None:
+            mappings_dir = os.path.join(suites_dir, "mappings")
+            mappings_files = cls.get_all_yamls(mappings_dir)
+
+            all_mappings = {}
+            for _, suite_config_file in mappings_files.items():
+                for suite_config in suite_config_file:
+                    if "suite_name" in suite_config and "base_suite" in suite_config:
+                        all_mappings[suite_config["suite_name"]] = suite_config
+                    else:
+                        raise ValueError("Invalid suite configuration, missing required keys. ",
+                                         suite_config)
+            cls._all_mappings = all_mappings
+        return cls._all_mappings
 
     @classmethod
     def merge_dicts(cls, dict1, dict2):
@@ -288,19 +335,8 @@ class SuiteFinder(object):
 
         return matrix_suite or explicit_suite
 
-    @staticmethod
-    def get_named_suites(config_dir):
-        """Populate the named suites by scanning config_dir/suites."""
-        named_suites = {}
 
-        suites_dir = os.path.join(config_dir, "suites")
-        root = os.path.abspath(suites_dir)
-        files = os.listdir(root)
-        for filename in files:
-            (short_name, ext) = os.path.splitext(filename)
-            if ext in (".yml", ".yaml"):
-                pathname = os.path.join(root, filename)
-                # TODO: store named suite in an object
-                named_suites[short_name] = pathname
-
-        return named_suites
+def get_suite(suite_name_or_path) -> _suite.Suite:
+    """Retrieve the Suite instance corresponding to a suite configuration file."""
+    suite_config = _get_suite_config(suite_name_or_path)
+    return _suite.Suite(suite_name_or_path, suite_config)

@@ -351,7 +351,7 @@ def create_task_list_for_tests(changed_tests: Set[str], build_variant: str,
     if not exclude_tasks:
         exclude_tasks = []
 
-    suites = get_suites(suite_files=SUITE_FILES, test_files=changed_tests)
+    suites = get_suites(suite_names_or_paths=SUITE_FILES, test_files=changed_tests)
     LOGGER.debug("Found suites to run", suites=suites)
 
     tests_by_executor = create_executor_list(suites, exclude_suites)

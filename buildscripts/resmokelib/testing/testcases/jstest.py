@@ -275,3 +275,14 @@ class JSTestCase(interface.TestCase, interface.UndoDBUtilsMixin):
                 f"Mongo shell exited with code {return_code} while running jstest {self.basename()}."
                 " Further test execution may be unsafe.")
             raise self.propagate_error  # pylint: disable=raising-bad-type
+
+
+class AllVersionsJSTestCase(JSTestCase):
+    """
+    Alias for JSTestCase for multiversion passthrough suites.
+
+    It run with all combinations of versions of replica sets and sharded clusters.
+    The distinct name is picked up by task generation.
+    """
+
+    REGISTERED_NAME = "all_versions_js_test"

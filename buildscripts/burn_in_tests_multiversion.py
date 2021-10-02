@@ -18,12 +18,11 @@ from buildscripts.burn_in_tests import EVERGREEN_FILE, \
 from buildscripts.ciconfig.evergreen import parse_evergreen_file, EvergreenProjectConfig
 from buildscripts.evergreen_burn_in_tests import GenerateConfig, DEFAULT_PROJECT, EvergreenFileChangeDetector
 from buildscripts.task_generation.constants import CONFIG_FILE
-from buildscripts.resmokelib.suitesconfig import get_named_suites_with_root_level_key
+from buildscripts.resmokelib.suitesconfig import burn_in_multiversion_suites
 from buildscripts.task_generation.evg_config_builder import EvgConfigBuilder
 from buildscripts.task_generation.gen_config import GenerationConfiguration
 from buildscripts.task_generation.generated_config import GeneratedConfiguration
 from buildscripts.task_generation.multiversion_util import MultiversionUtilService
-from buildscripts.task_generation.resmoke_proxy import ResmokeProxyConfig
 from buildscripts.task_generation.suite_split import SuiteSplitConfig, SuiteSplitParameters
 from buildscripts.task_generation.suite_split_strategies import SplitStrategy, greedy_division, \
     FallbackStrategy, round_robin_fallback
@@ -34,7 +33,6 @@ from buildscripts.util.cmdutils import enable_logging
 structlog.configure(logger_factory=LoggerFactory())
 LOGGER = structlog.getLogger(__name__)
 
-MULTIVERSION_CONFIG_KEY = "use_in_multiversion"
 MULTIVERSION_PASSTHROUGH_TAG = "multiversion_passthrough"
 BURN_IN_MULTIVERSION_TASK = "burn_in_tests_multiversion"
 DEFAULT_CONFIG_DIR = "generated_resmoke_config"
@@ -130,8 +128,7 @@ class MultiversionBurnInOrchestrator:
         tasks = set()
         if tests_by_task:
             # Get the multiversion suites that will run in as part of burn_in_multiversion.
-            multiversion_suites = get_named_suites_with_root_level_key(MULTIVERSION_CONFIG_KEY)
-            for suite in multiversion_suites:
+            for suite in burn_in_multiversion_suites():
                 task_name = suite["origin"]
                 if task_name not in tests_by_task.keys():
                     # Only generate burn in multiversion tasks for suites that would run the
@@ -264,8 +261,6 @@ def main(build_variant, run_build_variant, distro, project, generate_tasks_file,
         binder.bind(GenTaskOptions, gen_task_options)
         binder.bind(EvergreenApi, evg_api)
         binder.bind(GenerationConfiguration, GenerationConfiguration.from_yaml_file())
-        binder.bind(ResmokeProxyConfig,
-                    ResmokeProxyConfig(resmoke_suite_dir=DEFAULT_TEST_SUITE_DIR))
         binder.bind(EvergreenFileChangeDetector, EvergreenFileChangeDetector(task_id, evg_api))
         binder.bind(BurnInConfig, burn_in_config)
 

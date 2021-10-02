@@ -311,7 +311,7 @@ class CreateExecutorList(unittest.TestCase):
         mock_get_named_suites.return_value = ["dbtest"]
 
         under_test.create_executor_list([], [])
-        self.assertEqual(mock_suite_class.call_count, 0)
+        self.assertEqual(mock_suite_class.call_count, 1)
 
 
 def create_variant_task_mock(task_name, suite_name, distro="distro"):

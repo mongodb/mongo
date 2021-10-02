@@ -375,8 +375,6 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
 
     configure_tests(config.pop("test_files"), config.pop("replay_file"))
 
-    _config.NAMED_SUITES = SuiteFinder.get_named_suites(_config.CONFIG_DIR)
-
     _config.LOGGER_DIR = os.path.join(_config.CONFIG_DIR, "loggers")
 
     shuffle = config.pop("shuffle")

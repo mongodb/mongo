@@ -12,6 +12,9 @@
         num_shards: 2
         num_rs_nodes_per_shard: 2
 
+- name: test_kind
+  value:
+    test_kind: all_versions_js_test
 
 ### Suite-specific overrides ###
 - name: multiversion_sanity_check_selector

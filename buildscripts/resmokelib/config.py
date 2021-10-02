@@ -567,7 +567,6 @@ EXTERNAL_SUITE_SELECTORS = (DEFAULT_BENCHMARK_TEST_LIST, DEFAULT_UNIT_TEST_LIST,
 
 # Where to look for logging and suite configuration files
 CONFIG_DIR = None
-NAMED_SUITES = None
 LOGGER_DIR = None
 
 # Generated logging config for the current invocation.

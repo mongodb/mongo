@@ -22,7 +22,6 @@ from buildscripts.task_generation.gen_config import GenerationConfiguration
 from buildscripts.task_generation.gen_task_validation import GenTaskValidationService
 from buildscripts.task_generation.multiversion_util import MultiversionUtilService, \
     SHARDED_MIXED_VERSION_CONFIGS, REPL_MIXED_VERSION_CONFIGS
-from buildscripts.task_generation.resmoke_proxy import ResmokeProxyConfig
 from buildscripts.task_generation.suite_split import SuiteSplitConfig, SuiteSplitParameters
 from buildscripts.task_generation.suite_split_strategies import SplitStrategy, FallbackStrategy, \
     greedy_division, round_robin_fallback
@@ -453,8 +452,6 @@ def main(expansion_file: str, evg_api_config: str, evg_project_config: str, outp
         binder.bind(EvergreenApi, RetryingEvergreenApi.get_api(config_file=evg_api_config))
         binder.bind(EvergreenProjectConfig, parse_evergreen_file(evg_project_config))
         binder.bind(GenerationConfiguration, GenerationConfiguration.from_yaml_file())
-        binder.bind(ResmokeProxyConfig,
-                    ResmokeProxyConfig(resmoke_suite_dir=DEFAULT_TEST_SUITE_DIR))
 
     inject.configure(dependencies)
 

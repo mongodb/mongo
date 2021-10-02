@@ -12,9 +12,9 @@ class TestResmokeProxy(unittest.TestCase):
         mock_suite = MagicMock(
             tests=["test0", "test1", ["test2a", "tests2b", "test2c"], "test3", ["test4a"]])
 
-        resmoke_proxy = under_test.ResmokeProxyService(under_test.ResmokeProxyConfig("suites_dir"))
-        resmoke_proxy.suitesconfig = MagicMock()
-        resmoke_proxy.suitesconfig.get_suite.return_value = mock_suite
+        resmoke_proxy = under_test.ResmokeProxyService()
+        resmoke_proxy._suite_config = MagicMock()
+        resmoke_proxy._suite_config.get_suite.return_value = mock_suite
 
         test_list = resmoke_proxy.list_tests("some suite")
 

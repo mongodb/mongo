@@ -26,7 +26,6 @@ from buildscripts.patch_builds.selected_tests.selected_tests_client import Selec
 from buildscripts.task_generation.evg_config_builder import EvgConfigBuilder
 from buildscripts.task_generation.gen_config import GenerationConfiguration
 from buildscripts.task_generation.generated_config import GeneratedConfiguration
-from buildscripts.task_generation.resmoke_proxy import ResmokeProxyConfig
 from buildscripts.task_generation.suite_split import SuiteSplitParameters, SuiteSplitConfig
 from buildscripts.task_generation.suite_split_strategies import SplitStrategy, FallbackStrategy, \
     greedy_division, round_robin_fallback
@@ -503,8 +502,6 @@ def main(
         binder.bind(FallbackStrategy, round_robin_fallback)
         binder.bind(GenTaskOptions, evg_expansions.build_gen_task_options())
         binder.bind(GenerationConfiguration, GenerationConfiguration.from_yaml_file())
-        binder.bind(ResmokeProxyConfig,
-                    ResmokeProxyConfig(resmoke_suite_dir=DEFAULT_TEST_SUITE_DIR))
 
     inject.configure(dependencies)
 

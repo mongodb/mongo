@@ -10,9 +10,6 @@ import shlex
 import sys
 import time
 import shutil
-import tempfile
-import requests
-import dateutil.parser
 
 import curatorbin
 import pkg_resources
@@ -40,6 +37,7 @@ from buildscripts.resmokelib.run import generate_multiversion_exclude_tags
 from buildscripts.resmokelib.run import runtime_recorder
 from buildscripts.resmokelib.run import list_tags
 from buildscripts.resmokelib.run.runtime_recorder import compare_start_time
+from buildscripts.resmokelib.suitesconfig import get_suite_files
 
 _INTERNAL_OPTIONS_TITLE = "Internal Options"
 _MONGODB_SERVER_OPTIONS_TITLE = "MongoDB Server Options"
@@ -153,11 +151,16 @@ class TestRunner(Subcommand):  # pylint: disable=too-many-instance-attributes
                                       suite_names)
 
     def list_tags(self):
-        """List the tags and its documentation available in the suites."""
+        """
+        List the tags and its documentation available in the suites.
+
+        Note: this currently ignores composed/matrix suites as it's not obvious the suite
+        a particular tag applies to.
+        """
         tag_docs = {}
         out_tag_names = []
-        for suite_name in suitesconfig.get_named_suites():
-            suite_file = config.NAMED_SUITES.get(suite_name, "")
+        for suite_name, suite_file in get_suite_files():
+            # Matrix suites are ignored.
             tags_blocks = list_tags.get_tags_blocks(suite_file)
 
             for tags_block in tags_blocks:

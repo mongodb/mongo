@@ -20,7 +20,6 @@ from buildscripts.evergreen_burn_in_tests import EvergreenFileChangeDetector
 from buildscripts.task_generation.gen_config import GenerationConfiguration
 from buildscripts.task_generation.multiversion_util import REPL_MIXED_VERSION_CONFIGS, \
     SHARDED_MIXED_VERSION_CONFIGS
-from buildscripts.task_generation.resmoke_proxy import ResmokeProxyConfig
 from buildscripts.task_generation.suite_split import SuiteSplitConfig
 from buildscripts.task_generation.suite_split_strategies import greedy_division, SplitStrategy, \
     FallbackStrategy, round_robin_fallback
@@ -165,8 +164,6 @@ def configure_dependencies(evg_api, split_config):
         binder.bind(GenTaskOptions, gen_task_options)
         binder.bind(EvergreenApi, evg_api)
         binder.bind(GenerationConfiguration, GenerationConfiguration.from_yaml_file())
-        binder.bind(ResmokeProxyConfig,
-                    ResmokeProxyConfig(resmoke_suite_dir=under_test.DEFAULT_TEST_SUITE_DIR))
         binder.bind(EvergreenFileChangeDetector, None)
         binder.bind(EvergreenProjectConfig, MagicMock())
         binder.bind(

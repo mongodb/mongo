@@ -129,6 +129,7 @@ class MultiversionGenTaskService:
         :param params: Parameters for how tasks should be generated.
         :return: Arguments to pass to resmoke to run the generated task.
         """
+
         tag_file_location = self.gen_task_options.generated_file_location(EXCLUDE_TAGS_FILE)
 
         return (

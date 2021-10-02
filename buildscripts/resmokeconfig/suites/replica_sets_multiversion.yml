@@ -1,4 +1,4 @@
-test_kind: js_test
+test_kind: all_versions_js_test
 
 selector:
   roots:

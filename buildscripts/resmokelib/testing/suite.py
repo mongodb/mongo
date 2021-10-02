@@ -36,6 +36,8 @@ EXIT_CODE_MAP = {
     3221225725: "Stack Overflow",
 }
 
+MULTIVERSION_CONFIG_KEY = "use_in_multiversion"
+
 
 def translate_exit_code(exit_code):
     """
@@ -71,7 +73,8 @@ class Suite(object):  # pylint: disable=too-many-instance-attributes
         self._suite_options = suite_options
 
         self.test_kind = self.get_test_kind_config()
-        self.tests, self.excluded = self._get_tests_for_kind(self.test_kind)
+        self._tests = None
+        self._excluded = None
 
         self.return_code = None  # Set by the executor.
 
@@ -89,6 +92,20 @@ class Suite(object):  # pylint: disable=too-many-instance-attributes
     def __repr__(self):
         """Create a string representation of object for debugging."""
         return f"{self.test_kind}:{self._suite_name}"
+
+    @property
+    def tests(self):
+        """Get the tests."""
+        if self._tests is None:
+            self._tests, self._excluded = self._get_tests_for_kind(self.test_kind)
+        return self._tests
+
+    @property
+    def excluded(self):
+        """Get the excluded."""
+        if self._excluded is None:
+            self._tests, self._excluded = self._get_tests_for_kind(self.test_kind)
+        return self._excluded
 
     def _get_tests_for_kind(self, test_kind):
         """Return the tests to run based on the 'test_kind'-specific filtering policy."""
@@ -150,6 +167,10 @@ class Suite(object):  # pylint: disable=too-many-instance-attributes
     def get_test_kind_config(self):
         """Return the "test_kind" section of the YAML configuration."""
         return self._suite_config["test_kind"]
+
+    def burn_in_multiversion_task_name(self):
+        """Check if the suite should run in burn_in_multiversion by using a special root-level key."""
+        return self._suite_config.get(MULTIVERSION_CONFIG_KEY)
 
     @property
     def options(self):

@@ -5800,7 +5800,6 @@ tasks:
       suite: retryable_writes_downgrade_passthrough
       resmoke_args: --storageEngine=wiredTiger
       require_multiversion: true
-      implicit_multiversion: true
 
 - <<: *gen_task_template
   name: sharded_retryable_writes_downgrade_passthrough_gen

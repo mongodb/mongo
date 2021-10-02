@@ -212,6 +212,9 @@ default.profraw
 /corpora
 /corpora-merged
 
+# Linter and formatter cache
+.mypy_cache/
+
 # RPM build temps
 /distsrc.tar
 /selinux/tmp
