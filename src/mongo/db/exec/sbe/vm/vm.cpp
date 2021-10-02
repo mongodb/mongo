@@ -505,14 +505,45 @@ void CodeFragment::appendJumpNothing(int jumpOffset) {
     offset += writeToMemory(offset, jumpOffset);
 }
 
-ByteCode::~ByteCode() {
-    auto size = _argStackOwned.size();
-    invariant(_argStackTags.size() == size);
-    invariant(_argStackVals.size() == size);
-    for (size_t i = 0; i < size; ++i) {
-        if (_argStackOwned[i]) {
-            value::releaseValue(_argStackTags[i], _argStackVals[i]);
+void ByteCode::Stack::growAndResize(size_t newSize) {
+    auto currentCapacity = capacity();
+    if (newSize <= currentCapacity) {
+        _size = newSize;
+        return;
+    }
+
+    auto newCapacity = newSize;
+    if (newCapacity > kMaxCapacity) {
+        uasserted(6040901,
+                  str::stream() << "Requested capacity of " << newCapacity
+                                << " elements exceeds the maximum capacity of " << kMaxCapacity);
+        return;
+    }
+
+    if (currentCapacity >= kMaxCapacity / 2) {
+        newCapacity = kMaxCapacity;
+    } else if (2 * currentCapacity > newCapacity) {
+        newCapacity = 2 * currentCapacity;
+    }
+
+    try {
+        auto numSegments = (_size + ElementsPerSegment - 1) / ElementsPerSegment;
+        auto numNewSegments = (newCapacity + ElementsPerSegment - 1) / ElementsPerSegment;
+        newCapacity = numNewSegments * ElementsPerSegment;
+
+        auto newSegments = std::make_unique<StackSegment[]>(numNewSegments);
+
+        if (_segments.get() != nullptr && numSegments > 0) {
+            memcpy(newSegments.get(), _segments.get(), numSegments * sizeof(StackSegment));
         }
+
+        _segments = std::move(newSegments);
+        _capacity = newCapacity;
+        _size = newSize;
+    } catch (std::bad_alloc&) {
+        uasserted(6040902,
+                  str::stream() << "Unable to allocate requested capacity of " << newCapacity
+                                << " elements");
     }
 }
 
@@ -4923,18 +4954,29 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
 }
 
 std::tuple<uint8_t, value::TypeTags, value::Value> ByteCode::run(const CodeFragment* code) {
+    uassert(6040900, "The evaluation stack must be empty", _argStack.size() == 0);
+
+    ON_BLOCK_EXIT([&] {
+        auto size = _argStack.size();
+        for (size_t i = 0; i < size; ++i) {
+            auto [owned, tag] = _argStack.ownedAndTag(i);
+            if (owned) {
+                value::releaseValue(tag, _argStack.value(i));
+            }
+        }
+
+        _argStack.resize(0);
+    });
+
     runInternal(code, 0);
 
-    uassert(
-        4822801, "The evaluation stack must hold only a single value", _argStackOwned.size() == 1);
+    uassert(4822801, "The evaluation stack must hold only a single value", _argStack.size() == 1);
 
-    auto owned = _argStackOwned[0];
-    auto tag = _argStackTags[0];
-    auto val = _argStackVals[0];
+    auto [owned, tag] = _argStack.ownedAndTag(0);
+    auto val = _argStack.value(0);
 
-    _argStackOwned.clear();
-    _argStackTags.clear();
-    _argStackVals.clear();
+    // Transfer ownership of tag/val to the caller
+    _argStack.resize(0);
 
     return {owned, tag, val};
 }

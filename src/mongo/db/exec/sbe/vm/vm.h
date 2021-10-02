@@ -594,15 +594,91 @@ private:
 
 class ByteCode {
 public:
-    ~ByteCode();
-
     std::tuple<uint8_t, value::TypeTags, value::Value> run(const CodeFragment* code);
     bool runPredicate(const CodeFragment* code);
 
 private:
-    std::vector<uint8_t> _argStackOwned;
-    std::vector<value::TypeTags> _argStackTags;
-    std::vector<value::Value> _argStackVals;
+    // The VM stack is used to pass inputs to instructions and hold the outputs produced by
+    // instructions. Each element of the VM stack is 3-tuple comprised of a boolean ('owned'),
+    // a value::TypeTags ('tag'), and a value::Value ('value').
+    //
+    // In order to make the VM stack cache-friendly, for each element we want 'owned', 'tag',
+    // and 'value' to be located relatively close together, and we also want to avoid wasting
+    // any bytes due to padding.
+    //
+    // To achieve these goals, the VM stack is organized as a vector of "stack segments". Each
+    // "segment" is large enough to hold 4 elements. The first 8 bytes of a segment holds the
+    // 'owned' and 'tag' components, and the remaining 32 bytes hold the 'value' components.
+    static constexpr size_t ElementsPerSegment = 4;
+
+    struct OwnedAndTag {
+        uint8_t owned;
+        value::TypeTags tag;
+    };
+
+    struct StackSegment {
+        OwnedAndTag ownedAndTags[ElementsPerSegment];
+        value::Value values[ElementsPerSegment];
+    };
+
+    class Stack {
+    public:
+        static constexpr size_t kMaxCapacity =
+            ((std::numeric_limits<size_t>::max() / 2) / sizeof(StackSegment)) * ElementsPerSegment;
+
+        const auto& ownedAndTag(size_t index) const {
+            return _segments[index / ElementsPerSegment].ownedAndTags[index % ElementsPerSegment];
+        }
+        auto& ownedAndTag(size_t index) {
+            return _segments[index / ElementsPerSegment].ownedAndTags[index % ElementsPerSegment];
+        }
+
+        const auto& owned(size_t index) const {
+            return ownedAndTag(index).owned;
+        }
+        auto& owned(size_t index) {
+            return ownedAndTag(index).owned;
+        }
+
+        const auto& tag(size_t index) const {
+            return ownedAndTag(index).tag;
+        }
+        auto& tag(size_t index) {
+            return ownedAndTag(index).tag;
+        }
+
+        const auto& value(size_t index) const {
+            return _segments[index / ElementsPerSegment].values[index % ElementsPerSegment];
+        }
+        auto& value(size_t index) {
+            return _segments[index / ElementsPerSegment].values[index % ElementsPerSegment];
+        }
+
+        auto size() const {
+            return _size;
+        }
+
+        auto capacity() const {
+            return _capacity;
+        }
+
+        void resize(size_t newSize) {
+            if (MONGO_likely(newSize <= capacity())) {
+                _size = newSize;
+                return;
+            }
+            growAndResize(newSize);
+        }
+
+    private:
+        MONGO_COMPILER_NOINLINE void growAndResize(size_t newSize);
+
+        std::unique_ptr<StackSegment[]> _segments;
+        size_t _size = 0;
+        size_t _capacity = 0;
+    };
+
+    Stack _argStack;
 
     void runInternal(const CodeFragment* code, int64_t position);
     std::tuple<bool, value::TypeTags, value::Value> runLambdaInternal(const CodeFragment* code,
@@ -899,61 +975,54 @@ private:
     std::tuple<bool, value::TypeTags, value::Value> dispatchBuiltin(Builtin f, ArityType arity);
 
     std::tuple<bool, value::TypeTags, value::Value> getFromStack(size_t offset) {
-        auto backOffset = _argStackOwned.size() - 1 - offset;
-        auto owned = _argStackOwned[backOffset];
-        auto tag = _argStackTags[backOffset];
-        auto val = _argStackVals[backOffset];
+        auto backOffset = _argStack.size() - 1 - offset;
 
-        return {owned, tag, val};
+        auto [owned, tag] = _argStack.ownedAndTag(backOffset);
+        auto val = _argStack.value(backOffset);
+
+        return {static_cast<bool>(owned), tag, val};
     }
 
     std::tuple<bool, value::TypeTags, value::Value> moveFromStack(size_t offset) {
-        auto backOffset = _argStackOwned.size() - 1 - offset;
-        auto owned = _argStackOwned[backOffset];
-        _argStackOwned[backOffset] = false;
-        auto tag = _argStackTags[backOffset];
-        _argStackTags[backOffset] = value::TypeTags::Nothing;
-        auto val = _argStackVals[backOffset];
-        _argStackVals[backOffset] = 0;
+        auto backOffset = _argStack.size() - 1 - offset;
+        auto [owned, tag] = _argStack.ownedAndTag(backOffset);
+        _argStack.ownedAndTag(backOffset) = {false, value::TypeTags::Nothing};
+        auto val = _argStack.value(backOffset);
+        _argStack.value(backOffset) = 0;
 
         return {owned, tag, val};
     }
 
     void setStack(size_t offset, bool owned, value::TypeTags tag, value::Value val) {
-        auto backOffset = _argStackOwned.size() - 1 - offset;
-        _argStackOwned[backOffset] = owned;
-        _argStackTags[backOffset] = tag;
-        _argStackVals[backOffset] = val;
+        auto backOffset = _argStack.size() - 1 - offset;
+        _argStack.ownedAndTag(backOffset) = {owned, tag};
+        _argStack.value(backOffset) = val;
     }
 
     void pushStack(bool owned, value::TypeTags tag, value::Value val) {
-        _argStackOwned.push_back(owned);
-        _argStackTags.push_back(tag);
-        _argStackVals.push_back(val);
+        _argStack.resize(_argStack.size() + 1);
+        topStack(owned, tag, val);
     }
 
     void topStack(bool owned, value::TypeTags tag, value::Value val) {
-        _argStackOwned.back() = owned;
-        _argStackTags.back() = tag;
-        _argStackVals.back() = val;
+        size_t index = _argStack.size() - 1;
+        _argStack.ownedAndTag(index) = {owned, tag};
+        _argStack.value(index) = val;
     }
 
     void popStack() {
-        _argStackOwned.pop_back();
-        _argStackTags.pop_back();
-        _argStackVals.pop_back();
+        _argStack.resize(_argStack.size() - 1);
     }
 
     void popAndReleaseStack() {
-        auto owned = _argStackOwned.back();
-        auto tag = _argStackTags.back();
-        auto val = _argStackVals.back();
-
-        popStack();
+        size_t index = _argStack.size() - 1;
+        auto [owned, tag] = _argStack.ownedAndTag(index);
 
         if (owned) {
-            value::releaseValue(tag, val);
+            value::releaseValue(tag, _argStack.value(index));
         }
+
+        popStack();
     }
 
     void swapStack();
