@@ -435,7 +435,8 @@ LogicalTime computeOperationTime(OperationContext* opCtx, LogicalTime startOpera
 
         // Note: ReadConcernArgs::getLevel returns kLocal if none was set.
         if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern) {
-            operationTime = LogicalTime(replCoord->getLastCommittedOpTime().getTimestamp());
+            operationTime =
+                LogicalTime(replCoord->getCurrentCommittedSnapshotOpTime().getTimestamp());
         } else {
             operationTime = LogicalTime(replCoord->getMyLastAppliedOpTime().getTimestamp());
         }
