@@ -113,12 +113,14 @@ const txnChangeStream = coll.aggregate(
 assert.soon(() => txnChangeStream.hasNext());
 const event3 = txnChangeStream.next();
 assert.eq(event3.operationType, "insert", event3);
-assert.eq(event3.documentKey._id, 1, event3);
 
 assert.soon(() => txnChangeStream.hasNext());
 const event4 = txnChangeStream.next();
 assert.eq(event4.operationType, "insert", event4);
-assert.eq(event4.documentKey._id, 2, event4);
+
+// Note that the stream may output the two inserts in either order. Because they are within a
+// transaction, they effectively occur at exactly the same time.
+assert.sameMembers([1, 2], [event3.documentKey._id, event4.documentKey._id], [event3, event4]);
 
 assert(!txnChangeStream.hasNext());
 txnChangeStream.close();
@@ -167,13 +169,19 @@ const collationChangeStream = coll.aggregate(
     [{$changeStream: {resumeAfter: resumeAfterToken}}, {$match: {"fullDocument.string": "value"}}],
     {collation: {locale: "en_US", strength: 2}});
 
-["Value", "vAlue", "vaLue", "valUe"].forEach(val => {
+let stringValues = [];
+for (let i = 0; i < 4; ++i) {
     assert.soon(() => collationChangeStream.hasNext());
-    const fullDocumentEvent = collationChangeStream.next();
-    assert.eq(fullDocumentEvent.fullDocument.string, val, fullDocumentEvent);
-});
-
+    stringValues.push(collationChangeStream.next().fullDocument.string);
+}
 assert(!collationChangeStream.hasNext());
 collationChangeStream.close();
+
+assert.eq(stringValues.slice(0, 2), ["Value", "vAlue"]);
+
+// Again, the stream may output these two inserts in either order. Because they are within a
+// transaction, they effectively occur at exactly the same time.
+assert.sameMembers(stringValues.slice(2, 4), ["vaLue", "valUe"]);
+
 st.stop();
 })();
