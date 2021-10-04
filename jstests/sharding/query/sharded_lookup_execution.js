@@ -117,10 +117,16 @@ function assertLookupExecution(pipeline, opts, expected) {
         if (expected.subpipelineLocalExec) {
             const node = i == 0 ? st.shard0 : st.shard1;
             const localReadCount = getLocalReadCount(node, reviewsColl.getFullName(), opts.comment);
-            assert.eq(expected.subpipelineLocalExec[i],
-                      localReadCount,
-                      "expected to find " + expected.subpipelineLocalExec[i] +
-                          ' local reads but found ' + localReadCount + ' instead.');
+
+            if (expected.subpipelineLocalExec[i] !== localReadCount) {
+                const globalLogResponse = node.adminCommand({getLog: "global"});
+                if (globalLogResponse.ok) {
+                    jsTestLog('Log for node ' + node.name + ': ' + tojson(globalLogResponse.log));
+                }
+                assert(false,
+                       "Expected to find " + expected.subpipelineLocalExec[i] +
+                           " local reads but found " + localReadCount + " instead.");
+            }
         }
 
         // If there is a nested $lookup within the top-level $lookup subpipeline, confirm that

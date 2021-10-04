@@ -80,23 +80,35 @@ function assertProfilerEntriesMatch(expected, comment, pipeline) {
         // remote shards, which can be seen in the profiler, or performed as a local read, which can
         // be seen in a special log line. The filter on the namespace below ensures we catch both
         // pipelines run against the view namespace and pipelines run against the underlying coll.
-        profilerHasNumMatchingEntriesOrThrow({
-            profileDB: node.getDB(dbName),
-            filter: {
-                $or: [
-                    {"command.aggregate": {$eq: foreignNs}},
-                    {"command.aggregate": {$eq: foreign.getName()}}
-                ],
-                "command.comment": comment
-            },
-            numExpectedMatches: expected.subPipelineRemote[i]
-        });
+        // The number of shard targeting and local read operations can depend on which shard,
+        // primary or non-primary, executes a subpipeline first. To account for this, the caller can
+        // specify an array of possible values for 'subPipelineRemote' and 'subPipelineLocal'.
+        const filter = {
+            $or: [
+                {"command.aggregate": {$eq: foreignNs}},
+                {"command.aggregate": {$eq: foreign.getName()}}
+            ],
+            "command.comment": comment
+        };
+        const remoteSubpipelineCount = node.getDB(dbName).system.profile.find(filter).itcount();
+        let expectedRemoteCountList = expected.subPipelineRemote[i];
+        if (!Array.isArray(expectedRemoteCountList)) {
+            expectedRemoteCountList = [expectedRemoteCountList];
+        }
+        assert(expectedRemoteCountList.includes(remoteSubpipelineCount),
+               () => 'Expected count of profiler entries to be in ' +
+                   tojson(expectedRemoteCountList) + ' but found ' + remoteSubpipelineCount +
+                   ' instead in profiler ' +
+                   tojson({[node.name]: node.getDB(dbName).system.profile.find().toArray()}));
 
         const localReadCount = getLocalReadCount(node, foreignNs, comment);
-        assert.eq(expected.subPipelineLocal[i],
-                  localReadCount,
-                  "expected to find " + expected.subPipelineLocal[i] + ' local reads but found ' +
-                      localReadCount + ' instead.');
+        let expectedLocalCountList = expected.subPipelineLocal[i];
+        if (!Array.isArray(expectedLocalCountList)) {
+            expectedLocalCountList = [expectedLocalCountList];
+        }
+        assert(expectedLocalCountList.includes(localReadCount),
+               () => 'Expected count of local reads to be in ' + tojson(expectedLocalCountList) +
+                   ' but found ' + localReadCount + ' instead for node ' + node.name);
     }
 }
 
@@ -284,11 +296,14 @@ expectedRes = [
 ];
 assertAggResultAndRouting(pipeline, expectedRes, {comment: "graphLookup_foreign_does_not_exist"}, {
     toplevelExec: [1, 1],
-    // The primary node executing the $graphLookup believes it has stale information about the
-    // foreign coll and needs to target shards to properly resolve it. Afterwards, it can proceed
-    // with local reads. As before, the other node sends its subpipelines over the network.
+    // If the primary node tries to execute a subpipeline first, then it believes it has stale info
+    // about the foreign coll and needs to target shards to properly resolve it. Afterwards, it can
+    // do local reads. As before, the other node sends its subpipelines over the network. This
+    // results in 3 remote reads. If the non-primary shard sends a subpipeline to execute on the
+    // primary shard first, then the primary does a coll refresh before it attempts to run one of
+    // its own subpipelines and does not need to target shards. This results in 2 remote reads.
     subPipelineLocal: [2, 0],
-    subPipelineRemote: [3, 0]
+    subPipelineRemote: [[2, 3], 0]
 });
 
 //
@@ -426,13 +441,16 @@ assertAggResultAndRouting(
         executeOnSecondaries: true,
         // The $lookup can be executed in parallel since mongos knows both collections are sharded.
         toplevelExec: [1, 1],
-        // The primary tries and fails to read locally. It falls back to targeting shards, which
-        // also fails due to a StaleShardVersionError. The entire subpipeline is re-tried after the
-        // refresh. From then on, for every document that flows through the $lookup stage, each node
-        // executing the $lookup will perform a scatter-gather query and open a cursor on every
-        // shard that contains the foreign collection.
-        subPipelineLocal: [1, 0],
-        subPipelineRemote: [5, 4],
+        // If the primary executes a subpipeline first, it will try and fail to read locally. It
+        // falls back to targeting shards, which also fails due to a StaleShardVersionError. The
+        // entire subpipeline is re-tried after the refresh. If the non-primary shard executes a
+        // subpipeline first, it will refresh and target the correct shards, and the primary will
+        // do a refresh before it executes one of its own subpipelines. From then on, for every
+        // document that flows through the $lookup stage, each node executing the $lookup will
+        // perform a scatter-gather query and open a cursor on every shard that contains the foreign
+        // collection.
+        subPipelineLocal: [[0, 1], 0],
+        subPipelineRemote: [[4, 5], 4],
     });
 
 // Test $lookup when the foreign collection does not exist.
