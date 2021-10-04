@@ -225,6 +225,11 @@ executor:
   - class: CheckReplDBHash
   - class: CheckOrphansDeleted
   - class: ValidateCollections # Validation can interfere with other operations, so this goes last.
+    shell_options:
+      global_vars:
+        TestData:
+          # TODO (SERVER-60337): Enable fast count enforcement.
+          skipEnforceFastCountOnValidate: true
   - class: CleanupConcurrencyWorkloads
   fixture:
     class: ShardedClusterFixture
