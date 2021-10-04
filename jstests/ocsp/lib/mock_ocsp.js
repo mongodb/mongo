@@ -121,8 +121,15 @@ class MockOCSPServer {
 
         print("Stopping Mock OCSP Server");
 
-        const kSIGINT = 2;
-        stopMongoProgramByPid(this.pid, kSIGINT);
+        if (_isWindows()) {
+            // we use taskkill because we need to kill children
+            waitProgram(_startMongoProgram("taskkill", "/F", "/T", "/PID", this.pid));
+            // waitProgram to ignore error code
+            waitProgram(this.pid);
+        } else {
+            const kSIGINT = 2;
+            stopMongoProgramByPid(this.pid, kSIGINT);
+        }
 
         print("Mock OCSP Server stop complete");
     }
