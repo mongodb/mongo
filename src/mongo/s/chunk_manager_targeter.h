@@ -150,7 +150,8 @@ private:
     // Full namespace of the collection for this targeter
     NamespaceString _nss;
 
-    // Used to identify the original namespace that the user has requested.
+    // Used to identify the original namespace that the user has requested. Note: this will only be
+    // true if the buckets namespace is sharded.
     bool _isRequestOnTimeseriesViewNamespace = false;
 
     // Stores last error occurred

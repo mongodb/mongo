@@ -2,7 +2,7 @@
  * Tests running the update command on a time-series collection with concurrent modifications to the
  * collection.
  * @tags: [
- *   assumes_unsharded_collection, # TODO SERVER-59180: Remove this tag.
+ *   assumes_unsharded_collection, # TODO SERVER-60233: Remove this tag.
  *   does_not_support_stepdowns,
  *   does_not_support_transactions,
  *   requires_fcv_51,

@@ -3,7 +3,6 @@
  * were updated.
  *
  * @tags: [
- *   assumes_unsharded_collection, # TODO SERVER-59180: Remove this tag.
  *   does_not_support_stepdowns,
  *   does_not_support_transactions,
  *   requires_getmore,
@@ -14,9 +13,23 @@
 "use strict";
 
 load("jstests/core/timeseries/libs/timeseries.js");
+load("jstests/libs/fixture_helpers.js");
 
 if (!TimeseriesTest.timeseriesUpdatesAndDeletesEnabled(db.getMongo())) {
     jsTestLog("Skipping test because the time-series updates and deletes feature flag is disabled");
+    return;
+}
+
+if (FixtureHelpers.isMongos(db) &&
+    !TimeseriesTest.shardedtimeseriesCollectionsEnabled(db.getMongo())) {
+    jsTestLog("Skipping test because the time-series updates and deletes feature flag is disabled");
+    return;
+}
+
+if (FixtureHelpers.isMongos(db) &&
+    !TimeseriesTest.shardedTimeseriesUpdatesAndDeletesEnabled(db.getMongo())) {
+    jsTestLog(
+        "Skipping test because the sharded time-series updates and deletes feature flag is disabled");
     return;
 }
 

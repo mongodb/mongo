@@ -958,16 +958,21 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
 WriteResult performUpdates(OperationContext* opCtx,
                            const write_ops::UpdateCommandRequest& wholeOp,
                            OperationSource source) {
+    auto ns = wholeOp.getNamespace();
+    if (source == OperationSource::kTimeseriesUpdate && !ns.isTimeseriesBucketsCollection()) {
+        ns = ns.makeTimeseriesBucketsNamespace();
+    }
+
     // Update performs its own retries, so we should not be in a WriteUnitOfWork unless run in a
     // transaction.
     auto txnParticipant = TransactionParticipant::get(opCtx);
     invariant(!opCtx->lockState()->inAWriteUnitOfWork() ||
               (txnParticipant && opCtx->inMultiDocumentTransaction()));
-    uassertStatusOK(userAllowedWriteNS(opCtx, wholeOp.getNamespace()));
+    uassertStatusOK(userAllowedWriteNS(opCtx, ns));
 
     DisableDocumentSchemaValidationIfTrue docSchemaValidationDisabler(
         opCtx, wholeOp.getWriteCommandRequestBase().getBypassDocumentValidation());
-    LastOpFixer lastOpFixer(opCtx, wholeOp.getNamespace());
+    LastOpFixer lastOpFixer(opCtx, ns);
 
     bool containsRetry = false;
     ON_BLOCK_EXIT([&] { updateRetryStats(opCtx, containsRetry); });
@@ -1020,23 +1025,11 @@ WriteResult performUpdates(OperationContext* opCtx,
                 : std::vector<StmtId>{stmtId};
 
             out.results.emplace_back(performSingleUpdateOpWithDupKeyRetry(
-                opCtx,
-                source == OperationSource::kTimeseriesUpdate
-                    ? wholeOp.getNamespace().makeTimeseriesBucketsNamespace()
-                    : wholeOp.getNamespace(),
-                stmtIds,
-                singleOp,
-                runtimeConstants,
-                wholeOp.getLet(),
-                source));
+                opCtx, ns, stmtIds, singleOp, runtimeConstants, wholeOp.getLet(), source));
             lastOpFixer.finishedOpSuccessfully();
         } catch (const DBException& ex) {
-            out.canContinue = handleError(opCtx,
-                                          ex,
-                                          wholeOp.getNamespace(),
-                                          wholeOp.getWriteCommandRequestBase(),
-                                          singleOp.getMulti(),
-                                          &out);
+            out.canContinue = handleError(
+                opCtx, ex, ns, wholeOp.getWriteCommandRequestBase(), singleOp.getMulti(), &out);
             if (!out.canContinue) {
                 break;
             }
