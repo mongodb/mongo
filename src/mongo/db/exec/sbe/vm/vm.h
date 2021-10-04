@@ -73,15 +73,19 @@ std::pair<value::TypeTags, value::Value> genericCompare(
             case value::TypeTags::NumberDecimal: {
                 auto result = [&]() {
                     if (lhsTag == value::TypeTags::NumberDouble) {
-                        return op(compareDoubleToDecimal(
-                                      value::numericCast<double>(lhsTag, lhsValue),
-                                      value::numericCast<Decimal128>(rhsTag, rhsValue)),
+                        if (value::isNaN(lhsTag, lhsValue) || value::isNaN(rhsTag, rhsValue)) {
+                            return false;
+                        }
+                        return op(compareDoubleToDecimal(value::bitcastTo<double>(lhsValue),
+                                                         value::bitcastTo<Decimal128>(rhsValue)),
                                   0);
                     } else if (rhsTag == value::TypeTags::NumberDouble) {
-                        return op(
-                            compareDecimalToDouble(value::numericCast<Decimal128>(lhsTag, lhsValue),
-                                                   value::numericCast<double>(rhsTag, rhsValue)),
-                            0);
+                        if (value::isNaN(lhsTag, lhsValue) || value::isNaN(rhsTag, rhsValue)) {
+                            return false;
+                        }
+                        return op(compareDecimalToDouble(value::bitcastTo<Decimal128>(lhsValue),
+                                                         value::bitcastTo<double>(rhsValue)),
+                                  0);
                     } else {
                         return op(value::numericCast<Decimal128>(lhsTag, lhsValue),
                                   value::numericCast<Decimal128>(rhsTag, rhsValue));
