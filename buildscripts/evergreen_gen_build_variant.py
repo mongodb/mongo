@@ -369,7 +369,7 @@ class GenerateBuildVariantOrchestrator:
 
             [j.result() for j in jobs]  # pylint: disable=expression-not-assigned
 
-            builder.generate_archive_dist_test_debug_activator_task(build_variant_name)
+            # builder.generate_archive_dist_test_debug_activator_task(build_variant_name)
             # TODO: SERVER-59102 Check if this still causes a circular dependency on generator_tasks.
             # tasks_to_hide.add(ACTIVATE_ARCHIVE_DIST_TEST_DEBUG_TASK)
 
