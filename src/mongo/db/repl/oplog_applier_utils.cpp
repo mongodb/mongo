@@ -40,8 +40,11 @@
 #include "mongo/db/repl/oplog_applier_utils.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/util/fail_point.h"
 
 #include "mongo/logv2/log.h"
+
+MONGO_FAIL_POINT_DEFINE(hangAfterApplyingCollectionDropOplogEntry);
 
 namespace mongo {
 namespace repl {
@@ -267,6 +270,15 @@ Status OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
                 incrementOpsAppliedStats();
                 return status;
             });
+        if (op.getCommandType() == mongo::repl::OplogEntry::CommandType::kDrop) {
+            hangAfterApplyingCollectionDropOplogEntry.executeIf(
+                [&](const BSONObj&) {
+                    hangAfterApplyingCollectionDropOplogEntry.pauseWhileSet();
+                    LOGV2(5863600,
+                          "Hanging due to 'hangAfterApplyingCollectionDropOplogEntry' failpoint.");
+                },
+                [&](const BSONObj& data) { return (nss.db() == data["dbName"].str()); });
+        }
         return status;
     }
 
