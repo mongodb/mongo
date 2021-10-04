@@ -564,6 +564,37 @@ TEST_F(FindAndModifyRetryability, NestedUpdateWithPreImage) {
                       result);
 }
 
+TEST_F(FindAndModifyRetryability, UpdateRequestWithPreImageButNestedOpHasNoLinkShouldAssert) {
+    auto request = makeFindAndModifyRequest(
+        kNs, BSONObj(), write_ops::UpdateModification::parseFromClassicUpdate(BSONObj()));
+    request.setNew(false);
+
+    repl::OpTime imageOpTime(Timestamp(120, 3), 1);
+    auto noteOplog = makeOplogEntry(imageOpTime,                    // optime
+                                    repl::OpTypeEnum::kNoop,        // op type
+                                    kNs,                            // namespace
+                                    BSON("_id" << 1 << "z" << 1));  // o
+
+    insertOplogEntry(noteOplog);
+
+    auto innerOplog = makeOplogEntry(repl::OpTime(),                // optime
+                                     repl::OpTypeEnum::kUpdate,     // op type
+                                     kNs,                           // namespace
+                                     BSON("_id" << 1 << "y" << 1),  // o
+                                     BSON("_id" << 1));             // o2
+
+    auto updateOplog = makeOplogEntry(repl::OpTime(Timestamp(60, 10), 1),  // optime
+                                      repl::OpTypeEnum::kNoop,             // optype
+                                      kNs,                                 // namespace
+                                      kNestedOplog,                        // o
+                                      innerOplog.getEntry().toBSON(),      // o2
+                                      boost::none,                         // pre-image optime
+                                      boost::none);                        // post-image optime
+
+    ASSERT_THROWS(parseOplogEntryForFindAndModify(opCtx(), request, updateOplog),
+                  AssertionException);
+}
+
 TEST_F(FindAndModifyRetryability, UpdateWithPostImage) {
     auto request = makeFindAndModifyRequest(
         kNs, BSONObj(), write_ops::UpdateModification::parseFromClassicUpdate(BSONObj()));
@@ -622,6 +653,37 @@ TEST_F(FindAndModifyRetryability, NestedUpdateWithPostImage) {
     ASSERT_BSONOBJ_EQ(BSON("lastErrorObject" << BSON("n" << 1 << "updatedExisting" << true)
                                              << "value" << BSON("a" << 1 << "b" << 1)),
                       result);
+}
+
+TEST_F(FindAndModifyRetryability, UpdateRequestWithPostImageButNestedOpHasNoLinkShouldAssert) {
+    auto request = makeFindAndModifyRequest(
+        kNs, BSONObj(), write_ops::UpdateModification::parseFromClassicUpdate(BSONObj()));
+    request.setNew(true);
+
+    repl::OpTime imageOpTime(Timestamp(120, 3), 1);
+    auto noteOplog = makeOplogEntry(imageOpTime,                  // optime
+                                    repl::OpTypeEnum::kNoop,      // op type
+                                    kNs,                          // namespace
+                                    BSON("a" << 1 << "b" << 1));  // o
+
+    insertOplogEntry(noteOplog);
+
+    auto innerOplog = makeOplogEntry(repl::OpTime(),                // optime
+                                     repl::OpTypeEnum::kUpdate,     // op type
+                                     kNs,                           // namespace
+                                     BSON("_id" << 1 << "y" << 1),  // o
+                                     BSON("_id" << 1));             // o2
+
+    auto updateOplog = makeOplogEntry(repl::OpTime(Timestamp(60, 10), 1),  // optime
+                                      repl::OpTypeEnum::kNoop,             // op type
+                                      kNs,                                 // namespace
+                                      kNestedOplog,                        // o
+                                      innerOplog.getEntry().toBSON(),      // o2
+                                      boost::none,                         // pre-image optime
+                                      boost::none);                        // post-image optime
+
+    ASSERT_THROWS(parseOplogEntryForFindAndModify(opCtx(), request, updateOplog),
+                  AssertionException);
 }
 
 TEST_F(FindAndModifyRetryability, UpdateWithPostImageButOplogDoesNotExistShouldError) {

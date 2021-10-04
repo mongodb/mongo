@@ -386,6 +386,33 @@ TEST_F(ReshardingDonorOplogIterTest, FillsInPreImageOplogEntry) {
     ASSERT_TRUE(next.empty());
 }
 
+TEST_F(ReshardingDonorOplogIterTest, ShouldNotErrorIfPreImageOplogEntryCannotBeFound) {
+    const auto& preImageDoc = BSON("_id" << 0 << "x" << 1);
+    const auto& [preImageOp, deleteOp] =
+        makeDeleteWithPreImage(Timestamp(2, 4), preImageDoc, Timestamp(2, 5));
+    const auto& finalOplog = makeFinalOplog(Timestamp(43, 24));
+
+    DBDirectClient client(operationContext());
+    const auto& ns = oplogNss().ns();
+    client.insert(ns, deleteOp.toBSON());
+    client.insert(ns, finalOplog.toBSON());
+
+    ReshardingDonorOplogIterator iter(oplogNss(), kResumeFromBeginning, &onInsertAlwaysReady);
+    auto executor = makeTaskExecutorForIterator();
+    auto factory = makeCancelableOpCtx();
+    auto altClient = makeKillableClient();
+    AlternativeClientRegion acr(altClient);
+
+    auto next = getNextBatch(&iter, executor, factory);
+    ASSERT_EQ(next.size(), 1U);
+    ASSERT_BSONOBJ_EQ(getId(deleteOp), getId(next[0]));
+    ASSERT_FALSE(bool(next[0].getPreImageOp()));
+    ASSERT_FALSE(bool(next[0].getPostImageOp()));
+
+    next = getNextBatch(&iter, executor, factory);
+    ASSERT_TRUE(next.empty());
+}
+
 TEST_F(ReshardingDonorOplogIterTest, FillsInPostImageOplogEntry) {
     const auto& postImageDoc = BSON("_id" << 0 << "x" << 1);
     const auto& [postImageOp, updateOp] = makeUpdateWithPostImage(
@@ -415,6 +442,33 @@ TEST_F(ReshardingDonorOplogIterTest, FillsInPostImageOplogEntry) {
     ASSERT_TRUE(bool(next[0].getPostImageOp()));
     ASSERT_BSONOBJ_BINARY_EQ(getId(postImageOp), getId(*next[0].getPostImageOp()));
     ASSERT_BSONOBJ_BINARY_EQ(postImageDoc, next[0].getPostImageOp()->getObject());
+
+    next = getNextBatch(&iter, executor, factory);
+    ASSERT_TRUE(next.empty());
+}
+
+TEST_F(ReshardingDonorOplogIterTest, ShouldNotErrorIfPostImageOplogEntryCannotBeFound) {
+    const auto& postImageDoc = BSON("_id" << 0 << "x" << 1);
+    const auto& [postImageOp, updateOp] = makeUpdateWithPostImage(
+        Timestamp(2, 4), postImageDoc, Timestamp(2, 5), BSON("$set" << BSON("x" << 1)));
+    const auto& finalOplog = makeFinalOplog(Timestamp(43, 24));
+
+    DBDirectClient client(operationContext());
+    const auto& ns = oplogNss().ns();
+    client.insert(ns, updateOp.toBSON());
+    client.insert(ns, finalOplog.toBSON());
+
+    ReshardingDonorOplogIterator iter(oplogNss(), kResumeFromBeginning, &onInsertAlwaysReady);
+    auto executor = makeTaskExecutorForIterator();
+    auto factory = makeCancelableOpCtx();
+    auto altClient = makeKillableClient();
+    AlternativeClientRegion acr(altClient);
+
+    auto next = getNextBatch(&iter, executor, factory);
+    ASSERT_EQ(next.size(), 1U);
+    ASSERT_BSONOBJ_EQ(getId(updateOp), getId(next[0]));
+    ASSERT_FALSE(bool(next[0].getPreImageOp()));
+    ASSERT_FALSE(bool(next[0].getPostImageOp()));
 
     next = getNextBatch(&iter, executor, factory);
     ASSERT_TRUE(next.empty());
