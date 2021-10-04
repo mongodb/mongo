@@ -5,6 +5,8 @@
  * asserts that find queries using the plan cache produce the correct results.
  *
  * @tags: [
+ *     # Needed as the setParameter for ForceClassicEngine was introduced in 5.1.
+ *     requires_fcv_51,
  * ]
  */
 
