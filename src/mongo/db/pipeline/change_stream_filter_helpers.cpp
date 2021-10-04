@@ -62,11 +62,11 @@ std::unique_ptr<MatchExpression> buildOperationFilter(
     auto streamType = DocumentSourceChangeStream::getChangeStreamType(expCtx->ns);
 
     /**
-     * IMPORTANT: Any new operationType added here must also have a corresponding rewrite in both
-     * the 'exprRewriteOperationType' and 'matchRewriteOperationType' functions, which can be found
-     * in the file change_stream_rewrite_helpers.cpp. Without a corresponding rewrite, the optimizer
-     * will assume that no event can pass a $match filter on the newly added operationType, causing
-     * it to erroneously discard events.
+     * IMPORTANT: Any new operationType added here must also add corresponding oplog rewrites in the
+     * file change_stream_rewrite_helpers.cpp. A number of the existing rewrite functions in that
+     * file rely upon an exhaustive list of all change stream events that are derived directly from
+     * the oplog. Without appropriate rewrite rules for the new event, the optimizer will assume
+     * that no oplog entry can ever match the user's filter, causing it to discard those events.
      */
 
     // The standard event filter, before it is combined with the user filter, is as follows:
