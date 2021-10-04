@@ -133,6 +133,13 @@ public:
                                                  bool enableMajorityReadConcern) const;
 
     /**
+     * Checks that all of the stages in this pipeline are allowed to run with the specified read
+     * concern level. Does not do any pipeline global checks.
+     */
+    ReadConcernSupportResult sourcesSupportReadConcern(repl::ReadConcernLevel level,
+                                                       bool isImplicitDefault) const;
+
+    /**
      * Verifies that this pipeline is allowed to run in a multi-document transaction. This ensures
      * that each stage is compatible, and throws a UserException if not. This should only be called
      * if the caller has determined the current operation is part of a transaction.

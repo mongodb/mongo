@@ -293,6 +293,13 @@ public:
         return _pipelines;
     }
 
+    /**
+     * Check the read concern constraints of all sub-pipelines. If the stage that owns the
+     * sub-pipelines has its own constraints this should be overridden to take those into account.
+     */
+    ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
+                                                 bool isImplicitDefault) const override;
+
 protected:
     boost::optional<NamespaceString> _foreignNss;
     std::vector<LiteParsedPipeline> _pipelines;

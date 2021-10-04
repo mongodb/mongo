@@ -89,6 +89,39 @@ std::list<boost::intrusive_ptr<DocumentSource>> create(
     boost::optional<boost::intrusive_ptr<Expression>> partitionBy,
     const boost::optional<SortPattern>& sortBy,
     std::vector<WindowFunctionStatement> outputFields);
+
+class LiteParsedSetWindowFields : public LiteParsedDocumentSource {
+public:
+    static std::unique_ptr<LiteParsedSetWindowFields> parse(const NamespaceString& nss,
+                                                            const BSONElement& spec) {
+        return std::make_unique<LiteParsedSetWindowFields>(spec.fieldName());
+    }
+
+    explicit LiteParsedSetWindowFields(std::string parseTimeName)
+        : LiteParsedDocumentSource(std::move(parseTimeName)) {}
+
+    ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
+                                                 bool isImplicitDefault) const {
+        // $setWindowFields cannot spill to disk if read concern is set to "snapshot".
+        // TODO SERVER-59772 Enable $setWindowFields with read concern "snapshot".
+        return {{level == repl::ReadConcernLevel::kSnapshotReadConcern && !isImplicitDefault,
+                 {ErrorCodes::InvalidOptions,
+                  str::stream() << "Aggregation stage " << kStageName
+                                << " cannot run with readConcern '"
+                                << repl::readConcernLevels::toString(
+                                       repl::ReadConcernLevel::kSnapshotReadConcern)}},
+                // The default read concern can't be snapshot.
+                boost::none};
+    }
+
+    stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
+        return stdx::unordered_set<NamespaceString>();
+    }
+
+    PrivilegeVector requiredPrivileges(bool isMongos, bool bypassDocumentValidation) const final {
+        return {};
+    }
+};
 }  // namespace document_source_set_window_fields
 
 class DocumentSourceInternalSetWindowFields final : public DocumentSource {
@@ -131,7 +164,9 @@ public:
                                 HostTypeRequirement::kNone,
                                 DiskUseRequirement::kWritesTmpData,
                                 FacetRequirement::kAllowed,
-                                TransactionRequirement::kAllowed,
+                                // $setWindowFields does not work inside transactions.
+                                // TODO SERVER-59772 Enable $setWindowFields inside transactions.
+                                TransactionRequirement::kNotAllowed,
                                 LookupRequirement::kAllowed,
                                 UnionRequirement::kAllowed);
     }

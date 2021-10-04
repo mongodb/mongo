@@ -90,11 +90,17 @@ public:
 
         ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
                                                      bool isImplicitDefault) const final {
-            return {
+            ReadConcernSupportResult result = {
                 {level == repl::ReadConcernLevel::kLinearizableReadConcern,
                  {ErrorCodes::InvalidOptions,
                   "{} cannot be used with a 'linearizable' read concern level"_format(kStageName)}},
                 Status::OK()};
+            auto pipelineReadConcern = LiteParsedDocumentSourceNestedPipelines::supportsReadConcern(
+                level, isImplicitDefault);
+            // Merge the result from the sub-pipeline into the $merge specific read concern result
+            // to preserve the $merge errors over the internal pipeline errors.
+            result.merge(pipelineReadConcern);
+            return result;
         }
 
         PrivilegeVector requiredPrivileges(bool isMongos,
