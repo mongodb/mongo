@@ -32,6 +32,10 @@
 #include "mongo/db/pipeline/document_source_change_stream_add_post_image.h"
 
 #include "mongo/bson/simple_bsonelement_comparator.h"
+#include "mongo/db/ops/write_ops_parsers.h"
+#include "mongo/db/pipeline/change_stream_helpers_legacy.h"
+#include "mongo/db/pipeline/document_source_change_stream_add_pre_image.h"
+#include "mongo/db/update/update_driver.h"
 
 namespace mongo {
 
@@ -80,8 +84,33 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamAddPostImage::doGetNext(
         return input;
     }
 
+    // TODO SERVER-58584: remove the feature flag.
+    if (_fullDocumentMode != FullDocumentModeEnum::kUpdateLookup) {
+        tassert(5869000,
+                str::stream() << "Feature flag must be enabled for fullDocument: "
+                              << FullDocumentMode_serializer(_fullDocumentMode),
+                feature_flags::gFeatureFlagChangeStreamPreAndPostImages.isEnabled(
+                    serverGlobalParams.featureCompatibility));
+    }
+
+    // Create a mutable output document from the input document.
     MutableDocument output(input.releaseDocument());
-    output[kFullDocumentFieldName] = lookupPostImage(output.peek());
+    const auto postImageDoc = (_fullDocumentMode == FullDocumentModeEnum::kUpdateLookup
+                                   ? lookupLatestPostImage(output.peek())
+                                   : generatePostImage(output.peek()));
+    uassert(
+        ErrorCodes::NoMatchingDocument,
+        str::stream() << "Change stream was configured to require a post-image for all update, "
+                         "delete and replace events, but the post-image was not found for event: "
+                      << output.peek().toString(),
+        postImageDoc || _fullDocumentMode != FullDocumentModeEnum::kRequired);
+
+    // Even if no post-image was found, we have to populate the 'fullDocument' field.
+    output[kFullDocumentFieldName] = (postImageDoc ? Value(*postImageDoc) : Value(BSONNULL));
+
+    // Do not propagate the update modification and pre-image id information further.
+    output.remove(kRawOplogUpdateSpecFieldName);
+    output.remove(kPreImageIdFieldName);
     return output.freeze();
 }
 
@@ -106,7 +135,64 @@ NamespaceString DocumentSourceChangeStreamAddPostImage::assertValidNamespace(
     return nss;
 }
 
-Value DocumentSourceChangeStreamAddPostImage::lookupPostImage(const Document& updateOp) const {
+boost::optional<Document> DocumentSourceChangeStreamAddPostImage::generatePostImage(
+    const Document& updateOp) const {
+    // If the 'fullDocumentBeforeChange' is present and null, then we already tried and failed to
+    // look up a pre-image. We can't compute the post-image without it, so return early.
+    if (updateOp[kFullDocumentBeforeChangeFieldName].getType() == BSONType::jstNULL) {
+        return boost::none;
+    }
+
+    // Otherwise, obtain the pre-image from the information in the input document.
+    auto preImage = [&]() -> boost::optional<Document> {
+        // Check whether we have already looked up the pre-image document.
+        if (!updateOp[kFullDocumentBeforeChangeFieldName].missing()) {
+            return updateOp[kFullDocumentBeforeChangeFieldName].getDocument();
+        }
+
+        // Otherwise, we need to look it up ourselves. Extract the preImageId field.
+        auto preImageId = updateOp[kPreImageIdFieldName];
+        tassert(5869001,
+                "Missing both 'fullDocumentBeforeChange' and 'preImageId' fields",
+                !preImageId.missing());
+
+        // Use DSCSAddPreImage::lookupPreImage to retrieve the actual pre-image.
+        return DocumentSourceChangeStreamAddPreImage::lookupPreImage(pExpCtx,
+                                                                     preImageId.getDocument());
+    }();
+
+    // Return boost::none if pre-image is missing.
+    if (!preImage) {
+        return boost::none;
+    }
+
+    // Raw oplog update spec field must be provided for the update commands.
+    tassert(5869002,
+            "Raw oplog update spec was missing or invalid in change stream",
+            updateOp[kRawOplogUpdateSpecFieldName].isObject());
+
+    // Setup the UpdateDriver for performing the post-image computation.
+    UpdateDriver updateDriver(pExpCtx);
+    const auto rawOplogUpdateSpec = updateOp[kRawOplogUpdateSpecFieldName].getDocument().toBson();
+    const auto updateMod = write_ops::UpdateModification::parseFromOplogEntry(
+        rawOplogUpdateSpec, {false /* mustCheckExistenceForInsertOperations */});
+    // UpdateDriver only expects to apply a diff in the context of oplog application.
+    updateDriver.setFromOplogApplication(true);
+    updateDriver.parse(updateMod, {});
+
+    // Compute post-image.
+    mutablebson::Document postImage(preImage->toBson());
+    uassertStatusOK(updateDriver.update(pExpCtx->opCtx,
+                                        StringData(),
+                                        &postImage,
+                                        false /* validateForStorage */,
+                                        FieldRefSet(),
+                                        false /* isInsert */));
+    return Document(postImage.getObject());
+}
+
+boost::optional<Document> DocumentSourceChangeStreamAddPostImage::lookupLatestPostImage(
+    const Document& updateOp) const {
     // Make sure we have a well-formed input.
     auto nss = assertValidNamespace(updateOp);
 
@@ -115,23 +201,20 @@ Value DocumentSourceChangeStreamAddPostImage::lookupPostImage(const Document& up
                                           BSONType::Object)
                            .getDocument();
 
-    // Extract the UUID from resume token and do change stream lookups by UUID.
-    auto resumeToken =
-        ResumeToken::parse(updateOp[DocumentSourceChangeStream::kIdField].getDocument());
+    // Extract the resume token data from the input event.
+    auto resumeTokenData =
+        ResumeToken::parse(updateOp[DocumentSourceChangeStream::kIdField].getDocument()).getData();
 
     auto readConcern = BSON("level"
                             << "majority"
-                            << "afterClusterTime" << resumeToken.getData().clusterTime);
+                            << "afterClusterTime" << resumeTokenData.clusterTime);
 
     // Update lookup queries sent from mongoS to shards are allowed to use speculative majority
-    // reads.
-    invariant(resumeToken.getData().uuid);
-    auto lookedUpDoc = pExpCtx->mongoProcessInterface->lookupSingleDocument(
-        pExpCtx, nss, *resumeToken.getData().uuid, documentKey, std::move(readConcern));
-
-    // Check whether the lookup returned any documents. Even if the lookup itself succeeded, it may
-    // not have returned any results if the document was deleted in the time since the update op.
-    return (lookedUpDoc ? Value(*lookedUpDoc) : Value(BSONNULL));
+    // reads. Even if the lookup itself succeeded, it may not have returned any results if the
+    // document was deleted in the time since the update op.
+    invariant(resumeTokenData.uuid);
+    return pExpCtx->mongoProcessInterface->lookupSingleDocument(
+        pExpCtx, nss, *resumeTokenData.uuid, documentKey, std::move(readConcern));
 }
 
 Value DocumentSourceChangeStreamAddPostImage::serializeLatest(

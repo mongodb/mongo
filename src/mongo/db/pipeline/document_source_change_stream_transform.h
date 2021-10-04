@@ -108,8 +108,11 @@ private:
     // Set to true if this transformation stage can be run on the collectionless namespace.
     bool _isIndependentOfAnyCollection;
 
-    // Set to true if the pre-image id should be included in output documents.
-    bool _includePreImageId = false;
+    // Set to true if the pre-image should be included in the output documents.
+    bool _preImageRequested = false;
+
+    // Set to true if the post-image should be included in the output documents.
+    bool _postImageRequested = false;
 };
 
 }  // namespace mongo

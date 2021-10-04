@@ -94,9 +94,16 @@ DocumentSourceChangeStreamTransform::DocumentSourceChangeStreamTransform(
       _changeStreamSpec(std::move(spec)),
       _isIndependentOfAnyCollection(expCtx->ns.isCollectionlessAggregateNS()) {
 
-    // If the change stream spec requested a pre-image, make sure that we supply one.
-    _includePreImageId =
-        (_changeStreamSpec.getFullDocumentBeforeChange() != FullDocumentBeforeChangeModeEnum::kOff);
+    // Determine whether the user requested a point-in-time pre-image, which will affect this
+    // stage's output.
+    _preImageRequested =
+        _changeStreamSpec.getFullDocumentBeforeChange() != FullDocumentBeforeChangeModeEnum::kOff;
+
+    // Determine whether the user requested a point-in-time post-image, which will affect this
+    // stage's output.
+    _postImageRequested =
+        _changeStreamSpec.getFullDocument() == FullDocumentModeEnum::kWhenAvailable ||
+        _changeStreamSpec.getFullDocument() == FullDocumentModeEnum::kRequired;
 
     // Extract the resume token or high-water-mark from the spec.
     auto tokenData = DocumentSourceChangeStream::resolveResumeTokenFromSpec(_changeStreamSpec);
@@ -280,6 +287,12 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
                 operationType = DocumentSourceChangeStream::kReplaceOpType;
                 fullDocument = input[repl::OplogEntry::kObjectFieldName];
             }
+
+            // Add update modification for post-image computation.
+            if (_postImageRequested && operationType == DocumentSourceChangeStream::kUpdateOpType) {
+                doc.addField(DocumentSourceChangeStream::kRawOplogUpdateSpecField,
+                             input[repl::OplogEntry::kObjectFieldName]);
+            }
             documentKey = input[repl::OplogEntry::kObject2FieldName];
             break;
         }
@@ -395,9 +408,15 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
     // Add the post-image, pre-image id, namespace, documentKey and other fields as appropriate.
     doc.addField(DocumentSourceChangeStream::kFullDocumentField, std::move(fullDocument));
 
-    // Include pre-image id only for update, replace and delete operations.
-    static const std::set<StringData> preImageOps = {"update", "replace", "delete"};
-    if (_includePreImageId && preImageOps.count(operationType)) {
+    // Determine whether the preImageId should be included, for eligible operations. Note that we
+    // will include preImageId even if the user requested a post-image but no pre-image, because the
+    // pre-image is required to compute the post-image.
+    static const std::set<StringData> preImageOps = {DocumentSourceChangeStream::kUpdateOpType,
+                                                     DocumentSourceChangeStream::kReplaceOpType,
+                                                     DocumentSourceChangeStream::kDeleteOpType};
+    static const std::set<StringData> postImageOps = {DocumentSourceChangeStream::kUpdateOpType};
+    if ((_preImageRequested && preImageOps.count(operationType)) ||
+        (_postImageRequested && postImageOps.count(operationType))) {
         auto preImageOpTime = input[repl::OplogEntry::kPreImageOpTimeFieldName];
         if (!preImageOpTime.missing()) {
             // Set 'kPreImageIdField' to the pre-image optime. The DSCSAddPreImage stage will use
@@ -448,7 +467,7 @@ DepsTracker::State DocumentSourceChangeStreamTransform::getDependencies(DepsTrac
     deps->fields.insert(repl::OplogEntry::kTxnNumberFieldName.toString());
     deps->fields.insert(DocumentSourceChangeStream::kTxnOpIndexField.toString());
 
-    if (_includePreImageId) {
+    if (_preImageRequested) {
         deps->fields.insert(repl::OplogEntry::kPreImageOpTimeFieldName.toString());
         deps->fields.insert(DocumentSourceChangeStream::kApplyOpsIndexField.toString());
     }

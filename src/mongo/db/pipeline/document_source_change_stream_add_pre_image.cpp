@@ -109,7 +109,7 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamAddPreImage::doGetNext()
     // Obtain the pre-image document, if available, given the specified preImageId.
     auto preImageDoc = lookupPreImage(pExpCtx, preImageId.getDocument());
     uassert(
-        ErrorCodes::ChangeStreamHistoryLost,
+        ErrorCodes::NoMatchingDocument,
         str::stream() << "Change stream was configured to require a pre-image for all update, "
                          "delete and replace events, but the pre-image was not found for event: "
                       << input.getDocument().toString(),

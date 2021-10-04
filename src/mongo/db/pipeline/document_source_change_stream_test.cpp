@@ -2993,13 +2993,13 @@ TEST_F(ChangeStreamStageTest, TransformPreImageForDelete) {
                                             Value(BSONNULL));
     checkTransformation(deleteEntry, expectedDeleteWithNullPreImage.freeze(), {}, spec);
 
-    // When run with {fullDocumentBeforeChange: "required"} and a 'preImageOpTime' is present in the
-    // event's oplog entry but we cannot find the pre-image, we throw ChangeStreamHistoryLost.
+    // When run with {fullDocumentBeforeChange: "required"} but we cannot find the pre-image, we
+    // throw NoMatchingDocument.
     spec = BSON("$changeStream" << BSON("fullDocumentBeforeChange"
                                         << "required"));
     ASSERT_THROWS_CODE(checkTransformation(deleteEntry, boost::none, {}, spec),
                        AssertionException,
-                       ErrorCodes::ChangeStreamHistoryLost);
+                       ErrorCodes::NoMatchingDocument);
 }
 
 TEST_F(ChangeStreamStageTest, TransformPreImageForUpdate) {
@@ -3093,13 +3093,13 @@ TEST_F(ChangeStreamStageTest, TransformPreImageForUpdate) {
                                             Value(BSONNULL));
     checkTransformation(updateEntry, expectedUpdateWithNullPreImage.freeze(), {}, spec);
 
-    // When run with {fullDocumentBeforeChange: "required"} and a 'preImageOpTime' is present in the
-    // event's oplog entry but we cannot find the pre-image, we throw ChangeStreamHistoryLost.
+    // When run with {fullDocumentBeforeChange: "required"} but we cannot find the pre-image, we
+    // throw NoMatchingDocument.
     spec = BSON("$changeStream" << BSON("fullDocumentBeforeChange"
                                         << "required"));
     ASSERT_THROWS_CODE(checkTransformation(updateEntry, boost::none, {}, spec),
                        AssertionException,
-                       ErrorCodes::ChangeStreamHistoryLost);
+                       ErrorCodes::NoMatchingDocument);
 }
 
 TEST_F(ChangeStreamStageTest, TransformPreImageForReplace) {
@@ -3187,13 +3187,13 @@ TEST_F(ChangeStreamStageTest, TransformPreImageForReplace) {
                                              Value(BSONNULL));
     checkTransformation(replaceEntry, expectedReplaceWithNullPreImage.freeze(), {}, spec);
 
-    // When run with {fullDocumentBeforeChange: "required"} and a 'preImageOpTime' is present in the
-    // event's oplog entry but we cannot find the pre-image, we throw ChangeStreamHistoryLost.
+    // When run with {fullDocumentBeforeChange: "required"} but we cannot find the pre-image, we
+    // throw NoMatchingDocument.
     spec = BSON("$changeStream" << BSON("fullDocumentBeforeChange"
                                         << "required"));
     ASSERT_THROWS_CODE(checkTransformation(replaceEntry, boost::none, {}, spec),
                        AssertionException,
-                       ErrorCodes::ChangeStreamHistoryLost);
+                       ErrorCodes::NoMatchingDocument);
 }
 
 TEST_F(ChangeStreamStageDBTest, MatchFiltersOperationsOnSystemCollections) {

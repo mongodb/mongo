@@ -45,6 +45,11 @@ public:
     static constexpr StringData kStageName = "$_internalChangeStreamAddPostImage"_sd;
     static constexpr StringData kFullDocumentFieldName =
         DocumentSourceChangeStream::kFullDocumentField;
+    static constexpr StringData kRawOplogUpdateSpecFieldName =
+        DocumentSourceChangeStream::kRawOplogUpdateSpecField;
+    static constexpr StringData kPreImageIdFieldName = DocumentSourceChangeStream::kPreImageIdField;
+    static constexpr StringData kFullDocumentBeforeChangeFieldName =
+        DocumentSourceChangeStream::kFullDocumentBeforeChangeField;
 
     /**
      * Creates a DocumentSourceChangeStreamAddPostImage stage.
@@ -59,10 +64,14 @@ public:
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     /**
-     * Only modifies a single path: "fullDocument".
+     * Only modifies: "fullDocument", "updateModification", "preImageId".
      */
     GetModPathsReturn getModifiedPaths() const final {
-        return {GetModPathsReturn::Type::kFiniteSet, {kFullDocumentFieldName.toString()}, {}};
+        return {GetModPathsReturn::Type::kFiniteSet,
+                {kFullDocumentFieldName.toString(),
+                 kRawOplogUpdateSpecFieldName.toString(),
+                 kPreImageIdFieldName.toString()},
+                {}};
     }
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
@@ -99,6 +108,15 @@ public:
         deps->fields.insert(DocumentSourceChangeStream::kDocumentKeyField.toString());
         deps->fields.insert(DocumentSourceChangeStream::kOperationTypeField.toString());
         deps->fields.insert(DocumentSourceChangeStream::kIdField.toString());
+
+        // Fields needed for post-image computation.
+        if (_fullDocumentMode != FullDocumentModeEnum::kUpdateLookup) {
+            deps->fields.insert(
+                DocumentSourceChangeStream::kFullDocumentBeforeChangeField.toString());
+            deps->fields.insert(DocumentSourceChangeStream::kRawOplogUpdateSpecField.toString());
+            deps->fields.insert(DocumentSourceChangeStream::kPreImageIdField.toString());
+        }
+
         // This stage does not restrict the output fields to a finite set, and has no impact on
         // whether metadata is available or needed.
         return DepsTracker::State::SEE_NEXT;
@@ -126,11 +144,12 @@ private:
      */
     GetNextResult doGetNext() final;
 
-    /**
-     * Uses the "documentKey" field from 'updateOp' to look up the current version of the document.
-     * Returns Value(BSONNULL) if the document couldn't be found.
-     */
-    Value lookupPostImage(const Document& updateOp) const;
+    // Computes a post-image by taking a pre-image and applying an update modification that is
+    // stored in the oplog entry. Returns boost::none if no pre-image information is available.
+    boost::optional<Document> generatePostImage(const Document& updateOp) const;
+
+    // Retrieves the current version of the document for the update event.
+    boost::optional<Document> lookupLatestPostImage(const Document& updateOp) const;
 
     /**
      * Throws a AssertionException if the namespace found in 'inputDoc' doesn't match the one on the
