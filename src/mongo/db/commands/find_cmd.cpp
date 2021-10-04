@@ -59,9 +59,12 @@
 #include "mongo/db/transaction_participant.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/util/fail_point.h"
 
 namespace mongo {
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(allowExternalReadsForReverseOplogScanRule);
 
 const auto kTermField = "term"_sd;
 
@@ -371,6 +374,36 @@ public:
                 opCtx->lockState()->skipAcquireTicket();
             }
 
+            // If this read represents a reverse oplog scan, we want to bypass oplog visibility
+            // rules in the case of secondaries. We normally only read from these nodes at batch
+            // boundaries, but in this specific case we should fetch all new entries, to be
+            // consistent with any catalog changes that might be observable before the batch is
+            // finalized. This special rule for reverse oplog scans is needed by replication
+            // initial sync, for the purposes of calculating the stopTimestamp correctly.
+            boost::optional<PinReadSourceBlock> pinReadSourceBlock;
+            if (isOplogNss) {
+                auto reverseScan = false;
+
+                auto cmdSort = findCommand->getSort();
+                if (!cmdSort.isEmpty()) {
+                    BSONElement natural = cmdSort[query_request_helper::kNaturalSortField];
+                    if (natural) {
+                        reverseScan = natural.safeNumberInt() < 0;
+                    }
+                }
+
+                auto isInternal = (opCtx->getClient()->session() &&
+                                   (opCtx->getClient()->session()->getTags() &
+                                    transport::Session::kInternalClient));
+
+                if (MONGO_unlikely(allowExternalReadsForReverseOplogScanRule.shouldFail())) {
+                    isInternal = true;
+                }
+
+                if (reverseScan && isInternal) {
+                    pinReadSourceBlock.emplace(opCtx->recoveryUnit());
+                }
+            }
 
             // Acquire locks. If the query is on a view, we release our locks and convert the query
             // request into an aggregation command.

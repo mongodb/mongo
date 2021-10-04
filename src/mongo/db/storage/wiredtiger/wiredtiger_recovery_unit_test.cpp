@@ -865,5 +865,15 @@ DEATH_TEST_F(WiredTigerRecoveryUnitTestFixture,
     }
 }
 
+DEATH_TEST_F(WiredTigerRecoveryUnitTestFixture,
+             MayNotChangeReadSourceWhilePinned,
+             "Cannot change ReadSource as it is pinned.") {
+
+    // Storage engine operations require at least Global IS.
+    Lock::GlobalLock lk(clientAndCtx1.second.get(), MODE_IS);
+    ru1->pinReadSource();
+    ru1->setTimestampReadSource(RecoveryUnit::ReadSource::kNoOverlap);
+}
+
 }  // namespace
 }  // namespace mongo

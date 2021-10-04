@@ -62,6 +62,8 @@ last-continuous:
       test_file: jstests/core/timeseries/timeseries_find.js
     - ticket: SERVER-57700
       test_file: jstests/sharding/resharding_histogram_metrics.js
+    - ticket: SERVER-58636
+      test_file: jstests/replsets/initial_sync_replicate_drop_mid_secondary_batch.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -276,6 +278,8 @@ last-lts:
       test_file: jstests/sharding/test_resharding_test_fixture_shutdown_retry_needed.js
     - ticket: SERVER-57700
       test_file: jstests/sharding/resharding_histogram_metrics.js
+    - ticket: SERVER-58636
+      test_file: jstests/replsets/initial_sync_replicate_drop_mid_secondary_batch.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:

@@ -907,6 +907,8 @@ void WiredTigerRecoveryUnit::setRoundUpPreparedTimestamps(bool value) {
 
 void WiredTigerRecoveryUnit::setTimestampReadSource(ReadSource readSource,
                                                     boost::optional<Timestamp> provided) {
+    tassert(5863604, "Cannot change ReadSource as it is pinned.", !isReadSourcePinned());
+
     LOGV2_DEBUG(22416,
                 3,
                 "setting timestamp read source",
@@ -926,6 +928,20 @@ void WiredTigerRecoveryUnit::setTimestampReadSource(ReadSource readSource,
 
 RecoveryUnit::ReadSource WiredTigerRecoveryUnit::getTimestampReadSource() const {
     return _timestampReadSource;
+}
+
+void WiredTigerRecoveryUnit::pinReadSource() {
+    LOGV2_DEBUG(5863602, 3, "Pinning read source on WT recovery unit");
+    _readSourcePinned = true;
+}
+
+void WiredTigerRecoveryUnit::unpinReadSource() {
+    LOGV2_DEBUG(5863603, 3, "Unpinning WT recovery unit read source");
+    _readSourcePinned = false;
+}
+
+bool WiredTigerRecoveryUnit::isReadSourcePinned() const {
+    return _readSourcePinned;
 }
 
 void WiredTigerRecoveryUnit::beginIdle() {
