@@ -15,11 +15,7 @@ fi
 
 activate_venv
 echo "Calling the hang analyzer: PATH=\"/opt/mongodbtoolchain/gdb/bin:$PATH\" $python buildscripts/resmoke.py hang-analyzer $hang_analyzer_option"
-evergreen_workdir="${workdir}"
-if [ "Windows_NT" = "$OS" ]; then
-  evergreen_workdir="$(cygpath -w ${workdir})"
-fi
-EVERGREEN_WORKDIR="${evergreen_workdir}" PATH="/opt/mongodbtoolchain/gdb/bin:$PATH" $python buildscripts/resmoke.py hang-analyzer $hang_analyzer_option
+PATH="/opt/mongodbtoolchain/gdb/bin:$PATH" $python buildscripts/resmoke.py hang-analyzer $hang_analyzer_option
 
 # Call hang analyzer for tasks that are running remote mongo processes
 if [ -n "${private_ip_address}" ]; then

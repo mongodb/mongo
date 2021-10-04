@@ -1,6 +1,7 @@
 """Helper functions to interact with evergreen."""
 import os
-from typing import Optional
+import pathlib
+from typing import Optional, List
 
 import requests
 import structlog
@@ -17,8 +18,6 @@ EVERGREEN_CONFIG_LOCATIONS = (
     # Common for local machines
     os.path.expanduser(os.path.join("~", ".evergreen.yml")),
 )
-if "EVERGREEN_WORKDIR" in os.environ:
-    EVERGREEN_CONFIG_LOCATIONS = (os.environ["EVERGREEN_WORKDIR"], ) + EVERGREEN_CONFIG_LOCATIONS
 
 GENERIC_EDITION = "base"
 GENERIC_PLATFORM = "linux_x86_64"
@@ -33,23 +32,46 @@ class EvergreenConnError(Exception):
     pass
 
 
+def _find_evergreen_yaml_candidates() -> List[str]:
+    # Common for machines in Evergreen
+    candidates = [os.getcwd()]
+
+    cwd = pathlib.Path(os.getcwd())
+    # add every path that is the parent of CWD as well
+    for parent in cwd.parents:
+        candidates.append(parent)
+
+    # Common for local machines
+    candidates.append(os.path.expanduser(os.path.join("~", ".evergreen.yml")))
+
+    out = []
+    for path in candidates:
+        file = os.path.join(path, ".evergreen.yml")
+        if os.path.isfile(file):
+            out.append(file)
+
+    return out
+
+
 def get_evergreen_api(evergreen_config=None):
     """Return evergreen API."""
-    config_to_pass = evergreen_config
-    if not config_to_pass:
-        # Pickup the first config file found in common locations.
-        for file in EVERGREEN_CONFIG_LOCATIONS:
-            if os.path.isfile(file):
-                config_to_pass = file
-                break
-    try:
-        evg_api = RetryingEvergreenApi.get_api(config_file=config_to_pass)
-    except Exception as ex:
-        LOGGER.error("Most likely something is wrong with evergreen config file.",
-                     config_file=config_to_pass)
-        raise ex
+    if evergreen_config:
+        possible_configs = [evergreen_config]
     else:
-        return evg_api
+        possible_configs = _find_evergreen_yaml_candidates()
+
+    last_ex = None
+    for config in possible_configs:
+        try:
+            return RetryingEvergreenApi.get_api(config_file=config)
+        #
+        except Exception as ex:  # pylint: disable=broad-except
+            last_ex = ex
+            continue
+
+    LOGGER.error("Most likely something is wrong with evergreen config file.",
+                 config_file_candidates=possible_configs)
+    raise last_ex
 
 
 def get_buildvariant_name(config, edition, platform, architecture, major_minor_version):
