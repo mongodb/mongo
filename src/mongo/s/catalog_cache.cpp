@@ -73,6 +73,7 @@ const OperationContext::Decoration<bool> operationBlockedBehindCatalogCacheRefre
 
 }  // namespace
 
+AtomicWord<uint64_t> ComparableDatabaseVersion::_disambiguatingSequenceNumSource{1ULL};
 AtomicWord<uint64_t> ComparableDatabaseVersion::_forcedRefreshSequenceNumSource{1ULL};
 
 CachedDatabaseInfo::CachedDatabaseInfo(DatabaseTypeValueHandle&& dbt) : _dbt(std::move(dbt)){};
@@ -95,12 +96,15 @@ DatabaseVersion CachedDatabaseInfo::databaseVersion() const {
 
 ComparableDatabaseVersion ComparableDatabaseVersion::makeComparableDatabaseVersion(
     const boost::optional<DatabaseVersion>& version) {
-    return ComparableDatabaseVersion(version, _forcedRefreshSequenceNumSource.load());
+    return ComparableDatabaseVersion(version,
+                                     _disambiguatingSequenceNumSource.fetchAndAdd(1),
+                                     _forcedRefreshSequenceNumSource.load());
 }
 
 ComparableDatabaseVersion
 ComparableDatabaseVersion::makeComparableDatabaseVersionForForcedRefresh() {
     return ComparableDatabaseVersion(boost::none /* version */,
+                                     _disambiguatingSequenceNumSource.fetchAndAdd(1),
                                      _forcedRefreshSequenceNumSource.addAndFetch(2) - 1);
 }
 
@@ -114,6 +118,9 @@ BSONObj ComparableDatabaseVersion::toBSONForLogging() const {
         builder.append("dbVersion"_sd, _dbVersion->toBSON());
     else
         builder.append("dbVersion"_sd, "None");
+
+    builder.append("disambiguatingSequenceNum"_sd,
+                   static_cast<int64_t>(_disambiguatingSequenceNum));
 
     builder.append("forcedRefreshSequenceNum"_sd, static_cast<int64_t>(_forcedRefreshSequenceNum));
 
@@ -142,7 +149,13 @@ bool ComparableDatabaseVersion::operator<(const ComparableDatabaseVersion& other
     if (_forcedRefreshSequenceNum == 0)
         return false;  // Only default constructed values have _forcedRefreshSequenceNum == 0 and
                        // they are always equal
-    return _dbVersion < other._dbVersion;
+
+    // If both versions are valid we rely on the underlying DatabaseVersion comparison
+    if (_dbVersion && other._dbVersion)
+        return _dbVersion < other._dbVersion;
+
+    // Finally, we do a disambiguating sequence number comparison
+    return _disambiguatingSequenceNum < other._disambiguatingSequenceNum;
 }
 
 CatalogCache::CatalogCache(ServiceContext* const service, CatalogCacheLoader& cacheLoader)

@@ -131,11 +131,17 @@ TEST(ComparableDatabaseVersionTest, CompareTwoForcedRefreshVersions) {
     ASSERT_FALSE(forcedRefreshVersion1 > forcedRefreshVersion2);
 }
 
-TEST(ComparableDatabaseVersionTest, CompareTwoComparableChunkVersionsWithBoostNone) {
-    const auto version1 = ComparableDatabaseVersion::makeComparableDatabaseVersion(boost::none);
-    const auto version2 = ComparableDatabaseVersion::makeComparableDatabaseVersion(boost::none);
-
-    ASSERT_TRUE(version1 == version2);
+TEST(ComparableDatabaseVersionTest, CompareVersionsAgainstBoostNone) {
+    auto checkGreatherThan = [](const boost::optional<DatabaseVersion>& v1,
+                                const boost::optional<DatabaseVersion>& v2) {
+        const auto version1 = ComparableDatabaseVersion::makeComparableDatabaseVersion(v1);
+        const auto version2 = ComparableDatabaseVersion::makeComparableDatabaseVersion(v2);
+        ASSERT_TRUE(version1 < version2);
+    };
+    const DatabaseVersion v(UUID::gen(), Timestamp(42));
+    checkGreatherThan(boost::none, v);
+    checkGreatherThan(v, boost::none);
+    checkGreatherThan(boost::none, boost::none);
 }
 
 }  // namespace

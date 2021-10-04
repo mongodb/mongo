@@ -71,8 +71,9 @@ private:
 };
 
 /**
- * This class wrap a DatabaseVersion object augmenting it with a sequence number to allow for forced
- * catalog cache refreshes.
+ * This class wrap a DatabaseVersion object augmenting it with:
+ *  - a sequence number to allow for forced catalog cache refreshes
+ *  - a sequence number to disambiguate scenarios in which the DatabaseVersion isn't valid
  */
 class ComparableDatabaseVersion {
 public:
@@ -80,8 +81,8 @@ public:
      * Creates a ComparableDatabaseVersion that wraps the given DatabaseVersion.
      *
      * If version is boost::none it creates a ComparableDatabaseVersion that doesn't have a valid
-     * DatabaseVersion. This is useful in some scenarios in which the DatabaseVersion is provided
-     * later through ComparableDatabaseVersion::setVersion.
+     * version. This is useful in some scenarios in which the DatabaseVersion is provided later
+     * through ComparableDatabaseVersion::setVersion or to represent that a Database doesn't exist
      */
     static ComparableDatabaseVersion makeComparableDatabaseVersion(
         const boost::optional<DatabaseVersion>& version);
@@ -128,16 +129,21 @@ public:
 private:
     friend class CatalogCache;
 
+    static AtomicWord<uint64_t> _disambiguatingSequenceNumSource;
     static AtomicWord<uint64_t> _forcedRefreshSequenceNumSource;
 
     ComparableDatabaseVersion(boost::optional<DatabaseVersion> version,
+                              uint64_t disambiguatingSequenceNum,
                               uint64_t forcedRefreshSequenceNum)
-        : _dbVersion(std::move(version)), _forcedRefreshSequenceNum(forcedRefreshSequenceNum) {}
+        : _dbVersion(std::move(version)),
+          _disambiguatingSequenceNum(disambiguatingSequenceNum),
+          _forcedRefreshSequenceNum(forcedRefreshSequenceNum) {}
 
     void setDatabaseVersion(const DatabaseVersion& version);
 
     boost::optional<DatabaseVersion> _dbVersion;
 
+    uint64_t _disambiguatingSequenceNum{0};
     uint64_t _forcedRefreshSequenceNum{0};
 };
 

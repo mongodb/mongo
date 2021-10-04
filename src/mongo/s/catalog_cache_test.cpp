@@ -211,6 +211,34 @@ TEST_F(CatalogCacheTest, GetCachedDatabase) {
     ASSERT_EQ(cachedDb.databaseVersion().getLastMod(), dbVersion.getLastMod());
 }
 
+TEST_F(CatalogCacheTest, GetDatabaseDrop) {
+    const auto dbName = "testDB";
+    const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp());
+
+    _catalogCacheLoader->setDatabaseRefreshReturnValue(
+        DatabaseType(dbName, kShards[0], true, dbVersion));
+
+    // The CatalogCache doesn't have any valid info about this DB and finds a new DatabaseType
+    auto swDatabase = _catalogCache->getDatabase(operationContext(), dbName);
+    ASSERT_OK(swDatabase.getStatus());
+    const auto cachedDb = swDatabase.getValue();
+    ASSERT_TRUE(cachedDb.shardingEnabled());
+    ASSERT_EQ(cachedDb.databaseVersion().getUuid(), dbVersion.getUuid());
+    ASSERT_EQ(cachedDb.databaseVersion().getLastMod(), dbVersion.getLastMod());
+
+    // Advancing the timeInStore, e.g. because of a movePrimary
+    _catalogCache->onStaleDatabaseVersion(dbName, dbVersion.makeUpdated());
+
+    // However, when this CatalogCache asks to the loader for the new info associated to dbName it
+    // didn't find any (i.e. the database was dropped)
+    _catalogCacheLoader->setDatabaseRefreshReturnValue(
+        Status(ErrorCodes::NamespaceNotFound, "dummy errmsg"));
+
+    // Finally, the CatalogCache shouldn't find the Database
+    swDatabase = _catalogCache->getDatabase(operationContext(), dbName);
+    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, swDatabase.getStatus());
+}
+
 TEST_F(CatalogCacheTest, InvalidateSingleDbOnShardRemoval) {
     const auto dbName = "testDB";
     const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp());
