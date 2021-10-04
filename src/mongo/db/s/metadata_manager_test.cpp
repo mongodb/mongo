@@ -142,7 +142,7 @@ protected:
                                  kOtherShard);
 
         auto rt = cm->getRoutingTableHistory_ForTest().makeUpdated(
-            boost::none, boost::none, true, splitChunks);
+            boost::none /* timeseriesFields */, boost::none, boost::none, true, splitChunks);
 
         return CollectionMetadata(ChunkManager(cm->dbPrimary(),
                                                cm->dbVersion(),
@@ -167,6 +167,7 @@ protected:
         chunkVersion.incMajor();
 
         auto rt = cm->getRoutingTableHistory_ForTest().makeUpdated(
+            boost::none /* timeseriesFields */,
             boost::none,
             boost::none,
             true,

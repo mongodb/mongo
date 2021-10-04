@@ -672,7 +672,8 @@ CatalogCache::CollectionCache::LookupResult CatalogCache::CollectionCache::_look
             // updating. Otherwise, we're making a whole new routing table.
             if (isIncremental &&
                 existingHistory->optRt->getVersion().epoch() == collectionAndChunks.epoch) {
-                return existingHistory->optRt->makeUpdated(collectionAndChunks.reshardingFields,
+                return existingHistory->optRt->makeUpdated(collectionAndChunks.timeseriesFields,
+                                                           collectionAndChunks.reshardingFields,
                                                            maxChunkSize,
                                                            collectionAndChunks.allowMigrations,
                                                            collectionAndChunks.changedChunks);

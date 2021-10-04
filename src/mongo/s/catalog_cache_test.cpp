@@ -312,19 +312,52 @@ TEST_F(CatalogCacheTest, TimeseriesFieldsAreProperlyPropagatedOnCC) {
     loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], true, dbVersion)});
 
     auto coll = makeCollectionType(version);
-    TypeCollectionTimeseriesFields tsFields;
-    tsFields.setTimeseriesOptions(TimeseriesOptions("fieldName"));
-    coll.setTimeseriesFields(tsFields);
+    auto chunks = makeChunks(version);
+    auto timeseriesOptions = TimeseriesOptions("fieldName");
 
-    const auto scopedCollProv = scopedCollectionProvider(coll);
-    const auto scopedChunksProv = scopedChunksProvider(makeChunks(version));
+    // 1st refresh: we should find a bucket granularity of seconds (default)
+    {
+        TypeCollectionTimeseriesFields tsFields;
+        tsFields.setTimeseriesOptions(timeseriesOptions);
+        coll.setTimeseriesFields(tsFields);
 
-    const auto swChunkManager =
-        _catalogCache->getCollectionRoutingInfoWithRefresh(operationContext(), coll.getNss());
-    ASSERT_OK(swChunkManager.getStatus());
+        const auto scopedCollProv = scopedCollectionProvider(coll);
+        const auto scopedChunksProv = scopedChunksProvider(chunks);
 
-    const auto& chunkManager = swChunkManager.getValue();
-    ASSERT(chunkManager.getTimeseriesFields().is_initialized());
+        const auto swChunkManager =
+            _catalogCache->getCollectionRoutingInfoWithRefresh(operationContext(), coll.getNss());
+        ASSERT_OK(swChunkManager.getStatus());
+
+        const auto& chunkManager = swChunkManager.getValue();
+        ASSERT(chunkManager.getTimeseriesFields().is_initialized());
+        ASSERT(chunkManager.getTimeseriesFields()->getGranularity() ==
+               BucketGranularityEnum::Seconds);
+    }
+
+    // 2nd refresh: we should find a bucket granularity of hours
+    {
+        TypeCollectionTimeseriesFields tsFields;
+        timeseriesOptions.setGranularity(BucketGranularityEnum::Hours);
+        tsFields.setTimeseriesOptions(timeseriesOptions);
+        coll.setTimeseriesFields(tsFields);
+
+        auto& lastChunk = chunks.back();
+        ChunkVersion newCollectionVersion = lastChunk.getVersion();
+        newCollectionVersion.incMinor();
+        lastChunk.setVersion(newCollectionVersion);
+
+        const auto scopedCollProv = scopedCollectionProvider(coll);
+        const auto scopedChunksProv = scopedChunksProvider(std::vector{lastChunk});
+
+        const auto swChunkManager =
+            _catalogCache->getCollectionRoutingInfoWithRefresh(operationContext(), coll.getNss());
+        ASSERT_OK(swChunkManager.getStatus());
+
+        const auto& chunkManager = swChunkManager.getValue();
+        ASSERT(chunkManager.getTimeseriesFields().is_initialized());
+        ASSERT(chunkManager.getTimeseriesFields()->getGranularity() ==
+               BucketGranularityEnum::Hours);
+    }
 }
 
 TEST_F(CatalogCacheTest, LookupCollectionWithInvalidOptions) {

@@ -794,6 +794,7 @@ RoutingTableHistory RoutingTableHistory::makeNew(
 // ShardServerCatalogCacheLoader::_getLoaderMetadata() and copied into the persisted metadata when
 // it may overlap with the enqueued metadata.
 RoutingTableHistory RoutingTableHistory::makeUpdated(
+    boost::optional<TypeCollectionTimeseriesFields> timeseriesFields,
     boost::optional<TypeCollectionReshardingFields> reshardingFields,
     boost::optional<uint64_t> maxChunkSizeBytes,
     bool allowMigrations,
@@ -809,7 +810,7 @@ RoutingTableHistory RoutingTableHistory::makeUpdated(
                                getShardKeyPattern().getKeyPattern(),
                                CollatorInterface::cloneCollator(getDefaultCollator()),
                                isUnique(),
-                               _timeseriesFields,
+                               std::move(timeseriesFields),
                                std::move(reshardingFields),
                                maxChunkSizeBytes,
                                allowMigrations,

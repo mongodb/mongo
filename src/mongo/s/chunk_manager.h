@@ -189,12 +189,14 @@ public:
      * The changes in "changedChunks" must be sorted in ascending order by chunk version, and adhere
      * to the requirements of the routing table update algorithm.
      *
-     * The existence of "reshardingFields" inside the optional implies that this field was present
-     * inside the config.collections entry when refreshing. An uninitialized "reshardingFields"
-     * parameter implies that the field was not present, and will clear any currently held
-     * resharding fields inside the resulting RoutingTableHistory.
+     * The existence of timeseriesFields/reshardingFields inside the optional implies that this
+     * field was present inside the config.collections entry when refreshing. An uninitialized
+     * timeseriesFields/reshardingFields parameter implies that the field was not present, and will
+     * clear any currently held timeseries/resharding fields inside the resulting
+     * RoutingTableHistory.
      */
     RoutingTableHistory makeUpdated(
+        boost::optional<TypeCollectionTimeseriesFields> timeseriesFields,
         boost::optional<TypeCollectionReshardingFields> reshardingFields,
         boost::optional<uint64_t> maxChunkSizeBytes,
         bool allowMigrations,
