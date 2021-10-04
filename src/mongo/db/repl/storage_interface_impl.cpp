@@ -561,7 +561,6 @@ Status StorageInterfaceImpl::renameCollection(OperationContext* opCtx,
 
 Status StorageInterfaceImpl::setIndexIsMultikey(OperationContext* opCtx,
                                                 const NamespaceString& nss,
-                                                const UUID& collectionUUID,
                                                 const std::string& indexName,
                                                 const KeyStringSet& multikeyMetadataKeys,
                                                 const MultikeyPaths& paths,
@@ -569,19 +568,13 @@ Status StorageInterfaceImpl::setIndexIsMultikey(OperationContext* opCtx,
     if (ts.isNull()) {
         return Status(ErrorCodes::InvalidOptions,
                       str::stream() << "Cannot set index " << indexName << " on " << nss.ns()
-                                    << " (" << collectionUUID << ") as multikey at null timestamp");
+                                    << " as multikey at null timestamp");
     }
 
     return writeConflictRetry(opCtx, "StorageInterfaceImpl::setIndexIsMultikey", nss.ns(), [&] {
-        const NamespaceStringOrUUID nsOrUUID(nss);
-        boost::optional<AutoGetCollection> autoColl;
-        try {
-            autoColl.emplace(opCtx, nsOrUUID, MODE_IX);
-        } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
-            return ex.toStatus();
-        }
+        AutoGetCollection autoColl(opCtx, nss, MODE_IX);
         auto collectionResult = getCollection(
-            *autoColl, nsOrUUID, "The collection must exist before setting an index to multikey.");
+            autoColl, nss, "The collection must exist before setting an index to multikey.");
         if (!collectionResult.isOK()) {
             return collectionResult.getStatus();
         }
@@ -597,9 +590,8 @@ Status StorageInterfaceImpl::setIndexIsMultikey(OperationContext* opCtx,
             opCtx, indexName, true /* includeUnfinishedIndexes */);
         if (!idx) {
             return Status(ErrorCodes::IndexNotFound,
-                          str::stream()
-                              << "Could not find index " << indexName << " in " << nss.ns() << " ("
-                              << collectionUUID << ") to set to multikey.");
+                          str::stream() << "Could not find index " << indexName << " in "
+                                        << nss.ns() << " to set to multikey.");
         }
         collection->getIndexCatalog()->setMultikeyPaths(opCtx, idx, multikeyMetadataKeys, paths);
         wunit.commit();
