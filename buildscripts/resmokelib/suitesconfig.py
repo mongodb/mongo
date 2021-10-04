@@ -24,8 +24,12 @@ def get_named_suites() -> List[SuiteName]:
         # Skip "with_*server" and "no_server" because they do not define any test files to run.
         executor_only = {"with_server", "with_external_server", "no_server"}
 
+        # Skip dbtest; its executable location needs to be updated for local usage.
+        dbtest = {"dbtest"}
+
         explicit_suite_names = [
-            name for name in ExplicitSuiteConfig.get_named_suites() if name not in executor_only
+            name for name in ExplicitSuiteConfig.get_named_suites()
+            if (name not in executor_only and name not in dbtest)
         ]
         composed_suite_names = MatrixSuiteConfig.get_named_suites()
         _NAMED_SUITES = explicit_suite_names + composed_suite_names
@@ -69,6 +73,11 @@ def create_test_membership_map(fail_on_missing_selector=False, test_kind=None):
             suite = get_suite(suite_name)
             if test_kind and suite.get_test_kind_config() not in test_kind:
                 continue
+
+            for testfile in suite.tests:
+                if isinstance(testfile, (dict, list)):
+                    continue
+                test_membership[testfile].append(suite_name)
         except IOError as err:
             # We ignore errors from missing files referenced in the test suite's "selector"
             # section. Certain test suites (e.g. unittests.yml) have a dedicated text file to
@@ -78,11 +87,6 @@ def create_test_membership_map(fail_on_missing_selector=False, test_kind=None):
                 if not fail_on_missing_selector:
                     continue
             raise
-
-        for testfile in suite.tests:
-            if isinstance(testfile, (dict, list)):
-                continue
-            test_membership[testfile].append(suite_name)
     return test_membership
 
 
