@@ -43,22 +43,16 @@ namespace detail {
 template <typename... Ts>
 class ComposedAttr {
 public:
-    ComposedAttr(Ts&&... args) : _values(std::move(args)...) {}
+    ComposedAttr(Ts&&... args) : _values(std::forward<Ts>(args)...) {}
 
     /**
-     * Creates a flattend tuple of loggable named attributes
+     * Creates a flattened tuple of loggable named attributes
      */
     auto attributes() const;
 
 private:
     std::tuple<Ts...> _values;
 };
-
-template <typename>
-struct IsComposedAttr : std::false_type {};
-
-template <typename... Ts>
-struct IsComposedAttr<ComposedAttr<Ts...>> : std::true_type {};
 
 template <typename T>
 struct NamedArg {
