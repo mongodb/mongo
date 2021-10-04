@@ -552,22 +552,20 @@ Status renameBetweenDBs(OperationContext* opCtx,
     const auto& tmpName = tmpNameResult.getValue();
 
     LOGV2(20398,
-          "Attempting to create temporary collection: {tmpName} with the contents of collection: "
-          "{source}",
           "Attempting to create temporary collection",
           "temporaryCollection"_attr = tmpName,
           "sourceCollection"_attr = source);
 
-    Collection* tmpColl = nullptr;
+    // Renaming across databases will result in a new UUID.
+    NamespaceStringOrUUID tmpCollUUID{tmpName.db().toString(), UUID::gen()};
+
     {
         auto collectionOptions = sourceColl->getCollectionOptions();
-
-        // Renaming across databases will result in a new UUID.
-        collectionOptions.uuid = UUID::gen();
+        collectionOptions.uuid = tmpCollUUID.uuid();
 
         writeConflictRetry(opCtx, "renameCollection", tmpName.ns(), [&] {
             WriteUnitOfWork wunit(opCtx);
-            tmpColl = targetDB->createCollection(opCtx, tmpName, collectionOptions);
+            targetDB->createCollection(opCtx, tmpName, collectionOptions);
             wunit.commit();
         });
     }
@@ -623,7 +621,7 @@ Status renameBetweenDBs(OperationContext* opCtx,
             WriteUnitOfWork wunit(opCtx);
             auto fromMigrate = false;
             try {
-                CollectionWriter tmpCollWriter(tmpColl);
+                CollectionWriter tmpCollWriter(opCtx, *tmpCollUUID.uuid());
                 IndexBuildsCoordinator::get(opCtx)->createIndexesOnEmptyCollection(
                     opCtx, tmpCollWriter, indexesToCopy, fromMigrate);
             } catch (DBException& ex) {
@@ -638,9 +636,6 @@ Status renameBetweenDBs(OperationContext* opCtx,
     }
 
     {
-        NamespaceStringOrUUID tmpCollUUID =
-            NamespaceStringOrUUID(std::string(tmpName.db()), tmpColl->uuid());
-        tmpColl = nullptr;
         statsTracker.reset();
 
         // Copy over all the data from source collection to temporary collection. For this we can
