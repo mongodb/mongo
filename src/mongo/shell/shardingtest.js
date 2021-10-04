@@ -971,12 +971,13 @@ var ShardingTest = function(params) {
             // Must check shardMixedBinVersion because it causes shardOptions.binVersion to be an
             // object (versionIterator) rather than a version string. Must check mongosBinVersion,
             // as well, because it does not update mongosOptions.binVersion.
-            // TODO SERVER-50389: Differentiate between 'last-lts' and 'last-continuous' when
-            // last-continuous is supported with shardMixedBinVersions.
-            if ((MongoRunner.areBinVersionsTheSame(binVersion, "last-continuous") &&
-                 jsTestOptions().shardMixedBinVersions) ||
-                (jsTestOptions().mongosBinVersion &&
-                 MongoRunner.areBinVersionsTheSame(binVersion, jsTestOptions().mongosBinVersion))) {
+            const isMixedVersionShard =
+                (MongoRunner.areBinVersionsTheSame(binVersion, "last-continuous") ||
+                 MongoRunner.areBinVersionsTheSame(binVersion, "last-lts")) &&
+                jsTestOptions().shardMixedBinVersions;
+            const isMixedVersionMongos = jsTestOptions().mongosBinVersion &&
+                MongoRunner.areBinVersionsTheSame(binVersion, jsTestOptions().mongosBinVersion);
+            if (isMixedVersionShard || isMixedVersionMongos) {
                 return true;
             }
 
@@ -1245,13 +1246,12 @@ var ShardingTest = function(params) {
                 // If the test doesn't depend on specific shard binVersions, create a mixed
                 // version
                 // shard cluster that randomly assigns shard binVersions, half "latest" and half
-                // "last-continuous".
-                // TODO SERVER-50389: Support last-continuous binary version with
+                // "last-continuous" or "last-lts".
                 // shardMixedBinVersions.
                 if (!otherParams.shardOptions.binVersion) {
                     Random.setRandomSeed();
-                    otherParams.shardOptions.binVersion =
-                        MongoRunner.versionIterator(["latest", "last-continuous"], true);
+                    otherParams.shardOptions.binVersion = MongoRunner.versionIterator(
+                        ["latest", jsTestOptions().shardMixedBinVersions], true);
                 }
             }
 

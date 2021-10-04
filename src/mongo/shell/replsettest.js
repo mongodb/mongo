@@ -1416,7 +1416,6 @@ var ReplSetTest = function(opts) {
 
         // Set the FCV to 'last-lts'/'last-continuous' if we are running a mixed version replica
         // set. If this is a config server, the FCV will be set as part of ShardingTest.
-        // TODO SERVER-50389: Set FCV to 'last-continuous' properly when last-continuous binary
         // versions are supported with the useRandomBinVersionsWithinReplicaSet option.
         let setLastLTSFCV = (lastLTSBinVersionWasSpecifiedForSomeNode ||
                              jsTest.options().useRandomBinVersionsWithinReplicaSet) &&
@@ -1444,8 +1443,9 @@ var ReplSetTest = function(opts) {
 
                 // The server has a practice of adding a reconfig as part of upgrade/downgrade logic
                 // in the setFeatureCompatibilityVersion command.
-                print("Fetch the config version from primary since last-lts downgrade might " +
-                      "perform a reconfig.");
+                print(
+                    "Fetch the config version from primary since last-lts or last-continuous downgrade might " +
+                    "perform a reconfig.");
                 config.version = self.getReplSetConfigFromNode().version;
             });
         }
@@ -2788,9 +2788,8 @@ var ReplSetTest = function(opts) {
                 options.binVersion = "latest";
             } else {
                 const rand = Random.rand();
-                // TODO SERVER-50389: Support last-continuous binary version with
-                // useRandomBinVersionsWithinReplicaSet.
-                options.binVersion = rand < 0.5 ? "latest" : "last-continuous";
+                options.binVersion =
+                    rand < 0.5 ? "latest" : jsTest.options().useRandomBinVersionsWithinReplicaSet;
             }
             print("Randomly assigned binary version: " + options.binVersion + " to node: " + n);
         }

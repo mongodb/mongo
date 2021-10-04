@@ -27,4 +27,4 @@ executor:
       nodb: ''
       global_vars:
         TestData:
-          useRandomBinVersionsWithinReplicaSet: true
+          useRandomBinVersionsWithinReplicaSet: 'last-lts'

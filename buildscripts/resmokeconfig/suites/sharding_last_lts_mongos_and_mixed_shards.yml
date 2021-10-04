@@ -41,6 +41,6 @@ executor:
       global_vars:
         TestData:
           mongosBinVersion: 'last-lts'
-          shardMixedBinVersions: true
+          shardMixedBinVersions: 'last-lts'
           skipCheckingUUIDsConsistentAcrossCluster: true
       nodb: ''
