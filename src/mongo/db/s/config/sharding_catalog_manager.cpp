@@ -61,6 +61,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/long_collection_names_gen.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/transport/service_entry_point.h"
@@ -669,7 +670,9 @@ void ShardingCatalogManager::upgradeMetadataTo51Phase2(OperationContext* opCtx) 
     LOGV2(5857402, "Starting metadata upgrade to FCV 5.1 (phase 2)");
 
     try {
-        _enableSupportForLongCollectionName(opCtx);
+        if (feature_flags::gFeatureFlagLongCollectionNames.isEnabledAndIgnoreFCV()) {
+            _enableSupportForLongCollectionName(opCtx);
+        }
     } catch (const DBException& e) {
         LOGV2_ERROR(
             5857403, "Failed to upgrade metadata to FCV 5.1 (phase 2)", "error"_attr = redact(e));
@@ -683,7 +686,9 @@ void ShardingCatalogManager::downgradeMetadataToPre51Phase2(OperationContext* op
     LOGV2(5857405, "Starting metadata downgrade to pre FCV 5.1 (phase 2)");
 
     try {
-        _disableSupportForLongCollectionName(opCtx);
+        if (feature_flags::gFeatureFlagLongCollectionNames.isEnabledAndIgnoreFCV()) {
+            _disableSupportForLongCollectionName(opCtx);
+        }
     } catch (const DBException& e) {
         LOGV2_ERROR(5857406,
                     "Failed to downgrade metadata to pre FCV 5.1 (phase 2)",

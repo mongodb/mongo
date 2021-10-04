@@ -20,12 +20,8 @@ function setupClusterAndDatabase(binVersion) {
         mongos: 1,
         config: 1,
         shards: 2,
-        other: {
-            mongosOptions: {binVersion: binVersion},
-            configOptions: {binVersion: binVersion},
-            shardOptions: {binVersion: binVersion},
-            rs: {nodes: 2}
-        }
+        rs: {nodes: 2, binVersion: binVersion},
+        other: {mongosOptions: {binVersion: binVersion}, configOptions: {binVersion: binVersion}}
     });
     st.configRS.awaitReplication();
 
@@ -77,7 +73,7 @@ function createShardedCollection() {
 }
 
 function testDisabledLongNameSupport(collNs) {
-    jsTestLog('Verify that long name support is properly disabled on collection ' + collNs);
+    jsTest.log('Verify that long name support is properly disabled on collection ' + collNs);
 
     const collConfigDoc = st.s.getDB('config').collections.findOne({_id: collNs});
     assert.eq(collConfigDoc.supportingLongName, undefined);
@@ -91,7 +87,7 @@ function testDisabledLongNameSupport(collNs) {
     shard1Secondary.setSecondaryOk();
 
     for (const node of [shard0Primary, shard0Secondary, shard1Primary, shard1Secondary]) {
-        jsTestLog('Verify the consistency of the persisted cache on node ' + getNodeName(node));
+        jsTest.log('Verify the consistency of the persisted cache on node ' + getNodeName(node));
 
         const configDb = node.getDB('config');
 
@@ -104,7 +100,7 @@ function testDisabledLongNameSupport(collNs) {
 }
 
 function testImplicitlyEnabledLongNameSupport(collNs) {
-    jsTestLog('Verify that long name support is properly enabled on collection ' + collNs);
+    jsTest.log('Verify that long name support is properly enabled on collection ' + collNs);
 
     const collConfigDoc = st.s.getDB('config').collections.findOne({_id: collNs});
     assert.eq(collConfigDoc.supportingLongName, 'implicitly_enabled');
@@ -118,7 +114,7 @@ function testImplicitlyEnabledLongNameSupport(collNs) {
     shard1Secondary.setSecondaryOk();
 
     for (const node of [shard0Primary, shard0Secondary, shard1Primary, shard1Secondary]) {
-        jsTestLog('Verify the consistency of the persisted cache on node ' + getNodeName(node));
+        jsTest.log('Verify the consistency of the persisted cache on node ' + getNodeName(node));
 
         const configDb = node.getDB('config');
 
@@ -130,9 +126,21 @@ function testImplicitlyEnabledLongNameSupport(collNs) {
     }
 }
 
+function isFeatureFlagLongCollectionNamesEnabled() {
+    const getClusterLookupParam =
+        st.configRS.getPrimary().adminCommand({getParameter: 1, featureFlagLongCollectionNames: 1});
+    return getClusterLookupParam.hasOwnProperty('featureFlagLongCollectionNames') &&
+        getClusterLookupParam.featureFlagLongCollectionNames.value;
+}
+
 function checkClusterBeforeUpgrade(fcv, collNs) {
     checkConfigAndShardsFCV(fcv);
-    testDisabledLongNameSupport(collNs);
+
+    if (isFeatureFlagLongCollectionNamesEnabled()) {
+        testImplicitlyEnabledLongNameSupport(collNs);
+    } else {
+        testDisabledLongNameSupport(collNs);
+    }
 }
 
 function checkClusterAfterBinaryUpgrade() {
@@ -141,8 +149,14 @@ function checkClusterAfterBinaryUpgrade() {
 
 function checkClusterAfterFCVUpgrade(fcv, call1Ns, call2Ns) {
     checkConfigAndShardsFCV(fcv);
-    testImplicitlyEnabledLongNameSupport(call1Ns);
-    testImplicitlyEnabledLongNameSupport(call2Ns);
+
+    if (isFeatureFlagLongCollectionNamesEnabled()) {
+        testImplicitlyEnabledLongNameSupport(call1Ns);
+        testImplicitlyEnabledLongNameSupport(call2Ns);
+    } else {
+        testDisabledLongNameSupport(call1Ns);
+        testDisabledLongNameSupport(call2Ns);
+    }
 }
 
 function checkClusterAfterFCVDowngrade() {
@@ -151,6 +165,7 @@ function checkClusterAfterFCVDowngrade() {
 
 function checkClusterAfterBinaryDowngrade(fcv, call1Ns, call2Ns, call3Ns) {
     checkConfigAndShardsFCV(fcv);
+
     testDisabledLongNameSupport(call1Ns);
     testDisabledLongNameSupport(call2Ns);
     testDisabledLongNameSupport(call3Ns);

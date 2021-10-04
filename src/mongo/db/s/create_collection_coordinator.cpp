@@ -54,6 +54,7 @@
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/cluster_write.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/long_collection_names_gen.h"
 
 namespace mongo {
 namespace {
@@ -822,18 +823,21 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx) {
 
     coll.setKeyPattern(_shardKeyPattern->getKeyPattern());
 
-    // Prevent the FCV from changing before committing the new collection to the config server. This
-    // ensures that the 'supportingLongName' field is properly set (and committed) based on the
-    // current shard's FCV.
+    // Prevent the FCV from changing before committing the new collection to the config server.
+    // This ensures that the 'supportingLongName' field is properly set (and committed) based on
+    // the current shard's FCV.
     //
     // TODO: Remove once FCV 6.0 becomes last-lts
-    FixedFCVRegion fixedFCVRegion(opCtx);
+    std::shared_ptr<FixedFCVRegion> currentFCV;
 
     // TODO: Remove condition once FCV 6.0 becomes last-lts
-    const auto& currentFCV = serverGlobalParams.featureCompatibility;
-    if (currentFCV.isGreaterThanOrEqualTo(
-            multiversion::FeatureCompatibilityVersion::kUpgradingFrom_5_0_To_5_1)) {
-        coll.setSupportingLongName(SupportingLongNameStatusEnum::kImplicitlyEnabled);
+    if (feature_flags::gFeatureFlagLongCollectionNames.isEnabledAndIgnoreFCV()) {
+        currentFCV = std::make_shared<FixedFCVRegion>(opCtx);
+        if ((*currentFCV)
+                ->isGreaterThanOrEqualTo(
+                    multiversion::FeatureCompatibilityVersion::kUpgradingFrom_5_0_To_5_1)) {
+            coll.setSupportingLongName(SupportingLongNameStatusEnum::kImplicitlyEnabled);
+        }
     }
 
     if (_doc.getCreateCollectionRequest().getTimeseries()) {
