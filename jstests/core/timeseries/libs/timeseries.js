@@ -26,6 +26,9 @@ var TimeseriesTest = class {
             .featureFlagTimeseriesUpdatesAndDeletes.value;
     }
 
+    /**
+     * Returns whether sharded time-series updates and deletes are supported.
+     */
     static shardedTimeseriesUpdatesAndDeletesEnabled(conn) {
         return assert
             .commandWorked(

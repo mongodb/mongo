@@ -45,6 +45,7 @@
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_options.h"
+#include "mongo/db/timeseries/timeseries_update_delete_util.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/client/shard_registry.h"
@@ -128,11 +129,10 @@ UpdateType getUpdateExprType(const write_ops::UpdateOpEntry& updateDoc) {
 BSONObj getUpdateExprForTargeting(const boost::intrusive_ptr<ExpressionContext> expCtx,
                                   const ShardKeyPattern& shardKeyPattern,
                                   UpdateType updateType,
-                                  const write_ops::UpdateOpEntry& updateOp) {
+                                  const BSONObj& updateQuery,
+                                  const write_ops::UpdateModification& updateMod) {
     // We should never see an invalid update type here.
     invariant(updateType != UpdateType::kUnknown);
-
-    const auto& updateMod = updateOp.getU();
 
     // If this is not a replacement update, then the update expression remains unchanged.
     if (updateType != UpdateType::kReplacement) {
@@ -157,7 +157,7 @@ BSONObj getUpdateExprForTargeting(const boost::intrusive_ptr<ExpressionContext> 
     // This will guarantee that we can target a single shard, but it is not necessarily fatal if no
     // exact _id can be found.
     const auto idFromQuery =
-        uassertStatusOK(kVirtualIdShardKey.extractShardKeyFromQuery(expCtx, updateOp.getQ()));
+        uassertStatusOK(kVirtualIdShardKey.extractShardKeyFromQuery(expCtx, updateQuery));
     if (auto idElt = idFromQuery[kIdFieldName]) {
         updateExpr = updateExpr.addField(idElt);
     }
@@ -391,8 +391,8 @@ std::vector<ShardEndpoint> ChunkManagerTargeter::targetUpdate(OperationContext* 
     // as if the the shard key values are specified as NULL. A replacement document is also allowed
     // to have a missing '_id', and if the '_id' exists in the query, it will be emplaced in the
     // replacement document for targeting purposes.
+
     const auto& updateOp = itemRef.getUpdate();
-    const auto updateType = getUpdateExprType(updateOp);
 
     // If the collection is not sharded, forward the update to the primary shard.
     if (!_cm.isSharded()) {
@@ -414,10 +414,38 @@ std::vector<ShardEndpoint> ChunkManagerTargeter::targetUpdate(OperationContext* 
                                                                itemRef.getLet(),
                                                                itemRef.getLegacyRuntimeConstants());
 
-    const auto updateExpr =
-        getUpdateExprForTargeting(expCtx, shardKeyPattern, updateType, updateOp);
     const bool isUpsert = updateOp.getUpsert();
-    const auto query = updateOp.getQ();
+    auto query = updateOp.getQ();
+
+    if (_isRequestOnTimeseriesViewNamespace) {
+        uassert(ErrorCodes::NotImplemented,
+                str::stream() << "Updates are disallowed on sharded timeseries collections.",
+                feature_flags::gFeatureFlagShardedTimeSeriesUpdateDelete.isEnabledAndIgnoreFCV());
+        uassert(ErrorCodes::InvalidOptions,
+                str::stream()
+                    << "A {multi:false} update on a sharded timeseries collection is disallowed.",
+                updateOp.getMulti());
+        uassert(ErrorCodes::InvalidOptions,
+                str::stream()
+                    << "An {upsert:true} update on a sharded timeseries collection is disallowed.",
+                !isUpsert);
+
+        // Since this is a timeseries query, we may need to rename the metaField.
+        if (auto metaField = _cm.getTimeseriesFields().get().getMetaField()) {
+            query = timeseries::translateQuery(query, *metaField);
+        } else {
+            // We want to avoid targeting the query incorrectly if no metaField is defined on the
+            // timeseries collection, since we only allow queries on the metaField for timeseries
+            // updates. Note: any non-empty query should fail to update once it reaches the shards
+            // because there is no metaField for it to query for, but we don't want to validate this
+            // during routing.
+            query = BSONObj();
+        }
+    }
+
+    const auto updateType = getUpdateExprType(updateOp);
+    const auto updateExpr =
+        getUpdateExprForTargeting(expCtx, shardKeyPattern, updateType, query, updateOp.getU());
 
     // Utility function to target an update by shard key, and to handle any potential error results.
     auto targetByShardKey = [this, &collation](StatusWith<BSONObj> swShardKey, std::string msg) {

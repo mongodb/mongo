@@ -57,6 +57,9 @@ function generateBatch(size) {
  */
 function runTest({shardKey, cmdObj, numProfilerEntries}) {
     const isDelete = cmdObj["delete"] !== undefined;
+    const isUpdate = cmdObj["update"] !== undefined;
+    const cmdCollName = cmdObj[Object.keys(cmdObj)[0]];
+    const shardKeyHasMetaField = shardKey[metaField] !== undefined;
 
     // Insert some dummy data using 'mongos1' as the router, so that the cache is initialized on the
     // mongos while the collection is unsharded.
@@ -71,21 +74,22 @@ function runTest({shardKey, cmdObj, numProfilerEntries}) {
         key: shardKey,
     }));
 
-    assert.commandWorked(
-        mongos0.adminCommand({split: `${dbName}.system.buckets.${collName}`, middle: {meta: 1}}));
+    // Move one of the chunks into the second shard. Note that we can only do this if the meta field
+    // is part of the shard key.
+    const middle = shardKeyHasMetaField ? {meta: 1} : {"meta.a": 1};
+    assert.commandWorked(mongos0.adminCommand({split: `${dbName}.${bucketsCollName}`, middle}));
 
-    // Move one of the chunks into the second shard.
     const primaryShard = st.getPrimaryShard(dbName);
     const otherShard = st.getOther(primaryShard);
     assert.commandWorked(mongos0.adminCommand({
-        movechunk: `${dbName}.system.buckets.${collName}`,
-        find: {meta: 1},
+        movechunk: `${dbName}.${bucketsCollName}`,
+        find: middle,
         to: otherShard.name,
         _waitForDelete: true
     }));
 
     // Validate the command by running against 'mongos1' as the router.
-    function validateCommand(collName, numEntries, unVersioned) {
+    function validateCommand(cmdCollName, numEntries, unVersioned) {
         // Restart profiler.
         for (let shardDB of [shard0DB, shard1DB]) {
             shardDB.setProfilingLevel(0);
@@ -101,9 +105,13 @@ function runTest({shardKey, cmdObj, numProfilerEntries}) {
         }
 
         const queryField = `command.${Object.keys(cmdObj)[0]}`;
-        let filter = {[queryField]: collName, "command.shardVersion.0": {$ne: Timestamp(0, 0)}};
-        if (isDelete) {
-            filter = {"op": "remove", "ns": `${dbName}.${collName}`, "ok": {$ne: 0}};
+        let filter = {[queryField]: cmdCollName, "command.shardVersion.0": {$ne: Timestamp(0, 0)}};
+
+        // We currently do not log 'shardVersion' for updates. See SERVER-60354 for details.
+        if (isUpdate) {
+            filter = {"op": "update", "ns": `${dbName}.${cmdCollName}`, "ok": {$ne: 0}};
+        } else if (isDelete) {
+            filter = {"op": "remove", "ns": `${dbName}.${cmdCollName}`, "ok": {$ne: 0}};
         } else if (unVersioned) {
             filter["command.shardVersion.0"] = Timestamp(0, 0);
         }
@@ -115,11 +123,9 @@ function runTest({shardKey, cmdObj, numProfilerEntries}) {
                   {shard0Entries: shard0Entries, shard1Entries: shard1Entries});
     }
 
-    let targetShardedCollection = bucketsCollName;
-    if (isDelete && cmdObj["delete"] !== bucketsCollName) {
-        targetShardedCollection = collName;
-    }
-    validateCommand(targetShardedCollection, numProfilerEntries.sharded);
+    // The update command is always logged as being on the user-provided namespace.
+    validateCommand((isUpdate || isDelete) ? cmdCollName : bucketsCollName,
+                    numProfilerEntries.sharded);
 
     // Insert dummy data so that the 'mongos1' sees the collection as sharded.
     assert.commandWorked(mongos1.getCollection(collName).insert({[timeField]: ISODate()}));
@@ -130,9 +136,7 @@ function runTest({shardKey, cmdObj, numProfilerEntries}) {
         collName, {timeseries: {timeField: timeField, metaField: metaField}}));
 
     // When unsharded, the command should be run against the user requested namespace.
-    validateCommand(cmdObj[Object.keys(cmdObj)[0]] /* coll name specified in the command */,
-                    numProfilerEntries.unsharded,
-                    true);
+    validateCommand(cmdCollName, numProfilerEntries.unsharded, true);
 }
 
 /**
@@ -248,6 +252,60 @@ runTest({
 
 if (TimeseriesTest.timeseriesUpdatesAndDeletesEnabled(st.shard0) &&
     TimeseriesTest.shardedTimeseriesUpdatesAndDeletesEnabled(st.shard0)) {
+    // Tests for updates.
+    runTest({
+        shardKey: {[metaField + ".a"]: 1},
+        cmdObj: {
+            update: collName,
+            updates: [{
+                q: {},
+                u: {$inc: {[metaField + ".b"]: 1}},
+                multi: true,
+            }]
+        },
+        numProfilerEntries: {sharded: 2, unsharded: 1},
+    });
+
+    runTest({
+        shardKey: {[metaField + ".a"]: 1},
+        cmdObj: {
+            update: collName,
+            updates: [{
+                q: {[metaField + ".a"]: 1},
+                u: {$inc: {[metaField + ".b"]: -1}},
+                multi: true,
+            }]
+        },
+        numProfilerEntries: {sharded: 1, unsharded: 1},
+    });
+
+    runTest({
+        shardKey: {[metaField + ".a"]: 1},
+        cmdObj: {
+            update: bucketsCollName,
+            updates: [{
+                q: {},
+                u: {$inc: {["meta.b"]: 1}},
+                multi: true,
+            }]
+        },
+        numProfilerEntries: {sharded: 2, unsharded: 1},
+    });
+
+    runTest({
+        shardKey: {[metaField + ".a"]: 1},
+        cmdObj: {
+            update: bucketsCollName,
+            updates: [{
+                q: {["meta.a"]: 1},
+                u: {$inc: {["meta.b"]: -1}},
+                multi: true,
+            }]
+        },
+        numProfilerEntries: {sharded: 1, unsharded: 1},
+    });
+
+    // Tests for deletes.
     runTest({
         shardKey: {[metaField]: 1},
         cmdObj: {
@@ -295,8 +353,6 @@ if (TimeseriesTest.timeseriesUpdatesAndDeletesEnabled(st.shard0) &&
         },
         numProfilerEntries: {sharded: 1, unsharded: 1},
     });
-
-    // TODO SERVER-59180: Add tests for updates.
 }
 
 st.stop();

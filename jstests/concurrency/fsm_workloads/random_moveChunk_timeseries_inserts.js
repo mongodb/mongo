@@ -35,6 +35,17 @@ var $config = extendWorkload($config, function($config, $super) {
 
     $config.data.bucketPrefix = "system.buckets.";
 
+    $config.data.timeField = 't';
+    $config.data.metaField = 'm';
+
+    $config.data.generateMetaFieldValueForInitialInserts = () => {
+        return Math.floor(Random.rand() * $config.data.numMetaCount);
+    };
+
+    $config.data.generateMetaFieldValueForInsertStage = (i) => {
+        return i % $config.data.numMetaCount;
+    };
+
     $config.threadCount = 10;
     $config.iterations = 40;
     $config.startState = "init";
@@ -50,8 +61,8 @@ var $config = extendWorkload($config, function($config, $super) {
                 this.startTime + Math.floor(Random.rand() * this.numInitialDocs * this.increment);
             const doc = {
                 _id: new ObjectId(),
-                t: new Date(timer),
-                m: Math.floor(Random.rand() * this.numMetaCount)
+                [this.timeField]: new Date(timer),
+                [this.metaField]: this.generateMetaFieldValueForInsertStage(this.tid),
             };
             assertAlways.commandWorked(db[collName].insert(doc));
             assertAlways.commandWorked(db[this.nonShardCollName].insert(doc));
@@ -121,10 +132,16 @@ var $config = extendWorkload($config, function($config, $super) {
         // Make sure that queries using various indexes on time-series buckets collection return
         // buckets with all documents.
         const verifyBucketIndex = (bucketIndex) => {
+            const unpackStage = {
+                "$_internalUnpackBucket": {
+                    "timeField": this.timeField,
+                    "metaField": this.metaField,
+                    "bucketMaxSpanSeconds": NumberInt(3600)
+                }
+            };
             const bucketColl = db.getCollection(`system.buckets.${collName}`);
-            const buckets = bucketColl.aggregate([{$sort: bucketIndex}]).toArray();
             const numDocsInBuckets =
-                buckets.map(b => Object.keys(b.data._id).length).reduce((x, y) => x + y, 0);
+                bucketColl.aggregate([{$sort: bucketIndex}, unpackStage]).itcount();
             assert.eq(numInitialDocs, numDocsInBuckets);
             const plan = bucketColl.explain().aggregate([{$sort: bucketIndex}]);
             const stages = getPlanStages(plan, 'IXSCAN');
@@ -149,8 +166,8 @@ var $config = extendWorkload($config, function($config, $super) {
         db[collName].drop();
         db[this.nonShardCollName].drop();
 
-        assertAlways.commandWorked(
-            db.createCollection(collName, {timeseries: {timeField: "t", metaField: "m"}}));
+        assertAlways.commandWorked(db.createCollection(
+            collName, {timeseries: {timeField: this.timeField, metaField: this.metaField}}));
         cluster.shardCollection(db[collName], {t: 1}, false);
 
         // Create indexes to verify index integrity during the teardown state.
@@ -169,8 +186,8 @@ var $config = extendWorkload($config, function($config, $super) {
 
             const doc = {
                 _id: new ObjectId(),
-                t: new Date(currentTimeStamp),
-                m: i % this.numMetaCount
+                [this.timeField]: new Date(currentTimeStamp),
+                [this.metaField]: this.generateMetaFieldValueForInitialInserts(i),
             };
             bulk.insert(doc);
             bulkUnsharded.insert(doc);
