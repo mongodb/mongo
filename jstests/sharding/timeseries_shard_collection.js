@@ -170,131 +170,145 @@ if (TimeseriesTest.shardedtimeseriesCollectionsEnabled(st.shard0)) {
     }
 
     // Shard key on the hashed field.
-    (function hashAndTimeShardKey() {
-        assert.commandWorked(
-            sDB.createCollection('ts', {timeseries: {timeField: 'time', metaField: 'hostId'}}));
 
-        assert.commandWorked(st.s.adminCommand({enableSharding: 'test'}));
+    function runShardKeyPatternValidation(collectionExists) {
+        (function hashAndTimeShardKey() {
+            if (collectionExists) {
+                assert.commandWorked(sDB.createCollection(
+                    'ts', {timeseries: {timeField: 'time', metaField: 'hostId'}}));
+            }
 
-        // Only range is allowed on time field.
-        assert.commandFailedWithCode(st.s.adminCommand({
-            shardCollection: 'test.ts',
-            key: {time: 'hashed'},
-            timeseries: {timeField: 'time', metaField: 'hostId'},
-        }),
-                                     ErrorCodes.BadValue);
+            // Only range is allowed on time field.
+            assert.commandFailedWithCode(st.s.adminCommand({
+                shardCollection: 'test.ts',
+                key: {time: 'hashed'},
+                timeseries: {timeField: 'time', metaField: 'hostId'},
+            }),
+                                         ErrorCodes.BadValue);
 
-        let coll = sDB.getCollection('ts');
-        assert.commandWorked(coll.insert([
-            {hostId: 10, time: ISODate(`1901-01-01`)},
-            {hostId: 11, time: ISODate(`1902-01-01`)},
-        ]));
-        assert.commandWorked(coll.createIndex({hostId: 'hashed'}));
+            if (!collectionExists) {
+                assert.commandWorked(sDB.createCollection(
+                    'ts', {timeseries: {timeField: 'time', metaField: 'hostId'}}));
+            }
+            let coll = sDB.getCollection('ts');
+            assert.commandWorked(coll.insert([
+                {hostId: 10, time: ISODate(`1901-01-01`)},
+                {hostId: 11, time: ISODate(`1902-01-01`)},
+            ]));
+            assert.commandWorked(coll.createIndex({hostId: 'hashed'}));
 
-        assert.commandWorked(st.s.adminCommand({
-            shardCollection: 'test.ts',
-            key: {hostId: 'hashed'},
-            timeseries: {timeField: 'time', metaField: 'hostId'}
-        }));
+            assert.commandWorked(st.s.adminCommand({
+                shardCollection: 'test.ts',
+                key: {hostId: 'hashed'},
+                timeseries: {timeField: 'time', metaField: 'hostId'}
+            }));
 
-        validateBucketsCollectionSharded({
-            collName: 'ts',
-            shardKey: {meta: 'hashed'},
-            timeSeriesParams: {timeField: 'time', metaField: 'hostId'}
-        });
+            validateBucketsCollectionSharded({
+                collName: 'ts',
+                shardKey: {meta: 'hashed'},
+                timeSeriesParams: {timeField: 'time', metaField: 'hostId'}
+            });
 
-        assert.eq(coll.find().itcount(), 2);  // Validate count after sharding.
-        let insertCount = timeseriesInsert(coll);
-        assert.eq(coll.find().itcount(), insertCount + 2);
-        coll.drop();
+            assert.eq(coll.find().itcount(), 2);  // Validate count after sharding.
+            let insertCount = timeseriesInsert(coll);
+            assert.eq(coll.find().itcount(), insertCount + 2);
+            coll.drop();
 
-        assert.commandWorked(
-            sDB.createCollection('ts', {timeseries: {timeField: 'time', metaField: 'hostId'}}));
-        assert.commandWorked(st.s.adminCommand({enableSharding: 'test'}));
+            if (collectionExists) {
+                assert.commandWorked(sDB.createCollection(
+                    'ts', {timeseries: {timeField: 'time', metaField: 'hostId'}}));
+            }
+            assert.commandWorked(st.s.adminCommand({enableSharding: 'test'}));
 
-        // Sharding key with hashed meta field and time field.
-        assert.commandWorked(st.s.adminCommand({
-            shardCollection: 'test.ts',
-            key: {hostId: 'hashed', time: 1},
-            timeseries: {timeField: 'time', metaField: 'hostId'},
-            numInitialChunks: 2
-        }));
+            // Sharding key with hashed meta field and time field.
+            assert.commandWorked(st.s.adminCommand({
+                shardCollection: 'test.ts',
+                key: {hostId: 'hashed', time: 1},
+                timeseries: {timeField: 'time', metaField: 'hostId'},
+                numInitialChunks: 2
+            }));
 
-        coll = sDB.getCollection('ts');
-        assert.eq(coll.find().itcount(), 0);
-        insertCount = timeseriesInsert(coll);
-        assert.eq(coll.find().itcount(), insertCount);
-        coll.drop();
-    })();
+            coll = sDB.getCollection('ts');
+            assert.eq(coll.find().itcount(), 0);
+            insertCount = timeseriesInsert(coll);
+            assert.eq(coll.find().itcount(), insertCount);
+            coll.drop();
+        })();
 
-    // Test that invalid shard keys fail.
-    (function invalidShardKeyPatterns() {
-        assert.commandWorked(
-            sDB.createCollection('ts', {timeseries: {timeField: 'time', metaField: 'hostId'}}));
-        assert.commandWorked(st.s.adminCommand({enableSharding: 'test'}));
+        // Test that invalid shard keys fail.
+        (function invalidShardKeyPatterns() {
+            if (collectionExists) {
+                assert.commandWorked(sDB.createCollection(
+                    'ts', {timeseries: {timeField: 'time', metaField: 'hostId'}}));
+            }
 
-        // No other fields, including _id, are allowed in the shard key pattern
-        assert.commandFailedWithCode(st.s.adminCommand({
-            shardCollection: 'test.ts',
-            key: {_id: 1},
-            timeseries: {timeField: 'time', metaField: 'hostId'},
-        }),
-                                     5914001);
+            // No other fields, including _id, are allowed in the shard key pattern
+            assert.commandFailedWithCode(st.s.adminCommand({
+                shardCollection: 'test.ts',
+                key: {_id: 1},
+                timeseries: {timeField: 'time', metaField: 'hostId'},
+            }),
+                                         5914001);
 
-        assert.commandFailedWithCode(st.s.adminCommand({
-            shardCollection: 'test.ts',
-            key: {_id: 1, time: 1},
-            timeseries: {timeField: 'time', metaField: 'hostId'},
-        }),
-                                     5914001);
+            assert.commandFailedWithCode(st.s.adminCommand({
+                shardCollection: 'test.ts',
+                key: {_id: 1, time: 1},
+                timeseries: {timeField: 'time', metaField: 'hostId'},
+            }),
+                                         5914001);
 
-        assert.commandFailedWithCode(st.s.adminCommand({
-            shardCollection: 'test.ts',
-            key: {_id: 1, hostId: 1},
-            timeseries: {timeField: 'time', metaField: 'hostId'},
-        }),
-                                     5914001);
+            assert.commandFailedWithCode(st.s.adminCommand({
+                shardCollection: 'test.ts',
+                key: {_id: 1, hostId: 1},
+                timeseries: {timeField: 'time', metaField: 'hostId'},
+            }),
+                                         5914001);
 
-        assert.commandFailedWithCode(st.s.adminCommand({
-            shardCollection: 'test.ts',
-            key: {a: 1},
-            timeseries: {timeField: 'time', metaField: 'hostId'},
-        }),
-                                     5914001);
+            assert.commandFailedWithCode(st.s.adminCommand({
+                shardCollection: 'test.ts',
+                key: {a: 1},
+                timeseries: {timeField: 'time', metaField: 'hostId'},
+            }),
+                                         5914001);
 
-        // Shared key where time is not the last field in shard key should fail.
-        assert.commandFailedWithCode(st.s.adminCommand({
-            shardCollection: 'test.ts',
-            key: {time: 1, hostId: 1},
-            timeseries: {timeField: 'time', metaField: 'hostId'}
-        }),
-                                     5914000);
-        sDB.dropDatabase();
-    })();
+            // Shared key where time is not the last field in shard key should fail.
+            assert.commandFailedWithCode(st.s.adminCommand({
+                shardCollection: 'test.ts',
+                key: {time: 1, hostId: 1},
+                timeseries: {timeField: 'time', metaField: 'hostId'}
+            }),
+                                         5914000);
+            assert(sDB.getCollection("ts").drop());
+        })();
 
-    (function noMetaFieldTimeseries() {
-        assert.commandWorked(sDB.createCollection('ts', {timeseries: {timeField: 'time'}}));
-        assert.commandWorked(st.s.adminCommand({enableSharding: 'test'}));
+        (function noMetaFieldTimeseries() {
+            if (collectionExists) {
+                assert.commandWorked(sDB.createCollection('ts', {timeseries: {timeField: 'time'}}));
+            }
 
-        assert.commandFailedWithCode(st.s.adminCommand({
-            shardCollection: 'test.ts',
-            key: {_id: 1},
-            timeseries: {timeField: 'time'},
-        }),
-                                     5914001);
+            assert.commandFailedWithCode(st.s.adminCommand({
+                shardCollection: 'test.ts',
+                key: {_id: 1},
+                timeseries: {timeField: 'time'},
+            }),
+                                         5914001);
 
-        assert.commandFailedWithCode(st.s.adminCommand({
-            shardCollection: 'test.ts',
-            key: {a: 1},
-            timeseries: {timeField: 'time'},
-        }),
-                                     5914001);
+            assert.commandFailedWithCode(st.s.adminCommand({
+                shardCollection: 'test.ts',
+                key: {a: 1},
+                timeseries: {timeField: 'time'},
+            }),
+                                         5914001);
 
-        assert.commandWorked(st.s.adminCommand(
-            {shardCollection: 'test.ts', key: {time: 1}, timeseries: {timeField: 'time'}}));
+            assert.commandWorked(st.s.adminCommand(
+                {shardCollection: 'test.ts', key: {time: 1}, timeseries: {timeField: 'time'}}));
 
-        sDB.dropDatabase();
-    })();
+            assert(sDB.getCollection("ts").drop());
+        })();
+    }
+
+    runShardKeyPatternValidation(true);
+    runShardKeyPatternValidation(false);
 
 } else {
     (function timeseriesCollectionsCannotBeSharded() {

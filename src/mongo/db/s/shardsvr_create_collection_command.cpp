@@ -107,24 +107,25 @@ public:
                                 << nss << "' collection",
                             timeseries::optionsAreEqual(*createCmdRequest.getTimeseries(),
                                                         *bucketsColl->getTimeseriesOptions()));
-                    auto timeField = createCmdRequest.getTimeseries()->getTimeField();
-                    auto metaField = createCmdRequest.getTimeseries()->getMetaField();
-                    BSONObjIterator iter{*createCmdRequest.getShardKey()};
-                    while (auto elem = iter.next()) {
-                        if (elem.fieldNameStringData() == timeField) {
-                            uassert(5914000,
-                                    str::stream()
-                                        << "the time field '" << timeField
-                                        << "' can be only at the end of the shard key pattern",
-                                    !iter.more());
-                        } else {
-                            uassert(5914001,
-                                    str::stream() << "only the time field or meta field can be "
-                                                     "part of shard key pattern",
-                                    metaField &&
-                                        (elem.fieldNameStringData() == *metaField ||
-                                         elem.fieldNameStringData().startsWith(*metaField + ".")));
-                        }
+                }
+
+                auto timeField = createCmdRequest.getTimeseries()->getTimeField();
+                auto metaField = createCmdRequest.getTimeseries()->getMetaField();
+                BSONObjIterator iter{*createCmdRequest.getShardKey()};
+                while (auto elem = iter.next()) {
+                    if (elem.fieldNameStringData() == timeField) {
+                        uassert(5914000,
+                                str::stream()
+                                    << "the time field '" << timeField
+                                    << "' can be only at the end of the shard key pattern",
+                                !iter.more());
+                    } else {
+                        uassert(5914001,
+                                str::stream() << "only the time field or meta field can be "
+                                                 "part of shard key pattern",
+                                metaField &&
+                                    (elem.fieldNameStringData() == *metaField ||
+                                     elem.fieldNameStringData().startsWith(*metaField + ".")));
                     }
                 }
                 nss = bucketsNs;
