@@ -78,6 +78,7 @@ components:
     release_monitoring_id: 6845
     local_directory_path: src/third_party/boost
     team_owner: "Service Architecture"
+    upgrade_suppression: TODO SERVER-60440
 
   concurrencytest:
     homepage_url: https://github.com/cgoldberg/concurrencytest
@@ -158,6 +159,7 @@ components:
     release_monitoring_id: 5284
     local_directory_path: src/third_party/yaml-cpp
     team_owner: "Security"
+    upgrade_suppression: TODO SERVER-60439
 
   JSON-Schema-Test-Suite:
     homepage_url: https://github.com/json-schema-org/JSON-Schema-Test-Suite
