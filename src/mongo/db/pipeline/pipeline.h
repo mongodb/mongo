@@ -272,6 +272,11 @@ public:
     std::vector<Value> serialize() const;
     std::vector<BSONObj> serializeToBson() const;
 
+    /**
+     * Serializes the pipeline into BSON for explain/debug logging purposes.
+     */
+    std::vector<BSONObj> serializeToBSONForDebug() const;
+
     // The initial source is special since it varies between mongos and mongod.
     void addInitialSource(boost::intrusive_ptr<DocumentSource> source);
 

@@ -125,6 +125,12 @@ public:
         return _exec->getPlanExplainer().getVersion();
     }
 
+    BSONObj serializeToBSONForDebug() const final {
+        // Feel free to add any useful information here. For now this has not been useful for
+        // debugging so is left empty.
+        return BSON(kStageName << "{}");
+    }
+
 protected:
     DocumentSourceCursor(const CollectionPtr& collection,
                          std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,

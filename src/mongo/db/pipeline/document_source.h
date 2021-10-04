@@ -400,7 +400,7 @@ public:
      * Shortcut method to get a BSONObj for debugging. Often useful in log messages, but is not
      * cheap so avoid doing so on a hot path at a low verbosity.
      */
-    BSONObj serializeToBSONForDebug() const;
+    virtual BSONObj serializeToBSONForDebug() const;
 
     /**
      * If this stage uses additional namespaces, adds them to 'collectionNames'. These namespaces

@@ -43,10 +43,10 @@ namespace mongo {
 
 using boost::intrusive_ptr;
 
-REGISTER_INTERNAL_DOCUMENT_SOURCE(documents,
-                                  LiteParsedDocumentSourceDefault::parse,
-                                  DocumentSourceDocuments::createFromBson,
-                                  true);
+REGISTER_DOCUMENT_SOURCE(documents,
+                         LiteParsedDocumentSourceDefault::parse,
+                         DocumentSourceDocuments::createFromBson,
+                         AllowedWithApiStrict::kAlways);
 
 std::list<intrusive_ptr<DocumentSource>> DocumentSourceDocuments::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
@@ -54,7 +54,7 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceDocuments::createFromBson
     // $unwind, and $replaceRoot together.
     auto genField = UUID::gen().toString();
     auto projectContent = BSON(genField << elem);
-    auto queue = DocumentSourceQueue::create(expCtx);
+    auto queue = DocumentSourceQueue::create(expCtx, DocumentSourceDocuments::kStageName);
     queue->emplace_back(Document{});
     /* Create the following pipeline from $documents: [...]
      *  => [ queue([{}]),
@@ -66,9 +66,10 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceDocuments::createFromBson
         queue,
         DocumentSourceProject::create(projectContent, expCtx, elem.fieldNameStringData()),
         DocumentSourceUnwind::create(expCtx, genField, false, {}, true),
-        DocumentSourceReplaceRoot::createFromBson(
-            BSON("$replaceRoot" << BSON("newRoot" << std::string("$") + genField)).firstElement(),
-            expCtx)};
+        DocumentSourceReplaceRoot::create(expCtx,
+                                          ExpressionFieldPath::createPathFromString(
+                                              expCtx.get(), genField, expCtx->variablesParseState),
+                                          "elements within the array passed to $documents")};
 }
 
 }  // namespace mongo

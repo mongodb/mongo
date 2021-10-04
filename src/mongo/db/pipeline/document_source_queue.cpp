@@ -30,7 +30,6 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/document_source_queue.h"
-
 namespace mongo {
 
 REGISTER_INTERNAL_DOCUMENT_SOURCE(queue,
@@ -55,16 +54,20 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceQueue::createFromBson(
 }
 
 boost::intrusive_ptr<DocumentSourceQueue> DocumentSourceQueue::create(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    return new DocumentSourceQueue({}, expCtx);
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    boost::optional<StringData> aliasStageName) {
+    return new DocumentSourceQueue({}, expCtx, aliasStageName);
 }
 
 DocumentSourceQueue::DocumentSourceQueue(std::deque<GetNextResult> results,
-                                         const boost::intrusive_ptr<ExpressionContext>& expCtx)
-    : DocumentSource(kStageName, expCtx), _queue(std::move(results)) {}
+                                         const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                         boost::optional<StringData> aliasStageName)
+    : DocumentSource(kStageName /* pass the real stage name here for execution stats */, expCtx),
+      _queue(std::move(results)),
+      _aliasStageName(std::move(aliasStageName)) {}
 
 const char* DocumentSourceQueue::getSourceName() const {
-    return kStageName.rawData();
+    return _aliasStageName.value_or(kStageName).rawData();
 }
 
 DocumentSource::GetNextResult DocumentSourceQueue::doGetNext() {
@@ -80,7 +83,7 @@ DocumentSource::GetNextResult DocumentSourceQueue::doGetNext() {
 Value DocumentSourceQueue::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
     ValueArrayStream vals;
     for (auto elem : _queue) {
-        vals << elem.getDocument();
+        vals << elem.getDocument().getOwned();
     }
     return Value(DOC(kStageName << vals.done()));
 }

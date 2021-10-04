@@ -24,6 +24,7 @@ function buildErrorString(expected, found) {
     return "Expected:\n" + tojson(expected) + "\nGot:\n" + tojson(found);
 }
 function checkResults(resObj, expectedResult) {
+    assert.commandWorked(resObj);
     assert(arrayEq(resObj.cursor.firstBatch, expectedResult),
            buildErrorString(expectedResult, resObj.cursor.firstBatch));
 }

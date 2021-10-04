@@ -26,6 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 #include "mongo/platform/basic.h"
@@ -35,6 +36,7 @@
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/pipeline/document_source_documents.h"
 #include "mongo/db/pipeline/document_source_match.h"
+#include "mongo/db/pipeline/document_source_queue.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_source_union_with.h"
 #include "mongo/db/pipeline/document_source_union_with_gen.h"
@@ -85,12 +87,24 @@ DocumentSourceUnionWith::~DocumentSourceUnionWith() {
 
 void validateUnionWithCollectionlessPipeline(
     const boost::optional<std::vector<mongo::BSONObj>>& pipeline) {
+    const auto errMsg =
+        "$unionWith stage without explicit collection must have a pipeline with $documents as "
+        "first stage";
+
+    uassert(ErrorCodes::FailedToParse, errMsg, pipeline && pipeline->size() > 0);
+    const auto firstStageBson = (*pipeline)[0];
+    LOGV2_DEBUG(5909700,
+                4,
+                "$unionWith validating collectionless pipeline",
+                "pipeline"_attr = pipeline,
+                "first"_attr = firstStageBson);
     uassert(ErrorCodes::FailedToParse,
-            "$unionWith stage without explicit collection must have a pipeline with $documents as "
-            "first stage",
-            pipeline && pipeline->size() > 0 &&
-                // TODO SERVER-59628 replace with constraints check
-                !(*pipeline)[0].getField(DocumentSourceDocuments::kStageName).eoo());
+            errMsg,
+            // TODO SERVER-59628 replace with constraints check
+            (firstStageBson.hasField(DocumentSourceDocuments::kStageName) ||
+             firstStageBson.hasField(DocumentSourceQueue::kStageName))
+
+    );
 }
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceUnionWith::clone() const {

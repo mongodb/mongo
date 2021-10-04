@@ -32,7 +32,6 @@
 #include <deque>
 
 #include "mongo/db/pipeline/document_source.h"
-
 namespace mongo {
 
 /**
@@ -46,10 +45,12 @@ public:
     static constexpr StringData kStageName = "$queue"_sd;
 
     static boost::intrusive_ptr<DocumentSourceQueue> create(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx);
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        boost::optional<StringData> aliasStageName = boost::none);
 
     DocumentSourceQueue(std::deque<GetNextResult> results,
-                        const boost::intrusive_ptr<ExpressionContext>& expCtx);
+                        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                        boost::optional<StringData> aliasStageName = boost::none);
     ~DocumentSourceQueue() override = default;
 
     const char* getSourceName() const override;
@@ -59,7 +60,7 @@ public:
     StageConstraints constraints(Pipeline::SplitState pipeState) const override {
         StageConstraints constraints(StreamType::kStreaming,
                                      PositionRequirement::kFirst,
-                                     HostTypeRequirement::kNone,
+                                     HostTypeRequirement::kLocalOnly,
                                      DiskUseRequirement::kNoDiskUse,
                                      FacetRequirement::kNotAllowed,
                                      TransactionRequirement::kAllowed,
@@ -67,6 +68,7 @@ public:
                                      UnionRequirement::kAllowed);
 
         constraints.requiresInputDocSource = false;
+        constraints.isIndependentOfAnyCollection = true;
         return constraints;
     }
 
@@ -101,6 +103,10 @@ protected:
     GetNextResult doGetNext() override;
     // Return documents from front of queue.
     std::deque<GetNextResult> _queue;
+
+    // An optional alias name is provided for cases like $documents where we want an error message
+    // to indicate the name the user provided, not the internal $queue name.
+    boost::optional<StringData> _aliasStageName = boost::none;
 };
 
 }  // namespace mongo

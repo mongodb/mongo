@@ -2,51 +2,28 @@
 // The $documents follows these rules:
 // * $documents must be in the beginning of the pipeline,
 // * $documents content must evaluate into an array of objects.
-// $documents is not meant to be used in sharded env yet. It is going to return
-//  the same result set for each shard which is counter intuitive. The test is disabled
-//  for mongos
 // @tags: [
-//   do_not_wrap_aggregations_in_facets,
-//   assumes_unsharded_collection,
-//   assumes_read_preference_unchanged,
-//   assumes_read_concern_unchanged,
-//   assumes_against_mongod_not_mongos
+//   do_not_wrap_aggregations_in_facets
 // ]
-
 (function() {
 "use strict";
 
 load("jstests/aggregation/extras/utils.js");  // For resultsEq.
 
 const dbName = jsTestName();
-// TODO SERVER-59097 - expose $documents and get rid of internal
-// client here
-const writeConcernOptions = {
-    writeConcern: {w: "majority"}
-};
 
-const testInternalClient = (function createInternalClient() {
-    const connInternal = new Mongo(db.getMongo().host);
-    const curDB = connInternal.getDB(dbName);
-    assert.commandWorked(curDB.runCommand({
-        "hello": 1,
-        internalClient: {minWireVersion: NumberInt(0), maxWireVersion: NumberInt(7)}
-    }));
-    return connInternal;
-})();
-
-const currDB = testInternalClient.getDB(dbName);
+const currDB = db.getSiblingDB(dbName);
 const coll = currDB.documents;
-coll.drop(writeConcernOptions);
-coll.insert({a: 1}, writeConcernOptions);
+coll.drop();
+assert.commandWorked(coll.insert({a: 1}));
 
 const lookup_coll = currDB.lookup_coll;
-lookup_coll.drop(writeConcernOptions);
+lookup_coll.drop();
 for (let i = 0; i < 10; i++) {
-    lookup_coll.insert({id_name: i, name: "name_" + i}, writeConcernOptions);
+    assert.commandWorked(lookup_coll.insert({id_name: i, name: "name_" + i}));
 }
 // $documents given an array of objects.
-const docs = coll.aggregate([{$documents: [{a1: 1}, {a1: 2}]}], writeConcernOptions).toArray();
+const docs = currDB.aggregate([{$documents: [{a1: 1}, {a1: 2}]}]).toArray();
 
 assert.eq(2, docs.length);
 assert.eq(docs[0], {a1: 1});
@@ -54,8 +31,7 @@ assert.eq(docs[1], {a1: 2});
 
 // $documents evaluates to an array of objects.
 const docs1 =
-    coll.aggregate([{$documents: {$map: {input: {$range: [0, 100]}, in : {x: "$$this"}}}}],
-                   writeConcernOptions)
+    currDB.aggregate([{$documents: {$map: {input: {$range: [0, 100]}, in : {x: "$$this"}}}}])
         .toArray();
 
 assert.eq(100, docs1.length);
@@ -65,30 +41,27 @@ for (let i = 0; i < 100; i++) {
 
 // $documents evaluates to an array of objects.
 const docsUnionWith =
-    coll.aggregate(
-            [
-                {$documents: [{a: 13}]},
-                {
-                    $unionWith: {
-                        pipeline:
-                            [{$documents: {$map: {input: {$range: [0, 5]}, in : {x: "$$this"}}}}]
-                    }
+    coll.aggregate([
+            {
+                $unionWith: {
+                    pipeline: [{$documents: {$map: {input: {$range: [0, 5]}, in : {x: "$$this"}}}}]
                 }
-            ],
-            writeConcernOptions)
+            },
+            {$group: {_id: "$x", x: {$first: "$x"}}},
+            {$project: {_id: 0}},
+        ])
         .toArray();
 
-assert(resultsEq([{a: 13}, {x: 0}, {x: 1}, {x: 2}, {x: 3}, {x: 4}], docsUnionWith));
+assert(resultsEq([{x: null}, {x: 0}, {x: 1}, {x: 2}, {x: 3}, {x: 4}], docsUnionWith));
 
 {  // $documents with const objects inside $unionWith (no "coll").
-    const res = coll.aggregate(
-                        [
-                            {$unionWith: {pipeline: [{$documents: [{xx: 1}, {xx: 2}]}]}},
-                            {$project: {_id: 0}}
-                        ],
-                        writeConcernOptions)
+    const res = coll.aggregate([
+                        {$unionWith: {pipeline: [{$documents: [{xx: 1}, {xx: 2}]}]}},
+                        {$group: {_id: "$xx", xx: {$first: "$xx"}}},
+                        {$project: {_id: 0}}
+                    ])
                     .toArray();
-    assert(resultsEq([{a: 1}, {xx: 1}, {xx: 2}], res));
+    assert(resultsEq([{xx: null}, {xx: 1}, {xx: 2}], res));
 }
 
 {  // $documents with const objects inside $lookup (no "coll", explicit $match).
@@ -114,8 +87,8 @@ assert(resultsEq([{a: 13}, {x: 0}, {x: 1}, {x: 2}, {x: 3}, {x: 4}], docsUnionWit
                 },
                 {$match: {"names": {"$ne": []}}},
                 {$project: {_id: 0}}
-            ],
-            writeConcernOptions)
+            ]
+           )
             .toArray();
     assert(resultsEq(
         [
@@ -139,8 +112,7 @@ assert(resultsEq([{a: 13}, {x: 0}, {x: 1}, {x: 2}, {x: 3}, {x: 4}], docsUnionWit
                 },
                 {$match: {"names": {"$ne": []}}},
                 {$project: {_id: 0}}
-            ],
-            writeConcernOptions)
+            ])
             .toArray();
     assert(resultsEq(
         [
@@ -150,39 +122,52 @@ assert(resultsEq([{a: 13}, {x: 0}, {x: 1}, {x: 2}, {x: 3}, {x: 4}], docsUnionWit
         res));
 }
 
+// Must fail when $document appears in the top level collection pipeline.
+assert.throwsWithCode(() => {
+    coll.aggregate([{$documents: {$map: {input: {$range: [0, 100]}, in : {x: "$$this"}}}}]);
+}, ErrorCodes.InvalidNamespace);
+
 // Must fail due to misplaced $document.
 assert.throwsWithCode(() => {
-    coll.aggregate([{$project: {a: [{xx: 1}, {xx: 2}]}}, {$documents: [{a: 1}]}],
-                   writeConcernOptions);
+    coll.aggregate([{$project: {a: [{xx: 1}, {xx: 2}]}}, {$documents: [{a: 1}]}]);
 }, 40602);
 
 // $unionWith must fail due to no $document
 assert.throwsWithCode(() => {
-    coll.aggregate([{$unionWith: {pipeline: [{$project: {a: [{xx: 1}, {xx: 2}]}}]}}],
-                   writeConcernOptions);
-}, 9);
+    coll.aggregate([{$unionWith: {pipeline: [{$project: {a: [{xx: 1}, {xx: 2}]}}]}}]);
+}, ErrorCodes.FailedToParse);
 
 // Test that $lookup fails due to no 'from' argument and no $documents stage.
 assert.throwsWithCode(() => {
-    coll.aggregate([{$lookup: {let: {"id_lookup": "$id_name"}, as: "aa", pipeline: [{$project: {a: [{xx: 1}, {xx: 2}]}}]}}],
-        writeConcernOptions);
-}, 9);
+    coll.aggregate([
+        {
+            $lookup: {
+                let: {"id_lookup": "$id_name"},
+                as: "aa",
+                pipeline: [{$project: {a: [{xx: 1}, {xx: 2}]}}]
+            }
+        }
+        ]);
+}, ErrorCodes.FailedToParse);
 // Test that $lookup fails due to no 'from' argument and no pipeline field.
 assert.throwsWithCode(() => {
-    coll.aggregate([{$lookup: {let : {"id_lookup": "$id_name"}, as: "aa"}}], writeConcernOptions);
-}, 9);
-// Must fail due to $documents producing array of non-objects.
+    coll.aggregate([{$lookup: {let : {"id_lookup": "$id_name"}, as: "aa"}}]);
+}, ErrorCodes.FailedToParse);
+
+// Test that $documents fails due to producing array of non-objects.
 assert.throwsWithCode(() => {
-    coll.aggregate([{$documents: [1, 2, 3]}], writeConcernOptions);
+    currDB.aggregate([{$documents: [1, 2, 3]}]);
+}, 40228);
+// Now with one object and one scalar.
+assert.throwsWithCode(() => {
+    currDB.aggregate([{$documents: [{a: 1}, 2]}]);
 }, 40228);
 
-// Must fail due $documents producing non-array.
+// Test that $documents fails due when provided a non-array.
 assert.throwsWithCode(() => {
-    coll.aggregate([{$documents: {a: 1}}], writeConcernOptions);
+    currDB.aggregate([{$documents: "string"}]);
 }, 5858203);
 
-// Must fail due $documents producing array of non-objects.
-assert.throwsWithCode(() => {
-    coll.aggregate([{$documents: {a: [1, 2, 3]}}], writeConcernOptions);
-}, 5858203);
+// Test that $documents succeeds when given a singleton object.
+assert.eq(currDB.aggregate([{$documents: [{a: [1, 2, 3]}]}]).toArray(), [{a: [1, 2, 3]}]);
 })();

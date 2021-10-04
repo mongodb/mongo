@@ -32,6 +32,7 @@
 #include "mongo/db/pipeline/document_source_replace_root.h"
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
 
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/jsobj.h"
@@ -45,27 +46,13 @@ using boost::intrusive_ptr;
 Document ReplaceRootTransformation::applyTransformation(const Document& input) {
     // Extract subdocument in the form of a Value.
     Value newRoot = _newRoot->evaluate(input, &_expCtx->variables);
-
-    // To ensure an accurate user-facing message, any user-facing syntax that uses this stage
-    // internally must provide an message opener that complies with its documentation.
-    StringData msgOpener = [&]() {
-        switch (_specifiedName) {
-            case UserSpecifiedName::kReplaceRoot:
-                return "'newRoot' expression "_sd;
-            case UserSpecifiedName::kReplaceWith:
-                return "'replacement document' "_sd;
-            default:
-                MONGO_UNREACHABLE;
-        }
-    }();
-
     // The newRoot expression, if it exists, must evaluate to an object.
     uassert(40228,
-            str::stream() << msgOpener.toString()
-                          << "must evaluate to an object, but resulting value was: "
-                          << newRoot.toString() << ". Type of resulting value: '"
-                          << typeName(newRoot.getType())
-                          << "'. Input document: " << input.toString(),
+            fmt::format(kErrorTemplate.rawData(),
+                        _errMsgContextForNonObject,
+                        newRoot.toString(),
+                        typeName(newRoot.getType()),
+                        input.toString()),
             newRoot.getType() == BSONType::Object);
 
     // Turn the value into a document.
@@ -119,10 +106,21 @@ intrusive_ptr<DocumentSource> DocumentSourceReplaceRoot::createFromBson(
         std::make_unique<ReplaceRootTransformation>(
             expCtx,
             newRootExpression,
-            (stageName == kStageName) ? ReplaceRootTransformation::UserSpecifiedName::kReplaceRoot
-                                      : ReplaceRootTransformation::UserSpecifiedName::kReplaceWith),
+            (stageName == kStageName) ? "'newRoot' expression " : "'replacement document' "),
         kStageName.rawData(),
         isIndependentOfAnyCollection);
 }
 
+boost::intrusive_ptr<DocumentSource> DocumentSourceReplaceRoot::create(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const boost::intrusive_ptr<Expression>& newRootExpression,
+    std::string errMsgContextForNonObjects) {
+    const bool isIndependentOfAnyCollection = false;
+    return new DocumentSourceSingleDocumentTransformation(
+        expCtx,
+        std::make_unique<ReplaceRootTransformation>(
+            expCtx, newRootExpression, std::move(errMsgContextForNonObjects)),
+        kStageName.rawData(),
+        isIndependentOfAnyCollection);
+}
 }  // namespace mongo
