@@ -407,6 +407,21 @@ After the server has started up, it should notify you via the terminal that you 
 #### Frequently used flags and variables
 ### MongoDB build configuration
 #### Frequently used flags and variables
+
+##### `MONGO_GIT_HASH`
+
+The `MONGO_GIT_HASH` SCons variable controls the value of the git hash
+which will be interpolated into the build to identify the commit
+currently being built. If not overridden, this defaults to the git
+hash of the current commit.
+
+##### `MONGO_VERSION`
+
+The `MONGO_VERSION` SCons variable controls the value which will be
+interpolated into the build to identify the version of the software
+currently being built. If not overridden, this defaults to the result
+of `git describe`, which will use the local tags to derive a version.
+
 ### Targets and Aliases
 
 ## Build artifacts and installation
