@@ -792,15 +792,8 @@ void generateComparison(MatchExpressionVisitorContext* context,
         // SBE EConstant assumes ownership of the value so we have to make a copy here.
         auto [tag, val] = sbe::value::copyValue(tagView, valView);
 
-        // When 'rhs' is not NaN, return false if lhs is NaN. Otherwise, use usual comparison
-        // semantics.
-        return {makeBinaryOp(
-                    sbe::EPrimBinary::logicAnd,
-                    makeNot(makeFillEmptyFalse(makeFunction("isNaN", makeVariable(inputSlot)))),
-                    makeFillEmptyFalse(makeBinaryOp(binaryOp,
-                                                    makeVariable(inputSlot),
-                                                    makeConstant(tag, val),
-                                                    context->state.env))),
+        return {makeFillEmptyFalse(makeBinaryOp(
+                    binaryOp, makeVariable(inputSlot), makeConstant(tag, val), context->state.env)),
                 std::move(inputStage)};
     };
 
