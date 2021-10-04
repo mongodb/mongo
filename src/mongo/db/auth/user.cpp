@@ -117,8 +117,6 @@ void User::setIndirectRoles(RoleNameIterator indirectRoles) {
     while (indirectRoles.more()) {
         _indirectRoles.push_back(indirectRoles.next());
     }
-    // Keep indirectRoles sorted for more efficient comparison against other users.
-    std::sort(_indirectRoles.begin(), _indirectRoles.end());
 }
 
 void User::setPrivileges(const PrivilegeVector& privileges) {
@@ -181,31 +179,6 @@ Status User::validateRestrictions(OperationContext* opCtx) const {
     }
 
     return Status::OK();
-}
-
-bool User::hasDifferentRoles(const User& otherUser) const {
-    // If the number of direct or indirect roles in the users' are not the same, they have
-    // different roles.
-    if (_roles.size() != otherUser._roles.size() ||
-        _indirectRoles.size() != otherUser._indirectRoles.size()) {
-        return true;
-    }
-
-    // At this point, it is known that the users have the same number of direct roles. The
-    // direct roles sets are equivalent if all of the roles in the first user's directRoles are
-    // also in the other user's directRoles.
-    for (const auto& role : _roles) {
-        if (otherUser._roles.find(role) == otherUser._roles.end()) {
-            return true;
-        }
-    }
-
-    // Indirect roles should always be sorted.
-    dassert(std::is_sorted(_indirectRoles.begin(), _indirectRoles.end()));
-    dassert(std::is_sorted(otherUser._indirectRoles.begin(), otherUser._indirectRoles.end()));
-
-    return !std::equal(
-        _indirectRoles.begin(), _indirectRoles.end(), otherUser._indirectRoles.begin());
 }
 
 }  // namespace mongo

@@ -667,39 +667,6 @@ void AuthorizationManagerImpl::invalidateUserCache(OperationContext* opCtx) {
     _userCache.invalidateAll();
 }
 
-Status AuthorizationManagerImpl::refreshExternalUsers(OperationContext* opCtx) {
-    LOGV2_DEBUG(5914801, 2, "Refreshing all users from the $external database");
-    // First, get a snapshot of the UserHandles in the cache.
-    std::vector<UserHandle> cachedUsers = _userCache.getValueHandlesIfKey(
-        [&](const UserRequest& userRequest) { return userRequest.name.getDB() == "$external"_sd; });
-
-    // Then, retrieve the corresponding Users from the backing store for users in the $external
-    // database. Compare each of these user objects with the cached user object and call
-    // insertOrAssign if they differ.
-    bool isRefreshed{false};
-    for (const auto& cachedUser : cachedUsers) {
-        UserRequest request(cachedUser->getName(), boost::none);
-        auto storedUserStatus = _externalState->getUserObject(opCtx, request);
-        if (!storedUserStatus.isOK()) {
-            return storedUserStatus.getStatus();
-        }
-
-        if (cachedUser->hasDifferentRoles(storedUserStatus.getValue())) {
-            _userCache.insertOrAssign(
-                request, std::move(storedUserStatus.getValue()), Date_t::now());
-            isRefreshed = true;
-        }
-    }
-
-    // If any entries were refreshed, then the cache generation must be bumped for mongos to refresh
-    // its cache.
-    if (isRefreshed) {
-        _updateCacheGeneration();
-    }
-
-    return Status::OK();
-}
-
 Status AuthorizationManagerImpl::initialize(OperationContext* opCtx) {
     Status status = _externalState->initialize(opCtx);
     if (!status.isOK())

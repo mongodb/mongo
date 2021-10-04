@@ -226,11 +226,10 @@ Status AuthzManagerExternalStateMock::updateOne(OperationContext* opCtx,
             return status;
         BSONObj newObj = document.getObject().copy();
         *iter = newObj;
-        BSONElement idQuery = newObj["_id"_sd];
-        BSONObj idQueryObj = idQuery.isABSONObj() ? idQuery.Obj() : BSON("_id" << idQuery);
+        BSONObj idQuery = newObj["_id"_sd].Obj();
 
         if (_authzManager) {
-            _authzManager->logOp(opCtx, "u", collectionName, logObj, &idQueryObj);
+            _authzManager->logOp(opCtx, "u", collectionName, logObj, &idQuery);
         }
 
         return Status::OK();

@@ -320,13 +320,6 @@ public:
     virtual void invalidateUsersFromDB(OperationContext* opCtx, StringData dbname) = 0;
 
     /**
-     * Retrieves all users whose source is "$external" and checks if the corresponding user in the
-     * backing store has a different set of roles now. If so, it updates the cache entry with the
-     * new UserHandle.
-     */
-    virtual Status refreshExternalUsers(OperationContext* opCtx) = 0;
-
-    /**
      * Initializes the authorization manager.  Depending on what version the authorization
      * system is at, this may involve building up the user cache and/or the roles graph.
      * Call this function at startup and after resynchronizing a secondary.
