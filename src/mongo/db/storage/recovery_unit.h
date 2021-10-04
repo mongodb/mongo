@@ -459,6 +459,18 @@ public:
     };
 
     /**
+     * Pinning informs callers not to change the ReadSource on this RecoveryUnit. Callers are
+     * expected to first check isReadSourcePinned before attempting to change the ReadSource. An
+     * error may occur otherwise.
+     * See also `PinReadSourceBlock` for a RAII-style solution.
+     */
+    virtual void pinReadSource() {}
+    virtual void unpinReadSource() {}
+    virtual bool isReadSourcePinned() const {
+        return false;
+    }
+
+    /**
      * Sets whether this operation intends to perform reads that do not need to keep data in the
      * storage engine cache. This can be useful for operations that do large, one-time scans of
      * data, and will attempt to keep higher-priority data from being evicted from the cache. This
@@ -697,6 +709,26 @@ private:
     Changes _changes;
     State _state = State::kInactive;
     uint64_t _mySnapshotId;
+};
+
+/**
+ * RAII-style class to manage pinning and unpinning the readSource.
+ */
+class PinReadSourceBlock {
+    PinReadSourceBlock(const PinReadSourceBlock&) = delete;
+    PinReadSourceBlock& operator=(const PinReadSourceBlock&) = delete;
+
+public:
+    explicit PinReadSourceBlock(RecoveryUnit* recoveryUnit) : _recoveryUnit(recoveryUnit) {
+        _recoveryUnit->pinReadSource();
+    }
+
+    ~PinReadSourceBlock() {
+        _recoveryUnit->unpinReadSource();
+    }
+
+private:
+    RecoveryUnit* const _recoveryUnit;
 };
 
 }  // namespace mongo

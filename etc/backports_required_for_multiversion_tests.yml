@@ -175,6 +175,8 @@ all:
     test_file: jstests/aggregation/range.js
   - ticket: SERVER-59108
     test_file: jstests/replsets/stepdown_race_with_transaction.js
+  - ticket: SERVER-58636
+    test_file: jstests/replsets/initial_sync_replicate_drop_mid_secondary_batch.js
 
 
 suites:

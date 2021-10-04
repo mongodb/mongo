@@ -129,6 +129,16 @@ boost::optional<RecoveryUnit::ReadSource> getNewReadSource(OperationContext* opC
     const auto existing = opCtx->recoveryUnit()->getTimestampReadSource();
     std::string reason;
     const bool readAtLastApplied = shouldReadAtLastApplied(opCtx, nss, &reason);
+    if (opCtx->recoveryUnit()->isReadSourcePinned()) {
+        LOGV2_DEBUG(5863601,
+                    2,
+                    "Not changing readSource as it is pinned",
+                    "current"_attr = RecoveryUnit::toString(existing),
+                    "rejected"_attr = readAtLastApplied
+                        ? RecoveryUnit::toString(RecoveryUnit::ReadSource::kLastApplied)
+                        : RecoveryUnit::toString(RecoveryUnit::ReadSource::kNoTimestamp));
+        return boost::none;
+    }
     if (existing == RecoveryUnit::ReadSource::kNoTimestamp) {
         // Shifting from reading without a timestamp to reading with a timestamp can be dangerous
         // because writes will appear to vanish. This case is intended for new reads on secondaries

@@ -150,6 +150,12 @@ public:
 
     ReadSource getTimestampReadSource() const override;
 
+    void pinReadSource() override;
+
+    void unpinReadSource() override;
+
+    bool isReadSourcePinned() const override;
+
     virtual void setOrderedCommit(bool orderedCommit) override {
         _orderedCommit = orderedCommit;
     }
@@ -258,6 +264,8 @@ private:
 
     // When 'true', data read from disk should not be kept in the storage engine cache.
     bool _readOnce = false;
+
+    bool _readSourcePinned = false;
 
     // The behavior of handling prepare conflicts.
     PrepareConflictBehavior _prepareConflictBehavior{PrepareConflictBehavior::kEnforce};

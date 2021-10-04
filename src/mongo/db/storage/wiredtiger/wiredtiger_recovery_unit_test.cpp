@@ -30,6 +30,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 
 #include "mongo/base/checked_cast.h"
+#include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context.h"
@@ -755,6 +756,17 @@ DEATH_TEST_F(WiredTigerRecoveryUnitTestFixture,
         ru->assertInActiveTxn();
         ru->onRollback([ru] { ru->getSession(); });
     }
+}
+
+TEST_F(WiredTigerRecoveryUnitTestFixture, MayNotChangeReadSourceWhilePinned) {
+    // Storage engine operations require at least Global IS.
+    auto opCtx = cc().makeOperationContext();
+    opCtx->swapLockState(std::make_unique<LockerImpl>(), WithLock::withoutLock());
+    Lock::GlobalLock lk(opCtx.get(), MODE_IS);
+    ru1->pinReadSource();
+
+    ASSERT_THROWS_CODE(
+        ru1->setTimestampReadSource(RecoveryUnit::ReadSource::kNoOverlap), DBException, 5863604);
 }
 
 }  // namespace
