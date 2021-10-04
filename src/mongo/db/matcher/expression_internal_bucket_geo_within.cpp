@@ -28,11 +28,16 @@
  */
 
 
-#include "mongo/db/matcher/expression_internal_bucket_geo_within.h"
+#include <boost/optional.hpp>
+
+#include "mongo/platform/basic.h"
+
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/geo/geoparser.h"
+#include "mongo/db/matcher/expression_internal_bucket_geo_within.h"
+#include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
-#include "mongo/platform/basic.h"
 
 #include "third_party/s2/s2cellid.h"
 #include "third_party/s2/s2cellunion.h"
@@ -76,17 +81,60 @@ bool InternalBucketGeoWithinMatchExpression::matches(const MatchableDocument* do
     return _matchesBSONObj(doc->toBSON());
 }
 
+namespace {
+
+/**
+ * Dereference a path, treating each component of the path as an object field-name.
+ *
+ * If we try to traverse through an array or scalar, return boost::none to indicate that
+ * dereferencing the path failed.
+ *
+ * However, traversing through missing succeeds, returning missing.
+ * If this function returns missing, then the path only traversed through objects and missing.
+ */
+boost::optional<BSONElement> derefPath(const BSONObj& obj, const FieldPath& fieldPath) {
+    // Dereferencing the first path component always succeeds, because we start with an object,
+    // and because paths always have at least one component.
+    auto elem = obj[fieldPath.front()];
+    // Then we have zero or more path components.
+    for (size_t i = 1; i < fieldPath.getPathLength(); ++i) {
+        if (elem.eoo())
+            return BSONElement{};
+        if (elem.type() != BSONType::Object)
+            return boost::none;
+        elem = elem.Obj()[fieldPath.getFieldName(i)];
+    }
+    return elem;
+}
+
+}  // namespace
+
 bool InternalBucketGeoWithinMatchExpression::_matchesBSONObj(const BSONObj& obj) const {
-    auto controlMinElm = dotted_path_support::extractElementAtPath(
-        obj, str::stream() << timeseries::kControlMinFieldNamePrefix << _field);
-    auto controlMaxElm = dotted_path_support::extractElementAtPath(
-        obj, str::stream() << timeseries::kControlMaxFieldNamePrefix << _field);
+    // Look up the path in control.min and control.max.
+    // If it goes through an array, return true to avoid dealing with implicit array traversal.
+    // If it goes through a scalar, return true to avoid dealing with mixed types.
+    auto controlMinElmOptional = derefPath(obj, timeseries::kControlMinFieldNamePrefix + _field);
+    if (!controlMinElmOptional)
+        return true;
 
-    std::string path = str::stream() << timeseries::kControlMinFieldNamePrefix << _field;
+    auto controlMaxElmOptional = derefPath(obj, timeseries::kControlMaxFieldNamePrefix + _field);
+    if (!controlMaxElmOptional)
+        return true;
 
-    if (controlMinElm.eoo() || controlMaxElm.eoo() || !controlMinElm.isABSONObj() ||
-        !controlMaxElm.isABSONObj())
+    auto controlMinElm = *controlMinElmOptional;
+    auto controlMaxElm = *controlMaxElmOptional;
+
+    if (controlMinElm.eoo() && controlMaxElm.eoo()) {
+        // If both min and max are missing, and we got here only traversing through objects and
+        // missing, then this path is missing on every event in the bucket.
         return false;
+    }
+    if (controlMinElm.eoo() || controlMaxElm.eoo() || !controlMinElm.isABSONObj() ||
+        !controlMaxElm.isABSONObj()) {
+        // If either min or max is missing or a scalar, we may have mixed types, so conservatively
+        // return true.
+        return true;
+    }
 
     if (controlMinElm.type() != controlMaxElm.type())
         return true;

@@ -73,4 +73,50 @@ assert.commandWorked(coll.insert([
 results = coll.aggregate(pipeline).toArray();
 // Two documents should match the given query.
 assert.eq(results.length, 2, results);
+
+// Test a scenario where the control fields do not properly summarize the events:
+// 'a' is a mixture of objects and scalars.
+coll.drop();
+assert.commandWorked(
+    db.createCollection(coll.getName(), {timeseries: {timeField: 'time', metaField: 'meta'}}));
+assert.commandWorked(coll.insert([
+    {time: ISODate(), a: 5},
+    {time: ISODate(), a: {b: {type: "Point", coordinates: [0, 0]}}},
+    {time: ISODate(), a: ISODate('2020-01-01')},
+]));
+results = coll.aggregate([
+                  {$match: {'a.b': {$geoWithin: {$centerSphere: [[0, 0], 100]}}}},
+              ])
+              .toArray();
+assert.eq(results.length, 1, results);
+assert.docEq(results[0].a, {b: {type: "Point", coordinates: [0, 0]}});
+
+// Test a scenario where $geoWithin does implicit array traversal.
+coll.drop();
+assert.commandWorked(
+    db.createCollection(coll.getName(), {timeseries: {timeField: 'time', metaField: 'meta'}}));
+assert.commandWorked(coll.insert([
+    {
+        time: ISODate(),
+        a: [
+            12345,
+            {type: "Point", coordinates: [180, 0]},
+            {"1": {type: "Point", coordinates: [0, 0]}},
+        ]
+    },
+]));
+results = coll.aggregate([
+                  // The bucket-level predicate does not do any implicit array traversal, so 'a.1'
+                  // refers to the point [180, 0].  (So it rejects the bucket.)  But $geoWithin does
+                  // do implicit array traversal, so 'a.1' refers to the "1" field of any element of
+                  // 'a'.  (So it should include the event.)
+                  {$match: {'a.1': {$geoWithin: {$centerSphere: [[0, 0], 1]}}}},
+              ])
+              .toArray();
+assert.eq(results.length, 1, results);
+assert.docEq(results[0].a, [
+    12345,
+    {type: "Point", coordinates: [180, 0]},
+    {"1": {type: "Point", coordinates: [0, 0]}},
+]);
 }());
