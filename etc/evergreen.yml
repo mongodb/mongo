@@ -7998,53 +7998,53 @@ buildvariants:
     distros:
     - ubuntu2004-test
 
-- &enterprise-ubuntu2104-dynamic-gcc11-debug-experimental-template
-  name: enterprise-ubuntu2104-dynamic-gcc11-debug-experimental
-  display_name: "~ Shared Library Enterprise Ubuntu 21.04 GCC11 DEBUG"
+- &enterprise-rhel80-dynamic-v4gcc-debug-experimental-template
+  name: enterprise-rhel80-dynamic-v4gcc-debug-experimental
+  display_name: "~ Shared Library Enterprise RHEL 8.0 v4 Toolchain GCC DEBUG"
   cron: "0 0 * * *" # Every day starting at 00:00
   modules:
   - enterprise
   run_on:
-  - ubuntu2104-small
-  expansions: &enterprise-ubuntu2104-dynamic-gcc11-debug-experimental-expansions
+  - rhel80-small
+  expansions: &enterprise-rhel80-dynamic-v4gcc-debug-experimental-expansions
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
-    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --link-model=dynamic CC=/usr/bin/gcc-11 CXX=/usr/bin/g++-11
+    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --link-model=dynamic --variables-files=etc/scons/mongodbtoolchain_testing_gcc.vars
     has_packages: false
     scons_cache_scope: shared
     scons_cache_mode: all
-    large_distro_name: ubuntu2104-large
+    large_distro_name: rhel80-xlarge
     num_scons_link_jobs_available: 0.99
-  tasks: &enterprise-ubuntu2104-dynamic-gcc11-debug-experimental-tasks
+  tasks: &enterprise-rhel80-dynamic-v4gcc-debug-experimental-tasks
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:
-      - ubuntu2104-large
+      - rhel80-xlarge
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
-      - ubuntu2104-large
+      - rhel80-xlarge
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
-      - ubuntu2104-large
+      - rhel80-xlarge
 
-- <<: *enterprise-ubuntu2104-dynamic-gcc11-debug-experimental-template
-  name: enterprise-ubuntu2104-dynamic-clang12-debug-experimental
-  display_name: "~ Shared Library Enterprise Ubuntu 21.04 clang12 DEBUG"
+- <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-template
+  name: enterprise-rhel80-dynamic-v4clang-debug-experimental
+  display_name: "~ Shared Library Enterprise RHEL 8.0 v4 Toolchain Clang DEBUG"
   expansions:
-    <<: *enterprise-ubuntu2104-dynamic-gcc11-debug-experimental-expansions
-    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --link-model=dynamic CC=/usr/bin/clang-12 CXX=/usr/bin/clang++-12
+    <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-expansions
+    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --link-model=dynamic --variables-files=etc/scons/mongodbtoolchain_testing_clang.vars
 
-- <<: *enterprise-ubuntu2104-dynamic-gcc11-debug-experimental-template
-  name: enterprise-ubuntu2104-dynamic-gcc11-cxx20-debug-experimental
-  display_name: "~ Shared Library Enterprise Ubuntu 21.04 GCC11 C++20 DEBUG"
+- <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-template
+  name: enterprise-rhel80-dynamic-v4gcc-cxx20-debug-experimental
+  display_name: "~ Shared Library Enterprise RHEL 8.0 v4 Toolchain GCC C++20 DEBUG"
   expansions:
-    <<: *enterprise-ubuntu2104-dynamic-gcc11-debug-experimental-expansions
-    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --link-model=dynamic CC=/usr/bin/gcc-11 CXX=/usr/bin/g++-11 --cxx-std=20
+    <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-expansions
+    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --link-model=dynamic --variables-files=etc/scons/mongodbtoolchain_testing_gcc.vars --cxx-std=20
 
-- <<: *enterprise-ubuntu2104-dynamic-gcc11-debug-experimental-template
-  name: enterprise-ubuntu2104-dynamic-clang12-cxx20-debug-experimental
-  display_name: "~ Shared Library Enterprise Ubuntu 21.04 clang12 C++20 DEBUG"
+- <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-template
+  name: enterprise-rhel80-dynamic-v4clang-cxx20-debug-experimental
+  display_name: "~ Shared Library Enterprise RHEL 8.0 v4 Toolchain Clang C++20 DEBUG"
   expansions:
-    <<: *enterprise-ubuntu2104-dynamic-gcc11-debug-experimental-expansions
-    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --link-model=dynamic CC=/usr/bin/clang-12 CXX=/usr/bin/clang++-12 --cxx-std=20
+    <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-expansions
+    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --link-model=dynamic --variables-files=etc/scons/mongodbtoolchain_testing_clang.vars --cxx-std=20
 
 - name: enterprise-linux-64-amazon-ami
   display_name: "Enterprise Amazon Linux"
