@@ -30,8 +30,12 @@
 #define SCOPED_TYPES_H
 
 /* Following definitions are required in order to use printing format specifiers in C++. */
+#ifndef __STDC_LIMIT_MACROS
 #define __STDC_LIMIT_MACROS
+#endif
+#ifndef __STDC_FORMAT_MACROS
 #define __STDC_FORMAT_MACROS
+#endif
 
 extern "C" {
 #include "test_util.h"
