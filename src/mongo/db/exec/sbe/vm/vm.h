@@ -66,8 +66,24 @@ std::pair<value::TypeTags, value::Value> genericCompare(
                 return {value::TypeTags::Boolean, value::bitcastFrom<bool>(result)};
             }
             case value::TypeTags::NumberDouble: {
-                auto result = op(value::numericCast<double>(lhsTag, lhsValue),
-                                 value::numericCast<double>(rhsTag, rhsValue));
+                auto result = [&]() {
+                    if (lhsTag == value::TypeTags::NumberInt64) {
+                        auto rhs = value::bitcastTo<double>(rhsValue);
+                        if (std::isnan(rhs)) {
+                            return false;
+                        }
+                        return op(compareLongToDouble(value::bitcastTo<int64_t>(lhsValue), rhs), 0);
+                    } else if (rhsTag == value::TypeTags::NumberInt64) {
+                        auto lhs = value::bitcastTo<double>(lhsValue);
+                        if (std::isnan(lhs)) {
+                            return false;
+                        }
+                        return op(compareDoubleToLong(lhs, value::bitcastTo<int64_t>(rhsValue)), 0);
+                    } else {
+                        return op(value::numericCast<double>(lhsTag, lhsValue),
+                                  value::numericCast<double>(rhsTag, rhsValue));
+                    }
+                }();
                 return {value::TypeTags::Boolean, value::bitcastFrom<bool>(result)};
             }
             case value::TypeTags::NumberDecimal: {
