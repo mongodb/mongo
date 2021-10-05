@@ -39,6 +39,8 @@ namespace {
 
 const StatusWith<BSONObj> kOk = BSON("ok" << 1);
 const StatusWith<BSONObj> kPrepareOk = BSON("ok" << 1 << "prepareTimestamp" << Timestamp(1, 1));
+const StatusWith<BSONObj> kNoSuchTransaction =
+    BSON("ok" << 0 << "code" << ErrorCodes::NoSuchTransaction);
 
 class TransactionCoordinatorCatalogTest : public TransactionCoordinatorTestFixture {
 protected:
@@ -133,10 +135,17 @@ TEST_F(TransactionCoordinatorCatalogTest,
     LogicalSessionId lsid = makeLogicalSessionIdForTest();
     TxnNumberAndRetryCounter txnNumberAndRetryCounter1{1, 0};
     TxnNumberAndRetryCounter txnNumberAndRetryCounter2{1, 1};
+
+    // Can only create a new TransactionCoordinator after the previous TransactionCoordinator with
+    // the same txnNumber has reached abort decision.
     createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter1);
+    auto coordinator1InCatalog =
+        _coordinatorCatalog->get(operationContext(), lsid, txnNumberAndRetryCounter1);
+    coordinator1InCatalog->runCommit(operationContext(), kOneShardIdList);
+    assertCommandSentAndRespondWith("prepareTransaction", kNoSuchTransaction, boost::none);
     createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter2);
 
-    auto coordinator1InCatalog =
+    coordinator1InCatalog =
         _coordinatorCatalog->get(operationContext(), lsid, txnNumberAndRetryCounter1);
     ASSERT(coordinator1InCatalog != nullptr);
     ASSERT_EQ(coordinator1InCatalog->getTxnRetryCounterForTest(),
@@ -146,6 +155,11 @@ TEST_F(TransactionCoordinatorCatalogTest,
     ASSERT(coordinator2InCatalog != nullptr);
     ASSERT_EQ(coordinator2InCatalog->getTxnRetryCounterForTest(),
               *txnNumberAndRetryCounter2.getTxnRetryCounter());
+
+    assertCommandSentAndRespondWith("abortTransaction", kOk, boost::none);
+    ASSERT_THROWS_CODE(coordinator1InCatalog->getDecision().get(),
+                       AssertionException,
+                       ErrorCodes::NoSuchTransaction);
 }
 
 DEATH_TEST_F(TransactionCoordinatorCatalogTest,
@@ -189,7 +203,14 @@ TEST_F(TransactionCoordinatorCatalogTest,
     LogicalSessionId lsid = makeLogicalSessionIdForTest();
     TxnNumberAndRetryCounter txnNumberAndRetryCounter1{1, 0};
     TxnNumberAndRetryCounter txnNumberAndRetryCounter2{1, 1};
+
+    // Can only create a new TransactionCoordinator after the previous TransactionCoordinator with
+    // the same txnNumber has reached abort decision.
     createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter1);
+    auto coordinator1InCatalog =
+        _coordinatorCatalog->get(operationContext(), lsid, txnNumberAndRetryCounter1);
+    coordinator1InCatalog->runCommit(operationContext(), kOneShardIdList);
+    assertCommandSentAndRespondWith("prepareTransaction", kNoSuchTransaction, boost::none);
     createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter2);
 
     auto latestTxnNumberRetryCounterAndCoordinator =
@@ -201,6 +222,11 @@ TEST_F(TransactionCoordinatorCatalogTest,
               txnNumberAndRetryCounter2.getTxnNumber());
     ASSERT_EQ(*latestTxnNumberAndRetryCounter.getTxnRetryCounter(),
               *txnNumberAndRetryCounter2.getTxnRetryCounter());
+
+    assertCommandSentAndRespondWith("abortTransaction", kOk, boost::none);
+    ASSERT_THROWS_CODE(coordinator1InCatalog->getDecision().get(),
+                       AssertionException,
+                       ErrorCodes::NoSuchTransaction);
 }
 
 TEST_F(TransactionCoordinatorCatalogTest, CoordinatorsRemoveThemselvesFromCatalogWhenTheyComplete) {
@@ -248,7 +274,13 @@ TEST_F(
     TxnNumberAndRetryCounter txnNumberAndRetryCounter1{1, 0};
     TxnNumberAndRetryCounter txnNumberAndRetryCounter2{1, 1};
 
+    // Can only create a new TransactionCoordinator after the previous TransactionCoordinator with
+    // the same txnNumber has reached abort decision.
     createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter1);
+    auto coordinator1InCatalog =
+        _coordinatorCatalog->get(operationContext(), lsid, txnNumberAndRetryCounter1);
+    coordinator1InCatalog->runCommit(operationContext(), kOneShardIdList);
+    assertCommandSentAndRespondWith("prepareTransaction", kNoSuchTransaction, boost::none);
     createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter2);
 
     auto latestTxnNumberRetryCounterAndCoordinator =
@@ -260,11 +292,16 @@ TEST_F(
               txnNumberAndRetryCounter2.getTxnNumber());
     ASSERT_EQ(*latestTxnNumberAndRetryCounter.getTxnRetryCounter(),
               *txnNumberAndRetryCounter2.getTxnRetryCounter());
+
+    assertCommandSentAndRespondWith("abortTransaction", kOk, boost::none);
+    ASSERT_THROWS_CODE(coordinator1InCatalog->getDecision().get(),
+                       AssertionException,
+                       ErrorCodes::NoSuchTransaction);
 }
 
-DEATH_TEST_REGEX_F(TransactionCoordinatorCatalogTest,
-                   CreateExistingSessionAndTxnNumberWithPreviouslyCommittedTxnRetryCounterFails,
-                   "a previous coordinator.*already committed") {
+TEST_F(
+    TransactionCoordinatorCatalogTest,
+    CreateExistingSessionAndTxnNumberWithPreviousTxnRetryCounterThatHasNotCommittedOrAbortedFails) {
     LogicalSessionId lsid = makeLogicalSessionIdForTest();
     TxnNumberAndRetryCounter txnNumberAndRetryCounter1{1, 0};
     TxnNumberAndRetryCounter txnNumberAndRetryCounter2{1, 1};
@@ -272,14 +309,60 @@ DEATH_TEST_REGEX_F(TransactionCoordinatorCatalogTest,
     createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter1);
     auto coordinator1 =
         _coordinatorCatalog->get(operationContext(), lsid, txnNumberAndRetryCounter1);
-    coordinator1->runCommit(operationContext(), kTwoShardIdList);
+    coordinator1->runCommit(operationContext(), kOneShardIdList);
+
+    auto coordinator2 = std::make_shared<TransactionCoordinator>(
+        operationContext(),
+        lsid,
+        txnNumberAndRetryCounter2,
+        std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
+        Date_t::max());
+    ASSERT_THROWS_CODE(_coordinatorCatalog->insert(
+                           operationContext(), lsid, txnNumberAndRetryCounter2, coordinator2),
+                       AssertionException,
+                       6032300);
 
     assertCommandSentAndRespondWith("prepareTransaction", kPrepareOk, boost::none);
-    assertCommandSentAndRespondWith("prepareTransaction", kPrepareOk, boost::none);
-
+    assertCommandSentAndRespondWith("commitTransaction", kOk, boost::none);
     coordinator1->getDecision().get();
 
-    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter2);
+    coordinator2->cancelIfCommitNotYetStarted();
+    ASSERT_THROWS_CODE(coordinator2->getDecision().get(),
+                       AssertionException,
+                       ErrorCodes::TransactionCoordinatorCanceled);
+}
+
+TEST_F(TransactionCoordinatorCatalogTest,
+       CreateExistingSessionAndTxnNumberThatPreviouslyCommittedTxnRetryCounterFails) {
+    LogicalSessionId lsid = makeLogicalSessionIdForTest();
+    TxnNumberAndRetryCounter txnNumberAndRetryCounter1{1, 0};
+    TxnNumberAndRetryCounter txnNumberAndRetryCounter2{1, 1};
+
+    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter1);
+    auto coordinator1 =
+        _coordinatorCatalog->get(operationContext(), lsid, txnNumberAndRetryCounter1);
+    coordinator1->runCommit(operationContext(), kOneShardIdList);
+    assertCommandSentAndRespondWith("prepareTransaction", kPrepareOk, boost::none);
+    coordinator1->getDecision().get();
+
+    auto coordinator2 = std::make_shared<TransactionCoordinator>(
+        operationContext(),
+        lsid,
+        txnNumberAndRetryCounter2,
+        std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
+        Date_t::max());
+    ASSERT_THROWS_CODE(_coordinatorCatalog->insert(
+                           operationContext(), lsid, txnNumberAndRetryCounter2, coordinator2),
+                       AssertionException,
+                       6032301);
+
+    assertCommandSentAndRespondWith("commitTransaction", kOk, boost::none);
+    coordinator1->getDecision().get();
+
+    coordinator2->cancelIfCommitNotYetStarted();
+    ASSERT_THROWS_CODE(coordinator2->getDecision().get(),
+                       AssertionException,
+                       ErrorCodes::TransactionCoordinatorCanceled);
 }
 
 TEST_F(TransactionCoordinatorCatalogTest, StepDownBeforeCoordinatorInsertedIntoCatalog) {

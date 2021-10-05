@@ -34,6 +34,8 @@
 
 namespace mongo {
 
-void createTransactionCoordinator(OperationContext* opCtx, TxnNumber clientTxnNumber);
+void createTransactionCoordinator(OperationContext* opCtx,
+                                  TxnNumber clientTxnNumber,
+                                  boost::optional<TxnRetryCounter> txnRetryCounter);
 
 }  // namespace mongo

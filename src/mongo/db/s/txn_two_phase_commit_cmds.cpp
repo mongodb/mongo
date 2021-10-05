@@ -105,12 +105,16 @@ public:
                     "prepareTransaction must be run within a transaction",
                     txnParticipant);
 
+            TxnNumberAndRetryCounter txnNumberAndRetryCounter{*opCtx->getTxnNumber(),
+                                                              *opCtx->getTxnRetryCounter()};
+
             LOGV2_DEBUG(22483,
                         3,
-                        "{sessionId}:{txnNumber} Participant shard received prepareTransaction",
+                        "{sessionId}:{txnNumberAndRetryCounter} Participant shard received "
+                        "prepareTransaction",
                         "Participant shard received prepareTransaction",
                         "sessionId"_attr = opCtx->getLogicalSessionId()->toBSON(),
-                        "txnNumber"_attr = opCtx->getTxnNumber());
+                        "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter);
 
             // TODO(SERVER-46105) remove
             uassert(ErrorCodes::OperationNotSupportedInTransaction,
@@ -220,6 +224,7 @@ std::set<ShardId> validateParticipants(OperationContext* opCtx,
         "Coordinator shard received request to coordinate commit",
         "sessionId"_attr = opCtx->getLogicalSessionId()->getId(),
         "txnNumber"_attr = opCtx->getTxnNumber(),
+        "txnRetryCounter"_attr = opCtx->getTxnRetryCounter(),
         "participantList"_attr = ss.str());
 
     return participantsSet;
@@ -247,13 +252,16 @@ public:
             const auto& cmd = request();
             const auto tcs = TransactionCoordinatorService::get(opCtx);
 
+            const TxnNumberAndRetryCounter txnNumberAndRetryCounter{*opCtx->getTxnNumber(),
+                                                                    *opCtx->getTxnRetryCounter()};
+
             // Coordinate the commit, or recover the commit decision from disk if this command was
             // sent without a participant list.
             auto coordinatorDecisionFuture = cmd.getParticipants().empty()
-                ? tcs->recoverCommit(opCtx, *opCtx->getLogicalSessionId(), *opCtx->getTxnNumber())
+                ? tcs->recoverCommit(opCtx, *opCtx->getLogicalSessionId(), txnNumberAndRetryCounter)
                 : tcs->coordinateCommit(opCtx,
                                         *opCtx->getLogicalSessionId(),
-                                        *opCtx->getTxnNumber(),
+                                        txnNumberAndRetryCounter,
                                         validateParticipants(opCtx, cmd.getParticipants()));
 
             if (MONGO_unlikely(hangAfterStartingCoordinateCommit.shouldFail())) {
@@ -302,10 +310,11 @@ public:
 
             LOGV2_DEBUG(22486,
                         3,
-                        "{sessionId}:{txnNumber} Going to recover decision from local participant",
+                        "{sessionId}:{txnNumberAndRetryCounter} Going to recover decision from "
+                        "local participant",
                         "Going to recover decision from local participant",
                         "sessionId"_attr = opCtx->getLogicalSessionId()->getId(),
-                        "txnNumber"_attr = opCtx->getTxnNumber());
+                        "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter);
 
             boost::optional<SharedSemiFuture<void>> participantExitPrepareFuture;
             {

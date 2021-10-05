@@ -94,12 +94,15 @@ public:
                     "commitTransaction must be run within a transaction",
                     txnParticipant);
 
+            const TxnNumberAndRetryCounter txnNumberAndRetryCounter{*opCtx->getTxnNumber(),
+                                                                    *opCtx->getTxnRetryCounter()};
+
             LOGV2_DEBUG(20507,
                         3,
-                        "Received commitTransaction for transaction with txnNumber "
-                        "{txnNumber} on session {sessionId}",
+                        "Received commitTransaction for transaction with "
+                        "{txnNumberAndRetryCounter} on session {sessionId}",
                         "Received commitTransaction",
-                        "txnNumber"_attr = opCtx->getTxnNumber(),
+                        "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter,
                         "sessionId"_attr = opCtx->getLogicalSessionId()->toBSON());
 
             // commitTransaction is retryable.
@@ -133,7 +136,7 @@ public:
                 if (ShardingState::get(opCtx)->canAcceptShardedCommands().isOK() ||
                     serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
                     TransactionCoordinatorService::get(opCtx)->cancelIfCommitNotYetStarted(
-                        opCtx, *opCtx->getLogicalSessionId(), *opCtx->getTxnNumber());
+                        opCtx, *opCtx->getLogicalSessionId(), txnNumberAndRetryCounter);
                 }
 
                 // commitUnpreparedTransaction will throw if the transaction is prepared.
@@ -207,12 +210,15 @@ public:
                     "abortTransaction must be run within a transaction",
                     txnParticipant);
 
+            const TxnNumberAndRetryCounter txnNumberAndRetryCounter{*opCtx->getTxnNumber(),
+                                                                    *opCtx->getTxnRetryCounter()};
+
             LOGV2_DEBUG(20508,
                         3,
-                        "Received abortTransaction for transaction with txnNumber {txnNumber} "
+                        "Received abortTransaction for transaction with {txnNumberAndRetryCounter} "
                         "on session {sessionId}",
                         "Received abortTransaction",
-                        "txnNumber"_attr = opCtx->getTxnNumber(),
+                        "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter,
                         "sessionId"_attr = opCtx->getLogicalSessionId()->toBSON());
 
             uassert(ErrorCodes::NoSuchTransaction,
@@ -226,7 +232,7 @@ public:
                 (ShardingState::get(opCtx)->canAcceptShardedCommands().isOK() ||
                  serverGlobalParams.clusterRole == ClusterRole::ConfigServer)) {
                 TransactionCoordinatorService::get(opCtx)->cancelIfCommitNotYetStarted(
-                    opCtx, *opCtx->getLogicalSessionId(), *opCtx->getTxnNumber());
+                    opCtx, *opCtx->getLogicalSessionId(), txnNumberAndRetryCounter);
             }
 
             txnParticipant.abortTransaction(opCtx);

@@ -35,7 +35,9 @@
 namespace mongo {
 namespace {
 
-void createTransactionCoordinatorImpl(OperationContext*, TxnNumber) {}
+void createTransactionCoordinatorImpl(OperationContext*,
+                                      TxnNumber,
+                                      boost::optional<TxnRetryCounter>) {}
 
 auto createTransactionCoordinatorRegistration = MONGO_WEAK_FUNCTION_REGISTRATION(
     createTransactionCoordinator, createTransactionCoordinatorImpl);

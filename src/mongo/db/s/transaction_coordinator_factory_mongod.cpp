@@ -38,7 +38,9 @@
 namespace mongo {
 namespace {
 
-void createTransactionCoordinatorImpl(OperationContext* opCtx, TxnNumber clientTxnNumber) {
+void createTransactionCoordinatorImpl(OperationContext* opCtx,
+                                      TxnNumber clientTxnNumber,
+                                      boost::optional<TxnRetryCounter> clientTxnRetryCounter) {
     auto clientLsid = opCtx->getLogicalSessionId().get();
     auto clockSource = opCtx->getServiceContext()->getFastClockSource();
 
@@ -47,7 +49,7 @@ void createTransactionCoordinatorImpl(OperationContext* opCtx, TxnNumber clientT
     TransactionCoordinatorService::get(opCtx)->createCoordinator(
         opCtx,
         clientLsid,
-        clientTxnNumber,
+        {clientTxnNumber, clientTxnRetryCounter ? *clientTxnRetryCounter : 0},
         clockSource->now() + Seconds(gTransactionLifetimeLimitSeconds.load()));
 }
 

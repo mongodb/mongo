@@ -120,15 +120,16 @@ void TransactionCoordinatorCatalog::insert(OperationContext* opCtx,
         invariant(latestTxnRetryCounter < txnRetryCounter);
 
         const auto& latestCoordinatorOnSession = latestCoordinatorOnSessionIter->second;
-        if (latestCoordinatorOnSession->getDecision().isReady()) {
-            auto swDecision = latestCoordinatorOnSession->getDecision().getNoThrow();
-            invariant(!swDecision.isOK(),
-                      str::stream() << "Cannot insert a TransactionCoordinator into the "
-                                       "TransactionCoordinatorCatalog with the same session ID and "
-                                       "transaction number as a previous coordinator (transaction "
-                                       "retry counter "
-                                    << latestTxnRetryCounter << ") that is already committed");
-        }
+        uassert(6032300,
+                "Cannot create a new transaction coordinator with the same session ID and "
+                "transaction number as a previous coordinator that has not reached a decision",
+                latestCoordinatorOnSession->getDecision().isReady());
+        auto swDecision = latestCoordinatorOnSession->getDecision().getNoThrow();
+        uassert(6032301,
+                "Cannot create a new transaction coordinator with the same session ID and "
+                "transaction number as a previous coordinator that has already reached a commit "
+                "decision",
+                !swDecision.isOK());
     }
 
     coordinatorsBySession[txnNumber][txnRetryCounter] = coordinator;

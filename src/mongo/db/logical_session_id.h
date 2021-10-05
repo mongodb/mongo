@@ -160,4 +160,12 @@ private:
     const boost::optional<TxnRetryCounter> _txnRetryCounter;
 };
 
+inline bool operator==(const TxnNumberAndRetryCounter& l, const TxnNumberAndRetryCounter& r) {
+    return l.getTxnNumber() == r.getTxnNumber() && l.getTxnRetryCounter() == r.getTxnRetryCounter();
+}
+
+inline bool operator!=(const TxnNumberAndRetryCounter& l, const TxnNumberAndRetryCounter& r) {
+    return !(l == r);
+}
+
 }  // namespace mongo

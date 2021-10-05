@@ -33,6 +33,7 @@
 
 #include "mongo/db/s/transaction_coordinator_service.h"
 
+#include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/transaction_coordinator_document_gen.h"
 #include "mongo/db/s/transaction_coordinator_params_gen.h"
@@ -64,31 +65,29 @@ TransactionCoordinatorService* TransactionCoordinatorService::get(ServiceContext
     return &transactionCoordinatorServiceDecoration(serviceContext);
 }
 
-void TransactionCoordinatorService::createCoordinator(OperationContext* opCtx,
-                                                      LogicalSessionId lsid,
-                                                      TxnNumber txnNumber,
-                                                      Date_t commitDeadline) {
+void TransactionCoordinatorService::createCoordinator(
+    OperationContext* opCtx,
+    LogicalSessionId lsid,
+    TxnNumberAndRetryCounter txnNumberAndRetryCounter,
+    Date_t commitDeadline) {
     auto cas = _getCatalogAndScheduler(opCtx);
     auto& catalog = cas->catalog;
     auto& scheduler = cas->scheduler;
 
     if (auto latestTxnNumberRetryCounterAndCoordinator = catalog.getLatestOnSession(opCtx, lsid)) {
+        auto latestTxnNumberAndRetryCounter = latestTxnNumberRetryCounterAndCoordinator->first;
         auto latestCoordinator = latestTxnNumberRetryCounterAndCoordinator->second;
-        if (txnNumber == latestTxnNumberRetryCounterAndCoordinator->first.getTxnNumber()) {
+        if (txnNumberAndRetryCounter == latestTxnNumberAndRetryCounter) {
             return;
         }
         latestCoordinator->cancelIfCommitNotYetStarted();
     }
 
-    auto coordinator =
-        std::make_shared<TransactionCoordinator>(opCtx,
-                                                 lsid,
-                                                 TxnNumberAndRetryCounter{txnNumber, 0},
-                                                 scheduler.makeChildScheduler(),
-                                                 commitDeadline);
+    auto coordinator = std::make_shared<TransactionCoordinator>(
+        opCtx, lsid, txnNumberAndRetryCounter, scheduler.makeChildScheduler(), commitDeadline);
 
     try {
-        catalog.insert(opCtx, lsid, {txnNumber, 0}, coordinator);
+        catalog.insert(opCtx, lsid, txnNumberAndRetryCounter, coordinator);
     } catch (const DBException&) {
         // Handle the case where the opCtx has been interrupted and we do not successfully insert
         // the coordinator into the catalog.
@@ -141,12 +140,12 @@ void TransactionCoordinatorService::reportCoordinators(OperationContext* opCtx,
 boost::optional<SharedSemiFuture<txn::CommitDecision>>
 TransactionCoordinatorService::coordinateCommit(OperationContext* opCtx,
                                                 LogicalSessionId lsid,
-                                                TxnNumber txnNumber,
+                                                TxnNumberAndRetryCounter txnNumberAndRetryCounter,
                                                 const std::set<ShardId>& participantList) {
     auto cas = _getCatalogAndScheduler(opCtx);
     auto& catalog = cas->catalog;
 
-    auto coordinator = catalog.get(opCtx, lsid, {txnNumber, 0});
+    auto coordinator = catalog.get(opCtx, lsid, txnNumberAndRetryCounter);
     if (!coordinator) {
         return boost::none;
     }
@@ -160,11 +159,13 @@ TransactionCoordinatorService::coordinateCommit(OperationContext* opCtx,
 }
 
 boost::optional<SharedSemiFuture<txn::CommitDecision>> TransactionCoordinatorService::recoverCommit(
-    OperationContext* opCtx, LogicalSessionId lsid, TxnNumber txnNumber) {
+    OperationContext* opCtx,
+    LogicalSessionId lsid,
+    TxnNumberAndRetryCounter txnNumberAndRetryCounter) {
     auto cas = _getCatalogAndScheduler(opCtx);
     auto& catalog = cas->catalog;
 
-    auto coordinator = catalog.get(opCtx, lsid, {txnNumber, 0});
+    auto coordinator = catalog.get(opCtx, lsid, txnNumberAndRetryCounter);
     if (!coordinator) {
         return boost::none;
     }
@@ -240,16 +241,35 @@ void TransactionCoordinatorService::onStepUp(OperationContext* opCtx,
 
                         const auto lsid = *doc.getId().getSessionId();
                         const auto txnNumber = *doc.getId().getTxnNumber();
+                        const auto txnRetryCounter = [&] {
+                            if (feature_flags::gFeatureFlagInternalTransactions.isEnabled(
+                                    serverGlobalParams.featureCompatibility)) {
+                                auto optTxnRetryCounter = doc.getId().getTxnRetryCounter();
+                                uassert(6032303,
+                                        str::stream()
+                                            << "Expected the "
+                                            << NamespaceString::kTransactionCoordinatorsNamespace
+                                            << " entry for transaction " << txnNumber
+                                            << " on session " << lsid
+                                            << " to have a 'txnRetryCounter' field",
+                                        optTxnRetryCounter.has_value());
+                                return *optTxnRetryCounter;
+                            }
+                            return 0;
+                        }();
 
                         auto coordinator = std::make_shared<TransactionCoordinator>(
                             opCtx,
                             lsid,
-                            TxnNumberAndRetryCounter{txnNumber, 0},
+                            TxnNumberAndRetryCounter{txnNumber, txnRetryCounter},
                             scheduler.makeChildScheduler(),
                             clockSource->now() + Seconds(gTransactionLifetimeLimitSeconds.load()));
 
-                        catalog.insert(
-                            opCtx, lsid, {txnNumber, 0}, coordinator, true /* forStepUp */);
+                        catalog.insert(opCtx,
+                                       lsid,
+                                       {txnNumber, txnRetryCounter},
+                                       coordinator,
+                                       true /* forStepUp */);
                         coordinator->continueCommit(doc);
                     }
                 })
@@ -345,15 +365,16 @@ void TransactionCoordinatorService::CatalogAndScheduler::join() {
     catalog.join();
 }
 
-void TransactionCoordinatorService::cancelIfCommitNotYetStarted(OperationContext* opCtx,
-                                                                LogicalSessionId lsid,
-                                                                TxnNumber txnNumber) {
+void TransactionCoordinatorService::cancelIfCommitNotYetStarted(
+    OperationContext* opCtx,
+    LogicalSessionId lsid,
+    TxnNumberAndRetryCounter txnNumberAndRetryCounter) {
     auto cas = _getCatalogAndScheduler(opCtx);
     auto& catalog = cas->catalog;
 
     // No need to look at every coordinator since we cancel old coordinators when adding new ones.
     if (auto latestTxnNumberRetryCounterAndCoordinator = catalog.getLatestOnSession(opCtx, lsid)) {
-        if (txnNumber == latestTxnNumberRetryCounterAndCoordinator->first.getTxnNumber()) {
+        if (txnNumberAndRetryCounter == latestTxnNumberRetryCounterAndCoordinator->first) {
             latestTxnNumberRetryCounterAndCoordinator->second->cancelIfCommitNotYetStarted();
         }
     }

@@ -895,7 +895,8 @@ void CheckoutSessionAndInvokeCommand::_checkOutSession() {
             // If this shard has been selected as the coordinator, set up the coordinator state
             // to be ready to receive votes.
             if (sessionOptions.getCoordinator() == boost::optional<bool>(true)) {
-                createTransactionCoordinator(opCtx, *sessionOptions.getTxnNumber());
+                createTransactionCoordinator(
+                    opCtx, *sessionOptions.getTxnNumber(), sessionOptions.getTxnRetryCounter());
             }
         }
 

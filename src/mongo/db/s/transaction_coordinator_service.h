@@ -54,7 +54,7 @@ public:
      */
     void createCoordinator(OperationContext* opCtx,
                            LogicalSessionId lsid,
-                           TxnNumber txnNumber,
+                           TxnNumberAndRetryCounter txnNumberAndRetryCounter,
                            Date_t commitDeadline);
 
     /**
@@ -64,28 +64,29 @@ public:
     void reportCoordinators(OperationContext* opCtx, bool includeIdle, std::vector<BSONObj>* ops);
 
     /**
-     * If a coordinator for the (lsid, txnNumber) exists, delivers the participant list to the
-     * coordinator, which will cause the coordinator to start coordinating the commit if the
-     * coordinator had not yet received a list, and returns a Future that will contain the decision
-     * when the transaction finishes committing or aborting.
+     * If a coordinator for the (lsid, txnNumber, txnRetryCounter) exists, delivers the participant
+     * list to the coordinator, which will cause the coordinator to start coordinating the commit if
+     * the coordinator had not yet received a list, and returns a Future that will contain the
+     * decision when the transaction finishes committing or aborting.
      *
-     * If no coordinator for the (lsid, txnNumber) exists, returns boost::none.
+     * If no coordinator for the (lsid, txnNumber, txnRetryCounter) exists, returns boost::none.
      */
     boost::optional<SharedSemiFuture<txn::CommitDecision>> coordinateCommit(
         OperationContext* opCtx,
         LogicalSessionId lsid,
-        TxnNumber txnNumber,
+        TxnNumberAndRetryCounter txnNumberAndRetryCounter,
         const std::set<ShardId>& participantList);
 
     /**
-     * If a coordinator for the (lsid, txnNumber) exists, returns a Future that will contain the
-     * decision when the transaction finishes committing or aborting.
+     * If a coordinator for the (lsid, txnNumber, txnRetryCounter) exists, returns a Future that
+     * will contain the decision when the transaction finishes committing or aborting.
      *
-     * If no coordinator for the (lsid, txnNumber) exists, returns boost::none.
+     * If no coordinator for the (lsid, txnNumber, txnRetryCounter) exists, returns boost::none.
      */
-    boost::optional<SharedSemiFuture<txn::CommitDecision>> recoverCommit(OperationContext* opCtx,
-                                                                         LogicalSessionId lsid,
-                                                                         TxnNumber txnNumber);
+    boost::optional<SharedSemiFuture<txn::CommitDecision>> recoverCommit(
+        OperationContext* opCtx,
+        LogicalSessionId lsid,
+        TxnNumberAndRetryCounter txnNumberAndRetryCounter);
 
     /**
      * Marks the coordinator catalog as stepping up, which blocks all incoming requests for
@@ -118,7 +119,7 @@ public:
      */
     void cancelIfCommitNotYetStarted(OperationContext* opCtx,
                                      LogicalSessionId lsid,
-                                     TxnNumber txnNumber);
+                                     TxnNumberAndRetryCounter txnNumberAndRetryCounter);
 
     /**
      * Blocking call which waits for the previous stepUp/stepDown round to join and ensures all

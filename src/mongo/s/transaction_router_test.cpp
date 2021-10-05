@@ -716,24 +716,34 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 }
 
 TEST_F(TransactionRouterTestWithDefaultSession,
-       CannotCommitTransactionUsingTxnRetryCounterGreaterThanLastUsed) {
+       CanCommitTransactionUsingTxnRetryCounterGreaterThanLastUsed) {
     TxnNumber txnNum{3};
+    TxnRetryCounter txnRetryCounter0{0};
+    TxnRetryCounter txnRetryCounter1{1};
 
     auto txnRouter = TransactionRouter::get(operationContext());
-    txnRouter.beginOrContinueTxn(
-        operationContext(), txnNum, TransactionRouter::TransactionActions::kStart, 0);
+    txnRouter.beginOrContinueTxn(operationContext(),
+                                 txnNum,
+                                 TransactionRouter::TransactionActions::kStart,
+                                 txnRetryCounter0);
     txnRouter.setDefaultAtClusterTime(operationContext());
 
     // (Must reset readConcern from "snapshot".)
     repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs();
-    ASSERT_THROWS_CODE(
-        txnRouter.beginOrContinueTxn(
-            operationContext(), txnNum, TransactionRouter::TransactionActions::kCommit, 1),
-        AssertionException,
-        ErrorCodes::IllegalOperation);
+    txnRouter.beginOrContinueTxn(operationContext(),
+                                 txnNum,
+                                 TransactionRouter::TransactionActions::kCommit,
+                                 txnRetryCounter1);
 
-    auto commitResult = txnRouter.commitTransaction(operationContext(), boost::none);
-    ASSERT_BSONOBJ_EQ(commitResult, BSON("ok" << 1));
+    TxnRecoveryToken recoveryToken;
+    recoveryToken.setRecoveryShardId(shard1);
+
+    auto future =
+        launchAsync([&] { txnRouter.commitTransaction(operationContext(), recoveryToken); });
+
+    onCommand([&](const RemoteCommandRequest& request) { return BSON("ok" << 1); });
+
+    future.default_timed_get();
 }
 
 TEST_F(TransactionRouterTestWithDefaultSession,

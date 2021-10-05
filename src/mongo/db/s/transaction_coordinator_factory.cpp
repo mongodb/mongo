@@ -34,9 +34,11 @@
 
 namespace mongo {
 
-void createTransactionCoordinator(OperationContext* opCtx, TxnNumber clientTxnNumber) {
+void createTransactionCoordinator(OperationContext* opCtx,
+                                  TxnNumber clientTxnNumber,
+                                  boost::optional<TxnRetryCounter> txnRetryCounter) {
     static auto w = MONGO_WEAK_FUNCTION_DEFINITION(createTransactionCoordinator);
-    w(opCtx, clientTxnNumber);
+    w(opCtx, clientTxnNumber, txnRetryCounter);
 }
 
 }  // namespace mongo

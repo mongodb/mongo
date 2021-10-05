@@ -959,14 +959,24 @@ void TransactionRouter::Router::_beginOrContinueActiveTxnNumber(OperationContext
                 str::stream() << "Cannot " << actionTypeToString(action) << " transaction "
                               << txnNumber << " on session " << _sessionId()
                               << " using txnRetryCounter " << txnRetryCounter
+                              << " because it has already started to commit using "
+                              << "a lower txnRetryCounter " << o().txnRetryCounter,
+                o().commitType == CommitType::kNotInitiated || !o().abortCause.empty());
+
+        if (action == TransactionActions::kCommit) {
+            // If the first action seen by the router for this txnRetryCounter is to commit, that
+            // means that the client is attempting to recover a commit decision.
+            _resetRouterState(opCtx, txnNumber, txnRetryCounter);
+            p().isRecoveringCommit = true;
+            return;
+        }
+        uassert(ErrorCodes::IllegalOperation,
+                str::stream() << "Cannot " << actionTypeToString(action) << " transaction "
+                              << txnNumber << " on session " << _sessionId()
+                              << " using txnRetryCounter " << txnRetryCounter
                               << " because it is using a lower txnRetryCounter "
                               << o().txnRetryCounter,
                 action == TransactionActions::kStart);
-        uassert(ErrorCodes::IllegalOperation,
-                str::stream() << "Cannot restart transaction " << txnNumber << " on session "
-                              << _sessionId() << " using txnRetryCounter " << txnRetryCounter
-                              << " because it has already started to commit",
-                o().commitType == CommitType::kNotInitiated || !o().abortCause.empty());
         _resetRouterStateForStartTransaction(opCtx, txnNumber, txnRetryCounter);
     }
 }
