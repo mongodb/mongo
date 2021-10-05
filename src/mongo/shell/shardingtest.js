@@ -971,10 +971,9 @@ var ShardingTest = function(params) {
             // Must check shardMixedBinVersion because it causes shardOptions.binVersion to be an
             // object (versionIterator) rather than a version string. Must check mongosBinVersion,
             // as well, because it does not update mongosOptions.binVersion.
-            const isMixedVersionShard =
-                (MongoRunner.areBinVersionsTheSame(binVersion, "last-continuous") ||
-                 MongoRunner.areBinVersionsTheSame(binVersion, "last-lts")) &&
-                jsTestOptions().shardMixedBinVersions;
+            const isMixedVersionShard = jsTestOptions().shardMixedBinVersions &&
+                MongoRunner.areBinVersionsTheSame(binVersion,
+                                                  jsTestOptions().shardMixedBinVersions);
             const isMixedVersionMongos = jsTestOptions().mongosBinVersion &&
                 MongoRunner.areBinVersionsTheSame(binVersion, jsTestOptions().mongosBinVersion);
             if (isMixedVersionShard || isMixedVersionMongos) {
