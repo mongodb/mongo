@@ -56,6 +56,7 @@ class test_backup10(backup_base):
     def test_backup10(self):
         log2 = "WiredTigerLog.0000000002"
         log3 = "WiredTigerLog.0000000003"
+        log4 = "WiredTigerLog.0000000004"
 
         self.session.create(self.uri, "key_format=S,value_format=S")
 
@@ -84,7 +85,8 @@ class test_backup10(backup_base):
 
         # We expect that the duplicate logs are a superset of the
         # original logs. And we expect the difference to be the
-        # addition of log file 3 only.
+        # addition of two log files, one switch when opening the backup
+        # cursor and a switch when opening the duplicate cursor.
         orig_set = set(orig_logs)
         dup_set = set(dup_logs)
         self.assertTrue(dup_set.issuperset(orig_set))
@@ -92,6 +94,7 @@ class test_backup10(backup_base):
         self.assertEqual(len(diff), 1)
         self.assertTrue(log3 in dup_set)
         self.assertFalse(log3 in orig_set)
+        self.assertFalse(log4 in dup_set)
 
         # Test a few error cases now.
         # - We cannot make multiple duplcate backup cursors.
@@ -114,20 +117,6 @@ class test_backup10(backup_base):
             lambda:self.assertEquals(self.session.open_cursor(None,
             bkup_c, None), 0), msg)
 
-        # Open duplicate backup cursor again now that the first
-        # one is closed. Test every log file returned is the same
-        # as the first time.
-        dupc = self.session.open_cursor(None, bkup_c, config)
-        while True:
-            ret = dupc.next()
-            if ret != 0:
-                break
-            newfile = dupc.get_key()
-            self.assertTrue("WiredTigerLog" in newfile)
-            self.assertTrue(newfile in dup_logs)
-        self.assertEqual(ret, wiredtiger.WT_NOTFOUND)
-
-        dupc.close()
         bkup_c.close()
 
         # After the full backup, open and recover the backup database.
