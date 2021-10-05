@@ -55,15 +55,17 @@ static char home[1024]; /* Program working dir */
  * Also each worker thread creates its own textual records file that records the data it
  * inserted and it records the timestamp that was used for that insertion.
  */
+#define LOCAL_RETENTION 2            /* Local retention time */
+#define MIN_TIME LOCAL_RETENTION * 8 /* Make sure checkpoint and flush_tier run enough */
+#define MAX_TIME MIN_TIME * 4
+
 #define BUCKET "bucket"
 #define INVALID_KEY UINT64_MAX
-#define MAX_CKPT_INVL 5  /* Maximum interval between checkpoints */
-#define MAX_FLUSH_INVL 5 /* Maximum interval between flush_tier calls */
-#define MAX_TH 20        /* Maximum configurable threads */
-#define MAX_TIME 40
+#define MAX_CKPT_INVL LOCAL_RETENTION * 3  /* Maximum interval between checkpoints */
+#define MAX_FLUSH_INVL LOCAL_RETENTION * 2 /* Maximum interval between flush_tier calls */
+#define MAX_TH 20                          /* Maximum configurable threads */
 #define MAX_VAL 1024
 #define MIN_TH 5
-#define MIN_TIME 10
 #define NUM_INT_THREADS 3
 #define RECORDS_FILE "records-%" PRIu32
 /* Include worker threads and extra sessions */
@@ -96,7 +98,7 @@ static uint32_t flush_calls = 1;
     "eviction_updates_target=20,eviction_updates_trigger=90," \
     "log=(archive=true,file_max=10M,enabled),session_max=%d," \
     "statistics=(fast),statistics_log=(wait=1,json=true),"    \
-    "tiered_storage=(bucket=%s,bucket_prefix=pfx,name=local_store)"
+    "tiered_storage=(bucket=%s,bucket_prefix=pfx,local_retention=%d,name=local_store)"
 #define ENV_CONFIG_TXNSYNC                                \
     ENV_CONFIG_DEF                                        \
     ",eviction_dirty_target=20,eviction_dirty_trigger=90" \
@@ -440,8 +442,8 @@ run_workload(uint32_t nth, const char *build_dir)
 
     if (chdir(home) != 0)
         testutil_die(errno, "Child chdir: %s", home);
-    testutil_check(
-      __wt_snprintf(envconf, sizeof(envconf), ENV_CONFIG_TXNSYNC, cache_mb, SESSION_MAX, BUCKET));
+    testutil_check(__wt_snprintf(envconf, sizeof(envconf), ENV_CONFIG_TXNSYNC, cache_mb,
+      SESSION_MAX, BUCKET, LOCAL_RETENTION));
 
     testutil_check(__wt_snprintf(extconf, sizeof(extconf), ",extensions=(%s/%s=(early_load=true))",
       build_dir, WT_STORAGE_LIB));
@@ -489,7 +491,6 @@ run_workload(uint32_t nth, const char *build_dir)
         printf("Create timestamp thread\n");
         testutil_check(__wt_thread_create(NULL, &thr[ts_id], thread_ts_run, &td[ts_id]));
     }
-    printf("Create %" PRIu32 " writer threads\n", nth);
     printf("Create %" PRIu32 " writer threads\n", nth);
     for (i = 0; i < nth; ++i) {
         td[i].conn = conn;

@@ -686,8 +686,9 @@ struct __wt_connection_stats {
     int64_t rec_time_window_stop_txn;
     int64_t rec_split_stashed_bytes;
     int64_t rec_split_stashed_objects;
-    int64_t flush_state_races;
+    int64_t local_objects_inuse;
     int64_t flush_tier;
+    int64_t local_objects_removed;
     int64_t session_open;
     int64_t session_query_ts;
     int64_t session_table_alter_fail;

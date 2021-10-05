@@ -20,6 +20,16 @@
 #endif
 
 /*
+ * __tiered_server_run_chk --
+ *     Check to decide if the tiered storage server should continue running.
+ */
+static bool
+__tiered_server_run_chk(WT_SESSION_IMPL *session)
+{
+    return (FLD_ISSET(S2C(session)->server_flags, WT_CONN_SERVER_TIERED));
+}
+
+/*
  * __flush_tier_wait --
  *     Wait for all previous work units queued to be processed.
  */
@@ -121,55 +131,63 @@ err:
 
 /*
  * __tier_storage_remove_local --
- *     Perform one iteration of tiered storage local tier removal.
+ *     Perform one iteration of tiered storage local object removal.
  */
 static int
-__tier_storage_remove_local(WT_SESSION_IMPL *session, const char *uri, bool force)
+__tier_storage_remove_local(WT_SESSION_IMPL *session)
 {
-    WT_CONFIG_ITEM cval;
     WT_DECL_RET;
-    size_t len;
+    WT_TIERED_WORK_UNIT *entry;
     uint64_t now;
-    char *config, *newfile;
-    const char *cfg[2], *filename;
+    const char *object;
 
-    config = newfile = NULL;
-    if (uri == NULL)
-        return (0);
-    __wt_verbose(session, WT_VERB_TIERED, "Removing tree %s", uri);
-    filename = uri;
-    WT_PREFIX_SKIP_REQUIRED(session, filename, "tiered:");
-    len = strlen("file:") + strlen(filename) + 1;
-    WT_ERR(__wt_calloc_def(session, len, &newfile));
-    WT_ERR(__wt_snprintf(newfile, len, "file:%s", filename));
+    entry = NULL;
+    for (;;) {
+        /* Check if we're quitting or being reconfigured. */
+        if (!__tiered_server_run_chk(session))
+            break;
 
-    /*
-     * If the file:URI of the tiered object does not exist, there is nothing to do.
-     */
-    ret = __wt_metadata_search(session, newfile, &config);
-    if (ret == WT_NOTFOUND) {
-        ret = 0;
-        goto err;
-    }
-    WT_ERR(ret);
-
-    /*
-     * We have a local version of this tiered data. Check its metadata for when it expires and
-     * remove if necessary.
-     */
-    cfg[0] = config;
-    cfg[1] = NULL;
-    WT_ERR(__wt_config_gets(session, cfg, "local_retention", &cval));
-    __wt_seconds(session, &now);
-    if (force || (uint64_t)cval.val + S2C(session)->bstorage->retain_secs >= now)
+        __wt_seconds(session, &now);
+        __wt_tiered_get_drop_local(session, now, &entry);
+        if (entry == NULL)
+            break;
+        WT_ERR(__wt_tiered_name(
+          session, &entry->tiered->iface, entry->id, WT_TIERED_NAME_OBJECT, &object));
+        __wt_verbose(session, WT_VERB_TIERED, "REMOVE_LOCAL: %s at %" PRIu64, object, now);
+        WT_PREFIX_SKIP_REQUIRED(session, object, "object:");
         /*
-         * We want to remove the entry and the file. Probably do a schema_drop on the file:uri.
+         * If the handle is still open, it could still be in use for reading. In that case put the
+         * work unit back on the work queue and keep trying.
          */
-        __wt_verbose(session, WT_VERB_TIERED, "Would remove %s. Local retention expired", newfile);
-
+        if (__wt_handle_is_open(session, object)) {
+            __wt_verbose(session, WT_VERB_TIERED, "REMOVE_LOCAL: %s in USE, queue again", object);
+            WT_STAT_CONN_INCR(session, local_objects_inuse);
+            /*
+             * FIXME-WT-7470: If the object we want to remove is in use this is the place to call
+             * object sweep to clean up block->ofh file handles. Another alternative would be to try
+             * to sweep and then try the remove call below rather than pushing it back on the work
+             * queue. NOTE: Remove 'ofh' from s_string.ok when removing this comment.
+             *
+             * Update the time on the entry before pushing it back on the queue so that we don't get
+             * into an infinite loop trying to drop an open file that may be in use a while.
+             */
+            WT_ASSERT(session, entry->tiered != NULL && entry->tiered->bstorage != NULL);
+            entry->op_val = now + entry->tiered->bstorage->retain_secs;
+            __wt_tiered_push_work(session, entry);
+        } else {
+            __wt_verbose(session, WT_VERB_TIERED, "REMOVE_LOCAL: actually remove %s", object);
+            WT_STAT_CONN_INCR(session, local_objects_removed);
+            WT_ERR(__wt_fs_remove(session, object, false));
+            /*
+             * We are responsible for freeing the work unit when we're done with it.
+             */
+            __wt_tiered_work_free(session, entry);
+        }
+        entry = NULL;
+    }
 err:
-    __wt_free(session, config);
-    __wt_free(session, newfile);
+    if (entry != NULL)
+        __wt_tiered_work_free(session, entry);
     return (ret);
 }
 
@@ -230,8 +248,8 @@ err:
  *     Perform one iteration of copying newly flushed objects to the shared storage.
  */
 int
-__wt_tier_do_flush(
-  WT_SESSION_IMPL *session, WT_TIERED *tiered, const char *local_uri, const char *obj_uri)
+__wt_tier_do_flush(WT_SESSION_IMPL *session, WT_TIERED *tiered, uint32_t id, const char *local_uri,
+  const char *obj_uri)
 {
     WT_DECL_RET;
     WT_FILE_SYSTEM *bucket_fs;
@@ -260,6 +278,11 @@ __wt_tier_do_flush(
      */
     WT_RET(storage_source->ss_flush_finish(
       storage_source, &session->iface, bucket_fs, local_name, obj_name, NULL));
+    /*
+     * After successful flushing, push a work unit to drop the local object in the future. The
+     * object will be removed locally after the local retention period expires.
+     */
+    WT_RET(__wt_tiered_put_drop_local(session, tiered, id));
     return (0);
 }
 
@@ -276,7 +299,7 @@ __wt_tier_flush(WT_SESSION_IMPL *session, WT_TIERED *tiered, uint32_t id)
     local_uri = obj_uri = NULL;
     WT_ERR(__wt_tiered_name(session, &tiered->iface, id, WT_TIERED_NAME_LOCAL, &local_uri));
     WT_ERR(__wt_tiered_name(session, &tiered->iface, id, WT_TIERED_NAME_OBJECT, &obj_uri));
-    WT_ERR(__wt_tier_do_flush(session, tiered, local_uri, obj_uri));
+    WT_ERR(__wt_tier_do_flush(session, tiered, id, local_uri, obj_uri));
 
 err:
     __wt_free(session, local_uri);
@@ -296,6 +319,10 @@ __tier_storage_copy(WT_SESSION_IMPL *session)
 
     entry = NULL;
     for (;;) {
+        /* Check if we're quitting or being reconfigured. */
+        if (!__tiered_server_run_chk(session))
+            break;
+
         /*
          * We probably need some kind of flush generation so that we don't process flush items for
          * tables that are added during an in-progress flush_tier. This thread could run due to a
@@ -334,7 +361,7 @@ __tier_storage_remove(WT_SESSION_IMPL *session, bool force)
      * We want to walk the metadata perhaps and for each tiered URI, call remove on its file:URI
      * version.
      */
-    WT_RET(__tier_storage_remove_local(session, NULL, force));
+    WT_RET(__tier_storage_remove_local(session));
     return (0);
 }
 
@@ -445,16 +472,6 @@ __tiered_manager_config(WT_SESSION_IMPL *session, const char **cfg, bool *runp)
     mgr->workers_min = (uint32_t)cval.val;
     WT_ASSERT(session, mgr->workers_min <= mgr->workers_max);
     return (0);
-}
-
-/*
- * __tiered_server_run_chk --
- *     Check to decide if the tiered storage server should continue running.
- */
-static bool
-__tiered_server_run_chk(WT_SESSION_IMPL *session)
-{
-    return (FLD_ISSET(S2C(session)->server_flags, WT_CONN_SERVER_TIERED));
 }
 
 /*

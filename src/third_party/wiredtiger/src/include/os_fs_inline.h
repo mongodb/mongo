@@ -141,7 +141,7 @@ __wt_fs_remove(WT_SESSION_IMPL *session, const char *name, bool durable)
      * It is a layering violation to retrieve a WT_FH here, but it is a useful diagnostic to ensure
      * WiredTiger doesn't have the handle open.
      */
-    if (__wt_handle_is_open(session, name))
+    if (__wt_handle_is_open(session, name) && !F_ISSET(session, WT_SESSION_QUIET_TIERED))
         WT_RET_MSG(session, EINVAL, "%s: file-remove: file has open handles", name);
 #endif
 
