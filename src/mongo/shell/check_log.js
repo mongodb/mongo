@@ -121,6 +121,18 @@ checkLog = (function() {
     };
 
     /*
+     * Similar to checkContainsWithCountJson, but checks whether there are at least 'expectedCount'
+     * instances of 'id' in the logs.
+     */
+    const checkContainsWithAtLeastCountJson = function(
+        conn, id, attrsDict, expectedCount, severity = null, isRelaxed = false, context = null) {
+        return checkContainsWithCountJson(
+            conn, id, attrsDict, expectedCount, severity, isRelaxed, (actual, expected) => {
+                return actual >= expected;
+            }, context);
+    };
+
+    /*
      * Calls the 'getLog' function on the provided connection 'conn' to see if a log with the
      * provided id is found in the logs. If the id is found it looks up the specified attrribute by
      * attrName and checks if the msg is found in its value. Note: this function does not throw an
@@ -401,6 +413,7 @@ checkLog = (function() {
         checkContainsOnce: checkContainsOnce,
         checkContainsOnceJson: checkContainsOnceJson,
         checkContainsWithCountJson: checkContainsWithCountJson,
+        checkContainsWithAtLeastCountJson: checkContainsWithAtLeastCountJson,
         checkContainsOnceJsonStringMatch: checkContainsOnceJsonStringMatch,
         contains: contains,
         containsJson: containsJson,

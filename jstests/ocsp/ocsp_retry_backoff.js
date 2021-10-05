@@ -31,11 +31,12 @@ let conn = MongoRunner.runMongod(ocsp_options);
 
 sleep(10000);
 
-// validate that fetchAndStaple was invoked 5 times
+// validate that fetchAndStaple was invoked at least 5 times in the 10+ seconds
+// since the mongod process started.
 const FETCH_LOG_ID = 577164;
 assert.eq(true,
-          checkLog.checkContainsWithCountJson(conn, FETCH_LOG_ID, {}, 5),
-          'Number of log lines with ID ' + FETCH_LOG_ID + ' does not match expected');
+          checkLog.checkContainsWithAtLeastCountJson(conn, FETCH_LOG_ID, {}, 5),
+          'Number of log lines with ID ' + FETCH_LOG_ID + ' is less than expected');
 
 MongoRunner.stopMongod(conn);
 
