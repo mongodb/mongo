@@ -892,7 +892,7 @@ Status MigrationChunkClonerSourceLegacy::_storeCurrentLocs(OperationContext* opC
             avgRecSize = BSONObj::kMinBSONLength;
         }
         maxRecsWhenFull = _args.getMaxChunkSizeBytes() / avgRecSize;
-        maxRecsWhenFull = 130 * maxRecsWhenFull / 100;  // pad some slack
+        maxRecsWhenFull = 2 * maxRecsWhenFull;  // pad some slack
     } else {
         avgRecSize = 0;
         maxRecsWhenFull = kMaxObjectPerChunk + 1;
