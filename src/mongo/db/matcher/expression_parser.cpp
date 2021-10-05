@@ -1079,11 +1079,20 @@ StatusWithMatchExpression parseInternalBucketGeoWithinMatchExpression(
 
     auto subobj = elem.embeddedObject();
 
-    // Parse the region field, 'withinRegion', to a GeometryContainer.
     std::shared_ptr<GeometryContainer> geoContainer = std::make_shared<GeometryContainer>();
-    tassert(5776200,
-            "$_internalBucketGeoWithin expression must contain 'withinRegion' field",
-            subobj.hasField("withinRegion"));
+    if (!subobj.hasField("withinRegion") || !subobj.hasField("field")) {
+        return {ErrorCodes::FailedToParse,
+                str::stream() << InternalBucketGeoWithinMatchExpression::kName
+                              << " requires both 'withinRegion' and 'field' field"};
+    }
+
+    if (subobj["withinRegion"].type() != BSONType::Object) {
+        return {ErrorCodes::TypeMismatch,
+                str::stream() << InternalBucketGeoWithinMatchExpression::kName
+                              << "'s 'withinRegion' field must be an object"};
+    }
+
+    // Parse the region field, 'withinRegion', to a GeometryContainer.
     BSONObjIterator geoIt(subobj["withinRegion"].embeddedObject());
     while (geoIt.more()) {
         BSONElement elt = geoIt.next();
@@ -1093,10 +1102,13 @@ StatusWithMatchExpression parseInternalBucketGeoWithinMatchExpression(
             return status;
     }
 
+    if (subobj["field"].type() != BSONType::String) {
+        return {ErrorCodes::TypeMismatch,
+                str::stream() << InternalBucketGeoWithinMatchExpression::kName
+                              << "'s 'field' field must be a string"};
+    }
+
     // Parse the field.
-    tassert(5776201,
-            "$_internalBucketGeoWithin expression must contain 'field' field with a string value",
-            subobj.hasField("field") && subobj["field"].type() == BSONType::String);
     std::string field = subobj["field"].String();
 
     expCtx->sbeCompatible = false;
