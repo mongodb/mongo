@@ -1,0 +1,69 @@
+# Copyright (C) 2021-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+# This file defines the format of documents stored in
+# config.balancerCommandsSchedulerOngoingOperations on the config server.
+
+global:
+    cpp_namespace: "mongo"
+
+imports:
+    - "mongo/idl/basic_types.idl"
+    - "mongo/s/sharding_types.idl"
+
+structs:
+    PersistedBalancerCommand:
+        description: "Descriptor of a command issued by BalancerCommandsScheduler,
+                      persisted on disk (under NamespaceString::kConfigBalancerCommandsNamespace)
+                      to be re-executed in case of server crash."
+        strict: false
+        generate_comparison_operators: false
+        fields:
+            requestId: 
+                type: uuid
+                description: "Original RequestID associated to the command
+                              when this was issued for the first time. For logging purposes."
+                optional: false
+            remoteCommand: 
+                type: object_owned
+                description: "Serialised version of the remote command submitted by the
+                              BalancerCommandsScheduler."
+                optional: false
+            target: 
+                type: shard_id
+                description: "Id of the shard that has to receive and execute the remote command."
+                optional: false
+            nss:
+                type: namespacestring
+                description: "Namespace string being targeted by the remote command."
+                optional: false
+            requiresDistributedLock:
+                type: bool
+                description: "When true, the safe execution of the remote command requires
+                              the distributed lock for the targeted namespace to be taken."
+                optional: false

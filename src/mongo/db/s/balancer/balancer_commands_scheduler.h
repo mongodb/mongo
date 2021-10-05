@@ -88,7 +88,7 @@ class DeferredResponse {
 public:
     virtual ~DeferredResponse() = default;
 
-    virtual uint32_t getRequestId() const = 0;
+    virtual UUID getRequestId() const = 0;
 
     virtual bool hasFinalised() const = 0;
 
@@ -129,10 +129,10 @@ public:
     virtual ~BalancerCommandsScheduler() = default;
 
     /**
-     * Activates the scheduler, which will start accepting and processing
-     * request<Command>() invocations.
+     * Triggers an asynchronous self-initialisation of the component,
+     * which will start accepting request<Command>() invocations.
      */
-    virtual void start() = 0;
+    virtual void start(OperationContext* opCtx) = 0;
 
     /**
      * Stops the scheduler and the processing of any outstanding and incoming request
@@ -141,27 +141,34 @@ public:
     virtual void stop() = 0;
 
     virtual std::unique_ptr<MoveChunkResponse> requestMoveChunk(
+        OperationContext* opCtx,
         const NamespaceString& nss,
         const ChunkType& chunk,
         const ShardId& recipient,
         const MoveChunkSettings& commandSettings) = 0;
 
     virtual std::unique_ptr<MergeChunksResponse> requestMergeChunks(
-        const NamespaceString& nss, const ChunkType& lowerBound, const ChunkType& upperBound) = 0;
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const ChunkType& lowerBound,
+        const ChunkType& upperBound) = 0;
 
     virtual std::unique_ptr<SplitVectorResponse> requestSplitVector(
+        OperationContext* opCtx,
         const NamespaceString& nss,
         const ChunkType& chunk,
         const ShardKeyPattern& shardKeyPattern,
         const SplitVectorSettings& commandSettings) = 0;
 
     virtual std::unique_ptr<SplitChunkResponse> requestSplitChunk(
+        OperationContext* opCtx,
         const NamespaceString& nss,
         const ChunkType& chunk,
         const ShardKeyPattern& shardKeyPattern,
         const std::vector<BSONObj>& splitPoints) = 0;
 
     virtual std::unique_ptr<ChunkDataSizeResponse> requestChunkDataSize(
+        OperationContext* opCtx,
         const NamespaceString& nss,
         const ChunkType& chunk,
         const ShardKeyPattern& shardKeyPattern,

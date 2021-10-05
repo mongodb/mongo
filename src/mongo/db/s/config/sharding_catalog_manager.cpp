@@ -45,6 +45,7 @@
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/s/balancer/balancer_command_document_gen.h"
 #include "mongo/db/s/balancer/type_migration.h"
 #include "mongo/db/s/sharding_util.h"
 #include "mongo/db/s/type_lockpings.h"
@@ -426,6 +427,18 @@ Status ShardingCatalogManager::_initConfigIndexes(OperationContext* opCtx) {
     if (!result.isOK()) {
         return result.withContext("couldn't create ns_1_min_1 index on config.migrations");
     }
+
+    result =
+        configShard->createIndexOnConfig(opCtx,
+                                         NamespaceString::kConfigBalancerCommandsNamespace,
+                                         BSON(PersistedBalancerCommand::kRequestIdFieldName << 1),
+                                         unique);
+    if (!result.isOK()) {
+        return result.withContext(
+            "couldn't create requestId_1 index on "
+            "config.balancerCommandsSchedulerOngoingOperations");
+    }
+
 
     result = configShard->createIndexOnConfig(
         opCtx, ShardType::ConfigNS, BSON(ShardType::host() << 1), unique);

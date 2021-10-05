@@ -117,6 +117,10 @@ const NamespaceString NamespaceString::kShardingRenameParticipantsNamespace(
 
 const NamespaceString NamespaceString::kConfigSettingsNamespace(NamespaceString::kConfigDb,
                                                                 "settings");
+
+const NamespaceString NamespaceString::kConfigBalancerCommandsNamespace(
+    NamespaceString::kConfigDb, "balancerCommandsSchedulerOngoingOperations");
+
 const NamespaceString NamespaceString::kVectorClockNamespace(NamespaceString::kConfigDb,
                                                              "vectorClock");
 

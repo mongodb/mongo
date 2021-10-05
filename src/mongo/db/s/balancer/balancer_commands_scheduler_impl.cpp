@@ -31,6 +31,7 @@
 
 #include "mongo/db/s/balancer/balancer_commands_scheduler_impl.h"
 #include "mongo/db/client.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/grid.h"
@@ -77,24 +78,24 @@ BalancerCommandsSchedulerImpl::~BalancerCommandsSchedulerImpl() {
     stop();
 }
 
-void BalancerCommandsSchedulerImpl::_setState(WithLock, SchedulerState state) {
-    _state = state;
-    _stateUpdatedCV.notify_all();
-}
-
-void BalancerCommandsSchedulerImpl::start() {
+void BalancerCommandsSchedulerImpl::start(OperationContext* opCtx) {
     LOGV2(5847200, "Balancer command scheduler start requested");
     stdx::lock_guard<Latch> lgss(_startStopMutex);
     stdx::lock_guard<Latch> lg(_mutex);
-    if (_state == SchedulerState::Running) {
+    if (_state == SchedulerState::Recovering || _state == SchedulerState::Running) {
         return;
     }
 
-    // TODO init _requestIdCounter here based on the stored running requests from a past invocation?
     invariant(!_workerThreadHandle.joinable());
     _incompleteRequests.reserve(_maxRunningRequests * 10);
     _runningRequestIds.reserve(_maxRunningRequests);
-    _state = SchedulerState::Running;
+    auto requestsToRecover = _loadRequestsToRecover(opCtx);
+    _state = requestsToRecover.empty() ? SchedulerState::Running : SchedulerState::Recovering;
+
+    for (auto& requestToRecover : requestsToRecover) {
+        _enqueueRequest(lg, std::move(requestToRecover));
+    }
+
     _workerThreadHandle = stdx::thread([this] { _workerThread(); });
 }
 
@@ -108,12 +109,14 @@ void BalancerCommandsSchedulerImpl::stop() {
         }
 
         invariant(_workerThreadHandle.joinable());
-        _setState(lg, SchedulerState::Stopping);
+        _state = SchedulerState::Stopping;
+        _stateUpdatedCV.notify_all();
     }
     _workerThreadHandle.join();
 }
 
 std::unique_ptr<MoveChunkResponse> BalancerCommandsSchedulerImpl::requestMoveChunk(
+    OperationContext* opCtx,
     const NamespaceString& nss,
     const ChunkType& chunk,
     const ShardId& recipient,
@@ -130,17 +133,17 @@ std::unique_ptr<MoveChunkResponse> BalancerCommandsSchedulerImpl::requestMoveChu
                                                               commandSettings.forceJumbo,
                                                               chunk.getVersion());
 
-    auto requestCollectionInfo = _enqueueNewRequest(std::move(commandInfo));
+    auto requestCollectionInfo = _buildAndEnqueueNewRequest(opCtx, std::move(commandInfo));
     return std::make_unique<MoveChunkResponseImpl>(std::move(requestCollectionInfo));
 }
 
 std::unique_ptr<MergeChunksResponse> BalancerCommandsSchedulerImpl::requestMergeChunks(
-    const NamespaceString& nss, const ChunkType& lowerBound, const ChunkType& upperBound) {
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const ChunkType& lowerBound,
+    const ChunkType& upperBound) {
     invariant(lowerBound.getShard() == upperBound.getShard());
     invariant(lowerBound.getMax().woCompare(upperBound.getMin()) <= 0);
-    // TODO why this may fail?
-    // invariant(lowerBound.epoch() == upperBound.epoch() &&
-    //           lowerBound.getVersion().majorVersion() == upperBound.getVersion().majorVersion());
 
     auto commandInfo = std::make_shared<MergeChunksCommandInfo>(
         nss,
@@ -150,11 +153,12 @@ std::unique_ptr<MergeChunksResponse> BalancerCommandsSchedulerImpl::requestMerge
         lowerBound.getVersion().isOlderThan(upperBound.getVersion()) ? upperBound.getVersion()
                                                                      : lowerBound.getVersion());
 
-    auto requestCollectionInfo = _enqueueNewRequest(std::move(commandInfo));
+    auto requestCollectionInfo = _buildAndEnqueueNewRequest(opCtx, std::move(commandInfo));
     return std::make_unique<MergeChunksResponseImpl>(std::move(requestCollectionInfo));
 }
 
 std::unique_ptr<SplitVectorResponse> BalancerCommandsSchedulerImpl::requestSplitVector(
+    OperationContext* opCtx,
     const NamespaceString& nss,
     const ChunkType& chunk,
     const ShardKeyPattern& shardKeyPattern,
@@ -170,11 +174,12 @@ std::unique_ptr<SplitVectorResponse> BalancerCommandsSchedulerImpl::requestSplit
                                                                 commandSettings.maxChunkSizeBytes,
                                                                 commandSettings.force);
 
-    auto requestCollectionInfo = _enqueueNewRequest(std::move(commandInfo));
+    auto requestCollectionInfo = _buildAndEnqueueNewRequest(opCtx, std::move(commandInfo));
     return std::make_unique<SplitVectorResponseImpl>(std::move(requestCollectionInfo));
 }
 
 std::unique_ptr<SplitChunkResponse> BalancerCommandsSchedulerImpl::requestSplitChunk(
+    OperationContext* opCtx,
     const NamespaceString& nss,
     const ChunkType& chunk,
     const ShardKeyPattern& shardKeyPattern,
@@ -188,11 +193,12 @@ std::unique_ptr<SplitChunkResponse> BalancerCommandsSchedulerImpl::requestSplitC
                                                                chunk.getVersion(),
                                                                splitPoints);
 
-    auto requestCollectionInfo = _enqueueNewRequest(std::move(commandInfo));
+    auto requestCollectionInfo = _buildAndEnqueueNewRequest(opCtx, std::move(commandInfo));
     return std::make_unique<SplitChunkResponseImpl>(std::move(requestCollectionInfo));
 }
 
 std::unique_ptr<ChunkDataSizeResponse> BalancerCommandsSchedulerImpl::requestChunkDataSize(
+    OperationContext* opCtx,
     const NamespaceString& nss,
     const ChunkType& chunk,
     const ShardKeyPattern& shardKeyPattern,
@@ -205,34 +211,71 @@ std::unique_ptr<ChunkDataSizeResponse> BalancerCommandsSchedulerImpl::requestChu
                                                              estimatedValue,
                                                              chunk.getVersion());
 
-    auto requestCollectionInfo = _enqueueNewRequest(std::move(commandInfo));
+    auto requestCollectionInfo = _buildAndEnqueueNewRequest(opCtx, std::move(commandInfo));
     return std::make_unique<ChunkDataSizeResponseImpl>(std::move(requestCollectionInfo));
 }
 
-ResponseHandle BalancerCommandsSchedulerImpl::_enqueueNewRequest(
-    std::shared_ptr<CommandInfo>&& commandInfo) {
-    const auto newRequestId = _requestIdCounter.fetchAndAddRelaxed(1);
+ResponseHandle BalancerCommandsSchedulerImpl::_buildAndEnqueueNewRequest(
+    OperationContext* opCtx, std::shared_ptr<CommandInfo>&& commandInfo) {
+    const auto newRequestId = UUID::gen();
     LOGV2(5847202,
-          "Enqueuing new Balancer command request with id {reqId}. Details: {command} ",
+          "Enqueuing new Balancer command request with id {reqId}. Details: {command}",
           "Enqueuing new Balancer command request",
           "reqId"_attr = newRequestId,
-          "command"_attr = commandInfo->serialise().toString());
+          "command"_attr = commandInfo->serialise().toString(),
+          "recoveryDocRequired"_attr = commandInfo->requiresRecoveryOnCrash());
 
-    RequestData pendingRequest(newRequestId, std::move(commandInfo));
-    auto deferredResponseHandle = pendingRequest.getResponseHandle();
-    {
-        stdx::lock_guard<Latch> lg(_mutex);
-        if (_state == SchedulerState::Running) {
-            invariant(_workerThreadHandle.joinable());
-            _incompleteRequests.emplace(std::make_pair(newRequestId, std::move(pendingRequest)));
-            _pendingRequestIds.push_back(newRequestId);
-            _stateUpdatedCV.notify_all();
-        } else {
-            deferredResponseHandle.handle->set(Status(
-                ErrorCodes::CallbackCanceled, "Request rejected - balancer scheduler is stopped"));
+    if (commandInfo->requiresRecoveryOnCrash()) {
+        DBDirectClient dbClient(opCtx);
+        PersistedBalancerCommand recoveryDoc(newRequestId,
+                                             commandInfo->serialise(),
+                                             commandInfo->getTarget(),
+                                             commandInfo->getNameSpace(),
+                                             commandInfo->requiresDistributedLock());
+        std::vector<BSONObj> serialisedRecoveryInfo;
+        serialisedRecoveryInfo.emplace_back(recoveryDoc.toBSON());
+        auto reply = dbClient.insertAcknowledged(
+            NamespaceString::kConfigBalancerCommandsNamespace.toString(),
+            serialisedRecoveryInfo,
+            true,
+            WriteConcernOptions::Majority);
+
+        if (auto writeStatus = getStatusFromWriteCommandReply(reply); !writeStatus.isOK()) {
+            LOGV2(5847210,
+                  "Failed to persist command document for reqId {reqId}. Error status: {status}",
+                  "Failed to persist request command document",
+                  "reqId"_attr = newRequestId,
+                  "status"_attr = writeStatus);
+            return ResponseHandle(newRequestId, writeStatus);
         }
     }
+
+    RequestData pendingRequest(newRequestId, std::move(commandInfo));
+
+    stdx::unique_lock<Latch> ul(_mutex);
+    _stateUpdatedCV.wait(ul, [this] { return _state != SchedulerState::Recovering; });
+
+    return _enqueueRequest(ul, std::move(pendingRequest));
+}
+
+ResponseHandle BalancerCommandsSchedulerImpl::_enqueueRequest(WithLock, RequestData&& request) {
+    auto requestId = request.getId();
+    auto deferredResponseHandle = request.getResponseHandle();
+    if (_state == SchedulerState::Recovering || _state == SchedulerState::Running) {
+        _incompleteRequests.emplace(std::make_pair(requestId, std::move(request)));
+        _pendingRequestIds.push_back(requestId);
+        _stateUpdatedCV.notify_all();
+    } else {
+        deferredResponseHandle.handle->set(Status(
+            ErrorCodes::CallbackCanceled, "Request rejected - balancer scheduler is stopped"));
+    }
+
     return deferredResponseHandle;
+}
+
+bool BalancerCommandsSchedulerImpl::_canSubmitNewRequests(WithLock) {
+    return (!_pendingRequestIds.empty() && _runningRequestIds.size() < _maxRunningRequests &&
+            MONGO_likely(!pauseBalancerWorkerThread.shouldFail()));
 }
 
 Status BalancerCommandsSchedulerImpl::_acquireDistLock(OperationContext* opCtx,
@@ -304,7 +347,7 @@ CommandSubmissionResult BalancerCommandsSchedulerImpl::_submit(
             _applyCommandResponse(opCtx, requestId, args.response);
         };
 
-    if (handle.commandInfo->getType() == CommandInfo::Type::kMoveChunk) {
+    if (handle.commandInfo->requiresDistributedLock()) {
         Status lockAcquisitionResponse =
             _acquireDistLock(opCtx, handle.commandInfo->getNameSpace());
         if (!lockAcquisitionResponse.isOK()) {
@@ -336,17 +379,20 @@ void BalancerCommandsSchedulerImpl::_applySubmissionResult(
      * - set the execution context on the RequestData to be able to serve future cancel requests
      * - update the data structure describing running command requests
      * If failed,
-     * - persist the outcome into the deferred response
-     * - remove the RequestData (and the info on migration)
+     * - store the outcome into the deferred response
+     * - remove the RequestData and its persisted info (if any)
      */
     auto& requestToUpdate = requestToUpdateIt->second;
     if (submissionResult.context.isOK()) {
         requestToUpdate.addExecutionContext(std::move(submissionResult.context.getValue()));
         _runningRequestIds.insert(submissionResult.id);
     } else {
+        const auto& submittedCommandInfo = requestToUpdate.getCommandInfo();
         if (submissionResult.acquiredDistLock) {
-            const auto& submittedCommandInfo = requestToUpdate.getCommandInfo();
             _releaseDistLock(opCtx, submittedCommandInfo.getNameSpace());
+        }
+        if (submittedCommandInfo.requiresRecoveryOnCrash()) {
+            _obsoleteRecoveryDocumentIds.push_back(submissionResult.id);
         }
         requestToUpdate.setOutcome(submissionResult.context.getStatus());
         _incompleteRequests.erase(requestToUpdateIt);
@@ -355,24 +401,31 @@ void BalancerCommandsSchedulerImpl::_applySubmissionResult(
 
 void BalancerCommandsSchedulerImpl::_applyCommandResponse(
     OperationContext* opCtx,
-    uint32_t requestId,
+    UUID requestId,
     const executor::TaskExecutor::ResponseStatus& response) {
     {
         stdx::lock_guard<Latch> lg(_mutex);
         auto requestToCompleteIt = _incompleteRequests.find(requestId);
-        if (_state != SchedulerState::Running || requestToCompleteIt == _incompleteRequests.end()) {
+        if (_state == SchedulerState::Stopping || _state == SchedulerState::Stopped ||
+            requestToCompleteIt == _incompleteRequests.end()) {
             // Drop the response - the request is being cancelled in the worker thread.
-            // (TODO modify to handle stepdown scenarios).
             return;
         }
         auto& requestToComplete = requestToCompleteIt->second;
         requestToComplete.setOutcome(response);
         auto& commandInfo = requestToComplete.getCommandInfo();
-        if (commandInfo.getType() == CommandInfo::Type::kMoveChunk) {
+        if (commandInfo.requiresDistributedLock()) {
             _releaseDistLock(opCtx, commandInfo.getNameSpace());
+        }
+        if (commandInfo.requiresRecoveryOnCrash()) {
+            _obsoleteRecoveryDocumentIds.push_back(requestId);
         }
         _runningRequestIds.erase(requestId);
         _incompleteRequests.erase(requestToCompleteIt);
+        if (_incompleteRequests.empty() && _state == SchedulerState::Recovering) {
+            LOGV2(5847213, "Balancer scheduler recovery complete. Switching to regular execution");
+            _state = SchedulerState::Running;
+        }
         _stateUpdatedCV.notify_all();
     }
     LOGV2(5847204,
@@ -382,6 +435,59 @@ void BalancerCommandsSchedulerImpl::_applyCommandResponse(
           "response"_attr = response.toString());
 }
 
+std::vector<RequestData> BalancerCommandsSchedulerImpl::_loadRequestsToRecover(
+    OperationContext* opCtx) {
+    std::vector<RequestData> requestsToRecover;
+    auto documentProcessor = [&requestsToRecover](const BSONObj& commandToRecoverDoc) {
+        auto originalCommand = PersistedBalancerCommand::parse(
+            IDLParserErrorContext("BalancerCommandsScheduler"), commandToRecoverDoc);
+        auto recoveryCommand = std::make_shared<RecoveryCommandInfo>(originalCommand);
+        LOGV2(5847212,
+              "Recovered request id {reqId}, which command will be rescheduled. Details: "
+              "{command}",
+              "Command request recovered and set for rescheduling",
+              "reqId"_attr = originalCommand.getRequestId(),
+              "command"_attr = recoveryCommand->serialise());
+        requestsToRecover.emplace_back(originalCommand.getRequestId(), std::move(recoveryCommand));
+    };
+    DBDirectClient dbClient(opCtx);
+    dbClient.query(documentProcessor, NamespaceString::kConfigBalancerCommandsNamespace, BSONObj());
+    return requestsToRecover;
+}
+
+void BalancerCommandsSchedulerImpl::_cleanUpObsoleteRecoveryInfo(WithLock,
+                                                                 OperationContext* opCtx) {
+    if (_obsoleteRecoveryDocumentIds.empty()) {
+        return;
+    }
+    BSONObjBuilder queryBuilder;
+    if (_obsoleteRecoveryDocumentIds.size() == 1) {
+        _obsoleteRecoveryDocumentIds[0].appendToBuilder(
+            &queryBuilder, PersistedBalancerCommand::kRequestIdFieldName);
+    } else {
+        BSONObjBuilder requestIdClause(
+            queryBuilder.subobjStart(PersistedBalancerCommand::kRequestIdFieldName));
+        BSONArrayBuilder valuesBuilder(requestIdClause.subarrayStart("$in"));
+        for (const auto& requestId : _obsoleteRecoveryDocumentIds) {
+            requestId.appendToArrayBuilder(&valuesBuilder);
+        }
+    }
+
+    _obsoleteRecoveryDocumentIds.clear();
+
+    auto query = queryBuilder.obj();
+    DBDirectClient dbClient(opCtx);
+
+    auto reply = dbClient.removeAcknowledged(
+        NamespaceString::kConfigBalancerCommandsNamespace.toString(), query);
+
+    LOGV2(5847211,
+          "Clean up of obsolete document info performed with outcome {reply}",
+          "Clean up of obsolete document info performed",
+          "query"_attr = query,
+          "reply"_attr = reply);
+}
+
 
 void BalancerCommandsSchedulerImpl::_workerThread() {
     ON_BLOCK_EXIT([this] {
@@ -389,30 +495,36 @@ void BalancerCommandsSchedulerImpl::_workerThread() {
                   "BalancerCommandsScheduler worker thread failed to release all locks on exit");
         LOGV2(5847208, "Leaving balancer command scheduler thread");
         stdx::lock_guard<Latch> lg(_mutex);
-        _setState(lg, SchedulerState::Stopped);
+        _state = SchedulerState::Stopped;
+        _stateUpdatedCV.notify_all();
     });
 
     Client::initThread("BalancerCommandsScheduler");
     auto opCtxHolder = cc().makeOperationContext();
-    stdx::unordered_map<uint32_t, RequestData> requestsToCleanUpOnExit;
+    stdx::unordered_map<UUID, RequestData, UUID::Hash> requestsToCleanUpOnExit;
     LOGV2(5847205, "Balancer scheduler thread started");
 
     while (true) {
         std::vector<CommandSubmissionHandle> commandsToSubmit;
         {
             stdx::unique_lock<Latch> ul(_mutex);
-            _stateUpdatedCV.wait(ul, [this] {
-                return (_state != SchedulerState::Running ||
-                        (!_pendingRequestIds.empty() &&
-                         _runningRequestIds.size() < _maxRunningRequests &&
-                         MONGO_likely(!pauseBalancerWorkerThread.shouldFail())));
+            invariant(_state != SchedulerState::Stopped);
+            _stateUpdatedCV.wait(ul, [this, &ul] {
+                return (_state == SchedulerState::Stopping || _canSubmitNewRequests(ul) ||
+                        !_obsoleteRecoveryDocumentIds.empty());
             });
 
-            if (_state != SchedulerState::Running) {
+            _cleanUpObsoleteRecoveryInfo(ul, opCtxHolder.get());
+
+            if (_state == SchedulerState::Stopping) {
                 _runningRequestIds.clear();
                 _pendingRequestIds.clear();
                 _incompleteRequests.swap(requestsToCleanUpOnExit);
                 break;
+            }
+
+            if (!_canSubmitNewRequests(ul)) {
+                continue;
             }
 
             // 1. Pick up new requests to be submitted from the pending list, if possible.
@@ -450,6 +562,7 @@ void BalancerCommandsSchedulerImpl::_workerThread() {
     }
 
     // In case of clean exit, cancel all the pending/running command requests
+    // (but keep the related descriptor documents to ensure they will be reissued on recovery).
     auto executor = Grid::get(opCtxHolder.get())->getExecutorPool()->getFixedExecutor();
     for (auto& idAndRequest : requestsToCleanUpOnExit) {
         idAndRequest.second.setOutcome(Status(

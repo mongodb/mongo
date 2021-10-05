@@ -32,6 +32,7 @@
 #include <list>
 #include <unordered_map>
 
+#include "mongo/db/s/balancer/balancer_command_document_gen.h"
 #include "mongo/db/s/balancer/balancer_commands_scheduler.h"
 #include "mongo/db/s/dist_lock_manager.h"
 #include "mongo/db/service_context.h"
@@ -46,13 +47,20 @@ namespace mongo {
  * Data structure generated from RequestData to support the creation of SchedulerResponse objects.
  */
 struct ResponseHandle {
-    ResponseHandle(uint32_t requestId,
+    ResponseHandle(UUID requestId,
                    const std::shared_ptr<Notification<executor::RemoteCommandResponse>>& handle)
         : requestId(requestId), handle(handle) {}
+
+    ResponseHandle(UUID requestId, Status outcome)
+        : requestId(requestId),
+          handle(std::make_shared<Notification<executor::RemoteCommandResponse>>()) {
+        handle->set(outcome);
+    }
+
     ResponseHandle(ResponseHandle&& rhs)
         : requestId(rhs.requestId), handle(std::move(rhs.handle)) {}
 
-    const uint32_t requestId;
+    const UUID requestId;
     const std::shared_ptr<Notification<executor::RemoteCommandResponse>> handle;
 };
 
@@ -69,7 +77,7 @@ public:
 
     ~SchedulerResponse() = default;
 
-    uint32_t getRequestId() const {
+    UUID getRequestId() const {
         return _requestId;
     }
 
@@ -90,7 +98,7 @@ public:
     }
 
 private:
-    uint32_t _requestId;
+    UUID _requestId;
     std::shared_ptr<Notification<executor::RemoteCommandResponse>> _deferredValue;
 };
 
@@ -104,7 +112,7 @@ public:
     MoveChunkResponseImpl(ResponseHandle&& responseHandle)
         : SchedulerResponse(std::move(responseHandle)) {}
 
-    uint32_t getRequestId() const override {
+    UUID getRequestId() const override {
         return SchedulerResponse::getRequestId();
     }
 
@@ -122,7 +130,7 @@ public:
     MergeChunksResponseImpl(ResponseHandle&& responseHandle)
         : SchedulerResponse(std::move(responseHandle)) {}
 
-    uint32_t getRequestId() const override {
+    UUID getRequestId() const override {
         return SchedulerResponse::getRequestId();
     }
 
@@ -140,7 +148,7 @@ public:
     SplitVectorResponseImpl(ResponseHandle&& responseHandle)
         : SchedulerResponse(std::move(responseHandle)) {}
 
-    uint32_t getRequestId() const override {
+    UUID getRequestId() const override {
         return SchedulerResponse::getRequestId();
     }
 
@@ -171,7 +179,7 @@ public:
     SplitChunkResponseImpl(ResponseHandle&& responseHandle)
         : SchedulerResponse(std::move(responseHandle)) {}
 
-    uint32_t getRequestId() const override {
+    UUID getRequestId() const override {
         return SchedulerResponse::getRequestId();
     }
 
@@ -189,7 +197,7 @@ public:
     ChunkDataSizeResponseImpl(ResponseHandle&& responseHandle)
         : SchedulerResponse(std::move(responseHandle)) {}
 
-    uint32_t getRequestId() const override {
+    UUID getRequestId() const override {
         return SchedulerResponse::getRequestId();
     }
 
@@ -225,17 +233,19 @@ public:
  */
 class CommandInfo {
 public:
-    enum class Type { kMoveChunk, kMergeChunks, kSplitVector, kSplitChunk, kDataSize };
-
-    CommandInfo(Type type, const ShardId& targetShardId, const NamespaceString& nss)
-        : _type(type), _targetShardId(targetShardId), _nss(nss) {}
+    CommandInfo(const ShardId& targetShardId, const NamespaceString& nss)
+        : _targetShardId(targetShardId), _nss(nss) {}
 
     virtual ~CommandInfo() {}
 
     virtual BSONObj serialise() const = 0;
 
-    Type getType() const {
-        return _type;
+    virtual bool requiresRecoveryOnCrash() const {
+        return false;
+    }
+
+    virtual bool requiresDistributedLock() const {
+        return false;
     }
 
     const ShardId& getTarget() const {
@@ -247,7 +257,6 @@ public:
     }
 
 private:
-    Type _type;
     ShardId _targetShardId;
     NamespaceString _nss;
 };
@@ -267,7 +276,7 @@ public:
                          bool waitForDelete,
                          MoveChunkRequest::ForceJumbo forceJumbo,
                          const ChunkVersion& version)
-        : CommandInfo(Type::kMoveChunk, origin, nss),
+        : CommandInfo(origin, nss),
           _chunkBoundaries(lowerBoundKey, upperBoundKey),
           _recipient(recipient),
           _version(version),
@@ -291,6 +300,14 @@ public:
         return commandBuilder.obj();
     }
 
+    bool requiresRecoveryOnCrash() const override {
+        return true;
+    }
+
+    bool requiresDistributedLock() const override {
+        return true;
+    }
+
 private:
     ChunkRange _chunkBoundaries;
     ShardId _recipient;
@@ -308,7 +325,7 @@ public:
                            const BSONObj& lowerBoundKey,
                            const BSONObj& upperBoundKey,
                            const ChunkVersion& version)
-        : CommandInfo(Type::kMergeChunks, shardId, nss),
+        : CommandInfo(shardId, nss),
           _lowerBoundKey(lowerBoundKey),
           _upperBoundKey(upperBoundKey),
           _version(version) {}
@@ -351,7 +368,7 @@ public:
                            boost::optional<long long> maxChunkObjects,
                            boost::optional<long long> maxChunkSizeBytes,
                            bool force)
-        : CommandInfo(Type::kSplitVector, shardId, nss),
+        : CommandInfo(shardId, nss),
           _shardKeyPattern(shardKeyPattern),
           _lowerBoundKey(lowerBoundKey),
           _upperBoundKey(upperBoundKey),
@@ -408,7 +425,7 @@ public:
                         const BSONObj& upperBoundKey,
                         bool estimatedValue,
                         const ChunkVersion& version)
-        : CommandInfo(Type::kDataSize, shardId, nss),
+        : CommandInfo(shardId, nss),
           _shardKeyPattern(shardKeyPattern),
           _lowerBoundKey(lowerBoundKey),
           _upperBoundKey(upperBoundKey),
@@ -452,7 +469,7 @@ public:
                           const BSONObj& upperBoundKey,
                           const ChunkVersion& version,
                           const std::vector<BSONObj>& splitPoints)
-        : CommandInfo(Type::kSplitChunk, shardId, nss),
+        : CommandInfo(shardId, nss),
           _shardKeyPattern(shardKeyPattern),
           _lowerBoundKey(lowerBoundKey),
           _upperBoundKey(upperBoundKey),
@@ -487,18 +504,42 @@ private:
     static const std::string kSplitKeys;
 };
 
+class RecoveryCommandInfo : public CommandInfo {
+public:
+    RecoveryCommandInfo(const PersistedBalancerCommand& persistedCommand)
+        : CommandInfo(persistedCommand.getTarget(), persistedCommand.getNss()),
+          _serialisedCommand(persistedCommand.getRemoteCommand()),
+          _requiresDistributedLock(persistedCommand.getRequiresDistributedLock()) {}
+
+    BSONObj serialise() const override {
+        return _serialisedCommand;
+    }
+
+    bool requiresRecoveryOnCrash() const override {
+        return true;
+    }
+
+    bool requiresDistributedLock() const override {
+        return _requiresDistributedLock;
+    }
+
+private:
+    BSONObj _serialisedCommand;
+    bool _requiresDistributedLock;
+};
+
 /**
  * Helper data structure for submitting the shard command associated to a Request to the
  * BalancerCommandsScheduler.
  */
 struct CommandSubmissionHandle {
-    CommandSubmissionHandle(uint32_t id, const std::shared_ptr<CommandInfo>& commandInfo)
+    CommandSubmissionHandle(UUID id, const std::shared_ptr<CommandInfo>& commandInfo)
         : id(id), commandInfo(commandInfo) {}
 
     CommandSubmissionHandle(CommandSubmissionHandle&& rhs)
         : id(rhs.id), commandInfo(std::move(rhs.commandInfo)) {}
 
-    const uint32_t id;
+    const UUID id;
     const std::shared_ptr<CommandInfo> commandInfo;
 };
 
@@ -509,14 +550,12 @@ using ExecutionContext = executor::TaskExecutor::CallbackHandle;
  * Helper data structure for storing the outcome of a Command submission.
  */
 struct CommandSubmissionResult {
-    CommandSubmissionResult(uint32_t id,
-                            bool acquiredDistLock,
-                            StatusWith<ExecutionContext>&& context)
+    CommandSubmissionResult(UUID id, bool acquiredDistLock, StatusWith<ExecutionContext>&& context)
         : id(id), acquiredDistLock(acquiredDistLock), context(std::move(context)) {}
     CommandSubmissionResult(CommandSubmissionResult&& rhs)
         : id(rhs.id), acquiredDistLock(rhs.acquiredDistLock), context(std::move(rhs.context)) {}
     CommandSubmissionResult(const CommandSubmissionResult& rhs) = delete;
-    uint32_t id;
+    UUID id;
     bool acquiredDistLock;
     StatusWith<ExecutionContext> context;
 };
@@ -528,7 +567,7 @@ struct CommandSubmissionResult {
  */
 class RequestData {
 public:
-    RequestData(uint32_t id, std::shared_ptr<CommandInfo>&& commandInfo)
+    RequestData(UUID id, std::shared_ptr<CommandInfo>&& commandInfo)
         : _id(id),
           _commandInfo(std::move(commandInfo)),
           _deferredResponse(std::make_shared<Notification<executor::RemoteCommandResponse>>()),
@@ -544,7 +583,7 @@ public:
 
     ~RequestData() = default;
 
-    uint32_t getId() {
+    UUID getId() const {
         return _id;
     }
 
@@ -577,7 +616,7 @@ private:
 
     RequestData(const RequestData& rhs) = delete;
 
-    const uint32_t _id;
+    const UUID _id;
 
     std::shared_ptr<CommandInfo> _commandInfo;
 
@@ -596,40 +635,45 @@ public:
 
     ~BalancerCommandsSchedulerImpl();
 
-    void start() override;
+    void start(OperationContext* opCtx) override;
 
     void stop() override;
 
     std::unique_ptr<MoveChunkResponse> requestMoveChunk(
+        OperationContext* opCtx,
         const NamespaceString& nss,
         const ChunkType& chunk,
         const ShardId& destination,
         const MoveChunkSettings& commandSettings) override;
 
-    std::unique_ptr<MergeChunksResponse> requestMergeChunks(const NamespaceString& nss,
+    std::unique_ptr<MergeChunksResponse> requestMergeChunks(OperationContext* opCtx,
+                                                            const NamespaceString& nss,
                                                             const ChunkType& lowerBound,
                                                             const ChunkType& upperBound) override;
 
     std::unique_ptr<SplitVectorResponse> requestSplitVector(
+        OperationContext* opCtx,
         const NamespaceString& nss,
         const ChunkType& chunk,
         const ShardKeyPattern& shardKeyPattern,
         const SplitVectorSettings& commandSettings) override;
 
     std::unique_ptr<SplitChunkResponse> requestSplitChunk(
+        OperationContext* opCtx,
         const NamespaceString& nss,
         const ChunkType& chunk,
         const ShardKeyPattern& shardKeyPattern,
         const std::vector<BSONObj>& splitPoints) override;
 
     std::unique_ptr<ChunkDataSizeResponse> requestChunkDataSize(
+        OperationContext* opCtx,
         const NamespaceString& nss,
         const ChunkType& chunk,
         const ShardKeyPattern& shardKeyPattern,
         bool estimatedValue) override;
 
 private:
-    enum class SchedulerState { Running, Stopping, Stopped };
+    enum class SchedulerState { Recovering, Running, Stopping, Stopped };
 
     static const int32_t _maxRunningRequests{10};
 
@@ -643,25 +687,22 @@ private:
     stdx::thread _workerThreadHandle;
 
     /**
-     * Generator of unique Request IDs (within the life scope of BalancerCommandsSchedulerImpl)
-     */
-    AtomicWord<uint32_t> _requestIdCounter{0};
-
-    /**
      * Collection of all pending + running requests currently managed by
      * BalancerCommandsSchedulerImpl, organized by ID.
      */
-    stdx::unordered_map<uint32_t, RequestData> _incompleteRequests;
+    stdx::unordered_map<UUID, RequestData, UUID::Hash> _incompleteRequests;
 
     /**
      * List of request IDs that have not been yet submitted.
      */
-    std::list<uint32_t> _pendingRequestIds;
+    std::list<UUID> _pendingRequestIds;
 
     /**
      * List of request IDs that are currently running (submitted, but not yet completed).
      */
-    stdx::unordered_set<uint32_t> _runningRequestIds;
+    stdx::unordered_set<UUID, UUID::Hash> _runningRequestIds;
+
+    std::vector<UUID> _obsoleteRecoveryDocumentIds;
 
     /**
      * State to acquire and release DistLocks on a per namespace basis
@@ -674,9 +715,12 @@ private:
     };
     stdx::unordered_map<NamespaceString, Migrations> _migrationLocks;
 
-    void _setState(WithLock, SchedulerState state);
+    ResponseHandle _buildAndEnqueueNewRequest(OperationContext* opCtx,
+                                              std::shared_ptr<CommandInfo>&& commandInfo);
 
-    ResponseHandle _enqueueNewRequest(std::shared_ptr<CommandInfo>&& commandInfo);
+    ResponseHandle _enqueueRequest(WithLock, RequestData&& request);
+
+    bool _canSubmitNewRequests(WithLock);
 
     Status _acquireDistLock(OperationContext* opCtx, NamespaceString nss);
 
@@ -689,8 +733,12 @@ private:
                                 CommandSubmissionResult&& submissionResult);
 
     void _applyCommandResponse(OperationContext* opCtx,
-                               uint32_t requestId,
+                               UUID requestId,
                                const executor::TaskExecutor::ResponseStatus& response);
+
+    std::vector<RequestData> _loadRequestsToRecover(OperationContext* opCtx);
+
+    void _cleanUpObsoleteRecoveryInfo(WithLock, OperationContext* opCtx);
 
     void _workerThread();
 };
