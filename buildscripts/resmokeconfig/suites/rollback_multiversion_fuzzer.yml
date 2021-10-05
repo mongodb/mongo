@@ -22,4 +22,4 @@ executor:
               recovery: 3
               verbosity: 1
           rollbackShutdowns: true
-          useRandomBinVersionsWithinReplicaSet: true
+          useRandomBinVersionsWithinReplicaSet: 'last-lts'
