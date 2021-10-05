@@ -47,6 +47,7 @@
 #include "mongo/base/static_assert.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/platform/bits.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/util/allocator.h"
@@ -74,6 +75,11 @@ const int BSONObjMaxUserSize = 16 * 1024 * 1024;
 const int BSONObjMaxInternalSize = BSONObjMaxUserSize + (16 * 1024);
 
 const int BufferMaxSize = 64 * 1024 * 1024;
+
+/**
+ * This is the maximum size size of a buffer needed for storing a BSON object in a response message.
+ */
+const int kOpMsgReplyBSONBufferMaxSize = BSONObjMaxUserSize + (64 * 1024);
 
 class SharedBufferAllocator {
     SharedBufferAllocator(const SharedBufferAllocator&) = delete;
@@ -403,7 +409,7 @@ public:
         int newLen = l + by;
         size_t minSize = newLen + reservedBytes;
         if (minSize > _buf.capacity()) {
-            grow_reallocate(minSize);
+            _growReallocate(minSize);
         }
         l = newLen;
         return _buf.get() + oldlen;
@@ -415,7 +421,7 @@ public:
     void reserveBytes(size_t bytes) {
         size_t minSize = l + reservedBytes + bytes;
         if (minSize > _buf.capacity())
-            grow_reallocate(minSize);
+            _growReallocate(minSize);
 
         // This must happen *after* any attempt to grow.
         reservedBytes += bytes;
@@ -452,16 +458,34 @@ protected:
         DataView(grow(sizeof(t))).write(tagLittleEndian(t));
     }
     /* "slow" portion of 'grow()'  */
-    void grow_reallocate(int minSize) {
-        if (minSize > BufferMaxSize) {
+    void _growReallocate(size_t minSize) {
+        // Going beyond the maximum buffer size is not likely.
+        if (MONGO_unlikely(minSize > BufferMaxSize)) {
             growFailure(minSize);
         }
 
-        int a = 64;
-        while (a < minSize)
-            a = a * 2;
+        // We find the next power of two greater than the requested size, as it's
+        // commonly more friendly with the underlying (system) memory allocators.
+        size_t reallocSize = 1ull << (64 - countLeadingZeros64(minSize - 1));
 
-        _buf.realloc(a);
+        // Even though allocating some memory between BSONObjMaxUserSize and
+        // kOpMsgReplyBSONBufferMaxSize is common, but compared to very many small
+        // allocation done during the execution, it counts as an unlikely scenario. Still,
+        // it has a significant implact on the memory efficiency of the system.
+        if (MONGO_unlikely(
+                (minSize >= BSONObjMaxUserSize && minSize <= kOpMsgReplyBSONBufferMaxSize) ||
+                reallocSize == BSONObjMaxUserSize)) {
+            // BSONObjMaxUserSize and kOpMsgReplyBSONBufferMaxSize are two common sizes that we
+            // might allocate memory for. If the requested size is anywhere between
+            // BSONObjMaxUserSize and kOpMsgReplyBSONBufferMaxSize, we allocate
+            // kOpMsgReplyBSONBufferMaxSize bytes to avoid potential reallocation due to the
+            // additional header objects that wrap the maximum size of a BSON.
+            reallocSize = kOpMsgReplyBSONBufferMaxSize;
+        } else if (MONGO_unlikely(reallocSize < 64)) {
+            reallocSize = 64;
+        }
+
+        _buf.realloc(reallocSize);
     }
 
     /*
@@ -476,7 +500,7 @@ protected:
 
     BufferAllocator _buf;
     int l{0};
-    int reservedBytes{0};  // eagerly grow_reallocate to keep this many bytes of spare room.
+    int reservedBytes{0};  // eagerly _growReallocate to keep this many bytes of spare room.
 
     template <class Builder>
     friend class StringBuilderImpl;
