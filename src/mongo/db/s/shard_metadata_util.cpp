@@ -457,7 +457,7 @@ Status dropChunksAndDeleteCollectionsEntry(OperationContext* opCtx, const Namesp
     try {
         // Mark the collection entry as refreshing to indicate that the persisted metadata is about
         // to be dropped
-        if (!collectionEntry.getRefreshing()) {
+        if (!collectionEntry.getRefreshing() || !*collectionEntry.getRefreshing()) {
             uassertStatusOK(setPersistedRefreshFlags(opCtx, nss));
         }
 
