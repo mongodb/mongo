@@ -213,9 +213,26 @@ void DatabaseImpl::init(OperationContext* const opCtx) const {
 void DatabaseImpl::clearTmpCollections(OperationContext* opCtx) const {
     invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_IX));
 
-    std::vector<UUID> collectionUUIDsToDrop;
     CollectionCatalog::CollectionInfoFn callback = [&](const CollectionPtr& collection) {
-        collectionUUIDsToDrop.push_back(collection->uuid());
+        try {
+            WriteUnitOfWork wuow(opCtx);
+            Status status = dropCollection(opCtx, collection->ns(), {});
+            if (!status.isOK()) {
+                LOGV2_WARNING(20327,
+                              "could not drop temp collection '{namespace}': {error}",
+                              "could not drop temp collection",
+                              "namespace"_attr = collection->ns(),
+                              "error"_attr = redact(status));
+            }
+            wuow.commit();
+        } catch (const WriteConflictException&) {
+            LOGV2_WARNING(
+                20328,
+                "could not drop temp collection '{namespace}' due to WriteConflictException",
+                "could not drop temp collection due to WriteConflictException",
+                "namespace"_attr = collection->ns());
+            opCtx->recoveryUnit()->abandonSnapshot();
+        }
         return true;
     };
 
@@ -223,33 +240,7 @@ void DatabaseImpl::clearTmpCollections(OperationContext* opCtx) const {
         return collection->getCollectionOptions().temp;
     };
 
-    catalog::forEachCollectionFromDb(opCtx, name(), MODE_IX, callback, predicate);
-
-    for (const auto& collectionUUIDToDrop : collectionUUIDsToDrop) {
-        AutoGetCollection autoColl(
-            opCtx, NamespaceStringOrUUID(_name, collectionUUIDToDrop), MODE_X);
-        if (!autoColl.getCollection()) {
-            // The collection has already been dropped.
-            continue;
-        }
-
-        try {
-            WriteUnitOfWork wuow(opCtx);
-            Status status = dropCollection(opCtx, autoColl->ns(), {});
-            if (!status.isOK()) {
-                LOGV2_WARNING(20327,
-                              "could not drop temp collection",
-                              "namespace"_attr = autoColl->ns(),
-                              "error"_attr = redact(status));
-            }
-            wuow.commit();
-        } catch (const WriteConflictException&) {
-            LOGV2_WARNING(20328,
-                          "could not drop temp collection due to WriteConflictException",
-                          "namespace"_attr = autoColl->ns());
-            opCtx->recoveryUnit()->abandonSnapshot();
-        }
-    }
+    catalog::forEachCollectionFromDb(opCtx, name(), MODE_X, callback, predicate);
 }
 
 void DatabaseImpl::setDropPending(OperationContext* opCtx, bool dropPending) {

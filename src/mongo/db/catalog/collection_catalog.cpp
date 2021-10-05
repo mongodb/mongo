@@ -532,14 +532,6 @@ void CollectionCatalog::write(ServiceContext* svcCtx, CatalogWriteFn job) {
 
 void CollectionCatalog::write(OperationContext* opCtx,
                               std::function<void(CollectionCatalog&)> job) {
-    if (opCtx->lockState()->isW()) {
-        // Modifications can be done in-place when the global exclusive lock is held as all active
-        // transactions and cursors are closed.
-        auto& storage = getCatalog(opCtx->getServiceContext());
-        auto base = atomic_load(&storage.catalog);
-        job(*base);
-        return;
-    }
     write(opCtx->getServiceContext(), std::move(job));
 }
 
