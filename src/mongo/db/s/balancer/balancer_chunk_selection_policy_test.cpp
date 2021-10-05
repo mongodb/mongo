@@ -231,7 +231,7 @@ TEST_F(BalancerChunkSelectionTest, TagRangeMaxNotAlignedWithChunkMax) {
                               {BSON(kPattern << -15), kKeyPattern.globalMax()}});
 }
 
-TEST_F(BalancerChunkSelectionTest, ShardedTimeseriesCollectionsCannotBeAutoSplitted) {
+TEST_F(BalancerChunkSelectionTest, ShardedTimeseriesCollectionsCanBeAutoSplitted) {
     // Set up two shards in the metadata, each one with its own tag
     ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
                                                     ShardType::ConfigNS,
@@ -274,15 +274,14 @@ TEST_F(BalancerChunkSelectionTest, ShardedTimeseriesCollectionsCannotBeAutoSplit
         auto candidateChunksStatus = _chunkSelectionPolicy.get()->selectChunksToSplit(opCtx.get());
         ASSERT_OK(candidateChunksStatus.getStatus());
 
-        // No chunks to split since the coll is a sharded time-series collection
-        ASSERT_EQUALS(0U, candidateChunksStatus.getValue().size());
+        ASSERT_EQUALS(1U, candidateChunksStatus.getValue().size());
     });
 
     expectGetStatsCommands(2);
     future.default_timed_get();
 }
 
-TEST_F(BalancerChunkSelectionTest, ShardedTimeseriesCollectionsCannotBeBalanced) {
+TEST_F(BalancerChunkSelectionTest, ShardedTimeseriesCollectionsCanBeBalanced) {
     // Set up two shards in the metadata.
     ASSERT_OK(catalogClient()->insertConfigDocument(
         operationContext(), ShardType::ConfigNS, kShard0, kMajorityWriteConcern));
@@ -321,8 +320,7 @@ TEST_F(BalancerChunkSelectionTest, ShardedTimeseriesCollectionsCannotBeBalanced)
         auto candidateChunksStatus = _chunkSelectionPolicy.get()->selectChunksToMove(opCtx.get());
         ASSERT_OK(candidateChunksStatus.getStatus());
 
-        // No chunks to move since the coll is a sharded time-series collection
-        ASSERT_EQUALS(0, candidateChunksStatus.getValue().size());
+        ASSERT_EQUALS(1, candidateChunksStatus.getValue().size());
     });
 
     expectGetStatsCommands(2);
