@@ -661,6 +661,19 @@ struct __wt_cursor {
 	 */
 	int __F(reconfigure)(WT_CURSOR *cursor, const char *config);
 
+	/*!
+	 * Get the largest key of the cursor regardless of visibility.
+	 * The cursor is not positioned after calling this api. Only supported by data cursors.
+	 *
+	 * @snippet ex_all.c Reset the cursor
+	 *
+	 * @param cursor the cursor handle
+	 * @errors
+	 * If \c read_timestamp is set, EINVAL is returned.
+	 * Also, calling \c WT_CURSOR::get_key after this api call returns EINVAL.
+	 */
+	int __F(largest_key)(WT_CURSOR *cursor);
+
 	/*
 	 * Protected fields, only to be used by cursor implementations.
 	 */

@@ -103,6 +103,16 @@ fail with ::WT_DUPLICATE_KEY if the record previously exists, and
 WT_CURSOR::update and WT_CURSOR::remove will fail with ::WT_NOTFOUND if the
 record does not previously exist.
 
+@snippet ex_cursor.c cursor largest key
+
+The WT_SESSION::largest_key \c gets the largest key in a table regardless of
+visibility.
+
+It can only be called without a read timestamp, otherwise it returns an invalid
+argument error. Any following prev or next calls will behave as if they were
+invoked on an unpositioned cursor no matter the largest key call is successful
+or not.
+
 @section cursor_error Cursor position after error
 
 After any cursor handle method failure, the cursor's position is

@@ -51,6 +51,7 @@ __wt_curconfig_open(
       __wt_cursor_notsup,                             /* remove */
       __wt_cursor_notsup,                             /* reserve */
       __wt_cursor_reconfigure_notsup,                 /* reconfigure */
+      __wt_cursor_notsup,                             /* largest_key */
       __wt_cursor_notsup,                             /* cache */
       __wt_cursor_reopen_notsup,                      /* reopen */
       __curconfig_close);
