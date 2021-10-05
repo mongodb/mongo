@@ -44,4 +44,6 @@ feature_flags:
     featureFlagSearchMeta:
       description: "Feature flag for allowing use of search collectors alongside search results"
       cpp_varname: gFeatureFlagSearchMeta
-      default: false
+      default: true
+      version: 5.0
+

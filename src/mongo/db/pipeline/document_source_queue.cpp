@@ -80,7 +80,7 @@ DocumentSource::GetNextResult DocumentSourceQueue::doGetNext() {
 Value DocumentSourceQueue::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
     ValueArrayStream vals;
     for (auto elem : _queue) {
-        vals << elem.getDocument();
+        vals << elem.getDocument().getOwned();
     }
     return Value(DOC(kStageName << vals.done()));
 }
