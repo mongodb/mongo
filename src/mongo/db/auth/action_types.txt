@@ -85,6 +85,7 @@
 "logRotate",
 "moveChunk",
 "netstat",
+"oidReset",    # machine ID reset via the features command
 "planCacheIndexFilter", # view/update index filters
 "planCacheRead", # view contents of plan cache
 "planCacheWrite", # clear cache, drop cache entry, pin/unpin/shun plans
