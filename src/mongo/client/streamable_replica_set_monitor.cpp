@@ -689,8 +689,8 @@ void StreamableReplicaSetMonitor::onTopologyDescriptionChangedEvent(
               "RSM {replicaSet} Topology Change: {newTopologyDescription}",
               "RSM Topology Change",
               "replicaSet"_attr = getName(),
-              "newTopologyDescription"_attr = newDescription->toString(),
-              "previousTopologyDescription"_attr = previousDescription->toString());
+              "newTopologyDescription"_attr = newDescription->toBSON(),
+              "previousTopologyDescription"_attr = previousDescription->toBSON());
 
         auto maybePrimary = newDescription->getPrimary();
         if (maybePrimary) {

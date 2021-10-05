@@ -10,9 +10,9 @@ const st = new ShardingTest(
 const configRSPrimary = st.configRS.getPrimary();
 
 const unknownTopologyChangeRegex = new RegExp(
-    `Topology Change.*${st.configRS.name}.*topologyType:.*ReplicaSetNoPrimary.*type:.*Unknown`);
-const knownTopologyChangeRegex = new RegExp(
-    `Topology Change.*${st.configRS.name}.*topologyType:.*ReplicaSetWithPrimary.*type:.*RSPrimary`);
+    `Topology Change.*${st.configRS.name}.*topologyType":.*ReplicaSetNoPrimary.*type":.*Unknown`);
+const knownTopologyChangeRegex = new RegExp(`Topology Change.*${
+    st.configRS.name}.*topologyType":.*ReplicaSetWithPrimary.*type":.*RSPrimary`);
 const expeditedMonitoringAfterNetworkErrorRegex =
     new RegExp(`RSM monitoring host in expedited mode until we detect a primary`);
 const unknownServerDescriptionRegex =

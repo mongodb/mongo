@@ -12,7 +12,7 @@
 function makeTopologyChangeLogMsgRegex(rs, minWireVersion, maxWireVersion) {
     return new RegExp(
         `Topology Change.*${rs.name}` +
-        `.*minWireVersion: ${minWireVersion}.*maxWireVersion: ${maxWireVersion}`.repeat(
+        `.*minWireVersion":${minWireVersion}.*maxWireVersion":${maxWireVersion}`.repeat(
             rs.nodes.length));
 }
 

@@ -36,7 +36,7 @@
 
 namespace mongo::sdam {
 namespace {
-static constexpr auto kLogLevel = 2;
+static constexpr auto kLogLevel = 0;
 }  // namespace
 
 TopologyStateMachine::TopologyStateMachine(const SdamConfiguration& config) : _config(config) {
@@ -385,7 +385,8 @@ void TopologyStateMachine::removeServerDescription(TopologyDescription& topology
                 kLogLevel,
                 "Server '{serverAddress}' was removed from the topology",
                 "Server was removed from the topology",
-                "serverAddress"_attr = serverAddress);
+                "serverAddress"_attr = serverAddress,
+                "topologyDescription"_attr = topologyDescription.toBSON());
 }
 
 void TopologyStateMachine::modifyTopologyType(TopologyDescription& topologyDescription,
