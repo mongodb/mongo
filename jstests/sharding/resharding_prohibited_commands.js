@@ -15,12 +15,67 @@ load("jstests/sharding/libs/resharding_test_fixture.js");
 load("jstests/libs/fail_point_util.js");
 load('jstests/libs/parallel_shell_helpers.js');
 
+const databaseName = "reshardingDb";
+const collectionName = "coll";
+
+const otherDatabaseName = 'reshardingDb2';
+const otherCollectionName = 'coll2';
+const otherNamespace = `${otherDatabaseName}.${otherCollectionName}`;
+
+const donorOperationNamespace = 'config.localReshardingOperations.donor';
+
+const indexCreatedByTest = {
+    newKey: 1,
+    oldKey: 1
+};
+const indexDroppedByTest = {
+    x: 1
+};
+
+const prohibitedCommands = [
+    {collMod: collectionName},
+    {createIndexes: collectionName, indexes: [{name: "idx1", key: indexCreatedByTest}]},
+    {dropIndexes: collectionName, index: indexDroppedByTest},
+];
+
+/**
+ * @summary Goes through each of the commands specified in the prohibitedCommands array, executes
+ * the command against the provided database and asserts that the command succeeded.
+ * @param {*} database
+ */
+const assertCommandsSucceedAfterReshardingOpFinishes = (database) => {
+    prohibitedCommands.forEach((command) => {
+        jsTest.log(
+            `Testing that ${tojson(command)} succeeds after the resharding operation finishes.`);
+        assert.commandWorked(database.runCommand(command));
+    });
+};
+
+/**
+ * @summary Goes through each of the commands specified in the prohibitedCommands array,
+ * executes the commands and asserts that the command failed with ReshardCollectionInProgress.
+ * - In order for the dropIndexes command to fail correctly, the index its attempting to drop must
+ * exist.
+ * - In order for the createIndexes command to fail correctly, the index its attempting to create
+ * must not exist already.
+ * @param {*} database
+ */
+const assertCommandsFailDuringReshardingOp = (database) => {
+    prohibitedCommands.forEach((command) => {
+        jsTest.log(`Testing that ${tojson(command)} fails during resharding operation`);
+        assert.commandFailedWithCode(database.runCommand(command),
+                                     ErrorCodes.ReshardCollectionInProgress);
+    });
+};
+
 const reshardingTest = new ReshardingTest({numDonors: 2});
 reshardingTest.setup();
 
 const donorShardNames = reshardingTest.donorShardNames;
-let sourceCollection = reshardingTest.createShardedCollection({
-    ns: "reshardingDb.coll",
+const recipientShardNames = reshardingTest.recipientShardNames;
+
+const sourceCollection = reshardingTest.createShardedCollection({
+    ns: `${databaseName}.${collectionName}`,
     shardKeyPattern: {oldKey: 1},
     chunks: [
         {min: {oldKey: MinKey}, max: {oldKey: 0}, shard: donorShardNames[0]},
@@ -28,165 +83,84 @@ let sourceCollection = reshardingTest.createShardedCollection({
     ],
 });
 
-const recipientShardNames = reshardingTest.recipientShardNames;
 const mongos = sourceCollection.getMongo();
-let ns = sourceCollection.getFullName();
-
 const topology = DiscoverTopology.findConnectedNodes(mongos);
-const configPrimary = new Mongo(topology.configsvr.primary);
-const donor0 = new Mongo(topology.shards[donorShardNames[0]].primary);
-const donor1 = new Mongo(topology.shards[donorShardNames[1]].primary);
+const sourceNamespace = sourceCollection.getFullName();
 
-let pauseCoordinatorBeforeRemovingStateDoc;
-let pauseBeforeRemoveDonor0Doc;
-let pauseBeforeRemoveDonor1Doc;
-pauseCoordinatorBeforeRemovingStateDoc =
-    configureFailPoint(configPrimary, "reshardingPauseCoordinatorBeforeRemovingStateDoc");
+const waitUntilReshardingInitializedOnDonor = () => {
+    const donor = new Mongo(topology.shards[donorShardNames[0]].primary);
+    assert.soon(() => {
+        let res = donor.getCollection(donorOperationNamespace).find().toArray();
+        return res.length === 1;
+    }, "timed out waiting for resharding initialization on donor shard");
+};
 
-pauseBeforeRemoveDonor0Doc = configureFailPoint(donor0, "removeDonorDocFailpoint");
-pauseBeforeRemoveDonor1Doc = configureFailPoint(donor1, "removeDonorDocFailpoint");
+/**
+ * @summary The function that gets passed into reshardingTest.withReshardingInBackground
+ * @callback DuringReshardingCallback
+ * @param {String} tempNs - The temporary namespace used during resharding operations.
+ */
 
-let awaitAbort;
-reshardingTest.withReshardingInBackground(
-    {
+/**
+ * @summary A function that defines the surrounding environment for the tests surrounding the
+ * prohibited commands during resharding. It sets up the resharding configuration and asserts that
+ * the prohibited commands succeed once the resharding operation has completed.
+ * @param {DuringReshardingCallback} duringReshardingFn
+ * @param {Object} config
+ * @param {number} config.expectedErrorCode
+ * @param {Function} config.setup
+ */
+const withReshardingInBackground = (duringReshardingFn,
+                                    {setup = () => {}, expectedErrorCode} = {}) => {
+    assert.commandWorked(sourceCollection.createIndex(indexDroppedByTest));
+    setup();
+
+    reshardingTest.withReshardingInBackground({
         newShardKeyPattern: {newKey: 1},
         newChunks: [{min: {newKey: MinKey}, max: {newKey: MaxKey}, shard: recipientShardNames[0]}],
     },
-    (tempNs) => {
-        const topology = DiscoverTopology.findConnectedNodes(mongos);
-        assert.soon(() => {
-            let res =
-                donor0.getCollection("config.localReshardingOperations.donor").find().toArray();
-            return res.length == 1;
-        }, "timed out waiting for resharding initialization on donor shard");
+                                              duringReshardingFn,
+                                              {
+                                                  expectedErrorCode: expectedErrorCode,
+                                              });
 
-        awaitAbort = startParallelShell(
-            funWithArgs(function(ns) {
-                assert.commandWorked(db.adminCommand({abortReshardCollection: ns}));
-            }, ns), mongos.port);
-    },
-    {
-        expectedErrorCode: ErrorCodes.ReshardCollectionAborted,
-        postDecisionPersistedFn: () => {
-            // Once the coordinator has persisted an abort decision, collMod, createIndexes, and
-            // dropIndexes should be able to succeed. Wait until both donors have heard that the
-            // coordinator has made the decision.
-            assert.soon(() => {
-                const res0 = donor0.getCollection("config.cache.collections").findOne({_id: ns});
-                const res1 = donor1.getCollection("config.cache.collections").findOne({_id: ns});
-                return res0 && res0.reshardingFields.state === "aborting" && res1 &&
-                    res1.reshardingFields.state === "aborting";
-            }, () => `timed out waiting for the coordinator to persist decision`);
+    assertCommandsSucceedAfterReshardingOpFinishes(mongos.getDB(databaseName));
+    assert.commandWorked(sourceCollection.dropIndex(indexCreatedByTest));
+};
 
-            const db = mongos.getDB("reshardingDb");
-            assert.commandWorked(db.runCommand({collMod: 'coll'}));
-            assert.commandWorked(db.runCommand(
-                {createIndexes: 'coll', indexes: [{name: "idx1", key: {newKey: 1, oldKey: 1}}]}));
-            assert.commandWorked(
-                db.runCommand({dropIndexes: 'coll', index: {newKey: 1, oldKey: 1}}));
+// Tests that the prohibited commands work if the resharding operation is aborted.
+withReshardingInBackground(() => {
+    waitUntilReshardingInitializedOnDonor();
 
-            pauseBeforeRemoveDonor0Doc.off();
-            pauseBeforeRemoveDonor1Doc.off();
-            pauseCoordinatorBeforeRemovingStateDoc.off();
-            awaitAbort();
-        }
+    assert.commandWorked(mongos.adminCommand({abortReshardCollection: sourceNamespace}));
+}, {
+    expectedErrorCode: ErrorCodes.ReshardCollectionAborted,
+});
 
-    });
+// Tests that the prohibited commands succeed if the resharding operation succeeds. During the
+// operation it makes sures that the prohibited commands are rejected during the resharding
+// operation.
+withReshardingInBackground(() => {
+    waitUntilReshardingInitializedOnDonor();
 
-pauseCoordinatorBeforeRemovingStateDoc =
-    configureFailPoint(configPrimary, "reshardingPauseCoordinatorBeforeRemovingStateDoc");
+    jsTest.log(
+        "About to test that the admin commands do not work while the resharding operation is in progress.");
+    assert.commandFailedWithCode(
+        mongos.adminCommand(
+            {moveChunk: sourceNamespace, find: {oldKey: -10}, to: donorShardNames[1]}),
+        ErrorCodes.LockBusy);
+    assert.commandFailedWithCode(
+        mongos.adminCommand({reshardCollection: otherNamespace, key: {newKey: 1}}),
+        ErrorCodes.ReshardCollectionInProgress);
 
-let pauseBeforeRemoveRecipientDoc;
-reshardingTest.withReshardingInBackground(
-    {
-        newShardKeyPattern: {newKey: 1},
-        newChunks: [{min: {newKey: MinKey}, max: {newKey: MaxKey}, shard: recipientShardNames[0]}],
-    },
-    (tempNs) => {
-        const db = sourceCollection.getDB();
+    assertCommandsFailDuringReshardingOp(sourceCollection.getDB());
+}, {
+    setup: () => {
+        assert.commandWorked(mongos.adminCommand({enableSharding: otherDatabaseName}));
+        assert.commandWorked(
+            mongos.adminCommand({shardCollection: otherNamespace, key: {oldKey: 1}}));
+    }
+});
 
-        let res;
-        assert.soon(() => {
-            res = mongos.getCollection("config.collections")
-                      .find({_id: {$in: [ns, tempNs]}})
-                      .toArray();
-
-            return res.length === 2 && res.every(collEntry => collEntry.allowMigrations === false);
-        }, () => `timed out waiting for collections to have allowMigrations=false: ${tojson(res)}`);
-        assert.soon(
-            () => {
-                res = mongos.getCollection("config.collections").findOne({_id: ns});
-                return res.hasOwnProperty("reshardingFields");
-            },
-            () => `timed out waiting for resharding fields to be added to original nss: ${
-                tojson(res)}`);
-
-        const topology = DiscoverTopology.findConnectedNodes(mongos);
-        const donor = new Mongo(topology.shards[donorShardNames[0]].primary);
-        assert.soon(() => {
-            res = donor.getCollection("config.localReshardingOperations.donor").find().toArray();
-            return res.length == 1;
-        }, "timed out waiting for resharding initialization on donor shard");
-
-        assert.commandFailedWithCode(
-            mongos.adminCommand({moveChunk: ns, find: {oldKey: -10}, to: donorShardNames[1]}),
-            ErrorCodes.LockBusy);
-        assert.commandFailedWithCode(db.runCommand({collMod: 'coll'}),
-                                     ErrorCodes.ReshardCollectionInProgress);
-        assert.commandFailedWithCode(sourceCollection.createIndexes([{newKey: 1}]),
-                                     ErrorCodes.ReshardCollectionInProgress);
-        assert.commandFailedWithCode(db.runCommand({dropIndexes: 'coll', index: '*'}),
-                                     ErrorCodes.ReshardCollectionInProgress);
-
-        let newNs = "reshardingDb2.coll2";
-        assert.commandWorked(mongos.adminCommand({enableSharding: "reshardingDb2"}));
-        assert.commandWorked(mongos.adminCommand({shardCollection: newNs, key: {oldKey: 1}}));
-
-        assert.commandFailedWithCode(
-            mongos.adminCommand({reshardCollection: newNs, key: {newKey: 1}}),
-            ErrorCodes.ReshardCollectionInProgress);
-
-        mongos.getCollection(newNs).drop();
-
-        const recipient = new Mongo(topology.shards[recipientShardNames[0]].primary);
-        pauseBeforeRemoveRecipientDoc =
-            configureFailPoint(recipient, "removeRecipientDocFailpoint");
-    },
-    {
-        postDecisionPersistedFn: () => {
-            // Once the coordinator has persisted a commit decision, collMod, createIndexes, and
-            // dropIndexes should be able to succeed. Wait until the recipient is aware that the
-            // coordinator has persisted the decision.
-            const recipient = new Mongo(topology.shards[recipientShardNames[0]].primary);
-            assert.soon(() => {
-                const res = recipient.getCollection("config.cache.collections").findOne({_id: ns});
-                return res && res.reshardingFields.state === "committing";
-            }, () => `timed out waiting for the coordinator to persist decision: ${tojson(res)}`);
-
-            const db = mongos.getDB("reshardingDb");
-            assert.commandWorked(db.runCommand({collMod: 'coll'}));
-
-            // Create two indexes - one (idx1) that we will drop right away to ensure that
-            // dropIndexes succeeds, and the other (idx2) we will check still exists after the
-            // collection has been renamed.
-            assert.commandWorked(db.runCommand(
-                {createIndexes: 'coll', indexes: [{name: "idx1", key: {newKey: 1, oldKey: 1}}]}));
-            assert.commandWorked(db.runCommand(
-                {createIndexes: 'coll', indexes: [{name: "idx2", key: {newKey: 1, x: 1}}]}));
-
-            assert.commandWorked(
-                db.runCommand({dropIndexes: 'coll', index: {newKey: 1, oldKey: 1}}));
-
-            pauseBeforeRemoveRecipientDoc.off();
-            pauseCoordinatorBeforeRemovingStateDoc.off();
-        }
-
-    });
-
-// Assert that 'idx2' still exists after we've renamed the collection and resharding is finished.
-let indexes = mongos.getDB("reshardingDb").runCommand({listIndexes: 'coll'});
-assert(indexes.cursor.firstBatch.some((index) => index.name === 'idx2'));
-
-awaitAbort();
 reshardingTest.teardown();
 })();
