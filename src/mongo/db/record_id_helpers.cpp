@@ -109,6 +109,12 @@ RecordId keyForOID(OID oid) {
     return RecordId(keyBuilder.getBuffer(), keyBuilder.getSize());
 }
 
+RecordId keyForDate(Date_t date) {
+    KeyString::Builder keyBuilder(KeyString::Version::kLatestVersion);
+    keyBuilder.appendDate(date);
+    return RecordId(keyBuilder.getBuffer(), keyBuilder.getSize());
+}
+
 void appendToBSONAs(RecordId rid, BSONObjBuilder* builder, StringData fieldName) {
     rid.withFormat([&](RecordId::Null) { builder->appendNull(fieldName); },
                    [&](int64_t val) { builder->append(fieldName, val); },

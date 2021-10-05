@@ -551,6 +551,7 @@ public:
     void appendBinData(const BSONBinData& data);
     void appendSetAsArray(const BSONElementSet& set, const StringTransformFn& f = nullptr);
     void appendOID(OID oid);
+    void appendDate(Date_t date);
 
     /**
      * Appends a Discriminator byte and kEnd byte to a key string.

@@ -31,12 +31,15 @@
  * This file tests db/exec/collection_scan.cpp.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 #include "mongo/platform/basic.h"
 
 #include <fmt/printf.h>
 #include <memory>
 
 #include "mongo/client/dbclient_cursor.h"
+#include "mongo/db/catalog/clustered_collection_options_gen.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
@@ -53,6 +56,7 @@
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
 
@@ -173,7 +177,8 @@ public:
         NamespaceString _nss;
     };
 
-    ScopedCollectionDeleter makeCollectionClustered(const NamespaceString& ns) {
+    ScopedCollectionDeleter createClusteredCollection(const NamespaceString& ns,
+                                                      bool prePopulate = true) {
         AutoGetCollection autoColl(&_opCtx, ns, MODE_IX);
 
         {
@@ -188,12 +193,58 @@ public:
             wuow.commit();
         }
 
-
-        for (int i = 0; i < numObj(); ++i) {
-            _client.insert(ns.ns(), BSON("foo" << i));
+        if (prePopulate) {
+            for (int i = 0; i < numObj(); ++i) {
+                _client.insert(ns.ns(), BSON("foo" << i));
+            }
         }
 
         return {&_opCtx, ns};
+    }
+
+    void insertDocument(const NamespaceString& ns, const BSONObj& doc) {
+        _client.insert(ns.ns(), doc);
+    }
+
+    // Performs a bounded collection scan from 'minRecord' to 'maxRecord' in the specified
+    // 'direction'. Asserts that the collection scan retrieves 'expectedNumMatches' documents.
+    void runClusteredCollScan(const NamespaceString& ns,
+                              CollectionScanParams::Direction direction,
+                              RecordId minRecord,
+                              RecordId maxRecord,
+                              int expectedNumMatches) {
+        AutoGetCollectionForRead autoColl(&_opCtx, ns);
+
+        const CollectionPtr& coll = autoColl.getCollection();
+        ASSERT(coll->isClustered());
+
+        // Configure the scan.
+        CollectionScanParams params;
+        params.tailable = false;
+        params.direction = direction;
+        params.minRecord = minRecord;
+        params.maxRecord = maxRecord;
+
+        WorkingSet ws;
+        auto scan = std::make_unique<CollectionScan>(_expCtx.get(), coll, params, &ws, nullptr);
+
+        int count = 0;
+        while (!scan->isEOF()) {
+            WorkingSetID id = WorkingSet::INVALID_ID;
+            PlanStage::StageState state = scan->work(&id);
+            if (PlanStage::ADVANCED == state) {
+                WorkingSetMember* member = ws.get(id);
+                ASSERT(member->hasRecordId());
+                ASSERT(member->hasObj());
+
+                ASSERT_GTE(member->recordId, minRecord);
+                ASSERT_LTE(member->recordId, maxRecord);
+
+                count++;
+            }
+        }
+
+        ASSERT_EQ(count, expectedNumMatches);
     }
 
     static int numObj() {
@@ -494,7 +545,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanResumeAfterRecordIdSeekFai
 
 TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredMinMax) {
     auto ns = NamespaceString("a.b");
-    auto collDeleter = makeCollectionClustered(ns);
+    auto collDeleter = createClusteredCollection(ns);
     AutoGetCollectionForRead autoColl(&_opCtx, ns);
     const CollectionPtr& coll = autoColl.getCollection();
 
@@ -534,9 +585,171 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredMinMax) {
     ASSERT_EQ(count, recordIds.size());
 }
 
+// Tests a collection scan with bounds generated from type 'date', on a collection with all entries
+// generated from type 'objectId', exludes all entries.
+TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredMinMaxBoundsDateTypeNoMatches) {
+    const std::vector<CollectionScanParams::Direction> collScanDirections{
+        CollectionScanParams::FORWARD, CollectionScanParams::BACKWARD};
+
+    for (const auto direction : collScanDirections) {
+        LOGV2(6028700,
+              "Running clustered collection scan test case",
+              "scanDirection"_attr =
+                  (direction == CollectionScanParams::FORWARD ? "FORWARD" : "BACKWARD"));
+
+        auto ns = NamespaceString("a.b");
+
+        // Create a clustered collection pre-populated with RecordIds generated from type
+        // 'objectId'.
+        auto scopedCollectionDeleter = createClusteredCollection(ns);
+
+        // Use bounds that restrict the scan to RecordIds generated from type 'date'.
+        auto minRecord = record_id_helpers::keyForDate(Date_t::min());
+        auto maxRecord = record_id_helpers::keyForDate(Date_t::max());
+
+        // The collection has no records generated with type 'date'. There should be 0 matches.
+        runClusteredCollScan(ns, direction, minRecord, maxRecord, 0);
+    }
+}
+
+// Tests that if the bounds are generated from type 'date', only RecordIds generated with type
+// 'date' are included in the results.
+TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredMinMaxDateTypeMatches) {
+    const std::vector<CollectionScanParams::Direction> collScanDirections{
+        CollectionScanParams::FORWARD, CollectionScanParams::BACKWARD};
+
+    for (const auto direction : collScanDirections) {
+        LOGV2(6028701,
+              "Running clustered collection scan test case",
+              "scanDirection"_attr =
+                  (direction == CollectionScanParams::FORWARD ? "FORWARD" : "BACKWARD"));
+
+        auto ns = NamespaceString("a.b");
+
+        // Create a clustered collection pre-populated with RecordIds generated from type
+        // 'objectId'.
+        auto scopedCollectionDeleter = createClusteredCollection(ns);
+
+        auto numDateDocs = 5;
+
+        // Insert documents that generate a RecordId with type 'date'.
+        Date_t now = Date_t::now();
+        for (int i = 0; i < numDateDocs; i++) {
+            insertDocument(ns, BSON("_id" << now - Milliseconds(i)));
+        }
+
+        // Generate bounds from type 'date'.
+        auto minRecord = record_id_helpers::keyForDate(Date_t::min());
+        auto maxRecord = record_id_helpers::keyForDate(Date_t::max());
+
+        // The collection contains RecordIds generated from both type 'objectId' and 'date'. Only
+        // RecordIds that match the bound type should be included in the scan.
+        runClusteredCollScan(ns, direction, minRecord, maxRecord, numDateDocs);
+    }
+}
+
+TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredIgnoreNumericRecordIds) {
+    const std::vector<CollectionScanParams::Direction> collScanDirections{
+        CollectionScanParams::FORWARD, CollectionScanParams::BACKWARD};
+
+    for (const auto direction : collScanDirections) {
+        LOGV2(6028702,
+              "Running clustered collection scan test case",
+              "scanDirection"_attr =
+                  (direction == CollectionScanParams::FORWARD ? "FORWARD" : "BACKWARD"));
+        auto ns = NamespaceString("a.b");
+        auto scopedCollectionDeleter = createClusteredCollection(ns, false /* prePopulate */);
+
+        int numOIDDocs = 20;
+        // Insert documents with default '_id' values of type 'objectId' used to generate their
+        // RecordIds.
+        for (int i = 0; i < numOIDDocs; i++) {
+            insertDocument(ns, BSON("foo" << i));
+        }
+
+        // Insert documents that generate 'numeric' typed RecordIds.
+        auto numNumericDocs = 10;
+        for (int i = 0; i < numNumericDocs; i++) {
+            insertDocument(ns, BSON("_id" << i));
+        }
+
+        // Use bounds that will include every 'objectId' typed record.
+        auto minRecord = record_id_helpers::keyForOID(OID());
+        auto maxRecord = record_id_helpers::keyForOID(OID::max());
+
+        // Only records generated from type 'objectId' should result from the scan.
+        runClusteredCollScan(ns, direction, minRecord, maxRecord, numOIDDocs);
+    }
+}
+
+// Test exclusive filters work for date typed collection scan bounds.
+TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredMinMaxDateExclusive) {
+    const std::vector<CollectionScanParams::Direction> collScanDirections{
+        CollectionScanParams::FORWARD, CollectionScanParams::BACKWARD};
+
+    for (const auto direction : collScanDirections) {
+        LOGV2(6028703,
+              "Running clustered collection scan test case",
+              "scanDirection"_attr =
+                  (direction == CollectionScanParams::FORWARD ? "FORWARD" : "BACKWARD"));
+
+        auto ns = NamespaceString("a.b");
+
+        auto scopedCollectionDeleter = createClusteredCollection(ns, false /* prePopulate */);
+
+        AutoGetCollectionForRead autoColl(&_opCtx, ns);
+        const CollectionPtr& coll = autoColl.getCollection();
+
+        Date_t maxDate = Date_t::now();
+        Date_t middleDate = maxDate - Milliseconds(1);
+        Date_t minDate = middleDate - Milliseconds(1);
+        std::vector<BSONObj> dateDocuments = {
+            BSON("_id" << minDate), BSON("_id" << middleDate), BSON("_id" << maxDate)};
+        for (auto doc : dateDocuments) {
+            insertDocument(ns, doc);
+        }
+
+        CollectionScanParams params;
+        params.tailable = false;
+        params.direction = direction;
+
+        params.minRecord = record_id_helpers::keyForDate(minDate);
+        params.maxRecord = record_id_helpers::keyForDate(maxDate);
+
+        // Exclude all but the record with _id 'middleDate' from the scan.
+        StatusWithMatchExpression swMatch = MatchExpressionParser::parse(
+            BSON("_id" << BSON("$gt" << minDate << "$lt" << maxDate)), _expCtx.get());
+
+        ASSERT_OK(swMatch.getStatus());
+        auto filter = std::move(swMatch.getValue());
+
+        WorkingSet ws;
+        auto scan =
+            std::make_unique<CollectionScan>(_expCtx.get(), coll, params, &ws, filter.get());
+
+        int count = 0;
+        while (!scan->isEOF()) {
+            WorkingSetID id = WorkingSet::INVALID_ID;
+            PlanStage::StageState state = scan->work(&id);
+            if (PlanStage::ADVANCED == state) {
+                WorkingSetMember* member = ws.get(id);
+                ASSERT(member->hasRecordId());
+                ASSERT(member->hasObj());
+
+                ASSERT_NOT_EQUALS(member->recordId, record_id_helpers::keyForDate(maxDate));
+                ASSERT_NOT_EQUALS(member->recordId, record_id_helpers::keyForDate(minDate));
+                count++;
+            }
+        }
+
+        // Verify the min and max bounds are excluded.
+        ASSERT_EQ(count, dateDocuments.size() - 2);
+    }
+}
+
 TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredReverse) {
     auto ns = NamespaceString("a.b");
-    auto collDeleter = makeCollectionClustered(ns);
+    auto collDeleter = createClusteredCollection(ns);
     AutoGetCollectionForRead autoColl(&_opCtx, ns);
     const CollectionPtr& coll = autoColl.getCollection();
 
@@ -578,9 +791,9 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredReverse) {
     ASSERT_EQ(count, recordIds.size());
 }
 
-TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredNonExistentRecordIds) {
+TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredMinMaxFullObjectIdRange) {
     auto ns = NamespaceString("a.b");
-    auto collDeleter = makeCollectionClustered(ns);
+    auto collDeleter = createClusteredCollection(ns);
     AutoGetCollectionForRead autoColl(&_opCtx, ns);
     const CollectionPtr& coll = autoColl.getCollection();
 
@@ -596,7 +809,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredNonExistentRecord
     params.direction = CollectionScanParams::FORWARD;
     params.tailable = false;
 
-    // Use RecordIds that don't exist. Expect to see all records.
+    // Expect to see all records.
     params.minRecord = record_id_helpers::keyForOID(OID());
     params.maxRecord = record_id_helpers::keyForOID(OID::max());
 
@@ -624,7 +837,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredNonExistentRecord
 
 TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredInnerRange) {
     auto ns = NamespaceString("a.b");
-    auto collDeleter = makeCollectionClustered(ns);
+    auto collDeleter = createClusteredCollection(ns);
     AutoGetCollectionForRead autoColl(&_opCtx, ns);
     const CollectionPtr& coll = autoColl.getCollection();
 
@@ -673,7 +886,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredInnerRange) {
 
 TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredInnerRangeExclusive) {
     auto ns = NamespaceString("a.b");
-    auto collDeleter = makeCollectionClustered(ns);
+    auto collDeleter = createClusteredCollection(ns);
     AutoGetCollectionForRead autoColl(&_opCtx, ns);
     const CollectionPtr& coll = autoColl.getCollection();
 
@@ -733,7 +946,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredInnerRangeExclusi
 
 TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredInnerRangeExclusiveReverse) {
     auto ns = NamespaceString("a.b");
-    auto collDeleter = makeCollectionClustered(ns);
+    auto collDeleter = createClusteredCollection(ns);
     AutoGetCollectionForRead autoColl(&_opCtx, ns);
     const CollectionPtr& coll = autoColl.getCollection();
 

@@ -415,6 +415,13 @@ void BuilderBase<BufferT>::appendOID(OID oid) {
 }
 
 template <class BufferT>
+void BuilderBase<BufferT>::appendDate(Date_t date) {
+    _verifyAppendingState();
+    _appendDate(date, _shouldInvertOnAppend());
+    _elemCount++;
+}
+
+template <class BufferT>
 void BuilderBase<BufferT>::appendDiscriminator(const Discriminator discriminator) {
     // The discriminator forces this KeyString to compare Less/Greater than any KeyString with
     // the same prefix of keys. As an example, this can be used to land on the first key in the

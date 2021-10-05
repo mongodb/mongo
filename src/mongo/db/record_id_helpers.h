@@ -51,6 +51,7 @@ StatusWith<RecordId> keyForOptime(const Timestamp& opTime);
 StatusWith<RecordId> keyForDoc(const BSONObj& doc);
 RecordId keyForElem(const BSONElement& elem);
 RecordId keyForOID(OID oid);
+RecordId keyForDate(Date_t date);
 
 /**
  * data and len must be the arguments from RecordStore::insert() on an oplog collection.

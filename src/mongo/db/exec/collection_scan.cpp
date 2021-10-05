@@ -252,13 +252,22 @@ void CollectionScan::assertTsHasNotFallenOffOplog(const Record& record) {
 }
 
 namespace {
-bool atEndOfRangeInclusive(const CollectionScanParams& params, const WorkingSetMember& member) {
+bool pastEndOfRange(const CollectionScanParams& params, const WorkingSetMember& member) {
     if (params.direction == CollectionScanParams::FORWARD) {
         return params.maxRecord && member.recordId > *params.maxRecord;
     } else {
         return params.minRecord && member.recordId < *params.minRecord;
     }
 }
+
+bool beforeStartOfRange(const CollectionScanParams& params, const WorkingSetMember& member) {
+    if (params.direction == CollectionScanParams::FORWARD) {
+        return params.minRecord && member.recordId < *params.minRecord;
+    } else {
+        return params.maxRecord && member.recordId > *params.maxRecord;
+    }
+}
+
 }  // namespace
 
 PlanStage::StageState CollectionScan::returnIfMatches(WorkingSetMember* member,
@@ -269,13 +278,21 @@ PlanStage::StageState CollectionScan::returnIfMatches(WorkingSetMember* member,
     // The 'minRecord' and 'maxRecord' bounds are always inclusive, even if the query predicate is
     // an exclusive inequality like $gt or $lt. In such cases, we rely on '_filter' to either
     // exclude or include the endpoints as required by the user's query.
-    if (atEndOfRangeInclusive(_params, *member)) {
+    if (pastEndOfRange(_params, *member)) {
         _workingSet->free(memberID);
         _commonStats.isEOF = true;
         return PlanStage::IS_EOF;
     }
 
-    if (Filter::passes(member, _filter)) {
+    // For clustered collections, seekNear() is allowed to return a record prior to the
+    // requested minRecord for a forward scan or after the requested maxRecord for a reverse
+    // scan. Ensure that we do not return a record out of the requested range. Require that the
+    // caller advance our cursor until it is positioned within the correct range.
+    //
+    // In the future, we could change seekNear() to always return a record after minRecord in the
+    // direction of the scan. However, tailable scans depend on the current behavior in order to
+    // mark their position for resuming the tailable scan later on.
+    if (!beforeStartOfRange(_params, *member) && Filter::passes(member, _filter)) {
         if (_params.stopApplyingFilterAfterFirstMatch) {
             _filter = nullptr;
         }
