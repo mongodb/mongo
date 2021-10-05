@@ -70,7 +70,13 @@ public:
     }
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) const {}  // No auth required
+                                       std::vector<Privilege>* out) const {
+        if (cmdObj["oidReset"].trueValue()) {
+            ActionSet actions;
+            actions.addAction(ActionType::oidReset);
+            out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
+        }
+    }
     virtual bool run(OperationContext* opCtx,
                      const string& ns,
                      const BSONObj& cmdObj,

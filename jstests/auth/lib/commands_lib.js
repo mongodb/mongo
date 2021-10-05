@@ -3378,8 +3378,24 @@ var authCommandsLib = {
           testname: "features",
           command: {features: 1},
           testcases: [
-              {runOnDb: firstDbName, roles: roles_all, privilegesRequired: []},
-              {runOnDb: secondDbName, roles: roles_all, privilegesRequired: []}
+              {runOnDb: firstDbName, roles: roles_all, privileges: []},
+              {runOnDb: secondDbName, roles: roles_all, privileges: []}
+          ]
+        },
+        {
+          testname: "features_oidReset",
+          command: {features: 1, oidReset: true},
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                roles: roles_hostManager,
+                privileges: [{resource: {cluster: true}, actions: ["oidReset"]}],
+              },
+              {
+                runOnDb: secondDbName,
+                roles: roles_hostManager,
+                privileges: [{resource: {cluster: true}, actions: ["oidReset"]}],
+              }
           ]
         },
         {
