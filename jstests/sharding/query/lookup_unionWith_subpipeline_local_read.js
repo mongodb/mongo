@@ -20,7 +20,6 @@ const st = new ShardingTest({name: jsTestName(), mongos: 1, shards: 2, rs: {node
 const dbName = jsTestName() + '_db';
 st.s0.setCausalConsistency(true);
 const mongosDB = st.s0.getDB(dbName);
-mongosDB.setLogLevel(3);
 
 const local = mongosDB.local;
 const foreign = mongosDB.foreign;
@@ -28,7 +27,7 @@ const foreign = mongosDB.foreign;
 assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
 st.ensurePrimaryShard(mongosDB.getName(), st.shard0.shardName);
 
-// Turn on the profiler.
+// Turn on the profiler and increase the query log level for both shards.
 for (let rs of [st.rs0, st.rs1]) {
     const primary = rs.getPrimary();
     const secondary = rs.getSecondary();
