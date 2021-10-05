@@ -421,7 +421,7 @@ server_parameters:
     set_at: [ startup, runtime ]
     cpp_varname: "enableSearchMeta"
     cpp_vartype: AtomicWord<bool>
-    default: false
+    default: true
 
   enableTimeoutOfInactiveSessionCursors:
     description: "If true, cursors opened within sessions are eligible for inactive cursor timeout."

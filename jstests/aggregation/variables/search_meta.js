@@ -10,9 +10,6 @@
  */
 (function() {
 "use strict";
-load('jstests/libs/fixture_helpers.js');  // for runCommandOnEachPrimary.
-FixtureHelpers.runCommandOnEachPrimary(
-    {db: db.getSiblingDB("admin"), cmdObj: {setParameter: 1, enableSearchMeta: true}});
 
 const coll = db.searchCollector;
 coll.drop();

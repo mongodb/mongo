@@ -15,15 +15,12 @@
 
 (function() {
 "use strict";
-load('jstests/libs/fixture_helpers.js');  // for runCommandOnEachPrimary.
 
 const writeConcernOptions = {
     writeConcern: {w: "majority"}
 };
 
 const currDB = db;
-FixtureHelpers.runCommandOnEachPrimary(
-    {db: db.getSiblingDB("admin"), cmdObj: {setParameter: 1, enableSearchMeta: true}});
 const coll = currDB.documents;
 coll.drop(writeConcernOptions);
 coll.insert({a: 1}, writeConcernOptions);

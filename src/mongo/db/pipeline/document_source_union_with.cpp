@@ -211,7 +211,9 @@ DocumentSource::GetNextResult DocumentSourceUnionWith::doGetNext() {
         logStartingSubPipeline(serializedPipe);
         // $$SEARCH_META can be set during runtime earlier in the pipeline, and therefore must be
         // copied to the subpipeline manually.
-        if (enableSearchMeta.load()) {
+        if (serverGlobalParams.featureCompatibility.getVersion() >=
+                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44 &&
+            enableSearchMeta.load()) {
             auto metaVal = pExpCtx->variables.getValue(Variables::kSearchMetaId, Document());
             if (!metaVal.missing()) {
                 _pipeline->getContext()->variables.setReservedValue(
