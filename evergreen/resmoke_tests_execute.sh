@@ -136,6 +136,7 @@ if [[ ${disable_unit_tests} = "false" && ! -f ${skip_tests} ]]; then
     --taskName=${task_name} \
     --variantName=${build_variant} \
     --versionId=${version_id} \
+    --spawnUsing=${spawn_resmoke_using} \
     --reportFile=report.json \
     --perfReportFile=perf.json
   resmoke_exit_code=$?

@@ -22,7 +22,7 @@ class _SingleJSTestCase(interface.ProcessTestCase):
 
     REGISTERED_NAME = registry.LEAVE_UNREGISTERED
 
-    def __init__(self, logger, js_filename, test_id, shell_executable=None, shell_options=None):  # pylint: disable=too-many-arguments
+    def __init__(self, logger, js_filename, _id, shell_executable=None, shell_options=None):  # pylint: disable=too-many-arguments
         """Initialize the _SingleJSTestCase with the JS file to run."""
         interface.ProcessTestCase.__init__(self, logger, "JSTest", js_filename)
 
@@ -30,7 +30,7 @@ class _SingleJSTestCase(interface.ProcessTestCase):
         self.shell_executable = utils.default_if_none(config.MONGO_EXECUTABLE, shell_executable)
 
         self.js_filename = js_filename
-        self.test_id = test_id
+        self._id = _id
         self.shell_options = utils.default_if_none(shell_options, {}).copy()
 
     def configure(self, fixture, *args, **kwargs):
@@ -109,9 +109,9 @@ class _SingleJSTestCase(interface.ProcessTestCase):
 
     def _make_process(self):
         return core.programs.mongo_shell_program(
-            self.logger, self.fixture.job_num, test_id=self.test_id,
-            executable=self.shell_executable, filename=self.js_filename,
-            connection_string=self.fixture.get_driver_connection_url(), **self.shell_options)
+            self.logger, self.fixture.job_num, test_id=self._id, executable=self.shell_executable,
+            filename=self.js_filename, connection_string=self.fixture.get_driver_connection_url(),
+            **self.shell_options)
 
 
 class JSTestCaseBuilder:
@@ -157,7 +157,7 @@ class JSTestCaseBuilder:
 
         shell_options = self._get_shell_options_for_thread(num_clients, thread_id)
         test_case = _SingleJSTestCase(logger, self.test_case_template.js_filename,
-                                      self.test_case_template.id,
+                                      self.test_case_template.id(),
                                       self.test_case_template.shell_executable, shell_options)
 
         test_case.configure(self.test_case_template.fixture)

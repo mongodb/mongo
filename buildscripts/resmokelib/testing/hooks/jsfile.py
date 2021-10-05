@@ -64,7 +64,7 @@ class DynamicJSTestCase(interface.DynamicTestCase):
         """Initialize DynamicJSTestCase."""
         interface.DynamicTestCase.__init__(self, logger, test_name, description, base_test_name,
                                            hook)
-        self._js_test_builder = jstest.JSTestCaseBuilder(logger, js_filename, self.id,
+        self._js_test_builder = jstest.JSTestCaseBuilder(logger, js_filename, self.id(),
                                                          shell_options=shell_options)
         self._js_test_case = None
 

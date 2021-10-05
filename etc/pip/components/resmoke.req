@@ -1,4 +1,4 @@
-curatorbin == 1.2.1
+curatorbin == 1.2.3
 PyKMIP == 0.10.0
 evergreen.py == 3.2.0
 jinja2
