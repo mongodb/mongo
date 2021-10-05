@@ -71,13 +71,6 @@ public:
 
     BSONObj generateSection(OperationContext* opCtx,
                             const BSONElement& configElement) const override {
-        Lock::GlobalLock lk(
-            opCtx, LockMode::MODE_IS, Date_t::now(), Lock::InterruptBehavior::kLeaveUnlocked);
-        if (!lk.isLocked()) {
-            LOGV2_DEBUG(5906500, 2, "Failed to retrieve catalogStats statistics");
-            return BSONObj();
-        }
-
         Stats stats;
 
         const auto catalog = CollectionCatalog::get(opCtx);
