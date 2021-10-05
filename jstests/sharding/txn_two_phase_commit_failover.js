@@ -14,6 +14,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 'use strict';
 
 load('jstests/sharding/libs/sharded_transactions_helpers.js');
+load('jstests/libs/parallel_shell_helpers.js');
 
 const dbName = "test";
 const collName = "foo";
@@ -56,14 +57,25 @@ const runTest = function(sameNodeStepsUpAfterFailover) {
     let participant2 = st.shard2;
 
     const runCommitThroughMongosInParallelShellExpectSuccess = function() {
-        const runCommitExpectSuccessCode = "assert.commandWorked(db.adminCommand({" +
-            "commitTransaction: 1," +
-            "lsid: " + tojson(lsid) + "," +
-            "txnNumber: NumberLong(" + txnNumber + ")," +
-            "stmtId: NumberInt(0)," +
-            "autocommit: false," +
-            "}));";
-        return startParallelShell(runCommitExpectSuccessCode, st.s.port);
+        return startParallelShell(
+            funWithArgs((passed_lsid, passed_txnNumber) => {
+                try {
+                    assert.commandWorked(db.adminCommand({
+                        commitTransaction: 1,
+                        lsid: passed_lsid,
+                        txnNumber: NumberLong(passed_txnNumber),
+                        stmtId: NumberInt(0),
+                        autocommit: false,
+                    }));
+                } catch (err) {
+                    if ((err.hasOwnProperty('errorLabels') &&
+                         err.errorLabels.includes('TransientTransactionError'))) {
+                        quit(err.code);
+                    } else {
+                        throw err;
+                    }
+                }
+            }, lsid, txnNumber), st.s.port);
     };
 
     const runCommitThroughMongosInParallelShellExpectAbort = function() {
@@ -105,6 +117,11 @@ const runTest = function(sameNodeStepsUpAfterFailover) {
             startTransaction: true,
             autocommit: false,
         }));
+    };
+
+    const cleanUp = function() {
+        st.s.getDB(dbName).getCollection(collName).drop();
+        clearRawMongoProgramOutput();
     };
 
     const testCommitProtocol = function(makeAParticipantAbort, failpointData, expectAbortResponse) {
@@ -180,8 +197,31 @@ const runTest = function(sameNodeStepsUpAfterFailover) {
             });
         }
 
-        st.s.getDB(dbName).getCollection(collName).drop();
-        clearRawMongoProgramOutput();
+        cleanUp();
+    };
+
+    const testCommitProtocolWithRetry = function(
+        makeAParticipantAbort, failpointData, expectAbortResponse) {
+        const maxIterations = 5;
+        var numIterations = 0;
+
+        while (numIterations < maxIterations) {
+            try {
+                testCommitProtocol(makeAParticipantAbort, failpointData, expectAbortResponse);
+                break;
+            } catch (err) {
+                if (numIterations == maxIterations - 1 ||
+                    !(err.message.includes("[0] != [251] are not equal"))) {
+                    throw err;
+                }
+
+                cleanUp();
+                numIterations += 1;
+            }
+
+            jsTest.log("Received an error with label TransientTransactionError. Retry: " +
+                       numIterations);
+        }
     };
 
     //
@@ -189,7 +229,7 @@ const runTest = function(sameNodeStepsUpAfterFailover) {
     //
 
     failpointDataArr.forEach(function(failpointData) {
-        testCommitProtocol(
+        testCommitProtocolWithRetry(
             true /* make a participant abort */, failpointData, true /* expect abort decision */);
     });
 
@@ -205,7 +245,8 @@ const runTest = function(sameNodeStepsUpAfterFailover) {
         let expectAbort = (failpointData.failpoint == "hangBeforeWritingParticipantList") ||
             (failpointData.failpoint == "hangWhileTargetingLocalHost" && !failpointData.skip) ||
             false;
-        testCommitProtocol(false /* make a participant abort */, failpointData, expectAbort);
+        testCommitProtocolWithRetry(
+            false /* make a participant abort */, failpointData, expectAbort);
     });
     st.stop();
 };
