@@ -59,7 +59,7 @@ public:
     StageConstraints constraints(Pipeline::SplitState pipeState) const override {
         StageConstraints constraints(StreamType::kStreaming,
                                      PositionRequirement::kFirst,
-                                     HostTypeRequirement::kNone,
+                                     HostTypeRequirement::kLocalOnly,
                                      DiskUseRequirement::kNoDiskUse,
                                      FacetRequirement::kNotAllowed,
                                      TransactionRequirement::kAllowed,
@@ -67,6 +67,7 @@ public:
                                      UnionRequirement::kAllowed);
 
         constraints.requiresInputDocSource = false;
+        constraints.isIndependentOfAnyCollection = true;
         return constraints;
     }
 

@@ -277,8 +277,14 @@ CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(Pipeline*
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline(ownedPipeline,
                                                         PipelineDeleter(expCtx->opCtx));
 
-    invariant(pipeline->getSources().empty() ||
-              !dynamic_cast<DocumentSourceCursor*>(pipeline->getSources().front().get()));
+    boost::optional<DocumentSource*> firstStage = pipeline->getSources().empty()
+        ? boost::optional<DocumentSource*>{}
+        : pipeline->getSources().front().get();
+    invariant(!firstStage || !dynamic_cast<DocumentSourceCursor*>(*firstStage));
+    if (firstStage && !(*firstStage)->constraints().requiresInputDocSource) {
+        // There's no need to attach a cursor here.
+        return pipeline;
+    }
 
     boost::optional<AutoGetCollectionForReadCommand> autoColl;
     const NamespaceStringOrUUID nsOrUUID = expCtx->uuid

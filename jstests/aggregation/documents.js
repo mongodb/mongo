@@ -29,7 +29,7 @@ coll.drop(writeConcernOptions);
 coll.insert({a: 1}, writeConcernOptions);
 
 // $documents given an array of objects.
-const docs = coll.aggregate([{$documents: [{a1: 1}, {a1: 2}]}], writeConcernOptions).toArray();
+const docs = currDB.aggregate([{$documents: [{a1: 1}, {a1: 2}]}], writeConcernOptions).toArray();
 
 assert.eq(2, docs.length);
 assert.eq(docs[0], {a1: 1});
@@ -37,7 +37,8 @@ assert.eq(docs[1], {a1: 2});
 
 // $documents evaluates to an array of objects.
 const docs1 =
-    coll.aggregate([{$documents: {$map: {input: {$range: [0, 100]}, in : {x: "$$this"}}}}],
+    currDB
+        .aggregate([{$documents: {$map: {input: {$range: [0, 100]}, in : {x: "$$this"}}}}],
                    writeConcernOptions)
         .toArray();
 
@@ -48,7 +49,8 @@ for (let i = 0; i < 100; i++) {
 
 // $documents evaluates to an array of objects.
 const docsUnionWith =
-    coll.aggregate(
+    currDB
+        .aggregate(
             [
                 {$documents: [{a: 13}]},
                 {
@@ -76,9 +78,9 @@ assert.eq(res[0]["a"], 1);
 assert.eq(res[1], {xx: 1});
 assert.eq(res[2], {xx: 2});
 
-function assertFails(pipeline, code) {
+function assertFails(coll, pipeline, code) {
     assert.commandFailedWithCode(currDB.runCommand({
-        aggregate: coll.getName(),
+        aggregate: coll,
         pipeline: pipeline,
         writeConcern: writeConcernOptions.writeConcern,
         cursor: {}
@@ -87,16 +89,16 @@ function assertFails(pipeline, code) {
 }
 
 // Must fail due to misplaced $document.
-assertFails([{$project: {a: [{xx: 1}, {xx: 2}]}}, {$documents: [{a: 1}]}], 40602);
+assertFails(coll.getName(), [{$project: {a: [{xx: 1}, {xx: 2}]}}, {$documents: [{a: 1}]}], 40602);
 // $unionWith must fail due to no $document
-assertFails([{$unionWith: {pipeline: [{$project: {a: [{xx: 1}, {xx: 2}]}}]}}], 9);
+assertFails(coll.getName(), [{$unionWith: {pipeline: [{$project: {a: [{xx: 1}, {xx: 2}]}}]}}], 9);
 
 // Must fail due to $documents producing array of non-objects.
-assertFails([{$documents: [1, 2, 3]}], 40228);
+assertFails(1, [{$documents: [1, 2, 3]}], 40228);
 
 // Must fail due $documents producing non-array.
-assertFails([{$documents: {a: 1}}], 5858203);
+assertFails(1, [{$documents: {a: 1}}], 5858203);
 
 // Must fail due $documents producing array of non-objects.
-assertFails([{$documents: {a: [1, 2, 3]}}], 5858203);
+assertFails(1, [{$documents: {a: [1, 2, 3]}}], 5858203);
 })();

@@ -1146,8 +1146,25 @@ std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(Pipeline* owne
     auto expCtx = ownedPipeline->getContext();
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline(ownedPipeline,
                                                         PipelineDeleter(expCtx->opCtx));
-    invariant(pipeline->getSources().empty() ||
-              !dynamic_cast<DocumentSourceMergeCursors*>(pipeline->getSources().front().get()));
+    boost::optional<DocumentSource*> hasFirstStage = pipeline->getSources().empty()
+        ? boost::optional<DocumentSource*>{}
+        : pipeline->getSources().front().get();
+
+    if (hasFirstStage) {
+        // Make sure the first stage isn't already a $mergeCursors, and also check if it is a stage
+        // which needs to actually get a cursor attached or not.
+        const auto* firstStage = *hasFirstStage;
+        invariant(!dynamic_cast<const DocumentSourceMergeCursors*>(firstStage));
+        // Here we check the hostRequirement because there is at least one stage ($indexStats) which
+        // does not require input data, but is still expected to fan out and contact remote shards
+        // nonetheless.
+        if (auto constraints = firstStage->constraints(); !constraints.requiresInputDocSource &&
+            (constraints.hostRequirement == StageConstraints::HostTypeRequirement::kLocalOnly)) {
+            // There's no need to attach a cursor here - the first stage provides its own data and
+            // is meant to be run locally (e.g. $documents).
+            return pipeline;
+        }
+    }
 
     auto catalogCache = Grid::get(expCtx->opCtx)->catalogCache();
     return shardVersionRetry(
