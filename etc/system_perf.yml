@@ -935,7 +935,7 @@ buildvariants:
     name: compile-amazon2
     display_name: Compile
     modules: *modules
-    cron: "0 0 * * 0,2,4" # 00:00 on Sunday,Tuesday,Thursday
+    cron: "0 0 * * *" # Everyday at 00:00
     expansions: &compile-expansions
       platform: linux
       project_dir: &project_dir dsi
@@ -956,7 +956,7 @@ buildvariants:
 
   - name: linux-standalone
     display_name: Linux Standalone
-    cron: "0 0 * * 0,2,4" # 00:00 on Sunday,Tuesday,Thursday
+    cron: "0 0 * * *" # Everyday at 00:00
     modules: *modules
     expansions:
       mongodb_setup: standalone
@@ -991,7 +991,7 @@ buildvariants:
   - name: compile-rhel70
     display_name: Compile for Atlas-like
     modules: *modules
-    cron: "0 0 * * 0,2,4" # 00:00 on Sunday,Tuesday,Thursday
+    cron: "0 0 * * *" # Everyday at 00:00
     expansions:
       <<: *compile-expansions
       compile_flags: >-
@@ -1358,7 +1358,7 @@ buildvariants:
 
   - name: linux-3-node-replSet
     display_name: Linux 3-Node ReplSet
-    cron: "0 0 * * 0,2,4" # 00:00 on Sunday,Tuesday,Thursday
+    cron: "0 0 * * *" # Everyday at 00:00
     modules: *modules
     expansions:
       mongodb_setup: replica
