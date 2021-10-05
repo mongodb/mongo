@@ -115,6 +115,10 @@ public:
      */
     void cancelIfCommitNotYetStarted();
 
+    const TxnRetryCounter getTxnRetryCounterForTest() const {
+        return *_txnNumberAndRetryCounter.getTxnRetryCounter();
+    }
+
     /**
      * Returns the TransactionCoordinatorMetricsObserver for this TransactionCoordinator.
      */

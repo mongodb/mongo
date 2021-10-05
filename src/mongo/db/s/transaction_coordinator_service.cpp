@@ -72,9 +72,9 @@ void TransactionCoordinatorService::createCoordinator(OperationContext* opCtx,
     auto& catalog = cas->catalog;
     auto& scheduler = cas->scheduler;
 
-    if (auto latestTxnNumAndCoordinator = catalog.getLatestOnSession(opCtx, lsid)) {
-        auto latestCoordinator = latestTxnNumAndCoordinator->second;
-        if (txnNumber == latestTxnNumAndCoordinator->first) {
+    if (auto latestTxnNumberRetryCounterAndCoordinator = catalog.getLatestOnSession(opCtx, lsid)) {
+        auto latestCoordinator = latestTxnNumberRetryCounterAndCoordinator->second;
+        if (txnNumber == latestTxnNumberRetryCounterAndCoordinator->first.getTxnNumber()) {
             return;
         }
         latestCoordinator->cancelIfCommitNotYetStarted();
@@ -88,7 +88,7 @@ void TransactionCoordinatorService::createCoordinator(OperationContext* opCtx,
                                                  commitDeadline);
 
     try {
-        catalog.insert(opCtx, lsid, txnNumber, coordinator);
+        catalog.insert(opCtx, lsid, {txnNumber, 0}, coordinator);
     } catch (const DBException&) {
         // Handle the case where the opCtx has been interrupted and we do not successfully insert
         // the coordinator into the catalog.
@@ -146,7 +146,7 @@ TransactionCoordinatorService::coordinateCommit(OperationContext* opCtx,
     auto cas = _getCatalogAndScheduler(opCtx);
     auto& catalog = cas->catalog;
 
-    auto coordinator = catalog.get(opCtx, lsid, txnNumber);
+    auto coordinator = catalog.get(opCtx, lsid, {txnNumber, 0});
     if (!coordinator) {
         return boost::none;
     }
@@ -164,7 +164,7 @@ boost::optional<SharedSemiFuture<txn::CommitDecision>> TransactionCoordinatorSer
     auto cas = _getCatalogAndScheduler(opCtx);
     auto& catalog = cas->catalog;
 
-    auto coordinator = catalog.get(opCtx, lsid, txnNumber);
+    auto coordinator = catalog.get(opCtx, lsid, {txnNumber, 0});
     if (!coordinator) {
         return boost::none;
     }
@@ -248,7 +248,8 @@ void TransactionCoordinatorService::onStepUp(OperationContext* opCtx,
                             scheduler.makeChildScheduler(),
                             clockSource->now() + Seconds(gTransactionLifetimeLimitSeconds.load()));
 
-                        catalog.insert(opCtx, lsid, txnNumber, coordinator, true /* forStepUp */);
+                        catalog.insert(
+                            opCtx, lsid, {txnNumber, 0}, coordinator, true /* forStepUp */);
                         coordinator->continueCommit(doc);
                     }
                 })
@@ -351,9 +352,9 @@ void TransactionCoordinatorService::cancelIfCommitNotYetStarted(OperationContext
     auto& catalog = cas->catalog;
 
     // No need to look at every coordinator since we cancel old coordinators when adding new ones.
-    if (auto latestTxnNumAndCoordinator = catalog.getLatestOnSession(opCtx, lsid)) {
-        if (txnNumber == latestTxnNumAndCoordinator->first) {
-            latestTxnNumAndCoordinator->second->cancelIfCommitNotYetStarted();
+    if (auto latestTxnNumberRetryCounterAndCoordinator = catalog.getLatestOnSession(opCtx, lsid)) {
+        if (txnNumber == latestTxnNumberRetryCounterAndCoordinator->first.getTxnNumber()) {
+            latestTxnNumberRetryCounterAndCoordinator->second->cancelIfCommitNotYetStarted();
         }
     }
 }

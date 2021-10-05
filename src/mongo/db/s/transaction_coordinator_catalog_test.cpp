@@ -37,6 +37,9 @@
 namespace mongo {
 namespace {
 
+const StatusWith<BSONObj> kOk = BSON("ok" << 1);
+const StatusWith<BSONObj> kPrepareOk = BSON("ok" << 1 << "prepareTimestamp" << Timestamp(1, 1));
+
 class TransactionCoordinatorCatalogTest : public TransactionCoordinatorTestFixture {
 protected:
     void setUp() override {
@@ -55,15 +58,15 @@ protected:
 
     void createCoordinatorInCatalog(OperationContext* opCtx,
                                     LogicalSessionId lsid,
-                                    TxnNumber txnNumber) {
+                                    TxnNumberAndRetryCounter txnNumberAndRetryCounter) {
         auto newCoordinator = std::make_shared<TransactionCoordinator>(
             operationContext(),
             lsid,
-            TxnNumberAndRetryCounter{txnNumber, 0},
+            txnNumberAndRetryCounter,
             std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
             Date_t::max());
 
-        _coordinatorCatalog->insert(opCtx, lsid, txnNumber, newCoordinator);
+        _coordinatorCatalog->insert(opCtx, lsid, txnNumberAndRetryCounter, newCoordinator);
     }
 
     boost::optional<TransactionCoordinatorCatalog> _coordinatorCatalog;
@@ -71,73 +74,140 @@ protected:
 
 TEST_F(TransactionCoordinatorCatalogTest, GetOnSessionThatDoesNotExistReturnsNone) {
     LogicalSessionId lsid = makeLogicalSessionIdForTest();
-    TxnNumber txnNumber = 1;
-    auto coordinator = _coordinatorCatalog->get(operationContext(), lsid, txnNumber);
+    TxnNumberAndRetryCounter txnNumberAndRetryCounter{1, 0};
+    auto coordinator = _coordinatorCatalog->get(operationContext(), lsid, txnNumberAndRetryCounter);
     ASSERT(coordinator == nullptr);
 }
 
 TEST_F(TransactionCoordinatorCatalogTest,
        GetOnSessionThatExistsButTxnNumberThatDoesntExistReturnsNone) {
     LogicalSessionId lsid = makeLogicalSessionIdForTest();
-    TxnNumber txnNumber = 1;
-    createCoordinatorInCatalog(operationContext(), lsid, txnNumber);
-    auto coordinatorInCatalog = _coordinatorCatalog->get(operationContext(), lsid, txnNumber + 1);
+    TxnNumberAndRetryCounter txnNumberAndRetryCounter1{1, 0};
+    TxnNumberAndRetryCounter txnNumberAndRetryCounter2{2, 0};
+    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter1);
+    auto coordinatorInCatalog =
+        _coordinatorCatalog->get(operationContext(), lsid, txnNumberAndRetryCounter2);
+    ASSERT(coordinatorInCatalog == nullptr);
+}
+
+TEST_F(TransactionCoordinatorCatalogTest,
+       GetOnSessionAndTxnNumberThatExistButTxnRetryCounterThatDoesntExistReturnsNone) {
+    LogicalSessionId lsid = makeLogicalSessionIdForTest();
+    TxnNumberAndRetryCounter txnNumberAndRetryCounter1{1, 0};
+    TxnNumberAndRetryCounter txnNumberAndRetryCounter2{1, 1};
+    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter1);
+    auto coordinatorInCatalog =
+        _coordinatorCatalog->get(operationContext(), lsid, txnNumberAndRetryCounter2);
     ASSERT(coordinatorInCatalog == nullptr);
 }
 
 TEST_F(TransactionCoordinatorCatalogTest, CreateFollowedByGetReturnsCoordinator) {
     LogicalSessionId lsid = makeLogicalSessionIdForTest();
-    TxnNumber txnNumber = 1;
-    createCoordinatorInCatalog(operationContext(), lsid, txnNumber);
-    auto coordinatorInCatalog = _coordinatorCatalog->get(operationContext(), lsid, txnNumber);
+    TxnNumberAndRetryCounter txnNumberAndRetryCounter{1, 0};
+    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter);
+    auto coordinatorInCatalog =
+        _coordinatorCatalog->get(operationContext(), lsid, txnNumberAndRetryCounter);
     ASSERT(coordinatorInCatalog != nullptr);
+    ASSERT_EQ(coordinatorInCatalog->getTxnRetryCounterForTest(),
+              *txnNumberAndRetryCounter.getTxnRetryCounter());
 }
 
-TEST_F(TransactionCoordinatorCatalogTest, SecondCreateForSessionDoesNotOverwriteFirstCreate) {
+TEST_F(TransactionCoordinatorCatalogTest,
+       SecondCreateForSessionDoesNotOverwriteFirstCreateDifferentTxnNumber) {
     LogicalSessionId lsid = makeLogicalSessionIdForTest();
-    TxnNumber txnNumber1 = 1;
-    TxnNumber txnNumber2 = 2;
-    createCoordinatorInCatalog(operationContext(), lsid, txnNumber1);
-    createCoordinatorInCatalog(operationContext(), lsid, txnNumber2);
+    TxnNumberAndRetryCounter txnNumberAndRetryCounter1{1, 0};
+    TxnNumberAndRetryCounter txnNumberAndRetryCounter2{2, 0};
+    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter1);
+    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter2);
 
-    auto coordinator1InCatalog = _coordinatorCatalog->get(operationContext(), lsid, txnNumber1);
+    auto coordinator1InCatalog =
+        _coordinatorCatalog->get(operationContext(), lsid, txnNumberAndRetryCounter1);
     ASSERT(coordinator1InCatalog != nullptr);
+    auto coordinator2InCatalog =
+        _coordinatorCatalog->get(operationContext(), lsid, txnNumberAndRetryCounter2);
+    ASSERT(coordinator2InCatalog != nullptr);
+}
+
+TEST_F(TransactionCoordinatorCatalogTest,
+       SecondCreateForSessionDoesNotOverwriteFirstCreateDifferentTxnRetryCounter) {
+    LogicalSessionId lsid = makeLogicalSessionIdForTest();
+    TxnNumberAndRetryCounter txnNumberAndRetryCounter1{1, 0};
+    TxnNumberAndRetryCounter txnNumberAndRetryCounter2{1, 1};
+    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter1);
+    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter2);
+
+    auto coordinator1InCatalog =
+        _coordinatorCatalog->get(operationContext(), lsid, txnNumberAndRetryCounter1);
+    ASSERT(coordinator1InCatalog != nullptr);
+    ASSERT_EQ(coordinator1InCatalog->getTxnRetryCounterForTest(),
+              *txnNumberAndRetryCounter1.getTxnRetryCounter());
+    auto coordinator2InCatalog =
+        _coordinatorCatalog->get(operationContext(), lsid, txnNumberAndRetryCounter2);
+    ASSERT(coordinator2InCatalog != nullptr);
+    ASSERT_EQ(coordinator2InCatalog->getTxnRetryCounterForTest(),
+              *txnNumberAndRetryCounter2.getTxnRetryCounter());
 }
 
 DEATH_TEST_F(TransactionCoordinatorCatalogTest,
-             CreatingACoordinatorWithASessionIdAndTxnNumberThatAlreadyExistFails,
+             CreatingACoordinatorWithASessionIdTxnNumberAndRetryCounterThatAlreadyExistFails,
              "Invariant failure") {
     LogicalSessionId lsid = makeLogicalSessionIdForTest();
-    TxnNumber txnNumber = 1;
-    createCoordinatorInCatalog(operationContext(), lsid, txnNumber);
+    TxnNumberAndRetryCounter txnNumberAndRetryCounter{1, 0};
+    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter);
     // Re-creating w/ same session id and txn number should cause invariant failure
-    createCoordinatorInCatalog(operationContext(), lsid, txnNumber);
+    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter);
 }
 
 TEST_F(TransactionCoordinatorCatalogTest, GetLatestOnSessionWithNoCoordinatorsReturnsNone) {
     LogicalSessionId lsid = makeLogicalSessionIdForTest();
-    auto latestTxnNumAndCoordinator =
+    auto latestTxnNumberRetryCounterAndCoordinator =
         _coordinatorCatalog->getLatestOnSession(operationContext(), lsid);
-    ASSERT_FALSE(latestTxnNumAndCoordinator);
+    ASSERT_FALSE(latestTxnNumberRetryCounterAndCoordinator);
 }
 
 TEST_F(TransactionCoordinatorCatalogTest,
-       CreateFollowedByGetLatestOnSessionReturnsOnlyCoordinator) {
+       CreateFollowedByGetLatestOnSessionReturnsOnlyCoordinatorLatestTxnNumber) {
     LogicalSessionId lsid = makeLogicalSessionIdForTest();
-    TxnNumber txnNumber = 1;
-    createCoordinatorInCatalog(operationContext(), lsid, txnNumber);
-    auto latestTxnNumAndCoordinator =
-        _coordinatorCatalog->getLatestOnSession(operationContext(), lsid);
+    TxnNumberAndRetryCounter txnNumberAndRetryCounter1{1, 0};
+    TxnNumberAndRetryCounter txnNumberAndRetryCounter2{2, 0};
+    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter1);
+    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter2);
 
-    ASSERT_TRUE(latestTxnNumAndCoordinator);
-    ASSERT_EQ(latestTxnNumAndCoordinator->first, txnNumber);
+    auto latestTxnNumberRetryCounterAndCoordinator =
+        _coordinatorCatalog->getLatestOnSession(operationContext(), lsid);
+    ASSERT_TRUE(latestTxnNumberRetryCounterAndCoordinator);
+
+    auto latestTxnNumberAndRetryCounter = latestTxnNumberRetryCounterAndCoordinator->first;
+    ASSERT_EQ(latestTxnNumberAndRetryCounter.getTxnNumber(),
+              txnNumberAndRetryCounter2.getTxnNumber());
+    ASSERT_EQ(*latestTxnNumberAndRetryCounter.getTxnRetryCounter(),
+              *txnNumberAndRetryCounter2.getTxnRetryCounter());
+}
+
+TEST_F(TransactionCoordinatorCatalogTest,
+       CreateFollowedByGetLatestOnSessionReturnsOnlyCoordinatorLatestTxnNumberAndTxnRetryCounter) {
+    LogicalSessionId lsid = makeLogicalSessionIdForTest();
+    TxnNumberAndRetryCounter txnNumberAndRetryCounter1{1, 0};
+    TxnNumberAndRetryCounter txnNumberAndRetryCounter2{1, 1};
+    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter1);
+    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter2);
+
+    auto latestTxnNumberRetryCounterAndCoordinator =
+        _coordinatorCatalog->getLatestOnSession(operationContext(), lsid);
+    ASSERT_TRUE(latestTxnNumberRetryCounterAndCoordinator);
+
+    auto latestTxnNumberAndRetryCounter = latestTxnNumberRetryCounterAndCoordinator->first;
+    ASSERT_EQ(latestTxnNumberAndRetryCounter.getTxnNumber(),
+              txnNumberAndRetryCounter2.getTxnNumber());
+    ASSERT_EQ(*latestTxnNumberAndRetryCounter.getTxnRetryCounter(),
+              *txnNumberAndRetryCounter2.getTxnRetryCounter());
 }
 
 TEST_F(TransactionCoordinatorCatalogTest, CoordinatorsRemoveThemselvesFromCatalogWhenTheyComplete) {
     LogicalSessionId lsid = makeLogicalSessionIdForTest();
-    TxnNumber txnNumber = 1;
-    createCoordinatorInCatalog(operationContext(), lsid, txnNumber);
-    auto coordinator = _coordinatorCatalog->get(operationContext(), lsid, txnNumber);
+    TxnNumberAndRetryCounter txnNumberAndRetryCounter{1, 0};
+    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter);
+    auto coordinator = _coordinatorCatalog->get(operationContext(), lsid, txnNumberAndRetryCounter);
 
     coordinator->cancelIfCommitNotYetStarted();
     coordinator->onCompletion().wait();
@@ -146,45 +216,92 @@ TEST_F(TransactionCoordinatorCatalogTest, CoordinatorsRemoveThemselvesFromCatalo
     // the coordinator is removed from the catalog asynchronously.
     _coordinatorCatalog->join();
 
-    auto latestTxnNumAndCoordinator =
+    auto latestTxnNumberRetryCounterAndCoordinator =
         _coordinatorCatalog->getLatestOnSession(operationContext(), lsid);
-    ASSERT_FALSE(latestTxnNumAndCoordinator);
+    ASSERT_FALSE(latestTxnNumberRetryCounterAndCoordinator);
 }
 
 TEST_F(TransactionCoordinatorCatalogTest,
        TwoCreatesFollowedByGetLatestOnSessionReturnsCoordinatorWithHighestTxnNumber) {
     LogicalSessionId lsid = makeLogicalSessionIdForTest();
-    TxnNumber txnNumber1 = 1;
-    TxnNumber txnNumber2 = 2;
-    createCoordinatorInCatalog(operationContext(), lsid, txnNumber1);
-    createCoordinatorInCatalog(operationContext(), lsid, txnNumber2);
-    auto latestTxnNumAndCoordinator =
-        _coordinatorCatalog->getLatestOnSession(operationContext(), lsid);
+    TxnNumberAndRetryCounter txnNumberAndRetryCounter1{1, 0};
+    TxnNumberAndRetryCounter txnNumberAndRetryCounter2{2, 0};
 
-    ASSERT_EQ(latestTxnNumAndCoordinator->first, txnNumber2);
+    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter1);
+    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter2);
+
+    auto latestTxnNumberRetryCounterAndCoordinator =
+        _coordinatorCatalog->getLatestOnSession(operationContext(), lsid);
+    ASSERT_TRUE(latestTxnNumberRetryCounterAndCoordinator);
+
+    auto latestTxnNumberAndRetryCounter = latestTxnNumberRetryCounterAndCoordinator->first;
+    ASSERT_EQ(latestTxnNumberAndRetryCounter.getTxnNumber(),
+              txnNumberAndRetryCounter2.getTxnNumber());
+    ASSERT_EQ(*latestTxnNumberAndRetryCounter.getTxnRetryCounter(),
+              *txnNumberAndRetryCounter2.getTxnRetryCounter());
+}
+
+TEST_F(
+    TransactionCoordinatorCatalogTest,
+    TwoCreatesFollowedByGetLatestOnSessionReturnsCoordinatorWithHighestTxnNumberAndTxnRetryCounter) {
+    LogicalSessionId lsid = makeLogicalSessionIdForTest();
+    TxnNumberAndRetryCounter txnNumberAndRetryCounter1{1, 0};
+    TxnNumberAndRetryCounter txnNumberAndRetryCounter2{1, 1};
+
+    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter1);
+    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter2);
+
+    auto latestTxnNumberRetryCounterAndCoordinator =
+        _coordinatorCatalog->getLatestOnSession(operationContext(), lsid);
+    ASSERT_TRUE(latestTxnNumberRetryCounterAndCoordinator);
+
+    auto latestTxnNumberAndRetryCounter = latestTxnNumberRetryCounterAndCoordinator->first;
+    ASSERT_EQ(latestTxnNumberAndRetryCounter.getTxnNumber(),
+              txnNumberAndRetryCounter2.getTxnNumber());
+    ASSERT_EQ(*latestTxnNumberAndRetryCounter.getTxnRetryCounter(),
+              *txnNumberAndRetryCounter2.getTxnRetryCounter());
+}
+
+DEATH_TEST_REGEX_F(TransactionCoordinatorCatalogTest,
+                   CreateExistingSessionAndTxnNumberWithPreviouslyCommittedTxnRetryCounterFails,
+                   "a previous coordinator.*already committed") {
+    LogicalSessionId lsid = makeLogicalSessionIdForTest();
+    TxnNumberAndRetryCounter txnNumberAndRetryCounter1{1, 0};
+    TxnNumberAndRetryCounter txnNumberAndRetryCounter2{1, 1};
+
+    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter1);
+    auto coordinator1 =
+        _coordinatorCatalog->get(operationContext(), lsid, txnNumberAndRetryCounter1);
+    coordinator1->runCommit(operationContext(), kTwoShardIdList);
+
+    assertCommandSentAndRespondWith("prepareTransaction", kPrepareOk, boost::none);
+    assertCommandSentAndRespondWith("prepareTransaction", kPrepareOk, boost::none);
+
+    coordinator1->getDecision().get();
+
+    createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter2);
 }
 
 TEST_F(TransactionCoordinatorCatalogTest, StepDownBeforeCoordinatorInsertedIntoCatalog) {
     LogicalSessionId lsid = makeLogicalSessionIdForTest();
-    TxnNumber txnNumber = 1;
+    TxnNumberAndRetryCounter txnNumberAndRetryCounter{1, 0};
 
     txn::AsyncWorkScheduler aws(getServiceContext());
     TransactionCoordinatorCatalog catalog;
     catalog.exitStepUp(Status::OK());
 
-    auto coordinator =
-        std::make_shared<TransactionCoordinator>(operationContext(),
-                                                 lsid,
-                                                 TxnNumberAndRetryCounter{txnNumber, 0},
-                                                 aws.makeChildScheduler(),
-                                                 network()->now() + Seconds{5});
+    auto coordinator = std::make_shared<TransactionCoordinator>(operationContext(),
+                                                                lsid,
+                                                                txnNumberAndRetryCounter,
+                                                                aws.makeChildScheduler(),
+                                                                network()->now() + Seconds{5});
 
     aws.shutdown({ErrorCodes::TransactionCoordinatorSteppingDown, "Test step down"});
     catalog.onStepDown();
 
     advanceClockAndExecuteScheduledTasks();
 
-    catalog.insert(operationContext(), lsid, txnNumber, coordinator);
+    catalog.insert(operationContext(), lsid, txnNumberAndRetryCounter, coordinator);
     catalog.join();
 
     coordinator->onCompletion().wait();
