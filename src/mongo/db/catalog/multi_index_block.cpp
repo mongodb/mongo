@@ -615,7 +615,15 @@ void MultiIndexBlock::_doCollectionScan(OperationContext* opCtx,
                     collection,
                     objToIndex,
                     loc,
-                    /*saveCursorBeforeWrite*/ [&exec] { exec->saveState(); },
+                    /*saveCursorBeforeWrite*/
+                    [&exec, &objToIndex] {
+                        // Update objToIndex so that it continues to point to valid data when the
+                        // cursor is closed. A WCE may occur during a write to index A, and
+                        // objToIndex must still be used when the write is retried or for a write to
+                        // another index (if creating multiple indexes at once)
+                        objToIndex = objToIndex.getOwned();
+                        exec->saveState();
+                    },
                     /*restoreCursorAfterWrite*/ [&] { exec->restoreState(&collection); }));
 
         _failPointHangDuringBuild(opCtx,
