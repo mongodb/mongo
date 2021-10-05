@@ -21,4 +21,4 @@ executor:
               rollback: 0
           setParameters:
             numInitialSyncAttempts: 10000000
-          useRandomBinVersionsWithinReplicaSet: true
+          useRandomBinVersionsWithinReplicaSet: 'last-lts'
