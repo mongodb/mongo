@@ -13,18 +13,18 @@ load("jstests/aggregation/extras/utils.js");  // arrayEq
  */
 const makeArithmeticHelpers = (unitName, factor) => {
     const getter = date => {
-        const newDate = new Date(date);
+        const newDate = new ISODate(date.toISOString());
         // Calling the proper function on the passed in date object. If the unitName was "Seconds"
         // would be equivalent to `newDate.getSeconds()`.
-        return newDate["get" + unitName]();
+        return newDate["getUTC" + unitName]();
     };
 
     // Return a new date with the proper unit adjusted with the second parameter.
     // Dates and the setter helpers are generally mutable, but this function will make sure
     // the arithmetic helpers won't mutate their inputs.
     const setter = (date, newComponent) => {
-        const newDate = new Date(date);
-        newDate["set" + unitName](newComponent);
+        const newDate = new ISODate(date.toISOString());
+        newDate["setUTC" + unitName](newComponent);
         return newDate;
     };
 

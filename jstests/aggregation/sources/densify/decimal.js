@@ -10,14 +10,6 @@
 
 load("jstests/aggregation/extras/utils.js");  // For arrayEq.
 
-const featureEnabled =
-    assert.commandWorked(db.adminCommand({getParameter: 1, featureFlagDensify: 1}))
-        .featureFlagDensify.value;
-if (!featureEnabled) {
-    jsTestLog("Skipping test because the densify feature flag is disabled");
-    return;
-}
-
 function buildErrorString(found, expected) {
     return "Expected:\n" + tojson(expected) + "\nGot:\n" + tojson(found);
 }
@@ -94,6 +86,7 @@ expectedResult = [
     {val: .7},
     {val: .7999999999999999},
     {val: .8999999999999999},
+    {val: .9999999999999999},
     {val: NumberDecimal(1)},
 ];
 result = coll.aggregate(pipeline).toArray();

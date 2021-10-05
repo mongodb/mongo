@@ -42,11 +42,6 @@ feature_flags:
       default: true
       version: 5.1
 
-    featureFlagDensify:
-      description: "Feature flag for allowing a $densify stage in an aggregation pipeline"
-      cpp_varname: gFeatureFlagDensify
-      default: false
-
     featureFlagShardedTimeSeries:
       description: "Feature flag for allowing sharding a Time Series collection"
       cpp_varname: gFeatureFlagShardedTimeSeries

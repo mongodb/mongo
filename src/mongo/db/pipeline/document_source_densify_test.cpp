@@ -50,23 +50,6 @@ using DensifyPartitionNumericTest = AggregationContextFixture;
 using DensifyCloneTest = AggregationContextFixture;
 using DensifyStepTest = AggregationContextFixture;
 
-MONGO_INITIALIZER_GENERAL(turnOnDensifyFlag,
-                          ("AllFailPointsRegistered", "EndServerParameterRegistration"),
-                          ("BeginDocumentSourceRegistration",
-                           "addToDocSourceParserMap__internalDensify"))
-(InitializerContext*) {
-    const auto& spMap = ServerParameterSet::getGlobal()->getMap();
-    const auto& spIt = spMap.find("featureFlagDensify");
-    invariant(spIt != spMap.end(), str::stream() << "spMap keys: " << spMap.size());
-
-    auto* sp = spIt->second;
-    invariant(sp);
-    BSONObjBuilder bob;
-    sp->appendSupportingRoundtrip(nullptr, bob, "featureFlagDensify");
-    // Set to the new value
-    uassertStatusOK(sp->set(BSON("featureFlagDensify" << true).firstElement()));
-}
-
 Date_t makeDate(std::string dateStr) {
     auto statusDate = dateFromISOString(dateStr);
     ASSERT_TRUE(statusDate.isOK());

@@ -10,13 +10,6 @@ load("jstests/aggregation/sources/densify/libs/densify_in_js.js");
 
 (function() {
 "use strict";
-const featureEnabled =
-    assert.commandWorked(db.adminCommand({getParameter: 1, featureFlagDensify: 1}))
-        .featureFlagDensify.value;
-if (!featureEnabled) {
-    jsTestLog("Skipping test because the densify feature flag is disabled");
-    return;
-}
 const collName = jsTestName();
 const coll = db.getCollection(collName);
 coll.drop();
@@ -25,7 +18,7 @@ coll.drop();
 for (let i = 0; i < densifyUnits.length; i++) {
     const unit = densifyUnits[i];
     coll.drop();
-    const base = unit ? new Date(2021, 0, 1) : 0;
+    const base = unit ? new ISODate("2021-01-01") : 0;
     const {add} = getArithmeticFunctionsForUnit(unit);
 
     const runDensifyRangeTest = ({step, bounds}, msg) => testDensifyStage({

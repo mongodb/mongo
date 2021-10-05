@@ -11,14 +11,6 @@
 
 load("jstests/aggregation/extras/utils.js");  // arrayEq
 
-const featureEnabled =
-    assert.commandWorked(db.adminCommand({getParameter: 1, featureFlagDensify: 1}))
-        .featureFlagDensify.value;
-if (!featureEnabled) {
-    jsTestLog("Skipping test because the densify feature flag is disabled");
-    return;
-}
-
 const coll = db[jsTestName()];
 
 function buildErrorString(found, expected) {
@@ -57,10 +49,10 @@ function testOneDates() {
     coll.drop();
 
     const testDocs = [
-        {val: new Date(2021, 0, 1), partition: 0},
-        {val: new Date(2021, 0, 3), partition: 0},
-        {val: new Date(2021, 0, 1), partition: 1},
-        {val: new Date(2021, 0, 3), partition: 1}
+        {val: new ISODate("2021-01-01"), partition: 0},
+        {val: new ISODate("2021-01-03"), partition: 0},
+        {val: new ISODate("2021-01-01"), partition: 1},
+        {val: new ISODate("2021-01-03"), partition: 1}
     ];
     assert.commandWorked(coll.insert(testDocs));
 
@@ -75,8 +67,10 @@ function testOneDates() {
         }
     ]);
     const resultArray = result.toArray();
-    const testExpected = testDocs.concat(
-        [{val: new Date(2021, 0, 2), partition: 0}, {val: new Date(2021, 0, 2), partition: 1}]);
+    const testExpected = testDocs.concat([
+        {val: new ISODate("2021-01-02"), partition: 0},
+        {val: new ISODate("2021-01-02"), partition: 1}
+    ]);
     assert(arrayEq(resultArray, testExpected), buildErrorString(resultArray, testExpected));
     coll.drop();
 }
@@ -297,13 +291,16 @@ function fullTestTwoDates(stepVal = 2) {
     let testDocs = [];
     let testExpected = [];
     // Add an initial document.
-    testDocs.push({val: new Date(2021, 0, 1), part: 0});
-    testDocs.push({val: new Date(2021, 0, 1), part: 1});
-    testDocs.push({val: new Date(2031, 0, 1), part: 2});
-    testDocs.push({val: new Date(2025, 0, 1), part: 3});
+    testDocs.push({val: new ISODate("2021-01-01"), part: 0});
+    testDocs.push({val: new ISODate("2021-01-01"), part: 1});
+    testDocs.push({val: new ISODate("2031-01-01"), part: 2});
+    testDocs.push({val: new ISODate("2025-01-01"), part: 3});
     for (let densifyVal = 0; densifyVal < 11; densifyVal += stepVal) {
         for (let partitionVal = 0; partitionVal <= 3; partitionVal++) {
-            testExpected.push({val: new Date(2021 + densifyVal, 0, 1), part: partitionVal});
+            testExpected.push({
+                val: new ISODate((2021 + densifyVal).toString().padStart(2, '0') + "-01-01"),
+                part: partitionVal
+            });
         }
     }
     assert.commandWorked(coll.insert(testDocs));
@@ -442,15 +439,18 @@ function rangeTestTwoDates() {
     coll.drop();
     let testDocs = [];
     let testExpected = [];
-    testDocs.push({val: new Date(2021, 0, 1), part: 0});
-    testExpected.push({val: new Date(2021, 0, 1), part: 0});
-    testDocs.push({val: new Date(2021, 5, 1), part: 1});
-    testExpected.push({val: new Date(2021, 5, 1), part: 1});
-    testDocs.push({val: new Date(2021, 10, 1), part: 2});
-    testExpected.push({val: new Date(2021, 10, 1), part: 2});
+    testDocs.push({val: new ISODate("2021-01-01"), part: 0});
+    testExpected.push({val: new ISODate("2021-01-01"), part: 0});
+    testDocs.push({val: new ISODate("2021-06-01"), part: 1});
+    testExpected.push({val: new ISODate("2021-06-01"), part: 1});
+    testDocs.push({val: new ISODate("2021-11-01"), part: 2});
+    testExpected.push({val: new ISODate("2021-11-01"), part: 2});
     for (let densifyVal = 4; densifyVal < 8; densifyVal += 2) {
         for (let partitionVal = 0; partitionVal <= 2; partitionVal++) {
-            testExpected.push({val: new Date(2021, densifyVal, 1), part: partitionVal});
+            testExpected.push({
+                val: new ISODate("2021-" + densifyVal.toString().padStart(2, '0') + "-01"),
+                part: partitionVal
+            });
         }
     }
     assert.commandWorked(coll.insert(testDocs));
@@ -459,8 +459,11 @@ function rangeTestTwoDates() {
         {
             $densify: {
                 field: "val",
-                range:
-                    {step: 2, unit: "month", bounds: [new Date(2021, 4, 1), new Date(2021, 8, 1)]},
+                range: {
+                    step: 2,
+                    unit: "month",
+                    bounds: [new ISODate("2021-05-01"), new ISODate("2021-09-01")]
+                },
                 partitionByFields: ["part"]
             }
         },

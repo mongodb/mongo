@@ -12,13 +12,6 @@
 load("jstests/noPassthrough/libs/server_parameter_helpers.js");  // For setParameterOnAllHosts.
 load("jstests/libs/discover_topology.js");                       // For findNonConfigNodes.
 
-const featureEnabled =
-    assert.commandWorked(db.adminCommand({getParameter: 1, featureFlagDensify: 1}))
-        .featureFlagDensify.value;
-if (!featureEnabled) {
-    jsTestLog("Skipping test because the densify feature flag is disabled");
-    return;
-}
 const paramName = "internalQueryMaxAllowedDensifyDocs";
 const origParamValue = assert.commandWorked(
     db.adminCommand({getParameter: 1, internalQueryMaxAllowedDensifyDocs: 1}))[paramName];

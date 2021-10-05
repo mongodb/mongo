@@ -118,23 +118,19 @@ RangeStatement RangeStatement::parse(RangeSpec spec) {
     return range;
 }
 
-REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(
-    densify,
-    LiteParsedDocumentSourceDefault::parse,
-    document_source_densify::createFromBson,
-    AllowedWithApiStrict::kNeverInVersion1,
-    AllowedWithClientType::kAny,
-    multiversion::FeatureCompatibilityVersion::kVersion_5_1,
-    ::mongo::feature_flags::gFeatureFlagDensify.isEnabledAndIgnoreFCV());
+REGISTER_DOCUMENT_SOURCE_WITH_MIN_VERSION(densify,
+                                          LiteParsedDocumentSourceDefault::parse,
+                                          document_source_densify::createFromBson,
+                                          AllowedWithApiStrict::kNeverInVersion1,
+                                          multiversion::FeatureCompatibilityVersion::kVersion_5_1)
 
-REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(
-    _internalDensify,
-    LiteParsedDocumentSourceDefault::parse,
-    DocumentSourceInternalDensify::createFromBson,
-    AllowedWithApiStrict::kInternal,
-    AllowedWithClientType::kInternal,
-    multiversion::FeatureCompatibilityVersion::kVersion_5_1,
-    ::mongo::feature_flags::gFeatureFlagDensify.isEnabledAndIgnoreFCV());
+REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(_internalDensify,
+                                       LiteParsedDocumentSourceDefault::parse,
+                                       DocumentSourceInternalDensify::createFromBson,
+                                       AllowedWithApiStrict::kInternal,
+                                       AllowedWithClientType::kInternal,
+                                       multiversion::FeatureCompatibilityVersion::kVersion_5_1,
+                                       true);
 
 namespace document_source_densify {
 

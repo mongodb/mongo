@@ -11,14 +11,6 @@
 (function() {
 "use strict";
 
-const featureEnabled =
-    assert.commandWorked(db.adminCommand({getParameter: 1, featureFlagDensify: 1}))
-        .featureFlagDensify.value;
-if (!featureEnabled) {
-    jsTestLog("Skipping test because the densify feature flag is disabled");
-    return;
-}
-
 load("jstests/libs/fixture_helpers.js");
 
 const coll = db[jsTestName()];
@@ -114,27 +106,29 @@ assert.eq(
     ]);
 
 // PartitionByFields are prepended to the sortKey if date bounds are specified.
-assert.eq(
-    desugar({
-        $densify: {
-            field: "a",
-            partitionByFields: ["b", "c"],
-            range:
-                {step: 1.0, bounds: [new Date("2020-01-03"), new Date("2020-01-04")], unit: "day"}
-        }
-    }),
-    [
-        {$sort: {sortKey: {b: 1, c: 1, a: 1}}},
-        {
-            $_internalDensify: {
-                field: "a",
-                partitionByFields: ["b", "c"],
-                range: {
-                    step: 1.0,
-                    bounds: [new Date("2020-01-03"), new Date("2020-01-04")],
-                    unit: "day"
-                }
-            }
-        },
-    ]);
+assert.eq(desugar({
+              $densify: {
+                  field: "a",
+                  partitionByFields: ["b", "c"],
+                  range: {
+                      step: 1.0,
+                      bounds: [new ISODate("2020-01-03"), new ISODate("2020-01-04")],
+                      unit: "day"
+                  }
+              }
+          }),
+          [
+              {$sort: {sortKey: {b: 1, c: 1, a: 1}}},
+              {
+                  $_internalDensify: {
+                      field: "a",
+                      partitionByFields: ["b", "c"],
+                      range: {
+                          step: 1.0,
+                          bounds: [new ISODate("2020-01-03"), new ISODate("2020-01-04")],
+                          unit: "day"
+                      }
+                  }
+              },
+          ]);
 })();
