@@ -15,7 +15,7 @@ load("jstests/aggregation/extras/utils.js");  // For arrayEq.
 load("jstests/libs/profiler.js");             // For profilerHas*OrThrow helper functions.
 load("jstests/libs/log.js");                  // For findMatchingLogLines.
 
-const st = new ShardingTest({shards: [{verbose: 3}, {verbose: 3}], mongos: 2});
+const st = new ShardingTest({shards: 2, mongos: 2});
 const testName = "sharded_lookup";
 
 const mongosDB = st.s0.getDB(testName);
@@ -24,9 +24,13 @@ const shardList = [st.shard0.getDB(testName), st.shard1.getDB(testName)];
 assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
 st.ensurePrimaryShard(mongosDB.getName(), st.shard0.shardName);
 
-// Turn on the profiler for both shards.
+// Turn on the profiler and increase the query log level for both shards.
 assert.commandWorked(st.shard0.getDB(testName).setProfilingLevel(2));
 assert.commandWorked(st.shard1.getDB(testName).setProfilingLevel(2));
+assert.commandWorked(
+    st.shard0.adminCommand({setParameter: 1, logComponentVerbosity: {query: {verbosity: 3}}}));
+assert.commandWorked(
+    st.shard1.adminCommand({setParameter: 1, logComponentVerbosity: {query: {verbosity: 3}}}));
 
 const ordersColl = mongosDB.orders;
 const reviewsColl = mongosDB.reviews;
