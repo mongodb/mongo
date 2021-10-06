@@ -13,10 +13,15 @@
 static inline int
 __wt_buf_grow(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
 {
-    return (
-      size > buf->memsize || !WT_DATA_IN_ITEM(buf) ? __wt_buf_grow_worker(session, buf, size) : 0);
+    /*
+     * Take any offset in the buffer into account when calculating the size to allocate, it saves
+     * complex calculations in our callers to decide if the buffer is large enough in the case of
+     * buffers with offset data pointers.
+     */
+    return (!WT_DATA_IN_ITEM(buf) || size + WT_PTRDIFF(buf->data, buf->mem) > buf->memsize ?
+        __wt_buf_grow_worker(session, buf, size) :
+        0);
 }
-
 /*
  * __wt_buf_extend --
  *     Grow a buffer that's currently in-use.

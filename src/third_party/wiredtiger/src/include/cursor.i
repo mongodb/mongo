@@ -306,10 +306,14 @@ __wt_cursor_dhandle_decr_use(WT_SESSION_IMPL *session)
 
     dhandle = session->dhandle;
 
-    /* If we close a handle with a time of death set, clear it. */
+    /*
+     * If we close a handle with a time of death set, clear it. The ordering is important: after
+     * decrementing the use count, there's a chance that the data handle can be freed.
+     */
     WT_ASSERT(session, dhandle->session_inuse > 0);
-    if (__wt_atomic_subi32(&dhandle->session_inuse, 1) == 0 && dhandle->timeofdeath != 0)
+    if (dhandle->timeofdeath != 0 && dhandle->session_inuse == 1)
         dhandle->timeofdeath = 0;
+    (void)__wt_atomic_subi32(&dhandle->session_inuse, 1);
 }
 
 /*
