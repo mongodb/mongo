@@ -268,17 +268,6 @@ env.Library(
     ]
 )
 
-env.Benchmark(
-    target='collection_catalog_bm',
-    source=[
-        'collection_catalog_bm.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
-        'collection_catalog',
-    ],
-)
-
 env.Library(
     target='collection_catalog_helper',
     source=[
