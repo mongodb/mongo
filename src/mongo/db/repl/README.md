@@ -477,9 +477,11 @@ The receiving node's `TopologyCoordinator` updates the last time it received a h
 sending node for liveness checking in its `MemberData` list.
 
 If the sending node's config is newer than the receiving node's, then the receiving node schedules a
-heartbeat to get the config. The receiving node's `TopologyCoordinator` also updates its
-`MemberData` with the last update from the sending node and marks it as being up. See more details on
-config propagation via heartbeats in the [Reconfiguration](#Reconfiguration) section.
+heartbeat to get the config, except when the receiving node is [in primary state but cannot accept
+non-local writes](https://github.com/mongodb/mongo/blob/04777b82b0e0f7f83b99f1c837816bc93ba4d23b/src/mongo/db/repl/replication_coordinator_impl_heartbeat.cpp#L610-L618).
+The receiving node's `TopologyCoordinator` also updates its `MemberData` with the last update from
+the sending node and marks it as being up. See more details on config propagation via heartbeats in
+the [Reconfiguration](#Reconfiguration) section.
 
 It then creates a `ReplSetHeartbeatResponse` object. This includes:
 
@@ -1821,9 +1823,8 @@ will be "newer" than any other config in the system.
 
 Config ordering also affects voting behavior. If a replica set node is a candidate for election in
 config `(vc, tc)`, then a prospective voter with config `(v, t)` will only cast a vote for the
-candidate if `(vc, tc) = (v, t)`. For correctness, it would be acceptable for a candidate to cast
-its vote whenever `(vc, tc) >= (v, t)`, but the current implementation is more restrictive. For a
-description of the complete voting behavior, see the [Elections](#Elections) section.
+candidate if `(vc, tc) >= (v, t)`. For a description of the complete voting behavior, see the
+[Elections](#Elections) section.
 
 ### Formal Specification
 
