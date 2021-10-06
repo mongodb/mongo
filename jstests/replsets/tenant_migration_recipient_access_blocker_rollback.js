@@ -188,6 +188,7 @@ function runRollbackAfterLoneRecipientForgetMigrationCommand(tenantId) {
     // Stepping up one of the secondaries should cause the original primary to rollback.
     jsTestLog("Stepping up one of the secondaries.");
     assert.commandWorked(newPrimary.adminCommand({replSetStepUp: 1}));
+    fpOriginalPrimary.off();
 
     assert.commandFailedWithCode(recipientForgetMigrationThread.returnData(),
                                  ErrorCodes.InterruptedDueToReplStateChange);
@@ -208,7 +209,6 @@ function runRollbackAfterLoneRecipientForgetMigrationCommand(tenantId) {
     assert.eq(1, originalPrimary.getDB(dbName)[collName].find().itcount());
 
     fpOriginalPrimaryBeforeStarting.off();
-    fpOriginalPrimary.off();
     fpNewPrimary.off();
 
     tenantMigrationTest.stop();
