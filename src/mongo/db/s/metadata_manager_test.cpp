@@ -182,11 +182,9 @@ TEST_F(MetadataManagerTest, CleanUpForMigrateIn) {
         FailPointEnableBlock fpb("suspendRangeDeletion");
         auto notif1 = _manager->beginReceive(range1);
 
+        // This will hang if the range deletion task on the non-existing collection is scheduled
         notif1.wait();
     }
-
-    ASSERT_EQ(0UL, _manager->numberOfRangesToClean());
-    ASSERT_EQ(0UL, _manager->numberOfRangesToCleanStillInUse());
 
     CollectionOptions emptyCollOptions;
     ASSERT_OK(_storage->createCollection(operationContext(), kNss, emptyCollOptions));
