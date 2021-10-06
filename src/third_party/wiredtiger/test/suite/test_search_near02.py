@@ -118,7 +118,7 @@ class test_search_near02(wttest.WiredTigerTestCase):
         self.assertEqual(cursor3.get_key(), self.check_key("aaz"))
 
         # Enable prefix search.
-        cursor3.reconfigure("prefix_key=true")
+        cursor3.reconfigure("prefix_search=true")
 
         # The only visible key is aaz. As long we are looking for a key that starts with either "a",
         # "aa" or "aaz", search near should return back aaz. Otherwise, search near should return
@@ -153,7 +153,7 @@ class test_search_near02(wttest.WiredTigerTestCase):
         self.assertEqual(cursor3.search_near(), wiredtiger.WT_NOTFOUND)
 
         # Enable prefix search.
-        cursor3.reconfigure("prefix_key=true")
+        cursor3.reconfigure("prefix_search=true")
 
         cursor3.set_key("aaz")
         self.assertEqual(cursor3.search_near(), wiredtiger.WT_NOTFOUND)
@@ -181,7 +181,7 @@ class test_search_near02(wttest.WiredTigerTestCase):
         self.assertEqual(cursor3.get_key(), self.check_key("aazab"))
 
         # Enable prefix search.
-        cursor3.reconfigure("prefix_key=true")
+        cursor3.reconfigure("prefix_search=true")
 
         # Search near for a, should return the closest visible key with a matching prefix: aaa.
         cursor3.set_key("a")

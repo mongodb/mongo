@@ -856,7 +856,7 @@ __wt_cursor_cache_get(WT_SESSION_IMPL *session, const char *uri, uint64_t hash_v
              * than flag values, so fix them up according to the given configuration.
              */
             F_CLR(cursor,
-              WT_CURSTD_APPEND | WT_CURSTD_PREFIX_SEARCH | WT_CURSTD_RAW | WT_CURSTD_OVERWRITE);
+              WT_CURSTD_APPEND | WT_CURSTD_OVERWRITE | WT_CURSTD_PREFIX_SEARCH | WT_CURSTD_RAW);
             F_SET(cursor, overwrite_flag);
             /*
              * If this is a btree cursor, clear its read_once flag.
@@ -1084,7 +1084,7 @@ __wt_cursor_reconfigure(WT_CURSOR *cursor, const char *config)
         WT_ERR_NOTFOUND_OK(ret, false);
 
     /* Set the prefix search near flag. */
-    if ((ret = __wt_config_getones(session, config, "prefix_key", &cval)) == 0) {
+    if ((ret = __wt_config_getones(session, config, "prefix_search", &cval)) == 0) {
         if (cval.val) {
             /* Prefix search near configuration can only be used for row-store. */
             if (WT_CURSOR_RECNO(cursor))

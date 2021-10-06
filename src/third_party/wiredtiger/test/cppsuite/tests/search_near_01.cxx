@@ -206,7 +206,7 @@ class search_near_01 : public test_harness::test {
             collection &coll = tc->db.get_random_collection();
             if (cursors.find(coll.id) == cursors.end()) {
                 scoped_cursor cursor = tc->session.open_scoped_cursor(coll.name.c_str());
-                cursor->reconfigure(cursor.get(), "prefix_key=true");
+                cursor->reconfigure(cursor.get(), "prefix_search=true");
                 cursors.emplace(coll.id, std::move(cursor));
             }
 
