@@ -177,12 +177,7 @@ Status LogicalSessionCacheImpl::_reap(Client* client) {
             StringData notSetUpWarning =
                 "Sessions collection is not set up; "
                 "waiting until next sessions reap interval";
-            if (existsStatus.code() != ErrorCodes::NamespaceNotFound ||
-                existsStatus.code() != ErrorCodes::NamespaceNotSharded) {
-                log() << notSetUpWarning << ": " << existsStatus.reason();
-            } else {
-                log() << notSetUpWarning;
-            }
+            log() << notSetUpWarning << ": " << existsStatus.reason();
 
             return Status::OK();
         }
@@ -225,6 +220,8 @@ void LogicalSessionCacheImpl::_refresh(Client* client) {
 
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     if (replCoord && replCoord->isReplEnabled() && replCoord->getMemberState().arbiter()) {
+        stdx::lock_guard<Latch> lk(_mutex);
+        _activeSessions.clear();
         return;
     }
 
