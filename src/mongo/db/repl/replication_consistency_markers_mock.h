@@ -97,6 +97,7 @@ private:
     OpTime _appliedThrough;
     OpTime _minValid;
     Timestamp _oplogTruncateAfterPoint;
+    BSONObj _initialSyncId;
 };
 
 }  // namespace repl

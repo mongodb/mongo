@@ -135,12 +135,18 @@ Status ReplicationConsistencyMarkersMock::createInternalCollections(OperationCon
     return Status::OK();
 }
 
-void ReplicationConsistencyMarkersMock::setInitialSyncIdIfNotSet(OperationContext* opCtx) {}
+void ReplicationConsistencyMarkersMock::setInitialSyncIdIfNotSet(OperationContext* opCtx) {
+    if (_initialSyncId.isEmpty()) {
+        _initialSyncId = UUID::gen().toBSON();
+    }
+}
 
-void ReplicationConsistencyMarkersMock::clearInitialSyncId(OperationContext* opCtx) {}
+void ReplicationConsistencyMarkersMock::clearInitialSyncId(OperationContext* opCtx) {
+    _initialSyncId = BSONObj();
+}
 
 BSONObj ReplicationConsistencyMarkersMock::getInitialSyncId(OperationContext* opCtx) {
-    return BSONObj();
+    return _initialSyncId;
 }
 
 }  // namespace repl
