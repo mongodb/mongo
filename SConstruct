@@ -1948,7 +1948,7 @@ def init_no_global_libdeps_tag_emitter(target, source, env):
     line.
     """
 
-    if link_model.startswith('dynamic'):
+    if link_model == 'dynamic':
         start_flag = env.get('LINK_AS_NEEDED_LIB_START', '')
         end_flag = env.get('LINK_AS_NEEDED_LIB_END', '')
 
