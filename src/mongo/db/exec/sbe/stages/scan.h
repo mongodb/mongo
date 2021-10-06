@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/config.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/stages/collection_helpers.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
@@ -122,8 +123,8 @@ public:
     size_t estimateCompileTimeSize() const final;
 
 protected:
-    void doSaveState(bool fullSave) override;
-    void doRestoreState(bool fullSave) override;
+    void doSaveState(bool relinquishCursor) override;
+    void doRestoreState(bool relinquishCursor) override;
     void doDetachFromOperationContext() override;
     void doAttachToOperationContext(OperationContext* opCtx) override;
     void doDetachFromTrialRunTracker() override;
@@ -177,6 +178,12 @@ private:
     bool _firstGetNext{false};
 
     ScanStats _specificStats;
+
+#if defined(MONGO_CONFIG_DEBUG_BUILD)
+    // Debug-only buffer used to track the last thing returned from the stage. Between
+    // saves/restores this is used to check that the storage cursor has not changed position.
+    std::vector<char> _lastReturned;
+#endif
 };
 
 class ParallelScanStage final : public PlanStage {
@@ -283,6 +290,12 @@ private:
     bool _open{false};
 
     std::unique_ptr<SeekableRecordCursor> _cursor;
+
+#if defined(MONGO_CONFIG_DEBUG_BUILD)
+    // Debug-only buffer used to track the last thing returned from the stage. Between
+    // saves/restores this is used to check that the storage cursor has not changed position.
+    std::vector<char> _lastReturned;
+#endif
 };
 }  // namespace sbe
 }  // namespace mongo
