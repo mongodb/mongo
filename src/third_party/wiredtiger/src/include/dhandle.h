@@ -119,11 +119,12 @@ struct __wt_data_handle {
 #define WT_DHANDLE_DISCARD 0x002u      /* Close on release */
 #define WT_DHANDLE_DISCARD_KILL 0x004u /* Mark dead on release */
 #define WT_DHANDLE_DROPPED 0x008u      /* Handle is dropped */
-#define WT_DHANDLE_EXCLUSIVE 0x010u    /* Exclusive access */
-#define WT_DHANDLE_HS 0x020u           /* History store table */
-#define WT_DHANDLE_IS_METADATA 0x040u  /* Metadata handle */
-#define WT_DHANDLE_LOCK_ONLY 0x080u    /* Handle only used as a lock */
-#define WT_DHANDLE_OPEN 0x100u         /* Handle is open */
+#define WT_DHANDLE_EVICTED 0x010u      /* Btree is evicted (advisory) */
+#define WT_DHANDLE_EXCLUSIVE 0x020u    /* Exclusive access */
+#define WT_DHANDLE_HS 0x040u           /* History store table */
+#define WT_DHANDLE_IS_METADATA 0x080u  /* Metadata handle */
+#define WT_DHANDLE_LOCK_ONLY 0x100u    /* Handle only used as a lock */
+#define WT_DHANDLE_OPEN 0x200u         /* Handle is open */
                                        /* AUTOMATIC FLAG VALUE GENERATION STOP 12 */
     uint32_t flags;
 
