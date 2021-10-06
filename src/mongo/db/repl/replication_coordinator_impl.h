@@ -1024,6 +1024,11 @@ private:
     void _setConfigState_inlock(ConfigState newState);
 
     /**
+     * Returns the string representation of the config state.
+     */
+    static std::string getConfigStateString(ConfigState state);
+
+    /**
      * Returns true if the horizon mappings between the oldConfig and newConfig are different.
      */
     void _errorOnPromisesIfHorizonChanged(WithLock lk,

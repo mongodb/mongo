@@ -518,6 +518,7 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
     _replicationProcess->getConsistencyMarkers()->clearAppliedThrough(
         opCtx, lastAppliedOpTime.getTimestamp());
 
+    LOGV2(6015309, "Logging transition to primary to oplog on stepup");
     writeConflictRetry(opCtx, "logging transition to primary to oplog", "local.oplog.rs", [&] {
         AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
         WriteUnitOfWork wuow(opCtx);

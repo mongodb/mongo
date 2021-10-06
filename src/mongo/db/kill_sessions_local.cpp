@@ -190,6 +190,7 @@ void yieldLocksForPreparedTransactions(OperationContext* opCtx) {
 
     // Scan the sessions again to get the list of all sessions with prepared transaction
     // to yield their locks.
+    LOGV2(6015318, "Yielding locks for prepared transactions.");
     SessionKiller::Matcher matcherAllSessions(
         KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(newOpCtx.get())});
     killSessionsAction(newOpCtx.get(),
@@ -222,6 +223,7 @@ void invalidateSessionsForStepdown(OperationContext* opCtx) {
     // It is illegal to invalidate the sessions if the operation has a session checked out.
     invariant(!OperationContextSession::get(opCtx));
 
+    LOGV2(6015319, "Invalidating sessions for stepdown.");
     SessionKiller::Matcher matcherAllSessions(
         KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
     killSessionsAction(opCtx,

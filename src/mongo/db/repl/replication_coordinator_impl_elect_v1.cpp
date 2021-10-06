@@ -296,12 +296,16 @@ void ReplicationCoordinatorImpl::_writeLastVoteForMyElection(
         auto opCtx = cc().makeOperationContext();
         // Any writes that occur as part of an election should not be subject to Flow Control.
         opCtx->setShouldParticipateInFlowControl(false);
+        LOGV2(6015300,
+              "Storing last vote document in local storage for my election",
+              "lastVote"_attr = lastVote);
         return _externalState->storeLocalLastVoteDocument(opCtx.get(), lastVote);
     }();
 
     stdx::lock_guard<Latch> lk(_mutex);
     LoseElectionDryRunGuardV1 lossGuard(this);
     if (status == ErrorCodes::CallbackCanceled) {
+        LOGV2(6015301, "Callback for storing last vote got cancelled");
         return;
     }
 
