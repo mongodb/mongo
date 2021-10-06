@@ -2555,9 +2555,9 @@ size_t sizeWithoutRecordIdStrAtEnd(const void* bufferRaw, size_t bufSize) {
     const size_t numSegments = sizeByteId + 1;
 
     for (; sizeByteId > 0; sizeByteId--) {
-        ridSize += sizes[sizeByteId] << ((numSegments - sizeByteId - 1) * 7);
+        ridSize += static_cast<size_t>(sizes[sizeByteId]) << ((numSegments - sizeByteId - 1) * 7);
     }
-    ridSize += sizes[sizeByteId] << ((numSegments - sizeByteId - 1) * 7);
+    ridSize += static_cast<size_t>(sizes[sizeByteId]) << ((numSegments - sizeByteId - 1) * 7);
 
     invariant(bufSize >= ridSize + numSegments);
     return bufSize - ridSize - numSegments;
@@ -2603,9 +2603,9 @@ RecordId decodeRecordIdStrAtEnd(const void* bufferRaw, size_t bufSize) {
     const size_t numSegments = sizeByteId + 1;
 
     for (; sizeByteId > 0; sizeByteId--) {
-        ridSize += sizes[sizeByteId] << ((numSegments - sizeByteId - 1) * 7);
+        ridSize += static_cast<size_t>(sizes[sizeByteId]) << ((numSegments - sizeByteId - 1) * 7);
     }
-    ridSize += sizes[sizeByteId] << ((numSegments - sizeByteId - 1) * 7);
+    ridSize += static_cast<size_t>(sizes[sizeByteId]) << ((numSegments - sizeByteId - 1) * 7);
 
     invariant(bufSize >= ridSize + numSegments);
 
