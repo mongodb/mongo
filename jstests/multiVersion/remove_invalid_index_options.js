@@ -42,16 +42,14 @@ assert.commandWorked(primaryColl.createIndex({z: 1}, {xyz: false}));
 fpPrimary.off();
 fpSecondary.off();
 
-// Verify that the primary (latest) detects invalid index options.
+// Verify that the primary (latest) and secondary (last-lts) detect invalid index options.
 let validateRes = assert.commandWorked(primaryDB.runCommand({validate: collName}));
 assert(!validateRes.valid);
 
-// Verify that the secondary (last-lts) does not detect invalid index options.
 validateRes = assert.commandWorked(secondaryDB.runCommand({validate: collName}));
-assert(validateRes.valid);
+assert(!validateRes.valid);
 
-// Use collMod to remove the invalid index options in the collection. This has no effect on the
-// secondary node.
+// Use collMod to remove the invalid index options in the collection.
 assert.commandWorked(primaryDB.runCommand({collMod: collName}));
 
 // Removing unknown field from index spec.
@@ -59,12 +57,14 @@ checkLog.containsJson(primary, 23878, {fieldName: "safe"});
 checkLog.containsJson(primary, 23878, {fieldName: "force"});
 checkLog.containsJson(primary, 23878, {fieldName: "xyz"});
 
-// Verify that the index no longer has invalid index options on the primary.
+checkLog.containsJson(secondary, 23878, {fieldName: "safe"});
+checkLog.containsJson(secondary, 23878, {fieldName: "force"});
+checkLog.containsJson(secondary, 23878, {fieldName: "xyz"});
+
+// Verify that the index no longer has invalid index options.
 validateRes = assert.commandWorked(primaryDB.runCommand({validate: collName}));
 assert(validateRes.valid);
 
-// The secondary, which doesn't have the capability to detect invalid index options will return
-// successfully.
 validateRes = assert.commandWorked(secondaryDB.runCommand({validate: collName}));
 assert(validateRes.valid);
 
