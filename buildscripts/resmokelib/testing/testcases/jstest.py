@@ -190,7 +190,7 @@ class JSTestCase(interface.TestCase, interface.UndoDBUtilsMixin):
         """Initialize the TestCase for running JS files."""
         super().__init__(logger, self.TEST_KIND, js_filename)
         self.num_clients = JSTestCase.DEFAULT_CLIENT_NUM
-        self._builder = JSTestCaseBuilder(logger, js_filename, self.id, shell_executable,
+        self._builder = JSTestCaseBuilder(logger, js_filename, self.id(), shell_executable,
                                           shell_options)
 
     def configure(  # pylint: disable=arguments-differ,keyword-arg-before-vararg
