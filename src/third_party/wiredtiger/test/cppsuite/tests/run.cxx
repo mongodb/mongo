@@ -225,12 +225,20 @@ main(int argc, char *argv[])
             }
         } else {
             current_test_name = test_name;
-            /* Configuration parsing. */
-            if (!config_filename.empty())
-                cfg = parse_configuration_from_file(config_filename);
-            else if (cfg.empty())
-                cfg = parse_configuration_from_file(get_default_config_path(current_test_name));
-            error_code = run_test(current_test_name, cfg, wt_open_config);
+            /* Check the test exists. */
+            if (std::find(all_tests.begin(), all_tests.end(), current_test_name) ==
+              all_tests.end()) {
+                test_harness::logger::log_msg(
+                  LOG_ERROR, "The test " + current_test_name + " was not found.");
+                error_code = -1;
+            } else {
+                /* Configuration parsing. */
+                if (!config_filename.empty())
+                    cfg = parse_configuration_from_file(config_filename);
+                else if (cfg.empty())
+                    cfg = parse_configuration_from_file(get_default_config_path(current_test_name));
+                error_code = run_test(current_test_name, cfg, wt_open_config);
+            }
         }
 
         if (error_code != 0)

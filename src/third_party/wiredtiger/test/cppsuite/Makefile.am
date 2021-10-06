@@ -11,7 +11,7 @@ all:
 all_TESTS=
 noinst_PROGRAMS=
 
-run_SOURCES = test_harness/core/component.cxx \
+test_harness = test_harness/core/component.cxx \
               test_harness/core/configuration.cxx \
               test_harness/core/throttle.cxx \
               test_harness/util/logger.cxx \
@@ -28,9 +28,15 @@ run_SOURCES = test_harness/core/component.cxx \
               test_harness/test.cxx \
               test_harness/thread_manager.cxx \
               test_harness/timestamp_manager.cxx \
-              test_harness/workload_generator.cxx \
-              tests/run.cxx
+              test_harness/workload_generator.cxx
 
+# If you prefer to not use the run binary you can add a test via this
+# mechanism but it is generally frowned upon.
+csuite_style_example_test_SOURCES = $(test_harness) tests/csuite_style_example_test.cxx
+noinst_PROGRAMS += csuite_style_example_test
+all_TESTS += csuite_style_example_test
+
+run_SOURCES = $(test_harness) tests/run.cxx
 noinst_PROGRAMS += run
 all_TESTS += run
 
