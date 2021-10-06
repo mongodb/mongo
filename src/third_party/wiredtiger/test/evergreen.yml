@@ -3079,8 +3079,8 @@ buildvariants:
     test_env_vars: LD_LIBRARY_PATH=$(pwd)/../../.libs PATH=/opt/mongodbtoolchain/v3/bin:$PATH
     make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH make
     posix_configure_flags:
-      --enable-silent-rules --enable-python --enable-zlib --enable-snappy
-      --enable-strict --enable-static
+      --enable-diagnostic --enable-python --enable-silent-rules --enable-snappy --enable-static
+      --enable-strict --enable-zlib
   tasks:
     - name: compile
     - name: cppsuite-hs-cleanup-stress
