@@ -37,6 +37,7 @@
 #include "mongo/db/s/dist_lock_manager.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/notification.h"
@@ -86,7 +87,11 @@ public:
     }
 
     Status getOutcome() {
-        return getRemoteResponse().status;
+        auto response = getRemoteResponse();
+        if (!response.status.isOK()) {
+            return response.status;
+        }
+        return getStatusFromCommandResult(response.data);
     }
 
     executor::RemoteCommandResponse getRemoteResponse() {
@@ -165,6 +170,11 @@ public:
         if (!response.status.isOK()) {
             return response.status;
         }
+        auto commandStatus = getStatusFromCommandResult(response.data);
+        if (!commandStatus.isOK()) {
+            return commandStatus;
+        }
+
         std::vector<BSONObj> splitKeys;
         BSONObjIterator it(response.data.getObjectField("splitKeys"));
         while (it.more()) {
@@ -214,6 +224,10 @@ public:
         if (!response.status.isOK()) {
             return response.status;
         }
+        auto commandStatus = getStatusFromCommandResult(response.data);
+        if (!commandStatus.isOK()) {
+            return commandStatus;
+        }
         return response.data["size"].number();
     }
 
@@ -221,6 +235,10 @@ public:
         auto response = getRemoteResponse();
         if (!response.status.isOK()) {
             return response.status;
+        }
+        auto commandStatus = getStatusFromCommandResult(response.data);
+        if (!commandStatus.isOK()) {
+            return commandStatus;
         }
         return response.data["numObjects"].number();
     }
@@ -648,29 +666,31 @@ public:
 
     std::unique_ptr<MergeChunksResponse> requestMergeChunks(OperationContext* opCtx,
                                                             const NamespaceString& nss,
-                                                            const ChunkType& lowerBound,
-                                                            const ChunkType& upperBound) override;
+                                                            const ShardId& shardId,
+                                                            const ChunkRange& chunkRange,
+                                                            const ChunkVersion& version) override;
 
     std::unique_ptr<SplitVectorResponse> requestSplitVector(
         OperationContext* opCtx,
         const NamespaceString& nss,
         const ChunkType& chunk,
-        const ShardKeyPattern& shardKeyPattern,
+        const KeyPattern& keyPattern,
         const SplitVectorSettings& commandSettings) override;
 
     std::unique_ptr<SplitChunkResponse> requestSplitChunk(
         OperationContext* opCtx,
         const NamespaceString& nss,
         const ChunkType& chunk,
-        const ShardKeyPattern& shardKeyPattern,
+        const KeyPattern& keyPattern,
         const std::vector<BSONObj>& splitPoints) override;
 
-    std::unique_ptr<ChunkDataSizeResponse> requestChunkDataSize(
-        OperationContext* opCtx,
-        const NamespaceString& nss,
-        const ChunkType& chunk,
-        const ShardKeyPattern& shardKeyPattern,
-        bool estimatedValue) override;
+    std::unique_ptr<ChunkDataSizeResponse> requestDataSize(OperationContext* opCtx,
+                                                           const NamespaceString& nss,
+                                                           const ShardId& shardId,
+                                                           const ChunkRange& chunkRange,
+                                                           const ChunkVersion& version,
+                                                           const KeyPattern& keyPattern,
+                                                           bool estimatedValue) override;
 
 private:
     enum class SchedulerState { Recovering, Running, Stopping, Stopped };

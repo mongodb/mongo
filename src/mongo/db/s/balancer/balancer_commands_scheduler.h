@@ -37,7 +37,7 @@
 namespace mongo {
 
 class ChunkType;
-class ShardKeyPattern;
+class KeyPattern;
 class MigrationSecondaryThrottleOptions;
 
 /**
@@ -150,29 +150,31 @@ public:
     virtual std::unique_ptr<MergeChunksResponse> requestMergeChunks(
         OperationContext* opCtx,
         const NamespaceString& nss,
-        const ChunkType& lowerBound,
-        const ChunkType& upperBound) = 0;
+        const ShardId& shardId,
+        const ChunkRange& chunkRange,
+        const ChunkVersion& version) = 0;
 
     virtual std::unique_ptr<SplitVectorResponse> requestSplitVector(
         OperationContext* opCtx,
         const NamespaceString& nss,
         const ChunkType& chunk,
-        const ShardKeyPattern& shardKeyPattern,
+        const KeyPattern& keyPattern,
         const SplitVectorSettings& commandSettings) = 0;
 
     virtual std::unique_ptr<SplitChunkResponse> requestSplitChunk(
         OperationContext* opCtx,
         const NamespaceString& nss,
         const ChunkType& chunk,
-        const ShardKeyPattern& shardKeyPattern,
+        const KeyPattern& keyPattern,
         const std::vector<BSONObj>& splitPoints) = 0;
 
-    virtual std::unique_ptr<ChunkDataSizeResponse> requestChunkDataSize(
-        OperationContext* opCtx,
-        const NamespaceString& nss,
-        const ChunkType& chunk,
-        const ShardKeyPattern& shardKeyPattern,
-        bool estimatedValue) = 0;
+    virtual std::unique_ptr<ChunkDataSizeResponse> requestDataSize(OperationContext* opCtx,
+                                                                   const NamespaceString& nss,
+                                                                   const ShardId& shardId,
+                                                                   const ChunkRange& chunkRange,
+                                                                   const ChunkVersion& version,
+                                                                   const KeyPattern& keyPattern,
+                                                                   bool estimatedValue) = 0;
 };
 
 }  // namespace mongo

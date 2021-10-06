@@ -140,18 +140,12 @@ std::unique_ptr<MoveChunkResponse> BalancerCommandsSchedulerImpl::requestMoveChu
 std::unique_ptr<MergeChunksResponse> BalancerCommandsSchedulerImpl::requestMergeChunks(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    const ChunkType& lowerBound,
-    const ChunkType& upperBound) {
-    invariant(lowerBound.getShard() == upperBound.getShard());
-    invariant(lowerBound.getMax().woCompare(upperBound.getMin()) <= 0);
+    const ShardId& shardId,
+    const ChunkRange& chunkRange,
+    const ChunkVersion& version) {
 
     auto commandInfo = std::make_shared<MergeChunksCommandInfo>(
-        nss,
-        lowerBound.getShard(),
-        lowerBound.getMin(),
-        upperBound.getMax(),
-        lowerBound.getVersion().isOlderThan(upperBound.getVersion()) ? upperBound.getVersion()
-                                                                     : lowerBound.getVersion());
+        nss, shardId, chunkRange.getMin(), chunkRange.getMax(), version);
 
     auto requestCollectionInfo = _buildAndEnqueueNewRequest(opCtx, std::move(commandInfo));
     return std::make_unique<MergeChunksResponseImpl>(std::move(requestCollectionInfo));
@@ -161,12 +155,12 @@ std::unique_ptr<SplitVectorResponse> BalancerCommandsSchedulerImpl::requestSplit
     OperationContext* opCtx,
     const NamespaceString& nss,
     const ChunkType& chunk,
-    const ShardKeyPattern& shardKeyPattern,
+    const KeyPattern& keyPattern,
     const SplitVectorSettings& commandSettings) {
 
     auto commandInfo = std::make_shared<SplitVectorCommandInfo>(nss,
                                                                 chunk.getShard(),
-                                                                shardKeyPattern.toBSON(),
+                                                                keyPattern.toBSON(),
                                                                 chunk.getMin(),
                                                                 chunk.getMax(),
                                                                 commandSettings.maxSplitPoints,
@@ -182,7 +176,7 @@ std::unique_ptr<SplitChunkResponse> BalancerCommandsSchedulerImpl::requestSplitC
     OperationContext* opCtx,
     const NamespaceString& nss,
     const ChunkType& chunk,
-    const ShardKeyPattern& shardKeyPattern,
+    const KeyPattern& shardKeyPattern,
     const std::vector<BSONObj>& splitPoints) {
 
     auto commandInfo = std::make_shared<SplitChunkCommandInfo>(nss,
@@ -197,19 +191,21 @@ std::unique_ptr<SplitChunkResponse> BalancerCommandsSchedulerImpl::requestSplitC
     return std::make_unique<SplitChunkResponseImpl>(std::move(requestCollectionInfo));
 }
 
-std::unique_ptr<ChunkDataSizeResponse> BalancerCommandsSchedulerImpl::requestChunkDataSize(
+std::unique_ptr<ChunkDataSizeResponse> BalancerCommandsSchedulerImpl::requestDataSize(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    const ChunkType& chunk,
-    const ShardKeyPattern& shardKeyPattern,
+    const ShardId& shardId,
+    const ChunkRange& chunkRange,
+    const ChunkVersion& version,
+    const KeyPattern& keyPattern,
     bool estimatedValue) {
     auto commandInfo = std::make_shared<DataSizeCommandInfo>(nss,
-                                                             chunk.getShard(),
-                                                             shardKeyPattern.toBSON(),
-                                                             chunk.getMin(),
-                                                             chunk.getMax(),
+                                                             shardId,
+                                                             keyPattern.toBSON(),
+                                                             chunkRange.getMin(),
+                                                             chunkRange.getMax(),
                                                              estimatedValue,
-                                                             chunk.getVersion());
+                                                             version);
 
     auto requestCollectionInfo = _buildAndEnqueueNewRequest(opCtx, std::move(commandInfo));
     return std::make_unique<ChunkDataSizeResponseImpl>(std::move(requestCollectionInfo));

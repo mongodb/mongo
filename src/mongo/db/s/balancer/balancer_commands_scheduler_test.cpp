@@ -147,13 +147,14 @@ TEST_F(BalancerCommandsSchedulerTest, SuccessfulMoveChunkCommand) {
 
 TEST_F(BalancerCommandsSchedulerTest, SuccessfulMergeChunkCommand) {
     _scheduler.start(operationContext());
-    ChunkType chunk1 = makeChunk(0, kShardId0);
-    ChunkType chunk2 = makeChunk(10, kShardId0);
     auto networkResponseFuture = launchAsync([&]() {
         onCommand(
             [&](const executor::RemoteCommandRequest& request) { return BSON("ok" << true); });
     });
-    auto resp = _scheduler.requestMergeChunks(operationContext(), kNss, chunk1, chunk2);
+
+    ChunkRange range(BSON("x" << 0), BSON("x" << 20));
+    ChunkVersion version(1, 1, OID::gen(), Timestamp(10));
+    auto resp = _scheduler.requestMergeChunks(operationContext(), kNss, kShardId0, range, version);
     ASSERT_OK(resp->getOutcome());
     networkResponseFuture.default_timed_get();
     _scheduler.stop();
@@ -161,11 +162,10 @@ TEST_F(BalancerCommandsSchedulerTest, SuccessfulMergeChunkCommand) {
 
 TEST_F(BalancerCommandsSchedulerTest, MergeChunkNonexistentShard) {
     _scheduler.start(operationContext());
-    ChunkType brokenChunk1 = makeChunk(0, kShardId0);
-    brokenChunk1.setShard(ShardId("nonexistent"));
-    ChunkType brokenChunk2 = makeChunk(10, kShardId0);
-    brokenChunk2.setShard(ShardId("nonexistent"));
-    auto resp = _scheduler.requestMergeChunks(operationContext(), kNss, brokenChunk1, brokenChunk2);
+    ChunkRange range(BSON("x" << 0), BSON("x" << 20));
+    ChunkVersion version(1, 1, OID::gen(), Timestamp(10));
+    auto resp = _scheduler.requestMergeChunks(
+        operationContext(), kNss, ShardId("nonexistent"), range, version);
     auto shardNotFoundError = Status{ErrorCodes::ShardNotFound, "Shard nonexistent not found"};
     ASSERT_EQ(resp->getOutcome(), shardNotFoundError);
     _scheduler.stop();
@@ -184,11 +184,8 @@ TEST_F(BalancerCommandsSchedulerTest, SuccessfulSplitVectorCommand) {
             return splitChunkResponse.obj();
         });
     });
-    auto resp = _scheduler.requestSplitVector(operationContext(),
-                                              kNss,
-                                              splitChunk,
-                                              ShardKeyPattern(BSON("x" << 1)),
-                                              SplitVectorSettings());
+    auto resp = _scheduler.requestSplitVector(
+        operationContext(), kNss, splitChunk, KeyPattern(BSON("x" << 1)), SplitVectorSettings());
     ASSERT_OK(resp->getOutcome());
     ASSERT_OK(resp->getSplitKeys().getStatus());
     ASSERT_EQ(resp->getSplitKeys().getValue().size(), 1);
@@ -207,7 +204,7 @@ TEST_F(BalancerCommandsSchedulerTest, SuccessfulSplitChunkCommand) {
     auto resp = _scheduler.requestSplitChunk(operationContext(),
                                              kNss,
                                              splitChunk,
-                                             ShardKeyPattern(BSON("x" << 1)),
+                                             KeyPattern(BSON("x" << 1)),
                                              std::vector<BSONObj>{BSON("x" << 5)});
     ASSERT_OK(resp->getOutcome());
     networkResponseFuture.default_timed_get();
@@ -225,8 +222,13 @@ TEST_F(BalancerCommandsSchedulerTest, SuccessfulRequestChunkDataSizeCommand) {
         onCommand(
             [&](const executor::RemoteCommandRequest& request) { return chunkSizeResponse.obj(); });
     });
-    auto resp = _scheduler.requestChunkDataSize(
-        operationContext(), kNss, chunk, ShardKeyPattern(BSON("x" << 1)), false);
+    auto resp = _scheduler.requestDataSize(operationContext(),
+                                           kNss,
+                                           chunk.getShard(),
+                                           chunk.getRange(),
+                                           chunk.getVersion(),
+                                           KeyPattern(BSON("x" << 1)),
+                                           false);
     ASSERT_OK(resp->getOutcome());
     ASSERT_OK(resp->getSize().getStatus());
     ASSERT_EQ(resp->getSize().getValue(), 156);
