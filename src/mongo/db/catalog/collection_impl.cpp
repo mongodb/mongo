@@ -1452,6 +1452,13 @@ Status CollectionImpl::validate(OperationContext* opCtx,
                                 BSONObjBuilder* output) {
     dassert(opCtx->lockState()->isCollectionLockedForMode(ns(), MODE_IS));
 
+    const auto nss = NamespaceString(ns());
+    const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    // Check whether we are allowed to read from this node after acquiring our locks. If we are
+    // in a state where we cannot read, we should not run validate.
+    uassertStatusOK(replCoord->checkCanServeReadsFor(
+        opCtx, nss, ReadPreferenceSetting::get(opCtx).canRunOnSecondary()));
+
     try {
         ValidateResultsMap indexNsResultsMap;
         BSONObjBuilder keysPerIndex;  // not using subObjStart to be exception safe
