@@ -992,11 +992,6 @@ void ReshardingCoordinatorService::ReshardingCoordinator::installCoordinatorDoc(
     bob.append("namespace", doc.getSourceNss().toString());
     bob.append("collectionUUID", doc.getSourceUUID().toString());
     bob.append("reshardingUUID", doc.getReshardingUUID().toString());
-    ShardingLogging::get(opCtx)->logChange(opCtx,
-                                           "resharding.coordinator.transition",
-                                           doc.getSourceNss().toString(),
-                                           bob.obj(),
-                                           ShardingCatalogClient::kMajorityWriteConcern);
 
     LOGV2_INFO(5343001,
                "Transitioned resharding coordinator state",
@@ -1007,6 +1002,11 @@ void ReshardingCoordinatorService::ReshardingCoordinator::installCoordinatorDoc(
                "reshardingUUID"_attr = doc.getReshardingUUID());
 
     _coordinatorDoc = doc;
+    ShardingLogging::get(opCtx)->logChange(opCtx,
+                                           "resharding.coordinator.transition",
+                                           doc.getSourceNss().toString(),
+                                           bob.obj(),
+                                           ShardingCatalogClient::kMajorityWriteConcern);
 }
 
 void markCompleted(const Status& status) {
