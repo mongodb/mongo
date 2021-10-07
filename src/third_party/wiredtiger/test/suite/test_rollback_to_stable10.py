@@ -173,6 +173,10 @@ class test_rollback_to_stable10(test_rollback_to_stable_base):
     def test_rollback_to_stable_prepare(self):
         nrows = 1000
 
+        # FIXME-WT-7250 This test fails because of cache stuck on Windows.
+        if os.name == "nt":
+            self.skipTest('rollback_to_stable10 prepare test skipped on Windows')
+
         # Create a table without logging.
         self.pr("create/populate tables")
         uri_1 = "table:rollback_to_stable10_1"

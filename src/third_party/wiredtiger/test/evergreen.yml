@@ -317,7 +317,7 @@ functions:
         if [ ${is_cmake_build|false} = true ]; then
           . test/evergreen/find_cmake.sh
           cd cmake_build
-          ${test_env_vars|} $CTEST -L check ${smp_command|} -VV 2>&1
+          ${test_env_vars|} $CTEST -L check ${smp_command|} --output-on-failure 2>&1
         else
           cd build_posix
           ${test_env_vars|} ${make_command|make} VERBOSE=1 check ${smp_command|} 2>&1
@@ -553,6 +553,35 @@ functions:
             exit $ret
           done
         done
+
+  "generic-perf-test":
+    # Run a performance test
+    # Parameterised using the 'perf-test-name' and 'maxruns' variables
+    - command: shell.exec
+      params:
+        working_dir: "wiredtiger/bench/wtperf/wtperf_run_py"
+        shell: bash
+        script: |
+          set -o errexit
+          set -o verbose
+          ${virtualenv_binary} -p ${python_binary} venv
+          source venv/bin/activate
+          ${pip3_binary} install psutil
+          ${python_binary} wtperf_run.py -p ../../../cmake_build/bench/wtperf/wtperf -t ../runners/${perf-test-name}.wtperf -v -ho WT_TEST -m ${maxruns} -o out.json
+
+  "generic-perf-test-push-results":
+    # Push the json results to the 'Files' tab of the task in Evergreen
+    # Parameterised using the 'perf-test-name' variable
+    - command: s3.put
+      params:
+        aws_secret: ${aws_secret}
+        aws_key: ${aws_key}
+        local_file: wiredtiger/bench/wtperf/wtperf_run_py/out.json
+        bucket: build_external
+        permissions: public-read
+        content_type: text/html
+        display_name: "Test results (JSON)"
+        remote_file: wiredtiger/${build_variant}/${revision}/perf-test-${perf-test-name}-${build_id}-${execution}/test-results.json
 
 #########################################################################################
 # VARIABLES
@@ -967,6 +996,22 @@ tasks:
             set -o verbose
 
             ${test_env_vars|} $(pwd)/test/cppsuite/run -t hs_cleanup -C 'debug_mode=(cursor_copy=true)' -f test/cppsuite/configs/hs_cleanup_default.txt -l 2
+
+  - name: cppsuite-search-near-default
+    tags: ["pull_request"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/build_posix/"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} $(pwd)/test/cppsuite/run -t search_near_01 -f test/cppsuite/configs/search_near_01_default.txt -l 2
+            ${test_env_vars|} $(pwd)/test/cppsuite/run -t search_near_02 -f test/cppsuite/configs/search_near_02_default.txt -l 2
 
   - name: cppsuite-base-test-stress
     depends_on:
@@ -2366,6 +2411,10 @@ tasks:
       - func: "random abort test"
         vars:
           random_abort_args: -t 40
+      # random-abort - run compaction
+      - func: "random abort test"
+        vars:
+          random_abort_args: -c -t 60
 
       # truncated-log
       - func: "truncated log test"
@@ -2377,6 +2426,12 @@ tasks:
       - func: "format test"
         vars:
           extra_args: file_type=row
+
+      # format test for stressing compaction code path
+      - func: "format test"
+        vars:
+          times: 3
+          extra_args: file_type=row compaction=1 verify=1 runs.timer=3 ops.pct.delete=30
 
       #FIXME-WT-5270: Add wtperf testing from Jenkin "wiredtiger-test-check-long" after fixing WT-5270
 
@@ -2847,6 +2902,111 @@ tasks:
             set -o errexit
             python "../metrixplusplus/metrix++.py" limit --max-limit=std.code.complexity:cyclomatic:95
 
+    #############################
+    # Performance Tests for lsm #
+    #############################
+
+  - name: perf-test-small-lsm
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+      - func: "generic-perf-test"
+        vars:
+          perf-test-name: small-lsm
+          maxruns: 3
+      - func: "generic-perf-test-push-results"
+        vars:
+          perf-test-name: small-lsm
+
+  - name: perf-test-medium-lsm
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+      - func: "generic-perf-test"
+        vars:
+          perf-test-name: medium-lsm
+          maxruns: 1
+      - func: "generic-perf-test-push-results"
+        vars:
+          perf-test-name: medium-lsm
+
+  - name: perf-test-medium-lsm-compact
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+      - func: "generic-perf-test"
+        vars:
+          perf-test-name: medium-lsm-compact
+          maxruns: 1
+      - func: "generic-perf-test-push-results"
+        vars:
+          perf-test-name: medium-lsm-compact
+
+  - name: perf-test-medium-multi-lsm
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+      - func: "generic-perf-test"
+        vars:
+          perf-test-name: medium-multi-lsm
+          maxruns: 1
+      - func: "generic-perf-test-push-results"
+        vars:
+          perf-test-name: medium-multi-lsm
+
+    ###############################
+    # Performance Tests for btree #
+    ###############################
+
+  - name: perf-test-small-btree
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+      - func: "generic-perf-test"
+        vars:
+          perf-test-name: small-btree
+          maxruns: 1
+      - func: "generic-perf-test-push-results"
+        vars:
+          perf-test-name: small-btree
+
+  - name: perf-test-small-btree-backup
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+      - func: "generic-perf-test"
+        vars:
+          perf-test-name: small-btree-backup
+          maxruns: 1
+      - func: "generic-perf-test-push-results"
+        vars:
+          perf-test-name: small-btree-backup
+
+  - name: perf-test-medium-btree
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+      - func: "generic-perf-test"
+        vars:
+          perf-test-name: medium-btree
+          maxruns: 3
+      - func: "generic-perf-test-push-results"
+        vars:
+          perf-test-name: medium-btree
+
+  - name: perf-test-medium-btree-backup
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+      - func: "generic-perf-test"
+        vars:
+          perf-test-name: medium-btree-backup
+          maxruns: 3
+      - func: "generic-perf-test-push-results"
+        vars:
+          perf-test-name: medium-btree-backup
+
+
 buildvariants:
 
 - name: ubuntu2004
@@ -2990,6 +3150,7 @@ buildvariants:
     - name: make-check-test
     - name: cppsuite-base-test-default
     - name: cppsuite-hs-cleanup-default
+    - name: cppsuite-search-near-default
 
 - name: ubuntu2004-compilers
   display_name: "! Ubuntu 20.04 Compilers"
@@ -3024,6 +3185,33 @@ buildvariants:
     - name: ".stress-test-4"
     - name: format-abort-recovery-stress-test
 
+- name: ubuntu2004-perf-tests
+  display_name: Ubuntu 20.04 Performance tests
+  run_on:
+    - ubuntu2004-test
+  expansions:
+    test_env_vars: LD_LIBRARY_PATH=$(pwd) WT_BUILDDIR=$(pwd)
+    posix_configure_flags: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_v3_gcc.cmake -DCMAKE_C_FLAGS="-ggdb" -DHAVE_DIAGNOSTIC=1 -DENABLE_ZLIB=1  -DENABLE_SNAPPY=1 -DENABLE_STRICT=1 -DCMAKE_INSTALL_PREFIX=$(pwd)/LOCAL_INSTALL
+    python_binary: '/opt/mongodbtoolchain/v3/bin/python3'
+    pip3_binary: '/opt/mongodbtoolchain/v3/bin/pip3'
+    virtualenv_binary: '/opt/mongodbtoolchain/v3/bin/virtualenv'
+    smp_command: -j $(echo "`grep -c ^processor /proc/cpuinfo` * 2" | bc)
+    cmake_generator: Ninja
+    make_command: ninja
+    is_cmake_build: true
+  tasks:
+    # btree tests
+    - name: perf-test-small-btree
+    - name: perf-test-small-btree-backup
+    - name: perf-test-medium-btree
+    - name: perf-test-medium-btree-backup
+    # lsm tests
+    - name: perf-test-small-lsm
+    - name: perf-test-medium-lsm
+    - name: perf-test-medium-lsm-compact
+    - name: perf-test-medium-multi-lsm
+
+
 - name: large-scale-tests
   display_name: "Large scale tests"
   batchtime: 480 # 3 times a day
@@ -3052,8 +3240,8 @@ buildvariants:
     test_env_vars: LD_LIBRARY_PATH=$(pwd)/../../.libs PATH=/opt/mongodbtoolchain/v3/bin:$PATH
     make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH make
     posix_configure_flags:
-      --enable-silent-rules --enable-python --enable-zlib --enable-snappy
-      --enable-strict --enable-static
+      --enable-diagnostic --enable-python --enable-silent-rules --enable-snappy --enable-static
+      --enable-strict --enable-zlib
   tasks:
     - name: compile
     - name: cppsuite-hs-cleanup-stress

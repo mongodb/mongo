@@ -80,6 +80,12 @@ connection_manager::create_session()
     return (session);
 }
 
+WT_CONNECTION *
+connection_manager::get_connection()
+{
+    return (_conn);
+}
+
 /*
  * set_timestamp calls into the connection API in a thread safe manner to set global timestamps.
  */

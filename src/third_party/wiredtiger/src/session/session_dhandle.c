@@ -362,7 +362,6 @@ __session_dhandle_sweep(WT_SESSION_IMPL *session)
     WT_DATA_HANDLE *dhandle;
     WT_DATA_HANDLE_CACHE *dhandle_cache, *dhandle_cache_tmp;
     uint64_t now;
-    bool empty_btree;
 
     conn = S2C(session);
 
@@ -379,15 +378,16 @@ __session_dhandle_sweep(WT_SESSION_IMPL *session)
     TAILQ_FOREACH_SAFE(dhandle_cache, &session->dhandles, q, dhandle_cache_tmp)
     {
         dhandle = dhandle_cache->dhandle;
-        empty_btree = false;
-        if (WT_DHANDLE_BTREE(dhandle))
-            WT_WITH_DHANDLE(
-              session, dhandle, empty_btree = (__wt_btree_bytes_evictable(session) == 0));
 
+        /*
+         * Only discard handles that are dead or dying and, in the case of btrees, have been
+         * evicted. These checks are not done with any locks in place, other than the data handle
+         * reference, so we cannot peer past what is in the dhandle directly.
+         */
         if (dhandle != session->dhandle && dhandle->session_inuse == 0 &&
           (WT_DHANDLE_INACTIVE(dhandle) ||
-            (dhandle->timeofdeath != 0 && now - dhandle->timeofdeath > conn->sweep_idle_time) ||
-            empty_btree)) {
+            (dhandle->timeofdeath != 0 && now - dhandle->timeofdeath > conn->sweep_idle_time)) &&
+          (!WT_DHANDLE_BTREE(dhandle) || F_ISSET(dhandle, WT_DHANDLE_EVICTED))) {
             WT_STAT_CONN_INCR(session, dh_session_handles);
             WT_ASSERT(session, !WT_IS_METADATA(dhandle));
             __session_discard_dhandle(session, dhandle_cache);

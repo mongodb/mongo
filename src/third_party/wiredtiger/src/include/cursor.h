@@ -12,27 +12,27 @@
 /*
  * Initialize a static WT_CURSOR structure.
  */
-#define WT_CURSOR_STATIC_INIT(n, get_key, get_value, set_key, set_value, compare, equals, next,  \
-  prev, reset, search, search_near, insert, modify, update, remove, reserve, reconfigure, cache, \
-  reopen, close)                                                                                 \
-    static const WT_CURSOR n = {                                                                 \
-      NULL, /* session */                                                                        \
-      NULL, /* uri */                                                                            \
-      NULL, /* key_format */                                                                     \
-      NULL, /* value_format */                                                                   \
-      get_key, get_value, set_key, set_value, compare, equals, next, prev, reset, search,        \
-      search_near, insert, modify, update, remove, reserve, close, reconfigure, cache, reopen,   \
-      0,                     /* uri_hash */                                                      \
-      {NULL, NULL},          /* TAILQ_ENTRY q */                                                 \
-      0,                     /* recno key */                                                     \
-      {0},                   /* recno raw buffer */                                              \
-      NULL,                  /* json_private */                                                  \
-      NULL,                  /* lang_private */                                                  \
-      {NULL, 0, NULL, 0, 0}, /* WT_ITEM key */                                                   \
-      {NULL, 0, NULL, 0, 0}, /* WT_ITEM value */                                                 \
-      0,                     /* int saved_err */                                                 \
-      NULL,                  /* internal_uri */                                                  \
-      0                      /* uint32_t flags */                                                \
+#define WT_CURSOR_STATIC_INIT(n, get_key, get_value, set_key, set_value, compare, equals, next, \
+  prev, reset, search, search_near, insert, modify, update, remove, reserve, reconfigure,       \
+  largest_key, cache, reopen, close)                                                            \
+    static const WT_CURSOR n = {                                                                \
+      NULL, /* session */                                                                       \
+      NULL, /* uri */                                                                           \
+      NULL, /* key_format */                                                                    \
+      NULL, /* value_format */                                                                  \
+      get_key, get_value, set_key, set_value, compare, equals, next, prev, reset, search,       \
+      search_near, insert, modify, update, remove, reserve, close, reconfigure, largest_key,    \
+      cache, reopen, 0,      /* uri_hash */                                                     \
+      {NULL, NULL},          /* TAILQ_ENTRY q */                                                \
+      0,                     /* recno key */                                                    \
+      {0},                   /* recno raw buffer */                                             \
+      NULL,                  /* json_private */                                                 \
+      NULL,                  /* lang_private */                                                 \
+      {NULL, 0, NULL, 0, 0}, /* WT_ITEM key */                                                  \
+      {NULL, 0, NULL, 0, 0}, /* WT_ITEM value */                                                \
+      0,                     /* int saved_err */                                                \
+      NULL,                  /* internal_uri */                                                 \
+      0                      /* uint32_t flags */                                               \
     }
 
 struct __wt_cursor_backup {

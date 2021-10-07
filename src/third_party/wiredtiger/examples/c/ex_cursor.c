@@ -38,6 +38,7 @@ int cursor_search_near(WT_CURSOR *cursor);
 int cursor_insert(WT_CURSOR *cursor);
 int cursor_update(WT_CURSOR *cursor);
 int cursor_remove(WT_CURSOR *cursor);
+int cursor_largest_key(WT_CURSOR *cursor);
 
 static const char *home;
 
@@ -155,6 +156,14 @@ cursor_remove(WT_CURSOR *cursor)
 }
 /*! [cursor remove] */
 
+/*! [cursor largest key] */
+int
+cursor_largest_key(WT_CURSOR *cursor)
+{
+    return (cursor->largest_key(cursor));
+}
+/*! [cursor largest key] */
+
 int
 main(int argc, char *argv[])
 {
@@ -197,6 +206,7 @@ main(int argc, char *argv[])
     error_check(cursor_search_near(cursor));
     error_check(cursor_update(cursor));
     error_check(cursor_remove(cursor));
+    error_check(cursor_largest_key(cursor));
     error_check(cursor->close(cursor));
 
     /* Note: closing the connection implicitly closes open session(s). */

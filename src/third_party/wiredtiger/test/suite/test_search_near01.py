@@ -98,7 +98,7 @@ class test_search_near01(wttest.WiredTigerTestCase):
         # range forward, and then the whole range backwards.
         self.assertGreater(skip_count, key_count * 2)
 
-        cursor2.reconfigure("prefix_key=true")
+        cursor2.reconfigure("prefix_search=true")
         cursor2.set_key('aa')
         cursor2.search_near()
 
@@ -196,7 +196,7 @@ class test_search_near01(wttest.WiredTigerTestCase):
         # range forward, and then the whole range backwards.
         self.assertGreater(skip_count, key_count * 2)
 
-        cursor2.reconfigure("prefix_key=true")
+        cursor2.reconfigure("prefix_search=true")
         cursor2.set_key('cc')
         cursor2.search_near()
         self.assertEqual(self.get_stat(stat.conn.cursor_search_near_prefix_fast_paths), 2)
@@ -304,7 +304,7 @@ class test_search_near01(wttest.WiredTigerTestCase):
         # range forward, and then the whole range backwards.
         self.assertGreater(skip_count, key_count)
 
-        cursor2.reconfigure("prefix_key=true")
+        cursor2.reconfigure("prefix_search=true")
         cursor2.set_key('c')
         cursor2.search_near()
 
@@ -317,14 +317,14 @@ class test_search_near01(wttest.WiredTigerTestCase):
         session2.rollback_transaction()
         session2.begin_transaction('ignore_prepare=true')
         cursor4 = session2.open_cursor(uri)
-        cursor4.reconfigure("prefix_key=true")
+        cursor4.reconfigure("prefix_search=true")
         cursor4.set_key('c')
         cursor4.search_near()
         prefix_skip_count = self.get_stat(stat.conn.cursor_next_skip_lt_100, session2)
         self.assertEqual(prefix_skip_count - skip_count, 2)
         skip_count = prefix_skip_count
 
-        cursor4.reconfigure("prefix_key=false")
+        cursor4.reconfigure("prefix_search=false")
         cursor4.set_key('c')
         cursor4.search_near()
         self.assertEqual(self.get_stat(stat.conn.cursor_next_skip_lt_100, session2) - skip_count, 2)

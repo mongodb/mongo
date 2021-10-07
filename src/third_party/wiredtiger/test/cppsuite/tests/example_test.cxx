@@ -37,6 +37,13 @@ class example_test : public test_harness::test {
     example_test(const test_harness::test_args &args) : test(args) {}
 
     void
+    run()
+    {
+        /* You can remove the call to the base class to fully customized your test. */
+        test::run();
+    }
+
+    void
     populate(test_harness::database &, test_harness::timestamp_manager *,
       test_harness::configuration *, test_harness::workload_tracking *) override final
     {

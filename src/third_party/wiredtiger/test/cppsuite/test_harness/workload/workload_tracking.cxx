@@ -99,7 +99,8 @@ workload_tracking::do_work()
     /* Take a copy of the oldest so that we sweep with a consistent timestamp. */
     oldest_ts = _tsm.get_oldest_ts();
 
-    while ((ret = _sweep_cursor->prev(_sweep_cursor.get())) == 0) {
+    /* We need to check if the component is still running to avoid unecessary iterations. */
+    while (_running && (ret = _sweep_cursor->prev(_sweep_cursor.get())) == 0) {
         testutil_check(_sweep_cursor->get_key(_sweep_cursor.get(), &collection_id, &key, &ts));
         testutil_check(_sweep_cursor->get_value(_sweep_cursor.get(), &op_type, &value));
         /*
@@ -137,7 +138,13 @@ workload_tracking::do_work()
 
     free(sweep_key);
 
-    if (ret != WT_NOTFOUND)
+    /*
+     * If we get here and the test is still running, it means we must have reached the end of the
+     * table. We can also get here because the test is no longer running. In this case, the cursor
+     * can either be at the end of the table or still on a valid entry since we interrupted the
+     * work.
+     */
+    if (ret != 0 && ret != WT_NOTFOUND)
         testutil_die(LOG_ERROR,
           "Tracking table sweep failed: cursor->next() returned an unexpected error %d.", ret);
 

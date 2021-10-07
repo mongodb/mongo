@@ -9,6 +9,24 @@
 #include "wt_internal.h"
 
 /*
+ * __tiered_flush_state --
+ *     Account for flush work units so threads can know when shared storage flushing is complete.
+ */
+static void
+__tiered_flush_state(WT_SESSION_IMPL *session, uint32_t type, bool incr)
+{
+    WT_CONNECTION_IMPL *conn;
+
+    if (type != WT_TIERED_WORK_FLUSH)
+        return;
+    conn = S2C(session);
+    if (incr)
+        (void)__wt_atomic_addv32(&conn->flush_state, 1);
+    else
+        (void)__wt_atomic_subv32(&conn->flush_state, 1);
+}
+
+/*
  * __wt_tiered_work_free --
  *     Free a work unit and account for it in the flush state.
  */
@@ -16,18 +34,9 @@ void
 __wt_tiered_work_free(WT_SESSION_IMPL *session, WT_TIERED_WORK_UNIT *entry)
 {
     WT_CONNECTION_IMPL *conn;
-    uint32_t new_state, old_state;
 
     conn = S2C(session);
-    for (;;) {
-        WT_BARRIER();
-        old_state = conn->flush_state;
-        new_state = old_state - 1;
-        if (__wt_atomic_casv32(&conn->flush_state, old_state, new_state))
-            break;
-        WT_STAT_CONN_INCR(session, flush_state_races);
-        __wt_yield();
-    }
+    __tiered_flush_state(session, entry->type, false);
     /* If all work is done signal any waiting thread waiting for sync. */
     if (WT_FLUSH_STATE_DONE(conn->flush_state))
         __wt_cond_signal(session, conn->flush_cond);
@@ -42,23 +51,13 @@ void
 __wt_tiered_push_work(WT_SESSION_IMPL *session, WT_TIERED_WORK_UNIT *entry)
 {
     WT_CONNECTION_IMPL *conn;
-    uint32_t new_state, old_state;
 
     conn = S2C(session);
-
     __wt_spin_lock(session, &conn->tiered_lock);
     TAILQ_INSERT_TAIL(&conn->tieredqh, entry, q);
     WT_STAT_CONN_INCR(session, tiered_work_units_created);
     __wt_spin_unlock(session, &conn->tiered_lock);
-    for (;;) {
-        WT_BARRIER();
-        old_state = conn->flush_state;
-        new_state = old_state + 1;
-        if (__wt_atomic_casv32(&conn->flush_state, old_state, new_state))
-            break;
-        WT_STAT_CONN_INCR(session, flush_state_races);
-        __wt_yield();
-    }
+    __tiered_flush_state(session, entry->type, true);
     __wt_cond_signal(session, conn->tiered_cond);
     return;
 }
@@ -87,10 +86,10 @@ __wt_tiered_pop_work(
         if (FLD_ISSET(type, entry->type) && (maxval == 0 || entry->op_val < maxval)) {
             TAILQ_REMOVE(&conn->tieredqh, entry, q);
             WT_STAT_CONN_INCR(session, tiered_work_units_dequeued);
+            *entryp = entry;
             break;
         }
     }
-    *entryp = entry;
     __wt_spin_unlock(session, &conn->tiered_lock);
     return;
 }

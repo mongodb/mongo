@@ -2140,7 +2140,12 @@ __slvg_ovfl_reconcile(WT_SESSION_IMPL *session, WT_STUFF *ss)
         WT_ERR(__wt_calloc_def(session, trk->trk_ovfl_cnt, &slot));
         for (j = 0; j < trk->trk_ovfl_cnt; ++j) {
             addr = &trk->trk_ovfl_addr[j];
-            searchp =
+            /*
+             * It is possible that salvage found a leaf page that points to an overflow item, but
+             * there were no overflow items at all.
+             */
+            searchp = ss->ovfl == NULL ?
+              NULL :
               bsearch(addr, ss->ovfl, ss->ovfl_next, sizeof(WT_TRACK *), __slvg_ovfl_compare);
 
             /*

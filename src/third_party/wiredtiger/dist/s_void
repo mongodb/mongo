@@ -60,6 +60,7 @@ func_ok()
 	    -e '/int __wt_block_manager_size$/d' \
 	    -e '/int __wt_block_tiered_load$/d' \
 	    -e '/int __wt_block_write_size$/d' \
+	    -e '/int __wt_btcur_skip_page$/d' \
 	    -e '/int __wt_buf_catfmt$/d' \
 	    -e '/int __wt_buf_fmt$/d' \
 	    -e '/int __wt_count_birthmarks$/d' \

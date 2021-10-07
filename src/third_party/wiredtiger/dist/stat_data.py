@@ -505,8 +505,9 @@ conn_stats = [
     ##########################################
     # Tiered storage statistics
     ##########################################
-    StorageStat('flush_state_races', 'flush state races'),
     StorageStat('flush_tier', 'flush_tier operation calls'),
+    StorageStat('local_objects_inuse', 'attempts to remove a local object and the object is in use'),
+    StorageStat('local_objects_removed', 'local objects removed'),
 
     ##########################################
     # Thread Count statistics
@@ -819,13 +820,11 @@ conn_dsrc_stats = [
     CursorStat('cursor_next_hs_tombstone', 'cursor next calls that skip due to a globally visible history store tombstone'),
     CursorStat('cursor_next_skip_ge_100', 'cursor next calls that skip greater than or equal to 100 entries'),
     CursorStat('cursor_next_skip_lt_100', 'cursor next calls that skip less than 100 entries'),
-    CursorStat('cursor_next_skip_page_count', 'Total number of pages skipped without reading by cursor next calls'),
     CursorStat('cursor_next_skip_total', 'Total number of entries skipped by cursor next calls'),
     CursorStat('cursor_open_count', 'open cursor count', 'no_clear,no_scale'),
     CursorStat('cursor_prev_hs_tombstone', 'cursor prev calls that skip due to a globally visible history store tombstone'),
     CursorStat('cursor_prev_skip_ge_100', 'cursor prev calls that skip greater than or equal to 100 entries'),
     CursorStat('cursor_prev_skip_lt_100', 'cursor prev calls that skip less than 100 entries'),
-    CursorStat('cursor_prev_skip_page_count', 'Total number of pages skipped without reading by cursor prev calls'),
     CursorStat('cursor_prev_skip_total', 'Total number of entries skipped by cursor prev calls'),
     CursorStat('cursor_search_near_prefix_fast_paths', 'Total number of times a search near has exited due to prefix config'),
     CursorStat('cursor_skip_hs_cur_position', 'Total number of entries skipped to position the history store cursor'),

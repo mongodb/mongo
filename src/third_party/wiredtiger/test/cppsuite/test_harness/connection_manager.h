@@ -30,8 +30,12 @@
 #define CONN_API_H
 
 /* Following definitions are required in order to use printing format specifiers in C++. */
+#ifndef __STDC_LIMIT_MACROS
 #define __STDC_LIMIT_MACROS
+#endif
+#ifndef __STDC_FORMAT_MACROS
 #define __STDC_FORMAT_MACROS
+#endif
 
 #include <mutex>
 
@@ -59,6 +63,8 @@ class connection_manager {
     void close();
     void create(const std::string &config, const std::string &home = DEFAULT_DIR);
     scoped_session create_session();
+
+    WT_CONNECTION *get_connection();
 
     /*
      * set_timestamp calls into the connection API in a thread safe manner to set global timestamps.

@@ -78,7 +78,6 @@ s/^stress.split_4=/timing_stress_split_4=/
 s/^stress.split_5=/timing_stress_split_5=/
 s/^stress.split_6=/timing_stress_split_6=/
 s/^stress.split_7=/timing_stress_split_7=/
-s/^stress.split_8=/timing_stress_split_8=/
 s/^transaction.frequency=/transaction-frequency=/
 s/^transaction.isolation=/isolation=/
 s/^transaction.timestamps=/transaction_timestamps=/

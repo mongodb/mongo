@@ -672,22 +672,18 @@ err:
 }
 
 /*
- * __wt_session_blocking_checkpoint --
+ * __session_blocking_checkpoint --
  *     Perform a checkpoint or wait if it is already running to resolve an EBUSY error.
  */
-int
-__wt_session_blocking_checkpoint(WT_SESSION_IMPL *session, bool force, uint64_t seconds)
+static int
+__session_blocking_checkpoint(WT_SESSION_IMPL *session)
 {
     WT_DECL_RET;
     WT_TXN_GLOBAL *txn_global;
     uint64_t txn_gen;
-    const char *cfg[3] = {NULL, NULL, NULL};
+    const char *checkpoint_cfg[] = {WT_CONFIG_BASE(session, WT_SESSION_checkpoint), NULL};
 
-    cfg[0] = WT_CONFIG_BASE(session, WT_SESSION_checkpoint);
-    if (force)
-        cfg[1] = "force=1";
-
-    if ((ret = __wt_txn_checkpoint(session, cfg, false)) == 0)
+    if ((ret = __wt_txn_checkpoint(session, checkpoint_cfg, false)) == 0)
         return (0);
     WT_RET_BUSY_OK(ret);
 
@@ -704,13 +700,6 @@ __wt_session_blocking_checkpoint(WT_SESSION_IMPL *session, bool force, uint64_t 
          */
         if (!txn_global->checkpoint_running || txn_gen != __wt_gen(session, WT_GEN_CHECKPOINT))
             break;
-
-        /* If there's a timeout, give up. */
-        if (seconds == 0)
-            continue;
-        if (seconds <= WT_CKPT_WAIT)
-            return (EBUSY);
-        seconds -= WT_CKPT_WAIT;
     }
 
     return (0);
@@ -735,7 +724,7 @@ __session_alter(WT_SESSION *wt_session, const char *uri, const char *config)
      */
     ret = __session_alter_internal(session, uri, config);
     if (ret == EBUSY) {
-        WT_RET(__wt_session_blocking_checkpoint(session, false, 0));
+        WT_RET(__session_blocking_checkpoint(session));
         WT_STAT_CONN_INCR(session, session_table_alter_trigger_checkpoint);
         ret = __session_alter_internal(session, uri, config);
     }

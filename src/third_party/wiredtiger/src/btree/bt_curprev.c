@@ -484,10 +484,12 @@ __cursor_row_prev(
     WT_PAGE *page;
     WT_ROW *rip;
     WT_SESSION_IMPL *session;
+    bool prefix_search;
 
-    session = CUR2S(cbt);
-    page = cbt->ref->page;
     key = &cbt->iface.key;
+    page = cbt->ref->page;
+    session = CUR2S(cbt);
+    prefix_search = prefix != NULL && F_ISSET(&cbt->iface, WT_CURSTD_PREFIX_SEARCH);
     *skippedp = 0;
 
     /* If restarting after a prepare conflict, jump to the right spot. */
@@ -541,6 +543,14 @@ restart_read_insert:
         if ((ins = cbt->ins) != NULL) {
             key->data = WT_INSERT_KEY(ins);
             key->size = WT_INSERT_KEY_SIZE(ins);
+            /*
+             * If the cursor has prefix search configured we can early exit here if the key we are
+             * visiting is before our prefix.
+             */
+            if (prefix_search && __wt_prefix_match(prefix, key) > 0) {
+                WT_STAT_CONN_DATA_INCR(session, cursor_search_near_prefix_fast_paths);
+                return (WT_NOTFOUND);
+            }
             WT_RET(__wt_txn_read_upd_list(session, cbt, ins->upd));
             if (cbt->upd_value->type == WT_UPDATE_INVALID) {
                 ++*skippedp;
@@ -584,10 +594,7 @@ restart_read_page:
          * If the cursor has prefix search configured we can early exit here if the key we are
          * visiting is before our prefix.
          */
-        if (F_ISSET(&cbt->iface, WT_CURSTD_PREFIX_SEARCH) && prefix != NULL &&
-          __wt_prefix_match(prefix, &cbt->iface.key) > 0) {
-            /* It is not okay for the user to have a custom collator. */
-            WT_ASSERT(session, CUR2BT(cbt)->collator == NULL);
+        if (prefix_search && __wt_prefix_match(prefix, &cbt->iface.key) > 0) {
             WT_STAT_CONN_DATA_INCR(session, cursor_search_near_prefix_fast_paths);
             return (WT_NOTFOUND);
         }
@@ -620,13 +627,12 @@ __wt_btcur_prev_prefix(WT_CURSOR_BTREE *cbt, WT_ITEM *prefix, bool truncating)
     WT_DECL_RET;
     WT_PAGE *page;
     WT_SESSION_IMPL *session;
-    size_t pages_skipped_count, total_skipped, skipped;
+    size_t total_skipped, skipped;
     uint32_t flags;
     bool newpage, restart;
 
     cursor = &cbt->iface;
     session = CUR2S(cbt);
-    pages_skipped_count = 0;
     total_skipped = 0;
 
     WT_STAT_CONN_DATA_INCR(session, cursor_prev);
@@ -647,23 +653,13 @@ __wt_btcur_prev_prefix(WT_CURSOR_BTREE *cbt, WT_ITEM *prefix, bool truncating)
         __wt_btcur_iterate_setup(cbt);
 
     /*
-     * Walk any page we're holding until the underlying call returns not- found. Then, move to the
+     * Walk any page we're holding until the underlying call returns not-found. Then, move to the
      * previous page, until we reach the start of the file.
      */
     restart = F_ISSET(cbt, WT_CBT_ITERATE_RETRY_PREV);
     F_CLR(cbt, WT_CBT_ITERATE_RETRY_PREV);
     for (newpage = false;; newpage = true, restart = false) {
         page = cbt->ref == NULL ? NULL : cbt->ref->page;
-
-        /*
-         * Determine if all records on the page have been deleted and all the tombstones are visible
-         * to our transaction. If so, we can avoid reading the records on the page and move to the
-         * next page.
-         */
-        if (__wt_btcur_skip_page(cbt)) {
-            pages_skipped_count++;
-            goto skip_page;
-        }
 
         /*
          * Column-store pages may have appended entries. Handle it separately from the usual cursor
@@ -737,16 +733,26 @@ __wt_btcur_prev_prefix(WT_CURSOR_BTREE *cbt, WT_ITEM *prefix, bool truncating)
             WT_STAT_CONN_INCR(session, cache_eviction_force_delete);
         }
         cbt->page_deleted_count = 0;
-skip_page:
+
         if (F_ISSET(cbt, WT_CBT_READ_ONCE))
             LF_SET(WT_READ_WONT_NEED);
-        WT_ERR(__wt_tree_walk(session, &cbt->ref, flags));
+
+        /*
+         * If we are running with snapshot isolation, and not interested in returning tombstones, we
+         * could potentially skip pages. The skip function looks at the aggregated timestamp
+         * information to determine if something is visible on the page. If nothing is, the page is
+         * skipped.
+         */
+        if (session->txn->isolation == WT_ISO_SNAPSHOT &&
+          !F_ISSET(&cbt->iface, WT_CURSTD_IGNORE_TOMBSTONE))
+            WT_ERR(
+              __wt_tree_walk_custom_skip(session, &cbt->ref, __wt_btcur_skip_page, NULL, flags));
+        else
+            WT_ERR(__wt_tree_walk(session, &cbt->ref, flags));
         WT_ERR_TEST(cbt->ref == NULL, WT_NOTFOUND, false);
     }
 
 err:
-    WT_STAT_CONN_DATA_INCRV(session, cursor_prev_skip_page_count, pages_skipped_count);
-
     if (total_skipped < 100)
         WT_STAT_CONN_DATA_INCR(session, cursor_prev_skip_lt_100);
     else

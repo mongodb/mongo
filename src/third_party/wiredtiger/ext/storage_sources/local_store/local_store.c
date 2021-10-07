@@ -637,6 +637,8 @@ local_file_copy(LOCAL_STORAGE *local, WT_SESSION *session, const char *src_path,
             goto err;
         }
     }
+    if (ret == 0 && (ret = chmod(tmp_path, 0444)) < 0)
+        ret = local_err(local, session, errno, "%s: file_copy chmod failed", tmp_path);
     if ((ret = rename(tmp_path, dest_path)) != 0) {
         ret = local_err(local, session, errno, "%s: cannot rename from %s", dest_path, tmp_path);
         goto err;
@@ -693,7 +695,7 @@ err:
 
 /*
  * local_flush_finish --
- *     Move a file from the default file system to the cache in the new file system.
+ *     Cache a file in the new file system.
  */
 static int
 local_flush_finish(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session,
@@ -715,9 +717,13 @@ local_flush_finish(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session,
         goto err;
 
     local->op_count++;
-    if ((ret = rename(source, dest_path)) != 0) {
+    /*
+     * Link the object with the original local object. The could be replaced by a file copy if
+     * portability is an issue.
+     */
+    if ((ret = link(source, dest_path)) != 0) {
         ret = local_err(
-          local, session, errno, "ss_flush_finish rename %s to %s failed", source, dest_path);
+          local, session, errno, "ss_flush_finish link %s to %s failed", source, dest_path);
         goto err;
     }
     /* Set the file to readonly in the cache. */

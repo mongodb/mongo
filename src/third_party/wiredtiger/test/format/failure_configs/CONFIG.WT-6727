@@ -87,7 +87,6 @@ stress.split_4=0
 stress.split_5=0
 stress.split_6=0
 stress.split_7=0
-stress.split_8=0
 transaction.frequency=100
 transaction.isolation=snapshot
 transaction.timestamps=1

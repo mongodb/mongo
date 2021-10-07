@@ -155,17 +155,19 @@ __rollback_abort_update(WT_SESSION_IMPL *session, WT_ITEM *key, WT_UPDATE *first
 
 /*
  * __rollback_abort_insert_list --
- *     Apply the update abort check to each entry in an insert skip list.
+ *     Apply the update abort check to each entry in an insert skip list. Return how many entries
+ *     had stable updates.
  */
 static int
 __rollback_abort_insert_list(WT_SESSION_IMPL *session, WT_PAGE *page, WT_INSERT_HEAD *head,
-  wt_timestamp_t rollback_timestamp, bool *stable_update_found)
+  wt_timestamp_t rollback_timestamp, uint32_t *stable_updates_count)
 {
     WT_DECL_ITEM(key);
     WT_DECL_RET;
     WT_INSERT *ins;
     uint64_t recno;
     uint8_t *memp;
+    bool stable_update_found;
 
     WT_ERR(
       __wt_scr_alloc(session, page->type == WT_PAGE_ROW_LEAF ? 0 : WT_INTPACK64_MAXSIZE, &key));
@@ -182,12 +184,27 @@ __rollback_abort_insert_list(WT_SESSION_IMPL *session, WT_PAGE *page, WT_INSERT_
                 key->size = WT_PTRDIFF(memp, key->data);
             }
             WT_ERR(__rollback_abort_update(
-              session, key, ins->upd, rollback_timestamp, stable_update_found));
+              session, key, ins->upd, rollback_timestamp, &stable_update_found));
+            if (stable_update_found && stable_updates_count != NULL)
+                (*stable_updates_count)++;
         }
 
 err:
     __wt_scr_free(session, &key);
     return (ret);
+}
+
+/*
+ * __rollback_has_stable_update --
+ *     Check if an update chain has a stable update on it. Assume the update chain has already been
+ *     processed so all we need to do is look for a valid, non-aborted entry.
+ */
+static bool
+__rollback_has_stable_update(WT_UPDATE *upd)
+{
+    while (upd != NULL && (upd->type == WT_UPDATE_INVALID || upd->txnid == WT_TXN_ABORTED))
+        upd = upd->next;
+    return upd != NULL;
 }
 
 /*
@@ -225,57 +242,27 @@ err:
  *     Add the provided update to the head of the update list.
  */
 static inline int
-__rollback_row_modify(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip, WT_UPDATE *upd)
+__rollback_row_modify(WT_SESSION_IMPL *session, WT_REF *ref, WT_UPDATE *upd, WT_ITEM *key)
 {
+    WT_CURSOR_BTREE cbt;
     WT_DECL_RET;
-    WT_PAGE_MODIFY *mod;
-    WT_UPDATE *last_upd, *old_upd, **upd_entry;
-    size_t upd_size;
 
-    last_upd = NULL;
-    /* If we don't yet have a modify structure, we'll need one. */
-    WT_RET(__wt_page_modify_init(session, page));
-    mod = page->modify;
+    __wt_btcur_init(session, &cbt);
+    __wt_btcur_open(&cbt);
 
-    /* Allocate an update array as necessary. */
-    WT_PAGE_ALLOC_AND_SWAP(session, page, mod->mod_row_update, upd_entry, page->entries);
+    /* Search the page. */
+    WT_ERR(__wt_row_search(&cbt, key, true, ref, true, NULL));
 
-    /* Set the WT_UPDATE array reference. */
-    upd_entry = &mod->mod_row_update[WT_ROW_SLOT(page, rip)];
-    upd_size = __wt_update_list_memsize(upd);
+    /* Apply the modification. */
+#ifdef HAVE_DIAGNOSTIC
+    WT_ERR(__wt_row_modify(&cbt, key, NULL, upd, WT_UPDATE_INVALID, true, false));
+#else
+    WT_ERR(__wt_row_modify(&cbt, key, NULL, upd, WT_UPDATE_INVALID, true));
+#endif
 
-    /* If there are existing updates, append them after the new updates. */
-    for (last_upd = upd; last_upd->next != NULL; last_upd = last_upd->next)
-        ;
-    last_upd->next = *upd_entry;
-
-    /*
-     * We can either put a tombstone plus an update or a single update on the update chain.
-     *
-     * Set the "old" entry to the second update in the list so that the serialization function
-     * succeeds in swapping the first update into place.
-     */
-    if (upd->next != NULL)
-        *upd_entry = upd->next;
-    old_upd = *upd_entry;
-
-    /*
-     * Point the new WT_UPDATE item to the next element in the list. The serialization function acts
-     * as our memory barrier to flush this write.
-     */
-    upd->next = old_upd;
-
-    /*
-     * Serialize the update. Rollback to stable doesn't need to check the visibility of the on page
-     * value to detect conflict.
-     */
-    WT_ERR(__wt_update_serial(session, NULL, page, upd_entry, &upd, upd_size, true));
-
-    if (0) {
 err:
-        if (last_upd != NULL)
-            last_upd->next = NULL;
-    }
+    /* Free any resources that may have been cached in the cursor. */
+    WT_TRET(__wt_btcur_close(&cbt, true));
 
     return (ret);
 }
@@ -606,7 +593,7 @@ __rollback_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip, 
     }
 
     if (rip != NULL)
-        WT_ERR(__rollback_row_modify(session, page, rip, upd));
+        WT_ERR(__rollback_row_modify(session, ref, upd, key));
     else
         WT_ERR(__rollback_col_modify(session, ref, upd, recno));
 
@@ -644,6 +631,7 @@ __rollback_abort_ondisk_kv(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip, u
   WT_ITEM *row_key, WT_CELL_UNPACK_KV *vpack, wt_timestamp_t rollback_timestamp,
   bool *is_ondisk_stable)
 {
+    WT_DECL_ITEM(key);
     WT_DECL_ITEM(tmp);
     WT_DECL_RET;
     WT_PAGE *page;
@@ -766,14 +754,24 @@ __rollback_abort_ondisk_kv(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip, u
         return (0);
     }
 
-    if (rip != NULL)
-        WT_ERR(__rollback_row_modify(session, page, rip, upd));
-    else
+    if (rip != NULL) {
+        if (row_key != NULL)
+            key = row_key;
+        else {
+            /* Unpack a row key. */
+            WT_ERR(__wt_scr_alloc(session, 0, &key));
+            WT_ERR(__wt_row_leaf_key(session, page, rip, key, false));
+        }
+        WT_ERR(__rollback_row_modify(session, ref, upd, key));
+    } else
         WT_ERR(__rollback_col_modify(session, ref, upd, recno));
-    return (0);
 
+    if (0) {
 err:
-    __wt_free(session, upd);
+        __wt_free(session, upd);
+    }
+    if (rip != NULL && row_key == NULL)
+        __wt_scr_free(session, &key);
     return (ret);
 }
 
@@ -788,11 +786,12 @@ __rollback_abort_col_var(WT_SESSION_IMPL *session, WT_REF *ref, wt_timestamp_t r
     WT_CELL *kcell;
     WT_CELL_UNPACK_KV unpack;
     WT_COL *cip;
-    WT_INSERT_HEAD *ins;
+    WT_INSERT *ins;
+    WT_INSERT_HEAD *inshead;
     WT_PAGE *page;
-    uint64_t recno, rle;
-    uint32_t i, j;
-    bool is_ondisk_stable, stable_update_found;
+    uint64_t ins_recno, recno, rle;
+    uint32_t i, j, stable_updates_count;
+    bool is_ondisk_stable;
 
     page = ref->page;
     /*
@@ -805,11 +804,11 @@ __rollback_abort_col_var(WT_SESSION_IMPL *session, WT_REF *ref, wt_timestamp_t r
 
     /* Review the changes to the original on-page data items. */
     WT_COL_FOREACH (page, cip, i) {
-        stable_update_found = false;
+        stable_updates_count = 0;
 
-        if ((ins = WT_COL_UPDATE(page, cip)) != NULL)
+        if ((inshead = WT_COL_UPDATE(page, cip)) != NULL)
             WT_RET(__rollback_abort_insert_list(
-              session, page, ins, rollback_timestamp, &stable_update_found));
+              session, page, inshead, rollback_timestamp, &stable_updates_count));
 
         if (page->dsk != NULL) {
             /* Unpack the cell. We need its RLE count whether or not we're going to iterate it. */
@@ -818,44 +817,76 @@ __rollback_abort_col_var(WT_SESSION_IMPL *session, WT_REF *ref, wt_timestamp_t r
             rle = __wt_cell_rle(&unpack);
 
             /*
-             * If we found a stable update on the insert list, this key needs no further attention.
-             * Any other keys in this cell with stable updates also do not require attention. But
-             * beyond that, the on-disk value must be older than the update we found. That means it
-             * too is stable(*), so any keys in the cell that _don't_ have stable updates on the
-             * update list don't need further attention either. (And any unstable updates were just
-             * handled above.) Thus we can skip iterating over the cell.
+             * Each key whose on-disk value is not stable and has no stable update on the update
+             * list must be processed downstream.
              *
-             * Furthermore, if the cell is deleted it must be
-             * itself stable, because cells only appear as deleted if there is no older value that
-             * might need to be restored. We can skip iterating over the cell.
+             * If we can determine that the cell's on-disk value is stable, we can skip iterating
+             * over the cell; likewise, if we can determine that every key in the cell has a stable
+             * update on the update list, we can skip the iteration. Otherwise we have to try each
+             * key.
              *
-             * (*) Either that, or the update is not timestamped, in which case the on-disk value
-             * might not be stable but the non-timestamp update will hide it until the next
-             * reconciliation and then overwrite it.
+             * If the on-disk cell is deleted, it is stable, because cells only appear as deleted
+             * when there is no older value that might need to be restored.
+             *
+             * Note that in a purely timestamped world, the presence of any stable update for any
+             * key in the cell means the on-disk value must be stable, because the update must be
+             * newer than the on-disk value. However, this is no longer true if the stable update
+             * has no timestamp. It may also not be true if the on-disk value is prepared, or other
+             * corner cases. Therefore, we must iterate the cell unless _every_ key has a stable
+             * update.
+             *
+             * We can, however, stop iterating as soon as the downstream code reports back that the
+             * on-disk value is actually stable.
              */
-            if (stable_update_found)
-                WT_STAT_CONN_DATA_INCR(session, txn_rts_stable_rle_skipped);
-            else if (unpack.type == WT_CELL_DEL)
+            if (unpack.type == WT_CELL_DEL)
                 WT_STAT_CONN_DATA_INCR(session, txn_rts_delete_rle_skipped);
+            else if (stable_updates_count == rle)
+                WT_STAT_CONN_DATA_INCR(session, txn_rts_stable_rle_skipped);
             else {
-                for (j = 0; j < rle; j++) {
+                j = 0;
+                if (inshead != NULL) {
+                    WT_SKIP_FOREACH (ins, inshead) {
+                        /* If the update list goes past the end of the cell, something's wrong. */
+                        WT_ASSERT(session, j < rle);
+                        ins_recno = WT_INSERT_RECNO(ins);
+                        /* Process all the keys before this update. */
+                        while (recno + j < ins_recno) {
+                            WT_RET(__rollback_abort_ondisk_kv(session, ref, NULL, recno + j, NULL,
+                              &unpack, rollback_timestamp, &is_ondisk_stable));
+                            /* We can stop right away if the on-disk version is stable. */
+                            if (is_ondisk_stable) {
+                                if (rle > 1)
+                                    WT_STAT_CONN_DATA_INCR(session, txn_rts_stable_rle_skipped);
+                                goto stop;
+                            }
+                            j++;
+                        }
+                        /* If this key has a stable update, skip over it. */
+                        if (recno + j == ins_recno && __rollback_has_stable_update(ins->upd))
+                            j++;
+                    }
+                }
+                /* Process the rest of the keys. */
+                while (j < rle) {
                     WT_RET(__rollback_abort_ondisk_kv(session, ref, NULL, recno + j, NULL, &unpack,
                       rollback_timestamp, &is_ondisk_stable));
                     /* We can stop right away if the on-disk version is stable. */
                     if (is_ondisk_stable) {
                         if (rle > 1)
                             WT_STAT_CONN_DATA_INCR(session, txn_rts_stable_rle_skipped);
-                        break;
+                        goto stop;
                     }
+                    j++;
                 }
             }
+stop:
             recno += rle;
         }
     }
 
     /* Review the append list */
-    if ((ins = WT_COL_APPEND(page)) != NULL)
-        WT_RET(__rollback_abort_insert_list(session, page, ins, rollback_timestamp, NULL));
+    if ((inshead = WT_COL_APPEND(page)) != NULL)
+        WT_RET(__rollback_abort_insert_list(session, page, inshead, rollback_timestamp, NULL));
 
     /* Mark the page as dirty to reconcile the page. */
     if (page->modify)

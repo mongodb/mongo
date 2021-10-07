@@ -107,7 +107,7 @@ component_config =  throttle_config
 transaction_config = [
     Config('ops_per_transaction', '', r'''
         Defines how many operations a transaction can perform, the range is defined with a minimum
-        and a maximum and a random number is chosen between the two using a linear distrubtion.''',
+        and a maximum and a random number is chosen between the two using a linear distribution.''',
         type='category',subconfig=range_config),
 ]
 
@@ -116,7 +116,7 @@ thread_count = [
         Specifies the number of threads that will be used to perform a certain function.''', min=0)
 ]
 
-read_thread_config = thread_count + throttle_config + transaction_config
+read_thread_config = thread_count + throttle_config + transaction_config + record_config
 update_insert_thread_config = thread_count + transaction_config + throttle_config + record_config
 
 #
@@ -220,4 +220,6 @@ methods = {
                             How long the insertions will occur for.''')]),
     'example_test' : Method(test_config),
     'hs_cleanup' : Method(test_config),
+    'search_near_01' : Method(test_config),
+    'search_near_02' : Method(test_config),
 }

@@ -508,8 +508,6 @@ struct __wt_connection_stats {
     int64_t cursor_next_skip_total;
     int64_t cursor_prev_skip_total;
     int64_t cursor_skip_hs_cur_position;
-    int64_t cursor_next_skip_page_count;
-    int64_t cursor_prev_skip_page_count;
     int64_t cursor_search_near_prefix_fast_paths;
     int64_t cursor_cached_count;
     int64_t cursor_insert_bulk;
@@ -688,8 +686,9 @@ struct __wt_connection_stats {
     int64_t rec_time_window_stop_txn;
     int64_t rec_split_stashed_bytes;
     int64_t rec_split_stashed_objects;
-    int64_t flush_state_races;
+    int64_t local_objects_inuse;
     int64_t flush_tier;
+    int64_t local_objects_removed;
     int64_t session_open;
     int64_t session_query_ts;
     int64_t session_table_alter_fail;
@@ -946,8 +945,6 @@ struct __wt_dsrc_stats {
     int64_t cursor_next_skip_total;
     int64_t cursor_prev_skip_total;
     int64_t cursor_skip_hs_cur_position;
-    int64_t cursor_next_skip_page_count;
-    int64_t cursor_prev_skip_page_count;
     int64_t cursor_search_near_prefix_fast_paths;
     int64_t cursor_insert_bulk;
     int64_t cursor_reopen;
