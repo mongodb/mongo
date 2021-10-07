@@ -56,11 +56,7 @@ class MongoDFixture(interface.Fixture):
         if not self.preserve_dbpath and os.path.lexists(self._dbpath):
             shutil.rmtree(self._dbpath, ignore_errors=False)
 
-        try:
-            os.makedirs(self._dbpath)
-        except os.error:
-            # Directory already exists.
-            pass
+        os.makedirs(self._dbpath, exist_ok=True)
 
         launcher = MongodLauncher(self.fixturelib)
         # Second return val is the port, which we ignore because we explicitly created the port above.
