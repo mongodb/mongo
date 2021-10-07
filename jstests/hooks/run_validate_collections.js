@@ -15,8 +15,12 @@ if (topology.type === Topology.kStandalone) {
     hostList.push(topology.mongod);
 } else if (topology.type === Topology.kReplicaSet) {
     hostList.push(...topology.nodes);
+    new ReplSetTest(topology.nodes[0]).awaitSecondaryNodes();
 } else if (topology.type === Topology.kShardedCluster) {
     hostList.push(...topology.configsvr.nodes);
+    if (topology.configsvr.nodes.length > 1) {
+        new ReplSetTest(topology.configsvr.nodes[0]).awaitSecondaryNodes();
+    }
 
     for (let shardName of Object.keys(topology.shards)) {
         const shard = topology.shards[shardName];
@@ -25,6 +29,7 @@ if (topology.type === Topology.kStandalone) {
             hostList.push(shard.mongod);
         } else if (shard.type === Topology.kReplicaSet) {
             hostList.push(...shard.nodes);
+            new ReplSetTest(shard.nodes[0]).awaitSecondaryNodes();
         } else {
             throw new Error('Unrecognized topology format: ' + tojson(topology));
         }
