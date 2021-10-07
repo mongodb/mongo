@@ -21,7 +21,6 @@ find bench dist examples ext src test \
     -name '*.[ch]' -o \
     -name '*.dox' -o \
     -name '*.in' -o \
-    -name '*.py' -o \
     -name 's_*' -o \
     -name 'Makefile.am' |
     sed -e '/Makefile.in/d' \

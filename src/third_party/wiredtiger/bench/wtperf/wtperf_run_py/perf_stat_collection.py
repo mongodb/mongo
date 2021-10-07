@@ -1,12 +1,14 @@
 import re
 from perf_stat import PerfStat
 
+
 def find_stat(test_stat_path: str, pattern: str, position_of_value: int):
     for line in open(test_stat_path):
         match = re.match(pattern, line)
         if match:
             return float(line.split()[position_of_value])
     return 0
+
 
 class PerfStatCollection:
     def __init__(self):
