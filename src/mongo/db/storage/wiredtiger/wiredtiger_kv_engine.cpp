@@ -2367,7 +2367,7 @@ Timestamp WiredTigerKVEngine::getPinnedOplog() const {
 
     auto status = getOplogNeededForRollback();
     if (status.isOK()) {
-        return status.getValue();
+        return std::min(status.getValue(), pinned);
     }
 
     // If getOplogNeededForRollback fails, don't truncate any oplog right now.
