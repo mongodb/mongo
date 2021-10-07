@@ -8,7 +8,12 @@
  * ]
  */
 var $config = (function() {
-    const data = {numIds: 10};
+    const data = {
+        numIds: 10,
+        createCommand: (collName) => {
+            return {create: collName};
+        }
+    };
 
     const states = {
         init: function init(db, collName) {
@@ -229,7 +234,7 @@ var $config = (function() {
     };
 
     function setup(db, collName, cluster) {
-        assertAlways.commandWorked(db.runCommand({create: collName}));
+        assertAlways.commandWorked(db.runCommand(this.createCommand(collName)));
         for (let i = 0; i < this.numIds; i++) {
             const res = db[collName].insert({_id: i, value: this.docValue, num: 1});
             assertAlways.commandWorked(res);
