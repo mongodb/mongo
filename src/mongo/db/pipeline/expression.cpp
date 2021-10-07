@@ -6463,8 +6463,12 @@ boost::intrusive_ptr<Expression> ExpressionConvert::optimize() {
     // and _onNull values could still be legally folded if those values are not needed. Support for
     // that case would add more complexity than it's worth, though.
     if (ExpressionConstant::allNullOrConstant({_input, _to, _onError, _onNull})) {
-        return ExpressionConstant::create(
-            getExpressionContext(), evaluate(Document{}, &(getExpressionContext()->variables)));
+        try {
+            return ExpressionConstant::create(
+                getExpressionContext(), evaluate(Document{}, &(getExpressionContext()->variables)));
+        } catch (DBException& ex) {
+            uasserted(5693200, str::stream() << "Failed to optimize pipeline :: " + ex.reason());
+        }
     }
 
     return this;

@@ -198,14 +198,6 @@ boost::intrusive_ptr<DocumentSourceSort> createMetadataSortForReorder(
                                       maxMemoryUsageBytes);
 }
 
-// Optimize the section of the pipeline before the $_internalUnpackBucket stage.
-void optimizePrefix(Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
-    auto prefix = Pipeline::SourceContainer(container->begin(), itr);
-    Pipeline::optimizeContainer(&prefix);
-    container->erase(container->begin(), itr);
-    container->splice(itr, prefix);
-}
-
 // Returns whether 'field' depends on a pushed down $addFields or computed $project.
 bool fieldIsComputed(BucketSpec spec, std::string field) {
     return std::any_of(

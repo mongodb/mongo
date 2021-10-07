@@ -449,4 +449,9 @@ private:
     bool _dismissed = false;
 };
 
+/**
+ * Print operator useful for diagnostics
+ */
+std::ostream& operator<<(std::ostream& os, const Pipeline& pipeline);
+
 }  // namespace mongo

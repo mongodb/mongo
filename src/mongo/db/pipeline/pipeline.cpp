@@ -26,20 +26,16 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/logv2/log.h"
-
-#include <algorithm>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_merge.h"
@@ -50,6 +46,8 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
+#include <algorithm>
+
 
 namespace mongo {
 
@@ -667,6 +665,18 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::makePipeline(
     }
 
     return pipeline;
+}
+
+std::ostream& operator<<(std::ostream& os, const Pipeline& pipeline) {
+    vector<Value> serializedSources;
+    for (auto&& source : pipeline.getSources()) {
+        source->serializeToArray(serializedSources, explain::VerbosityEnum::kQueryPlanner);
+    }
+
+    for (auto stage : serializedSources) {
+        os << stage << " ";
+    }
+    return os;
 }
 
 Pipeline::SourceContainer::iterator Pipeline::optimizeEndOfPipeline(
