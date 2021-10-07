@@ -2954,6 +2954,30 @@ tasks:
         vars:
           perf-test-name: medium-multi-lsm
 
+  - name: perf-test-parallel-pop-lsm
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+      - func: "generic-perf-test"
+        vars:
+          perf-test-name: parallel-pop-lsm
+          maxruns: 1
+      - func: "generic-perf-test-push-results"
+        vars:
+          perf-test-name: parallel-pop-lsm
+
+  - name: perf-test-update-lsm
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+      - func: "generic-perf-test"
+        vars:
+          perf-test-name: update-lsm
+          maxruns: 1
+      - func: "generic-perf-test-push-results"
+        vars:
+          perf-test-name: update-lsm
+
     ###############################
     # Performance Tests for btree #
     ###############################
@@ -3210,6 +3234,8 @@ buildvariants:
     - name: perf-test-medium-lsm
     - name: perf-test-medium-lsm-compact
     - name: perf-test-medium-multi-lsm
+    - name: perf-test-parallel-pop-lsm
+    - name: perf-test-update-lsm
 
 
 - name: large-scale-tests
