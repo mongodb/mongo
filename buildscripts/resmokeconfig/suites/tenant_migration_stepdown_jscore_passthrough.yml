@@ -281,6 +281,9 @@ executor:
       global_vars:
         TestData: *TestData
   - class: ValidateCollections
+    shell_options:
+      global_vars:
+        TestData: *TestData
   - class: CleanEveryN
     n: 1
   fixture:
