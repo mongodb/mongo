@@ -88,7 +88,7 @@ public:
     void insertNDocsOf1MB(OperationContext* opCtx, int nDocs) {
         DBDirectClient client(opCtx);
 
-        std::string oneMBstr(1024 * 1024, 'a');
+        std::string oneMBstr(1024 * 1023, 'a');  // 1 byte less than 1 MB, considering the padding
         for (int i = 0; i < nDocs; i++) {
             BSONObjBuilder builder;
             builder.append(kPattern, _nextShardKey++);
@@ -175,12 +175,12 @@ TEST_F(AutoSplitVectorTest10MB, SplitIfDataSlightlyMoreThanThreshold) {
 
 // Split points if `data size > max chunk size * 2` and threshold reached
 TEST_F(AutoSplitVectorTest10MB, SplitIfDataMoreThanThreshold) {
-    const auto surplus = 13;
+    const auto surplus = 14;
     insertNDocsOf1MB(operationContext(), surplus /* nDocs */);
     std::vector<BSONObj> splitKeys = autoSplit(operationContext(), 10 /* maxChunkSizeMB */);
     ASSERT_EQ(splitKeys.size(), 2);
-    ASSERT_EQ(6, splitKeys.front().getIntField(kPattern));
-    ASSERT_EQ(13, splitKeys.back().getIntField(kPattern));
+    ASSERT_EQ(7, splitKeys.front().getIntField(kPattern));
+    ASSERT_EQ(15, splitKeys.back().getIntField(kPattern));
 }
 
 // Split points are not recalculated if the right-most chunk is at least `80% maxChunkSize`
@@ -189,7 +189,7 @@ TEST_F(AutoSplitVectorTest10MB, NoRecalculateIfBigLastChunk) {
     insertNDocsOf1MB(operationContext(), surplus /* nDocs */);
     std::vector<BSONObj> splitKeys = autoSplit(operationContext(), 10 /* maxChunkSizeMB */);
     ASSERT_EQ(splitKeys.size(), 1);
-    ASSERT_EQ(9, splitKeys.front().getIntField(kPattern));
+    ASSERT_EQ(8, splitKeys.front().getIntField(kPattern));
 }
 
 class RepositionLastSplitPointsTest : public AutoSplitVectorTest {
