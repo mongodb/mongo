@@ -268,8 +268,6 @@ struct Instruction {
         getArraySize,
 
         aggSum,
-        aggDoubleDoubleSum,
-        doubleDoubleSumFinalize,
         aggMin,
         aggMax,
         aggFirst,
@@ -345,6 +343,8 @@ enum class Builtin : uint8_t {
     addToSet,         // agg function to append to a set
     collAddToSet,     // agg function to append to a set (with collation)
     doubleDoubleSum,  // special double summation
+    aggDoubleDoubleSum,
+    doubleDoubleSumFinalize,
     bitTestZero,      // test bitwise mask & value is zero
     bitTestMask,      // test bitwise mask & value is mask
     bitTestPosition,  // test BinData with a bit position list
@@ -524,8 +524,6 @@ public:
     void appendGetArraySize();
 
     void appendSum();
-    void appendDoubleDoubleSum();
-    void appendDoubleDoubleSumFinalize();
     void appendMin();
     void appendMax();
     void appendFirst();
@@ -789,20 +787,7 @@ private:
                                                            value::TypeTags fieldTag,
                                                            value::Value fieldValue);
 
-    std::tuple<bool, value::TypeTags, value::Value> aggDoubleDoubleSumImpl(value::TypeTags lhsTag,
-                                                                           value::Value lhsValue,
-                                                                           value::TypeTags rhsTag,
-                                                                           value::Value rhsValue);
-
-    std::tuple<bool, value::TypeTags, value::Value> aggDoubleDoubleSum(value::TypeTags accTag,
-                                                                       value::Value accValue,
-                                                                       value::TypeTags fieldTag,
-                                                                       value::Value fieldValue);
-
-    // This function is necessary because 'aggDoubleDoubleSum()' result is 'Array' type but we need
-    // to produce a scalar value out of it.
-    std::tuple<bool, value::TypeTags, value::Value> doubleDoubleSumFinalize(
-        value::TypeTags fieldTag, value::Value fieldValue);
+    void aggDoubleDoubleSumImpl(value::Array* arr, value::TypeTags rhsTag, value::Value rhsValue);
 
     std::tuple<bool, value::TypeTags, value::Value> aggMin(value::TypeTags accTag,
                                                            value::Value accValue,
@@ -920,6 +905,8 @@ private:
     std::tuple<bool, value::TypeTags, value::Value> builtinAddToSet(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinCollAddToSet(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinDoubleDoubleSum(ArityType arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinAggDoubleDoubleSum(ArityType arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinDoubleDoubleSumFinalize(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinBitTestZero(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinBitTestMask(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinBitTestPosition(ArityType arity);
@@ -984,17 +971,26 @@ private:
         auto [owned, tag] = _argStack.ownedAndTag(backOffset);
         auto val = _argStack.value(backOffset);
 
-        return {static_cast<bool>(owned), tag, val};
+        return {owned, tag, val};
     }
 
     std::tuple<bool, value::TypeTags, value::Value> moveFromStack(size_t offset) {
         auto backOffset = _argStack.size() - 1 - offset;
+
         auto [owned, tag] = _argStack.ownedAndTag(backOffset);
-        _argStack.ownedAndTag(backOffset) = {false, value::TypeTags::Nothing};
         auto val = _argStack.value(backOffset);
-        _argStack.value(backOffset) = 0;
+        _argStack.owned(backOffset) = false;
 
         return {owned, tag, val};
+    }
+
+    std::pair<value::TypeTags, value::Value> moveOwnedFromStack(size_t offset) {
+        auto [owned, tag, val] = moveFromStack(offset);
+        if (!owned) {
+            std::tie(tag, val) = value::copyValue(tag, val);
+        }
+
+        return {tag, val};
     }
 
     void setStack(size_t offset, bool owned, value::TypeTags tag, value::Value val) {

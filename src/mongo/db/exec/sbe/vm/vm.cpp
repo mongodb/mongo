@@ -112,8 +112,6 @@ int Instruction::stackOffset[Instruction::Tags::lastInstruction] = {
     0,   // getArraySize
 
     -1,  // aggSum
-    -1,  // aggDoubleDoubleSum
-    0,   // doubleDoubleSumFinalize
     -1,  // aggMin
     -1,  // aggMax
     -1,  // aggFirst
@@ -364,14 +362,6 @@ void CodeFragment::appendGetArraySize() {
 
 void CodeFragment::appendSum() {
     appendSimpleInstruction(Instruction::aggSum);
-}
-
-void CodeFragment::appendDoubleDoubleSum() {
-    appendSimpleInstruction(Instruction::aggDoubleDoubleSum);
-}
-
-void CodeFragment::appendDoubleDoubleSumFinalize() {
-    appendSimpleInstruction(Instruction::doubleDoubleSumFinalize);
 }
 
 void CodeFragment::appendMin() {
@@ -940,22 +930,21 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::aggSum(value::TypeTags
     return genericAdd(accTag, accValue, fieldTag, fieldValue);
 }
 
-std::tuple<bool, value::TypeTags, value::Value> ByteCode::aggDoubleDoubleSum(
-    value::TypeTags accTag,
-    value::Value accValue,
-    value::TypeTags fieldTag,
-    value::Value fieldValue) {
-    // Skip aggregation step if we don't have the input.
-    if (fieldTag == value::TypeTags::Nothing) {
-        auto [tag, val] = value::copyValue(accTag, accValue);
-        return {true, tag, val};
-    }
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggDoubleDoubleSum(
+    ArityType arity) {
+
+    auto [_, fieldTag, fieldValue] = getFromStack(1);
+    // Move the incoming accumulator state from the stack. Given that we are now the owner of the
+    // state we are free to do any in-place update as we see fit.
+    auto [accTag, accValue] = moveOwnedFromStack(0);
+    value::ValueGuard guard{accTag, accValue};
 
     // Initialize the accumulator.
     if (accTag == value::TypeTags::Nothing) {
-        auto [accTagN, accValueN] = value::makeNewArray();
-        value::ValueGuard guard{accTagN, accValueN};
-        auto arr = value::getArrayView(accValueN);
+        std::tie(accTag, accValue) = value::makeNewArray();
+        value::ValueGuard guard{accTag, accValue};
+        auto arr = value::getArrayView(accValue);
+        arr->reserve(AggSumValueElems::kMaxSizeOfArray);
 
         // The order of the following three elements should match to 'AggSumValueElems'.
         arr->push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0));
@@ -963,14 +952,22 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::aggDoubleDoubleSum(
         arr->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.0));
         // The absent 'kDecimalTotal' element means that we've not seen any decimal value. So, we're
         // not adding 'kDecimalTotal' element yet.
-        return aggDoubleDoubleSumImpl(accTagN, accValueN, fieldTag, fieldValue);
+        aggDoubleDoubleSumImpl(arr, fieldTag, fieldValue);
+        guard.reset();
+        return {true, accTag, accValue};
     }
+    tassert(5755317, "The result slot must be Array-typed", accTag == value::TypeTags::Array);
 
-    return aggDoubleDoubleSumImpl(accTag, accValue, fieldTag, fieldValue);
+    aggDoubleDoubleSumImpl(value::getArrayView(accValue), fieldTag, fieldValue);
+    guard.reset();
+    return {true, accTag, accValue};
 }
 
-std::tuple<bool, value::TypeTags, value::Value> ByteCode::doubleDoubleSumFinalize(
-    value::TypeTags fieldTag, value::Value fieldValue) {
+// This function is necessary because 'aggDoubleDoubleSum()' result is 'Array' type but we need
+// to produce a scalar value out of it.
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinDoubleDoubleSumFinalize(
+    ArityType arity) {
+    auto [_, fieldTag, fieldValue] = getFromStack(0);
     auto arr = value::getArrayView(fieldValue);
     tassert(5755321,
             str::stream() << "The result slot must have at least "
@@ -3702,6 +3699,10 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builti
             return builtinCollAddToSet(arity);
         case Builtin::doubleDoubleSum:
             return builtinDoubleDoubleSum(arity);
+        case Builtin::aggDoubleDoubleSum:
+            return builtinAggDoubleDoubleSum(arity);
+        case Builtin::doubleDoubleSumFinalize:
+            return builtinDoubleDoubleSumFinalize(arity);
         case Builtin::bitTestZero:
             return builtinBitTestZero(arity);
         case Builtin::bitTestMask:
@@ -4516,35 +4517,6 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                     }
                     if (lhsOwned) {
                         value::releaseValue(lhsTag, lhsVal);
-                    }
-                    break;
-                }
-                case Instruction::aggDoubleDoubleSum: {
-                    auto [rhsOwned, rhsTag, rhsVal] = getFromStack(0);
-                    popStack();
-                    auto [lhsOwned, lhsTag, lhsVal] = getFromStack(0);
-
-                    auto [owned, tag, val] = aggDoubleDoubleSum(lhsTag, lhsVal, rhsTag, rhsVal);
-
-                    topStack(owned, tag, val);
-
-                    if (rhsOwned) {
-                        value::releaseValue(rhsTag, rhsVal);
-                    }
-                    if (lhsOwned) {
-                        value::releaseValue(lhsTag, lhsVal);
-                    }
-                    break;
-                }
-                case Instruction::doubleDoubleSumFinalize: {
-                    auto [sumArrayOwned, sumArrayTag, sumArrayVal] = getFromStack(0);
-                    auto [finalSumOwned, finalSumTag, finalSumVal] =
-                        doubleDoubleSumFinalize(sumArrayTag, sumArrayVal);
-
-                    topStack(finalSumOwned, finalSumTag, finalSumVal);
-
-                    if (sumArrayOwned) {
-                        value::releaseValue(sumArrayTag, sumArrayVal);
                     }
                     break;
                 }

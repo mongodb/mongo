@@ -775,6 +775,17 @@ public:
         return {_typeTags[idx], _values[idx]};
     }
 
+    // The in-place update of arrays is allowed only in very limited set of contexts (e.g. when
+    // arrays are used in an accumulator slot). The owner of the array must guarantee that no other
+    // component can observe the value being updated.
+    void setAt(std::size_t idx, TypeTags tag, Value val) {
+        if (tag != TypeTags::Nothing && idx < _values.size()) {
+            releaseValue(_typeTags[idx], _values[idx]);
+            _typeTags[idx] = tag;
+            _values[idx] = val;
+        }
+    }
+
     void reserve(size_t s) {
         // Normalize to at least 1.
         s = s ? s : 1;
