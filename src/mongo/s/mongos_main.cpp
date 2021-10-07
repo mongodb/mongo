@@ -907,6 +907,7 @@ ExitCode mongos_main(int argc, char* argv[]) {
         return EXIT_ABRUPT;
     }
 
+    audit::rotateAuditLog();
     registerShutdownTask(cleanupTask);
 
     const auto service = getGlobalServiceContext();

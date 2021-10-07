@@ -152,6 +152,11 @@ private:
 };
 
 /**
+ * Rotates the audit log in enterprise. Only to be called on startup.
+ */
+void rotateAuditLog();
+
+/**
  * Logs the result of an authentication attempt.
  */
 void logAuthentication(Client* client, const AuthenticateEvent& event);

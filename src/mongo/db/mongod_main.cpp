@@ -1469,6 +1469,7 @@ int mongod_main(int argc, char* argv[]) {
         }
     }
 
+    audit::rotateAuditLog();
     setUpCollectionShardingState(service);
     setUpCatalog(service);
     setUpReplication(service);

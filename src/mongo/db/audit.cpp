@@ -39,6 +39,8 @@ std::function<void(ServiceContext*)> initializeSynchronizeJob;
 
 ImpersonatedClientAttrs::ImpersonatedClientAttrs(Client* client) {}
 
+void rotateAuditLog() {}
+
 void logClientMetadata(Client* client) {
     invariant(client);
 }
