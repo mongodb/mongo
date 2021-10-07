@@ -536,6 +536,16 @@ functions:
       bucket: mciuploads
       local_file: src/mongo-binaries.tgz
 
+  "fetch dist debugsymbols": &fetch_dist_debugsymbols
+    command: s3.get
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      remote_file: ${project}/${build_variant}/${revision}/dist/mongo-${build_id}-debugsymbols.${ext|tgz}
+      bucket: mciuploads
+      local_file: src/mongo-debugsymbols.tgz
+      optional: true
+
   "fetch binaries": &fetch_binaries
     command: s3.get
     params:
@@ -6533,6 +6543,7 @@ tasks:
         build_variants: [rhel70, windows]
     - func: "generate compile expansions"
     - func: "apply compile expansions"
+    - func: "fetch dist debugsymbols"
     - func: "set up remote credentials"
       vars:
         aws_key_remote: ${repo_aws_key}
