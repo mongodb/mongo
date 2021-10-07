@@ -17,7 +17,7 @@ git clone git@github.com:10gen/coredb-patchbuild-optimizer.git
 pushd coredb-patchbuild-optimizer
 # Reusing bfsuggestion's password here to avoid having to
 # go through the process of adding a new Evergreen project expansion.
-$python tagfilegenerator.py "${bfsuggestion_password}"
+$python tagfilegenerator.py "${coredb_patchbuild_optimizer_password}"
 mv failedtesttags ..
 popd
 
