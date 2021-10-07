@@ -208,7 +208,6 @@ selector:
   - jstests/sharding/features3.js
   - jstests/sharding/tag_auto_split_partial_key.js
   - jstests/sharding/explain_cmd.js
-  - jstests/sharding/stats.js
   - jstests/sharding/shard_existing.js
   - jstests/sharding/count2.js
   - jstests/sharding/no_empty_reset.js
