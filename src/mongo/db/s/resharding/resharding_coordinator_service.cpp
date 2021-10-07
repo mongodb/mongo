@@ -52,6 +52,7 @@
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding_util.h"
+#include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_util.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
@@ -64,6 +65,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/abort_reshard_collection_gen.h"
 #include "mongo/s/request_types/commit_reshard_collection_gen.h"
+#include "mongo/s/request_types/drop_collection_if_uuid_not_matching_gen.h"
 #include "mongo/s/request_types/flush_resharding_state_change_gen.h"
 #include "mongo/s/request_types/flush_routing_table_cache_updates_gen.h"
 #include "mongo/s/shard_id.h"
@@ -1703,13 +1705,49 @@ ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllParticipantShardsD
             auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
             auto& coordinatorDoc = coordinatorDocsChangedOnDisk[1];
 
-            reshardingPauseCoordinatorBeforeRemovingStateDoc.pauseWhileSetAndNotCanceled(
-                opCtx.get(), _ctHolder->getStepdownToken());
-
             boost::optional<Status> abortReason;
             if (coordinatorDoc.getAbortReason()) {
                 abortReason = getStatusFromAbortReason(coordinatorDoc);
             }
+
+            if (!abortReason) {
+                // (SERVER-54231) Ensure every catalog entry referring the source uuid is
+                // cleared out on every shard.
+                const auto allShardIds =
+                    Grid::get(opCtx.get())->shardRegistry()->getAllShardIds(opCtx.get());
+                const auto& nss = coordinatorDoc.getSourceNss();
+                const auto& notMatchingThisUUID = coordinatorDoc.getReshardingUUID();
+                const auto cmdObj =
+                    ShardsvrDropCollectionIfUUIDNotMatchingRequest(nss, notMatchingThisUUID)
+                        .toBSON({});
+
+                try {
+                    sharding_ddl_util::sendAuthenticatedCommandToShards(
+                        opCtx.get(), nss.db(), cmdObj, allShardIds, **executor);
+                } catch (const DBException& ex) {
+                    if (ex.code() == ErrorCodes::CommandNotFound) {
+                        // TODO SERVER-60531 get rid of the catch logic
+                        // Cleanup failed because at least one shard could is using a binary
+                        // not supporting the ShardsvrDropCollectionIfUUIDNotMatching command.
+                        LOGV2_INFO(5423100,
+                                   "Resharding coordinator couldn't guarantee older incarnations "
+                                   "of the collection were dropped. A chunk migration to a shard "
+                                   "with an older incarnation of the collection will fail",
+                                   "namespace"_attr = nss.ns());
+                    } else if (opCtx->checkForInterruptNoAssert().isOK()) {
+                        LOGV2_INFO(
+                            5423101,
+                            "Resharding coordinator failed while trying to drop possible older "
+                            "incarnations of the collection. A chunk migration to a shard with "
+                            "an older incarnation of the collection will fail",
+                            "namespace"_attr = nss.ns(),
+                            "error"_attr = redact(ex.toStatus()));
+                    }
+                }
+            }
+
+            reshardingPauseCoordinatorBeforeRemovingStateDoc.pauseWhileSetAndNotCanceled(
+                opCtx.get(), _ctHolder->getStepdownToken());
 
             // Notify `ReshardingMetrics` as the operation is now complete for external observers.
             markCompleted(abortReason ? *abortReason : Status::OK());
