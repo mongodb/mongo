@@ -1220,7 +1220,7 @@ void StorageEngineImpl::TimestampMonitor::clearListeners() {
 int64_t StorageEngineImpl::sizeOnDiskForDb(OperationContext* opCtx, StringData dbName) {
     int64_t size = 0;
 
-    catalog::forEachCollectionFromDb(opCtx, dbName, MODE_IS, [&](const CollectionPtr& collection) {
+    auto perCollectionWork = [&](const CollectionPtr& collection) {
         size += collection->getRecordStore()->storageSize(opCtx);
 
         auto it = collection->getIndexCatalog()->getIndexIterator(opCtx, true);
@@ -1229,7 +1229,17 @@ int64_t StorageEngineImpl::sizeOnDiskForDb(OperationContext* opCtx, StringData d
         }
 
         return true;
-    });
+    };
+
+    if (opCtx->isLockFreeReadsOp()) {
+        auto collectionCatalog = CollectionCatalog::get(opCtx);
+        for (auto it = collectionCatalog->begin(opCtx, dbName); it != collectionCatalog->end(opCtx);
+             ++it) {
+            perCollectionWork(*it);
+        }
+    } else {
+        catalog::forEachCollectionFromDb(opCtx, dbName, MODE_IS, perCollectionWork);
+    };
 
     return size;
 }

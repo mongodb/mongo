@@ -41,6 +41,10 @@ public:
         return nullptr;
     }
 
+    bool dbExists(OperationContext* opCtx, StringData dbName) const override {
+        return false;
+    }
+
     std::shared_ptr<const ViewCatalog> getViewCatalog(OperationContext* const opCtx,
                                                       StringData dbName) const override {
         return nullptr;

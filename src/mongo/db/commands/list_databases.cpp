@@ -30,12 +30,14 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/list_databases_gen.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop_failpoint_helpers.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -138,7 +140,7 @@ public:
             for (const auto& itemName : dbNames) {
                 if (authorizedDatabases &&
                     !as->isAuthorizedForAnyActionOnAnyResourceInDB(itemName)) {
-                    // We don't have listDatabases on the cluser or find on this database.
+                    // We don't have listDatabases on the cluster or find on this database.
                     continue;
                 }
 
@@ -151,9 +153,9 @@ public:
                         continue;
                     }
 
-                    AutoGetDb autoDb(opCtx, itemName, MODE_IS);
-                    auto* const db = autoDb.getDb();
-                    if (!db) {
+                    AutoGetDbForReadMaybeLockFree lockFreeReadBlock(opCtx, itemName);
+                    // The database could have been dropped since we called 'listDatabases()' above.
+                    if (!DatabaseHolder::get(opCtx)->dbExists(opCtx, itemName)) {
                         continue;
                     }
 

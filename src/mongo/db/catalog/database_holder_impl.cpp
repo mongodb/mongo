@@ -83,6 +83,11 @@ Database* DatabaseHolderImpl::getDb(OperationContext* opCtx, StringData ns) cons
     return nullptr;
 }
 
+bool DatabaseHolderImpl::dbExists(OperationContext* opCtx, StringData ns) const {
+    stdx::lock_guard<SimpleMutex> lk(_m);
+    return _dbs.find(_todb(ns)) != _dbs.end();
+}
+
 std::shared_ptr<const ViewCatalog> DatabaseHolderImpl::getViewCatalog(OperationContext* opCtx,
                                                                       StringData dbName) const {
     stdx::lock_guard<SimpleMutex> lk(_m);

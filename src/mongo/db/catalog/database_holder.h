@@ -66,13 +66,19 @@ public:
     virtual Database* getDb(OperationContext* opCtx, StringData ns) const = 0;
 
     /**
+     * Checks if a database exists without holding a database-level lock. This class' internal mutex
+     * provides concurrency protection around looking up the db name of 'ns'.
+     */
+    virtual bool dbExists(OperationContext* opCtx, StringData ns) const = 0;
+
+    /**
      * Fetches the ViewCatalog decorating the Database matching 'dbName', or returns nullptr if the
      * database does not exist. The returned ViewCatalog is safe to access without a lock because it
      * is held as a shared_ptr.
      *
      * The ViewCatalog must be fetched through this interface if the caller holds no database lock
      * to ensure the Database object is safe to access. This class' internal mutex provides
-     * concurrency protection around looking up and accessing the Database object matching 'dbName.
+     * concurrency protection around looking up and accessing the Database object matching 'dbName'.
      */
     virtual std::shared_ptr<const ViewCatalog> getViewCatalog(OperationContext* opCtx,
                                                               StringData dbName) const = 0;

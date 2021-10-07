@@ -42,6 +42,8 @@ public:
 
     Database* getDb(OperationContext* opCtx, StringData ns) const override;
 
+    bool dbExists(OperationContext* opCtx, StringData ns) const override;
+
     std::shared_ptr<const ViewCatalog> getViewCatalog(OperationContext* opCtx,
                                                       StringData dbName) const override;
 
