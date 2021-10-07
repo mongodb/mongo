@@ -1244,6 +1244,7 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx, Timestamp mayT
     _truncateCount.fetchAndAdd(1);
     LOGV2(22402,
           "WiredTiger record store oplog truncation finished",
+          "pinnedOplogTimestamp"_attr = mayTruncateUpTo,
           "numRecords"_attr = _sizeInfo->numRecords.load(),
           "dataSize"_attr = _sizeInfo->dataSize.load(),
           "duration"_attr = Milliseconds(elapsedMillis));
