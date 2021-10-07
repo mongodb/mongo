@@ -38,9 +38,11 @@
 #include <type_traits>
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_algo.h"
+#include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/matcher/expression_internal_expr_comparison.h"
 #include "mongo/db/pipeline/document_source_add_fields.h"
 #include "mongo/db/pipeline/document_source_group.h"
@@ -548,11 +550,61 @@ std::pair<BSONObj, bool> DocumentSourceInternalUnpackBucket::extractOrBuildProje
     return {BSONObj{}, false};
 }
 
+/*
+ * Creates a predicate that ensures that if there exists a subpath of matchExprPath such that the
+ * type of `control.min.subpath` is not the same as `control.max.subpath` then we will match that
+ * document.
+ */
+std::unique_ptr<MatchExpression> createTypeEqualityPredicate(
+    boost::intrusive_ptr<ExpressionContext> pExpCtx, const StringData& matchExprPath) {
+    FieldPath matchExprField(matchExprPath);
+    using namespace timeseries;
+    std::vector<std::unique_ptr<MatchExpression>> typeEqualityPredicates;
+
+    // Assume that we're generating a predicate on "a.b"
+    for (size_t i = 0; i < matchExprField.getPathLength(); i++) {
+        auto minPath = std::string{kControlMinFieldNamePrefix} + matchExprField.getSubpath(i);
+        auto maxPath = std::string{kControlMaxFieldNamePrefix} + matchExprField.getSubpath(i);
+
+        // This whole block adds
+        // {$expr: {$ne: [{$type: "$control.min.a"}, {$type: "$control.max.a"}]}}
+        // in order to ensure that the type of `control.min.a` and `control.max.a` are the same.
+
+        // This produces {$expr: ... }
+        typeEqualityPredicates.push_back(std::make_unique<ExprMatchExpression>(
+            // This produces {$ne: ... }
+            make_intrusive<ExpressionCompare>(
+                pExpCtx.get(),
+                ExpressionCompare::CmpOp::NE,
+                // This produces [...]
+                makeVector<boost::intrusive_ptr<Expression>>(
+                    // This produces {$type: ... }
+                    make_intrusive<ExpressionType>(
+                        pExpCtx.get(),
+                        // This produces [...]
+                        makeVector<boost::intrusive_ptr<Expression>>(
+                            // This produces "$control.min.a"
+                            ExpressionFieldPath::createPathFromString(
+                                pExpCtx.get(), minPath, pExpCtx->variablesParseState))),
+                    // This produces {$type: ... }
+                    make_intrusive<ExpressionType>(
+                        pExpCtx.get(),
+                        // This produces [...]
+                        makeVector<boost::intrusive_ptr<Expression>>(
+                            // This produces "$control.max.a"
+                            ExpressionFieldPath::createPathFromString(
+                                pExpCtx.get(), maxPath, pExpCtx->variablesParseState))))),
+            pExpCtx));
+    }
+    return std::make_unique<OrMatchExpression>(std::move(typeEqualityPredicates));
+}
+
 std::unique_ptr<MatchExpression> createComparisonPredicate(
     const ComparisonMatchExpression* matchExpr,
     const BucketSpec& bucketSpec,
     int bucketMaxSpanSeconds,
-    ExpressionContext::CollationMatchesDefault collationMatchesDefault) {
+    ExpressionContext::CollationMatchesDefault collationMatchesDefault,
+    boost::intrusive_ptr<ExpressionContext> pExpCtx) {
     using namespace timeseries;
     const auto matchExprPath = matchExpr->path();
     const auto matchExprData = matchExpr->getData();
@@ -632,9 +684,12 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
                           kBucketIdFieldName,
                           constructObjectIdValue<GTEMatchExpression>(matchExprData,
                                                                      bucketMaxSpanSeconds)))
-                : makePredicate(
-                      MatchExprPredicate<InternalExprLTEMatchExpression>(minPath, matchExprData),
-                      MatchExprPredicate<InternalExprGTEMatchExpression>(maxPath, matchExprData));
+                : std::make_unique<OrMatchExpression>(makeVector<std::unique_ptr<MatchExpression>>(
+                      makePredicate(MatchExprPredicate<InternalExprLTEMatchExpression>(
+                                        minPath, matchExprData),
+                                    MatchExprPredicate<InternalExprGTEMatchExpression>(
+                                        maxPath, matchExprData)),
+                      createTypeEqualityPredicate(pExpCtx, matchExprPath)));
 
         case MatchExpression::GT:
             // For $gt, make a $gt predicate against 'control.max'. In addition, if the comparison
@@ -654,8 +709,9 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
                           kBucketIdFieldName,
                           constructObjectIdValue<GTMatchExpression>(matchExprData,
                                                                     bucketMaxSpanSeconds)))
-                : makePredicate(
-                      MatchExprPredicate<InternalExprGTMatchExpression>(maxPath, matchExprData));
+                : std::make_unique<OrMatchExpression>(makeVector<std::unique_ptr<MatchExpression>>(
+                      std::make_unique<InternalExprGTMatchExpression>(maxPath, matchExprData),
+                      createTypeEqualityPredicate(pExpCtx, matchExprPath)));
 
         case MatchExpression::GTE:
             // For $gte, make a $gte predicate against 'control.max'. In addition, if the comparison
@@ -675,8 +731,9 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
                           kBucketIdFieldName,
                           constructObjectIdValue<GTEMatchExpression>(matchExprData,
                                                                      bucketMaxSpanSeconds)))
-                : makePredicate(
-                      MatchExprPredicate<InternalExprGTEMatchExpression>(maxPath, matchExprData));
+                : std::make_unique<OrMatchExpression>(makeVector<std::unique_ptr<MatchExpression>>(
+                      std::make_unique<InternalExprGTEMatchExpression>(maxPath, matchExprData),
+                      createTypeEqualityPredicate(pExpCtx, matchExprPath)));
 
         case MatchExpression::LT:
             // For $lt, make a $lt predicate against 'control.min'. In addition, if the comparison
@@ -692,8 +749,9 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
                           kBucketIdFieldName,
                           constructObjectIdValue<LTMatchExpression>(matchExprData,
                                                                     bucketMaxSpanSeconds)))
-                : makePredicate(
-                      MatchExprPredicate<InternalExprLTMatchExpression>(minPath, matchExprData));
+                : std::make_unique<OrMatchExpression>(makeVector<std::unique_ptr<MatchExpression>>(
+                      std::make_unique<InternalExprLTMatchExpression>(minPath, matchExprData),
+                      createTypeEqualityPredicate(pExpCtx, matchExprPath)));
 
         case MatchExpression::LTE:
             // For $lte, make a $lte predicate against 'control.min'. In addition, if the comparison
@@ -709,8 +767,9 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
                           kBucketIdFieldName,
                           constructObjectIdValue<LTEMatchExpression>(matchExprData,
                                                                      bucketMaxSpanSeconds)))
-                : makePredicate(
-                      MatchExprPredicate<InternalExprLTEMatchExpression>(minPath, matchExprData));
+                : std::make_unique<OrMatchExpression>(makeVector<std::unique_ptr<MatchExpression>>(
+                      std::make_unique<InternalExprLTEMatchExpression>(minPath, matchExprData),
+                      createTypeEqualityPredicate(pExpCtx, matchExprPath)));
 
         default:
             MONGO_UNREACHABLE_TASSERT(5348302);
@@ -738,7 +797,8 @@ DocumentSourceInternalUnpackBucket::createPredicatesOnBucketLevelField(
         return createComparisonPredicate(static_cast<const ComparisonMatchExpression*>(matchExpr),
                                          _bucketUnpacker.bucketSpec(),
                                          _bucketMaxSpanSeconds,
-                                         pExpCtx->collationMatchesDefault);
+                                         pExpCtx->collationMatchesDefault,
+                                         pExpCtx);
     }
 
     return nullptr;

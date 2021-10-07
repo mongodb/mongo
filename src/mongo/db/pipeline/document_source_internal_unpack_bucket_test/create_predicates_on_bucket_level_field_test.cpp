@@ -56,7 +56,9 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
                          ->createPredicatesOnBucketLevelField(original->getMatchExpression());
 
     ASSERT_BSONOBJ_EQ(predicate->serialize(true),
-                      fromjson("{'control.max.a': {$_internalExprGt: 1}}"));
+                      fromjson("{$or: [ {'control.max.a': {$_internalExprGt: 1}},"
+                               "{$or: [ {$expr: {$ne: [ {$type: [ \"$control.min.a\" ]},"
+                               "{$type: [ \"$control.max.a\" ]} ]}} ]} ]}"));
 }
 
 TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
@@ -75,7 +77,9 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
                          ->createPredicatesOnBucketLevelField(original->getMatchExpression());
 
     ASSERT_BSONOBJ_EQ(predicate->serialize(true),
-                      fromjson("{'control.max.a': {$_internalExprGte: 1}}"));
+                      fromjson("{$or: [ {'control.max.a': {$_internalExprGte: 1}},"
+                               "{$or: [ {$expr: {$ne: [ {$type: [ \"$control.min.a\" ]},"
+                               "{$type: [ \"$control.max.a\" ]} ]}} ]} ]}"));
 }
 
 TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
@@ -94,7 +98,9 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
                          ->createPredicatesOnBucketLevelField(original->getMatchExpression());
 
     ASSERT_BSONOBJ_EQ(predicate->serialize(true),
-                      fromjson("{'control.min.a': {$_internalExprLt: 1}}"));
+                      fromjson("{$or: [ {'control.min.a': {$_internalExprLt: 1}},"
+                               "{$or: [ {$expr: {$ne: [ {$type: [ \"$control.min.a\" ]},"
+                               "{$type: [ \"$control.max.a\" ]} ]}} ]} ]}"));
 }
 
 TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
@@ -113,7 +119,9 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
                          ->createPredicatesOnBucketLevelField(original->getMatchExpression());
 
     ASSERT_BSONOBJ_EQ(predicate->serialize(true),
-                      fromjson("{'control.min.a': {$_internalExprLte: 1}}"));
+                      fromjson("{$or: [ {'control.min.a': {$_internalExprLte: 1}},"
+                               "{$or: [ {$expr: {$ne: [ {$type: [ \"$control.min.a\" ]},"
+                               "{$type: [ \"$control.max.a\" ]} ]}} ]} ]}"));
 }
 
 TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
@@ -132,8 +140,10 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
                          ->createPredicatesOnBucketLevelField(original->getMatchExpression());
 
     ASSERT_BSONOBJ_EQ(predicate->serialize(true),
-                      fromjson("{$and: [{'control.min.a': {$_internalExprLte: 1}}, "
-                               "{'control.max.a': {$_internalExprGte: 1}}]}"));
+                      fromjson("{$or: [ {$and:[{'control.min.a': {$_internalExprLte: 1}},"
+                               "{'control.max.a': {$_internalExprGte: 1}}]},"
+                               "{$or: [ {$expr: {$ne: [ {$type: [ \"$control.min.a\" ]},"
+                               "{$type: [ \"$control.max.a\" ]} ]}} ]} ]}"));
 }
 
 TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
@@ -152,8 +162,12 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
                          ->createPredicatesOnBucketLevelField(original->getMatchExpression());
 
     ASSERT_BSONOBJ_EQ(predicate->serialize(true),
-                      fromjson("{$and: [{'control.max.b': {$_internalExprGt: 1}}, "
-                               "{'control.min.a': {$_internalExprLt: 5}}]}"));
+                      fromjson("{$and: [ {$or: [ {'control.max.b': {$_internalExprGt: 1}},"
+                               "{$or: [ {$expr: {$ne: [ {$type: [ \"$control.min.b\" ]},"
+                               "{$type: [ \"$control.max.b\" ]} ]}} ]} ]},"
+                               "{$or: [ {'control.min.a': {$_internalExprLt: 5}},"
+                               "{$or: [ {$expr: {$ne: [ {$type: [ \"$control.min.a\" ]},"
+                               "{$type: [ \"$control.max.a\" ]} ]}} ]} ]} ]}"));
 }
 
 TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
@@ -190,7 +204,9 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
                          ->createPredicatesOnBucketLevelField(original->getMatchExpression());
 
     ASSERT_BSONOBJ_EQ(predicate->serialize(true),
-                      fromjson("{$and: [{'control.max.b': {$_internalExprGt: 1}}]}"));
+                      fromjson("{$and: [ {$or: [ {'control.max.b': {$_internalExprGt: 1}},"
+                               "{$or: [ {$expr: {$ne: [ {$type: [ \"$control.min.b\" ]},"
+                               "{$type: [ \"$control.max.b\" ]} ]}} ]} ]} ]}"));
 }
 
 TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
@@ -210,9 +226,15 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
                          ->createPredicatesOnBucketLevelField(original->getMatchExpression());
 
     ASSERT_BSONOBJ_EQ(predicate->serialize(true),
-                      fromjson("{$and: [{'control.max.b': {$_internalExprGte: 2}}, {$and: "
-                               "[{'control.max.b': {$_internalExprGt: 1}}, "
-                               "{'control.min.a': {$_internalExprLt: 5}}]}]}"));
+                      fromjson("{$and: [ {$or: [ {'control.max.b': {$_internalExprGte: 2}},"
+                               "{$or: [ {$expr: {$ne: [ {$type: [ \"$control.min.b\" ]},"
+                               "{$type: [ \"$control.max.b\" ]} ]}} ]} ]},"
+                               "{$and: [ {$or: [ {'control.max.b': {$_internalExprGt: 1}},"
+                               "{$or: [ {$expr: {$ne: [ {$type: [ \"$control.min.b\" ]},"
+                               "{$type: [ \"$control.max.b\" ]} ]}} ]} ]},"
+                               "{$or: [ {'control.min.a': {$_internalExprLt: 5}},"
+                               "{$or: [ {$expr: {$ne: [ {$type: [ \"$control.min.a\" ]},"
+                               "{$type: [ \"$control.max.a\" ]} ]}} ]} ]} ]} ]}"));
 }
 
 TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
@@ -231,7 +253,9 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
     ASSERT_EQ(stages.size(), 3U);
 
     ASSERT_BSONOBJ_EQ(stages[0].getDocument().toBson(),
-                      fromjson("{$match: {'control.max.b': {$_internalExprGt: 1}}}"));
+                      fromjson("{$match: {$or: [ {'control.max.b': {$_internalExprGt: 1}},"
+                               "{$expr: {$ne: [ {$type: [ \"$control.min.b\" ]},"
+                               "{$type: [ \"$control.max.b\" ]} ]}} ]}}"));
     ASSERT_BSONOBJ_EQ(stages[1].getDocument().toBson(), unpackBucketObj);
     ASSERT_BSONOBJ_EQ(stages[2].getDocument().toBson(),
                       fromjson("{$match: {$and: [{b: {$gt: 1}}, {a: {$not: {$eq: 5}}}]}}"));
@@ -254,8 +278,15 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
 
     ASSERT_BSONOBJ_EQ(
         stages[0],
-        fromjson("{$match: {$and: [{'control.max.b': {$_internalExprGte: 2}}, {'control.max.c': "
-                 "{$_internalExprGt: 1}}, {'control.min.a': {$_internalExprLt: 5}}]}}"));
+        fromjson("{$match: {$and: [ {$or: [ {'control.max.b': {$_internalExprGte: 2}},"
+                 "{$or: [ {$expr: {$ne: [ {$type: [ \"$control.min.b\" ]},"
+                 "{$type: [ \"$control.max.b\" ]} ]}} ]} ]},"
+                 "{$or: [ {'control.max.c': {$_internalExprGt: 1}},"
+                 "{$or: [ {$expr: {$ne: [ {$type: [ \"$control.min.c\" ]},"
+                 "{$type: [ \"$control.max.c\" ]} ]}} ]} ]},"
+                 "{$or: [ {'control.min.a': {$_internalExprLt: 5}},"
+                 "{$or: [ {$expr: {$ne: [ {$type: [ \"$control.min.a\" ]},"
+                 "{$type: [ \"$control.max.a\" ]} ]}} ]} ]} ]}}"));
     ASSERT_BSONOBJ_EQ(stages[1], unpackBucketObj);
     ASSERT_BSONOBJ_EQ(stages[2], matchObj);
 }
@@ -366,7 +397,9 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
                          ->createPredicatesOnBucketLevelField(original->getMatchExpression());
 
     ASSERT_BSONOBJ_EQ(predicate->serialize(true),
-                      fromjson("{$and: [{'control.max.a': {$_internalExprGt: 1}}]}"));
+                      fromjson("{$and: [ {$or: [ {'control.max.a': {$_internalExprGt: 1}},"
+                               "{$or: [ {$expr: {$ne: [ {$type: [ \"$control.min.a\" ]},"
+                               "{$type: [ \"$control.max.a\" ]} ]}} ]} ]} ]}"));
 }
 
 TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest, OptimizeMapsTimePredicatesOnId) {
