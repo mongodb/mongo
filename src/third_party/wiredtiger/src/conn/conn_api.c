@@ -2148,7 +2148,7 @@ __wt_timing_stress_config(WT_SESSION_IMPL *session, const char *cfg[])
       {"split_1", WT_TIMING_STRESS_SPLIT_1}, {"split_2", WT_TIMING_STRESS_SPLIT_2},
       {"split_3", WT_TIMING_STRESS_SPLIT_3}, {"split_4", WT_TIMING_STRESS_SPLIT_4},
       {"split_5", WT_TIMING_STRESS_SPLIT_5}, {"split_6", WT_TIMING_STRESS_SPLIT_6},
-      {"split_7", WT_TIMING_STRESS_SPLIT_7}, {"split_8", WT_TIMING_STRESS_SPLIT_8}, {NULL, 0}};
+      {"split_7", WT_TIMING_STRESS_SPLIT_7}, {NULL, 0}};
     WT_CONFIG_ITEM cval, sval;
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;

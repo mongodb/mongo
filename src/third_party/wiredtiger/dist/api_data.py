@@ -805,7 +805,7 @@ connection_runtime_config = [
         'failpoint_history_store_delete_key_from_ts', 'failpoint_history_store_insert_1',
         'failpoint_history_store_insert_2', 'history_store_checkpoint_delay',
         'history_store_search', 'history_store_sweep_race', 'prepare_checkpoint_delay', 'split_1',
-        'split_2', 'split_3', 'split_4', 'split_5', 'split_6', 'split_7', 'split_8']),
+        'split_2', 'split_3', 'split_4', 'split_5', 'split_6', 'split_7']),
     Config('verbose', '[]', r'''
         enable messages for various events. Options are given as a
         list, such as <code>"verbose=[evictserver,read]"</code>''',

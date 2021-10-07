@@ -26,8 +26,16 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#define __STDC_LIMIT_MACROS  // needed to get UINT64_MAX in C++
-#define __STDC_FORMAT_MACROS // needed to get PRIuXX macros in C++
+/* Needed to get UINT64_MAX in C++. */
+#ifndef __STDC_LIMIT_MACROS
+#define __STDC_LIMIT_MACROS
+#endif
+
+/* Needed to get PRIuXX macros in C++. */
+#ifndef __STDC_FORMAT_MACROS
+#define __STDC_FORMAT_MACROS
+#endif
+
 #include <iomanip>
 #include <iostream>
 #include <fstream>

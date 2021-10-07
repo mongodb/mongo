@@ -38,6 +38,7 @@ static char home[1024]; /* Program working dir */
  */
 static const char *const col_uri = "table:col_main";
 static const char *const uri = "table:main";
+static bool compaction;
 static bool compat;
 static bool inmem;
 
@@ -216,6 +217,17 @@ thread_run(void *arg)
          */
         if (fprintf(fp[INSERT_RECORD_FILE_ID], "%" PRIu64 "\n", i) == -1)
             testutil_die(errno, "fprintf");
+
+        /*
+         * If configured, run compaction on database after each epoch of 100000 operations.
+         */
+        if (compaction && i >= 100000 && i % 100000 == 0) {
+            printf("Running compaction in Thread %" PRIu32 "\n", td->id);
+            if (columnar_table)
+                testutil_check(session->compact(session, col_uri, NULL));
+            else
+                testutil_check(session->compact(session, uri, NULL));
+        }
 
         /*
          * Decide what kind of operation can be performed on the already inserted data.
@@ -607,17 +619,20 @@ main(int argc, char *argv[])
 
     (void)testutil_set_progname(argv);
 
-    compat = inmem = false;
+    compaction = compat = inmem = false;
     nth = MIN_TH;
     rand_th = rand_time = true;
     timeout = MIN_TIME;
     verify_only = false;
     working_dir = "WT_TEST.random-abort";
 
-    while ((ch = __wt_getopt(progname, argc, argv, "Ch:mT:t:v")) != EOF)
+    while ((ch = __wt_getopt(progname, argc, argv, "Cch:mT:t:v")) != EOF)
         switch (ch) {
         case 'C':
             compat = true;
+            break;
+        case 'c':
+            compaction = true;
             break;
         case 'h':
             working_dir = __wt_optarg;
@@ -669,8 +684,9 @@ main(int argc, char *argv[])
         printf("Parent: Compatibility %s in-mem log %s\n", compat ? "true" : "false",
           inmem ? "true" : "false");
         printf("Parent: Create %" PRIu32 " threads; sleep %" PRIu32 " seconds\n", nth, timeout);
-        printf("CONFIG: %s%s%s -h %s -T %" PRIu32 " -t %" PRIu32 "\n", progname,
-          compat ? " -C" : "", inmem ? " -m" : "", working_dir, nth, timeout);
+        printf("CONFIG: %s%s%s%s -h %s -T %" PRIu32 " -t %" PRIu32 "\n", progname,
+          compat ? " -C" : "", compaction ? " -c" : "", inmem ? " -m" : "", working_dir, nth,
+          timeout);
         /*
          * Fork a child to insert as many items. We will then randomly kill the child, run recovery
          * and make sure all items we wrote exist after recovery runs.

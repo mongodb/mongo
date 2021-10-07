@@ -181,8 +181,6 @@ static const char *list[] = {
   "stress.split_6",
   "timing_stress_split_7=",
   "stress.split_7",
-  "timing_stress_split_8=",
-  "stress.split_8",
   "transaction-frequency=",
   "transaction.frequency",
   "transaction_timestamps=",

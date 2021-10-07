@@ -462,14 +462,13 @@ __wt_log_get_backup_files(
      * log file will be removed from the list of files returned. New writes will not be included in
      * the backup.
      */
-    if (active_only)
-        F_SET(log, WT_LOG_FORCE_NEWFILE);
+    F_SET(log, WT_LOG_FORCE_NEWFILE);
     WT_RET(__wt_log_force_write(session, 1, NULL));
     WT_RET(__log_get_files(session, WT_LOG_FILENAME, &files, &count));
 
     for (max = 0, i = 0; i < count;) {
         WT_ERR(__wt_log_extract_lognum(session, files[i], &id));
-        if (active_only && (id < min_file || id > max_file)) {
+        if ((active_only && id < min_file) || id > max_file) {
             /*
              * Any files not being returned are individually freed and the array adjusted.
              */

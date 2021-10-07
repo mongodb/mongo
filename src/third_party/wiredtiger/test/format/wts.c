@@ -292,8 +292,6 @@ create_database(const char *home, WT_CONNECTION **connp)
         CONFIG_APPEND(p, ",split_6");
     if (g.c_timing_stress_split_7)
         CONFIG_APPEND(p, ",split_7");
-    if (g.c_timing_stress_split_8)
-        CONFIG_APPEND(p, ",split_8");
     CONFIG_APPEND(p, "]");
 
     /* Extensions. */
@@ -523,8 +521,6 @@ wts_open(const char *home, WT_CONNECTION **connp, WT_SESSION **sessionp, bool al
         CONFIG_APPEND(p, ",split_6");
     if (g.c_timing_stress_split_7)
         CONFIG_APPEND(p, ",split_7");
-    if (g.c_timing_stress_split_8)
-        CONFIG_APPEND(p, ",split_8");
     CONFIG_APPEND(p, "]");
 
     /* If in-memory, there's only a single, shared WT_CONNECTION handle. */

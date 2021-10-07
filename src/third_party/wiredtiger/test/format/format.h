@@ -264,7 +264,6 @@ typedef struct {
     uint32_t c_timing_stress_split_5;
     uint32_t c_timing_stress_split_6;
     uint32_t c_timing_stress_split_7;
-    uint32_t c_timing_stress_split_8;
     uint32_t c_truncate;
     uint32_t c_txn_implicit;
     uint32_t c_txn_timestamps;
@@ -402,7 +401,8 @@ typedef struct {
     uint64_t insert_list[256]; /* column-store inserted records */
     u_int insert_list_cnt;
 
-    WT_ITEM vprint; /* Temporary buffer for printable values */
+    WT_ITEM vprint;     /* Temporary buffer for printable values */
+    WT_ITEM moda, modb; /* Temporary buffer for modify operations */
 
 #define TINFO_RUNNING 1  /* Running */
 #define TINFO_COMPLETE 2 /* Finished */

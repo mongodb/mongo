@@ -266,21 +266,22 @@ void op_create(void *);
 void op_create_unique(void *);
 void op_cursor(void *);
 void op_drop(void *);
+bool testutil_is_flag_set(const char *);
+void testutil_build_dir(TEST_OPTS *, char *, int);
 void testutil_clean_work_dir(const char *);
 void testutil_cleanup(TEST_OPTS *);
 void testutil_copy_data(const char *);
-bool testutil_is_flag_set(const char *);
-void testutil_build_dir(TEST_OPTS *, char *, int);
+void testutil_copy_file(WT_SESSION *, const char *);
+void testutil_create_backup_directory(const char *);
 void testutil_make_work_dir(const char *);
+void testutil_modify_apply(WT_ITEM *, WT_ITEM *, WT_MODIFY *, int);
 int testutil_parse_opts(int, char *const *, TEST_OPTS *);
 void testutil_print_command_line(int argc, char *const *argv);
 void testutil_progress(TEST_OPTS *, const char *);
-void testutil_timestamp_parse(const char *, uint64_t *);
-void testutil_create_backup_directory(const char *);
-void testutil_copy_file(WT_SESSION *, const char *);
 #ifndef _WIN32
 void testutil_sleep_wait(uint32_t, pid_t);
 #endif
+void testutil_timestamp_parse(const char *, uint64_t *);
 void testutil_work_dir_from_path(char *, size_t, const char *);
 WT_THREAD_RET thread_append(void *);
 

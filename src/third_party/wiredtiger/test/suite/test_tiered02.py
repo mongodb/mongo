@@ -83,9 +83,7 @@ class test_tiered02(wttest.WiredTigerTestCase):
             self.assertEqual(len(got), self.flushed_objects)
         self.flushed_objects = len(got)
 
-    # Test tiered storage with the old prototype way of signaling flushing to the shared
-    # tier via checkpoints.  When flush_tier is working, the checkpoint calls can be
-    # replaced with flush_tier.
+    # Test tiered storage with checkpoints and flush_tier calls.
     def test_tiered(self):
         self.flushed_objects = 0
         args = 'key_format=S'
@@ -110,7 +108,7 @@ class test_tiered02(wttest.WiredTigerTestCase):
         self.close_conn()
         self.progress('reopen_conn')
         self.reopen_conn()
-        # Check what was there before
+        # Check what was there before.
         ds = SimpleDataSet(self, self.uri, 10, config=args)
         ds.check()
 
@@ -152,7 +150,7 @@ class test_tiered02(wttest.WiredTigerTestCase):
         self.progress('reopen_conn')
         self.reopen_conn()
 
-        # Check what was there before
+        # Check what was there before.
         ds = SimpleDataSet(self, self.uri, 200, config=args)
         ds.check()
 

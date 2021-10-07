@@ -81,7 +81,7 @@ class test_tiered06(wttest.WiredTigerTestCase):
         # Nothing is in the directory list until a flush.
         self.assertEquals(fs.fs_directory_list(session, '', ''), [])
 
-        # Flushing moves the file into the file system
+        # Flushing copies the file into the file system.
         local.ss_flush(session, fs, 'foobar', 'foobar', None)
         local.ss_flush_finish(session, fs, 'foobar', 'foobar', None)
 
@@ -91,7 +91,7 @@ class test_tiered06(wttest.WiredTigerTestCase):
 
         fh = fs.fs_open_file(session, 'foobar', FileSystem.open_file_type_data, FileSystem.open_readonly)
         inbytes = bytes(1000000)         # An empty buffer with a million zero bytes.
-        fh.fh_read(session, 0, inbytes)  # read into the buffer
+        fh.fh_read(session, 0, inbytes)  # Read into the buffer.
         self.assertEquals(outbytes[0:1000000], inbytes)
         self.assertEquals(fs.fs_size(session, 'foobar'), len(outbytes))
         self.assertEquals(fh.fh_size(session), len(outbytes))
@@ -136,29 +136,29 @@ class test_tiered06(wttest.WiredTigerTestCase):
         block_size = 4096
         f = open('abc', 'wb')
 
-        # blocks filled with 'a', etc.
+        # Create some blocks filled with 'a', etc.
         a_block = ('a' * block_size).encode()
         b_block = ('b' * block_size).encode()
         c_block = ('c' * block_size).encode()
         file_size = nblocks * block_size
 
-        # write all blocks as 'a', but in reverse order
+        # Write all blocks as 'a', but in reverse order.
         for pos in range(file_size - block_size, 0, -block_size):
             f.seek(pos)
             f.write(a_block)
 
-        # write the even blocks as 'b', forwards
+        # Write the even blocks as 'b', forwards.
         for pos in range(0, file_size, block_size * 2):
             f.seek(pos)
             f.write(b_block)
 
-        # write every third block as 'c', backwards
+        # Write every third block as 'c', backwards.
         for pos in range(file_size - block_size, 0, -block_size * 3):
             f.seek(pos)
             f.write(c_block)
         f.close()
 
-        # Flushing moves the file into the file system
+        # Flushing copies the file into the file system.
         local.ss_flush(session, fs, 'abc', 'abc', None)
         local.ss_flush_finish(session, fs, 'abc', 'abc', None)
 
@@ -172,7 +172,7 @@ class test_tiered06(wttest.WiredTigerTestCase):
             in_block = bytes(block_size)
             fh = fs.fs_open_file(session, 'abc', FileSystem.open_file_type_data, FileSystem.open_readonly)
 
-            # Do some spot checks, reading non-sequentially
+            # Do some spot checks, reading non-sequentially.
             fh.fh_read(session, 500 * block_size, in_block)  # divisible by 2, not 3
             self.assertEquals(in_block, b_block)
             fh.fh_read(session, 333 * block_size, in_block)  # divisible by 3, not 2
@@ -208,7 +208,7 @@ class test_tiered06(wttest.WiredTigerTestCase):
     cachedir1 = "./cache1"
     cachedir2 = "./cache2"
 
-    # Add a suffix to each in a list
+    # Add a suffix to each in a list.
     def suffix(self, lst, sfx):
         return [x + '.' + sfx for x in lst]
 
@@ -221,7 +221,7 @@ class test_tiered06(wttest.WiredTigerTestCase):
 
     # Check for data files in the WiredTiger home directory.
     def check_home(self, expect):
-        # Get list of all .wt files in home, prune out the WiredTiger produced ones
+        # Get list of all .wt files in home, prune out the WiredTiger produced ones.
         got = sorted(list(os.listdir(self.home)))
         got = [x for x in got if not x.startswith('WiredTiger') and x.endswith('.wt')]
         expect = sorted(self.suffix(expect, 'wt'))
@@ -229,7 +229,7 @@ class test_tiered06(wttest.WiredTigerTestCase):
 
     # Check that objects are "in the cloud" after a flush.
     # Using the local storage module, they are actually going to be in either
-    # objectdir1 or objectdir2
+    # objectdir1 or objectdir2.
     def check_objects(self, expect1, expect2):
         got = sorted(list(os.listdir(self.objectdir1)))
         expect = sorted(self.suffix(expect1, 'wtobj'))
@@ -252,7 +252,7 @@ class test_tiered06(wttest.WiredTigerTestCase):
             f.write('hello')
 
     def test_local_file_systems(self):
-        # Test using various buckets, hosts
+        # Test using various buckets, hosts.
 
         session = self.session
         local = self.conn.get_storage_source('local_store')
@@ -310,12 +310,12 @@ class test_tiered06(wttest.WiredTigerTestCase):
         self.check_caches([], [])
         self.check_objects(['beagle'], [])
 
-        # Bad file to flush
+        # Bad file to flush.
         errmsg = '/No such file/'
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: local.ss_flush(session, fs1, 'bad.wt', 'bad.wtobj'), errmsg)
 
-        # It's okay to flush again, nothing changes
+        # It's okay to flush again, nothing changes.
         local.ss_flush(session, fs1, 'beagle.wt', 'beagle.wtobj')
         self.check_home(['beagle', 'bird', 'bison', 'bat', 'cat', 'cougar', 'coyote', 'cub'])
         self.check_dirlist(fs1, '', ['beagle'])
@@ -323,15 +323,15 @@ class test_tiered06(wttest.WiredTigerTestCase):
         self.check_caches([], [])
         self.check_objects(['beagle'], [])
 
-        # When we flush_finish, the local file will move to the cache directory
+        # When we flush_finish, the local file will be in both the local and cache directory.
         local.ss_flush_finish(session, fs1, 'beagle.wt', 'beagle.wtobj')
-        self.check_home(['bird', 'bison', 'bat', 'cat', 'cougar', 'coyote', 'cub'])
+        self.check_home(['beagle', 'bird', 'bison', 'bat', 'cat', 'cougar', 'coyote', 'cub'])
         self.check_dirlist(fs1, '', ['beagle'])
         self.check_dirlist(fs2, '', [])
         self.check_caches(['beagle'], [])
         self.check_objects(['beagle'], [])
 
-        # Do a some more in each file ssytem
+        # Do a some more in each file system.
         local.ss_flush(session, fs1, 'bison.wt', 'bison.wtobj')
         local.ss_flush(session, fs2, 'cat.wt', 'cat.wtobj')
         local.ss_flush(session, fs1, 'bat.wt', 'bat.wtobj')
@@ -339,13 +339,13 @@ class test_tiered06(wttest.WiredTigerTestCase):
         local.ss_flush(session, fs2, 'cub.wt', 'cub.wtobj')
         local.ss_flush_finish(session, fs1, 'bat.wt', 'bat.wtobj')
 
-        self.check_home(['bird', 'bison', 'cougar', 'coyote', 'cub'])
+        self.check_home(['beagle', 'bird', 'bison', 'bat', 'cat', 'cougar', 'coyote', 'cub'])
         self.check_dirlist(fs1, '', ['beagle', 'bat', 'bison'])
         self.check_dirlist(fs2, '', ['cat', 'cub'])
         self.check_caches(['beagle', 'bat'], ['cat'])
         self.check_objects(['beagle', 'bat', 'bison'], ['cat', 'cub'])
 
-        # Test directory listing prefixes
+        # Test directory listing prefixes.
         self.check_dirlist(fs1, '', ['beagle', 'bat', 'bison'])
         self.check_dirlist(fs1, 'ba', ['bat'])
         self.check_dirlist(fs1, 'be', ['beagle'])

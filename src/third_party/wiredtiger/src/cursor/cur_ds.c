@@ -425,6 +425,7 @@ __wt_curds_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, con
       __curds_remove,                                 /* remove */
       __curds_reserve,                                /* reserve */
       __wt_cursor_reconfigure_notsup,                 /* reconfigure */
+      __wt_cursor_notsup,                             /* largest_key */
       __wt_cursor_notsup,                             /* cache */
       __wt_cursor_reopen_notsup,                      /* reopen */
       __curds_close);                                 /* close */

@@ -116,6 +116,9 @@ class postrun_statistic_check {
  */
 class runtime_monitor : public component {
     public:
+    static void get_stat(scoped_cursor &, int, int64_t *);
+
+    public:
     runtime_monitor(configuration *config, database &database);
     ~runtime_monitor();
 

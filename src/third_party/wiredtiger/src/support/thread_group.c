@@ -42,14 +42,15 @@ err:
         WT_IGNORE_RET(__wt_panic(session, ret, "Unrecoverable utility thread error"));
 
     /*
-     * The three cases when threads are expected to stop are:
+     * The cases when threads are expected to stop are:
      * 1.  When recovery is done.
      * 2.  When the connection is closing.
      * 3.  When a shutdown has been requested via clearing the run flag.
+     * 4.  When an error has occurred and the connection panic flag is set.
      */
     WT_ASSERT(session,
       !F_ISSET(thread, WT_THREAD_RUN) ||
-        F_ISSET(S2C(session), WT_CONN_CLOSING | WT_CONN_RECOVERING));
+        F_ISSET(S2C(session), WT_CONN_CLOSING | WT_CONN_PANIC | WT_CONN_RECOVERING));
 
     return (WT_THREAD_RET_VALUE);
 }

@@ -671,6 +671,7 @@ __curfile_create(WT_SESSION_IMPL *session, WT_CURSOR *owner, const char *cfg[], 
       __curfile_remove,                               /* remove */
       __curfile_reserve,                              /* reserve */
       __wt_cursor_reconfigure,                        /* reconfigure */
+      __wt_cursor_largest_key,                        /* largest_key */
       __curfile_cache,                                /* cache */
       __curfile_reopen,                               /* reopen */
       __curfile_close);                               /* close */

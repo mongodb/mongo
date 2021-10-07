@@ -44,10 +44,11 @@ random_generator::instance()
 std::string
 random_generator::generate_random_string(std::size_t length, characters_type type)
 {
+    const std::string characters = get_characters(type);
     std::string str;
 
     while (str.size() < length)
-        str += get_characters(type);
+        str += characters;
 
     std::shuffle(str.begin(), str.end(), _generator);
     return (str.substr(0, length));

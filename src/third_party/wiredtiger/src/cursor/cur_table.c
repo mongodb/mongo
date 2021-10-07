@@ -102,6 +102,7 @@ __wt_apply_single_idx(WT_SESSION_IMPL *session, WT_INDEX *idx, WT_CURSOR *cur,
       __wt_cursor_notsup,                             /* remove */
       __wt_cursor_notsup,                             /* reserve */
       __wt_cursor_reconfigure_notsup,                 /* reconfigure */
+      __wt_cursor_notsup,                             /* largest_key */
       __wt_cursor_notsup,                             /* cache */
       __wt_cursor_reopen_notsup,                      /* reopen */
       __wt_cursor_notsup);                            /* close */
@@ -789,6 +790,31 @@ err:
 }
 
 /*
+ * __curtable_largest_key --
+ *     WT_CURSOR->largest_key method for the table cursor type.
+ */
+static int
+__curtable_largest_key(WT_CURSOR *cursor)
+{
+    WT_CURSOR *primary;
+    WT_CURSOR_TABLE *ctable;
+    WT_DECL_RET;
+    WT_SESSION_IMPL *session;
+
+    ctable = (WT_CURSOR_TABLE *)cursor;
+    JOINABLE_CURSOR_API_CALL(cursor, session, largest_key, NULL);
+
+    WT_ERR(cursor->reset(cursor));
+    primary = *ctable->cg_cursors;
+    WT_ERR(primary->largest_key(primary));
+
+err:
+    if (ret != 0)
+        WT_TRET(cursor->reset(cursor));
+    API_END_RET(session, ret);
+}
+
+/*
  * __curtable_close --
  *     WT_CURSOR->close method for the table cursor type.
  */
@@ -968,6 +994,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, 
       __curtable_remove,                                /* remove */
       __curtable_reserve,                               /* reserve */
       __wt_cursor_reconfigure,                          /* reconfigure */
+      __curtable_largest_key,                           /* largest_key */
       __wt_cursor_notsup,                               /* cache */
       __wt_cursor_reopen_notsup,                        /* reopen */
       __curtable_close);                                /* close */
