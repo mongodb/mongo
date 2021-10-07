@@ -91,11 +91,11 @@ transaction_context::commit(const std::string &config)
 {
     WT_DECL_RET;
     testutil_assert(_in_txn && !_needs_rollback);
-    if ((ret = _session->commit_transaction(_session, config.empty() ? nullptr : config.c_str())) !=
-      0) {
+    ret = _session->commit_transaction(_session, config.empty() ? nullptr : config.c_str());
+    testutil_assert(ret == 0 || ret == WT_ROLLBACK);
+    if (ret != 0)
         logger::log_msg(LOG_WARN,
           "Failed to commit transaction in commit, received error code: " + std::to_string(ret));
-    }
     _op_count = 0;
     _in_txn = false;
     return (ret == 0);
