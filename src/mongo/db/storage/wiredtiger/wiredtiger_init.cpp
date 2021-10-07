@@ -121,7 +121,7 @@ public:
             ++setupCountForUnitTests;
 
             // Intentionally leaked.
-            [[maybe_unused]] auto leakedSection = new WiredTigerServerStatusSection(kv.get());
+            [[maybe_unused]] auto leakedSection = new WiredTigerServerStatusSection();
 
             // This allows unit tests to run this code without encountering memory leaks
 #if __has_feature(address_sanitizer)

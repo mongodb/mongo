@@ -40,13 +40,10 @@ class WiredTigerKVEngine;
  */
 class WiredTigerServerStatusSection : public ServerStatusSection {
 public:
-    WiredTigerServerStatusSection(WiredTigerKVEngine* engine);
+    WiredTigerServerStatusSection();
     bool includeByDefault() const override;
     BSONObj generateSection(OperationContext* opCtx,
                             const BSONElement& configElement) const override;
-
-private:
-    WiredTigerKVEngine* _engine;
 };
 
 }  // namespace mongo
