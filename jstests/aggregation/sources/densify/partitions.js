@@ -499,6 +499,29 @@ function fullTestFour() {
     assert(arrayEq(resultArray, testExpected), buildErrorString(resultArray, testExpected));
 }
 
+// Test a single document collection.
+function singleDocumentTest() {
+    coll.drop();
+    let testDocs = [{val: 1}];
+    let testExpected = testDocs;
+    assert.commandWorked(coll.insert(testDocs));
+    let result = coll.aggregate([
+        {$project: {_id: 0}},
+        {$densify: {field: "val", range: {step: 1, bounds: "full"}, partitionByFields: ["part"]}},
+    ]);
+    let resultArray = result.toArray();
+    assert(arrayEq(resultArray, testExpected), buildErrorString(resultArray, testExpected));
+    result = coll.aggregate([
+        {$project: {_id: 0}},
+        {
+            $densify:
+                {field: "val", range: {step: 1, bounds: "partition"}, partitionByFields: ["part"]}
+        },
+    ]);
+    resultArray = result.toArray();
+    assert(arrayEq(resultArray, testExpected), buildErrorString(resultArray, testExpected));
+}
+
 testOne();
 testTwo();
 testThree();
@@ -518,4 +541,6 @@ fullTestFour();
 testOneDates();
 fullTestTwoDates();
 rangeTestTwoDates();
+
+singleDocumentTest();
 })();

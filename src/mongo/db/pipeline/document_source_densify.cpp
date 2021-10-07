@@ -691,6 +691,7 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::doGetNext() {
                     [&](Full) {
                         _current = val;
                         _globalMin = val;
+                        _globalMax = val;
                         _densifyState = DensifyState::kNeedGen;
                         return nextDoc;
                     },
