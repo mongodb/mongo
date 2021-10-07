@@ -43,6 +43,11 @@ executor:
         eval: jsTest.authenticate(db.getMongo())
       <<: *authOptions
   - class: ValidateCollections
+    shell_options:
+      global_vars:
+        TestData: *TestData
+        eval: jsTest.authenticate(db.getMongo())
+      <<: *authOptions
   fixture:
     class: ReplicaSetFixture
     mongod_options:
