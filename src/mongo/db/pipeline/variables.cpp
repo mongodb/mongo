@@ -164,10 +164,6 @@ Value Variables::getValue(Id id, const Document& root) const {
                           str::stream() << "Builtin variable '$$" << getBuiltinVariableName(id)
                                         << "' is not available");
             case Variables::kSearchMetaId: {
-                uassert(5858105,
-                        str::stream() << "Must enable 'featureFlagSearchMeta' to access '$$"
-                                      << getBuiltinVariableName(id),
-                        ::mongo::feature_flags::gFeatureFlagSearchMeta.isEnabledAndIgnoreFCV());
                 auto metaIt = _definitions.find(id);
                 return metaIt == _definitions.end() ? Value() : metaIt->second.value;
             }
