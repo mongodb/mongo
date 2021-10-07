@@ -180,6 +180,7 @@ selector:
   - jstests/sharding/time_zone_info_mongos.js
   # Remove if/once SERVER-50547 is backported to 4.0.
   - jstests/sharding/pipeline_length_limit.js
+  - jstests/sharding/mongos_precache_routing_info.js
   - jstests/sharding/warm_up_connection_pool.js
 
 executor:

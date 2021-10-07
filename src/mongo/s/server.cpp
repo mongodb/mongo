@@ -426,6 +426,11 @@ Status initializeSharding(OperationContext* opCtx) {
         return status;
     }
 
+    status = preCacheMongosRoutingInfo(opCtx);
+    if (!status.isOK()) {
+        return status;
+    }
+
     status = preWarmConnectionPool(opCtx);
     if (!status.isOK()) {
         return status;

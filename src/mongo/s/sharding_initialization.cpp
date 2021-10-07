@@ -270,6 +270,33 @@ Status waitForShardRegistryReload(OperationContext* opCtx) {
     return {ErrorCodes::ShutdownInProgress, "aborting shard loading attempt"};
 }
 
+Status preCacheMongosRoutingInfo(OperationContext* opCtx) {
+    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+        return Status::OK();
+    }
+    auto grid = Grid::get(opCtx);
+
+    auto shardingCatalogClient = grid->catalogClient();
+    auto result =
+        shardingCatalogClient->getAllDBs(opCtx, repl::ReadConcernLevel::kMajorityReadConcern);
+
+    if (!result.isOK()) {
+        return result.getStatus();
+    }
+
+    auto cache = grid->catalogCache();
+    for (auto& db : result.getValue().value) {
+        for (auto& coll : shardingCatalogClient->getAllShardedCollectionsForDb(
+                 opCtx, db.getName(), repl::ReadConcernLevel::kMajorityReadConcern)) {
+            auto resp = cache->getShardedCollectionRoutingInfoWithRefresh(opCtx, coll);
+            if (!resp.isOK()) {
+                return resp.getStatus();
+            }
+        }
+    }
+    return Status::OK();
+}
+
 Status preWarmConnectionPool(OperationContext* opCtx) {
     if (!gWarmMinConnectionsInShardingTaskExecutorPoolOnStartup) {
         return Status::OK();
