@@ -295,7 +295,7 @@ void ReplicationCoordinatorExternalStateImpl::_stopDataReplication_inlock(
 
     // Clear the buffer. This unblocks the OplogFetcher if it is blocked with a full queue, but
     // ensures that it won't add anything. It will also unblock the OplogApplier pipeline if it
-    // is waiting for an operation to be past the slaveDelay point.
+    // is waiting for an operation to be past the secondaryDelaySecs point.
     if (oldOplogBuffer) {
         oldOplogBuffer->clear(opCtx);
     }

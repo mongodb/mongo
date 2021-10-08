@@ -92,7 +92,7 @@ MemberConfig::MemberConfig(const BSONObj& mcfg) {
             uasserted(ErrorCodes::BadValue, "priority must be 0 when non-voting (votes:0)");
         }
         if (getSecondaryDelay() > Seconds(0)) {
-            uasserted(ErrorCodes::BadValue, "priority must be 0 when slaveDelay is used");
+            uasserted(ErrorCodes::BadValue, "priority must be 0 when secondaryDelaySecs is used");
         }
         if (isHidden()) {
             uasserted(ErrorCodes::BadValue, "priority must be 0 when hidden=true");
