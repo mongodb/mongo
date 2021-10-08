@@ -402,7 +402,14 @@ private:
     };
 
     DensifyValue getDensifyValue(const Document& doc) {
-        return DensifyValue::getFromDocument(doc, _field);
+        auto val = DensifyValue::getFromDocument(doc, _field);
+        uassert(6053600,
+                val.isNumber()
+                    ? "Encountered numeric densify value in collection when step has a date unit."
+                    : "Encountered date densify value in collection when step does not have a date "
+                      "unit.",
+                (!_range.getUnit() && val.isNumber()) || (_range.getUnit() && val.isDate()));
+        return val;
     }
 
     Value getDensifyPartition(const Document& doc) {
