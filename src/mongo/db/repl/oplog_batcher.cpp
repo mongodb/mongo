@@ -177,10 +177,10 @@ StatusWith<std::vector<OplogEntry>> OplogBatcher::getNextApplierBatch(
                                   << ", oplog entry: " << redact(entry.toBSONForLogging())};
         }
 
-        if (batchLimits.slaveDelayLatestTimestamp) {
+        if (batchLimits.secondaryDelaySecsLatestTimestamp) {
             auto entryTime =
                 Date_t::fromDurationSinceEpoch(Seconds(entry.getTimestamp().getSecs()));
-            if (entryTime > *batchLimits.slaveDelayLatestTimestamp) {
+            if (entryTime > *batchLimits.secondaryDelaySecsLatestTimestamp) {
                 if (ops.empty()) {
                     // Sleep if we've got nothing to do. Only sleep for 1 second at a time to allow
                     // reconfigs and shutdown to occur.
@@ -226,18 +226,18 @@ StatusWith<std::vector<OplogEntry>> OplogBatcher::getNextApplierBatch(
 }
 
 /**
- * If slaveDelay is enabled, this function calculates the most recent timestamp of any oplog
+ * If secondaryDelaySecs is enabled, this function calculates the most recent timestamp of any oplog
  * entries that can be be returned in a batch.
  */
-boost::optional<Date_t> OplogBatcher::_calculateSlaveDelayLatestTimestamp() {
+boost::optional<Date_t> OplogBatcher::_calculateSecondaryDelaySecsLatestTimestamp() {
     auto service = cc().getServiceContext();
     auto replCoord = ReplicationCoordinator::get(service);
-    auto slaveDelay = replCoord->getSecondaryDelaySecs();
-    if (slaveDelay <= Seconds(0)) {
+    auto secondaryDelaySecs = replCoord->getSecondaryDelaySecs();
+    if (secondaryDelaySecs <= Seconds(0)) {
         return {};
     }
     auto fastClockSource = service->getFastClockSource();
-    return fastClockSource->now() - slaveDelay;
+    return fastClockSource->now() - secondaryDelaySecs;
 }
 
 void OplogBatcher::_consume(OperationContext* opCtx, OplogBuffer* oplogBuffer) {
@@ -259,7 +259,8 @@ void OplogBatcher::_run(StorageInterface* storageInterface) {
     while (true) {
         globalFailPointRegistry().find("rsSyncApplyStop")->pauseWhileSet();
 
-        batchLimits.slaveDelayLatestTimestamp = _calculateSlaveDelayLatestTimestamp();
+        batchLimits.secondaryDelaySecsLatestTimestamp =
+            _calculateSecondaryDelaySecsLatestTimestamp();
 
         // Check the limits once per batch since users can change them at runtime.
         batchLimits.ops = getBatchLimitOplogEntries();

@@ -3007,8 +3007,6 @@ long long TopologyCoordinator::getTerm() const {
     return _term;
 }
 
-// TODO(siyuan): Merge _hddata into _slaveInfo, so that we have a single view of the
-// replset. Passing metadata is unnecessary.
 bool TopologyCoordinator::shouldChangeSyncSource(const HostAndPort& currentSource,
                                                  const rpc::ReplSetMetadata& replMetadata,
                                                  const rpc::OplogQueryMetadata& oqMetadata,
