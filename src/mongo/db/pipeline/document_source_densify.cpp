@@ -898,13 +898,13 @@ bool DensifyValue::isOnStepRelativeTo(DensifyValue base, RangeStatement range) c
                 // Months, quarters and years have variable lengths depending on leap days
                 // and days-in-a-month, so a step is not a constant number of milliseconds
                 // across all dates. For these units, we need to iterate through rather than
-                // performing a calculation with modulo.
+                // performing a calculation with modulo. As long as `baseDate` is not a large number
+                // of steps away from the value we're testing (as is true in our usage with _current
+                // as the base), this should not be a performance issue.
                 if (unit == TimeUnit::month || unit == TimeUnit::quarter ||
                     unit == TimeUnit::year) {
 
                     Date_t steppedDate = baseDate;
-                    // TODO SERVER-60202: Could be sped up with binary search rather than stepping
-                    // sequentially.
                     while (steppedDate < date) {
                         steppedDate = dateAdd(steppedDate, unit, step, timezone());
                     }
