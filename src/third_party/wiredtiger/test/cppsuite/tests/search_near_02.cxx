@@ -160,7 +160,7 @@ class search_near_02 : public test_harness::test {
                 auto &cursor_prefix = cursors[coll.id];
                 /* The cached cursors have the prefix configuration enabled. */
                 testutil_check(
-                  cursor_prefix.get()->reconfigure(cursor_prefix.get(), "prefix_key=true"));
+                  cursor_prefix.get()->reconfigure(cursor_prefix.get(), "prefix_search=true"));
             }
 
             auto &cursor_prefix = cursors[coll.id];

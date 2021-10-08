@@ -64,9 +64,9 @@ class test_search_near03(wttest.WiredTigerTestCase):
         cursor = self.session.open_cursor(uri)
         # Check if the format is valid for prefix configuration.
         if self.valid_key_format():
-            self.assertEqual(cursor.reconfigure("prefix_key=true"), 0)
+            self.assertEqual(cursor.reconfigure("prefix_search=true"), 0)
         else:
             msg = '/Invalid argument/'
             self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-                lambda: cursor.reconfigure("prefix_key=true"), msg)
+                lambda: cursor.reconfigure("prefix_search=true"), msg)
         cursor.close()
