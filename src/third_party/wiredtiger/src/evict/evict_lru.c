@@ -2047,9 +2047,14 @@ fast:
      */
     if (pages_queued < target_pages / 2 && !urgent_queued)
         btree->evict_walk_period = WT_MIN(WT_MAX(1, 2 * btree->evict_walk_period), 100);
-    else if (pages_queued == target_pages)
+    else if (pages_queued == target_pages) {
         btree->evict_walk_period = 0;
-    else if (btree->evict_walk_period > 0)
+        /*
+         * If there's a chance the Btree was fully evicted, update the evicted flag in the handle.
+         */
+        if (__wt_btree_bytes_evictable(session) == 0)
+            F_SET(session->dhandle, WT_DHANDLE_EVICTED);
+    } else if (btree->evict_walk_period > 0)
         btree->evict_walk_period /= 2;
 
     /*

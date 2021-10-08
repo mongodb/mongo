@@ -319,6 +319,9 @@ __wt_conn_dhandle_close(WT_SESSION_IMPL *session, bool final, bool mark_dead)
 
         /* Reset the tree's eviction priority (if any). */
         __wt_evict_priority_clear(session);
+
+        /* Mark the advisory bit that the tree has been evicted. */
+        F_SET(dhandle, WT_DHANDLE_EVICTED);
     }
 
     /*
