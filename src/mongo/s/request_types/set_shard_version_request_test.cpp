@@ -41,7 +41,7 @@ using unittest::assertGet;
 namespace {
 
 TEST(SetShardVersionRequest, ParseFull) {
-    const ChunkVersion chunkVersion(1, 2, OID::gen(), Timestamp());
+    const ChunkVersion chunkVersion(1, 2, OID::gen(), Timestamp(1, 1));
 
     SetShardVersionRequest request =
         assertGet(SetShardVersionRequest::parseFromBSON(
@@ -59,7 +59,7 @@ TEST(SetShardVersionRequest, ParseFull) {
 }
 
 TEST(SetShardVersionRequest, ParseFullWithAuthoritative) {
-    const ChunkVersion chunkVersion(1, 2, OID::gen(), Timestamp());
+    const ChunkVersion chunkVersion(1, 2, OID::gen(), Timestamp(1, 1));
 
     SetShardVersionRequest request =
         assertGet(SetShardVersionRequest::parseFromBSON(
@@ -78,7 +78,7 @@ TEST(SetShardVersionRequest, ParseFullWithAuthoritative) {
 }
 
 TEST(SetShardVersionRequest, ParseFullNoNS) {
-    const ChunkVersion chunkVersion(1, 2, OID::gen(), Timestamp());
+    const ChunkVersion chunkVersion(1, 2, OID::gen(), Timestamp(1, 1));
 
     auto ssvStatus =
         SetShardVersionRequest::parseFromBSON(BSON("setShardVersion"
@@ -90,7 +90,7 @@ TEST(SetShardVersionRequest, ParseFullNoNS) {
 }
 
 TEST(SetShardVersionRequest, ParseFullNSContainsDBOnly) {
-    const ChunkVersion chunkVersion(1, 2, OID::gen(), Timestamp());
+    const ChunkVersion chunkVersion(1, 2, OID::gen(), Timestamp(1, 1));
 
     auto ssvStatus =
         SetShardVersionRequest::parseFromBSON(BSON("setShardVersion"
@@ -102,7 +102,7 @@ TEST(SetShardVersionRequest, ParseFullNSContainsDBOnly) {
 }
 
 TEST(SetShardVersionRequest, ToSSVCommandFull) {
-    const ChunkVersion chunkVersion(1, 2, OID::gen(), Timestamp());
+    const ChunkVersion chunkVersion(1, 2, OID::gen(), Timestamp(1, 1));
 
     SetShardVersionRequest ssv(NamespaceString("db.coll"), chunkVersion, false);
 
@@ -122,7 +122,7 @@ TEST(SetShardVersionRequest, ToSSVCommandFull) {
 }
 
 TEST(SetShardVersionRequest, ToSSVCommandFullAuthoritative) {
-    const ChunkVersion chunkVersion(1, 2, OID::gen(), Timestamp());
+    const ChunkVersion chunkVersion(1, 2, OID::gen(), Timestamp(1, 1));
 
     SetShardVersionRequest ssv(NamespaceString("db.coll"), chunkVersion, true);
 
@@ -142,7 +142,7 @@ TEST(SetShardVersionRequest, ToSSVCommandFullAuthoritative) {
 }
 
 TEST(SetShardVersionRequest, ToSSVCommandFullForceRefresh) {
-    const ChunkVersion chunkVersion(1, 2, OID::gen(), Timestamp());
+    const ChunkVersion chunkVersion(1, 2, OID::gen(), Timestamp(1, 1));
 
     SetShardVersionRequest ssv(NamespaceString("db.coll"), chunkVersion, false, true);
 

@@ -105,14 +105,14 @@ public:
             nullptr,
             false,
             epoch,
-            Timestamp(),
+            Timestamp(1, 1),
             boost::none /* timeseriesFields */,
             boost::none,
             boost::none /* chunkSizeBytes */,
             true,
             {ChunkType{uuid,
                        ChunkRange{BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY)},
-                       ChunkVersion(1, 0, epoch, Timestamp()),
+                       ChunkVersion(1, 0, epoch, Timestamp(1, 1)),
                        ShardId("dummyShardId")}});
 
         AutoGetDb autoDb(operationContext(), kNss.db(), MODE_IX);
@@ -121,7 +121,7 @@ public:
             ->setFilteringMetadata(
                 operationContext(),
                 CollectionMetadata(ChunkManager(ShardId("dummyShardId"),
-                                                DatabaseVersion(UUID::gen(), Timestamp()),
+                                                DatabaseVersion(UUID::gen(), Timestamp(1, 1)),
                                                 makeStandaloneRoutingTableHistory(std::move(rt)),
                                                 boost::none),
                                    ShardId("dummyShardId")));

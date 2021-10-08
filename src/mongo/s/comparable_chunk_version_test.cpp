@@ -37,7 +37,7 @@ namespace {
 
 TEST(ComparableChunkVersionTest, VersionsEqual) {
     const auto epoch = OID::gen();
-    const Timestamp timestamp;
+    const Timestamp timestamp(1, 1);
     const ChunkVersion v1(1, 0, epoch, timestamp);
     const ChunkVersion v2(1, 0, epoch, timestamp);
     const auto version1 = ComparableChunkVersion::makeComparableChunkVersion(v1);
@@ -46,7 +46,7 @@ TEST(ComparableChunkVersionTest, VersionsEqual) {
 }
 
 TEST(ComparableChunkVersionTest, VersionsEqualAfterCopy) {
-    const ChunkVersion chunkVersion(1, 0, OID::gen(), Timestamp());
+    const ChunkVersion chunkVersion(1, 0, OID::gen(), Timestamp(1, 1));
     const auto version1 = ComparableChunkVersion::makeComparableChunkVersion(chunkVersion);
     const auto version2 = version1;
     ASSERT(version1 == version2);
@@ -75,7 +75,7 @@ TEST(ComparableChunkVersionTest, CompareDifferentVersionsTimestampsIgnoreSequenc
 
 TEST(ComparableChunkVersionTest, VersionGreaterSameTimestamps) {
     const auto epoch = OID::gen();
-    const Timestamp timestamp;
+    const Timestamp timestamp(1, 1);
     const ChunkVersion v1(1, 0, epoch, timestamp);
     const ChunkVersion v2(1, 2, epoch, timestamp);
     const ChunkVersion v3(2, 0, epoch, timestamp);
@@ -92,7 +92,7 @@ TEST(ComparableChunkVersionTest, VersionGreaterSameTimestamps) {
 
 TEST(ComparableChunkVersionTest, VersionLessSameTimestamps) {
     const auto epoch = OID::gen();
-    const Timestamp timestamp;
+    const Timestamp timestamp(1, 1);
     const ChunkVersion v1(1, 0, epoch, timestamp);
     const ChunkVersion v2(1, 2, epoch, timestamp);
     const ChunkVersion v3(2, 0, epoch, timestamp);
@@ -115,7 +115,7 @@ TEST(ComparableChunkVersionTest, DefaultConstructedVersionsAreEqual) {
 }
 
 TEST(ComparableChunkVersionTest, DefaultConstructedVersionIsAlwaysLessThanWithChunksVersion) {
-    const ChunkVersion chunkVersion(1, 0, OID::gen(), Timestamp());
+    const ChunkVersion chunkVersion(1, 0, OID::gen(), Timestamp(1, 1));
     const ComparableChunkVersion defaultVersion{};
     const auto withChunksVersion = ComparableChunkVersion::makeComparableChunkVersion(chunkVersion);
     ASSERT(defaultVersion != withChunksVersion);
@@ -124,7 +124,7 @@ TEST(ComparableChunkVersionTest, DefaultConstructedVersionIsAlwaysLessThanWithCh
 }
 
 TEST(ComparableChunkVersionTest, DefaultConstructedVersionIsAlwaysLessThanNoChunksVersion) {
-    const ChunkVersion chunkVersion(0, 0, OID::gen(), Timestamp());
+    const ChunkVersion chunkVersion(0, 0, OID::gen(), Timestamp(1, 1));
     const ComparableChunkVersion defaultVersion{};
     const auto noChunksVersion = ComparableChunkVersion::makeComparableChunkVersion(chunkVersion);
     ASSERT(defaultVersion != noChunksVersion);
@@ -143,8 +143,8 @@ TEST(ComparableChunkVersionTest, DefaultConstructedVersionIsAlwaysLessThanUnshar
 
 TEST(ComparableChunkVersionTest, TwoNoChunksVersionsAreTheSame) {
     const auto oid = OID::gen();
-    const ChunkVersion v1(0, 0, oid, Timestamp());
-    const ChunkVersion v2(0, 0, oid, Timestamp());
+    const ChunkVersion v1(0, 0, oid, Timestamp(1, 1));
+    const ChunkVersion v2(0, 0, oid, Timestamp(1, 1));
     const auto noChunksVersion1 = ComparableChunkVersion::makeComparableChunkVersion(v1);
     const auto noChunksVersion2 = ComparableChunkVersion::makeComparableChunkVersion(v2);
     ASSERT(noChunksVersion1 == noChunksVersion2);

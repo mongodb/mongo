@@ -86,7 +86,7 @@ TEST_F(ShardingCatalogClientTest, GetCollectionExisting) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     CollectionType expectedColl(
-        NamespaceString("TestDB.TestNS"), OID::gen(), Timestamp(), Date_t::now(), UUID::gen());
+        NamespaceString("TestDB.TestNS"), OID::gen(), Timestamp(1, 1), Date_t::now(), UUID::gen());
     expectedColl.setKeyPattern(BSON("KeyName" << 1));
 
     const OpTime newOpTime(Timestamp(7, 6), 5);
@@ -159,7 +159,7 @@ TEST_F(ShardingCatalogClientTest, GetDatabaseExisting) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     DatabaseType expectedDb(
-        "bigdata", ShardId("shard0000"), true, DatabaseVersion(UUID::gen(), Timestamp()));
+        "bigdata", ShardId("shard0000"), true, DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
 
     const OpTime newOpTime(Timestamp(7, 6), 5);
 
@@ -207,7 +207,7 @@ TEST_F(ShardingCatalogClientTest, GetDatabaseStaleSecondaryRetrySuccess) {
     configTargeter()->setFindHostReturnValue(firstHost);
 
     DatabaseType expectedDb(
-        "bigdata", ShardId("shard0000"), true, DatabaseVersion(UUID::gen(), Timestamp()));
+        "bigdata", ShardId("shard0000"), true, DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
 
     auto future = launchAsync([this, &expectedDb] {
         return catalogClient()->getDatabase(
@@ -441,7 +441,7 @@ TEST_F(ShardingCatalogClientTest, GetChunksForUUIDNoSortNoLimit) {
 
     const auto collUuid = UUID::gen();
     const auto collEpoch = OID::gen();
-    const auto collTimestamp = Timestamp();
+    const auto collTimestamp = Timestamp(1, 1);
 
     ChunkVersion queryChunkVersion({1, 2, collEpoch, collTimestamp});
 
@@ -490,7 +490,7 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSInvalidChunk) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     const auto collUuid = UUID::gen();
-    ChunkVersion queryChunkVersion({1, 2, OID::gen(), Timestamp()});
+    ChunkVersion queryChunkVersion({1, 2, OID::gen(), Timestamp(1, 1)});
 
     const BSONObj chunksQuery(
         BSON(ChunkType::collectionUUID()
@@ -516,14 +516,14 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSInvalidChunk) {
         chunkA.setCollectionUUID(collUuid);
         chunkA.setMin(BSON("a" << 1));
         chunkA.setMax(BSON("a" << 100));
-        chunkA.setVersion({1, 2, OID::gen(), Timestamp()});
+        chunkA.setVersion({1, 2, OID::gen(), Timestamp(1, 1)});
         chunkA.setShard(ShardId("shard0000"));
 
         ChunkType chunkB;
         chunkB.setCollectionUUID(collUuid);
         chunkB.setMin(BSON("a" << 100));
         chunkB.setMax(BSON("a" << 200));
-        chunkB.setVersion({3, 4, OID::gen(), Timestamp()});
+        chunkB.setVersion({3, 4, OID::gen(), Timestamp(1, 1)});
         // Missing shard id
 
         return vector<BSONObj>{chunkA.toConfigBSON(), chunkB.toConfigBSON()};
@@ -766,13 +766,16 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsValidResultsNoDb) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     CollectionType coll1(
-        NamespaceString{"test.coll1"}, OID::gen(), Timestamp(), network()->now(), UUID::gen());
+        NamespaceString{"test.coll1"}, OID::gen(), Timestamp(1, 1), network()->now(), UUID::gen());
     coll1.setKeyPattern(KeyPattern{BSON("_id" << 1)});
     coll1.setUnique(false);
 
 
-    CollectionType coll2(
-        NamespaceString{"anotherdb.coll1"}, OID::gen(), Timestamp(), network()->now(), UUID::gen());
+    CollectionType coll2(NamespaceString{"anotherdb.coll1"},
+                         OID::gen(),
+                         Timestamp(1, 1),
+                         network()->now(),
+                         UUID::gen());
     coll2.setKeyPattern(KeyPattern{BSON("_id" << 1)});
     coll2.setUnique(false);
 
@@ -820,12 +823,12 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsValidResultsWithDb) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     CollectionType coll1(
-        NamespaceString{"test.coll1"}, OID::gen(), Timestamp(), network()->now(), UUID::gen());
+        NamespaceString{"test.coll1"}, OID::gen(), Timestamp(1, 1), network()->now(), UUID::gen());
     coll1.setKeyPattern(KeyPattern{BSON("_id" << 1)});
     coll1.setUnique(true);
 
     CollectionType coll2(
-        NamespaceString{"test.coll2"}, OID::gen(), Timestamp(), network()->now(), UUID::gen());
+        NamespaceString{"test.coll2"}, OID::gen(), Timestamp(1, 1), network()->now(), UUID::gen());
     coll2.setKeyPattern(KeyPattern{BSON("_id" << 1)});
     coll2.setUnique(false);
 
@@ -866,7 +869,7 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsInvalidCollectionType) {
     });
 
     CollectionType validColl(
-        NamespaceString{"test.coll1"}, OID::gen(), Timestamp(), network()->now(), UUID::gen());
+        NamespaceString{"test.coll1"}, OID::gen(), Timestamp(1, 1), network()->now(), UUID::gen());
     validColl.setKeyPattern(KeyPattern{BSON("_id" << 1)});
     validColl.setUnique(true);
 
@@ -900,9 +903,9 @@ TEST_F(ShardingCatalogClientTest, GetDatabasesForShardValid) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     DatabaseType dbt1(
-        "db1", ShardId("shard0000"), false, DatabaseVersion(UUID::gen(), Timestamp()));
+        "db1", ShardId("shard0000"), false, DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
     DatabaseType dbt2(
-        "db2", ShardId("shard0000"), false, DatabaseVersion(UUID::gen(), Timestamp()));
+        "db2", ShardId("shard0000"), false, DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
 
     auto future = launchAsync([this] {
         return assertGet(
@@ -944,7 +947,8 @@ TEST_F(ShardingCatalogClientTest, GetDatabasesForShardInvalidDoc) {
     });
 
     onFindCommand([](const RemoteCommandRequest& request) {
-        DatabaseType dbt1("db1", {"shard0000"}, false, DatabaseVersion(UUID::gen(), Timestamp()));
+        DatabaseType dbt1(
+            "db1", {"shard0000"}, false, DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
         return vector<BSONObj>{
             dbt1.toBSON(),
             BSON(DatabaseType::name() << 0)  // DatabaseType::name() should be a string
@@ -1049,7 +1053,8 @@ TEST_F(ShardingCatalogClientTest, GetTagsForCollectionInvalidTag) {
 TEST_F(ShardingCatalogClientTest, UpdateDatabase) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    DatabaseType dbt("test", ShardId("shard0000"), true, DatabaseVersion(UUID::gen(), Timestamp()));
+    DatabaseType dbt(
+        "test", ShardId("shard0000"), true, DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
 
     auto future = launchAsync([this, dbt] {
         auto status =
@@ -1097,7 +1102,7 @@ TEST_F(ShardingCatalogClientTest, UpdateConfigDocumentNonRetryableError) {
     configTargeter()->setFindHostReturnValue(host1);
 
     DatabaseType dbt(
-        "test", ShardId("shard0001"), false, DatabaseVersion(UUID::gen(), Timestamp()));
+        "test", ShardId("shard0001"), false, DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
 
     auto future = launchAsync([this, dbt] {
         auto status =
@@ -1188,7 +1193,7 @@ TEST_F(ShardingCatalogClientTest, ApplyChunkOpsDeprecatedSuccessfulWithCheck) {
                                                 << "second precondition"));
     const NamespaceString nss("config.chunks");
     const UUID uuid = UUID::gen();
-    ChunkVersion lastChunkVersion(0, 0, OID(), Timestamp());
+    ChunkVersion lastChunkVersion(0, 0, OID(), Timestamp(1, 1));
 
     auto future = launchAsync([this, updateOps, preCondition, uuid, nss, lastChunkVersion] {
         auto status =
@@ -1302,7 +1307,7 @@ TEST_F(ShardingCatalogClientTest, RetryOnFindCommandNetworkErrorSucceedsAtMaxRet
 
     onFindCommand([](const RemoteCommandRequest& request) {
         DatabaseType dbType(
-            "TestDB", ShardId("TestShard"), true, DatabaseVersion(UUID::gen(), Timestamp()));
+            "TestDB", ShardId("TestShard"), true, DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
 
         return vector<BSONObj>{dbType.toBSON()};
     });

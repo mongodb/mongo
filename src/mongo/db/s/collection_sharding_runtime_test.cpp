@@ -56,7 +56,7 @@ protected:
     static CollectionMetadata makeShardedMetadata(OperationContext* opCtx,
                                                   UUID uuid = UUID::gen()) {
         const OID epoch = OID::gen();
-        const Timestamp timestamp;
+        const Timestamp timestamp(1, 1);
         auto range = ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY));
         auto chunk = ChunkType(
             uuid, std::move(range), ChunkVersion(1, 0, epoch, timestamp), ShardId("other"));

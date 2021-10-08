@@ -350,7 +350,7 @@ public:
     const ShardKeyPattern kShardKeyPattern = ShardKeyPattern(BSON("_id" << 1));
     const UUID kDefaultUUID = UUID::gen();
     const OID kEpoch = OID::gen();
-    const Timestamp kDefaultTimestamp = Timestamp(1);
+    const Timestamp kDefaultTimestamp = Timestamp(2, 0);
     const DatabaseType kDefaultDatabaseType = DatabaseType(
         kNss.db().toString(), ShardId("0"), true, DatabaseVersion(kDefaultUUID, kDefaultTimestamp));
     const std::vector<ShardType> kShardList = {ShardType("0", "Host0:12345"),
@@ -652,7 +652,7 @@ TEST_F(SubmitRangeDeletionTaskTest,
     // stale when the task is submitted.
     const auto staleUUID = UUID::gen();
     const auto staleEpoch = OID::gen();
-    const auto staleTimestamp = Timestamp(0);
+    const auto staleTimestamp = Timestamp(1, 0);
     auto staleColl = makeCollectionType(staleUUID, staleEpoch, staleTimestamp);
     _mockCatalogCacheLoader->setDatabaseRefreshReturnValue(kDefaultDatabaseType);
     _mockCatalogCacheLoader->setCollectionRefreshReturnValue(staleColl);
@@ -696,7 +696,7 @@ TEST_F(SubmitRangeDeletionTaskTest,
 
     // Make the refresh triggered by submitting the task return an arbitrary UUID.
     const auto otherEpoch = OID::gen();
-    const auto otherTimestamp = Timestamp(2);
+    const auto otherTimestamp = Timestamp(3, 0);
     auto otherColl = makeCollectionType(UUID::gen(), otherEpoch, otherTimestamp);
     _mockCatalogCacheLoader->setDatabaseRefreshReturnValue(kDefaultDatabaseType);
     _mockCatalogCacheLoader->setCollectionRefreshReturnValue(otherColl);

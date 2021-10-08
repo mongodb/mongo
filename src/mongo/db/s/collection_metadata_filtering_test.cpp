@@ -73,13 +73,13 @@ protected:
             nullptr,
             false,
             epoch,
-            Timestamp(),
+            Timestamp(1, 1),
             timeseriesFields,
             boost::none,
             boost::none,
             true,
             [&] {
-                ChunkVersion version(1, 0, epoch, Timestamp());
+                ChunkVersion version(1, 0, epoch, Timestamp(1, 1));
 
                 ChunkType chunk1(uuid,
                                  {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << -100)},
@@ -111,7 +111,7 @@ protected:
             }());
 
         ChunkManager cm(ShardId("0"),
-                        DatabaseVersion(UUID::gen(), Timestamp()),
+                        DatabaseVersion(UUID::gen(), Timestamp(1, 1)),
                         makeStandaloneRoutingTableHistory(std::move(rt)),
                         boost::none);
         ASSERT_EQ(4, cm.numChunks());

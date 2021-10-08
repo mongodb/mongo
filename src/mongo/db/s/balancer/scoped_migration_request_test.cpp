@@ -103,7 +103,7 @@ ScopedMigrationRequest ScopedMigrationRequestTest::makeScopedMigrationRequest(
 MigrateInfo ScopedMigrationRequestTest::makeMigrateInfo() {
     const NamespaceString collNss{kNs};
     const auto collUuid = UUID::gen();
-    const ChunkVersion kChunkVersion{1, 2, OID::gen(), Timestamp()};
+    const ChunkVersion kChunkVersion{1, 2, OID::gen(), Timestamp(1, 1)};
 
     BSONObjBuilder chunkBuilder;
     collUuid.appendToBuilder(&chunkBuilder, ChunkType::collectionUUID.name());

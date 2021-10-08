@@ -62,7 +62,7 @@ public:
         setupShards({shard});
 
         CollectionType shardedCollection(
-            shardedNS(), OID::gen(), Timestamp(), Date_t::now(), UUID::gen());
+            shardedNS(), OID::gen(), Timestamp(1, 1), Date_t::now(), UUID::gen());
         shardedCollection.setKeyPattern(BSON("x" << 1));
 
         ASSERT_OK(insertToConfigCollection(
@@ -260,7 +260,7 @@ TEST_F(AssignKeyRangeToZoneTestFixture, RemoveZoneWithDollarPrefixedShardKeysSho
 
 TEST_F(AssignKeyRangeToZoneTestFixture, MinThatIsAShardKeyPrefixShouldConvertToFullShardKey) {
     NamespaceString ns("compound.shard");
-    CollectionType shardedCollection(ns, OID::gen(), Timestamp(), Date_t::now(), UUID::gen());
+    CollectionType shardedCollection(ns, OID::gen(), Timestamp(1, 1), Date_t::now(), UUID::gen());
     shardedCollection.setKeyPattern(BSON("x" << 1 << "y" << 1));
 
     ASSERT_OK(insertToConfigCollection(
@@ -277,7 +277,7 @@ TEST_F(AssignKeyRangeToZoneTestFixture, MinThatIsAShardKeyPrefixShouldConvertToF
 
 TEST_F(AssignKeyRangeToZoneTestFixture, MaxThatIsAShardKeyPrefixShouldConvertToFullShardKey) {
     NamespaceString ns("compound.shard");
-    CollectionType shardedCollection(ns, OID::gen(), Timestamp(), Date_t::now(), UUID::gen());
+    CollectionType shardedCollection(ns, OID::gen(), Timestamp(1, 1), Date_t::now(), UUID::gen());
     shardedCollection.setKeyPattern(BSON("x" << 1 << "y" << 1));
 
     ASSERT_OK(insertToConfigCollection(
@@ -329,7 +329,7 @@ TEST_F(AssignKeyRangeToZoneTestFixture, MinMaxThatIsNotAShardKeyPrefixShouldFail
 
 TEST_F(AssignKeyRangeToZoneTestFixture, MinMaxThatIsAShardKeyPrefixShouldSucceed) {
     NamespaceString ns("compound.shard");
-    CollectionType shardedCollection(ns, OID::gen(), Timestamp(), Date_t::now(), UUID::gen());
+    CollectionType shardedCollection(ns, OID::gen(), Timestamp(1, 1), Date_t::now(), UUID::gen());
     shardedCollection.setKeyPattern(BSON("x" << 1 << "y" << 1));
 
     ASSERT_OK(insertToConfigCollection(
@@ -372,7 +372,7 @@ TEST_F(AssignKeyRangeToZoneTestFixture, TimeseriesCollMustHaveTimeKeyRangeMinKey
     const std::string controlTimeField =
         timeseries::kControlMinFieldNamePrefix.toString() + timeField;
     const TimeseriesOptions timeseriesOptions(timeField.toString());
-    CollectionType shardedCollection(ns, OID::gen(), Timestamp(), Date_t::now(), UUID::gen());
+    CollectionType shardedCollection(ns, OID::gen(), Timestamp(1, 1), Date_t::now(), UUID::gen());
     TypeCollectionTimeseriesFields timeseriesFields;
     timeseriesFields.setTimeseriesOptions(timeseriesOptions);
     shardedCollection.setTimeseriesFields(timeseriesFields);
@@ -523,7 +523,7 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, NewRangeOverlappingInsideExistingShoul
  */
 TEST_F(AssignKeyRangeWithOneRangeFixture, NewRangeOverlappingWithDifferentNSShouldSucceed) {
     CollectionType shardedCollection(
-        NamespaceString("other.coll"), OID::gen(), Timestamp(), Date_t::now(), UUID::gen());
+        NamespaceString("other.coll"), OID::gen(), Timestamp(1, 1), Date_t::now(), UUID::gen());
     shardedCollection.setKeyPattern(BSON("x" << 1));
 
     ASSERT_OK(insertToConfigCollection(
@@ -743,7 +743,7 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, RemoveWithInvalidMaxShardKeyShouldFail
 
 TEST_F(AssignKeyRangeWithOneRangeFixture, RemoveWithPartialMinPrefixShouldRemoveRange) {
     NamespaceString ns("compound.shard");
-    CollectionType shardedCollection(ns, OID::gen(), Timestamp(), Date_t::now(), UUID::gen());
+    CollectionType shardedCollection(ns, OID::gen(), Timestamp(1, 1), Date_t::now(), UUID::gen());
     shardedCollection.setKeyPattern(BSON("x" << 1 << "y" << 1));
 
     ASSERT_OK(insertToConfigCollection(
@@ -766,7 +766,7 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, RemoveWithPartialMinPrefixShouldRemove
 
 TEST_F(AssignKeyRangeWithOneRangeFixture, RemoveWithPartialMaxPrefixShouldRemoveRange) {
     NamespaceString ns("compound.shard");
-    CollectionType shardedCollection(ns, OID::gen(), Timestamp(), Date_t::now(), UUID::gen());
+    CollectionType shardedCollection(ns, OID::gen(), Timestamp(1, 1), Date_t::now(), UUID::gen());
     shardedCollection.setKeyPattern(BSON("x" << 1 << "y" << 1));
 
     ASSERT_OK(insertToConfigCollection(

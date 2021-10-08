@@ -49,7 +49,7 @@ const ShardId kShard("shard0000");
 TEST(ChunkType, MissingConfigRequiredFields) {
     const auto collUuid = UUID::gen();
     const auto collEpoch = OID::gen();
-    const auto collTimestamp = Timestamp();
+    const auto collTimestamp = Timestamp(1, 1);
 
     ChunkVersion chunkVersion(1, 2, collEpoch, collTimestamp);
 
@@ -86,7 +86,7 @@ TEST(ChunkType, MissingConfigRequiredFields) {
 
 TEST(ChunkType, MissingShardRequiredFields) {
     const OID epoch = OID::gen();
-    const Timestamp timestamp;
+    const Timestamp timestamp(1, 1);
     ChunkVersion chunkVersion(1, 2, epoch, timestamp);
     const auto lastmod = Timestamp(chunkVersion.toLong());
 
@@ -116,7 +116,7 @@ TEST(ChunkType, MissingShardRequiredFields) {
 
 TEST(ChunkType, ToFromShardBSON) {
     const OID epoch = OID::gen();
-    const Timestamp timestamp;
+    const Timestamp timestamp(1, 1);
     ChunkVersion chunkVersion(1, 2, epoch, timestamp);
     auto lastmod = Timestamp(chunkVersion.toLong());
 

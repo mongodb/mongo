@@ -46,12 +46,14 @@ const NamespaceString CollectionType::ConfigNS("config.collections");
 CollectionType::CollectionType(
     NamespaceString nss, OID epoch, Timestamp creationTime, Date_t updatedAt, UUID uuid)
     : CollectionTypeBase(std::move(nss), std::move(updatedAt), std::move(creationTime)) {
+    invariant(creationTime != Timestamp(0, 0));
     setEpoch(std::move(epoch));
     setUuid(std::move(uuid));
 }
 
 CollectionType::CollectionType(const BSONObj& obj) {
     CollectionType::parseProtected(IDLParserErrorContext("CollectionType"), obj);
+    invariant(getTimestamp() != Timestamp(0, 0));
     uassert(ErrorCodes::BadValue,
             str::stream() << "Invalid namespace " << getNss(),
             getNss().isValid());

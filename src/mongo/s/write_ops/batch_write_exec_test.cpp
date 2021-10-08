@@ -141,7 +141,7 @@ BSONObj expectInsertsReturnStaleDbVersionErrorsBase(const NamespaceString& nss,
         errorBuilder.append("index", i);
         errorBuilder.append("code", int(ErrorCodes::StaleDbVersion));
 
-        auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp());
+        auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 1));
         errorBuilder.append("db", nss.db());
         errorBuilder.append("vReceived", dbVersion.toBSON());
         errorBuilder.append("vWanted", dbVersion.makeUpdated().toBSON());
@@ -281,8 +281,9 @@ public:
 
     MockNSTargeter singleShardNSTargeter{
         nss,
-        {MockRange(ShardEndpoint(
-                       kShardName1, ChunkVersion(100, 200, OID::gen(), Timestamp()), boost::none),
+        {MockRange(ShardEndpoint(kShardName1,
+                                 ChunkVersion(100, 200, OID::gen(), Timestamp(1, 1)),
+                                 boost::none),
                    BSON("x" << MINKEY),
                    BSON("x" << MAXKEY))}};
 };
@@ -439,20 +440,20 @@ TEST_F(BatchWriteExecTest, SingleDeleteTargetsShardWithLet) {
         std::vector<ShardEndpoint> targetDelete(OperationContext* opCtx,
                                                 const BatchItemRef& itemRef) const override {
             return std::vector{ShardEndpoint(
-                kShardName2, ChunkVersion(101, 200, epoch, Timestamp()), boost::none)};
+                kShardName2, ChunkVersion(101, 200, epoch, Timestamp(1, 1)), boost::none)};
         }
     };
 
     MultiShardTargeter multiShardNSTargeter(
         nss,
-        {MockRange(
-             ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch, Timestamp()), boost::none),
-             BSON("x" << MINKEY),
-             BSON("x" << 0)),
-         MockRange(
-             ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch, Timestamp()), boost::none),
-             BSON("x" << 0),
-             BSON("x" << MAXKEY))});
+        {MockRange(ShardEndpoint(
+                       kShardName1, ChunkVersion(100, 200, epoch, Timestamp(1, 1)), boost::none),
+                   BSON("x" << MINKEY),
+                   BSON("x" << 0)),
+         MockRange(ShardEndpoint(
+                       kShardName2, ChunkVersion(101, 200, epoch, Timestamp(1, 1)), boost::none),
+                   BSON("x" << 0),
+                   BSON("x" << MAXKEY))});
 
     auto future = launchAsync([&] {
         BatchedCommandResponse response;

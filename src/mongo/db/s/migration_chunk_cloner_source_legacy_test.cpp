@@ -188,7 +188,7 @@ protected:
                     operationContext(),
                     CollectionMetadata(
                         ChunkManager(ShardId("dummyShardId"),
-                                     DatabaseVersion(UUID::gen(), Timestamp()),
+                                     DatabaseVersion(UUID::gen(), Timestamp(1, 1)),
                                      makeStandaloneRoutingTableHistory(std::move(rt)),
                                      boost::none),
                         ShardId("dummyShardId")));
@@ -207,7 +207,7 @@ protected:
         MoveChunkRequest::appendAsCommand(
             &cmdBuilder,
             kNss,
-            ChunkVersion(1, 0, OID::gen(), Timestamp()),
+            ChunkVersion(1, 0, OID::gen(), Timestamp(1, 1)),
             kDonorConnStr.getSetName(),
             kRecipientConnStr.getSetName(),
             chunkRange,

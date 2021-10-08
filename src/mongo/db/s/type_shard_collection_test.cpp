@@ -48,7 +48,7 @@ TEST(ShardCollectionType, FromBSONEmptyShardKeyFails) {
     ASSERT_THROWS_CODE(
         ShardCollectionType(BSON(ShardCollectionType::kNssFieldName
                                  << kNss.ns() << ShardCollectionType::kEpochFieldName << OID::gen()
-                                 << ShardCollectionType::kTimestampFieldName << Timestamp()
+                                 << ShardCollectionType::kTimestampFieldName << Timestamp(1, 1)
                                  << ShardCollectionType::kUuidFieldName << UUID::gen()
                                  << ShardCollectionType::kKeyPatternFieldName << BSONObj()
                                  << ShardCollectionType::kUniqueFieldName << true)),
@@ -67,7 +67,7 @@ TEST(ShardCollectionType, FromBSONEpochMatchesLastRefreshedCollectionVersionWhen
              << ShardCollectionType::kUuidFieldName << UUID::gen()
              << ShardCollectionType::kKeyPatternFieldName << kKeyPattern
              << ShardCollectionType::kUniqueFieldName << true
-             << ShardCollectionType::kLastRefreshedCollectionVersionFieldName << Timestamp()));
+             << ShardCollectionType::kLastRefreshedCollectionVersionFieldName << Timestamp(1, 1)));
     ASSERT_EQ(epoch, shardCollType.getLastRefreshedCollectionVersion()->epoch());
     ASSERT_EQ(timestamp, shardCollType.getLastRefreshedCollectionVersion()->getTimestamp());
 }
@@ -90,7 +90,7 @@ TEST(ShardCollectionType, FromBSONEpochMatchesLastRefreshedCollectionVersionWhen
 
 TEST(ShardCollectionType, ToBSONEmptyDefaultCollationNotIncluded) {
     ShardCollectionType shardCollType(
-        kNss, OID::gen(), Timestamp(), UUID::gen(), kKeyPattern, true);
+        kNss, OID::gen(), Timestamp(1, 1), UUID::gen(), kKeyPattern, true);
     BSONObj obj = shardCollType.toBSON();
 
     ASSERT_FALSE(obj.hasField(ShardCollectionType::kDefaultCollationFieldName));
@@ -103,7 +103,7 @@ TEST(ShardCollectionType, ToBSONEmptyDefaultCollationNotIncluded) {
 
 TEST(ShardCollectionType, ReshardingFieldsIncluded) {
     ShardCollectionType shardCollType(
-        kNss, OID::gen(), Timestamp(), UUID::gen(), kKeyPattern, true);
+        kNss, OID::gen(), Timestamp(1, 1), UUID::gen(), kKeyPattern, true);
 
     TypeCollectionReshardingFields reshardingFields;
     const auto reshardingUUID = UUID::gen();
@@ -120,7 +120,7 @@ TEST(ShardCollectionType, ReshardingFieldsIncluded) {
 
 TEST(ShardCollectionType, AllowMigrationsFieldBackwardsCompatibility) {
     ShardCollectionType shardCollType(
-        kNss, OID::gen(), Timestamp(), UUID::gen(), kKeyPattern, true);
+        kNss, OID::gen(), Timestamp(1, 1), UUID::gen(), kKeyPattern, true);
     shardCollType.setAllowMigrations(false);
     ASSERT_EQ(false, shardCollType.toBSON()[ShardCollectionType::kAllowMigrationsFieldName].Bool());
 
