@@ -266,9 +266,9 @@ function assertAggResultEqInTransaction(coll, pipeline, expected) {
     assert.commandWorked(session.commitTransaction_forTesting());
 }
 
-// Set up an unsharded collection to use for $lookup. We cannot lookup into sharded collections.
-// TODO SERVER-29159: Add testing for lookup into sharded collections in a transaction once that
-// is supported.
+// Set up an unsharded collection to use for $lookup, as lookup into a sharded collection in a
+// transaction is not yet supported.
+// TODO SERVER-39162: Add testing for lookup into sharded collections in a transaction.
 const lookupDbName = "dbForLookup";
 const lookupCollName = "collForLookup";
 assert.commandWorked(
