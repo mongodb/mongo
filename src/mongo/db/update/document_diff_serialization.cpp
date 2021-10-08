@@ -36,6 +36,8 @@
 
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
+#include <boost/container/flat_map.hpp>
+#include <boost/container/static_vector.hpp>
 
 namespace mongo {
 namespace diff_tree {
@@ -511,10 +513,16 @@ DocumentDiffReader::DocumentDiffReader(const Diff& diff) : _diff(diff) {
     static_assert(kInsertSectionFieldName.size() == 1);
     static_assert(kUpdateSectionFieldName.size() == 1);
 
-    const std::map<char, Section> sections{{kDeleteSectionFieldName[0], Section{&_deletes, 1}},
-                                           {kUpdateSectionFieldName[0], Section{&_updates, 2}},
-                                           {kInsertSectionFieldName[0], Section{&_inserts, 3}},
-                                           {kSubDiffSectionFieldPrefix, Section{&_subDiffs, 4}}};
+    // Create a map only using stack memory for this temporary helper map. Make sure to update the
+    // size for the 'static_vector' if changes are made to the number of elements we hold.
+    const boost::container::flat_map<char,
+                                     Section,
+                                     std::less<char>,
+                                     boost::container::static_vector<std::pair<char, Section>, 4>>
+        sections{{kDeleteSectionFieldName[0], Section{&_deletes, 1}},
+                 {kUpdateSectionFieldName[0], Section{&_updates, 2}},
+                 {kInsertSectionFieldName[0], Section{&_inserts, 3}},
+                 {kSubDiffSectionFieldPrefix, Section{&_subDiffs, 4}}};
 
     char prev = 0;
     bool hasSubDiffSections = false;

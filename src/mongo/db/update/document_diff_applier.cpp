@@ -74,17 +74,17 @@ struct DocumentDiffTables {
         uassert(4728000, str::stream() << "duplicate field name in diff: " << fieldName, inserted);
     }
 
-    // Map from field name to modification for that field.
+    // Map from field name to modification for that field. Not populated for insert only diffs.
     StringDataMap<FieldModification> fieldMap;
 
     // Order in which new fields should be added to the pre image.
     std::vector<BSONElement> fieldsToInsert;
-    std::size_t sizeOfFieldsToInsert = 0;
     // Diff only inserts fields, no deletes or updates
     bool insertOnly = false;
 };
 
-DocumentDiffTables buildObjDiffTables(DocumentDiffReader* reader) {
+DocumentDiffTables buildObjDiffTables(DocumentDiffReader* reader,
+                                      bool mustCheckExistenceForInsertOperations) {
     DocumentDiffTables out;
     out.insertOnly = true;
 
@@ -101,16 +101,18 @@ DocumentDiffTables buildObjDiffTables(DocumentDiffReader* reader) {
         out.insertOnly = false;
     }
 
-    boost::optional<BSONElement> nextInsert;
-    while ((nextInsert = reader->nextInsert())) {
-        out.safeInsert(nextInsert->fieldNameStringData(), Insert{*nextInsert});
-        out.fieldsToInsert.push_back(*nextInsert);
-        out.sizeOfFieldsToInsert += out.fieldsToInsert.back().size();
-    }
-
     for (auto next = reader->nextSubDiff(); next; next = reader->nextSubDiff()) {
         out.safeInsert(next->first, SubDiff{next->second});
         out.insertOnly = false;
+    }
+
+    boost::optional<BSONElement> nextInsert;
+    while ((nextInsert = reader->nextInsert())) {
+        if (mustCheckExistenceForInsertOperations || !out.insertOnly) {
+            out.safeInsert(nextInsert->fieldNameStringData(), Insert{*nextInsert});
+        }
+
+        out.fieldsToInsert.push_back(*nextInsert);
     }
     return out;
 }
@@ -193,7 +195,8 @@ int32_t computeDamageOnObject(const BSONObj& preImageRoot,
                               BufBuilder* bufBuilder,
                               size_t offsetRoot,
                               bool mustCheckExistenceForInsertOperations) {
-    const DocumentDiffTables tables = buildObjDiffTables(reader);
+    const DocumentDiffTables tables =
+        buildObjDiffTables(reader, mustCheckExistenceForInsertOperations);
     int32_t diffSize = 0;
     // Reserves four bytes for the total size. Stores the offset instead of the actual pointer in
     // case the buffer grows and invalidates the pointer. Will update the value at the end.
@@ -490,10 +493,10 @@ public:
                            BSONObjBuilder* builder) {
         // First build some tables so we can quickly apply the diff. We shouldn't need to examine
         // the diff again once this is done.
-        const DocumentDiffTables tables = buildObjDiffTables(reader);
+        const DocumentDiffTables tables =
+            buildObjDiffTables(reader, _mustCheckExistenceForInsertOperations);
 
         if (!_mustCheckExistenceForInsertOperations && tables.insertOnly) {
-            builder->bb().reserveBytes(preImage.objsize() + tables.sizeOfFieldsToInsert);
             builder->appendElements(preImage);
             for (auto&& elt : tables.fieldsToInsert) {
                 builder->append(elt);
@@ -718,6 +721,15 @@ ApplyDiffOutput applyDiff(const BSONObj& pre,
     BSONObjBuilder out;
     DiffApplier applier(indexData, mustCheckExistenceForInsertOperations);
     FieldRef path;
+
+    // Use size of pre + diff as an approximation for size needed for post object when the diff is
+    // insert-only. This is an upper bound for the size needed to avoid re-allocations when applying
+    // the diff.
+    const auto estimatedSize = pre.objsize() + diff.objsize();
+    // The interface around reserving bytes is strange. You need to "claim" the reserved bytes for
+    // it to take effect.
+    out.bb().reserveBytes(estimatedSize);
+    out.bb().claimReservedBytes(estimatedSize);
     applier.applyDiffToObject(pre, &path, &reader, &out);
     return {out.obj(), applier.indexesAffected()};
 }
