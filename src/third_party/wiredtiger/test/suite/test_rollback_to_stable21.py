@@ -245,6 +245,5 @@ class test_rollback_to_stable21(test_rollback_to_stable_base):
         hs_restored_tombstone = stat_cursor[stat.conn.txn_rts_hs_restore_tombstones][2]
         stat_cursor.close()
 
-        # The udpate and delete operations are not inserted into the history store as they are not visible
-        self.assertEquals(hs_removed, 0)
-        self.assertEquals(hs_restored_tombstone, 0)
+        self.assertGreater(hs_removed, 0)
+        self.assertGreater(hs_restored_tombstone, 0)
