@@ -665,7 +665,11 @@ StatusWith<OplogFetcher::Documents> OplogFetcher::_getNextBatch() {
         Timer timer;
         if (!_cursor) {
             // An error occurred and we should recreate the cursor.
-            auto status = _createNewCursor(false /* initialFind */);
+            // The OplogFetcher uses an aggregation command in tenant migrations, which does not
+            // support tailable cursors. When recreating the cursor, use the longer initial max time
+            // to avoid timing out.
+            const bool initialFind = _config.forTenantMigration;
+            auto status = _createNewCursor(initialFind /* initialFind */);
             if (!status.isOK()) {
                 return status;
             }
