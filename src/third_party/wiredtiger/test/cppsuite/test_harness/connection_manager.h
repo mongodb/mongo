@@ -64,6 +64,8 @@ class connection_manager {
     void create(const std::string &config, const std::string &home = DEFAULT_DIR);
     scoped_session create_session();
 
+    WT_CONNECTION *get_connection();
+
     /*
      * set_timestamp calls into the connection API in a thread safe manner to set global timestamps.
      */
