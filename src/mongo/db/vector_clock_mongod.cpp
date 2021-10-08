@@ -413,7 +413,7 @@ void VectorClockMongoD::_tickTo(Component component, LogicalTime newTime) {
     if (component == Component::ConfigTime) {
         // The ConfigTime is allowed to be tickTo on the ConfigServer and on the shard only when
         // called from ShardingStateRecovery
-        // TODO SERVER-55032 re-add clusterRole == configServer condition like for TopologyTime
+        // TODO SERVER-60110 re-add clusterRole == configServer condition like for TopologyTime
         _advanceComponentTimeTo(component, std::move(newTime));
         return;
     }

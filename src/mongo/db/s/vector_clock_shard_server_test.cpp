@@ -124,7 +124,7 @@ DEATH_TEST_F(VectorClockShardServerTest, CannotTickConfigTime, "Hit a MONGO_UNRE
     vc->tickConfigTime(1);
 }
 
-// TODO SERVER-55032 re-enable the following test
+// TODO SERVER-60110 re-enable the following test
 // DEATH_TEST_F(VectorClockShardServerTest, CannotTickToConfigTime, "Hit a MONGO_UNREACHABLE") {
 //    auto sc = getServiceContext();
 //    auto vc = VectorClockMutable::get(sc);
