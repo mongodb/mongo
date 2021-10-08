@@ -432,7 +432,7 @@ public:
      * checked by the commands infrastructure. Used by $lookup and $graphLookup to enforce the
      * constraint that the foreign collection must be unsharded if featureFlagShardedLookup is
      * turned off. Also used to enforce that the catalog cache is up-to-date when doing a local
-     * read.If the parent operation is unversioned, this method does nothing.
+     * read.
      */
     virtual void setExpectedShardVersion(OperationContext* opCtx,
                                          const NamespaceString& nss,
