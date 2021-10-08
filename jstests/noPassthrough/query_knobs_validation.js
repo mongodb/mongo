@@ -40,6 +40,7 @@ const expectedParamDefaults = {
     internalDocumentSourceSetWindowFieldsMaxMemoryBytes: 100 * 1024 * 1024,
     internalQueryMaxJsEmitBytes: 100 * 1024 * 1024,
     internalQueryMaxPushBytes: 100 * 1024 * 1024,
+    internalQueryMaxRangeBytes: 100 * 1024 * 1024,
     internalQueryMaxAddToSetBytes: 100 * 1024 * 1024,
     // Should be half the value of 'internalQueryExecYieldIterations' parameter.
     internalInsertMaxBatchSize: 500,

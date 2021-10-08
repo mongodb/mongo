@@ -4142,10 +4142,23 @@ Value ExpressionRange::evaluate(const Document& root, Variables* variables) cons
         uassert(34449, "$range requires a non-zero step value", step != 0);
     }
 
+    // Calculate how much memory is needed to generate the array and avoid going over the memLimit.
+    auto steps = (end - current) / step;
+    // If steps not positive then no amount of steps can get you from start to end. For example
+    // with start=5, end=7, step=-1 steps would be negative and in this case we would return an
+    // empty array.
+    auto length = steps >= 0 ? 1 + steps : 0;
+    int64_t memNeeded = sizeof(std::vector<Value>) + length * startVal.getApproximateSize();
+    auto memLimit = internalQueryMaxRangeBytes.load();
+    uassert(ErrorCodes::ExceededMemoryLimit,
+            str::stream() << "$range would use too much memory (" << memNeeded << " bytes) "
+                          << "and cannot spill to disk. Memory limit: " << memLimit << " bytes",
+            memNeeded < memLimit);
+
     std::vector<Value> output;
 
     while ((step > 0 ? current < end : current > end)) {
-        output.push_back(Value(static_cast<int>(current)));
+        output.emplace_back(static_cast<int>(current));
         current += step;
     }
 

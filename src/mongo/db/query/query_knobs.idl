@@ -142,7 +142,7 @@ server_parameters:
 
   planCacheSize:
     description: "The maximum amount of memory that the system will allocate for the plan cache.
-      It takes value value in one of the two formats: 
+      It takes value value in one of the two formats:
       1. <number>% indicates a percentage of the physical memory available to the process. E.g.: 15%.
       2. <number>(MB|GB), indicates the amount of memory in MB or GB. E.g.: 1.5GB, 100MB.
       The defualt value is 5% which means 5% of the physical memory available to the process."
@@ -151,7 +151,7 @@ server_parameters:
     cpp_vartype: synchronized_value<std::string>
     default: "5%"
     on_update: plan_cache_util::onPlanCacheSizeUpdate
-    
+
   #
   # Parsing
   #
@@ -405,6 +405,17 @@ server_parameters:
     validator:
         gt: 0
 
+  internalQueryMaxRangeBytes:
+    description: "Limits the vector of values pushed into a single array while generating $range
+        result."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryMaxRangeBytes"
+    cpp_vartype: AtomicWord<int>
+    default:
+      expr: 100 * 1024 * 1024
+    validator:
+        gt: 0
+
   internalQueryMaxAddToSetBytes:
     description: "Limits the vector of values pushed into a single array while grouping with the
         $addToSet accumulator."
@@ -546,9 +557,9 @@ server_parameters:
         expr: 100 * 1024 * 1024
     validator:
         gt: 0
-        
+
   enableSearchMeta:
-    description: "Exists for backwards compatibility in startup parameters, 
+    description: "Exists for backwards compatibility in startup parameters,
       enabling this was required on 4.4 to access SEARCH_META variables. Does not do anything."
     set_at: [ startup, runtime ]
     cpp_varname: "enableSearchMeta"
@@ -570,7 +581,7 @@ server_parameters:
     default:  500000
     validator:
         gt: 0
- 
+
   internalDocumentSourceDensifyMaxMemoryBytes:
     description: "Limits the number of bytes densification can use to store partition information."
     set_at: [ startup, runtime ]

@@ -48,6 +48,7 @@
 #include "mongo/db/index/btree_key_generator.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/datetime/date_time_support.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
@@ -1393,22 +1394,23 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinNewArrayFromRan
         return {false, value::TypeTags::Nothing, 0};
     }
 
-    auto isPositiveStep = stepVal > 0;
+    // Calculate how much memory is needed to generate the array and avoid going over the memLimit.
+    auto steps = (endVal - startVal) / stepVal;
+    // If steps not positive then no amount of steps can get you from start to end. For example
+    // with start=5, end=7, step=-1 steps would be negative and in this case we would return an
+    // empty array.
+    auto length = steps >= 0 ? 1 + steps : 0;
+    int64_t memNeeded = sizeof(value::Array) + length * value::getApproximateSize(startTag, start);
+    auto memLimit = internalQueryMaxRangeBytes.load();
+    uassert(ErrorCodes::ExceededMemoryLimit,
+            str::stream() << "$range would use too much memory (" << memNeeded
+                          << " bytes) and cannot spill to disk. Memory limit: " << memLimit
+                          << " bytes",
+            memNeeded < memLimit);
 
-    if (isPositiveStep) {
-        if (startVal < endVal) {
-            arr->reserve(1 + (endVal - startVal) / stepVal);
-            for (auto i = startVal; i < endVal; i += stepVal) {
-                arr->push_back(value::TypeTags::NumberInt32, value::bitcastTo<int32_t>(i));
-            }
-        }
-    } else {
-        if (startVal > endVal) {
-            arr->reserve(1 + (startVal - endVal) / (-stepVal));
-            for (auto i = startVal; i > endVal; i += stepVal) {
-                arr->push_back(value::TypeTags::NumberInt32, value::bitcastTo<int32_t>(i));
-            }
-        }
+    arr->reserve(length);
+    for (auto i = startVal; stepVal > 0 ? i < endVal : i > endVal; i += stepVal) {
+        arr->push_back(value::TypeTags::NumberInt32, value::bitcastTo<int32_t>(i));
     }
 
     guard.reset();
