@@ -125,8 +125,8 @@ public:
     }
 
 protected:
-    // MONGO_STATIC_ASSERT(std::atomic<WordType>::is_always_lockfree); // TODO C++17
-    std::atomic<WordType> _value;  // NOLINT
+    MONGO_STATIC_ASSERT(std::atomic<WordType>::is_always_lock_free);  // NOLINT
+    std::atomic<WordType> _value;                                     // NOLINT
 };
 
 /**
@@ -230,8 +230,6 @@ public:
 template <typename T>
 class AtomicWord : public atomic_word_detail::Base<T> {
 public:
-    MONGO_STATIC_ASSERT(!std::is_integral<T>::value ||
-                        sizeof(T) == sizeof(atomic_word_detail::Base<T>));
     using atomic_word_detail::Base<T>::Base;
 };
 
