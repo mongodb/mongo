@@ -1,9 +1,31 @@
 #
 # This file defines the tasks and platforms for WiredTiger in the
-# MongoDB continuous integration system (see https://mci.mongodb.com).
+# MongoDB continuous integration system (https://evergreen.mongodb.com).
 #
 
+#######################################
+#            Project Settings         #
+#######################################
+
+stepback: true
+pre:
+  - func: "cleanup"
+post:
+  - func: "upload artifact"
+    vars:
+      postfix: -${execution}
+  - func: "save wt hang analyzer core/debugger files"
+  - func: "dump stderr/stdout"
+  - func: "cleanup"
+timeout:
+  - func: "run wt hang analyzer"
+
+#######################################
+#            Functions                #
+#######################################
+
 functions:
+
   "get project" :
     command: git.get_project
     params:
@@ -583,15 +605,18 @@ functions:
         display_name: "Test results (JSON)"
         remote_file: wiredtiger/${build_variant}/${revision}/perf-test-${perf-test-name}-${build_id}-${execution}/test-results.json
 
+#######################################
+#               Variables             #
+#######################################
+
+variables:
+
 #########################################################################################
-# VARIABLES
-#
 # The following stress tests are configured to run for six hours via the "-t 360"
 # argument to format.sh: format-stress-test, format-stress-sanitizer-test, and
 # race-condition-stress-sanitizer-test. The smoke and recovery tests run in a loop,
 # with the number of runs adjusted to provide aproximately six hours of testing.
 #########################################################################################
-variables:
 
   - &format-stress-test
     exec_timeout_secs: 25200
@@ -665,19 +690,12 @@ variables:
         vars:
           times: 25
 
-pre:
-  - func: "cleanup"
-post:
-  - func: "upload artifact"
-    vars:
-      postfix: -${execution}
-  - func: "save wt hang analyzer core/debugger files"
-  - func: "dump stderr/stdout"
-  - func: "cleanup"
-timeout:
-  - func: "run wt hang analyzer"
+#######################################
+#               Tasks                 #
+#######################################
 
 tasks:
+
   # Base compile task on posix flavours
   - name: compile
     tags: ["pull_request"]
@@ -2154,6 +2172,7 @@ tasks:
 
   - name: doc-update
     patchable: false
+    stepback: false
     commands:
       - func: "get project"
       - func: "compile wiredtiger docs"
@@ -3030,6 +3049,9 @@ tasks:
         vars:
           perf-test-name: medium-btree-backup
 
+#######################################
+#            Buildvariants            #
+#######################################
 
 buildvariants:
 
@@ -3397,6 +3419,7 @@ buildvariants:
   display_name: OS X 10.14
   run_on:
   - macos-1014
+  batchtime: 120 # 2 hours
   expansions:
     configure_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH ADD_CFLAGS="-ggdb -fPIC"
     posix_configure_flags: --enable-silent-rules --enable-diagnostic --enable-python --enable-zlib --enable-strict --enable-static --prefix=$(pwd)/LOCAL_INSTALL
@@ -3414,6 +3437,7 @@ buildvariants:
   display_name: "* OS X 10.14 CMake"
   run_on:
   - macos-1014
+  batchtime: 120 # 2 hours
   expansions:
     posix_configure_flags: -DCMAKE_C_FLAGS="-ggdb" -DHAVE_DIAGNOSTIC=1 -DENABLE_PYTHON=1 -DENABLE_ZLIB=1 -DENABLE_STRICT=1 -DCMAKE_INSTALL_PREFIX=$(pwd)/LOCAL_INSTALL
     python_binary: 'python3'
@@ -3463,6 +3487,7 @@ buildvariants:
   display_name: "~ Ubuntu 18.04 PPC"
   run_on:
   - ubuntu1804-power8-test
+  batchtime: 120 # 2 hours
   expansions:
     format_test_setting: ulimit -c unlimited
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
@@ -3503,6 +3528,7 @@ buildvariants:
   display_name: "~ Ubuntu 18.04 zSeries"
   run_on:
   - ubuntu1804-zseries-test
+  batchtime: 120 # 2 hours
   expansions:
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH make
