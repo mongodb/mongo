@@ -37,7 +37,7 @@ namespace mongo {
 
 void assertLanguageFeatureIsAllowed(
     const OperationContext* opCtx,
-    std::string operatorName,
+    StringData operatorName,
     AllowedWithApiStrict allowedWithApiStrict,
     AllowedWithClientType allowedWithClientType,
     boost::optional<std::function<void(const APIParameters&)>> callbackForSometimesAllowed) {

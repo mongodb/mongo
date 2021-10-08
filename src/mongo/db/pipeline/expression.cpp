@@ -215,9 +215,6 @@ intrusive_ptr<Expression> Expression::parseExpression(ExpressionContext* const e
                 (*entry.requiredMinVersion <= *expCtx->maxFeatureCompatibilityVersion));
 
     if (expCtx->opCtx) {
-        // Only confirm API versioning if in a user operation, and not parsing a collection
-        // validator. Instead we perform checks for validators at time of access in subsequent
-        // insert/update.
         assertLanguageFeatureIsAllowed(
             expCtx->opCtx, opName, entry.allowedWithApiStrict, entry.allowedWithClientType);
     }
