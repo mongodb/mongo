@@ -36,7 +36,11 @@ CONFIG_DIRECTORY = "generated_burn_in_tags_config"
 CONFIG_FILE = "burn_in_tags_gen.json"
 EVERGREEN_FILE = "etc/evergreen.yml"
 EVG_CONFIG_FILE = ".evergreen.yml"
+
 COMPILE_TASK = "compile_and_archive_dist_test_TG"
+# Burn in tags requires running on RHEL80 currently.
+COMPILE_TASK_DISTRO = "rhel80-large"
+
 TASK_ID_EXPANSION = "task_id"
 
 ConfigOptions = namedtuple("ConfigOptions", [
@@ -124,7 +128,7 @@ def _generate_evg_build_variant(
 
     build_variant = BuildVariant(run_build_variant, display_name, expansions=expansions,
                                  modules=modules, run_on=run_on)
-    build_variant.add_existing_task(ExistingTask(COMPILE_TASK))
+    build_variant.add_existing_task(ExistingTask(COMPILE_TASK), distros=[COMPILE_TASK_DISTRO])
     return build_variant
 
 
