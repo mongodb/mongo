@@ -34,7 +34,7 @@
 namespace mongo {
 
 REGISTER_TEST_EXPRESSION(_testApiVersion,
-                         AllowedWithApiStrict::kSometimes,
+                         AllowedWithApiStrict::kConditionally,
                          AllowedWithClientType::kAny,
                          ExpressionTestApiVersion::parse);
 

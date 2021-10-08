@@ -153,7 +153,7 @@ void LiteParsedPipeline::validate(const OperationContext* opCtx,
                 [&](const APIParameters& apiParameters) {
                     tassert(5807600,
                             "Expected callback only if allowed 'sometimes'",
-                            stageInfo.allowedWithApiStrict == AllowedWithApiStrict::kSometimes);
+                            stageInfo.allowedWithApiStrict == AllowedWithApiStrict::kConditionally);
                     stage->assertPermittedInAPIVersion(apiParameters);
                 };
             assertLanguageFeatureIsAllowed(opCtx,

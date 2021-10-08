@@ -40,7 +40,7 @@ void assertLanguageFeatureIsAllowed(
     StringData operatorName,
     AllowedWithApiStrict allowedWithApiStrict,
     AllowedWithClientType allowedWithClientType,
-    boost::optional<std::function<void(const APIParameters&)>> callbackForSometimesAllowed) {
+    boost::optional<std::function<void(const APIParameters&)>> conditionalCallback) {
     // An internal client could be one of the following :
     //     - Does not have any transport session
     //     - The transport session tag is internal
@@ -77,8 +77,8 @@ void assertLanguageFeatureIsAllowed(
                     isInternalClient);
             break;
         }
-        case AllowedWithApiStrict::kSometimes: {
-            if (auto callback = callbackForSometimesAllowed) {
+        case AllowedWithApiStrict::kConditionally: {
+            if (auto callback = conditionalCallback) {
                 (*callback)(apiParameters);
             }
             break;

@@ -363,7 +363,7 @@ PrivilegeVector DocumentSourceLookUp::LiteParsed::requiredPrivileges(
 REGISTER_DOCUMENT_SOURCE(lookup,
                          DocumentSourceLookUp::LiteParsed::parse,
                          DocumentSourceLookUp::createFromBson,
-                         AllowedWithApiStrict::kSometimes);
+                         AllowedWithApiStrict::kConditionally);
 
 const char* DocumentSourceLookUp::getSourceName() const {
     return kStageName.rawData();
