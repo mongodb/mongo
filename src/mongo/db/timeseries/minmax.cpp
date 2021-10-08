@@ -589,7 +589,8 @@ bool MinMax::_appendUpdates(MinMaxStore::Obj obj, BSONObjBuilder* builder, GetDa
                 _clearUpdated(it, getData);
                 appended = true;
                 hasUpdateSection = true;
-            } else if (subdata.type() != MinMaxStore::Type::kValue) {
+            } else if (subdata.type() != MinMaxStore::Type::kValue &&
+                       subdata.type() != MinMaxStore::Type::kUnset) {
                 BSONObjBuilder subDiff;
                 if (_appendUpdates(obj.object(it), &subDiff, getData)) {
                     // An update occurred at a lower level, so append the sub diff.

@@ -123,6 +123,28 @@ TEST(MinMax, MinMaxNoUpdatesAfterFullMinMax) {
     ASSERT_BSONOBJ_EQ(minMaxObj.minUpdates(), BSON("u" << BSON("a" << 1)));
 }
 
+TEST(MinMax, MinMaxNoUpdatesAfterFullMinMaxNested) {
+    MinMax minMaxObj;
+    const auto* strCmp = &SimpleStringDataComparator::kInstance;
+
+    auto obj = BSON("a" << BSON("z" << 1) << "b" << BSON_ARRAY(BSON("z" << 1) << BSON("z" << 2)));
+    minMaxObj.update(obj, "_meta"_sd, strCmp);
+    ASSERT_BSONOBJ_EQ(minMaxObj.min(), obj);
+    ASSERT_BSONOBJ_EQ(minMaxObj.max(), obj);
+    ASSERT_BSONOBJ_EQ(minMaxObj.minUpdates(), BSONObj{});
+    ASSERT_BSONOBJ_EQ(minMaxObj.maxUpdates(), BSONObj{});
+
+    minMaxObj.update(
+        BSON("a" << BSON_ARRAY(BSON("z" << 1) << BSON("z" << 2)) << "b" << BSON("z" << 1)),
+        "_meta"_sd,
+        strCmp);
+    ASSERT_BSONOBJ_EQ(minMaxObj.minUpdates(), BSON("u" << BSON("b" << BSON("z" << 1))));
+    ASSERT_BSONOBJ_EQ(minMaxObj.maxUpdates(),
+                      BSON("u" << BSON("a" << BSON_ARRAY(BSON("z" << 1) << BSON("z" << 2)))));
+    ASSERT_BSONOBJ_EQ(minMaxObj.minUpdates(), BSONObj{});
+    ASSERT_BSONOBJ_EQ(minMaxObj.maxUpdates(), BSONObj{});
+}
+
 TEST(MinMax, MinMaxInitialUpdates) {
     MinMax minMaxObj;
     const auto* strCmp = &SimpleStringDataComparator::kInstance;
