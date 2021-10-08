@@ -78,12 +78,17 @@ Status onPlanCacheSizeUpdate(const std::string& str) {
         return newSize.getStatus();
     }
 
-    auto serviceCtx = Client::getCurrent()->getServiceContext();
-    tassert(6007013, "ServiceContext must be non null", serviceCtx);
+    // The client is nullptr if the parameter is supplied from the command line. In this case, we
+    // ignore the update event, the parameter will be processed when initializing the service
+    // context.
+    if (auto client = Client::getCurrent()) {
+        auto serviceCtx = client->getServiceContext();
+        tassert(6007013, "ServiceContext must be non null", serviceCtx);
 
-    auto updater = sbePlanCacheSizeUpdaterDecoration(serviceCtx).get();
-    tassert(6007014, "Plan cache size updater must be non null", serviceCtx);
-    updater->update(serviceCtx, newSize.getValue());
+        auto updater = sbePlanCacheSizeUpdaterDecoration(serviceCtx).get();
+        tassert(6007014, "Plan cache size updater must be non null", serviceCtx);
+        updater->update(serviceCtx, newSize.getValue());
+    }
 
     return Status::OK();
 }
