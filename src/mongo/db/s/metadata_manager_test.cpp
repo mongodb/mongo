@@ -85,15 +85,15 @@ protected:
             nullptr,
             false,
             epoch,
-            Timestamp(),
+            Timestamp(1, 1),
             boost::none /* timeseriesFields */,
             boost::none,
             boost::none /* chunkSizeBytes */,
             true,
-            {ChunkType{uuid, range, ChunkVersion(1, 0, epoch, Timestamp()), kOtherShard}});
+            {ChunkType{uuid, range, ChunkVersion(1, 0, epoch, Timestamp(1, 1)), kOtherShard}});
 
         return CollectionMetadata(ChunkManager(kThisShard,
-                                               DatabaseVersion(UUID::gen(), Timestamp()),
+                                               DatabaseVersion(UUID::gen(), Timestamp(1, 1)),
                                                makeStandaloneRoutingTableHistory(std::move(rt)),
                                                boost::none),
                                   kThisShard);

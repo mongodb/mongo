@@ -92,12 +92,13 @@ void assertChunkVersionWasBumpedTo(const ChunkType& chunkTypeBefore,
 }
 
 TEST_F(EnsureChunkVersionIsGreaterThanTest, IfNoCollectionFoundReturnsSuccess) {
-    const auto requestedChunkType = generateChunkType(_nss,
-                                                      _collUuid,
-                                                      ChunkVersion(10, 2, OID::gen(), Timestamp()),
-                                                      ShardId(_shardName),
-                                                      BSON("a" << 1),
-                                                      BSON("a" << 10));
+    const auto requestedChunkType =
+        generateChunkType(_nss,
+                          _collUuid,
+                          ChunkVersion(10, 2, OID::gen(), Timestamp(1, 1)),
+                          ShardId(_shardName),
+                          BSON("a" << 1),
+                          BSON("a" << 10));
 
     ShardingCatalogManager::get(operationContext())
         ->ensureChunkVersionIsGreaterThan(operationContext(),

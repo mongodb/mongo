@@ -67,7 +67,7 @@ TEST_F(ProcessInterfaceStandaloneTest,
        FailsToEnsureFieldsUniqueIfTargetCollectionVersionIsSpecifiedOnMongos) {
     auto expCtx = getExpCtx();
     auto targetCollectionVersion =
-        boost::make_optional(ChunkVersion(0, 0, OID::gen(), Timestamp()));
+        boost::make_optional(ChunkVersion(0, 0, OID::gen(), Timestamp(1, 1)));
     auto processInterface = makeProcessInterface();
 
     // Test that 'targetCollectionVersion' is not accepted if not from mongos.
@@ -90,7 +90,7 @@ TEST_F(ProcessInterfaceStandaloneTest,
 TEST_F(ProcessInterfaceStandaloneTest, FailsToEnsureFieldsUniqueIfJoinFieldsAreNotSentFromMongos) {
     auto expCtx = getExpCtx();
     auto targetCollectionVersion =
-        boost::make_optional(ChunkVersion(0, 0, OID::gen(), Timestamp()));
+        boost::make_optional(ChunkVersion(0, 0, OID::gen(), Timestamp(1, 1)));
     auto processInterface = makeProcessInterface();
 
     expCtx->fromMongos = true;

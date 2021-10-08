@@ -131,11 +131,12 @@ TEST(ChunkVersionComparison, EqualityOperators) {
     OID epoch = OID::gen();
     Timestamp timestamp = Timestamp(1);
 
-    ASSERT_EQ(ChunkVersion(3, 1, epoch, Timestamp()), ChunkVersion(3, 1, epoch, Timestamp()));
+    ASSERT_EQ(ChunkVersion(3, 1, epoch, Timestamp(1, 1)),
+              ChunkVersion(3, 1, epoch, Timestamp(1, 1)));
     ASSERT_EQ(ChunkVersion(3, 1, OID(), timestamp), ChunkVersion(3, 1, OID(), timestamp));
 
-    ASSERT_NE(ChunkVersion(3, 1, epoch, timestamp), ChunkVersion(3, 1, OID(), Timestamp()));
-    ASSERT_NE(ChunkVersion(3, 1, OID(), Timestamp()), ChunkVersion(3, 1, epoch, timestamp));
+    ASSERT_NE(ChunkVersion(3, 1, epoch, timestamp), ChunkVersion(3, 1, OID(), Timestamp(1, 1)));
+    ASSERT_NE(ChunkVersion(3, 1, OID(), Timestamp(1, 1)), ChunkVersion(3, 1, epoch, timestamp));
     ASSERT_NE(ChunkVersion(4, 2, epoch, timestamp), ChunkVersion(4, 1, epoch, timestamp));
 }
 
@@ -164,7 +165,7 @@ TEST(ChunkVersionConstruction, CreateWithLargeValues) {
     const uint32_t majorVersion = 1 << 24;
     const auto epoch = OID::gen();
 
-    ChunkVersion version(majorVersion, minorVersion, epoch, Timestamp());
+    ChunkVersion version(majorVersion, minorVersion, epoch, Timestamp(1, 1));
     ASSERT_EQ(majorVersion, version.majorVersion());
     ASSERT_EQ(minorVersion, version.minorVersion());
     ASSERT_EQ(epoch, version.epoch());
@@ -175,7 +176,7 @@ TEST(ChunkVersionManipulation, ThrowsErrorIfOverflowIsAttemptedForMajorVersion) 
     const uint32_t majorVersion = std::numeric_limits<uint32_t>::max();
     const auto epoch = OID::gen();
 
-    ChunkVersion version(majorVersion, minorVersion, epoch, Timestamp());
+    ChunkVersion version(majorVersion, minorVersion, epoch, Timestamp(1, 1));
     ASSERT_EQ(majorVersion, version.majorVersion());
     ASSERT_EQ(minorVersion, version.minorVersion());
     ASSERT_EQ(epoch, version.epoch());
@@ -188,7 +189,7 @@ TEST(ChunkVersionManipulation, ThrowsErrorIfOverflowIsAttemptedForMinorVersion) 
     const uint32_t majorVersion = 0;
     const auto epoch = OID::gen();
 
-    ChunkVersion version(majorVersion, minorVersion, epoch, Timestamp());
+    ChunkVersion version(majorVersion, minorVersion, epoch, Timestamp(1, 1));
     ASSERT_EQ(majorVersion, version.majorVersion());
     ASSERT_EQ(minorVersion, version.minorVersion());
     ASSERT_EQ(epoch, version.epoch());

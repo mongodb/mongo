@@ -52,7 +52,7 @@ CollectionMetadata makeCollectionMetadataImpl(
     const std::vector<std::pair<BSONObj, BSONObj>>& thisShardsChunks,
     bool staleChunkManager,
     UUID uuid = UUID::gen(),
-    Timestamp timestamp = Timestamp(),
+    Timestamp timestamp = Timestamp(1, 1),
     boost::optional<TypeCollectionReshardingFields> reshardingFields = boost::none) {
 
     const OID epoch = OID::gen();
@@ -135,7 +135,7 @@ protected:
             (state >= CoordinatorStateEnum::kCommitting) ? reshardingUuid : existingUuid;
 
         return makeCollectionMetadataImpl(
-            KeyPattern(BSON("a" << 1)), {}, false, metadataUuid, Timestamp(), reshardingFields);
+            KeyPattern(BSON("a" << 1)), {}, false, metadataUuid, Timestamp(1, 1), reshardingFields);
     }
 };
 

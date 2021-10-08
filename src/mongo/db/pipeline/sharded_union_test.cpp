@@ -168,7 +168,7 @@ TEST_F(ShardedUnionTest, RetriesSubPipelineOnStaleConfigError) {
     // Mock the expected config server queries.
     const OID epoch = OID::gen();
     const UUID uuid = UUID::gen();
-    const Timestamp timestamp;
+    const Timestamp timestamp(1, 1);
     const ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
 
     ChunkVersion version(1, 0, epoch, timestamp);
@@ -247,7 +247,7 @@ TEST_F(ShardedUnionTest, CorrectlySplitsSubPipelineIfRefreshedDistributionRequir
     // created and moved to the first shard.
     const OID epoch = OID::gen();
     const UUID uuid = UUID::gen();
-    const Timestamp timestamp;
+    const Timestamp timestamp(1, 1);
     const ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
 
     ChunkVersion version(1, 0, epoch, timestamp);
@@ -337,7 +337,7 @@ TEST_F(ShardedUnionTest, AvoidsSplittingSubPipelineIfRefreshedDistributionDoesNo
     // the same shard.
     const OID epoch = OID::gen();
     const UUID uuid = UUID::gen();
-    const Timestamp timestamp;
+    const Timestamp timestamp(1, 1);
     const ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
     ChunkVersion version(1, 0, epoch, timestamp);
     ChunkType chunk1(
@@ -397,7 +397,7 @@ TEST_F(ShardedUnionTest, IncorporatesViewDefinitionAndRetriesWhenViewErrorReceiv
     const UUID uuid = UUID::gen();
     const ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
 
-    const Timestamp timestamp;
+    const Timestamp timestamp(1, 1);
     ChunkVersion version(1, 0, epoch, timestamp);
 
     ChunkType chunk1(*cm.getUUID(),

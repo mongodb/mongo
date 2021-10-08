@@ -47,7 +47,7 @@ TEST(DatabaseType, Empty) {
 
 TEST(DatabaseType, Basic) {
     UUID uuid = UUID::gen();
-    Timestamp timestamp = Timestamp();
+    Timestamp timestamp = Timestamp(1, 1);
     StatusWith<DatabaseType> status = DatabaseType::fromBSON(
         BSON(DatabaseType::name("mydb")
              << DatabaseType::primary("shard") << DatabaseType::sharded(true)

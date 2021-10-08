@@ -182,7 +182,7 @@ protected:
 
 TEST_F(CatalogCacheTest, GetDatabase) {
     const auto dbName = "testDB";
-    const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp());
+    const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 1));
     _catalogCacheLoader->setDatabaseRefreshReturnValue(
         DatabaseType(dbName, kShards[0], true, dbVersion));
 
@@ -198,7 +198,7 @@ TEST_F(CatalogCacheTest, GetDatabase) {
 
 TEST_F(CatalogCacheTest, GetCachedDatabase) {
     const auto dbName = "testDB";
-    const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp());
+    const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 1));
     loadDatabases({DatabaseType(dbName, kShards[0], true, dbVersion)});
 
     const auto swDatabase = _catalogCache->getDatabase(operationContext(), dbName);
@@ -213,7 +213,7 @@ TEST_F(CatalogCacheTest, GetCachedDatabase) {
 
 TEST_F(CatalogCacheTest, GetDatabaseDrop) {
     const auto dbName = "testDB";
-    const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp());
+    const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 1));
 
     _catalogCacheLoader->setDatabaseRefreshReturnValue(
         DatabaseType(dbName, kShards[0], true, dbVersion));
@@ -241,7 +241,7 @@ TEST_F(CatalogCacheTest, GetDatabaseDrop) {
 
 TEST_F(CatalogCacheTest, InvalidateSingleDbOnShardRemoval) {
     const auto dbName = "testDB";
-    const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp());
+    const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 1));
     loadDatabases({DatabaseType(dbName, kShards[0], true, dbVersion)});
 
     _catalogCache->invalidateEntriesThatReferenceShard(kShards[0]);
@@ -256,7 +256,7 @@ TEST_F(CatalogCacheTest, InvalidateSingleDbOnShardRemoval) {
 
 TEST_F(CatalogCacheTest, OnStaleDatabaseVersionNoVersion) {
     // onStaleDatabaseVesrsion must invalidate the database entry if invoked with no version
-    const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp());
+    const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 1));
     loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], true, dbVersion)});
 
     _catalogCache->onStaleDatabaseVersion(kNss.db(), boost::none);
@@ -266,8 +266,8 @@ TEST_F(CatalogCacheTest, OnStaleDatabaseVersionNoVersion) {
 }
 
 TEST_F(CatalogCacheTest, OnStaleShardVersionWithSameVersion) {
-    const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp());
-    const auto cachedCollVersion = ChunkVersion(1, 0, OID::gen(), Timestamp());
+    const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 1));
+    const auto cachedCollVersion = ChunkVersion(1, 0, OID::gen(), Timestamp(1, 1));
 
     loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], true, dbVersion)});
     loadCollection(cachedCollVersion);
@@ -277,8 +277,8 @@ TEST_F(CatalogCacheTest, OnStaleShardVersionWithSameVersion) {
 }
 
 TEST_F(CatalogCacheTest, OnStaleShardVersionWithNoVersion) {
-    const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp());
-    const auto cachedCollVersion = ChunkVersion(1, 0, OID::gen(), Timestamp());
+    const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 1));
+    const auto cachedCollVersion = ChunkVersion(1, 0, OID::gen(), Timestamp(1, 1));
 
     loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], true, dbVersion)});
     loadCollection(cachedCollVersion);
@@ -290,8 +290,8 @@ TEST_F(CatalogCacheTest, OnStaleShardVersionWithNoVersion) {
 }
 
 TEST_F(CatalogCacheTest, OnStaleShardVersionWithGraterVersion) {
-    const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp());
-    const auto cachedCollVersion = ChunkVersion(1, 0, OID::gen(), Timestamp());
+    const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 1));
+    const auto cachedCollVersion = ChunkVersion(1, 0, OID::gen(), Timestamp(1, 1));
     const auto wantedCollVersion =
         ChunkVersion(2, 0, cachedCollVersion.epoch(), cachedCollVersion.getTimestamp());
 
@@ -305,7 +305,7 @@ TEST_F(CatalogCacheTest, OnStaleShardVersionWithGraterVersion) {
 }
 
 TEST_F(CatalogCacheTest, TimeseriesFieldsAreProperlyPropagatedOnCC) {
-    const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp());
+    const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 1));
     const auto epoch = OID::gen();
     const auto version = ChunkVersion(1, 0, epoch, Timestamp(42));
 
@@ -361,7 +361,7 @@ TEST_F(CatalogCacheTest, TimeseriesFieldsAreProperlyPropagatedOnCC) {
 }
 
 TEST_F(CatalogCacheTest, LookupCollectionWithInvalidOptions) {
-    const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp());
+    const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 1));
     const auto epoch = OID::gen();
     const auto version = ChunkVersion(1, 0, epoch, Timestamp(42));
 

@@ -60,7 +60,7 @@ TEST(ComparableDatabaseVersionTest, CompareVersionDifferentTimestamps) {
 }
 
 TEST(ComparableDatabaseVersionTest, VersionGreaterSameTimestamp) {
-    const DatabaseVersion v1(UUID::gen(), Timestamp(0));
+    const DatabaseVersion v1(UUID::gen(), Timestamp(1));
     const DatabaseVersion v2 = v1.makeUpdated();
     const auto version1 = ComparableDatabaseVersion::makeComparableDatabaseVersion(v1);
     const auto version2 = ComparableDatabaseVersion::makeComparableDatabaseVersion(v2);
@@ -87,7 +87,7 @@ TEST(ComparableDatabaseVersionTest, DefaultConstructedVersionsAreEqual) {
 }
 
 TEST(ComparableDatabaseVersionTest, DefaultConstructedVersionIsAlwaysLess) {
-    DatabaseVersion v(UUID::gen(), Timestamp());
+    DatabaseVersion v(UUID::gen(), Timestamp(1, 1));
     const auto version1 = ComparableDatabaseVersion::makeComparableDatabaseVersion(v);
     const ComparableDatabaseVersion defaultVersion{};
     ASSERT(defaultVersion != version1);
@@ -96,7 +96,7 @@ TEST(ComparableDatabaseVersionTest, DefaultConstructedVersionIsAlwaysLess) {
 }
 
 TEST(ComparableDatabaseVersionTest, CompareForcedRefreshVersionVersusValidDatabaseVersion) {
-    const DatabaseVersion v(UUID::gen(), Timestamp());
+    const DatabaseVersion v(UUID::gen(), Timestamp(1, 1));
     const ComparableDatabaseVersion defaultVersionBeforeForce;
     const auto versionBeforeForce = ComparableDatabaseVersion::makeComparableDatabaseVersion(v);
     const auto forcedRefreshVersion =

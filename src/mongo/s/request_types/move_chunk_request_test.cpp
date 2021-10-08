@@ -49,7 +49,7 @@ const int kMaxChunkSizeBytes = 1024;
 const bool kWaitForDelete = true;
 
 TEST(MoveChunkRequest, Roundtrip) {
-    const ChunkVersion chunkVersion(3, 1, OID::gen(), Timestamp());
+    const ChunkVersion chunkVersion(3, 1, OID::gen(), Timestamp(1, 1));
 
     BSONObjBuilder builder;
     MoveChunkRequest::appendAsCommand(
@@ -81,7 +81,7 @@ TEST(MoveChunkRequest, Roundtrip) {
 }
 
 TEST(MoveChunkRequest, EqualityOperatorSameValue) {
-    const ChunkVersion chunkVersion(3, 1, OID::gen(), Timestamp());
+    const ChunkVersion chunkVersion(3, 1, OID::gen(), Timestamp(1, 1));
 
     BSONObjBuilder builder;
     MoveChunkRequest::appendAsCommand(
@@ -106,7 +106,7 @@ TEST(MoveChunkRequest, EqualityOperatorSameValue) {
 }
 
 TEST(MoveChunkRequest, EqualityOperatorDifferentValues) {
-    const ChunkVersion chunkVersion(3, 1, OID::gen(), Timestamp());
+    const ChunkVersion chunkVersion(3, 1, OID::gen(), Timestamp(1, 1));
 
     BSONObjBuilder builder1;
     MoveChunkRequest::appendAsCommand(

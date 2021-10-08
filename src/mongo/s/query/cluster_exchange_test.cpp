@@ -526,7 +526,7 @@ TEST_F(ClusterExchangeTest, WordCountUseCaseExampleShardedByWord) {
 TEST_F(ClusterExchangeTest, CompoundShardKeyThreeShards) {
     const OID epoch = OID::gen();
     const UUID uuid = UUID::gen();
-    const Timestamp timestamp;
+    const Timestamp timestamp(1, 1);
     ShardKeyPattern shardKey(BSON("x" << 1 << "y" << 1));
 
     setupNShards(3);

@@ -441,7 +441,7 @@ TEST_F(ShardServerCatalogCacheLoaderTest, PrimaryLoadFromShardedAndFindMixedChun
 }
 
 TEST_F(ShardServerCatalogCacheLoaderTest, TimeseriesFieldsAreProperlyPropagatedOnSSCCL) {
-    ChunkVersion collectionVersion(1, 0, OID::gen(), Timestamp());
+    ChunkVersion collectionVersion(1, 0, OID::gen(), Timestamp(1, 1));
 
     CollectionType collectionType = makeCollectionType(collectionVersion);
     vector<ChunkType> chunks = makeFiveChunks(collectionVersion);
@@ -483,7 +483,7 @@ TEST_F(ShardServerCatalogCacheLoaderTest, TimeseriesFieldsAreProperlyPropagatedO
 }
 
 void ShardServerCatalogCacheLoaderTest::refreshCollectionEpochOnRemoteLoader() {
-    ChunkVersion collectionVersion(1, 2, OID::gen(), Timestamp());
+    ChunkVersion collectionVersion(1, 2, OID::gen(), Timestamp(1, 1));
     CollectionType collectionType = makeCollectionType(collectionVersion);
     vector<ChunkType> chunks = makeFiveChunks(collectionVersion);
     _remoteLoaderMock->setCollectionRefreshReturnValue(collectionType);
@@ -513,7 +513,7 @@ TEST_F(ShardServerCatalogCacheLoaderTest, CollAndChunkTasksConsistency) {
 }
 
 TEST_F(ShardServerCatalogCacheLoaderTest, SupportingLongNameFieldsAreProperlyPropagatedOnSSCCL) {
-    ChunkVersion collectionVersion(1, 0, OID::gen(), Timestamp());
+    ChunkVersion collectionVersion(1, 0, OID::gen(), Timestamp(1, 1));
 
     CollectionType collectionType = makeCollectionType(collectionVersion);
     collectionType.setSupportingLongName(SupportingLongNameStatusEnum::kExplicitlyEnabled);

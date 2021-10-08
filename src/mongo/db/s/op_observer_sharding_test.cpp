@@ -66,14 +66,14 @@ protected:
         const OID epoch = OID::gen();
         auto range = ChunkRange(BSON("key" << MINKEY), BSON("key" << MAXKEY));
         auto chunk = ChunkType(
-            uuid, std::move(range), ChunkVersion(1, 0, epoch, Timestamp()), ShardId("other"));
+            uuid, std::move(range), ChunkVersion(1, 0, epoch, Timestamp(1, 1)), ShardId("other"));
         auto rt = RoutingTableHistory::makeNew(kTestNss,
                                                uuid,
                                                KeyPattern(keyPattern),
                                                nullptr,
                                                false,
                                                epoch,
-                                               Timestamp(),
+                                               Timestamp(1, 1),
                                                boost::none /* timeseriesFields */,
                                                boost::none,
                                                boost::none /* chunkSizeBytes */,
@@ -81,7 +81,7 @@ protected:
                                                {std::move(chunk)});
 
         return CollectionMetadata(ChunkManager(ShardId("this"),
-                                               DatabaseVersion(UUID::gen(), Timestamp()),
+                                               DatabaseVersion(UUID::gen(), Timestamp(1, 1)),
                                                makeStandaloneRoutingTableHistory(std::move(rt)),
                                                Timestamp(100, 0)),
                                   ShardId("this"));

@@ -170,17 +170,17 @@ public:
                 kCrudUUID,
                 ChunkRange{BSON(kOriginalShardKey << MINKEY),
                            BSON(kOriginalShardKey << -std::numeric_limits<double>::infinity())},
-                ChunkVersion(1, 0, epoch, Timestamp()),
+                ChunkVersion(1, 0, epoch, Timestamp(1, 1)),
                 _sourceId.getShardId()},
             ChunkType{
                 kCrudUUID,
                 ChunkRange{BSON(kOriginalShardKey << -std::numeric_limits<double>::infinity()),
                            BSON(kOriginalShardKey << 0)},
-                ChunkVersion(1, 0, epoch, Timestamp()),
+                ChunkVersion(1, 0, epoch, Timestamp(1, 1)),
                 kOtherShardId},
             ChunkType{kCrudUUID,
                       ChunkRange{BSON(kOriginalShardKey << 0), BSON(kOriginalShardKey << MAXKEY)},
-                      ChunkVersion(1, 0, epoch, Timestamp()),
+                      ChunkVersion(1, 0, epoch, Timestamp(1, 1)),
                       _sourceId.getShardId()}};
 
         auto rt = RoutingTableHistory::makeNew(kCrudNs,
@@ -189,7 +189,7 @@ public:
                                                nullptr,
                                                false,
                                                epoch,
-                                               Timestamp(),
+                                               Timestamp(1, 1),
                                                boost::none /* timeseriesFields */,
                                                boost::none,
                                                boost::none /* chunkSizeBytes */,
@@ -197,7 +197,7 @@ public:
                                                chunks);
 
         return ChunkManager(_sourceId.getShardId(),
-                            DatabaseVersion(UUID::gen(), Timestamp()),
+                            DatabaseVersion(UUID::gen(), Timestamp(1, 1)),
                             makeStandaloneRoutingTableHistory(std::move(rt)),
                             boost::none);
     }

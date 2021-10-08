@@ -408,7 +408,7 @@ TEST_F(UpdateRetryTest, NotWritablePrimaryOnceSuccessAfterRetry) {
     configTargeter()->setFindHostReturnValue(host1);
 
     CollectionType collection(
-        NamespaceString("db.coll"), OID::gen(), Timestamp(), network()->now(), UUID::gen());
+        NamespaceString("db.coll"), OID::gen(), Timestamp(1, 1), network()->now(), UUID::gen());
     collection.setKeyPattern(KeyPattern(BSON("_id" << 1)));
 
     BSONObj objToUpdate = BSON("_id" << 1 << "Value"

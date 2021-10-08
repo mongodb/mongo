@@ -43,7 +43,7 @@ namespace {
 using unittest::assertGet;
 
 TEST(BalanceChunkRequest, ParseFromConfigCommandNoSecondaryThrottle) {
-    const ChunkVersion version(1, 0, OID::gen(), Timestamp());
+    const ChunkVersion version(1, 0, OID::gen(), Timestamp(1, 1));
     auto request = assertGet(BalanceChunkRequest::parseFromConfigCommand(
         BSON("_configsvrMoveChunk"
              << 1 << "ns"
@@ -66,7 +66,7 @@ TEST(BalanceChunkRequest, ParseFromConfigCommandNoSecondaryThrottle) {
 
 TEST(BalanceChunkRequest, ParseFromConfigCommandWithUUID) {
     const auto uuid = UUID::gen();
-    const ChunkVersion version(1, 0, OID::gen(), Timestamp());
+    const ChunkVersion version(1, 0, OID::gen(), Timestamp(1, 1));
     auto request = assertGet(BalanceChunkRequest::parseFromConfigCommand(
         BSON("_configsvrMoveChunk" << 1 << "uuid" << uuid << "min" << BSON("a" << -100LL) << "max"
                                    << BSON("a" << 100LL) << "shard"
@@ -87,7 +87,7 @@ TEST(BalanceChunkRequest, ParseFromConfigCommandWithUUID) {
 }
 
 TEST(BalanceChunkRequest, ParseFromConfigCommandWithSecondaryThrottle) {
-    const ChunkVersion version(1, 0, OID::gen(), Timestamp());
+    const ChunkVersion version(1, 0, OID::gen(), Timestamp(1, 1));
     auto request = assertGet(BalanceChunkRequest::parseFromConfigCommand(
         BSON("_configsvrMoveChunk"
              << 1 << "ns"

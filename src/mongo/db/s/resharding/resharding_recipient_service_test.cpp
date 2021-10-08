@@ -80,7 +80,7 @@ public:
         std::vector<ChunkType> chunks = {ChunkType{
             _sourceUUID,
             ChunkRange{BSON(_currentShardKey << MINKEY), BSON(_currentShardKey << MAXKEY)},
-            ChunkVersion(100, 0, epoch, Timestamp()),
+            ChunkVersion(100, 0, epoch, Timestamp(1, 1)),
             _someDonorId}};
 
         auto rt = RoutingTableHistory::makeNew(_sourceNss,
@@ -89,7 +89,7 @@ public:
                                                nullptr /* defaultCollator */,
                                                false /* unique */,
                                                std::move(epoch),
-                                               Timestamp(),
+                                               Timestamp(1, 1),
                                                boost::none /* timeseriesFields */,
                                                boost::none /* reshardingFields */,
                                                boost::none /* chunkSizeBytes */,
@@ -97,7 +97,7 @@ public:
                                                chunks);
 
         return ChunkManager(_someDonorId,
-                            DatabaseVersion(UUID::gen(), Timestamp()),
+                            DatabaseVersion(UUID::gen(), Timestamp(1, 1)),
                             _makeStandaloneRoutingTableHistory(std::move(rt)),
                             boost::none /* clusterTime */);
     }

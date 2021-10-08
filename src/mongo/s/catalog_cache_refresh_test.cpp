@@ -60,7 +60,7 @@ protected:
     void expectGetDatabase() {
         expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
             DatabaseType db(
-                kNss.db().toString(), {"0"}, true, DatabaseVersion(UUID::gen(), Timestamp()));
+                kNss.db().toString(), {"0"}, true, DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
             return std::vector<BSONObj>{db.toBSON()};
         }());
     }
@@ -328,7 +328,7 @@ TEST_F(CatalogCacheRefreshTest, ChunksBSONCorrupted) {
         const auto chunk1 =
             ChunkType(coll.getUuid(),
                       {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << 0)},
-                      ChunkVersion(1, 0, epoch, Timestamp()),
+                      ChunkVersion(1, 0, epoch, Timestamp(1, 1)),
                       {"0"});
         return std::vector<BSONObj>{/* collection */
                                     coll.toBSON(),
@@ -407,7 +407,7 @@ TEST_F(CatalogCacheRefreshTest, FullLoadMissingChunkWithLowestVersion) {
 TEST_F(CatalogCacheRefreshTest, FullLoadMissingChunkWithHighestVersion) {
     const OID epoch = OID::gen();
     const UUID uuid = UUID::gen();
-    const Timestamp timestamp;
+    const Timestamp timestamp(1, 1);
     const ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
 
     auto future = scheduleRoutingInfoUnforcedRefresh(kNss);
