@@ -12,22 +12,40 @@ load('./jstests/multiVersion/libs/verify_versions.js');
 const mixedVersionsToCheck = [
     {config: ["latest"], shard: ["last-lts", "latest"], mongos: ["last-lts"]},
     {config: ["latest"], shard: ["last-continuous", "latest"], mongos: ["last-continuous"]},
+    {config: ["latest"], shard: ["last-continuous", "last-lts"], mongos: ["last-continuous"]},
+    {config: ["latest"], shard: ["last-lts", "last-continuous"], mongos: ["last-lts"]},
 ];
 
 for (let versions of mixedVersionsToCheck) {
     jsTest.log("Testing mixed versions: " + tojson(versions));
-    // Set up a multi-version cluster
-    var st = new ShardingTest({
-        shards: 2,
-        mongos: 2,
-        other: {
-            mongosOptions: {binVersion: versions.mongos},
-            configOptions: {binVersion: versions.config},
-            shardOptions: {binVersion: versions.shard},
-            enableBalancer: true
+    try {
+        // Set up a multi-version cluster
+        var st = new ShardingTest({
+            shards: 2,
+            mongos: 2,
+            other: {
+                mongosOptions: {binVersion: versions.mongos},
+                configOptions: {binVersion: versions.config},
+                shardOptions: {binVersion: versions.shard},
+                enableBalancer: true
+            }
+        });
+    } catch (e) {
+        if (e instanceof Error) {
+            assert.includes(
+                e.message,
+                "Can only specify one of 'last-lts' and 'last-continuous' in binVersion, not both.");
+            continue;
+        } else {
+            throw e;
         }
-    });
-
+    }
+    if ((versions.shard[0] === "last-continuous" && versions.shard[1] === "last-lts") ||
+        (versions.shard[1] === "last-continuous" && versions.shard[0] === "last-lts")) {
+        assert(
+            MongoRunner.areBinVersionsTheSame("last-continuous", "last-lts"),
+            "Should have thrown error in creating ShardingTest because can only specify one of 'last-lts' and 'last-continuous' in binVersion, not both.");
+    }
     var shards = [st.shard0, st.shard1];
     var mongoses = [st.s0, st.s1];
     var configs = [st.config0, st.config1, st.config2];
