@@ -6,6 +6,8 @@
 (function() {
 "use strict";
 
+load("jstests/libs/storage_helpers.js");  // getOldestRequiredTimestampForCrashRecovery()
+
 function runTest({cleanShutdown}) {
     const rst = new ReplSetTest({
         name: jsTestName(),
@@ -35,7 +37,18 @@ function runTest({cleanShutdown}) {
     }));
     rst.awaitSecondaryNodes();
 
-    let secondary = rst.getSecondary();
+    const secondary = rst.getSecondary();
+
+    // Wait until the secondary has an initial checkpoint.
+    assert.soon(() => {
+        const oldestRequiredTimestampForCrashRecovery =
+            getOldestRequiredTimestampForCrashRecovery(secondary.getDB("admin"));
+        jsTestLog("Secondary oldestRequiredTimestampForCrashRecovery: " +
+                  tojson(oldestRequiredTimestampForCrashRecovery));
+        return oldestRequiredTimestampForCrashRecovery &&
+            timestampCmp(oldestRequiredTimestampForCrashRecovery, Timestamp(0, 0)) > 0;
+    }, "Timeout waiting for the initial checkpoint", ReplSetTest.kDefaultTimeoutMS, 1000);
+
     if (cleanShutdown) {
         jsTestLog("Restarting secondary node from clean shutdown");
         rst.stop(secondary, 0, undefined, {forRestart: true});
@@ -46,14 +59,14 @@ function runTest({cleanShutdown}) {
 
     // Restarting from shutdown shouldn't need to go through initial sync again. Set a failpoint to
     // hang initial sync so that if the node decides to do initial sync again, the test will fail.
-    secondary = rst.start(secondary,
-                          {
-                              setParameter: {
-                                  'failpoint.initialSyncHangAfterGettingBeginFetchingTimestamp':
-                                      tojson({mode: 'alwaysOn'}),
-                              }
-                          },
-                          true /* restart */);
+    rst.start(secondary,
+              {
+                  setParameter: {
+                      'failpoint.initialSyncHangAfterGettingBeginFetchingTimestamp':
+                          tojson({mode: 'alwaysOn'}),
+                  }
+              },
+              true /* restart */);
 
     rst.awaitSecondaryNodes();
 
