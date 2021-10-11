@@ -719,8 +719,6 @@ void OpObserverImpl::aboutToDelete(OperationContext* opCtx,
                                    BSONObj const& doc) {
     documentKeyDecoration(opCtx).emplace(getDocumentKey(opCtx, nss, doc));
 
-    auto* const css = CollectionShardingState::get(opCtx, nss);
-    auto collDesc = css->getCollectionDescription(opCtx);
     ShardingWriteRouter shardingWriteRouter(opCtx, nss, Grid::get(opCtx)->catalogCache());
 
     repl::DurableReplOperation op;
