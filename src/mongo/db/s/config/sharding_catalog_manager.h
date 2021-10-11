@@ -351,6 +351,20 @@ public:
                                          const NamespaceString& nss,
                                          TxnNumber txnNumber) const;
 
+    /*
+     * Set the estimated size field for a chunk. Only used for defragmentation operations
+     */
+    void setChunkEstimatedSize(OperationContext* opCtx,
+                               const ChunkType& chunk,
+                               long long estSize,
+                               const WriteConcernOptions& writeConcern);
+
+    /*
+     * Clear the estimated size for all chunks of a given collection.
+     * Returns true if at least once chunk was modified.
+     */
+    bool clearChunkEstimatedSize(OperationContext* opCtx, const UUID& uuid);
+
     //
     // Database Operations
     //

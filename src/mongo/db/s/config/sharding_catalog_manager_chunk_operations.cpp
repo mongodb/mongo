@@ -61,6 +61,7 @@
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/shard_util.h"
 #include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
 
@@ -1598,6 +1599,68 @@ void ShardingCatalogManager::bumpCollectionMinorVersionInTxn(OperationContext* o
                                                              const NamespaceString& nss,
                                                              TxnNumber txnNumber) const {
     bumpCollectionMinorVersion(opCtx, nss, txnNumber);
+}
+
+void ShardingCatalogManager::setChunkEstimatedSize(OperationContext* opCtx,
+                                                   const ChunkType& chunk,
+                                                   long long estSize,
+                                                   const WriteConcernOptions& writeConcern) {
+    // ensure the unsigned value fits in the signed long long
+    uassert(6049442, "Estimated chunk size cannot be negative", estSize < 0);
+
+    // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
+    // migrations
+    // TODO(SERVER-25359): Replace with a collection-specific lock map to allow splits/merges/
+    // move chunks on different collections to proceed in parallel
+    Lock::ExclusiveLock lk(opCtx, opCtx->lockState(), _kChunkOpLock);
+
+    const auto chunkQuery = BSON(ChunkType::collectionUUID()
+                                 << chunk.getCollectionUUID() << ChunkType::min(chunk.getMin())
+                                 << ChunkType::max(chunk.getMax()));
+    BSONObjBuilder updateBuilder;
+    BSONObjBuilder updateSub(updateBuilder.subobjStart("$set"));
+    updateSub.appendNumber(ChunkType::estimatedSize.name(), estSize);
+    updateSub.doneFast();
+
+    auto didUpdate = uassertStatusOK(
+        Grid::get(opCtx)->catalogClient()->updateConfigDocument(opCtx,
+                                                                ChunkType::ConfigNS,
+                                                                chunkQuery,
+                                                                updateBuilder.done(),
+                                                                false /* upsert */,
+                                                                writeConcern));
+    if (!didUpdate) {
+        uasserted(6049401, "Did not update chunk with estimated size");
+    }
+}
+
+bool ShardingCatalogManager::clearChunkEstimatedSize(OperationContext* opCtx, const UUID& uuid) {
+    // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
+    // migrations
+    Lock::ExclusiveLock lk(opCtx, opCtx->lockState(), _kChunkOpLock);
+
+    const auto query = BSON(ChunkType::collectionUUID() << uuid);
+    const auto update = BSON("$unset" << BSON(ChunkType::estimatedSize() << ""));
+    BatchedCommandRequest request([&] {
+        write_ops::UpdateCommandRequest updateOp(ChunkType::ConfigNS);
+        updateOp.setUpdates({[&] {
+            write_ops::UpdateOpEntry entry;
+            entry.setQ(query);
+            entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(update));
+            entry.setUpsert(false);
+            entry.setMulti(true);
+            return entry;
+        }()});
+        return updateOp;
+    }());
+    request.setWriteConcern(ShardingCatalogClient::kMajorityWriteConcern.toBSON());
+
+    auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+    auto response = configShard->runBatchWriteCommand(
+        opCtx, Shard::kDefaultConfigCommandTimeout, request, Shard::RetryPolicy::kIdempotent);
+
+    uassertStatusOK(response.toStatus());
+    return response.getN() > 0;
 }
 
 }  // namespace mongo

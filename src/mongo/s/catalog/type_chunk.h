@@ -210,6 +210,7 @@ public:
     static const BSONField<OID> epoch;
     static const BSONField<Timestamp> timestamp;
     static const BSONField<BSONObj> history;
+    static const BSONField<long long> estimatedSize;
 
     ChunkType();
     ChunkType(CollectionUUID collectionUUID,
@@ -291,6 +292,10 @@ public:
     }
     void setShard(const ShardId& shard);
 
+    boost::optional<long long> getEstimatedSizeBytes() const {
+        return _estimatedSizeBytes;
+    }
+
     bool getJumbo() const {
         return _jumbo.get_value_or(false);
     }
@@ -334,6 +339,8 @@ private:
     boost::optional<ChunkVersion> _version;
     // (M)(C)(S)  shard this chunk lives in
     boost::optional<ShardId> _shard;
+    // (O)(C)     chunk size used for chunk merging operation
+    boost::optional<long long> _estimatedSizeBytes;
     // (O)(C)     too big to move?
     boost::optional<bool> _jumbo;
     // history of the chunk
