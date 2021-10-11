@@ -39,7 +39,9 @@
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/query/projection.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/base64.h"
 
 namespace mongo {
 
@@ -75,6 +77,7 @@ const char kEncodeProjectionSection = '|';
 const char kEncodeProjectionRequirementSeparator = '-';
 const char kEncodeRegexFlagsSeparator = '/';
 const char kEncodeSortSection = '~';
+const char kEncodeEngineSection = '@';
 
 /**
  * Encode user-provided string. Cache key delimiters seen in the
@@ -92,6 +95,7 @@ void encodeUserString(StringData s, StringBuilder* keyBuilder) {
             case kEncodeProjectionRequirementSeparator:
             case kEncodeRegexFlagsSeparator:
             case kEncodeSortSection:
+            case kEncodeEngineSection:
             case '\\':
                 *keyBuilder << '\\';
             // Fall through to default case.
@@ -563,6 +567,62 @@ void encodeKeyForProj(const projection_ast::Projection* proj, StringBuilder* key
         isFirst = false;
     }
 }
+
+void encodeFindCommandRequest(const FindCommandRequest& findCommand, BufBuilder* bufBuilder) {
+    if (auto skip = findCommand.getSkip()) {
+        bufBuilder->appendNum(*skip);
+    } else {
+        bufBuilder->appendNum(0);
+    }
+    if (auto limit = findCommand.getLimit()) {
+        bufBuilder->appendNum(*limit);
+    } else {
+        bufBuilder->appendNum(0);
+    }
+
+    // Encode a OptionalBool value - 'n' if the value is not specified, 't' for true, and 'f' for
+    // false.
+    auto encodeOptionalBool = [bufBuilder](const mongo::OptionalBool& val) {
+        if (!val.has_value()) {
+            bufBuilder->appendChar('n');
+        } else if (val) {
+            bufBuilder->appendChar('t');
+        } else {
+            bufBuilder->appendChar('f');
+        }
+    };
+    encodeOptionalBool(findCommand.getAllowDiskUse());
+    encodeOptionalBool(findCommand.getReturnKey());
+    encodeOptionalBool(findCommand.getRequestResumeToken());
+    encodeOptionalBool(findCommand.getTailable());
+
+    // Encode a BSON object by its raw data.
+    auto encodeBSONObj = [&bufBuilder](const BSONObj& obj) {
+        bufBuilder->appendBuf(obj.objdata(), obj.objsize());
+    };
+    encodeBSONObj(findCommand.getResumeAfter());
+    encodeBSONObj(findCommand.getMin());
+    encodeBSONObj(findCommand.getMax());
+}
+
+void encodeQueryParameters(BufBuilder* bufBuilder) {
+    auto encodeBool = [bufBuilder](bool val) { bufBuilder->appendChar(val ? 't' : 'f'); };
+
+    encodeBool(internalQueryForceIntersectionPlans.load());
+    encodeBool(internalQueryPlannerEnableIndexIntersection.load());
+    encodeBool(internalQueryPlannerEnableHashIntersection.load());
+
+    bufBuilder->appendNum(internalQueryPlannerMaxIndexedSolutions.load());
+    encodeBool(internalQueryEnumerationPreferLockstepOrEnumeration.load());
+    bufBuilder->appendNum(internalQueryEnumerationMaxOrSolutions.load());
+    bufBuilder->appendNum(internalQueryEnumerationMaxIntersectPerAnd.load());
+    encodeBool(internalQueryPlanOrChildrenIndependently.load());
+    bufBuilder->appendNum(internalQueryMaxScansToExplode.load());
+    encodeBool(internalQueryPlannerGenerateCoveredWholeIndexScans.load());
+
+    bufBuilder->appendNum(internalQueryMaxBlockingSortMemoryUsageBytes.load());
+    bufBuilder->appendNum(internalQuerySlotBasedExecutionMaxStaticIndexScanIntervals.load());
+}
 }  // namespace
 
 namespace canonical_query_encoder {
@@ -574,7 +634,38 @@ CanonicalQuery::QueryShapeString encode(const CanonicalQuery& cq) {
     encodeKeyForProj(cq.getProj(), &keyBuilder);
     encodeCollation(cq.getCollator(), &keyBuilder);
 
+    // This encoding can be removed once the classic query engine reaches EOL and SBE is used
+    // exclusively for all query execution.
+    keyBuilder << kEncodeEngineSection << (cq.getForceClassicEngine() ? "f" : "t");
+
     return keyBuilder.str();
+}
+
+std::string encodeSBE(const CanonicalQuery& cq) {
+    const auto& filter = cq.getQueryObj();
+    const auto& proj = cq.getFindCommandRequest().getProjection();
+    const auto& sort = cq.getFindCommandRequest().getSort();
+
+    StringBuilder strBuilder;
+    encodeKeyForSort(sort, &strBuilder);
+    encodeCollation(cq.getCollator(), &strBuilder);
+    auto sortAndCollation = strBuilder.stringData();
+
+    // A constant for reserving buffer size. It should be large enough to reserve the space required
+    // to encode various properties from the FindCommandRequest and query knobs.
+    const int kBufferSizeConstant = 200;
+    size_t bufSize =
+        filter.objsize() + proj.objsize() + sortAndCollation.size() + kBufferSizeConstant;
+
+    BufBuilder bufBuilder(bufSize);
+    bufBuilder.appendBuf(filter.objdata(), filter.objsize());
+    bufBuilder.appendBuf(proj.objdata(), proj.objsize());
+    bufBuilder.appendStr(sortAndCollation, false /* includeEndingNull */);
+
+    encodeFindCommandRequest(cq.getFindCommandRequest(), &bufBuilder);
+    encodeQueryParameters(&bufBuilder);
+
+    return base64::encode(StringData(bufBuilder.buf(), bufBuilder.len()));
 }
 
 uint32_t computeHash(StringData key) {

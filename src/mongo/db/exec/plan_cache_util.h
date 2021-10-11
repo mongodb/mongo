@@ -196,7 +196,7 @@ void updatePlanCache(
             PlanCacheLoggingCallbacks<PlanCacheKey, SolutionCacheData> callbacks{query};
             uassertStatusOK(CollectionQueryInfo::get(collection)
                                 .getPlanCache()
-                                ->set(plan_cache_key_factory::make<PlanCacheKey>(query, collection),
+                                ->set(plan_cache_key_factory::make(query, collection),
                                       std::move(plannerDataForCache),
                                       solutions,
                                       std::move(ranking),
@@ -212,10 +212,9 @@ void updatePlanCache(
                     auto cachedPlan = std::make_unique<sbe::CachedSbePlan>(
                         candidates[winnerIdx].root->clone(), candidates[winnerIdx].data);
 
-                    PlanCacheLoggingCallbacks<sbe::PlanCacheKey, sbe::CachedSbePlan> callbacks{
-                        query};
+                    PlanCacheLoggingCallbacks<PlanCacheKey, sbe::CachedSbePlan> callbacks{query};
                     uassertStatusOK(sbe::getPlanCache(opCtx).set(
-                        plan_cache_key_factory::make<sbe::PlanCacheKey>(query, collection),
+                        plan_cache_key_factory::make(query, collection),
                         std::move(cachedPlan),
                         solutions,
                         std::move(ranking),

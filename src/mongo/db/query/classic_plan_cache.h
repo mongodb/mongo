@@ -32,95 +32,11 @@
 #include <string>
 
 #include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/plan_cache.h"
 
 namespace mongo {
 
-/**
- * Represents the "key" used in the PlanCache mapping from query shape -> query plan.
- */
-class PlanCacheKey {
-public:
-    PlanCacheKey(CanonicalQuery::QueryShapeString shapeString,
-                 std::string indexabilityString,
-                 bool forceClassicEngine) {
-        _lengthOfStablePart = shapeString.size();
-        _key = std::move(shapeString);
-        _key += indexabilityString;
-        _key += forceClassicEngine ? "t" : "f";
-    }
-
-    CanonicalQuery::QueryShapeString getStableKey() const {
-        return std::string(_key, 0, _lengthOfStablePart);
-    }
-
-    StringData getStableKeyStringData() const {
-        return StringData(_key.c_str(), _lengthOfStablePart);
-    }
-
-    /**
-     * Return the 'indexability discriminators', that is, the plan cache key component after the
-     * stable key, but before the boolean indicating whether we are using the classic engine.
-     */
-    StringData getIndexabilityDiscriminators() const {
-        return StringData(_key.c_str() + _lengthOfStablePart,
-                          _key.size() - _lengthOfStablePart - 1);
-    }
-
-    /**
-     * Return the "unstable" portion of the key, which may vary across catalog changes.
-     */
-    StringData getUnstablePart() const {
-        return StringData(_key.c_str() + _lengthOfStablePart, _key.size() - _lengthOfStablePart);
-    }
-
-    StringData stringData() const {
-        return _key;
-    }
-
-    const std::string& toString() const {
-        return _key;
-    }
-
-    bool operator==(const PlanCacheKey& other) const {
-        return other._key == _key && other._lengthOfStablePart == _lengthOfStablePart;
-    }
-
-    bool operator!=(const PlanCacheKey& other) const {
-        return !(*this == other);
-    }
-
-    uint32_t queryHash() const {
-        return canonical_query_encoder::computeHash(getStableKeyStringData());
-    }
-
-    uint32_t planCacheKeyHash() const {
-        return canonical_query_encoder::computeHash(stringData());
-    }
-
-private:
-    // Key is broken into three parts:
-    // <stable key> | <indexability discriminators> | <forceClassicEngine boolean>
-    // This third part can be removed once the classic query engine reaches EOL and SBE is used
-    // exclusively for all query execution. Combined, the three parts make up the plan cache key.
-    // We store them in one std::string so that we can easily/cheaply extract the stable key.
-    std::string _key;
-
-    // How long the "stable key" is.
-    size_t _lengthOfStablePart;
-};
-
-std::ostream& operator<<(std::ostream& stream, const PlanCacheKey& key);
-StringBuilder& operator<<(StringBuilder& builder, const PlanCacheKey& key);
-
-class PlanCacheKeyHasher {
-public:
-    std::size_t operator()(const PlanCacheKey& k) const {
-        return std::hash<std::string>{}(k.toString());
-    }
-};
 
 /**
  * A PlanCacheIndexTree is the meaty component of the data

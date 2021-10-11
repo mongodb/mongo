@@ -95,12 +95,12 @@ void generatePlannerInfo(PlanExecutor* exec,
         const QuerySettings* querySettings =
             QuerySettingsDecoration::get(collection->getSharedDecorations());
         const PlanCacheKey planCacheKey =
-            plan_cache_key_factory::make<PlanCacheKey>(*exec->getCanonicalQuery(), collection);
+            plan_cache_key_factory::make(*exec->getCanonicalQuery(), collection);
         planCacheKeyHash = planCacheKey.planCacheKeyHash();
         queryHash = planCacheKey.queryHash();
 
         if (auto allowedIndicesFilter =
-                querySettings->getAllowedIndicesFilter(planCacheKey.getStableKey())) {
+                querySettings->getAllowedIndicesFilter(planCacheKey.getQueryShape())) {
             // Found an index filter set on the query shape.
             indexFilterSet = true;
         }

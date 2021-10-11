@@ -31,7 +31,8 @@
 
 #include "mongo/db/query/planner_ixselect.h"
 
-namespace mongo::plan_cache_detail {
+namespace mongo {
+namespace plan_cache_detail {
 // Delimiters for cache key encoding.
 const char kEncodeDiscriminatorsBegin = '<';
 const char kEncodeDiscriminatorsEnd = '>';
@@ -72,10 +73,10 @@ void encodeIndexability(const MatchExpression* tree,
         encodeIndexability(tree->getChild(i), indexabilityState, keyBuilder);
     }
 }
+}  // namespace plan_cache_detail
 
-PlanCacheKey make(const CanonicalQuery& query,
-                  const CollectionPtr& collection,
-                  PlanCacheKeyTag<PlanCacheKey> tag) {
+namespace plan_cache_key_factory {
+PlanCacheKey make(const CanonicalQuery& query, const CollectionPtr& collection) {
     const auto shapeString = query.encodeKey();
 
     StringBuilder indexabilityKeyBuilder;
@@ -84,12 +85,7 @@ PlanCacheKey make(const CanonicalQuery& query,
         CollectionQueryInfo::get(collection).getPlanCacheIndexabilityState(),
         &indexabilityKeyBuilder);
 
-    return PlanCacheKey(shapeString, indexabilityKeyBuilder.str(), !query.getForceClassicEngine());
+    return PlanCacheKey(shapeString, indexabilityKeyBuilder.str());
 }
-
-sbe::PlanCacheKey make(const CanonicalQuery& query,
-                       const CollectionPtr& collection,
-                       PlanCacheKeyTag<sbe::PlanCacheKey> tag) {
-    return sbe::PlanCacheKey(query.getQueryObj());
-}
-}  // namespace mongo::plan_cache_detail
+}  // namespace plan_cache_key_factory
+}  // namespace mongo

@@ -139,12 +139,4 @@ sbe::PlanCache& getPlanCache(OperationContext* opCtx) {
     tassert(5933400, "Cannot get the global SBE plan cache by a nullptr", opCtx);
     return getPlanCache(opCtx->getServiceContext());
 }
-
-uint32_t PlanCacheKey::queryHash() const {
-    return static_cast<uint32_t>(PlanCacheKeyHasher{}(*this));
-}
-
-uint32_t PlanCacheKey::planCacheKeyHash() const {
-    return static_cast<uint32_t>(PlanCacheKeyHasher{}(*this));
-}
 }  // namespace mongo::sbe

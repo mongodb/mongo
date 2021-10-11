@@ -261,7 +261,7 @@ Status ClearFilters::clear(OperationContext* opCtx,
         querySettings->removeAllowedIndices(cq->encodeKey());
 
         // Remove entry from plan cache
-        planCache->remove(plan_cache_key_factory::make<PlanCacheKey>(*cq, collection));
+        planCache->remove(plan_cache_key_factory::make(*cq, collection));
 
         LOGV2(20479,
               "Removed index filter on {query}",
@@ -320,7 +320,7 @@ Status ClearFilters::clear(OperationContext* opCtx,
         std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
         // Remove plan cache entry.
-        planCache->remove(plan_cache_key_factory::make<PlanCacheKey>(*cq, collection));
+        planCache->remove(plan_cache_key_factory::make(*cq, collection));
     }
 
     LOGV2(20480,
@@ -401,7 +401,7 @@ Status SetFilter::set(OperationContext* opCtx,
     querySettings->setAllowedIndices(*cq, indexes, indexNames);
 
     // Remove entry from plan cache.
-    planCache->remove(plan_cache_key_factory::make<PlanCacheKey>(*cq, collection));
+    planCache->remove(plan_cache_key_factory::make(*cq, collection));
 
     LOGV2(20481,
           "Index filter set on {query} {indexes}",

@@ -133,7 +133,7 @@ CandidatePlans CachedSolutionPlanner::replan(bool shouldCache, std::string reaso
     if (shouldCache) {
         // Deactivate the current cache entry.
         auto cache = CollectionQueryInfo::get(_collection).getPlanCache();
-        cache->deactivate(plan_cache_key_factory::make<mongo::PlanCacheKey>(_cq, _collection));
+        cache->deactivate(plan_cache_key_factory::make(_cq, _collection));
     }
 
     auto buildExecutableTree = [&](const QuerySolution& sol) {

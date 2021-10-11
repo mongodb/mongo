@@ -40,43 +40,6 @@ namespace mongo {
 namespace sbe {
 
 /**
- * Represents the key used to look up entries in the SBE PlanCache.
- */
-class PlanCacheKey {
-public:
-    explicit PlanCacheKey(BSONObj filter) : _filter(filter.getOwned()) {}
-
-    bool operator==(const PlanCacheKey& other) const {
-        return other._filter.binaryEqual(_filter);
-    }
-
-    bool operator!=(const PlanCacheKey& other) const {
-        return !(*this == other);
-    }
-
-    const BSONObj& getFilter() const {
-        return _filter;
-    }
-
-    uint32_t queryHash() const;
-
-    uint32_t planCacheKeyHash() const;
-
-private:
-    const BSONObj _filter;
-};
-
-/**
- * Provides hash function to hash a 'PlanCacheKey'.
- */
-class PlanCacheKeyHasher {
-public:
-    std::size_t operator()(const PlanCacheKey& key) const {
-        return SimpleBSONObjComparator::kInstance.hash(key.getFilter());
-    }
-};
-
-/**
  * Represents the data cached in the SBE plan cache. This data holds an execution plan and necessary
  * auxiliary data for preparing and executing the PlanStage tree.
  */
@@ -104,8 +67,7 @@ struct BudgetEstimator {
     }
 };
 
-using PlanCache =
-    PlanCacheBase<sbe::PlanCacheKey, CachedSbePlan, BudgetEstimator, sbe::PlanCacheKeyHasher>;
+using PlanCache = PlanCacheBase<PlanCacheKey, CachedSbePlan, BudgetEstimator, PlanCacheKeyHasher>;
 
 /**
  * A helper method to get the global SBE plan cache decorated in 'serviceCtx'.

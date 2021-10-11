@@ -299,7 +299,7 @@ TEST_F(QueryStageMultiPlanTest, MPSDoesNotCreateActiveCacheEntryImmediately) {
     const CollectionPtr& coll = ctx.getCollection();
 
     const auto cq = makeCanonicalQuery(_opCtx.get(), nss, BSON("foo" << 7));
-    auto key = plan_cache_key_factory::make<PlanCacheKey>(*cq, coll);
+    auto key = plan_cache_key_factory::make(*cq, coll);
 
     // Run an index scan and collection scan, searching for {foo: 7}.
     auto mps = runMultiPlanner(_expCtx.get(), nss, coll, 7);
@@ -355,7 +355,7 @@ TEST_F(QueryStageMultiPlanTest, MPSDoesCreatesActiveEntryWhenInactiveEntriesDisa
     const CollectionPtr& coll = ctx.getCollection();
 
     const auto cq = makeCanonicalQuery(_opCtx.get(), nss, BSON("foo" << 7));
-    auto key = plan_cache_key_factory::make<PlanCacheKey>(*cq, coll);
+    auto key = plan_cache_key_factory::make(*cq, coll);
 
     // Run an index scan and collection scan, searching for {foo: 7}.
     auto mps = runMultiPlanner(_expCtx.get(), nss, coll, 7);
@@ -390,7 +390,7 @@ TEST_F(QueryStageMultiPlanTest, MPSBackupPlan) {
     verify(statusWithCQ.isOK());
     unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
     ASSERT(nullptr != cq.get());
-    auto key = plan_cache_key_factory::make<PlanCacheKey>(*cq, collection.getCollection());
+    auto key = plan_cache_key_factory::make(*cq, collection.getCollection());
 
     // Force index intersection.
     bool forceIxisectOldValue = internalQueryForceIntersectionPlans.load();

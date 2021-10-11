@@ -32,6 +32,7 @@
 #include "mongo/db/query/lru_key_value.h"
 #include "mongo/db/query/plan_cache_callbacks.h"
 #include "mongo/db/query/plan_cache_debug_info.h"
+#include "mongo/db/query/plan_cache_key.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/container_size_helper.h"
 

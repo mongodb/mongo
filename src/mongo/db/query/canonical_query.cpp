@@ -545,7 +545,8 @@ std::string CanonicalQuery::toStringShort() const {
 }
 
 CanonicalQuery::QueryShapeString CanonicalQuery::encodeKey() const {
-    return canonical_query_encoder::encode(*this);
+    return (feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV() && !_forceClassicEngine)
+        ? canonical_query_encoder::encodeSBE(*this)
+        : canonical_query_encoder::encode(*this);
 }
-
 }  // namespace mongo

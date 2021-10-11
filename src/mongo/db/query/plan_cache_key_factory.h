@@ -44,35 +44,12 @@ namespace plan_cache_detail {
 void encodeIndexability(const MatchExpression* tree,
                         const PlanCacheIndexabilityState& indexabilityState,
                         StringBuilder* keyBuilder);
-
-/**
- * A dispatch tag for the factory functions below.
- */
-template <typename KeyType>
-struct PlanCacheKeyTag {};
-
-/**
- * Creates a key for the classic plan cache from the canonical query and collection instances.
- */
-PlanCacheKey make(const CanonicalQuery& query,
-                  const CollectionPtr& collection,
-                  PlanCacheKeyTag<PlanCacheKey> tag);
-
-/**
- * Creates a key for the SBE plan cache from the canonical query and collection instances.
- */
-sbe::PlanCacheKey make(const CanonicalQuery& query,
-                       const CollectionPtr& collection,
-                       PlanCacheKeyTag<sbe::PlanCacheKey> tag);
 }  // namespace plan_cache_detail
 
 namespace plan_cache_key_factory {
 /**
  * A factory helper to make a plan cache key of the given type.
  */
-template <typename K>
-K make(const CanonicalQuery& query, const CollectionPtr& collection) {
-    return plan_cache_detail::make(query, collection, plan_cache_detail::PlanCacheKeyTag<K>{});
-}
+PlanCacheKey make(const CanonicalQuery& query, const CollectionPtr& collection);
 }  // namespace plan_cache_key_factory
 }  // namespace mongo

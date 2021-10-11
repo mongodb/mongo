@@ -79,7 +79,7 @@ PlanCacheKey makeKey(const CanonicalQuery& cq, const std::vector<CoreIndexInfo>&
     StringBuilder indexabilityKeyBuilder;
     plan_cache_detail::encodeIndexability(cq.root(), indexabilityState, &indexabilityKeyBuilder);
 
-    return {cq.encodeKey(), indexabilityKeyBuilder.str(), !cq.getForceClassicEngine()};
+    return {cq.encodeKey(), indexabilityKeyBuilder.str()};
 }
 
 /**
@@ -217,7 +217,7 @@ unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
  * Check that the stable keys of 'a' and 'b' are equal, but the index discriminators are not.
  */
 void assertPlanCacheKeysUnequalDueToDiscriminators(const PlanCacheKey& a, const PlanCacheKey& b) {
-    ASSERT_EQ(a.getStableKeyStringData(), b.getStableKeyStringData());
+    ASSERT_EQ(a.getQueryShapeStringData(), b.getQueryShapeStringData());
     ASSERT_EQ(a.getIndexabilityDiscriminators().size(), b.getIndexabilityDiscriminators().size());
     ASSERT_NE(a.getIndexabilityDiscriminators(), b.getIndexabilityDiscriminators());
 
@@ -226,26 +226,30 @@ void assertPlanCacheKeysUnequalDueToDiscriminators(const PlanCacheKey& a, const 
 }
 
 /**
- * Check that the stable keys of 'a' and 'b' are equal, but the 'forceClassicEngine'
- * values are not.
+ * Check that the stable keys of 'a' and 'b' are not equal because of the last character.
  */
 void assertPlanCacheKeysUnequalDueToForceClassicEngineValue(const PlanCacheKey& a,
                                                             const PlanCacheKey& b) {
-    ASSERT_EQ(a.getStableKeyStringData(), b.getStableKeyStringData());
-    auto aUnstablePart = a.getUnstablePart();
-    auto bUnstablePart = b.getUnstablePart();
+    auto aUnstablePart = a.getIndexabilityDiscriminators();
+    auto bUnstablePart = b.getIndexabilityDiscriminators();
+    auto aStablePart = a.getQueryShape();
+    auto bStablePart = b.getQueryShape();
 
-    ASSERT_EQ(aUnstablePart.size(), aUnstablePart.size());
+    ASSERT_EQ(aUnstablePart, bUnstablePart);
+    // The last character of the stable part encodes the engine that uses this PlanCacheKey. So the
+    // stable parts except for the last character should be identical.
+    ASSERT_EQ(aStablePart.substr(0, aStablePart.size() - 1),
+              bStablePart.substr(0, bStablePart.size() - 1));
 
     // Should have at least 1 byte to represent whether we must use the classic engine.
-    ASSERT_GTE(aUnstablePart.size(), 1);
+    ASSERT_GTE(aStablePart.size(), 1);
 
     // The indexability discriminators should match.
     ASSERT_EQ(a.getIndexabilityDiscriminators(), b.getIndexabilityDiscriminators());
 
-    // The unstable parts should not match because of the last character.
-    ASSERT_NE(aUnstablePart, bUnstablePart);
-    ASSERT_NE(aUnstablePart[aUnstablePart.size() - 1], bUnstablePart[bUnstablePart.size() - 1]);
+    // The stable parts should not match because of the last character.
+    ASSERT_NE(aStablePart, bStablePart);
+    ASSERT_NE(aStablePart.back(), bStablePart.back());
 }
 
 /**
@@ -1332,7 +1336,7 @@ protected:
 };
 
 const std::string mockKey("mock_cache_key");
-const PlanCacheKey CachePlanSelectionTest::ck(mockKey, "", internalQueryForceClassicEngine.load());
+const PlanCacheKey CachePlanSelectionTest::ck(mockKey, "");
 
 //
 // Equality
@@ -1996,9 +2000,10 @@ TEST(PlanCacheTest, ComputeKeyCollationIndex) {
     PlanCacheKey noStringKey = makeKey(*noStrings, indexCores);
     PlanCacheKey withStringAndCollationKey = makeKey(*containsStringHasCollation, indexCores);
     ASSERT_NE(noStringKey, withStringAndCollationKey);
-    ASSERT_EQ(noStringKey.getUnstablePart(), withStringAndCollationKey.getUnstablePart());
-    ASSERT_NE(noStringKey.getStableKeyStringData(),
-              withStringAndCollationKey.getStableKeyStringData());
+    ASSERT_EQ(noStringKey.getIndexabilityDiscriminators(),
+              withStringAndCollationKey.getIndexabilityDiscriminators());
+    ASSERT_NE(noStringKey.getQueryShapeStringData(),
+              withStringAndCollationKey.getQueryShapeStringData());
 
     unique_ptr<CanonicalQuery> inContainsString(canonicalize("{a: {$in: [1, 'abc', 2]}}"));
     unique_ptr<CanonicalQuery> inContainsObject(canonicalize("{a: {$in: [1, {b: 'abc'}, 2]}}"));
@@ -2022,8 +2027,8 @@ TEST(PlanCacheTest, ComputeKeyCollationIndex) {
     // the index.
     ASSERT_NE(makeKey(*inNoStrings, indexCores),
               makeKey(*inContainsStringHasCollation, indexCores));
-    ASSERT_EQ(makeKey(*inNoStrings, indexCores).getUnstablePart(),
-              makeKey(*inContainsStringHasCollation, indexCores).getUnstablePart());
+    ASSERT_EQ(makeKey(*inNoStrings, indexCores).getIndexabilityDiscriminators(),
+              makeKey(*inContainsStringHasCollation, indexCores).getIndexabilityDiscriminators());
 }
 
 TEST(PlanCacheTest, ComputeKeyWildcardIndex) {
@@ -2271,7 +2276,7 @@ TEST(PlanCacheTest, StableKeyDoesNotChangeAcrossIndexCreation) {
     PlanCache planCache(5000);
     unique_ptr<CanonicalQuery> cq(canonicalize("{a: 0}}"));
     const PlanCacheKey preIndexKey = makeKey(*cq);
-    const auto preIndexStableKey = preIndexKey.getStableKey();
+    const auto preIndexStableKey = preIndexKey.getQueryShape();
     ASSERT_EQ(preIndexKey.getIndexabilityDiscriminators(), "");
 
     const auto keyPattern = BSON("a" << 1);
@@ -2283,7 +2288,7 @@ TEST(PlanCacheTest, StableKeyDoesNotChangeAcrossIndexCreation) {
                       IndexEntry::Identifier{""})};  // name
 
     const PlanCacheKey postIndexKey = makeKey(*cq, indexCores);
-    const auto postIndexStableKey = postIndexKey.getStableKey();
+    const auto postIndexStableKey = postIndexKey.getQueryShape();
     ASSERT_NE(preIndexKey, postIndexKey);
     ASSERT_EQ(preIndexStableKey, postIndexStableKey);
     ASSERT_EQ(postIndexKey.getIndexabilityDiscriminators(), "<1>");
@@ -2298,7 +2303,7 @@ TEST(PlanCacheTest, ComputeKeyNotEqualsArray) {
     const PlanCacheKey noIndexNeScalarKey = makeKey(*cqNeScalar);
     ASSERT_EQ(noIndexNeArrayKey.getIndexabilityDiscriminators(), "<0>");
     ASSERT_EQ(noIndexNeScalarKey.getIndexabilityDiscriminators(), "<1>");
-    ASSERT_EQ(noIndexNeScalarKey.getStableKey(), noIndexNeArrayKey.getStableKey());
+    ASSERT_EQ(noIndexNeScalarKey.getQueryShape(), noIndexNeArrayKey.getQueryShape());
 
     const auto keyPattern = BSON("a" << 1);
     // Create a normal btree index. It will have a discriminator.
@@ -2312,9 +2317,9 @@ TEST(PlanCacheTest, ComputeKeyNotEqualsArray) {
     const PlanCacheKey withIndexNeScalarKey = makeKey(*cqNeScalar, indexCores);
 
     ASSERT_NE(noIndexNeArrayKey, withIndexNeArrayKey);
-    ASSERT_EQ(noIndexNeArrayKey.getStableKey(), withIndexNeArrayKey.getStableKey());
+    ASSERT_EQ(noIndexNeArrayKey.getQueryShape(), withIndexNeArrayKey.getQueryShape());
 
-    ASSERT_EQ(noIndexNeScalarKey.getStableKey(), withIndexNeScalarKey.getStableKey());
+    ASSERT_EQ(noIndexNeScalarKey.getQueryShape(), withIndexNeScalarKey.getQueryShape());
     // There will be one discriminator for the $not and another for the leaf node ({$eq: 123}).
     ASSERT_EQ(withIndexNeScalarKey.getIndexabilityDiscriminators(), "<1><1>");
     // There will be one discriminator for the $not and another for the leaf node ({$eq: [1]}).
@@ -2332,7 +2337,7 @@ TEST(PlanCacheTest, ComputeKeyNinArray) {
     const PlanCacheKey noIndexNinScalarKey = makeKey(*cqNinScalar);
     ASSERT_EQ(noIndexNinArrayKey.getIndexabilityDiscriminators(), "<0>");
     ASSERT_EQ(noIndexNinScalarKey.getIndexabilityDiscriminators(), "<1>");
-    ASSERT_EQ(noIndexNinScalarKey.getStableKey(), noIndexNinArrayKey.getStableKey());
+    ASSERT_EQ(noIndexNinScalarKey.getQueryShape(), noIndexNinArrayKey.getQueryShape());
 
     const auto keyPattern = BSON("a" << 1);
     // Create a normal btree index. It will have a discriminator.
@@ -2347,10 +2352,11 @@ TEST(PlanCacheTest, ComputeKeyNinArray) {
 
     // The unstable part of the key for $nin: [<array>] should have changed. The stable part,
     // however, should not.
-    ASSERT_EQ(noIndexNinArrayKey.getStableKey(), withIndexNinArrayKey.getStableKey());
-    ASSERT_NE(noIndexNinArrayKey.getUnstablePart(), withIndexNinArrayKey.getUnstablePart());
+    ASSERT_EQ(noIndexNinArrayKey.getQueryShape(), withIndexNinArrayKey.getQueryShape());
+    ASSERT_NE(noIndexNinArrayKey.getIndexabilityDiscriminators(),
+              withIndexNinArrayKey.getIndexabilityDiscriminators());
 
-    ASSERT_EQ(noIndexNinScalarKey.getStableKey(), withIndexNinScalarKey.getStableKey());
+    ASSERT_EQ(noIndexNinScalarKey.getQueryShape(), withIndexNinScalarKey.getQueryShape());
     ASSERT_EQ(withIndexNinArrayKey.getIndexabilityDiscriminators(), "<0><1>");
     ASSERT_EQ(withIndexNinScalarKey.getIndexabilityDiscriminators(), "<1><1>");
 }
@@ -2371,8 +2377,8 @@ TEST(PlanCacheTest, PlanCacheKeyCollision) {
 
     const PlanCacheKey keyA = makeKey(*cqNeA);
     const PlanCacheKey keyB = makeKey(*cqNeB);
-    ASSERT_EQ(keyA.getStableKey(), keyB.getStableKey());
-    ASSERT_NE(keyA.getUnstablePart(), keyB.getUnstablePart());
+    ASSERT_EQ(keyA.getQueryShape(), keyB.getQueryShape());
+    ASSERT_NE(keyA.getIndexabilityDiscriminators(), keyB.getIndexabilityDiscriminators());
     const auto keyPattern = BSON("a" << 1);
     // Create a normal btree index. It will have a discriminator.
     std::vector<CoreIndexInfo> indexCores = {
@@ -2383,8 +2389,9 @@ TEST(PlanCacheTest, PlanCacheKeyCollision) {
     const PlanCacheKey keyAWithIndex = makeKey(*cqNeA, indexCores);
     const PlanCacheKey keyBWithIndex = makeKey(*cqNeB, indexCores);
 
-    ASSERT_EQ(keyAWithIndex.getStableKey(), keyBWithIndex.getStableKey());
-    ASSERT_NE(keyAWithIndex.getUnstablePart(), keyBWithIndex.getUnstablePart());
+    ASSERT_EQ(keyAWithIndex.getQueryShape(), keyBWithIndex.getQueryShape());
+    ASSERT_NE(keyAWithIndex.getIndexabilityDiscriminators(),
+              keyBWithIndex.getIndexabilityDiscriminators());
 }
 
 TEST(PlanCacheTest, PlanCacheSizeWithCRUDOperations) {

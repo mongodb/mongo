@@ -169,7 +169,8 @@ public:
 
     /**
      * Compute the "shape" of this query by encoding the match, projection and sort, and stripping
-     * out the appropriate values.
+     * out the appropriate values. Note that different types of PlanCache use different encoding
+     * approaches.
      */
     QueryShapeString encodeKey() const;
 

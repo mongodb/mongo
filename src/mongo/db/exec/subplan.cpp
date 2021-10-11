@@ -169,7 +169,7 @@ Status SubplanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
 
     std::function<PlanCacheKey(const CanonicalQuery& cq, const CollectionPtr& coll)>
         createPlanCacheKey = [](const CanonicalQuery& cq, const CollectionPtr& coll) {
-            return plan_cache_key_factory::make<PlanCacheKey>(cq, coll);
+            return plan_cache_key_factory::make(cq, coll);
         };
 
     // Plan each branch of the $or.
