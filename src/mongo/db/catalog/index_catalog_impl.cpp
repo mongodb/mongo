@@ -265,9 +265,9 @@ void IndexCatalogImpl::_logInternalState(OperationContext* opCtx,
                 "Internal Index Catalog state",
                 "numIndexesTotal"_attr = numIndexesTotal(opCtx),
                 "numIndexesInCollectionCatalogEntry"_attr = numIndexesInCollectionCatalogEntry,
-                "readyIndexes_size"_attr = _readyIndexes.size(),
-                "buildingIndexes_size"_attr = _buildingIndexes.size(),
-                "indexNamesToDrop_size"_attr = indexNamesToDrop.size(),
+                "numReadyIndexes"_attr = _readyIndexes.size(),
+                "numBuildingIndexes"_attr = _buildingIndexes.size(),
+                "indexNamesToDrop"_attr = indexNamesToDrop,
                 "haveIdIndex"_attr = haveIdIndex);
 
     // Report the ready indexes.
@@ -275,17 +275,17 @@ void IndexCatalogImpl::_logInternalState(OperationContext* opCtx,
         const IndexDescriptor* desc = entry->descriptor();
         LOGV2_ERROR(20367,
                     "readyIndex",
-                    "desc_indexName"_attr = desc->indexName(),
-                    "desc_infoObj"_attr = redact(desc->infoObj()));
+                    "index"_attr = desc->indexName(),
+                    "indexInfo"_attr = redact(desc->infoObj()));
     }
 
     // Report the in-progress indexes.
     for (const auto& entry : _buildingIndexes) {
         const IndexDescriptor* desc = entry->descriptor();
         LOGV2_ERROR(20369,
-                    "inprogIndex",
-                    "desc_indexName"_attr = desc->indexName(),
-                    "desc_infoObj"_attr = redact(desc->infoObj()));
+                    "buildingIndex",
+                    "index"_attr = desc->indexName(),
+                    "indexInfo"_attr = redact(desc->infoObj()));
     }
 
     LOGV2_ERROR(20370, "Internal Collection Catalog Entry state:");
@@ -307,13 +307,6 @@ void IndexCatalogImpl::_logInternalState(OperationContext* opCtx,
                     "readyIndexes",
                     "index"_attr = index,
                     "spec"_attr = redact(collection->getIndexSpec(index)));
-    }
-
-    for (const auto& indexNameToDrop : indexNamesToDrop) {
-        LOGV2_ERROR(20376,
-                    "indexNamesToDrop",
-                    "index"_attr = indexNameToDrop,
-                    "spec"_attr = redact(collection->getIndexSpec(indexNameToDrop)));
     }
 }
 
