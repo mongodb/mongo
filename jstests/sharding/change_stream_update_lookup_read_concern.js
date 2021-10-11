@@ -1,10 +1,15 @@
-// Tests that a change stream's update lookup will use the appropriate read concern. In particular,
-// tests that the update lookup will return a version of the document at least as recent as the
-// change that we're doing the lookup for, and that change will be majority-committed.
-// @tags: [
-//   requires_majority_read_concern,
-//   uses_change_streams,
-// ]
+/**
+ * Tests that a change stream's update lookup will use the appropriate read concern. In particular,
+ * tests that the update lookup will return a version of the document at least as recent as the
+ * change that we're doing the lookup for, and that change will be majority-committed.
+ * @tags: [
+ *   requires_majority_read_concern,
+ *   # This test has some timing dependency causing failures when run with a non-streamable rsm
+ *   # (e.g. sdam), because non-streamable rsm is generally slower to learn of new replica set info.
+ *   requires_streamable_rsm,
+ *   uses_change_streams,
+ * ]
+ */
 (function() {
 "use strict";
 
