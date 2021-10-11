@@ -393,6 +393,14 @@ Status storeMongodOptions(const moe::Environment& params) {
         storageGlobalParams.dbpath =
             storageGlobalParams.dbpath.erase(storageGlobalParams.dbpath.size() - 1);
     }
+
+    StringData dbpath(storageGlobalParams.dbpath);
+    if (dbpath.size() >= 2 && dbpath.startsWith("\\\\")) {
+        // Check if the dbpath is on a Windows network share (eg. \\myserver\myshare)
+        LOGV2_WARNING_OPTIONS(5808500,
+                              {logv2::LogTag::kStartupWarnings},
+                              "dbpath should not be used on a network share");
+    }
 #endif
 
     if (params.count("operationProfiling.mode")) {
