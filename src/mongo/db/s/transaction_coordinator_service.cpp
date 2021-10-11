@@ -80,8 +80,12 @@ void TransactionCoordinatorService::createCoordinator(OperationContext* opCtx,
         latestCoordinator->cancelIfCommitNotYetStarted();
     }
 
-    auto coordinator = std::make_shared<TransactionCoordinator>(
-        opCtx, lsid, txnNumber, scheduler.makeChildScheduler(), commitDeadline);
+    auto coordinator =
+        std::make_shared<TransactionCoordinator>(opCtx,
+                                                 lsid,
+                                                 TxnNumberAndRetryCounter{txnNumber, 0},
+                                                 scheduler.makeChildScheduler(),
+                                                 commitDeadline);
 
     try {
         catalog.insert(opCtx, lsid, txnNumber, coordinator);
@@ -240,7 +244,7 @@ void TransactionCoordinatorService::onStepUp(OperationContext* opCtx,
                         auto coordinator = std::make_shared<TransactionCoordinator>(
                             opCtx,
                             lsid,
-                            txnNumber,
+                            TxnNumberAndRetryCounter{txnNumber, 0},
                             scheduler.makeChildScheduler(),
                             clockSource->now() + Seconds(gTransactionLifetimeLimitSeconds.load()));
 

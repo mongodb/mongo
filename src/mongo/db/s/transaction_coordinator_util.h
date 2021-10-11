@@ -42,7 +42,7 @@ namespace txn {
  * Upserts a document of the form:
  *
  * {
- *    _id: {lsid: <lsid>, txnNumber: <txnNumber>}
+ *    _id: {lsid: <lsid>, txnNumber: <txnNumber>, txnRetryCounter: <txnRetryCounter>}
  *    participants: ["shard0000", "shard0001"]
  * }
  *
@@ -51,12 +51,13 @@ namespace txn {
  * Throws if the upsert fails or waiting for writeConcern fails.
  *
  * If the upsert returns a DuplicateKey error, converts it to an anonymous error, because it means a
- * document for the (lsid, txnNumber) exists with a different participant list.
+ * document for the (lsid, txnNumber, txnRetryCounter) exists with a different participant list.
  */
-Future<repl::OpTime> persistParticipantsList(txn::AsyncWorkScheduler& scheduler,
-                                             const LogicalSessionId& lsid,
-                                             TxnNumber txnNumber,
-                                             const txn::ParticipantsList& participants);
+Future<repl::OpTime> persistParticipantsList(
+    txn::AsyncWorkScheduler& scheduler,
+    const LogicalSessionId& lsid,
+    const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
+    const txn::ParticipantsList& participants);
 
 struct PrepareResponse;
 class PrepareVoteConsensus {
@@ -97,7 +98,7 @@ private:
 Future<PrepareVoteConsensus> sendPrepare(ServiceContext* service,
                                          txn::AsyncWorkScheduler& scheduler,
                                          const LogicalSessionId& lsid,
-                                         TxnNumber txnNumber,
+                                         const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
                                          const APIParameters& apiParams,
                                          const txn::ParticipantsList& participants);
 
@@ -105,10 +106,10 @@ Future<PrepareVoteConsensus> sendPrepare(ServiceContext* service,
  * If 'commitTimestamp' is boost::none, updates the document in config.transaction_coordinators
  * for
  *
- * (lsid, txnNumber) to be:
+ * (lsid, txnNumber, txnRetryCounter) to be:
  *
  * {
- *    _id: {lsid: <lsid>, txnNumber: <txnNumber>}
+ *    _id: {lsid: <lsid>, txnNumber: <txnNumber>, txnRetryCounter: <txnRetryCounter>}
  *    participants: ["shard0000", "shard0001"]
  *    decision: "abort"
  * }
@@ -116,7 +117,7 @@ Future<PrepareVoteConsensus> sendPrepare(ServiceContext* service,
  * else updates the document to be:
  *
  * {
- *    _id: {lsid: <lsid>, txnNumber: <txnNumber>}
+ *    _id: {lsid: <lsid>, txnNumber: <txnNumber>, txnRetryCounter: <txnRetryCounter>}
  *    participants: ["shard0000", "shard0001"]
  *    decision: "commit"
  *    commitTimestamp: Timestamp(xxxxxxxx, x),
@@ -127,12 +128,12 @@ Future<PrepareVoteConsensus> sendPrepare(ServiceContext* service,
  * Throws if the update fails or waiting for writeConcern fails.
  *
  * If the update succeeds but did not update any document, throws an anonymous error, because it
- * means either no document for (lsid, txnNumber) exists, or a document exists but has a different
- * participant list, different decision, or different commit Timestamp.
+ * means either no document for (lsid, txnNumber, txnRetryCounter) exists, or a document exists but
+ * has a different participant list, different decision, or different commit Timestamp.
  */
 Future<repl::OpTime> persistDecision(txn::AsyncWorkScheduler& scheduler,
                                      const LogicalSessionId& lsid,
-                                     TxnNumber txnNumber,
+                                     const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
                                      const txn::ParticipantsList& participants,
                                      const txn::CoordinatorCommitDecision& decision);
 
@@ -143,7 +144,7 @@ Future<repl::OpTime> persistDecision(txn::AsyncWorkScheduler& scheduler,
 Future<void> sendCommit(ServiceContext* service,
                         txn::AsyncWorkScheduler& scheduler,
                         const LogicalSessionId& lsid,
-                        TxnNumber txnNumber,
+                        const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
                         const APIParameters& apiParams,
                         const txn::ParticipantsList& participants,
                         Timestamp commitTimestamp);
@@ -155,7 +156,7 @@ Future<void> sendCommit(ServiceContext* service,
 Future<void> sendAbort(ServiceContext* service,
                        txn::AsyncWorkScheduler& scheduler,
                        const LogicalSessionId& lsid,
-                       TxnNumber txnNumber,
+                       const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
                        const APIParameters& apiParams,
                        const txn::ParticipantsList& participants);
 
@@ -167,12 +168,12 @@ Future<void> sendAbort(ServiceContext* service,
  * Throws if the update fails.
  *
  * If the delete succeeds but did not delete any document, throws an anonymous error, because it
- * means either no document for (lsid, txnNumber) exists, or a document exists but without a
- * decision.
+ * means either no document for (lsid, txnNumber, txnRetryCounter) exists, or a document exists but
+ * without a decision.
  */
 Future<void> deleteCoordinatorDoc(txn::AsyncWorkScheduler& scheduler,
                                   const LogicalSessionId& lsid,
-                                  TxnNumber txnNumber);
+                                  const TxnNumberAndRetryCounter& txnNumberAndRetryCounter);
 
 /**
  * Reads and returns all documents in config.transaction_coordinators.
@@ -208,7 +209,7 @@ struct PrepareResponse {
 Future<PrepareResponse> sendPrepareToShard(ServiceContext* service,
                                            txn::AsyncWorkScheduler& scheduler,
                                            const LogicalSessionId& lsid,
-                                           TxnNumber txnNumber,
+                                           const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
                                            const ShardId& shardId,
                                            const BSONObj& prepareCommandObj,
                                            OperationContextFn operationContextFn =
@@ -228,7 +229,7 @@ Future<PrepareResponse> sendPrepareToShard(ServiceContext* service,
 Future<void> sendDecisionToShard(ServiceContext* service,
                                  txn::AsyncWorkScheduler& scheduler,
                                  const LogicalSessionId& lsid,
-                                 TxnNumber txnNumber,
+                                 const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
                                  const ShardId& shardId,
                                  const BSONObj& commandObj,
                                  OperationContextFn operationContextFn = [](OperationContext*) {});
@@ -237,7 +238,8 @@ Future<void> sendDecisionToShard(ServiceContext* service,
  * Returns a string representation of the transaction id represented by the given session id and
  * transaction number.
  */
-std::string txnIdToString(const LogicalSessionId& lsid, TxnNumber txnNumber);
+std::string txnIdToString(const LogicalSessionId& lsid,
+                          const TxnNumberAndRetryCounter& txnNumberAndRetryCounter);
 
 }  // namespace txn
 }  // namespace mongo

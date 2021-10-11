@@ -59,7 +59,7 @@ protected:
         auto newCoordinator = std::make_shared<TransactionCoordinator>(
             operationContext(),
             lsid,
-            txnNumber,
+            TxnNumberAndRetryCounter{txnNumber, 0},
             std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
             Date_t::max());
 
@@ -172,11 +172,12 @@ TEST_F(TransactionCoordinatorCatalogTest, StepDownBeforeCoordinatorInsertedIntoC
     TransactionCoordinatorCatalog catalog;
     catalog.exitStepUp(Status::OK());
 
-    auto coordinator = std::make_shared<TransactionCoordinator>(operationContext(),
-                                                                lsid,
-                                                                txnNumber,
-                                                                aws.makeChildScheduler(),
-                                                                network()->now() + Seconds{5});
+    auto coordinator =
+        std::make_shared<TransactionCoordinator>(operationContext(),
+                                                 lsid,
+                                                 TxnNumberAndRetryCounter{txnNumber, 0},
+                                                 aws.makeChildScheduler(),
+                                                 network()->now() + Seconds{5});
 
     aws.shutdown({ErrorCodes::TransactionCoordinatorSteppingDown, "Test step down"});
     catalog.onStepDown();

@@ -132,4 +132,34 @@ using LogicalSessionRecordSet = stdx::unordered_set<LogicalSessionRecord, Logica
 template <typename T>
 using LogicalSessionIdMap = stdx::unordered_map<LogicalSessionId, T, LogicalSessionIdHash>;
 
+class TxnNumberAndRetryCounter {
+public:
+    TxnNumberAndRetryCounter(TxnNumber txnNumber, TxnRetryCounter txnRetryCounter)
+        : _txnNumber(txnNumber), _txnRetryCounter(txnRetryCounter) {}
+
+    TxnNumberAndRetryCounter(TxnNumber txnNumber)
+        : _txnNumber(txnNumber), _txnRetryCounter(boost::none) {}
+
+    BSONObj toBSON() const {
+        BSONObjBuilder bob;
+        bob.append(OperationSessionInfo::kTxnNumberFieldName, _txnNumber);
+        if (_txnRetryCounter) {
+            bob.append(OperationSessionInfo::kTxnRetryCounterFieldName, *_txnRetryCounter);
+        }
+        return bob.obj();
+    }
+
+    const TxnNumber getTxnNumber() const {
+        return _txnNumber;
+    }
+
+    const boost::optional<TxnRetryCounter> getTxnRetryCounter() const {
+        return _txnRetryCounter;
+    }
+
+private:
+    const TxnNumber _txnNumber;
+    const boost::optional<TxnRetryCounter> _txnRetryCounter;
+};
+
 }  // namespace mongo

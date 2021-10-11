@@ -38,6 +38,7 @@
 #include "mongo/db/commands/txn_two_phase_commit_cmds_gen.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/transaction_coordinator_futures_util.h"
@@ -102,16 +103,17 @@ bool shouldRetryPersistingCoordinatorState(const StatusWith<T>& responseStatus) 
 }  // namespace
 
 namespace {
-repl::OpTime persistParticipantListBlocking(OperationContext* opCtx,
-                                            const LogicalSessionId& lsid,
-                                            TxnNumber txnNumber,
-                                            const std::vector<ShardId>& participantList) {
+repl::OpTime persistParticipantListBlocking(
+    OperationContext* opCtx,
+    const LogicalSessionId& lsid,
+    const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
+    const std::vector<ShardId>& participantList) {
     LOGV2_DEBUG(22463,
                 3,
-                "{sessionId}:{txnNumber} Going to write participant list",
+                "{sessionId}:{txnNumberAndRetryCounter} Going to write participant list",
                 "Going to write participant list",
                 "sessionId"_attr = lsid.getId(),
-                "txnNumber"_attr = txnNumber);
+                "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter);
 
     if (MONGO_unlikely(hangBeforeWritingParticipantList.shouldFail())) {
         LOGV2(22464, "Hit hangBeforeWritingParticipantList failpoint");
@@ -120,7 +122,11 @@ repl::OpTime persistParticipantListBlocking(OperationContext* opCtx,
 
     OperationSessionInfo sessionInfo;
     sessionInfo.setSessionId(lsid);
-    sessionInfo.setTxnNumber(txnNumber);
+    sessionInfo.setTxnNumber(txnNumberAndRetryCounter.getTxnNumber());
+    if (feature_flags::gFeatureFlagInternalTransactions.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        sessionInfo.setTxnRetryCounter(*txnNumberAndRetryCounter.getTxnRetryCounter());
+    }
 
     DBDirectClient client(opCtx);
 
@@ -167,7 +173,7 @@ repl::OpTime persistParticipantListBlocking(OperationContext* opCtx,
         uasserted(51025,
                   str::stream() << "While attempting to write participant list "
                                 << buildParticipantListString(participantList) << " for "
-                                << lsid.getId() << ':' << txnNumber
+                                << lsid.getId() << ':' << txnNumberAndRetryCounter.toBSON()
                                 << ", found document with a different participant list: " << doc);
     }
 
@@ -176,29 +182,35 @@ repl::OpTime persistParticipantListBlocking(OperationContext* opCtx,
 
     LOGV2_DEBUG(22465,
                 3,
-                "{sessionId}:{txnNumber} Wrote participant list",
+                "{sessionId}:{txnNumberAndRetryCounter} Wrote participant list",
                 "sessionId"_attr = lsid.getId(),
-                "txnNumber"_attr = txnNumber);
+                "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter);
 
     return repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
 }
 }  // namespace
 
-Future<repl::OpTime> persistParticipantsList(txn::AsyncWorkScheduler& scheduler,
-                                             const LogicalSessionId& lsid,
-                                             TxnNumber txnNumber,
-                                             const txn::ParticipantsList& participants) {
+Future<repl::OpTime> persistParticipantsList(
+    txn::AsyncWorkScheduler& scheduler,
+    const LogicalSessionId& lsid,
+    const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
+    const txn::ParticipantsList& participants) {
     return txn::doWhile(
         scheduler,
         boost::none /* no need for a backoff */,
         [](const StatusWith<repl::OpTime>& s) { return shouldRetryPersistingCoordinatorState(s); },
-        [&scheduler, lsid, txnNumber, participants] {
-            return scheduler.scheduleWork([lsid, txnNumber, participants](OperationContext* opCtx) {
-                FlowControl::Bypass flowControlBypass(opCtx);
-                getTransactionCoordinatorWorkerCurOpRepository()->set(
-                    opCtx, lsid, txnNumber, CoordinatorAction::kWritingParticipantList);
-                return persistParticipantListBlocking(opCtx, lsid, txnNumber, participants);
-            });
+        [&scheduler, lsid, txnNumberAndRetryCounter, participants] {
+            return scheduler.scheduleWork(
+                [lsid, txnNumberAndRetryCounter, participants](OperationContext* opCtx) {
+                    FlowControl::Bypass flowControlBypass(opCtx);
+                    getTransactionCoordinatorWorkerCurOpRepository()->set(
+                        opCtx,
+                        lsid,
+                        txnNumberAndRetryCounter.getTxnNumber(),
+                        CoordinatorAction::kWritingParticipantList);
+                    return persistParticipantListBlocking(
+                        opCtx, lsid, txnNumberAndRetryCounter, participants);
+                });
         });
 }
 
@@ -232,14 +244,20 @@ CoordinatorCommitDecision PrepareVoteConsensus::decision() const {
 Future<PrepareVoteConsensus> sendPrepare(ServiceContext* service,
                                          txn::AsyncWorkScheduler& scheduler,
                                          const LogicalSessionId& lsid,
-                                         TxnNumber txnNumber,
+                                         const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
                                          const APIParameters& apiParams,
                                          const txn::ParticipantsList& participants) {
     PrepareTransaction prepareTransaction;
     prepareTransaction.setDbName(NamespaceString::kAdminDb);
-    BSONObjBuilder bob(BSON("lsid" << lsid.toBSON() << "txnNumber" << txnNumber << "autocommit"
+    BSONObjBuilder bob(BSON("lsid" << lsid.toBSON() << "txnNumber"
+                                   << txnNumberAndRetryCounter.getTxnNumber() << "autocommit"
                                    << false << WriteConcernOptions::kWriteConcernField
                                    << WriteConcernOptions::Majority));
+    if (feature_flags::gFeatureFlagInternalTransactions.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        bob.append(OperationSessionInfo::kTxnRetryCounterFieldName,
+                   *txnNumberAndRetryCounter.getTxnRetryCounter());
+    }
     apiParams.appendInfo(&bob);
     auto prepareObj = prepareTransaction.toBSON(bob.obj());
 
@@ -249,10 +267,14 @@ Future<PrepareVoteConsensus> sendPrepare(ServiceContext* service,
     // vector of responses.
     auto prepareScheduler = scheduler.makeChildScheduler();
 
-    OperationContextFn operationContextFn = [lsid, txnNumber](OperationContext* opCtx) {
+    OperationContextFn operationContextFn = [lsid,
+                                             txnNumberAndRetryCounter](OperationContext* opCtx) {
         invariant(opCtx);
         getTransactionCoordinatorWorkerCurOpRepository()->set(
-            opCtx, lsid, txnNumber, CoordinatorAction::kSendingPrepare);
+            opCtx,
+            lsid,
+            txnNumberAndRetryCounter.getTxnNumber(),
+            CoordinatorAction::kSendingPrepare);
 
         if (MONGO_unlikely(hangBeforeSendingPrepare.shouldFail())) {
             LOGV2(22466, "Hit hangBeforeSendingPrepare failpoint");
@@ -264,7 +286,7 @@ Future<PrepareVoteConsensus> sendPrepare(ServiceContext* service,
         responses.emplace_back(sendPrepareToShard(service,
                                                   *prepareScheduler,
                                                   lsid,
-                                                  txnNumber,
+                                                  txnNumberAndRetryCounter,
                                                   participant,
                                                   prepareObj,
                                                   operationContextFn));
@@ -278,8 +300,8 @@ Future<PrepareVoteConsensus> sendPrepare(ServiceContext* service,
                // Initial value
                PrepareVoteConsensus{int(participants.size())},
                // Aggregates an incoming response (next) with the existing aggregate value (result)
-               [&prepareScheduler = *prepareScheduler, txnNumber](PrepareVoteConsensus& result,
-                                                                  const PrepareResponse& next) {
+               [&prepareScheduler = *prepareScheduler, txnNumberAndRetryCounter](
+                   PrepareVoteConsensus& result, const PrepareResponse& next) {
                    result.registerVote(next);
 
                    if (next.vote == PrepareVote::kAbort) {
@@ -287,7 +309,7 @@ Future<PrepareVoteConsensus> sendPrepare(ServiceContext* service,
                                    1,
                                    "Received abort prepare vote from node",
                                    "shardId"_attr = next.shardId,
-                                   "txnNumber"_attr = txnNumber,
+                                   "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter,
                                    "error"_attr = (next.abortReason.has_value()
                                                        ? next.abortReason.value().reason()
                                                        : ""));
@@ -308,15 +330,15 @@ Future<PrepareVoteConsensus> sendPrepare(ServiceContext* service,
 namespace {
 repl::OpTime persistDecisionBlocking(OperationContext* opCtx,
                                      const LogicalSessionId& lsid,
-                                     TxnNumber txnNumber,
+                                     const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
                                      const std::vector<ShardId>& participantList,
                                      const txn::CoordinatorCommitDecision& decision) {
     const bool isCommit = decision.getDecision() == txn::CommitDecision::kCommit;
     LOGV2_DEBUG(22467,
                 3,
-                "{sessionId}:{txnNumber} Going to write decision {decision}",
+                "{sessionId}:{txnNumberAndRetryCounter} Going to write decision {decision}",
                 "sessionId"_attr = lsid.getId(),
-                "txnNumber"_attr = txnNumber,
+                "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter,
                 "decision"_attr = (isCommit ? "commit" : "abort"));
 
     if (MONGO_unlikely(hangBeforeWritingDecision.shouldFail())) {
@@ -326,7 +348,11 @@ repl::OpTime persistDecisionBlocking(OperationContext* opCtx,
 
     OperationSessionInfo sessionInfo;
     sessionInfo.setSessionId(lsid);
-    sessionInfo.setTxnNumber(txnNumber);
+    sessionInfo.setTxnNumber(txnNumberAndRetryCounter.getTxnNumber());
+    if (feature_flags::gFeatureFlagInternalTransactions.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        sessionInfo.setTxnRetryCounter(*txnNumberAndRetryCounter.getTxnRetryCounter());
+    }
 
     DBDirectClient client(opCtx);
 
@@ -379,7 +405,7 @@ repl::OpTime persistDecisionBlocking(OperationContext* opCtx,
         uasserted(51026,
                   str::stream() << "While attempting to write decision "
                                 << (isCommit ? "'commit'" : "'abort'") << " for" << lsid.getId()
-                                << ':' << txnNumber
+                                << ':' << txnNumberAndRetryCounter.toBSON()
                                 << ", either failed to find document for this lsid:txnNumber or "
                                    "document existed with a different participant list, decision "
                                    "or commitTimestamp: "
@@ -388,10 +414,10 @@ repl::OpTime persistDecisionBlocking(OperationContext* opCtx,
 
     LOGV2_DEBUG(22469,
                 3,
-                "{sessionId}:{txnNumber} Wrote decision {decision}",
+                "{sessionId}:{txnNumberAndRetryCounter} Wrote decision {decision}",
                 "Wrote decision",
                 "sessionId"_attr = lsid.getId(),
-                "txnNumber"_attr = txnNumber,
+                "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter,
                 "decision"_attr = (isCommit ? "commit" : "abort"));
 
     return repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
@@ -400,20 +426,24 @@ repl::OpTime persistDecisionBlocking(OperationContext* opCtx,
 
 Future<repl::OpTime> persistDecision(txn::AsyncWorkScheduler& scheduler,
                                      const LogicalSessionId& lsid,
-                                     TxnNumber txnNumber,
+                                     const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
                                      const txn::ParticipantsList& participants,
                                      const txn::CoordinatorCommitDecision& decision) {
     return txn::doWhile(
         scheduler,
         boost::none /* no need for a backoff */,
         [](const StatusWith<repl::OpTime>& s) { return shouldRetryPersistingCoordinatorState(s); },
-        [&scheduler, lsid, txnNumber, participants, decision] {
+        [&scheduler, lsid, txnNumberAndRetryCounter, participants, decision] {
             return scheduler.scheduleWork(
-                [lsid, txnNumber, participants, decision](OperationContext* opCtx) {
+                [lsid, txnNumberAndRetryCounter, participants, decision](OperationContext* opCtx) {
                     FlowControl::Bypass flowControlBypass(opCtx);
                     getTransactionCoordinatorWorkerCurOpRepository()->set(
-                        opCtx, lsid, txnNumber, CoordinatorAction::kWritingDecision);
-                    return persistDecisionBlocking(opCtx, lsid, txnNumber, participants, decision);
+                        opCtx,
+                        lsid,
+                        txnNumberAndRetryCounter.getTxnNumber(),
+                        CoordinatorAction::kWritingDecision);
+                    return persistDecisionBlocking(
+                        opCtx, lsid, txnNumberAndRetryCounter, participants, decision);
                 });
         });
 }
@@ -421,23 +451,33 @@ Future<repl::OpTime> persistDecision(txn::AsyncWorkScheduler& scheduler,
 Future<void> sendCommit(ServiceContext* service,
                         txn::AsyncWorkScheduler& scheduler,
                         const LogicalSessionId& lsid,
-                        TxnNumber txnNumber,
+                        const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
                         const APIParameters& apiParams,
                         const txn::ParticipantsList& participants,
                         Timestamp commitTimestamp) {
     CommitTransaction commitTransaction;
     commitTransaction.setDbName(NamespaceString::kAdminDb);
     commitTransaction.setCommitTimestamp(commitTimestamp);
-    BSONObjBuilder bob(BSON("lsid" << lsid.toBSON() << "txnNumber" << txnNumber << "autocommit"
+    BSONObjBuilder bob(BSON("lsid" << lsid.toBSON() << "txnNumber"
+                                   << txnNumberAndRetryCounter.getTxnNumber() << "autocommit"
                                    << false << WriteConcernOptions::kWriteConcernField
                                    << WriteConcernOptions::Majority));
+    if (feature_flags::gFeatureFlagInternalTransactions.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        bob.append(OperationSessionInfo::kTxnRetryCounterFieldName,
+                   *txnNumberAndRetryCounter.getTxnRetryCounter());
+    }
     apiParams.appendInfo(&bob);
     auto commitObj = commitTransaction.toBSON(bob.obj());
 
-    OperationContextFn operationContextFn = [lsid, txnNumber](OperationContext* opCtx) {
+    OperationContextFn operationContextFn = [lsid,
+                                             txnNumberAndRetryCounter](OperationContext* opCtx) {
         invariant(opCtx);
         getTransactionCoordinatorWorkerCurOpRepository()->set(
-            opCtx, lsid, txnNumber, CoordinatorAction::kSendingCommit);
+            opCtx,
+            lsid,
+            txnNumberAndRetryCounter.getTxnNumber(),
+            CoordinatorAction::kSendingCommit);
 
         if (MONGO_unlikely(hangBeforeSendingCommit.shouldFail())) {
             LOGV2(22470, "Hit hangBeforeSendingCommit failpoint");
@@ -447,8 +487,13 @@ Future<void> sendCommit(ServiceContext* service,
 
     std::vector<Future<void>> responses;
     for (const auto& participant : participants) {
-        responses.push_back(sendDecisionToShard(
-            service, scheduler, lsid, txnNumber, participant, commitObj, operationContextFn));
+        responses.push_back(sendDecisionToShard(service,
+                                                scheduler,
+                                                lsid,
+                                                txnNumberAndRetryCounter,
+                                                participant,
+                                                commitObj,
+                                                operationContextFn));
     }
     return txn::whenAll(responses);
 }
@@ -456,21 +501,28 @@ Future<void> sendCommit(ServiceContext* service,
 Future<void> sendAbort(ServiceContext* service,
                        txn::AsyncWorkScheduler& scheduler,
                        const LogicalSessionId& lsid,
-                       TxnNumber txnNumber,
+                       const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
                        const APIParameters& apiParams,
                        const txn::ParticipantsList& participants) {
     AbortTransaction abortTransaction;
     abortTransaction.setDbName(NamespaceString::kAdminDb);
-    BSONObjBuilder bob(BSON("lsid" << lsid.toBSON() << "txnNumber" << txnNumber << "autocommit"
+    BSONObjBuilder bob(BSON("lsid" << lsid.toBSON() << "txnNumber"
+                                   << txnNumberAndRetryCounter.getTxnNumber() << "autocommit"
                                    << false << WriteConcernOptions::kWriteConcernField
                                    << WriteConcernOptions::Majority));
+    if (feature_flags::gFeatureFlagInternalTransactions.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        bob.append(OperationSessionInfo::kTxnRetryCounterFieldName,
+                   *txnNumberAndRetryCounter.getTxnRetryCounter());
+    }
     apiParams.appendInfo(&bob);
     auto abortObj = abortTransaction.toBSON(bob.obj());
 
-    OperationContextFn operationContextFn = [lsid, txnNumber](OperationContext* opCtx) {
+    OperationContextFn operationContextFn = [lsid,
+                                             txnNumberAndRetryCounter](OperationContext* opCtx) {
         invariant(opCtx);
         getTransactionCoordinatorWorkerCurOpRepository()->set(
-            opCtx, lsid, txnNumber, CoordinatorAction::kSendingAbort);
+            opCtx, lsid, txnNumberAndRetryCounter.getTxnNumber(), CoordinatorAction::kSendingAbort);
 
         if (MONGO_unlikely(hangBeforeSendingAbort.shouldFail())) {
             LOGV2(22471, "Hit hangBeforeSendingAbort failpoint");
@@ -480,8 +532,13 @@ Future<void> sendAbort(ServiceContext* service,
 
     std::vector<Future<void>> responses;
     for (const auto& participant : participants) {
-        responses.push_back(sendDecisionToShard(
-            service, scheduler, lsid, txnNumber, participant, abortObj, operationContextFn));
+        responses.push_back(sendDecisionToShard(service,
+                                                scheduler,
+                                                lsid,
+                                                txnNumberAndRetryCounter,
+                                                participant,
+                                                abortObj,
+                                                operationContextFn));
     }
     return txn::whenAll(responses);
 }
@@ -489,13 +546,13 @@ Future<void> sendAbort(ServiceContext* service,
 namespace {
 void deleteCoordinatorDocBlocking(OperationContext* opCtx,
                                   const LogicalSessionId& lsid,
-                                  TxnNumber txnNumber) {
+                                  const TxnNumberAndRetryCounter& txnNumberAndRetryCounter) {
     LOGV2_DEBUG(22472,
                 3,
-                "{sessionId}:{txnNumber} Going to delete coordinator doc",
+                "{sessionId}:{txnNumberAndRetryCounter} Going to delete coordinator doc",
                 "Going to delete coordinator doc",
                 "sessionId"_attr = lsid.getId(),
-                "txnNumber"_attr = txnNumber);
+                "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter);
 
     if (MONGO_unlikely(hangBeforeDeletingCoordinatorDoc.shouldFail())) {
         LOGV2(22473, "Hit hangBeforeDeletingCoordinatorDoc failpoint");
@@ -504,7 +561,11 @@ void deleteCoordinatorDocBlocking(OperationContext* opCtx,
 
     OperationSessionInfo sessionInfo;
     sessionInfo.setSessionId(lsid);
-    sessionInfo.setTxnNumber(txnNumber);
+    sessionInfo.setTxnNumber(txnNumberAndRetryCounter.getTxnNumber());
+    if (feature_flags::gFeatureFlagInternalTransactions.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        sessionInfo.setTxnRetryCounter(*txnNumberAndRetryCounter.getTxnRetryCounter());
+    }
 
     DBDirectClient client(opCtx);
 
@@ -545,7 +606,7 @@ void deleteCoordinatorDocBlocking(OperationContext* opCtx,
             BSON(TransactionCoordinatorDocument::kIdFieldName << sessionInfo.toBSON()));
         uasserted(51027,
                   str::stream() << "While attempting to delete document for " << lsid.getId() << ':'
-                                << txnNumber
+                                << txnNumberAndRetryCounter.toBSON()
                                 << ", either failed to find document for this lsid:txnNumber or "
                                    "document existed without a decision: "
                                 << doc);
@@ -553,10 +614,10 @@ void deleteCoordinatorDocBlocking(OperationContext* opCtx,
 
     LOGV2_DEBUG(22474,
                 3,
-                "{sessionId}:{txnNumber} Deleted coordinator doc",
+                "{sessionId}:{txnNumberAndRetryCounter} Deleted coordinator doc",
                 "Deleted coordinator doc",
                 "sessionId"_attr = lsid.getId(),
-                "txnNumber"_attr = txnNumber);
+                "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter);
 
     hangAfterDeletingCoordinatorDoc.execute([&](const BSONObj& data) {
         LOGV2(22475, "Hit hangAfterDeletingCoordinatorDoc failpoint");
@@ -571,19 +632,22 @@ void deleteCoordinatorDocBlocking(OperationContext* opCtx,
 
 Future<void> deleteCoordinatorDoc(txn::AsyncWorkScheduler& scheduler,
                                   const LogicalSessionId& lsid,
-                                  TxnNumber txnNumber) {
-    return txn::doWhile(
-        scheduler,
-        boost::none /* no need for a backoff */,
-        [](const Status& s) { return s == ErrorCodes::Interrupted; },
-        [&scheduler, lsid, txnNumber] {
-            return scheduler.scheduleWork([lsid, txnNumber](OperationContext* opCtx) {
-                FlowControl::Bypass flowControlBypass(opCtx);
-                getTransactionCoordinatorWorkerCurOpRepository()->set(
-                    opCtx, lsid, txnNumber, CoordinatorAction::kDeletingCoordinatorDoc);
-                deleteCoordinatorDocBlocking(opCtx, lsid, txnNumber);
-            });
-        });
+                                  const TxnNumberAndRetryCounter& txnNumberAndRetryCounter) {
+    return txn::doWhile(scheduler,
+                        boost::none /* no need for a backoff */,
+                        [](const Status& s) { return s == ErrorCodes::Interrupted; },
+                        [&scheduler, lsid, txnNumberAndRetryCounter] {
+                            return scheduler.scheduleWork([lsid, txnNumberAndRetryCounter](
+                                                              OperationContext* opCtx) {
+                                FlowControl::Bypass flowControlBypass(opCtx);
+                                getTransactionCoordinatorWorkerCurOpRepository()->set(
+                                    opCtx,
+                                    lsid,
+                                    txnNumberAndRetryCounter.getTxnNumber(),
+                                    CoordinatorAction::kDeletingCoordinatorDoc);
+                                deleteCoordinatorDocBlocking(opCtx, lsid, txnNumberAndRetryCounter);
+                            });
+                        });
 }
 
 std::vector<TransactionCoordinatorDocument> readAllCoordinatorDocs(OperationContext* opCtx) {
@@ -607,7 +671,7 @@ std::vector<TransactionCoordinatorDocument> readAllCoordinatorDocs(OperationCont
 Future<PrepareResponse> sendPrepareToShard(ServiceContext* service,
                                            txn::AsyncWorkScheduler& scheduler,
                                            const LogicalSessionId& lsid,
-                                           TxnNumber txnNumber,
+                                           const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
                                            const ShardId& shardId,
                                            const BSONObj& commandObj,
                                            OperationContextFn operationContextFn) {
@@ -624,18 +688,18 @@ Future<PrepareResponse> sendPrepareToShard(ServiceContext* service,
         },
         [&scheduler,
          lsid,
-         txnNumber,
+         txnNumberAndRetryCounter,
          shardId,
          isLocalShard,
          commandObj = commandObj.getOwned(),
          operationContextFn] {
             LOGV2_DEBUG(22476,
                         3,
-                        "{sessionId}:{txnNumber} Coordinator going to send command "
+                        "{sessionId}:{txnNumberAndRetryCounter} Coordinator going to send command "
                         "{command} to {localOrRemote} shard {shardId}",
                         "Coordinator going to send command to shard",
                         "sessionId"_attr = lsid.getId(),
-                        "txnNumber"_attr = txnNumber,
+                        "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter,
                         "command"_attr = commandObj,
                         "localOrRemote"_attr = (isLocalShard ? "local" : "remote"),
                         "shardId"_attr = shardId);
@@ -643,7 +707,7 @@ Future<PrepareResponse> sendPrepareToShard(ServiceContext* service,
             return scheduler
                 .scheduleRemoteCommand(
                     shardId, kPrimaryReadPreference, commandObj, operationContextFn)
-                .then([lsid, txnNumber, shardId, commandObj = commandObj.getOwned()](
+                .then([lsid, txnNumberAndRetryCounter, shardId, commandObj = commandObj.getOwned()](
                           ResponseStatus response) {
                     auto status = getStatusFromCommandResult(response.data);
                     auto wcStatus = getWriteConcernStatusFromCommandResult(response.data);
@@ -667,10 +731,10 @@ Future<PrepareResponse> sendPrepareToShard(ServiceContext* service,
                                                    << ", which is not an expected behavior. "
                                                       "Interpreting the response as vote to abort");
                             LOGV2(22477,
-                                  "{sessionId}:{txnNumber} {error}",
+                                  "{sessionId}:{txnNumberAndRetryCounter} {error}",
                                   "Coordinator received error from transaction participant",
                                   "sessionId"_attr = lsid.getId(),
-                                  "txnNumber"_attr = txnNumber,
+                                  "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter,
                                   "error"_attr = redact(abortStatus));
 
                             return PrepareResponse{
@@ -680,12 +744,12 @@ Future<PrepareResponse> sendPrepareToShard(ServiceContext* service,
                         LOGV2_DEBUG(
                             22478,
                             3,
-                            "{sessionId}:{txnNumber} Coordinator shard received a "
+                            "{sessionId}:{txnNumberAndRetryCounter} Coordinator shard received a "
                             "vote to commit from shard {shardId} with prepareTimestamp: "
                             "{prepareTimestamp}",
                             "Coordinator shard received a vote to commit from participant shard",
                             "sessionId"_attr = lsid.getId(),
-                            "txnNumber"_attr = txnNumber,
+                            "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter,
                             "shardId"_attr = shardId,
                             "prepareTimestampField"_attr = prepareTimestampField.timestamp());
 
@@ -697,11 +761,11 @@ Future<PrepareResponse> sendPrepareToShard(ServiceContext* service,
 
                     LOGV2_DEBUG(22479,
                                 3,
-                                "{sessionId}:{txnNumber} Coordinator shard received "
+                                "{sessionId}:{txnNumberAndRetryCounter} Coordinator shard received "
                                 "{error} from shard {shardId} for {command}",
                                 "Coordinator shard received response from shard",
                                 "sessionId"_attr = lsid.getId(),
-                                "txnNumber"_attr = txnNumber,
+                                "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter,
                                 "error"_attr = status,
                                 "shardId"_attr = shardId,
                                 "command"_attr = commandObj);
@@ -732,14 +796,15 @@ Future<PrepareResponse> sendPrepareToShard(ServiceContext* service,
         });
 
     return std::move(f).onError<ErrorCodes::TransactionCoordinatorReachedAbortDecision>(
-        [lsid, txnNumber, shardId](const Status& status) {
-            LOGV2_DEBUG(22480,
-                        3,
-                        "{sessionId}:{txnNumber} Prepare stopped retrying due to retrying "
-                        "being cancelled",
-                        "Prepare stopped retrying due to retrying being cancelled",
-                        "sessionId"_attr = lsid.getId(),
-                        "txnNumber"_attr = txnNumber);
+        [lsid, txnNumberAndRetryCounter, shardId](const Status& status) {
+            LOGV2_DEBUG(
+                22480,
+                3,
+                "{sessionId}:{txnNumberAndRetryCounter} Prepare stopped retrying due to retrying "
+                "being cancelled",
+                "Prepare stopped retrying due to retrying being cancelled",
+                "sessionId"_attr = lsid.getId(),
+                "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter);
             return PrepareResponse{shardId,
                                    boost::none,
                                    boost::none,
@@ -750,7 +815,7 @@ Future<PrepareResponse> sendPrepareToShard(ServiceContext* service,
 Future<void> sendDecisionToShard(ServiceContext* service,
                                  txn::AsyncWorkScheduler& scheduler,
                                  const LogicalSessionId& lsid,
-                                 TxnNumber txnNumber,
+                                 const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
                                  const ShardId& shardId,
                                  const BSONObj& commandObj,
                                  OperationContextFn operationContextFn) {
@@ -766,18 +831,18 @@ Future<void> sendDecisionToShard(ServiceContext* service,
         },
         [&scheduler,
          lsid,
-         txnNumber,
+         txnNumberAndRetryCounter,
          shardId,
          isLocalShard,
          operationContextFn,
          commandObj = commandObj.getOwned()] {
             LOGV2_DEBUG(22481,
                         3,
-                        "{sessionId}:{txnNumber} Coordinator going to send command "
+                        "{sessionId}:{txnNumberAndRetryCounter} Coordinator going to send command "
                         "{command} to {localOrRemote} shard {shardId}",
                         "Coordinator going to send command to shard",
                         "sessionId"_attr = lsid.getId(),
-                        "txnNumber"_attr = txnNumber,
+                        "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter,
                         "command"_attr = commandObj,
                         "localOrRemote"_attr = (isLocalShard ? "local" : "remote"),
                         "shardId"_attr = shardId);
@@ -785,7 +850,7 @@ Future<void> sendDecisionToShard(ServiceContext* service,
             return scheduler
                 .scheduleRemoteCommand(
                     shardId, kPrimaryReadPreference, commandObj, operationContextFn)
-                .then([lsid, txnNumber, shardId, commandObj = commandObj.getOwned()](
+                .then([lsid, txnNumberAndRetryCounter, shardId, commandObj = commandObj.getOwned()](
                           ResponseStatus response) {
                     auto status = getStatusFromCommandResult(response.data);
                     auto wcStatus = getWriteConcernStatusFromCommandResult(response.data);
@@ -796,16 +861,17 @@ Future<void> sendDecisionToShard(ServiceContext* service,
                         status = wcStatus;
                     }
 
-                    LOGV2_DEBUG(22482,
-                                3,
-                                "{sessionId}:{txnNumber}  Coordinator shard received "
-                                "{status} in response to {command} from shard {shardId}",
-                                "Coordinator shard received response from shard",
-                                "sessionId"_attr = lsid.getId(),
-                                "txnNumber"_attr = txnNumber,
-                                "status"_attr = status,
-                                "command"_attr = commandObj,
-                                "shardId"_attr = shardId);
+                    LOGV2_DEBUG(
+                        22482,
+                        3,
+                        "{sessionId}:{txnNumberAndRetryCounter}  Coordinator shard received "
+                        "{status} in response to {command} from shard {shardId}",
+                        "Coordinator shard received response from shard",
+                        "sessionId"_attr = lsid.getId(),
+                        "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter,
+                        "status"_attr = status,
+                        "command"_attr = commandObj,
+                        "shardId"_attr = shardId);
 
                     if (ErrorCodes::isVoteAbortError(status.code())) {
                         // Interpret voteAbort errors as an ack.
@@ -824,8 +890,14 @@ Future<void> sendDecisionToShard(ServiceContext* service,
         });
 }
 
-std::string txnIdToString(const LogicalSessionId& lsid, TxnNumber txnNumber) {
-    return str::stream() << lsid.getId() << ':' << txnNumber;
+std::string txnIdToString(const LogicalSessionId& lsid,
+                          const TxnNumberAndRetryCounter& txnNumberAndRetryCounter) {
+    str::stream ss;
+    ss << lsid.getId() << ':' << txnNumberAndRetryCounter.getTxnNumber();
+    if (auto retryCounter = txnNumberAndRetryCounter.getTxnRetryCounter()) {
+        ss << ':' << *retryCounter;
+    }
+    return ss;
 }
 
 }  // namespace txn

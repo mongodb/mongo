@@ -40,7 +40,7 @@ class TransactionCoordinatorMetricsObserver;
 
 /**
  * State machine, which implements the two-phase commit protocol for a specific transaction,
- * identified by lsid + txnNumber.
+ * identified by lsid + txnNumber + txnRetryCounter.
  *
  * The lifetime of a coordinator starts with a construction and ends with the `onCompletion()`
  * future getting signaled. It is illegal to destroy a coordinator without waiting for
@@ -64,8 +64,8 @@ public:
     };
 
     /**
-     * Instantiates a new TransactioncCoordinator for the specified lsid + txnNumber pair and gives
-     * it a 'scheduler' to use for any asynchronous tasks it spawns.
+     * Instantiates a new TransactionCoordinator for the specified lsid + txnNumber +
+     * txnRetryCounter and gives it a 'scheduler' to use for any asynchronous tasks it spawns.
      *
      * If the 'coordinateCommitDeadline' parameter is specified, a timed task will be scheduled to
      * cause the coordinator to be put in a cancelled state, if runCommit is not eventually
@@ -73,7 +73,7 @@ public:
      */
     TransactionCoordinator(OperationContext* operationContext,
                            const LogicalSessionId& lsid,
-                           TxnNumber txnNumber,
+                           const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
                            std::unique_ptr<txn::AsyncWorkScheduler> scheduler,
                            Date_t deadline);
 
@@ -151,9 +151,9 @@ private:
     // Shortcut to the service context under which this coordinator runs
     ServiceContext* const _serviceContext;
 
-    // The lsid + transaction number that this coordinator is coordinating
+    // The lsid + txnNumber + txnRetryCounter that this coordinator is coordinating.
     const LogicalSessionId _lsid;
-    const TxnNumber _txnNumber;
+    const TxnNumberAndRetryCounter _txnNumberAndRetryCounter;
 
     // Scheduler and context wrapping all asynchronous work dispatched by this coordinator
     std::unique_ptr<txn::AsyncWorkScheduler> _scheduler;
