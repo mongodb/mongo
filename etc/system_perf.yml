@@ -893,6 +893,13 @@ tasks:
         vars:
           test_control: "change_streams_latency"
 
+  - name: change_streams_listen_throughput
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "change_streams_listen_throughput"
+
   - name: change_streams_multi_mongos
     priority: 5
     commands:
@@ -1039,6 +1046,7 @@ buildvariants:
       - name: bestbuy_query
       - name: change_streams_throughput
       - name: change_streams_latency
+      - name: change_streams_listen_throughput
       - name: snapshot_reads
       - name: linkbench
       - name: linkbench2
@@ -1223,6 +1231,7 @@ buildvariants:
       - name: mongos_large_catalog_workloads
       - name: change_streams_throughput
       - name: change_streams_latency
+      - name: change_streams_listen_throughput
       - name: change_streams_multi_mongos
 
   - name: linux-shard-lite-audit
@@ -1267,6 +1276,7 @@ buildvariants:
       - name: bestbuy_query
       - name: change_streams_latency
       - name: change_streams_throughput
+      - name: change_streams_listen_throughput
       - name: industry_benchmarks
       - name: industry_benchmarks_wmajority
       - name: linkbench
@@ -1393,6 +1403,7 @@ buildvariants:
       - name: bestbuy_query
       - name: change_streams_throughput
       - name: change_streams_latency
+      - name: change_streams_listen_throughput
       - name: snapshot_reads
       - name: secondary_reads
       - name: tpcc
@@ -1443,6 +1454,7 @@ buildvariants:
       - name: bestbuy_query
       - name: change_streams_throughput
       - name: change_streams_latency
+      - name: change_streams_listen_throughput
       - name: snapshot_reads
       - name: secondary_reads
       - name: tpcc
@@ -1493,6 +1505,7 @@ buildvariants:
       - name: bestbuy_query
       - name: change_streams_throughput
       - name: change_streams_latency
+      - name: change_streams_listen_throughput
       - name: snapshot_reads
       - name: secondary_reads
       - name: tpcc
@@ -1545,6 +1558,7 @@ buildvariants:
       - name: bestbuy_query
       - name: change_streams_throughput
       - name: change_streams_latency
+      - name: change_streams_listen_throughput
       - name: snapshot_reads
       - name: secondary_reads
       - name: tpcc
@@ -1583,6 +1597,7 @@ buildvariants:
       - name: industry_benchmarks_wmajority
       - name: change_streams_throughput
       - name: change_streams_latency
+      - name: change_streams_listen_throughput
       - name: tpcc
       - name: linkbench
       - name: linkbench2
@@ -1775,6 +1790,7 @@ buildvariants:
       - name: bestbuy_query
       - name: change_streams_throughput
       - name: change_streams_latency
+      - name: change_streams_listen_throughput
       - name: snapshot_reads
       - name: secondary_reads
       - name: tpcc
