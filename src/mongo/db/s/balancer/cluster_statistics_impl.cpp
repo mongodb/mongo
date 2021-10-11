@@ -89,7 +89,6 @@ StatusWith<std::string> retrieveShardMongoDVersion(OperationContext* opCtx, Shar
 
     return version;
 }
-
 }  // namespace
 
 using ShardStatistics = ClusterStatistics::ShardStatistics;
@@ -99,6 +98,16 @@ ClusterStatisticsImpl::ClusterStatisticsImpl(BalancerRandomSource& random) : _ra
 ClusterStatisticsImpl::~ClusterStatisticsImpl() = default;
 
 StatusWith<std::vector<ShardStatistics>> ClusterStatisticsImpl::getStats(OperationContext* opCtx) {
+    return _getStats(opCtx, boost::none);
+}
+
+StatusWith<std::vector<ShardStatistics>> ClusterStatisticsImpl::getCollStats(
+    OperationContext* opCtx, NamespaceString const& ns) {
+    return _getStats(opCtx, ns);
+}
+
+StatusWith<std::vector<ShardStatistics>> ClusterStatisticsImpl::_getStats(
+    OperationContext* opCtx, boost::optional<NamespaceString> ns) {
     // Get a list of all the shards that are participating in this balance round along with any
     // maximum allowed quotas and current utilization. We get the latter by issuing
     // db.serverStatus() (mem.mapped) to all shards.
@@ -118,10 +127,13 @@ StatusWith<std::vector<ShardStatistics>> ClusterStatisticsImpl::getStats(Operati
 
     for (const auto& shard : shards) {
         const auto shardSizeStatus = [&]() -> StatusWith<long long> {
+            if (ns) {
+                return shardutil::retrieveCollectionShardSize(opCtx, shard.getName(), *ns);
+            }
+            // optimization for the case where the balancer does not care about the dataSize
             if (!shard.getMaxSizeMB()) {
                 return 0;
             }
-
             return shardutil::retrieveTotalShardSize(opCtx, shard.getName());
         }();
 
@@ -155,11 +167,12 @@ StatusWith<std::vector<ShardStatistics>> ClusterStatisticsImpl::getStats(Operati
         }
 
         stats.emplace_back(shard.getName(),
-                           shard.getMaxSizeMB(),
-                           shardSizeStatus.getValue() / 1024 / 1024,
+                           shard.getMaxSizeMB() * 1024 * 1024,
+                           shardSizeStatus.getValue(),
                            shard.getDraining(),
                            std::move(shardTags),
-                           std::move(mongoDVersion));
+                           std::move(mongoDVersion),
+                           ShardStatistics::use_bytes_t{});
     }
 
     return stats;

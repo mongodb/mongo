@@ -46,7 +46,13 @@ public:
 
     StatusWith<std::vector<ShardStatistics>> getStats(OperationContext* opCtx) override;
 
+    StatusWith<std::vector<ShardStatistics>> getCollStats(OperationContext* opCtx,
+                                                          NamespaceString const& ns) override;
+
 private:
+    StatusWith<std::vector<ShardStatistics>> _getStats(OperationContext* opCtx,
+                                                       boost::optional<NamespaceString> ns);
+
     // Source of randomness when metadata needs to be randomized.
     BalancerRandomSource& _random;
 };

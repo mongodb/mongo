@@ -90,6 +90,43 @@ StatusWith<long long> retrieveTotalShardSize(OperationContext* opCtx, const Shar
     return totalSizeElem.numberLong();
 }
 
+StatusWith<long long> retrieveCollectionShardSize(OperationContext* opCtx,
+                                                  const ShardId& shardId,
+                                                  NamespaceString const& ns,
+                                                  bool estimate) {
+    auto shardStatus = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId);
+    if (!shardStatus.isOK()) {
+        return shardStatus.getStatus();
+    }
+
+    const Minutes maxTimeMSOverride{10};
+    const auto cmdObj = BSON("dataSize" << ns.ns() << "estimate" << estimate);
+    auto statStatus = shardStatus.getValue()->runCommandWithFixedRetryAttempts(
+        opCtx,
+        ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
+        ns.db().toString(),
+        cmdObj,
+        maxTimeMSOverride,
+        Shard::RetryPolicy::kIdempotent);
+
+    auto stat = Shard::CommandResponse::getEffectiveStatus(statStatus);
+    if (!stat.isOK()) {
+        if (stat == ErrorCodes::NamespaceNotFound) {
+            return 0;
+        }
+        return stat;
+    }
+
+
+    BSONElement sizeElem = statStatus.getValue().response["size"];
+    if (!sizeElem.isNumber()) {
+        return {ErrorCodes::NoSuchKey, "size field not found in dataSize"};
+    }
+
+    return sizeElem.safeNumberLong();
+}
+
+
 StatusWith<std::vector<BSONObj>> selectChunkSplitPoints(OperationContext* opCtx,
                                                         const ShardId& shardId,
                                                         const NamespaceString& nss,

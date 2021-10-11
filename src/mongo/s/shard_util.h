@@ -62,6 +62,19 @@ namespace shardutil {
 StatusWith<long long> retrieveTotalShardSize(OperationContext* opCtx, const ShardId& shardId);
 
 /**
+ * Executes the dataSize command against the specified shard and obtains the total data
+ * size for the collection in bytes (essentially, the dataSize field).
+ *
+ * Returns OK with the total size in bytes or an error. Known errors are:
+ *  ShardNotFound if shard by that id is not available on the registry
+ *  NoSuchKey if the total shard size could not be retrieved
+ */
+StatusWith<long long> retrieveCollectionShardSize(OperationContext* opCtx,
+                                                  const ShardId& shardId,
+                                                  NamespaceString const& ns,
+                                                  bool estimate = true);
+
+/**
  * Ask the specified shard to figure out the split points for a given chunk.
  *
  * shardId The shard id to query.
