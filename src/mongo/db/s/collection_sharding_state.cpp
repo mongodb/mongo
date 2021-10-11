@@ -140,12 +140,6 @@ std::shared_ptr<CollectionShardingState> CollectionShardingState::getSharedForLo
     return collectionsMap->getOrCreate(nss);
 }
 
-CollectionShardingState* CollectionShardingState::get_UNSAFE(ServiceContext* svcCtx,
-                                                             const NamespaceString& nss) {
-    auto& collectionsMap = CollectionShardingStateMap::get(svcCtx);
-    return collectionsMap->getOrCreate(nss).get();
-}
-
 void CollectionShardingState::appendInfoForShardingStateCommand(OperationContext* opCtx,
                                                                 BSONObjBuilder* builder) {
     auto& collectionsMap = CollectionShardingStateMap::get(opCtx->getServiceContext());

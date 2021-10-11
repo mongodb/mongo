@@ -72,13 +72,6 @@ public:
      */
     static CollectionShardingRuntime* get(CollectionShardingState* css);
 
-    /**
-     * It is the caller's responsibility to ensure that the collection locks for this namespace are
-     * held when this is called. The returned pointer should never be stored.
-     */
-    static CollectionShardingRuntime* get_UNSAFE(ServiceContext* svcCtx,
-                                                 const NamespaceString& nss);
-
     ScopedCollectionFilter getOwnershipFilter(OperationContext* opCtx,
                                               OrphanCleanupPolicy orphanCleanupPolicy) override;
 

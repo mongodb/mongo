@@ -328,13 +328,15 @@ public:
         CollectionShardingRuntimeTest::tearDown();
     }
 
+    // Creates the CSR if it does not exist and stashes it in the CollectionShardingStateMap. This
+    // is required for waitForClean tests which use CollectionShardingRuntime::get().
     CollectionShardingRuntime& csr() {
-        // Creates the CSR if it does not exist and stashes it in the CollectionShardingStateMap.
-        // This is required for waitForClean tests which use CollectionShardingRuntime::get().
-        return *CollectionShardingRuntime::get_UNSAFE(getServiceContext(), kTestNss);
+        AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IX);
+        auto* css = CollectionShardingState::get(operationContext(), kTestNss);
+        return *checked_cast<CollectionShardingRuntime*>(css);
     }
 
-    UUID uuid() {
+    const UUID& uuid() const {
         return _uuid;
     }
 

@@ -153,13 +153,6 @@ public:
      * Returns the number of ranges scheduled for deletion on the collection.
      */
     virtual size_t numberOfRangesScheduledForDeletion() const = 0;
-
-protected:
-    /**
-     * It is the caller's responsibility to ensure that the collection locks for this namespace are
-     * held when this is called. The returned pointer should never be stored.
-     */
-    static CollectionShardingState* get_UNSAFE(ServiceContext* svcCtx, const NamespaceString& nss);
 };
 
 /**
