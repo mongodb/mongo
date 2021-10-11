@@ -96,6 +96,8 @@ last-continuous:
       test_file: jstests/sharding/change_stream_show_migration_events.js
     - ticket: SERVER-58636
       test_file: jstests/replsets/initial_sync_replicate_drop_mid_secondary_batch.js
+    - ticket: SERVER-59613
+      test_file: jstests/aggregation/range.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -352,6 +354,8 @@ last-lts:
       test_file: jstests/sharding/change_stream_show_migration_events.js
     - ticket: SERVER-58636
       test_file: jstests/replsets/initial_sync_replicate_drop_mid_secondary_batch.js
+    - ticket: SERVER-59613
+      test_file: jstests/aggregation/range.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:

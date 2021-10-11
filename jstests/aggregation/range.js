@@ -297,4 +297,11 @@ const decimalRangeResult =
         .toArray();
 
 assert(arrayEq(decimalRangeExpectedResult, decimalRangeResult));
+
+assert(coll.drop());
+assert.commandWorked(coll.insertOne({_id: 1}));
+assertErrorCode(
+    coll, [{$project: {result: {$range: [0, 1073741924]}}}], ErrorCodes.ExceededMemoryLimit);
+assert(arrayEq([{_id: 1, result: []}],
+               coll.aggregate([{$project: {result: {$range: [0, 1073741924, -1]}}}]).toArray()));
 }());
