@@ -175,11 +175,14 @@ public:
     /**
      * Waits for all ranges deletion tasks with UUID 'collectionUuid' overlapping range
      * 'orphanRange' to be processed, even if the collection does not exist in the storage catalog.
+     * It will block until the minimum of the operation context's timeout deadline or waitTimeout is
+     * reached.
      */
     static Status waitForClean(OperationContext* opCtx,
                                const NamespaceString& nss,
                                const UUID& collectionUuid,
-                               ChunkRange orphanRange);
+                               ChunkRange orphanRange,
+                               Milliseconds waitTimeout);
 
     std::uint64_t getNumMetadataManagerChanges_forTest() {
         return _numMetadataManagerChanges;
