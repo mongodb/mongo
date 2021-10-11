@@ -382,7 +382,6 @@ env.Library(
         'document_source_change_stream_check_invalidate.cpp',
         'document_source_change_stream_check_resumability.cpp',
         'document_source_change_stream_check_topology_change.cpp',
-        'document_source_change_stream_close_cursor.cpp',
         'document_source_change_stream_ensure_resume_token_present.cpp',
         'document_source_change_stream_handle_topology_change.cpp',
         'document_source_change_stream_add_pre_image.cpp',

@@ -65,11 +65,10 @@ namespace {
 constexpr auto checkValueType = &DocumentSourceChangeStream::checkValueType;
 }  // namespace
 
-REGISTER_INTERNAL_DOCUMENT_SOURCE(
-    _internalChangeStreamTransform,
-    LiteParsedDocumentSourceChangeStreamInternal::parse,
-    DocumentSourceChangeStreamTransform::createFromBson,
-    feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV());
+REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalChangeStreamTransform,
+                                  LiteParsedDocumentSourceChangeStreamInternal::parse,
+                                  DocumentSourceChangeStreamTransform::createFromBson,
+                                  true);
 
 intrusive_ptr<DocumentSourceChangeStreamTransform> DocumentSourceChangeStreamTransform::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -444,7 +443,7 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
     return doc.freeze();
 }
 
-Value DocumentSourceChangeStreamTransform::serializeLatest(
+Value DocumentSourceChangeStreamTransform::serialize(
     boost::optional<ExplainOptions::Verbosity> explain) const {
     if (explain) {
         return Value(Document{{DocumentSourceChangeStream::kStageName,

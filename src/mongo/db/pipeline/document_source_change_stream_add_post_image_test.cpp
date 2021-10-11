@@ -106,8 +106,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldSerializeAsExpectedForE
                         Document{{"stage"_sd, DocumentSourceChangeStreamAddPostImage::kStageName},
                                  {"fullDocument"_sd, "updateLookup"_sd}}}});
 
-    ASSERT_VALUE_EQ(stage->serializeToValue({ExplainOptions::Verbosity::kQueryPlanner}),
-                    expectedOutput);
+    ASSERT_VALUE_EQ(stage->serialize({ExplainOptions::Verbosity::kQueryPlanner}), expectedOutput);
 }
 
 TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldSerializeAsExpectedForDispatch) {
@@ -117,7 +116,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldSerializeAsExpectedForD
     const auto expectedOutput = Value(Document{{DocumentSourceChangeStreamAddPostImage::kStageName,
                                                 Document{{"fullDocument"_sd, "updateLookup"_sd}}}});
 
-    ASSERT_VALUE_EQ(stage->serializeToValue(), expectedOutput);
+    ASSERT_VALUE_EQ(stage->serialize(), expectedOutput);
 }
 
 TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfMissingDocumentKeyOnUpdate) {

@@ -46,9 +46,7 @@ namespace mongo {
  * the first time. When this event is detected, this stage will establish a new cursor on that
  * shard and add it to the cursors being merged.
  */
-class DocumentSourceChangeStreamHandleTopologyChange final
-    : public DocumentSource,
-      public ChangeStreamStageSerializationInterface {
+class DocumentSourceChangeStreamHandleTopologyChange final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$_internalChangeStreamHandleTopologyChange"_sd;
 
@@ -63,9 +61,7 @@ public:
         return kStageName.rawData();
     }
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final {
-        return ChangeStreamStageSerializationInterface::serializeToValue(explain);
-    }
+    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final;
 
     StageConstraints constraints(Pipeline::SplitState) const final;
 
@@ -82,10 +78,6 @@ private:
     DocumentSourceChangeStreamHandleTopologyChange(const boost::intrusive_ptr<ExpressionContext>&);
 
     GetNextResult doGetNext() final;
-
-    Value serializeLegacy(boost::optional<ExplainOptions::Verbosity> explain) const final;
-
-    Value serializeLatest(boost::optional<ExplainOptions::Verbosity> explain) const final;
 
     /**
      * Establish the new cursors and tell the RouterStageMerge about them.

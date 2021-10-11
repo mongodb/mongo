@@ -38,11 +38,10 @@ using boost::intrusive_ptr;
 namespace mongo {
 namespace {
 
-REGISTER_INTERNAL_DOCUMENT_SOURCE(
-    _internalChangeStreamCheckResumability,
-    LiteParsedDocumentSourceChangeStreamInternal::parse,
-    DocumentSourceChangeStreamCheckResumability::createFromBson,
-    feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV());
+REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalChangeStreamCheckResumability,
+                                  LiteParsedDocumentSourceChangeStreamInternal::parse,
+                                  DocumentSourceChangeStreamCheckResumability::createFromBson,
+                                  true);
 
 }  // namespace
 
@@ -246,7 +245,7 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamCheckResumability::doGet
     MONGO_UNREACHABLE;
 }
 
-Value DocumentSourceChangeStreamCheckResumability::serializeLatest(
+Value DocumentSourceChangeStreamCheckResumability::serialize(
     boost::optional<ExplainOptions::Verbosity> explain) const {
     return explain
         ? Value(DOC(DocumentSourceChangeStream::kStageName
@@ -258,4 +257,5 @@ Value DocumentSourceChangeStreamCheckResumability::serializeLatest(
                DocumentSourceChangeStreamCheckResumabilitySpec(ResumeToken(_tokenFromClient))
                    .toBSON()}});
 }
+
 }  // namespace mongo

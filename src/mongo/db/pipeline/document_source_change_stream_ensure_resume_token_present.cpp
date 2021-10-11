@@ -76,10 +76,8 @@ StageConstraints DocumentSourceChangeStreamEnsureResumeTokenPresent::constraints
     // pipelines, swaps can allow $match and 'DocumentSourceSingleDocumentTransformation' stages to
     // execute on the shards, providing inter-node parallelism and potentially reducing the amount
     // of data sent form each shard to the mongoS.
-    if (feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV()) {
-        constraints.canSwapWithMatch = true;
-        constraints.canSwapWithSingleDocTransform = true;
-    }
+    constraints.canSwapWithMatch = true;
+    constraints.canSwapWithSingleDocTransform = true;
 
     return constraints;
 }

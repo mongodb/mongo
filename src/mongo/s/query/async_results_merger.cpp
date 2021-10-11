@@ -494,9 +494,7 @@ Status AsyncResultsMerger::scheduleGetMores() {
 
 Status AsyncResultsMerger::_scheduleGetMores(WithLock lk) {
     // Before scheduling more work, check whether the cursor has been invalidated.
-    if (feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV()) {
-        _assertNotInvalidated(lk);
-    }
+    _assertNotInvalidated(lk);
 
     // Schedule remote work on hosts for which we need more results.
     for (size_t i = 0; i < _remotes.size(); ++i) {

@@ -36,11 +36,10 @@
 namespace mongo {
 
 
-REGISTER_INTERNAL_DOCUMENT_SOURCE(
-    _internalChangeStreamOplogMatch,
-    LiteParsedDocumentSourceChangeStreamInternal::parse,
-    DocumentSourceChangeStreamOplogMatch::createFromBson,
-    feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV());
+REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalChangeStreamOplogMatch,
+                                  LiteParsedDocumentSourceChangeStreamInternal::parse,
+                                  DocumentSourceChangeStreamOplogMatch::createFromBson,
+                                  true);
 
 namespace change_stream_filter {
 /**
@@ -191,7 +190,7 @@ Pipeline::SourceContainer::iterator DocumentSourceChangeStreamOplogMatch::doOpti
     return nextChangeStreamStageItr;
 }
 
-Value DocumentSourceChangeStreamOplogMatch::serializeLatest(
+Value DocumentSourceChangeStreamOplogMatch::serialize(
     boost::optional<ExplainOptions::Verbosity> explain) const {
     if (explain) {
         return Value(

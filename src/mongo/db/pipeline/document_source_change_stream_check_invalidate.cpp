@@ -41,11 +41,10 @@ namespace mongo {
 
 using DSCS = DocumentSourceChangeStream;
 
-REGISTER_INTERNAL_DOCUMENT_SOURCE(
-    _internalChangeStreamCheckInvalidate,
-    LiteParsedDocumentSourceChangeStreamInternal::parse,
-    DocumentSourceChangeStreamCheckInvalidate::createFromBson,
-    feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV());
+REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalChangeStreamCheckInvalidate,
+                                  LiteParsedDocumentSourceChangeStreamInternal::parse,
+                                  DocumentSourceChangeStreamCheckInvalidate::createFromBson,
+                                  true);
 
 namespace {
 
@@ -103,8 +102,7 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamCheckInvalidate::doGetNe
         return res;
     }
 
-    if (_queuedException &&
-        feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV()) {
+    if (_queuedException) {
         uasserted(static_cast<ChangeStreamInvalidationInfo>(*_queuedException),
                   "Change stream invalidated");
     }
@@ -179,7 +177,7 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamCheckInvalidate::doGetNe
     return nextInput;
 }
 
-Value DocumentSourceChangeStreamCheckInvalidate::serializeLatest(
+Value DocumentSourceChangeStreamCheckInvalidate::serialize(
     boost::optional<ExplainOptions::Verbosity> explain) const {
     if (explain) {
         return Value(Document{{DocumentSourceChangeStream::kStageName,

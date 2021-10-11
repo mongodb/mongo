@@ -236,12 +236,7 @@ public:
             ASSERT_DOCUMENT_EQ(next.releaseDocument(), *expectedInvalidate);
 
             // Then throw an exception on the next call of getNext().
-            if (!feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV()) {
-                ASSERT_THROWS(lastStage->getNext(), ExceptionFor<ErrorCodes::CloseChangeStream>);
-            } else {
-                ASSERT_THROWS(lastStage->getNext(),
-                              ExceptionFor<ErrorCodes::ChangeStreamInvalidated>);
-            }
+            ASSERT_THROWS(lastStage->getNext(), ExceptionFor<ErrorCodes::ChangeStreamInvalidated>);
         }
     }
 
@@ -440,58 +435,10 @@ public:
         };
         checkTransformation(deltaOplog, expectedUpdateField);
     }
-};
 
-bool getCSOptimizationFeatureFlagValue() {
-    return feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV();
-}
-
-bool getCSRewriteFeatureFlagValue() {
-    return feature_flags::gFeatureFlagChangeStreamsRewrite.isEnabledAndIgnoreFCV();
-}
-
-bool isChangeStreamPreAndPostImagesEnabled() {
-    return feature_flags::gFeatureFlagChangeStreamPreAndPostImages.isEnabledAndIgnoreFCV();
-}
-
-/**
- * Runs the tests with feature flag 'featureFlagChangeStreamsOptimization' true and false.
- */
-class ChangeStreamStageWithDualFeatureFlagValueTest : public ChangeStreamStageTest {
-public:
-    ChangeStreamStageWithDualFeatureFlagValueTest() : ChangeStreamStageTest() {}
-
-
-    void run() {
-        {
-            RAIIServerParameterControllerForTest controller("featureFlagChangeStreamsOptimization",
-                                                            true);
-            ASSERT(getCSOptimizationFeatureFlagValue());
-            ChangeStreamStageTest::run();
-        }
-        {
-            RAIIServerParameterControllerForTest controller("featureFlagChangeStreamsOptimization",
-                                                            false);
-            ASSERT_FALSE(getCSOptimizationFeatureFlagValue());
-            ChangeStreamStageTest::run();
-        }
-    }
-};
-
-class ChangeStreamPipelineOptimizationTest : public ChangeStreamStageTest {
-public:
-    explicit ChangeStreamPipelineOptimizationTest() : ChangeStreamStageTest() {}
-
-    void run() {
-        RAIIServerParameterControllerForTest controllerOptimization(
-            "featureFlagChangeStreamsOptimization", true);
-        ASSERT(getCSOptimizationFeatureFlagValue());
-        RAIIServerParameterControllerForTest controllerRewrite("featureFlagChangeStreamsRewrite",
-                                                               true);
-        ASSERT(getCSOptimizationFeatureFlagValue());
-        ChangeStreamStageTest::run();
-    }
-
+    /**
+     * Helper to create change stream pipeline for testing.
+     */
     std::unique_ptr<Pipeline, PipelineDeleter> buildTestPipeline(
         const std::vector<BSONObj>& rawPipeline) {
         auto expCtx = getExpCtx();
@@ -504,6 +451,9 @@ public:
         return pipeline;
     }
 
+    /**
+     * Helper to verify if the change stream pipeline contains expected stages.
+     */
     void assertStagesNameOrder(std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
                                const std::vector<std::string> expectedStages) {
         ASSERT_EQ(pipeline->getSources().size(), expectedStages.size());
@@ -518,6 +468,14 @@ public:
         }
     }
 };
+
+bool getCSRewriteFeatureFlagValue() {
+    return feature_flags::gFeatureFlagChangeStreamsRewrite.isEnabledAndIgnoreFCV();
+}
+
+bool isChangeStreamPreAndPostImagesEnabled() {
+    return feature_flags::gFeatureFlagChangeStreamPreAndPostImages.isEnabledAndIgnoreFCV();
+}
 
 TEST_F(ChangeStreamStageTest, ShouldRejectNonObjectArg) {
     auto expCtx = getExpCtx();
@@ -2186,12 +2144,8 @@ TEST_F(ChangeStreamStageTest, MatchFiltersNoOp) {
     checkTransformation(noOp, boost::none);
 }
 
-TEST_F(ChangeStreamStageWithDualFeatureFlagValueTest,
-       TransformationShouldBeAbleToReParseSerializedStage) {
+TEST_F(ChangeStreamStageTest, TransformationShouldBeAbleToReParseSerializedStage) {
     auto expCtx = getExpCtx();
-    const auto featureFlag = getCSOptimizationFeatureFlagValue();
-    const auto serializedStageName =
-        featureFlag ? DocumentSourceChangeStreamTransform::kStageName : DSChangeStream::kStageName;
 
     DocumentSourceChangeStreamSpec spec;
     spec.setStartAtOperationTime(kDefaultTs);
@@ -2201,8 +2155,7 @@ TEST_F(ChangeStreamStageWithDualFeatureFlagValueTest,
 
     vector<intrusive_ptr<DocumentSource>> allStages(std::begin(result), std::end(result));
 
-    const size_t changeStreamStageSize = featureFlag ? 5 : 6;
-    ASSERT_EQ(allStages.size(), changeStreamStageSize);
+    ASSERT_EQ(allStages.size(), 5);
 
     auto stage = allStages[2];
     ASSERT(dynamic_cast<DocumentSourceChangeStreamTransform*>(stage.get()));
@@ -2215,8 +2168,9 @@ TEST_F(ChangeStreamStageWithDualFeatureFlagValueTest,
     ASSERT_EQ(serialization.size(), 1UL);
     ASSERT_EQ(serialization[0].getType(), BSONType::Object);
     auto serializedDoc = serialization[0].getDocument();
-    ASSERT_BSONOBJ_EQ(serializedDoc[serializedStageName].getDocument().toBson(),
-                      originalSpec[""].Obj());
+    ASSERT_BSONOBJ_EQ(
+        serializedDoc[DocumentSourceChangeStreamTransform::kStageName].getDocument().toBson(),
+        originalSpec[""].Obj());
 
     //
     // Create a new stage from the serialization. Serialize the new stage and confirm that it is
@@ -2227,26 +2181,15 @@ TEST_F(ChangeStreamStageWithDualFeatureFlagValueTest,
         DSChangeStream::createFromBson(serializedBson.firstElement(), expCtx), expCtx);
     auto newSerialization = roundTripped->serialize();
 
-    // When optimiziation is enabled, we should serialize all the internal stages.
-    if (featureFlag) {
-        ASSERT_EQ(newSerialization.size(), 5UL);
+    ASSERT_EQ(newSerialization.size(), 5UL);
 
-        // DSCSTransform stage should be the third stage after DSCSOplogMatch and
-        // DSCSUnwindTransactions stages.
-        ASSERT_VALUE_EQ(newSerialization[2], serialization[0]);
-    } else {
-        ASSERT_EQ(newSerialization.size(), 1UL);
-        ASSERT_VALUE_EQ(newSerialization[0], serialization[0]);
-    }
+    // DSCSTransform stage should be the third stage after DSCSOplogMatch and
+    // DSCSUnwindTransactions stages.
+    ASSERT_VALUE_EQ(newSerialization[2], serialization[0]);
 }
 
-TEST_F(ChangeStreamStageWithDualFeatureFlagValueTest,
-       DSCSTransformStageEmptySpecSerializeResumeAfter) {
+TEST_F(ChangeStreamStageTest, DSCSTransformStageEmptySpecSerializeResumeAfter) {
     auto expCtx = getExpCtx();
-    auto featureFlag = getCSOptimizationFeatureFlagValue();
-    const auto serializedStageName =
-        featureFlag ? DocumentSourceChangeStreamTransform::kStageName : DSChangeStream::kStageName;
-
     auto originalSpec = BSON(DSChangeStream::kStageName << BSONObj());
 
     // Verify that the 'initialPostBatchResumeToken' is populated while parsing.
@@ -2271,18 +2214,13 @@ TEST_F(ChangeStreamStageWithDualFeatureFlagValueTest,
     ASSERT_EQ(serialization.size(), 1UL);
     ASSERT_EQ(serialization[0].getType(), BSONType::Object);
     ASSERT(!serialization[0]
-                .getDocument()[serializedStageName]
-                .getDocument()[featureFlag
-                                   ? DocumentSourceChangeStreamSpec::kStartAtOperationTimeFieldName
-                                   : DocumentSourceChangeStreamSpec::kResumeAfterFieldName]
+                .getDocument()[DocumentSourceChangeStreamTransform::kStageName]
+                .getDocument()[DocumentSourceChangeStreamSpec::kStartAtOperationTimeFieldName]
                 .missing());
 }
 
-TEST_F(ChangeStreamStageWithDualFeatureFlagValueTest, DSCSTransformStageWithResumeTokenSerialize) {
+TEST_F(ChangeStreamStageTest, DSCSTransformStageWithResumeTokenSerialize) {
     auto expCtx = getExpCtx();
-    const auto serializedStageName = getCSOptimizationFeatureFlagValue()
-        ? DocumentSourceChangeStreamTransform::kStageName
-        : DSChangeStream::kStageName;
 
     DocumentSourceChangeStreamSpec spec;
     spec.setResumeAfter(ResumeToken::parse(makeResumeToken(kDefaultTs, testUuid())));
@@ -2303,7 +2241,10 @@ TEST_F(ChangeStreamStageWithDualFeatureFlagValueTest, DSCSTransformStageWithResu
     stage->serializeToArray(serialization);
     ASSERT_EQ(serialization.size(), 1UL);
     ASSERT_EQ(serialization[0].getType(), BSONType::Object);
-    ASSERT_BSONOBJ_EQ(serialization[0].getDocument()[serializedStageName].getDocument().toBson(),
+    ASSERT_BSONOBJ_EQ(serialization[0]
+                          .getDocument()[DocumentSourceChangeStreamTransform::kStageName]
+                          .getDocument()
+                          .toBson(),
                       originalSpec[""].Obj());
 }
 
@@ -2313,17 +2254,14 @@ void validateDocumentSourceStageSerialization(
     auto stage = Stage::createFromBson(specAsBSON.firstElement(), expCtx);
     vector<Value> serialization;
     stage->serializeToArray(serialization);
-    if (getCSOptimizationFeatureFlagValue()) {
-        ASSERT_EQ(serialization.size(), 1UL);
-        ASSERT_EQ(serialization[0].getType(), BSONType::Object);
-        ASSERT_BSONOBJ_EQ(serialization[0].getDocument().toBson(),
-                          BSON(Stage::kStageName << spec.toBSON()));
-    } else {
-        ASSERT(serialization.empty());
-    }
+
+    ASSERT_EQ(serialization.size(), 1UL);
+    ASSERT_EQ(serialization[0].getType(), BSONType::Object);
+    ASSERT_BSONOBJ_EQ(serialization[0].getDocument().toBson(),
+                      BSON(Stage::kStageName << spec.toBSON()));
 }
 
-TEST_F(ChangeStreamStageWithDualFeatureFlagValueTest, DSCSOplogMatchStageSerialization) {
+TEST_F(ChangeStreamStageTest, DSCSOplogMatchStageSerialization) {
     auto expCtx = getExpCtx();
 
     DocumentSourceChangeStreamOplogMatchSpec spec;
@@ -2335,7 +2273,7 @@ TEST_F(ChangeStreamStageWithDualFeatureFlagValueTest, DSCSOplogMatchStageSeriali
         std::move(spec), stageSpecAsBSON, expCtx);
 }
 
-TEST_F(ChangeStreamStageWithDualFeatureFlagValueTest, DSCSUnwindTransactionStageSerialization) {
+TEST_F(ChangeStreamStageTest, DSCSUnwindTransactionStageSerialization) {
     auto expCtx = getExpCtx();
 
     auto filter = BSON("ns" << BSON("$regex"
@@ -2347,7 +2285,7 @@ TEST_F(ChangeStreamStageWithDualFeatureFlagValueTest, DSCSUnwindTransactionStage
         std::move(spec), stageSpecAsBSON, expCtx);
 }
 
-TEST_F(ChangeStreamStageWithDualFeatureFlagValueTest, DSCSCheckInvalidateStageSerialization) {
+TEST_F(ChangeStreamStageTest, DSCSCheckInvalidateStageSerialization) {
     auto expCtx = getExpCtx();
 
     DocumentSourceChangeStreamCheckInvalidateSpec spec;
@@ -2359,7 +2297,7 @@ TEST_F(ChangeStreamStageWithDualFeatureFlagValueTest, DSCSCheckInvalidateStageSe
         std::move(spec), stageSpecAsBSON, expCtx);
 }
 
-TEST_F(ChangeStreamStageWithDualFeatureFlagValueTest, DSCSResumabilityStageSerialization) {
+TEST_F(ChangeStreamStageTest, DSCSResumabilityStageSerialization) {
     auto expCtx = getExpCtx();
 
     DocumentSourceChangeStreamCheckResumabilitySpec spec;
@@ -2370,7 +2308,7 @@ TEST_F(ChangeStreamStageWithDualFeatureFlagValueTest, DSCSResumabilityStageSeria
         std::move(spec), stageSpecAsBSON, expCtx);
 }
 
-TEST_F(ChangeStreamStageWithDualFeatureFlagValueTest, DSCSLookupChangePreImageStageSerialization) {
+TEST_F(ChangeStreamStageTest, DSCSLookupChangePreImageStageSerialization) {
     auto expCtx = getExpCtx();
 
     DocumentSourceChangeStreamAddPreImageSpec spec(FullDocumentBeforeChangeModeEnum::kRequired);
@@ -2380,7 +2318,7 @@ TEST_F(ChangeStreamStageWithDualFeatureFlagValueTest, DSCSLookupChangePreImageSt
         std::move(spec), stageSpecAsBSON, expCtx);
 }
 
-TEST_F(ChangeStreamStageWithDualFeatureFlagValueTest, DSCSLookupChangePostImageStageSerialization) {
+TEST_F(ChangeStreamStageTest, DSCSLookupChangePostImageStageSerialization) {
     auto expCtx = getExpCtx();
 
     DocumentSourceChangeStreamAddPostImageSpec spec(FullDocumentModeEnum::kUpdateLookup);
@@ -2417,11 +2355,7 @@ TEST_F(ChangeStreamStageTest, CloseCursorOnInvalidateEntries) {
     ASSERT_DOCUMENT_EQ(next.releaseDocument(), expectedInvalidate);
 
     // Then throw an exception on the next call of getNext().
-    if (!feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV()) {
-        ASSERT_THROWS(lastStage->getNext(), ExceptionFor<ErrorCodes::CloseChangeStream>);
-    } else {
-        ASSERT_THROWS(lastStage->getNext(), ExceptionFor<ErrorCodes::ChangeStreamInvalidated>);
-    }
+    ASSERT_THROWS(lastStage->getNext(), ExceptionFor<ErrorCodes::ChangeStreamInvalidated>);
 }
 
 TEST_F(ChangeStreamStageTest, CloseCursorEvenIfInvalidateEntriesGetFilteredOut) {
@@ -2433,11 +2367,7 @@ TEST_F(ChangeStreamStageTest, CloseCursorEvenIfInvalidateEntriesGetFilteredOut) 
     match->setSource(lastStage.get());
 
     // Throw an exception on the call of getNext().
-    if (!feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV()) {
-        ASSERT_THROWS(match->getNext(), ExceptionFor<ErrorCodes::CloseChangeStream>);
-    } else {
-        ASSERT_THROWS(match->getNext(), ExceptionFor<ErrorCodes::ChangeStreamInvalidated>);
-    }
+    ASSERT_THROWS(match->getNext(), ExceptionFor<ErrorCodes::ChangeStreamInvalidated>);
 }
 
 TEST_F(ChangeStreamStageTest, DocumentKeyShouldIncludeShardKeyFromResumeToken) {
@@ -3458,7 +3388,7 @@ TEST_F(ChangeStreamStageDBTest, StartAfterSucceedsEvenIfResumeTokenDoesNotContai
         BSON("$changeStream" << BSON("startAfter" << resumeToken)));
 }
 
-TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamWithSingleMatch) {
+TEST_F(ChangeStreamStageTest, ChangeStreamWithSingleMatch) {
     //
     // Tests that the single '$match' gets promoted before the '$_internalUpdateOnAddShard'.
     //
@@ -3480,7 +3410,7 @@ TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamWithSingleMatch) {
                            "$_internalChangeStreamHandleTopologyChange"});
 }
 
-TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamWithMultipleMatch) {
+TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleMatch) {
     //
     // Tests that multiple '$match' gets merged and promoted before the
     // '$_internalUpdateOnAddShard'.
@@ -3502,7 +3432,7 @@ TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamWithMultipleMatch) {
                            "$_internalChangeStreamHandleTopologyChange"});
 }
 
-TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamWithMultipleMatchAndResumeToken) {
+TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleMatchAndResumeToken) {
     //
     // Tests that multiple '$match' gets merged and promoted before the
     // '$_internalUpdateOnAddShard' if resume token if present.
@@ -3530,7 +3460,7 @@ TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamWithMultipleMatchAndRes
                            "$_internalChangeStreamEnsureResumeTokenPresent"});
 }
 
-TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamWithSingleProject) {
+TEST_F(ChangeStreamStageTest, ChangeStreamWithSingleProject) {
     //
     // Tests that the single'$project' gets promoted before the '$_internalUpdateOnAddShard'.
     //
@@ -3550,7 +3480,7 @@ TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamWithSingleProject) {
                            "$_internalChangeStreamHandleTopologyChange"});
 }
 
-TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamWithMultipleProject) {
+TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleProject) {
     //
     // Tests that multiple '$project' gets promoted before the '$_internalUpdateOnAddShard'.
     //
@@ -3572,7 +3502,7 @@ TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamWithMultipleProject) {
                            "$_internalChangeStreamHandleTopologyChange"});
 }
 
-TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamWithMultipleProjectAndResumeToken) {
+TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleProjectAndResumeToken) {
     //
     // Tests that multiple '$project' gets promoted before the '$_internalUpdateOnAddShard' if
     // resume token is present.
@@ -3599,7 +3529,7 @@ TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamWithMultipleProjectAndR
                            "$_internalChangeStreamEnsureResumeTokenPresent"});
 }
 
-TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamWithProjectMatchAndResumeToken) {
+TEST_F(ChangeStreamStageTest, ChangeStreamWithProjectMatchAndResumeToken) {
     //
     // Tests that a '$project' followed by a '$match' gets optimized and they get promoted before
     // the '$_internalUpdateOnAddShard'.
@@ -3627,7 +3557,7 @@ TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamWithProjectMatchAndResu
                            "$_internalChangeStreamEnsureResumeTokenPresent"});
 }
 
-TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamWithSingleUnset) {
+TEST_F(ChangeStreamStageTest, ChangeStreamWithSingleUnset) {
     //
     // Tests that the single'$unset' gets promoted before the '$_internalUpdateOnAddShard' as
     // '$project'.
@@ -3648,7 +3578,7 @@ TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamWithSingleUnset) {
                            "$_internalChangeStreamHandleTopologyChange"});
 }
 
-TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamWithMultipleUnset) {
+TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleUnset) {
     //
     // Tests that multiple '$unset' gets promoted before the '$_internalUpdateOnAddShard' as
     // '$project'.
@@ -3671,7 +3601,7 @@ TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamWithMultipleUnset) {
                            "$_internalChangeStreamHandleTopologyChange"});
 }
 
-TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamWithUnsetAndResumeToken) {
+TEST_F(ChangeStreamStageTest, ChangeStreamWithUnsetAndResumeToken) {
     //
     // Tests that the '$unset' gets promoted before the '$_internalUpdateOnAddShard' as '$project'
     // even if resume token is present.
@@ -3697,7 +3627,7 @@ TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamWithUnsetAndResumeToken
                            "$_internalChangeStreamEnsureResumeTokenPresent"});
 }
 
-TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamWithSingleAddFields) {
+TEST_F(ChangeStreamStageTest, ChangeStreamWithSingleAddFields) {
     //
     // Tests that the single'$addFields' gets promoted before the '$_internalUpdateOnAddShard'.
     //
@@ -3717,7 +3647,7 @@ TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamWithSingleAddFields) {
                            "$_internalChangeStreamHandleTopologyChange"});
 }
 
-TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamWithMultipleAddFields) {
+TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleAddFields) {
     //
     // Tests that multiple '$addFields' gets promoted before the '$_internalUpdateOnAddShard'.
     //
@@ -3739,7 +3669,7 @@ TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamWithMultipleAddFields) 
                            "$_internalChangeStreamHandleTopologyChange"});
 }
 
-TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamWithAddFieldsAndResumeToken) {
+TEST_F(ChangeStreamStageTest, ChangeStreamWithAddFieldsAndResumeToken) {
     //
     // Tests that the '$addFields' gets promoted before the '$_internalUpdateOnAddShard' if
     // resume token is present.
@@ -3764,7 +3694,7 @@ TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamWithAddFieldsAndResumeT
                            "$_internalChangeStreamEnsureResumeTokenPresent"});
 }
 
-TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamWithSingleSet) {
+TEST_F(ChangeStreamStageTest, ChangeStreamWithSingleSet) {
     //
     // Tests that the single'$set' gets promoted before the '$_internalUpdateOnAddShard'.
     //
@@ -3784,7 +3714,7 @@ TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamWithSingleSet) {
                            "$_internalChangeStreamHandleTopologyChange"});
 }
 
-TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamWithMultipleSet) {
+TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleSet) {
     //
     // Tests that multiple '$set' gets promoted before the '$_internalUpdateOnAddShard'.
     //
@@ -3806,7 +3736,7 @@ TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamWithMultipleSet) {
                            "$_internalChangeStreamHandleTopologyChange"});
 }
 
-TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamWithSetAndResumeToken) {
+TEST_F(ChangeStreamStageTest, ChangeStreamWithSetAndResumeToken) {
     //
     // Tests that the '$set' gets promoted before the '$_internalUpdateOnAddShard' if
     // resume token is present.
@@ -3831,7 +3761,7 @@ TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamWithSetAndResumeToken) 
                            "$_internalChangeStreamEnsureResumeTokenPresent"});
 }
 
-TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamWithSingleReplaceRoot) {
+TEST_F(ChangeStreamStageTest, ChangeStreamWithSingleReplaceRoot) {
     //
     // Tests that the single'$replaceRoot' gets promoted before the '$_internalUpdateOnAddShard'.
     //
@@ -3851,7 +3781,7 @@ TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamWithSingleReplaceRoot) 
                            "$_internalChangeStreamHandleTopologyChange"});
 }
 
-TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamWithReplaceRootAndResumeToken) {
+TEST_F(ChangeStreamStageTest, ChangeStreamWithReplaceRootAndResumeToken) {
     //
     // Tests that the '$replaceRoot' gets promoted before the '$_internalUpdateOnAddShard' if
     // resume token is present.
@@ -3877,7 +3807,7 @@ TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamWithReplaceRootAndResum
                            "$_internalChangeStreamEnsureResumeTokenPresent"});
 }
 
-TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamWithSingleReplaceWith) {
+TEST_F(ChangeStreamStageTest, ChangeStreamWithSingleReplaceWith) {
     //
     // Tests that the single '$replaceWith' gets promoted before the '$_internalUpdateOnAddShard' as
     // '$replaceRoot'.
@@ -3898,7 +3828,7 @@ TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamWithSingleReplaceWith) 
                            "$_internalChangeStreamHandleTopologyChange"});
 }
 
-TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamWithReplaceWithAndResumeToken) {
+TEST_F(ChangeStreamStageTest, ChangeStreamWithReplaceWithAndResumeToken) {
     //
     // Tests that the '$replaceWith' gets promoted before the '$_internalUpdateOnAddShard' if
     // resume token is present as '$replaceRoot'.
@@ -3924,7 +3854,7 @@ TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamWithReplaceWithAndResum
                            "$_internalChangeStreamEnsureResumeTokenPresent"});
 }
 
-TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamWithAllStagesAndResumeToken) {
+TEST_F(ChangeStreamStageTest, ChangeStreamWithAllStagesAndResumeToken) {
     //
     // Tests that when all allowed stages are included along with the resume token, the final
     // pipeline gets optimized.

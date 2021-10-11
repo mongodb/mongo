@@ -45,9 +45,7 @@ namespace mongo {
  * that previously may not have held any data for the collection being watched, and they contain the
  * information necessary for the mongoS to include the new shard in the merged change stream.
  */
-class DocumentSourceChangeStreamCheckTopologyChange final
-    : public DocumentSource,
-      public ChangeStreamStageSerializationInterface {
+class DocumentSourceChangeStreamCheckTopologyChange final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$_internalChangeStreamCheckTopologyChange"_sd;
 
@@ -69,9 +67,7 @@ public:
         return boost::none;
     }
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final {
-        return ChangeStreamStageSerializationInterface::serializeToValue(explain);
-    }
+    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final;
 
 private:
     DocumentSourceChangeStreamCheckTopologyChange(
@@ -79,10 +75,6 @@ private:
         : DocumentSource(kStageName, expCtx) {}
 
     GetNextResult doGetNext() final;
-
-    Value serializeLegacy(boost::optional<ExplainOptions::Verbosity> explain) const final;
-
-    Value serializeLatest(boost::optional<ExplainOptions::Verbosity> explain) const final;
 };
 
 }  // namespace mongo

@@ -105,10 +105,8 @@ StageConstraints DocumentSourceChangeStreamHandleTopologyChange::constraints(
     // Can be swapped with the '$match' and 'DocumentSourceSingleDocumentTransformation' stages and
     // ensures that they get pushed down to the shards, as this stage bisects the change streams
     // pipeline.
-    if (feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV()) {
-        constraints.canSwapWithMatch = true;
-        constraints.canSwapWithSingleDocTransform = true;
-    }
+    constraints.canSwapWithMatch = true;
+    constraints.canSwapWithSingleDocTransform = true;
 
     return constraints;
 }
@@ -229,7 +227,7 @@ BSONObj DocumentSourceChangeStreamHandleTopologyChange::replaceResumeTokenInComm
     return newCmd.freeze().toBson();
 }
 
-Value DocumentSourceChangeStreamHandleTopologyChange::serializeLatest(
+Value DocumentSourceChangeStreamHandleTopologyChange::serialize(
     boost::optional<ExplainOptions::Verbosity> explain) const {
     if (explain) {
         return Value(DOC(DocumentSourceChangeStream::kStageName

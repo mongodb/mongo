@@ -38,9 +38,7 @@ namespace mongo {
  * Part of the change stream API machinery used to look up the post-image of a document. Uses the
  * "documentKey" field of the input to look up the new version of the document.
  */
-class DocumentSourceChangeStreamAddPostImage final
-    : public DocumentSource,
-      public ChangeStreamStageSerializationInterface {
+class DocumentSourceChangeStreamAddPostImage final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$_internalChangeStreamAddPostImage"_sd;
     static constexpr StringData kFullDocumentFieldName =
@@ -77,15 +75,9 @@ public:
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         invariant(pipeState != Pipeline::SplitState::kSplitForShards);
 
-        // TODO SERVER-55659: remove the feature flag.
-        HostTypeRequirement hostTypeRequirement =
-            feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV()
-            ? HostTypeRequirement::kAnyShard
-            : HostTypeRequirement::kLocalOnly;
-
         StageConstraints constraints(StreamType::kStreaming,
                                      PositionRequirement::kNone,
-                                     hostTypeRequirement,
+                                     HostTypeRequirement::kAnyShard,
                                      DiskUseRequirement::kNoDiskUse,
                                      FacetRequirement::kNotAllowed,
                                      TransactionRequirement::kNotAllowed,
@@ -122,9 +114,7 @@ public:
         return DepsTracker::State::SEE_NEXT;
     }
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final {
-        return ChangeStreamStageSerializationInterface::serializeToValue(explain);
-    }
+    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 
     const char* getSourceName() const final {
         return kStageName.rawData();
@@ -157,9 +147,6 @@ private:
      * function verifies that the only the database names match.
      */
     NamespaceString assertValidNamespace(const Document& inputDoc) const;
-
-    Value serializeLegacy(boost::optional<ExplainOptions::Verbosity> explain) const final;
-    Value serializeLatest(boost::optional<ExplainOptions::Verbosity> explain) const final;
 
     // Determines whether post-images are strictly required or may be included only when available,
     // and whether to return a point-in-time post-image or the most current majority-committed

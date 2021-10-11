@@ -35,11 +35,10 @@
 
 namespace mongo {
 
-REGISTER_INTERNAL_DOCUMENT_SOURCE(
-    _internalChangeStreamCheckTopologyChange,
-    LiteParsedDocumentSourceChangeStreamInternal::parse,
-    DocumentSourceChangeStreamCheckTopologyChange::createFromBson,
-    feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV());
+REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalChangeStreamCheckTopologyChange,
+                                  LiteParsedDocumentSourceChangeStreamInternal::parse,
+                                  DocumentSourceChangeStreamCheckTopologyChange::createFromBson,
+                                  true);
 
 StageConstraints DocumentSourceChangeStreamCheckTopologyChange::constraints(
     Pipeline::SplitState pipeState) const {
@@ -87,7 +86,7 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamCheckTopologyChange::doG
     return nextInput;
 }
 
-Value DocumentSourceChangeStreamCheckTopologyChange::serializeLatest(
+Value DocumentSourceChangeStreamCheckTopologyChange::serialize(
     boost::optional<ExplainOptions::Verbosity> explain) const {
     if (explain) {
         return Value(DOC(DocumentSourceChangeStream::kStageName

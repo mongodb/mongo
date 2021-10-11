@@ -43,11 +43,10 @@
 namespace mongo {
 
 namespace {
-REGISTER_INTERNAL_DOCUMENT_SOURCE(
-    _internalChangeStreamAddPreImage,
-    LiteParsedDocumentSourceChangeStreamInternal::parse,
-    DocumentSourceChangeStreamAddPreImage::createFromBson,
-    feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV());
+REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalChangeStreamAddPreImage,
+                                  LiteParsedDocumentSourceChangeStreamInternal::parse,
+                                  DocumentSourceChangeStreamAddPreImage::createFromBson,
+                                  true);
 }  // namespace
 
 constexpr StringData DocumentSourceChangeStreamAddPreImage::kStageName;
@@ -165,7 +164,7 @@ boost::optional<Document> DocumentSourceChangeStreamAddPreImage::lookupPreImage(
     return lookedUpDoc->getField(ChangeStreamPreImage::kPreImageFieldName).getDocument().getOwned();
 }
 
-Value DocumentSourceChangeStreamAddPreImage::serializeLatest(
+Value DocumentSourceChangeStreamAddPreImage::serialize(
     boost::optional<ExplainOptions::Verbosity> explain) const {
     return explain
         ? Value(Document{

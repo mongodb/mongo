@@ -36,8 +36,7 @@ namespace mongo {
  * A custom subclass of DocumentSourceMatch which is used to generate a $match stage to be applied
  * on the oplog. The stage requires itself to be the first stage in the pipeline.
  */
-class DocumentSourceChangeStreamOplogMatch final : public DocumentSourceMatch,
-                                                   public ChangeStreamStageSerializationInterface {
+class DocumentSourceChangeStreamOplogMatch final : public DocumentSourceMatch {
 public:
     static constexpr StringData kStageName = "$_internalChangeStreamOplogMatch"_sd;
 
@@ -81,9 +80,7 @@ public:
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final;
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final {
-        return ChangeStreamStageSerializationInterface::serializeToValue(explain);
-    }
+    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final;
 
 protected:
     Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
@@ -101,9 +98,6 @@ private:
         : DocumentSourceMatch(std::move(filter), expCtx), _optimizedEndOfPipeline(true) {
         expCtx->tailableMode = TailableModeEnum::kTailableAndAwaitData;
     }
-
-    Value serializeLegacy(boost::optional<ExplainOptions::Verbosity> explain) const final;
-    Value serializeLatest(boost::optional<ExplainOptions::Verbosity> explain) const final;
 
     // Needed for re-creating the filter during optimization. Note that we do not serialize these
     // fields. The filter in a serialized DocumentSourceOplogMatch is considered final, so there is

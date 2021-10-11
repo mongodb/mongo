@@ -39,9 +39,7 @@ namespace mongo {
  * "invalidate" entry for commands that should invalidate the change stream (e.g. collection drop
  * for a single-collection change stream). It is not intended to be created by the user.
  */
-class DocumentSourceChangeStreamCheckInvalidate final
-    : public DocumentSource,
-      public ChangeStreamStageSerializationInterface {
+class DocumentSourceChangeStreamCheckInvalidate final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$_internalChangeStreamCheckInvalidate"_sd;
 
@@ -66,9 +64,7 @@ public:
         return boost::none;
     }
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final {
-        return ChangeStreamStageSerializationInterface::serializeToValue(explain);
-    }
+    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final;
 
     static boost::intrusive_ptr<DocumentSourceChangeStreamCheckInvalidate> createFromBson(
         BSONElement spec, const boost::intrusive_ptr<ExpressionContext>& expCtx);
@@ -90,9 +86,6 @@ private:
     }
 
     GetNextResult doGetNext() final;
-
-    Value serializeLegacy(boost::optional<ExplainOptions::Verbosity> explain) const final;
-    Value serializeLatest(boost::optional<ExplainOptions::Verbosity> explain) const final;
 
     boost::optional<ResumeTokenData> _startAfterInvalidate;
     boost::optional<Document> _queuedInvalidate;

@@ -30,12 +30,6 @@ global:
   cpp_namespace: "mongo::feature_flags"
 
 feature_flags:
-    featureFlagChangeStreamsOptimization:
-      description: "Feature flag for enabling change streams optimization"
-      cpp_varname: gFeatureFlagChangeStreamsOptimization
-      default: true
-      version: 5.1
-
     featureFlagChangeStreamsRewrite:
       description: "Feature flag for enabling change streams oplog rewrites"
       cpp_varname: gFeatureFlagChangeStreamsRewrite

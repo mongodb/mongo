@@ -43,7 +43,6 @@
 #include "mongo/db/pipeline/document_source_change_stream_check_invalidate.h"
 #include "mongo/db/pipeline/document_source_change_stream_check_resumability.h"
 #include "mongo/db/pipeline/document_source_change_stream_check_topology_change.h"
-#include "mongo/db/pipeline/document_source_change_stream_close_cursor.h"
 #include "mongo/db/pipeline/document_source_change_stream_ensure_resume_token_present.h"
 #include "mongo/db/pipeline/document_source_change_stream_handle_topology_change.h"
 #include "mongo/db/pipeline/document_source_change_stream_oplog_match.h"
@@ -233,8 +232,7 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
 
     // If we see this stage on a shard, it means that the raw $changeStream stage was dispatched to
     // us from an old mongoS. Build a legacy shard pipeline.
-    if (expCtx->needsMerge ||
-        !feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV()) {
+    if (expCtx->needsMerge) {
         return change_stream_legacy::buildPipeline(expCtx, spec);
     }
     return _buildPipeline(expCtx, spec);

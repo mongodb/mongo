@@ -15,12 +15,14 @@ const ChangeStreamWatchMode = Object.freeze({
 });
 
 /**
- * Returns true if feature flag 'featureFlagChangeStreamsOptimization' is enabled, false otherwise.
+ * Returns true if server version is 5.1 or above. Version 5.1 and above optimizes the change stream
+ * pipeline.
+ *
+ * TODO SERVER-60736: remove this function and update all call-sites.
  */
 function isChangeStreamsOptimizationEnabled(db) {
-    const getParam = db.adminCommand({getParameter: 1, featureFlagChangeStreamsOptimization: 1});
-    return getParam.hasOwnProperty("featureFlagChangeStreamsOptimization") &&
-        getParam.featureFlagChangeStreamsOptimization.value;
+    return MongoRunner.compareBinVersions(db.getSiblingDB("admin").serverStatus().version, "5.1") !=
+        -1;
 }
 
 /**

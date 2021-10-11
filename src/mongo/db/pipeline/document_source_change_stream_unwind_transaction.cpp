@@ -39,11 +39,10 @@
 
 namespace mongo {
 
-REGISTER_INTERNAL_DOCUMENT_SOURCE(
-    _internalChangeStreamUnwindTransaction,
-    LiteParsedDocumentSourceChangeStreamInternal::parse,
-    DocumentSourceChangeStreamUnwindTransaction::createFromBson,
-    feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV());
+REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalChangeStreamUnwindTransaction,
+                                  LiteParsedDocumentSourceChangeStreamInternal::parse,
+                                  DocumentSourceChangeStreamUnwindTransaction::createFromBson,
+                                  true);
 
 boost::intrusive_ptr<DocumentSourceChangeStreamUnwindTransaction>
 DocumentSourceChangeStreamUnwindTransaction::create(
@@ -88,7 +87,7 @@ StageConstraints DocumentSourceChangeStreamUnwindTransaction::constraints(
                             ChangeStreamRequirement::kChangeStreamStage);
 }
 
-Value DocumentSourceChangeStreamUnwindTransaction::serializeLatest(
+Value DocumentSourceChangeStreamUnwindTransaction::serialize(
     boost::optional<ExplainOptions::Verbosity> explain) const {
     tassert(5467604, "expression has not been initialized", _expression);
 

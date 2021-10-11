@@ -258,24 +258,4 @@ public:
     }
 };
 
-/**
- * Class interface to keep track of the change streams internal stage serialization formats across
- * versions or features.
- *
- * TODO SERVER-55659: remove this serializer class and make each stage serialize only the "latest"
- * format.
- */
-class ChangeStreamStageSerializationInterface {
-public:
-    Value serializeToValue(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const {
-        return feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV()
-            ? serializeLatest(explain)
-            : serializeLegacy(explain);
-    }
-
-protected:
-    virtual Value serializeLegacy(boost::optional<ExplainOptions::Verbosity> explain) const = 0;
-    virtual Value serializeLatest(boost::optional<ExplainOptions::Verbosity> explain) const = 0;
-};
-
 }  // namespace mongo

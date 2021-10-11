@@ -43,11 +43,10 @@ constexpr StringData DocumentSourceChangeStreamAddPostImage::kStageName;
 constexpr StringData DocumentSourceChangeStreamAddPostImage::kFullDocumentFieldName;
 
 namespace {
-REGISTER_INTERNAL_DOCUMENT_SOURCE(
-    _internalChangeStreamAddPostImage,
-    LiteParsedDocumentSourceChangeStreamInternal::parse,
-    DocumentSourceChangeStreamAddPostImage::createFromBson,
-    feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV());
+REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalChangeStreamAddPostImage,
+                                  LiteParsedDocumentSourceChangeStreamInternal::parse,
+                                  DocumentSourceChangeStreamAddPostImage::createFromBson,
+                                  true);
 
 
 Value assertFieldHasType(const Document& fullDoc, StringData fieldName, BSONType expectedType) {
@@ -217,7 +216,7 @@ boost::optional<Document> DocumentSourceChangeStreamAddPostImage::lookupLatestPo
         pExpCtx, nss, *resumeTokenData.uuid, documentKey, std::move(readConcern));
 }
 
-Value DocumentSourceChangeStreamAddPostImage::serializeLatest(
+Value DocumentSourceChangeStreamAddPostImage::serialize(
     boost::optional<ExplainOptions::Verbosity> explain) const {
     return explain
         ? Value(Document{

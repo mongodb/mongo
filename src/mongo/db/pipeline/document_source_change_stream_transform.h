@@ -33,8 +33,7 @@
 
 namespace mongo {
 
-class DocumentSourceChangeStreamTransform : public DocumentSource,
-                                            public ChangeStreamStageSerializationInterface {
+class DocumentSourceChangeStreamTransform : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$_internalChangeStreamTransform"_sd;
 
@@ -54,9 +53,7 @@ public:
 
     DocumentSource::GetModPathsReturn getModifiedPaths() const final;
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final {
-        return ChangeStreamStageSerializationInterface::serializeToValue(explain);
-    }
+    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final;
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final;
 
@@ -96,9 +93,6 @@ private:
      * Helper used for determining what resume token to return.
      */
     ResumeTokenData getResumeToken(Value ts, Value uuid, Value documentKey, Value txnOpIndex);
-
-    Value serializeLegacy(boost::optional<ExplainOptions::Verbosity> explain) const final;
-    Value serializeLatest(boost::optional<ExplainOptions::Verbosity> explain) const final;
 
     DocumentSourceChangeStreamSpec _changeStreamSpec;
 

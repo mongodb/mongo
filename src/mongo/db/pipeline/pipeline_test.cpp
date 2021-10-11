@@ -75,8 +75,8 @@ using std::vector;
 
 const NamespaceString kTestNss = NamespaceString("a.collection");
 
-size_t getChangeStreamStageSize() {
-    return (feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV() ? 6 : 6);
+constexpr size_t getChangeStreamStageSize() {
+    return 6;
 }
 
 void setMockReplicationCoordinatorOnOpCtx(OperationContext* opCtx) {

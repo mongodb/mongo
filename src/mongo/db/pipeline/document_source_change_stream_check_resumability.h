@@ -59,8 +59,7 @@ namespace mongo {
  * - Otherwise we cannot resume, as we do not know if there were any events between the resume token
  *   and the first matching document in the oplog.
  */
-class DocumentSourceChangeStreamCheckResumability : public DocumentSource,
-                                                    public ChangeStreamStageSerializationInterface {
+class DocumentSourceChangeStreamCheckResumability : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$_internalChangeStreamCheckResumability"_sd;
 
@@ -90,9 +89,7 @@ public:
         return boost::none;
     }
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const override {
-        return ChangeStreamStageSerializationInterface::serializeToValue(explain);
-    }
+    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const override;
 
     static boost::intrusive_ptr<DocumentSourceChangeStreamCheckResumability> createFromBson(
         BSONElement spec, const boost::intrusive_ptr<ExpressionContext>& expCtx);
@@ -117,9 +114,5 @@ protected:
 
     ResumeStatus _resumeStatus = ResumeStatus::kCheckNextDoc;
     const ResumeTokenData _tokenFromClient;
-
-private:
-    Value serializeLegacy(boost::optional<ExplainOptions::Verbosity> explain) const final;
-    Value serializeLatest(boost::optional<ExplainOptions::Verbosity> explain) const final;
 };
 }  // namespace mongo
