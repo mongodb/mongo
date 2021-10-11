@@ -293,6 +293,7 @@ selector:
   # "Cowardly refusing to run test with transaction override enabled when it uses
   # startParallelShell()"
   - uses_parallel_shell
+  - does_not_support_causal_consistency
 
 executor:
   archive:

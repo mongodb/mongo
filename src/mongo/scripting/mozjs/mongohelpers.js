@@ -76,6 +76,7 @@ exportToMongoHelpers = {
             var lines = fnSrc.split('\n');
             var col = loc.column;
             var fnSrc;
+            var tmpTree;
             var origLine = lines[loc.line - 1];
 
             // The parser has a weird behavior where sometimes if you have an expression like
