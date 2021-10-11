@@ -28,6 +28,7 @@ import importlib
 import io
 import shutil
 import shlex
+import tempfile
 import textwrap
 
 from glob import glob
@@ -515,6 +516,11 @@ class NinjaState:
                 ),
                 "description": "Symlink $in -> $out",
             },
+            "NOOP": {
+                "command": "echo 0 > {}".format("NUL" if sys.platform == 'win32' else "/dev/null"),
+                "description": "Checking $out",
+                "pool": "local_pool",
+            },
             "INSTALL": {
                 "command": "$COPY $in $out",
                 "description": "Install $out",
@@ -559,9 +565,9 @@ class NinjaState:
             },
             "REGENERATE": {
                 "command": "$SCONS_INVOCATION_W_TARGETS",
-                "description": "Regenerating $out",
-                "generator": 1,
+                "description": "Regenerating $self",
                 "depfile": os.path.join(get_path(env['NINJA_BUILDDIR']), '$out.depfile'),
+                "generator": 1,
                 # Console pool restricts to 1 job running at a time,
                 # it additionally has some special handling about
                 # passing stdin, stdout, etc to process in this pool
@@ -806,15 +812,28 @@ class NinjaState:
         # list of build generation about. However, because the generate rule
         # is hardcoded here, we need to do this generate_depfile call manually.
         ninja_file_path = self.env.File(ninja_file).path
+        ninja_in_file_path = os.path.join(get_path(self.env['NINJA_BUILDDIR']), os.path.basename(ninja_file)) + ".in"
         generate_depfile(
             self.env,
-            ninja_file_path,
-            self.env['NINJA_REGENERATE_DEPS']
+            ninja_in_file_path,
+            self.env['NINJA_REGENERATE_DEPS'],
         )
 
         ninja.build(
-            ninja_file_path,
+            ninja_in_file_path,
             rule="REGENERATE",
+            variables={
+                "self": ninja_file_path,
+            },
+        )
+
+        # This sets up a dependency edge between build.ninja.in and build.ninja
+        # without actually taking any action to transform one into the other
+        # because we write both files ourselves later.
+        ninja.build(
+            ninja_file_path,
+            rule="NOOP",
+            inputs=[ninja_in_file_path],
             implicit=[__file__],
         )
 
@@ -851,8 +870,10 @@ class NinjaState:
         if scons_default_targets:
             ninja.default(" ".join(scons_default_targets))
 
-        with open(ninja_file, "w") as build_ninja:
-            build_ninja.write(content.getvalue())
+        with tempfile.NamedTemporaryFile(delete=False, mode='w') as temp_ninja_file:
+            temp_ninja_file.write(content.getvalue())
+        shutil.move(temp_ninja_file.name, ninja_in_file_path)
+        shutil.copy2(ninja_in_file_path, ninja_file)
 
         self.__generated = True
 
