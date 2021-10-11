@@ -771,30 +771,30 @@ void ReplicationCoordinatorImpl::_initialSyncerCompletionFunction(
                   "Initial Sync has been cancelled",
                   "error"_attr = opTimeStatus.getStatus());
             return;
-        } else if (opTimeStatus == ErrorCodes::InvalidSyncSource &&
-                   _initialSyncer->getInitialSyncMethod() != "logical") {
-            LOGV2(5780600,
-                  "Falling back to logical initial sync: {error}",
-                  "Falling back to logical initial sync",
-                  "error"_attr = opTimeStatus.getStatus());
-            lock.unlock();
-            clearSyncSourceDenylist();
-            _scheduleWorkAt(_replExecutor->now(),
-                            [=](const mongo::executor::TaskExecutor::CallbackArgs& cbData) {
-                                _startInitialSync(
-                                    cc().makeOperationContext().get(),
-                                    [this](const StatusWith<OpTimeAndWallTime>& opTimeStatus) {
-                                        _initialSyncerCompletionFunction(opTimeStatus);
-                                    },
-                                    true /* fallbackToLogical */);
-                            });
-            return;
         } else if (!opTimeStatus.isOK()) {
             if (_inShutdown) {
                 LOGV2(21325,
                       "Initial Sync failed during shutdown due to {error}",
                       "Initial Sync failed during shutdown",
                       "error"_attr = opTimeStatus.getStatus());
+                return;
+            } else if (opTimeStatus == ErrorCodes::InvalidSyncSource &&
+                       _initialSyncer->getInitialSyncMethod() != "logical") {
+                LOGV2(5780600,
+                      "Falling back to logical initial sync: {error}",
+                      "Falling back to logical initial sync",
+                      "error"_attr = opTimeStatus.getStatus());
+                lock.unlock();
+                clearSyncSourceDenylist();
+                _scheduleWorkAt(_replExecutor->now(),
+                                [=](const mongo::executor::TaskExecutor::CallbackArgs& cbData) {
+                                    _startInitialSync(
+                                        cc().makeOperationContext().get(),
+                                        [this](const StatusWith<OpTimeAndWallTime>& opTimeStatus) {
+                                            _initialSyncerCompletionFunction(opTimeStatus);
+                                        },
+                                        true /* fallbackToLogical */);
+                                });
                 return;
             } else {
                 LOGV2_ERROR(21416,
