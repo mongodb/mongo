@@ -68,6 +68,7 @@ CMake
 CONCAT
 CONFIG
 COVERITY
+CPP
 CPUs
 CRC
 CSV
@@ -482,6 +483,7 @@ WithSeeds
 Wpedantic
 WriteFile
 Wsign
+Wundef
 Wuninitialized
 Wunused
 XP
@@ -647,6 +649,7 @@ copyin
 copyout
 countp
 cp
+cplusplus
 cpuid
 crc
 create's
