@@ -135,7 +135,9 @@ var conversionTestDocs = [
     {_id: 57, input: function() {}, target: "bool", expected: true},
     // Symbol and CodeWScope are not supported from JavaScript, so we can't test them here.
     {_id: 58, input: new Timestamp(1 / 1000, 1), target: "bool", expected: true},
-    {_id: 59, input: MinKey, target: "bool", expected: true}
+    {_id: 59, input: MinKey, target: "bool", expected: true},
+
+    {_id: 60, input: Timestamp(1, 1), target: "date", expected: ISODate("1970-01-01T00:00:01.000Z")}
 ];
 populateCollection(conversionTestDocs);
 

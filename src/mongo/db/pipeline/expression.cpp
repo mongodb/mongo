@@ -6041,6 +6041,14 @@ public:
         };
 
         //
+        // Conversions from bsonTimestamp
+        //
+        table[BSONType::bsonTimestamp][BSONType::Date] = [](ExpressionContext* const expCtx,
+                                                            Value inputValue) {
+            return Value(inputValue.coerceToDate());
+        };
+
+        //
         // Conversions from NumberInt
         //
         table[BSONType::NumberInt][BSONType::NumberDouble] = [](ExpressionContext* const expCtx,

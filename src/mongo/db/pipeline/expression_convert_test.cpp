@@ -2052,6 +2052,22 @@ TEST_F(ExpressionConvertTest, ConvertObjectIdToDate) {
               "2017-10-19T13:30:00.000Z");
 }
 
+TEST_F(ExpressionConvertTest, ConvertTimestampToDate) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "date"));
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+
+    Document timestampInput{{"path1", Timestamp(1508419800, 1)}};
+
+    ASSERT_EQ(
+        dateToISOStringUTC(convertExp->evaluate(timestampInput, &expCtx->variables).getDate()),
+        "2017-10-19T13:30:00.000Z");
+}
+
 TEST_F(ExpressionConvertTest, ConvertStringToInt) {
     auto expCtx = getExpCtx();
 
