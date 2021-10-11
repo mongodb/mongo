@@ -2609,6 +2609,8 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
     AutoGetRstlForStepUpStepDown arsd(
         this, opCtx, ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepDown, deadline);
 
+    stepdownHangAfterGrabbingRSTL.pauseWhileSet();
+
     stdx::unique_lock<Latch> lk(_mutex);
 
     opCtx->checkForInterrupt();

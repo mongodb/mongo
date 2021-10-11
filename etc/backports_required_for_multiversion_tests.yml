@@ -52,6 +52,8 @@ last-continuous:
       test_file: jstests/replsets/tenant_migration_fetch_committed_transactions_retry.js
     - ticket: SERVER-56887
       test_file: jstests/sharding/database_versioning_all_commands.js
+    - ticket: SERVER-59108
+      test_file: jstests/replsets/stepdown_race_with_transaction.js
     - ticket: SERVER-59613
       test_file: jstests/aggregation/range.js
     - ticket: SERVER-59923
@@ -258,6 +260,8 @@ last-lts:
       test_file: jstests/aggregation/expressions/date_add_subtract.js
     - ticket: SERVER-51943
       test_file: jstests/replsets/tenant_migration_fetch_committed_transactions_retry.js
+    - ticket: SERVER-59108
+      test_file: jstests/replsets/stepdown_race_with_transaction.js
     - ticket: SERVER-59613
       test_file: jstests/aggregation/range.js
     - ticket: SERVER-59923
