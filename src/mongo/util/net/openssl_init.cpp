@@ -83,34 +83,31 @@ public:
     }
 
     static void lockingCallback(int mode, int type, const char* file, int line) {
+        const auto m = mutexes.at(type).get();
         if (mode & CRYPTO_LOCK) {
-            mutexes()[type]->lock();
+            m->lock();
         } else {
-            mutexes()[type]->unlock();
+            m->unlock();
         }
     }
 
     static void init() {
+        while ((int)mutexes.size() < CRYPTO_num_locks()) {
+            mutexes.emplace_back(std::make_unique<stdx::recursive_mutex>());
+        }
+
         CRYPTO_set_id_callback(&SSLThreadInfo::getID);
         CRYPTO_set_locking_callback(&SSLThreadInfo::lockingCallback);
-
-        while ((int)mutexes().size() < CRYPTO_num_locks()) {
-            mutexes().emplace_back(std::make_unique<stdx::recursive_mutex>());
-        }
     }
 
 private:
     SSLThreadInfo() = delete;
 
-    // Note: see SERVER-8734 for why we are using a recursive mutex here.
-    // Once the deadlock fix in OpenSSL is incorporated into most distros of
-    // Linux, this can be changed back to a nonrecursive mutex.
-    static std::vector<std::unique_ptr<stdx::recursive_mutex>>& mutexes() {
-        // Keep the static as a pointer to avoid it ever to be destroyed. It is referenced in the
-        // CallErrRemoveState thread local above.
-        static auto m = new std::vector<std::unique_ptr<stdx::recursive_mutex>>();
-        return *m;
-    }
+    // History: see SERVER-8734 for why we are using a recursive mutex here.
+    // Original plan was to revert to regular mutex when OpenSSL fixes the deadock.
+    // Deadlock was fixed in OpenSSL 0.9.8y, however OpenSSL 1.1.1 and later
+    // started to use internal locking, so there is no longer a need to revert.
+    static std::vector<std::unique_ptr<stdx::recursive_mutex>> mutexes;
 
     class ThreadIDManager {
     public:
@@ -143,6 +140,8 @@ private:
         return m;
     }
 };
+
+std::vector<std::unique_ptr<stdx::recursive_mutex>> SSLThreadInfo::mutexes;
 
 void setupFIPS() {
 // Turn on FIPS mode if requested, OPENSSL_FIPS must be defined by the OpenSSL headers
