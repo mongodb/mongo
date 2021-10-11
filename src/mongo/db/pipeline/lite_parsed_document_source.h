@@ -92,6 +92,19 @@ public:
                                AllowedWithClientType allowedWithClientType);
 
     /**
+     * Function that will be used as an alternate parser for a document source that has been
+     * disabled.
+     */
+    static std::unique_ptr<LiteParsedDocumentSource> parseDisabled(NamespaceString nss,
+                                                                   const BSONElement& spec) {
+        uasserted(
+            ErrorCodes::QueryFeatureNotAllowed,
+            str::stream() << spec.fieldName()
+                          << " is not allowed with the current configuration. You may need to "
+                             "enable the corresponding feature flag");
+    }
+
+    /**
      * Returns the 'LiteParserInfo' for the specified stage name.
      */
     static const LiteParserInfo& getInfo(const std::string& stageName);

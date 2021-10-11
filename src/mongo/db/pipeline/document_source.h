@@ -135,18 +135,23 @@ class Document;
  *
  * This is the most general REGISTER_DOCUMENT_SOURCE* macro, which all others should delegate to.
  */
-#define REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(                                     \
-    key, liteParser, fullParser, allowedWithApiStrict, clientType, minVersion, ...) \
-    MONGO_INITIALIZER_GENERAL(addToDocSourceParserMap_##key,                        \
-                              ("BeginDocumentSourceRegistration"),                  \
-                              ("EndDocumentSourceRegistration"))                    \
-    (InitializerContext*) {                                                         \
-        if (!__VA_ARGS__) {                                                         \
-            return;                                                                 \
-        }                                                                           \
-        LiteParsedDocumentSource::registerParser(                                   \
-            "$" #key, liteParser, allowedWithApiStrict, clientType);                \
-        DocumentSource::registerParser("$" #key, fullParser, minVersion);           \
+#define REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(                                                  \
+    key, liteParser, fullParser, allowedWithApiStrict, clientType, minVersion, ...)              \
+    MONGO_INITIALIZER_GENERAL(addToDocSourceParserMap_##key,                                     \
+                              ("BeginDocumentSourceRegistration"),                               \
+                              ("EndDocumentSourceRegistration"))                                 \
+    (InitializerContext*) {                                                                      \
+        if (!__VA_ARGS__) {                                                                      \
+            DocumentSource::registerParser("$" #key, DocumentSource::parseDisabled, minVersion); \
+            LiteParsedDocumentSource::registerParser("$" #key,                                   \
+                                                     LiteParsedDocumentSource::parseDisabled,    \
+                                                     allowedWithApiStrict,                       \
+                                                     clientType);                                \
+            return;                                                                              \
+        }                                                                                        \
+        LiteParsedDocumentSource::registerParser(                                                \
+            "$" #key, liteParser, allowedWithApiStrict, clientType);                             \
+        DocumentSource::registerParser("$" #key, fullParser, minVersion);                        \
     }
 
 /**
@@ -423,6 +428,18 @@ public:
     static std::list<boost::intrusive_ptr<DocumentSource>> parse(
         const boost::intrusive_ptr<ExpressionContext>& expCtx, BSONObj stageObj);
 
+    /**
+     * Function that will be used as an alternate parser for a document source that has been
+     * disabled.
+     */
+    static boost::intrusive_ptr<DocumentSource> parseDisabled(
+        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+        uasserted(
+            ErrorCodes::QueryFeatureNotAllowed,
+            str::stream() << elem.fieldName()
+                          << " is not allowed with the current configuration. You may need to "
+                             "enable the corresponding feature flag");
+    }
     /**
      * Registers a DocumentSource with a parsing function, so that when a stage with the given name
      * is encountered, it will call 'parser' to construct that stage.
