@@ -212,8 +212,7 @@ __hs_insert_record(WT_SESSION_IMPL *session, WT_CURSOR *cursor, WT_BTREE *btree,
     cursor->set_value(
       cursor, tw, tw->durable_stop_ts, tw->durable_start_ts, (uint64_t)type, hs_value);
     WT_ERR(cursor->insert(cursor));
-    WT_STAT_CONN_INCR(session, cache_hs_insert);
-    WT_STAT_DATA_INCR(session, cache_hs_insert);
+    WT_STAT_CONN_DATA_INCR(session, cache_hs_insert);
 
 err:
     if (!hs_read_all_flag)
@@ -286,7 +285,7 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_MULTI *mult
     WT_UPDATE_VECTOR out_of_order_ts_updates;
     WT_SAVE_UPD *list;
     WT_UPDATE *first_globally_visible_upd, *fix_ts_upd, *min_ts_upd, *out_of_order_ts_upd;
-    WT_UPDATE *non_aborted_upd, *oldest_upd, *prev_upd, *tombstone, *upd;
+    WT_UPDATE *newest_hs, *non_aborted_upd, *oldest_upd, *prev_upd, *ref_upd, *tombstone, *upd;
     WT_TIME_WINDOW tw;
     wt_off_t hs_size;
     uint64_t insert_cnt, max_hs_size, modify_cnt;
@@ -368,7 +367,11 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_MULTI *mult
             WT_ERR(__wt_illegal_value(session, r->page->type));
         }
 
-        first_globally_visible_upd = min_ts_upd = out_of_order_ts_upd = NULL;
+        newest_hs = first_globally_visible_upd = min_ts_upd = out_of_order_ts_upd = NULL;
+        ref_upd = list->onpage_upd;
+
+        __wt_update_vector_clear(&out_of_order_ts_updates);
+        __wt_update_vector_clear(&updates);
 
         /*
          * Reverse deltas are only supported on 'S' and 'u' value formats.
@@ -404,6 +407,7 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_MULTI *mult
          * tombstone.
          * 4) We have a single tombstone on the chain, it is simply ignored.
          */
+        squashed = false;
         for (upd = list->onpage_upd, non_aborted_upd = prev_upd = NULL; upd != NULL;
              prev_upd = non_aborted_upd, upd = upd->next) {
             if (upd->txnid == WT_TXN_ABORTED)
@@ -455,6 +459,24 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_MULTI *mult
                 enable_reverse_modify = false;
 
             /*
+             * Find the first update to insert to the history store. (The value that is just older
+             * than the on-page value)
+             */
+            if (newest_hs == NULL) {
+                if (upd->txnid != ref_upd->txnid || upd->start_ts != ref_upd->start_ts) {
+                    if (upd->type == WT_UPDATE_TOMBSTONE)
+                        ref_upd = upd;
+                    else
+                        newest_hs = upd;
+                    if (squashed) {
+                        WT_STAT_CONN_DATA_INCR(session, cache_hs_write_squash);
+                        squashed = false;
+                    }
+                } else if (upd != ref_upd)
+                    squashed = true;
+            }
+
+            /*
              * No need to continue if we see the first self contained value after the first globally
              * visible value.
              */
@@ -467,6 +489,13 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_MULTI *mult
              */
             if (upd->type == WT_UPDATE_STANDARD && F_ISSET(upd, WT_UPDATE_HS))
                 break;
+        }
+
+        if (newest_hs == NULL || F_ISSET(newest_hs, WT_UPDATE_HS)) {
+            /* The onpage value is squashed. */
+            if (newest_hs == NULL && squashed)
+                WT_STAT_CONN_DATA_INCR(session, cache_hs_write_squash);
+            continue;
         }
 
         prev_upd = upd = NULL;
@@ -501,19 +530,20 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_MULTI *mult
 
         WT_ERR(__hs_next_upd_full_value(session, &updates, NULL, full_value, &upd));
 
-        hs_inserted = squashed = false;
+        hs_inserted = false;
 
         /*
-         * Flush the updates on stack. Stopping once we run out or we reach the onpage update or we
-         * encounter a prepared update.
+         * Flush the updates on stack. Stopping once we finish inserting the newest history store
+         * value.
          */
         modify_cnt = 0;
-        for (; updates.size > 0 && upd->prepare_state != WT_PREPARE_INPROGRESS;
-             tmp = full_value, full_value = prev_full_value, prev_full_value = tmp,
-             upd = prev_upd) {
+        for (;; tmp = full_value, full_value = prev_full_value, prev_full_value = tmp,
+                upd = prev_upd) {
             /* We should never insert the onpage value to the history store. */
             WT_ASSERT(session, upd != list->onpage_upd);
             WT_ASSERT(session, upd->type == WT_UPDATE_STANDARD || upd->type == WT_UPDATE_MODIFY);
+            /* We should never insert prepared updates to the history store. */
+            WT_ASSERT(session, upd->prepare_state != WT_PREPARE_INPROGRESS);
 
             tombstone = NULL;
             __wt_update_vector_peek(&updates, &prev_upd);
@@ -633,9 +663,9 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_MULTI *mult
 
             /*
              * Calculate reverse modify and clear the history store records with timestamps when
-             * inserting the first update. Always write on-disk data store updates to the history
-             * store as a full update because the on-disk update will be the base update for all the
-             * updates that are older than the on-disk update. Limit the number of consecutive
+             * inserting the first update. Always write the newest update in the history store as a
+             * full update. We don't want to handle the edge cases that the reverse modifies be
+             * applied to the wrong on-disk base value. This also limits the number of consecutive
              * reverse modifies for standard updates. We want to ensure we do not store a large
              * chain of reverse modifies as to impact read performance.
              *
@@ -645,19 +675,21 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_MULTI *mult
              * the RTS.
              */
             nentries = MAX_REVERSE_MODIFY_NUM;
-            if (!F_ISSET(upd, WT_UPDATE_DS) && !F_ISSET(prev_upd, WT_UPDATE_DS) &&
-              enable_reverse_modify && modify_cnt < WT_MAX_CONSECUTIVE_REVERSE_MODIFY &&
+            if (upd != newest_hs && enable_reverse_modify &&
+              modify_cnt < WT_MAX_CONSECUTIVE_REVERSE_MODIFY &&
               __wt_calc_modify(session, prev_full_value, full_value, prev_full_value->size / 10,
                 entries, &nentries) == 0) {
                 WT_ERR(__wt_modify_pack(hs_cursor, entries, nentries, &modify_value));
                 ret = __hs_insert_record(session, hs_cursor, btree, key, WT_UPDATE_MODIFY,
                   modify_value, &tw, error_on_ooo_ts);
+                WT_STAT_CONN_DATA_INCR(session, cache_hs_insert_reverse_modify);
                 __wt_scr_free(session, &modify_value);
                 ++modify_cnt;
             } else {
                 modify_cnt = 0;
                 ret = __hs_insert_record(session, hs_cursor, btree, key, WT_UPDATE_STANDARD,
                   full_value, &tw, error_on_ooo_ts);
+                WT_STAT_CONN_DATA_INCR(session, cache_hs_insert_full_update);
             }
 
             /*
@@ -681,15 +713,14 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_MULTI *mult
                 WT_STAT_CONN_DATA_INCR(session, cache_hs_write_squash);
                 squashed = false;
             }
-        }
 
-        /* If we squash the onpage value, we increase the counter here. */
-        if (squashed)
-            WT_STAT_CONN_DATA_INCR(session, cache_hs_write_squash);
+            if (upd == newest_hs)
+                break;
+        }
 
         /*
          * In the case that the onpage value is an out of order timestamp update and the update
-         * older than it is a tombstone, it remains in the stack. Clean it up.
+         * older than it is a tombstone, it remains in the stack.
          */
         WT_ASSERT(session, out_of_order_ts_updates.size <= 1);
 #ifdef HAVE_DIAGNOSTIC
@@ -699,8 +730,6 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_MULTI *mult
               upd->txnid == list->onpage_upd->txnid && upd->start_ts == list->onpage_upd->start_ts);
         }
 #endif
-        __wt_update_vector_clear(&out_of_order_ts_updates);
-        __wt_update_vector_clear(&updates);
     }
 
     /* Fail here 0.5% of the time if we are an eviction thread. */
