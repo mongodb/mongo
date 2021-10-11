@@ -80,7 +80,8 @@ public:
     static Status waitForClean(OperationContext* opCtx,
                                const NamespaceString& nss,
                                const UUID& collectionUuid,
-                               ChunkRange orphanRange);
+                               ChunkRange orphanRange,
+                               Milliseconds waitTimeout);
 
     ScopedCollectionFilter getOwnershipFilter(OperationContext* opCtx) override;
 

@@ -231,7 +231,8 @@ TEST_F(CollectionShardingRuntimeWithRangeDeleterTest,
         operationContext(),
         kTestNss,
         uuid(),
-        ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY)));
+        ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY)),
+        Milliseconds::max());
     ASSERT_EQ(status.code(), ErrorCodes::ConflictingOperationInProgress);
 }
 
@@ -245,7 +246,8 @@ TEST_F(CollectionShardingRuntimeWithRangeDeleterTest,
         operationContext(),
         kTestNss,
         randomUuid,
-        ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY)));
+        ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY)),
+        Milliseconds::max());
     ASSERT_EQ(status.code(), ErrorCodes::ConflictingOperationInProgress);
 }
 
@@ -258,7 +260,8 @@ TEST_F(CollectionShardingRuntimeWithRangeDeleterTest,
         operationContext(),
         kTestNss,
         uuid(),
-        ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY)));
+        ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY)),
+        Milliseconds::max());
 
     ASSERT_OK(status);
 }
@@ -281,7 +284,8 @@ TEST_F(CollectionShardingRuntimeWithRangeDeleterTest,
         operationContext(),
         kTestNss,
         uuid(),
-        ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY)));
+        ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY)),
+        Milliseconds::max());
 
     ASSERT_EQ(status.code(), ErrorCodes::MaxTimeMSExpired);
 
@@ -310,7 +314,8 @@ TEST_F(CollectionShardingRuntimeWithRangeDeleterTest,
         operationContext(),
         kTestNss,
         uuid(),
-        ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY)));
+        ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY)),
+        Milliseconds::max());
 
     // waitForClean should block until both cleanup tasks have run. This is a best-effort check,
     // since even if it did not block, it is possible that the cleanup tasks could complete before
@@ -335,7 +340,8 @@ TEST_F(CollectionShardingRuntimeWithRangeDeleterTest,
         operationContext(),
         kTestNss,
         uuid(),
-        ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY)));
+        ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY)),
+        Milliseconds::max());
 
     ASSERT_OK(status);
     ASSERT(cleanupComplete.isReady());

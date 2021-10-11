@@ -198,6 +198,9 @@ def mongod_program(  # pylint: disable=too-many-branches,too-many-statements
 
     if executable == LAST_STABLE_MONGOD_BINARY:
         suite_set_parameters.setdefault("enableTestCommands", True)
+        # receiveChunkWaitForRangeDeleterTimeoutMS is available from 4.4 onwards.
+        if "receiveChunkWaitForRangeDeleterTimeoutMS" in suite_set_parameters:
+            suite_set_parameters.pop("receiveChunkWaitForRangeDeleterTimeoutMS", None)
     else:
         _add_testing_set_parameters(suite_set_parameters)
 

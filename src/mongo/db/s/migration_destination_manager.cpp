@@ -957,6 +957,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
         uassertStatusOK(Grid::get(outerOpCtx)->shardRegistry()->getShard(outerOpCtx, _fromShard));
 
     const ChunkRange range(_min, _max);
+    auto waitTime = Milliseconds(receiveChunkWaitForRangeDeleterTimeoutMS.load());
 
     // 1. Ensure any data which might have been left orphaned in the range being moved has been
     // deleted.
@@ -980,7 +981,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
                       _useFCV44RangeDeleterProtocol ? _migrationId->toBSON() : BSONObj());
 
             auto status = CollectionShardingRuntime::waitForClean(
-                outerOpCtx, _nss, donorCollectionOptionsAndIndexes.uuid, range);
+                outerOpCtx, _nss, donorCollectionOptionsAndIndexes.uuid, range, waitTime);
 
             if (!status.isOK()) {
                 _setStateFail(redact(status.toString()));
@@ -1015,7 +1016,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
 
         // Wait for any other, overlapping queued deletions to drain
         cleanupStatus = CollectionShardingRuntime::waitForClean(
-            outerOpCtx, _nss, donorCollectionOptionsAndIndexes.uuid, range);
+            outerOpCtx, _nss, donorCollectionOptionsAndIndexes.uuid, range, waitTime);
         if (!cleanupStatus.isOK()) {
             _setStateFail(redact(cleanupStatus.reason()));
             return;
