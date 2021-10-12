@@ -216,6 +216,9 @@ DBCollection.prototype._massageObject = function(q) {
 };
 
 DBCollection.prototype.find = function(query, fields, limit, skip, batchSize, options) {
+    // Verify that API version parameters are not supplied via the shell helper.
+    assert.noAPIParams(options);
+
     var cursor = new DBQuery(this._mongo,
                              this._db,
                              this,
@@ -738,8 +741,8 @@ DBCollection.prototype.getShardVersion = function() {
     return this._db._adminCommand({getShardVersion: this._fullName});
 };
 
-DBCollection.prototype.getIndexes = function(filter) {
-    var res = this.runCommand("listIndexes", filter);
+DBCollection.prototype.getIndexes = function() {
+    var res = this.runCommand("listIndexes");
 
     if (!res.ok) {
         if (res.code == ErrorCodes.NamespaceNotFound) {

@@ -67,10 +67,20 @@ assertAggregateFailsWithAPIStrict([{$collStats: {latencyStats: {}, queryExecStat
 assertAggregateFailsWithAPIStrict(
     [{$collStats: {latencyStats: {}, storageStats: {scale: 1024}, queryExecStats: {}}}]);
 
-assert.doesNotThrow(
-    () => db[collName].aggregate([{$collStats: {}}], {apiVersion: "1", apiStrict: true}));
-assert.doesNotThrow(
-    () => db[collName].aggregate([{$collStats: {count: {}}}], {apiVersion: "1", apiStrict: true}));
+assert.commandWorked(db.runCommand({
+    aggregate: collName,
+    pipeline: [{$collStats: {}}],
+    cursor: {},
+    apiVersion: "1",
+    apiStrict: true
+}));
+assert.commandWorked(db.runCommand({
+    aggregate: collName,
+    pipeline: [{$collStats: {count: {}}}],
+    cursor: {},
+    apiVersion: "1",
+    apiStrict: true
+}));
 
 // Test that by running the aggregate command with $collStats + $group like our drivers do to
 // compute the count, we get back a single result in the first batch - no getMore is required.

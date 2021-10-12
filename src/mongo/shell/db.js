@@ -221,6 +221,10 @@ DB.prototype._runAggregate = function(cmdObj, aggregateOptions) {
     assert(aggregateOptions === undefined || aggregateOptions instanceof Object,
            "'aggregateOptions' argument must be an object");
 
+    // Disallow explicit API parameters on the aggregate shell helper; callers should use runCommand
+    // directly if they want to test this.
+    assert.noAPIParams(aggregateOptions);
+
     // Make a copy of the initial command object, i.e. {aggregate: x, pipeline: [...]}.
     cmdObj = Object.extend({}, cmdObj);
 

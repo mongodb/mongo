@@ -191,6 +191,23 @@ if (m.adminCommand('buildinfo').modules.indexOf('enterprise') > -1) {
     assert.eq(result, 0, `Error running shell with script '${testPrompt}'`);
 }
 
+// Test that shell helpers which return a cursor do not accept API versioning parameters. This is to
+// avoid the potential pitfall of sending API parameters on the initial command but not on
+// subsequent getMore's.
+const coll = m.getDB("test").collection;
+assert.throws(() => coll.aggregate([], {apiVersion: 1}));
+assert.throws(() => coll.aggregate([], {apiStrict: true}));
+assert.throws(() => coll.aggregate([], {apiDeprecationErrors: true}));
+assert.throws(() => coll.find({}, {}, 1, 0, 1, {apiVersion: 1}));
+assert.throws(() => coll.find({}, {}, 1, 0, 1, {apiStrict: true}));
+assert.throws(() => coll.find({}, {}, 1, 0, 1, {apiDeprecationErrors: true}));
+assert.throws(() => coll.watch({}, {apiVersion: 1}));
+assert.throws(() => coll.watch({}, {apiStrict: true}));
+assert.throws(() => coll.watch({}, {apiDeprecationErrors: true}));
+assert.throws(() => coll.getDB().watch({}, {apiVersion: 1}));
+assert.throws(() => coll.getDB().watch({}, {apiStrict: true}));
+assert.throws(() => coll.getDB().watch({}, {apiDeprecationErrors: true}));
+
 /*
  * Mongo-specific tests.
  */

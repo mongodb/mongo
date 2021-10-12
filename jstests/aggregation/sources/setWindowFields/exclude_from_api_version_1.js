@@ -63,6 +63,11 @@ assert.commandFailedWithCode(
     ErrorCodes.APIStrictError);
 
 // Test that $count is included from API Version 1 so long as it's used in $group.
-assert.doesNotThrow(() => coll.aggregate([{$group: {_id: null, count: {$count: {}}}}],
-                                         {apiVersion: "1", apiStrict: true}));
+assert.commandWorked(db.runCommand({
+    aggregate: coll.getName(),
+    pipeline: [{$group: {_id: null, count: {$count: {}}}}],
+    cursor: {},
+    apiVersion: "1",
+    apiStrict: true
+}));
 })();

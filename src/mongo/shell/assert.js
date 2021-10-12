@@ -1096,5 +1096,15 @@ assert = (function() {
         }
     };
 
+    assert.noAPIParams = function(cmdOptions) {
+        if (!(cmdOptions instanceof Object)) {
+            return;
+        }
+        assert(!cmdOptions.hasOwnProperty("apiVersion") &&
+                   !cmdOptions.hasOwnProperty("apiStrict") &&
+                   !cmdOptions.hasOwnProperty("apiDeprecationErrors"),
+               "API parameters are not allowed in this context");
+    };
+
     return assert;
 })();
