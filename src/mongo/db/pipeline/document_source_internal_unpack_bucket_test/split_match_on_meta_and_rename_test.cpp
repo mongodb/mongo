@@ -261,7 +261,7 @@ TEST_F(InternalUnpackBucketSplitMatchOnMetaAndRename, OptimizeSplitsMatchAndMaps
     // $_internalUnpackBucket and merged.
     auto serialized = pipeline->serializeToBson();
     ASSERT_EQ(3u, serialized.size());
-    ASSERT_BSONOBJ_EQ(fromjson("{$match: {$and: [{$and: [{meta: {$gte: 0}}, {meta: {$lte: 5}}]}, "
+    ASSERT_BSONOBJ_EQ(fromjson("{$match: {$and: [{meta: {$gte: 0}}, {meta: {$lte: 5}}, "
                                "{'control.min.a': {$_internalExprLte: 4}}]}}"),
                       serialized[0]);
     ASSERT_BSONOBJ_EQ(unpack, serialized[1]);

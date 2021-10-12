@@ -58,8 +58,8 @@ TEST_F(OptimizePipeline, MixedMatchPushedDown) {
 
     // We should push down the $match on the metaField and the predicates on the control field.
     // The created $match stages should be added before $_internalUnpackBucket and merged.
-    ASSERT_BSONOBJ_EQ(fromjson("{$match: {$and: [{'control.min.a': {$_internalExprLte: 4}}, {meta: "
-                               "{$gte: 0}}, {meta: {$lte: 5}}]}}"),
+    ASSERT_BSONOBJ_EQ(fromjson("{$match: {$and: [{meta: {$gte: 0}}, {meta: {$lte: 5}}, "
+                               "{'control.min.a': {$_internalExprLte: 4}}]}}"),
                       stages[0].getDocument().toBson());
     ASSERT_BSONOBJ_EQ(unpack, stages[1].getDocument().toBson());
     ASSERT_BSONOBJ_EQ(fromjson("{$match: {a: {$lte: 4}}}"), stages[2].getDocument().toBson());
@@ -141,8 +141,8 @@ TEST_F(OptimizePipeline, MultipleMatchesPushedDown) {
     // The created $match stages should be added before $_internalUnpackBucket and merged.
     auto stages = pipeline->writeExplainOps(ExplainOptions::Verbosity::kQueryPlanner);
     ASSERT_EQ(3u, stages.size());
-    ASSERT_BSONOBJ_EQ(fromjson("{$match: {$and: [{'control.min.a': {$_internalExprLte: 4}}, {meta: "
-                               "{$gte: 0}}, {meta: {$lte: 5}}]}}"),
+    ASSERT_BSONOBJ_EQ(fromjson("{$match: {$and: [{meta: {$gte: 0}}, {meta: {$lte: 5}}, "
+                               "{'control.min.a': {$_internalExprLte: 4}}]}}"),
                       stages[0].getDocument().toBson());
     ASSERT_BSONOBJ_EQ(unpack, stages[1].getDocument().toBson());
     ASSERT_BSONOBJ_EQ(fromjson("{$match: {a: {$lte: 4}}}"), stages[2].getDocument().toBson());
@@ -165,8 +165,8 @@ TEST_F(OptimizePipeline, MultipleMatchesPushedDownWithSort) {
     // The created $match stages should be added before $_internalUnpackBucket and merged.
     auto stages = pipeline->writeExplainOps(ExplainOptions::Verbosity::kQueryPlanner);
     ASSERT_EQ(4u, stages.size());
-    ASSERT_BSONOBJ_EQ(fromjson("{$match: {$and: [{'control.min.a': {$_internalExprLte: 4}}, {meta: "
-                               "{$gte: 0}}, {meta: {$lte: 5}}]}}"),
+    ASSERT_BSONOBJ_EQ(fromjson("{$match: {$and: [{meta: {$gte: 0}}, {meta: {$lte: 5}}, "
+                               "{'control.min.a': {$_internalExprLte: 4}}]}}"),
                       stages[0].getDocument().toBson());
     ASSERT_BSONOBJ_EQ(unpack, stages[1].getDocument().toBson());
     ASSERT_BSONOBJ_EQ(fromjson("{$match: {a: {$lte: 4}}}"), stages[2].getDocument().toBson());
