@@ -556,7 +556,8 @@ void ServiceStateMachine::Impl::cleanupSession(const Status& status) {
         transport::ServiceExecutorContext::reset(client);
     }
 
-    _state.store(State::Ended);
+    auto previousState = _state.swap(State::Ended);
+    invariant(previousState != State::Ended);
 
     _inMessage.reset();
 
