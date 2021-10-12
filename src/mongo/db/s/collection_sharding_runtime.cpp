@@ -337,24 +337,23 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
             "Operations on sharded time-series collections are not supported",
             !currentMetadata.isSharded() || !currentMetadata.getTimeseriesFields());
 
+    if (ChunkVersion::isIgnoredVersion(receivedShardVersion))
+        return optCurrentMetadata;
+
     auto wantedShardVersion = currentMetadata.getShardVersion();
 
-    {
-        auto criticalSectionSignal = _critSec.getSignal(
+    if (auto criticalSectionSignal = _critSec.getSignal(
             opCtx->lockState()->isWriteLocked() ? ShardingMigrationCriticalSection::kWrite
-                                                : ShardingMigrationCriticalSection::kRead);
-
-        uassert(StaleConfigInfo(_nss,
-                                receivedShardVersion,
-                                wantedShardVersion,
-                                ShardingState::get(opCtx)->shardId(),
-                                std::move(criticalSectionSignal)),
-                str::stream() << "migration commit in progress for " << _nss.ns(),
-                !criticalSectionSignal);
+                                                : ShardingMigrationCriticalSection::kRead)) {
+        uasserted(StaleConfigInfo(_nss,
+                                  receivedShardVersion,
+                                  wantedShardVersion,
+                                  ShardingState::get(opCtx)->shardId(),
+                                  std::move(criticalSectionSignal)),
+                  str::stream() << "migration commit in progress for " << _nss.ns());
     }
 
-    if (wantedShardVersion.isWriteCompatibleWith(receivedShardVersion) ||
-        ChunkVersion::isIgnoredVersion(receivedShardVersion))
+    if (wantedShardVersion.isWriteCompatibleWith(receivedShardVersion))
         return optCurrentMetadata;
 
     StaleConfigInfo sci(
