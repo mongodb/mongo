@@ -132,7 +132,7 @@ void UpdateDriver::parse(
 
     if (updateMod.type() == write_ops::UpdateModification::Type::kPipeline) {
         uassert(ErrorCodes::FailedToParse,
-                "arrayFilters may not be specified for pipeline-syle updates",
+                "arrayFilters may not be specified for pipeline-style updates",
                 arrayFilters.empty());
         _updateExecutor =
             std::make_unique<PipelineExecutor>(_expCtx, updateMod.getUpdatePipeline(), constants);
@@ -142,7 +142,7 @@ void UpdateDriver::parse(
 
     if (updateMod.type() == write_ops::UpdateModification::Type::kDelta) {
         uassert(4772603,
-                "arrayFilters may not be specified for delta-syle updates",
+                "arrayFilters may not be specified for delta-style updates",
                 arrayFilters.empty());
 
         _updateType = UpdateType::kDelta;
@@ -170,7 +170,7 @@ void UpdateDriver::parse(
         uassert(5857811, "multi update is not supported for transform-style update", !multi);
 
         uassert(5857812,
-                "arrayFilters may not be specified for transform-syle updates",
+                "arrayFilters may not be specified for transform-style updates",
                 arrayFilters.empty());
 
         _updateType = UpdateType::kTransform;
