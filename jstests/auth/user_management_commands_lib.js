@@ -172,33 +172,224 @@ function runAllUserManagementCommandsTests(conn, writeConcern) {
     })();
 
     (function testUsersInfo() {
+        // Helper functions for the expected output of usersInfo, depending on the variant used.
+        function assertNoExtraInfo(user) {
+            assert(!user.credentials);
+            assertNoPrivilegesOrAuthRestrictions(user);
+        }
+
+        function assertNoPrivilegesOrAuthRestrictions(user) {
+            assert(!user.inheritedRoles);
+            assert(!user.inheritedPrivileges);
+            assert(!user.inheritedAuthenticationRestrictions);
+            assert(!user.authenticationRestrictions);
+        }
+
+        function assertShowCredentials(user) {
+            assert(user.credentials['SCRAM-SHA-1']);
+            assert(user.credentials['SCRAM-SHA-256']);
+        }
+
+        function assertShowPrivileges(user,
+                                      expectedInheritedRolesLength,
+                                      expectedInheritedPrivilegesLength,
+                                      expectedInheritedAuthenticationRestrictionsLength) {
+            assert.eq(expectedInheritedRolesLength, user.inheritedRoles.length);
+            assert.eq(expectedInheritedPrivilegesLength, user.inheritedPrivileges.length);
+            assert.eq(expectedInheritedAuthenticationRestrictionsLength,
+                      user.inheritedAuthenticationRestrictions.length);
+        }
+
+        function assertShowAuthenticationRestrictions(
+            user,
+            expectedInheritedRolesLength,
+            expectedInheritedPrivilegesLength,
+            expectedInheritedAuthenticationRestrictionsLength,
+            expectedAuthenticationRestrictionsLength) {
+            assertShowPrivileges(user,
+                                 expectedInheritedRolesLength,
+                                 expectedInheritedPrivilegesLength,
+                                 expectedInheritedAuthenticationRestrictionsLength);
+            assert.eq(expectedAuthenticationRestrictionsLength,
+                      user.authenticationRestrictions.length);
+        }
+
         jsTestLog("Testing usersInfo");
 
+        jsTestLog("Running exact usersInfo with default options on username only");
         var res = testUserAdmin.runCommand({usersInfo: 'spencer'});
         printjson(res);
         assert.eq(1, res.users.length);
         assert.eq(10036, res.users[0].customData.zipCode);
+        assertNoExtraInfo(res.users[0]);
 
+        jsTestLog("Running exact usersInfo with default options on username and db");
         res = testUserAdmin.runCommand({usersInfo: {user: 'spencer', db: 'test'}});
+        printjson(res);
         assert.eq(1, res.users.length);
         assert.eq(10036, res.users[0].customData.zipCode);
+        assertNoExtraInfo(res.users[0]);
+
+        jsTestLog('Running exact usersInfo on single user with showCredentials set to true');
+        res = testUserAdmin.runCommand(
+            {usersInfo: {user: 'spencer', db: 'test'}, showCredentials: true});
+        printjson(res);
+        assert.eq(1, res.users.length);
+        assert.eq(10036, res.users[0].customData.zipCode);
+        assertShowCredentials(res.users[0]);
+        assertNoPrivilegesOrAuthRestrictions(res.users[0]);
+
+        jsTestLog('Running exact usersInfo on single user with showPrivileges set to true');
+        res = testUserAdmin.runCommand(
+            {usersInfo: {user: 'spencer', db: 'test'}, showPrivileges: true});
+        printjson(res);
+        assert.eq(1, res.users.length);
+        assert.eq(10036, res.users[0].customData.zipCode);
+        assert(!res.users[0].credentials);
+        assertShowPrivileges(res.users[0], 1, 2, 0);
+        assert(!res.users[0].authenticationRestrictions);
+
+        jsTestLog(
+            'Running exact usersInfo on single user with showAuthenticationRestrictions set to true');
+        res = testUserAdmin.runCommand(
+            {usersInfo: {user: 'spencer', db: 'test'}, showAuthenticationRestrictions: true});
+        printjson(res);
+        assert.eq(1, res.users.length);
+        assert.eq(10036, res.users[0].customData.zipCode);
+        assert(!res.users[0].credentials);
+        assertShowAuthenticationRestrictions(res.users[0], 1, 2, 0, 0);
+
+        jsTestLog('Running exact usersInfo on single user with showCustomData set to false');
+        res = testUserAdmin.runCommand(
+            {usersInfo: {user: 'spencer', db: 'test'}, showCustomData: false});
+        printjson(res);
+        assert.eq(1, res.users.length);
+        assert(!res.users[0].customData);
+        assertNoExtraInfo(res.users[0]);
+
+        // This should trigger the authorization user cache.
+        jsTestLog('Running exact usersInfo on single user with all non-default options set');
+        res = testUserAdmin.runCommand({
+            usersInfo: {user: 'spencer', db: 'test'},
+            showCredentials: true,
+            showPrivileges: true,
+            showAuthenticationRestrictions: true,
+            showCustomData: false
+        });
+        printjson(res);
+        assert.eq(1, res.users.length);
+        assert(!res.users[0].customData);
+        assertShowCredentials(res.users[0]);
+        assertShowAuthenticationRestrictions(res.users[0], 1, 2, 0, 0);
 
         // UsersInfo results are ordered alphabetically by user field then db field,
         // not by user insertion order
+        jsTestLog('Running exact usersInfo on multiple users with default options');
         res = testUserAdmin.runCommand({usersInfo: ['spencer', {user: 'userAdmin', db: 'admin'}]});
         printjson(res);
         assert.eq(2, res.users.length);
         assert.eq("spencer", res.users[0].user);
         assert.eq(10036, res.users[0].customData.zipCode);
-        assert(res.users[1].customData.userAdmin);
         assert.eq("userAdmin", res.users[1].user);
+        assert(res.users[1].customData.userAdmin);
+        res.users.forEach(user => {
+            assertNoExtraInfo(user);
+        });
 
+        jsTestLog('Running exact usersInfo on multiple users with showCredentials set to true');
+        res = testUserAdmin.runCommand(
+            {usersInfo: ['spencer', {user: 'userAdmin', db: 'admin'}], showCredentials: true});
+        printjson(res);
+        assert.eq(2, res.users.length);
+        assert.eq("spencer", res.users[0].user);
+        assert.eq(10036, res.users[0].customData.zipCode);
+        assert.eq("userAdmin", res.users[1].user);
+        assert(res.users[1].customData.userAdmin);
+        res.users.forEach(user => {
+            assertShowCredentials(user);
+            assertNoPrivilegesOrAuthRestrictions(user);
+        });
+
+        jsTestLog('Running exact usersInfo on multiple users with showPrivileges set to true');
+        res = testUserAdmin.runCommand(
+            {usersInfo: ['spencer', {user: 'userAdmin', db: 'admin'}], showPrivileges: true});
+        printjson(res);
+        assert.eq(2, res.users.length);
+        assert.eq("spencer", res.users[0].user);
+        assert.eq(10036, res.users[0].customData.zipCode);
+        assert(!res.users[0].credentials);
+        assertShowPrivileges(res.users[0], 1, 2, 0);
+        assert(!res.users[0].authenticationRestrictions);
+        assert.eq("userAdmin", res.users[1].user);
+        assert(res.users[1].customData.userAdmin);
+        assert(!res.users[1].credentials);
+        assertShowPrivileges(res.users[1], 1, 9, 0);
+        assert(!res.users[1].authenticationRestrictions);
+
+        jsTestLog(
+            'Running exact usersInfo on multiple users with showAuthenticationRestrictions set to true');
+        res = testUserAdmin.runCommand({
+            usersInfo: ['spencer', {user: 'userAdmin', db: 'admin'}],
+            showAuthenticationRestrictions: true
+        });
+        printjson(res);
+        assert.eq(2, res.users.length);
+        assert.eq("spencer", res.users[0].user);
+        assert.eq(10036, res.users[0].customData.zipCode);
+        assert(!res.users[0].credentials);
+        assertShowAuthenticationRestrictions(res.users[0], 1, 2, 0, 0);
+        assert.eq("userAdmin", res.users[1].user);
+        assert(res.users[1].customData.userAdmin);
+        assert(!res.users[1].credentials);
+        assertShowAuthenticationRestrictions(res.users[1], 1, 9, 0, 0);
+
+        // This should also trigger the authorization user cache.
+        jsTestLog('Running exact usersInfo on multiple users with all non-default options set');
+        res = testUserAdmin.runCommand({
+            usersInfo: ['spencer', {user: 'userAdmin', db: 'admin'}],
+            showCredentials: true,
+            showPrivileges: true,
+            showAuthenticationRestrictions: true,
+            showCustomData: false,
+        });
+        printjson(res);
+        assert.eq(2, res.users.length);
+        assert.eq("spencer", res.users[0].user);
+        assert(!res.users[0].customData);
+        assertShowAuthenticationRestrictions(res.users[0], 1, 2, 0, 0);
+        assert.eq("userAdmin", res.users[1].user);
+        assert(!res.users[1].customData);
+        assertShowAuthenticationRestrictions(res.users[1], 1, 9, 0, 0);
+        res.users.forEach(user => {
+            assertShowCredentials(user);
+        });
+
+        jsTestLog('Running non-exact usersInfo on current db with all default options set');
         res = testUserAdmin.runCommand({usersInfo: 1});
         assert.eq(2, res.users.length);
         assert.eq("andy", res.users[0].user);
         assert.eq("spencer", res.users[1].user);
         assert(!res.users[0].customData);
         assert.eq(10036, res.users[1].customData.zipCode);
+        // showPrivileges and showAuthenticationRestrictions should not be allowed on non-exact
+        // usersInfo queries.
+        assert.commandFailed(testUserAdmin.runCommand({usersInfo: 1, showPrivileges: true}));
+        assert.commandFailed(
+            testUserAdmin.runCommand({usersInfo: 1, showAuthenticationRestrictions: true}));
+
+        // showCredentials and showCustomData should be allowed on non-exact usersInfo queries.
+        jsTestLog(
+            'Running non-exact usersInfo on current db with showCredentials and showCustomData set to non-defaults');
+        res =
+            testUserAdmin.runCommand({usersInfo: 1, showCredentials: true, showCustomData: false});
+        printjson(res);
+        assert.eq(2, res.users.length);
+        assert.eq("andy", res.users[0].user);
+        assert.eq("spencer", res.users[1].user);
+        res.users.forEach(user => {
+            assertShowCredentials(user);
+            assert(!user.customData);
+        });
 
         res = testUserAdmin.runCommand({usersInfo: {forAllDBs: true}});
         printjson(res);
@@ -207,6 +398,26 @@ function runAllUserManagementCommandsTests(conn, writeConcern) {
         assert.eq("andy", res.users[1].user);
         assert.eq("spencer", res.users[2].user);
         assert.eq("userAdmin", res.users[3].user);
+        // showPrivileges and showAuthenticationRestrictions should not be allowed on non-exact
+        // usersInfo queries.
+        assert.commandFailed(
+            testUserAdmin.runCommand({usersInfo: {forAllDBs: true}, showPrivileges: true}));
+        assert.commandFailed(testUserAdmin.runCommand(
+            {usersInfo: {forAllDBs: true}, showAuthenticationRestrictions: true}));
+
+        // showCredentials and showCustomData should be allowed on non-exact usersInfo queries.
+        res = testUserAdmin.runCommand(
+            {usersInfo: {forAllDBs: true}, showCredentials: true, showCustomData: false});
+        printjson(res);
+        assert.eq(4, res.users.length);
+        assert.eq("admin", res.users[0].user);
+        assert.eq("andy", res.users[1].user);
+        assert.eq("spencer", res.users[2].user);
+        assert.eq("userAdmin", res.users[3].user);
+        res.users.forEach(user => {
+            assertShowCredentials(user);
+            assert(!user.customData);
+        });
     })();
 
     (function testDropUser() {

@@ -1343,41 +1343,64 @@ UsersInfoReply CmdUMCTyped<UsersInfoCommand, UMCInfoParams>::Invocation::typedRu
                 "Privilege or restriction details require exact-match usersInfo queries",
                 !cmd.getFilter() && arg.isExact());
 
-        // If you want privileges or restrictions you need to call getUserDescription
-        // on each user.
+        // Exact-match usersInfo queries can be optimized to utilize the user cache if custom data
+        // can be omitted. This is especially helpful when config servers execute exact-match
+        // usersInfo queries on behalf of mongoses gathering roles + privileges for recently
+        // authenticated users.
         for (const auto& userName : arg.getElements(dbname)) {
-            BSONObj userDetails;
-            auto status = authzManager->getUserDescription(opCtx, userName, &userDetails);
-            if (status.code() == ErrorCodes::UserNotFound) {
-                continue;
-            }
-            uassertStatusOK(status);
-
-            // getUserDescription always includes credentials and restrictions, which may need
-            // to be stripped out
-            BSONObjBuilder strippedUser;
-            for (const BSONElement& e : userDetails) {
-                if (e.fieldNameStringData() == "credentials") {
-                    BSONArrayBuilder mechanismNamesBuilder;
-                    BSONObj mechanismsObj = e.Obj();
-                    for (const BSONElement& mechanismElement : mechanismsObj) {
-                        mechanismNamesBuilder.append(mechanismElement.fieldNameStringData());
-                    }
-                    strippedUser.append("mechanisms", mechanismNamesBuilder.arr());
-
-                    if (!cmd.getShowCredentials()) {
-                        continue;
-                    }
-                }
-
-                if ((e.fieldNameStringData() == "authenticationRestrictions") &&
-                    !cmd.getShowAuthenticationRestrictions()) {
+            if (cmd.getShowCustomData()) {
+                BSONObj userDetails;
+                auto status = authzManager->getUserDescription(opCtx, userName, &userDetails);
+                if (status.code() == ErrorCodes::UserNotFound) {
                     continue;
                 }
+                uassertStatusOK(status);
 
-                strippedUser.append(e);
+                // getUserDescription always includes credentials and restrictions, which may need
+                // to be stripped out
+                BSONObjBuilder strippedUser;
+                for (const BSONElement& e : userDetails) {
+                    if (e.fieldNameStringData() == "credentials") {
+                        BSONArrayBuilder mechanismNamesBuilder;
+                        BSONObj mechanismsObj = e.Obj();
+                        for (const BSONElement& mechanismElement : mechanismsObj) {
+                            mechanismNamesBuilder.append(mechanismElement.fieldNameStringData());
+                        }
+                        strippedUser.append("mechanisms", mechanismNamesBuilder.arr());
+
+                        if (!cmd.getShowCredentials()) {
+                            continue;
+                        }
+                    }
+
+                    if ((e.fieldNameStringData() == "authenticationRestrictions") &&
+                        !cmd.getShowAuthenticationRestrictions()) {
+                        continue;
+                    }
+
+                    strippedUser.append(e);
+                }
+                users.push_back(strippedUser.obj());
+            } else {
+                // Custom data is not required in the output, so it can be generated from a cached
+                // user object.
+                auto swUserHandle = authzManager->acquireUser(opCtx, userName);
+                if (swUserHandle.getStatus().code() == ErrorCodes::UserNotFound) {
+                    continue;
+                }
+                UserHandle user = uassertStatusOK(swUserHandle);
+
+                // The returned User object will need to be marshalled back into a BSON document and
+                // stripped of credentials and restrictions if they were not explicitly requested.
+                BSONObjBuilder userObjBuilder;
+                user->reportForUsersInfo(&userObjBuilder,
+                                         cmd.getShowCredentials(),
+                                         cmd.getShowPrivileges(),
+                                         cmd.getShowAuthenticationRestrictions());
+                BSONObj userObj = userObjBuilder.obj();
+                users.push_back(userObj);
+                userObjBuilder.doneFast();
             }
-            users.push_back(strippedUser.obj());
         }
     } else {
         // If you don't need privileges, or authenticationRestrictions, you can just do a
@@ -1411,15 +1434,18 @@ UsersInfoReply CmdUMCTyped<UsersInfoCommand, UMCInfoParams>::Invocation::typedRu
                                                                      << "in"
                                                                      << "$$cred.k")))));
 
-        if (cmd.getShowCredentials()) {
-            // Authentication restrictions are only rendered in the single user case.
-            pipeline.push_back(BSON("$unset"
-                                    << "authenticationRestrictions"));
-        } else {
-            // Remove credentials as well, they're not required in the output
-            pipeline.push_back(BSON("$unset" << BSON_ARRAY("authenticationRestrictions"
-                                                           << "credentials")));
+        // Authentication restrictions are only rendered in the single user case.
+        BSONArrayBuilder fieldsToRemoveBuilder;
+        fieldsToRemoveBuilder.append("authenticationRestrictions");
+        if (!cmd.getShowCredentials()) {
+            // Remove credentials as well, they're not required in the output.
+            fieldsToRemoveBuilder.append("credentials");
         }
+        if (!cmd.getShowCustomData()) {
+            // Remove customData as well, it's not required in the output.
+            fieldsToRemoveBuilder.append("customData");
+        }
+        pipeline.push_back(BSON("$unset" << fieldsToRemoveBuilder.arr()));
 
         // Handle a user specified filter.
         if (auto filter = cmd.getFilter()) {

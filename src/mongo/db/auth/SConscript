@@ -98,6 +98,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/crypto/sha_block_${MONGO_CRYPTO}',
+        'auth',
         'authentication_restriction',
         'authprivilege',
     ],

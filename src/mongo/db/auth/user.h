@@ -66,6 +66,13 @@ class User {
 
 public:
     using UserId = std::vector<std::uint8_t>;
+    constexpr static auto kSHA1FieldName = "SCRAM-SHA-1"_sd;
+    constexpr static auto kSHA256FieldName = "SCRAM-SHA-256"_sd;
+    constexpr static auto kExternalFieldName = "external"_sd;
+    constexpr static auto kIterationCountFieldName = "iterationCount"_sd;
+    constexpr static auto kSaltFieldName = "salt"_sd;
+    constexpr static auto kServerKeyFieldName = "serverKey"_sd;
+    constexpr static auto kStoredKeyFieldName = "storedKey"_sd;
 
     template <typename HashBlock>
     struct SCRAMCredentials {
@@ -89,6 +96,13 @@ public:
         bool empty() const {
             return !iterationCount && salt.empty() && serverKey.empty() && storedKey.empty();
         }
+
+        void toBSON(BSONObjBuilder* builder) const {
+            builder->append(kIterationCountFieldName, iterationCount);
+            builder->append(kSaltFieldName, salt);
+            builder->append(kStoredKeyFieldName, storedKey);
+            builder->append(kServerKeyFieldName, serverKey);
+        }
     };
 
     struct CredentialData {
@@ -106,6 +120,40 @@ public:
 
         template <typename HashBlock>
         const SCRAMCredentials<HashBlock>& scram() const;
+
+        void toBSON(BSONObjBuilder* builder) const {
+            if (scram_sha1.isValid()) {
+                BSONObjBuilder sha1ObjBuilder(builder->subobjStart(kSHA1FieldName));
+                scram_sha1.toBSON(&sha1ObjBuilder);
+                sha1ObjBuilder.doneFast();
+            }
+            if (scram_sha256.isValid()) {
+                BSONObjBuilder sha256ObjBuilder(builder->subobjStart(kSHA256FieldName));
+                scram_sha256.toBSON(&sha256ObjBuilder);
+                sha256ObjBuilder.doneFast();
+            }
+            if (isExternal) {
+                builder->append(kExternalFieldName, true);
+            }
+        }
+
+        std::vector<StringData> toMechanismsVector() const {
+            std::vector<StringData> mechanismsVec;
+            if (scram_sha1.isValid()) {
+                mechanismsVec.push_back(kSHA1FieldName);
+            }
+            if (scram_sha256.isValid()) {
+                mechanismsVec.push_back(kSHA256FieldName);
+            }
+            if (isExternal) {
+                mechanismsVec.push_back(kExternalFieldName);
+            }
+
+            // Valid CredentialData objects must have at least one mechanism.
+            invariant(mechanismsVec.size() > 0);
+
+            return mechanismsVec;
+        }
     };
 
     using ResourcePrivilegeMap = stdx::unordered_map<ResourcePattern, Privilege>;
@@ -244,6 +292,15 @@ public:
      * Process both direct and indirect authentication restrictions.
      */
     Status validateRestrictions(OperationContext* opCtx) const;
+
+    /**
+     * Generates a BSON representation of the User object with all the information needed for
+     * usersInfo.
+     */
+    void reportForUsersInfo(BSONObjBuilder* builder,
+                            bool showCredentials,
+                            bool showPrivileges,
+                            bool showAuthenticationRestrictions) const;
 
 private:
     // Unique ID (often UUID) for this user. May be empty for legacy users.

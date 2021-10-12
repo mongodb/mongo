@@ -132,13 +132,13 @@ Status AuthzManagerExternalStateMongos::getUserDescription(OperationContext* opC
                                                            BSONObj* result) {
     const UserName& userName = user.name;
     if (!user.roles) {
-        BSONObj usersInfoCmd =
-            BSON("usersInfo" << BSON_ARRAY(BSON(AuthorizationManager::USER_NAME_FIELD_NAME
-                                                << userName.getUser()
-                                                << AuthorizationManager::USER_DB_FIELD_NAME
-                                                << userName.getDB()))
-                             << "showPrivileges" << true << "showCredentials" << true
-                             << "showAuthenticationRestrictions" << true);
+        BSONObj usersInfoCmd = BSON(
+            "usersInfo" << BSON_ARRAY(BSON(AuthorizationManager::USER_NAME_FIELD_NAME
+                                           << userName.getUser()
+                                           << AuthorizationManager::USER_DB_FIELD_NAME
+                                           << userName.getDB()))
+                        << "showPrivileges" << true << "showCredentials" << true
+                        << "showAuthenticationRestrictions" << true << "showCustomData" << false);
         BSONObjBuilder builder;
         const bool ok = Grid::get(opCtx)->catalogClient()->runUserManagementReadCommand(
             opCtx, "admin", usersInfoCmd, &builder);

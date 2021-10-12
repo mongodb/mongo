@@ -358,6 +358,12 @@ commands:
                     If viewing all users, you cannot specify this field.
                 type: safeBool
                 default: false
+            showCustomData:
+                description: >-
+                    Set the field to false to omit the custom data provided by the client for the
+                    user. 
+                type: safeBool
+                default: true
             filter:
                 description: >-
                     A document that specifies $match stage conditions to return information

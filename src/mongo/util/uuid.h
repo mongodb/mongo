@@ -81,8 +81,12 @@ public:
 
     static UUID fromCDR(ConstDataRange cdr) {
         UUID uuid{UUIDStorage{}};
-        invariant(cdr.length() == uuid._uuid.size());
-        memcpy(uuid._uuid.data(), cdr.data(), uuid._uuid.size());
+        // Allow empty CDRs to generate empty UUIDs.
+        if (cdr.length() > 0) {
+            invariant(cdr.length() == uuid._uuid.size());
+            memcpy(uuid._uuid.data(), cdr.data(), uuid._uuid.size());
+        }
+
         return uuid;
     }
 
