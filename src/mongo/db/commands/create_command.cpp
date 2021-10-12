@@ -64,7 +64,7 @@ constexpr auto kCreateCommandHelp =
     "  viewOn: <string: name of source collection or view>,\n"
     "  pipeline: <array<object>: aggregation pipeline stage>,\n"
     "  collation: <document: default collation for the collection or view>,\n"
-    "  changeStreamPreAndPostImages: <bool: pre- and post-images for change streams enabled>,\n"
+    "  changeStreamPreAndPostImages: <document: pre- and post-images options for change streams>,\n"
     "  writeConcern: <document: write concern expression for the operation>]\n"
     "}"_sd;
 
@@ -272,10 +272,13 @@ public:
             if (feature_flags::gFeatureFlagChangeStreamPreAndPostImages.isEnabled(
                     serverGlobalParams.featureCompatibility)) {
                 const auto isRecordPreImagesEnabled = cmd.getRecordPreImages().get_value_or(false);
+                const auto isChangeStreamPreAndPostImagesEnabled =
+                    (cmd.getChangeStreamPreAndPostImages() &&
+                     cmd.getChangeStreamPreAndPostImages()->getEnabled());
                 uassert(ErrorCodes::InvalidOptions,
-                        "recordPreImages and changeStreamPreAndPostImages can not be set to true "
-                        "simultaneously",
-                        !(cmd.getChangeStreamPreAndPostImages() && isRecordPreImagesEnabled));
+                        "'recordPreImages' and 'changeStreamPreAndPostImages.enabled' can not be "
+                        "set to true simultaneously",
+                        !(isChangeStreamPreAndPostImagesEnabled && isRecordPreImagesEnabled));
             } else {
                 uassert(5846900,
                         "BSON field 'changeStreamPreAndPostImages' is an unknown field.",

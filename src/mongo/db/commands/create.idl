@@ -37,6 +37,7 @@ imports:
     - "mongo/db/catalog/collection_options.idl"
     - "mongo/db/catalog/clustered_collection_options.idl"
     - "mongo/db/timeseries/timeseries.idl"
+    - "mongo/db/pipeline/change_stream_pre_and_post_images_options.idl"
 
 structs:
     CreateCommandReply:
@@ -161,8 +162,9 @@ commands:
                 optional: true
                 unstable: true
             changeStreamPreAndPostImages:
-                description: "Determines whether point-in-time pre- and post-images are available for change streams opened on this collection."
-                type: optionalBool
+                description: "The options for point-in-time pre- and post-images in change streams opened on this collection."
+                type: ChangeStreamPreAndPostImagesOptions
+                optional: true
                 unstable: true
             timeseries:
                 description: "The options to create the time-series collection with."

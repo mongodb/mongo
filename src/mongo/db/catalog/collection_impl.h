@@ -316,7 +316,8 @@ public:
     void setRecordPreImages(OperationContext* opCtx, bool val) final;
 
     bool isChangeStreamPreAndPostImagesEnabled() const final;
-    void setChangeStreamPreAndPostImages(OperationContext* opCtx, bool val) final;
+    void setChangeStreamPreAndPostImages(OperationContext* opCtx,
+                                         ChangeStreamPreAndPostImagesOptions val) final;
 
     bool isTemporary() const final;
 

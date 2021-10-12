@@ -1,5 +1,5 @@
 // Tests that the point-in-time pre- and post-images are loaded correctly in $changeStream running
-// with different arguments for collections with 'changeStreamPreAndPostImages' set to true.
+// with different arguments for collections with 'changeStreamPreAndPostImages' being enabled.
 // @tags: [
 //  assumes_against_mongod_not_mongos,
 //  change_stream_does_not_expect_txns,
@@ -111,7 +111,7 @@ function preAndPostImageTest({
 
     // Enable changeStreamPreAndPostImages for pre-images recording.
     assert.commandWorked(
-        testDB.runCommand({collMod: collName, changeStreamPreAndPostImages: true}));
+        testDB.runCommand({collMod: collName, changeStreamPreAndPostImages: {enabled: true}}));
 
     // Perform an update modification.
     assert.commandWorked(coll.update(updatedDoc, {$inc: {x: 2}}));

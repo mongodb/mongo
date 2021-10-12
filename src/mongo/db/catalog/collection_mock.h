@@ -262,7 +262,8 @@ public:
         std::abort();
     }
 
-    void setChangeStreamPreAndPostImages(OperationContext* opCtx, bool val) {
+    void setChangeStreamPreAndPostImages(OperationContext* opCtx,
+                                         ChangeStreamPreAndPostImagesOptions val) {
         std::abort();
     }
 

@@ -41,6 +41,7 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/client.h"
+#include "mongo/db/coll_mod_gen.h"
 #include "mongo/db/commands/create_gen.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop_failpoint_helpers.h"
@@ -112,7 +113,7 @@ struct CollModRequest {
     boost::optional<ValidationActionEnum> collValidationAction;
     boost::optional<ValidationLevelEnum> collValidationLevel;
     bool recordPreImages = false;
-    OptionalBool changeStreamPreAndPostImagesEnabled;
+    boost::optional<ChangeStreamPreAndPostImagesOptions> changeStreamPreAndPostImagesOptions;
 };
 
 StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
@@ -320,13 +321,21 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
             cmr.viewOn = e.str();
         } else if (fieldName == "recordPreImages" && !isView && !isTimeseries) {
             cmr.recordPreImages = e.trueValue();
-        } else if (fieldName == "changeStreamPreAndPostImages" && !isView && !isTimeseries) {
-            if (e.type() != mongo::Bool) {
+        } else if (fieldName == CollMod::kChangeStreamPreAndPostImagesFieldName && !isView &&
+                   !isTimeseries) {
+            if (e.type() != mongo::Object) {
                 return {ErrorCodes::InvalidOptions,
-                        "'changeStreamPreAndPostImages' option must be a boolean"};
+                        str::stream() << "'" << CollMod::kChangeStreamPreAndPostImagesFieldName
+                                      << "' option must be a document"};
             }
 
-            cmr.changeStreamPreAndPostImagesEnabled = e.trueValue();
+            try {
+                cmr.changeStreamPreAndPostImagesOptions =
+                    ChangeStreamPreAndPostImagesOptions::parse(
+                        {"changeStreamPreAndPostImagesOptions"}, e.Obj());
+            } catch (const DBException& ex) {
+                return ex.toStatus();
+            }
         } else if (fieldName == "expireAfterSeconds") {
             if (coll->getRecordStore()->keyFormat() != KeyFormat::String) {
                 return Status(ErrorCodes::InvalidOptions,
@@ -574,15 +583,17 @@ Status _collModInternal(OperationContext* opCtx,
 
         // TODO SERVER-58584: remove the feature flag.
         if (feature_flags::gFeatureFlagChangeStreamPreAndPostImages.isEnabledAndIgnoreFCV()) {
-            // If 'changeStreamPreAndPostImagesEnabled' is set to true, 'recordPreImages' must be
-            // set to false. If 'recordPreImages' is set to true,
-            // 'changeStreamPreAndPostImagesEnabled' must be set to false.
-            if (cmrNew.changeStreamPreAndPostImagesEnabled) {
+            // If 'changeStreamPreAndPostImagesOptions' are enabled, 'recordPreImages' must be set
+            // to false. If 'recordPreImages' is set to true, 'changeStreamPreAndPostImagesOptions'
+            // must be disabled.
+            if (cmrNew.changeStreamPreAndPostImagesOptions &&
+                cmrNew.changeStreamPreAndPostImagesOptions->getEnabled()) {
                 cmrNew.recordPreImages = false;
             }
 
             if (cmrNew.recordPreImages) {
-                cmrNew.changeStreamPreAndPostImagesEnabled = false;
+                cmrNew.changeStreamPreAndPostImagesOptions =
+                    ChangeStreamPreAndPostImagesOptions(false);
             }
         }
 
@@ -676,11 +687,11 @@ Status _collModInternal(OperationContext* opCtx,
 
         // TODO SERVER-58584: remove the feature flag.
         if (feature_flags::gFeatureFlagChangeStreamPreAndPostImages.isEnabledAndIgnoreFCV() &&
-            cmrNew.changeStreamPreAndPostImagesEnabled.has_value() &&
-            cmrNew.changeStreamPreAndPostImagesEnabled !=
-                oldCollOptions.changeStreamPreAndPostImagesEnabled) {
+            cmrNew.changeStreamPreAndPostImagesOptions.has_value() &&
+            *cmrNew.changeStreamPreAndPostImagesOptions !=
+                oldCollOptions.changeStreamPreAndPostImagesOptions) {
             coll.getWritableCollection()->setChangeStreamPreAndPostImages(
-                opCtx, cmrNew.changeStreamPreAndPostImagesEnabled);
+                opCtx, *cmrNew.changeStreamPreAndPostImagesOptions);
         }
 
         if (ts.isABSONObj()) {

@@ -547,3 +547,20 @@ function assertInvalidChangeStreamNss(dbName, collName = "test", options) {
         (res) => assert.commandFailedWithCode(
             res, [ErrorCodes.InvalidNamespace, ErrorCodes.InvalidOptions]));
 }
+
+/**
+ * Asserts that 'changeStreamPreAndPostImages' collection option is present and is enabled for
+ * collection.
+ */
+function assertChangeStreamPreAndPostImagesCollectionOptionIsEnabled(db, collName) {
+    const collectionInfos = db.getCollectionInfos({name: collName});
+    assert(collectionInfos[0].options["changeStreamPreAndPostImages"]["enabled"] === true);
+}
+
+/**
+ * Asserts that 'changeStreamPreAndPostImages' collection option is absent in the collection.
+ */
+function assertChangeStreamPreAndPostImagesCollectionOptionIsAbsent(db, collName) {
+    const collectionInfos = db.getCollectionInfos({name: collName});
+    assert(!collectionInfos[0].options.hasOwnProperty("changeStreamPreAndPostImages"));
+}

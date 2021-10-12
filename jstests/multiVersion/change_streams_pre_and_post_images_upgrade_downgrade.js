@@ -10,6 +10,10 @@ load("jstests/libs/collection_drop_recreate.js");  // For assertCreateCollection
 load("jstests/libs/collection_options.js");        // For assertCollectionOptionIsEnabled,
                                                    // assertCollectionOptionIsAbsent.
 load("jstests/multiVersion/libs/multi_rs.js");     // For upgradeSet.
+load(
+    "jstests/libs/change_stream_util.js");  // For
+                                            // assertChangeStreamPreAndPostImagesCollectionOptionIsEnabled,
+                                            // assertChangeStreamPreAndPostImagesCollectionOptionIsAbsent.
 
 const collName = "test";
 
@@ -34,37 +38,38 @@ function runTest(downgradeVersion) {
     // Set the FCV to the latest.
     testDB.adminCommand({setFeatureCompatibilityVersion: latestFCV});
 
-    // 'changeStreamPreAndPostImages' field must be absent and 'recordPreImages' field must be set
+    // 'changeStreamPreAndPostImages' option must be absent and 'recordPreImages' option must be set
     // to true.
     assertCollectionOptionIsEnabled(testDB, collName, "recordPreImages");
-    assertCollectionOptionIsAbsent(testDB, collName, "changeStreamPreAndPostImages");
+    assertChangeStreamPreAndPostImagesCollectionOptionIsAbsent(testDB, collName);
 
     // Enable pre-/post-images for the collection with "recordPreImages" enabled.
     assert.commandWorked(
-        testDB.runCommand({"collMod": collName, "changeStreamPreAndPostImages": true}));
+        testDB.runCommand({"collMod": collName, "changeStreamPreAndPostImages": {enabled: true}}));
 
-    // 'changeStreamPreAndPostImages' field must be set to true and 'recordPreImages' should be
-    // absent.
+    // 'changeStreamPreAndPostImages' option must be enabled and 'recordPreImages' should be absent.
     assertCollectionOptionIsAbsent(testDB, collName, "recordPreImages");
-    assertCollectionOptionIsEnabled(testDB, collName, "changeStreamPreAndPostImages");
+    assertChangeStreamPreAndPostImagesCollectionOptionIsEnabled(testDB, collName);
 
     // Set 'recordPreImages: true' to disable 'changeStreamPreAndPostImages' option.
     assert.commandWorked(testDB.runCommand({"collMod": collName, "recordPreImages": true}));
 
-    // 'changeStreamPreAndPostImages' field must be absent and 'recordPreImages' should be set to
+    // 'changeStreamPreAndPostImages' option must be absent and 'recordPreImages' should be set to
     // true.
     assertCollectionOptionIsEnabled(testDB, collName, "recordPreImages");
-    assertCollectionOptionIsAbsent(testDB, collName, "changeStreamPreAndPostImages");
+    assertChangeStreamPreAndPostImagesCollectionOptionIsAbsent(testDB, collName);
 
     // Downgrade the FCV.
     testDB.adminCommand({setFeatureCompatibilityVersion: downgradeFCV});
 
-    // Verify that an attempt to set 'changeStreamPreAndPostImages' options fails for the downgrade
+    // Verify that an attempt to set 'changeStreamPreAndPostImages' option fails for the downgrade
     // version.
     assert.commandFailedWithCode(
-        testDB.createCollection(collName, {"changeStreamPreAndPostImages": false}), 5846900);
+        testDB.createCollection(collName, {"changeStreamPreAndPostImages": {enabled: false}}),
+        5846900);
     assert.commandFailedWithCode(
-        testDB.runCommand({"collMod": collName, "changeStreamPreAndPostImages": false}), 5846901);
+        testDB.runCommand({"collMod": collName, "changeStreamPreAndPostImages": {enabled: false}}),
+        5846901);
 
     // Downgrade the cluster.
     rst.upgradeSet({binVersion: downgradeVersion});
@@ -72,10 +77,10 @@ function runTest(downgradeVersion) {
     // Reset the db reference.
     testDB = rst.getPrimary().getDB(jsTestName());
 
-    // 'changeStreamPreAndPostImages' field must be absent and 'recordPreImages' should be set to
+    // 'changeStreamPreAndPostImages' option must be absent and 'recordPreImages' should be set to
     // true.
     assertCollectionOptionIsEnabled(testDB, collName, "recordPreImages");
-    assertCollectionOptionIsAbsent(testDB, collName, "changeStreamPreAndPostImages");
+    assertChangeStreamPreAndPostImagesCollectionOptionIsAbsent(testDB, collName);
 
     // Upgrade the replica set.
     rst.upgradeSet({binVersion: "latest"});
@@ -86,18 +91,18 @@ function runTest(downgradeVersion) {
 
     // Enable pre-/post-images for the collection with "recordPreImages" enabled.
     assert.commandWorked(
-        testDB.runCommand({"collMod": collName, "changeStreamPreAndPostImages": true}));
+        testDB.runCommand({"collMod": collName, "changeStreamPreAndPostImages": {enabled: true}}));
 
-    // 'changeStreamPreAndPostImages' field must be set to true and 'recordPreImages' field must be
+    // 'changeStreamPreAndPostImages' option must be enabled and 'recordPreImages' option must be
     // absent.
-    assertCollectionOptionIsEnabled(testDB, collName, "changeStreamPreAndPostImages");
+    assertChangeStreamPreAndPostImagesCollectionOptionIsEnabled(testDB, collName);
     assertCollectionOptionIsAbsent(testDB, collName, "recordPreImages");
 
     // Downgrade the FCV.
     testDB.adminCommand({setFeatureCompatibilityVersion: downgradeFCV});
 
-    // Downgrading the cluster should fail, since unsupported field 'changeStreamPreAndPostImages'
-    // is set to true for the collection.
+    // Downgrading the cluster should fail, since unsupported option 'changeStreamPreAndPostImages'
+    // is enabled for the collection.
     try {
         rst.upgradeSet({binVersion: downgradeVersion});
         assert(false);

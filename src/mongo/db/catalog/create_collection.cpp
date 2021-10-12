@@ -130,7 +130,7 @@ Status _createView(OperationContext* opCtx,
                           str::stream() << "Not primary while creating collection " << nss);
         }
 
-        if (collectionOptions.changeStreamPreAndPostImagesEnabled) {
+        if (collectionOptions.changeStreamPreAndPostImagesOptions.getEnabled()) {
             return Status(ErrorCodes::InvalidOptions,
                           "option not supported on a view: changeStreamPreAndPostImages");
         }
@@ -529,7 +529,7 @@ Status createCollection(OperationContext* opCtx,
                 str::stream() << "Cannot create system collection " << ns
                               << " within a transaction.",
                 !opCtx->inMultiDocumentTransaction() || !ns.isSystem());
-        if (options.changeStreamPreAndPostImagesEnabled) {
+        if (options.changeStreamPreAndPostImagesOptions.getEnabled()) {
             tassert(5868500,
                     "ChangeStreamPreAndPostImages feature flag must be enabled",
                     feature_flags::gFeatureFlagChangeStreamPreAndPostImages.isEnabled(

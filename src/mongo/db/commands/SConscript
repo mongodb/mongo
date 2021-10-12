@@ -277,6 +277,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/auth/authprivilege',
         '$BUILD_DIR/mongo/db/catalog/clustered_collection_options',
         '$BUILD_DIR/mongo/db/catalog/collection_options',
+        '$BUILD_DIR/mongo/db/pipeline/change_stream_pre_and_post_images_options',
         '$BUILD_DIR/mongo/db/query/query_knobs',
         '$BUILD_DIR/mongo/db/server_options',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_options',

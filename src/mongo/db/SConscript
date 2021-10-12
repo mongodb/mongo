@@ -604,6 +604,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands/create_command',
         '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
+        '$BUILD_DIR/mongo/db/pipeline/change_stream_pre_and_post_images_options',
         '$BUILD_DIR/mongo/db/query/common_query_enums_and_helpers',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
         '$BUILD_DIR/mongo/idl/idl_parser',

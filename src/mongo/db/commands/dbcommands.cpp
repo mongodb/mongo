@@ -629,10 +629,13 @@ public:
         if (feature_flags::gFeatureFlagChangeStreamPreAndPostImages.isEnabled(
                 serverGlobalParams.featureCompatibility)) {
             const auto isRecordPreImagesEnabled = cmd->getRecordPreImages().get_value_or(false);
+            const auto isChangeStreamPreAndPostImagesEnabled =
+                (cmd->getChangeStreamPreAndPostImages() &&
+                 cmd->getChangeStreamPreAndPostImages()->getEnabled());
             uassert(ErrorCodes::InvalidOptions,
-                    "recordPreImages and changeStreamPreAndPostImages can not be set to true "
-                    "simultaneously",
-                    !(cmd->getChangeStreamPreAndPostImages() && isRecordPreImagesEnabled));
+                    "'recordPreImages' and 'changeStreamPreAndPostImages.enabled' can not be set "
+                    "to true simultaneously",
+                    !(isChangeStreamPreAndPostImagesEnabled && isRecordPreImagesEnabled));
         } else {
             uassert(5846901,
                     "BSON field 'changeStreamPreAndPostImages' is an unknown field.",

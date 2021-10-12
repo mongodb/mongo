@@ -36,6 +36,7 @@ imports:
     - "mongo/idl/basic_types.idl"
     - "mongo/db/catalog/collection_options.idl"
     - "mongo/db/timeseries/timeseries.idl"
+    - "mongo/db/pipeline/change_stream_pre_and_post_images_options.idl"
 
 structs:
     CollModIndex:
@@ -137,8 +138,9 @@ commands:
                 optional: true
                 type: safeBool
             changeStreamPreAndPostImages:
-                description: "Determines whether pre- and post-images of documents are available in the change stream events."
-                type: optionalBool
+                description: "The options for point-in-time pre- and post-images in change streams opened on this collection."
+                type: ChangeStreamPreAndPostImagesOptions
+                optional: true
                 unstable: true
             expireAfterSeconds:
                 description: "The number of seconds after which old data should be deleted. This can

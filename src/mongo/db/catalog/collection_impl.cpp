@@ -435,7 +435,7 @@ void CollectionImpl::init(OperationContext* opCtx) {
         uassertStatusOK(validateRecordPreImagesOptionIsPermitted(_ns));
     }
 
-    if (collectionOptions.changeStreamPreAndPostImagesEnabled) {
+    if (collectionOptions.changeStreamPreAndPostImagesOptions.getEnabled()) {
         uassertStatusOK(validateChangeStreamPreAndPostImagesOptionIsPermitted(_ns));
     }
 
@@ -1403,11 +1403,12 @@ void CollectionImpl::setRecordPreImages(OperationContext* opCtx, bool val) {
 }
 
 bool CollectionImpl::isChangeStreamPreAndPostImagesEnabled() const {
-    return _metadata->options.changeStreamPreAndPostImagesEnabled;
+    return _metadata->options.changeStreamPreAndPostImagesOptions.getEnabled();
 }
 
-void CollectionImpl::setChangeStreamPreAndPostImages(OperationContext* opCtx, bool val) {
-    if (val) {
+void CollectionImpl::setChangeStreamPreAndPostImages(OperationContext* opCtx,
+                                                     ChangeStreamPreAndPostImagesOptions val) {
+    if (val.getEnabled()) {
         uassertStatusOK(validateChangeStreamPreAndPostImagesOptionIsPermitted(_ns));
 
         // Create preimages collection if it doesn't already exist.
@@ -1415,7 +1416,7 @@ void CollectionImpl::setChangeStreamPreAndPostImages(OperationContext* opCtx, bo
     }
 
     _writeMetadata(opCtx, [&](BSONCollectionCatalogEntry::MetaData& md) {
-        md.options.changeStreamPreAndPostImagesEnabled = val;
+        md.options.changeStreamPreAndPostImagesOptions = val;
     });
 }
 

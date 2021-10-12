@@ -37,6 +37,7 @@
 #include "mongo/db/catalog/clustered_collection_options_gen.h"
 #include "mongo/db/catalog/collection_options_gen.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/pipeline/change_stream_pre_and_post_images_options_gen.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/util/uuid.h"
 
@@ -132,10 +133,10 @@ struct CollectionOptions {
     bool temp = false;
     bool recordPreImages = false;
 
-    // If set to true, stores the pre-images of the documents affected by update and delete
-    // operations in a dedicated collection, that will be used for reading data via changeStreams.
-    // Can not be set to true together with 'recordPreImages' (mutually exclusive).
-    bool changeStreamPreAndPostImagesEnabled = false;
+    // Change stream options define whether or not to store the pre-images of the documents affected
+    // by update and delete operations in a dedicated collection, that will be used for reading data
+    // via changeStreams. Can not be enabled together with 'recordPreImages' (mutually exclusive).
+    ChangeStreamPreAndPostImagesOptions changeStreamPreAndPostImagesOptions{false};
 
     // Storage engine collection options. Always owned or empty.
     BSONObj storageEngine;

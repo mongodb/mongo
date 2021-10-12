@@ -137,7 +137,18 @@ StatusWith<CollectionOptions> CollectionOptions::parse(const BSONObj& options, P
         } else if (fieldName == "recordPreImages") {
             collectionOptions.recordPreImages = e.trueValue();
         } else if (fieldName == "changeStreamPreAndPostImages") {
-            collectionOptions.changeStreamPreAndPostImagesEnabled = e.trueValue();
+            if (e.type() != mongo::Object) {
+                return {ErrorCodes::InvalidOptions,
+                        "'changeStreamPreAndPostImages' option must be a document"};
+            }
+
+            try {
+                collectionOptions.changeStreamPreAndPostImagesOptions =
+                    ChangeStreamPreAndPostImagesOptions::parse(
+                        {"changeStreamPreAndPostImagesOptions"}, e.Obj());
+            } catch (const DBException& ex) {
+                return ex.toStatus();
+            }
         } else if (fieldName == "storageEngine") {
             if (e.type() != mongo::Object) {
                 return {ErrorCodes::TypeMismatch, "'storageEngine' must be a document"};
@@ -305,8 +316,8 @@ CollectionOptions CollectionOptions::fromCreateCommand(const CreateCommand& cmd)
     if (auto recordPreImages = cmd.getRecordPreImages()) {
         options.recordPreImages = *recordPreImages;
     }
-    if (cmd.getChangeStreamPreAndPostImages().has_value()) {
-        options.changeStreamPreAndPostImagesEnabled = cmd.getChangeStreamPreAndPostImages();
+    if (auto changeStreamPreAndPostImagesOptions = cmd.getChangeStreamPreAndPostImages()) {
+        options.changeStreamPreAndPostImagesOptions = *changeStreamPreAndPostImagesOptions;
     }
     if (auto timeseries = cmd.getTimeseries()) {
         options.timeseries = std::move(*timeseries);
@@ -373,9 +384,10 @@ void CollectionOptions::appendBSON(BSONObjBuilder* builder,
 
     // TODO SERVER-58584: remove the feature flag.
     if (feature_flags::gFeatureFlagChangeStreamPreAndPostImages.isEnabledAndIgnoreFCV() &&
-        changeStreamPreAndPostImagesEnabled &&
+        changeStreamPreAndPostImagesOptions.getEnabled() &&
         shouldAppend(CreateCommand::kChangeStreamPreAndPostImagesFieldName)) {
-        builder->appendBool(CreateCommand::kChangeStreamPreAndPostImagesFieldName, true);
+        builder->append(CreateCommand::kChangeStreamPreAndPostImagesFieldName,
+                        changeStreamPreAndPostImagesOptions.toBSON());
     }
 
     if (!storageEngine.isEmpty() && shouldAppend(CreateCommand::kStorageEngineFieldName)) {
@@ -458,7 +470,7 @@ bool CollectionOptions::matchesStorageOptions(const CollectionOptions& other,
         return false;
     }
 
-    if (changeStreamPreAndPostImagesEnabled != other.changeStreamPreAndPostImagesEnabled) {
+    if (changeStreamPreAndPostImagesOptions != other.changeStreamPreAndPostImagesOptions) {
         return false;
     }
 

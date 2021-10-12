@@ -1,5 +1,5 @@
 // Tests that pre-images are stored in the pre-images collection on updates in collections with
-// 'changeStreamPreAndPostImages' set to true.
+// 'changeStreamPreAndPostImages' being enabled.
 // @tags: [
 //  requires_fcv_51,
 //  featureFlagChangeStreamPreAndPostImages,
@@ -50,7 +50,8 @@ assert.commandWorked(coll.remove(updatedDoc));
 assert.eq(preImagesColl.count(), 0);
 
 // Enable changeStreamPreAndPostImages for pre-images recording.
-assert.commandWorked(testDB.runCommand({collMod: collName, changeStreamPreAndPostImages: true}));
+assert.commandWorked(
+    testDB.runCommand({collMod: collName, changeStreamPreAndPostImages: {enabled: true}}));
 
 // Perform an insert.
 assert.commandWorked(coll.insert(originalDoc));
