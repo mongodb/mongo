@@ -4151,7 +4151,7 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=change_streams_secondary_reads --storageEngiue=wiredTiger
+      resmoke_args: --suites=change_streams_secondary_reads --storageEngine=wiredTiger
 
 - <<: *task_template
   name: change_streams_sharded_collections_passthrough
