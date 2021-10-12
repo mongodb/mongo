@@ -72,7 +72,7 @@ protected:
     void tearDown() {
         auto opCtx = makeOpCtx();
         DBDirectClient client(opCtx.get());
-        client.dropCollection("local.replset.election");
+        client.dropCollection(NamespaceString::kLastVoteNamespace.toString());
 
         _replCoordExternalState.reset();
         _dropPendingCollectionReaper.reset();

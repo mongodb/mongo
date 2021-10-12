@@ -92,6 +92,8 @@ const NamespaceString NamespaceString::kExternalKeysCollectionNamespace(Namespac
 const NamespaceString NamespaceString::kRsOplogNamespace(NamespaceString::kLocalDb, "oplog.rs");
 const NamespaceString NamespaceString::kSystemReplSetNamespace(NamespaceString::kLocalDb,
                                                                "system.replset");
+const NamespaceString NamespaceString::kLastVoteNamespace(NamespaceString::kLocalDb,
+                                                          "replset.election");
 const NamespaceString NamespaceString::kChangeStreamPreImagesNamespace(NamespaceString::kLocalDb,
                                                                        "system.preimages");
 const NamespaceString NamespaceString::kIndexBuildEntryNamespace(NamespaceString::kConfigDb,

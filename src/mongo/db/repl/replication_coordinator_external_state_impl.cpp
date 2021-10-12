@@ -125,7 +125,6 @@ namespace {
 const char localDbName[] = "local";
 const char configCollectionName[] = "local.system.replset";
 const auto configDatabaseName = localDbName;
-const char lastVoteCollectionName[] = "local.replset.election";
 const auto lastVoteDatabaseName = localDbName;
 const char meCollectionName[] = "local.me";
 const auto meDatabaseName = localDbName;
@@ -625,23 +624,29 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalConfigDocument(Operati
 Status ReplicationCoordinatorExternalStateImpl::createLocalLastVoteCollection(
     OperationContext* opCtx) {
     auto status = _storageInterface->createCollection(
-        opCtx, NamespaceString(lastVoteCollectionName), CollectionOptions());
+        opCtx, NamespaceString::kLastVoteNamespace, CollectionOptions());
     if (!status.isOK() && status.code() != ErrorCodes::NamespaceExists) {
         return {ErrorCodes::CannotCreateCollection,
                 str::stream() << "Failed to create local last vote collection. Ns: "
-                              << lastVoteCollectionName << " Error: " << status.toString()};
+                              << NamespaceString::kLastVoteNamespace.toString()
+                              << " Error: " << status.toString()};
     }
 
     // Make sure there's always a last vote document.
     try {
         writeConflictRetry(
-            opCtx, "create initial replica set lastVote", lastVoteCollectionName, [opCtx] {
-                AutoGetCollection coll(opCtx, NamespaceString(lastVoteCollectionName), MODE_X);
+            opCtx,
+            "create initial replica set lastVote",
+            NamespaceString::kLastVoteNamespace.toString(),
+            [opCtx] {
+                AutoGetCollection coll(opCtx, NamespaceString::kLastVoteNamespace, MODE_X);
                 BSONObj result;
-                bool exists = Helpers::getSingleton(opCtx, lastVoteCollectionName, result);
+                bool exists = Helpers::getSingleton(
+                    opCtx, NamespaceString::kLastVoteNamespace.ns().c_str(), result);
                 if (!exists) {
                     LastVote lastVote{OpTime::kInitialTerm, -1};
-                    Helpers::putSingleton(opCtx, lastVoteCollectionName, lastVote.toBSON());
+                    Helpers::putSingleton(
+                        opCtx, NamespaceString::kLastVoteNamespace.ns().c_str(), lastVote.toBSON());
                 }
             });
     } catch (const DBException& ex) {
@@ -655,13 +660,18 @@ StatusWith<LastVote> ReplicationCoordinatorExternalStateImpl::loadLocalLastVoteD
     OperationContext* opCtx) {
     try {
         return writeConflictRetry(
-            opCtx, "load replica set lastVote", lastVoteCollectionName, [opCtx] {
+            opCtx,
+            "load replica set lastVote",
+            NamespaceString::kLastVoteNamespace.toString(),
+            [opCtx] {
                 BSONObj lastVoteObj;
-                if (!Helpers::getSingleton(opCtx, lastVoteCollectionName, lastVoteObj)) {
+                if (!Helpers::getSingleton(opCtx,
+                                           NamespaceString::kLastVoteNamespace.toString().c_str(),
+                                           lastVoteObj)) {
                     return StatusWith<LastVote>(
                         ErrorCodes::NoMatchingDocument,
                         str::stream() << "Did not find replica set lastVote document in "
-                                      << lastVoteCollectionName);
+                                      << NamespaceString::kLastVoteNamespace.toString());
                 }
                 return LastVote::readFromLastVote(lastVoteObj);
             });
@@ -684,14 +694,17 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalLastVoteDocument(
         // acquisition and the "waitUntilDurable" lock acquisition must be uninterruptible.
         UninterruptibleLockGuard noInterrupt(opCtx->lockState());
 
-        Status status =
-            writeConflictRetry(opCtx, "save replica set lastVote", lastVoteCollectionName, [&] {
+        Status status = writeConflictRetry(
+            opCtx,
+            "save replica set lastVote",
+            NamespaceString::kLastVoteNamespace.toString(),
+            [&] {
                 // Writes to non-replicated collections do not need concurrency control with the
                 // OplogApplier that never accesses them. Skip taking the PBWM.
                 ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(
                     opCtx->lockState());
 
-                AutoGetCollection coll(opCtx, NamespaceString(lastVoteCollectionName), MODE_IX);
+                AutoGetCollection coll(opCtx, NamespaceString::kLastVoteNamespace, MODE_IX);
                 WriteUnitOfWork wunit(opCtx);
 
                 // We only want to replace the last vote document if the new last vote document
@@ -700,14 +713,16 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalLastVoteDocument(
                 // operations. We have already ensured at startup time that there is an old
                 // document.
                 BSONObj result;
-                bool exists = Helpers::getSingleton(opCtx, lastVoteCollectionName, result);
+                bool exists = Helpers::getSingleton(
+                    opCtx, NamespaceString::kLastVoteNamespace.ns().c_str(), result);
                 fassert(51241, exists);
                 StatusWith<LastVote> oldLastVoteDoc = LastVote::readFromLastVote(result);
                 if (!oldLastVoteDoc.isOK()) {
                     return oldLastVoteDoc.getStatus();
                 }
                 if (lastVote.getTerm() > oldLastVoteDoc.getValue().getTerm()) {
-                    Helpers::putSingleton(opCtx, lastVoteCollectionName, lastVoteObj);
+                    Helpers::putSingleton(
+                        opCtx, NamespaceString::kLastVoteNamespace.ns().c_str(), lastVoteObj);
                 }
                 wunit.commit();
                 return Status::OK();

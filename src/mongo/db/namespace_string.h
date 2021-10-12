@@ -139,6 +139,9 @@ public:
     // Namespace for replica set configuration settings.
     static const NamespaceString kSystemReplSetNamespace;
 
+    // Namespace for storing the last replica set election vote.
+    static const NamespaceString kLastVoteNamespace;
+
     // Namespace for change stream pre-images collection.
     static const NamespaceString kChangeStreamPreImagesNamespace;
 
