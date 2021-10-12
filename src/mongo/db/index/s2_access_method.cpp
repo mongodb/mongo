@@ -114,7 +114,7 @@ StatusWith<BSONObj> S2AccessMethod::fixSpec(const BSONObj& specObj) {
                               << S2_INDEX_VERSION_3 << "] are supported"};
     }
 
-    const auto indexVersion = indexVersionElt.numberLong();
+    const auto indexVersion = indexVersionElt.safeNumberLong();
     if (indexVersion != S2_INDEX_VERSION_1 && indexVersion != S2_INDEX_VERSION_2 &&
         indexVersion != S2_INDEX_VERSION_3) {
         return {ErrorCodes::CannotCreateIndex,
