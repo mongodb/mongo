@@ -43,6 +43,8 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/record_id_helpers.h"
+#include "mongo/db/storage/key_string.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
@@ -552,7 +554,9 @@ Status validate(OperationContext* opCtx,
 
         // In traverseRecordStore(), the index validator keeps track the records in the record
         // store so that _validateIndexes() can confirm that the index entries match the records in
-        // the collection.
+        // the collection. For clustered collections, the validator also verifies that the
+        // record key (RecordId) matches the cluster key field in the record value (document's
+        // cluster key).
         indexValidator.traverseRecordStore(opCtx, results, output);
 
         // Pause collection validation while a lock is held and between collection and index data

@@ -66,6 +66,36 @@ const long long kMaxErrorSizeBytes = 1 * 1024 * 1024;
 const long long kInterruptIntervalNumRecords = 4096;
 const long long kInterruptIntervalNumBytes = 50 * 1024 * 1024;  // 50MB.
 
+/**
+ * Validate that for each record in a clustered RecordStore the record key (RecordId) matches the
+ * document's cluster key in the record value.
+ */
+void _validateClusteredCollectionRecordId(OperationContext* opCtx,
+                                          const RecordId& rid,
+                                          const BSONObj& doc,
+                                          ValidateResults* results) {
+    const auto ridFromDoc = record_id_helpers::keyForDoc(doc);
+    if (!ridFromDoc.isOK()) {
+        results->valid = false;
+        results->errors.push_back(str::stream() << rid << " " << ridFromDoc.getStatus().reason());
+        results->corruptRecords.push_back(rid);
+        return;
+    }
+
+    const auto ksFromBSON =
+        KeyString::Builder(KeyString::Version::kLatestVersion, ridFromDoc.getValue());
+    const auto ksFromRid = KeyString::Builder(KeyString::Version::kLatestVersion, rid);
+
+    if (ksFromRid != ksFromBSON) {
+        results->valid = false;
+        results->errors.push_back(str::stream()
+                                  << "Document with " << rid << " has mismatched " << doc["_id"]
+                                  << " (RecordId KeyString='" << ksFromRid.toString()
+                                  << "', cluster key KeyString='" << ksFromBSON.toString() << "')");
+        results->corruptRecords.push_back(rid);
+    }
+}
+
 }  // namespace
 
 Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
@@ -87,6 +117,10 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
     const CollectionPtr& coll = _validateState->getCollection();
     if (!coll->getIndexCatalog()->haveAnyIndexes()) {
         return status;
+    }
+
+    if (coll->isClustered()) {
+        _validateClusteredCollectionRecordId(opCtx, recordId, recordBson, results);
     }
 
     auto& executionCtx = StorageExecutionContext::get(opCtx);
