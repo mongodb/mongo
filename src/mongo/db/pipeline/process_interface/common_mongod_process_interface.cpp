@@ -141,15 +141,16 @@ bool supportsUniqueKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
             CollatorInterface::collatorsMatch(index->getCollator(), expCtx->getCollator()));
 }
 
-// In an operation across GetMore requests we need to check that ignore conflicts is set for each
-// write to the RecordStore.
-void setIgnoreConflictsWriteBehavior(const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    if (expCtx->opCtx->recoveryUnit()->getPrepareConflictBehavior() !=
-        PrepareConflictBehavior::kIgnoreConflictsAllowWrites) {
-        expCtx->opCtx->recoveryUnit()->abandonSnapshot();
-        expCtx->opCtx->recoveryUnit()->setPrepareConflictBehavior(
-            PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
-    }
+// Proactively assert that this operation can safely write before hitting an assertion in the
+// storage engine. We can safely write if we are enforcing prepare conflicts by blocking or if we
+// are ignoring prepare conflicts and explicitly allowing writes. Ignoring prepare conflicts
+// without allowing writes will cause this operation to fail in the storage engine.
+void assertIgnorePrepareConflictsBehavior(const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    tassert(5996900,
+            "Expected operation to either be blocking on prepare conflicts or ignoring prepare "
+            "conflicts and allowing writes",
+            expCtx->opCtx->recoveryUnit()->getPrepareConflictBehavior() !=
+                PrepareConflictBehavior::kIgnoreConflicts);
 }
 
 }  // namespace
@@ -659,7 +660,7 @@ void CommonMongodProcessInterface::writeRecordsToRecordStore(
     std::vector<Record>* records,
     const std::vector<Timestamp>& ts) const {
     tassert(5643012, "Attempted to write to record store with nullptr", records);
-    setIgnoreConflictsWriteBehavior(expCtx);
+    assertIgnorePrepareConflictsBehavior(expCtx);
     writeConflictRetry(expCtx->opCtx, "MPI::writeRecordsToRecordStore", expCtx->ns.ns(), [&] {
         AutoGetCollection autoColl(expCtx->opCtx, expCtx->ns, MODE_IX);
         WriteUnitOfWork wuow(expCtx->opCtx);
@@ -672,9 +673,7 @@ void CommonMongodProcessInterface::writeRecordsToRecordStore(
 }
 std::unique_ptr<TemporaryRecordStore> CommonMongodProcessInterface::createTemporaryRecordStore(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
-    expCtx->opCtx->recoveryUnit()->abandonSnapshot();
-    expCtx->opCtx->recoveryUnit()->setPrepareConflictBehavior(
-        PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
+    assertIgnorePrepareConflictsBehavior(expCtx);
     return expCtx->opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStore(
         expCtx->opCtx);
 }
@@ -690,7 +689,7 @@ Document CommonMongodProcessInterface::readRecordFromRecordStore(
 
 void CommonMongodProcessInterface::deleteRecordFromRecordStore(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, RecordStore* rs, RecordId rID) const {
-    setIgnoreConflictsWriteBehavior(expCtx);
+    assertIgnorePrepareConflictsBehavior(expCtx);
     writeConflictRetry(expCtx->opCtx, "MPI::deleteFromRecordStore", expCtx->ns.ns(), [&] {
         AutoGetCollection autoColl(expCtx->opCtx, expCtx->ns, MODE_IX);
         WriteUnitOfWork wuow(expCtx->opCtx);
@@ -701,7 +700,7 @@ void CommonMongodProcessInterface::deleteRecordFromRecordStore(
 
 void CommonMongodProcessInterface::truncateRecordStore(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, RecordStore* rs) const {
-    setIgnoreConflictsWriteBehavior(expCtx);
+    assertIgnorePrepareConflictsBehavior(expCtx);
     writeConflictRetry(expCtx->opCtx, "MPI::truncateRecordStore", expCtx->ns.ns(), [&] {
         AutoGetCollection autoColl(expCtx->opCtx, expCtx->ns, MODE_IX);
         WriteUnitOfWork wuow(expCtx->opCtx);
@@ -714,7 +713,7 @@ void CommonMongodProcessInterface::truncateRecordStore(
 void CommonMongodProcessInterface::deleteTemporaryRecordStore(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     std::unique_ptr<TemporaryRecordStore> rs) const {
-    setIgnoreConflictsWriteBehavior(expCtx);
+    assertIgnorePrepareConflictsBehavior(expCtx);
     AutoGetCollection autoColl(expCtx->opCtx, expCtx->ns, MODE_IX);
     rs->finalizeTemporaryTable(expCtx->opCtx, TemporaryRecordStore::FinalizationAction::kDelete);
 }

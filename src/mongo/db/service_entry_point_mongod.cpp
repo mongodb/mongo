@@ -64,8 +64,13 @@ public:
 
     void setPrepareConflictBehaviorForReadConcern(
         OperationContext* opCtx, const CommandInvocation* invocation) const override {
+        // Some read commands can safely ignore prepare conflicts by default because they do not
+        // require snapshot isolation and do not conflict with concurrent writes. We also give these
+        // operations permission to write, as this may be required for queries that spill using the
+        // storage engine. The kIgnoreConflictsAllowWrites setting suppresses an assertion in the
+        // storage engine that prevents operations that ignore prepare conflicts from also writing.
         const auto prepareConflictBehavior = invocation->canIgnorePrepareConflicts()
-            ? PrepareConflictBehavior::kIgnoreConflicts
+            ? PrepareConflictBehavior::kIgnoreConflictsAllowWrites
             : PrepareConflictBehavior::kEnforce;
         mongo::setPrepareConflictBehaviorForReadConcern(
             opCtx, repl::ReadConcernArgs::get(opCtx), prepareConflictBehavior);
