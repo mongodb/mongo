@@ -26,8 +26,10 @@ checkLog.contains(rollbackNode, "rollbackHangAfterTransitionToRollback fail poin
 
 // Try to run the validate command on the rollback node. This should fail with a
 // NotPrimaryOrSecondary error.
-assert.commandFailedWithCode(rollbackNode.getDB(dbName).runCommand({"validate": collName}),
-                             ErrorCodes.NotPrimaryOrSecondary);
+const result =
+    assert.commandFailedWithCode(rollbackNode.getDB(dbName).runCommand({"validate": collName}),
+                                 ErrorCodes.NotPrimaryOrSecondary);
+jsTestLog('Validation failed on rollback node as expected: ' + tojson(result));
 
 assert.commandWorked(rollbackNode.adminCommand(
     {configureFailPoint: "rollbackHangAfterTransitionToRollback", mode: "off"}));
