@@ -238,7 +238,7 @@ class TaskGenerator:
 
         timeout = self.generate_timeouts(test_name)
         commands = resmoke_commands("run tests", run_tests_vars, timeout,
-                                    self.task_info.require_multiversion)
+                                    self.task_info.require_multiversion_setup)
         dependencies = {TaskDependency(ARCHIVE_DIST_TEST_DEBUG_TASK)}
 
         return Task(sub_task_name, commands, dependencies)

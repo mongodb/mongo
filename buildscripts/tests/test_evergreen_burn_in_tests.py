@@ -303,7 +303,7 @@ def create_tests_by_task_mock(n_tasks, n_tests):
         f"task_{i}_gen":
         under_test.TaskInfo(display_task_name=f"task_{i}", resmoke_args=f"--suites=suite_{i}",
                             tests=[f"jstests/tests_{j}" for j in range(n_tests)],
-                            require_multiversion=None, distro=f"distro_{i}")
+                            require_multiversion_setup=False, distro=f"distro_{i}")
         for i in range(n_tasks)
     }
 
@@ -368,7 +368,7 @@ class TestCreateGenerateTasksFile(unittest.TestCase):
     @patch(ns("sys.exit"))
     @patch(ns("validate_task_generation_limit"))
     def test_cap_on_task_generate(self, validate_mock, exit_mock):
-        gen_config = MagicMock(require_multiversion=False)
+        gen_config = MagicMock(require_multiversion_setup=False)
         repeat_config = MagicMock()
         tests_by_task = MagicMock()
         mock_evg_api = MagicMock()

@@ -49,7 +49,8 @@ SELECTOR_FILE = "etc/burn_in_tests.yml"
 SUITE_FILES = ["with_server"]
 
 SUPPORTED_TEST_KINDS = ("fsm_workload_test", "js_test", "json_schema_test",
-                        "multi_stmt_txn_passthrough", "parallel_fsm_workload_test")
+                        "multi_stmt_txn_passthrough", "parallel_fsm_workload_test",
+                        "all_versions_js_test")
 
 
 class RepeatConfig(object):
@@ -257,14 +258,14 @@ class TaskInfo(NamedTuple):
     display_task_name: Display name of task.
     resmoke_args: Arguments to provide to resmoke on task invocation.
     tests: List of tests to run as part of task.
-    require_multiversion: Requires downloading Multiversion binaries.
+    require_multiversion_setup: Requires downloading Multiversion binaries.
     distro: Evergreen distro task runs on.
     """
 
     display_task_name: str
+    require_multiversion_setup: bool
     resmoke_args: str
     tests: List[str]
-    require_multiversion: Optional[bool]
     distro: str
 
     @classmethod
@@ -282,8 +283,8 @@ class TaskInfo(NamedTuple):
         return cls(
             display_task_name=_get_task_name(task), resmoke_args=_set_resmoke_args(task),
             tests=tests_by_suite[task.resmoke_suite],
-            require_multiversion=task.require_multiversion, distro=_distro_to_run_task_on(
-                task, evg_proj_config, build_variant))
+            require_multiversion_setup=task.require_multiversion_setup,
+            distro=_distro_to_run_task_on(task, evg_proj_config, build_variant))
 
 
 def create_task_list(evergreen_conf: EvergreenProjectConfig, build_variant: str,

@@ -7,13 +7,17 @@ import structlog
 from shrub.v2 import Task, TaskDependency
 
 from buildscripts.patch_builds.task_generation import resmoke_commands
+from buildscripts.resmokelib.multiversionconstants import REQUIRES_FCV_TAG
 from buildscripts.task_generation.constants import ARCHIVE_DIST_TEST_DEBUG_TASK
-from buildscripts.task_generation.suite_split import GeneratedSuite, SubSuite
+from buildscripts.task_generation.suite_split import GeneratedSuite
 from buildscripts.task_generation.task_types.gentask_options import GenTaskOptions
 from buildscripts.task_generation.timeout import TimeoutEstimate
-from buildscripts.util import taskname
 
 LOGGER = structlog.getLogger(__name__)
+
+BACKPORT_REQUIRED_TAG = "backport_required_multiversion"
+EXCLUDE_TAGS = f"{REQUIRES_FCV_TAG},multiversion_incompatible,{BACKPORT_REQUIRED_TAG}"
+EXCLUDE_TAGS_FILE = "multiversion_exclude_tags.yml"
 
 
 def string_contains_any_of_args(string: str, args: List[str]) -> bool:
@@ -32,7 +36,7 @@ class ResmokeGenTaskParams(NamedTuple):
     Parameters describing how a specific resmoke suite should be generated.
 
     use_large_distro: Whether generated tasks should be run on a "large" distro.
-    require_multiversion: Requires downloading Multiversion binaries.
+    require_multiversion_setup: Requires downloading Multiversion binaries.
     repeat_suites: How many times generated suites should be repeated.
     resmoke_args: Arguments to pass to resmoke in generated tasks.
     resmoke_jobs_max: Max number of jobs that resmoke should execute in parallel.
@@ -41,7 +45,7 @@ class ResmokeGenTaskParams(NamedTuple):
 
     use_large_distro: bool
     large_distro_name: Optional[str]
-    require_multiversion: Optional[bool]
+    require_multiversion_setup: Optional[bool]
     repeat_suites: int
     resmoke_args: str
     resmoke_jobs_max: Optional[int]
@@ -86,41 +90,38 @@ class ResmokeGenTaskService:
         :return: Set of shrub tasks to generate the given suite.
         """
         tasks = {
-            self._create_sub_task(suite, generated_suite, params)
-            for suite in generated_suite.sub_suites
+            self._create_sub_task(index, suite.get_timeout_estimate(), generated_suite, params)
+            for index, suite in enumerate(generated_suite.sub_suites)
         }
 
         if self.gen_task_options.create_misc_suite:
-            # Add the misc suite
-            misc_task_name = f"{generated_suite.task_name}_misc_{generated_suite.build_variant}"
             tasks.add(
-                self._generate_task(None, misc_task_name, TimeoutEstimate.no_timeouts(), params,
-                                    generated_suite))
+                self._create_sub_task(None, est_timeout=TimeoutEstimate.no_timeouts(),
+                                      suite=generated_suite, params=params))
 
         return tasks
 
-    def _create_sub_task(self, sub_suite: SubSuite, suite: GeneratedSuite,
-                         params: ResmokeGenTaskParams) -> Task:
+    def _create_sub_task(self, index: Optional[int], est_timeout: TimeoutEstimate,
+                         suite: GeneratedSuite, params: ResmokeGenTaskParams) -> Task:
         """
         Create the sub task for the given suite.
 
-        :param sub_suite: Sub-Suite to generate.
+        :param index: index of sub_suite.
+        :param est_timeout: timeout estimate.
         :param suite: Parent suite being created.
         :param params: Parameters describing how tasks should be generated.
         :return: Shrub configuration for the sub-suite.
         """
-        sub_task_name = taskname.name_generated_task(suite.task_name, sub_suite.index, len(suite),
-                                                     suite.build_variant)
-        return self._generate_task(sub_suite.index, sub_task_name, sub_suite.get_timeout_estimate(),
-                                   params, suite)
+        return self._generate_task(
+            suite.sub_suite_config_file(index), suite.sub_suite_task_name(index), est_timeout,
+            params, suite)
 
-    def _generate_task(self, sub_suite_index: Optional[int], sub_task_name: str,
-                       timeout_est: TimeoutEstimate, params: ResmokeGenTaskParams,
-                       suite: GeneratedSuite) -> Task:
+    def _generate_task(self, sub_suite_file, sub_task_name: str, timeout_est: TimeoutEstimate,
+                       params: ResmokeGenTaskParams, suite: GeneratedSuite) -> Task:
         """
         Generate a shrub evergreen config for a resmoke task.
 
-        :param sub_suite_index: Index of suite being generated.
+        :param sub_suite_file: Name of the suite file to run in the generated task.
         :param sub_task_name: Name of task to generate.
         :param timeout_est: Estimated runtime to use for calculating timeouts.
         :param params: Parameters describing how tasks should be generated.
@@ -128,45 +129,74 @@ class ResmokeGenTaskService:
         :return: Shrub configuration for the described task.
         """
         # pylint: disable=too-many-arguments
-        LOGGER.debug("Generating task", suite=suite.display_task_name(), index=sub_suite_index)
+        LOGGER.debug("Generating task running suite", sub_task_name=sub_task_name,
+                     sub_suite_file=sub_suite_file)
 
-        target_suite_file = self.gen_task_options.suite_location(
-            suite.sub_suite_config_file(sub_suite_index))
-        run_tests_vars = self._get_run_tests_vars(target_suite_file, suite.suite_name, params)
+        sub_suite_file_path = self.gen_task_options.suite_location(sub_suite_file)
+        run_tests_vars = self._get_run_tests_vars(sub_suite_file_path=sub_suite_file_path,
+                                                  suite_file=suite.suite_name,
+                                                  task_name=suite.task_name, params=params)
 
-        require_multiversion = params.require_multiversion
+        require_multiversion_setup = params.require_multiversion_setup
         timeout_cmd = timeout_est.generate_timeout_cmd(self.gen_task_options.is_patch,
                                                        params.repeat_suites,
                                                        self.gen_task_options.use_default_timeouts)
         commands = resmoke_commands("run generated tests", run_tests_vars, timeout_cmd,
-                                    require_multiversion)
+                                    require_multiversion_setup)
 
         return Task(sub_task_name, commands, self._get_dependencies())
 
-    @staticmethod
+    def generate_resmoke_args(self, sub_suite_file: str, original_suite: str, task_name: str,
+                              params: ResmokeGenTaskParams) -> str:
+        """
+        Generate the resmoke args for the given suite.
+
+        :param sub_suite_file: File containing configuration for test suite.
+        :param original_suite: Name of source suite of the generated suite files.
+        :param task_name: Name of the task.
+        :param params: task generation parameters.
+
+        :return: arguments to pass to resmoke.
+        """
+        resmoke_args = f"--suite={sub_suite_file} --originSuite={original_suite} {params.resmoke_args}"
+        if params.repeat_suites and not string_contains_any_of_args(resmoke_args,
+                                                                    ["repeatSuites", "repeat"]):
+            resmoke_args += f" --repeatSuites={params.repeat_suites} "
+
+        if params.require_multiversion_setup:
+            tag_file = self.gen_task_options.generated_file_location(EXCLUDE_TAGS_FILE)
+            resmoke_args += f" --tagFile={tag_file}"
+            resmoke_args += f" --excludeWithAnyTags={EXCLUDE_TAGS},{task_name}_{BACKPORT_REQUIRED_TAG} "
+
+        return resmoke_args
+
     def _get_run_tests_vars(
+            self,
+            sub_suite_file_path: str,
             suite_file: str,
-            suite_name: str,
+            task_name: str,
             params: ResmokeGenTaskParams,
     ) -> Dict[str, Any]:
         """
         Generate a dictionary of the variables to pass to the task.
 
-        :param suite_file: Suite being generated.
-        :param suite_name: Name of suite being generated
+        :param sub_suite_file_path: path to the generated suite file.
+        :param suite_file: name of the original suite file.
+        :param task_name: Name of the task.
         :param params: Parameters describing how tasks should be generated.
         :return: Dictionary containing variables and value to pass to generated task.
         """
         variables = {
-            "resmoke_args": params.generate_resmoke_args(suite_file, suite_name),
-            "gen_task_config_location": params.config_location,
+            "resmoke_args":
+                self.generate_resmoke_args(sub_suite_file=sub_suite_file_path,
+                                           original_suite=suite_file, task_name=task_name,
+                                           params=params), "gen_task_config_location":
+                                               params.config_location, "require_multiversion_setup":
+                                                   params.require_multiversion_setup
         }
 
         if params.resmoke_jobs_max:
             variables["resmoke_jobs_max"] = params.resmoke_jobs_max
-
-        if params.require_multiversion:
-            variables["require_multiversion"] = params.require_multiversion
 
         return variables
 

@@ -34,7 +34,7 @@ def build_mock_gen_options(use_default_timeouts=False):
 def build_mock_gen_params(repeat_suites=1, resmoke_args="resmoke args"):
     return under_test.ResmokeGenTaskParams(
         use_large_distro=False,
-        require_multiversion=None,
+        require_multiversion_setup=False,
         repeat_suites=repeat_suites,
         resmoke_args=resmoke_args,
         resmoke_jobs_max=None,
@@ -46,10 +46,10 @@ def build_mock_gen_params(repeat_suites=1, resmoke_args="resmoke args"):
 def build_mock_suite(n_sub_suites, include_runtimes=True):
     return GeneratedSuite(
         sub_suites=[
-            SubSuite.from_test_list(
-                index=i, suite_name=f"suite_{i}", test_list=[f"test_{i*j}" for j in range(3)],
+            SubSuite(
+                test_list=[f"test_{i*j}" for j in range(3)],
                 runtime_list=[TestRuntime(test_name=f"test_{i*j}", runtime=3.14)
-                              for j in range(3)] if include_runtimes else None, task_overhead=None)
+                              for j in range(3)] if include_runtimes else None, task_overhead=0)
             for i in range(n_sub_suites)
         ],
         build_variant="build variant",

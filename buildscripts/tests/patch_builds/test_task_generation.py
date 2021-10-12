@@ -23,7 +23,7 @@ class TestResmokeCommand(unittest.TestCase):
         timeout_info = under_test.TimeoutInfo.default_timeout()
 
         commands = under_test.resmoke_commands(run_tests, test_vars, timeout_info,
-                                               require_multiversion=True)
+                                               require_multiversion_setup=True)
 
         # 4 expected command = 1 for setup + 1 for running tests + 3 for multiversion setup.
         self.assertEqual(6, len(commands))
@@ -44,7 +44,7 @@ class TestResmokeCommand(unittest.TestCase):
         timeout_info = under_test.TimeoutInfo.overridden(timeout=5)
 
         commands = under_test.resmoke_commands(run_tests, test_vars, timeout_info,
-                                               require_multiversion=True)
+                                               require_multiversion_setup=True)
 
         # 5 expected command = 1 for setup + 1 for running tests + 3 for multiversion setup +
         # 1 for timeout.

@@ -16,6 +16,7 @@
   value:
     test_kind: all_versions_js_test
 
+
 ### Suite-specific overrides ###
 - name: multiversion_sanity_check_selector
   value:
@@ -30,3 +31,53 @@
         mongod_options:
           set_parameters:
             receiveChunkWaitForRangeDeleterTimeoutMS:
+
+- name: replica_sets_multiversion_selector
+  value:
+    selector:
+      roots:
+        - jstests/replsets/*.js
+      exclude_with_any_tags:
+        - multiversion_incompatible
+        - backport_required_multiversion
+        - replica_sets_multiversion_backport_required_multiversion
+      exclude_files:
+        - jstests/replsets/initial_sync_rename_collection.js
+        - jstests/replsets/initial_sync_drop_collection.js
+        - jstests/replsets/apply_prepare_txn_write_conflict_robustness.js
+        - jstests/replsets/invalidate_sessions_on_stepdown.js
+        - jstests/replsets/initial_sync_fails_unclean_restart.js
+
+- name: replica_sets_multiversion_testdata
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              useRandomBinVersionsWithinReplicaSet: 'last-lts'
+
+- name: sharding_multiversion_selector
+  value:
+    selector:
+      exclude_with_any_tags:
+        - multiversion_incompatible
+        - backport_required_multiversion
+        - replica_sets_multiversion_backport_required_multiversion
+      exclude_files:
+        # Enable when 4.6 becomes last stable
+        - jstests/sharding/query/merge_command_options.js
+        - jstests/sharding/max_time_ms_enforced_on_shard.js
+        # TODO SERVER-46040: Enable when SERVER-46040 is backported
+        - jstests/sharding/drop_indexes_with_stale_config_error.js
+        - jstests/sharding/query/merge_write_concern.js
+
+- name: sharding_multiversion_testdata
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              useRandomBinVersionsWithinReplicaSet: 'last-lts'
+              mongosBinVersion: 'last-lts'

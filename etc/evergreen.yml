@@ -144,9 +144,9 @@ variables:
       <<: *jepsen_config_vars
 
 - &jstestfuzz_config_vars
+  is_jstestfuzz: true
   num_files: 15
   num_tasks: 5
-  is_jstestfuzz: true
   resmoke_args: --help # resmoke_args needs to be overridden to specify one of the jstestfuzz suites
   resmoke_jobs_max: 1
   should_shuffle: false
@@ -2907,49 +2907,6 @@ tasks:
       files:
         - src/burn_in_tests_gen.json
 
-- name: burn_in_tests_multiversion_gen
-  tags: []
-  commands:
-  - command: manifest.load
-  - func: "git get project and add git tag"
-  - *f_expansions_write
-  - *kill_processes
-  - *cleanup_environment
-  - func: "set up venv"
-  - func: "upload pip requirements"
-  - func: "f_expansions_write"
-  - func: "configure evergreen api credentials"
-  - func: "do multiversion setup"
-  - command: subprocess.exec
-    type: test
-    params:
-      binary: bash
-      args:
-        - "src/evergreen/burn_in_tests_multiversion.sh"
-
-  - command: archive.targz_pack
-    params:
-      target: src/generate_tasks_config.tgz
-      source_dir: src/generated_resmoke_config
-      include:
-        - "*"
-
-  - command: s3.put
-    params:
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      local_file: src/generate_tasks_config.tgz
-      remote_file: ${project}/${build_variant}/${revision}/generate_tasks/burn_in_tests_multiversion_gen_config-${build_id}.tgz
-      bucket: mciuploads
-      permissions: public-read
-      content_type: application/gzip
-      display_name: Generated Multiversion Resmoke.py Suite Config - Execution ${execution}
-
-  - command: generate.tasks
-    params:
-      files:
-        - src/generated_resmoke_config/burn_in_tests_multiversion_gen.json
-
 - <<: *benchmark_template
   name: benchmarks_orphaned
   tags: ["benchmarks"]
@@ -3073,7 +3030,7 @@ tasks:
 ## initial sync multiversion fuzzer ##
 - <<: *jstestfuzz_template
   name: initial_sync_multiversion_fuzzer_gen
-  tags: ["multiversion_fuzzer", "require-npm", "random-name", "multiversion"]
+  tags: ["multiversion_fuzzer", "require_npm", "random_name", "multiversion"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -3084,12 +3041,11 @@ tasks:
       suite: initial_sync_multiversion_fuzzer
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
       name: initial_sync_multiversion_fuzzer
-      require_multiversion: true
 
 ## initial sync generational fuzzer ##
 - <<: *jstestfuzz_template
   name: initial_sync_fuzzer_gen
-  tags: ["require-npm", "random-name"]
+  tags: ["require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -3104,7 +3060,7 @@ tasks:
 ## Standalone generational fuzzer for multiversion aggregation pipelines ##
 - <<: *jstestfuzz_template
   name: aggregation_multiversion_fuzzer_gen
-  tags: ["aggfuzzer", "common", "multiversion", "require-npm", "random-name"]
+  tags: ["aggfuzzer", "common", "multiversion", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -3115,12 +3071,11 @@ tasks:
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
       npm_command: agg-fuzzer
       name: aggregation_multiversion_fuzzer
-      require_multiversion: true
 
 ## Standalone generational fuzzer for multiversion aggregation expressions ##
 - <<: *jstestfuzz_template
   name: aggregation_expression_multiversion_fuzzer_gen
-  tags: ["aggfuzzer", "multiversion", "require-npm", "random-name"]
+  tags: ["aggfuzzer", "multiversion", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -3131,12 +3086,11 @@ tasks:
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
       npm_command: agg-expr-fuzzer
       name: aggregation_expression_multiversion_fuzzer
-      require_multiversion: true
 
 ## Standalone generational fuzzer for checking optimized and unoptimized expression equivalence
 - <<: *jstestfuzz_template
   name: aggregation_expression_optimization_fuzzer_gen
-  tags: ["aggfuzzer", "require-npm", "random-name"]
+  tags: ["aggfuzzer", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -3152,7 +3106,7 @@ tasks:
 ## Standalone generational fuzzer for checking optimized and unoptimized aggregation pipelines
 - <<: *jstestfuzz_template
   name: aggregation_optimization_fuzzer_gen
-  tags: ["aggfuzzer", "require-npm", "random-name"]
+  tags: ["aggfuzzer", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -3168,7 +3122,7 @@ tasks:
 ## Standalone fuzzer for checking wildcard index correctness ##
 - <<: *jstestfuzz_template
   name: aggregation_wildcard_fuzzer_gen
-  tags: ["aggfuzzer", "common", "wildcard", "require-npm", "random-name"]
+  tags: ["aggfuzzer", "common", "wildcard", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -3184,7 +3138,7 @@ tasks:
 ## Standalone fuzzer for checking timeseries optimizations correctness ##
 - <<: *jstestfuzz_template
   name: aggregation_timeseries_fuzzer_gen
-  tags: ["aggfuzzer", "common", "timeseries", "require-npm", "random-name"]
+  tags: ["aggfuzzer", "common", "timeseries", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -3200,7 +3154,7 @@ tasks:
 ## Standalone generational fuzzer for checking optimized and unoptimized change stream pipelines ##
 - <<: *jstestfuzz_template
   name: change_stream_optimization_fuzzer_gen
-  tags: ["change_stream_fuzzer", "require-npm", "random-name"]
+  tags: ["change_stream_fuzzer", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -3216,7 +3170,7 @@ tasks:
 ## jstestfuzz standalone fuzzer for checking find and aggregate equivalence ##
 - <<: *jstestfuzz_template
   name: query_fuzzer_standalone_gen
-  tags: ["query_fuzzer", "require-npm", "random-name"]
+  tags: ["query_fuzzer", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -3232,7 +3186,7 @@ tasks:
 ## jstestfuzz sharded fuzzer for checking find and aggregate equivalence ##
 - <<: *jstestfuzz_template
   name: query_fuzzer_sharded_gen
-  tags: ["query_fuzzer", "require-npm", "random-name"]
+  tags: ["query_fuzzer", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -3248,7 +3202,7 @@ tasks:
 ## jstestfuzz standalone update generational fuzzer ##
 - <<: *jstestfuzz_template
   name: update_fuzzer_gen
-  tags: ["updatefuzzer", "require-npm", "random-name", "multiversion"]
+  tags: ["updatefuzzer", "require_npm", "random_name", "multiversion"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -3259,12 +3213,11 @@ tasks:
       suite: generational_fuzzer
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
       name: update_fuzzer
-      require_multiversion: true
 
 ## jstestfuzz replication update generational fuzzer ##
 - <<: *jstestfuzz_template
   name: update_fuzzer_replication_gen
-  tags: ["updatefuzzer", "require-npm", "random-name", "multiversion"]
+  tags: ["updatefuzzer", "require_npm", "random_name", "multiversion"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -3275,12 +3228,11 @@ tasks:
       suite: generational_fuzzer_replication
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
       name: update_fuzzer_replication
-      require_multiversion: true
 
 ## rollback multiversion fuzzer ##
 - <<: *jstestfuzz_template
   name: rollback_multiversion_fuzzer_gen
-  tags: ["multiversion_fuzzer", "require-npm", "random-name", "multiversion"]
+  tags: ["multiversion_fuzzer", "require_npm", "random_name", "multiversion"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -3293,12 +3245,11 @@ tasks:
       # index build commit quorum.
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}, enableIndexBuildCommitQuorum: false}'"
       name: rollback_multiversion_fuzzer
-      require_multiversion: true
 
 ## rollback generational fuzzer ##
 - <<: *jstestfuzz_template
   name: rollback_fuzzer_gen
-  tags: ["rollbackfuzzer", "require-npm", "random-name"]
+  tags: ["rollbackfuzzer", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -3315,7 +3266,7 @@ tasks:
 ## rollback generational fuzzer with clean shutdowns ##
 - <<: *jstestfuzz_template
   name: rollback_fuzzer_clean_shutdowns_gen
-  tags: ["rollbackfuzzer", "require-npm", "random-name"]
+  tags: ["rollbackfuzzer", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -3333,7 +3284,7 @@ tasks:
 ## rollback generational fuzzer with unclean shutdowns ##
 - <<: *jstestfuzz_template
   name: rollback_fuzzer_unclean_shutdowns_gen
-  tags: ["rollbackfuzzer", "require-npm", "random-name"]
+  tags: ["rollbackfuzzer", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -3351,7 +3302,7 @@ tasks:
 ## jstestfuzz ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_gen
-  tags: ["jstestfuzz", "common", "require-npm", "random-name"]
+  tags: ["jstestfuzz", "common", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -3365,7 +3316,7 @@ tasks:
 ## jstestfuzz concurrent ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_concurrent_gen
-  tags: ["jstestfuzz", "common", "require-npm", "random-name"]
+  tags: ["jstestfuzz", "common", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -3380,7 +3331,7 @@ tasks:
 ## jstestfuzz concurrent replica set ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_concurrent_replication_gen
-  tags: ["jstestfuzz", "common", "repl", "require-npm", "random-name"]
+  tags: ["jstestfuzz", "common", "repl", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -3395,7 +3346,7 @@ tasks:
 ## jstestfuzz concurrent replica set with logical session ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_concurrent_replication_session_gen
-  tags: ["jstestfuzz", "session", "require-npm", "random-name"]
+  tags: ["jstestfuzz", "session", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -3410,7 +3361,7 @@ tasks:
 ## jstestfuzz concurrent sharded cluster ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_concurrent_sharded_gen
-  tags: ["jstestfuzz", "common", "sharding", "require-npm", "random-name"]
+  tags: ["jstestfuzz", "common", "sharding", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -3425,7 +3376,7 @@ tasks:
 ## jstestfuzz concurrent sharded cluster causal consistency ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_concurrent_sharded_causal_consistency_gen
-  tags: ["jstestfuzz", "causal", "require-npm", "random-name"]
+  tags: ["jstestfuzz", "causal", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -3440,7 +3391,7 @@ tasks:
 ## jstestfuzz concurrent sharded cluster continuous stepdown ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_concurrent_sharded_continuous_stepdown_gen
-  tags: ["jstestfuzz", "stepdowns", "require-npm", "random-name"]
+  tags: ["jstestfuzz", "stepdowns", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -3455,7 +3406,7 @@ tasks:
 ## jstestfuzz concurrent sharded cluster with logical session ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_concurrent_sharded_session_gen
-  tags: ["jstestfuzz", "session", "require-npm", "random-name"]
+  tags: ["jstestfuzz", "session", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -3470,7 +3421,7 @@ tasks:
 # jstestfuzz interrupt #
 - <<: *jstestfuzz_template
   name: jstestfuzz_interrupt_gen
-  tags: ["jstestfuzz", "interrupt", "require-npm", "random-name"]
+  tags: ["jstestfuzz", "interrupt", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -3483,7 +3434,7 @@ tasks:
 # jstestfuzz interrupt #
 - <<: *jstestfuzz_template
   name: jstestfuzz_interrupt_replication_gen
-  tags: ["jstestfuzz", "interrupt", "require-npm", "random-name"]
+  tags: ["jstestfuzz", "interrupt", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -3496,7 +3447,7 @@ tasks:
 # jstestfuzz write conflict #
 - <<: *jstestfuzz_template
   name: jstestfuzz_replication_write_conflicts_gen
-  tags: ["jstestfuzz", "write_conflict", "require-npm", "random-name"]
+  tags: ["jstestfuzz", "write_conflict", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -3509,7 +3460,7 @@ tasks:
 # jstestfuzz concurrent conflict #
 - <<: *jstestfuzz_template
   name: jstestfuzz_concurrent_replication_write_conflicts_gen
-  tags: ["jstestfuzz", "write_conflict", "require-npm", "random-name"]
+  tags: ["jstestfuzz", "write_conflict", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -3522,7 +3473,7 @@ tasks:
 # jstestfuzz interrupt with flow control engaged #
 - <<: *jstestfuzz_template
   name: jstestfuzz_interrupt_replication_flow_control_gen
-  tags: ["jstestfuzz", "interrupt", "flow_control", "require-npm", "random-name"]
+  tags: ["jstestfuzz", "interrupt", "flow_control", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -3537,7 +3488,7 @@ tasks:
 ## jstestfuzz sharded cluster continuous stepdown with flow control engaged ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_sharded_continuous_stepdown_flow_control_gen
-  tags: ["jstestfuzz", "flow_control", "stepdowns", "require-npm", "random-name"]
+  tags: ["jstestfuzz", "flow_control", "stepdowns", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -3555,7 +3506,7 @@ tasks:
 ## jstestfuzz concurrent sharded cluster continuous stepdown with flow control engaged ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_concurrent_sharded_continuous_stepdown_flow_control_gen
-  tags: ["jstestfuzz", "flow_control", "stepdowns", "require-npm", "random-name"]
+  tags: ["jstestfuzz", "flow_control", "stepdowns", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -3573,7 +3524,7 @@ tasks:
 # jstestfuzz replication continuous stepdown with flow control engaged #
 - <<: *jstestfuzz_template
   name: jstestfuzz_replication_continuous_stepdown_flow_control_gen
-  tags: ["jstestfuzz", "repl", "flow_control", "stepdowns", "require-npm", "random-name"]
+  tags: ["jstestfuzz", "repl", "flow_control", "stepdowns", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -3591,7 +3542,7 @@ tasks:
 ## jstestfuzz concurrent replication continuous stepdown with flow control engaged ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_concurrent_replication_continuous_stepdown_flow_control_gen
-  tags: ["jstestfuzz", "repl", "flow_control", "stepdowns", "require-npm", "random-name"]
+  tags: ["jstestfuzz", "repl", "flow_control", "stepdowns", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -3609,7 +3560,7 @@ tasks:
 ## jstestfuzz replica set ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_replication_gen
-  tags: ["jstestfuzz", "common", "repl", "require-npm", "random-name"]
+  tags: ["jstestfuzz", "common", "repl", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -3621,24 +3572,47 @@ tasks:
 
 ## jstestfuzz replica set ##
 - <<: *jstestfuzz_template
-  name: jstestfuzz_replication_multiversion_passthrough_gen
-  tags: ["jstestfuzz_multiversion_passthrough_gen", "require-npm", "random-name", "multiversion"]
+  name: jstestfuzz_replication_multiversion_passthrough_new_old_new_gen
+  tags: ["jstestfuzz_multiversion_passthrough_gen", "require_npm", "random_name", "multiversion"]
   commands:
   - func: "generate resmoke tasks"
     vars:
       <<: *jstestfuzz_config_vars
       jstestfuzz_vars: --jsTestsDir ../jstests
-      resmoke_args: "--storageEngine=wiredTiger --mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+      resmoke_args: "--storageEngine=wiredTiger --mongodSetParameters='{logComponentVerbosity: {command: 2}}' --oldBinVersion=last_continuous --mixedBinVersions=new-old-new"
       suite: jstestfuzz_replication
-      is_jstestfuzz: true
-      require_multiversion: true
-      implicit_multiversion: true
       npm_command: jstestfuzz
+
+  ## jstestfuzz replica set ##
+- <<: *jstestfuzz_template
+  name: jstestfuzz_replication_multiversion_passthrough_old_new_new_gen
+  tags: ["jstestfuzz_multiversion_passthrough_gen", "require_npm", "random_name", "multiversion"]
+  commands:
+    - func: "generate resmoke tasks"
+      vars:
+        <<: *jstestfuzz_config_vars
+        jstestfuzz_vars: --jsTestsDir ../jstests
+        resmoke_args: "--storageEngine=wiredTiger --mongodSetParameters='{logComponentVerbosity: {command: 2}}' --oldBinVersion=last_continuous --mixedBinVersions=old-new-new"
+        suite: jstestfuzz_replication
+        npm_command: jstestfuz
+
+  ## jstestfuzz replica set ##
+- <<: *jstestfuzz_template
+  name: jstestfuzz_replication_multiversion_passthrough_new_new_old_gen
+  tags: ["jstestfuzz_multiversion_passthrough_gen", "require_npm", "random_name", "multiversion"]
+  commands:
+    - func: "generate resmoke tasks"
+      vars:
+        <<: *jstestfuzz_config_vars
+        jstestfuzz_vars: --jsTestsDir ../jstests
+        resmoke_args: "--storageEngine=wiredTiger --mongodSetParameters='{logComponentVerbosity: {command: 2}}' --oldBinVersion=last_continuous --mixedBinVersions=new-new-old"
+        suite: jstestfuzz_replication
+        npm_command: jstestfuz
 
 ## jstestfuzz initial sync replica set ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_replication_initsync_gen
-  tags: ["jstestfuzz", "initsync", "require-npm", "random-name"]
+  tags: ["jstestfuzz", "initsync", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -3653,7 +3627,7 @@ tasks:
 ## jstestfuzz replica set with logical session ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_replication_session_gen
-  tags: ["jstestfuzz", "session", "require-npm", "random-name"]
+  tags: ["jstestfuzz", "session", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -3666,7 +3640,7 @@ tasks:
 ## jstestfuzz sharded cluster ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_sharded_gen
-  tags: ["jstestfuzz", "common", "sharding", "require-npm", "random-name"]
+  tags: ["jstestfuzz", "common", "sharding", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -3679,23 +3653,20 @@ tasks:
 ## jstestfuzz sharded multiversion cluster ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_sharded_multiversion_passthrough_gen
-  tags: ["jstestfuzz_multiversion_passthrough_gen", "require-npm", "random-name", "multiversion"]
+  tags: ["jstestfuzz_multiversion_passthrough_gen", "require_npm", "random_name", "multiversion"]
   commands:
   - func: "generate resmoke tasks"
     vars:
       <<: *jstestfuzz_config_vars
       jstestfuzz_vars: --jsTestsDir ../jstests
-      resmoke_args: "--storageEngine=wiredTiger --mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+      resmoke_args: "--storageEngine=wiredTiger --mongodSetParameters='{logComponentVerbosity: {command: 2}}' --oldBinVersion=last_continuous --mixedBinVersions='new-old-old-new'"
       suite: jstestfuzz_sharded
-      is_jstestfuzz: true
-      require_multiversion: true
-      implicit_multiversion: true
       npm_command: jstestfuzz
 
 ## jstestfuzz sharded cluster causal consistency ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_sharded_causal_consistency_gen
-  tags: ["jstestfuzz", "causal", "require-npm", "random-name"]
+  tags: ["jstestfuzz", "causal", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -3708,7 +3679,7 @@ tasks:
 ## jstestfuzz sharded cluster continuous stepdown ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_sharded_continuous_stepdown_gen
-  tags: ["jstestfuzz", "stepdowns", "require-npm", "random-name"]
+  tags: ["jstestfuzz", "stepdowns", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -3723,7 +3694,7 @@ tasks:
 ## jstestfuzz sharded cluster with logical session ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_sharded_session_gen
-  tags: ["jstestfuzz", "session", "require-npm", "random-name"]
+  tags: ["jstestfuzz", "session", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -3736,7 +3707,7 @@ tasks:
 ## resharding generational fuzzer ##
 - <<: *jstestfuzz_template
   name: resharding_fuzzer_inplace_gen
-  tags: ["resharding_fuzzer", "require-npm", "random-name"]
+  tags: ["resharding_fuzzer", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -3751,7 +3722,7 @@ tasks:
 
 - <<: *jstestfuzz_template
   name: resharding_fuzzer_split_gen
-  tags: ["resharding_fuzzer", "require-npm", "random-name"]
+  tags: ["resharding_fuzzer", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -3766,7 +3737,7 @@ tasks:
 
 - <<: *jstestfuzz_template
   name: resharding_fuzzer_merge_gen
-  tags: ["resharding_fuzzer", "require-npm", "random-name"]
+  tags: ["resharding_fuzzer", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -3781,7 +3752,7 @@ tasks:
 
 - <<: *jstestfuzz_template
   name: resharding_fuzzer_shuffle_gen
-  tags: ["resharding_fuzzer", "require-npm", "random-name"]
+  tags: ["resharding_fuzzer", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -3796,7 +3767,7 @@ tasks:
 
 - <<: *jstestfuzz_template
   name: resharding_fuzzer_idempotency_gen
-  tags: ["resharding_fuzzer", "require-npm", "random-name"]
+  tags: ["resharding_fuzzer", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -3812,26 +3783,58 @@ tasks:
 
 ## Tests that the multiversion test generation logic is not broken.
 - <<: *gen_task_template
-  name: multiversion_sanity_check_passthrough_gen
-  tags: ["multiversion"]
+  name: multiversion_sanity_check_new_old_new_gen
+  tags: ["multiversion", "multiversion_sanity_check"]
   commands:
   - func: "generate resmoke tasks"
     vars:
-      suite: replica_sets_jscore_passthrough
-      resmoke_args: --storageEngine=wiredTiger --includeWithAnyTags=multiversion_sanity_check
-      require_multiversion: true
-      implicit_multiversion: true
+      suite: multiversion_sanity_check
+      resmoke_args: --oldBinVersion=last_continuous --mixedBinVersions=new-old-new --storageEngine=wiredTiger
 
 - <<: *gen_task_template
-  name: replica_sets_jscore_multiversion_passthrough_gen
-  tags: ["multiversion_passthrough", "multiversion"]
+  name: multiversion_sanity_check_old_new_new_gen
+  tags: ["multiversion", "multiversion_sanity_check"]
   commands:
-  - func: "generate resmoke tasks"
-    vars:
-      suite: replica_sets_jscore_passthrough
-      resmoke_args: --storageEngine=wiredTiger
-      require_multiversion: true
-      implicit_multiversion: true
+    - func: "generate resmoke tasks"
+      vars:
+        suite: multiversion_sanity_check
+        resmoke_args: --oldBinVersion=last_continuous --mixedBinVersions=old-new-new --storageEngine=wiredTiger
+
+- <<: *gen_task_template
+  name: multiversion_sanity_check_new_new_old_gen
+  tags: ["multiversion", "multiversion_sanity_check"]
+  commands:
+    - func: "generate resmoke tasks"
+      vars:
+        suite: multiversion_sanity_check
+        resmoke_args: --oldBinVersion=last_continuous --mixedBinVersions=new-new-old --storageEngine=wiredTiger
+
+- <<: *gen_task_template
+  name: replica_sets_jscore_multiversion_passthrough_new_old_new_gen
+  tags: ["multiversion", "multiversion_passthrough"]
+  commands:
+    - func: "generate resmoke tasks"
+      vars:
+        suite: replica_sets_jscore_multiversion
+        resmoke_args: --oldBinVersion=last_continuous --mixedBinVersions=new-old-new --storageEngine=wiredTiger
+
+- <<: *gen_task_template
+  name: replica_sets_jscore_multiversion_passthrough_old_new_new_gen
+  tags: ["multiversion", "multiversion_passthrough"]
+  commands:
+    - func: "generate resmoke tasks"
+      vars:
+        suite: replica_sets_jscore_multiversion
+        resmoke_args: --oldBinVersion=last_continuous --mixedBinVersions=old-new-new --storageEngine=wiredTiger
+
+- <<: *gen_task_template
+  name: replica_sets_jscore_multiversion_passthrough_new_new_old_gen
+  tags: ["multiversion", "multiversion_passthrough"]
+  commands:
+    - func: "generate resmoke tasks"
+      vars:
+        suite: replica_sets_jscore_multiversion
+        resmoke_args: --oldBinVersion=last_continuous --mixedBinVersions=new-new-old --storageEngine=wiredTiger
 
 # Check that the mutational fuzzer can parse JS files modified in a patch build.
 - name: lint_fuzzer_sanity_patch
@@ -4073,15 +4076,31 @@ tasks:
       resmoke_args: --suites=change_streams --storageEngine=wiredTiger
 
 - <<: *gen_task_template
-  name: change_streams_multiversion_passthrough_gen
-  tags: ["multiversion_passthrough", "multiversion"]
+  name: change_streams_multiversion_new_old_new_gen
+  tags: ["multiversion", "multiversion_passthrough"]
   commands:
-  - func: "generate resmoke tasks"
-    vars:
-      suite: change_streams
-      resmoke_args: --storageEngine=wiredTiger
-      require_multiversion: true
-      implicit_multiversion: true
+    - func: "generate resmoke tasks"
+      vars:
+        suite: change_streams_multiversion
+        resmoke_args: --oldBinVersion=last_continuous --mixedBinVersions=new-old-new --storageEngine=wiredTiger
+
+- <<: *gen_task_template
+  name: change_streams_multiversion_old_new_new_gen
+  tags: ["multiversion", "multiversion_passthrough"]
+  commands:
+    - func: "generate resmoke tasks"
+      vars:
+        suite: change_streams_multiversion
+        resmoke_args: --oldBinVersion=last_continuous --mixedBinVersions=old-new-new --storageEngine=wiredTiger
+
+- <<: *gen_task_template
+  name: change_streams_multiversion_new_new_old_gen
+  tags: ["multiversion", "multiversion_passthrough"]
+  commands:
+    - func: "generate resmoke tasks"
+      vars:
+        suite: change_streams_multiversion
+        resmoke_args: --oldBinVersion=last_continuous --mixedBinVersions=new-new-old --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: change_streams_multiversion_downgrade_passthrough_gen
@@ -4091,8 +4110,6 @@ tasks:
     vars:
       suite: change_streams_multiversion_downgrade_passthrough
       resmoke_args: --storageEngine=wiredTiger
-      require_multiversion: true
-      implicit_multiversion: true
 
 - <<: *task_template
   name: change_streams_update_v1_oplog
@@ -4134,7 +4151,7 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=change_streams_secondary_reads --storageEngine=wiredTiger
+      resmoke_args: --suites=change_streams_secondary_reads --storageEngiue=wiredTiger
 
 - <<: *task_template
   name: change_streams_sharded_collections_passthrough
@@ -4153,10 +4170,8 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      suite: change_streams_sharded_collections_passthrough
-      resmoke_args: --storageEngine=wiredTiger
-      require_multiversion: true
-      implicit_multiversion: true
+      suite: change_streams_sharded_collections_multiversion
+      resmoke_args: --storageEngine=wiredTiger --oldBinVersion=last_continuous --mixedBinVersions="new-old-old-new"
 
 - <<: *task_template
   name: change_streams_whole_db_passthrough
@@ -4809,7 +4824,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       resmoke_args: "--storageEngine=wiredTiger"
-      require_multiversion: true
 
 - <<: *gen_task_template
   name: multiversion_gen
@@ -4818,7 +4832,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       resmoke_args: "--storageEngine=wiredTiger"
-      require_multiversion: true
 
 # Tests the runFeatureFlagMultiversionTest helper.
 # This requires the 'featureFlagToaster' and 'featureFlagSpoon' parameters to be set to true on
@@ -4830,7 +4843,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       resmoke_args: "--storageEngine=wiredTiger"
-      require_multiversion: true
 
 - <<: *gen_task_template
   name: unittest_shell_hang_analyzer_gen
@@ -4901,15 +4913,13 @@ tasks:
       resmoke_args: --suites=sharded_collections_jscore_passthrough --storageEngine=wiredTiger
 
 - <<: *gen_task_template
-  name: sharded_collections_jscore_multiversion_passthrough_gen
+  name: sharded_collections_jscore_multiversion_gen
   tags: ["multiversion_passthrough", "multiversion"]
   commands:
   - func: "generate resmoke tasks"
     vars:
-      suite: sharded_collections_jscore_passthrough
-      resmoke_args: --storageEngine=wiredTiger
-      require_multiversion: true
-      implicit_multiversion: true
+      suite: sharded_collections_jscore_multiversion
+      resmoke_args: --storageEngine=wiredTiger --oldBinVersion=last_continuous --mixedBinVersions="new-old-old-new"
 
 - <<: *task_template
   name: sharding_jscore_passthrough
@@ -4921,15 +4931,13 @@ tasks:
       resmoke_args: --suites=sharding_jscore_passthrough --storageEngine=wiredTiger
 
 - <<: *gen_task_template
-  name: sharding_jscore_multiversion_passthrough_gen
+  name: sharding_jscore_multiversion_gen
   tags: ["multiversion_passthrough", "multiversion"]
   commands:
   - func: "generate resmoke tasks"
     vars:
-      suite: sharding_jscore_passthrough
-      resmoke_args: --storageEngine=wiredTiger
-      require_multiversion: true
-      implicit_multiversion: true
+      suite: sharding_jscore_multiversion
+      resmoke_args: --storageEngine=wiredTiger --oldBinVersion=last_continuous --mixedBinVersions="new-old-old-new"
 
 - <<: *gen_task_template
   name: sharding_api_version_jscore_passthrough_gen
@@ -5107,15 +5115,31 @@ tasks:
       resmoke_jobs_max: 1
 
 - <<: *gen_task_template
-  name: concurrency_replication_multiversion_passthrough_gen
-  tags: ["multiversion_passthrough", "multiversion"]
+  name: concurrency_replication_multiversion_new_old_new_gen
+  tags: ["multiversion", "multiversion_passthrough"]
   commands:
-  - func: "generate resmoke tasks"
-    vars:
-      suite: concurrency_replication
-      resmoke_args: --storageEngine=wiredTiger
-      require_multiversion: true
-      implicit_multiversion: true
+    - func: "generate resmoke tasks"
+      vars:
+        suite: concurrency_replication_multiversion
+        resmoke_args: --oldBinVersion=last_continuous --mixedBinVersions=new-old-new --storageEngine=wiredTiger
+
+- <<: *gen_task_template
+  name: concurrency_replication_multiversion_old_new_new_gen
+  tags: ["multiversion", "multiversion_passthrough"]
+  commands:
+    - func: "generate resmoke tasks"
+      vars:
+        suite: concurrency_replication_multiversion
+        resmoke_args: --oldBinVersion=last_continuous --mixedBinVersions=old-new-new --storageEngine=wiredTiger
+
+- <<: *gen_task_template
+  name: concurrency_replication_multiversion_new_new_old_gen
+  tags: ["multiversion", "multiversion_passthrough"]
+  commands:
+    - func: "generate resmoke tasks"
+      vars:
+        suite: concurrency_replication_multiversion
+        resmoke_args: --oldBinVersion=last_continuous --mixedBinVersions=new-new-old --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: concurrency_replication_causal_consistency_gen
@@ -5196,15 +5220,13 @@ tasks:
       resmoke_jobs_max: 1
 
 - <<: *gen_task_template
-  name: concurrency_sharded_replication_multiversion_passthrough_gen
+  name: concurrency_sharded_replication_multiversion_gen
   tags: ["multiversion_passthrough", "sharded", "multiversion"]
   commands:
   - func: "generate resmoke tasks"
     vars:
-      suite: concurrency_sharded_replication
-      resmoke_args: --storageEngine=wiredTiger
-      require_multiversion: true
-      implicit_multiversion: true
+      suite: concurrency_sharded_replication_multiversion
+      resmoke_args: --storageEngine=wiredTiger --oldBinVersion=last_continuous --mixedBinVersions="new-old-old-new"
 
 - <<: *gen_task_template
   name: concurrency_sharded_replication_with_balancer_gen
@@ -5380,7 +5402,7 @@ tasks:
 
 - <<: *gen_task_template
   name: concurrency_simultaneous_gen
-  tags: ["concurrency", "common", "random-name"]
+  tags: ["concurrency", "common", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -5389,7 +5411,7 @@ tasks:
 
 - <<: *gen_task_template
   name: concurrency_simultaneous_replication_gen
-  tags: ["concurrency", "common", "large", "repl", "random-name"]
+  tags: ["concurrency", "common", "large", "repl", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -5398,7 +5420,7 @@ tasks:
 
 - <<: *task_template
   name: concurrency_simultaneous_replication_wiredtiger_cursor_sweeps
-  tags: ["concurrency", "repl", "random-name"]
+  tags: ["concurrency", "repl", "random_name"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -5408,7 +5430,7 @@ tasks:
 
 - <<: *task_template
   name: concurrency_simultaneous_replication_wiredtiger_eviction_debug
-  tags: ["concurrency", "repl", "debug_only", "random-name"]
+  tags: ["concurrency", "repl", "debug_only", "random_name"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -5545,7 +5567,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       resmoke_args: --storageEngine=wiredTiger --tagFile=generated_resmoke_config/multiversion_exclude_tags.yml
-      require_multiversion: true
       suite: replica_sets_multiversion
 
 - <<: *task_template
@@ -5574,7 +5595,6 @@ tasks:
     vars:
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger --tagFile=generated_resmoke_config/multiversion_exclude_tags.yml
-      require_multiversion: true
       suite: sharding_multiversion
 
 - <<: *gen_task_template
@@ -5649,7 +5669,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
-      require_multiversion: true
       resmoke_args: --tagFile=generated_resmoke_config/multiversion_exclude_tags.yml
 
 - <<: *gen_task_template
@@ -5792,7 +5811,6 @@ tasks:
     vars:
       suite: retryable_writes_downgrade_passthrough
       resmoke_args: --storageEngine=wiredTiger
-      require_multiversion: true
 
 - <<: *gen_task_template
   name: sharded_retryable_writes_downgrade_passthrough_gen
@@ -5802,8 +5820,6 @@ tasks:
     vars:
       suite: sharded_retryable_writes_downgrade_passthrough
       resmoke_args: --storageEngine=wiredTiger
-      require_multiversion: true
-      implicit_multiversion: true
 
 - <<: *gen_task_template
   name: logical_session_cache_replication_default_refresh_jscore_passthrough_gen
@@ -9393,7 +9409,6 @@ buildvariants:
   - name: lint_fuzzer_sanity_patch
   - name: test_api_version_compatibility
   - name: burn_in_tests_gen
-  - name: burn_in_tests_multiversion_gen
   - name: check_feature_flag_tags
   - name: check_for_todos
   - name: .aggfuzzer
@@ -9428,7 +9443,7 @@ buildvariants:
   - name: jsonSchema
   - name: .jstestfuzz !.flow_control  # Flow control jstestfuzz take longer.
   - name: libunwind_tests
-  - name: multiversion_sanity_check_passthrough_gen
+  - name: .multiversion_sanity_check
   - name: mqlrun
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
@@ -9667,7 +9682,6 @@ buildvariants:
   - name: build_variant_gen
   - name: burn_in_tags_gen
   - name: burn_in_tests_gen
-  - name: burn_in_tests_multiversion_gen
   - name: check_feature_flag_tags
   - name: check_for_todos
   - name: compile_test_and_package_parallel_core_stream_TG
@@ -9694,7 +9708,7 @@ buildvariants:
   - name: mqlrun
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: multiversion_gen
-  - name: multiversion_sanity_check_passthrough_gen
+  - name: .multiversion_sanity_check
   - name: replica_sets_api_version_jscore_passthrough_gen
   - name: replica_sets_reconfig_jscore_passthrough_gen
   - name: replica_sets_reconfig_jscore_stepdown_passthrough_gen
@@ -12185,7 +12199,7 @@ buildvariants:
   - name: jsCore_txns_large_txns_format
 #  - name: jsonSchema
   - name: .jstestfuzz !.flow_control !.stepdowns !.causal
-#  - name: multiversion_sanity_check_passthrough_gen
+#  - name: .multiversion_sanity_check
 #  - name: mqlrun
 #  - name: .multi_shard
 #  - name: .query_fuzzer

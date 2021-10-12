@@ -103,23 +103,23 @@ last-continuous:
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
-    change_streams_multiversion_passthrough:
+    change_streams_multiversion:
 
-    change_streams_sharded_collections_multiversion_passthrough:
+    change_streams_sharded_collections_multiversion:
 
-    concurrency_replication_multiversion_passthrough:
+    concurrency_replication_multiversion:
 
-    concurrency_sharded_replication_multiversion_passthrough:
+    concurrency_sharded_replication_multiversion:
 
     replica_sets_multiversion:
       - ticket: SERVER-58744
         test_file: jstests/replsets/apply_ops_capped_collection.js
 
-    replica_sets_jscore_multiversion_passthrough:
+    replica_sets_jscore_multiversion:
 
-    sharding_jscore_multiversion_passthrough:
+    sharding_jscore_multiversion:
 
-    sharded_collections_jscore_multiversion_passthrough:
+    sharded_collections_jscore_multiversion:
 
 last-lts:
   # Tests that should be excluded from ALL multiversion suites should be listed here.
@@ -363,20 +363,20 @@ last-lts:
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
-    change_streams_multiversion_passthrough:
+    change_streams_multiversion:
 
-    change_streams_sharded_collections_multiversion_passthrough:
+    change_streams_sharded_collections_multiversion:
 
-    concurrency_replication_multiversion_passthrough:
+    concurrency_replication_multiversion:
 
-    concurrency_sharded_replication_multiversion_passthrough:
+    concurrency_sharded_replication_multiversion:
 
     replica_sets_multiversion:
     - ticket: SERVER-35649
       test_file: jstests/replsets/disallow_adding_initialized_node1.js
 
-    replica_sets_jscore_multiversion_passthrough:
+    replica_sets_jscore_multiversion:
 
-    sharding_jscore_multiversion_passthrough:
+    sharding_jscore_multiversion:
 
-    sharded_collections_jscore_multiversion_passthrough:
+    sharded_collections_jscore_multiversion:

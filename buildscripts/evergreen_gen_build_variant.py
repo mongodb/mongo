@@ -16,18 +16,14 @@ from evergreen import Task as EvgTask
 
 from buildscripts.ciconfig.evergreen import EvergreenProjectConfig, parse_evergreen_file, Task, \
     Variant
-from buildscripts.task_generation.constants import ACTIVATE_ARCHIVE_DIST_TEST_DEBUG_TASK
 from buildscripts.task_generation.evg_config_builder import EvgConfigBuilder
 from buildscripts.task_generation.gen_config import GenerationConfiguration
 from buildscripts.task_generation.gen_task_validation import GenTaskValidationService
-from buildscripts.task_generation.multiversion_util import MultiversionUtilService, \
-    SHARDED_MIXED_VERSION_CONFIGS, REPL_MIXED_VERSION_CONFIGS
 from buildscripts.task_generation.suite_split import SuiteSplitConfig, SuiteSplitParameters
 from buildscripts.task_generation.suite_split_strategies import SplitStrategy, FallbackStrategy, \
     greedy_division, round_robin_fallback
 from buildscripts.task_generation.task_types.fuzzer_tasks import FuzzerGenTaskParams
 from buildscripts.task_generation.task_types.gentask_options import GenTaskOptions
-from buildscripts.task_generation.task_types.multiversion_tasks import MultiversionGenTaskParams
 from buildscripts.task_generation.task_types.resmoke_tasks import ResmokeGenTaskParams
 from buildscripts.util.cmdutils import enable_logging
 from buildscripts.util.fileops import read_yaml_file
@@ -117,8 +113,8 @@ class EvgExpansions(BaseModel):
 
     def config_location(self) -> str:
         """Location where generated configuration is stored."""
-        task = remove_gen_suffix(self.task_name)
-        return f"{self.build_variant}/{self.revision}/generate_tasks/{task}_gen-{self.build_id}.tgz"
+        generated_task_name = remove_gen_suffix(self.task_name)
+        return f"{self.build_variant}/{self.revision}/generate_tasks/{generated_task_name}_gen-{self.build_id}.tgz"
 
 
 def translate_run_var(run_var: str, build_variant: Variant) -> Any:
@@ -141,13 +137,6 @@ def translate_run_var(run_var: str, build_variant: Variant) -> Any:
     return run_var
 
 
-def get_version_configs(is_sharded: bool) -> List[str]:
-    """Get the version configurations to use."""
-    if is_sharded:
-        return SHARDED_MIXED_VERSION_CONFIGS
-    return REPL_MIXED_VERSION_CONFIGS
-
-
 class GenerateBuildVariantOrchestrator:
     """Orchestrator for generating tasks in a build variant."""
 
@@ -159,7 +148,6 @@ class GenerateBuildVariantOrchestrator:
             gen_task_options: GenTaskOptions,
             evg_project_config: EvergreenProjectConfig,
             evg_expansions: EvgExpansions,
-            multiversion_util: MultiversionUtilService,
             evg_api: EvergreenApi,
     ) -> None:
         """
@@ -169,14 +157,12 @@ class GenerateBuildVariantOrchestrator:
         :param gen_task_options: Options for how tasks should be generated.
         :param evg_project_config: Configuration for Evergreen Project.
         :param evg_expansions: Evergreen expansions for running task.
-        :param multiversion_util: Multiversion utility service.
         :param evg_api: Evergreen API client.
         """
         self.gen_task_validation = gen_task_validation
         self.gen_task_options = gen_task_options
         self.evg_project_config = evg_project_config
         self.evg_expansions = evg_expansions
-        self.multiversion_util = multiversion_util
         self.evg_api = evg_api
 
     def get_build_variant_expansion(self, build_variant_name: str, expansion: str) -> Any:
@@ -200,15 +186,15 @@ class GenerateBuildVariantOrchestrator:
         :return: Parameters for how task should be split.
         """
         build_variant = self.evg_project_config.get_variant(build_variant_gen)
-        task = remove_gen_suffix(task_def.name)
+        task_name = remove_gen_suffix(task_def.name)
         run_vars = task_def.generate_resmoke_tasks_command.get("vars", {})
 
-        suite = run_vars.get("suite", task)
+        suite_name = run_vars.get("suite", task_name)
         return SuiteSplitParameters(
             build_variant=build_variant_gen,
-            task_name=task,
-            suite_name=suite,
-            filename=suite,
+            task_name=task_name,
+            suite_name=suite_name,
+            filename=suite_name,
             is_asan=build_variant.is_asan_build(),
         )
 
@@ -229,7 +215,7 @@ class GenerateBuildVariantOrchestrator:
 
         return ResmokeGenTaskParams(
             use_large_distro=run_vars.get("use_large_distro"),
-            require_multiversion=run_vars.get("require_multiversion"),
+            require_multiversion_setup=task_def.require_multiversion_setup(),
             repeat_suites=repeat_suites,
             resmoke_args=run_vars.get("resmoke_args"),
             resmoke_jobs_max=run_vars.get("resmoke_jobs_max"),
@@ -237,41 +223,12 @@ class GenerateBuildVariantOrchestrator:
             config_location=self.evg_expansions.config_location(),
         )
 
-    def task_def_to_mv_gen_params(self, task_def: Task, build_variant: str, is_sharded: bool,
-                                  version_config: List[str]) -> MultiversionGenTaskParams:
-        """
-        Build parameters for how a task should be generated based on its task definition.
-
-        :param task_def: Task definition in evergreen project config.
-        :param build_variant: Name of Build Variant being generated.
-        :param is_sharded: True if the tasks being generated are for a sharded config.
-        :param version_config: List of version configurations to generate.
-        :return: Parameters for how task should be generated.
-        """
-        run_vars = task_def.generate_resmoke_tasks_command["vars"]
-        task = remove_gen_suffix(task_def.name)
-
-        return MultiversionGenTaskParams(
-            mixed_version_configs=version_config,
-            is_sharded=is_sharded,
-            resmoke_args=run_vars.get("resmoke_args"),
-            parent_task_name=task,
-            origin_suite=run_vars.get("suite", task),
-            use_large_distro=run_vars.get("use_large_distro"),
-            large_distro_name=self.get_build_variant_expansion(build_variant, "large_distro_name"),
-            config_location=self.evg_expansions.config_location(),
-        )
-
-    def task_def_to_fuzzer_params(
-            self, task_def: Task, build_variant: str, is_sharded: Optional[bool] = None,
-            version_config: Optional[List[str]] = None) -> FuzzerGenTaskParams:
+    def task_def_to_fuzzer_params(self, task_def: Task, build_variant: str) -> FuzzerGenTaskParams:
         """
         Build parameters for how a fuzzer task should be generated based on its task definition.
 
         :param task_def: Task definition in evergreen project config.
         :param build_variant: Name of Build Variant being generated.
-        :param is_sharded: True task if for a sharded configuration.
-        :param version_config: List of version configs task is being generated for.
         :return: Parameters for how a fuzzer task should be generated.
         """
         variant = self.evg_project_config.get_variant(build_variant)
@@ -291,12 +248,10 @@ class GenerateBuildVariantOrchestrator:
             resmoke_jobs_max=run_vars.get("resmoke_jobs_max"),
             should_shuffle=run_vars.get("should_shuffle"),
             timeout_secs=run_vars.get("timeout_secs"),
-            require_multiversion=run_vars.get("require_multiversion"),
+            require_multiversion_setup=task_def.require_multiversion_setup(),
             use_large_distro=run_vars.get("use_large_distro", False),
             large_distro_name=self.get_build_variant_expansion(build_variant, "large_distro_name"),
             config_location=self.evg_expansions.config_location(),
-            is_sharded=is_sharded,
-            version_config=version_config,
         )
 
     def generate(self, task_id: str, build_variant_name: str, output_file: str) -> None:
@@ -338,40 +293,18 @@ class GenerateBuildVariantOrchestrator:
                 if task_def.is_generate_resmoke_task:
                     tasks_to_hide.add(task_name)
 
-                    is_sharded = None
-                    version_list = None
                     run_vars = task_def.generate_resmoke_tasks_command["vars"]
-                    suite = run_vars.get("suite")
-                    is_jstestfuzz = run_vars.get("is_jstestfuzz", False)
-                    implicit_multiversion = run_vars.get("implicit_multiversion", False)
+                    requires_npm = run_vars.get("is_jstestfuzz", False)
 
-                    if implicit_multiversion:
-                        assert suite is not None
-                        is_sharded = self.multiversion_util.is_suite_sharded(suite)
-                        version_list = get_version_configs(is_sharded)
-
-                    if is_jstestfuzz:
-                        fuzzer_params = self.task_def_to_fuzzer_params(
-                            task_def, build_variant_name, is_sharded, version_list)
+                    if requires_npm:
+                        fuzzer_params = self.task_def_to_fuzzer_params(task_def, build_variant_name)
                         jobs.append(exe.submit(builder.generate_fuzzer, fuzzer_params))
                     else:
                         split_params = self.task_def_to_split_params(task_def, build_variant_name)
-                        if implicit_multiversion:
-                            gen_params = self.task_def_to_mv_gen_params(
-                                task_def, build_variant_name, is_sharded, version_list)
-                            jobs.append(
-                                exe.submit(builder.add_multiversion_suite, split_params,
-                                           gen_params))
-                        else:
-                            gen_params = self.task_def_to_gen_params(task_def, build_variant_name)
-                            jobs.append(
-                                exe.submit(builder.generate_suite, split_params, gen_params))
+                        gen_params = self.task_def_to_gen_params(task_def, build_variant_name)
+                        jobs.append(exe.submit(builder.generate_suite, split_params, gen_params))
 
             [j.result() for j in jobs]  # pylint: disable=expression-not-assigned
-
-            # builder.generate_archive_dist_test_debug_activator_task(build_variant_name)
-            # TODO: SERVER-59102 Check if this still causes a circular dependency on generator_tasks.
-            # tasks_to_hide.add(ACTIVATE_ARCHIVE_DIST_TEST_DEBUG_TASK)
 
         end_time = perf_counter()
         duration = end_time - start_time

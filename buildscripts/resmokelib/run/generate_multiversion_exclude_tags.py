@@ -8,7 +8,7 @@ from subprocess import check_output
 
 import requests
 
-from buildscripts.ciconfig import tags as _tags
+from buildscripts.resmokelib.testing import tags as _tags
 from buildscripts.resmokelib.config import MultiversionOptions
 from buildscripts.resmokelib.core.programs import get_path_env_var
 from buildscripts.resmokelib.utils import is_windows

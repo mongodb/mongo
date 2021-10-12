@@ -85,18 +85,14 @@ def _get_config_options(expansions_file_data, build_variant, run_build_variant):
                          repeat_tests_max, project)
 
 
-def _create_evg_build_variant_map(expansions_file_data, evergreen_conf):
+def _create_evg_build_variant_map(expansions_file_data):
     """
     Generate relationship of base buildvariant to generated buildvariant.
 
     :param expansions_file_data: Config data file to use.
-    :param evergreen_conf: Evergreen configuration.
     :return: Map of base buildvariants to their generated buildvariants.
     """
-    burn_in_tags_gen_variant = expansions_file_data["build_variant"]
-    burn_in_tags_gen_variant_config = evergreen_conf.get_variant(burn_in_tags_gen_variant)
-    burn_in_tag_build_variants = burn_in_tags_gen_variant_config.expansions.get(
-        "burn_in_tag_buildvariants")
+    burn_in_tag_build_variants = expansions_file_data["burn_in_tag_buildvariants"]
 
     if burn_in_tag_build_variants:
         return {
@@ -179,7 +175,7 @@ def burn_in(task_expansions: Dict[str, Any], evg_conf: EvergreenProjectConfig,
     :param repos: Git repositories.
     """
     shrub_project = ShrubProject.empty()
-    build_variant_map = _create_evg_build_variant_map(task_expansions, evg_conf)
+    build_variant_map = _create_evg_build_variant_map(task_expansions)
     _generate_evg_tasks(evergreen_api, shrub_project, task_expansions, build_variant_map, repos,
                         evg_conf)
 

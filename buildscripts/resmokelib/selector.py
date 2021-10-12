@@ -12,7 +12,7 @@ import random
 import subprocess
 import sys
 
-import buildscripts.ciconfig.tags as _tags
+import buildscripts.resmokelib.testing.tags as _tags
 from buildscripts.resmokelib import config
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib import utils

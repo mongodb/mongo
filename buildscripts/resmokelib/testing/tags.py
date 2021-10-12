@@ -6,7 +6,7 @@ from functools import cmp_to_key
 import textwrap
 import yaml
 
-from ..resmokelib.utils import default_if_none
+from buildscripts.resmokelib.utils import default_if_none
 
 
 # Setup to preserve order in yaml.dump, see https://stackoverflow.com/a/8661021
@@ -46,19 +46,6 @@ class TagsConfig(object):
 
         return cls(raw, **kwargs)
 
-    @classmethod
-    def from_dict(cls, raw, **kwargs):
-        """Return a TagsConfig from a dict representing the associations between tests and tags.
-
-        See TagsConfig.__init__() for the keyword arguments that can be specified.
-        """
-
-        return cls(copy.deepcopy(raw), **kwargs)
-
-    def get_test_kinds(self):
-        """List the test kinds."""
-        return list(self._conf.keys())
-
     def get_test_patterns(self, test_kind):
         """List the test patterns under 'test_kind'."""
         return list(getdefault(self._conf, test_kind, {}).keys())
@@ -77,31 +64,6 @@ class TagsConfig(object):
             tags.sort(key=cmp_to_key(self._cmp_func) if self._cmp_func else None)
             return True
         return False
-
-    def remove_tag(self, test_kind, test_pattern, tag):
-        """Remove a tag. Return True if the tag was removed or False if the tag was not present."""
-        patterns = self._conf.get(test_kind)
-        if not patterns or test_pattern not in patterns:
-            return False
-        tags = patterns.get(test_pattern)
-        if tags and tag in tags:
-            tags[:] = (value for value in tags if value != tag)
-            # Remove the pattern if there are no associated tags.
-            if not tags:
-                del patterns[test_pattern]
-            return True
-        return False
-
-    def remove_test_pattern(self, test_kind, test_pattern):
-        """Remove a test pattern."""
-        patterns = self._conf.get(test_kind)
-        if not patterns or test_pattern not in patterns:
-            return
-        del patterns[test_pattern]
-
-    def is_modified(self):
-        """Return True if the tags have been modified, False otherwise."""
-        return self._conf != self._conf_copy
 
     def write_file(self, filename, preamble=None):
         """Write the tags to a file.

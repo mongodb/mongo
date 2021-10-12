@@ -3,7 +3,7 @@
 import os
 import unittest
 
-import buildscripts.ciconfig.tags as _tags
+import buildscripts.resmokelib.testing.tags as _tags
 
 # pylint: disable=missing-docstring,protected-access
 
@@ -20,13 +20,6 @@ class TestTagsConfig(unittest.TestCase):
         invalid_path = "non_existing_file"
         with self.assertRaises(IOError):
             _tags.TagsConfig.from_file(invalid_path)
-
-    def test_list_test_kinds(self):
-        test_kinds = self.conf.get_test_kinds()
-        self.assertEqual(3, len(test_kinds))
-        self.assertIn("js_test", test_kinds)
-        self.assertIn("cpp_unit_test", test_kinds)
-        self.assertIn("db_test", test_kinds)
 
     def test_list_test_patterns(self):
         patterns = self.conf.get_test_patterns("js_test")
@@ -89,51 +82,6 @@ class TestTagsConfig(unittest.TestCase):
         tags = self.conf.get_tags(test_kind, test_pattern)
         self.assertIn(new_tag, tags)
 
-    def test_remove_tag(self):
-        test_kind = "js_test"
-        test_pattern = "jstests/core/example.js"
-        tag = "tag1"
-        tags = self.conf.get_tags(test_kind, test_pattern)
-        self.assertIn(tag, tags)
-
-        self.conf.remove_tag(test_kind, test_pattern, tag)
-
-        tags = self.conf.get_tags(test_kind, test_pattern)
-        self.assertNotIn(tag, tags)
-
-    def test_remove_unknown_tag(self):
-        test_kind = "js_test"
-        test_pattern = "jstests/core/example.js"
-        tag = "tag18"
-        tags = self.conf.get_tags(test_kind, test_pattern)
-        self.assertNotIn(tag, tags)
-
-        self.conf.remove_tag(test_kind, test_pattern, tag)
-
-        tags = self.conf.get_tags(test_kind, test_pattern)
-        self.assertNotIn(tag, tags)
-
-    def test_remove_tag_and_clean(self):
-        test_kind = "js_test"
-        test_pattern = "jstests/core/all*.js"
-        tags = self.conf.get_tags(test_kind, test_pattern)
-        self.assertEqual(2, len(tags))
-
-        # Copy the list because the loop will modify the original.
-        tags = tags[:]
-        for tag in tags:
-            self.conf.remove_tag(test_kind, test_pattern, tag)
-
-        patterns = self.conf.get_test_patterns(test_kind)
-        self.assertNotIn(test_pattern, patterns)
-
-    def test_remove_pattern(self):
-        test_kind = "js_test"
-        test_pattern = "jstests/core/example.js"
-        self.assertIn(test_pattern, self.conf.get_test_patterns(test_kind))
-        self.conf.remove_test_pattern(test_kind, test_pattern)
-        self.assertNotIn(test_pattern, self.conf.get_test_patterns(test_kind))
-
     def test_tag_order(self):
         test_kind = "js_test"
         test_pattern = "jstests/core/example.js"
@@ -174,30 +122,3 @@ class TestTagsConfig(unittest.TestCase):
         conf.add_tag(test_kind, test_pattern, "tag1|aaa")
         tags = conf.get_tags(test_kind, test_pattern)
         self.assertEqual(["ta|g2", "tag1", "tag1|aaa", "tag2", "tag3"], tags)
-
-    def test_is_modified_after_add(self):
-        self.assertFalse(self.conf.is_modified())
-        # add an existing tag
-        self.conf.add_tag("js_test", "jstests/core/example.js", "tag1")
-        self.assertFalse(self.conf.is_modified())
-        # add a new tag
-        self.conf.add_tag("js_test", "jstests/core/example.js", "tag4")
-        self.assertTrue(self.conf.is_modified())
-
-    def test_is_modified_after_remove(self):
-        self.assertFalse(self.conf.is_modified())
-        # remove an unknown tag
-        self.conf.remove_tag("js_test", "jstests/core/example.js", "tag4")
-        self.assertFalse(self.conf.is_modified())
-        # remove an existing tag
-        self.conf.remove_tag("js_test", "jstests/core/example.js", "tag1")
-        self.assertTrue(self.conf.is_modified())
-
-    def test_is_modified_after_add_remove(self):
-        self.assertFalse(self.conf.is_modified())
-        # add a new tag
-        self.conf.add_tag("js_test", "jstests/core/example.js", "tag4")
-        self.assertTrue(self.conf.is_modified())
-        # remove the tag
-        self.conf.remove_tag("js_test", "jstests/core/example.js", "tag4")
-        self.assertFalse(self.conf.is_modified())

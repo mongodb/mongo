@@ -36,8 +36,6 @@ EXIT_CODE_MAP = {
     3221225725: "Stack Overflow",
 }
 
-MULTIVERSION_CONFIG_KEY = "use_in_multiversion"
-
 
 def translate_exit_code(exit_code):
     """
@@ -167,10 +165,6 @@ class Suite(object):  # pylint: disable=too-many-instance-attributes
     def get_test_kind_config(self):
         """Return the "test_kind" section of the YAML configuration."""
         return self._suite_config["test_kind"]
-
-    def burn_in_multiversion_task_name(self):
-        """Check if the suite should run in burn_in_multiversion by using a special root-level key."""
-        return self._suite_config.get(MULTIVERSION_CONFIG_KEY)
 
     @property
     def options(self):

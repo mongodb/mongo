@@ -54,29 +54,15 @@ def get_evergreen_config() -> EvergreenProjectConfig:
 
 class TestCreateEvgBuildVariantMap(unittest.TestCase):
     def test_create_evg_buildvariant_map(self):
-        evg_conf_mock = get_evergreen_config()
-        expansions_file_data = {"build_variant": "enterprise-rhel-80-64-bit"}
-
-        buildvariant_map = under_test._create_evg_build_variant_map(expansions_file_data,
-                                                                    evg_conf_mock)
+        expansions_file_data = {
+            "build_variant": "variant1", "burn_in_tag_buildvariants": "variant2 variant3"
+        }
+        buildvariant_map = under_test._create_evg_build_variant_map(expansions_file_data)
 
         expected_buildvariant_map = {
-            "enterprise-rhel-80-64-bit-majority-read-concern-off":
-                "enterprise-rhel-80-64-bit-majority-read-concern-off-required",
-            "enterprise-rhel-80-64-bit-inmem":
-                "enterprise-rhel-80-64-bit-inmem-required"
+            "variant2": "variant2-required", "variant3": "variant3-required"
         }
         self.assertEqual(buildvariant_map, expected_buildvariant_map)
-
-    def test_create_evg_buildvariant_map_no_base_variants(self):
-        evg_conf_mock = MagicMock()
-        evg_conf_mock.parse_evergreen_file.return_value = get_evergreen_config()
-        expansions_file_data = {"build_variant": "buildvariant-without-burn-in-tag-buildvariants"}
-
-        buildvariant_map = under_test._create_evg_build_variant_map(expansions_file_data,
-                                                                    evg_conf_mock)
-
-        self.assertEqual(buildvariant_map, {})
 
 
 class TestGenerateEvgBuildVariants(unittest.TestCase):
@@ -126,7 +112,7 @@ class TestGenerateEvgTasks(unittest.TestCase):
                 display_task_name="aggregation_mongos_passthrough",
                 resmoke_args="--suites=aggregation_mongos_passthrough --storageEngine=wiredTiger",
                 tests=["jstests/aggregation/ifnull.js"],
-                require_multiversion=None,
+                require_multiversion_setup=False,
                 distro="",
             )
         }  # yapf: disable

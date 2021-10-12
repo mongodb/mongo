@@ -5,7 +5,7 @@ import math
 GEN_SUFFIX = "_gen"
 
 
-def name_generated_task(parent_name, task_index, total_tasks, variant=None):
+def name_generated_task(parent_name, task_index=None, total_tasks=0, variant=None):
     """
     Create a zero-padded sub-task name.
 
@@ -19,8 +19,11 @@ def name_generated_task(parent_name, task_index, total_tasks, variant=None):
     if variant:
         suffix = f"_{variant}"
 
-    index_width = int(math.ceil(math.log10(total_tasks)))
-    return f"{parent_name}_{str(task_index).zfill(index_width)}{suffix}"
+    if task_index is None:
+        return f"{parent_name}_misc{suffix}"
+    else:
+        index_width = int(math.ceil(math.log10(total_tasks)))
+        return f"{parent_name}_{str(task_index).zfill(index_width)}{suffix}"
 
 
 def remove_gen_suffix(task_name: str) -> str:

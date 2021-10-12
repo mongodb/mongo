@@ -42,17 +42,6 @@ def get_suite_files() -> List[str]:
     return ExplicitSuiteConfig.get_suite_files() + MatrixSuiteConfig.get_suite_files()
 
 
-def burn_in_multiversion_suites():
-    """Return the suites that should run in burn_in_multiversion."""
-    suites_to_return = []
-
-    for suite_name in get_named_suites():
-        multiversion_name = get_suite(suite_name).burn_in_multiversion_task_name()
-        if multiversion_name is not None:
-            suites_to_return.append({"origin": suite_name, "multiversion_name": multiversion_name})
-    return suites_to_return
-
-
 def create_test_membership_map(fail_on_missing_selector=False, test_kind=None):
     """Return a dict keyed by test name containing all of the suites that will run that test.
 

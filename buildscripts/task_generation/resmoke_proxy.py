@@ -58,38 +58,37 @@ class ResmokeProxyService:
         """
         return self._suite_config.SuiteFinder.get_config_obj(suite_name)
 
-    def render_suite_files(self, suites: List["SubSuite"], suite_name: str,
-                           generated_suite_filename: str, test_list: List[str],
-                           create_misc_suite: bool, suite: "GeneratedSuite") -> List[GeneratedFile]:
+    def render_suite_files(self, suite: "GeneratedSuite",
+                           create_misc_suite: bool) -> List[GeneratedFile]:
         """
         Render the given list of suites.
 
         This will create a dictionary of all the resmoke config files to create with the
         filename of each file as the key and the contents as the value.
 
-        :param suites: List of suites to render.
-        :param suite_name: Base name of suites.
-        :param generated_suite_filename: The name to use as the file name for generated suite file.
-        :param test_list: List of tests used in suites.
-        :param create_misc_suite: Whether or not a _misc suite file should be created.
         :param suite: Generated suite files belong to.
+        :param create_misc_suite: Whether to create the file for the _misc task.
         :return: Dictionary of rendered resmoke config files.
         """
         # pylint: disable=too-many-arguments
-        source_config = self._suite_config.SuiteFinder.get_config_obj(suite_name)
+        original_suite_name = suite.suite_name
+        test_list = suite.get_test_list()
+
+        source_config = self._suite_config.SuiteFinder.get_config_obj(original_suite_name)
         suite_configs = [
-            GeneratedFile(file_name=f"{suite.sub_suite_config_file(i)}.yml",
-                          content=sub_suite.generate_resmoke_config(source_config))
-            for i, sub_suite in enumerate(suites)
+            GeneratedFile(
+                file_name=suite.sub_suite_config_file(i),
+                content=sub_suite.generate_resmoke_config(source_config))
+            for i, sub_suite in enumerate(suite.sub_suites)
         ]
         if create_misc_suite:
             suite_configs.append(
                 GeneratedFile(
-                    file_name=f"{suite.sub_suite_config_file(None)}.yml",
-                    content=generate_resmoke_suite_config(source_config, generated_suite_filename,
+                    file_name=suite.sub_suite_config_file(None),
+                    content=generate_resmoke_suite_config(source_config, original_suite_name,
                                                           excludes=test_list)))
 
-        LOGGER.debug("Generated files for suite", suite=suite_name,
+        LOGGER.debug("Generated files for suite", suite=original_suite_name,
                      files=[f.file_name for f in suite_configs])
 
         return suite_configs

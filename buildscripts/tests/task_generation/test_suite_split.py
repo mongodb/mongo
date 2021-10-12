@@ -57,12 +57,7 @@ def build_mock_split_params(test_filter=None):
 
 def build_mock_sub_suite(index, test_list):
     return under_test.SubSuite(
-        index=index,
-        suite_name="suite_name",
         test_list=test_list,
-        tests_with_runtime_info=0,
-        max_test_runtime=0,
-        historic_runtime=0,
         task_overhead=0,
     )
 
@@ -74,7 +69,7 @@ class TestSubSuite(unittest.TestCase):
             MagicMock(spec_set=TestRuntime, test_name=test, runtime=3.14) for test in test_list
         ]
         runtime_list[3].runtime = 0
-        sub_suite = under_test.SubSuite.from_test_list(0, "my_suite", test_list, None, runtime_list)
+        sub_suite = under_test.SubSuite(test_list, 0, runtime_list)
 
         assert not sub_suite.should_overwrite_timeout()
 
@@ -83,7 +78,7 @@ class TestSubSuite(unittest.TestCase):
         runtime_list = [
             MagicMock(spec_set=TestRuntime, test_name=test, runtime=3.14) for test in test_list
         ]
-        sub_suite = under_test.SubSuite.from_test_list(0, "my_suite", test_list, None, runtime_list)
+        sub_suite = under_test.SubSuite(test_list, 0, runtime_list)
 
         assert sub_suite.should_overwrite_timeout()
 
@@ -109,14 +104,14 @@ class TestGeneratedSuite(unittest.TestCase):
         task_name = "task_name"
         n_sub_suites = 42
         mock_sub_suites = [build_mock_sub_suite(i, []) for i in range(n_sub_suites)]
-        mock_suite = under_test.GeneratedSuite(
-            sub_suites=mock_sub_suites, build_variant="build_variant", task_name=f"{task_name}_gen",
-            suite_name="suite_name", filename="filename")
+        mock_suite = under_test.GeneratedSuite(sub_suites=mock_sub_suites,
+                                               build_variant="build_variant", task_name=task_name,
+                                               suite_name="suite_name", filename="filename")
 
-        self.assertEqual(mock_suite.sub_suite_config_file(34), "task_name_34")
-        self.assertEqual(mock_suite.sub_suite_config_file(0), "task_name_00")
-        self.assertEqual(mock_suite.sub_suite_config_file(3), "task_name_03")
-        self.assertEqual(mock_suite.sub_suite_config_file(None), "task_name_misc")
+        self.assertEqual(mock_suite.sub_suite_config_file(34), "task_name_34.yml")
+        self.assertEqual(mock_suite.sub_suite_config_file(0), "task_name_00.yml")
+        self.assertEqual(mock_suite.sub_suite_config_file(3), "task_name_03.yml")
+        self.assertEqual(mock_suite.sub_suite_config_file(None), "task_name_misc.yml")
 
 
 class TestSplitSuite(unittest.TestCase):

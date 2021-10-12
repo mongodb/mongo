@@ -11,8 +11,7 @@ from buildscripts.task_generation.task_types.fuzzer_tasks import FuzzerGenTaskSe
 # pylint: disable=missing-docstring,invalid-name,unused-argument,no-self-use,protected-access
 
 
-def build_mock_fuzzer_params(multi_version=None, use_large_distro=None, add_to_display=True,
-                             large_distro_name=None):
+def build_mock_fuzzer_params(multi_version=False, use_large_distro=None, large_distro_name=None):
     return under_test.FuzzerGenTaskParams(
         task_name="task name",
         variant="build variant",
@@ -26,9 +25,8 @@ def build_mock_fuzzer_params(multi_version=None, use_large_distro=None, add_to_d
         resmoke_jobs_max=5,
         should_shuffle=True,
         timeout_secs=100,
-        require_multiversion=multi_version,
+        require_multiversion_setup=multi_version,
         use_large_distro=use_large_distro,
-        add_to_display_task=add_to_display,
         large_distro_name=large_distro_name,
         config_location="config location",
     )
@@ -40,7 +38,6 @@ def build_mocked_service():
         gen_task_options=MagicMock(),
         gen_config=MagicMock(),
         resmoke_gen_task_service=MagicMock(),
-        multiversion_gen_task_service=MagicMock(),
         fuzzer_gen_task_service=FuzzerGenTaskService(),
     )
 
@@ -74,21 +71,6 @@ class TestGenerateFuzzerTask(unittest.TestCase):
 
         fuzzer_config = build_variant.as_dict()
         self.assertTrue(all(mock_distro in task["distros"] for task in fuzzer_config["tasks"]))
-
-    def test_fuzzer_tasks_should_not_be_added_to_display_group_when_specified(self):
-        mock_params = build_mock_fuzzer_params(add_to_display=False)
-        build_variant = BuildVariant("mock build variant")
-        service = build_mocked_service()
-
-        fuzzer_task = service.generate_fuzzer_task(mock_params, build_variant)
-
-        self.assertEqual(fuzzer_task.task_name, mock_params.task_name)
-        self.assertEqual(len(fuzzer_task.sub_tasks), mock_params.num_tasks)
-
-        self.assertEqual(len(build_variant.tasks), mock_params.num_tasks)
-
-        display_tasks = list(build_variant.display_tasks)
-        self.assertEqual(len(display_tasks), 0)
 
 
 class TestGetDistro(unittest.TestCase):

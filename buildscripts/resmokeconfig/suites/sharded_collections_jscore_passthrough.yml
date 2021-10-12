@@ -1,5 +1,4 @@
 test_kind: js_test
-use_in_multiversion: sharded_collections_jscore_multiversion_passthrough
 
 selector:
   roots:

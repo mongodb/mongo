@@ -104,6 +104,9 @@ class Task(object):
         """Initialize a Task from a dictionary containing its configuration."""
         self.raw = conf_dict
 
+        # Lazy parse task tags.
+        self._tags = None
+
     @property
     def name(self):
         """Get the task name."""
@@ -170,18 +173,6 @@ class Task(object):
         return suite_name
 
     @property
-    def require_multiversion(self):
-        """Get the multiversion path if task uses multiversion setup, or None."""
-        command_obj = None
-        if self.is_run_tests_task:
-            command_obj = self.run_tests_command
-
-        if self.is_generate_resmoke_task:
-            command_obj = self.generate_resmoke_tasks_command
-
-        return command_obj.get("vars", {}).get("require_multiversion")
-
-    @property
     def resmoke_args(self):
         """Get the resmoke_args from 'run tests' function if defined, or None."""
         if self.is_run_tests_task:
@@ -211,7 +202,25 @@ class Task(object):
     @property
     def tags(self):
         """Get a set of tags this task has been marked with."""
-        return set(self.raw.get("tags", []))
+        if self._tags is None:
+            self._tags = set(self.raw.get("tags", []))
+        return self._tags
+
+    def require_multiversion_setup(self):
+        """Check if the task requires running the multiversion setup."""
+        return "multiversion" in self.tags
+
+    def requires_npm(self):
+        """Check if the task needs to run npm setup."""
+        return "require_npm" in self.tags
+
+    def is_test_name_random(self):
+        """
+        Check if the name of the tests are randomly generated.
+
+        Those tests won't have associated test history.
+        """
+        return "random_name" in self.tags
 
     def __str__(self):
         return self.name
