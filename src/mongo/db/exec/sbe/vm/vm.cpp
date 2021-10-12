@@ -48,6 +48,7 @@
 #include "mongo/db/index/btree_key_generator.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/datetime/date_time_support.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
