@@ -8,12 +8,9 @@
 (function() {
 "use strict";
 
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
-
+load("jstests/libs/sbe_explain_helpers.js");  // For engineSpecificAssertion.
 const t = db[jsTestName()];
 t.drop();
-
-const isSBEEnabled = checkSBEEnabled(db);
 
 function keysExamined(query, hint, sort) {
     if (!hint) {
@@ -55,30 +52,42 @@ assert.commandWorked(t.insert({a: 2, b: 2}));
 // SBE or the classic engine. This is because the classic engine will use a multi-interval index
 // scan whereas SBE will decompose the intervals into a set of single-interval bounds and will end
 // up examining 0 keys.
-let expectedKeys = isSBEEnabled ? 0 : 3;
-assert.eq(expectedKeys, keysExamined({a: {$in: [1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1}));
-assert.eq(expectedKeys,
-          keysExamined({a: {$in: [1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1}, {a: -1, b: -1}));
+let assertFn = function(expectedKeys, numKeysExamined) {
+    return numKeysExamined === expectedKeys;
+};
+let errMsg = function(actualNumKeys) {
+    return "Chosen plan examined " + actualNumKeys + " keys";
+};
+let sbeAssert = actualKeys => assertFn(0, actualKeys);
+let classicAssert = actualKeys => assertFn(3, actualKeys);
+let numKeys = keysExamined({a: {$in: [1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1});
+engineSpecificAssertion(classicAssert(numKeys), sbeAssert(numKeys), db, errMsg(numKeys));
+numKeys = keysExamined({a: {$in: [1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1}, {a: -1, b: -1});
+engineSpecificAssertion(classicAssert(numKeys), sbeAssert(numKeys), db, errMsg(numKeys));
 
 assert.commandWorked(t.insert({a: 1, b: 1}));
 assert.commandWorked(t.insert({a: 1, b: 1}));
-assert.eq(expectedKeys, keysExamined({a: {$in: [1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1}));
-assert.eq(expectedKeys, keysExamined({a: {$in: [1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1}));
-assert.eq(expectedKeys,
-          keysExamined({a: {$in: [1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1}, {a: -1, b: -1}));
+numKeys = keysExamined({a: {$in: [1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1});
+engineSpecificAssertion(classicAssert(numKeys), sbeAssert(numKeys), db, errMsg(numKeys));
+numKeys = keysExamined({a: {$in: [1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1});
+engineSpecificAssertion(classicAssert(numKeys), sbeAssert(numKeys), db, errMsg(numKeys));
+numKeys = keysExamined({a: {$in: [1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1}, {a: -1, b: -1});
+engineSpecificAssertion(classicAssert(numKeys), sbeAssert(numKeys), db, errMsg(numKeys));
 
 // We examine one less key in the classic engine because the bounds are slightly tighter.
-if (!isSBEEnabled) {
-    expectedKeys = 2;
-}
-assert.eq(expectedKeys, keysExamined({a: {$in: [1, 1.9]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1}));
-assert.eq(expectedKeys,
-          keysExamined({a: {$in: [1.1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1}, {a: -1, b: -1}));
+classicAssert = actualKeys => assertFn(2, actualKeys);
+numKeys = keysExamined({a: {$in: [1, 1.9]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1});
+engineSpecificAssertion(classicAssert(numKeys), sbeAssert(numKeys), db, errMsg(numKeys));
+
+numKeys = keysExamined({a: {$in: [1.1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1}, {a: -1, b: -1});
+engineSpecificAssertion(classicAssert(numKeys), sbeAssert(numKeys), db, errMsg(numKeys));
 
 assert.commandWorked(t.insert({a: 1, b: 1.5}));
 
 // We examine one extra key in both engines because we've inserted a document that falls within
 // both sets of bounds being scanned.
-expectedKeys = isSBEEnabled ? 1 : 4;
-assert.eq(expectedKeys, keysExamined({a: {$in: [1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1}), "F");
+sbeAssert = actualKeys => assertFn(1, actualKeys);
+classicAssert = actualKeys => assertFn(4, actualKeys);
+numKeys = keysExamined({a: {$in: [1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1});
+engineSpecificAssertion(classicAssert(numKeys), sbeAssert(numKeys), db, errMsg(numKeys));
 })();

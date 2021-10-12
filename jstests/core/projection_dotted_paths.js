@@ -12,10 +12,8 @@
 "use strict";
 
 load("jstests/libs/analyze_plan.js");
-load("jstests/libs/sbe_util.js");             // For checkSBEEnabled.
 load("jstests/aggregation/extras/utils.js");  // arrayEq
-
-const isSBEEnabled = checkSBEEnabled(db);
+load("jstests/libs/sbe_explain_helpers.js");
 
 let coll = db["projection_dotted_paths"];
 coll.drop();
@@ -66,11 +64,11 @@ assert(!isIndexOnly(db, getWinningPlan(explain.queryPlanner)));
 resultDoc = coll.findOne({_id: 1}, {_id: 0, "b.c": 1, "b.e": 1, c: 1});
 assert.docEq(resultDoc, {b: {c: 1, e: 1}, c: 1});
 explain = coll.find({_id: 1}, {_id: 0, "b.c": 1, "b.e": 1, c: 1}).explain("queryPlanner");
-if (isSBEEnabled) {
-    assert(isIxscan(db, getWinningPlan(explain.queryPlanner)), explain);
-} else {
-    assert(isIdhack(db, getWinningPlan(explain.queryPlanner)), explain);
-}
+
+engineSpecificAssertion(isIdhack(db, getWinningPlan(explain.queryPlanner)),
+                        isIxscan(db, getWinningPlan(explain.queryPlanner)),
+                        db,
+                        explain);
 
 // If we make a dotted path multikey, projections using that path cannot be covered. But
 // projections which do not include the multikey path can still be covered.
