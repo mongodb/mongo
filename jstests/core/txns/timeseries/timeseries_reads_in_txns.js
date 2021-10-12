@@ -1,14 +1,13 @@
 /**
  * Tests if queries against time-series collections in transactions work as expected.
  * @tags: [
- *   assumes_against_mongod_not_mongos,
  *   uses_transactions,
  * ]
  */
 (function() {
 "use strict";
 
-load("jstests/core/timeseries/libs/timeseries.js");
+load("jstests/core/timeseries/libs/timeseries.js");  // For 'TimeseriesTest'.
 
 if (!TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo())) {
     jsTestLog("Skipping test because the time-series collection feature flag is disabled");

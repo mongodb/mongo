@@ -1,7 +1,6 @@
 /**
  * Tests running the delete command on a time-series collection.
  * @tags: [
- *   assumes_no_implicit_collection_creation_after_drop,
  *   does_not_support_stepdowns,
  *   does_not_support_transactions,
  *   requires_getmore,
@@ -12,9 +11,18 @@
 "use strict";
 
 load("jstests/core/timeseries/libs/timeseries.js");
+load("jstests/core/timeseries/libs/timeseries.js");  // For 'TimeseriesTest'.
+load("jstests/libs/fixture_helpers.js");             // For 'FixtureHelpers'.
 
 if (!TimeseriesTest.timeseriesUpdatesAndDeletesEnabled(db.getMongo())) {
     jsTestLog("Skipping test because the time-series updates and deletes feature flag is disabled");
+    return;
+}
+
+if (FixtureHelpers.isMongos(db) &&
+    TimeseriesTest.shardedtimeseriesCollectionsEnabled(db.getMongo()) &&
+    !TimeseriesTest.shardedTimeseriesUpdatesAndDeletesEnabled(db.getMongo())) {
+    jsTestLog("Skipping test because the sharded time-series feature flag is disabled");
     return;
 }
 

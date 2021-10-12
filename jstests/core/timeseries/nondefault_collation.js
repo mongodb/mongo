@@ -7,15 +7,14 @@
  *   requires_pipeline_optimization,
  *   requires_getmore,
  *   does_not_support_stepdowns,
- *   assumes_no_implicit_collection_creation_after_drop,
- *   assumes_unsharded_collection,
  *   does_not_support_transactions,
  *   multiversion_incompatible
  * ]
  */
-load("jstests/libs/analyze_plan.js");
 (function() {
 "use strict";
+
+load("jstests/libs/analyze_plan.js");
 
 const coll = db.timeseries_nondefault_collation;
 const bucketsColl = db.getCollection('system.buckets.' + coll.getName());

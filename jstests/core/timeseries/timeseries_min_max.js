@@ -3,7 +3,6 @@
  * maximum values inserted into the bucket.
  *
  * @tags: [
- *   assumes_no_implicit_collection_creation_after_drop,
  *   does_not_support_stepdowns,
  *   does_not_support_transactions,
  *   requires_getmore,
@@ -12,7 +11,7 @@
 (function() {
 "use strict";
 
-load("jstests/core/timeseries/libs/timeseries.js");
+load("jstests/core/timeseries/libs/timeseries.js");  // For 'TimeseriesTest'.
 
 TimeseriesTest.run((insert) => {
     const collNamePrefix = 'timeseries_min_max_';

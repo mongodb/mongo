@@ -2,16 +2,18 @@
  * Tests that idle buckets are removed when the bucket catalog's memory threshold is reached.
  *
  * @tags: [
- *   assumes_no_implicit_collection_creation_after_drop,
  *   does_not_support_stepdowns,
  *   does_not_support_transactions,
  *   requires_getmore,
+ *   # Disable inMemory storage engine to avoid the following error:
+ *   # "WiredTigerRecordStore::insertRecord -31807: WT_CACHE_FULL: operation would overflow cache"
+ *   requires_persistence,
  * ]
  */
 (function() {
 "use strict";
 
-load("jstests/core/timeseries/libs/timeseries.js");
+load("jstests/core/timeseries/libs/timeseries.js");  // For 'TimeseriesTest'.
 
 TimeseriesTest.run((insert) => {
     const isTimeseriesBucketCompressionEnabled =

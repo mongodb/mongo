@@ -6,7 +6,7 @@ selector:
   - jstests/libs/txns/txn_passthrough_runner_selftest.js
   exclude_files:
   # These tests already run with transactions.
-  - jstests/core/txns/*.js
+  - jstests/core/txns/**/*.js
 
   ##
   ## Limitations with the way the runner file injects transactions.
