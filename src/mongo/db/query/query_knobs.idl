@@ -151,7 +151,9 @@ server_parameters:
     cpp_vartype: synchronized_value<std::string>
     default: "5%"
     on_update: plan_cache_util::onPlanCacheSizeUpdate
-
+    validator:
+      callback: plan_cache_util::validatePlanCacheSize
+    
   #
   # Parsing
   #

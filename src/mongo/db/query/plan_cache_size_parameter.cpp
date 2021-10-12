@@ -93,6 +93,10 @@ Status onPlanCacheSizeUpdate(const std::string& str) {
     return Status::OK();
 }
 
+Status validatePlanCacheSize(const std::string& str) {
+    return PlanCacheSizeParameter::parse(str).getStatus();
+}
+
 const Decorable<ServiceContext>::Decoration<std::unique_ptr<PlanCacheSizeUpdater>>
     sbePlanCacheSizeUpdaterDecoration =
         ServiceContext::declareDecoration<std::unique_ptr<PlanCacheSizeUpdater>>();

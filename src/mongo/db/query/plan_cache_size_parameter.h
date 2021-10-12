@@ -63,6 +63,11 @@ struct PlanCacheSizeParameter {
 Status onPlanCacheSizeUpdate(const std::string& str);
 
 /**
+ * Callback called on validation of planCacheSize parameter.
+ */
+Status validatePlanCacheSize(const std::string& str);
+
+/**
  * Encapsulates a callback function used to update the PlanCache size when the planCacheSize
  * parameter is updated.
  */
