@@ -99,7 +99,7 @@ StatusWith<BSONObj> S2BucketAccessMethod::fixSpec(const BSONObj& specObj) {
     if (!indexVersionElt.isNumber() ||
         (indexVersionElt.type() == BSONType::NumberDouble &&
          !std::isnormal(indexVersionElt.numberDouble())) ||
-        (indexVersionElt.numberLong() != S2_INDEX_VERSION_3)) {
+        (indexVersionElt.safeNumberLong() != S2_INDEX_VERSION_3)) {
         return {ErrorCodes::CannotCreateIndex,
                 str::stream() << "unsupported geo index version { " << kIndexVersionFieldName
                               << " : " << indexVersionElt << " }, only versions: ["
