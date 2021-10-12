@@ -31,6 +31,11 @@ if (!isLockFreeReadsEnabled) {
 
 const coll = db.jstests_sbe_cmd;
 coll.drop();
+const basicFind = coll.find().explain();
+if (!basicFind.queryPlanner.winningPlan.hasOwnProperty("slotBasedPlan")) {
+    jsTestLog("Skipping test because the SBE feature flag is disabled");
+    return;
+}
 
 // Helper that executes a given 'query', gets the generated 'slotBasedPlan' from explain output,
 // and runs that SBE plan through the internal 'sbe' command which executes the plan string

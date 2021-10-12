@@ -33,7 +33,10 @@ assert.commandWorked(coll.insertMany([
 
 // Use explain to obtain a test SBE command string.
 const explain = coll.find({a: 1, b: 2}).explain();
-assert(explain.queryPlanner.winningPlan.hasOwnProperty("slotBasedPlan"), explain);
+if (!explain.queryPlanner.winningPlan.hasOwnProperty("slotBasedPlan")) {
+    jsTestLog("Skipping test because the SBE feature flag is disabled");
+    return;
+}
 const slotBasedPlan = explain.queryPlanner.winningPlan.slotBasedPlan;
 assert(slotBasedPlan.hasOwnProperty("stages"), explain);
 const sbeString = slotBasedPlan.stages;

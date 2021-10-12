@@ -35,9 +35,9 @@
 
 (function() {
 load("jstests/libs/analyze_plan.js");
-load("jstests/libs/fixture_helpers.js");      // For 'FixtureHelpers'.
-load("jstests/libs/sbe_explain_helpers.js");  // For 'assertIdHackPlan()'.
-load("jstests/libs/sbe_util.js");             // For checkSBEEnabled.
+load("jstests/libs/fixture_helpers.js");  // For 'FixtureHelpers'.
+load("jstests/libs/sbe_explain_helpers.js");
+load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 
 if (checkSBEEnabled(db, ["featureFlagSbePlanCache"])) {
     jsTest.log("Skipping test because SBE and SBE plan cache are both enabled.");
@@ -159,9 +159,9 @@ assert.commandWorked(coll.runCommand('planCacheSetFilter', {query: queryID, inde
 var explain = coll.explain("executionStats").find(queryID).finish();
 assert.commandWorked(explain);
 
-const isSBEEnabled = checkSBEEnabled(db);
-assertIdHackPlan(db, getWinningPlan(explain.queryPlanner), "FETCH", isSBEEnabled);
-
+const winningPlan = getWinningPlan(explain.queryPlanner);
+engineSpecificAssertion(
+    isIdhack(db, winningPlan), isIdIndexScan(db, winningPlan, "FETCH"), db, winningPlan);
 // Clear filters
 // Clearing filters on a missing collection should be a no-op.
 assert.commandWorked(missingCollection.runCommand('planCacheClearFilters'));

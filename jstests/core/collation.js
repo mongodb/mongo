@@ -18,9 +18,7 @@ load("jstests/libs/get_index_helpers.js");
 load("jstests/concurrency/fsm_workload_helpers/server_types.js");
 // For isReplSet
 load("jstests/libs/fixture_helpers.js");
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
-
-const isSBEEnabled = checkSBEEnabled(db);
+load("jstests/libs/sbe_explain_helpers.js");  // For engineSpecificAssertion.
 
 var coll = db.collation;
 coll.drop();
@@ -676,9 +674,9 @@ coll.drop();
 assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
 explainRes = coll.explain("executionStats").find({_id: "foo"}).finish();
 assert.commandWorked(explainRes);
-planStage =
-    getPlanStage(getWinningPlan(explainRes.queryPlanner), isSBEEnabled ? "IXSCAN" : "IDHACK");
-assert.neq(null, planStage);
+let classicAssert = null !== getPlanStage(getWinningPlan(explainRes.queryPlanner), "IDHACK");
+let sbeAssert = null !== getPlanStage(getWinningPlan(explainRes.queryPlanner), "IXSCAN");
+engineSpecificAssertion(classicAssert, sbeAssert, db, explainRes);
 
 // Find should return correct results for query containing $expr when no collation specified and
 // collection has a default collation.
@@ -717,12 +715,9 @@ assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "e
 explainRes =
     coll.explain("executionStats").find({_id: "foo"}).collation({locale: "en_US"}).finish();
 assert.commandWorked(explainRes);
-if (isSBEEnabled) {
-    planStage = getPlanStage(getWinningPlan(explainRes.queryPlanner), "IXSCAN");
-} else {
-    planStage = getPlanStage(explainRes.executionStats.executionStages, "IDHACK");
-}
-assert.neq(null, planStage, explainRes);
+classicAssert = null !== getPlanStage(explainRes.executionStats.executionStages, "IDHACK");
+sbeAssert = null !== getPlanStage(getWinningPlan(explainRes.queryPlanner), "IXSCAN");
+engineSpecificAssertion(classicAssert, sbeAssert, db, explainRes);
 
 // Find on _id should not use idhack stage when query collation does not match collection
 // default.
@@ -731,12 +726,10 @@ assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "e
 explainRes =
     coll.explain("executionStats").find({_id: "foo"}).collation({locale: "fr_CA"}).finish();
 assert.commandWorked(explainRes);
-if (isSBEEnabled) {
-    planStage = getPlanStage(getWinningPlan(explainRes.queryPlanner), "IXSCAN");
-} else {
-    planStage = getPlanStage(explainRes.executionStats.executionStages, "IDHACK");
-}
-assert.eq(null, planStage);
+
+classicAssert = null === getPlanStage(explainRes.executionStats.executionStages, "IDHACK");
+sbeAssert = null === getPlanStage(getWinningPlan(explainRes.queryPlanner), "IXSCAN");
+engineSpecificAssertion(classicAssert, sbeAssert, db, explainRes);
 
 // Find should select compatible index when no collation specified and collection has a default
 // collation.

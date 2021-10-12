@@ -19,8 +19,9 @@
 
 load('jstests/libs/analyze_plan.js');              // For getPlanStage().
 load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
-load('jstests/libs/fixture_helpers.js');  // For getPrimaryForNodeHostingDatabase and isMongos.
-load("jstests/libs/sbe_util.js");         // For checkSBEEnabled.
+load('jstests/libs/fixture_helpers.js');      // For getPrimaryForNodeHostingDatabase and isMongos.
+load("jstests/libs/sbe_util.js");             // For checkSBEEnabled.
+load("jstests/libs/sbe_explain_helpers.js");  // For engineSpecificAssertion.
 
 if (checkSBEEnabled(db, ["featureFlagSbePlanCache"])) {
     jsTest.log("Skipping test because SBE and SBE plan cache are both enabled.");
@@ -89,15 +90,37 @@ assert.eq(cacheEntry.isActive, true);
 // Should be at least two plans: one using the {a: 1} index and the other using the b.$** index.
 assert.gte(cacheEntry.creationExecStats.length, 2, tojson(cacheEntry.plans));
 
-const isSBEEnabled = checkSBEEnabled(db);
-
 // In SBE index scan stage does not serialize key pattern in execution stats, so we use IXSCAN from
 // the query plan instead.
-const plan = isSBEEnabled ? cacheEntry.cachedPlan.queryPlan
-                          : cacheEntry.creationExecStats[0].executionStages;
-const ixScanStage = getPlanStage(plan, "IXSCAN");
-assert.neq(ixScanStage, null, () => tojson(plan));
-assert.eq(ixScanStage.keyPattern, {"$_path": 1, "b": 1}, () => tojson(plan));
+const sbeIxScan = function() {
+    const cachedPlan = cacheEntry.cachedPlan;
+    if (!cachedPlan)
+        return null;
+    if (!cachedPlan.queryPlan)
+        return null;
+    return getPlanStage(cachedPlan.queryPlan, "IXSCAN");
+}();
+
+const classicIxScan = function() {
+    const execStats = cacheEntry.creationExecStats;
+    if (!execStats)
+        return null;
+    const elem = execStats[0];
+    if (!elem)
+        return null;
+    if (!elem.executionStages)
+        return null;
+    return getPlanStage(elem.executionStages, "IXSCAN");
+}();
+const expectedKeyPattern = {
+    "$_path": 1,
+    "b": 1
+};
+const classicKeyPatternMatch =
+    classicIxScan !== null && bsonWoCompare(classicIxScan.keyPattern, expectedKeyPattern) === 0;
+const sbeKeyPatternmatch =
+    sbeIxScan !== null && bsonWoCompare(sbeIxScan.keyPattern, expectedKeyPattern) === 0;
+engineSpecificAssertion(classicKeyPatternMatch, sbeKeyPatternmatch, db, tojson(cacheEntry));
 
 // Run the query again. This time it should use the cached plan. We should get the same result
 // as earlier.
