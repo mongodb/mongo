@@ -2624,41 +2624,80 @@ def doConfigure(myenv):
         }
         """ % compiler_minimum_string)
     elif myenv.ToolchainIs('gcc'):
-        compiler_minimum_string = "GCC 8.2"
-        compiler_test_body = textwrap.dedent(
-        """
-        #if !defined(__GNUC__) || defined(__clang__)
-        #error
-        #endif
+        if get_option('cxx-std') == "20":
+            compiler_minimum_string = "GCC 11.2"
+            compiler_test_body = textwrap.dedent(
+            """
+            #if !defined(__GNUC__) || defined(__clang__)
+            #error
+            #endif
 
-        #if (__GNUC__ < 8) || (__GNUC__ == 8 && __GNUC_MINOR__ < 2)
-        #error %s or newer is required to build MongoDB
-        #endif
+            #if (__GNUC__ < 11) || (__GNUC__ == 11 && __GNUC_MINOR__ < 2)
+            #error %s or newer is required to build MongoDB
+            #endif
 
-        int main(int argc, char* argv[]) {
-            return 0;
-        }
-        """ % compiler_minimum_string)
+            int main(int argc, char* argv[]) {
+                return 0;
+            }
+            """ % compiler_minimum_string)
+        else:
+            compiler_minimum_string = "GCC 8.2"
+            compiler_test_body = textwrap.dedent(
+            """
+            #if !defined(__GNUC__) || defined(__clang__)
+            #error
+            #endif
+
+            #if (__GNUC__ < 8) || (__GNUC__ == 8 && __GNUC_MINOR__ < 2)
+            #error %s or newer is required to build MongoDB
+            #endif
+
+            int main(int argc, char* argv[]) {
+                return 0;
+            }
+            """ % compiler_minimum_string)
     elif myenv.ToolchainIs('clang'):
-        compiler_minimum_string = "clang 7.0 (or Apple XCode 10.2)"
-        compiler_test_body = textwrap.dedent(
-        """
-        #if !defined(__clang__)
-        #error
-        #endif
+        if get_option('cxx-std') == "20":
+            compiler_minimum_string = "clang 12.0 (or Apple XCode 13.0)"
+            compiler_test_body = textwrap.dedent(
+            """
+            #if !defined(__clang__)
+            #error
+            #endif
 
-        #if defined(__apple_build_version__)
-        #if __apple_build_version__ < 10010046
-        #error %s or newer is required to build MongoDB
-        #endif
-        #elif (__clang_major__ < 7) || (__clang_major__ == 7 && __clang_minor__ < 0)
-        #error %s or newer is required to build MongoDB
-        #endif
+            #if defined(__apple_build_version__)
+            #if __apple_build_version__ < 13000029
+            #error %s or newer is required to build MongoDB
+            #endif
+            #elif (__clang_major__ < 12) || (__clang_major__ == 12 && __clang_minor__ < 0)
+            #error %s or newer is required to build MongoDB
+            #endif
 
-        int main(int argc, char* argv[]) {
-            return 0;
-        }
-        """ % (compiler_minimum_string, compiler_minimum_string))
+            int main(int argc, char* argv[]) {
+                return 0;
+            }
+            """ % (compiler_minimum_string, compiler_minimum_string))
+        else:
+            compiler_minimum_string = "clang 7.0 (or Apple XCode 10.2)"
+            compiler_test_body = textwrap.dedent(
+            """
+            #if !defined(__clang__)
+            #error
+            #endif
+
+            #if defined(__apple_build_version__)
+            #if __apple_build_version__ < 10010046
+            #error %s or newer is required to build MongoDB
+            #endif
+            #elif (__clang_major__ < 7) || (__clang_major__ == 7 && __clang_minor__ < 0)
+            #error %s or newer is required to build MongoDB
+            #endif
+
+            int main(int argc, char* argv[]) {
+                return 0;
+            }
+            """ % (compiler_minimum_string, compiler_minimum_string))
+
     else:
         myenv.ConfError("Error: can't check compiler minimum; don't know this compiler...")
 
