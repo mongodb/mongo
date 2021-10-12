@@ -2,7 +2,6 @@
  * Tests that only measurements with a binary identical meta field are included in the same bucket
  * in a time-series collection.
  * @tags: [
- *     assumes_no_implicit_collection_creation_after_drop,
  *     does_not_support_stepdowns,
  *     does_not_support_transactions,
  *     requires_fcv_49,
@@ -13,7 +12,7 @@
 (function() {
 "use strict";
 
-load("jstests/core/timeseries/libs/timeseries.js");
+load("jstests/core/timeseries/libs/timeseries.js");  // For 'TimeseriesTest'.
 
 TimeseriesTest.run((insert) => {
     const collNamePrefix = 'timeseries_metadata_';

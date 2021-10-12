@@ -2,6 +2,7 @@
  * Tests correctness of time-series bucket granularity configuration.
  *
  * @tags: [
+ *   # TODO SERVER-57570: Remove this tag.
  *   assumes_against_mongod_not_mongos,
  *   assumes_no_implicit_collection_creation_after_drop,
  *   assumes_unsharded_collection,

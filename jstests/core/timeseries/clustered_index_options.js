@@ -4,7 +4,6 @@
  * collections using the output of listCollections, which includes the clusteredIndex option.
  *
  * @tags: [
- *     assumes_against_mongod_not_mongos,
  *     does_not_support_stepdowns,
  *     requires_fcv_49,
  * ]
@@ -12,7 +11,7 @@
 (function() {
 "use strict";
 
-load("jstests/core/timeseries/libs/timeseries.js");
+load("jstests/core/timeseries/libs/timeseries.js");  // For 'TimeseriesTest'.
 
 if (!TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo())) {
     jsTestLog("Skipping test because the time-series collection feature flag is disabled");
