@@ -100,6 +100,8 @@ last-continuous:
       test_file: jstests/replsets/initial_sync_replicate_drop_mid_secondary_batch.js
     - ticket: SERVER-59613
       test_file: jstests/aggregation/range.js
+    - ticket: SERVER-59923
+      test_file: jstests/sharding/test_resharding_test_fixture_shutdown_retry_needed.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -360,6 +362,8 @@ last-lts:
       test_file: jstests/replsets/initial_sync_replicate_drop_mid_secondary_batch.js
     - ticket: SERVER-59613
       test_file: jstests/aggregation/range.js
+    - ticket: SERVER-59923
+      test_file: jstests/sharding/test_resharding_test_fixture_shutdown_retry_needed.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
