@@ -1136,7 +1136,10 @@ void CollectionImpl::deleteDocument(OperationContext* opCtx,
         uasserted(10089, "cannot remove from a capped collection");
     }
 
-    const auto oplogSlot = reserveOplogSlotsForRetryableFindAndModify(opCtx);
+    boost::optional<OplogSlot> oplogSlot = boost::none;
+    if (storeDeletedDoc == Collection::StoreDeletedDoc::On) {
+        oplogSlot = reserveOplogSlotsForRetryableFindAndModify(opCtx);
+    }
     OpObserver::OplogDeleteEntryArgs deleteArgs{
         nullptr, fromMigrate, getRecordPreImages(), oplogSlot, oplogSlot != boost::none};
 
