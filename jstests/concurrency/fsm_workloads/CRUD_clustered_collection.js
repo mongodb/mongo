@@ -6,6 +6,7 @@
  *
  * TODO SERVER-60123: Enable sharding for clustered collections.
  * @tags: [
+ *  requires_fcv_51,
  *  featureFlagClusteredIndexes,
  *  assumes_unsharded_collection,
  *  ]
