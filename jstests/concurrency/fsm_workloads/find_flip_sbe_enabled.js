@@ -7,23 +7,21 @@
  * @tags: [
  *     # Needed as the setParameter for ForceClassicEngine was introduced in 5.1.
  *     requires_fcv_51,
+ *     # Our test infrastructure prevents tests which use the 'setParameter' command from running in
+ *     # stepdown suites, since parameters are local to each mongod in the replica set.
+ *     does_not_support_stepdowns,
  * ]
  */
 
-load("jstests/libs/sbe_util.js");
-
 var $config = (function() {
-    let data = {originalParamValue: false, isSBEEnabled: false};
+    let data = {originalParamValue: false};
 
     function setup(db, coll, cluster) {
-        if (!checkSBEEnabled(db)) {
-            jsTestLog("Skipping this test because sbe is disabled");
-        }
-
-        cluster.executeOnMongodNodes(function(db) {
-            db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: true});
-        });
-
+        const originalParamValue =
+            db.adminCommand({getParameter: 1, internalQueryForceClassicEngine: 1});
+        assertAlways.commandWorked(originalParamValue);
+        assert(originalParamValue.hasOwnProperty("internalQueryForceClassicEngine"));
+        this.originalParamValue = originalParamValue.internalQueryForceClassicEngine;
         for (let i = 0; i < 10; ++i) {
             assertAlways.commandWorked(
                 db.coll.insert({_id: i, x: i.toString(), y: i.toString(), z: i.toString()}));
@@ -34,69 +32,45 @@ var $config = (function() {
     }
 
     let states = (function() {
-        function init(db, coll) {
-            const originalParamValue =
-                db.adminCommand({getParameter: 1, "internalQueryForceClassicEngine": 1});
-            assertAlways.commandWorked(originalParamValue);
-            this.originalParamValue = originalParamValue.internalQueryForceClassicEngine;
-
-            if (!checkSBEEnabled(db)) {
-                return;
-            }
-            this.isSBEEnabled = true;
-        }
-
-        function toggleSBESwitchOn(db, coll) {
-            if (!this.isSBEEnabled) {
-                return;
-            }
-
-            assertAlways.commandWorked(
-                db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: false}));
-        }
-
-        function toggleSBESwitchOff(db, coll) {
-            if (!this.isSBEEnabled) {
-                return;
-            }
-
+        function setForceClassicEngineOn(db, coll) {
             assertAlways.commandWorked(
                 db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: true}));
         }
 
-        function runQueriesAndCheckResults(db, coll) {
-            if (!this.isSBEEnabled) {
-                return;
-            }
+        function setForceClassicEngineOff(db, coll) {
+            assertAlways.commandWorked(
+                db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: false}));
+        }
 
+        function runQueriesAndCheckResults(db, coll) {
             for (let i = 0; i < 10; i++) {
-                const res =
-                    db.coll.find({x: i.toString(), y: i.toString(), z: i.toString()}).toArray();
-                assertAlways.eq(res.length, 1);
-                assertAlways.eq(res[0]._id, i);
+                let res;
+                try {
+                    res =
+                        db.coll.find({x: i.toString(), y: i.toString(), z: i.toString()}).toArray();
+                    assertAlways.eq(res.length, 1);
+                    assertAlways.eq(res[0]._id, i);
+                } catch (e) {
+                    assertAlways.eq(e.code, ErrorCodes.QueryPlanKilled);  // Acceptable error.
+                }
             }
         }
 
         function createIndex(db, coll) {
-            if (!this.isSBEEnabled) {
-                return;
-            }
-
-            assertAlways.commandWorked(db.coll.createIndex({z: 1}));
+            const res = db.coll.createIndex({z: 1});
+            assertAlways(res.ok === 1 || res.code === ErrorCodes.IndexBuildAlreadyInProgress,
+                         "Create index failed: " + tojson(res));
         }
 
         function dropIndex(db, coll) {
-            if (!this.isSBEEnabled) {
-                return;
-            }
-
-            assertAlways.commandWorked(db.coll.dropIndex({z: 1}));
+            const res = db.coll.dropIndex({z: 1});
+            assertAlways(res.ok === 1 || res.code === ErrorCodes.IndexNotFound,
+                         "Drop index failed: " + tojson(res));
         }
 
         return {
-            init: init,
-            toggleSBESwitchOn: toggleSBESwitchOn,
-            toggleSBESwitchOff: toggleSBESwitchOff,
+            setForceClassicEngineOn: setForceClassicEngineOn,
+            setForceClassicEngineOff: setForceClassicEngineOff,
             runQueriesAndCheckResults: runQueriesAndCheckResults,
             createIndex: createIndex,
             dropIndex: dropIndex
@@ -104,38 +78,43 @@ var $config = (function() {
     })();
 
     let transitions = {
-        init: {toggleSBESwitchOn: 1},
+        setForceClassicEngineOn: {
+            setForceClassicEngineOn: 0.1,
+            setForceClassicEngineOff: 0.1,
+            runQueriesAndCheckResults: 0.8
+        },
 
-        toggleSBESwitchOn:
-            {toggleSBESwitchOn: 0.1, toggleSBESwitchOff: 0.1, runQueriesAndCheckResults: 0.8},
-
-        toggleSBESwitchOff:
-            {toggleSBESwitchOn: 0.1, toggleSBESwitchOff: 0.1, runQueriesAndCheckResults: 0.8},
+        setForceClassicEngineOff: {
+            setForceClassicEngineOn: 0.1,
+            setForceClassicEngineOff: 0.1,
+            runQueriesAndCheckResults: 0.8
+        },
 
         runQueriesAndCheckResults: {
-            toggleSBESwitchOn: 0.1,
-            toggleSBESwitchOff: 0.1,
+            setForceClassicEngineOn: 0.1,
+            setForceClassicEngineOff: 0.1,
             runQueriesAndCheckResults: 0.78,
             createIndex: 0.02,
         },
 
         createIndex: {
-            toggleSBESwitchOn: 0.1,
-            toggleSBESwitchOff: 0.1,
+            setForceClassicEngineOn: 0.1,
+            setForceClassicEngineOff: 0.1,
             runQueriesAndCheckResults: 0.78,
             createIndex: 0.01,
             dropIndex: 0.01
         },
 
         dropIndex: {
-            toggleSBESwitchOn: 0.1,
-            toggleSBESwitchOff: 0.1,
+            setForceClassicEngineOn: 0.1,
+            setForceClassicEngineOff: 0.1,
             runQueriesAndCheckResults: 0.78,
             createIndex: 0.02,
         }
     };
 
     function teardown(db, coll, cluster) {
+        // Restore the original state of the ForceClassicEngine parameter.
         const setParam = this.originalParamValue;
         cluster.executeOnMongodNodes(function(db) {
             assertAlways.commandWorked(
@@ -146,7 +125,7 @@ var $config = (function() {
     return {
         threadCount: 10,
         iterations: 100,
-        startState: 'init',
+        startState: 'setForceClassicEngineOn',
         states: states,
         transitions: transitions,
         setup: setup,
