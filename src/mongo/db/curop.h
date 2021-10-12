@@ -232,6 +232,7 @@ public:
     // For search using mongot.
     boost::optional<long long> mongotCursorId{boost::none};
     boost::optional<long long> msWaitingForMongot{boost::none};
+    long long mongotBatchNum = 0;
 
     bool hasSortStage{false};  // true if the query plan involves an in-memory sort
 

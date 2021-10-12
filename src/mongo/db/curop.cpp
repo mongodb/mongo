@@ -1450,6 +1450,7 @@ BSONObj OpDebug::makeMongotDebugStatsObject() const {
     if (msWaitingForMongot) {
         cursorBuilder.append("timeWaitingMillis", msWaitingForMongot.get());
     }
+    cursorBuilder.append("batchNum", mongotBatchNum);
     return cursorBuilder.obj();
 }
 

@@ -142,6 +142,7 @@ void TaskExecutorCursor::_getNextBatch(OperationContext* opCtx) {
     auto dateEnd = clock->now();
     _millisecondsWaiting += std::max(Milliseconds(0), dateEnd - dateStart);
     uassertStatusOK(out);
+    ++_batchNum;
 
     // If we had a cursor id, set it to kClosedCursorId so that we don't attempt to kill the cursor
     // if there was an error.

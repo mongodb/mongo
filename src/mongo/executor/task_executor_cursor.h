@@ -111,6 +111,10 @@ public:
         return _cursorVars;
     }
 
+    long long getBatchNum() {
+        return _batchNum;
+    }
+
 private:
     /**
      * Runs a remote command and pipes the output back to this object
@@ -154,6 +158,7 @@ private:
     // Storage for the last batch we fetched
     std::vector<BSONObj> _batch;
     decltype(_batch)::iterator _batchIter;
+    long long _batchNum = 0;
 
     // Multi producer because we hold onto the producer side in this object, as well as placing it
     // into callbacks for the task executor
