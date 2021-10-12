@@ -131,6 +131,7 @@ let testCases = {
     _shardsvrCreateCollection: {skip: "internal command"},
     _shardsvrCreateCollectionParticipant: {skip: "internal command"},
     _shardsvrDropCollection: {skip: "internal command"},
+    _shardsvrDropCollectionIfUUIDNotMatching: {skip: "internal command"},
     _shardsvrDropCollectionParticipant: {skip: "internal command"},
     _shardsvrDropDatabase: {skip: "internal command"},
     _shardsvrDropDatabaseParticipant: {skip: "internal command"},

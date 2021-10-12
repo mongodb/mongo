@@ -57,6 +57,13 @@ Status dropCollection(OperationContext* opCtx,
                       DropCollectionSystemCollectionMode systemCollectionMode);
 
 /**
+ * Drops the collection "collectionName" only if its uuid is not matching "expectedUUID".
+ */
+Status dropCollectionIfUUIDNotMatching(OperationContext* opCtx,
+                                       const NamespaceString& ns,
+                                       const UUID& expectedUUID);
+
+/**
  * Drops the collection "collectionName". When applying a 'drop' oplog entry on a secondary, the
  * 'dropOpTime' will contain the optime of the oplog entry.
  */
