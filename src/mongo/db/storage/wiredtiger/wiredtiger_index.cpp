@@ -84,9 +84,6 @@ MONGO_FAIL_POINT_DEFINE(WTCompactIndexEBUSY);
 MONGO_FAIL_POINT_DEFINE(WTEmulateOutOfOrderNextIndexKey);
 MONGO_FAIL_POINT_DEFINE(WTIndexPauseAfterSearchNear);
 
-using std::string;
-using std::vector;
-
 static const WiredTigerItem emptyItem(nullptr, 0);
 }  // namespace
 
