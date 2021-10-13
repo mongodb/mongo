@@ -184,13 +184,21 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCom
             }
 
             if (isMongos() && args.response.status == ErrorCodes::IncompatibleWithUpgradedServer) {
-                severe() << "This mongos server must be upgraded. It is attempting to communicate "
-                            "with "
-                            "an upgraded cluster with which it is incompatible. Error: '"
-                         << args.response.status.toString()
-                         << "' Crashing in order to bring attention to the incompatibility, rather "
-                            "than erroring endlessly.";
-                fassertNoTrace(50710, false);
+                StringBuilder msg;
+                msg << "This mongos server must be upgraded. It is attempting to communicate "
+                       "with an upgraded cluster (host "
+                    << target << ") with which it is incompatible. Error: '"
+                    << args.response.status.toString() << "'";
+                if (grid->isShardingInitialized()) {
+                    severe() << msg.str()
+                             << ". Crashing in order to bring attention to the incompatibility, "
+                                "rather than erroring endlessly.";
+                    fassertNoTrace(50710, false);
+                } else {
+                    warning() << msg.str()
+                              << ". If this error repeats after pre-warming connections mongos "
+                                 "will crash.";
+                }
             }
 
             if (shard) {
