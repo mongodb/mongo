@@ -1,6 +1,7 @@
 /**
- * Tests the options used to create a clustered collection and verifies the options match in the
- * listCollections output.
+ * Tests the options used to create a clustered collection. Validates the created collection's
+ * listIndexes and listCollections outputs and ensures the clusteredIndex cannot be dropped
+ * regardless of the creation options used.
  *
  * @tags: [
  *   requires_fcv_51,
@@ -22,25 +23,55 @@ if (!clusteredIndexesEnabled) {
     return;
 }
 
-const validateListCollections = function(db, collName, creationOptions) {
+// listCollections should include the clusteredIndex.
+const validateListCollections = function(db, collName, fullCreationOptions) {
     const listColls =
         assert.commandWorked(db.runCommand({listCollections: 1, filter: {name: collName}}));
     const listCollsOptions = listColls.cursor.firstBatch[0].options;
     assert(listCollsOptions.clusteredIndex);
+    assert.docEq(listCollsOptions.clusteredIndex, fullCreationOptions.clusteredIndex);
+};
 
-    let expectedOptions = creationOptions;
+// The clusteredIndex should appear in listIndexes with additional "clustered" field.
+const validateListIndexes = function(db, collName, fullCreationOptions) {
+    const listIndexes = assert.commandWorked(db[collName].runCommand("listIndexes"));
+    const expectedListIndexesOutput =
+        Object.extend({clustered: true}, fullCreationOptions.clusteredIndex);
+    assert.docEq(listIndexes.cursor.firstBatch[0], expectedListIndexesOutput);
+};
+
+// It is illegal to drop the clusteredIndex. Verify that the various ways of dropping the
+// clusteredIndex fail accordingly.
+const validateClusteredIndexUndroppable = function(db, collName, fullCreationOptions) {
+    const expectedIndexName = fullCreationOptions.clusteredIndex.name;
+
+    assert.commandFailedWithCode(db[collName].dropIndex({_id: 1}), 5979800);
+
+    assert.commandFailedWithCode(db[collName].dropIndex(expectedIndexName), 5979800);
+
+    assert.commandFailedWithCode(db.runCommand({dropIndexes: collName, index: [expectedIndexName]}),
+                                 5979800);
+};
+
+const validateCreatedCollection = function(db, collName, creationOptions) {
+    // Upon creating a collection, fields absent in the user provided creation options are filled in
+    // with default values. The fullCreationOptions should contain default values for the fields not
+    // specified by the user.
+    let fullCreationOptions = creationOptions;
 
     // If the creationOptions don't specify the name, expect the default.
     if (!creationOptions.clusteredIndex.name) {
-        expectedOptions.clusteredIndex.name = "_id_";
+        fullCreationOptions.clusteredIndex.name = "_id_";
     }
 
     // If the creationOptions don't specify 'v', expect the default.
     if (!creationOptions.clusteredIndex.v) {
-        expectedOptions.clusteredIndex.v = 2;
+        fullCreationOptions.clusteredIndex.v = 2;
     }
 
-    assert.docEq(listCollsOptions.clusteredIndex, expectedOptions.clusteredIndex);
+    validateListCollections(db, collName, fullCreationOptions);
+    validateListIndexes(db, collName, fullCreationOptions);
+    validateClusteredIndexUndroppable(db, collName, fullCreationOptions);
 };
 
 /**
@@ -48,11 +79,16 @@ const validateListCollections = function(db, collName, creationOptions) {
  */
 const runSuccessfulCreate = function(db, coll, creationOptions) {
     assert.commandWorked(db.createCollection(coll.getName(), creationOptions));
-    validateListCollections(testDB, coll.getName(), creationOptions);
+    validateCreatedCollection(testDB, coll.getName(), creationOptions);
     coll.drop();
 };
+
 const testDB = db.getSiblingDB(jsTestName());
 const coll = testDB.coll;
+coll.drop();
+
+runSuccessfulCreate(
+    testDB, coll, {clusteredIndex: {key: {_id: 1}, unique: true}, expireAfterSeconds: 5});
 
 coll.drop();
 

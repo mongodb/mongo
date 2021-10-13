@@ -32,6 +32,8 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/catalog/clustered_collection_options_gen.h"
+#include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/commands/list_collections_filter.h"
 #include "mongo/db/index_build_entry_helpers.h"
 #include "mongo/db/index_builds_coordinator.h"
@@ -202,7 +204,14 @@ BaseCloner::AfterStageBehavior CollectionCloner::listIndexesStage() {
 
     // Parse the index specs into their respective state, ready or unfinished.
     for (auto&& spec : indexSpecs) {
-        if (spec.hasField("buildUUID")) {
+        if (spec.hasField("clustered")) {
+            invariant(_collectionOptions.clusteredIndex);
+            invariant(spec.getBoolField("clustered") == true);
+            invariant(clustered_util::formatClusterKeyForListIndexes(
+                          _collectionOptions.clusteredIndex.get())
+                          .woCompare(spec) == 0);
+            // Skip if the spec is for the collection's clusteredIndex.
+        } else if (spec.hasField("buildUUID")) {
             _unfinishedIndexSpecs.push_back(spec.getOwned());
         } else if (spec.hasField("name") && spec.getStringField("name") == "_id_"_sd) {
             _idIndexSpec = spec.getOwned();

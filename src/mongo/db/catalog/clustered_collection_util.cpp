@@ -75,5 +75,12 @@ bool requiresLegacyFormat(const NamespaceString& nss) {
     return nss.isTimeseriesBucketsCollection();
 }
 
+BSONObj formatClusterKeyForListIndexes(const ClusteredCollectionInfo& collInfo) {
+    BSONObjBuilder bob;
+    collInfo.getIndexSpec().serialize(&bob);
+    bob.append("clustered", true);
+    return bob.obj();
+}
+
 }  // namespace clustered_util
 }  // namespace mongo

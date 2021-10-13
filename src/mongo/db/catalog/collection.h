@@ -531,6 +531,8 @@ public:
      */
     virtual bool isClustered() const = 0;
 
+    virtual boost::optional<ClusteredCollectionInfo> getClusteredInfo() const = 0;
+
     /**
      * Updates the expireAfterSeconds setting for a clustered TTL index in this Collection and the
      * durable catalog.

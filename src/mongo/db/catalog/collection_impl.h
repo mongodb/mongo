@@ -321,7 +321,12 @@ public:
 
     bool isTemporary() const final;
 
+    /**
+     * isClustered() relies on the object returned from getClusteredInfo(). If
+     * ClusteredCollectionInfo exists, the collection is clustered.
+     */
     bool isClustered() const final;
+    boost::optional<ClusteredCollectionInfo> getClusteredInfo() const final;
     void updateClusteredIndexTTLSetting(OperationContext* opCtx,
                                         boost::optional<int64_t> expireAfterSeconds) final;
 
@@ -581,9 +586,6 @@ private:
     // The validator is using shared state internally. Collections share validator until a new
     // validator is set in setValidator which sets a new instance.
     Validator _validator;
-
-    // Whether or not this collection is clustered on _id values.
-    bool _clustered = false;
 
     // The earliest snapshot that is allowed to use this collection.
     boost::optional<Timestamp> _minVisibleSnapshot;

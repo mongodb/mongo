@@ -241,6 +241,10 @@ public:
         std::abort();
     }
 
+    boost::optional<ClusteredCollectionInfo> getClusteredInfo() const {
+        std::abort();
+    }
+
     void updateClusteredIndexTTLSetting(OperationContext* opCtx,
                                         boost::optional<int64_t> expireAfterSeconds) {
         std::abort();

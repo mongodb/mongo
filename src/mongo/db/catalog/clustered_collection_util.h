@@ -54,6 +54,11 @@ boost::optional<ClusteredCollectionInfo> parseClusteredInfo(const BSONElement& e
  */
 bool requiresLegacyFormat(const NamespaceString& nss);
 
-}  // namespace clustered_util
+/**
+ * listIndexes requires the ClusteredIndexSpec be formatted with an additional field 'clustered:
+ * true' to indicate it is a clustered index.
+ */
+BSONObj formatClusterKeyForListIndexes(const ClusteredCollectionInfo& collInfo);
 
+}  // namespace clustered_util
 }  // namespace mongo

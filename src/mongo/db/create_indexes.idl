@@ -151,7 +151,9 @@ structs:
                 type: safeBool
                 optional: true
                 unstable: true
-
+            clustered:
+                type: safeBool
+                optional: true
 commands:
     createIndexes:
         description: "Command for creating indexes on a collection"

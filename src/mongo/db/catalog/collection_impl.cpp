@@ -455,7 +455,6 @@ void CollectionImpl::init(OperationContext* opCtx) {
     }
 
     if (collectionOptions.clusteredIndex) {
-        _clustered = true;
         if (collectionOptions.expireAfterSeconds) {
             // TTL indexes are not compatible with capped collections.
             invariant(!collectionOptions.capped);
@@ -1357,7 +1356,11 @@ bool CollectionImpl::isTemporary() const {
 }
 
 bool CollectionImpl::isClustered() const {
-    return _clustered;
+    return getClusteredInfo().is_initialized();
+}
+
+boost::optional<ClusteredCollectionInfo> CollectionImpl::getClusteredInfo() const {
+    return getCollectionOptions().clusteredIndex;
 }
 
 void CollectionImpl::updateClusteredIndexTTLSetting(OperationContext* opCtx,
