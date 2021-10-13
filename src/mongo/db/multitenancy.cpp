@@ -44,7 +44,7 @@ boost::optional<OID> getActiveTenant(OperationContext* opCtx) {
         return boost::none;
     }
 
-    return token->getTenant();
+    return token->getAuthenticatedUser().getTenant();
 }
 
 }  // namespace mongo

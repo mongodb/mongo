@@ -30,6 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/bson/oid.h"
+#include "mongo/crypto/sha256_block.h"
 #include "mongo/db/auth/security_token.h"
 #include "mongo/db/auth/security_token_gen.h"
 #include "mongo/db/client.h"
@@ -43,14 +44,28 @@ namespace rpc {
 namespace test {
 namespace {
 
+constexpr auto kAuthenticatedUserFieldName = "authenticatedUser"_sd;
 constexpr auto kPingFieldName = "ping"_sd;
-constexpr auto kTenantFieldName = "tenant"_sd;
+constexpr auto kSigFieldName = "sig"_sd;
+
+BSONObj makeSecurityToken(const UserName& userName) {
+    auto authUser = userName.toBSON(true /* serialize token */);
+    ASSERT_EQ(authUser["tenant"_sd].type(), jstOID);
+
+    BSONObjBuilder token;
+    token.append(kAuthenticatedUserFieldName, authUser);
+
+    auto block = SHA256Block::computeHash({ConstDataRange(authUser.objdata(), authUser.objsize())});
+    token.appendBinData(kSigFieldName, block.size(), BinDataGeneral, block.data());
+
+    return token.obj();
+}
 
 class SecurityTokenMetadataTest : public LockerNoopServiceContextTest {};
 
 TEST_F(SecurityTokenMetadataTest, SecurityTokenNotAccepted) {
     const auto kPingBody = BSON(kPingFieldName << 1);
-    const auto kTokenBody = BSON(kTenantFieldName << OID::gen());
+    const auto kTokenBody = makeSecurityToken(UserName("user", "admin", OID::gen()));
 
     gMultitenancySupport = false;
     auto msgBytes = OpMsgBytes{0, kBodySection, kPingBody, kSecurityTokenSection, kTokenBody};
@@ -63,7 +78,7 @@ TEST_F(SecurityTokenMetadataTest, SecurityTokenNotAccepted) {
 TEST_F(SecurityTokenMetadataTest, BasicSuccess) {
     const auto kOid = OID::gen();
     const auto kPingBody = BSON(kPingFieldName << 1);
-    const auto kTokenBody = BSON(kTenantFieldName << kOid);
+    const auto kTokenBody = makeSecurityToken(UserName("user", "admin", kOid));
 
     gMultitenancySupport = true;
     auto msg = OpMsgBytes{0, kBodySection, kPingBody, kSecurityTokenSection, kTokenBody}.parse();
@@ -77,7 +92,12 @@ TEST_F(SecurityTokenMetadataTest, BasicSuccess) {
     auth::readSecurityTokenMetadata(opCtx.get(), msg.securityToken);
     auto token = auth::getSecurityToken(opCtx.get());
     ASSERT(token != boost::none);
-    ASSERT_EQ(token->getTenant(), kOid);
+
+    auto authedUser = token->getAuthenticatedUser();
+    ASSERT_EQ(authedUser.getUser(), "user");
+    ASSERT_EQ(authedUser.getDB(), "admin");
+    ASSERT_TRUE(authedUser.getTenant() != boost::none);
+    ASSERT_EQ(authedUser.getTenant().get(), kOid);
 }
 
 }  // namespace

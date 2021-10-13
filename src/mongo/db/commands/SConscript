@@ -161,6 +161,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/logical_session_id',
         '$BUILD_DIR/mongo/db/logical_session_id_helpers',
         '$BUILD_DIR/mongo/db/multitenancy',
+        '$BUILD_DIR/mongo/db/multitenancy_params',
         '$BUILD_DIR/mongo/db/pipeline/change_stream_pipeline',
         '$BUILD_DIR/mongo/db/pipeline/pipeline',
         '$BUILD_DIR/mongo/db/repl/isself',

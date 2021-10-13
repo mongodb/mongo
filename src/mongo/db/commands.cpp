@@ -109,7 +109,8 @@ bool checkAuthorizationImplPreParse(OperationContext* opCtx,
         return false;  // Still can't decide on auth because of the localhost bypass.
     uassert(ErrorCodes::Unauthorized,
             str::stream() << "command " << command->getName() << " requires authentication",
-            !command->requiresAuth() || authzSession->isAuthenticated());
+            !command->requiresAuth() || authzSession->isAuthenticated() ||
+                request.securityToken.nFields());
     return false;
 }
 

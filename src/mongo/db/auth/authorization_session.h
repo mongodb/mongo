@@ -169,6 +169,9 @@ public:
     // Gets an iterator over the roles of all authenticated users stored in this manager.
     virtual RoleNameIterator getAuthenticatedRoleNames() = 0;
 
+    // Removes all authenticated principals while in kSecurityToken authentication mode.
+    virtual void logoutSecurityTokenUser(Client* client) = 0;
+
     // Removes any authenticated principals and revokes any privileges that were granted via those
     // principals. This function modifies state. Synchronizes with the Client lock.
     virtual void logoutAllDatabases(Client* client, StringData reason) = 0;
@@ -177,6 +180,14 @@ public:
     // database, and revokes any privileges that were granted via that principal. This function
     // modifies state. Synchronizes with the Client lock.
     virtual void logoutDatabase(Client* client, StringData dbname, StringData reason) = 0;
+
+    // How the active session is authenticated.
+    enum class AuthenticationMode {
+        kNone,           // Not authenticated.
+        kConnection,     // For the duration of the connection, or until logged out.
+        kSecurityToken,  // By operation scoped security token.
+    };
+    virtual AuthenticationMode getAuthenticationMode() const = 0;
 
     // Adds the internalSecurity user to the set of authenticated users.
     // Used to grant internal threads full access. Takes in the Client

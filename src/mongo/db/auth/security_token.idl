@@ -30,6 +30,8 @@ global:
     cpp_namespace: "mongo::auth"
 
 imports:
+    - "mongo/db/auth/auth_types.idl"
+    - "mongo/crypto/sha256_block.idl"
     - "mongo/idl/basic_types.idl"
 
 structs:
@@ -37,7 +39,11 @@ structs:
         description: "Security Token as passed in OP_MSG"
         strict: true
         fields:
-            tenant:
-                description: Tenant identifier
-                type: objectid
+            authenticatedUser:
+                description: Authenticated user for which this token grants authorizations
+                type: UserName
+            sig:
+                # WIP This is temporarily a SHA256 hash of the authenticatedUser BSON object.
+                description: Validated signature on this security token
+                type: sha256Block
 

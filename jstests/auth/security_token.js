@@ -4,9 +4,12 @@
 (function() {
 'use strict';
 
-const kLogLevelForToken = 4;
+const tenantID = ObjectId();
+const kLogLevelForToken = 5;
 const kAcceptedSecurityTokenID = 5838100;
 const kLogMessageID = 5060500;
+const kLogoutMessageID = 6161506;
+const kStaleAuthenticationMessageID = 6161507;
 const isMongoStoreEnabled = TestData.setParameters.featureFlagMongoStore;
 
 if (!isMongoStoreEnabled) {
@@ -22,78 +25,123 @@ function assertNoTokensProcessedYet(conn) {
               'Unexpected security token has been processed');
 }
 
-function runTest(conn, enabled) {
+function makeTokenAndExpect(user, db) {
+    const authUser = {user: user, db: db, tenant: tenantID};
+
+    const token = _createSecurityToken(authUser);
+    jsTest.log('Using security token: ' + tojson(token));
+
+    // Clone and rewrite OID and BinData fields to be roundtrip-safe.
+    const expect = Object.assign({}, token);
+    expect.authenticatedUser = Object.assign({}, token.authenticatedUser);
+    expect.authenticatedUser.tenant = {'$oid': tenantID.str};
+    expect.sig = {'$binary': {base64: token.sig.base64(), subType: '0'}};
+
+    return [token, {token: expect}];
+}
+
+function runTest(conn, enabled, rst = undefined) {
     const admin = conn.getDB('admin');
+    const tenantAdmin = conn.getDB(tenantID.str + '_admin');
     assert.commandWorked(admin.runCommand({createUser: 'admin', pwd: 'admin', roles: ['root']}));
     assert(admin.auth('admin', 'admin'));
+
+    // Create a tenant-local user.
+    const createUserCmd =
+        {createUser: 'user1', "$tenant": tenantID, pwd: 'pwd', roles: ['readWriteAnyDatabase']};
+    if (enabled) {
+        assert.commandWorked(admin.runCommand(createUserCmd));
+
+        // Confirm the user exists on the tenant authz collection only, and not the global
+        // collection.
+        assert.eq(admin.system.users.count({user: 'user1'}),
+                  0,
+                  'user1 should not exist on global users collection');
+        assert.eq(tenantAdmin.system.users.count({user: 'user1'}),
+                  1,
+                  'user1 should exist on tenant users collection');
+    } else {
+        assert.commandFailed(admin.runCommand(createUserCmd));
+    }
+
+    if (rst) {
+        rst.awaitReplication();
+    }
 
     // Dial up the logging to watch for tenant ID being processed.
     const originalLogLevel =
         assert.commandWorked(admin.setLogLevel(kLogLevelForToken)).was.verbosity;
 
+    const tokenConn = new Mongo(conn.host);
+    const tokenDB = tokenConn.getDB('admin');
+
     // Basic OP_MSG command.
-    conn._setSecurityToken({});
-    assert.commandWorked(admin.runCommand({ping: 1}));
+    tokenConn._setSecurityToken({});
+    assert.commandWorked(tokenDB.runCommand({ping: 1}));
     assertNoTokensProcessedYet(conn);
+
+    // Test that no token equates to unauthenticated.
+    assert.commandFailed(tokenDB.runCommand({features: 1}));
 
     // Passing a security token with unknown fields will always fail.
-    conn._setSecurityToken({invalid: 1});
-    assert.commandFailed(admin.runCommand({ping: 1}));
-    conn._setSecurityToken({});  // clear so check-log can work
+    tokenConn._setSecurityToken({invalid: 1});
+    assert.commandFailed(tokenDB.runCommand({ping: 1}));
     assertNoTokensProcessedYet(conn);
 
-    const tenantID = ObjectId();
-    conn._setSecurityToken({tenant: tenantID});
+    const [token, expect] = makeTokenAndExpect('user1', 'admin');
+    tokenConn._setSecurityToken(token);
+
     if (enabled) {
         // Basic use.
-        assert.commandWorked(admin.runCommand({logMessage: 'This is a test'}));
+        assert.commandWorked(tokenDB.runCommand({features: 1}));
+
+        // Connection status, verify that the user/role info is returned without serializing tenant.
+        const authInfo = assert.commandWorked(tokenDB.runCommand({connectionStatus: 1})).authInfo;
+        jsTest.log(authInfo);
+        assert.eq(authInfo.authenticatedUsers.length, 1);
+        assert(0 === bsonWoCompare(authInfo.authenticatedUsers[0], {user: 'user1', db: 'admin'}));
+        assert.eq(authInfo.authenticatedUserRoles.length, 1);
+        assert(0 ===
+               bsonWoCompare(authInfo.authenticatedUserRoles[0],
+                             {role: 'readWriteAnyDatabase', db: 'admin'}));
 
         // Look for "Accepted Security Token" message with explicit tenant logging.
-        // Log line will contain {"$oid": "12345..."} rather than ObjectId.
-        const expect = {token: {tenant: {"$oid": tenantID.str}}};
         jsTest.log('Checking for: ' + tojson(expect));
         checkLog.containsJson(conn, kAcceptedSecurityTokenID, expect, 'Security Token not logged');
 
-        // Now look for logMessage log line with implicit logging.
-        const logMessages = checkLog.getGlobalLog(conn)
-                                .map((l) => JSON.parse(l))
-                                .filter((l) => l.id === kLogMessageID);
-        jsTest.log(logMessages);
-        assert.eq(logMessages.length, 1, 'Unexpected number of entries');
-        assert.eq(logMessages[0].tenant, tenantID.str, 'Unable to find tenant ID');
+        // Negative test, logMessage requires logMessage privilege on cluster (not granted)
+        assert.commandFailed(tokenDB.runCommand({logMessage: 'This is a test'}));
+
+        // Positive test, writing to a new collection.
+        assert.writeOK(tokenConn.getDB('test').coll1.insert({x: 1}));
+
+        const log = checkLog.getGlobalLog(conn).map((l) => JSON.parse(l));
+
+        // We performed 4 commands as a token auth'd user.
+        // We should see four post-operation logout events.
+        const logoutMessages = log.filter((l) => (l.id === kLogoutMessageID));
+        assert.eq(logoutMessages.length,
+                  4,
+                  'Unexpected number of logout messages: ' + tojson(logoutMessages));
+
+        // None of those authorization sessions should remain active into their next requests.
+        const staleMessages = log.filter((l) => (l.id === kStaleAuthenticationMessageID));
+        assert.eq(
+            staleMessages.length, 0, 'Unexpected stale authentications: ' + tojson(staleMessages));
     } else {
+        assert.commandWorked(
+            admin.runCommand({createUser: 'user1', pwd: 'pwd', roles: ['readWriteAnyDatabase']}));
         // Attempting to pass a valid looking security token will fail if not enabled.
-        assert.commandFailed(admin.runCommand({logMessage: 'This is a test'}));
+        assert.commandFailed(tokenDB.runCommand({features: 1}));
     }
 
     // Restore logging and conn token before shutting down.
-    conn._setSecurityToken({});
     assert.commandWorked(admin.setLogLevel(originalLogLevel));
-}
-
-function runShardTest(mongos, mongod, command) {
-    const db1 = mongos.getDB('db1');
-    const tenantID = ObjectId();
-
-    const mongodOrig =
-        assert.commandWorked(mongod.getDB('admin').setLogLevel(kLogLevelForToken)).was.verbosity;
-    const mongosOrig =
-        assert.commandWorked(mongos.getDB('admin').setLogLevel(kLogLevelForToken)).was.verbosity;
-    mongos._setSecurityToken({tenant: tenantID});
-    assert.commandWorked(db1.runCommand(command));
-    mongos._setSecurityToken({});
-    assert.commandWorked(mongos.getDB('admin').setLogLevel(mongosOrig));
-    assert.commandWorked(mongod.getDB('admin').setLogLevel(mongodOrig));
-
-    const expect = {token: {tenant: {"$oid": tenantID.str}}};
-    checkLog.containsJson(
-        mongos, kAcceptedSecurityTokenID, expect, 'Security Token not logged on mongos');
-    checkLog.containsJson(
-        mongod, kAcceptedSecurityTokenID, expect, 'Security Token not logged on mongod');
 }
 
 function runTests(enabled) {
     const opts = {
+        auth: '',
         setParameter: "multitenancySupport=" + (enabled ? 'true' : 'false'),
     };
     {
@@ -104,28 +152,14 @@ function runTests(enabled) {
     }
     {
         const rst = new ReplSetTest({nodes: 2, nodeOptions: opts});
-        rst.startSet();
+        rst.startSet({keyFile: 'jstests/libs/key1'});
         rst.initiate();
-        runTest(rst.getPrimary(), enabled);
+        runTest(rst.getPrimary(), enabled, rst);
         rst.stopSet();
     }
-    {
-        const st = new ShardingTest({
-            shards: 1,
-            mongos: 1,
-            config: 1,
-            other: {shardOptions: opts, configOptions: opts, mongosOptions: opts}
-        });
-        runTest(st.s0, enabled);
-
-        if (enabled) {
-            // Check for passthroughs to config/data shards.
-            runShardTest(st.s0, st.config0, {createUser: 'user1', pwd: 'user', roles: []});
-            runShardTest(st.s0, st.shard0, {insert: 'coll1', documents: [{_id: ObjectId(), x: 1}]});
-        }
-
-        st.stop();
-    }
+    // Do not test sharding since mongos must have an authenticated connection to
+    // all mongod nodes, and this conflicts with proxying tokens which we'll be
+    // performing in mongoq.
 }
 
 runTests(true);

@@ -215,6 +215,14 @@ public:
         // Do nothing
     }
 
+    AuthenticationMode getAuthenticationMode() const override {
+        return AuthenticationMode::kNone;
+    }
+
+    void logoutSecurityTokenUser(Client* client) override {
+        UASSERT_NOT_IMPLEMENTED;
+    }
+
 protected:
     std::tuple<std::vector<UserName>*, std::vector<RoleName>*> _getImpersonations() override {
         UASSERT_NOT_IMPLEMENTED;

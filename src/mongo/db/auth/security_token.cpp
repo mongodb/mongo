@@ -35,6 +35,7 @@
 
 #include "mongo/base/init.h"
 #include "mongo/bson/oid.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/logv2/log.h"
@@ -54,14 +55,41 @@ MONGO_INITIALIZER(SecurityTokenOptionValidate)(InitializerContext*) {
             auto* opCtx = client ? client->getOperationContext() : nullptr;
             auto token = getSecurityToken(opCtx);
             if (token) {
-                return token->getTenant();
+                return token->getAuthenticatedUser().getTenant();
             } else {
                 return boost::none;
             }
         });
     }
 }
+
+// Placeholder algorithm.
+void validateSecurityTokenSignature(BSONObj authUser, const SHA256Block& sig) {
+    auto computed =
+        SHA256Block::computeHash({ConstDataRange(authUser.objdata(), authUser.objsize())});
+    uassert(ErrorCodes::Unauthorized, "Token signature invalid", computed == sig);
+}
 }  // namespace
+
+SecurityTokenAuthenticationGuard::SecurityTokenAuthenticationGuard(OperationContext* opCtx) {
+    auto token = getSecurityToken(opCtx);
+    if (token == boost::none) {
+        _client = nullptr;
+        return;
+    }
+
+    auto client = opCtx->getClient();
+    uassertStatusOK(AuthorizationSession::get(client)->addAndAuthorizeUser(
+        opCtx, token->getAuthenticatedUser()));
+    _client = client;
+}
+
+SecurityTokenAuthenticationGuard::~SecurityTokenAuthenticationGuard() {
+    if (_client) {
+        // SecurityToken based users are "logged out" at the end of their request.
+        AuthorizationSession::get(_client)->logoutSecurityTokenUser(_client);
+    }
+}
 
 void readSecurityTokenMetadata(OperationContext* opCtx, BSONObj securityToken) try {
     if (securityToken.nFields() == 0) {
@@ -70,7 +98,15 @@ void readSecurityTokenMetadata(OperationContext* opCtx, BSONObj securityToken) t
 
     uassert(ErrorCodes::BadValue, "Multitenancy not enabled", gMultitenancySupport);
 
-    securityTokenDecoration(opCtx) = SecurityToken::parse({"Security Token"}, securityToken);
+    auto token = SecurityToken::parse({"Security Token"}, securityToken);
+    auto authenticatedUser = token.getAuthenticatedUser();
+    uassert(ErrorCodes::BadValue,
+            "Security token authenticated user requires a valid Tenant ID",
+            authenticatedUser.getTenant());
+
+    validateSecurityTokenSignature(securityToken["authenticatedUser"].Obj(), token.getSig());
+
+    securityTokenDecoration(opCtx) = std::move(token);
     LOGV2_DEBUG(5838100, 4, "Accepted security token", "token"_attr = securityToken);
 
 } catch (const DBException& ex) {

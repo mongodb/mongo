@@ -415,6 +415,32 @@ BSONObj convertShardKeyToHashed(const BSONObj& a, void* data) {
     return BSON("" << key);
 }
 
+/**
+ * Generate a security token suitable for passing in an OpMsg payload token field.
+ *
+ * @param user object - { user: 'name', db: 'dbname', tenant: OID }
+ * @return object - { authenticatedUser: {...user object...}, sig: BinDataGeneral(Signature) }
+ */
+BSONObj _createSecurityToken(const BSONObj& args, void* data) {
+    uassert(6161500,
+            "_createSecurityToken requires a single object argument",
+            (args.nFields() == 1) && (args.firstElement().type() == Object));
+    auto authUser = args.firstElement().Obj();
+
+    // Temporary algorithm.
+    auto digest =
+        SHA256Block::computeHash({ConstDataRange(authUser.objdata(), authUser.objsize())});
+
+    BSONObjBuilder ret;
+    {
+        BSONObjBuilder token(ret.subobjStart(""_sd));
+        token.append("authenticatedUser"_sd, authUser);
+        token.appendBinData("sig"_sd, digest.size(), BinDataGeneral, digest.data());
+        token.doneFast();
+    }
+    return ret.obj();
+}
+
 BSONObj replMonitorStats(const BSONObj& a, void* data) {
     uassert(17134,
             "replMonitorStats requires a single string argument (the ReplSet name)",
@@ -478,6 +504,7 @@ BSONObj numberDecimalsEqual(const BSONObj& input, void*) {
 
 void installShellUtils(Scope& scope) {
     scope.injectNative("getMemInfo", JSGetMemInfo);
+    scope.injectNative("_createSecurityToken", _createSecurityToken);
     scope.injectNative("_replMonitorStats", replMonitorStats);
     scope.injectNative("_srand", JSSrand);
     scope.injectNative("_rand", JSRand);

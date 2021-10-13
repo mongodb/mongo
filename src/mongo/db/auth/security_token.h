@@ -33,10 +33,21 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/security_token_gen.h"
+#include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 
 namespace mongo {
 namespace auth {
+
+class SecurityTokenAuthenticationGuard {
+public:
+    SecurityTokenAuthenticationGuard() = delete;
+    SecurityTokenAuthenticationGuard(OperationContext* opCtx);
+    ~SecurityTokenAuthenticationGuard();
+
+private:
+    Client* _client;
+};
 
 /**
  * Parse any SecurityToken from the OpMsg and place it as a decoration

@@ -44,6 +44,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authz_session_external_state.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/security_token.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/client.h"
 #include "mongo/db/namespace_string.h"
@@ -101,6 +102,20 @@ AuthorizationManager& AuthorizationSessionImpl::getAuthorizationManager() {
 void AuthorizationSessionImpl::startRequest(OperationContext* opCtx) {
     _externalState->startRequest(opCtx);
     _refreshUserInfoAsNeeded(opCtx);
+    if (_authenticationMode == AuthenticationMode::kSecurityToken) {
+        // Previously authenticated using SecurityToken,
+        // clear that user and reset to unauthenticated state.
+        invariant(_authenticatedUsers.count() <= 1);
+        if (auto users = std::exchange(_authenticatedUsers, {}); users.count()) {
+            LOGV2_DEBUG(6161507,
+                        3,
+                        "security token based user still authenticated at start of request, "
+                        "clearing from authentication state",
+                        "user"_attr = users.getNames().get().toBSON(true /* encode tenant */));
+            _buildAuthenticatedRolesVector();
+        }
+        _authenticationMode = AuthenticationMode::kNone;
+    }
 }
 
 void AuthorizationSessionImpl::startContractTracking() {
@@ -177,6 +192,19 @@ Status AuthorizationSessionImpl::addAndAuthorizeUser(OperationContext* opCtx,
     }
 
     stdx::lock_guard<Client> lk(*opCtx->getClient());
+
+    if (auto token = auth::getSecurityToken(opCtx)) {
+        uassert(
+            6161501,
+            "Attempt to authorize via security token on connection with established authentication",
+            _authenticationMode != AuthenticationMode::kConnection);
+        uassert(6161502,
+                "Attempt to authorize a user other than that present in the security token",
+                token->getAuthenticatedUser() == userName);
+        _authenticationMode = AuthenticationMode::kSecurityToken;
+    } else {
+        _authenticationMode = AuthenticationMode::kConnection;
+    }
     _authenticatedUsers.add(std::move(user));
 
     // If there are any users and roles in the impersonation data, clear it out.
@@ -214,8 +242,34 @@ User* AuthorizationSessionImpl::getSingleUser() {
     return lookupUser(userName);
 }
 
+void AuthorizationSessionImpl::logoutSecurityTokenUser(Client* client) {
+    stdx::lock_guard<Client> lk(*client);
+
+    uassert(6161503,
+            "Attempted to deauth a security token user while using standard login",
+            _authenticationMode != AuthenticationMode::kConnection);
+
+    auto users = std::exchange(_authenticatedUsers, {});
+    invariant(users.count() <= 1);
+    if (users.count() == 1) {
+        LOGV2_DEBUG(6161506,
+                    5,
+                    "security token based user explicitly logged out",
+                    "user"_attr = users.getNames().get().toBSON(true /* encode tenant */));
+    }
+
+    // Explicitly skip auditing the logout event,
+    // security tokens don't represent a permanent login.
+    clearImpersonatedUserData();
+    _buildAuthenticatedRolesVector();
+}
+
 void AuthorizationSessionImpl::logoutAllDatabases(Client* client, StringData reason) {
     stdx::lock_guard<Client> lk(*client);
+
+    uassert(6161504,
+            "May not log out while using a security token based authentication",
+            _authenticationMode != AuthenticationMode::kSecurityToken);
 
     auto users = std::exchange(_authenticatedUsers, {});
     if (users.count() == 0) {
@@ -233,6 +287,10 @@ void AuthorizationSessionImpl::logoutDatabase(Client* client,
                                               StringData dbname,
                                               StringData reason) {
     stdx::lock_guard<Client> lk(*client);
+
+    uassert(6161505,
+            "May not log out while using a security token based authentication",
+            _authenticationMode != AuthenticationMode::kSecurityToken);
 
     // Emit logout audit event and then remove all users logged into dbname.
     UserSet updatedUsers(_authenticatedUsers);
@@ -410,7 +468,7 @@ bool AuthorizationSessionImpl::isAuthorizedForActionsOnNamespace(const Namespace
     return isAuthorizedForPrivilege(Privilege(ResourcePattern::forExactNamespace(ns), actions));
 }
 
-static const int resourceSearchListCapacity = 7;
+constexpr int resourceSearchListCapacity = 7;
 /**
  * Builds from "target" an exhaustive list of all ResourcePatterns that match "target".
  *
@@ -664,13 +722,16 @@ void AuthorizationSessionImpl::_refreshUserInfoAsNeeded(OperationContext* opCtx)
 
 void AuthorizationSessionImpl::_buildAuthenticatedRolesVector() {
     _authenticatedRoleNames.clear();
-    for (UserSet::iterator it = _authenticatedUsers.begin(); it != _authenticatedUsers.end();
-         ++it) {
-        RoleNameIterator roles = (*it)->getIndirectRoles();
+    for (const auto& userHandle : _authenticatedUsers) {
+        RoleNameIterator roles = userHandle->getIndirectRoles();
         while (roles.more()) {
             RoleName roleName = roles.next();
             _authenticatedRoleNames.push_back(RoleName(roleName.getRole(), roleName.getDB()));
         }
+    }
+
+    if (_authenticatedUsers.count() == 0) {
+        _authenticationMode = AuthenticationMode::kNone;
     }
 }
 

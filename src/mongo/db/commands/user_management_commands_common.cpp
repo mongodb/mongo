@@ -41,11 +41,14 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/auth/security_token_gen.h"
 #include "mongo/db/auth/user.h"
 #include "mongo/db/auth/user_management_commands_parser.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/commands/user_management_commands_gen.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/multitenancy.h"
+#include "mongo/db/multitenancy_gen.h"
 #include "mongo/util/sequence_util.h"
 #include "mongo/util/str.h"
 
@@ -187,6 +190,16 @@ void checkAuthForTypedCommand(OperationContext* opCtx, const CreateUserCommand& 
             str::stream() << "Not authorized to create users on db: " << dbname,
             as->isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(dbname),
                                                  ActionType::createUser));
+
+    if (request.getTenantOverride() != boost::none) {
+        const bool isNotTokenAuth = (as->getAuthenticationMode() !=
+                                     AuthorizationSession::AuthenticationMode::kSecurityToken);
+
+        uassert(ErrorCodes::Unauthorized,
+                "$tenant parameter to createUser command only accepted in "
+                "test mode with security tokens enabled but not in use",
+                getTestCommandsEnabled() && gMultitenancySupport && isNotTokenAuth);
+    }
 
     auto resolvedRoles = resolveRoleNames(request.getRoles(), dbname);
     uassertStatusOK(checkAuthorizedToGrantRoles(as, resolvedRoles));

@@ -206,6 +206,16 @@ Status checkOkayToGrantPrivilegesToRole(const RoleName& role, const PrivilegeVec
     return Status::OK();
 }
 
+// Temporary placeholder pending availability of NamespaceWithTenant.
+NamespaceString getNamespaceWithTenant(const NamespaceString& nss,
+                                       const boost::optional<OID>& tenant) {
+    if (tenant) {
+        return NamespaceString(str::stream() << tenant.get() << '_' << nss.db(), nss.coll());
+    } else {
+        return nss;
+    }
+}
+
 /**
  * Finds all documents matching "query" in "collectionName".  For each document returned,
  * calls the function resultProcessor on it.
@@ -439,9 +449,11 @@ Status removeRoleDocuments(OperationContext* opCtx,
 /**
  * Creates the given user object in the given database.
  */
-Status insertPrivilegeDocument(OperationContext* opCtx, const BSONObj& userObj) {
-    Status status =
-        insertAuthzDocument(opCtx, AuthorizationManager::usersCollectionNamespace, userObj);
+Status insertPrivilegeDocument(OperationContext* opCtx,
+                               const BSONObj& userObj,
+                               const boost::optional<OID>& tenant = boost::none) {
+    auto nss = getNamespaceWithTenant(AuthorizationManager::usersCollectionNamespace, tenant);
+    Status status = insertAuthzDocument(opCtx, nss, userObj);
     if (status.isOK()) {
         return status;
     }
@@ -1005,7 +1017,7 @@ void CmdUMCTyped<CreateUserCommand>::Invocation::typedRun(OperationContext* opCt
     uassert(ErrorCodes::BadValue,
             "Username cannot contain NULL characters",
             cmd.getCommandParameter().find('\0') == std::string::npos);
-    UserName userName(cmd.getCommandParameter(), dbname);
+    UserName userName(cmd.getCommandParameter(), dbname, cmd.getTenantOverride());
 
     uassert(ErrorCodes::BadValue,
             "Must provide a 'pwd' field for all user documents, except those"
@@ -1042,8 +1054,7 @@ void CmdUMCTyped<CreateUserCommand>::Invocation::typedRun(OperationContext* opCt
     BSONObjBuilder userObjBuilder;
     userObjBuilder.append("_id", userName.getUnambiguousName());
     UUID::gen().appendToBuilder(&userObjBuilder, AuthorizationManager::USERID_FIELD_NAME);
-    userObjBuilder.append(AuthorizationManager::USER_NAME_FIELD_NAME, userName.getUser());
-    userObjBuilder.append(AuthorizationManager::USER_DB_FIELD_NAME, userName.getDB());
+    userName.appendToBSON(&userObjBuilder);
 
     auto* serviceContext = opCtx->getClient()->getServiceContext();
     auto* authzManager = AuthorizationManager::get(serviceContext);
@@ -1089,7 +1100,7 @@ void CmdUMCTyped<CreateUserCommand>::Invocation::typedRun(OperationContext* opCt
                          authRestrictionsArray);
 
     // Must invalidate even on bad status
-    auto status = insertPrivilegeDocument(opCtx, userObj);
+    auto status = insertPrivilegeDocument(opCtx, userObj, userName.getTenant());
     authzManager->invalidateUserByName(opCtx, userName);
     uassertStatusOK(status);
 }

@@ -44,6 +44,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/impersonation_session.h"
 #include "mongo/db/auth/ldap_cumulative_operation_stats.h"
+#include "mongo/db/auth/security_token.h"
 #include "mongo/db/client.h"
 #include "mongo/db/command_can_run_here.h"
 #include "mongo/db/commands.h"
@@ -634,6 +635,7 @@ private:
     OperationSessionInfoFromClient _sessionOptions;
     boost::optional<ResourceConsumption::ScopedMetricsCollector> _scopedMetrics;
     boost::optional<ImpersonationSessionGuard> _impersonationSessionGuard;
+    boost::optional<auth::SecurityTokenAuthenticationGuard> _tokenAuthorizationSessionGuard;
     std::unique_ptr<PolymorphicScoped> _scoped;
     bool _refreshedDatabase = false;
     bool _refreshedCollection = false;
@@ -1288,6 +1290,8 @@ void ExecCommandDatabase::_initiateCommand() {
     });
 
     rpc::readRequestMetadata(opCtx, request, command->requiresAuth());
+    _tokenAuthorizationSessionGuard.emplace(opCtx);
+
     rpc::TrackingMetadata::get(opCtx).initWithOperName(command->getName());
 
     auto const replCoord = repl::ReplicationCoordinator::get(opCtx);

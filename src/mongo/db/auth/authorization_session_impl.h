@@ -91,8 +91,13 @@ public:
 
     RoleNameIterator getAuthenticatedRoleNames() override;
 
+    void logoutSecurityTokenUser(Client* client) override;
     void logoutAllDatabases(Client* client, StringData reason) override;
     void logoutDatabase(Client* client, StringData dbname, StringData reason) override;
+
+    AuthenticationMode getAuthenticationMode() const override {
+        return _authenticationMode;
+    }
 
     void grantInternalAuthorization(Client* client) override;
 
@@ -160,6 +165,9 @@ protected:
 
     // All Users who have been authenticated on this connection.
     UserSet _authenticatedUsers;
+
+    // What authentication mode we're currently operating in.
+    AuthenticationMode _authenticationMode = AuthenticationMode::kNone;
 
     // The roles of the authenticated users. This vector is generated when the authenticated
     // users set is changed.
