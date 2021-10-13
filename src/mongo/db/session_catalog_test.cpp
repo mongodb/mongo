@@ -134,10 +134,12 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx,
     RAIIServerParameterControllerForTest controller{"featureFlagInternalTransactions", false};
 
     _opCtx->setLogicalSessionId(makeLogicalSessionIdWithTxnNumberAndUUIDForTest());
-    ASSERT_THROWS_CODE(OperationContextSession(_opCtx), DBException, ErrorCodes::InvalidOptions);
+    ASSERT_THROWS_CODE(
+        OperationContextSession(_opCtx), DBException, ErrorCodes::InternalTransactionNotSupported);
 
     _opCtx->setLogicalSessionId(makeLogicalSessionIdWithTxnUUIDForTest());
-    ASSERT_THROWS_CODE(OperationContextSession(_opCtx), DBException, ErrorCodes::InvalidOptions);
+    ASSERT_THROWS_CODE(
+        OperationContextSession(_opCtx), DBException, ErrorCodes::InternalTransactionNotSupported);
 
     ASSERT_EQ(0UL, catalog()->size());
 }

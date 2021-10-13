@@ -33,7 +33,7 @@ function runTest(downgradeFCV) {
         startTransaction: true,
         autocommit: false
     }),
-                                 ErrorCodes.InvalidOptions);
+                                 ErrorCodes.InternalTransactionNotSupported);
     assert.commandFailedWithCode(testDB.runCommand({
         insert: kCollName,
         documents: [{x: 1}],
@@ -42,7 +42,7 @@ function runTest(downgradeFCV) {
         startTransaction: true,
         autocommit: false
     }),
-                                 ErrorCodes.InvalidOptions);
+                                 ErrorCodes.InternalTransactionNotSupported);
 
     assert.commandWorked(shard0Primary.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
 

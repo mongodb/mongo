@@ -207,10 +207,10 @@ TEST_F(LogicalSessionCacheTest, CannotVivifySessionWithParentSessionIfFeatureFla
     RAIIServerParameterControllerForTest controller{"featureFlagInternalTransactions", false};
     ASSERT_THROWS_CODE(cache()->vivify(opCtx(), makeLogicalSessionIdWithTxnNumberAndUUIDForTest()),
                        DBException,
-                       ErrorCodes::InvalidOptions);
+                       ErrorCodes::InternalTransactionNotSupported);
     ASSERT_THROWS_CODE(cache()->vivify(opCtx(), makeLogicalSessionIdWithTxnUUIDForTest()),
                        DBException,
-                       ErrorCodes::InvalidOptions);
+                       ErrorCodes::InternalTransactionNotSupported);
     ASSERT_EQ(0UL, cache()->size());
 }
 

@@ -97,7 +97,7 @@ OperationSessionInfoFromClient initializeOperationSessionInfo(OperationContext* 
         }
 
         if (getParentSessionId(lsid)) {
-            uassert(ErrorCodes::InvalidOptions,
+            uassert(ErrorCodes::InternalTransactionNotSupported,
                     "Internal sessions are not enabled",
                     feature_flags::gFeatureFlagInternalTransactions.isEnabled(
                         serverGlobalParams.featureCompatibility));

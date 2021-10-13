@@ -77,7 +77,7 @@ SessionCatalog* SessionCatalog::get(ServiceContext* service) {
 
 SessionCatalog::ScopedCheckedOutSession SessionCatalog::_checkOutSessionWithParentSession(
     OperationContext* opCtx, const LogicalSessionId& lsid, boost::optional<KillToken> killToken) {
-    uassert(ErrorCodes::InvalidOptions,
+    uassert(ErrorCodes::InternalTransactionNotSupported,
             "Internal transactions are not enabled",
             feature_flags::gFeatureFlagInternalTransactions.isEnabled(
                 serverGlobalParams.featureCompatibility));
