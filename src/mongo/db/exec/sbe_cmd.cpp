@@ -83,6 +83,19 @@ public:
         uassertStatusOK(CursorRequest::parseCommandCursorOptions(
             cmdObj, query_request_helper::kDefaultBatchSize, &batchSize));
 
+        // Acquire the global lock, acquire a snapshot, and stash our version of the collection
+        // catalog. The is necessary because SBE plan executors currently use the external lock
+        // policy. Note that this must be done before parsing because the parser may look up
+        // collections in the stashed catalog.
+        //
+        // Unlike the similar 'AutoGetCollection*' variants of this db_raii object, this will not
+        // handle re-establishing a view of the catalog which is consistent with the new storage
+        // snapshot after a yield. For this reason, the SBE command cannot yield.
+        //
+        // Also, this will not handle all read concerns. This is ok because the SBE command is
+        // experimental and need not support the various read concerns.
+        AutoGetDbForReadLockFree autoGet{opCtx, dbname};
+
         auto env = std::make_unique<sbe::RuntimeEnvironment>();
         sbe::Parser parser(env.get());
         auto root = parser.parse(opCtx, dbname, cmdObj["sbe"].String());
@@ -105,18 +118,6 @@ public:
         if (recordIdSlot) {
             data.outputs.set(stage_builder::PlanStageSlots::kRecordId, *recordIdSlot);
         }
-
-        // Acquire the global lock, acquire a snapshot, and stash our version of the collection
-        // catalog. The is necessary because SBE plan executors currently use the external lock
-        // policy.
-        //
-        // Unlike the similar 'AutoGetCollection*' variants of this db_raii object, this will not
-        // handle re-establishing a view of the catalog which is consistent with the new storage
-        // snapshot after a yield. For this reason, the SBE command cannot yield.
-        //
-        // Also, this will not handle all read concerns. This is ok because the SBE command is
-        // experimental and need not support the various read concerns.
-        AutoGetDbForReadLockFree autoGet{opCtx, dbname};
 
         root->attachToOperationContext(opCtx);
         exec = uassertStatusOK(plan_executor_factory::make(opCtx,

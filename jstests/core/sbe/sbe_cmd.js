@@ -66,4 +66,16 @@ assertSbeCommandWorked({query: {b: 1}});
 assertSbeCommandWorked({query: {a: 1, c: 3}});
 // Test query: {a: 1, c: 3} with projection {_id: 0}.
 assertSbeCommandWorked({query: {a: 1, c: 3}, projection: {_id: 0}});
+
+// Verify that the sbe command can detect if a collection has been dropped.
+const explain = coll.find().explain();
+assert(explain.queryPlanner.winningPlan.hasOwnProperty("slotBasedPlan"), explain);
+const slotBasedPlan = explain.queryPlanner.winningPlan.slotBasedPlan.stages;
+
+// The command response should be OK as long as the collection exists.
+assert(db._sbe(slotBasedPlan));
+
+// After the collection is dropped, the parser should detect that the collection doesn't exist.
+assert(coll.drop());
+assert.throwsWithCode(() => db._sbe(slotBasedPlan), 6056700);
 }());
