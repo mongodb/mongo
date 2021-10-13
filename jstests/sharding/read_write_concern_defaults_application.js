@@ -126,6 +126,7 @@ let testCases = {
     _migrateClone: {skip: "internal command"},
     _recvChunkAbort: {skip: "internal command"},
     _recvChunkCommit: {skip: "internal command"},
+    _recvChunkReleaseCritSec: {skip: "internal command"},
     _recvChunkStart: {skip: "internal command"},
     _recvChunkStatus: {skip: "internal command"},
     _shardsvrAbortReshardCollection: {skip: "internal command"},

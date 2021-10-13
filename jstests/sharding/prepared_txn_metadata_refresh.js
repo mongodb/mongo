@@ -40,6 +40,12 @@ let txnNumber = 0;
 assert.commandWorked(st.rs0.getPrimary().getDB('admin').runCommand(
     {configureFailPoint: 'doNotRefreshRecipientAfterCommit', mode: 'alwaysOn'}));
 
+// TODO SERVER-60415: After 6.0 is released, no longer accept FailPointSetFailed errors
+assert.commandWorkedOrFailedWithCode(
+    st.rs2.getPrimary().getDB('admin').runCommand(
+        {configureFailPoint: 'migrationRecipientFailPostCommitRefresh', mode: 'alwaysOn'}),
+    ErrorCodes.FailPointSetFailed);
+
 let destPrimary = st.rs2.getPrimary();
 pauseMigrateAtStep(destPrimary, migrateStepNames.cloned);
 var joinMoveChunk =

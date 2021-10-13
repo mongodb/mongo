@@ -11,6 +11,22 @@ var staticMongod = MongoRunner.runMongod({});  // For startParallelOps.
 
 var st = new ShardingTest({shards: 3});
 
+const featureFlagMigrationRecipientCriticalSection =
+    assert.commandWorked(st.configRS.getPrimary().adminCommand(
+        {getParameter: 1, featureFlagMigrationRecipientCriticalSection: 1}));
+const featureFlagMigrationRecipientCriticalSectionEnabled =
+    featureFlagMigrationRecipientCriticalSection.featureFlagMigrationRecipientCriticalSection.value;
+
+if (featureFlagMigrationRecipientCriticalSectionEnabled) {
+    // When featureFlagMigrationRecipientCriticalSection is enabled, the recipient cannot start a
+    // new migration until the donor has instructed it to release its critical section (after the
+    // commit on the configsvr). Because of this, this test is not possible.
+    jsTest.log('Skipping test because featureFlagMigrationRecipientCriticalSection is enabled');
+    st.stop();
+    MongoRunner.stopMongod(staticMongod);
+    return;
+}
+
 assert.commandWorked(st.s0.adminCommand({enableSharding: 'TestDB'}));
 st.ensurePrimaryShard('TestDB', st.shard0.shardName);
 assert.commandWorked(st.s0.adminCommand({shardCollection: 'TestDB.TestColl', key: {Key: 1}}));

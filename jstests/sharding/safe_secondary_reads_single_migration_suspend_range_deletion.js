@@ -89,6 +89,7 @@ let testCases = {
     _shardsvrMovePrimary: {skip: "primary only"},
     _recvChunkAbort: {skip: "primary only"},
     _recvChunkCommit: {skip: "primary only"},
+    _recvChunkReleaseCritSec: {skip: "primary only"},
     _recvChunkStart: {skip: "primary only"},
     _recvChunkStatus: {skip: "primary only"},
     _transferMods: {skip: "primary only"},

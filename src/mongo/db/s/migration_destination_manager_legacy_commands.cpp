@@ -302,5 +302,58 @@ public:
 
 } recvChunkAbortCommand;
 
+class RecvChunkReleaseCritSecCommand : public BasicCommand {
+public:
+    RecvChunkReleaseCritSecCommand() : BasicCommand("_recvChunkReleaseCritSec") {}
+
+    std::string help() const override {
+        return "internal";
+    }
+
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return AllowedOnSecondary::kNever;
+    }
+
+    bool adminOnly() const override {
+        return true;
+    }
+
+
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
+
+    void addRequiredPrivileges(const std::string& dbname,
+                               const BSONObj& cmdObj,
+                               std::vector<Privilege>* out) const override {
+        ActionSet actions;
+        actions.addAction(ActionType::internal);
+        out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
+    }
+
+    bool run(OperationContext* opCtx,
+             const std::string& dbname,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) override {
+        opCtx->setAlwaysInterruptAtStepDownOrUp();
+
+        const auto sessionId = uassertStatusOK(MigrationSessionId::extractFromBSON(cmdObj));
+
+        LOGV2_DEBUG(5899101, 2, "Received _recvChunkReleaseCritSec", "sessionId"_attr = sessionId);
+
+        const auto mdm = MigrationDestinationManager::get(opCtx);
+        const auto status = mdm->exitCriticalSection(opCtx, sessionId);
+        if (!status.isOK()) {
+            LOGV2(5899109,
+                  "_recvChunkReleaseCritSec failed: {error}",
+                  "_recvChunkReleaseCritSec failed",
+                  "error"_attr = redact(status));
+            uassertStatusOK(status);
+        }
+        return true;
+    }
+
+} recvChunkReleaseCritSecCommand;
+
 }  // namespace
 }  // namespace mongo

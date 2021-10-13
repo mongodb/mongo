@@ -514,6 +514,7 @@ const testCases = {
     _migrateClone: {skip: isNotRunOnUserDatabase},
     _recvChunkAbort: {skip: isNotRunOnUserDatabase},
     _recvChunkCommit: {skip: isNotRunOnUserDatabase},
+    _recvChunkReleaseCritSec: {skip: isNotRunOnUserDatabase},
     _recvChunkStart: {skip: isNotRunOnUserDatabase},
     _recvChunkStatus: {skip: isNotRunOnUserDatabase},
     _shardsvrCloneCatalogData: {skip: isNotRunOnUserDatabase},

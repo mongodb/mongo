@@ -94,6 +94,13 @@ public:
      */
     void forgetMigration(OperationContext* opCtx);
 
+    /**
+     * Asynchronously releases the recipient critical section without waiting for it to finish. Sets
+     * the _releaseRecipientCriticalSectionFuture future that will be readied once the recipient
+     * critical section has been released.
+     */
+    void launchReleaseRecipientCriticalSection(OperationContext* opCtx);
+
 private:
     /**
      * Deletes the range deletion task from the recipient node and marks the range deletion task on
@@ -110,6 +117,7 @@ private:
 
     MigrationCoordinatorDocument _migrationInfo;
     bool _waitForDelete = false;
+    boost::optional<ExecutorFuture<void>> _releaseRecipientCriticalSectionFuture;
 };
 
 }  // namespace migrationutil

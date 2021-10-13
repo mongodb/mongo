@@ -49,9 +49,21 @@ var ShardVersioningUtil = (function() {
      */
     let moveChunkNotRefreshRecipient = function(mongos, ns, fromShard, toShard, findQuery) {
         let failPoint = configureFailPoint(fromShard, "doNotRefreshRecipientAfterCommit");
+
+        // TODO SERVER-60415: After 6.0 is released, no longer accept FailPointSetFailed errors
+        assert.commandWorkedOrFailedWithCode(
+            toShard.adminCommand(
+                {configureFailPoint: "migrationRecipientFailPostCommitRefresh", mode: "alwaysOn"}),
+            ErrorCodes.FailPointSetFailed);
+
         assert.commandWorked(mongos.adminCommand(
             {moveChunk: ns, find: findQuery, to: toShard.shardName, _waitForDelete: true}));
+
         failPoint.off();
+        assert.commandWorkedOrFailedWithCode(
+            toShard.adminCommand(
+                {configureFailPoint: "migrationRecipientFailPostCommitRefresh", mode: "off"}),
+            ErrorCodes.FailPointSetFailed);
     };
 
     return {

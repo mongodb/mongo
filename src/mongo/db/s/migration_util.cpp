@@ -53,10 +53,12 @@
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/migration_coordinator.h"
+#include "mongo/db/s/migration_destination_manager.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_statistics.h"
+#include "mongo/db/s/sharding_util.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/db/write_concern.h"
@@ -1067,5 +1069,43 @@ void recoverMigrationCoordinations(OperationContext* opCtx, NamespaceString nss)
         });
 }
 
+ExecutorFuture<void> launchReleaseCriticalSectionOnRecipientFuture(
+    OperationContext* opCtx,
+    const ShardId& recipientShardId,
+    const NamespaceString& nss,
+    const MigrationSessionId& sessionId) {
+    const auto serviceContext = opCtx->getServiceContext();
+    auto executor = getMigrationUtilExecutor(serviceContext);
+    return ExecutorFuture<void>(executor).then([=] {
+        ThreadClient tc("releaseRecipientCritSec", serviceContext);
+        {
+            stdx::lock_guard<Client> lk(*tc.get());
+            tc->setSystemOperationKillableByStepdown(lk);
+        }
+        auto uniqueOpCtx = tc->makeOperationContext();
+        auto opCtx = uniqueOpCtx.get();
+
+        retryIdempotentWorkAsPrimaryUntilSuccessOrStepdown(
+            opCtx,
+            "release migration critical section on recipient",
+            [&](OperationContext* newOpCtx) {
+                auto executor = Grid::get(newOpCtx)->getExecutorPool()->getFixedExecutor();
+                try {
+                    BSONObjBuilder builder;
+                    builder.append("_recvChunkReleaseCritSec", nss.ns());
+                    sessionId.append(&builder);
+
+                    sharding_util::sendCommandToShards(
+                        newOpCtx, "admin"_sd, builder.obj(), {recipientShardId}, executor);
+                } catch (const ExceptionFor<ErrorCodes::ShardNotFound>& exShardNotFound) {
+                    LOGV2(5899106,
+                          "Failed to release critical section on recipient",
+                          "shardId"_attr = recipientShardId,
+                          "sessionId"_attr = sessionId,
+                          "error"_attr = exShardNotFound);
+                };
+            });
+    });
+}
 }  // namespace migrationutil
 }  // namespace mongo

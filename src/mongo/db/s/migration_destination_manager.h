@@ -74,7 +74,18 @@ class MigrationDestinationManager {
     MigrationDestinationManager& operator=(const MigrationDestinationManager&) = delete;
 
 public:
-    enum State { READY, CLONE, CATCHUP, STEADY, COMMIT_START, DONE, FAIL, ABORT };
+    enum State {
+        READY,
+        CLONE,
+        CATCHUP,
+        STEADY,
+        COMMIT_START,
+        ENTERED_CRIT_SEC,
+        EXIT_CRIT_SEC,
+        DONE,
+        FAIL,
+        ABORT
+    };
 
     MigrationDestinationManager();
     ~MigrationDestinationManager();
@@ -133,6 +144,13 @@ public:
     void abortWithoutSessionIdCheck();
 
     Status startCommit(const MigrationSessionId& sessionId);
+
+    /*
+     * Refreshes the filtering metadata and releases the migration recipient critical section for
+     * the specified migration session. If no session is ongoing or the session doesn't match the
+     * current one, it does nothing and returns OK.
+     */
+    Status exitCriticalSection(OperationContext* opCtx, const MigrationSessionId& sessionId);
 
     /**
      * Gets the collection indexes from fromShardId. If given a chunk manager, will fetch the
@@ -239,7 +257,6 @@ private:
     LogicalSessionId _lsid;
     TxnNumber _txnNumber{kUninitializedTxnNumber};
     NamespaceString _nss;
-    boost::optional<UUID> _collUuid;
     ConnectionString _fromShardConnString;
     ShardId _fromShard;
     ShardId _toShard;

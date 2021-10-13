@@ -60,6 +60,8 @@
 #include "mongo/db/s/move_timing_helper.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
+#include "mongo/db/s/recoverable_critical_section_service.h"
+#include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_statistics.h"
 #include "mongo/db/s/start_chunk_clone_request.h"
@@ -74,6 +76,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/pm2423_feature_flags_gen.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/stdx/chrono.h"
 #include "mongo/util/fail_point.h"
@@ -159,6 +162,10 @@ std::string stateToString(MigrationDestinationManager::State state) {
             return "steady";
         case MigrationDestinationManager::COMMIT_START:
             return "commitStart";
+        case MigrationDestinationManager::ENTERED_CRIT_SEC:
+            return "enteredCriticalSection";
+        case MigrationDestinationManager::EXIT_CRIT_SEC:
+            return "exitCriticalSection";
         case MigrationDestinationManager::DONE:
             return "done";
         case MigrationDestinationManager::FAIL:
@@ -261,6 +268,13 @@ BSONObj createTransferModsRequest(const NamespaceString& nss, const MigrationSes
     return builder.obj();
 }
 
+BSONObj criticalSectionReason(const MigrationSessionId& sessionId) {
+    BSONObjBuilder builder;
+    builder.append("recvChunk", 1);
+    sessionId.append(&builder);
+    return builder.obj();
+}
+
 // Enabling / disabling these fail points pauses / resumes MigrateStatus::_go(), the thread which
 // receives a chunk migration from the donor.
 MONGO_FAIL_POINT_DEFINE(migrateThreadHangAtStep1);
@@ -273,6 +287,7 @@ MONGO_FAIL_POINT_DEFINE(migrateThreadHangAtStep7);
 
 MONGO_FAIL_POINT_DEFINE(failMigrationOnRecipient);
 MONGO_FAIL_POINT_DEFINE(failMigrationReceivedOutOfRangeOperation);
+MONGO_FAIL_POINT_DEFINE(migrationRecipientFailPostCommitRefresh);
 
 }  // namespace
 
@@ -599,18 +614,74 @@ Status MigrationDestinationManager::startCommit(const MigrationSessionId& sessio
     // Assigning a timeout slightly higher than the one used for network requests to the config
     // server. Enough time to retry at least once in case of network failures (SERVER-51397).
     deadline = Date_t::now() + convergenceTimeout;
-    while (_sessionId) {
-        if (stdx::cv_status::timeout ==
-            _isActiveCV.wait_until(lock, deadline.toSystemTimePoint())) {
-            _errmsg = str::stream() << "startCommit timed out waiting, " << _sessionId->toString();
-            _state = FAIL;
-            _stateChangedCV.notify_all();
-            return {ErrorCodes::CommandFailed, _errmsg};
+    if (!feature_flags::gFeatureFlagMigrationRecipientCriticalSection.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        while (_sessionId) {
+            if (stdx::cv_status::timeout ==
+                _isActiveCV.wait_until(lock, deadline.toSystemTimePoint())) {
+                _errmsg = str::stream()
+                    << "startCommit timed out waiting, " << _sessionId->toString();
+                _state = FAIL;
+                _stateChangedCV.notify_all();
+                return {ErrorCodes::CommandFailed, _errmsg};
+            }
+        }
+        if (_state != DONE) {
+            return {ErrorCodes::CommandFailed, "startCommit failed, final data failed to transfer"};
+        }
+    } else {
+        while (_state == COMMIT_START) {
+            if (stdx::cv_status::timeout ==
+                _stateChangedCV.wait_until(lock, deadline.toSystemTimePoint())) {
+                _errmsg = str::stream()
+                    << "startCommit timed out waiting, " << _sessionId->toString();
+                _state = FAIL;
+                _stateChangedCV.notify_all();
+                return {ErrorCodes::CommandFailed, _errmsg};
+            }
+        }
+        if (_state != ENTERED_CRIT_SEC) {
+            return {ErrorCodes::CommandFailed,
+                    "startCommit failed, final data failed to transfer or failed to enter critical "
+                    "section"};
         }
     }
-    if (_state != DONE) {
-        return {ErrorCodes::CommandFailed, "startCommit failed, final data failed to transfer"};
+
+    return Status::OK();
+}
+
+Status MigrationDestinationManager::exitCriticalSection(OperationContext* opCtx,
+                                                        const MigrationSessionId& sessionId) {
+    stdx::unique_lock<Latch> lock(_mutex);
+    if (!_sessionId || !_sessionId->matches(sessionId)) {
+        LOGV2_DEBUG(5899104,
+                    2,
+                    "Request to exit recipient critical section does not match current session",
+                    "requested"_attr = sessionId,
+                    "current"_attr = _sessionId);
+        return Status::OK();
     }
+
+    if (_state < ENTERED_CRIT_SEC) {
+        return {ErrorCodes::CommandFailed, "recipient critical section has not yet been entered"};
+    }
+
+    // If the thread is waiting to be signaled to release the CS, signal it by transitioning
+    // _state to EXIT_CRIT_SEC
+    if (_state == ENTERED_CRIT_SEC) {
+        _state = EXIT_CRIT_SEC;
+        _stateChangedCV.notify_all();
+    }
+
+    // Wait for the thread to finish
+    opCtx->waitForConditionOrInterrupt(_isActiveCV, lock, [&]() { return !_sessionId; });
+
+    if (_state != DONE) {
+        return {ErrorCodes::CommandFailed, "exitCriticalSection failed"};
+    }
+
+    LOGV2_DEBUG(
+        5899105, 2, "Succeeded releasing recipient critical section", "requested"_attr = sessionId);
 
     return Status::OK();
 }
@@ -931,7 +1002,6 @@ void MigrationDestinationManager::_migrateThread() {
 
     stdx::lock_guard<Latch> lk(_mutex);
     _sessionId.reset();
-    _collUuid.reset();
     _scopedReceiveChunk.reset();
     _isActiveCV.notify_all();
 }
@@ -1392,6 +1462,79 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
     if (_sessionMigration->getState() == SessionCatalogMigrationDestination::State::ErrorOccurred) {
         _setStateFail(redact(_sessionMigration->getErrMsg()));
         return;
+    }
+
+    if (feature_flags::gFeatureFlagMigrationRecipientCriticalSection.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        const auto critSecReason = criticalSectionReason(*_sessionId);
+
+        // Enter critical section
+        runWithoutSession(outerOpCtx, [&] {
+            RecoverableCriticalSectionService::get(opCtx)
+                ->acquireRecoverableCriticalSectionBlockWrites(
+                    opCtx, _nss, critSecReason, ShardingCatalogClient::kLocalWriteConcern);
+        });
+
+        LOGV2_DEBUG(5899107, 2, "Acquired migration recipient critical section", "nss"_attr = _nss);
+
+        if (getState() == FAIL) {
+            _setStateFail("timed out waiting for critical section acquisition");
+
+            runWithoutSession(outerOpCtx, [&] {
+                RecoverableCriticalSectionService::get(opCtx)->releaseRecoverableCriticalSection(
+                    opCtx, _nss, critSecReason, ShardingCatalogClient::kLocalWriteConcern);
+            });
+
+            return;
+        }
+
+        _setState(ENTERED_CRIT_SEC);
+
+        {
+            runWithoutSession(outerOpCtx, [&] {
+                stdx::unique_lock<Latch> lock(_mutex);
+                opCtx->waitForConditionOrInterrupt(
+                    _stateChangedCV, lock, [&]() { return _state == EXIT_CRIT_SEC; });
+            });
+        }
+
+        // Refresh the filtering metadata
+        runWithoutSession(outerOpCtx, [&] {
+            LOGV2_DEBUG(
+                5899111, 2, "Refreshing filtering metadata before exiting critical section");
+
+            try {
+                if (MONGO_unlikely(migrationRecipientFailPostCommitRefresh.shouldFail())) {
+                    uasserted(ErrorCodes::InternalError,
+                              "skipShardFilteringMetadataRefresh failpoint");
+                }
+
+                forceShardFilteringMetadataRefresh(opCtx, _nss);
+            } catch (const DBException& ex) {
+                LOGV2_DEBUG(5899103,
+                            2,
+                            "Post-migration commit refresh failed on recipient",
+                            "migrationId"_attr = _migrationId,
+                            "error"_attr = redact(ex));
+
+                UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+                AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
+                CollectionShardingRuntime::get(opCtx, _nss)->clearFilteringMetadata(opCtx);
+            }
+        });
+
+        LOGV2_DEBUG(5899110, 2, "Exiting critical section");
+
+        // Release CS
+        runWithoutSession(outerOpCtx, [&] {
+            RecoverableCriticalSectionService::get(opCtx)->releaseRecoverableCriticalSection(
+                opCtx,
+                _nss,
+                BSON("recvChunk" << 1 << "sessionId" << _sessionId->toString()),
+                ShardingCatalogClient::kMajorityWriteConcern);
+        });
+
+        LOGV2_DEBUG(5899108, 2, "Released migration recipient critical section", "nss"_attr = _nss);
     }
 
     _setState(DONE);

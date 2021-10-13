@@ -66,6 +66,7 @@ const allCommands = {
     _migrateClone: {skip: isPrimaryOnly},
     _recvChunkAbort: {skip: isPrimaryOnly},
     _recvChunkCommit: {skip: isPrimaryOnly},
+    _recvChunkReleaseCritSec: {skip: isPrimaryOnly},
     _recvChunkStart: {skip: isPrimaryOnly},
     _recvChunkStatus: {skip: isPrimaryOnly},
     _shardsvrAbortReshardCollection: {skip: isPrimaryOnly},

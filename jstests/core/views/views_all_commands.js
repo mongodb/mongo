@@ -129,6 +129,7 @@ let viewsCommandTests = {
     _movePrimary: {skip: isAnInternalCommand},
     _recvChunkAbort: {skip: isAnInternalCommand},
     _recvChunkCommit: {skip: isAnInternalCommand},
+    _recvChunkReleaseCritSec: {skip: isAnInternalCommand},
     _recvChunkStart: {skip: isAnInternalCommand},
     _recvChunkStatus: {skip: isAnInternalCommand},
     _shardsvrAbortReshardCollection: {skip: isAnInternalCommand},

@@ -225,5 +225,13 @@ void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx);
  */
 void recoverMigrationCoordinations(OperationContext* opCtx, NamespaceString nss);
 
+/**
+ * Instructs the recipient shard to release its critical section.
+ */
+ExecutorFuture<void> launchReleaseCriticalSectionOnRecipientFuture(
+    OperationContext* opCtx,
+    const ShardId& recipientShardId,
+    const NamespaceString& nss,
+    const MigrationSessionId& sessionId);
 }  // namespace migrationutil
 }  // namespace mongo

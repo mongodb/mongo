@@ -7,6 +7,12 @@
 
 var st = new ShardingTest({shards: 2, mongos: 4});
 
+const featureFlagMigrationRecipientCriticalSection =
+    assert.commandWorked(st.configRS.getPrimary().adminCommand(
+        {getParameter: 1, featureFlagMigrationRecipientCriticalSection: 1}));
+const featureFlagMigrationRecipientCriticalSectionEnabled =
+    featureFlagMigrationRecipientCriticalSection.featureFlagMigrationRecipientCriticalSection.value;
+
 var testDB_s0 = st.s.getDB('test');
 assert.commandWorked(testDB_s0.adminCommand({enableSharding: 'test'}));
 st.ensurePrimaryShard('test', st.shard1.shardName);
@@ -44,7 +50,9 @@ st.configRS.awaitLastOpCommitted();
 // shard1: 0|0|a
 // mongos0: 1|0|a
 
-checkShardMajorVersion(st.rs0.getPrimary(), 0);
+if (!featureFlagMigrationRecipientCriticalSectionEnabled) {
+    checkShardMajorVersion(st.rs0.getPrimary(), 0);
+}
 checkShardMajorVersion(st.rs1.getPrimary(), 0);
 
 // mongos0 still thinks that { x: 1 } belong to st.shard1.shardName, but should be able to
@@ -109,7 +117,9 @@ st.configRS.awaitLastOpCommitted();
 //
 // mongos2: 2|0|a
 
-checkShardMajorVersion(st.rs0.getPrimary(), 0);
+if (!featureFlagMigrationRecipientCriticalSectionEnabled) {
+    checkShardMajorVersion(st.rs0.getPrimary(), 0);
+}
 checkShardMajorVersion(st.rs1.getPrimary(), 2);
 
 // Set shard metadata to 2|0|b
@@ -162,7 +172,9 @@ st.configRS.awaitLastOpCommitted();
 //
 // mongos0: 0|0|0
 
-checkShardMajorVersion(st.rs0.getPrimary(), 0);
+if (!featureFlagMigrationRecipientCriticalSectionEnabled) {
+    checkShardMajorVersion(st.rs0.getPrimary(), 0);
+}
 checkShardMajorVersion(st.rs1.getPrimary(), 0);
 
 // 1st mongos thinks that collection is unshareded and will attempt to query primary shard.

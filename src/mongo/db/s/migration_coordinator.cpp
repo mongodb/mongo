@@ -39,6 +39,7 @@
 #include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/s/pm2423_feature_flags_gen.h"
 #include "mongo/util/fail_point.h"
 
 namespace mongo {
@@ -157,6 +158,23 @@ boost::optional<SemiFuture<void>> MigrationCoordinator::completeMigration(Operat
           "MigrationCoordinator delivering decision to self and to recipient",
           "decision"_attr = (decision == DecisionEnum::kCommitted ? "committed" : "aborted"),
           "migrationId"_attr = _migrationInfo.getId());
+
+    if (feature_flags::gFeatureFlagMigrationRecipientCriticalSection.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        if (!_releaseRecipientCriticalSectionFuture) {
+            launchReleaseRecipientCriticalSection(opCtx);
+        }
+
+        try {
+            invariant(_releaseRecipientCriticalSectionFuture);
+            _releaseRecipientCriticalSectionFuture->get(opCtx);
+        } catch (const ExceptionFor<ErrorCodes::ShardNotFound>& exShardNotFound) {
+            LOGV2(5899100,
+                  "Failed to releaseCriticalSectionOnRecipient",
+                  "shardId"_attr = _migrationInfo.getRecipientShardId(),
+                  "error"_attr = exShardNotFound);
+        }
+    }
 
     boost::optional<SemiFuture<void>> cleanupCompleteFuture = boost::none;
 
@@ -291,6 +309,15 @@ void MigrationCoordinator::forgetMigration(OperationContext* opCtx) {
                 "Deleting migration coordinator document",
                 "migrationId"_attr = _migrationInfo.getId());
     migrationutil::deleteMigrationCoordinatorDocumentLocally(opCtx, _migrationInfo.getId());
+}
+
+void MigrationCoordinator::launchReleaseRecipientCriticalSection(OperationContext* opCtx) {
+    _releaseRecipientCriticalSectionFuture =
+        migrationutil::launchReleaseCriticalSectionOnRecipientFuture(
+            opCtx,
+            _migrationInfo.getRecipientShardId(),
+            _migrationInfo.getNss(),
+            _migrationInfo.getMigrationSessionId());
 }
 
 }  // namespace migrationutil

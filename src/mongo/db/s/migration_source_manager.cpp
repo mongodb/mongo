@@ -61,6 +61,7 @@
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/pm2423_feature_flags_gen.h"
 #include "mongo/s/request_types/commit_chunk_migration_request_type.h"
 #include "mongo/s/request_types/set_shard_version_request.h"
 #include "mongo/s/shard_key_pattern.h"
@@ -444,6 +445,12 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
             ErrorCodes::InternalError, "Failpoint 'migrationCommitNetworkError' generated error");
     }
 
+    if (feature_flags::gFeatureFlagMigrationRecipientCriticalSection.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        // Asynchronously tell the recipient to release its critical section
+        _coordinator->launchReleaseRecipientCriticalSection(_opCtx);
+    }
+
     Status migrationCommitStatus =
         Shard::CommandResponse::getEffectiveStatus(commitChunkMigrationResponse);
 
@@ -535,7 +542,9 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
 
     const ChunkRange range(_args.getMinKey(), _args.getMaxKey());
 
-    if (!MONGO_unlikely(doNotRefreshRecipientAfterCommit.shouldFail())) {
+    if (!feature_flags::gFeatureFlagMigrationRecipientCriticalSection.isEnabled(
+            serverGlobalParams.featureCompatibility) &&
+        !MONGO_unlikely(doNotRefreshRecipientAfterCommit.shouldFail())) {
         // Best-effort make the recipient refresh its routing table to the new collection
         // version.
         refreshRecipientRoutingTable(
