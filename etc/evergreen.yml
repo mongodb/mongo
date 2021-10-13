@@ -3781,6 +3781,23 @@ tasks:
         --storageEngine=wiredTiger
       name: resharding_fuzzer_idempotency
 
+- <<: *jstestfuzz_template
+  name: resharding_fuzzer_stepup_gen
+  tags: ["resharding_fuzzer", "require_npm", "random_name"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      <<: *jstestfuzz_config_vars
+      num_files: 10
+      num_tasks: 5
+      npm_command: resharding-fuzzer
+      jstestfuzz_vars: >-
+        --numDonors 3 --numRecipients 3 --inPlace yes
+        --electionMech stepup --electionRole donor --electionRole recipient
+      suite: resharding_fuzzer
+      resmoke_args: --storageEngine=wiredTiger
+      name: resharding_fuzzer_stepup
+
 ## Tests that the multiversion test generation logic is not broken.
 - <<: *gen_task_template
   name: multiversion_sanity_check_new_old_new_gen
