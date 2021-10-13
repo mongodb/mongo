@@ -139,8 +139,8 @@ TEST_F(LogicalSessionCacheTest, ParentAndChildSessionsHaveEqualLogicalSessionRec
     auto lastUse = Date_t::now();
     auto parentSessionRecord = makeLogicalSessionRecord(parentLsid, lastUse);
 
-    auto childSessionRecord0 =
-        makeLogicalSessionRecord(makeLogicalSessionIdWithTxnNumberForTest(parentLsid), lastUse);
+    auto childSessionRecord0 = makeLogicalSessionRecord(
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid), lastUse);
     ASSERT_BSONOBJ_EQ(parentSessionRecord.toBSON(), childSessionRecord0.toBSON());
 
     auto childSessionRecord1 =
@@ -178,7 +178,7 @@ TEST_F(LogicalSessionCacheTest, VivifyUpdatesLastUse) {
     };
 
     runTest(makeLogicalSessionIdForTest());
-    runTest(makeLogicalSessionIdWithTxnNumberForTest());
+    runTest(makeLogicalSessionIdWithTxnNumberAndUUIDForTest());
     runTest(makeLogicalSessionIdWithTxnUUIDForTest());
 }
 
@@ -197,15 +197,15 @@ TEST_F(LogicalSessionCacheTest, VivifyUpdatesLastUseOfParentSession) {
     };
 
     auto parentLsid = makeLogicalSessionIdForTest();
-    runTest(parentLsid, makeLogicalSessionIdWithTxnNumberForTest(parentLsid));
+    runTest(parentLsid, makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid));
     runTest(parentLsid, makeLogicalSessionIdWithTxnUUIDForTest(parentLsid));
-    runTest(makeLogicalSessionIdWithTxnNumberForTest(parentLsid),
+    runTest(makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid),
             makeLogicalSessionIdWithTxnUUIDForTest(parentLsid));
 }
 
 TEST_F(LogicalSessionCacheTest, CannotVivifySessionWithParentSessionIfFeatureFlagIsNotEnabled) {
     RAIIServerParameterControllerForTest controller{"featureFlagInternalTransactions", false};
-    ASSERT_THROWS_CODE(cache()->vivify(opCtx(), makeLogicalSessionIdWithTxnNumberForTest()),
+    ASSERT_THROWS_CODE(cache()->vivify(opCtx(), makeLogicalSessionIdWithTxnNumberAndUUIDForTest()),
                        DBException,
                        ErrorCodes::InvalidOptions);
     ASSERT_THROWS_CODE(cache()->vivify(opCtx(), makeLogicalSessionIdWithTxnUUIDForTest()),
@@ -216,7 +216,7 @@ TEST_F(LogicalSessionCacheTest, CannotVivifySessionWithParentSessionIfFeatureFla
 
 TEST_F(LogicalSessionCacheTest, CannotVivifySessionWithParentSessionIfNotRunningInShardedCluster) {
     serverGlobalParams.clusterRole = ClusterRole::None;
-    ASSERT_THROWS_CODE(cache()->vivify(opCtx(), makeLogicalSessionIdWithTxnNumberForTest()),
+    ASSERT_THROWS_CODE(cache()->vivify(opCtx(), makeLogicalSessionIdWithTxnNumberAndUUIDForTest()),
                        DBException,
                        ErrorCodes::InvalidOptions);
     ASSERT_THROWS_CODE(cache()->vivify(opCtx(), makeLogicalSessionIdWithTxnUUIDForTest()),
@@ -269,7 +269,8 @@ TEST_F(LogicalSessionCacheTest, StartSession) {
     };
 
     runTest(makeLogicalSessionIdForTest(), makeLogicalSessionIdForTest());
-    runTest(makeLogicalSessionIdWithTxnNumberForTest(), makeLogicalSessionIdWithTxnNumberForTest());
+    runTest(makeLogicalSessionIdWithTxnNumberAndUUIDForTest(),
+            makeLogicalSessionIdWithTxnNumberAndUUIDForTest());
     runTest(makeLogicalSessionIdWithTxnUUIDForTest(), makeLogicalSessionIdWithTxnUUIDForTest());
 }
 
@@ -278,7 +279,7 @@ TEST_F(LogicalSessionCacheTest, EndSessions) {
     const auto lsids = []() -> std::vector<LogicalSessionId> {
         auto lsid0 = makeLogicalSessionIdForTest();
         auto lsid1 = makeLogicalSessionIdForTest();
-        auto lsid2 = makeLogicalSessionIdWithTxnNumberForTest(lsid1);
+        auto lsid2 = makeLogicalSessionIdWithTxnNumberAndUUIDForTest(lsid1);
         auto lsid3 = makeLogicalSessionIdWithTxnUUIDForTest(lsid1);
         return {lsid0, lsid1, lsid2, lsid3};
     }();
@@ -303,7 +304,7 @@ TEST_F(LogicalSessionCacheTest, PeekCached) {
     ASSERT_BSONOBJ_EQ(record0.toBSON(), cache()->peekCached(lsid0)->toBSON());
 
     // Verify that it is invalid to pass an lsid with a parent lsid into peekCached.
-    auto lsid1 = makeLogicalSessionIdWithTxnNumberForTest(lsid0);
+    auto lsid1 = makeLogicalSessionIdWithTxnNumberAndUUIDForTest(lsid0);
     ASSERT_THROWS_CODE(cache()->peekCached(lsid1), DBException, ErrorCodes::InvalidOptions);
     auto lsid2 = makeLogicalSessionIdWithTxnUUIDForTest(lsid0);
     ASSERT_THROWS_CODE(cache()->peekCached(lsid2), DBException, ErrorCodes::InvalidOptions);

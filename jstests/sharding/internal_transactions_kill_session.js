@@ -26,8 +26,8 @@ assert.commandWorked(testDB.runCommand({create: kCollName}));
 (() => {
     jsTest.log(
         "Test running killSessions on mongos using an internal transaction with lsid containing " +
-        "txnNumber and stmtId");
-    const lsid = {id: sessionUUID, txnNumber: NumberLong(0), stmtId: NumberInt(0)};
+        "txnNumber and txnUUID");
+    const lsid = {id: sessionUUID, txnNumber: NumberLong(0), txnUUID: UUID()};
     const txnNumber = NumberLong(0);
     assert.commandWorked(testDB.runCommand({
         insert: kCollName,
@@ -99,8 +99,8 @@ assert.commandWorked(testDB.runCommand({create: kCollName}));
 (() => {
     jsTest.log(
         "Test running killSessions on mongod using an internal transaction with lsid containing " +
-        "txnNumber and stmtId");
-    const lsid = {id: sessionUUID, txnNumber: NumberLong(1), stmtId: NumberInt(0)};
+        "txnNumber and txnUUID");
+    const lsid = {id: sessionUUID, txnNumber: NumberLong(1), txnUUID: UUID()};
     const txnNumber = NumberLong(2);
     assert.commandWorked(testDB.runCommand({
         insert: kCollName,

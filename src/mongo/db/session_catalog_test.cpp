@@ -94,7 +94,7 @@ TEST_F(SessionCatalogTest, GetParentSessionId) {
     auto parentLsid = makeLogicalSessionIdForTest();
     ASSERT(!getParentSessionId(parentLsid).has_value());
     ASSERT_EQ(parentLsid,
-              *getParentSessionId(makeLogicalSessionIdWithTxnNumberForTest(parentLsid)));
+              *getParentSessionId(makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid)));
     ASSERT_EQ(parentLsid, *getParentSessionId(makeLogicalSessionIdWithTxnUUIDForTest(parentLsid)));
 }
 
@@ -109,7 +109,7 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, CheckoutAndReleaseSession) {
 
 TEST_F(SessionCatalogTestWithDefaultOpCtx, CheckoutAndReleaseSessionWithTxnNumber) {
     auto parentLsid = makeLogicalSessionIdForTest();
-    auto childLsid = makeLogicalSessionIdWithTxnNumberForTest(parentLsid);
+    auto childLsid = makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid);
     _opCtx->setLogicalSessionId(childLsid);
     OperationContextSession ocs(_opCtx);
 
@@ -133,7 +133,7 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx,
        CannotCheckoutSessionWithParentSessionIfFeatureFlagIsNotEnabled) {
     RAIIServerParameterControllerForTest controller{"featureFlagInternalTransactions", false};
 
-    _opCtx->setLogicalSessionId(makeLogicalSessionIdWithTxnNumberForTest());
+    _opCtx->setLogicalSessionId(makeLogicalSessionIdWithTxnNumberAndUUIDForTest());
     ASSERT_THROWS_CODE(OperationContextSession(_opCtx), DBException, ErrorCodes::InvalidOptions);
 
     _opCtx->setLogicalSessionId(makeLogicalSessionIdWithTxnUUIDForTest());
@@ -146,7 +146,7 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx,
        CannotCheckoutSessionWithParentSessionIfNotRunningInShardedCluster) {
     serverGlobalParams.clusterRole = ClusterRole::None;
 
-    _opCtx->setLogicalSessionId(makeLogicalSessionIdWithTxnNumberForTest());
+    _opCtx->setLogicalSessionId(makeLogicalSessionIdWithTxnNumberAndUUIDForTest());
     ASSERT_THROWS_CODE(OperationContextSession(_opCtx), DBException, ErrorCodes::InvalidOptions);
 
     _opCtx->setLogicalSessionId(makeLogicalSessionIdWithTxnUUIDForTest());
@@ -176,7 +176,7 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, CannotCheckOutParentSessionOfCheckedO
     };
 
     auto parentLsid = makeLogicalSessionIdForTest();
-    runTest(parentLsid, makeLogicalSessionIdWithTxnNumberForTest(parentLsid));
+    runTest(parentLsid, makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid));
     runTest(parentLsid, makeLogicalSessionIdWithTxnUUIDForTest(parentLsid));
 }
 
@@ -201,7 +201,7 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, CannotCheckOutChildSessionOfCheckedOu
     };
 
     auto parentLsid = makeLogicalSessionIdForTest();
-    runTest(parentLsid, makeLogicalSessionIdWithTxnNumberForTest(parentLsid));
+    runTest(parentLsid, makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid));
     runTest(parentLsid, makeLogicalSessionIdWithTxnUUIDForTest(parentLsid));
 }
 
@@ -226,11 +226,11 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, CannotCheckoutMultipleChildSessionsCo
     };
 
     auto parentLsid = makeLogicalSessionIdForTest();
-    runTest(makeLogicalSessionIdWithTxnNumberForTest(parentLsid, 0),
-            makeLogicalSessionIdWithTxnNumberForTest(parentLsid, 1));
+    runTest(makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid),
+            makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid));
     runTest(makeLogicalSessionIdWithTxnUUIDForTest(parentLsid),
             makeLogicalSessionIdWithTxnUUIDForTest(parentLsid));
-    runTest(makeLogicalSessionIdWithTxnNumberForTest(parentLsid),
+    runTest(makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid),
             makeLogicalSessionIdWithTxnUUIDForTest(parentLsid));
 }
 
@@ -273,7 +273,7 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, NestedOperationContextSession) {
     };
 
     runTest(makeLogicalSessionIdForTest());
-    runTest(makeLogicalSessionIdWithTxnNumberForTest());
+    runTest(makeLogicalSessionIdWithTxnNumberAndUUIDForTest());
     runTest(makeLogicalSessionIdWithTxnUUIDForTest());
 }
 
@@ -282,7 +282,7 @@ TEST_F(SessionCatalogTest, ScanSession) {
     const auto lsids = []() -> std::vector<LogicalSessionId> {
         auto lsid0 = makeLogicalSessionIdForTest();
         auto lsid1 = makeLogicalSessionIdForTest();
-        auto lsid2 = makeLogicalSessionIdWithTxnNumberForTest(lsid1);
+        auto lsid2 = makeLogicalSessionIdWithTxnNumberAndUUIDForTest(lsid1);
         auto lsid3 = makeLogicalSessionIdWithTxnUUIDForTest(lsid1);
         return {lsid0, lsid1, lsid2, lsid3};
     }();
@@ -323,7 +323,7 @@ TEST_F(SessionCatalogTest, ScanSessionMarkForReapWhenSessionIsIdle) {
     const auto lsids = []() -> std::vector<LogicalSessionId> {
         auto lsid0 = makeLogicalSessionIdForTest();
         auto lsid1 = makeLogicalSessionIdForTest();
-        auto lsid2 = makeLogicalSessionIdWithTxnNumberForTest(lsid1);
+        auto lsid2 = makeLogicalSessionIdWithTxnNumberAndUUIDForTest(lsid1);
         auto lsid3 = makeLogicalSessionIdWithTxnUUIDForTest(lsid1);
         return {lsid0, lsid1, lsid2, lsid3};
     }();
@@ -378,7 +378,7 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, ScanSessions) {
     const auto lsids = []() -> std::vector<LogicalSessionId> {
         auto lsid0 = makeLogicalSessionIdForTest();
         auto lsid1 = makeLogicalSessionIdForTest();
-        auto lsid2 = makeLogicalSessionIdWithTxnNumberForTest(lsid1);
+        auto lsid2 = makeLogicalSessionIdWithTxnNumberAndUUIDForTest(lsid1);
         auto lsid3 = makeLogicalSessionIdWithTxnUUIDForTest(lsid1);
         return {lsid0, lsid1, lsid2, lsid3};
     }();
@@ -427,7 +427,7 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, ScanSessionsMarkForReap) {
     const auto lsids = []() -> std::vector<LogicalSessionId> {
         auto lsid0 = makeLogicalSessionIdForTest();
         auto lsid1 = makeLogicalSessionIdForTest();
-        auto lsid2 = makeLogicalSessionIdWithTxnNumberForTest(lsid1);
+        auto lsid2 = makeLogicalSessionIdWithTxnNumberAndUUIDForTest(lsid1);
         auto lsid3 = makeLogicalSessionIdWithTxnUUIDForTest(lsid1);
         return {lsid0, lsid1, lsid2, lsid3};
     }();
@@ -521,7 +521,7 @@ TEST_F(SessionCatalogTest, KillSessionWhenSessionIsNotCheckedOut) {
     };
 
     runTest(makeLogicalSessionIdForTest());
-    runTest(makeLogicalSessionIdWithTxnNumberForTest());
+    runTest(makeLogicalSessionIdWithTxnNumberAndUUIDForTest());
     runTest(makeLogicalSessionIdWithTxnUUIDForTest());
 }
 
@@ -597,7 +597,7 @@ TEST_F(SessionCatalogTest, KillSessionWhenSessionIsCheckedOut) {
     };
 
     runTest(makeLogicalSessionIdForTest());
-    runTest(makeLogicalSessionIdWithTxnNumberForTest());
+    runTest(makeLogicalSessionIdWithTxnNumberAndUUIDForTest());
     runTest(makeLogicalSessionIdWithTxnUUIDForTest());
 }
 
@@ -673,7 +673,7 @@ TEST_F(SessionCatalogTest, KillParentSessionWhenChildSessionIsCheckedOut) {
     };
 
     auto parentLsid = makeLogicalSessionIdForTest();
-    runTest(parentLsid, makeLogicalSessionIdWithTxnNumberForTest(parentLsid));
+    runTest(parentLsid, makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid));
     runTest(parentLsid, makeLogicalSessionIdWithTxnUUIDForTest(parentLsid));
 }
 
@@ -747,7 +747,7 @@ TEST_F(SessionCatalogTest, KillParentSessionWhenChildSessionIsNotCheckedOut) {
     };
 
     auto parentLsid = makeLogicalSessionIdForTest();
-    runTest(parentLsid, makeLogicalSessionIdWithTxnNumberForTest(parentLsid));
+    runTest(parentLsid, makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid));
     runTest(parentLsid, makeLogicalSessionIdWithTxnUUIDForTest(parentLsid));
 }
 
@@ -830,7 +830,7 @@ TEST_F(SessionCatalogTest, KillSessionWhenChildSessionIsCheckedOut) {
     };
 
     auto parentLsid = makeLogicalSessionIdForTest();
-    runTest(parentLsid, makeLogicalSessionIdWithTxnNumberForTest(parentLsid));
+    runTest(parentLsid, makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid));
     runTest(parentLsid, makeLogicalSessionIdWithTxnUUIDForTest(parentLsid));
 }
 
@@ -911,7 +911,7 @@ TEST_F(SessionCatalogTest, KillSessionWhenChildSessionIsNotCheckedOut) {
     };
 
     auto parentLsid = makeLogicalSessionIdForTest();
-    runTest(parentLsid, makeLogicalSessionIdWithTxnNumberForTest(parentLsid));
+    runTest(parentLsid, makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid));
     runTest(parentLsid, makeLogicalSessionIdWithTxnUUIDForTest(parentLsid));
 }
 
@@ -976,7 +976,7 @@ TEST_F(SessionCatalogTest, MarkSessionAsKilledCanBeCalledMoreThanOnce) {
     };
 
     runTest(makeLogicalSessionIdForTest());
-    runTest(makeLogicalSessionIdWithTxnNumberForTest());
+    runTest(makeLogicalSessionIdWithTxnNumberAndUUIDForTest());
     runTest(makeLogicalSessionIdWithTxnUUIDForTest());
 }
 
@@ -1002,7 +1002,7 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, SessionDiscarOperationContextAfterChe
     };
 
     runTest(makeLogicalSessionIdForTest());
-    runTest(makeLogicalSessionIdWithTxnNumberForTest());
+    runTest(makeLogicalSessionIdWithTxnNumberAndUUIDForTest());
     runTest(makeLogicalSessionIdWithTxnUUIDForTest());
 }
 
@@ -1025,7 +1025,7 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, SessionDiscarOperationContextAfterChe
     };
 
     runTest(makeLogicalSessionIdForTest());
-    runTest(makeLogicalSessionIdWithTxnNumberForTest());
+    runTest(makeLogicalSessionIdWithTxnNumberAndUUIDForTest());
     runTest(makeLogicalSessionIdWithTxnUUIDForTest());
 }
 
@@ -1033,8 +1033,8 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, KillSessionsThroughScanSessions) {
     // Create sessions in the catalog.
     const auto lsids = []() -> std::vector<LogicalSessionId> {
         auto lsid0 = makeLogicalSessionIdForTest();
-        auto lsid1 = makeLogicalSessionIdWithTxnNumberForTest();
-        auto lsid2 = makeLogicalSessionIdWithTxnNumberForTest();
+        auto lsid1 = makeLogicalSessionIdWithTxnNumberAndUUIDForTest();
+        auto lsid2 = makeLogicalSessionIdWithTxnNumberAndUUIDForTest();
         return {lsid0, lsid1, lsid2};
     }();
 
@@ -1173,7 +1173,7 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, ConcurrentCheckOutAndKill) {
     };
 
     runTest(makeLogicalSessionIdForTest());
-    runTest(makeLogicalSessionIdWithTxnNumberForTest());
+    runTest(makeLogicalSessionIdWithTxnNumberAndUUIDForTest());
     runTest(makeLogicalSessionIdWithTxnUUIDForTest());
 }
 

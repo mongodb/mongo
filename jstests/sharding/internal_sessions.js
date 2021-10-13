@@ -26,9 +26,9 @@ const kConfigSessionNs = "config.system.sessions";
     // Verify that internal sessions are only supported in transactions.
     const sessionUUID = UUID();
 
-    jsTest.log(
-        "Test running an internal session with lsid containing txnNumber and stmtId outside transaction");
-    const lsid1 = {id: sessionUUID, txnNumber: NumberLong(35), stmtId: NumberInt(0)};
+    jsTest.log("Test running an internal session with lsid containing txnNumber and " +
+               "txnUUID outside transaction");
+    const lsid1 = {id: sessionUUID, txnNumber: NumberLong(35), txnUUID: UUID()};
     assert.commandFailedWithCode(testDB.runCommand({
         insert: kCollName,
         documents: [{x: 1}],
@@ -66,7 +66,8 @@ const kConfigSessionNs = "config.system.sessions";
 })();
 
 (() => {
-    jsTest.log("Test that the only supported child lsid formats are txnNumber+stmtId, and txnUUID");
+    jsTest.log(
+        "Test that the only supported child lsid formats are txnNumber+txnUUID, and txnUUID");
 
     const sessionUUID = UUID();
 
@@ -74,42 +75,6 @@ const kConfigSessionNs = "config.system.sessions";
         insert: kCollName,
         documents: [{x: 1}],
         lsid: {id: sessionUUID, txnNumber: NumberLong(35)},
-        txnNumber: NumberLong(0),
-        startTransaction: true,
-        autocommit: false
-    }),
-                                 ErrorCodes.InvalidOptions);
-    assert.commandFailedWithCode(testDB.runCommand({
-        insert: kCollName,
-        documents: [{x: 1}],
-        lsid: {id: sessionUUID, stmtId: NumberInt(0)},
-        txnNumber: NumberLong(0),
-        startTransaction: true,
-        autocommit: false
-    }),
-                                 ErrorCodes.InvalidOptions);
-    assert.commandFailedWithCode(testDB.runCommand({
-        insert: kCollName,
-        documents: [{x: 1}],
-        lsid: {id: sessionUUID, txnUUID: UUID(), stmtId: NumberInt(0)},
-        txnNumber: NumberLong(0),
-        startTransaction: true,
-        autocommit: false
-    }),
-                                 ErrorCodes.InvalidOptions);
-    assert.commandFailedWithCode(testDB.runCommand({
-        insert: kCollName,
-        documents: [{x: 1}],
-        lsid: {id: sessionUUID, txnNumber: NumberLong(35), txnUUID: UUID()},
-        txnNumber: NumberLong(0),
-        startTransaction: true,
-        autocommit: false
-    }),
-                                 ErrorCodes.InvalidOptions);
-    assert.commandFailedWithCode(testDB.runCommand({
-        insert: kCollName,
-        documents: [{x: 1}],
-        lsid: {id: sessionUUID, txnNumber: NumberLong(35), txnUUID: UUID(), stmtId: NumberInt(0)},
         txnNumber: NumberLong(0),
         startTransaction: true,
         autocommit: false
@@ -143,8 +108,8 @@ const kConfigSessionNs = "config.system.sessions";
 
     // Starting child sessions should succeed since parent and child sessions are tracked as one
     // logical session.
-    jsTest.log("Test running an internal transaction with lsid containing txnNumber and stmtId");
-    const lsid1 = {id: sessionUUID, txnNumber: NumberLong(35), stmtId: NumberInt(0)};
+    jsTest.log("Test running an internal transaction with lsid containing txnNumber and txnUUID");
+    const lsid1 = {id: sessionUUID, txnNumber: NumberLong(35), txnUUID: UUID()};
     const txnNumber1 = NumberLong(0);
     assert.commandWorked(testDB.runCommand({
         insert: kCollName,
@@ -159,7 +124,7 @@ const kConfigSessionNs = "config.system.sessions";
     assert.neq(null, shard0Primary.getCollection(kConfigTxnNs).findOne({
         "_id.id": sessionUUID,
         "_id.txnNumber": lsid1.txnNumber,
-        "_id.stmtId": lsid1.stmtId
+        "_id.txnUUID": lsid1.txnUUID
     }));
 
     jsTest.log("Test running an internal transaction with lsid containing txnUUID");
@@ -186,7 +151,6 @@ const kConfigSessionNs = "config.system.sessions";
     assert.eq(sessionDocs.length, 1);
     assert(!sessionDocs[0]._id.hasOwnProperty("txnTxnNumber"), tojson(sessionDocs[0]));
     assert(!sessionDocs[0]._id.hasOwnProperty("txnUUID"), tojson(sessionDocs[0]));
-    assert(!sessionDocs[0]._id.hasOwnProperty("stmtId"), tojson(sessionDocs[0]));
     assert.gte(sessionDocs[0].lastUse, minLastUse, tojson(sessionDocs[0]));
 })();
 

@@ -61,8 +61,7 @@ constexpr Minutes kLogicalSessionDefaultTimeout =
 
 inline bool operator==(const LogicalSessionId& lhs, const LogicalSessionId& rhs) {
     return (lhs.getId() == rhs.getId()) && (lhs.getUid() == rhs.getUid()) &&
-        (lhs.getTxnNumber() == rhs.getTxnNumber()) && (lhs.getStmtId() == rhs.getStmtId()) &&
-        (lhs.getTxnUUID() == rhs.getTxnUUID());
+        (lhs.getTxnNumber() == rhs.getTxnNumber()) && (lhs.getTxnUUID() == rhs.getTxnUUID());
 }
 
 inline bool operator!=(const LogicalSessionId& lhs, const LogicalSessionId& rhs) {
@@ -79,9 +78,8 @@ inline bool operator!=(const LogicalSessionRecord& lhs, const LogicalSessionReco
 
 LogicalSessionId makeLogicalSessionIdForTest();
 
-LogicalSessionId makeLogicalSessionIdWithTxnNumberForTest(
-    boost::optional<LogicalSessionId> parentLsid = boost::none,
-    boost::optional<StmtId> stmtId = boost::none);
+LogicalSessionId makeLogicalSessionIdWithTxnNumberAndUUIDForTest(
+    boost::optional<LogicalSessionId> parentLsid = boost::none);
 
 LogicalSessionId makeLogicalSessionIdWithTxnUUIDForTest(
     boost::optional<LogicalSessionId> parentLsid = boost::none);

@@ -76,7 +76,7 @@ SHA256Block getLogicalSessionUserDigestFor(StringData user, StringData db) {
 }
 
 boost::optional<LogicalSessionId> getParentSessionId(const LogicalSessionId& sessionId) {
-    if (sessionId.getTxnNumber() || sessionId.getTxnUUID()) {
+    if (sessionId.getTxnUUID()) {
         return LogicalSessionId{sessionId.getId(), sessionId.getUid()};
     }
     return boost::none;
@@ -93,22 +93,13 @@ LogicalSessionId makeLogicalSessionId(const LogicalSessionFromClient& fromClient
                                       OperationContext* opCtx,
                                       std::initializer_list<Privilege> allowSpoof) {
     uassert(ErrorCodes::InvalidOptions,
-            "Cannot specify both txnNumber and txnUUID in lsid",
-            !fromClient.getTxnNumber() || !fromClient.getTxnUUID());
-
-    uassert(ErrorCodes::InvalidOptions,
-            "Cannot specify txnNumber in lsid without specifying stmtId",
-            !fromClient.getTxnNumber() || fromClient.getStmtId());
-
-    uassert(ErrorCodes::InvalidOptions,
-            "Cannot specify stmtId in lsid without specifying txnNumber",
-            !fromClient.getStmtId() || fromClient.getTxnNumber());
+            "Cannot specify txnNumber in lsid without specifying txnUUID",
+            !fromClient.getTxnNumber() || fromClient.getTxnUUID());
 
     LogicalSessionId lsid;
 
     lsid.setId(fromClient.getId());
     lsid.getInternalSessionFields().setTxnNumber(fromClient.getTxnNumber());
-    lsid.getInternalSessionFields().setStmtId(fromClient.getStmtId());
     lsid.getInternalSessionFields().setTxnUUID(fromClient.getTxnUUID());
 
     if (fromClient.getUid()) {

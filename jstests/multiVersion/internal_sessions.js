@@ -18,7 +18,7 @@ function runTest(downgradeFCV) {
     const testDB = shard0Primary.getDB(kDbName);
 
     const sessionUUID = UUID();
-    const lsid0 = {id: sessionUUID, txnNumber: NumberLong(35), stmtId: NumberInt(0)};
+    const lsid0 = {id: sessionUUID, txnNumber: NumberLong(35), txnUUID: UUID()};
     const txnNumber0 = NumberLong(0);
     const lsid1 = {id: sessionUUID, txnUUID: UUID()};
     const txnNumber1 = NumberLong(35);

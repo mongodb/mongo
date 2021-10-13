@@ -65,16 +65,12 @@ types:
 
 structs:
   InternalSessionFields:
-    description: "Internal sessiond id fields"
+    description: "Internal session id fields"
     strict: true
     fields:
       txnNumber:
         description: "Used for internal sessions only."
         type: TxnNumber
-        optional: true
-      stmtId:
-        description: "Used for internal sessions only."
-        type: StmtId
         optional: true
       txnUUID:
         description: "Used for internal sessions only."

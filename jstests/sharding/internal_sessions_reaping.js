@@ -86,7 +86,7 @@ numTransactionsCollEntries++;
 const childLsid1 = {
     id: sessionUUID,
     txnNumber: parentTxnNumber1,
-    stmtId: NumberInt(0)
+    txnUUID: UUID()
 };
 
 assert.commandWorked(testDB.runCommand({
@@ -118,7 +118,7 @@ assert.eq(numTransactionsCollEntries, transactionsCollOnPrimary.find().itcount()
 const childLsid2 = {
     id: sessionUUID,
     txnNumber: parentTxnNumber2,
-    stmtId: NumberInt(0)
+    txnUUID: UUID()
 };
 
 assert.commandWorked(testDB.runCommand({
