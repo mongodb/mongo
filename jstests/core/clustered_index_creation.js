@@ -54,6 +54,8 @@ const runSuccessfulCreate = function(db, coll, creationOptions) {
 const testDB = db.getSiblingDB(jsTestName());
 const coll = testDB.coll;
 
+coll.drop();
+
 runSuccessfulCreate(testDB, coll, {clusteredIndex: {key: {_id: 1}, unique: true}});
 
 runSuccessfulCreate(
@@ -64,6 +66,18 @@ runSuccessfulCreate(
 
 runSuccessfulCreate(
     testDB, coll, {clusteredIndex: {key: {_id: 1}, name: "index_on_id", unique: true, v: 2}});
+
+// Validate that it's not possible to create a clustered collection as a view.
+assert.commandFailedWithCode(
+    testDB.createCollection(coll.getName(),
+                            {clusteredIndex: {key: {_id: 1}, unique: true}, viewOn: "sourceColl"}),
+    6026500);
+
+// Validate that it's not possible to create a clustered collection with {autoIndexId: false}.
+assert.commandFailedWithCode(
+    testDB.createCollection(coll.getName(),
+                            {clusteredIndex: {key: {_id: 1}, unique: true}, autoIndexId: false}),
+    6026501);
 
 assert.commandFailedWithCode(
     testDB.createCollection(coll.getName(), {clusteredIndex: {key: {_id: 1}, unique: false}}),

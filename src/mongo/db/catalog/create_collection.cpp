@@ -449,6 +449,10 @@ Status _createCollection(OperationContext* opCtx,
                     ErrorCodes::InvalidOptions,
                     "The 'clusteredIndex' option is not supported with the 'idIndex' option");
             }
+            if (collectionOptions.autoIndexId == CollectionOptions::NO) {
+                return Status(ErrorCodes::Error(6026501),
+                              "The 'clusteredIndex' option does not support {autoIndexId: false}");
+            }
 
             auto clusteredIndexStatus = validateClusteredIndexSpec(
                 opCtx, clusteredIndex->getIndexSpec(), collectionOptions.expireAfterSeconds);
@@ -514,6 +518,10 @@ Status createCollection(OperationContext* opCtx,
                 str::stream() << "Cannot create a view in a multi-document "
                                  "transaction.",
                 !opCtx->inMultiDocumentTransaction());
+        uassert(ErrorCodes::Error(6026500),
+                "The 'clusteredIndex' option is not supported with views",
+                !options.clusteredIndex);
+
         return _createView(opCtx, ns, std::move(options));
     } else if (options.timeseries && !ns.isTimeseriesBucketsCollection()) {
         // This helper is designed for user-created time-series collections on primaries. If a
