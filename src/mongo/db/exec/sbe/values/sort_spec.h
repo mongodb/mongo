@@ -57,6 +57,8 @@ public:
         return _collator;
     }
 
+    size_t getApproximateSize() const;
+
 private:
     BtreeKeyGenerator initKeyGen() const;
 

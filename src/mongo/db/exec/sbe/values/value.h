@@ -905,6 +905,8 @@ public:
 
     size_t getNumberCaptures() const;
 
+    size_t getApproximateSize() const;
+
 private:
     void _compile();
 

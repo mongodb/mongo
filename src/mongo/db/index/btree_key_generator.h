@@ -82,6 +82,8 @@ public:
                  MultikeyPaths* multikeyPaths,
                  boost::optional<RecordId> id = boost::none) const;
 
+    size_t getApproximateSize() const;
+
 private:
     /**
      * Stores info regarding traversal of a positional path. A path through a document is
@@ -102,6 +104,8 @@ private:
         bool hasPositionallyIndexedElt() const {
             return !positionallyIndexedElt.eoo();
         }
+
+        size_t getApproximateSize() const;
 
         // Stores the array element indexed by position. If the key pattern has no positional
         // element, then this is EOO.

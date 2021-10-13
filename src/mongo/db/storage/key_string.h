@@ -440,6 +440,8 @@ public:
         return _version;
     }
 
+    size_t getApproximateSize() const;
+
 private:
     Version _version;
     // _ksSize is the total length that the KeyString takes up in the buffer.

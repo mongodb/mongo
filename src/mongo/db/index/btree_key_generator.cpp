@@ -276,6 +276,36 @@ void BtreeKeyGenerator::getKeys(SharedBufferFragmentBuilder& pooledBufferBuilder
     }
 }
 
+size_t BtreeKeyGenerator::getApproximateSize() const {
+    auto computePositionalInfoSize = [](const std::vector<PositionalPathInfo>& v) {
+        size_t size = 0;
+        for (const auto& elem : v) {
+            size += elem.getApproximateSize();
+        }
+        return size;
+    };
+
+    // _fieldNames contains pointers to blocks of memory that BtreeKeyGenerator doesn't own,
+    // so we don't account for the sizes of those blocks of memory here. Likewise, _collator
+    // points to a block of memory that BtreeKeyGenerator doesn't own, so we don't acccount
+    // for the size of this block of memory either.
+    auto size = sizeof(BtreeKeyGenerator);
+    size += _fieldNames.size() * sizeof(const char*);
+    size += _nullKeyString.getApproximateSize() - sizeof(_nullKeyString);
+    size += _fixed.size() * sizeof(BSONElement);
+    size += computePositionalInfoSize(_emptyPositionalInfo);
+    size += _pathLengths.size() * sizeof(size_t);
+    return size;
+}
+
+size_t BtreeKeyGenerator::PositionalPathInfo::getApproximateSize() const {
+    // remainingPath points to a block of memory that PositionalPathInfo doesn't own, so we
+    // don't account for the size of this block of memory here.
+    auto size = sizeof(PositionalPathInfo);
+    size += arrayObj.isOwned() ? arrayObj.objsize() : 0;
+    return size;
+}
+
 void BtreeKeyGenerator::_getKeysWithoutArray(SharedBufferFragmentBuilder& pooledBufferBuilder,
                                              const BSONObj& obj,
                                              boost::optional<RecordId> id,

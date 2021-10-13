@@ -333,6 +333,8 @@ public:
         return _hasId;
     };
 
+    size_t getApproximateSize() const;
+
 private:
     KeyPattern _keyPattern;
 

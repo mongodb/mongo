@@ -75,6 +75,8 @@ public:
      */
     BSONObj toBSON() const;
 
+    size_t getApproximateSize() const final;
+
 private:
     void _addTerms(FTSTokenizer* tokenizer, const std::string& tokens, bool negated);
 

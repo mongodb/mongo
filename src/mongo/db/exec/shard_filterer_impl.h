@@ -54,6 +54,8 @@ public:
 
     const KeyPattern& getKeyPattern() const override;
 
+    size_t getApproximateSize() const override;
+
 private:
     DocumentBelongsResult keyBelongsToMeHelper(const BSONObj& doc) const;
 

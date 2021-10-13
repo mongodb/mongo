@@ -141,6 +141,13 @@ bool FTSMatcher::negativePhrasesMatch(const BSONObj& obj) const {
     return true;
 }
 
+size_t FTSMatcher::getApproximateSize() const {
+    auto size = sizeof(FTSMatcher);
+    size += _query.getApproximateSize() - sizeof(_query);
+    size += _spec.getApproximateSize() - sizeof(_spec);
+    return size;
+}
+
 bool FTSMatcher::_phraseMatch(const string& phrase, const BSONObj& obj) const {
     FTSElementIterator it(_spec, obj);
 

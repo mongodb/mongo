@@ -91,4 +91,9 @@ bool JsFunction::runAsPredicate(const BSONObj& obj) const {
     return _scope->getBoolean("__returnValue");
 }
 
+size_t JsFunction::getApproximateSize() const {
+    // The memory pointed to by _scope is owned by the MozJS engine, so we do not account
+    // for the size of that memory here.
+    return sizeof(JsFunction);
+}
 }  // namespace mongo

@@ -125,6 +125,8 @@ public:
 
     BSONObj globalMax() const;
 
+    size_t getApproximateSize() const;
+
 private:
     BSONObj _pattern;
 };

@@ -62,6 +62,10 @@ public:
     bool keyBelongsToMe(const BSONObj& shardKey) const override {
         MONGO_UNREACHABLE;
     }
+
+    size_t getApproximateSize() const override {
+        MONGO_UNREACHABLE;
+    }
 };
 
 /**

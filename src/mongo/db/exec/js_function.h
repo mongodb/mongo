@@ -41,6 +41,8 @@ public:
 
     bool runAsPredicate(const BSONObj& obj) const;
 
+    size_t getApproximateSize() const;
+
 private:
     std::shared_ptr<Scope> _scope;
     ScriptingFunction _func;

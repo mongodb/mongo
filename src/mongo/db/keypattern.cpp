@@ -115,4 +115,10 @@ BSONObj KeyPattern::globalMax() const {
     return extendRangeBound(BSONObj(), true);
 }
 
+size_t KeyPattern::getApproximateSize() const {
+    auto size = sizeof(KeyPattern);
+    size += _pattern.isOwned() ? _pattern.objsize() : 0;
+    return size;
+}
+
 }  // namespace mongo

@@ -168,6 +168,12 @@ size_t PcreRegex::getNumberCaptures() const {
     return static_cast<size_t>(numCaptures);
 }
 
+size_t PcreRegex::getApproximateSize() const {
+    size_t pcreSize;
+    pcre_fullinfo(_pcrePtr, nullptr, PCRE_INFO_SIZE, &pcreSize);
+    return sizeof(PcreRegex) + _pattern.size() + 1 + _options.size() + 1 + pcreSize;
+}
+
 KeyString::Value SortSpec::generateSortKey(const BSONObj& obj) const {
     KeyStringSet keySet;
     SharedBufferFragmentBuilder allocator(KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
@@ -206,6 +212,15 @@ BtreeKeyGenerator SortSpec::initKeyGen() const {
     auto ordering = Ordering::make(_sortPattern);
 
     return {std::move(fields), std::move(fixed), isSparse, _collator, version, ordering};
+}
+
+size_t SortSpec::getApproximateSize() const {
+    // _collator points to a block of memory that SortSpec doesn't own, so we don't acccount
+    // for the size of this block of memory here.
+    auto size = sizeof(SortSpec);
+    size += _sortPattern.isOwned() ? _sortPattern.objsize() : 0;
+    size += _keyGen.getApproximateSize() - sizeof(_keyGen);
+    return size;
 }
 
 std::pair<TypeTags, Value> makeCopyJsFunction(const JsFunction& jsFunction) {

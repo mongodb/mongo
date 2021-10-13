@@ -88,4 +88,12 @@ const KeyPattern& ShardFiltererImpl::getKeyPattern() const {
     invariant(_keyPattern);
     return _keyPattern->getKeyPattern();
 }
+
+size_t ShardFiltererImpl::getApproximateSize() const {
+    // _collectionFilter contains a shared_ptr to metadata, but it does not own this metadata,
+    // so we don't account for the size of the metadata here.
+    auto size = sizeof(ShardFiltererImpl);
+    size += _keyPattern ? _keyPattern->getApproximateSize() - sizeof(ShardKeyPattern) : 0;
+    return 0;
+}
 }  // namespace mongo

@@ -2705,6 +2705,12 @@ void Value::serializeWithoutRecordIdLong(BufBuilder& buf) const {
     buf.appendBuf(_buffer.get() + _ksSize, _buffer.size() - _ksSize);  // Serialize TypeBits
 }
 
+size_t Value::getApproximateSize() const {
+    auto size = sizeof(Value);
+    size += !_buffer.isShared() ? SharedBuffer::kHolderSize + _buffer.size() : 0;
+    return size;
+}
+
 template class BuilderBase<Builder>;
 template class BuilderBase<HeapBuilder>;
 template class BuilderBase<PooledBuilder>;

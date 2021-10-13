@@ -122,6 +122,8 @@ public:
         return _textIndexVersion;
     }
 
+    size_t getApproximateSize() const;
+
 private:
     //
     // Helper methods.  Invoked for TEXT_INDEX_VERSION_2 spec objects only.

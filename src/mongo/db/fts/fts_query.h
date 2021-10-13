@@ -97,6 +97,10 @@ public:
      */
     virtual std::unique_ptr<FTSQuery> clone() const = 0;
 
+    virtual size_t getApproximateSize() const {
+        return sizeof(FTSQuery) + _query.size() + 1 + _language.size() + 1;
+    }
+
 private:
     std::string _query;
     std::string _language;

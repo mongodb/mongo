@@ -512,5 +512,32 @@ StatusWith<BSONObj> FTSSpec::fixSpec(const BSONObj& spec) {
 
     return b.obj();
 }
+
+size_t FTSSpec::getApproximateSize() const {
+    auto computeVectorSize = [](const std::vector<std::string>& v) {
+        size_t size = 0;
+        for (const auto& str : v) {
+            size += sizeof(str) + str.size() + 1;
+        }
+        return size;
+    };
+
+    auto computeWeightsSize = [](const Weights& w) {
+        size_t size = 0;
+        for (const auto& p : w) {
+            size += sizeof(p) + p.first.size() + 1;
+        }
+        return size;
+    };
+
+    // _defaultLanguage is owned by the LanguageRegistry class and may be shared across many
+    // FTSSpec's, so we don't account for the size of _defaultLanguage here.
+    auto size = sizeof(FTSSpec);
+    size += _languageOverrideField.size() + 1;
+    size += computeWeightsSize(_weights);
+    size += computeVectorSize(_extraBefore);
+    size += computeVectorSize(_extraAfter);
+    return size;
+}
 }  // namespace fts
 }  // namespace mongo

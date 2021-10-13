@@ -70,5 +70,7 @@ public:
      * the shard key.
      */
     virtual const KeyPattern& getKeyPattern() const = 0;
+
+    virtual size_t getApproximateSize() const = 0;
 };
 }  // namespace mongo

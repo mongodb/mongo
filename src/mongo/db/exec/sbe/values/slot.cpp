@@ -32,6 +32,8 @@
 #include "mongo/db/exec/sbe/values/slot.h"
 
 #include "mongo/bson/util/builder.h"
+#include "mongo/db/exec/js_function.h"
+#include "mongo/db/exec/sbe/values/sort_spec.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/util/bufreader.h"
 
@@ -387,6 +389,7 @@ int getApproximateSize(TypeTags tag, Value val) {
         case TypeTags::MinKey:
         case TypeTags::MaxKey:
         case TypeTags::bsonUndefined:
+        case TypeTags::LocalLambda:
             break;
         // There are deep types.
         case TypeTags::NumberDecimal:
@@ -466,17 +469,28 @@ int getApproximateSize(TypeTags tag, Value val) {
             // including the 'length' field itself.
             result += ConstDataView(getRawPointerView(val)).read<LittleEndian<uint32_t>>();
             break;
-        // These types are currently unsupported. Temporarily break in these cases because
-        // calculating the estimated size of a cached SBE plan requires a size value.
-        // TODO: SERVER-60273 Calculate the estimated size for missing types.
-        case TypeTags::LocalLambda:
         case TypeTags::pcreRegex:
+            result += getPcreRegexView(val)->getApproximateSize();
+            break;
         case TypeTags::timeZoneDB:
+            // This type points to a block of memory that it doesn't own, so we don't acccount
+            // for the size of this block of memory here.
+            break;
         case TypeTags::jsFunction:
+            result += getJsFunctionView(val)->getApproximateSize();
+            break;
         case TypeTags::shardFilterer:
+            result += getShardFiltererView(val)->getApproximateSize();
+            break;
         case TypeTags::collator:
+            // This type points to a block of memory that it doesn't own, so we don't acccount
+            // for the size of this block of memory here.
+            break;
         case TypeTags::ftsMatcher:
+            result += getFtsMatcherView(val)->getApproximateSize();
+            break;
         case TypeTags::sortSpec:
+            result += getSortSpecView(val)->getApproximateSize();
             break;
         default:
             MONGO_UNREACHABLE;

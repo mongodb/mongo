@@ -643,4 +643,19 @@ BoundList ShardKeyPattern::flattenBounds(const IndexBounds& indexBounds) const {
     return ret;
 }
 
+size_t ShardKeyPattern::getApproximateSize() const {
+    auto computeVectorSize = [](const std::vector<std::unique_ptr<FieldRef>>& v) {
+        size_t size = 0;
+        for (const auto& ptr : v) {
+            size += sizeof(ptr) + (ptr ? ptr->estimateObjectSizeInBytes() : 0);
+        }
+        return size;
+    };
+
+    auto size = sizeof(ShardKeyPattern);
+    size += _keyPattern.getApproximateSize() - sizeof(KeyPattern);
+    size += computeVectorSize(_keyPatternPaths);
+    return 0;
+}
+
 }  // namespace mongo

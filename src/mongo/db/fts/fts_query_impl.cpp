@@ -206,5 +206,32 @@ BSONObj FTSQueryImpl::toBSON() const {
     bob.append("negatedPhrases", getNegatedPhr());
     return bob.obj();
 }
+
+size_t FTSQueryImpl::getApproximateSize() const {
+    auto computeVectorSize = [](const std::vector<std::string>& v) {
+        size_t size = 0;
+        for (const auto& str : v) {
+            size += sizeof(str) + str.size() + 1;
+        }
+        return size;
+    };
+
+    auto computeSetSize = [](const std::set<std::string>& s) {
+        size_t size = 0;
+        for (const auto& str : s) {
+            size += sizeof(str) + str.size() + 1;
+        }
+        return size;
+    };
+
+    auto size = sizeof(FTSQueryImpl);
+    size += FTSQuery::getApproximateSize() - sizeof(FTSQuery);
+    size += computeSetSize(_positiveTerms);
+    size += computeSetSize(_negatedTerms);
+    size += computeVectorSize(_positivePhrases);
+    size += computeVectorSize(_negatedPhrases);
+    size += computeSetSize(_termsForBounds);
+    return size;
+}
 }  // namespace fts
 }  // namespace mongo

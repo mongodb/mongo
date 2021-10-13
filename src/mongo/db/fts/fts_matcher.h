@@ -83,6 +83,8 @@ public:
         return _spec;
     }
 
+    size_t getApproximateSize() const;
+
 private:
     /**
      * For matching, can we skip the positive term check?  This is done as optimization when
