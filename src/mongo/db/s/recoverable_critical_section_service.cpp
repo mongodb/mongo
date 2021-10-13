@@ -350,10 +350,18 @@ void RecoverableCriticalSectionService::recoverRecoverableCriticalSections(
     // Release all in-memory critical sections
     const auto collectionNames = CollectionShardingState::getCollectionNames(opCtx);
     for (const auto& collName : collectionNames) {
-        AutoGetCollection collLock(opCtx, collName, MODE_X);
-        auto* const csr = CollectionShardingRuntime::get(opCtx, collName);
-        auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr);
-        csr->exitCriticalSectionNoChecks(csrLock);
+        try {
+            AutoGetCollection collLock(opCtx, collName, MODE_X);
+            auto* const csr = CollectionShardingRuntime::get(opCtx, collName);
+            auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr);
+            csr->exitCriticalSectionNoChecks(csrLock);
+        } catch (const ExceptionFor<ErrorCodes::CommandNotSupportedOnView>&) {
+            LOGV2_DEBUG(6050800,
+                        2,
+                        "Skipping attempting to exit critical section for view in "
+                        "recoverRecoverableCriticalSections",
+                        "namespace"_attr = collName);
+        }
     }
 
     // Map the critical sections that are on disk to memory
