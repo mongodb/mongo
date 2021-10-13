@@ -22,6 +22,7 @@ const testDB = st.s.getDB(kDbName);
 const sessionUUID = UUID();
 
 assert.commandWorked(testDB.runCommand({create: kCollName}));
+assert.commandWorked(shard0Primary.adminCommand({refreshLogicalSessionCacheNow: 1}));
 
 (() => {
     jsTest.log(

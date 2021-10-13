@@ -267,7 +267,8 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
                     if (status.isOK() && session) {
                         // Return lsid to the SessionCache. If status is not OK, let the lsid be
                         // discarded.
-                        SessionCache::get(opCtx)->release(*session);
+                        InternalSessionPool::get(opCtx)->release(
+                            {session->getLsid(), session->getTxnNumber()});
                     }
                 } catch (DBException& ex) {
                     static constexpr auto errMsg = "Failed to release sharding DDL coordinator";
@@ -322,51 +323,6 @@ SemiFuture<void> ShardingDDLCoordinator_NORESILIENT::run(OperationContext* opCtx
         DatabaseShardingState::checkIsPrimaryShardForDb(opCtx, _nss.db());
     }
     return runImpl(Grid::get(opCtx)->getExecutorPool()->getFixedExecutor());
-}
-
-const auto serviceDecorator =
-    ServiceContext::declareDecoration<ShardingDDLCoordinator::SessionCache>();
-
-auto ShardingDDLCoordinator::SessionCache::get(ServiceContext* serviceContext) -> SessionCache* {
-    return &serviceDecorator(serviceContext);
-}
-
-auto ShardingDDLCoordinator::SessionCache::get(OperationContext* opCtx) -> SessionCache* {
-    return get(opCtx->getServiceContext());
-}
-
-ShardingDDLSession ShardingDDLCoordinator::SessionCache::acquire() {
-    const ShardingDDLSession session = [&] {
-        stdx::unique_lock<Latch> lock(_cacheMutex);
-
-        if (!_cache.empty()) {
-            auto session = std::move(_cache.top());
-            _cache.pop();
-            return session;
-        } else {
-            return ShardingDDLSession(makeSystemLogicalSessionId(), TxnNumber(0));
-        }
-    }();
-
-    LOGV2_DEBUG(5565606,
-                2,
-                "Acquired new DDL logical session",
-                "lsid"_attr = session.getLsid(),
-                "txnNumber"_attr = session.getTxnNumber());
-
-    return session;
-}
-
-void ShardingDDLCoordinator::SessionCache::release(ShardingDDLSession session) {
-    LOGV2_DEBUG(5565607,
-                2,
-                "Released DDL logical session",
-                "lsid"_attr = session.getLsid(),
-                "highestUsedTxnNumber"_attr = session.getTxnNumber());
-
-    session.setTxnNumber(session.getTxnNumber() + 1);
-    stdx::unique_lock<Latch> lock(_cacheMutex);
-    _cache.push(std::move(session));
 }
 
 }  // namespace mongo

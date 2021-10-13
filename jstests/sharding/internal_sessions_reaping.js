@@ -39,6 +39,9 @@ let transactionsCollOnPrimary = shard0Primary.getCollection(kConfigTxnsNs);
 let imageCollOnPrimary = shard0Primary.getCollection(kImageCollNs);
 let testDB = shard0Primary.getDB(kDbName);
 
+assert.commandWorked(testDB.createCollection(kCollName));
+assert.commandWorked(shard0Primary.adminCommand({refreshLogicalSessionCacheNow: 1}));
+
 const sessionUUID = UUID();
 const parentLsid = {
     id: sessionUUID
