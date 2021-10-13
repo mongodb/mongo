@@ -32,7 +32,7 @@ const validateListCollections = function(db, collName, creationOptions) {
 
     // If the creationOptions don't specify the name, expect the default.
     if (!creationOptions.clusteredIndex.name) {
-        expectedOptions.clusteredIndex.name = "_id_1";
+        expectedOptions.clusteredIndex.name = "_id_";
     }
 
     // If the creationOptions don't specify 'v', expect the default.

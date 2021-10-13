@@ -34,7 +34,7 @@
 namespace mongo {
 namespace clustered_util {
 
-static constexpr StringData kDefaultClusteredIndexName = "_id_1"_sd;
+static constexpr StringData kDefaultClusteredIndexName = "_id_"_sd;
 
 ClusteredCollectionInfo makeCanonicalClusteredInfoForLegacyFormat() {
     auto indexSpec = ClusteredIndexSpec{BSON("_id" << 1), true};
