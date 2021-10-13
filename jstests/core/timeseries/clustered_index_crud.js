@@ -2,8 +2,6 @@
  * Tests inserting various _id values and duplicates on a timeseries bucket collection.
  *
  * @tags: [
- *   assumes_against_mongod_not_mongos,
- *   assumes_no_implicit_collection_creation_after_drop,
  *   does_not_support_stepdowns,
  *   requires_fcv_51,
  *   requires_wiredtiger,

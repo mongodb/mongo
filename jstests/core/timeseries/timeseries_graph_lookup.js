@@ -1,9 +1,7 @@
 /**
  * Verifies that time-series collections work as expected with $graphLookup.
  *
- *
  * @tags: [
- *   assumes_unsharded_collection,
  *   does_not_support_transactions,
  *   requires_timeseries,
  * ]

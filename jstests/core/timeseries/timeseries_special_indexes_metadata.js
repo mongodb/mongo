@@ -4,8 +4,6 @@
  * Tests index creation, index drops, list indexes, hide/unhide index on a time-series collection.
  *
  * @tags: [
- *   # The shardCollection implicitly creates an index on time field.
- *   assumes_unsharded_collection,
  *   does_not_support_stepdowns,
  *   does_not_support_transactions,
  *   requires_fcv_51,
@@ -19,6 +17,7 @@
 
 load("jstests/core/timeseries/libs/timeseries.js");
 load("jstests/libs/analyze_plan.js");
+load("jstests/libs/fixture_helpers.js");
 
 TimeseriesTest.run((insert) => {
     const testdb = db.getSiblingDB("timeseries_special_indexes_db");
@@ -90,23 +89,28 @@ TimeseriesTest.run((insert) => {
 
     /**
      * Checks that listIndexes against the time-series collection returns the 'timeseriesIndexSpec'
-     * index. Expects only the 'timeseriesIndexSpec' index to exist.
+     * index. Expects only the 'timeseriesIndexSpec' index to exist (plus an implicitly-created
+     * index if the collection is implicitly sharded).
      */
     function listIndexesHasIndex(timeseriesIndexSpec) {
         const timeseriesListIndexesCursor =
             assert.commandWorked(testdb.runCommand({listIndexes: timeseriescoll.getName()})).cursor;
 
         // Check the ns is OK.
-        assert.eq(timeseriescoll.getFullName(),
+        // TODO SERVER-61039 This should be timeseriescoll.getFullName() in both cases.
+        const expectedNs = FixtureHelpers.isSharded(bucketscoll) ? bucketscoll.getFullName()
+                                                                 : timeseriescoll.getFullName();
+        assert.eq(expectedNs,
                   timeseriesListIndexesCursor.ns,
                   "Found unexpected namespace: " + tojson(timeseriesListIndexesCursor));
 
         // Check for the index.
-        assert.eq(
-            1, timeseriesListIndexesCursor.firstBatch.length, tojson(timeseriesListIndexesCursor));
-        assert.docEq(timeseriesIndexSpec,
-                     timeseriesListIndexesCursor.firstBatch[0].key,
-                     "Found unexpected index spec: " + tojson(timeseriesListIndexesCursor));
+        const keys = timeseriesListIndexesCursor.firstBatch.map(d => d.key);
+        const expectedKeys = FixtureHelpers.isSharded(bucketscoll) ? [{tm: 1}, timeseriesIndexSpec]
+                                                                   : [timeseriesIndexSpec];
+        assert.sameMembers(expectedKeys,
+                           keys,
+                           "Found unexpected index spec: " + tojson(timeseriesListIndexesCursor));
     }
 
     /**

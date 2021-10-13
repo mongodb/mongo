@@ -3,7 +3,6 @@
  * $_internalUnpackBucket when used on a non-metadata field on a time-series collection.
  *
  * @tags: [
- *   assumes_unsharded_collection,
  *   requires_fcv_51,
  *   requires_pipeline_optimization,
  *   requires_timeseries,
@@ -22,6 +21,7 @@ coll.drop();
 
 assert.commandWorked(
     db.createCollection(coll.getName(), {timeseries: {timeField: 'time', metaField: 'meta'}}));
+const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
 
 const pipeline = [{
     $match: {
@@ -36,16 +36,19 @@ const pipeline = [{
 const explain = coll.explain().aggregate(pipeline);
 const collScanStages = getAggPlanStages(explain, "COLLSCAN");
 for (let collScanStage of collScanStages) {
-    assert.docEq({
+    let expectedPredicate = {
         "$_internalBucketGeoWithin": {
             "withinRegion": {
                 "$geometry": {"type": "Polygon", "coordinates": [[[0, 0], [3, 6], [6, 1], [0, 0]]]}
             },
             "field": "loc"
         }
-    },
-                 collScanStage.filter,
-                 collScanStages);
+    };
+    // TODO SERVER-60373 Fix duplicate predicates for sharded time-series collection
+    if (FixtureHelpers.isSharded(bucketsColl)) {
+        expectedPredicate = {$and: [expectedPredicate, expectedPredicate]};
+    }
+    assert.docEq(expectedPredicate, collScanStage.filter, collScanStages);
 }
 
 // Test that $geoWithin still gives the correct result, when the events are in the same bucket.

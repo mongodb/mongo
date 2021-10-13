@@ -69,6 +69,9 @@ selector:
   # This file is testing resmoke's multiversion framework, not Server behavior
   - jstests/core/mixed_version_replica_set.js
 
+  # TODO SERVER-61050
+  - jstests/core/timeseries/timeseries_merge.js
+
   exclude_with_any_tags:
   - assumes_against_mongod_not_mongos
   - assumes_standalone_mongod

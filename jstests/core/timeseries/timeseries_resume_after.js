@@ -3,6 +3,7 @@
  * $_resumeAfter.
  *
  * @tags: [
+ *   # Queries on mongoS may not request or provide a resume token.
  *   assumes_against_mongod_not_mongos,
  *   does_not_support_stepdowns,
  *   does_not_support_transactions,

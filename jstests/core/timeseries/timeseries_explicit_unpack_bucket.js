@@ -4,7 +4,6 @@
  * MongoDB products rather than user applications.
  *
  * @tags: [
- *   assumes_unsharded_collection,
  *   does_not_support_transactions,
  *   requires_timeseries,
  * ]

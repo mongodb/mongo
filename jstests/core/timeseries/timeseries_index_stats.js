@@ -6,10 +6,6 @@
  *   # $indexStats stage. The former operation must be routed to the primary in a replica set,
  *   # whereas the latter may be routed to a secondary.
  *   assumes_read_preference_unchanged,
- *   # Cannot implicitly shard accessed collections because of following errmsg: A single
- *   # update/delete on a sharded collection must contain an exact match on _id or contain the shard
- *   # key.
- *   assumes_unsharded_collection,
  *   does_not_support_stepdowns,
  *   does_not_support_transactions,
  *   requires_getmore,
@@ -20,6 +16,7 @@
 "use strict";
 
 load("jstests/core/timeseries/libs/timeseries.js");
+load("jstests/libs/fixture_helpers.js");  // For isSharded.
 
 TimeseriesTest.run((insert) => {
     const timeFieldName = 'tm';
@@ -47,6 +44,11 @@ TimeseriesTest.run((insert) => {
     for (const [indexName, indexKey] of Object.entries(indexKeys)) {
         assert.commandWorked(coll.createIndex(indexKey, {name: indexName}),
                              'failed to create index: ' + indexName + ': ' + tojson(indexKey));
+    }
+    if (FixtureHelpers.isSharded(bucketsColl)) {
+        // Expect one additional index, created implicitly when the collection was implicitly
+        // sharded.
+        indexKeys['control.min.tm_1'] = {[timeFieldName]: 1};
     }
 
     // Create an index directly on the buckets collection that would not be visible in the

@@ -3,7 +3,6 @@
  *
  *
  * @tags: [
- *   assumes_unsharded_collection,
  *   does_not_support_transactions,
  *   requires_non_retryable_commands,
  *   requires_timeseries,

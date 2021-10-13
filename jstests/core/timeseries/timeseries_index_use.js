@@ -2,8 +2,6 @@
  * Tests index usage on meta and time fields for timeseries collections.
  *
  * @tags: [
- *   # The shardCollection implicitly creates an index on time field.
- *   assumes_unsharded_collection,
  *   does_not_support_stepdowns,
  *   does_not_support_transactions,
  *   requires_fcv_51,
@@ -66,7 +64,6 @@ TimeseriesTest.run((insert) => {
         const ixscan = getAggPlanStage(explain, "IXSCAN");
         assert.neq(null, ixscan, tojson(explain));
         assert.eq("testIndexName", ixscan.indexName, tojson(ixscan));
-
         assert.commandWorked(coll.dropIndex("testIndexName"));
     };
 
@@ -102,26 +99,33 @@ TimeseriesTest.run((insert) => {
     const timeDate = ISODate('2005-01-01 00:00:00.000Z');
 
     // Test ascending and descending index on timeField.
-    testQueryUsesIndex({[timeFieldName]: {$lte: timeDate}}, 2, {[timeFieldName]: 1});
-    testQueryUsesIndex({[timeFieldName]: {$gte: timeDate}}, 1, {[timeFieldName]: -1});
+    if (!FixtureHelpers.isSharded(bucketsColl)) {
+        // Skip if the collection is implicitly sharded: it may use the implicitly created index.
+        testQueryUsesIndex({[timeFieldName]: {$lte: timeDate}}, 2, {[timeFieldName]: 1});
+        testQueryUsesIndex({[timeFieldName]: {$gte: timeDate}}, 1, {[timeFieldName]: -1});
+    }
 
     // Test ascending and descending index on metaField.
     testQueryUsesIndex({[metaFieldName]: {$eq: 3}}, 1, {[metaFieldName]: 1});
     testQueryUsesIndex({[metaFieldName]: {$lt: 3}}, 2, {[metaFieldName]: -1});
 
     // Test compound indexes on metaField and timeField.
-    testQueryUsesIndex({[metaFieldName]: {$gte: 2}}, 3, {[metaFieldName]: 1, [timeFieldName]: 1});
-    testQueryUsesIndex(
-        {[timeFieldName]: {$lt: timeDate}}, 2, {[timeFieldName]: 1, [metaFieldName]: 1});
-    testQueryUsesIndex({[metaFieldName]: {$lte: 3}, [timeFieldName]: {$gte: timeDate}},
-                       1,
-                       {[metaFieldName]: 1, [timeFieldName]: 1});
-    testQueryUsesIndex({[metaFieldName]: {$eq: 2}, [timeFieldName]: {$lte: timeDate}},
-                       1,
-                       {[metaFieldName]: -1, [timeFieldName]: -1});
-    testQueryUsesIndex({[metaFieldName]: {$lt: 3}, [timeFieldName]: {$lte: timeDate}},
-                       1,
-                       {[timeFieldName]: 1, [metaFieldName]: -1});
+    if (!FixtureHelpers.isSharded(bucketsColl)) {
+        // Skip if the collection is implicitly sharded: it may use the implicitly created index.
+        testQueryUsesIndex(
+            {[metaFieldName]: {$gte: 2}}, 3, {[metaFieldName]: 1, [timeFieldName]: 1});
+        testQueryUsesIndex(
+            {[timeFieldName]: {$lt: timeDate}}, 2, {[timeFieldName]: 1, [metaFieldName]: 1});
+        testQueryUsesIndex({[metaFieldName]: {$lte: 3}, [timeFieldName]: {$gte: timeDate}},
+                           1,
+                           {[metaFieldName]: 1, [timeFieldName]: 1});
+        testQueryUsesIndex({[metaFieldName]: {$eq: 2}, [timeFieldName]: {$lte: timeDate}},
+                           1,
+                           {[metaFieldName]: -1, [timeFieldName]: -1});
+        testQueryUsesIndex({[metaFieldName]: {$lt: 3}, [timeFieldName]: {$lte: timeDate}},
+                           1,
+                           {[timeFieldName]: 1, [metaFieldName]: -1});
+    }
 
     /********************************** Tests object meta values **********************************/
     resetCollections();
@@ -170,19 +174,23 @@ TimeseriesTest.run((insert) => {
                        {sparse: true});
 
     // Test compound indexes on timeField and subfields of metaField.
-    testQueryUsesIndex(
-        {[metaFieldName + '.a']: {$gte: 2}}, 1, {[metaFieldName + '.a']: 1, [timeFieldName]: 1});
-    testQueryUsesIndex(
-        {[timeFieldName]: {$lt: timeDate}}, 2, {[timeFieldName]: 1, [metaFieldName + '.a']: 1});
-    testQueryUsesIndex({[metaFieldName + '.a']: {$lte: 4}, [timeFieldName]: {$lte: timeDate}},
-                       2,
-                       {[metaFieldName + '.a']: 1, [timeFieldName]: 1});
-    testQueryUsesIndex({[metaFieldName + '.a']: {$lte: 4}, [timeFieldName]: {$lte: timeDate}},
-                       2,
-                       {[metaFieldName + '.a']: 1, [timeFieldName]: -1});
-    testQueryUsesIndex({[metaFieldName + '.a']: {$eq: "1"}, [timeFieldName]: {$gt: timeDate}},
-                       1,
-                       {[timeFieldName]: -1, [metaFieldName + '.a']: 1});
+    if (!FixtureHelpers.isSharded(bucketsColl)) {
+        // Skip if the collection is implicitly sharded: it may use the implicitly created index.
+        testQueryUsesIndex({[metaFieldName + '.a']: {$gte: 2}},
+                           1,
+                           {[metaFieldName + '.a']: 1, [timeFieldName]: 1});
+        testQueryUsesIndex(
+            {[timeFieldName]: {$lt: timeDate}}, 2, {[timeFieldName]: 1, [metaFieldName + '.a']: 1});
+        testQueryUsesIndex({[metaFieldName + '.a']: {$lte: 4}, [timeFieldName]: {$lte: timeDate}},
+                           2,
+                           {[metaFieldName + '.a']: 1, [timeFieldName]: 1});
+        testQueryUsesIndex({[metaFieldName + '.a']: {$lte: 4}, [timeFieldName]: {$lte: timeDate}},
+                           2,
+                           {[metaFieldName + '.a']: 1, [timeFieldName]: -1});
+        testQueryUsesIndex({[metaFieldName + '.a']: {$eq: "1"}, [timeFieldName]: {$gt: timeDate}},
+                           1,
+                           {[timeFieldName]: -1, [metaFieldName + '.a']: 1});
+    }
 
     // Test wildcard indexes with metaField.
     testQueryUsesIndex({[metaFieldName + '.a']: {$lt: 3}}, 1, {[metaFieldName + '.$**']: 1});

@@ -2,8 +2,6 @@
  * Tests collation with time-series collections.
  *
  * @tags: [
- *   # The shardCollection implicitly creates an index on time field.
- *   assumes_unsharded_collection,
  *   does_not_support_stepdowns,
  *   does_not_support_transactions,
  *   requires_getmore,
@@ -85,20 +83,19 @@ TimeseriesTest.run((insert) => {
     }
 
     // Check that listIndexes returns specs with collation information.
+    // Don't assume that no other indexes exist--passthrough suites may create other indexes.
     const indexSpecs = coll.getIndexes();
-    assert.eq(2, indexSpecs.length, 'Unexpected index specs: ' + tojson(indexSpecs));
-    for (let i = 0; i < indexSpecs.length; ++i) {
-        if (indexSpecs[i].name === 'index_numeric') {
-            assert.eq(true,
-                      indexSpecs[i].collation.numericOrdering,
-                      'Invalid index spec for index_numeric: ' + tojson(indexSpecs[i]));
-        } else if (indexSpecs[i].name === 'index_string') {
-            assert.eq(false,
-                      indexSpecs[i].collation.numericOrdering,
-                      'Invalid index spec for index_string: ' + tojson(indexSpecs[i]));
-        } else {
-            assert(false, 'Unexpected index spec: ' + tojson(indexSpecs[i]));
-        }
-    }
+
+    const indexSpecsNumeric = indexSpecs.filter(ix => ix.name === 'index_numeric');
+    assert.eq(1, indexSpecsNumeric.length, {indexSpecs, indexSpecsNumeric});
+    assert.eq(true,
+              indexSpecsNumeric[0].collation.numericOrdering,
+              'Invalid index spec for index_numeric: ' + tojson(indexSpecsNumeric[0]));
+
+    const indexSpecsString = indexSpecs.filter(ix => ix.name === 'index_string');
+    assert.eq(1, indexSpecsString.length, {indexSpecs, indexSpecsString});
+    assert.eq(false,
+              indexSpecsString[0].collation.numericOrdering,
+              'Invalid index spec for index_string: ' + tojson(indexSpecsString[0]));
 });
 })();

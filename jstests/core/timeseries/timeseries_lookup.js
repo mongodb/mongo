@@ -2,8 +2,6 @@
  * Test that time-series bucket collections work as expected with $lookup.
  *
  * @tags: [
- *   # Cannot run lookup with sharded foreign collection.
- *   assumes_unsharded_collection,
  *   does_not_support_transactions,
  *   requires_timeseries,
  * ]
@@ -32,12 +30,7 @@ TimeseriesTest.run((insert) => {
         collA.drop();
         collB.drop();
         assert.commandWorked(testDB.createCollection(collA.getName(), collAOption));
-
-        // Currently, we do not support $lookup on sharded foreign collections. Certain test suites
-        // override createCollection() shell helper to implicitly shard the collection. To avoid
-        // this behaviour, we issue create command directly.
-        assert.commandWorked(
-            testDB.runCommand(Object.assign({create: collB.getName()}, collBOption)));
+        assert.commandWorked(testDB.createCollection(collB.getName(), collBOption));
 
         let entryCountPerHost = new Array(numHosts).fill(0);
 

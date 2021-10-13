@@ -2,8 +2,6 @@
  * Tests index creation, index drops, list indexes, hide/unhide index on a time-series collection.
  *
  * @tags: [
- *   # The shardCollection implicitly creates an index on time field.
- *   assumes_unsharded_collection,
  *   does_not_support_stepdowns,
  *   does_not_support_transactions,
  *   requires_fcv_51,
@@ -13,6 +11,7 @@
 (function() {
 "use strict";
 
+load("jstests/libs/fixture_helpers.js");
 load("jstests/core/timeseries/libs/timeseries.js");
 
 TimeseriesTest.run((insert) => {
@@ -64,6 +63,15 @@ TimeseriesTest.run((insert) => {
             coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
         assert.contains(bucketsColl.getName(), db.getCollectionNames());
 
+        // When the collection is sharded, there is 1 extra index for the shard key.
+        const numExtraIndexes = FixtureHelpers.isSharded(bucketsColl) ? 1 : 0;
+        {
+            const indexes = bucketsColl.getIndexes();
+            assert.eq(numExtraIndexes,
+                      indexes.length,
+                      'unexpected number of indexes on the buckets collection: ' + tojson(indexes));
+        }
+
         // Insert data on the time-series collection and index it.
         assert.commandWorked(insert(coll, doc), 'failed to insert doc: ' + tojson(doc));
         assert.commandWorked(coll.createIndex(keyForCreate),
@@ -84,16 +92,21 @@ TimeseriesTest.run((insert) => {
         // Note: call the listIndexes command directly, rather than use a helper, so that we can
         // inspect the result's namespace in addition to the result's index key pattern.
         let cursorDoc = assert.commandWorked(db.runCommand({listIndexes: coll.getName()})).cursor;
-        assert.eq(coll.getFullName(), cursorDoc.ns, tojson(cursorDoc));
-        assert.eq(1, cursorDoc.firstBatch.length, tojson(cursorDoc));
-        assert.docEq(keyForCreate, cursorDoc.firstBatch[0].key, tojson(cursorDoc));
+        // TODO SERVER-61039 listIndexes should reply with coll.getFullName() in both cases.
+        if (FixtureHelpers.isSharded(bucketsColl)) {
+            assert.eq(bucketsColl.getFullName(), cursorDoc.ns, tojson(cursorDoc));
+        } else {
+            assert.eq(coll.getFullName(), cursorDoc.ns, tojson(cursorDoc));
+        }
+        assert.eq(1 + numExtraIndexes, cursorDoc.firstBatch.length, tojson(cursorDoc));
+        assert.contains(keyForCreate, cursorDoc.firstBatch.map(ix => ix.key), tojson(cursorDoc));
 
         // Check that listIndexes against the buckets collection returns the index as hinted
         cursorDoc =
             assert.commandWorked(db.runCommand({listIndexes: bucketsColl.getName()})).cursor;
         assert.eq(bucketsColl.getFullName(), cursorDoc.ns, tojson(cursorDoc));
-        assert.eq(1, cursorDoc.firstBatch.length, tojson(cursorDoc));
-        assert.docEq(hint, cursorDoc.firstBatch[0].key, tojson(cursorDoc));
+        assert.eq(1 + numExtraIndexes, cursorDoc.firstBatch.length, tojson(cursorDoc));
+        assert.contains(hint, cursorDoc.firstBatch.map(ix => ix.key), tojson(cursorDoc));
 
         // Drop the index on the time-series collection and then check that the underlying buckets
         // collection index was dropped properly.
@@ -281,8 +294,10 @@ TimeseriesTest.run((insert) => {
     const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
     assert.commandWorked(bucketsColl.createIndex({not_metadata: 1}),
                          'failed to create index: ' + tojson({not_metadata: 1}));
-    assert.eq(1, bucketsColl.getIndexes().length, tojson(bucketsColl.getIndexes()));
-    assert.eq(0, coll.getIndexes().length, tojson(coll.getIndexes()));
+    const numExtraIndexes = FixtureHelpers.isSharded(bucketsColl) ? 1 : 0;
+    assert.eq(
+        1 + numExtraIndexes, bucketsColl.getIndexes().length, tojson(bucketsColl.getIndexes()));
+    assert.eq(0 + numExtraIndexes, coll.getIndexes().length, tojson(coll.getIndexes()));
 
     // Cannot directly create a "2dsphere_bucket" index.
     testCreateIndexFailed({"loc": "2dsphere_bucket"});

@@ -2,7 +2,6 @@
  * Test that time-series bucket collections work as expected with $unionWith.
  *
  * @tags: [
- *   assumes_unsharded_collection,
  *   does_not_support_transactions,
  *   requires_timeseries,
  * ]
