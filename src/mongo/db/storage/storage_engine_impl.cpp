@@ -66,6 +66,7 @@ using std::string;
 using std::vector;
 
 MONGO_FAIL_POINT_DEFINE(failToParseResumeIndexInfo);
+MONGO_FAIL_POINT_DEFINE(setMinVisibleForAllCollectionsToOldestOnStartup);
 
 namespace {
 const std::string catalogInfo = "_mdb_catalog";
@@ -299,6 +300,15 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx, LastShutdownState l
                 // visible timestamp pulled back to that value.
                 minVisibleTs = _engine->getOldestTimestamp();
             }
+
+            // This failpoint is useful for tests which want to exercise atClusterTime reads across
+            // server starts (e.g. resharding). It is likely only safe for tests which don't run
+            // operations that bump the minimum visible timestamp and can guarantee the collection
+            // always exists for the atClusterTime value(s).
+            setMinVisibleForAllCollectionsToOldestOnStartup.execute(
+                [this, &minVisibleTs](const BSONObj& data) {
+                    minVisibleTs = _engine->getOldestTimestamp();
+                });
         }
 
         _initCollection(opCtx, entry.catalogId, entry.nss, _options.forRepair, minVisibleTs);

@@ -32,6 +32,7 @@ var ReshardingTest = class {
         periodicNoopIntervalSecs: periodicNoopIntervalSecs = undefined,
         writePeriodicNoops: writePeriodicNoops = undefined,
         enableElections: enableElections = false,
+        shouldSetMinVisibleToOldestOnStartup: shouldSetMinVisibleToOldestOnStartup = false,
     } = {}) {
         // The @private JSDoc comments cause VS Code to not display the corresponding properties and
         // methods in its autocomplete list. This makes it simpler for test authors to know what the
@@ -56,6 +57,8 @@ var ReshardingTest = class {
         this._writePeriodicNoops = writePeriodicNoops;
         /** @private */
         this._enableElections = enableElections;
+        /** @private */
+        this._shouldSetMinVisibleToOldestOnStartup = shouldSetMinVisibleToOldestOnStartup;
 
         // Properties set by setup().
         /** @private */
@@ -110,6 +113,22 @@ var ReshardingTest = class {
 
             rsOptions.setParameter.enableElectionHandoff = 0;
             configOptions.setParameter.enableElectionHandoff = 0;
+
+            // The server conservatively sets the minimum visible timestamp of collections created
+            // after the oldest_timestamp to be the stable_timestamp. Furthermore, there is no
+            // guarantee the oldest_timestamp will advance past the creation timestamp of the source
+            // sharded collection. This means that after a donor shard restarts an atClusterTime
+            // read at the cloneTimestamp on it would fail with SnapshotUnavailable. We enable the
+            // following failpoint so the minimum visible timestamp is set to the oldest_timestamp
+            // regardless. Note that this is safe for resharding tests to do because the source
+            // sharded collection is guaranteed to exist in the collection catalog at the
+            // cloneTimestamp and tests involving elections do not run operations which would bump
+            // the minimum visible timestamp (e.g. creating or dropping indexes).
+            if (this._shouldSetMinVisibleToOldestOnStartup) {
+                rsOptions
+                    .setParameter["failpoint.setMinVisibleForAllCollectionsToOldestOnStartup"] =
+                    tojson({mode: "alwaysOn"});
+            }
         }
 
         if (this._minimumOperationDurationMS !== undefined) {
@@ -266,6 +285,12 @@ var ReshardingTest = class {
     /** @private */
     _startReshardingInBackgroundAndAllowCommandFailure({newShardKeyPattern, newChunks},
                                                        expectedErrorCode) {
+        assert.neq(expectedErrorCode,
+                   ErrorCodes.HostUnreachable,
+                   "HostUnreachable error must never be expected as final reshardCollection" +
+                       " command error response because it indicates mongos gave up retrying and" +
+                       " the client must instead retry");
+
         newChunks = newChunks.map(
             chunk => ({min: chunk.min, max: chunk.max, recipientShardId: chunk.shard}));
 
@@ -285,12 +310,23 @@ var ReshardingTest = class {
             function(
                 host, ns, newShardKeyPattern, newChunks, commandDoneSignal, expectedErrorCode) {
                 const conn = new Mongo(host);
-                const res = conn.adminCommand({
-                    reshardCollection: ns,
-                    key: newShardKeyPattern,
-                    _presetReshardedChunks: newChunks,
-                });
-                commandDoneSignal.countDown();
+
+                let res;
+                while (true) {
+                    res = conn.adminCommand({
+                        reshardCollection: ns,
+                        key: newShardKeyPattern,
+                        _presetReshardedChunks: newChunks,
+                    });
+
+                    if (res.ok === 1 || res.code !== ErrorCodes.HostUnreachable) {
+                        commandDoneSignal.countDown();
+                        break;
+                    }
+
+                    print("Ignoring error from mongos giving up retrying" +
+                          ` _shardsvrReshardCollection command: ${tojsononeline(res)}`);
+                }
 
                 if (expectedErrorCode === ErrorCodes.OK) {
                     assert.commandWorked(res);
@@ -778,6 +814,10 @@ var ReshardingTest = class {
 
             if (res.ok === 1) {
                 replSet.awaitNodesAgreeOnPrimary();
+                // We wait for replication to ensure all nodes have finished their rollback before
+                // another round of rollback may triggered by the test. TODO SERVER-59721: Remove
+                // this wait.
+                replSet.awaitReplication();
                 assert.eq(newPrimary, replSet.getPrimary());
                 return;
             }
@@ -791,6 +831,9 @@ var ReshardingTest = class {
         jsTest.log(`ReshardingTestFixture failed to step up secondaries, trying to step` +
                    ` original primary back up`);
         replSet.stepUp(originalPrimary, {awaitReplicationBeforeStepUp: false});
+        // We wait for replication to ensure all nodes have finished their rollback before another
+        // round of rollback may triggered by the test. TODO SERVER-59721: Remove this wait.
+        replSet.awaitReplication();
     }
 
     killAndRestartPrimaryOnShard(shardName) {
@@ -802,6 +845,10 @@ var ReshardingTest = class {
         const SIGKILL = 9;
         const opts = {allowedExitCode: MongoRunner.EXIT_SIGKILL};
         replSet.restart(originalPrimaryConn, opts, SIGKILL);
+        replSet.awaitNodesAgreeOnPrimary();
+        // We wait for replication to ensure all nodes have finished their rollback before another
+        // round of rollback may triggered by the test. TODO SERVER-59721: Remove this wait.
+        replSet.awaitReplication();
     }
 
     shutdownAndRestartPrimaryOnShard(shardName) {
@@ -813,6 +860,10 @@ var ReshardingTest = class {
 
         const SIGTERM = 15;
         replSet.restart(originalPrimaryConn, {}, SIGTERM);
+        replSet.awaitNodesAgreeOnPrimary();
+        // We wait for replication to ensure all nodes have finished their rollback before another
+        // round of rollback may triggered by the test. TODO SERVER-59721: Remove this wait.
+        replSet.awaitReplication();
     }
 
     /**
