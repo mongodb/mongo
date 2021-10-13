@@ -87,7 +87,7 @@ class SetupMultiversion(Subcommand):
 
     # pylint: disable=too-many-instance-attributes
     def __init__(self, download_options, install_dir="", link_dir="", mv_platform=None,
-                 edition=None, architecture=None, use_latest=None, versions=None,
+                 edition=None, architecture=None, use_latest=None, versions=None, variant=None,
                  install_last_lts=None, install_last_continuous=None, evergreen_config=None,
                  github_oauth_token=None, debug=None, ignore_failed_push=False):
         """Initialize."""
@@ -99,6 +99,7 @@ class SetupMultiversion(Subcommand):
         self.platform = mv_platform.lower() if mv_platform else None
         self.inferred_platform = bool(self.platform is None)
         self.architecture = architecture.lower() if architecture else None
+        self.variant = variant.lower() if variant else None
         self.use_latest = use_latest
         self.versions = versions
         self.install_last_lts = install_last_lts
@@ -165,7 +166,7 @@ class SetupMultiversion(Subcommand):
                     LOGGER.warning("Latest URL is not available or not requested,"
                                    " falling back to getting the URL for a specific"
                                    " version.")
-                    urls = self.get_urls(version)
+                    urls = self.get_urls(version, self.variant)
                 if not urls:
                     LOGGER.error("URL is not available for the version.", version=version)
                     exit(1)
@@ -191,8 +192,8 @@ class SetupMultiversion(Subcommand):
         """Download and extract values indicated in `urls`."""
         artifacts_url = urls.get("Artifacts", "") if self.download_artifacts else None
         binaries_url = urls.get("Binaries", "") if self.download_binaries else None
-        python_venv_url = urls.get("Python venv (see included README.txt)",
-                                   "") if self.download_python_venv else None
+        python_venv_url = urls.get("Python venv (see included README.txt)", "") or urls.get(
+            "Python venv (see included venv_readme.txt)", "") if self.download_python_venv else None
         download_symbols_url = None
 
         if self.download_symbols:
@@ -345,10 +346,13 @@ class SetupMultiversion(Subcommand):
             install_dir_list.append(link_dir)
 
     def get_buildvariant_name(self, major_minor_version):
-        """Return buildvariant name.
-
-        Wrapper around evergreen_conn.get_buildvariant_name().
         """
+        Return buildvariant name.
+
+        Gets buildvariant name from evergreen_conn.get_buildvariant_name() -- if not user specified.
+        """
+        if self.variant:
+            return self.variant
 
         return evergreen_conn.get_buildvariant_name(
             config=self.config, edition=self.edition, platform=self.platform,
@@ -384,7 +388,7 @@ class SetupMultiversionPlugin(PluginInterface):
         return SetupMultiversion(
             install_dir=args.install_dir, link_dir=args.link_dir, mv_platform=args.platform,
             edition=args.edition, architecture=args.architecture, use_latest=args.use_latest,
-            versions=args.versions, install_last_lts=args.install_last_lts,
+            versions=args.versions, install_last_lts=args.install_last_lts, variant=args.variant,
             install_last_continuous=args.install_last_continuous, download_options=download_options,
             evergreen_config=args.evergreen_config, github_oauth_token=args.github_oauth_token,
             ignore_failed_push=(not args.require_push), debug=args.debug)
@@ -408,6 +412,9 @@ class SetupMultiversionPlugin(PluginInterface):
             "-a", "--architecture", dest="architecture", default="x86_64",
             help="Architecture to download, [default: %(default)s]. Examples include: "
             "'arm64', 'ppc64le', 's390x' and 'x86_64'.")
+        parser.add_argument(
+            "-v", "--variant", dest="variant", default=None, help="Specify a variant to use, "
+            "which supersedes the --platform, --edition and --architecture options.")
         parser.add_argument(
             "-u", "--useLatest", dest="use_latest", action="store_true",
             help="If specified, the latest version from Evergreen will be downloaded, if it exists, "
