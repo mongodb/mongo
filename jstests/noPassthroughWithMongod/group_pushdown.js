@@ -187,13 +187,32 @@ assertNoGroupPushdown(
     [{$sortByCount: "$item"}],
     [{"_id": "a", "count": 2}, {"_id": "b", "count": 2}, {"_id": "c", "count": 1}]);
 
-// When in a sharded environment or we are spilling $doingMerge is set to true. We should bail out
-// and not push down $group stages and the suffix of the pipeline when we encounter a $group stage
-// with this flag set.
+// When at the mongos-side in a sharded environment or we are spilling $doingMerge is set to true.
+// We should bail out and not push down $group stages and the suffix of the pipeline when we
+// encounter a $group stage with this flag set.
 explain = coll.explain().aggregate([
     {$group: {_id: "$item", s: {$sum: "$price"}}},
     {$group: {_id: "$a", s: {$sum: "$b"}, $doingMerge: true}}
 ]);
 assert.neq(null, getAggPlanStage(explain, "GROUP"), explain);
+assert(explain.stages[1].hasOwnProperty("$group"));
+
+// In a sharded environment, the mongos splits a $group stage into two different stages. One is a
+// merge $group stage at the mongos-side which does the global aggregation and the other is a $group
+// stage at the shard-side which does the partial aggregation. The shard-side $group stage is
+// requested with 'needsMerge' and 'fromMongos' flags set to true from the mongos, which we should
+// block from being pushed down to SBE until we implement 'needsMerge' behavior for each
+// accumulator.
+//
+// TODO SERVER-59070 Remove the following test case after implementing 'needsMerge' behavior.
+explain = coll.runCommand({
+    aggregate: coll.getName(),
+    explain: true,
+    pipeline: [{$group: {_id: "$item"}}],
+    needsMerge: true,
+    fromMongos: true,
+    cursor: {}
+});
+assert.eq(null, getAggPlanStage(explain, "GROUP"), explain);
 assert(explain.stages[1].hasOwnProperty("$group"));
 })();
