@@ -20,6 +20,20 @@ function insertDocs(coll) {
     }
 }
 
+// A list of connections to all the nodes currently being used by the test.
+let connsToAllNodes = [];
+
+/**
+ * Prevents premature maxTimeMS expiration by enabling the "maxTimeNeverTimeOut" failpoint on each
+ * node under test.
+ */
+function prohibitMaxTimeExpiration() {
+    for (const conn of connsToAllNodes) {
+        assert.commandWorked(conn.getDB("admin").runCommand(
+            {configureFailPoint: "maxTimeNeverTimeOut", mode: "alwaysOn"}));
+    }
+}
+
 /**
  * Wait until the server sets its CurOp "msg" to the failpoint name, indicating that it's
  * hanging.
@@ -55,12 +69,8 @@ function forceAggregationToHangAndCheckMaxTimeMsExpires(
 
     assert.commandWorked(failPointConn.getDB("admin").runCommand(failpointCommand));
 
-    // Make sure we don't run out of time on either of the involved nodes before the failpoint is
-    // hit.
-    assert.commandWorked(conn.getDB("admin").runCommand(
-        {configureFailPoint: "maxTimeNeverTimeOut", mode: "alwaysOn"}));
-    assert.commandWorked(maxTimeMsConn.getDB("admin").runCommand(
-        {configureFailPoint: "maxTimeNeverTimeOut", mode: "alwaysOn"}));
+    // Make sure we don't run out of time on any of the involved nodes before the failpoint is hit.
+    prohibitMaxTimeExpiration();
 
     // Build the parallel shell function.
     let shellStr = `const testDB = db.getSiblingDB('${kDBName}');`;
@@ -136,6 +146,7 @@ function runUnshardedTest(conn, primaryConn, maxTimeMsConn) {
 (function() {
 const conn = MongoRunner.runMongod({});
 assert.neq(null, conn, 'mongod was unable to start up');
+connsToAllNodes = [conn];
 insertDocs(conn.getDB(kDBName)[kSourceCollName]);
 runUnshardedTest(conn, conn, conn);
 MongoRunner.stopMongod(conn);
@@ -149,6 +160,7 @@ replTest.initiate();
 replTest.awaitReplication();
 const primary = replTest.getPrimary();
 const secondary = replTest.getSecondary();
+connsToAllNodes = [primary, secondary];
 insertDocs(primary.getDB(kDBName)[kSourceCollName]);
 // Run the $out on the primary and test that the maxTimeMS times out on the primary.
 runUnshardedTest(primary, primary, primary);
