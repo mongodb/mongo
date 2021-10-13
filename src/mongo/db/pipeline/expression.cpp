@@ -3120,11 +3120,15 @@ public:
         } else {
             doubleProduct *= val.coerceToDouble();
 
-            if (!std::isfinite(val.coerceToDouble()) ||
-                overflow::mul(longProduct, val.coerceToLong(), &longProduct)) {
-                // The number is either Infinity or NaN, or the 'longProduct' would have
-                // overflowed, so we're abandoning it.
-                productType = NumberDouble;
+            if (productType != NumberDouble) {
+                // If `productType` is not a double, it must be one of the integer types, so we
+                // attempt to update `longProduct`.
+                if (!std::isfinite(val.coerceToDouble()) ||
+                    overflow::mul(longProduct, val.coerceToLong(), &longProduct)) {
+                    // The multiplier is either Infinity or NaN, or the `longProduct` would
+                    // have overflowed, so we're abandoning it.
+                    productType = NumberDouble;
+                }
             }
         }
     }
