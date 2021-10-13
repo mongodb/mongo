@@ -54,4 +54,11 @@ void setClientIsFromLoadBalancer(Client* client);
  */
 void handleHello(OperationContext* opCtx, BSONObjBuilder* result, bool helloHasLoadBalancedOption);
 
+bool isFromLoadBalancer(Client* client);
+
+/**
+ * Returns whether the feature flag for load balancer support is enabled.
+ */
+bool isEnabled();
+
 }  // namespace mongo::load_balancer_support

@@ -46,6 +46,8 @@ public:
     using ServiceEntryPointImpl::ServiceEntryPointImpl;
     Future<DbResponse> handleRequest(OperationContext* opCtx,
                                      const Message& request) noexcept override;
+
+    void onClientDisconnect(Client* client) override;
 };
 
 }  // namespace mongo

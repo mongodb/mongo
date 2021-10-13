@@ -49,6 +49,9 @@
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/warn_deprecated_wire_ops.h"
 #include "mongo/s/commands/strategy.h"
+#include "mongo/s/grid.h"
+#include "mongo/s/load_balancer_support.h"
+#include "mongo/s/query/cluster_cursor_manager.h"
 
 namespace mongo {
 
@@ -203,4 +206,14 @@ Future<DbResponse> ServiceEntryPointMongos::handleRequest(OperationContext* opCt
     return hr->run();
 }
 
+void ServiceEntryPointMongos::onClientDisconnect(Client* client) {
+    if (load_balancer_support::isFromLoadBalancer(client)) {
+        auto ccm = Grid::get(client->getServiceContext())->getCursorManager();
+        auto killerOperationContext = client->makeOperationContext();
+        ccm->killCursorsSatisfying(killerOperationContext.get(),
+                                   [&](CursorId, const ClusterCursorManager::CursorEntry& entry) {
+                                       return entry.originatingClientUuid() == client->getUUID();
+                                   });
+    }
+}
 }  // namespace mongo

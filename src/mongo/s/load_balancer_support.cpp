@@ -45,11 +45,6 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(clientIsFromLoadBalancer);
 
-bool featureEnabled() {
-    return feature_flags::gFeatureFlagLoadBalancer.isEnabled(
-        serverGlobalParams.featureCompatibility);
-}
-
 struct PerService {
     /**
      * When a client reaches a mongos through a load balancer, the `serviceId`
@@ -92,15 +87,20 @@ const auto getPerServiceState = ServiceContext::declareDecoration<PerService>();
 const auto getPerClientState = Client::declareDecoration<PerClient>();
 }  // namespace
 
+bool isEnabled() {
+    return feature_flags::gFeatureFlagLoadBalancer.isEnabled(
+        serverGlobalParams.featureCompatibility);
+}
+
 void setClientIsFromLoadBalancer(Client* client) {
-    if (!featureEnabled())
+    if (!isEnabled())
         return;
     auto& perClient = getPerClientState(client);
     perClient.setIsFromLoadBalancer();
 }
 
 void handleHello(OperationContext* opCtx, BSONObjBuilder* result, bool helloHasLoadBalancedOption) {
-    if (!featureEnabled())
+    if (!isEnabled())
         return;
     auto& perClient = getPerClientState(opCtx->getClient());
     if (perClient.didHello() || !perClient.isFromLoadBalancer())
@@ -115,4 +115,10 @@ void handleHello(OperationContext* opCtx, BSONObjBuilder* result, bool helloHasL
     perClient.setDidHello();
 }
 
+bool isFromLoadBalancer(Client* client) {
+    if (!isEnabled()) {
+        return false;
+    }
+    return getPerClientState(client).isFromLoadBalancer();
+}
 }  // namespace mongo::load_balancer_support

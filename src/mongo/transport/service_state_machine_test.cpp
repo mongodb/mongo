@@ -258,6 +258,10 @@ public:
         return _data->isConnected.load();
     }
 
+    int onClientDisconnectCalledTimes() const {
+        return _onClientDisconnectCalled;
+    }
+
     friend constexpr StringData toString(FailureCondition fail) {
         switch (fail) {
             case FailureCondition::kNone:
@@ -452,6 +456,10 @@ private:
         _stateQueue.push(IngressState::kEnd);
     }
 
+    void _onClientDisconnect() {
+        ++_onClientDisconnectCalled;
+    }
+
     const boost::optional<ServiceExecutor::ThreadingModel> _threadingModel;
     boost::optional<ServiceExecutor::ThreadingModel> _originalThreadingModel;
 
@@ -463,6 +471,8 @@ private:
 
     std::shared_ptr<ServiceStateMachineTest::Session> _session;
     SingleProducerSingleConsumerQueue<IngressState> _stateQueue;
+
+    int _onClientDisconnectCalled{0};
 };
 
 /**
@@ -550,6 +560,11 @@ public:
 
     void onEndSession(const transport::SessionHandle& session) override {
         _fixture->_cleanup(session);
+    }
+
+    void onClientDisconnect(Client* client) override {
+        invariant(client);
+        _fixture->_onClientDisconnect();
     }
 
 private:
@@ -792,6 +807,17 @@ TEST_F(ServiceStateMachineTest, EndBeforeStartSession) {
     initNewSession();
     endSession();
     startSession();
+}
+
+TEST_F(ServiceStateMachineTest, OnClientDisconnectCalledOnCleanup) {
+    initNewSession();
+    startSession();
+    ASSERT_EQ(popIngressState(), IngressState::kSource);
+    ASSERT_EQ(onClientDisconnectCalledTimes(), 0);
+    endSession();
+    ASSERT_EQ(popIngressState(), IngressState::kEnd);
+    joinSession();
+    ASSERT_EQ(onClientDisconnectCalledTimes(), 1);
 }
 
 TEST_F(ServiceStateMachineWithDedicatedThreadsTest, DefaultLoop) {

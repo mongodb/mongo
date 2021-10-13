@@ -527,6 +527,7 @@ env.Library(
         'client/sharding_client',
         'commands/cluster_commands',
         'committed_optime_metadata_hook',
+        'load_balancer_support',
         'mongos_initializers',
         'mongos_topology_coordinator',
         'query/cluster_cursor_cleanup_job',
