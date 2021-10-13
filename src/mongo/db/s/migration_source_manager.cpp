@@ -129,8 +129,8 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
       _stats(ShardingStatistics::get(_opCtx)),
       _critSecReason(BSON("command"
                           << "moveChunk"
-                          << "fromShard" << request.getFromShardId() << "toShard"
-                          << request.getToShardId())) {
+                          << "fromShard" << _args.getFromShardId() << "toShard"
+                          << _args.getToShardId())) {
     invariant(!_opCtx->lockState()->isLocked());
 
     LOGV2(22016,
