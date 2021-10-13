@@ -1333,7 +1333,7 @@ Status IndexCatalogImpl::_indexKeys(OperationContext* opCtx,
             }
         }
 
-        int64_t inserted;
+        int64_t inserted = 0;
         status = index->indexBuildInterceptor()->sideWrite(opCtx,
                                                            keys,
                                                            multikeyMetadataKeys,
@@ -1345,7 +1345,7 @@ Status IndexCatalogImpl::_indexKeys(OperationContext* opCtx,
             *keysInsertedOut += inserted;
         }
     } else {
-        int64_t numInserted;
+        int64_t numInserted = 0;
         status = index->accessMethod()->insertKeysAndUpdateMultikeyPaths(
             opCtx,
             coll,
@@ -1508,7 +1508,7 @@ void IndexCatalogImpl::_unindexKeys(OperationContext* opCtx,
             }
         }
 
-        int64_t removed;
+        int64_t removed = 0;
         fassert(31155,
                 index->indexBuildInterceptor()->sideWrite(
                     opCtx, keys, {}, {}, loc, IndexBuildInterceptor::Op::kDelete, &removed));
@@ -1528,7 +1528,7 @@ void IndexCatalogImpl::_unindexKeys(OperationContext* opCtx,
     // duplicates. See SERVER-17487 for more details.
     options.dupsAllowed = options.dupsAllowed || !index->isReady(opCtx, collection);
 
-    int64_t removed;
+    int64_t removed = 0;
     Status status = index->accessMethod()->removeKeys(opCtx, keys, loc, options, &removed);
 
     if (!status.isOK()) {
