@@ -107,8 +107,8 @@ BSONObj AsyncDBClient::_buildIsMasterRequest(const std::string& appName,
 void AsyncDBClient::_parseIsMasterResponse(BSONObj request,
                                            const std::unique_ptr<rpc::ReplyInterface>& response) {
     uassert(50786,
-            "Expected opQuery response to isMaster",
-            response->getProtocol() == rpc::Protocol::kOpQuery);
+            "Expected OP_MSG response to isMaster",
+            response->getProtocol() == rpc::Protocol::kOpMsg);
     auto wireSpec = WireSpec::instance().get();
     auto responseBody = response->getCommandReply();
     uassertStatusOK(getStatusFromCommandResult(responseBody));
@@ -233,16 +233,10 @@ Future<bool> AsyncDBClient::completeSpeculativeAuth(std::shared_ptr<SaslClientSe
 Future<void> AsyncDBClient::initWireVersion(const std::string& appName,
                                             executor::NetworkConnectionHook* const hook) {
     auto requestObj = _buildIsMasterRequest(appName, hook);
-    // We use a legacy request to create our ismaster request because we may
-    // have to communicate with servers that do not support other protocols.
-    auto requestMsg = makeDeprecatedQueryMessage("admin.$cmd",
-                                                 requestObj,
-                                                 1 /*nToReturn*/,
-                                                 0 /*nToSkip*/,
-                                                 nullptr /*fieldsToReturn*/,
-                                                 0 /*queryOptions*/);
+    auto opMsgRequest = OpMsgRequest::fromDBAndBody("admin", requestObj);
+
     auto msgId = nextMessageId();
-    return _call(requestMsg, msgId)
+    return _call(opMsgRequest.serialize(), msgId)
         .then([msgId, this]() { return _waitForResponse(msgId); })
         .then([this, requestObj, hook, timer = Timer{}](Message response) {
             auto cmdReply = rpc::makeReply(&response);

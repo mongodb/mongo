@@ -85,6 +85,23 @@ Message makeDeprecatedKillCursorsMessage(long long cursorId) {
     });
 }
 
+Message makeDeprecatedQueryMessage(StringData ns,
+                                   BSONObj query,
+                                   int nToReturn,
+                                   int nToSkip,
+                                   const BSONObj* fieldsToReturn,
+                                   int queryOptions) {
+    return makeMessage(dbQuery, [&](BufBuilder& b) {
+        b.appendNum(queryOptions);
+        b.appendStr(ns);
+        b.appendNum(nToSkip);
+        b.appendNum(nToReturn);
+        query.appendSelfToBufBuilder(b);
+        if (fieldsToReturn)
+            fieldsToReturn->appendSelfToBufBuilder(b);
+    });
+}
+
 Message makeDeprecatedGetMoreMessage(StringData ns, long long cursorId, int nToReturn, int flags) {
     return makeMessage(dbGetMore, [&](BufBuilder& b) {
         b.appendNum(flags);

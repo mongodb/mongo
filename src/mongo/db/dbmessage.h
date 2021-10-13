@@ -416,16 +416,6 @@ Message makeMessage(NetworkOp op, Func&& bodyBuilder) {
     return out;
 }
 
-/**
- * Builds a legacy OP_QUERY message.
- */
-Message makeDeprecatedQueryMessage(StringData ns,
-                                   BSONObj query,
-                                   int nToReturn,
-                                   int nToSkip,
-                                   const BSONObj* fieldsToReturn,
-                                   int queryOptions);
-
 enum InsertOptions {
     /**
      * With muli-insert keep processing inserts if one fails.
@@ -435,6 +425,9 @@ enum InsertOptions {
 
 /**
  * Builds a legacy OP_INSERT message.
+ *
+ * The OP_INSERT command is no longer supported, so new callers of this function should not be
+ * added! This is currently retained for the limited purpose of unit testing.
  */
 Message makeDeprecatedInsertMessage(StringData ns,
                                     const BSONObj* objs,
