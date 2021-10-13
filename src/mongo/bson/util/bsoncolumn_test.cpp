@@ -296,6 +296,11 @@ public:
         builder.appendChar(control << 4 | count);
     }
 
+    static void appendInterleavedStart(BufBuilder& builder, BSONObj reference) {
+        builder.appendChar((char)0xF0);
+        builder.appendBuf(reference.objdata(), reference.objsize());
+    }
+
     template <typename T>
     static void _appendSimple8bBlock(BufBuilder& builder, boost::optional<T> val) {
         auto prev = builder.len();
@@ -445,6 +450,8 @@ public:
     }
 
     const boost::optional<uint64_t> kDeltaForBinaryEqualValues = Simple8bTypeUtil::encodeInt64(0);
+    const boost::optional<uint128_t> kDeltaForBinaryEqualValues128 =
+        Simple8bTypeUtil::encodeInt128(0);
 
 private:
     std::forward_list<BSONObj> _elementMemory;
@@ -2276,6 +2283,344 @@ TEST_F(BSONColumnTest, ArrayEqual) {
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
     verifyDecompression(binData, elems);
+}
+
+TEST_F(BSONColumnTest, Interleaved) {
+    std::vector<BSONElement> elems = {createElementObj(BSON("x" << 1 << "y" << 2)),
+                                      createElementObj(BSON("x" << 1 << "y" << 3)),
+                                      createElementObj(BSON("x" << 1 << "y" << 3)),
+                                      BSONElement(),
+                                      createElementObj(BSON("y" << 4)),
+                                      createElementObj(BSON("x" << 1 << "y" << 3))};
+
+    BufBuilder expected;
+    appendElementCount(expected, elems.size());
+    appendInterleavedStart(expected, elems.front().Obj());
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected,
+                           {kDeltaForBinaryEqualValues,
+                            deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd]),
+                            deltaInt32(elems[2].Obj()["x"_sd], elems[1].Obj()["x"_sd]),
+                            boost::none,
+                            boost::none,
+                            deltaInt32(elems[5].Obj()["x"_sd], elems[2].Obj()["x"_sd])},
+                           1);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected,
+                           {kDeltaForBinaryEqualValues,
+                            deltaInt32(elems[1].Obj()["y"_sd], elems[0].Obj()["y"_sd]),
+                            deltaInt32(elems[2].Obj()["y"_sd], elems[1].Obj()["y"_sd]),
+                            boost::none,
+                            deltaInt32(elems[4].Obj()["y"_sd], elems[2].Obj()["y"_sd]),
+                            deltaInt32(elems[5].Obj()["y"_sd], elems[4].Obj()["y"_sd])},
+                           1);
+    appendEOO(expected);
+    appendEOO(expected);
+
+    BSONBinData data;
+    data.data = expected.buf();
+    data.length = expected.len();
+    data.type = BinDataType::Column;
+    verifyDecompression(data, elems);
+}
+
+TEST_F(BSONColumnTest, InterleavedAfterNonInterleaved) {
+    std::vector<BSONElement> elems = {createElementInt32(1),
+                                      createElementObj(BSON("x" << 1 << "y" << 2)),
+                                      createElementObj(BSON("x" << 1 << "y" << 3)),
+                                      createElementObj(BSON("x" << 2 << "y" << 4))};
+
+    BufBuilder expected;
+    appendElementCount(expected, elems.size());
+    appendLiteral(expected, elems.front());
+    appendInterleavedStart(expected, elems[1].Obj());
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected,
+                           {kDeltaForBinaryEqualValues,
+                            deltaInt32(elems[2].Obj()["x"_sd], elems[1].Obj()["x"_sd]),
+                            deltaInt32(elems[3].Obj()["x"_sd], elems[2].Obj()["x"_sd])},
+                           1);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected,
+                           {kDeltaForBinaryEqualValues,
+                            deltaInt32(elems[2].Obj()["y"_sd], elems[1].Obj()["y"_sd]),
+                            deltaInt32(elems[3].Obj()["y"_sd], elems[2].Obj()["y"_sd])},
+                           1);
+    appendEOO(expected);
+    appendEOO(expected);
+
+    BSONBinData data;
+    data.data = expected.buf();
+    data.length = expected.len();
+    data.type = BinDataType::Column;
+    verifyDecompression(data, elems);
+}
+
+TEST_F(BSONColumnTest, InterleavedLevels) {
+    std::vector<BSONElement> elems = {createElementObj(BSON("root" << BSON("x" << 1) << "y" << 2)),
+                                      createElementObj(BSON("root" << BSON("x" << 2) << "y" << 5)),
+                                      createElementObj(BSON("root" << BSON("x" << 2) << "y" << 5))};
+
+    BufBuilder expected;
+    appendElementCount(expected, elems.size());
+    appendInterleavedStart(expected, elems.front().Obj());
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected,
+                           {kDeltaForBinaryEqualValues,
+                            deltaInt32(elems[1].Obj()["root"_sd].Obj()["x"_sd],
+                                       elems[0].Obj()["root"_sd].Obj()["x"_sd]),
+                            deltaInt32(elems[2].Obj()["root"_sd].Obj()["x"_sd],
+                                       elems[1].Obj()["root"_sd].Obj()["x"_sd])},
+                           1);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected,
+                           {kDeltaForBinaryEqualValues,
+                            deltaInt32(elems[1].Obj()["y"_sd], elems[0].Obj()["y"_sd]),
+                            deltaInt32(elems[2].Obj()["y"_sd], elems[1].Obj()["y"_sd])},
+                           1);
+    appendEOO(expected);
+    appendEOO(expected);
+
+    BSONBinData data;
+    data.data = expected.buf();
+    data.length = expected.len();
+    data.type = BinDataType::Column;
+    verifyDecompression(data, elems);
+}
+
+TEST_F(BSONColumnTest, InterleavedDoubleDifferentScale) {
+    std::vector<BSONElement> elems = {createElementObj(BSON("x" << 1.0 << "y" << 2.0)),
+                                      createElementObj(BSON("x" << 1.1 << "y" << 3.0)),
+                                      createElementObj(BSON("x" << 1.2 << "y" << 2.0)),
+                                      createElementObj(BSON("x" << 1.0)),
+                                      createElementObj(BSON("x" << 1.5 << "y" << 2.0))};
+
+    BufBuilder expected;
+    appendElementCount(expected, elems.size());
+    appendInterleavedStart(expected, elems.front().Obj());
+    appendSimple8bControl(expected, 0b1010, 0b0000);
+    appendSimple8bBlocks64(expected,
+                           {kDeltaForBinaryEqualValues,
+                            deltaDouble(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd], 10),
+                            deltaDouble(elems[2].Obj()["x"_sd], elems[1].Obj()["x"_sd], 10),
+                            deltaDouble(elems[3].Obj()["x"_sd], elems[2].Obj()["x"_sd], 10),
+                            deltaDouble(elems[4].Obj()["x"_sd], elems[3].Obj()["x"_sd], 10)},
+                           1);
+    appendSimple8bControl(expected, 0b1001, 0b0000);
+    appendSimple8bBlocks64(expected,
+                           {kDeltaForBinaryEqualValues,
+                            deltaDouble(elems[1].Obj()["y"_sd], elems[0].Obj()["y"_sd], 1),
+                            deltaDouble(elems[2].Obj()["y"_sd], elems[1].Obj()["y"_sd], 1),
+                            boost::none,
+                            deltaDouble(elems[4].Obj()["y"_sd], elems[2].Obj()["y"_sd], 1)},
+                           1);
+    appendEOO(expected);
+    appendEOO(expected);
+
+    BSONBinData data;
+    data.data = expected.buf();
+    data.length = expected.len();
+    data.type = BinDataType::Column;
+    verifyDecompression(data, elems);
+}
+
+TEST_F(BSONColumnTest, InterleavedMix64And128Bit) {
+    std::vector<BSONElement> elems = {createElementObj(BSON("x" << 1 << "y"
+                                                                << "count0")),
+                                      createElementObj(BSON("x" << 2 << "y"
+                                                                << "count1")),
+                                      createElementObj(BSON("x" << 3 << "y"
+                                                                << "count2")),
+                                      createElementObj(BSON("x" << 4)),
+                                      createElementObj(BSON("x" << 5 << "y"
+                                                                << "count3"))};
+
+    BufBuilder expected;
+    appendElementCount(expected, elems.size());
+    appendInterleavedStart(expected, elems.front().Obj());
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected,
+                           {kDeltaForBinaryEqualValues,
+                            deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd]),
+                            deltaInt32(elems[2].Obj()["x"_sd], elems[1].Obj()["x"_sd]),
+                            deltaInt32(elems[3].Obj()["x"_sd], elems[2].Obj()["x"_sd]),
+                            deltaInt32(elems[4].Obj()["x"_sd], elems[3].Obj()["x"_sd])},
+                           1);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks128(expected,
+                            {kDeltaForBinaryEqualValues128,
+                             deltaString(elems[1].Obj()["y"_sd], elems[0].Obj()["y"_sd]),
+                             deltaString(elems[2].Obj()["y"_sd], elems[1].Obj()["y"_sd]),
+                             boost::none,
+                             deltaString(elems[4].Obj()["y"_sd], elems[2].Obj()["y"_sd])},
+                            1);
+    appendEOO(expected);
+    appendEOO(expected);
+
+    BSONBinData data;
+    data.data = expected.buf();
+    data.length = expected.len();
+    data.type = BinDataType::Column;
+    verifyDecompression(data, elems);
+}
+
+TEST_F(BSONColumnTest, InterleavedWithEmptySubObj) {
+    std::vector<BSONElement> elems = {
+        createElementObj(BSON("x" << 1 << "y" << BSONObjBuilder().obj())),
+        createElementObj(BSON("x" << 2 << "y" << BSONObjBuilder().obj())),
+        createElementObj(BSON("x" << 3 << "y" << BSONObjBuilder().obj()))};
+
+    BufBuilder expected;
+    appendElementCount(expected, elems.size());
+    appendInterleavedStart(expected, elems.front().Obj());
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected,
+                           {kDeltaForBinaryEqualValues,
+                            deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd]),
+                            deltaInt32(elems[2].Obj()["x"_sd], elems[1].Obj()["x"_sd])},
+                           1);
+    appendEOO(expected);
+    appendEOO(expected);
+
+    BSONBinData data;
+    data.data = expected.buf();
+    data.length = expected.len();
+    data.type = BinDataType::Column;
+    verifyDecompression(data, elems);
+}
+
+TEST_F(BSONColumnTest, InterleavedSchemaChange) {
+    std::vector<BSONElement> elems = {createElementObj(BSON("x" << 1 << "y" << 2)),
+                                      createElementObj(BSON("x" << 1 << "y" << 3)),
+                                      createElementObj(BSON("x" << 1 << "y" << 3.0)),
+                                      createElementObj(BSON("x" << 1 << "y" << 4.0))};
+
+    BufBuilder expected;
+    appendElementCount(expected, elems.size());
+    appendInterleavedStart(expected, elems.front().Obj());
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected,
+                           {kDeltaForBinaryEqualValues,
+                            deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd]),
+                            deltaInt32(elems[2].Obj()["x"_sd], elems[1].Obj()["x"_sd]),
+                            deltaInt32(elems[3].Obj()["x"_sd], elems[2].Obj()["x"_sd])},
+                           1);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(
+        expected,
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["y"_sd], elems[0].Obj()["y"_sd])},
+        1);
+    appendLiteral(expected, elems[2].Obj()["y"_sd]);
+    appendSimple8bControl(expected, 0b1001, 0b0000);
+    appendSimple8bBlocks64(
+        expected, {deltaDouble(elems[3].Obj()["y"_sd], elems[2].Obj()["y"_sd], 1)}, 1);
+    appendEOO(expected);
+    appendEOO(expected);
+
+    BSONBinData data;
+    data.data = expected.buf();
+    data.length = expected.len();
+    data.type = BinDataType::Column;
+    verifyDecompression(data, elems);
+}
+
+TEST_F(BSONColumnTest, ReenterInterleaved) {
+    std::vector<BSONElement> elems = {createElementObj(BSON("x" << 1 << "y" << 2)),
+                                      createElementObj(BSON("x" << 1 << "y" << 3)),
+                                      createElementInt32(1),
+                                      createElementObj(BSON("x" << 2 << "y" << 2 << "z" << 2)),
+                                      createElementObj(BSON("x" << 5 << "y" << 3 << "z" << 3))};
+
+    BufBuilder expected;
+    appendElementCount(expected, elems.size());
+    appendInterleavedStart(expected, elems.front().Obj());
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(
+        expected,
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd])},
+        1);
+    appendSimple8bControl(expected, 0b1001, 0b0000);
+    appendSimple8bBlocks64(
+        expected,
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[1].Obj()["y"_sd], elems[0].Obj()["y"_sd])},
+        1);
+    appendEOO(expected);
+    appendLiteral(expected, elems[2]);
+    appendInterleavedStart(expected, elems[3].Obj());
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(
+        expected,
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[4].Obj()["x"_sd], elems[3].Obj()["x"_sd])},
+        1);
+    appendSimple8bControl(expected, 0b1001, 0b0000);
+    appendSimple8bBlocks64(
+        expected,
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[4].Obj()["y"_sd], elems[3].Obj()["y"_sd])},
+        1);
+    appendSimple8bControl(expected, 0b1001, 0b0000);
+    appendSimple8bBlocks64(
+        expected,
+        {kDeltaForBinaryEqualValues, deltaInt32(elems[4].Obj()["z"_sd], elems[3].Obj()["z"_sd])},
+        1);
+    appendEOO(expected);
+    appendEOO(expected);
+
+    BSONBinData data;
+    data.data = expected.buf();
+    data.length = expected.len();
+    data.type = BinDataType::Column;
+    verifyDecompression(data, elems);
+}
+
+TEST_F(BSONColumnTest, InterleavedAlternating) {
+    std::vector<BSONElement> elems = {createElementObj(BSON("x" << 1)),
+                                      createElementObj(BSON("y" << 2)),
+                                      createElementObj(BSON("z" << 3)),
+                                      createElementObj(BSON("x" << 2)),
+                                      createElementObj(BSON("y" << 3)),
+                                      createElementObj(BSON("z" << 4))};
+
+    BufBuilder expected;
+    appendElementCount(expected, elems.size());
+    appendInterleavedStart(expected,
+                           BSON("x" << elems[0].Obj().firstElement().Int() << "y"
+                                    << elems[1].Obj().firstElement().Int() << "z"
+                                    << elems[2].Obj().firstElement().Int()));
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected,
+                           {kDeltaForBinaryEqualValues,
+                            boost::none,
+                            boost::none,
+                            deltaInt32(elems[3].Obj()["x"_sd], elems[0].Obj()["x"_sd]),
+                            boost::none,
+                            boost::none},
+                           1);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected,
+                           {boost::none,
+                            kDeltaForBinaryEqualValues,
+                            boost::none,
+                            boost::none,
+                            deltaInt32(elems[4].Obj()["y"_sd], elems[1].Obj()["y"_sd]),
+                            boost::none},
+                           1);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected,
+                           {boost::none,
+                            boost::none,
+                            kDeltaForBinaryEqualValues,
+                            boost::none,
+                            boost::none,
+                            deltaInt32(elems[5].Obj()["z"_sd], elems[2].Obj()["z"_sd])},
+                           1);
+    appendEOO(expected);
+    appendEOO(expected);
+
+    BSONBinData data;
+    data.data = expected.buf();
+    data.length = expected.len();
+    data.type = BinDataType::Column;
+    verifyDecompression(data, elems);
 }
 
 TEST_F(BSONColumnTest, InvalidControlByte) {
