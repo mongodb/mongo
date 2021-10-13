@@ -7193,6 +7193,30 @@ tasks:
         args:
           - "./src/evergreen/feature_flag_tags_check.sh"
 
+- name: antithesis_image_build
+  tags: ["antithesis"]
+  # this is not patchable to avoid hitting the docker registry excessively.
+  # When iterating on this task, feel free to make this patchable for
+  # testing purposes. Your image changes will be pushed with the
+  # evergreen-patch tag, so as to not clobber the waterfall
+  patchable: false
+  depends_on:
+  - name: archive_dist_test_debug
+  commands:
+  - *f_expansions_write
+  - func: "git get project no modules"
+  - func: "f_expansions_write"
+  - func: "kill processes"
+  - func: "cleanup environment"
+  - func: "set up venv"
+  - func: "do setup"
+  # TODO SERVER-60619 download debug symbols and put them where needed.
+  - command: subprocess.exec
+    params:
+      binary: bash
+      args:
+        - "./src/evergreen/antithesis_image_build.sh"
+
 #######################################
 #             Task Groups             #
 #######################################
@@ -7697,6 +7721,9 @@ buildvariants:
   - name: compile_ninja_TG
     distros:
     - ubuntu1804-build
+  - name: .antithesis
+    distros:
+    - ubuntu1804-large
   - name: build_variant_gen
   - name: .aggfuzzer .common
   - name: audit
@@ -12283,3 +12310,23 @@ buildvariants:
     test_flags: >-
       --runAllFeatureFlagTests
       --excludeWithAnyTags=resource_intensive
+
+- name: enterprise-ubuntu1804-64-libvoidstar
+  display_name: ~ Enterprise Ubuntu 18.04 w/ libvoidstar
+  cron: "0 0 * * FRI" # Every week starting 00:00 on Friday
+  modules:
+  - enterprise
+  run_on:
+  - ubuntu1804-large
+  stepback: false
+  expansions:
+    compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars CCFLAGS="-fsanitize-coverage=trace-pc-guard" LIBS="voidstar"
+    multiversion_platform: ubuntu1804
+    multiversion_edition: enterprise
+    repo_edition: enterprise
+    large_distro_name: ubuntu1804-build
+    use_scons_cache: false
+    scons_cache_scope: "none"
+  tasks:
+  - name: compile_and_archive_dist_test_TG
+  - name: .antithesis

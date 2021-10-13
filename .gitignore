@@ -222,3 +222,9 @@ default.profraw
 /rpmbuild
 /repo
 /rpm/tmp
+
+# antithesis image building assets
+/buildscripts/antithesis/database/dist-test
+/buildscripts/antithesis/workload/src
+/buildscripts/antithesis/workload/mongo
+/buildscripts/resmokeconfig/suites/antithesis_*.yml
