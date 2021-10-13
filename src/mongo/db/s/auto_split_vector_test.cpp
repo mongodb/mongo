@@ -224,6 +224,7 @@ public:
     }
 };
 
+/*
 // Test that last split points are recalculated fairly (if the surplus allows so)
 TEST_F(RepositionLastSplitPointsTest, RandomRepositioningTest) {
     PseudoRandom random(SecureRandom().nextInt64());
@@ -243,6 +244,7 @@ TEST_F(RepositionLastSplitPointsTest, RandomRepositioningTest) {
         checkRepositioning(maxDocsPerChunk, surplus, nSplitPointsToReposition);
     }
 }
+*/
 
 }  // namespace
 }  // namespace mongo
