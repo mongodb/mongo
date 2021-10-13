@@ -12265,5 +12265,4 @@ buildvariants:
     max_sub_suites: 3
     test_flags: >-
       --runAllFeatureFlagTests
-      --additionalFeatureFlags=featureFlagSbePlanCache
       --excludeWithAnyTags=resource_intensive
