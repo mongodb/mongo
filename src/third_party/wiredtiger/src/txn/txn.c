@@ -1181,6 +1181,7 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
     WT_CURSOR_BTREE *cbt;
     WT_DECL_RET;
     WT_ITEM hs_recno_key;
+    WT_PAGE *page;
     WT_TXN *txn;
     WT_UPDATE *first_committed_upd, *fix_upd, *tombstone, *upd;
 #ifdef HAVE_DIAGNOSTIC
@@ -1239,6 +1240,14 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
         ;
 
     /*
+     * Get the underlying btree and the in-memory page with the prepared updates that are to be
+     * resolved. The hazard pointer on the page is already acquired during the cursor search
+     * operation to prevent eviction evicting the page while resolving the prepared updates.
+     */
+    cbt = (WT_CURSOR_BTREE *)(*cursorp);
+    page = cbt->ref->page;
+
+    /*
      * Locate the previous update from the history store and append it to the update chain if
      * required. We know there may be content in the history store if the prepared update is written
      * to the disk image or first committed update older than the prepared update is marked as
@@ -1262,7 +1271,6 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
       first_committed_upd != NULL && F_ISSET(first_committed_upd, WT_UPDATE_HS);
     if (prepare_on_disk || first_committed_upd_in_hs) {
         btree = S2BT(session);
-        cbt = (WT_CURSOR_BTREE *)(*cursorp);
 
         /*
          * Open a history store table cursor and scan the history store for the given btree and key
@@ -1305,8 +1313,8 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
             WT_ERR(ret);
             tombstone = NULL;
         } else if (ret == 0)
-            WT_ERR(__txn_locate_hs_record(session, hs_cursor, cbt->ref->page, upd, commit, &fix_upd,
-              &upd_appended, first_committed_upd));
+            WT_ERR(__txn_locate_hs_record(
+              session, hs_cursor, page, upd, commit, &fix_upd, &upd_appended, first_committed_upd));
         else
             ret = 0;
     }
@@ -1368,8 +1376,7 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
     }
 
     /* Mark the page dirty once the prepared updates are resolved. */
-    cbt = (WT_CURSOR_BTREE *)(*cursorp);
-    __wt_page_modify_set(session, cbt->ref->page);
+    __wt_page_modify_set(session, page);
 
     /*
      * Fix the history store contents if they exist, when there are no more updates in the update
