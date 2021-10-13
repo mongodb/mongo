@@ -32,6 +32,7 @@
 #include <limits>
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/client.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/future.h"
@@ -101,6 +102,13 @@ public:
      * This function implies that the Session itself will soon be destructed.
      */
     virtual void onEndSession(const transport::SessionHandle&) {}
+
+    /**
+     * Optional handler which is invoked after a client disconnect. A client disconnect occurs when
+     * the connection between the mongo process and client is closed for any reason, and is defined
+     * by the destruction and cleanup of the ServiceStateMachine that manages the client.
+     */
+    virtual void onClientDisconnect(Client* client) {}
 
 protected:
     ServiceEntryPoint() = default;

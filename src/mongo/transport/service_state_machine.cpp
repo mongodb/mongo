@@ -644,9 +644,10 @@ void ServiceStateMachine::Impl::cleanupSession(const Status& status) {
     LOGV2_DEBUG(5127900, 2, "Ending session", "error"_attr = status);
 
     cleanupExhaustResources();
+    auto client = _clientStrand->getClientPointer();
+    _sep->onClientDisconnect(client);
 
     {
-        auto client = _clientStrand->getClientPointer();
         stdx::lock_guard lk(*client);
         transport::ServiceExecutorContext::reset(client);
     }

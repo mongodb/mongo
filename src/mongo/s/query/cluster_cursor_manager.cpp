@@ -234,6 +234,7 @@ StatusWith<CursorId> ClusterCursorManager::registerCursor(
                                                       cursorLifetime,
                                                       now,
                                                       authenticatedUsers,
+                                                      opCtx->getClient()->getUUID(),
                                                       opCtx->getOperationKey()));
     invariant(emplaceResult.second);
     _log.push({LogEvent::Type::kRegisterComplete, cursorId, now, nss});
@@ -408,46 +409,36 @@ void ClusterCursorManager::detachAndKillCursor(stdx::unique_lock<Latch> lk,
 
 std::size_t ClusterCursorManager::killMortalCursorsInactiveSince(OperationContext* opCtx,
                                                                  Date_t cutoff) {
-    const auto now = _clockSource->now();
-    stdx::unique_lock<Latch> lk(_mutex);
+    return killCursorsSatisfying(
+        opCtx, [cutoff](CursorId cursorId, const CursorEntry& entry) -> bool {
+            if (entry.getLifetimeType() == CursorLifetime::Immortal ||
+                entry.getOperationUsingCursor() ||
+                (entry.getLsid() && !enableTimeoutOfInactiveSessionCursors.load())) {
+                return false;
+            }
 
-    auto pred = [cutoff](CursorId cursorId, const CursorEntry& entry) -> bool {
-        if (entry.getLifetimeType() == CursorLifetime::Immortal ||
-            entry.getOperationUsingCursor() ||
-            (entry.getLsid() && !enableTimeoutOfInactiveSessionCursors.load())) {
-            return false;
-        }
+            bool res = entry.getLastActive() <= cutoff;
 
-        bool res = entry.getLastActive() <= cutoff;
+            if (res) {
+                LOGV2(22837,
+                      "Cursor timed out",
+                      "cursorId"_attr = cursorId,
+                      "idleSince"_attr = entry.getLastActive().toString());
+            }
 
-        if (res) {
-            LOGV2(22837,
-                  "Cursor timed out",
-                  "cursorId"_attr = cursorId,
-                  "idleSince"_attr = entry.getLastActive().toString());
-        }
-
-        return res;
-    };
-
-    return killCursorsSatisfying(std::move(lk), opCtx, std::move(pred), now);
+            return res;
+        });
 }
 
 void ClusterCursorManager::killAllCursors(OperationContext* opCtx) {
-    const auto now = _clockSource->now();
-    stdx::unique_lock<Latch> lk(_mutex);
-    auto pred = [](CursorId, const CursorEntry&) -> bool { return true; };
-
-    killCursorsSatisfying(std::move(lk), opCtx, std::move(pred), now);
+    killCursorsSatisfying(opCtx, [](CursorId, const CursorEntry&) -> bool { return true; });
 }
 
 std::size_t ClusterCursorManager::killCursorsSatisfying(
-    stdx::unique_lock<Latch> lk,
-    OperationContext* opCtx,
-    std::function<bool(CursorId, const CursorEntry&)> pred,
-    Date_t now) {
+    OperationContext* opCtx, const std::function<bool(CursorId, const CursorEntry&)>& pred) {
     invariant(opCtx);
-    invariant(lk.owns_lock());
+    const auto now = _clockSource->now();
+    stdx::unique_lock<Latch> lk(_mutex);
     std::size_t nKilled = 0;
 
     _log.push(

@@ -216,6 +216,151 @@ public:
     };
 
     /**
+     * CursorEntry is a movable, non-copyable container for a single cursor.
+     */
+    class CursorEntry {
+    public:
+        CursorEntry() = default;
+
+        CursorEntry(std::unique_ptr<ClusterClientCursor> cursor,
+                    CursorType cursorType,
+                    CursorLifetime cursorLifetime,
+                    Date_t lastActive,
+                    UserNameIterator authenticatedUsersIter,
+                    UUID clientUUID,
+                    boost::optional<OperationKey> opKey)
+            : _cursor(std::move(cursor)),
+              _cursorType(cursorType),
+              _cursorLifetime(cursorLifetime),
+              _lastActive(lastActive),
+              _lsid(_cursor->getLsid()),
+              _opKey(std::move(opKey)),
+              _originatingClient(std::move(clientUUID)),
+              _authenticatedUsers(
+                  userNameIteratorToContainer<std::vector<UserName>>(authenticatedUsersIter)) {
+            invariant(_cursor);
+        }
+
+        CursorEntry(const CursorEntry&) = delete;
+        CursorEntry& operator=(const CursorEntry&) = delete;
+
+        CursorEntry(CursorEntry&& other) = default;
+        CursorEntry& operator=(CursorEntry&& other) = default;
+
+        bool isKillPending() const {
+            // A cursor is kill pending if it's checked out by an OperationContext that was
+            // interrupted.
+            if (!_operationUsingCursor) {
+                return false;
+            }
+
+            // Must hold the Client lock when calling isKillPending().
+            stdx::unique_lock<Client> lk(*_operationUsingCursor->getClient());
+            return _operationUsingCursor->isKillPending();
+        }
+
+        CursorType getCursorType() const {
+            return _cursorType;
+        }
+
+        CursorLifetime getLifetimeType() const {
+            return _cursorLifetime;
+        }
+
+        Date_t getLastActive() const {
+            return _lastActive;
+        }
+
+        boost::optional<LogicalSessionId> getLsid() const {
+            return _lsid;
+        }
+
+        boost::optional<OperationKey> getOperationKey() const {
+            return _opKey;
+        }
+
+        /**
+         * Returns a cursor guard holding the cursor owned by this CursorEntry for an operation to
+         * use. Only one operation may use the cursor at a time, so callers should check that
+         * getOperationUsingCursor() returns null before using this function. Callers may not pass
+         * nullptr for opCtx. Ownership of the cursor is given to the returned
+         * ClusterClientCursorGuard; callers that want to assume ownership over the cursor directly
+         * must unpack the cursor from the returned guard.
+         */
+        ClusterClientCursorGuard releaseCursor(OperationContext* opCtx) {
+            invariant(!_operationUsingCursor);
+            invariant(_cursor);
+            invariant(opCtx);
+            _operationUsingCursor = opCtx;
+            return ClusterClientCursorGuard(opCtx, std::move(_cursor));
+        }
+
+        /**
+         * Creates a generic cursor from the cursor inside this entry. Should only be called on
+         * idle cursors. The caller must supply the cursorId and namespace because the CursorEntry
+         * does not have access to them.  Cannot be called if this CursorEntry does not own an
+         * underlying ClusterClientCursor.
+         */
+        GenericCursor cursorToGenericCursor(CursorId cursorId, const NamespaceString& ns) const;
+
+        OperationContext* getOperationUsingCursor() const {
+            return _operationUsingCursor;
+        }
+
+        /**
+         * Indicate that the cursor is no longer in use by an operation. Once this is called,
+         * another operation may check the cursor out.
+         */
+        void returnCursor(std::unique_ptr<ClusterClientCursor> cursor) {
+            invariant(cursor);
+            invariant(!_cursor);
+            invariant(_operationUsingCursor);
+
+            _cursor = std::move(cursor);
+            _operationUsingCursor = nullptr;
+        }
+
+        void setLastActive(Date_t lastActive) {
+            _lastActive = lastActive;
+        }
+
+        UserNameIterator getAuthenticatedUsers() const {
+            return makeUserNameIterator(_authenticatedUsers.begin(), _authenticatedUsers.end());
+        }
+
+        const UUID& originatingClientUuid() const {
+            return _originatingClient;
+        }
+
+    private:
+        std::unique_ptr<ClusterClientCursor> _cursor;
+        CursorType _cursorType = CursorType::SingleTarget;
+        CursorLifetime _cursorLifetime = CursorLifetime::Mortal;
+        Date_t _lastActive;
+        boost::optional<LogicalSessionId> _lsid;
+
+        /**
+         * The client OperationKey from the OperationContext at the time of registering a cursor.
+         */
+        boost::optional<OperationKey> _opKey;
+
+        /**
+         * Current operation using the cursor. Non-null if the cursor is checked out.
+         */
+        OperationContext* _operationUsingCursor = nullptr;
+
+        /**
+         * The UUID of the Client that opened the cursor.
+         */
+        UUID _originatingClient;
+
+        /**
+         * The set of users authorized to use this cursor.
+         */
+        std::vector<UserName> _authenticatedUsers;
+    };
+
+    /**
      * Constructs an empty manager.
      *
      * Does not take ownership of 'clockSource'.  'clockSource' must refer to a non-null clock
@@ -315,6 +460,12 @@ public:
     Status killCursor(OperationContext* opCtx, const NamespaceString& nss, CursorId cursorId);
 
     /**
+     * Kill the cursors satisfying the given predicate. Returns the number of cursors killed.
+     */
+    std::size_t killCursorsSatisfying(
+        OperationContext* opCtx, const std::function<bool(CursorId, const CursorEntry&)>& pred);
+
+    /**
      * Informs the manager that all mortal cursors with a 'last active' time equal to or earlier
      * than 'cutoff' should be killed.  The cursors need not necessarily be in the 'idle' state.
      *
@@ -332,7 +483,6 @@ public:
      * May block waiting for other threads to finish, but does not block on the network.
      */
     void killAllCursors(OperationContext* opCtx);
-
 
     /**
      * Returns the number of open cursors on a ClusterCursorManager, broken down by type.
@@ -387,7 +537,6 @@ public:
     }
 
 private:
-    class CursorEntry;
     struct CursorEntryContainer;
     using CursorEntryMap = stdx::unordered_map<CursorId, CursorEntry>;
     using NssToCursorContainerMap = stdx::unordered_map<NamespaceString, CursorEntryContainer>;
@@ -510,145 +659,6 @@ private:
      * Flags the OperationContext that's using the given cursor as interrupted.
      */
     void killOperationUsingCursor(WithLock, CursorEntry* entry);
-
-    /**
-     * Kill the cursors satisfying the given predicate. Assumes that 'lk' is held upon entry. The
-     * 'now' parameter is only used for the internal logging mechansim.
-     *
-     * Returns the number of cursors killed.
-     */
-    std::size_t killCursorsSatisfying(stdx::unique_lock<Latch> lk,
-                                      OperationContext* opCtx,
-                                      std::function<bool(CursorId, const CursorEntry&)> pred,
-                                      Date_t now);
-
-    /**
-     * CursorEntry is a moveable, non-copyable container for a single cursor.
-     */
-    class CursorEntry {
-        CursorEntry(const CursorEntry&) = delete;
-        CursorEntry& operator=(const CursorEntry&) = delete;
-
-    public:
-        CursorEntry() = default;
-
-        CursorEntry(std::unique_ptr<ClusterClientCursor> cursor,
-                    CursorType cursorType,
-                    CursorLifetime cursorLifetime,
-                    Date_t lastActive,
-                    UserNameIterator authenticatedUsersIter,
-                    boost::optional<OperationKey> opKey)
-            : _cursor(std::move(cursor)),
-              _cursorType(cursorType),
-              _cursorLifetime(cursorLifetime),
-              _lastActive(lastActive),
-              _lsid(_cursor->getLsid()),
-              _opKey(std::move(opKey)),
-              _authenticatedUsers(
-                  userNameIteratorToContainer<std::vector<UserName>>(authenticatedUsersIter)) {
-            invariant(_cursor);
-        }
-
-        CursorEntry(CursorEntry&& other) = default;
-        CursorEntry& operator=(CursorEntry&& other) = default;
-
-        bool isKillPending() const {
-            // A cursor is kill pending if it's checked out by an OperationContext that was
-            // interrupted.
-            if (!_operationUsingCursor) {
-                return false;
-            }
-
-            // Must hold the Client lock when calling isKillPending().
-            stdx::unique_lock<Client> lk(*_operationUsingCursor->getClient());
-            return _operationUsingCursor->isKillPending();
-        }
-
-        CursorType getCursorType() const {
-            return _cursorType;
-        }
-
-        CursorLifetime getLifetimeType() const {
-            return _cursorLifetime;
-        }
-
-        Date_t getLastActive() const {
-            return _lastActive;
-        }
-
-        boost::optional<LogicalSessionId> getLsid() const {
-            return _lsid;
-        }
-
-        boost::optional<OperationKey> getOperationKey() const {
-            return _opKey;
-        }
-
-        /**
-         * Returns a cursor guard holding the cursor owned by this CursorEntry for an operation to
-         * use. Only one operation may use the cursor at a time, so callers should check that
-         * getOperationUsingCursor() returns null before using this function. Callers may not pass
-         * nullptr for opCtx. Ownership of the cursor is given to the returned
-         * ClusterClientCursorGuard; callers that want to assume ownership over the cursor directly
-         * must unpack the cursor from the returned guard.
-         */
-        ClusterClientCursorGuard releaseCursor(OperationContext* opCtx) {
-            invariant(!_operationUsingCursor);
-            invariant(_cursor);
-            invariant(opCtx);
-            _operationUsingCursor = opCtx;
-            return ClusterClientCursorGuard(opCtx, std::move(_cursor));
-        }
-
-        /**
-         * Creates a generic cursor from the cursor inside this entry. Should only be called on
-         * idle cursors. The caller must supply the cursorId and namespace because the CursorEntry
-         * does not have access to them.  Cannot be called if this CursorEntry does not own an
-         * underlying ClusterClientCursor.
-         */
-        GenericCursor cursorToGenericCursor(CursorId cursorId, const NamespaceString& ns) const;
-
-        OperationContext* getOperationUsingCursor() const {
-            return _operationUsingCursor;
-        }
-
-        /**
-         * Indicate that the cursor is no longer in use by an operation. Once this is called,
-         * another operation may check the cursor out.
-         */
-        void returnCursor(std::unique_ptr<ClusterClientCursor> cursor) {
-            invariant(cursor);
-            invariant(!_cursor);
-            invariant(_operationUsingCursor);
-
-            _cursor = std::move(cursor);
-            _operationUsingCursor = nullptr;
-        }
-
-        void setLastActive(Date_t lastActive) {
-            _lastActive = lastActive;
-        }
-
-        UserNameIterator getAuthenticatedUsers() const {
-            return makeUserNameIterator(_authenticatedUsers.begin(), _authenticatedUsers.end());
-        }
-
-    private:
-        std::unique_ptr<ClusterClientCursor> _cursor;
-        CursorType _cursorType = CursorType::SingleTarget;
-        CursorLifetime _cursorLifetime = CursorLifetime::Mortal;
-        Date_t _lastActive;
-        boost::optional<LogicalSessionId> _lsid;
-
-        // The client OperationKey from the OperationContext at the time of registering a cursor.
-        boost::optional<OperationKey> _opKey;
-
-        // Current operation using the cursor. Non-null if the cursor is checked out.
-        OperationContext* _operationUsingCursor = nullptr;
-
-        // The set of users authorized to use this cursor.
-        const std::vector<UserName> _authenticatedUsers;
-    };
 
     /**
      * CursorEntryContainer is a moveable, non-copyable container for a set of cursors, where all

@@ -554,6 +554,7 @@ env.Library(
         'cluster_last_error_info',
         'commands/cluster_commands',
         'committed_optime_metadata_hook',
+        'load_balancer_support',
         'mongos_initializers',
         'mongos_topology_coordinator',
         'query/cluster_cursor_cleanup_job',
