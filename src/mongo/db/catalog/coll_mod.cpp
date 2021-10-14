@@ -493,10 +493,6 @@ Status _collModInternal(OperationContext* opCtx,
     auto viewPipeline = cmrNew.viewPipeLine;
     auto viewOn = cmrNew.viewOn;
     auto clusteredIndexExpireAfterSeconds = cmrNew.clusteredIndexExpireAfterSeconds;
-    // WriteConflictExceptions thrown in the writeConflictRetry loop enclosing this function can
-    // cause collModIndexRequest->idx to become invalid, so save a copy to use in the loop until we
-    // can refresh it.
-    auto idx = cmrNew.indexRequest.idx;
     auto ts = cmrNew.timeseries;
 
     if (!serverGlobalParams.quiet.load()) {
@@ -564,7 +560,7 @@ Status _collModInternal(OperationContext* opCtx,
 
         // Handle index modifications.
         processCollModIndexRequest(
-            opCtx, &coll, idx, &cmrNew.indexRequest, &indexCollModInfo, result);
+            opCtx, &coll, cmrNew.indexRequest.idx, &cmrNew.indexRequest, &indexCollModInfo, result);
 
         if (cmrNew.collValidator) {
             coll.getWritableCollection()->setValidator(opCtx, *cmrNew.collValidator);

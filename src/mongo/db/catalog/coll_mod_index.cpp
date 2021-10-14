@@ -172,11 +172,11 @@ void processCollModIndexRequest(OperationContext* opCtx,
         !indexHidden ? boost::optional<bool>() : oldHidden.booleanSafe(),
         idx->indexName()};
 
-    // Notify the index catalog that the definition of this index changed. This will
-    // invalidate the local idx pointer. On rollback of this WUOW, the idx pointer in
-    // cmrNew will be invalidated and the local var idx pointer will be valid again.
-    collModIndexRequest->idx = autoColl->getWritableCollection()->getIndexCatalog()->refreshEntry(
+    // Notify the index catalog that the definition of this index changed. This will invalidate the
+    // local idx pointer. On rollback of this WUOW, the local var idx pointer will be valid again.
+    autoColl->getWritableCollection()->getIndexCatalog()->refreshEntry(
         opCtx, autoColl->getWritableCollection(), idx);
+
     opCtx->recoveryUnit()->registerChange(std::make_unique<CollModResultChange>(
         oldExpireSecs, newExpireSecs, oldHidden, newHidden, result));
 
