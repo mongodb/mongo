@@ -120,7 +120,8 @@ void SpillableCache::spillToDisk() {
                 "engine configured",
                 _expCtx->opCtx->getServiceContext()->getStorageEngine());
         _usedDisk = true;
-        _diskCache = _expCtx->mongoProcessInterface->createTemporaryRecordStore(_expCtx);
+        _diskCache =
+            _expCtx->mongoProcessInterface->createTemporaryRecordStore(_expCtx, KeyFormat::Long);
     }
     // If we've freed things from cache before writing to disk, we need to update
     // '_diskWrittenIndex' to be the actual index of the document we're going to write.

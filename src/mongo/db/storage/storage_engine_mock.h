@@ -87,11 +87,12 @@ public:
                              const NamespaceString& ns) final {
         return Status::OK();
     }
-    std::unique_ptr<TemporaryRecordStore> makeTemporaryRecordStore(OperationContext* opCtx) final {
+    std::unique_ptr<TemporaryRecordStore> makeTemporaryRecordStore(OperationContext* opCtx,
+                                                                   KeyFormat keyFormat) final {
         return {};
     }
     std::unique_ptr<TemporaryRecordStore> makeTemporaryRecordStoreForResumableIndexBuild(
-        OperationContext* opCtx) final {
+        OperationContext* opCtx, KeyFormat keyFormat) final {
         return {};
     }
     std::unique_ptr<TemporaryRecordStore> makeTemporaryRecordStoreFromExistingIdent(

@@ -100,7 +100,8 @@ public:
                                      const CollectionOptions& options) = 0;
 
     virtual std::unique_ptr<RecordStore> makeTemporaryRecordStore(OperationContext* opCtx,
-                                                                  StringData ident) = 0;
+                                                                  StringData ident,
+                                                                  KeyFormat keyFormat) = 0;
 
     /**
      * Similar to createRecordStore but this imports from an existing table with the provided ident

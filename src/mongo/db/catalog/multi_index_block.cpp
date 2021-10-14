@@ -956,7 +956,7 @@ void MultiIndexBlock::_writeStateToDisk(OperationContext* opCtx,
     auto obj = _constructStateObject(opCtx, collection);
     auto rs = opCtx->getServiceContext()
                   ->getStorageEngine()
-                  ->makeTemporaryRecordStoreForResumableIndexBuild(opCtx);
+                  ->makeTemporaryRecordStoreForResumableIndexBuild(opCtx, KeyFormat::Long);
 
     WriteUnitOfWork wuow(opCtx);
 

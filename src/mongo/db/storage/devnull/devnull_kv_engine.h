@@ -62,7 +62,8 @@ public:
                                                         const CollectionOptions& options);
 
     virtual std::unique_ptr<RecordStore> makeTemporaryRecordStore(OperationContext* opCtx,
-                                                                  StringData ident) override;
+                                                                  StringData ident,
+                                                                  KeyFormat keyFormat) override;
 
     virtual Status createSortedDataInterface(OperationContext* opCtx,
                                              const CollectionOptions& collOptions,

@@ -91,7 +91,7 @@ public:
     }
 
     std::unique_ptr<TemporaryRecordStore> makeTemporary(OperationContext* opCtx) {
-        return _storageEngine->makeTemporaryRecordStore(opCtx);
+        return _storageEngine->makeTemporaryRecordStore(opCtx, KeyFormat::Long);
     }
 
     /**

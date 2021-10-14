@@ -60,8 +60,11 @@ public:
 
 class DevNullRecordStore : public RecordStore {
 public:
-    DevNullRecordStore(StringData ns, StringData identName, const CollectionOptions& options)
-        : RecordStore(ns, identName), _options(options) {
+    DevNullRecordStore(StringData ns,
+                       StringData identName,
+                       const CollectionOptions& options,
+                       KeyFormat keyFormat)
+        : RecordStore(ns, identName), _options(options), _keyFormat(keyFormat) {
         _numInserts = 0;
         _dummy = BSON("_id" << 1);
     }
@@ -85,7 +88,7 @@ public:
     }
 
     virtual KeyFormat keyFormat() const {
-        return KeyFormat::Long;
+        return _keyFormat;
     }
 
     virtual int64_t storageSize(OperationContext* opCtx,
@@ -155,6 +158,7 @@ public:
 
 private:
     CollectionOptions _options;
+    KeyFormat _keyFormat;
     long long _numInserts;
     BSONObj _dummy;
 };
@@ -240,12 +244,13 @@ std::unique_ptr<RecordStore> DevNullKVEngine::getRecordStore(OperationContext* o
     if (ident == "_mdb_catalog") {
         return std::make_unique<EphemeralForTestRecordStore>(ns, ident, &_catalogInfo);
     }
-    return std::make_unique<DevNullRecordStore>(ns, ident, options);
+    return std::make_unique<DevNullRecordStore>(ns, ident, options, KeyFormat::Long);
 }
 
 std::unique_ptr<RecordStore> DevNullKVEngine::makeTemporaryRecordStore(OperationContext* opCtx,
-                                                                       StringData ident) {
-    return std::make_unique<DevNullRecordStore>("" /* ns */, ident, CollectionOptions());
+                                                                       StringData ident,
+                                                                       KeyFormat keyFormat) {
+    return std::make_unique<DevNullRecordStore>("" /* ns */, ident, CollectionOptions(), keyFormat);
 }
 
 std::unique_ptr<SortedDataInterface> DevNullKVEngine::getSortedDataInterface(

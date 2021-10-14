@@ -109,10 +109,10 @@ public:
                                      const NamespaceString& nss) override;
 
     virtual std::unique_ptr<TemporaryRecordStore> makeTemporaryRecordStore(
-        OperationContext* opCtx) override;
+        OperationContext* opCtx, KeyFormat keyFormat) override;
 
     virtual std::unique_ptr<TemporaryRecordStore> makeTemporaryRecordStoreForResumableIndexBuild(
-        OperationContext* opCtx) override;
+        OperationContext* opCtx, KeyFormat keyFormat) override;
 
     virtual std::unique_ptr<TemporaryRecordStore> makeTemporaryRecordStoreFromExistingIdent(
         OperationContext* opCtx, StringData ident) override;

@@ -282,7 +282,7 @@ public:
     }
 
     std::unique_ptr<TemporaryRecordStore> createTemporaryRecordStore(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
+        const boost::intrusive_ptr<ExpressionContext>& expCtx, KeyFormat keyFormat) const {
         MONGO_UNREACHABLE;
     }
 

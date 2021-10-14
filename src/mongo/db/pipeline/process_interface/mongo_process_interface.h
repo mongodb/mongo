@@ -483,7 +483,7 @@ public:
      * Create a temporary record store.
      */
     virtual std::unique_ptr<TemporaryRecordStore> createTemporaryRecordStore(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx) const = 0;
+        const boost::intrusive_ptr<ExpressionContext>& expCtx, KeyFormat keyFormat) const = 0;
 
     /**
      * Write the records in 'records' to the record store. Record store must already exist. Asserts

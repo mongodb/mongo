@@ -930,17 +930,18 @@ Status StorageEngineImpl::repairRecordStore(OperationContext* opCtx,
 }
 
 std::unique_ptr<TemporaryRecordStore> StorageEngineImpl::makeTemporaryRecordStore(
-    OperationContext* opCtx) {
+    OperationContext* opCtx, KeyFormat keyFormat) {
     std::unique_ptr<RecordStore> rs =
-        _engine->makeTemporaryRecordStore(opCtx, _catalog->newInternalIdent());
+        _engine->makeTemporaryRecordStore(opCtx, _catalog->newInternalIdent(), keyFormat);
     LOGV2_DEBUG(22258, 1, "Created temporary record store", "ident"_attr = rs->getIdent());
     return std::make_unique<TemporaryKVRecordStore>(getEngine(), std::move(rs));
 }
 
 std::unique_ptr<TemporaryRecordStore>
-StorageEngineImpl::makeTemporaryRecordStoreForResumableIndexBuild(OperationContext* opCtx) {
-    std::unique_ptr<RecordStore> rs =
-        _engine->makeTemporaryRecordStore(opCtx, _catalog->newInternalResumableIndexBuildIdent());
+StorageEngineImpl::makeTemporaryRecordStoreForResumableIndexBuild(OperationContext* opCtx,
+                                                                  KeyFormat keyFormat) {
+    std::unique_ptr<RecordStore> rs = _engine->makeTemporaryRecordStore(
+        opCtx, _catalog->newInternalResumableIndexBuildIdent(), keyFormat);
     LOGV2_DEBUG(4921500,
                 1,
                 "Created temporary record store for resumable index build",

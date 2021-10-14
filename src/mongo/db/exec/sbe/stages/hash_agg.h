@@ -32,6 +32,7 @@
 #include <unordered_map>
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/stages/record_store.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/db/query/query_knobs_gen.h"
@@ -88,7 +89,13 @@ public:
     std::vector<DebugPrinter::Block> debugPrint() const final;
     size_t estimateCompileTimeSize() const final;
 
+protected:
+    void doDetachFromOperationContext() override;
+    void doAttachToOperationContext(OperationContext* opCtx) override;
+
 private:
+    void makeTemporaryRecordStore();
+
     using TableType = stdx::unordered_map<value::MaterializedRow,
                                           value::MaterializedRow,
                                           value::MaterializedRowHasher,
@@ -132,6 +139,10 @@ private:
 
     bool _compiled{false};
     bool _childOpened{false};
+
+    // Used when spilling to disk.
+    std::unique_ptr<RecordStore> _recordStore;
 };
+
 }  // namespace sbe
 }  // namespace mongo

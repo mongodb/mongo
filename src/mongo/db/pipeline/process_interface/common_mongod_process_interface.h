@@ -102,7 +102,7 @@ public:
                                            const NamespaceString& outputNs) const final;
 
     std::unique_ptr<TemporaryRecordStore> createTemporaryRecordStore(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx) const final;
+        const boost::intrusive_ptr<ExpressionContext>& expCtx, KeyFormat keyFormat) const final;
 
     void writeRecordsToRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                    RecordStore* rs,

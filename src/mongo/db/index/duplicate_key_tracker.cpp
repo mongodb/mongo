@@ -49,8 +49,8 @@ static constexpr StringData kKeyField = "key"_sd;
 
 DuplicateKeyTracker::DuplicateKeyTracker(OperationContext* opCtx, const IndexCatalogEntry* entry)
     : _indexCatalogEntry(entry),
-      _keyConstraintsTable(
-          opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStore(opCtx)) {
+      _keyConstraintsTable(opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStore(
+          opCtx, KeyFormat::Long)) {
 
     invariant(_indexCatalogEntry->descriptor()->unique());
 }

@@ -75,7 +75,8 @@ void SkippedRecordTracker::record(OperationContext* opCtx, const RecordId& recor
     // Lazily initialize table when we record the first document.
     if (!_skippedRecordsTable) {
         _skippedRecordsTable =
-            opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStore(opCtx);
+            opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStore(
+                opCtx, KeyFormat::Long);
     }
 
     writeConflictRetry(

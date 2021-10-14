@@ -152,7 +152,6 @@ void assertIgnorePrepareConflictsBehavior(const boost::intrusive_ptr<ExpressionC
             expCtx->opCtx->recoveryUnit()->getPrepareConflictBehavior() !=
                 PrepareConflictBehavior::kIgnoreConflicts);
 }
-
 }  // namespace
 
 std::unique_ptr<TransactionHistoryIteratorBase>
@@ -671,11 +670,12 @@ void CommonMongodProcessInterface::writeRecordsToRecordStore(
         wuow.commit();
     });
 }
+
 std::unique_ptr<TemporaryRecordStore> CommonMongodProcessInterface::createTemporaryRecordStore(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, KeyFormat keyFormat) const {
     assertIgnorePrepareConflictsBehavior(expCtx);
     return expCtx->opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStore(
-        expCtx->opCtx);
+        expCtx->opCtx, keyFormat);
 }
 
 Document CommonMongodProcessInterface::readRecordFromRecordStore(

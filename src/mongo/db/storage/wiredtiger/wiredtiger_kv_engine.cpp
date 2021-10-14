@@ -1599,7 +1599,8 @@ std::unique_ptr<SortedDataInterface> WiredTigerKVEngine::getSortedDataInterface(
 }
 
 std::unique_ptr<RecordStore> WiredTigerKVEngine::makeTemporaryRecordStore(OperationContext* opCtx,
-                                                                          StringData ident) {
+                                                                          StringData ident,
+                                                                          KeyFormat keyFormat) {
     invariant(!_readOnly || !recoverToOplogTimestamp.empty());
 
     _ensureIdentPath(ident);
@@ -1626,7 +1627,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::makeTemporaryRecordStore(Operat
     params.ident = ident.toString();
     params.engineName = _canonicalName;
     params.isCapped = false;
-    params.keyFormat = KeyFormat::Long;
+    params.keyFormat = keyFormat;
     params.overwrite = true;
     params.isEphemeral = _ephemeral;
     params.cappedCallback = nullptr;

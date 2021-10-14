@@ -84,9 +84,10 @@ Status KVEngine::importRecordStore(OperationContext* opCtx,
 }
 
 std::unique_ptr<mongo::RecordStore> KVEngine::makeTemporaryRecordStore(OperationContext* opCtx,
-                                                                       StringData ident) {
+                                                                       StringData ident,
+                                                                       KeyFormat keyFormat) {
     std::unique_ptr<mongo::RecordStore> recordStore =
-        std::make_unique<RecordStore>("", ident, KeyFormat::Long, false);
+        std::make_unique<RecordStore>("", ident, keyFormat, false);
     stdx::lock_guard lock(_identsLock);
     _idents[ident.toString()] = true;
     return recordStore;

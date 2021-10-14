@@ -43,12 +43,12 @@ namespace {
 class MongoProcessInterfaceForTest : public StubMongoProcessInterface {
 public:
     std::unique_ptr<TemporaryRecordStore> createTemporaryRecordStore(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx) const override {
+        const boost::intrusive_ptr<ExpressionContext>& expCtx, KeyFormat keyFormat) const override {
         expCtx->opCtx->recoveryUnit()->abandonSnapshot();
         expCtx->opCtx->recoveryUnit()->setPrepareConflictBehavior(
             PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
         return expCtx->opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStore(
-            expCtx->opCtx);
+            expCtx->opCtx, keyFormat);
     }
 
     void writeRecordsToRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,

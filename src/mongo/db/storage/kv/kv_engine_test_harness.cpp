@@ -303,7 +303,7 @@ TEST_F(KVEngineTestHarness, TemporaryRecordStoreSimple) {
     std::unique_ptr<RecordStore> rs;
     {
         auto opCtx = _makeOperationContext(engine);
-        rs = engine->makeTemporaryRecordStore(opCtx.get(), ident);
+        rs = engine->makeTemporaryRecordStore(opCtx.get(), ident, KeyFormat::Long);
         ASSERT(rs);
     }
 
