@@ -88,28 +88,14 @@ StatusWith<DistributionStatus> createCollectionDistributionStatus(
         return true;
     });
 
-    const auto swCollectionTags =
-        Grid::get(opCtx)->catalogClient()->getTagsForCollection(opCtx, nss);
-    if (!swCollectionTags.isOK()) {
-        return swCollectionTags.getStatus().withContext(
-            str::stream() << "Unable to load tags for collection " << nss);
-    }
-    const auto& collectionTags = swCollectionTags.getValue();
-
     DistributionStatus distribution(nss, std::move(shardToChunksMap));
 
-    // Cache the collection tags
     const auto& keyPattern = chunkMgr.getShardKeyPattern().getKeyPattern();
 
-    for (const auto& tag : collectionTags) {
-        auto status = distribution.addRangeToZone(
-            ZoneRange(keyPattern.extendRangeBound(tag.getMinKey(), false),
-                      keyPattern.extendRangeBound(tag.getMaxKey(), false),
-                      tag.getTag()));
-
-        if (!status.isOK()) {
-            return status;
-        }
+    // Cache the collection tags
+    auto status = ZoneInfo::addTagsFromCatalog(opCtx, nss, keyPattern, distribution.zoneInfo());
+    if (!status.isOK()) {
+        return status;
     }
 
     return {std::move(distribution)};

@@ -44,7 +44,9 @@
 #include "mongo/db/client.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/s/balancer/balancer_chunk_merger_impl.h"
 #include "mongo/db/s/balancer/balancer_chunk_selection_policy_impl.h"
+#include "mongo/db/s/balancer/balancer_commands_scheduler_impl.h"
 #include "mongo/db/s/balancer/cluster_statistics_impl.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/sharding_logging.h"
@@ -54,6 +56,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/balancer_collection_status_gen.h"
+#include "mongo/s/request_types/configure_collection_auto_split_gen.h"
 #include "mongo/s/shard_util.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/exit.h"
@@ -85,6 +88,7 @@ const Seconds kShortBalanceRoundInterval(1);
 static constexpr StringData kBalancerPolicyStatusDraining = "draining"_sd;
 static constexpr StringData kBalancerPolicyStatusZoneViolation = "zoneViolation"_sd;
 static constexpr StringData kBalancerPolicyStatusChunksImbalance = "chunksImbalance"_sd;
+static constexpr StringData kBalancerPolicyStatusChunksMerging = "chunksMerging"_sd;
 
 /**
  * Utility class to generate timing and statistics for a single balancer round.
@@ -114,7 +118,6 @@ public:
             builder.append("candidateChunks", _candidateChunks);
             builder.append("chunksMoved", _chunksMoved);
         }
-
         return builder.obj();
     }
 
@@ -176,6 +179,8 @@ Balancer::Balancer()
       _clusterStats(std::make_unique<ClusterStatisticsImpl>(_random)),
       _chunkSelectionPolicy(
           std::make_unique<BalancerChunkSelectionPolicyImpl>(_clusterStats.get(), _random)),
+      _commandScheduler(std::make_unique<BalancerCommandsSchedulerImpl>()),
+      _chunkMerger(std::make_unique<BalancerChunkMergerImpl>(*_commandScheduler, *_clusterStats)),
       _migrationManager(_balancerDecoration.owner(this)) {}
 
 
@@ -183,6 +188,12 @@ Balancer::~Balancer() {
     // Terminate the balancer thread so it doesn't leak memory.
     interruptBalancer();
     waitForBalancerToStop();
+    if (_chunkMerger) {
+        _chunkMerger->waitForStop();
+    }
+    if (_commandScheduler) {
+        _commandScheduler->stop();
+    }
 }
 
 void Balancer::onStepUpBegin(OperationContext* opCtx, long long term) {
@@ -198,6 +209,12 @@ void Balancer::onStepUpComplete(OperationContext* opCtx, long long term) {
 
 void Balancer::onStepDown() {
     interruptBalancer();
+    if (_chunkMerger) {
+        _chunkMerger->onStepDown();
+    }
+    if (_commandScheduler) {
+        _commandScheduler->stop();
+    }
 }
 
 void Balancer::onBecomeArbiter() {
@@ -427,6 +444,8 @@ void Balancer::_mainThread() {
                     LOGV2_DEBUG(21861, 1, "Done enforcing tag range boundaries.");
                 }
 
+                _mergeChunksIfNeeded(opCtx.get());
+
                 const auto candidateChunks =
                     uassertStatusOK(_chunkSelectionPolicy->selectChunksToMove(opCtx.get()));
 
@@ -486,6 +505,8 @@ void Balancer::_mainThread() {
         invariant(_state == kStopping);
         invariant(_migrationManagerInterruptThread.joinable());
     }
+
+    _commandScheduler->stop();
 
     _migrationManagerInterruptThread.join();
     _migrationManager.drainActiveMigrations();
@@ -726,6 +747,59 @@ int Balancer::_moveChunks(OperationContext* opCtx,
     return numChunksProcessed;
 }
 
+void Balancer::_mergeChunksIfNeeded(OperationContext* opCtx) {
+    using Progress = BalancerChunkMerger::Progress;
+
+    auto balancerConfig = Grid::get(opCtx)->getBalancerConfiguration();
+
+    // If the balancer was disabled since we started this round, don't start new chunk moves
+    if (_stopOrPauseRequested() || !balancerConfig->shouldBalance()) {
+        LOGV2_DEBUG(8423324, 1, "Skipping balancing round because balancer was stopped");
+        return;
+    }
+
+    if (!mongo::feature_flags::gShardingPerCollectionAutoSplitter.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        return;
+    }
+
+    const auto collections = _chunkMerger->selectCollections(opCtx);
+    if (collections.empty()) {
+        return;
+    }
+
+    LOGV2(8423320, "Balancer will perform chunk merges");
+
+    _commandScheduler->start(opCtx);
+
+    auto* manager = ShardingCatalogManager::get(opCtx);
+    for (CollectionType const& coll : collections) {
+        auto progress = _chunkMerger->mergeChunksOnShards(opCtx, coll);
+        if (progress != Progress::Done) {
+            continue;
+        }
+
+        LOGV2(8423321, "Move chunk phase on {nss}", "nss"_attr = coll.getNss());
+
+        progress = _chunkMerger->moveMergeOrSplitChunks(opCtx, coll);
+        if (progress != Progress::Done) {
+            continue;
+        }
+
+        if (_chunkMerger->isConverged(opCtx, coll)) {
+            LOGV2_DEBUG(8423323,
+                        1,
+                        "Converged merging chunks for {namespace}",
+                        "namespace"_attr = coll.getNss());
+            manager->configureCollectionAutoSplit(opCtx,
+                                                  coll.getNss(),
+                                                  /*maxChunkSizeBytes*/ boost::none,
+                                                  /*balancerShouldMergeChunks*/ false,
+                                                  /*enableAutoSplitter*/ boost::none);
+        }
+    }
+}
+
 void Balancer::notifyPersistedBalancerSettingsChanged() {
     stdx::unique_lock<Latch> lock(_mutex);
     _condVar.notify_all();
@@ -733,6 +807,11 @@ void Balancer::notifyPersistedBalancerSettingsChanged() {
 
 Balancer::BalancerStatus Balancer::getBalancerStatusForNs(OperationContext* opCtx,
                                                           const NamespaceString& ns) {
+    bool isMerging = _chunkMerger->isMergeCandidate(opCtx, ns);
+    if (isMerging) {
+        return {false, kBalancerPolicyStatusChunksMerging.toString()};
+    }
+
     auto splitChunks = uassertStatusOK(_chunkSelectionPolicy->selectChunksToSplit(opCtx, ns));
     if (!splitChunks.empty()) {
         return {false, kBalancerPolicyStatusZoneViolation.toString()};

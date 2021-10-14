@@ -441,20 +441,18 @@ void ShardingCatalogManager::configureCollectionAutoSplit(
     OperationContext* opCtx,
     const NamespaceString& nss,
     boost::optional<int64_t> maxChunkSizeBytes,
+    boost::optional<bool> balancerShouldMergeChunks,
     boost::optional<bool> enableAutoSplitter) {
 
     uassert(ErrorCodes::InvalidOptions,
             "invalid collection auto splitter config update",
-            maxChunkSizeBytes || enableAutoSplitter);
-
-    const auto coll = Grid::get(opCtx)->catalogClient()->getCollection(
-        opCtx, nss, repl::ReadConcernLevel::kLocalReadConcern);
+            maxChunkSizeBytes || balancerShouldMergeChunks || enableAutoSplitter);
 
     short updatedFields = 0;
     BSONObjBuilder updateCmd;
     {
         BSONObjBuilder setBuilder(updateCmd.subobjStart("$set"));
-        if (maxChunkSizeBytes) {
+        if (maxChunkSizeBytes && *maxChunkSizeBytes != 0) {
             // verify we got a positive integer in range [1MB, 1GB]
             uassert(ErrorCodes::InvalidOptions,
                     str::stream() << "Chunk size '" << *maxChunkSizeBytes
@@ -464,8 +462,11 @@ void ShardingCatalogManager::configureCollectionAutoSplit(
 
             setBuilder.append(CollectionType::kMaxChunkSizeBytesFieldName, *maxChunkSizeBytes);
             updatedFields++;
-
-            // TODO: SERVER-58908 add defragmentation getter / setter logic
+        }
+        if (balancerShouldMergeChunks) {
+            const bool doMerge = balancerShouldMergeChunks.get();
+            setBuilder.append(CollectionType::kBalancerShouldMergeChunksFieldName, doMerge);
+            updatedFields++;
         }
         if (enableAutoSplitter) {
             const bool doSplit = enableAutoSplitter.get();
@@ -473,12 +474,19 @@ void ShardingCatalogManager::configureCollectionAutoSplit(
             updatedFields++;
         }
     }
+    if (maxChunkSizeBytes && *maxChunkSizeBytes == 0) {
+        BSONObjBuilder unsetBuilder(updateCmd.subobjStart("$unset"));
+        unsetBuilder.append(CollectionType::kMaxChunkSizeBytesFieldName, 0);
+        updatedFields++;
+    }
 
     if (updatedFields == 0) {
         return;
     }
 
     const auto cm = Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfo(opCtx, nss);
+    const auto uuid = cm.getUUID();
+
     std::set<ShardId> shardsIds;
     cm.getAllShardIds(&shardsIds);
 
@@ -486,9 +494,8 @@ void ShardingCatalogManager::configureCollectionAutoSplit(
         opCtx, CollectionType::ConfigNS, [&](OperationContext* opCtx, TxnNumber txnNumber) {
             const auto update = updateCmd.obj();
 
-            const auto query =
-                BSON(CollectionType::kNssFieldName << nss.ns() << CollectionType::kUuidFieldName
-                                                   << coll.getUuid());
+            const auto query = BSON(CollectionType::kNssFieldName
+                                    << nss.ns() << CollectionType::kUuidFieldName << *uuid);
             const auto res = writeToConfigDocumentInTxn(
                 opCtx,
                 CollectionType::ConfigNS,

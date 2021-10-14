@@ -110,6 +110,10 @@ structs:
                 type: safeInt64
                 description: "Max chunk size in bytes."
                 optional: true
+            balancerShouldMergeChunks: 
+                type: bool
+                description: "Balancer will merge chunks up to the configured maxChunkSizeBytes."
+                optional: true
             noAutoSplit: 
                 type: bool
                 description: "Specifies whether the auto-splitter should be running or not for this collection."

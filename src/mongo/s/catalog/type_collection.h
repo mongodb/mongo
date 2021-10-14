@@ -84,6 +84,7 @@ public:
     static constexpr auto kUuidFieldName = kPre50CompatibleUuidFieldName;
     static constexpr auto kAllowMigrationsFieldName = kPre50CompatibleAllowMigrationsFieldName;
 
+    using CollectionTypeBase::kBalancerShouldMergeChunksFieldName;
     using CollectionTypeBase::kMaxChunkSizeBytesFieldName;
     using CollectionTypeBase::kNoAutoSplitFieldName;
     using CollectionTypeBase::kNssFieldName;
@@ -144,12 +145,16 @@ public:
 
     void setMaxChunkSizeBytes(int64_t value);
 
+    bool getBalancerShouldMergeChunks() const {
+        return CollectionTypeBase::getBalancerShouldMergeChunks().get_value_or(false);
+    }
+
     bool getAllowAutoSplit() const {
         return !getNoAutoSplit().get_value_or(false);
     }
 
     bool getAllowBalance() const {
-        return !getNoBalance();
+        return !getNoBalance() && !getBalancerShouldMergeChunks();
     }
 
     bool getAllowMigrations() const {

@@ -194,7 +194,7 @@ Status BalancerConfiguration::refreshAndCheck(OperationContext* opCtx) {
         return chunkSizeStatus.withContext("Failed to refresh the chunk sizes settings");
     }
 
-    // AutoSplit settings
+    // Global AutoSplit settings
     Status autoSplitStatus = _refreshAutoSplitSettings(opCtx);
     if (!autoSplitStatus.isOK()) {
         return autoSplitStatus.withContext("Failed to refresh the autoSplit settings");

@@ -41,6 +41,8 @@ namespace mongo {
 
 class ChunkType;
 class ClusterStatistics;
+class BalancerChunkMerger;
+class BalancerCommandsScheduler;
 class MigrationSecondaryThrottleOptions;
 class OperationContext;
 class ServiceContext;
@@ -265,6 +267,11 @@ private:
     int _moveChunks(OperationContext* opCtx,
                     const BalancerChunkSelectionPolicy::MigrateInfoVector& candidateChunks);
 
+    /**
+     * Merge chunks on collections where the balancerShouldMergeChunks flag is set to true
+     */
+    void _mergeChunksIfNeeded(OperationContext* opCtx);
+
     // Protects the state below
     Mutex _mutex = MONGO_MAKE_LATCH("Balancer::_mutex");
 
@@ -316,6 +323,10 @@ private:
     // Balancer policy. Depends on the cluster statistics instance and source of randomness above so
     // it should be created after them and destroyed before them.
     std::unique_ptr<BalancerChunkSelectionPolicy> _chunkSelectionPolicy;
+
+    std::unique_ptr<BalancerCommandsScheduler> _commandScheduler;
+
+    std::unique_ptr<BalancerChunkMerger> _chunkMerger;
 
     // Migration manager used to schedule and manage migrations
     MigrationManager _migrationManager;

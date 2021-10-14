@@ -84,7 +84,11 @@ public:
 
             // throws if collection does not exist or parameters are invalid
             ShardingCatalogManager::get(opCtx)->configureCollectionAutoSplit(
-                opCtx, nss, maxChunkSizeBytes, request().getEnableAutoSplitter());
+                opCtx,
+                nss,
+                maxChunkSizeBytes,
+                request().getBalancerShouldMergeChunks(),
+                request().getEnableAutoSplitter());
         }
 
     private:

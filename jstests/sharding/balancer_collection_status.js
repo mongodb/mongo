@@ -35,6 +35,7 @@ assert.commandWorked(st.s0.adminCommand({enableSharding: 'db'}));
 assert.commandWorked(st.s0.adminCommand({shardCollection: 'db.col', key: {key: 1}}));
 
 // only sharded collections are allowed
+assert.commandWorked(st.s0.getDB('db').runCommand({create: "col2"}));
 assert.commandFailedWithCode(st.s0.adminCommand({balancerCollectionStatus: 'db.col2'}),
                              ErrorCodes.NamespaceNotSharded);
 

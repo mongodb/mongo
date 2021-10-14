@@ -88,7 +88,9 @@ public:
 
         void doCheckAuthorization(OperationContext* opCtx) const override {
             ActionSet actions({ActionType::splitChunk});
-            // TODO: SERVER-58908 add balancer merge parameter
+            if (request().getBalancerShouldMergeChunks().get_value_or(false)) {
+                actions.addAction(ActionType::moveChunk);
+            }
             uassert(ErrorCodes::Unauthorized,
                     "Unauthorized",
                     AuthorizationSession::get(opCtx->getClient())

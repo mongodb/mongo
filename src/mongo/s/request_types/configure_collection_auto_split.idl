@@ -47,24 +47,27 @@ structs:
             defaultChunkSize: 
                 type: safeInt
                 cpp_name: defaultChunkSizeMB
-                description: "New default chunk size in MB."
+                description: "New default chunk size in MB, 0 will unset the collection specific chunk size."
                 optional: true
             enableAutoSplitter: 
                 type: bool
                 description: "Specifies whether the auto-splitter should be running or not for this collection."
                 optional: true
-
+            balancerShouldMergeChunks:
+                type: bool
+                description: "Tell the balancer to merge chunks until they reach the new default chunk size"
+                optional: true
 
 commands:
     configureAutoSplit:
         command_name: configureCollectionAutoSplitter
         cpp_name: ConfigureCollAutoSplit
         description: "Public configureCollectionAutoSplitter command on mongos"
-        strict: true
+        strict: false
         namespace: type
         api_version: ""
+        reply_type: OkReply
         type: namespacestring
-        inline_chained_structs: true
         chained_structs:
             configure_auto_split_params: 
                 cpp_name: ConfigureCollAutoSplit
@@ -77,7 +80,6 @@ commands:
         namespace: type
         api_version: ""
         type: namespacestring
-        inline_chained_structs: true
         chained_structs:
             configure_auto_split_params: 
                 cpp_name: ConfigureCollAutoSplit
