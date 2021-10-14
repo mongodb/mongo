@@ -158,20 +158,10 @@ std::pair<value::TypeTags, value::Value> convertFrom(const char* be,
             }
 
             auto size = ConstDataView(be).read<LittleEndian<uint32_t>>();
-            auto subtype = static_cast<BinDataType>((be + sizeof(uint32_t))[0]);
-
-            if (subtype != BinDataType::ByteArrayDeprecated) {
-                auto metaSize = sizeof(uint32_t) + 1;
-                auto binData = new uint8_t[size + metaSize];
-                memcpy(binData, be, size + metaSize);
-                return {value::TypeTags::bsonBinData, value::bitcastFrom<uint8_t*>(binData)};
-            } else {
-                // The legacy byte array stores an extra int32 in byte[size].
-                auto metaSize = 2 * sizeof(uint32_t) + 1;
-                auto binData = new uint8_t[size + metaSize];
-                memcpy(binData, be, size + metaSize);
-                return {value::TypeTags::bsonBinData, value::bitcastFrom<uint8_t*>(binData)};
-            }
+            auto metaSize = sizeof(uint32_t) + 1;
+            auto binData = new uint8_t[size + metaSize];
+            memcpy(binData, be, size + metaSize);
+            return {value::TypeTags::bsonBinData, value::bitcastFrom<uint8_t*>(binData)};
         }
         case BSONType::Object: {
             if constexpr (View) {
