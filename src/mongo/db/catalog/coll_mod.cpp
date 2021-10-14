@@ -559,8 +559,7 @@ Status _collModInternal(OperationContext* opCtx,
         }
 
         // Handle index modifications.
-        processCollModIndexRequest(
-            opCtx, &coll, cmrNew.indexRequest.idx, &cmrNew.indexRequest, &indexCollModInfo, result);
+        processCollModIndexRequest(opCtx, &coll, cmrNew.indexRequest, &indexCollModInfo, result);
 
         if (cmrNew.collValidator) {
             coll.getWritableCollection()->setValidator(opCtx, *cmrNew.collValidator);

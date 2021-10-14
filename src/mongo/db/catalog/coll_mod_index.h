@@ -58,8 +58,7 @@ struct CollModIndexRequest {
  */
 void processCollModIndexRequest(OperationContext* opCtx,
                                 AutoGetCollection* autoColl,
-                                const IndexDescriptor* idx,
-                                CollModIndexRequest* collModIndexRequest,
+                                const CollModIndexRequest& collModIndexRequest,
                                 boost::optional<IndexCollModInfo>* indexCollModInfo,
                                 BSONObjBuilder* result);
 

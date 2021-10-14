@@ -133,12 +133,12 @@ void _processCollModIndexRequestHidden(OperationContext* opCtx,
 
 void processCollModIndexRequest(OperationContext* opCtx,
                                 AutoGetCollection* autoColl,
-                                const IndexDescriptor* idx,
-                                CollModIndexRequest* collModIndexRequest,
+                                const CollModIndexRequest& collModIndexRequest,
                                 boost::optional<IndexCollModInfo>* indexCollModInfo,
                                 BSONObjBuilder* result) {
-    auto indexExpireAfterSeconds = collModIndexRequest->indexExpireAfterSeconds;
-    auto indexHidden = collModIndexRequest->indexHidden;
+    auto idx = collModIndexRequest.idx;
+    auto indexExpireAfterSeconds = collModIndexRequest.indexExpireAfterSeconds;
+    auto indexHidden = collModIndexRequest.indexHidden;
 
     // Return early if there are no index modifications requested.
     if (!indexExpireAfterSeconds && !indexHidden) {
