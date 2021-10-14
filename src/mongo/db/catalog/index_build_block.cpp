@@ -247,8 +247,11 @@ void IndexBuildBlock::success(OperationContext* opCtx, Collection* collection) {
                   "Index build: done building index {indexName} on ns {nss}",
                   "Index build: done building",
                   "buildUUID"_attr = buildUUID,
+                  "collectionUUID"_attr = coll->uuid(),
                   "namespace"_attr = coll->ns(),
                   "index"_attr = indexName,
+                  "ident"_attr = entry->getIdent(),
+                  "collectionIdent"_attr = coll->getSharedIdent()->getIdent(),
                   "commitTimestamp"_attr = commitTime);
 
             if (commitTime) {
