@@ -39,7 +39,7 @@ const updatedDoc2 = {
     _id: 1,
     x: 5
 };
-const replaceDoc = {
+const replacedDoc = {
     _id: 1,
     z: 1
 };
@@ -50,7 +50,8 @@ function preAndPostImageTest({
     changeStreamOptions = {},
     expectedOnUpdateImagesWithChangeStreamPreImagesDisabled = {},
     expectedOnUpdateImages = {},
-    expectedOnReplaceImages = {}
+    expectedOnReplaceImages = {},
+    expectedOnDeleteImages = {},
 } = {}) {
     // Confirms that the change event document does not contain any internal-only fields.
     function assertChangeStreamInternalFieldsNotPresent(changeStreamDoc) {
@@ -124,7 +125,7 @@ function preAndPostImageTest({
     assertChangeStreamInternalFieldsNotPresent(changeStreamDoc);
 
     // Perform a full-document replacement.
-    assert.commandWorked(coll.update(updatedDoc2, replaceDoc));
+    assert.commandWorked(coll.update(updatedDoc2, replacedDoc));
 
     // The next change stream event should contain the expected pre- and post-images.
     assert.soon(() => changeStreamCursor.hasNext());
@@ -133,12 +134,24 @@ function preAndPostImageTest({
     assert.eq(changeStreamDoc.fullDocument, expectedOnReplaceImages.postImage);
     assert.eq(changeStreamDoc.operationType, "replace");
     assertChangeStreamInternalFieldsNotPresent(changeStreamDoc);
+
+    // Perform a document removal.
+    assert.commandWorked(coll.remove(replacedDoc));
+
+    // The next change stream event should contain the expected pre-image.
+    assert.soon(() => changeStreamCursor.hasNext());
+    changeStreamDoc = changeStreamCursor.next();
+    assert.eq(changeStreamDoc.fullDocumentBeforeChange, expectedOnDeleteImages.preImage);
+    assert(!changeStreamDoc.hasOwnProperty("fullDocument"), changeStreamDoc);
+    assert.eq(changeStreamDoc.operationType, "delete");
+    assertChangeStreamInternalFieldsNotPresent(changeStreamDoc);
 }
 
 preAndPostImageTest({
     expectedOnReplaceImages: {
-        postImage: replaceDoc,
-    }
+        postImage: replacedDoc,
+    },
+    expectedOnDeleteImages: {}
 });
 preAndPostImageTest({
     changeStreamOptions: {fullDocumentBeforeChange: 'whenAvailable'},
@@ -150,7 +163,10 @@ preAndPostImageTest({
     },
     expectedOnReplaceImages: {
         preImage: updatedDoc2,
-        postImage: replaceDoc,
+        postImage: replacedDoc,
+    },
+    expectedOnDeleteImages: {
+        preImage: replacedDoc,
     }
 });
 preAndPostImageTest({
@@ -162,7 +178,7 @@ preAndPostImageTest({
         postImage: updatedDoc2,
     },
     expectedOnReplaceImages: {
-        postImage: replaceDoc,
+        postImage: replacedDoc,
     }
 });
 preAndPostImageTest({
@@ -177,7 +193,10 @@ preAndPostImageTest({
     },
     expectedOnReplaceImages: {
         preImage: updatedDoc2,
-        postImage: replaceDoc,
+        postImage: replacedDoc,
+    },
+    expectedOnDeleteImages: {
+        preImage: replacedDoc,
     }
 });
 preAndPostImageTest({
@@ -188,7 +207,10 @@ preAndPostImageTest({
     },
     expectedOnReplaceImages: {
         preImage: updatedDoc2,
-        postImage: replaceDoc,
+        postImage: replacedDoc,
+    },
+    expectedOnDeleteImages: {
+        preImage: replacedDoc,
     }
 });
 preAndPostImageTest({
@@ -198,7 +220,7 @@ preAndPostImageTest({
         postImage: updatedDoc2,
     },
     expectedOnReplaceImages: {
-        postImage: replaceDoc,
+        postImage: replacedDoc,
     }
 });
 preAndPostImageTest({
@@ -210,7 +232,10 @@ preAndPostImageTest({
     },
     expectedOnReplaceImages: {
         preImage: updatedDoc2,
-        postImage: replaceDoc,
+        postImage: replacedDoc,
+    },
+    expectedOnDeleteImages: {
+        preImage: replacedDoc,
     }
 });
 preAndPostImageTest({
@@ -222,7 +247,10 @@ preAndPostImageTest({
     },
     expectedOnReplaceImages: {
         preImage: updatedDoc2,
-        postImage: replaceDoc,
+        postImage: replacedDoc,
+    },
+    expectedOnDeleteImages: {
+        preImage: replacedDoc,
     }
 });
 preAndPostImageTest({
@@ -234,7 +262,10 @@ preAndPostImageTest({
     },
     expectedOnReplaceImages: {
         preImage: updatedDoc2,
-        postImage: replaceDoc,
+        postImage: replacedDoc,
+    },
+    expectedOnDeleteImages: {
+        preImage: replacedDoc,
     }
 });
 }());

@@ -88,6 +88,17 @@ public:
         kTwoPhase,
     };
 
+    enum class RetryableWriteImageRecordingType {
+        // The operation is not a retryable "findAndModify" command. No pre-images must be recorded.
+        kNotRetryable,
+
+        // Store the pre-images for retryable "findAndModify" commands in the side collection.
+        kRecordInSideCollection,
+
+        // Store the pre-images for retryable "findAndModify" commands in the oplog.
+        kRecordInOplog,
+    };
+
     virtual ~OpObserver() = default;
 
     virtual void onCreateIndex(OperationContext* opCtx,
@@ -139,20 +150,22 @@ public:
                                const NamespaceString& nss,
                                const BSONObj& doc) = 0;
 
-    /**
-     * "fromMigrate" indicates whether the delete was induced by a chunk migration, and so should be
-     * ignored by the user as an internal maintenance operation and not a real delete.
-     */
     struct OplogDeleteEntryArgs {
         const BSONObj* deletedDoc = nullptr;
+
+        // "fromMigrate" indicates whether the delete was induced by a chunk migration, and so
+        // should be ignored by the user as an internal maintenance operation and not a real delete.
         bool fromMigrate = false;
         bool preImageRecordingEnabledForCollection = false;
+        bool changeStreamPreAndPostImagesEnabledForCollection = false;
+
+        // Specifies the pre-image recording options for the retryable "findAndModify" commands. Set
+        // to 'kNotRetryable' if the command is not a retryable write.
+        RetryableWriteImageRecordingType retryableWritePreImageRecordingType =
+            RetryableWriteImageRecordingType::kNotRetryable;
 
         // Set if an OpTime was reserved for the delete ahead of time.
         boost::optional<OplogSlot> oplogSlot = boost::none;
-        // When true, store the pre- or post- image for findAndModify commands in the side
-        // collection. When false, store the image in the oplog.
-        bool storeImageInSideCollection = false;
     };
 
     /**
@@ -161,8 +174,8 @@ public:
      * "ns" name of the collection from which deleteState.idDoc will be deleted.
      *
      * "args" is a reference to information detailing whether the pre-image of the doc should be
-     * preserved with deletion.  If `args.deletedDoc != nullptr`, then the opObserver must store the
-     * pre-image to be stored in addition to the documentKey.
+     * preserved with deletion. If `retryableWritePreImageRecordingType != kNotRetryable`, then the
+     * opObserver must store the `deletedDoc` in addition to the documentKey.
      */
     virtual void onDelete(OperationContext* opCtx,
                           const NamespaceString& nss,

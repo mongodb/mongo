@@ -1047,6 +1047,14 @@ void CollectionImpl::_cappedDeleteAsNeeded(OperationContext* opCtx,
                 // Explicitly setting values despite them being the defaults.
                 args.deletedDoc = nullptr;
                 args.fromMigrate = false;
+
+                // If collection has change stream pre-/post-images enabled, pass the 'deletedDoc'
+                // for writing it in the pre-images collection.
+                if (isChangeStreamPreAndPostImagesEnabled()) {
+                    args.deletedDoc = &doc;
+                    args.changeStreamPreAndPostImagesEnabledForCollection = true;
+                }
+
                 // Reserves an optime for the deletion and sets the timestamp for future writes.
                 opObserver->onDelete(opCtx, ns(), uuid(), kUninitializedStmtId, args);
             }
@@ -1160,14 +1168,28 @@ void CollectionImpl::deleteDocument(OperationContext* opCtx,
     if (storeDeletedDoc == Collection::StoreDeletedDoc::On) {
         oplogSlot = reserveOplogSlotsForRetryableFindAndModify(opCtx);
     }
-    OpObserver::OplogDeleteEntryArgs deleteArgs{
-        nullptr, fromMigrate, getRecordPreImages(), oplogSlot, oplogSlot != boost::none};
+    auto retryableWritePreImageRecordingType =
+        OpObserver::RetryableWriteImageRecordingType::kNotRetryable;
+    if (storeDeletedDoc == Collection::StoreDeletedDoc::On && isRetryableWrite(opCtx)) {
+        retryableWritePreImageRecordingType =
+            (oplogSlot != boost::none
+                 ? OpObserver::RetryableWriteImageRecordingType::kRecordInSideCollection
+                 : OpObserver::RetryableWriteImageRecordingType::kRecordInOplog);
+    }
+    OpObserver::OplogDeleteEntryArgs deleteArgs{nullptr /* deletedDoc */,
+                                                fromMigrate,
+                                                getRecordPreImages(),
+                                                isChangeStreamPreAndPostImagesEnabled(),
+                                                retryableWritePreImageRecordingType,
+                                                oplogSlot};
 
     getGlobalServiceContext()->getOpObserver()->aboutToDelete(opCtx, ns(), doc.value());
 
     boost::optional<BSONObj> deletedDoc;
-    if ((storeDeletedDoc == Collection::StoreDeletedDoc::On && opCtx->getTxnNumber()) ||
-        getRecordPreImages()) {
+    const bool isRecordingPreImageForRetryableWrite = retryableWritePreImageRecordingType !=
+        OpObserver::RetryableWriteImageRecordingType::kNotRetryable;
+    if (isRecordingPreImageForRetryableWrite || getRecordPreImages() ||
+        isChangeStreamPreAndPostImagesEnabled()) {
         deletedDoc.emplace(doc.value().getOwned());
     }
     int64_t keysDeleted = 0;
