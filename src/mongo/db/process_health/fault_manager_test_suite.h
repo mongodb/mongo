@@ -37,6 +37,7 @@
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/tick_source_mock.h"
 
 namespace mongo {
 
@@ -102,9 +103,16 @@ public:
         init();
     }
 
+    void tearDown() override {
+        LOGV2(6007905, "Clean up test resources");
+        // Shutdown the executor before the context is deleted.
+        resetManager();
+    }
+
     void init() {
         _svcCtx = ServiceContext::make();
         _svcCtx->setFastClockSource(std::make_unique<ClockSourceMock>());
+        _svcCtx->setTickSource(std::make_unique<TickSourceMock<Milliseconds>>());
         resetManager();
     }
 
@@ -115,16 +123,18 @@ public:
         auto executor = makeSharedThreadPoolTestExecutor(std::move(network));
         executor->startup();
 
+        invariant(_svcCtx->getFastClockSource());
         FaultManager::set(_svcCtx.get(),
                           std::make_unique<FaultManagerTestImpl>(_svcCtx.get(), executor));
     }
 
     void registerMockHealthObserver(FaultFacetType mockType,
                                     std::function<double()> getSeverityCallback) {
-        HealthObserverRegistration::registerObserverFactory([mockType, getSeverityCallback](
-                                                                ClockSource* clockSource) {
-            return std::make_unique<HealthObserverMock>(mockType, clockSource, getSeverityCallback);
-        });
+        HealthObserverRegistration::registerObserverFactory(
+            [mockType, getSeverityCallback](ClockSource* clockSource, TickSource* tickSource) {
+                return std::make_unique<HealthObserverMock>(
+                    mockType, clockSource, tickSource, getSeverityCallback);
+            });
     }
 
     FaultManagerTestImpl& manager() {
@@ -135,10 +145,16 @@ public:
         return *static_cast<ClockSourceMock*>(_svcCtx->getFastClockSource());
     }
 
+    TickSourceMock<Milliseconds>& tickSource() {
+        return *static_cast<TickSourceMock<Milliseconds>*>(_svcCtx->getTickSource());
+    }
+
     template <typename Duration>
     void advanceTime(Duration d) {
         executor::NetworkInterfaceMock::InNetworkGuard guard(_net);
         _net->advanceTime(_net->now() + d);
+        clockSource().advance(d);
+        tickSource().advance(d);
     }
 
     void assertInvalidStateTransition(FaultState newState) {

@@ -75,9 +75,15 @@ class FaultFacetsContainerFactory {
 public:
     virtual ~FaultFacetsContainerFactory() = default;
 
-    virtual FaultFacetsContainerPtr getFaultFacetsContainer() = 0;
+    virtual FaultFacetsContainerPtr getFaultFacetsContainer() const = 0;
 
     virtual FaultFacetsContainerPtr getOrCreateFaultFacetsContainer() = 0;
+
+    /**
+     * Update the container with supplied check result.
+     * Create or delete existing facet depending on the status.
+     */
+    virtual void updateWithCheckStatus(HealthCheckStatus&& checkStatus) = 0;
 };
 
 }  // namespace process_health

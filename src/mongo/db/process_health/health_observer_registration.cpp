@@ -34,8 +34,8 @@ namespace process_health {
 
 namespace {
 
-using HealthObserverFactoryCallback =
-    std::function<std::unique_ptr<HealthObserver>(ClockSource* clockSource)>;
+using HealthObserverFactoryCallback = std::function<std::unique_ptr<HealthObserver>(
+    ClockSource* clockSource, TickSource* tickSource)>;
 
 // Returns static vector of all registrations.
 // No synchronization is required as all the factories are registered during
@@ -49,15 +49,16 @@ std::vector<HealthObserverFactoryCallback>* getObserverFactories() {
 }  // namespace
 
 void HealthObserverRegistration::registerObserverFactory(
-    std::function<std::unique_ptr<HealthObserver>(ClockSource* clockSource)> factoryCallback) {
+    std::function<std::unique_ptr<HealthObserver>(ClockSource* clockSource, TickSource* tickSource)>
+        factoryCallback) {
     getObserverFactories()->push_back(std::move(factoryCallback));
 }
 
 std::vector<std::unique_ptr<HealthObserver>> HealthObserverRegistration::instantiateAllObservers(
-    ClockSource* clockSource) {
+    ClockSource* clockSource, TickSource* tickSource) {
     std::vector<std::unique_ptr<HealthObserver>> result;
     for (auto& cb : *getObserverFactories()) {
-        result.push_back(cb(clockSource));
+        result.push_back(cb(clockSource, tickSource));
     }
     return result;
 }

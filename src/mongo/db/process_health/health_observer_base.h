@@ -42,29 +42,54 @@ namespace process_health {
  */
 class HealthObserverBase : public HealthObserver {
 public:
-    HealthObserverBase(ClockSource* clockSource);
+    HealthObserverBase(ClockSource* clockSource, TickSource* tickSource);
     virtual ~HealthObserverBase() = default;
+
+    ClockSource* clockSource() const {
+        return _clockSource;
+    }
+
+    TickSource* tickSource() const {
+        return _tickSource;
+    }
+
+    /**
+     * @return Milliseconds the shortest interval it is safe to repeat this check on.
+     */
+    virtual Milliseconds minimalCheckInterval() const {
+        return Milliseconds(10);
+    }
 
     // Implements the common logic for periodic checks.
     // Every observer should implement periodicCheckImpl() for specific tests.
-    void periodicCheck(FaultFacetsContainerFactory& factory) final;
+    void periodicCheck(FaultFacetsContainerFactory& factory,
+                       std::shared_ptr<executor::TaskExecutor> taskExecutor) override;
 
 protected:
+    struct PeriodicHealthCheckContext {};
+
     /**
      * The main method every health observer should implement for a particular
      * health check it does.
      *
-     * @param optionalExistingFacet if a fault facet of this particular type already exists
-     *        (if there is an ongoing incident already)
+     * @return The result of a complete health check
      */
-    // TODO(SERVER-59592): futurize this.
-    virtual FaultFacetPtr periodicCheckImpl(FaultFacetPtr optionalExistingFacet) = 0;
+    virtual Future<HealthCheckStatus> periodicCheckImpl(
+        PeriodicHealthCheckContext&& periodicCheckContext) = 0;
+
+    HealthObserverIntensity getIntensity() override;
 
     ClockSource* const _clockSource;
+    TickSource* const _tickSource;
 
-    HealthObserverIntensity _intensity = HealthObserverIntensity::kNonCritical;
-
-    HealthObserverIntensity getIntensity();
+    mutable Mutex _mutex =
+        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(1), "HealthObserverBase::_mutex");
+    // Initially disable all observers until enabled by config options.
+    HealthObserverIntensity _intensity = HealthObserverIntensity::kOff;
+    // Indicates if there any check running to prevent running checks concurrently.
+    bool _currentlyRunningHealthCheck = false;
+    // Enforces the safety interval.
+    Date_t _lastTimeTheCheckWasRun;
 };
 
 }  // namespace process_health

@@ -114,9 +114,11 @@ protected:
     // Protected interface FaultFacetsContainerFactory implementation.
 
     // The interface FaultFacetsContainerFactory is implemented by the member '_fault'.
-    FaultFacetsContainerPtr getFaultFacetsContainer() override;
+    FaultFacetsContainerPtr getFaultFacetsContainer() const override;
 
     FaultFacetsContainerPtr getOrCreateFaultFacetsContainer() override;
+
+    void updateWithCheckStatus(HealthCheckStatus&& checkStatus) override;
 
     // State machine related.
 

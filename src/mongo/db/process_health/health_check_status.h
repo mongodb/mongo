@@ -43,7 +43,7 @@ namespace process_health {
 enum class FaultFacetType { kMock1 = 0, kMock2, kLdap };
 
 /**
- * The immutable class representing current status of an ongoing fault tracked by facet.
+ * The class representing current status of an ongoing fault tracked by facet.
  */
 class HealthCheckStatus {
 public:
@@ -69,6 +69,9 @@ public:
                               << " cannot be longer than duration " << _duration,
                 _duration >= _activeFaultDuration);
     }
+
+    // Constructs a resolved status (no fault detected).
+    HealthCheckStatus(FaultFacetType type) : _type(type), _severity(0), _description("resolved") {}
 
     HealthCheckStatus(const HealthCheckStatus&) = default;
     HealthCheckStatus& operator=(const HealthCheckStatus&) = default;

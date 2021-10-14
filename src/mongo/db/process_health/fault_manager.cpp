@@ -81,7 +81,10 @@ void FaultManager::set(ServiceContext* svcCtx, std::unique_ptr<FaultManager> new
 
 FaultManager::FaultManager(ServiceContext* svcCtx,
                            std::shared_ptr<executor::TaskExecutor> taskExecutor)
-    : _svcCtx(svcCtx), _taskExecutor(taskExecutor) {}
+    : _svcCtx(svcCtx), _taskExecutor(taskExecutor) {
+    invariant(_svcCtx);
+    invariant(_svcCtx->getFastClockSource());
+}
 
 void FaultManager::schedulePeriodicHealthCheckThread(bool immediately) {
     if (!feature_flags::gFeatureFlagHealthMonitoring.isEnabled(
@@ -110,9 +113,11 @@ void FaultManager::schedulePeriodicHealthCheckThread(bool immediately) {
 }
 
 FaultManager::~FaultManager() {
+    _taskExecutor->shutdown();
     if (_periodicHealthCheckCbHandle) {
         _taskExecutor->cancel(*_periodicHealthCheckCbHandle);
     }
+    _taskExecutor->join();
 }
 
 void FaultManager::startPeriodicHealthChecks() {
@@ -134,7 +139,7 @@ FaultConstPtr FaultManager::currentFault() const {
     return std::static_pointer_cast<const Fault>(_fault);
 }
 
-FaultFacetsContainerPtr FaultManager::getFaultFacetsContainer() {
+FaultFacetsContainerPtr FaultManager::getFaultFacetsContainer() const {
     auto lk = stdx::lock_guard(_mutex);
     return std::static_pointer_cast<FaultFacetsContainer>(_fault);
 }
@@ -158,7 +163,7 @@ void FaultManager::healthCheck() {
 
     // Start checks outside of lock.
     for (auto observer : observers) {
-        observer->periodicCheck(*this);
+        observer->periodicCheck(*this, _taskExecutor);
     }
 
     // Garbage collect all resolved fault facets.
@@ -179,6 +184,45 @@ void FaultManager::healthCheck() {
 
     // Actions above can result in a state change.
     checkForStateTransition();
+}
+
+void FaultManager::updateWithCheckStatus(HealthCheckStatus&& checkStatus) {
+    auto container = getFaultFacetsContainer();
+    if (HealthCheckStatus::isResolved(checkStatus.getSeverity())) {
+        if (container) {
+            container->updateWithSuppliedFacet(checkStatus.getType(), nullptr);
+        }
+        return;
+    }
+
+    // TODO(SERVER-60587): implement Facet properly.
+    class Impl : public FaultFacet {
+    public:
+        Impl(HealthCheckStatus status) : _status(status) {}
+
+        FaultFacetType getType() const override {
+            return _status.getType();
+        }
+
+        HealthCheckStatus getStatus() const override {
+            return _status;
+        }
+
+    private:
+        HealthCheckStatus _status;
+    };
+
+    if (!container) {
+        // Need to create container first.
+        container = getOrCreateFaultFacetsContainer();
+    }
+
+    auto facet = container->getFaultFacet(checkStatus.getType());
+    if (!facet) {
+        auto newFacet = FaultFacetPtr(new Impl(checkStatus));
+        container->updateWithSuppliedFacet(checkStatus.getType(), newFacet);
+    }
+    // TODO(SERVER-60587): update facet with new check status.
 }
 
 void FaultManager::checkForStateTransition() {
@@ -257,14 +301,15 @@ void FaultManager::_initHealthObserversIfNeeded() {
         return;
     }
 
-    stdx::lock_guard<Latch> lk(_mutex);
+    auto lk = stdx::lock_guard(_mutex);
     // One more time under lock to avoid race.
     if (_initializedAllHealthObservers.load()) {
         return;
     }
     _initializedAllHealthObservers.store(true);
 
-    _observers = HealthObserverRegistration::instantiateAllObservers(_svcCtx->getFastClockSource());
+    _observers = HealthObserverRegistration::instantiateAllObservers(_svcCtx->getFastClockSource(),
+                                                                     _svcCtx->getTickSource());
 
     // Verify that all observer types are unique.
     std::set<FaultFacetType> allTypes;
@@ -273,7 +318,7 @@ void FaultManager::_initHealthObserversIfNeeded() {
     }
     invariant(allTypes.size() == _observers.size());
 
-    stdx::lock_guard<Latch> lk2(_stateMutex);
+    auto lk2 = stdx::lock_guard(_stateMutex);
     LOGV2(5956701,
           "Instantiated health observers, periodic health checking starts",
           "managerState"_attr = _currentState,

@@ -34,6 +34,7 @@
 #include "mongo/db/process_health/health_observer_registration.h"
 #include "mongo/db/service_context.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
 
@@ -51,6 +52,33 @@ public:
         HealthObserverRegistration::resetObserverFactoriesForTest();
         FaultManagerTestNoPeriodicThread::setUp();
     }
+
+    void waitForFaultBeingResolved() {
+        Timer t;
+        while (manager().currentFault() && t.elapsed() < Minutes(1)) {
+            sleepFor(Milliseconds(10));
+        }
+    }
+
+    void waitForFaultBeingCreated() {
+        Timer t;
+        while (!manager().currentFault() && t.elapsed() < Minutes(1)) {
+            sleepFor(Milliseconds(10));
+        }
+    }
+
+    void waitForTransitionIntoState(FaultState state) {
+        Timer t;
+        while (manager().getFaultState() != state ||
+               (state == FaultState::kOk && manager().currentFault())) {
+            advanceTime(Milliseconds(100));
+            manager().healthCheckTest();
+            sleepFor(Milliseconds(1));
+            if (t.elapsed() >= Minutes(1)) {
+                break;
+            }
+        };
+    }
 };
 
 // Tests that the mock observer is registered properly.
@@ -59,7 +87,8 @@ public:
 // by the instantiate method below will be greater than expected.
 TEST_F(FaultManagerTestWithObserversReset, Registration) {
     registerMockHealthObserver(FaultFacetType::kMock1, [] { return 0; });
-    auto allObservers = HealthObserverRegistration::instantiateAllObservers(&clockSource());
+    auto allObservers =
+        HealthObserverRegistration::instantiateAllObservers(&clockSource(), &tickSource());
     ASSERT_EQ(1, allObservers.size());
     ASSERT_EQ(FaultFacetType::kMock1, allObservers[0]->getType());
 }
@@ -68,34 +97,33 @@ TEST_F(FaultManagerTestWithObserversReset, HealthCheckCreatesObservers) {
     registerMockHealthObserver(FaultFacetType::kMock1, [] { return 0.1; });
     ASSERT_EQ(0, manager().getHealthObserversTest().size());
 
-    // Trigger periodic health check.
-    startHealthCheckThread();
+    advanceTime(Milliseconds(100));
+    manager().healthCheckTest();
     ASSERT_EQ(1, manager().getHealthObserversTest().size());
 }
 
 TEST_F(FaultManagerTestWithObserversReset, HealthCheckCreatesFacetOnHealthCheckFoundFault) {
     registerMockHealthObserver(FaultFacetType::kMock1, [] { return 0.1; });
-    startHealthCheckThread();
 
+    advanceTime(Milliseconds(100));
+    manager().healthCheckTest();
+    waitForFaultBeingCreated();
     auto currentFault = manager().currentFault();
     ASSERT_TRUE(currentFault);  // Is created.
 }
-
 
 TEST_F(FaultManagerTestWithObserversReset, StateTransitionOnHealthCheckFoundFault) {
     registerMockHealthObserver(FaultFacetType::kMock1, [] { return 0.1; });
     ASSERT_EQ(FaultState::kStartupCheck, manager().getFaultState());
 
-    startHealthCheckThread();
+    waitForTransitionIntoState(FaultState::kTransientFault);
     ASSERT_EQ(FaultState::kTransientFault, manager().getFaultState());
 }
 
 TEST_F(FaultManagerTestWithObserversReset, HealthCheckCreatesCorrectFacetOnHealthCheckFoundFault) {
     registerMockHealthObserver(FaultFacetType::kMock1, [] { return 0.1; });
     registerMockHealthObserver(FaultFacetType::kMock2, [] { return 0.0; });
-    startHealthCheckThread();
-    auto currentFault = manager().currentFault();
-    ASSERT_TRUE(currentFault);  // Is created.
+    waitForTransitionIntoState(FaultState::kTransientFault);
 
     FaultInternal& internalFault = manager().getFault();
     ASSERT_TRUE(internalFault.getFaultFacet(FaultFacetType::kMock1));
@@ -105,33 +133,31 @@ TEST_F(FaultManagerTestWithObserversReset, HealthCheckCreatesCorrectFacetOnHealt
 TEST_F(FaultManagerTestWithObserversReset, SeverityIsMaxFromAllFacetsSeverity) {
     registerMockHealthObserver(FaultFacetType::kMock1, [] { return 0.8; });
     registerMockHealthObserver(FaultFacetType::kMock2, [] { return 0.5; });
-    startHealthCheckThread();
+    advanceTime(Milliseconds(100));
+    manager().healthCheckTest();
+    do {
+        waitForFaultBeingCreated();
+    } while (manager().getFault().getFacets().size() != 2);  // Race between two facets.
     auto currentFault = manager().currentFault();
 
     ASSERT_APPROX_EQUAL(0.8, currentFault->getSeverity(), 0.001);
 }
 
-TEST_F(FaultManagerTestWithObserversReset, HealthCheckCreatesFacetThenIsGarbageCollected) {
+TEST_F(FaultManagerTestWithObserversReset,
+       HealthCheckCreatesFacetThenIsGarbageCollectedAndStateTransitioned) {
     AtomicDouble severity{0.1};
     registerMockHealthObserver(FaultFacetType::kMock1, [&severity] { return severity.load(); });
-    startHealthCheckThread();
+    advanceTime(Milliseconds(100));
+    manager().healthCheckTest();
+    waitForFaultBeingCreated();
     ASSERT_TRUE(manager().currentFault());  // Is created.
 
     // Resolve and it should be garbage collected.
     severity.store(0.0);
-    advanceTime(Milliseconds(60));
+    waitForTransitionIntoState(FaultState::kOk);
+
     ASSERT_FALSE(manager().currentFault());
-}
-
-TEST_F(FaultManagerTestWithObserversReset, StateTransitionOnGarbageCollection) {
-    AtomicDouble severity{0.1};
-    registerMockHealthObserver(FaultFacetType::kMock1, [&severity] { return severity.load(); });
-    startHealthCheckThread();
-    ASSERT_EQ(FaultState::kTransientFault, manager().getFaultState());
-
-    // Resolve, it should be garbage collected and the state should change.
-    severity.store(0.0);
-    advanceTime(Milliseconds(60));
+    // State is transitioned.
     ASSERT_EQ(FaultState::kOk, manager().getFaultState());
 }
 
@@ -140,36 +166,62 @@ TEST_F(FaultManagerTestWithObserversReset, HealthCheckCreates2FacetsThenIsGarbag
     AtomicDouble severity2{0.1};
     registerMockHealthObserver(FaultFacetType::kMock1, [&severity1] { return severity1.load(); });
     registerMockHealthObserver(FaultFacetType::kMock2, [&severity2] { return severity2.load(); });
-    startHealthCheckThread();
+    manager().healthCheckTest();
+    waitForFaultBeingCreated();
 
-    FaultInternal& internalFault = manager().getFault();
-    ASSERT_TRUE(internalFault.getFaultFacet(FaultFacetType::kMock1));
-    ASSERT_TRUE(internalFault.getFaultFacet(FaultFacetType::kMock2));
+    while (manager().getFault().getFacets().size() != 2) {
+        sleepFor(Milliseconds(1));
+    }
 
     // Resolve one facet and it should be garbage collected.
     severity1.store(0.0);
-    advanceTime(Milliseconds(60));
+    advanceTime(Milliseconds(100));
+    manager().healthCheckTest();
+
+    FaultInternal& internalFault = manager().getFault();
+    while (internalFault.getFaultFacet(FaultFacetType::kMock1)) {
+        sleepFor(Milliseconds(1));
+        // Check is async, needs more turns for garbage collection to work.
+        advanceTime(Milliseconds(100));
+        manager().healthCheckTest();
+    }
     ASSERT_FALSE(internalFault.getFaultFacet(FaultFacetType::kMock1));
     ASSERT_TRUE(internalFault.getFaultFacet(FaultFacetType::kMock2));
 }
 
 TEST_F(FaultManagerTestWithObserversReset, HealthCheckWithOffFacetCreatesNoFault) {
     registerMockHealthObserver(FaultFacetType::kMock1, [] { return 0.0; });
-    startHealthCheckThread();
+    manager().healthCheckTest();
+    waitForFaultBeingResolved();
     auto currentFault = manager().currentFault();
     ASSERT_TRUE(!currentFault);  // Is not created.
 }
 
-TEST_F(FaultManagerTestWithObserversReset, HealthCheckWithNonCriticalFacetCreatesFault) {
-    registerMockHealthObserver(FaultFacetType::kMock1, [] { return 0.1; });
-    startHealthCheckThread();
+TEST_F(FaultManagerTestWithObserversReset, DoesNotRestartCheckBeforeIntervalExpired) {
+    AtomicDouble severity{0.0};
+    registerMockHealthObserver(FaultFacetType::kMock1, [&severity] { return severity.load(); });
+    manager().healthCheckTest();
+    waitForFaultBeingResolved();
     auto currentFault = manager().currentFault();
-    ASSERT_TRUE(currentFault);
+    ASSERT_TRUE(!currentFault);  // Is not created.
+
+    severity.store(0.1);
+    manager().healthCheckTest();
+    currentFault = manager().currentFault();
+    // The check did not run because the delay interval did not expire.
+    ASSERT_TRUE(!currentFault);
+
+    advanceTime(Milliseconds(100));
+    manager().healthCheckTest();
+    waitForFaultBeingCreated();
+    currentFault = manager().currentFault();
+    ASSERT_TRUE(currentFault);  // The fault was created.
 }
 
 TEST_F(FaultManagerTestWithObserversReset, HealthCheckWithCriticalFacetCreatesFault) {
     registerMockHealthObserver(FaultFacetType::kMock1, [] { return 1.1; });
-    startHealthCheckThread();
+    manager().healthCheckTest();
+    waitForFaultBeingCreated();
     auto currentFault = manager().currentFault();
     ASSERT_TRUE(currentFault);
 }
