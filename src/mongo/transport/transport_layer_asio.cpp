@@ -99,6 +99,7 @@ boost::optional<Status> maybeTcpFastOpenStatus;
 }  // namespace
 
 MONGO_FAIL_POINT_DEFINE(transportLayerASIOasyncConnectTimesOut);
+MONGO_FAIL_POINT_DEFINE(transportLayerASIOhangBeforeAccept);
 
 #ifdef MONGO_CONFIG_SSL
 SSLConnectionContext::~SSLConnectionContext() = default;
@@ -538,8 +539,11 @@ StatusWith<TransportLayerASIO::ASIOSessionHandle> TransportLayerASIO::_doSyncCon
 #ifdef TCP_FASTOPEN_CONNECT
     const auto family = protocol.family();
     if ((family == AF_INET) || (family == AF_INET6)) {
-        setSocketOption(
-            sock, TCPFastOpenConnect(gTCPFastOpenClient), ec, "connect (sync) TCP fast open");
+        setSocketOption(sock,
+                        TCPFastOpenConnect(gTCPFastOpenClient),
+                        "connect (sync) TCP fast open",
+                        logv2::LogSeverity::Info(),
+                        ec);
         if (tcpFastOpenIsConfigured) {
             return errorCodeToStatus(ec);
         }
@@ -692,8 +696,9 @@ Future<SessionHandle> TransportLayerASIO::asyncConnect(
             std::error_code ec;
             setSocketOption(connector->socket,
                             TCPFastOpenConnect(gTCPFastOpenClient),
-                            ec,
-                            "connect (async) TCP fast open");
+                            "connect (async) TCP fast open",
+                            logv2::LogSeverity::Info(),
+                            ec);
             if (tcpFastOpenIsConfigured) {
                 return futurize(ec);
             }
@@ -988,13 +993,19 @@ Status TransportLayerASIO::setup() {
 
             throw;
         }
-        setSocketOption(acceptor, GenericAcceptor::reuse_address(true), "acceptor reuse address");
+        setSocketOption(acceptor,
+                        GenericAcceptor::reuse_address(true),
+                        "acceptor reuse address",
+                        logv2::LogSeverity::Info());
 
         std::error_code ec;
 #ifdef TCP_FASTOPEN
         if (gTCPFastOpenServer && ((addr.family() == AF_INET) || (addr.family() == AF_INET6))) {
-            setSocketOption(
-                acceptor, TCPFastOpen(gTCPFastOpenQueueSize), ec, "acceptor TCP fast open");
+            setSocketOption(acceptor,
+                            TCPFastOpen(gTCPFastOpenQueueSize),
+                            "acceptor TCP fast open",
+                            logv2::LogSeverity::Info(),
+                            ec);
             if (tcpFastOpenIsConfigured) {
                 return errorCodeToStatus(ec);
             }
@@ -1002,7 +1013,8 @@ Status TransportLayerASIO::setup() {
         }
 #endif
         if (addr.family() == AF_INET6) {
-            setSocketOption(acceptor, asio::ip::v6_only(true), "acceptor v6 only");
+            setSocketOption(
+                acceptor, asio::ip::v6_only(true), "acceptor v6 only", logv2::LogSeverity::Info());
         }
 
         acceptor.non_blocking(true, ec);
@@ -1187,6 +1199,8 @@ ReactorHandle TransportLayerASIO::getReactor(WhichReactor which) {
 void TransportLayerASIO::_acceptConnection(GenericAcceptor& acceptor) {
     auto acceptCb = [this, &acceptor](const std::error_code& ec,
                                       ASIOSession::GenericSocket peerSocket) mutable {
+        transportLayerASIOhangBeforeAccept.pauseWhileSet();
+
         if (auto lk = stdx::lock_guard(_mutex); _isShutdown) {
             return;
         }
@@ -1214,6 +1228,16 @@ void TransportLayerASIO::_acceptConnection(GenericAcceptor& acceptor) {
             std::shared_ptr<ASIOSession> session(
                 new ASIOSession(this, std::move(peerSocket), true));
             _sep->startSession(std::move(session));
+        } catch (const asio::system_error& e) {
+            // Swallow connection reset errors. Connection reset errors classically present as
+            // asio::error::eof, but can bubble up as asio::error::invalid_argument when calling
+            // into socket.set_option().
+            if (e.code() != asio::error::eof && e.code() != asio::error::invalid_argument) {
+                LOGV2_WARNING(5746600,
+                              "Error accepting new connection: {error}",
+                              "Error accepting new connection",
+                              "error"_attr = e.code().message());
+            }
         } catch (const DBException& e) {
             LOGV2_WARNING(23023,
                           "Error accepting new connection: {error}",

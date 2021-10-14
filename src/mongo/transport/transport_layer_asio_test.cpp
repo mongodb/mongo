@@ -104,14 +104,21 @@ class SimpleConnectionThread {
 public:
     explicit SimpleConnectionThread(int port) : _port(port) {
         _thr = stdx::thread{[&] {
-            Socket s;
             auto sa = SockAddr::create("localhost", _port, AF_INET);
-            s.connect(sa);
+            _s.connect(sa);
             LOGV2(23034, "connection: port {port}", "port"_attr = _port);
             stdx::unique_lock<Latch> lk(_mutex);
             _cv.wait(lk, [&] { return _stop; });
             LOGV2(23035, "connection: Rx stop request");
         }};
+    }
+
+    void forceCloseSocket() {
+        // Setting linger on to a zero-value timeout causes the socket to send an RST packet to the
+        // recipient side when closing the connection.
+        struct linger sl = {1, 0};
+        ASSERT_EQ(setsockopt(_s.rawFD(), SOL_SOCKET, SO_LINGER, &sl, sizeof(sl)), 0);
+        _s.close();
     }
 
     void stop() {
@@ -130,12 +137,12 @@ private:
     stdx::condition_variable _cv;
     stdx::thread _thr;
     bool _stop = false;
+
+    Socket _s;
     int _port;
 };
 
-TEST(TransportLayerASIO, PortZeroConnect) {
-    ServiceEntryPointUtil sepu;
-
+std::unique_ptr<transport::TransportLayerASIO> makeAndStartTL(ServiceEntryPoint* sep) {
     auto options = [] {
         ServerGlobalParams params;
         params.noUnixSocket = true;
@@ -147,20 +154,46 @@ TEST(TransportLayerASIO, PortZeroConnect) {
         return opts;
     }();
 
-    transport::TransportLayerASIO tla(options, &sepu);
-    sepu.setTransportLayer(&tla);
+    auto tla = std::make_unique<transport::TransportLayerASIO>(options, sep);
+    ASSERT_OK(tla->setup());
+    ASSERT_OK(tla->start());
 
-    ASSERT_OK(tla.setup());
-    ASSERT_OK(tla.start());
-    int port = tla.listenerPort();
+    return tla;
+}
+
+TEST(TransportLayerASIO, PortZeroConnect) {
+    ServiceEntryPointUtil sepu;
+    auto tla = makeAndStartTL(&sepu);
+
+    int port = tla->listenerPort();
     ASSERT_GT(port, 0);
     LOGV2(23038, "TransportLayerASIO.listenerPort() is {port}", "port"_attr = port);
 
     SimpleConnectionThread connect_thread(port);
     sepu.waitForConnect();
+
+    ASSERT_EQ(sepu.numOpenSessions(), 1);
     connect_thread.stop();
     sepu.endAllSessions({});
-    tla.shutdown();
+    tla->shutdown();
+}
+
+TEST(TransportLayerASIO, TCPResetAfterConnectionIsSilentlySwallowed) {
+    ServiceEntryPointUtil sepu;
+    auto tla = makeAndStartTL(&sepu);
+
+    auto hangBeforeAcceptFp = globalFailPointRegistry().find("transportLayerASIOhangBeforeAccept");
+    auto timesEntered = hangBeforeAcceptFp->setMode(FailPoint::alwaysOn);
+
+    SimpleConnectionThread connect_thread(tla->listenerPort());
+    hangBeforeAcceptFp->waitForTimesEntered(timesEntered + 1);
+
+    connect_thread.forceCloseSocket();
+    hangBeforeAcceptFp->setMode(FailPoint::off);
+
+    ASSERT_EQ(sepu.numOpenSessions(), 0);
+    connect_thread.stop();
+    tla->shutdown();
 }
 
 class TimeoutSEP : public ServiceEntryPoint {
@@ -290,22 +323,6 @@ private:
     asio::ip::tcp::socket _sock;
     asio::ip::tcp::endpoint _endpoint;
 };
-
-std::unique_ptr<transport::TransportLayerASIO> makeAndStartTL(ServiceEntryPoint* sep) {
-    auto options = [] {
-        ServerGlobalParams params;
-        params.noUnixSocket = true;
-        transport::TransportLayerASIO::Options opts(&params);
-        opts.port = 0;
-        return opts;
-    }();
-
-    auto tla = std::make_unique<transport::TransportLayerASIO>(options, sep);
-    ASSERT_OK(tla->setup());
-    ASSERT_OK(tla->start());
-
-    return tla;
-}
 
 /* check that timeouts actually time out */
 TEST(TransportLayerASIO, SourceSyncTimeoutTimesOut) {

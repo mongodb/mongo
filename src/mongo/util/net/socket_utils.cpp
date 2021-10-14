@@ -102,38 +102,45 @@ const CString kKeepAliveInterval(X_STR_CONST("KeepAliveInterval"));
 #endif
 
 void setSocketKeepAliveParams(int sock,
-                              unsigned int maxKeepIdleSecs,
-                              unsigned int maxKeepIntvlSecs) {
+                              logv2::LogSeverity errorLogSeverity,
+                              Seconds maxKeepIdleSecs,
+                              Seconds maxKeepIntvlSecs) {
+    int logSeverity = errorLogSeverity.toInt();
+
 #ifdef _WIN32
     // Defaults per MSDN when registry key does not exist.
     // Expressed in seconds here to be consistent with posix,
     // though Windows uses milliseconds.
-    const DWORD kWindowsKeepAliveTimeSecsDefault = 2 * 60 * 60;
-    const DWORD kWindowsKeepAliveIntervalSecsDefault = 1;
+    static constexpr Seconds kWindowsKeepAliveTimeDefault{Hours{2}};
+    static constexpr Seconds kWindowsKeepAliveIntervalDefault{1};
 
-    const auto getKey = [](const CString& key, DWORD default_value) {
-        auto withval = windows::getDWORDRegistryKey(kKeepAliveGroup, key);
-        if (withval.isOK()) {
-            auto val = withval.getValue();
+    const auto getKey = [&](const CString& key, Seconds defaultValue) {
+        auto swValOpt = windows::getDWORDRegistryKey(kKeepAliveGroup, key);
+        if (swValOpt.isOK()) {
+            auto valOpt = swValOpt.getValue();
             // Return seconds
-            return val ? (val.get() / 1000) : default_value;
+            return valOpt ? duration_cast<Seconds>(Milliseconds(valOpt.get())) : defaultValue;
         }
-        LOGV2_ERROR(23203,
+        LOGV2_DEBUG(23203,
+                    logSeverity,
                     "can't get KeepAlive parameter: {error}",
                     "Can't get KeepAlive parameter",
-                    "error"_attr = withval.getStatus());
-        return default_value;
+                    "error"_attr = swValOpt.getStatus());
+
+        return defaultValue;
     };
 
-    const auto keepIdleSecs = getKey(kKeepAliveTime, kWindowsKeepAliveTimeSecsDefault);
-    const auto keepIntvlSecs = getKey(kKeepAliveInterval, kWindowsKeepAliveIntervalSecsDefault);
+    const auto keepIdleSecs = getKey(kKeepAliveTime, kWindowsKeepAliveTimeDefault);
+    const auto keepIntvlSecs = getKey(kKeepAliveInterval, kWindowsKeepAliveIntervalDefault);
 
     if ((keepIdleSecs > maxKeepIdleSecs) || (keepIntvlSecs > maxKeepIntvlSecs)) {
         DWORD sent = 0;
         struct tcp_keepalive keepalive;
         keepalive.onoff = TRUE;
-        keepalive.keepalivetime = std::min<DWORD>(keepIdleSecs, maxKeepIdleSecs) * 1000;
-        keepalive.keepaliveinterval = std::min<DWORD>(keepIntvlSecs, maxKeepIntvlSecs) * 1000;
+        keepalive.keepalivetime =
+            durationCount<Milliseconds>(std::min(keepIdleSecs, maxKeepIdleSecs));
+        keepalive.keepaliveinterval =
+            durationCount<Milliseconds>(std::min(keepIntvlSecs, maxKeepIntvlSecs));
         if (WSAIoctl(sock,
                      SIO_KEEPALIVE_VALS,
                      &keepalive,
@@ -143,37 +150,45 @@ void setSocketKeepAliveParams(int sock,
                      &sent,
                      nullptr,
                      nullptr)) {
-            LOGV2_ERROR(23204,
+            int wsaErr = WSAGetLastError();
+            LOGV2_DEBUG(23204,
+                        logSeverity,
                         "failed setting keepalive values: {error}",
                         "Failed setting keepalive values",
-                        "error"_attr = WSAGetLastError());
+                        "error"_attr = errnoWithDescription(wsaErr));
         }
     }
 #elif defined(__APPLE__) || defined(__linux__)
-    const auto updateSockOpt =
-        [sock](int level, int optnum, unsigned int maxval, StringData optname) {
-            unsigned int optval = 1;
-            socklen_t len = sizeof(optval);
+    const auto updateSockOpt = [&](int level, int optnum, Seconds maxVal, StringData optname) {
+        Seconds optVal{1};
+        unsigned int rawOptVal = durationCount<Seconds>(optVal);
+        socklen_t optValLen = sizeof(rawOptVal);
 
-            if (getsockopt(sock, level, optnum, (char*)&optval, &len)) {
-                LOGV2_ERROR(23205,
-                            "can't get {optname}: {error}",
-                            "Can't get socket option",
+        if (getsockopt(sock, level, optnum, reinterpret_cast<char*>(&rawOptVal), &optValLen)) {
+            int savedErrno = errno;
+            LOGV2_DEBUG(23205,
+                        logSeverity,
+                        "can't get {optname}: {error}",
+                        "Can't get socket option",
+                        "optname"_attr = optname,
+                        "error"_attr = errnoWithDescription(savedErrno));
+        }
+
+        if (optVal > maxVal) {
+            unsigned int rawMaxVal = durationCount<Seconds>(maxVal);
+            socklen_t maxValLen = sizeof(rawMaxVal);
+
+            if (setsockopt(sock, level, optnum, reinterpret_cast<char*>(&rawMaxVal), maxValLen)) {
+                int savedErrno = errno;
+                LOGV2_DEBUG(23206,
+                            logSeverity,
+                            "can't set {optname}: {error}",
+                            "Can't set socket option",
                             "optname"_attr = optname,
-                            "error"_attr = errnoWithDescription());
+                            "error"_attr = errnoWithDescription(savedErrno));
             }
-
-            if (optval > maxval) {
-                optval = maxval;
-                if (setsockopt(sock, level, optnum, (char*)&optval, sizeof(optval))) {
-                    LOGV2_ERROR(23206,
-                                "can't set {optname}: {error}",
-                                "Can't set socket option",
-                                "optname"_attr = optname,
-                                "error"_attr = errnoWithDescription());
-                }
-            }
-        };
+        }
+    };
 
 #ifdef __APPLE__
     updateSockOpt(IPPROTO_TCP, TCP_KEEPALIVE, maxKeepIdleSecs, "TCP_KEEPALIVE");

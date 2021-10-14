@@ -171,7 +171,7 @@ void disableNagle(int sock) {
                     "error"_attr = errnoWithDescription());
 #endif
 
-    setSocketKeepAliveParams(sock);
+    setSocketKeepAliveParams(sock, logv2::LogSeverity::Error());
 }
 
 int socketGetLastError() {

@@ -303,19 +303,19 @@ boost::optional<std::array<std::uint8_t, 7>> checkTLSRequest(const asio::const_b
 
 void failedSetSocketOption(const std::system_error& ex,
                            StringData note,
-                           BSONObj optionDescription) {
-    LOGV2_INFO(5693100,
-               "Asio socket.set_option failed with std::system_error",
-               "note"_attr = note,
-               "option"_attr = optionDescription,
-               "error"_attr = [&ex] {
-                   return BSONObjBuilder{}
-                       .append("what", ex.what())
-                       .append("message", ex.code().message())
-                       .append("category", ex.code().category().name())
-                       .append("value", ex.code().value())
-                       .obj();
-               }());
+                           BSONObj optionDescription,
+                           logv2::LogSeverity errorLogSeverity) {
+    LOGV2_DEBUG(5693100,
+                errorLogSeverity.toInt(),
+                "Asio socket.set_option failed with std::system_error",
+                "note"_attr = note,
+                "option"_attr = optionDescription,
+                "error"_attr = BSONObjBuilder{}
+                                   .append("what", ex.what())
+                                   .append("message", ex.code().message())
+                                   .append("category", ex.code().category().name())
+                                   .append("value", ex.code().value())
+                                   .obj());
 }
 
 }  // namespace mongo::transport

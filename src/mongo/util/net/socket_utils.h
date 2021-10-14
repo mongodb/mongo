@@ -31,12 +31,19 @@
 
 #include <string>
 
+#include "mongo/logv2/log_severity.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 
+inline constexpr Seconds kMaxKeepIdleSecs{300};
+inline constexpr Seconds kMaxKeepIntvlSecs{1};
+
+
 void setSocketKeepAliveParams(int sock,
-                              unsigned int maxKeepIdleSecs = 300,
-                              unsigned int maxKeepIntvlSecs = 1);
+                              logv2::LogSeverity errorLogSeverity,
+                              Seconds maxKeepIdleSecs = kMaxKeepIdleSecs,
+                              Seconds maxKeepIntvlSecs = kMaxKeepIntvlSecs);
 
 std::string makeUnixSockPath(int port);
 
