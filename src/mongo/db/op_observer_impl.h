@@ -97,7 +97,7 @@ public:
 
     void onInserts(OperationContext* opCtx,
                    const NamespaceString& nss,
-                   OptionalCollectionUUID uuid,
+                   const UUID& uuid,
                    std::vector<InsertStatement>::const_iterator begin,
                    std::vector<InsertStatement>::const_iterator end,
                    bool fromMigrate) final;
@@ -107,7 +107,7 @@ public:
                        const BSONObj& doc) final;
     void onDelete(OperationContext* opCtx,
                   const NamespaceString& nss,
-                  OptionalCollectionUUID uuid,
+                  const UUID& uuid,
                   StmtId stmtId,
                   const OplogDeleteEntryArgs& args) final;
     void onInternalOpMessage(OperationContext* opCtx,

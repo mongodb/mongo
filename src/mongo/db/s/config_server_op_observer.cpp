@@ -59,7 +59,7 @@ ConfigServerOpObserver::~ConfigServerOpObserver() = default;
 
 void ConfigServerOpObserver::onDelete(OperationContext* opCtx,
                                       const NamespaceString& nss,
-                                      OptionalCollectionUUID uuid,
+                                      const UUID& uuid,
                                       StmtId stmtId,
                                       const OplogDeleteEntryArgs& args) {
     if (nss == VersionType::ConfigNS) {
@@ -106,7 +106,7 @@ void ConfigServerOpObserver::onReplicationRollback(OperationContext* opCtx,
 
 void ConfigServerOpObserver::onInserts(OperationContext* opCtx,
                                        const NamespaceString& nss,
-                                       OptionalCollectionUUID uuid,
+                                       const UUID& uuid,
                                        std::vector<InsertStatement>::const_iterator begin,
                                        std::vector<InsertStatement>::const_iterator end,
                                        bool fromMigrate) {

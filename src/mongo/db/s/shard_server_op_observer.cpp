@@ -247,7 +247,7 @@ ShardServerOpObserver::~ShardServerOpObserver() = default;
 
 void ShardServerOpObserver::onInserts(OperationContext* opCtx,
                                       const NamespaceString& nss,
-                                      OptionalCollectionUUID uuid,
+                                      const UUID& uuid,
                                       std::vector<InsertStatement>::const_iterator begin,
                                       std::vector<InsertStatement>::const_iterator end,
                                       bool fromMigrate) {
@@ -475,7 +475,7 @@ void ShardServerOpObserver::aboutToDelete(OperationContext* opCtx,
 
 void ShardServerOpObserver::onDelete(OperationContext* opCtx,
                                      const NamespaceString& nss,
-                                     OptionalCollectionUUID uuid,
+                                     const UUID& uuid,
                                      StmtId stmtId,
                                      const OplogDeleteEntryArgs& args) {
     auto& documentId = documentIdDecoration(opCtx);

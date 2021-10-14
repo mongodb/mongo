@@ -262,7 +262,7 @@ public:
      */
     void onInserts(OperationContext* opCtx,
                    const NamespaceString& nss,
-                   OptionalCollectionUUID uuid,
+                   const UUID& uuid,
                    std::vector<InsertStatement>::const_iterator begin,
                    std::vector<InsertStatement>::const_iterator end,
                    bool fromMigrate) override;
@@ -318,7 +318,7 @@ void MapReduceOpObserver::onStartIndexBuild(OperationContext* opCtx,
 
 void MapReduceOpObserver::onInserts(OperationContext* opCtx,
                                     const NamespaceString& nss,
-                                    OptionalCollectionUUID uuid,
+                                    const UUID& uuid,
                                     std::vector<InsertStatement>::const_iterator begin,
                                     std::vector<InsertStatement>::const_iterator end,
                                     bool fromMigrate) {

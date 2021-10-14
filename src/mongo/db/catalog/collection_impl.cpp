@@ -806,7 +806,7 @@ Status CollectionImpl::insertDocumentForBulkLoader(
     }
     inserts.emplace_back(kUninitializedStmtId, doc, slot);
 
-    getGlobalServiceContext()->getOpObserver()->onInserts(
+    opCtx->getServiceContext()->getOpObserver()->onInserts(
         opCtx, ns(), uuid(), inserts.begin(), inserts.end(), false);
 
     _cappedDeleteAsNeeded(opCtx, loc.getValue());

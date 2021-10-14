@@ -54,7 +54,7 @@ namespace repl {
 
 void OplogApplierImplOpObserver::onInserts(OperationContext* opCtx,
                                            const NamespaceString& nss,
-                                           OptionalCollectionUUID uuid,
+                                           const UUID& uuid,
                                            std::vector<InsertStatement>::const_iterator begin,
                                            std::vector<InsertStatement>::const_iterator end,
                                            bool fromMigrate) {
@@ -71,7 +71,7 @@ void OplogApplierImplOpObserver::onInserts(OperationContext* opCtx,
 
 void OplogApplierImplOpObserver::onDelete(OperationContext* opCtx,
                                           const NamespaceString& nss,
-                                          OptionalCollectionUUID uuid,
+                                          const UUID& uuid,
                                           StmtId stmtId,
                                           const OpObserver::OplogDeleteEntryArgs& args) {
     if (!onDeleteFn) {

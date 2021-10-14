@@ -197,7 +197,7 @@ private:
 
 void TenantMigrationDonorOpObserver::onInserts(OperationContext* opCtx,
                                                const NamespaceString& nss,
-                                               OptionalCollectionUUID uuid,
+                                               const UUID& uuid,
                                                std::vector<InsertStatement>::const_iterator first,
                                                std::vector<InsertStatement>::const_iterator last,
                                                bool fromMigrate) {
@@ -280,7 +280,7 @@ void TenantMigrationDonorOpObserver::aboutToDelete(OperationContext* opCtx,
 
 void TenantMigrationDonorOpObserver::onDelete(OperationContext* opCtx,
                                               const NamespaceString& nss,
-                                              OptionalCollectionUUID uuid,
+                                              const UUID& uuid,
                                               StmtId stmtId,
                                               const OplogDeleteEntryArgs& args) {
     if (nss == NamespaceString::kTenantMigrationDonorsNamespace &&

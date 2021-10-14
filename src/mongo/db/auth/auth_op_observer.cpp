@@ -52,7 +52,7 @@ AuthOpObserver::~AuthOpObserver() = default;
 
 void AuthOpObserver::onInserts(OperationContext* opCtx,
                                const NamespaceString& nss,
-                               OptionalCollectionUUID uuid,
+                               const UUID& uuid,
                                std::vector<InsertStatement>::const_iterator first,
                                std::vector<InsertStatement>::const_iterator last,
                                bool fromMigrate) {
@@ -86,7 +86,7 @@ void AuthOpObserver::aboutToDelete(OperationContext* opCtx,
 
 void AuthOpObserver::onDelete(OperationContext* opCtx,
                               const NamespaceString& nss,
-                              OptionalCollectionUUID uuid,
+                              const UUID& uuid,
                               StmtId stmtId,
                               const OplogDeleteEntryArgs& args) {
     auto& documentId = documentIdDecoration(opCtx);

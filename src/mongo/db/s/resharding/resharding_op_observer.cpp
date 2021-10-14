@@ -179,7 +179,7 @@ ReshardingOpObserver::~ReshardingOpObserver() = default;
 
 void ReshardingOpObserver::onInserts(OperationContext* opCtx,
                                      const NamespaceString& nss,
-                                     OptionalCollectionUUID uuid,
+                                     const UUID& uuid,
                                      std::vector<InsertStatement>::const_iterator begin,
                                      std::vector<InsertStatement>::const_iterator end,
                                      bool fromMigrate) {
@@ -233,7 +233,7 @@ void ReshardingOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEn
 
 void ReshardingOpObserver::onDelete(OperationContext* opCtx,
                                     const NamespaceString& nss,
-                                    OptionalCollectionUUID uuid,
+                                    const UUID& uuid,
                                     StmtId stmtId,
                                     const OplogDeleteEntryArgs& args) {
     if (nss == NamespaceString::kDonorReshardingOperationsNamespace) {

@@ -59,7 +59,7 @@ void PrimaryOnlyServiceOpObserver::aboutToDelete(OperationContext* opCtx,
 
 void PrimaryOnlyServiceOpObserver::onDelete(OperationContext* opCtx,
                                             const NamespaceString& nss,
-                                            OptionalCollectionUUID uuid,
+                                            const UUID& uuid,
                                             StmtId stmtId,
                                             const OplogDeleteEntryArgs& args) {
     auto& documentId = documentIdDecoration(opCtx);

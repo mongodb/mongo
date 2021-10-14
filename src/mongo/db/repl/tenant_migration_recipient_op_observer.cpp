@@ -151,7 +151,7 @@ void TenantMigrationRecipientOpObserver::aboutToDelete(OperationContext* opCtx,
 
 void TenantMigrationRecipientOpObserver::onDelete(OperationContext* opCtx,
                                                   const NamespaceString& nss,
-                                                  OptionalCollectionUUID uuid,
+                                                  const UUID& uuid,
                                                   StmtId stmtId,
                                                   const OplogDeleteEntryArgs& args) {
     if (nss == NamespaceString::kTenantMigrationRecipientsNamespace &&

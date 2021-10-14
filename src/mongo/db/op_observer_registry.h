@@ -68,53 +68,53 @@ public:
             o->onCreateIndex(opCtx, nss, uuid, indexDoc, fromMigrate);
     }
 
-    virtual void onStartIndexBuild(OperationContext* opCtx,
-                                   const NamespaceString& nss,
-                                   CollectionUUID collUUID,
-                                   const UUID& indexBuildUUID,
-                                   const std::vector<BSONObj>& indexes,
-                                   bool fromMigrate) override {
+    void onStartIndexBuild(OperationContext* opCtx,
+                           const NamespaceString& nss,
+                           CollectionUUID collUUID,
+                           const UUID& indexBuildUUID,
+                           const std::vector<BSONObj>& indexes,
+                           bool fromMigrate) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers) {
             o->onStartIndexBuild(opCtx, nss, collUUID, indexBuildUUID, indexes, fromMigrate);
         }
     }
 
-    virtual void onStartIndexBuildSinglePhase(OperationContext* opCtx,
-                                              const NamespaceString& nss) override {
+    void onStartIndexBuildSinglePhase(OperationContext* opCtx,
+                                      const NamespaceString& nss) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers) {
             o->onStartIndexBuildSinglePhase(opCtx, nss);
         }
     }
 
-    virtual void onAbortIndexBuildSinglePhase(OperationContext* opCtx,
-                                              const NamespaceString& nss) override {
+    void onAbortIndexBuildSinglePhase(OperationContext* opCtx,
+                                      const NamespaceString& nss) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers) {
             o->onAbortIndexBuildSinglePhase(opCtx, nss);
         }
     }
 
-    virtual void onCommitIndexBuild(OperationContext* opCtx,
-                                    const NamespaceString& nss,
-                                    CollectionUUID collUUID,
-                                    const UUID& indexBuildUUID,
-                                    const std::vector<BSONObj>& indexes,
-                                    bool fromMigrate) override {
+    void onCommitIndexBuild(OperationContext* opCtx,
+                            const NamespaceString& nss,
+                            CollectionUUID collUUID,
+                            const UUID& indexBuildUUID,
+                            const std::vector<BSONObj>& indexes,
+                            bool fromMigrate) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers) {
             o->onCommitIndexBuild(opCtx, nss, collUUID, indexBuildUUID, indexes, fromMigrate);
         }
     }
 
-    virtual void onAbortIndexBuild(OperationContext* opCtx,
-                                   const NamespaceString& nss,
-                                   CollectionUUID collUUID,
-                                   const UUID& indexBuildUUID,
-                                   const std::vector<BSONObj>& indexes,
-                                   const Status& cause,
-                                   bool fromMigrate) override {
+    void onAbortIndexBuild(OperationContext* opCtx,
+                           const NamespaceString& nss,
+                           CollectionUUID collUUID,
+                           const UUID& indexBuildUUID,
+                           const std::vector<BSONObj>& indexes,
+                           const Status& cause,
+                           bool fromMigrate) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers) {
             o->onAbortIndexBuild(opCtx, nss, collUUID, indexBuildUUID, indexes, cause, fromMigrate);
@@ -123,7 +123,7 @@ public:
 
     void onInserts(OperationContext* const opCtx,
                    const NamespaceString& nss,
-                   OptionalCollectionUUID uuid,
+                   const UUID& uuid,
                    std::vector<InsertStatement>::const_iterator begin,
                    std::vector<InsertStatement>::const_iterator end,
                    bool fromMigrate) override {
@@ -148,7 +148,7 @@ public:
 
     void onDelete(OperationContext* const opCtx,
                   const NamespaceString& nss,
-                  OptionalCollectionUUID uuid,
+                  const UUID& uuid,
                   StmtId stmtId,
                   const OplogDeleteEntryArgs& args) override {
         ReservedTimes times{opCtx};

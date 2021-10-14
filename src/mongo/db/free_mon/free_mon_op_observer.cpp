@@ -73,7 +73,7 @@ repl::OpTime FreeMonOpObserver::onDropCollection(OperationContext* opCtx,
 
 void FreeMonOpObserver::onInserts(OperationContext* opCtx,
                                   const NamespaceString& nss,
-                                  OptionalCollectionUUID uuid,
+                                  const UUID& uuid,
                                   std::vector<InsertStatement>::const_iterator begin,
                                   std::vector<InsertStatement>::const_iterator end,
                                   bool fromMigrate) {
@@ -132,7 +132,7 @@ void FreeMonOpObserver::aboutToDelete(OperationContext* opCtx,
 
 void FreeMonOpObserver::onDelete(OperationContext* opCtx,
                                  const NamespaceString& nss,
-                                 OptionalCollectionUUID uuid,
+                                 const UUID& uuid,
                                  StmtId stmtId,
                                  const OplogDeleteEntryArgs& args) {
     if (nss != NamespaceString::kServerConfigurationNamespace) {

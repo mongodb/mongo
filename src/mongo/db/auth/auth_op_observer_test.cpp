@@ -144,7 +144,7 @@ DEATH_TEST_F(AuthOpObserverTest, AboutToDeleteMustPreceedOnDelete, "invariant") 
     auto opCtx = cc().makeOperationContext();
     cc().swapLockState(std::make_unique<LockerNoop>());
     NamespaceString nss = {"test", "coll"};
-    opObserver.onDelete(opCtx.get(), nss, {}, {}, {});
+    opObserver.onDelete(opCtx.get(), nss, UUID::gen(), {}, {});
 }
 
 DEATH_TEST_F(AuthOpObserverTest, EachOnDeleteRequiresAboutToDelete, "invariant") {
@@ -153,8 +153,8 @@ DEATH_TEST_F(AuthOpObserverTest, EachOnDeleteRequiresAboutToDelete, "invariant")
     cc().swapLockState(std::make_unique<LockerNoop>());
     NamespaceString nss = {"test", "coll"};
     opObserver.aboutToDelete(opCtx.get(), nss, {});
-    opObserver.onDelete(opCtx.get(), nss, {}, {}, {});
-    opObserver.onDelete(opCtx.get(), nss, {}, {}, {});
+    opObserver.onDelete(opCtx.get(), nss, UUID::gen(), {}, {});
+    opObserver.onDelete(opCtx.get(), nss, UUID::gen(), {}, {});
 }
 
 }  // namespace

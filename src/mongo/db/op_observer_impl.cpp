@@ -519,7 +519,7 @@ void OpObserverImpl::onAbortIndexBuild(OperationContext* opCtx,
 
 void OpObserverImpl::onInserts(OperationContext* opCtx,
                                const NamespaceString& nss,
-                               OptionalCollectionUUID uuid,
+                               const UUID& uuid,
                                std::vector<InsertStatement>::const_iterator first,
                                std::vector<InsertStatement>::const_iterator last,
                                bool fromMigrate) {
@@ -544,7 +544,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
         }
 
         for (auto iter = first; iter != last; iter++) {
-            auto operation = MutableOplogEntry::makeInsertOperation(nss, uuid.get(), iter->doc);
+            auto operation = MutableOplogEntry::makeInsertOperation(nss, uuid, iter->doc);
             operation.setDestinedRecipient(
                 shardingWriteRouter.getReshardingDestinedRecipient(iter->doc));
             txnParticipant.addTransactionOperation(opCtx, operation);
@@ -771,7 +771,7 @@ void OpObserverImpl::aboutToDelete(OperationContext* opCtx,
 
 void OpObserverImpl::onDelete(OperationContext* opCtx,
                               const NamespaceString& nss,
-                              OptionalCollectionUUID uuid,
+                              const UUID& uuid,
                               StmtId stmtId,
                               const OplogDeleteEntryArgs& args) {
     auto optDocKey = documentKeyDecoration(opCtx);
@@ -789,7 +789,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
                 "Attempted a retryable write within a multi-document transaction",
                 args.retryableWritePreImageRecordingType == RetryableOptions::kNotRetryable);
         auto operation =
-            MutableOplogEntry::makeDeleteOperation(nss, uuid.get(), documentKey.getShardKeyAndId());
+            MutableOplogEntry::makeDeleteOperation(nss, uuid, documentKey.getShardKeyAndId());
 
         if (args.preImageRecordingEnabledForCollection) {
             tassert(5868701,
@@ -837,9 +837,9 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
         // and not performing an initial sync or a tenant migration.
         if (opCtx->isEnforcingConstraints() &&
             args.changeStreamPreAndPostImagesEnabledForCollection) {
-            tassert(5868704, "Deleted document and uuid must be set", args.deletedDoc && uuid);
+            tassert(5868704, "Deleted document must be set", args.deletedDoc);
 
-            ChangeStreamPreImageId id(uuid.get(), opTime.writeOpTime.getTimestamp(), 0);
+            ChangeStreamPreImageId id(uuid, opTime.writeOpTime.getTimestamp(), 0);
             ChangeStreamPreImage preImage(id, opTime.wallClockTime, *args.deletedDoc);
             writeToChangeStreamPreImagesCollection(opCtx, preImage);
         }

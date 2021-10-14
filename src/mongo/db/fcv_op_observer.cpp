@@ -149,7 +149,7 @@ void FcvOpObserver::_onInsertOrUpdate(OperationContext* opCtx, const BSONObj& do
 
 void FcvOpObserver::onInserts(OperationContext* opCtx,
                               const NamespaceString& nss,
-                              OptionalCollectionUUID uuid,
+                              const UUID& uuid,
                               std::vector<InsertStatement>::const_iterator first,
                               std::vector<InsertStatement>::const_iterator last,
                               bool fromMigrate) {
@@ -171,7 +171,7 @@ void FcvOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs
 
 void FcvOpObserver::onDelete(OperationContext* opCtx,
                              const NamespaceString& nss,
-                             OptionalCollectionUUID uuid,
+                             const UUID& uuid,
                              StmtId stmtId,
                              const OplogDeleteEntryArgs& args) {
     // documentKeyDecoration is set in OpObserverImpl::aboutToDelete. So the FcvOpObserver
