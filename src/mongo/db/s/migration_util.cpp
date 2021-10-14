@@ -160,10 +160,10 @@ const ServiceContext::ConstructorActionRegisterer migrationUtilExecutorRegistere
     [](ServiceContext* service) { migrationUtilExecutorDecoration(service).shutDownAndJoin(); }};
 
 template <typename Cmd>
-void sendToRecipient(OperationContext* opCtx,
-                     const ShardId& recipientId,
-                     const Cmd& cmd,
-                     const BSONObj& passthroughFields = {}) {
+void sendWriteCommandToRecipient(OperationContext* opCtx,
+                                 const ShardId& recipientId,
+                                 const Cmd& cmd,
+                                 const BSONObj& passthroughFields = {}) {
     auto recipientShard =
         uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, recipientId));
 
@@ -177,7 +177,8 @@ void sendToRecipient(OperationContext* opCtx,
         cmdBSON,
         Shard::RetryPolicy::kIdempotent);
 
-    uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(response));
+    uassertStatusOK(response.getStatus());
+    uassertStatusOK(getStatusFromWriteCommandReply(response.getValue().response));
 }
 
 /**
@@ -733,10 +734,11 @@ void deleteRangeDeletionTaskOnRecipient(OperationContext* opCtx,
 
     hangInDeleteRangeDeletionOnRecipientInterruptible.pauseWhileSet(opCtx);
 
-    sendToRecipient(opCtx,
-                    recipientId,
-                    deleteOp,
-                    BSON(WriteConcernOptions::kWriteConcernField << WriteConcernOptions::Majority));
+    sendWriteCommandToRecipient(
+        opCtx,
+        recipientId,
+        deleteOp,
+        BSON(WriteConcernOptions::kWriteConcernField << WriteConcernOptions::Majority));
 
     if (hangInDeleteRangeDeletionOnRecipientThenSimulateErrorUninterruptible.shouldFail()) {
         hangInDeleteRangeDeletionOnRecipientThenSimulateErrorUninterruptible.pauseWhileSet(opCtx);
@@ -777,7 +779,7 @@ void markAsReadyRangeDeletionTaskOnRecipient(OperationContext* opCtx,
             hangInReadyRangeDeletionOnRecipientInterruptible.pauseWhileSet(newOpCtx);
 
             try {
-                sendToRecipient(
+                sendWriteCommandToRecipient(
                     newOpCtx,
                     recipientId,
                     updateOp,
@@ -820,7 +822,7 @@ void advanceTransactionOnRecipient(OperationContext* opCtx,
                                   << "txnNumber" << currentTxnNumber + 1);
 
     hangInAdvanceTxnNumInterruptible.pauseWhileSet(opCtx);
-    sendToRecipient(opCtx, recipientId, updateOp, passthroughFields);
+    sendWriteCommandToRecipient(opCtx, recipientId, updateOp, passthroughFields);
 
     if (hangInAdvanceTxnNumThenSimulateErrorUninterruptible.shouldFail()) {
         hangInAdvanceTxnNumThenSimulateErrorUninterruptible.pauseWhileSet(opCtx);
