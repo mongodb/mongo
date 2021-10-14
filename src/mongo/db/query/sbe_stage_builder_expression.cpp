@@ -3481,10 +3481,9 @@ private:
                                                  str::stream() << "$" << dateExprName
                                                                << " expects a valid time unit")},
             CaseValuePair{makeNot(makeFunction("exists", amountRef.clone())),
-                          sbe::makeE<sbe::EFail>(
-                              ErrorCodes::Error{5166606},
-                              str::stream() << "$" << dateExprName
-                                            << " expects amount argument to be an integer number")},
+                          sbe::makeE<sbe::EFail>(ErrorCodes::Error{5166606},
+                                                 str::stream() << "invalid $" << dateExprName
+                                                               << " 'amount' argument value")},
             sbe::makeE<sbe::EFunction>("dateAdd", std::move(args)));
 
         _context->pushExpr(
