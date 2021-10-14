@@ -35,7 +35,6 @@
 
 #include "mongo/base/initializer.h"
 #include "mongo/config.h"
-#include "mongo/db/concurrency/locker_noop_client_observer.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/signal_handlers_synchronous.h"
@@ -46,9 +45,7 @@ int main(int argc, char** argv) {
     ::mongo::setupSynchronousSignalHandlers();
 
     ::mongo::runGlobalInitializersOrDie(std::vector<std::string>(argv, argv + argc));
-    auto serviceContext = ::mongo::ServiceContext::make();
-    serviceContext->registerClientObserver(std::make_unique<::mongo::LockerNoopClientObserver>());
-    ::mongo::setGlobalServiceContext(std::move(serviceContext));
+    ::mongo::setGlobalServiceContext(::mongo::ServiceContext::make());
 
     // Copied from the BENCHMARK_MAIN macro.
     ::benchmark::Initialize(&argc, argv);
