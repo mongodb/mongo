@@ -409,7 +409,7 @@ public:
             commandBuilder.append(kMaxChunkObjects, _maxChunkObjects.get());
         }
         if (_maxChunkSizeBytes) {
-            commandBuilder.append(kMaxChunkSize, _maxChunkSizeBytes.get());
+            commandBuilder.append(kMaxChunkSizeBytes, _maxChunkSizeBytes.get());
         }
         return commandBuilder.obj();
     }
@@ -428,7 +428,7 @@ private:
     static const std::string kKeyPattern;
     static const std::string kLowerBound;
     static const std::string kUpperBound;
-    static const std::string kMaxChunkSize;
+    static const std::string kMaxChunkSizeBytes;
     static const std::string kMaxSplitPoints;
     static const std::string kMaxChunkObjects;
     static const std::string kForceSplit;
