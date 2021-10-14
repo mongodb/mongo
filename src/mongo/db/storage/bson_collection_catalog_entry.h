@@ -148,6 +148,15 @@ public:
         std::string ns;
         CollectionOptions options;
         std::vector<IndexMetaData> indexes;
+
+        // Time-series collections created in versions 5.1 and earlier are allowed to contain
+        // measurements with arbitrarily mixed schema in the buckets. When upgrading from these
+        // earlier versions and setting FCV to 5.2 and up, this flag will be set to true by default
+        // for existing time-series collections. To set the flag to false, all of the buckets need
+        // to be checked for mixed-schema data. Newly created time-series collections in FCV 5.2 and
+        // up will have this flag set to false by default. This will be boost::none if this catalog
+        // entry is not representing a time-series collection or if FCV < 5.2.
+        boost::optional<bool> timeseriesBucketsMayHaveMixedSchemaData;
     };
 };
 }  // namespace mongo

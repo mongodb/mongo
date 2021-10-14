@@ -45,6 +45,7 @@
 #include "mongo/db/storage/devnull/devnull_kv_engine.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/storage_engine_impl.h"
+#include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/str.h"
@@ -64,7 +65,7 @@ public:
         CatalogTestFixture::setUp();
 
         _nss = NamespaceString("unittests.durable_catalog");
-        _collectionUUID = createCollection(_nss);
+        _collectionUUID = createCollection(_nss, CollectionOptions());
     }
 
     NamespaceString ns() {
@@ -85,14 +86,13 @@ public:
             operationContext(), *_collectionUUID, CollectionCatalog::LifetimeMode::kInplace);
     }
 
-    CollectionUUID createCollection(const NamespaceString& nss) {
+    CollectionUUID createCollection(const NamespaceString& nss, CollectionOptions options) {
         Lock::DBLock dbLk(operationContext(), nss.db(), MODE_IX);
         Lock::CollectionLock collLk(operationContext(), nss, MODE_IX);
 
         WriteUnitOfWork wuow(operationContext());
 
         const bool allocateDefaultSpace = true;
-        CollectionOptions options;
         options.uuid = UUID::gen();
 
         auto swColl =
@@ -586,7 +586,7 @@ TEST_F(DurableCatalogTest, IdentSuffixUsesRand) {
 
     const NamespaceString nss = NamespaceString("a.b");
 
-    auto uuid = createCollection(nss);
+    auto uuid = createCollection(nss, CollectionOptions());
     auto collection = CollectionCatalog::get(operationContext())
                           ->lookupCollectionByUUID(operationContext(), uuid);
     RecordId catalogId = collection->getCatalogId();
@@ -632,13 +632,79 @@ TEST_F(DurableCatalogTest, ImportCollectionRandConflict) {
     {
         // Check that a newly created collection doesn't use 'rand' as the suffix in the ident.
         const NamespaceString nss = NamespaceString("a.b");
-        createCollection(nss);
+        createCollection(nss, CollectionOptions());
 
         RecordId catalogId = getCollection()->getCatalogId();
         ASSERT(!StringData(getCatalog()->getEntry(catalogId).ident).endsWith(rand));
     }
 
     ASSERT_NOT_EQUALS(getCatalog()->getRand_forTest(), rand);
+}
+
+TEST_F(DurableCatalogTest, CheckTimeseriesBucketsMayHaveMixedSchemaDataFlagFCVLatest) {
+    // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
+    serverGlobalParams.mutableFeatureCompatibility.setVersion(multiversion::GenericFCV::kLatest);
+
+    {
+        const NamespaceString regularNss = NamespaceString("test.regular");
+        createCollection(regularNss, CollectionOptions());
+
+        auto collection = CollectionCatalog::get(operationContext())
+                              ->lookupCollectionByNamespace(operationContext(), regularNss);
+        RecordId catalogId = collection->getCatalogId();
+        ASSERT(!getCatalog()
+                    ->getMetaData(operationContext(), catalogId)
+                    ->timeseriesBucketsMayHaveMixedSchemaData);
+    }
+
+    {
+        const NamespaceString bucketsNss = NamespaceString("system.buckets.ts");
+        CollectionOptions options;
+        options.timeseries = TimeseriesOptions(/*timeField=*/"t");
+        createCollection(bucketsNss, options);
+
+        auto collection = CollectionCatalog::get(operationContext())
+                              ->lookupCollectionByNamespace(operationContext(), bucketsNss);
+        RecordId catalogId = collection->getCatalogId();
+        ASSERT(getCatalog()
+                   ->getMetaData(operationContext(), catalogId)
+                   ->timeseriesBucketsMayHaveMixedSchemaData);
+        ASSERT_FALSE(*getCatalog()
+                          ->getMetaData(operationContext(), catalogId)
+                          ->timeseriesBucketsMayHaveMixedSchemaData);
+    }
+}
+
+TEST_F(DurableCatalogTest, CheckTimeseriesBucketsMayHaveMixedSchemaDataFlagFCVLastContinuous) {
+    // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
+    serverGlobalParams.mutableFeatureCompatibility.setVersion(
+        multiversion::GenericFCV::kLastContinuous);
+
+    {
+        const NamespaceString regularNss = NamespaceString("test.regular");
+        createCollection(regularNss, CollectionOptions());
+
+        auto collection = CollectionCatalog::get(operationContext())
+                              ->lookupCollectionByNamespace(operationContext(), regularNss);
+        RecordId catalogId = collection->getCatalogId();
+        ASSERT(!getCatalog()
+                    ->getMetaData(operationContext(), catalogId)
+                    ->timeseriesBucketsMayHaveMixedSchemaData);
+    }
+
+    {
+        const NamespaceString bucketsNss = NamespaceString("system.buckets.ts");
+        CollectionOptions options;
+        options.timeseries = TimeseriesOptions(/*timeField=*/"t");
+        createCollection(bucketsNss, options);
+
+        auto collection = CollectionCatalog::get(operationContext())
+                              ->lookupCollectionByNamespace(operationContext(), bucketsNss);
+        RecordId catalogId = collection->getCatalogId();
+        ASSERT(!getCatalog()
+                    ->getMetaData(operationContext(), catalogId)
+                    ->timeseriesBucketsMayHaveMixedSchemaData);
+    }
 }
 
 }  // namespace

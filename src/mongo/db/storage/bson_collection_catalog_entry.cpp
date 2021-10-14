@@ -44,6 +44,9 @@ namespace {
 // expect to see in an indexed field.
 const size_t kMaxKeyPatternPathLength = 2048;
 
+const std::string kTimeseriesBucketsMayHaveMixedSchemaDataFieldName =
+    "timeseriesBucketsMayHaveMixedSchemaData";
+
 /**
  * Encodes 'multikeyPaths' as binary data and appends it to 'bob'.
  *
@@ -218,6 +221,12 @@ BSONObj BSONCollectionCatalogEntry::MetaData::toBSON(bool hasExclusiveAccess) co
         }
         arr.doneFast();
     }
+
+    if (timeseriesBucketsMayHaveMixedSchemaData) {
+        b.append(kTimeseriesBucketsMayHaveMixedSchemaDataFieldName,
+                 *timeseriesBucketsMayHaveMixedSchemaData);
+    }
+
     return b.obj();
 }
 
@@ -260,6 +269,11 @@ void BSONCollectionCatalogEntry::MetaData::parse(const BSONObj& obj) {
 
             indexes.push_back(imd);
         }
+    }
+
+    BSONElement timeseriesMixedSchemaElem = obj[kTimeseriesBucketsMayHaveMixedSchemaDataFieldName];
+    if (!timeseriesMixedSchemaElem.eoo() && timeseriesMixedSchemaElem.isBoolean()) {
+        timeseriesBucketsMayHaveMixedSchemaData = timeseriesMixedSchemaElem.Bool();
     }
 }
 }  // namespace mongo

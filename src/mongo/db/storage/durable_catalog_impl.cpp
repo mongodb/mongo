@@ -371,6 +371,16 @@ StatusWith<DurableCatalog::Entry> DurableCatalogImpl::_addEntry(OperationContext
         BSONCollectionCatalogEntry::MetaData md;
         md.ns = nss.ns();
         md.options = options;
+        // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
+        // TODO SERVER-60693: use the 5.2 FCV constant.
+        if (options.timeseries &&
+            serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
+                multiversion::GenericFCV::kLatest)) {
+            // Newly created catalog entries for time-series collections in FCV 5.2+ will have this
+            // flag set to false by default as mixed-schema data is only possible in versions 5.1
+            // and earlier.
+            md.timeseriesBucketsMayHaveMixedSchemaData = false;
+        }
         b.append("md", md.toBSON());
         obj = b.obj();
     }

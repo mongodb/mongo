@@ -456,6 +456,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/storage/storage_engine_impl',
         '$BUILD_DIR/mongo/db/storage/storage_repair_observer',
         '$BUILD_DIR/mongo/db/storage/wiredtiger/storage_wiredtiger',
+        '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
         '$BUILD_DIR/mongo/executor/network_interface_factory',
         '$BUILD_DIR/mongo/executor/network_interface_mock',
         '$BUILD_DIR/mongo/util/periodic_runner_factory',
