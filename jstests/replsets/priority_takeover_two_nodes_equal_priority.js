@@ -39,7 +39,7 @@ assert.soon(
 
 jsTestLog("Stepping down the current primary.");
 assert.commandWorked(
-    primary.adminCommand({replSetStepDown: 10 * 60, secondaryCatchUpPeriodSecs: 10 * 60}));
+    primary.adminCommand({replSetStepDown: 10 * 60 * 3, secondaryCatchUpPeriodSecs: 10 * 60}));
 
 // Make sure the primary has stepped down.
 assert.neq(primary, replTest.getPrimary());
