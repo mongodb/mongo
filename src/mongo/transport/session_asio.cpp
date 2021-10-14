@@ -95,10 +95,11 @@ TransportLayerASIO::ASIOSession::ASIOSession(
       _tl(tl),
       _isIngressSession(isIngressSession) {
     auto family = endpointToSockAddr(_socket.local_endpoint()).getType();
+    auto sev = logv2::LogSeverity::Debug(3);
     if (family == AF_INET || family == AF_INET6) {
-        setSocketOption(_socket, asio::ip::tcp::no_delay(true), "session no delay");
-        setSocketOption(_socket, asio::socket_base::keep_alive(true), "session keep alive");
-        setSocketKeepAliveParams(_socket.native_handle());
+        setSocketOption(_socket, asio::ip::tcp::no_delay(true), "session no delay", sev);
+        setSocketOption(_socket, asio::socket_base::keep_alive(true), "session keep alive", sev);
+        setSocketKeepAliveParams(_socket.native_handle(), sev);
     }
 
     _localAddr = endpointToSockAddr(_socket.local_endpoint());
@@ -129,8 +130,8 @@ TransportLayerASIO::ASIOSession::ASIOSession(
 #endif
 } catch (const DBException&) {
     throw;
-} catch (const asio::system_error& error) {
-    uasserted(ErrorCodes::SocketException, error.what());
+} catch (const asio::system_error&) {
+    throw;
 } catch (...) {
     uasserted(50797, str::stream() << "Unknown exception while configuring socket.");
 }
@@ -324,16 +325,20 @@ void TransportLayerASIO::ASIOSession::ensureSync() {
         // Change boost::none (which means no timeout) into a zero value for the socket option,
         // which also means no timeout.
         auto timeout = _configuredTimeout.value_or(Milliseconds{0});
-        setSocketOption(
-            getSocket(), ASIOSocketTimeoutOption<SO_SNDTIMEO>(timeout), ec, "session send timeout");
+        setSocketOption(getSocket(),
+                        ASIOSocketTimeoutOption<SO_SNDTIMEO>(timeout),
+                        "session send timeout",
+                        logv2::LogSeverity::Info(),
+                        ec);
         if (auto status = errorCodeToStatus(ec); !status.isOK()) {
             tasserted(5342000, status.reason());
         }
 
         setSocketOption(getSocket(),
                         ASIOSocketTimeoutOption<SO_RCVTIMEO>(timeout),
-                        ec,
-                        "session receive timeout");
+                        "session receive timeout",
+                        logv2::LogSeverity::Info(),
+                        ec);
         if (auto status = errorCodeToStatus(ec); !status.isOK()) {
             tasserted(5342001, status.reason());
         }
