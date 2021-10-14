@@ -7224,6 +7224,10 @@ Value ExpressionDateSubtract::evaluateDateArithmetics(Date_t date,
                                                       TimeUnit unit,
                                                       long long amount,
                                                       const TimeZone& timezone) const {
+    // Long long min value cannot be negated.
+    uassert(6045000,
+            str::stream() << "invalid $dateSubtract 'amount' parameter value: " << amount,
+            amount != std::numeric_limits<long long>::min());
     return Value(dateAdd(date, unit, -amount, timezone));
 }
 

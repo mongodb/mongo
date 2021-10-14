@@ -212,6 +212,11 @@ function runAndAssertErrorCode(dateArithmeticsSpec, expectedErrorCode) {
     runAndAssertErrorCode(
         {$dateSubtract: {startDate: "$date", unit: "month", amount: -30000000000}}, 5976500);
 
+    // Invalid 'amount' parameter error of dateSubtract operation: long long min value cannot be
+    // negated.
+    runAndAssertErrorCode(
+        {$dateSubtract: {startDate: "$date", unit: "day", amount: -9223372036854775808}}, 6045000);
+
     // Invalid value of timezone argument.
     runAndAssertErrorCode(
         {$dateAdd: {startDate: "$date", unit: "year", amount: 1, timezone: "Unknown"}}, 40485);
