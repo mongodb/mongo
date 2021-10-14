@@ -123,21 +123,16 @@ protected:
     void checkForStateTransition();  // Invoked by periodic thread.
 
     // Methods that represent particular events that trigger state transition.
-    Status processFaultExistsEvent();
-    Status processFaultIsResolvedEvent();
+    void processFaultExistsEvent();
+    void processFaultIsResolvedEvent();
 
     // Makes a valid state transition or returns an error.
     // State transition should be triggered by events above.
-    Status transitionToState(FaultState newState);
+    void transitionToState(FaultState newState);
 
     void schedulePeriodicHealthCheckThread(bool immediately = false);
 
 private:
-    // State machine related.
-    Status _transitionToKOk();
-    Status _transitionToKTransientFault();
-    Status _transitionToKActiveFault();
-
     // One time init.
     void _initHealthObserversIfNeeded();
 

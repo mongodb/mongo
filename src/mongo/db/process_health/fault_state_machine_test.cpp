@@ -50,7 +50,7 @@ std::shared_ptr<executor::ThreadPoolTaskExecutor> constructTaskExecutor() {
 }
 
 // State machine tests.
-TEST(FaultManagerForTest, StateTransitionsFromOk) {
+TEST_F(FaultManagerTest, StateTransitionsFromOk) {
     auto serviceCtx = ServiceContext::make();
     std::vector<std::pair<FaultState, bool>> transitionValidPairs{
         {FaultState::kOk, false},
@@ -59,18 +59,19 @@ TEST(FaultManagerForTest, StateTransitionsFromOk) {
         {FaultState::kActiveFault, false}};
 
     for (auto& pair : transitionValidPairs) {
-        FaultManagerTestImpl faultManager(serviceCtx.get(), constructTaskExecutor());
-        ASSERT_OK(faultManager.transitionStateTest(FaultState::kOk));
+        manager().transitionStateTest(FaultState::kOk);
 
         if (pair.second) {
-            ASSERT_OK(faultManager.transitionStateTest(pair.first));
+            manager().transitionStateTest(pair.first);
         } else {
-            ASSERT_NOT_OK(faultManager.transitionStateTest(pair.first));
+            assertInvalidStateTransition(pair.first);
         }
+
+        resetManager();
     }
 }
 
-TEST(FaultManagerForTest, StateTransitionsFromStartupCheck) {
+TEST_F(FaultManagerTest, StateTransitionsFromStartupCheck) {
     auto serviceCtx = ServiceContext::make();
     std::vector<std::pair<FaultState, bool>> transitionValidPairs{
         {FaultState::kOk, true},
@@ -79,17 +80,17 @@ TEST(FaultManagerForTest, StateTransitionsFromStartupCheck) {
         {FaultState::kActiveFault, false}};
 
     for (auto& pair : transitionValidPairs) {
-        FaultManagerTestImpl faultManager(serviceCtx.get(), constructTaskExecutor());
-
         if (pair.second) {
-            ASSERT_OK(faultManager.transitionStateTest(pair.first));
+            manager().transitionStateTest(pair.first);
         } else {
-            ASSERT_NOT_OK(faultManager.transitionStateTest(pair.first));
+            assertInvalidStateTransition(pair.first);
         }
+
+        resetManager();
     }
 }
 
-TEST(FaultManagerForTest, StateTransitionsFromTransientFault) {
+TEST_F(FaultManagerTest, StateTransitionsFromTransientFault) {
     auto serviceCtx = ServiceContext::make();
     std::vector<std::pair<FaultState, bool>> transitionValidPairs{
         {FaultState::kOk, true},
@@ -98,18 +99,19 @@ TEST(FaultManagerForTest, StateTransitionsFromTransientFault) {
         {FaultState::kActiveFault, true}};
 
     for (auto& pair : transitionValidPairs) {
-        FaultManagerTestImpl faultManager(serviceCtx.get(), constructTaskExecutor());
-        ASSERT_OK(faultManager.transitionStateTest(FaultState::kTransientFault));
+        manager().transitionStateTest(FaultState::kTransientFault);
 
         if (pair.second) {
-            ASSERT_OK(faultManager.transitionStateTest(pair.first));
+            manager().transitionStateTest(pair.first);
         } else {
-            ASSERT_NOT_OK(faultManager.transitionStateTest(pair.first));
+            assertInvalidStateTransition(pair.first);
         }
+
+        resetManager();
     }
 }
 
-TEST(FaultManagerForTest, StateTransitionsFromActiveFault) {
+TEST_F(FaultManagerTest, StateTransitionsFromActiveFault) {
     auto serviceCtx = ServiceContext::make();
     std::vector<std::pair<FaultState, bool>> transitionValidPairs{
         {FaultState::kOk, false},
@@ -118,73 +120,74 @@ TEST(FaultManagerForTest, StateTransitionsFromActiveFault) {
         {FaultState::kActiveFault, false}};
 
     for (auto& pair : transitionValidPairs) {
-        FaultManagerTestImpl faultManager(serviceCtx.get(), constructTaskExecutor());
-        ASSERT_OK(faultManager.transitionStateTest(FaultState::kTransientFault));
-        ASSERT_OK(faultManager.transitionStateTest(FaultState::kActiveFault));
+        manager().transitionStateTest(FaultState::kTransientFault);
+        manager().transitionStateTest(FaultState::kActiveFault);
 
         if (pair.second) {
-            ASSERT_OK(faultManager.transitionStateTest(pair.first));
+            manager().transitionStateTest(pair.first);
         } else {
-            ASSERT_NOT_OK(faultManager.transitionStateTest(pair.first));
+            assertInvalidStateTransition(pair.first);
         }
+
+        resetManager();
     }
 }
 
 // State transitions triggered by events.
 TEST_F(FaultManagerTest, EventsFromOk) {
-    std::vector<std::pair<std::function<Status()>, FaultState>> validTransitions{
-        {[this] { return manager().processFaultIsResolvedEventTest(); }, FaultState::kOk},
-        {[this] { return manager().processFaultExistsEventTest(); }, FaultState::kTransientFault}};
+    std::vector<std::pair<std::function<void()>, FaultState>> validTransitions{
+        {[this] { manager().processFaultIsResolvedEventTest(); }, FaultState::kOk},
+        {[this] { manager().processFaultExistsEventTest(); }, FaultState::kTransientFault}};
 
     for (auto& pair : validTransitions) {
         resetManager();
-        ASSERT_OK(manager().transitionStateTest(FaultState::kOk));
+        manager().transitionStateTest(FaultState::kOk);
 
-        ASSERT_OK(pair.first());  // Send event.
+        pair.first();  // Send event.
         ASSERT_EQ(pair.second, manager().getFaultState());
     }
 }
 
 TEST_F(FaultManagerTest, EventsFromStartupCheck) {
-    std::vector<std::pair<std::function<Status()>, FaultState>> validTransitions{
-        {[this] { return manager().processFaultIsResolvedEventTest(); }, FaultState::kOk},
-        {[this] { return manager().processFaultExistsEventTest(); }, FaultState::kTransientFault}};
+    std::vector<std::pair<std::function<void()>, FaultState>> validTransitions{
+        {[this] { manager().processFaultIsResolvedEventTest(); }, FaultState::kOk},
+        {[this] { manager().processFaultExistsEventTest(); }, FaultState::kTransientFault}};
 
     for (auto& pair : validTransitions) {
         resetManager();
         ASSERT_EQ(FaultState::kStartupCheck, manager().getFaultState());
 
-        ASSERT_OK(pair.first());  // Send event.
+        pair.first();  // Send event.
         ASSERT_EQ(pair.second, manager().getFaultState());
     }
 }
 
 TEST_F(FaultManagerTest, EventsFromTransientFault) {
-    std::vector<std::pair<std::function<Status()>, FaultState>> validTransitions{
-        {[this] { return manager().processFaultIsResolvedEventTest(); }, FaultState::kOk},
-        {[this] { return manager().processFaultExistsEventTest(); }, FaultState::kTransientFault}};
+    std::vector<std::pair<std::function<void()>, FaultState>> validTransitions{
+        {[this] { manager().processFaultIsResolvedEventTest(); }, FaultState::kOk},
+        {[this] { manager().processFaultExistsEventTest(); }, FaultState::kTransientFault}};
 
     for (auto& pair : validTransitions) {
         resetManager();
-        ASSERT_OK(manager().transitionStateTest(FaultState::kTransientFault));
+        manager().transitionStateTest(FaultState::kTransientFault);
 
-        ASSERT_OK(pair.first());  // Send event.
+        pair.first();  // Send event.
         ASSERT_EQ(pair.second, manager().getFaultState());
     }
 }
 
 TEST_F(FaultManagerTest, EventsFromActiveFault) {
     // No event can transition out of active fault.
-    std::vector<std::pair<std::function<Status()>, FaultState>> validTransitions{
-        {[this] { return manager().processFaultIsResolvedEventTest(); }, FaultState::kActiveFault},
-        {[this] { return manager().processFaultExistsEventTest(); }, FaultState::kActiveFault}};
+    std::vector<std::pair<std::function<void()>, FaultState>> validTransitions{
+        {[this] { manager().processFaultIsResolvedEventTest(); }, FaultState::kActiveFault},
+        {[this] { manager().processFaultExistsEventTest(); }, FaultState::kActiveFault}};
 
     for (auto& pair : validTransitions) {
         resetManager();
-        ASSERT_OK(manager().transitionStateTest(FaultState::kTransientFault));
-        ASSERT_OK(manager().transitionStateTest(FaultState::kActiveFault));
+        manager().transitionStateTest(FaultState::kTransientFault);
+        manager().transitionStateTest(FaultState::kActiveFault);
 
-        ASSERT_OK(pair.first());  // Send event.
+        pair.first();  // Send event.
         ASSERT_EQ(pair.second, manager().getFaultState());
     }
 }
