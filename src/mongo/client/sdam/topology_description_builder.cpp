@@ -55,7 +55,7 @@ TopologyDescriptionBuilder& TopologyDescriptionBuilder::withSetName(const std::s
 }
 
 TopologyDescriptionBuilder& TopologyDescriptionBuilder::withMaxSetVersion(int maxSetVersion) {
-    _instance->_maxSetVersion = maxSetVersion;
+    _instance->_maxElectionIdSetVersionPair.setVersion = maxSetVersion;
     return *this;
 }
 
@@ -67,7 +67,7 @@ TopologyDescriptionBuilder& TopologyDescriptionBuilder::withServers(
 
 TopologyDescriptionBuilder& TopologyDescriptionBuilder::withMaxElectionID(
     const OID& maxElectionId) {
-    _instance->_maxElectionId = maxElectionId;
+    _instance->_maxElectionIdSetVersionPair.electionId = maxElectionId;
     return *this;
 }
 

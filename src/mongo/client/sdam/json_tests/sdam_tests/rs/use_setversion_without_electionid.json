@@ -69,20 +69,23 @@
       "outcome": {
         "servers": {
           "a:27017": {
+            "type": "RSPrimary",
+            "setName": "rs",
+            "setVersion": 1,
+            "electionId": {
+              "$oid": "000000000000000000000001"
+            }
+          },
+          "b:27017": {
             "type": "Unknown",
             "setName": null,
             "electionId": null
-          },
-          "b:27017": {
-            "type": "RSPrimary",
-            "setName": "rs",
-            "setVersion": 2
           }
         },
         "topologyType": "ReplicaSetWithPrimary",
         "logicalSessionTimeoutMinutes": null,
         "setName": "rs",
-        "maxSetVersion": 2,
+        "maxSetVersion": 1,
         "maxElectionId": {
           "$oid": "000000000000000000000001"
         }
@@ -112,22 +115,25 @@
       "outcome": {
         "servers": {
           "a:27017": {
+            "type": "RSPrimary",
+            "setName": "rs",
+            "setVersion": 1,
+            "electionId": {
+              "$oid": "000000000000000000000002"
+            }
+          },
+          "b:27017": {
             "type": "Unknown",
             "setName": null,
             "electionId": null
-          },
-          "b:27017": {
-            "type": "RSPrimary",
-            "setName": "rs",
-            "setVersion": 2
           }
         },
         "topologyType": "ReplicaSetWithPrimary",
         "logicalSessionTimeoutMinutes": null,
         "setName": "rs",
-        "maxSetVersion": 2,
+        "maxSetVersion": 1,
         "maxElectionId": {
-          "$oid": "000000000000000000000001"
+          "$oid": "000000000000000000000002"
         }
       }
     }

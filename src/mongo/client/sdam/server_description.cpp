@@ -277,16 +277,8 @@ const boost::optional<std::string>& ServerDescription::getSetName() const {
     return _setName;
 }
 
-const boost::optional<int>& ServerDescription::getSetVersion() const {
-    return _setVersion;
-}
-
-const boost::optional<mongo::OID>& ServerDescription::getElectionId() const {
-    return _electionId;
-}
-
 const ElectionIdSetVersionPair ServerDescription::getElectionIdSetVersionPair() const {
-    return ElectionIdSetVersionPair{getElectionId(), getSetVersion()};
+    return ElectionIdSetVersionPair{_electionId, _setVersion};
 }
 
 const boost::optional<HostAndPort>& ServerDescription::getPrimary() const {

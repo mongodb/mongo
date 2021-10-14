@@ -26,16 +26,23 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
+
 #include "mongo/client/sdam/topology_description.h"
 
-#include "mongo/client/sdam/sdam_datatypes.h"
-#include "mongo/client/sdam/server_description.h"
-#include "mongo/db/wire_version.h"
-#include "mongo/util/fail_point.h"
 #include <algorithm>
 #include <cstring>
 #include <iterator>
 #include <memory>
+
+#include "mongo/client/sdam/sdam_datatypes.h"
+#include "mongo/client/sdam/server_description.h"
+#include "mongo/db/wire_version.h"
+#include "mongo/logv2/log.h"
+#include "mongo/util/fail_point.h"
+
+// Checkpoint to track when election Id and Set version is changed.
+MONGO_FAIL_POINT_DEFINE(maxElectionIdSetVersionPairUpdated);
 
 namespace mongo::sdam {
 MONGO_FAIL_POINT_DEFINE(topologyDescriptionInstallServerDescription);
@@ -85,16 +92,22 @@ const boost::optional<std::string>& TopologyDescription::getSetName() const {
     return _setName;
 }
 
-const boost::optional<int>& TopologyDescription::getMaxSetVersion() const {
-    return _maxSetVersion;
+ElectionIdSetVersionPair TopologyDescription::getMaxElectionIdSetVersionPair() const {
+    return _maxElectionIdSetVersionPair;
 }
 
-const boost::optional<OID>& TopologyDescription::getMaxElectionId() const {
-    return _maxElectionId;
-}
-
-const ElectionIdSetVersionPair TopologyDescription::getMaxElectionIdSetVersionPair() const {
-    return ElectionIdSetVersionPair{getMaxElectionId(), getMaxSetVersion()};
+void TopologyDescription::updateMaxElectionIdSetVersionPair(const ElectionIdSetVersionPair& pair) {
+    if (MONGO_unlikely(maxElectionIdSetVersionPairUpdated.shouldFail())) {
+        LOGV2(5940906,
+              "Fail point maxElectionIdSetVersionPairUpdated",
+              "topologyId"_attr = _id,
+              "primaryForSet"_attr = _setName ? *_setName : std::string("Unknown"),
+              "incomingElectionId"_attr = pair.electionId,
+              "currentMaxElectionId"_attr = _maxElectionIdSetVersionPair.electionId,
+              "incomingSetVersion"_attr = pair.setVersion,
+              "currentMaxSetVersion"_attr = _maxElectionIdSetVersionPair.setVersion);
+    }
+    _maxElectionIdSetVersionPair = pair;
 }
 
 const std::vector<ServerDescriptionPtr>& TopologyDescription::getServers() const {
@@ -287,12 +300,8 @@ BSONObj TopologyDescription::toBSON() {
         bson << "compatibleError" << *_compatibleError;
     }
 
-    if (_maxSetVersion) {
-        bson << "maxSetVersion" << *_maxSetVersion;
-    }
-
-    if (_maxElectionId) {
-        bson << "maxElectionId" << *_maxElectionId;
+    if (_maxElectionIdSetVersionPair.anyDefined()) {
+        bson << "maxElectionIdSetVersion" << _maxElectionIdSetVersionPair.toBSON();
     }
 
     return bson.obj();
