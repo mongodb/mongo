@@ -30,6 +30,7 @@
 
 #include "mongo/db/process_health/fault_facet.h"
 #include "mongo/db/process_health/fault_facets_container.h"
+#include "mongo/executor/task_executor.h"
 
 namespace mongo {
 namespace process_health {
@@ -65,10 +66,13 @@ public:
      * should prorate the invocations to avoid DoS.
      * The implementation may or may not block for the completion of the check, this remains
      * unspecified.
+     * Note: no methods in this class should return any check results, the proper way to
+     * get result is to check facets in the FaultManager.
      *
      * @param factory Interface to get or create the factory of facets container.
      */
-    virtual void periodicCheck(FaultFacetsContainerFactory& factory) = 0;
+    virtual void periodicCheck(FaultFacetsContainerFactory& factory,
+                               std::shared_ptr<executor::TaskExecutor> taskExecutor) = 0;
 
     /**
      * @return HealthObserverIntensity

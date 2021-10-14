@@ -44,8 +44,9 @@ class HealthObserverMock : public HealthObserverBase {
 public:
     HealthObserverMock(FaultFacetType mockType,
                        ClockSource* clockSource,
+                       TickSource* tickSource,
                        std::function<double()> getSeverityCallback)
-        : HealthObserverBase(clockSource),
+        : HealthObserverBase(clockSource, tickSource),
           _mockType(mockType),
           _getSeverityCallback(getSeverityCallback) {}
 
@@ -56,28 +57,23 @@ protected:
         return _mockType;
     }
 
-    FaultFacetPtr periodicCheckImpl(FaultFacetPtr optionalExistingFacet) override {
+    Future<HealthCheckStatus> periodicCheckImpl(
+        PeriodicHealthCheckContext&& periodicCheckContext) override {
         // Detects mocked severity and handles it.
         const double severity = _getSeverityCallback();
 
+        auto completionPf = makePromiseFuture<HealthCheckStatus>();
         if (HealthCheckStatus::isResolved(severity)) {
-            return {};
-        } else if (!optionalExistingFacet) {
-            FaultFacetPtr facet =
-                std::make_unique<FaultFacetMock>(_mockType, _clockSource, _getSeverityCallback);
-            return facet;
+            completionPf.promise.emplaceValue(HealthCheckStatus(getType()));
+        } else {
+            completionPf.promise.emplaceValue(
+                HealthCheckStatus(getType(), severity, "failed", Milliseconds(0), Milliseconds(0)));
         }
-        return optionalExistingFacet;
+        return std::move(completionPf.future);
     }
 
     HealthObserverIntensity getIntensity() override {
-        if (_getSeverityCallback() >= 1.0) {
-            return HealthObserverIntensity::kCritical;
-        } else if (_getSeverityCallback() > 0.0) {
-            return HealthObserverIntensity::kNonCritical;
-        }
-
-        return HealthObserverIntensity::kOff;
+        return HealthObserverIntensity::kNonCritical;
     }
 
 private:
