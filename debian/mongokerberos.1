@@ -1,489 +1,409 @@
-.\" Man page generated from reStructuredText.
-.
-.TH "MONGOKERBEROS" "1" "Jun 23, 2020" "4.4" "mongodb-manual"
-.SH NAME
-mongokerberos \- MongoDB Kerberos Validation Utility
-.
-.nr rst2man-indent-level 0
-.
-.de1 rstReportMargin
-\\$1 \\n[an-margin]
-level \\n[rst2man-indent-level]
-level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
--
-\\n[rst2man-indent0]
-\\n[rst2man-indent1]
-\\n[rst2man-indent2]
-..
-.de1 INDENT
-.\" .rstReportMargin pre:
-. RS \\$1
-. nr rst2man-indent\\n[rst2man-indent-level] \\n[an-margin]
-. nr rst2man-indent-level +1
-.\" .rstReportMargin post:
-..
-.de UNINDENT
-. RE
-.\" indent \\n[an-margin]
-.\" old: \\n[rst2man-indent\\n[rst2man-indent-level]]
-.nr rst2man-indent-level -1
-.\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
-.in \\n[rst2man-indent\\n[rst2man-indent-level]]u
-..
-.SS On this page
-.INDENT 0.0
-.IP \(bu 2
-\fI\%Synopsis\fP
-.IP \(bu 2
-\fI\%Installation\fP
-.IP \(bu 2
-\fI\%Usage\fP
-.IP \(bu 2
-\fI\%Options\fP
-.UNINDENT
-.sp
-New in version 4.4: MongoDB Enterprise
-
+.TH mongokerberos 1
+.SH MONGOKERBEROS
 .SH SYNOPSIS
-.sp
 Starting in version 4.4, MongoDB Enterprise provides
-\fI\%mongokerberos\fP for testing MongoDB\(aqs Kerberos and GSSAPI
-configuration options against a
-running Kerberos deployment. \fI\%mongokerberos\fP can be used
-in one of two modes: \fIserver\fP and \fIclient\fP\&.
-.TS
-center;
-|l|l|.
-_
-T{
+\fBmongokerberos\f1\f1 for testing MongoDB\(aqs Kerberos and GSSAPI
+\fBconfiguration options\f1 against a
+running Kerberos deployment. \fBmongokerberos\f1\f1 can be used
+in one of two modes: \fIserver\f1 and \fIclient\f1\&.
+.RS
+.IP \(bu 2
+.RS
+.IP \(bu 4
 Mode
-T}	T{
+.IP \(bu 4
 Description
-T}
-_
-T{
+.RE
+.IP \(bu 2
+.RS
+.IP \(bu 4
 Server
-T}	T{
-In \fIserver mode\fP, \fI\%mongokerberos\fP analyzes
+.IP \(bu 4
+In \fIserver mode\f1, \fBmongokerberos\f1\f1 analyzes
 Kerberos\-related configurations on the server, and returns a
 report which includes error messages for any configurations that
-are problematic. For usage, see \fI\%Server Mode\fP
-T}
-_
-T{
+are problematic. For usage, see \fBServer Mode\f1
+.RE
+.IP \(bu 2
+.RS
+.IP \(bu 4
 Client
-T}	T{
-In \fIclient mode\fP, \fI\%mongokerberos\fP tests Kerberos
+.IP \(bu 4
+In \fIclient mode\f1, \fBmongokerberos\f1\f1 tests Kerberos
 authentication for a provided username, and returns a report
 which includes the success or failure of each step in the
 Kerberos authentication procedure. For usage, see
-\fI\%Client Mode\fP
-T}
-_
-.TE
-.sp
+\fBClient Mode\f1
+.RE
+.RE
+.PP
 Error messages for both modes include information on specific errors
 encountered and potential advice for resolving the error.
-.sp
-\fI\%mongokerberos\fP supports the following deployment types,
+.PP
+\fBmongokerberos\f1\f1 supports the following deployment types,
 in both server and client modes:
-.INDENT 0.0
+.RS
 .IP \(bu 2
 Linux MongoDB clients authenticating to MIT Kerberos deployments on
-supported Linux platforms\&.
+\fBsupported Linux platforms\f1\&.
 .IP \(bu 2
 Windows MongoDB clients authenticating to Windows Active Directory
 deployments on
-supported Windows platforms\&.
+\fBsupported Windows platforms\f1\&.
 .IP \(bu 2
 Linux MongoDB clients authenticating to Windows Active Directory
 deployments.
-.UNINDENT
-.sp
-\fBNOTE:\fP
-.INDENT 0.0
-.INDENT 3.5
-MongoDB Enterprise and \fI\%mongokerberos\fP only support the
-\fI\%MIT implementation\fP
+.RE
+.PP
+MongoDB Enterprise and \fBmongokerberos\f1\f1 only support the
+MIT implementation (https://kerberos.org/)
 of Kerberos.
-.UNINDENT
-.UNINDENT
-.sp
+.PP
 Generally, when configuring options related to
-Kerberos authentication, it is good practice
-to verify your configuration with \fI\%mongokerberos\fP\&.
-.sp
-\fI\%mongokerberos\fP is a testing and verification tool; it does not
+\fBKerberos authentication\f1, it is good practice
+to verify your configuration with \fBmongokerberos\f1\f1\&.
+.PP
+\fBmongokerberos\f1\f1 is a testing and verification tool; it does not
 edit any files or configure any services. For configuring Kerberos on
-your platform please consult the \fI\%MIT Kerberos documentation\fP, or your platform\(aqs
+your platform please consult the MIT Kerberos documentation (https://web.mit.edu/kerberos/krb5\-latest/doc/), or your platform\(aqs
 documentation. For configuring MongoDB to authenticate using Kerberos,
 please reference the following tutorials:
-.INDENT 0.0
+.RS
 .IP \(bu 2
-/tutorial/control\-access\-to\-mongodb\-with\-kerberos\-authentication
+\fBConfigure MongoDB with Kerberos Authentication on Linux\f1
 .IP \(bu 2
-/tutorial/control\-access\-to\-mongodb\-windows\-with\-kerberos\-authentication\&.
-.UNINDENT
-.sp
+\fBConfigure MongoDB with Kerberos Authentication on Windows\f1\&.
+.RE
+.PP
 This document provides a complete overview of all command line options
-for \fI\%mongokerberos\fP\&.
+for \fBmongokerberos\f1\f1\&.
 .SH INSTALLATION
-.sp
-The \fI\%mongokerberos\fP tool is part of the \fIMongoDB Database Tools Extra\fP
-package, and can be \fI\%installed with the MongoDB Server\fP or as a
-\fI\%standalone installation\fP\&.
-.SS Install with Server
-.sp
-To install \fI\%mongokerberos\fP as part of a MongoDB Enterprise Server
+.PP
+The \fBmongokerberos\f1\f1 tool is part of the \fIMongoDB Database Tools Extra\f1
+package, and can be \fBinstalled with the MongoDB Server\f1 or as a
+\fBstandalone installation\f1\&.
+.SS INSTALL WITH SERVER
+.PP
+To install \fBmongokerberos\f1\f1 as part of a MongoDB Enterprise Server
 installation:
-.INDENT 0.0
+.RS
 .IP \(bu 2
 Follow the instructions for your platform:
-Install MongoDB Enterprise Server
+\fBInstall MongoDB Enterprise Server\f1
 .IP \(bu 2
-After completing the installation, \fI\%mongokerberos\fP and the other
+After completing the installation, \fBmongokerberos\f1\f1 and the other
 included tools are available in the same location as the Server.
-.sp
-\fBNOTE:\fP
-.INDENT 2.0
-.INDENT 3.5
-For the Windows \fB\&.msi\fP installer wizard, the
-Complete installation option includes \fI\%mongokerberos\fP\&.
-.UNINDENT
-.UNINDENT
-.UNINDENT
-.SS Install as Standalone
-.sp
-To install \fI\%mongokerberos\fP as a standalone installation:
-.INDENT 0.0
+.IP
+For the Windows \fB\&.msi\f1 installer wizard, the
+Complete installation option includes \fBmongokerberos\f1\f1\&.
+.RE
+.SS INSTALL AS STANDALONE
+.PP
+To install \fBmongokerberos\f1\f1 as a standalone installation:
+.RS
 .IP \(bu 2
 Follow the download link for MongoDB Enterprise Edition:
-\fI\%MongoDB Enterprise Download Center\fP
+MongoDB Enterprise Download Center (https://www.mongodb.com/try/download/enterprise?tck=docs_server)
 .IP \(bu 2
 Select your Platform (operating system) from the dropdown
 menu, then select the appropriate Package for your
 platform according to the following chart:
-.TS
-center;
-|l|l|.
-_
-T{
+.RS
+.IP \(bu 4
+.RS
+.IP \(bu 6
 OS
-T}	T{
+.IP \(bu 6
 Package
-T}
-_
-T{
-\fILinux\fP
-T}	T{
-\fBtgz\fP package
-T}
-_
-T{
-\fIWindows\fP
-T}	T{
-\fBzip\fP package
-T}
-_
-T{
-\fImacOS\fP
-T}	T{
-\fBtgz\fP package
-T}
-_
-.TE
+.RE
+.IP \(bu 4
+.RS
+.IP \(bu 6
+Linux
+.IP \(bu 6
+\fBtgz\f1 package
+.RE
+.IP \(bu 4
+.RS
+.IP \(bu 6
+Windows
+.IP \(bu 6
+\fBzip\f1 package
+.RE
+.IP \(bu 4
+.RS
+.IP \(bu 6
+macOS
+.IP \(bu 6
+\fBtgz\f1 package
+.RE
+.RE
 .IP \(bu 2
-Once downloaded, unpack the archive and copy \fI\%mongokerberos\fP to a
+Once downloaded, unpack the archive and copy \fBmongokerberos\f1\f1 to a
 location on your hard drive.
-.INDENT 2.0
-.INDENT 3.5
-.SS Tip
-.sp
-Linux and macOS users may wish to copy \fI\%mongokerberos\fP to a filesystem
-location that is defined in the \fB$PATH\fP environment variable, such
-as \fB/usr/bin\fP\&. Doing so allows referencing \fI\%mongokerberos\fP directly
+.IP
+Linux and macOS users may wish to copy \fBmongokerberos\f1\f1 to a filesystem
+location that is defined in the \fB$PATH\f1 environment variable, such
+as \fB/usr/bin\f1\&. Doing so allows referencing \fBmongokerberos\f1\f1 directly
 on the command line by name, without needing to specify its full
 path, or first navigating to its parent directory. See the
-installation guide for your platform
+\fBinstallation guide\f1 for your platform
 for more information.
-.UNINDENT
-.UNINDENT
-.UNINDENT
+.RE
 .SH USAGE
-.sp
-\fI\%mongokerberos\fP can be run in two modes: \fIserver\fP and
-\fIclient\fP\&.
-.sp
-Run \fI\%mongokerberos\fP from the system command line, not the \fBmongo\fP shell.
-.SS Server Mode
-.sp
-Running \fI\%mongokerberos\fP in server mode performs a series of
+.PP
+\fBmongokerberos\f1\f1 can be run in two modes: \fIserver\f1 and
+\fIclient\f1\&.
+.PP
+Run \fBmongokerberos\f1\f1 from the system command line, not in the
+\fBmongosh\f1\f1\&.
+.SS SERVER MODE
+.PP
+Running \fBmongokerberos\f1\f1 in server mode performs a series of
 verification steps against your system\(aqs Kerberos configuration,
 including checking for proper DNS resolution, validation of the Kerberos
 system keytab file, and testing against the MongoDB service principal
-for your \fBmongod\fP or \fBmongos\fP instance.
-.sp
-Before you can use \fI\%mongokerberos\fP in server mode, you must:
-.INDENT 0.0
-.IP 1. 3
+for your \fBmongod\f1\f1 or \fBmongos\f1\f1 instance.
+.PP
+Before you can use \fBmongokerberos\f1\f1 in server mode, you must:
+.RS
+.IP \(bu 2
 Configure Kerberos on your platform according to your platform\(aqs
 documentation.
-.IP 2. 3
+.IP \(bu 2
 Create the MongoDB service principal for use with your
-\fBmongod\fP or \fBmongos\fP instance, as described
+\fBmongod\f1\f1 or \fBmongos\f1\f1 instance, as described
 in the following steps:
-.INDENT 3.0
-.IP \(bu 2
-Configure Service Principal on Linux
-.IP \(bu 2
-Configure Service Principal on Windows
-.UNINDENT
-.UNINDENT
-.sp
+.RS
+.IP \(bu 4
+\fBConfigure Service Principal on Linux\f1
+.IP \(bu 4
+\fBConfigure Service Principal on Windows\f1
+.RE
+.RE
+.PP
 Once you have completed these steps, you can run
-\fI\%mongokerberos\fP in server mode using the
-\fB\-\-server\fP flag as follows:
-.INDENT 0.0
-.INDENT 3.5
-.sp
-.nf
-.ft C
-mongokerberos \-\-server
-.ft P
-.fi
-.UNINDENT
-.UNINDENT
-.sp
+\fBmongokerberos\f1\f1 in server mode using the
+\fB\-\-server\f1 flag as follows:
+.PP
+.EX
+  mongokerberos \-\-server
+.EE
+.PP
 If Kerberos has been configured properly on the server, and the service
 principal created successfully, the output might resemble the following:
-.INDENT 0.0
-.INDENT 3.5
-.sp
-.nf
-.ft C
-Resolving kerberos environment...
-[OK] Kerberos environment resolved without errors.
-
-Verifying DNS resolution works with Kerberos service at <hostname>...
-[OK] DNS test successful.
-
-Getting MIT Kerberos KRB5 environment variables...
-  * KRB5CCNAME: not set.
-  * KRB5_CLIENT_KTNAME: not set.
-  * KRB5_CONFIG: not set.
-  * KRB5_KTNAME: not set.
-  * KRB5_TRACE: not set.
-[OK]
-
-Verifying existence of KRB5 keytab FILE:/etc/krb5.keytab...
-[OK] KRB5 keytab exists and is populated.
-
-Checking principal(s) in KRB5 keytab...
-Found the following principals for MongoDB service mongodb:
-  * mongodb/server.example.com@SERVER.EXAMPLE.COM
-Found the following kvnos in keytab entries for service mongodb:
-  * 3
-[OK] KRB5 keytab is valid.
-
-Fetching KRB5 Config...
-KRB5 config profile resolved as:
-   <Your Kerberos profile file will be output here>
-[OK] KRB5 config profile resolved without errors.
-
-Attempting to initiate security context with service credentials...
-[OK] Security context initiated successfully.
-.ft P
-.fi
-.UNINDENT
-.UNINDENT
-.sp
+.PP
+.EX
+  Resolving kerberos environment...
+  [OK] Kerberos environment resolved without errors.
+  
+  Verifying DNS resolution works with Kerberos service at <hostname>...
+  [OK] DNS test successful.
+  
+  Getting MIT Kerberos KRB5 environment variables...
+    * KRB5CCNAME: not set.
+    * KRB5_CLIENT_KTNAME: not set.
+    * KRB5_CONFIG: not set.
+    * KRB5_KTNAME: not set.
+    * KRB5_TRACE: not set.
+  [OK]
+  
+  Verifying existence of KRB5 keytab FILE:/etc/krb5.keytab...
+  [OK] KRB5 keytab exists and is populated.
+  
+  Checking principal(s) in KRB5 keytab...
+  Found the following principals for MongoDB service mongodb:
+    * mongodb/server.example.com@SERVER.EXAMPLE.COM
+  Found the following kvnos in keytab entries for service mongodb:
+    * 3
+  [OK] KRB5 keytab is valid.
+  
+  Fetching KRB5 Config...
+  KRB5 config profile resolved as:
+     <Your Kerberos profile file will be output here>
+  [OK] KRB5 config profile resolved without errors.
+  
+  Attempting to initiate security context with service credentials...
+  [OK] Security context initiated successfully.
+.EE
+.PP
 The final message indicates that the system\(aqs Kerberos configuration is
 ready to be used with MongoDB. If any errors are encountered with
 the configuration, they will be presented as part of the above output.
-.SS Client Mode
-.sp
-Running \fI\%mongokerberos\fP in client mode tests authentication
+.SS CLIENT MODE
+.PP
+Running \fBmongokerberos\f1\f1 in client mode tests authentication
 against your system\(aqs Kerberos environment, performing each step in the
 Kerberos authentication process, including checking for proper DNS
 resolution, verification of the Kerberos client keytab file, and testing
 whether a ticket can be successfully granted. Running
-\fI\%mongokerberos\fP in client mode simulates the client
-authentication procedure of the \fBmongo\fP shell.
-.sp
-Before you can use \fI\%mongokerberos\fP in client mode, you must
+\fBmongokerberos\f1\f1 in client mode simulates the client
+authentication procedure of \fBmongosh\f1\f1\&.
+.PP
+Before you can use \fBmongokerberos\f1\f1 in client mode, you must
 first have configured Kerberos on your platform according to your
 platform\(aqs documentation. Optionally, you may also choose to run
-\fI\%mongokerberos\fP in
-\fI\%server mode\fP first to verify that your
+\fBmongokerberos\f1\f1 in
+\fBserver mode\f1 first to verify that your
 platform\(aqs Kerberos configuration is valid before using client mode.
-.sp
+.PP
 Once you have completed these steps, you can run
-\fI\%mongokerberos\fP in client mode to test user authentication,
-using the \fB\-\-client\fP flag as follows:
-.INDENT 0.0
-.INDENT 3.5
-.sp
-.nf
-.ft C
-mongokerberos \-\-client \-\-username <username>
-.ft P
-.fi
-.UNINDENT
-.UNINDENT
-.sp
+\fBmongokerberos\f1\f1 in client mode to test user authentication,
+using the \fB\-\-client\f1 flag as follows:
+.PP
+.EX
+  mongokerberos \-\-client \-\-username <username>
+.EE
+.PP
 You must provide a valid username, which is used to request a Kerberos
 ticket as part of the authentication procedure. Your platform\(aqs
 Kerberos infrastructure must be aware of this user.
-.sp
+.PP
 If the provided credentials are valid, and the Kerberos options in the
 configuration files are valid, the output might resemble the following:
-.INDENT 0.0
-.INDENT 3.5
-.sp
-.nf
-.ft C
- Resolving kerberos environment...
- [OK] Kerberos environment resolved without errors.
-
- Verifying DNS resolution works with Kerberos service at <hostname>...
- [OK] DNS test successful.
-
- Getting MIT Kerberos KRB5 environment variables...
-   * KRB5CCNAME: not set.
-   * KRB5_CLIENT_KTNAME: not set.
-   * KRB5_CONFIG: not set.
-   * KRB5_KTNAME: not set.
-   * KRB5_TRACE: not set.
- [OK]
-
- Verifying existence of KRB5 client keytab FILE:/path/to/client.keytab...
- [OK] KRB5 client keytab exists and is populated.
-
- Checking principal(s) in KRB5 keytab...
- [OK] KRB5 keytab is valid.
-
- Fetching KRB5 Config...
- KRB5 config profile resolved as:
-    <Your Kerberos profile file will be output here>
- [OK] KRB5 config profile resolved without errors.
-
- Attempting client half of GSSAPI conversation...
- [OK] Client half of GSSAPI conversation completed successfully.
-.ft P
-.fi
-.UNINDENT
-.UNINDENT
-.sp
+.PP
+.EX
+   Resolving kerberos environment...
+   [OK] Kerberos environment resolved without errors.
+  
+   Verifying DNS resolution works with Kerberos service at <hostname>...
+   [OK] DNS test successful.
+  
+   Getting MIT Kerberos KRB5 environment variables...
+     * KRB5CCNAME: not set.
+     * KRB5_CLIENT_KTNAME: not set.
+     * KRB5_CONFIG: not set.
+     * KRB5_KTNAME: not set.
+     * KRB5_TRACE: not set.
+   [OK]
+  
+   Verifying existence of KRB5 client keytab FILE:/path/to/client.keytab...
+   [OK] KRB5 client keytab exists and is populated.
+  
+   Checking principal(s) in KRB5 keytab...
+   [OK] KRB5 keytab is valid.
+  
+   Fetching KRB5 Config...
+   KRB5 config profile resolved as:
+      <Your Kerberos profile file will be output here>
+   [OK] KRB5 config profile resolved without errors.
+  
+   Attempting client half of GSSAPI conversation...
+   [OK] Client half of GSSAPI conversation completed successfully.
+.EE
+.PP
 The final message indicates that client authentication completed
 successfully for the user provided.  If any errors are encountered
 during the authentication steps, they will be presented as part of the
 above output.
 .SH OPTIONS
-.INDENT 0.0
-.TP
-.B \-\-server
-Runs \fI\%mongokerberos\fP in server mode to test that your
+.PP
+\fBmongokerberos \-\-server\f1
+.RS
+.PP
+Runs \fBmongokerberos\f1\f1 in server mode to test that your
 platform\(aqs Kerberos configuration is valid for use with MongoDB.
-.sp
-See \fI\%Server Mode\fP for example usage and expected
+.PP
+See \fBServer Mode\f1 for example usage and expected
 output.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-client
-Runs \fI\%mongokerberos\fP in client mode to test client
+.RE
+.PP
+\fBmongokerberos \-\-client\f1
+.RS
+.PP
+Runs \fBmongokerberos\f1\f1 in client mode to test client
 authentication against your system\(aqs Kerberos environment. Requires
-specifying a valid username with \fI\%\-\-username\fP when running in
-client mode. \fI\%mongokerberos\fP will request a Kerberos ticket
+specifying a valid username with \fB\-\-username\f1\f1 when running in
+client mode. \fBmongokerberos\f1\f1 will request a Kerberos ticket
 for this username as part of the validation procedure. Running
-\fI\%mongokerberos\fP in client mode simulates the client
-authentication procedure of the \fBmongo\fP shell.
-.sp
-See \fI\%Client Mode\fP for example usage and expected
+\fBmongokerberos\f1\f1 in client mode simulates the client
+authentication procedure of \fBmongosh\f1\f1\&.
+.PP
+See \fBClient Mode\f1 for example usage and expected
 output.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-config <filename>, \-f <filename>
+.RE
+.PP
+\fBmongokerberos \-\-config\f1, \fBmongokerberos \-f\f1
+.RS
+.PP
 Specifies a configuration file for runtime configuration options.
 The options are equivalent to the command\-line
-configuration options. See /reference/configuration\-options for
+configuration options. See \fBConfiguration File Options\f1 for
 more information.
-.sp
-\fI\%mongokerberos\fP will read the values for
-\fBsaslHostName\fP and \fBsaslServiceName\fP from this
+.PP
+\fBmongokerberos\f1\f1 will read the values for
+\fBsaslHostName\f1\f1 and \fBsaslServiceName\f1\f1 from this
 file if present. These values can alteratively be specified with the
-\fI\%\-\-setParameter\fP option instead.
-.sp
+\fB\-\-setParameter\f1\f1 option instead.
+.PP
 Ensure the configuration file uses ASCII encoding. The
-\fI\%mongokerberos\fP instance does not support configuration
+\fBmongokerberos\f1\f1 instance does not support configuration
 files with non\-ASCII encoding, including UTF\-8.
-.sp
-Only valid in \fI\%server mode\fP\&.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-setParameter <options>
+.PP
+Only valid in \fBserver mode\f1\&.
+.RE
+.PP
+\fBmongokerberos \-\-setParameter\f1
+.RS
+.PP
 Sets a configurable parameter. You can specify multiple
-\fBsetParameter\fP fields.
-.sp
-While you can use any supported parameters with \fBsetParameter\fP,
-\fI\%mongokerberos\fP only checks for the value of the following:
-.INDENT 7.0
+\fBsetParameter\f1 fields.
+.PP
+While you can use any supported parameters with \fBsetParameter\f1,
+\fBmongokerberos\f1\f1 only checks for the value of the following:
+.RS
 .IP \(bu 2
-\fBsaslHostName\fP
+\fBsaslHostName\f1\f1
 .IP \(bu 2
-\fBsaslServiceName\fP
-.UNINDENT
-.sp
-If using the \fI\%\-\-config\fP option with a configuration file that
-also contains these values, the \fBsetParameter\fP values will
+\fBsaslServiceName\f1\f1
+.RE
+.PP
+If using the \fB\-\-config\f1\f1 option with a configuration file that
+also contains these values, the \fBsetParameter\f1 values will
 override the values from the configuration file.
-.sp
-Valid in both \fI\%server mode\fP
-and \fI\%client mode\fP\&.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-host <hostname>
+.PP
+Valid in both \fBserver mode\f1
+and \fBclient mode\f1\&.
+.RE
+.PP
+\fBmongokerberos \-\-host\f1
+.RS
+.PP
 Specify the hostname of the MongoDB server to connect to when testing
 authentication.
-.sp
-If \fI\%\-\-host\fP is not specified, \fI\%mongokerberos\fP does
+.PP
+If \fB\-\-host\f1\f1 is not specified, \fBmongokerberos\f1\f1 does
 not perform any DNS validation of the hostname (i.e. PTR record
 verification)
-.sp
-Only valid in \fI\%client mode\fP\&.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-username <username>, \-u <username>
-Username for \fI\%mongokerberos\fP to use when attempting Kerberos
+.PP
+Only valid in \fBclient mode\f1\&.
+.RE
+.PP
+\fBmongokerberos \-\-username\f1, \fBmongokerberos \-u\f1
+.RS
+.PP
+Username for \fBmongokerberos\f1\f1 to use when attempting Kerberos
 authentication. This value is required when running in
-\fI\%client mode\fP\&.
-.sp
-Only valid in \fI\%client mode\fP\&.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-gssapiServiceName <servicename>
-\fIdefault: \(aqmongodb\(aq\fP
-.sp
+\fBclient mode\f1\&.
+.PP
+Only valid in \fBclient mode\f1\&.
+.RE
+.PP
+\fBmongokerberos \-\-gssapiServiceName\f1
+.RS
+.PP
+\fIdefault: \(aqmongodb\(aq\f1
+.PP
 Service principal name to use when authenticating using
 GSSAPI/Kerberos.
-.sp
-Only valid in \fI\%client mode\fP\&.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-gssapiHostName <hostname>
+.PP
+Only valid in \fBclient mode\f1\&.
+.RE
+.PP
+\fBmongokerberos \-\-gssapiHostName\f1
+.RS
+.PP
 Remote hostname to use for purpose of GSSAPI/Kerberos authentication.
-.sp
-Only valid in \fI\%client mode\fP\&.
-.UNINDENT
-.SH AUTHOR
-MongoDB Documentation Project
-.SH COPYRIGHT
-2008-2020
-.\" Generated by docutils manpage writer.
-.
+.PP
+Only valid in \fBclient mode\f1\&.
+.RE
