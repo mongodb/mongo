@@ -26,9 +26,9 @@ class ResmokeProxyService:
     """A service to proxy requests to resmoke."""
 
     @inject.autoparams()
-    def __init__(self) -> None:
+    def __init__(self, run_options="") -> None:
         """Initialize the service."""
-        _parser.set_run_options()
+        _parser.set_run_options(run_options)
         self._suite_config = _suiteconfig
 
     def list_tests(self, suite_name: str) -> List[str]:
