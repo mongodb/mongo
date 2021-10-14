@@ -291,7 +291,8 @@ class TestAdjustGenTasksPriority(unittest.TestCase):
         gen_tasks = {"task_3", "task_8", "task_13"}
         n_build_tasks = 25
         mock_task_list = [
-            MagicMock(display_name=f"task_{i}", priority=0) for i in range(n_build_tasks)
+            MagicMock(build_variant='dummy_variant', display_name=f"task_{i}", priority=0)
+            for i in range(n_build_tasks)
         ]
         mock_orchestrator = build_mock_orchestrator(build_task_list=mock_task_list)
 

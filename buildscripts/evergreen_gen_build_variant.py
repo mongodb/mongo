@@ -319,6 +319,15 @@ class GenerateBuildVariantOrchestrator:
         LOGGER.info("Configure task", task_id=task.task_id, priority=priority)
         self.evg_api.configure_task(task.task_id, priority=priority)
 
+    @classmethod
+    def _should_adjust_task_priority(cls, task, gen_tasks):
+        if task.display_name in gen_tasks:
+            return True
+        # Test out the effect of Evergreen capacity constraints.
+        if task.build_variant.endswith("-query-patch-only"):
+            return True
+        return False
+
     def adjust_gen_tasks_priority(self, gen_tasks: Set[str]) -> int:
         """
         Increase the priority of any "_gen" tasks.
@@ -334,7 +343,7 @@ class GenerateBuildVariantOrchestrator:
         with Executor(max_workers=MAX_WORKERS) as exe:
             jobs = [
                 exe.submit(self.adjust_task_priority, task) for task in task_list
-                if task.display_name in gen_tasks
+                if self._should_adjust_task_priority(task, gen_tasks)
             ]
 
         results = [j.result() for j in jobs]
