@@ -63,8 +63,7 @@ aggregationCommand = {
     allowDiskUse: true,
     cursor: {},
 };
-assert.commandFailedWithCode(sessionColl.runCommand(aggregationCommand),
-                             ErrorCodes.OperationNotSupportedInTransaction);
+assert.commandFailedWithCode(sessionColl.runCommand(aggregationCommand), ErrorCodes.InvalidOptions);
 // Transaction state is now unusual, abort it and start a new one.
 session.abortTransaction();
 session.startTransaction({readConcern: {level: "snapshot"}});
@@ -75,7 +74,6 @@ aggregationCommand = {
     allowDiskUse: true,
     cursor: {}
 };
-assert.commandFailedWithCode(sessionColl.runCommand(aggregationCommand),
-                             ErrorCodes.OperationNotSupportedInTransaction);
+assert.commandFailedWithCode(sessionColl.runCommand(aggregationCommand), ErrorCodes.InvalidOptions);
 rst.stopSet();
 })();

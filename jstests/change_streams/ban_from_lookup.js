@@ -1,5 +1,9 @@
 /**
  * Test that the $changeStream stage cannot be used in a $lookup pipeline or sub-pipeline.
+ *
+ * @tags: [
+ *   change_stream_does_not_expect_txns,
+ * ]
  */
 (function() {
 "use strict";

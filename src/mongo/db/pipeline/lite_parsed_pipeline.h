@@ -151,6 +151,13 @@ public:
         boost::optional<ExplainOptions::Verbosity> explain) const;
 
     /**
+     * Verifies that this pipeline is allowed to run with the read concern from the provided opCtx.
+     * Used only when asserting is the desired behavior, otherwise use supportsReadConcern instead.
+     */
+    void assertSupportsReadConcern(OperationContext* opCtx,
+                                   boost::optional<ExplainOptions::Verbosity> explain) const;
+
+    /**
      * Perform checks that verify that the LitePipe is valid. Note that this function must be called
      * before forwarding an aggregation command on an unsharded collection, in order to verify that
      * the involved namespaces are allowed to be sharded.

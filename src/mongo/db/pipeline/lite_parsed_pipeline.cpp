@@ -106,6 +106,21 @@ void LiteParsedPipeline::assertSupportsMultiDocumentTransaction(
     }
 }
 
+void LiteParsedPipeline::assertSupportsReadConcern(
+    OperationContext* opCtx, boost::optional<ExplainOptions::Verbosity> explain) const {
+    const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+    auto readConcernSupport = supportsReadConcern(readConcernArgs.getLevel(),
+                                                  readConcernArgs.isImplicitDefault(),
+                                                  explain,
+                                                  serverGlobalParams.enableMajorityReadConcern);
+    if (readConcernArgs.hasLevel()) {
+        if (!readConcernSupport.readConcernSupport.isOK()) {
+            uassertStatusOK(readConcernSupport.readConcernSupport.withContext(
+                "Operation does not support this transaction's read concern"));
+        }
+    }
+}
+
 void LiteParsedPipeline::verifyIsSupported(
     OperationContext* opCtx,
     const std::function<bool(OperationContext*, const NamespaceString&)> isSharded,
@@ -115,6 +130,7 @@ void LiteParsedPipeline::verifyIsSupported(
     const bool inMultiDocumentTransaction = opCtx->inMultiDocumentTransaction();
     if (inMultiDocumentTransaction) {
         assertSupportsMultiDocumentTransaction(explain);
+        assertSupportsReadConcern(opCtx, explain);
     }
     // Verify that no involved namespace is sharded unless allowed by the pipeline.
     for (const auto& nss : getInvolvedNamespaces()) {

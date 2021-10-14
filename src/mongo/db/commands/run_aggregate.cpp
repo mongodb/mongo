@@ -577,10 +577,11 @@ Status runAggregate(OperationContext* opCtx,
     boost::intrusive_ptr<ExpressionContext> expCtx;
     auto curOp = CurOp::get(opCtx);
     {
-        // If we are in a transaction, check whether the parsed pipeline supports
-        // being in a transaction.
+        // If we are in a transaction, check whether the parsed pipeline supports being in
+        // a transaction and if the transaction's read concern is supported.
         if (opCtx->inMultiDocumentTransaction()) {
             liteParsedPipeline.assertSupportsMultiDocumentTransaction(request.getExplain());
+            liteParsedPipeline.assertSupportsReadConcern(opCtx, request.getExplain());
         }
 
         const auto& pipelineInvolvedNamespaces = liteParsedPipeline.getInvolvedNamespaces();
