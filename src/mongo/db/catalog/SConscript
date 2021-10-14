@@ -449,6 +449,7 @@ env.Library(
     source=[
         'capped_utils.cpp',
         'coll_mod.cpp',
+        'coll_mod_index.cpp',
         "collection_compact.cpp",
         'create_collection.cpp',
         'drop_collection.cpp',
