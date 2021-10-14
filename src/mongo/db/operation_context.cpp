@@ -218,6 +218,14 @@ bool opShouldFail(Client* client, const BSONObj& failPointInfo) {
 }  // namespace
 
 Status OperationContext::checkForInterruptNoAssert() noexcept {
+    const auto killStatus = getKillStatus();
+
+    if (_ignoreInterruptsExceptForReplStateChange &&
+        killStatus != ErrorCodes::InterruptedDueToReplStateChange &&
+        !_killRequestedForReplStateChange.loadRelaxed()) {
+        return Status::OK();
+    }
+
     // TODO: Remove the MONGO_likely(hasClientAndServiceContext) once all operation contexts are
     // constructed with clients.
     const auto hasClientAndServiceContext = getClient() && getServiceContext();
@@ -250,7 +258,6 @@ Status OperationContext::checkForInterruptNoAssert() noexcept {
         },
         [&](auto&& data) { return opShouldFail(getClient(), data); });
 
-    const auto killStatus = getKillStatus();
     if (killStatus != ErrorCodes::OK) {
         if (killStatus == ErrorCodes::TransactionExceededLifetimeLimitSeconds)
             return Status(
@@ -344,6 +351,13 @@ void OperationContext::markKilled(ErrorCodes::Error killCode) {
 
     if (killCode == ErrorCodes::ClientDisconnect) {
         LOGV2(20883, "Interrupted operation as its client disconnected", "opId"_attr = getOpID());
+    }
+
+    // Record that a kill was requested on this operationContext due to replication state change
+    // since it is possible to call markKilled() multiple times but only the first killCode will
+    // be preserved.
+    if (killCode == ErrorCodes::InterruptedDueToReplStateChange) {
+        _killRequestedForReplStateChange.store(true);
     }
 
     if (auto status = ErrorCodes::OK; _killCode.compareAndSwap(&status, killCode)) {
