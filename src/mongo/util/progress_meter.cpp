@@ -66,10 +66,10 @@ bool ProgressMeter::hit(int n) {
         return false;
 
     if (_total > 0) {
+        std::string stashedName = getName();
         int per = (int)(((double)_done * 100.0) / (double)_total);
-
         logv2::DynamicAttributes attrs;
-        attrs.add("name", _name);
+        attrs.add("name", stashedName);
         attrs.add("done", _done);
         if (_showTotal) {
             attrs.add("total", _total);
@@ -89,9 +89,9 @@ std::string ProgressMeter::toString() const {
         return "";
     std::stringstream buf;
     if (_total) {
-        buf << _name << ": " << _done << '/' << _total << ' ' << (_done * 100) / _total << '%';
+        buf << getName() << ": " << _done << '/' << _total << ' ' << (_done * 100) / _total << '%';
     } else {
-        buf << _name << ": not started";
+        buf << getName() << ": not started";
     }
 
     if (!_units.empty()) {

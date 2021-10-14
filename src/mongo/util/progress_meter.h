@@ -29,9 +29,11 @@
 
 #pragma once
 
-#include "mongo/util/thread_safe_string.h"
-
 #include <string>
+#include <utility>
+
+#include "mongo/base/string_data.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 
@@ -45,8 +47,7 @@ public:
                   int checkInterval = 100,
                   std::string units = "",
                   std::string name = "Progress")
-        : _showTotal(true), _units(units) {
-        _name = name.c_str();
+        : _showTotal(true), _units(units), _name(std::move(name)) {
         reset(total, secondsBetween, checkInterval);
     }
 
@@ -78,10 +79,12 @@ public:
     }
 
     void setName(StringData name) {
-        _name = name;
+        stdx::lock_guard lk(_nameMutex);
+        _name = std::string{name};
     }
     std::string getName() const {
-        return _name.toString();
+        stdx::lock_guard lk(_nameMutex);
+        return _name;
     }
 
     void setTotalWhileRunning(unsigned long long total) {
@@ -123,7 +126,9 @@ private:
     int _lastTime;
 
     std::string _units;
-    ThreadSafeString _name;
+
+    mutable stdx::mutex _nameMutex;  // NOLINT
+    std::string _name;               // guarded by _nameMutex
 };
 
 /*

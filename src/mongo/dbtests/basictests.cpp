@@ -30,6 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include <iostream>
+#include <string>
 
 #include "mongo/db/client.h"
 #include "mongo/dbtests/dbtests.h"
@@ -37,7 +38,6 @@
 #include "mongo/util/queue.h"
 #include "mongo/util/str.h"
 #include "mongo/util/text.h"
-#include "mongo/util/thread_safe_string.h"
 #include "mongo/util/timer.h"
 
 namespace BasicTests {
@@ -236,31 +236,6 @@ public:
         } catch (...) {
         }
         ASSERT_EQUALS(1, x);
-    }
-};
-
-class ThreadSafeStringTest {
-public:
-    void run() {
-        ThreadSafeString s;
-        s = "eliot";
-        ASSERT_EQUALS(s.toString(), "eliot");
-        ASSERT(s.toString() != "eliot2");
-
-        ThreadSafeString s2;
-        s2 = s.toString().c_str();
-        ASSERT_EQUALS(s2.toString(), "eliot");
-
-
-        {
-            string foo;
-            {
-                ThreadSafeString bar;
-                bar = "eliot2";
-                foo = bar.toString();
-            }
-            ASSERT_EQUALS("eliot2", foo);
-        }
     }
 };
 
