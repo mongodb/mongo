@@ -318,6 +318,8 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
                   "specIndex"_attr = i,
                   "numSpecs"_attr = indexSpecs.size(),
                   "method"_attr = _method,
+                  "ident"_attr = indexCatalogEntry->getIdent(),
+                  "collectionIdent"_attr = collection->getSharedIdent()->getIdent(),
                   "maxTemporaryMemoryUsageMB"_attr =
                       eachIndexBuildMaxMemoryUsageBytes / 1024 / 1024);
 
