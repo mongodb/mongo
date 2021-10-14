@@ -96,7 +96,8 @@ void assertMovePrimaryInProgress(OperationContext* opCtx, NamespaceString const&
     }
 }
 
-struct CollModRequest : public CollModIndexRequest {
+struct CollModRequest {
+    CollModIndexRequest indexRequest;
     BSONElement clusteredIndexExpireAfterSeconds = {};
     BSONElement viewPipeLine = {};
     BSONElement timeseries = {};
@@ -166,13 +167,14 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
                 keyPattern = keyPatternElem.embeddedObject();
             }
 
-            cmr.indexExpireAfterSeconds = indexObj["expireAfterSeconds"];
-            cmr.indexHidden = indexObj["hidden"];
+            auto cmrIndex = &cmr.indexRequest;
+            cmrIndex->indexExpireAfterSeconds = indexObj["expireAfterSeconds"];
+            cmrIndex->indexHidden = indexObj["hidden"];
 
-            if (cmr.indexExpireAfterSeconds.eoo() && cmr.indexHidden.eoo()) {
+            if (cmrIndex->indexExpireAfterSeconds.eoo() && cmrIndex->indexHidden.eoo()) {
                 return Status(ErrorCodes::InvalidOptions, "no expireAfterSeconds or hidden field");
             }
-            if (!cmr.indexExpireAfterSeconds.eoo()) {
+            if (!cmrIndex->indexExpireAfterSeconds.eoo()) {
                 if (isTimeseries) {
                     return Status(ErrorCodes::InvalidOptions,
                                   "TTL indexes are not supported for time-series collections. "
@@ -180,17 +182,17 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
                                   "'expireAfterSeconds' option instead");
                 }
                 if (auto status = index_key_validate::validateExpireAfterSeconds(
-                        cmr.indexExpireAfterSeconds.safeNumberLong());
+                        cmrIndex->indexExpireAfterSeconds.safeNumberLong());
                     !status.isOK()) {
                     return {ErrorCodes::InvalidOptions, status.reason()};
                 }
             }
-            if (!cmr.indexHidden.eoo() && !cmr.indexHidden.isBoolean()) {
+            if (!cmrIndex->indexHidden.eoo() && !cmrIndex->indexHidden.isBoolean()) {
                 return Status(ErrorCodes::InvalidOptions, "hidden field must be a boolean");
             }
             if (!indexName.empty()) {
-                cmr.idx = coll->getIndexCatalog()->findIndexByName(opCtx, indexName);
-                if (!cmr.idx) {
+                cmrIndex->idx = coll->getIndexCatalog()->findIndexByName(opCtx, indexName);
+                if (!cmrIndex->idx) {
                     return Status(ErrorCodes::IndexNotFound,
                                   str::stream()
                                       << "cannot find index " << indexName << " for ns " << nss);
@@ -213,17 +215,17 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
                                       << "cannot find index " << keyPattern << " for ns " << nss);
                 }
 
-                cmr.idx = indexes[0];
+                cmrIndex->idx = indexes[0];
             }
 
-            if (!cmr.indexExpireAfterSeconds.eoo()) {
-                BSONElement oldExpireSecs = cmr.idx->infoObj().getField("expireAfterSeconds");
+            if (!cmrIndex->indexExpireAfterSeconds.eoo()) {
+                BSONElement oldExpireSecs = cmrIndex->idx->infoObj().getField("expireAfterSeconds");
                 if (oldExpireSecs.eoo()) {
-                    if (cmr.idx->isIdIndex()) {
+                    if (cmrIndex->idx->isIdIndex()) {
                         return Status(ErrorCodes::InvalidOptions,
                                       "the _id field does not support TTL indexes");
                     }
-                    if (cmr.idx->getNumFields() != 1) {
+                    if (cmrIndex->idx->getNumFields() != 1) {
                         return Status(ErrorCodes::InvalidOptions,
                                       "TTL indexes are single-field indexes, compound indexes do "
                                       "not support TTL");
@@ -234,17 +236,17 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
                 }
             }
 
-            if (cmr.indexHidden) {
+            if (cmrIndex->indexHidden) {
                 // Hiding a hidden index or unhiding a visible index should be treated as a no-op.
-                if (cmr.idx->hidden() == cmr.indexHidden.booleanSafe()) {
+                if (cmrIndex->idx->hidden() == cmrIndex->indexHidden.booleanSafe()) {
                     // If the collMod includes "expireAfterSeconds", remove the no-op "hidden"
                     // parameter and write the remaining "index" object to the oplog entry builder.
-                    if (!cmr.indexExpireAfterSeconds.eoo()) {
+                    if (!cmrIndex->indexExpireAfterSeconds.eoo()) {
                         oplogEntryBuilder->append(fieldName, indexObj.removeField("hidden"));
                     }
                     // Un-set "indexHidden" in CollModRequest, and skip the automatic write to the
                     // oplogEntryBuilder that occurs at the end of the parsing loop.
-                    cmr.indexHidden = {};
+                    cmrIndex->indexHidden = {};
                     continue;
                 }
 
@@ -257,7 +259,7 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
 
                 // Disallow index hiding/unhiding on _id indexes - these are created by default and
                 // are critical to most collection operations.
-                if (cmr.idx->isIdIndex()) {
+                if (cmrIndex->idx->isIdIndex()) {
                     return Status(ErrorCodes::BadValue, "can't hide _id index");
                 }
             }
@@ -494,7 +496,7 @@ Status _collModInternal(OperationContext* opCtx,
     // WriteConflictExceptions thrown in the writeConflictRetry loop enclosing this function can
     // cause collModIndexRequest->idx to become invalid, so save a copy to use in the loop until we
     // can refresh it.
-    auto idx = cmrNew.idx;
+    auto idx = cmrNew.indexRequest.idx;
     auto ts = cmrNew.timeseries;
 
     if (!serverGlobalParams.quiet.load()) {
@@ -561,7 +563,8 @@ Status _collModInternal(OperationContext* opCtx,
         }
 
         // Handle index modifications.
-        processCollModIndexRequest(opCtx, &coll, idx, &cmrNew, &indexCollModInfo, result);
+        processCollModIndexRequest(
+            opCtx, &coll, idx, &cmrNew.indexRequest, &indexCollModInfo, result);
 
         if (cmrNew.collValidator) {
             coll.getWritableCollection()->setValidator(opCtx, *cmrNew.collValidator);
