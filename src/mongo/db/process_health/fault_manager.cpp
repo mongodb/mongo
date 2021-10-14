@@ -177,46 +177,38 @@ void FaultManager::healthCheck() {
         }
     }
 
-    // Actions above can result is a state change.
+    // Actions above can result in a state change.
     checkForStateTransition();
 }
 
 void FaultManager::checkForStateTransition() {
-    Status status = Status::OK();
     FaultConstPtr fault = currentFault();
     if (fault && !HealthCheckStatus::isResolved(fault->getSeverity())) {
-        status = processFaultExistsEvent();
+        processFaultExistsEvent();
     } else if (!fault || HealthCheckStatus::isResolved(fault->getSeverity())) {
-        status = processFaultIsResolvedEvent();
-    }
-
-    if (!status.isOK()) {
-        LOGV2_ERROR(5936701, "Error during Fault manager state transition", "error"_attr = status);
+        processFaultIsResolvedEvent();
     }
 }
 
-Status FaultManager::processFaultExistsEvent() {
-    Status status = Status::OK();
+void FaultManager::processFaultExistsEvent() {
     FaultState currentState = getFaultState();
 
     switch (currentState) {
         case FaultState::kStartupCheck:
         case FaultState::kOk:
-            status = _transitionToKTransientFault();
+            transitionToState(FaultState::kTransientFault);
             break;
         case FaultState::kTransientFault:
         case FaultState::kActiveFault:
             // NOP.
             break;
         default:
-            invariant(false);
+            MONGO_UNREACHABLE;
             break;
     }
-    return status;
 }
 
-Status FaultManager::processFaultIsResolvedEvent() {
-    Status status = Status::OK();
+void FaultManager::processFaultIsResolvedEvent() {
     FaultState currentState = getFaultState();
 
     switch (currentState) {
@@ -225,76 +217,39 @@ Status FaultManager::processFaultIsResolvedEvent() {
             break;
         case FaultState::kStartupCheck:
         case FaultState::kTransientFault:
-            status = _transitionToKOk();
+            transitionToState(FaultState::kOk);
             break;
         case FaultState::kActiveFault:
             // Too late, this state cannot be resolved to Ok.
             break;
         default:
-            invariant(false);
+            MONGO_UNREACHABLE;
             break;
     }
-    return status;
 }
 
-Status FaultManager::transitionToState(FaultState newState) {
-    Status status = Status::OK();
-    switch (newState) {
-        case FaultState::kOk:
-            status = _transitionToKOk();
-            break;
-        case FaultState::kTransientFault:
-            status = _transitionToKTransientFault();
-            break;
-        case FaultState::kActiveFault:
-            status = _transitionToKActiveFault();
-            break;
-        default:
-            return Status(ErrorCodes::BadValue,
-                          fmt::format("Illegal transition from {} to {}", _currentState, newState));
-            break;
-    }
+void FaultManager::transitionToState(FaultState newState) {
+    // Maps currentState to valid newStates
+    static stdx::unordered_map<FaultState, std::vector<FaultState>> validTransitions = {
+        {FaultState::kStartupCheck, {FaultState::kOk, FaultState::kTransientFault}},
+        {FaultState::kOk, {FaultState::kTransientFault}},
+        {FaultState::kTransientFault, {FaultState::kOk, FaultState::kActiveFault}},
+        {FaultState::kActiveFault, {}},
+    };
 
-    if (status.isOK()) {
-        LOGV2_DEBUG(5936201, 1, "Transitioned fault manager state", "newState"_attr = newState);
-    }
-
-    return status;
-}
-
-Status FaultManager::_transitionToKOk() {
     stdx::lock_guard<Latch> lk(_stateMutex);
-    if (_currentState != FaultState::kStartupCheck && _currentState != FaultState::kTransientFault)
-        return Status(
-            ErrorCodes::BadValue,
-            fmt::format("Illegal transition from {} to {}", _currentState, FaultState::kOk));
+    const auto& validStates = validTransitions.at(_currentState);
+    auto validIt = std::find(validStates.begin(), validStates.end(), newState);
+    uassert(ErrorCodes::BadValue,
+            str::stream() << "Invalid fault manager transition from " << _currentState << " to "
+                          << newState,
+            validIt != validStates.end());
 
-    _currentState = FaultState::kOk;
-    return Status::OK();
-}
-
-Status FaultManager::_transitionToKTransientFault() {
-    stdx::lock_guard<Latch> lk(_stateMutex);
-    if (_currentState != FaultState::kStartupCheck && _currentState != FaultState::kOk)
-        return Status(ErrorCodes::BadValue,
-                      fmt::format("Illegal transition from {} to {}",
-                                  _currentState,
-                                  FaultState::kTransientFault));
-
-    _currentState = FaultState::kTransientFault;
-    return Status::OK();
-}
-
-Status FaultManager::_transitionToKActiveFault() {
-    stdx::lock_guard<Latch> lk(_stateMutex);
-    if (_currentState != FaultState::kTransientFault)
-        return Status(ErrorCodes::BadValue,
-                      fmt::format("Illegal transition from {} to {}",
-                                  _currentState,
-                                  FaultState::kActiveFault));
-
-    _currentState = FaultState::kActiveFault;
-    return Status::OK();
+    LOGV2(5936201,
+          "Transitioned fault manager state",
+          "newState"_attr = str::stream() << newState,
+          "oldState"_attr = str::stream() << _currentState);
+    _currentState = newState;
 }
 
 void FaultManager::_initHealthObserversIfNeeded() {

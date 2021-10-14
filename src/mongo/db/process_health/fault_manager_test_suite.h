@@ -57,8 +57,8 @@ public:
                          std::shared_ptr<executor::TaskExecutor> taskExecutor)
         : FaultManager(svcCtx, taskExecutor) {}
 
-    Status transitionStateTest(FaultState newState) {
-        return transitionToState(newState);
+    void transitionStateTest(FaultState newState) {
+        transitionToState(newState);
     }
 
     FaultState getFaultStateTest() {
@@ -73,11 +73,11 @@ public:
         return getHealthObservers();
     }
 
-    Status processFaultExistsEventTest() {
-        return processFaultExistsEvent();
+    void processFaultExistsEventTest() {
+        processFaultExistsEvent();
     }
 
-    Status processFaultIsResolvedEventTest() {
+    void processFaultIsResolvedEventTest() {
         return processFaultIsResolvedEvent();
     }
 
@@ -140,6 +140,17 @@ public:
         executor::NetworkInterfaceMock::InNetworkGuard guard(_net);
         _net->advanceTime(_net->now() + d);
     }
+
+    void assertInvalidStateTransition(FaultState newState) {
+        try {
+            manager().transitionStateTest(newState);
+            ASSERT(false);
+        } catch (const DBException& ex) {
+            ASSERT(ex.code() == ErrorCodes::BadValue);
+            // expected exception
+        }
+    }
+
 
 private:
     ServiceContext::UniqueServiceContext _svcCtx;
