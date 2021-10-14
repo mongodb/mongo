@@ -134,10 +134,6 @@ public:
     void saveState(bool relinquishCursor) {
         auto stage = static_cast<T*>(this);
         stage->_commonStats.yields++;
-#if defined(MONGO_CONFIG_DEBUG_BUILD)
-        invariant(_saveState == SaveState::kNotSaved);
-#endif
-
         stage->doSaveState(relinquishCursor);
         // Save the children in a right to left order so dependent stages (i.e. one using correlated
         // slots) are saved first.
