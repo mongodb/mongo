@@ -237,9 +237,7 @@ std::vector<BSONObj> autoSplitVector(OperationContext* opCtx,
 
         // Traverse the index and add the maxDocsPerChunk-th key to the result vector
         while (forwardIdxScanner->getNext(&currentKey, nullptr) == PlanExecutor::ADVANCED) {
-            numScannedKeys++;
-
-            if (numScannedKeys > maxDocsPerChunk) {
+            if (++numScannedKeys >= maxDocsPerChunk) {
                 currentKey = orderShardKeyFields(keyPattern, currentKey);
 
                 if (currentKey.woCompare(lastSplitPoint) == 0) {
