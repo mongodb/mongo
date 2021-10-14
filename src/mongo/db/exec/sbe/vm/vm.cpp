@@ -1690,76 +1690,62 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinAddToArray(Arit
     return {ownAgg, tagAgg, valAgg};
 }
 
-// TODO SERVER-60289: A new accumulator is allocated whenever a new value needs to be
-// accumulated. As the accumulated value is an Object type, this may cause performance
-// issues. Possible solutions to this could include extending the interface of Object or creating
-// a new type that better supports the mergeObjects operation.
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinMergeObjects(ArityType arity) {
-    auto [ownAgg, tagAgg, valAgg] = getFromStack(0);
     auto [_, tagField, valField] = getFromStack(1);
+    // Move the incoming accumulator state from the stack. Given that we are now the owner of the
+    // state we are free to do any in-place update as we see fit.
+    auto [tagAgg, valAgg] = moveOwnedFromStack(0);
 
+    value::ValueGuard guard{tagAgg, valAgg};
     // Create a new object if it does not exist yet.
     if (tagAgg == value::TypeTags::Nothing) {
-        ownAgg = true;
         std::tie(tagAgg, valAgg) = value::makeNewObject();
-    } else {
-        // Take ownership of the accumulator.
-        topStack(false, value::TypeTags::Nothing, 0);
     }
-    value::ValueGuard guard{tagAgg, valAgg};
 
-    invariant(ownAgg && tagAgg == value::TypeTags::Object);
+    invariant(tagAgg == value::TypeTags::Object);
 
     if (tagField == value::TypeTags::Nothing || tagField == value::TypeTags::Null) {
         guard.reset();
-        return {ownAgg, tagAgg, valAgg};
+        return {true, tagAgg, valAgg};
     }
+
+    auto obj = value::getObjectView(valAgg);
 
     StringMap<std::pair<value::TypeTags, value::Value>> currObjMap;
-    for (auto currObjEnumerator = value::ObjectEnumerator{tagField, valField};
-         !currObjEnumerator.atEnd();
-         currObjEnumerator.advance()) {
-        currObjMap[currObjEnumerator.getFieldName()] = currObjEnumerator.getViewOfValue();
+    for (auto currObjEnum = value::ObjectEnumerator{tagField, valField}; !currObjEnum.atEnd();
+         currObjEnum.advance()) {
+        currObjMap[currObjEnum.getFieldName()] = currObjEnum.getViewOfValue();
     }
 
-    // Process the accumulated fields and copy them over to new accumulator if it
-    // doesn't exist within the current object being processed or copy over field
-    // from the current object directly. Preserves the order of existing fields in the
+    // Process the accumulated fields and if a field within the current object already exists
+    // within the existing accuultor, we set the value of that field within the accumuator to the
+    // value contained within the current object. Preserves the order of existing fields in the
     // accumulator
-    auto [newTagAgg, newValAgg] = value::makeNewObject();
-    value::ValueGuard newGuard{newTagAgg, newValAgg};
-    auto newObj = value::getObjectView(newValAgg);
-    for (auto aggObjEnumerator = value::ObjectEnumerator{tagAgg, valAgg}; !aggObjEnumerator.atEnd();
-         aggObjEnumerator.advance()) {
-        auto it = currObjMap.find(aggObjEnumerator.getFieldName());
-        if (it == currObjMap.end()) {
-            auto [aggObjTag, aggObjVal] = aggObjEnumerator.getViewOfValue();
-            auto [aggObjTagCopy, aggObjValCopy] = value::copyValue(aggObjTag, aggObjVal);
-            newObj->push_back(aggObjEnumerator.getFieldName(), aggObjTagCopy, aggObjValCopy);
-        } else {
+    for (size_t idx = 0, numFields = obj->size(); idx < numFields; ++idx) {
+        auto it = currObjMap.find(obj->field(idx));
+        if (it != currObjMap.end()) {
             auto [currObjTag, currObjVal] = it->second;
             auto [currObjTagCopy, currObjValCopy] = value::copyValue(currObjTag, currObjVal);
-            newObj->push_back(aggObjEnumerator.getFieldName(), currObjTagCopy, currObjValCopy);
+            obj->setAt(idx, currObjTagCopy, currObjValCopy);
             currObjMap.erase(it);
         }
     }
 
-    // Copy the remaining fields of the current object being processed to the new
+    // Copy the remaining fields of the current object being processed to the
     // accumulator. Fields that were already present in the accumulated fields
-    // have been copied over already. Preserves the relative order of the new fields
-    for (auto currObjEnumerator = value::ObjectEnumerator{tagField, valField};
-         !currObjEnumerator.atEnd();
-         currObjEnumerator.advance()) {
-        auto it = currObjMap.find(currObjEnumerator.getFieldName());
+    // have been set already. Preserves the relative order of the new fields
+    for (auto currObjEnum = value::ObjectEnumerator{tagField, valField}; !currObjEnum.atEnd();
+         currObjEnum.advance()) {
+        auto it = currObjMap.find(currObjEnum.getFieldName());
         if (it != currObjMap.end()) {
             auto [currObjTag, currObjVal] = it->second;
             auto [currObjTagCopy, currObjValCopy] = value::copyValue(currObjTag, currObjVal);
-            newObj->push_back(currObjEnumerator.getFieldName(), currObjTagCopy, currObjValCopy);
+            obj->push_back(currObjEnum.getFieldName(), currObjTagCopy, currObjValCopy);
         }
     }
 
-    newGuard.reset();
-    return {ownAgg, newTagAgg, newValAgg};
+    guard.reset();
+    return {true, tagAgg, valAgg};
 }
 
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinAddToSet(ArityType arity) {
