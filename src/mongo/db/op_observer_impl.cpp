@@ -700,13 +700,15 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
                                    dataImage);
         }
 
+        // Write a pre-image to the change streams pre-images collection if the node is the primary
+        // and not performing an initial sync or a tenant migration.
         if (opCtx->isEnforcingConstraints() &&
             args.updateArgs.changeStreamPreAndPostImagesEnabledForCollection) {
             const auto& preImageDoc = args.updateArgs.preImageDoc;
             tassert(5868600, "PreImage must be set", preImageDoc && !preImageDoc.get().isEmpty());
 
-            ChangeStreamPreImageId _id(args.uuid, opTime.writeOpTime.getTimestamp(), 0);
-            ChangeStreamPreImage preImage(_id, opTime.wallClockTime, preImageDoc.get());
+            ChangeStreamPreImageId id(args.uuid, opTime.writeOpTime.getTimestamp(), 0);
+            ChangeStreamPreImage preImage(id, opTime.wallClockTime, preImageDoc.get());
             writeToChangeStreamPreImagesCollection(opCtx, preImage);
         }
 
@@ -780,11 +782,19 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
     const bool inMultiDocumentTransaction =
         txnParticipant && opCtx->writesAreReplicated() && txnParticipant.transactionIsOpen();
 
+    using RetryableOptions = OpObserver::RetryableWriteImageRecordingType;
     OpTimeBundle opTime;
     if (inMultiDocumentTransaction) {
+        tassert(5868700,
+                "Attempted a retryable write within a multi-document transaction",
+                args.retryableWritePreImageRecordingType == RetryableOptions::kNotRetryable);
         auto operation =
             MutableOplogEntry::makeDeleteOperation(nss, uuid.get(), documentKey.getShardKeyAndId());
-        if (args.deletedDoc && args.preImageRecordingEnabledForCollection) {
+
+        if (args.preImageRecordingEnabledForCollection) {
+            tassert(5868701,
+                    "Deleted document must be present for pre-image recording",
+                    args.deletedDoc);
             operation.setPreImage(args.deletedDoc->getOwned());
         }
 
@@ -792,23 +802,25 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
         txnParticipant.addTransactionOperation(opCtx, operation);
     } else {
         MutableOplogEntry oplogEntry;
-        if (args.deletedDoc && args.storeImageInSideCollection &&
-            !args.preImageRecordingEnabledForCollection) {
-            // If we have a deleted document and the image should be saved to
-            // `config.image_collection`...
+        boost::optional<BSONObj> deletedDocForOplog = boost::none;
+
+        if (args.retryableWritePreImageRecordingType == RetryableOptions::kRecordInOplog ||
+            args.preImageRecordingEnabledForCollection) {
+            tassert(5868702,
+                    "Deleted document must be present for pre-image recording",
+                    args.deletedDoc);
+            deletedDocForOplog = {*(args.deletedDoc)};
+        } else if (args.retryableWritePreImageRecordingType ==
+                   RetryableOptions::kRecordInSideCollection) {
+            tassert(5868703,
+                    "Deleted document must be present for pre-image recording",
+                    args.deletedDoc);
             invariant(opCtx->getTxnNumber());
 
             oplogEntry.setNeedsRetryImage({repl::RetryImageEnum::kPreImage});
             if (args.oplogSlot) {
                 oplogEntry.setOpTime(*args.oplogSlot);
             }
-        }
-
-        boost::optional<BSONObj> deletedDocForOplog = boost::none;
-        if (args.deletedDoc && !oplogEntry.getNeedsRetryImage()) {
-            // If we have a deletedDoc preImage and we're not writing it to
-            // `config.image_collection`, instead write it to the oplog.
-            deletedDocForOplog = {*(args.deletedDoc)};
         }
         opTime = replLogDelete(
             opCtx, nss, &oplogEntry, uuid, stmtId, args.fromMigrate, deletedDocForOplog);
@@ -819,6 +831,17 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
                                    opTime.writeOpTime.getTimestamp(),
                                    repl::RetryImageEnum::kPreImage,
                                    *(args.deletedDoc));
+        }
+
+        // Write a pre-image to the change streams pre-images collection if the node is the primary
+        // and not performing an initial sync or a tenant migration.
+        if (opCtx->isEnforcingConstraints() &&
+            args.changeStreamPreAndPostImagesEnabledForCollection) {
+            tassert(5868704, "Deleted document and uuid must be set", args.deletedDoc && uuid);
+
+            ChangeStreamPreImageId id(uuid.get(), opTime.writeOpTime.getTimestamp(), 0);
+            ChangeStreamPreImage preImage(id, opTime.wallClockTime, *args.deletedDoc);
+            writeToChangeStreamPreImagesCollection(opCtx, preImage);
         }
 
         SessionTxnRecord sessionTxnRecord;
