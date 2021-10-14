@@ -32,7 +32,6 @@ var ReshardingTest = class {
         periodicNoopIntervalSecs: periodicNoopIntervalSecs = undefined,
         writePeriodicNoops: writePeriodicNoops = undefined,
         enableElections: enableElections = false,
-        shouldSetMinVisibleToOldestOnStartup: shouldSetMinVisibleToOldestOnStartup = false,
     } = {}) {
         // The @private JSDoc comments cause VS Code to not display the corresponding properties and
         // methods in its autocomplete list. This makes it simpler for test authors to know what the
@@ -57,8 +56,6 @@ var ReshardingTest = class {
         this._writePeriodicNoops = writePeriodicNoops;
         /** @private */
         this._enableElections = enableElections;
-        /** @private */
-        this._shouldSetMinVisibleToOldestOnStartup = shouldSetMinVisibleToOldestOnStartup;
 
         // Properties set by setup().
         /** @private */
@@ -124,11 +121,8 @@ var ReshardingTest = class {
             // sharded collection is guaranteed to exist in the collection catalog at the
             // cloneTimestamp and tests involving elections do not run operations which would bump
             // the minimum visible timestamp (e.g. creating or dropping indexes).
-            if (this._shouldSetMinVisibleToOldestOnStartup) {
-                rsOptions
-                    .setParameter["failpoint.setMinVisibleForAllCollectionsToOldestOnStartup"] =
-                    tojson({mode: "alwaysOn"});
-            }
+            rsOptions.setParameter["failpoint.setMinVisibleForAllCollectionsToOldestOnStartup"] =
+                tojson({mode: "alwaysOn"});
         }
 
         if (this._minimumOperationDurationMS !== undefined) {
@@ -285,11 +279,16 @@ var ReshardingTest = class {
     /** @private */
     _startReshardingInBackgroundAndAllowCommandFailure({newShardKeyPattern, newChunks},
                                                        expectedErrorCode) {
-        assert.neq(expectedErrorCode,
-                   ErrorCodes.HostUnreachable,
-                   "HostUnreachable error must never be expected as final reshardCollection" +
-                       " command error response because it indicates mongos gave up retrying and" +
-                       " the client must instead retry");
+        for (let disallowedErrorCode of [ErrorCodes.FailedToSatisfyReadPreference,
+                                         ErrorCodes.HostUnreachable,
+        ]) {
+            assert.neq(
+                expectedErrorCode,
+                disallowedErrorCode,
+                `${ErrorCodeStrings[disallowedErrorCode]} error must never be expected as final` +
+                    " reshardCollection command error response because it indicates mongos gave" +
+                    " up retrying and the client must instead retry");
+        }
 
         newChunks = newChunks.map(
             chunk => ({min: chunk.min, max: chunk.max, recipientShardId: chunk.shard}));
@@ -311,21 +310,32 @@ var ReshardingTest = class {
                 host, ns, newShardKeyPattern, newChunks, commandDoneSignal, expectedErrorCode) {
                 const conn = new Mongo(host);
 
+                // We allow the client to retry the reshardCollection a large but still finite
+                // number of times. This is done because the mongos would also return a
+                // FailedToSatisfyReadPreference error response when the primary of the shard is
+                // permanently down (e.g. due to a bug causing the server to crash) and it would be
+                // preferable to not have the test run indefinitely in that situation.
+                const kMaxNumAttempts = 40;  // = [10 minutes / kDefaultFindHostTimeout]
+
                 let res;
-                while (true) {
+                for (let i = 1; i <= kMaxNumAttempts; ++i) {
                     res = conn.adminCommand({
                         reshardCollection: ns,
                         key: newShardKeyPattern,
                         _presetReshardedChunks: newChunks,
                     });
 
-                    if (res.ok === 1 || res.code !== ErrorCodes.HostUnreachable) {
+                    if (res.ok === 1 ||
+                        (res.code !== ErrorCodes.FailedToSatisfyReadPreference &&
+                         res.code !== ErrorCodes.HostUnreachable)) {
                         commandDoneSignal.countDown();
                         break;
                     }
 
-                    print("Ignoring error from mongos giving up retrying" +
-                          ` _shardsvrReshardCollection command: ${tojsononeline(res)}`);
+                    if (i < kMaxNumAttempts) {
+                        print("Ignoring error from mongos giving up retrying" +
+                              ` _shardsvrReshardCollection command: ${tojsononeline(res)}`);
+                    }
                 }
 
                 if (expectedErrorCode === ErrorCodes.OK) {
