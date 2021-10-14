@@ -88,12 +88,13 @@ public:
     void insertNDocsOf1MB(OperationContext* opCtx, int nDocs) {
         DBDirectClient client(opCtx);
 
-        std::string oneMBstr(1024 * 1023, 'a');  // 1 byte less than 1 MB, considering the padding
+        std::string s(1024 * 1024 - 24, 'a');  // To get a 1MB document
         for (int i = 0; i < nDocs; i++) {
             BSONObjBuilder builder;
             builder.append(kPattern, _nextShardKey++);
-            builder.append("str", oneMBstr);
+            builder.append("str", s);
             BSONObj obj = builder.obj();
+            ASSERT(obj.objsize() == 1024 * 1024);  // 1 MB document
             client.insert(kNss.toString(), obj);
         }
     }
@@ -189,7 +190,7 @@ TEST_F(AutoSplitVectorTest10MB, NoRecalculateIfBigLastChunk) {
     insertNDocsOf1MB(operationContext(), surplus /* nDocs */);
     std::vector<BSONObj> splitKeys = autoSplit(operationContext(), 10 /* maxChunkSizeMB */);
     ASSERT_EQ(splitKeys.size(), 1);
-    ASSERT_EQ(8, splitKeys.front().getIntField(kPattern));
+    ASSERT_EQ(9, splitKeys.front().getIntField(kPattern));
 }
 
 class RepositionLastSplitPointsTest : public AutoSplitVectorTest {
@@ -218,13 +219,18 @@ public:
         for (const auto& splitKey : splitKeys) {
             int _id = splitKey.getIntField(kPattern);
             // Expect an approximate match due to integers rounding in the split points algorithm.
-            ASSERT(_id >= approximateNextMin - 2 && _id <= approximateNextMin + 2);
+            ASSERT(_id >= approximateNextMin - 2 && _id <= approximateNextMin + 2) << BSON(
+                "approximateNextMin"
+                << approximateNextMin << "splitKeys" << splitKeys << "maxDocsPerChunk"
+                << maxDocsPerChunk << "surplus" << surplus << "nSplitPoints" << nSplitPoints
+                << "maxDocsPerNewChunk" << maxDocsPerNewChunk << "mustReposition" << mustReposition
+                << "toInsert" << toInsert << "expectedChunkSize" << expectedChunkSize);
             approximateNextMin = _id + expectedChunkSize;
         }
     }
 };
 
-/*
+
 // Test that last split points are recalculated fairly (if the surplus allows so)
 TEST_F(RepositionLastSplitPointsTest, RandomRepositioningTest) {
     PseudoRandom random(SecureRandom().nextInt64());
@@ -244,7 +250,7 @@ TEST_F(RepositionLastSplitPointsTest, RandomRepositioningTest) {
         checkRepositioning(maxDocsPerChunk, surplus, nSplitPointsToReposition);
     }
 }
-*/
+
 
 }  // namespace
 }  // namespace mongo
