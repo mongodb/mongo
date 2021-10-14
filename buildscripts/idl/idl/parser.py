@@ -1123,8 +1123,9 @@ def parse(stream, input_file_name, resolver):
         if parsed_doc.errors:
             return parsed_doc
 
-        # We need to generate includes for imported IDL files which have structs
-        if base_file_name == input_file_name and parsed_doc.spec.symbols.structs:
+        # We need to generate includes for imported IDL files which have structs or enums.
+        if (base_file_name == input_file_name
+                and (parsed_doc.spec.symbols.structs or parsed_doc.spec.symbols.enums)):
             needs_include.append(imported_file_name)
 
         # Add other imported files to the list of files to parse
