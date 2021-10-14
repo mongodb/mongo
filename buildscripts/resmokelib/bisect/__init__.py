@@ -21,11 +21,11 @@ indicate a successful test. The command performs the following steps:
 (3) Find the 'middle' version. 
 (4) Setup a test environment.
     - The 'binaries', 'artifacts' and 'links' will be downloaded to a new directory named 
-    'test_mongo' in the present working directory.
-    - The 'test_mongo' directory will also have a sub directory -- 'test_mongo/mongo_repo' 
+    'build' in the present working directory.
+    - The 'build' directory will also have a sub directory -- 'build/mongo_repo' 
     containing the git repo for this version.
     - Create a virtual environment called 'bisect_venv' and install packages for this version.
-(5) Activate the virtual environment & run the user provided shell script. 
+(5) Activate 'bisect_venv' & run the user provided shell script from within the 'build' directory. 
 (6) Teardown the test environment.
 (7) Repeat steps (3)-(6) on the left half, if (5) failed, or right half, if (5) succeeded.
 
