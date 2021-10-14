@@ -302,8 +302,10 @@ void TransactionCoordinatorCatalog::filter(FilterPredicate predicate, FilterVisi
     for (auto&& [sessionId, coordinatorsForSession] : _coordinatorsBySession) {
         for (auto&& [txnNumber, coordinatorsForTxnNumber] : coordinatorsForSession) {
             for (auto&& [txnRetryCounter, coordinator] : coordinatorsForTxnNumber) {
-                if (predicate(sessionId, txnNumber, coordinator)) {
-                    visitor(sessionId, txnNumber, coordinator);
+                auto txnNumberAndRetryCounter =
+                    TxnNumberAndRetryCounter(txnNumber, txnRetryCounter);
+                if (predicate(sessionId, txnNumberAndRetryCounter, coordinator)) {
+                    visitor(sessionId, txnNumberAndRetryCounter, coordinator);
                 }
             }
         }

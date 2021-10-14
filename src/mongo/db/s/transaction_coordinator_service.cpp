@@ -118,7 +118,7 @@ void TransactionCoordinatorService::reportCoordinators(OperationContext* opCtx,
 
     auto predicate =
         [includeIdle](const LogicalSessionId lsid,
-                      const TxnNumber txnNumber,
+                      const TxnNumberAndRetryCounter txnNumberAndRetryCounter,
                       const std::shared_ptr<TransactionCoordinator> transactionCoordinator) {
             TransactionCoordinator::Step step = transactionCoordinator->getStep();
             if (includeIdle || step > TransactionCoordinator::Step::kInactive) {
@@ -128,7 +128,7 @@ void TransactionCoordinatorService::reportCoordinators(OperationContext* opCtx,
         };
 
     auto reporter = [ops](const LogicalSessionId lsid,
-                          const TxnNumber txnNumber,
+                          const TxnNumberAndRetryCounter txnNumberAndRetryCounter,
                           const std::shared_ptr<TransactionCoordinator> transactionCoordinator) {
         BSONObjBuilder doc;
         transactionCoordinator->reportState(doc);

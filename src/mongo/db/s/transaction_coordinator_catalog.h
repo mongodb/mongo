@@ -107,11 +107,11 @@ public:
 
     using FilterPredicate =
         std::function<bool(const LogicalSessionId lsid,
-                           const TxnNumber txnNumber,
+                           const TxnNumberAndRetryCounter txnNumberAndRetryCounter,
                            const std::shared_ptr<TransactionCoordinator> transactionCoordinator)>;
     using FilterVisitor =
         std::function<void(const LogicalSessionId lsid,
-                           const TxnNumber txnNumber,
+                           const TxnNumberAndRetryCounter txnNumberAndRetryCounter,
                            const std::shared_ptr<TransactionCoordinator> transactionCoordinator)>;
 
     void filter(FilterPredicate predicate, FilterVisitor visitor);
