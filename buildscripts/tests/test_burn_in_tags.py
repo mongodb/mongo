@@ -110,10 +110,12 @@ class TestGenerateEvgTasks(unittest.TestCase):
         create_tests_by_task_mock.return_value = {
             "aggregation_mongos_passthrough": TaskInfo(
                 display_task_name="aggregation_mongos_passthrough",
+                suite="aggregation_mongos_passthrough",
                 resmoke_args="--suites=aggregation_mongos_passthrough --storageEngine=wiredTiger",
                 tests=["jstests/aggregation/ifnull.js"],
                 require_multiversion_setup=False,
                 distro="",
+                build_variant="enterprise-rhel-80-64-bit-inmem"
             )
         }  # yapf: disable
         expansions_file_data = get_expansions_data()

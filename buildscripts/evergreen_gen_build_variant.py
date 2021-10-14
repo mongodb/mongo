@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 """Generate configuration for a build variant."""
-import os
-import re
 from concurrent.futures import ThreadPoolExecutor as Executor
 from datetime import datetime, timedelta
 from time import perf_counter
-from typing import Optional, Any, List, Set
+from typing import Optional, Any, Set
 
 import click
 import inject
@@ -16,6 +14,8 @@ from evergreen import Task as EvgTask
 
 from buildscripts.ciconfig.evergreen import EvergreenProjectConfig, parse_evergreen_file, Task, \
     Variant
+from buildscripts.task_generation.constants import MAX_WORKERS, LOOKBACK_DURATION_DAYS, MAX_TASK_PRIORITY, \
+    GENERATED_CONFIG_DIR, GEN_PARENT_TASK, EXPANSION_RE
 from buildscripts.task_generation.evg_config_builder import EvgConfigBuilder
 from buildscripts.task_generation.gen_config import GenerationConfiguration
 from buildscripts.task_generation.gen_task_validation import GenTaskValidationService
@@ -30,14 +30,6 @@ from buildscripts.util.fileops import read_yaml_file
 from buildscripts.util.taskname import remove_gen_suffix
 
 LOGGER = structlog.get_logger(__name__)
-
-DEFAULT_TEST_SUITE_DIR = os.path.join("buildscripts", "resmokeconfig", "suites")
-MAX_WORKERS = 16
-LOOKBACK_DURATION_DAYS = 14
-MAX_TASK_PRIORITY = 99
-GENERATED_CONFIG_DIR = "generated_resmoke_config"
-GEN_PARENT_TASK = "generator_tasks"
-EXPANSION_RE = re.compile(r"\${(?P<id>[a-zA-Z0-9_]+)(\|(?P<default>.*))?}")
 
 
 class EvgExpansions(BaseModel):

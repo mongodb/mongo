@@ -84,50 +84,12 @@ class TestTask(unittest.TestCase):  # pylint: disable=too-many-public-methods
         self.assertEqual(task_dict, task.raw)
 
     def test_resmoke_args(self):
-        task_commands = [{"func": "run tests", "vars": {"resmoke_args": "--suites=core"}}]
-        task_dict = {"name": "jsCore", "commands": task_commands}
+        suite_and_task = "jstestfuzz"
+        task_commands = [{"func": "run tests", "vars": {"resmoke_args": "--arg=val"}}]
+        task_dict = {"name": suite_and_task, "commands": task_commands}
         task = _evergreen.Task(task_dict)
 
-        self.assertEqual("--suites=core", task.resmoke_args)
-        self.assertEqual("core", task.resmoke_suite)
-
-    def test_resmoke_suite(self):
-        suite = "core"
-        task_dict = {
-            "name":
-                "jsCore", "commands": [{
-                    "func": "run tests", "vars": {"resmoke_args": "--suites={}".format(suite)}
-                }]
-        }
-        task = _evergreen.Task(task_dict)
-
-        self.assertEqual(suite, task.resmoke_suite)
-
-    def test_resmoke_suite_multiple(self):
-        task_dict = {
-            "name":
-                "jsCore", "commands": [{
-                    "func": "run tests",
-                    "vars": {"resmoke_args": "--suites=core --suites=core2--installDir=/bin"}
-                }]
-        }
-        task = _evergreen.Task(task_dict)
-
-        with self.assertRaises(RuntimeError):
-            self.assertIsNone(task.resmoke_suite)
-
-    def test_resmoke_suite_with_comma(self):
-        task_dict = {
-            "name":
-                "jsCore", "commands": [{
-                    "func": "run tests",
-                    "vars": {"resmoke_args": "--suites=core,core2--installDir=/bin"}
-                }]
-        }
-        task = _evergreen.Task(task_dict)
-
-        with self.assertRaises(RuntimeError):
-            self.assertIsNone(task.resmoke_suite)
+        self.assertEqual(f"--suites={suite_and_task} --arg=val", task.resmoke_args)
 
     def test_is_run_tests_task(self):
         task_commands = [{"func": "run tests", "vars": {"resmoke_args": "--suites=core"}}]
@@ -170,7 +132,6 @@ class TestTask(unittest.TestCase):  # pylint: disable=too-many-public-methods
         task = _evergreen.Task(task_dict)
 
         self.assertEqual("--suites=jsCore --installDir=/bin", task.resmoke_args)
-        self.assertEqual("jsCore", task.resmoke_suite)
 
     def test_is_generate_resmoke_task(self):
         task_name = "core"
@@ -205,7 +166,6 @@ class TestTask(unittest.TestCase):  # pylint: disable=too-many-public-methods
         task = _evergreen.Task(task_dict)
 
         self.assertEqual("--suites=core --installDir=/bin", task.resmoke_args)
-        self.assertEqual("core", task.resmoke_suite)
 
     def test_tags_with_no_tags(self):
         task_dict = {
@@ -281,16 +241,16 @@ class TestTask(unittest.TestCase):  # pylint: disable=too-many-public-methods
         task_dict = {"name": task_name, "commands": task_commands}
         task = _evergreen.Task(task_dict)
 
-        self.assertEqual(suite_name, task.get_vars_suite_name(task_commands[0]["vars"]))
+        self.assertEqual(suite_name, task.get_suite_name())
 
-    def test_get_vars_suite_name_gen_resmoke_no_vars(self):
-        task_name = "jsCore"
+    def test_get_suite_name_default_to_task_name(self):
+        task_name = "concurrency_gen"
+        no_gen_task_name = "concurrency"
         task_commands = [{"func": "generate resmoke tasks"}]
         task_dict = {"name": task_name, "commands": task_commands}
         task = _evergreen.Task(task_dict)
 
-        with self.assertRaises(TypeError):
-            task.get_vars_suite_name(None)
+        self.assertEqual(no_gen_task_name, task.get_suite_name())
 
     def test_generate_task_name_non_gen_tasks(self):
         task_name = "jsCore"
@@ -431,111 +391,21 @@ class TestVariant(unittest.TestCase):
 
         # Check combined_resmoke_args when test_flags is set on the variant.
         resmoke_task = variant_ubuntu.get_task("resmoke_task")
-        self.assertEqual("--suites=somesuite --storageEngine=wiredTiger --param=value --ubuntu",
+        self.assertEqual("--suites=resmoke_task --storageEngine=wiredTiger --param=value --ubuntu",
                          resmoke_task.combined_resmoke_args)
 
         # Check combined_resmoke_args when the task doesn't have resmoke_args.
         passing_task = variant_ubuntu.get_task("passing_test")
-        self.assertIsNone(passing_task.combined_resmoke_args)
+        self.assertEqual("--suites=passing_test  --param=value --ubuntu",
+                         passing_task.combined_resmoke_args)
 
         # Check combined_resmoke_args when test_flags is not set on the variant.
         variant_debian = self.conf.get_variant("debian")
         resmoke_task = variant_debian.get_task("resmoke_task")
-        self.assertEqual("--suites=somesuite --storageEngine=wiredTiger",
+        self.assertEqual("--suites=resmoke_task --storageEngine=wiredTiger",
                          resmoke_task.combined_resmoke_args)
 
         # Check for tasks included in task_groups
         variant_amazon = self.conf.get_variant("amazon")
         self.assertEqual(3, len(variant_amazon.tasks))
         self.assertIn("compile", variant_amazon.task_names)
-
-
-class TestResmokeArgs(unittest.TestCase):
-    """Unit tests for the Variant class."""
-
-    def test_get_arg(self):
-        suite_name = "suite1"
-        resmoke_args = "--suites={} test1.js".format(suite_name)
-        self.assertEqual(suite_name, _evergreen.ResmokeArgs.get_arg(resmoke_args, "suites"))
-
-    def test_get_arg_with_space(self):
-        suite_name = "suite1"
-        resmoke_args = "--suites {} test1.js".format(suite_name)
-        self.assertEqual(suite_name, _evergreen.ResmokeArgs.get_arg(resmoke_args, "suites"))
-
-    def test_get_arg_missing(self):
-        suite_name = "suite1"
-        resmoke_args = "--otherArg={} test1.js".format(suite_name)
-        self.assertIsNone(_evergreen.ResmokeArgs.get_arg(resmoke_args, "suites"))
-
-    def test_get_arg_multiple(self):
-        resmoke_args = "--myarg=val1 --myarg=val2 test1.js"
-        with self.assertRaises(RuntimeError):
-            _evergreen.ResmokeArgs.get_arg(resmoke_args, "myarg")
-
-    def test_get_arg_with_comma(self):
-        arg_vals = "val1,val2,val3"
-        resmoke_args = "--myarg={} test1.js".format(arg_vals)
-        self.assertEqual(arg_vals, _evergreen.ResmokeArgs.get_arg(resmoke_args, "myarg"))
-
-    def test_set_arg(self):
-        suite_name = "new_suite"
-        resmoke_args = "--suites=old_suite test1.js"
-        new_resmoke_args = "--suites={} test1.js".format(suite_name)
-        self.assertEqual(new_resmoke_args,
-                         _evergreen.ResmokeArgs.set_updated_arg(resmoke_args, "suites", suite_name))
-
-    def test_set_arg_with_space(self):
-        suite_name = "new_suite"
-        resmoke_args = "--suites old_suite test1.js"
-        new_resmoke_args = "--suites={} test1.js".format(suite_name)
-        self.assertEqual(new_resmoke_args,
-                         _evergreen.ResmokeArgs.set_updated_arg(resmoke_args, "suites", suite_name))
-
-    def test_set_arg_same_suite(self):
-        suite_name = "new_suite"
-        resmoke_args = "--suites=new_suite test1.js"
-        new_resmoke_args = "--suites={} test1.js".format(suite_name)
-        self.assertEqual(new_resmoke_args,
-                         _evergreen.ResmokeArgs.set_updated_arg(resmoke_args, "suites", suite_name))
-
-    def test_set_arg_no_suite(self):
-        suite_name = "new_suite"
-        resmoke_args = "--other_arg=val1 test1.js"
-        new_resmoke_args = "{} --suites={}".format(resmoke_args, suite_name)
-        self.assertEqual(new_resmoke_args,
-                         _evergreen.ResmokeArgs.set_updated_arg(resmoke_args, "suites", suite_name))
-
-    def test_set_arg_multiple(self):
-        new_val = "myval"
-        resmoke_args = "--myarg=val1 --myarg=val2 test1.js"
-        with self.assertRaises(RuntimeError):
-            _evergreen.ResmokeArgs.set_updated_arg(resmoke_args, "myarg", new_val)
-
-    def test_remove_arg(self):
-        resmoke_args = "--suites=old_suite"
-        new_resmoke_args = ""
-        self.assertEqual(new_resmoke_args, _evergreen.ResmokeArgs.remove_arg(
-            resmoke_args, "suites"))
-
-    def test_remove_arg_with_trailing_space(self):
-        resmoke_args = "--suites=old_suite test1.js"
-        new_resmoke_args = "test1.js"
-        self.assertEqual(new_resmoke_args, _evergreen.ResmokeArgs.remove_arg(
-            resmoke_args, "suites"))
-
-    def test_remove_arg_with_space(self):
-        resmoke_args = "--suites old_suite test1.js"
-        new_resmoke_args = "test1.js"
-        self.assertEqual(new_resmoke_args, _evergreen.ResmokeArgs.remove_arg(
-            resmoke_args, "suites"))
-
-    def test_remove_arg_with_comma(self):
-        resmoke_args = "--myarg=val1,val2,val3 test1.js"
-        new_resmoke_args = "test1.js"
-        self.assertEqual(new_resmoke_args, _evergreen.ResmokeArgs.remove_arg(resmoke_args, "myarg"))
-
-    def test_remove_arg_multiple(self):
-        resmoke_args = "--myarg=val1 --myarg=val2 test1.js"
-        with self.assertRaises(RuntimeError):
-            _evergreen.ResmokeArgs.remove_arg(resmoke_args, "myarg")

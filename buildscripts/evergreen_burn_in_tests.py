@@ -5,7 +5,7 @@ import os
 import sys
 from datetime import datetime, timedelta
 from math import ceil
-from typing import Optional, List, Dict, Set
+from typing import Optional, List, Dict, Set, NamedTuple
 
 import click
 import requests
@@ -21,7 +21,10 @@ from buildscripts.patch_builds.change_data import RevisionMap
 from buildscripts.patch_builds.evg_change_data import generate_revision_map_from_manifest
 from buildscripts.patch_builds.task_generation import TimeoutInfo, resmoke_commands, \
     validate_task_generation_limit
-from buildscripts.task_generation.constants import CONFIG_FILE, EVERGREEN_FILE, ARCHIVE_DIST_TEST_DEBUG_TASK
+from buildscripts.task_generation.constants import CONFIG_FILE, EVERGREEN_FILE, ARCHIVE_DIST_TEST_DEBUG_TASK, \
+    EXCLUDES_TAGS_FILE_PATH, BACKPORT_REQUIRED_TAG
+from buildscripts.task_generation.suite_split import SubSuite, GeneratedSuite
+from buildscripts.task_generation.task_types.resmoke_tasks import EXCLUDE_TAGS
 from buildscripts.util.fileops import write_file
 from buildscripts.util.taskname import name_generated_task
 from buildscripts.util.teststats import TestRuntime, HistoricTaskData
@@ -165,22 +168,28 @@ def _calculate_exec_timeout(repeat_config: RepeatConfig, avg_test_runtime: float
                 AVG_TEST_SETUP_SEC)
 
 
-class TaskGenerator:
+class BurnInGenTaskParams(NamedTuple):
+    """Parameters describing how a specific resmoke burn in suite should be generated."""
+
+    resmoke_args: str
+    require_multiversion_setup: bool
+    distro: str
+
+
+class BurnInGenTaskService:
     """Class to generate task configurations."""
 
     def __init__(self, generate_config: GenerateConfig, repeat_config: RepeatConfig,
-                 task_info: TaskInfo, task_runtime_stats: List[TestRuntime]) -> None:
+                 task_runtime_stats: List[TestRuntime]) -> None:
         """
         Create a new task generator.
 
         :param generate_config: Generate configuration to use.
         :param repeat_config: Repeat configuration to use.
-        :param task_info: Information about how tasks should be generated.
         :param task_runtime_stats: Historic runtime of tests associated with task.
         """
         self.generate_config = generate_config
         self.repeat_config = repeat_config
-        self.task_info = task_info
         self.task_runtime_stats = task_runtime_stats
 
     def generate_timeouts(self, test: str) -> TimeoutInfo:
@@ -205,43 +214,55 @@ class TaskGenerator:
 
         return TimeoutInfo.default_timeout()
 
-    def generate_name(self, index: int) -> str:
+    def _generate_resmoke_args(self, task_name: str, params: BurnInGenTaskParams,
+                               test_arg: str) -> str:
+        resmoke_args = f"{params.resmoke_args} {self.repeat_config.generate_resmoke_options()} {test_arg}"
+
+        if params.require_multiversion_setup:
+            tag_file = EXCLUDES_TAGS_FILE_PATH
+            resmoke_args += f" --tagFile={tag_file}"
+            resmoke_args += f" --excludeWithAnyTags={EXCLUDE_TAGS},{task_name}_{BACKPORT_REQUIRED_TAG} "
+
+        return resmoke_args
+
+    def _generate_task_name(self, gen_suite: GeneratedSuite, index: int) -> str:
         """
         Generate a subtask name.
 
+        :param gen_suite: GeneratedSuite object.
         :param index: Index of subtask.
         :return: Name to use for generated sub-task.
         """
         prefix = self.generate_config.task_prefix
-        task_name = self.task_info.display_task_name
-        return name_generated_task(f"{prefix}:{task_name}", index, len(self.task_info.tests),
+        task_name = gen_suite.task_name
+
+        return name_generated_task(f"{prefix}:{task_name}", index, len(gen_suite),
                                    self.generate_config.run_build_variant)
 
-    def create_task(self, index: int, test_name: str) -> Task:
-        """
-        Create the task configuration for the given test using the given index.
+    def generate_tasks(self, gen_suite: GeneratedSuite, params: BurnInGenTaskParams) -> List[Task]:
+        """Create the task configuration for the given test using the given index."""
 
-        :param index: Index of sub-task being created.
-        :param test_name: Name of test that should be executed.
-        :return: Configuration for generating the specified task.
-        """
-        resmoke_args = self.task_info.resmoke_args
+        tasks = set()
+        for index, suite in enumerate(gen_suite.sub_suites):
+            if len(suite.test_list) != 1:
+                raise ValueError(
+                    f"Can only run one test per suite in burn-in; got {suite.test_list}")
+            test_name = suite.test_list[0]
+            test_unix_style = test_name.replace('\\', '/')
+            run_tests_vars = {
+                "suite":
+                    gen_suite.suite_name, "resmoke_args":
+                        self._generate_resmoke_args(gen_suite.task_name, params, test_unix_style)
+            }
 
-        sub_task_name = self.generate_name(index)
-        LOGGER.debug("Generating sub-task", sub_task=sub_task_name)
+            timeout_cmd = self.generate_timeouts(test_name)
+            commands = resmoke_commands("run tests", run_tests_vars, timeout_cmd,
+                                        params.require_multiversion_setup)
+            dependencies = {TaskDependency(ARCHIVE_DIST_TEST_DEBUG_TASK)}
 
-        test_unix_style = test_name.replace('\\', '/')
-        run_tests_vars = {
-            "resmoke_args":
-                f"{resmoke_args} {self.repeat_config.generate_resmoke_options()} {test_unix_style}"
-        }
+            tasks.add(Task(self._generate_task_name(gen_suite, index), commands, dependencies))
 
-        timeout = self.generate_timeouts(test_name)
-        commands = resmoke_commands("run tests", run_tests_vars, timeout,
-                                    self.task_info.require_multiversion_setup)
-        dependencies = {TaskDependency(ARCHIVE_DIST_TEST_DEBUG_TASK)}
-
-        return Task(sub_task_name, commands, dependencies)
+        return tasks
 
 
 class EvergreenFileChangeDetector(FileChangeDetector):
@@ -265,6 +286,15 @@ class EvergreenFileChangeDetector(FileChangeDetector):
         :return: Map of repositories and revisions to diff against.
         """
         return generate_revision_map_from_manifest(repos, self.task_id, self.evg_api)
+
+
+def _tests_dict_to_generated_suites(task_info: TaskInfo, tests_runtimes: List[TestRuntime]):
+    """Convert diction of tests to `GenerateSuite` objects to conform to the *GenTaskService interface."""
+    sub_suites = []
+    for _, test in enumerate(task_info.tests):
+        sub_suites.append(SubSuite([test], 0, tests_runtimes))
+    return GeneratedSuite(sub_suites=sub_suites, build_variant=task_info.build_variant,
+                          task_name=task_info.display_task_name, suite_name=task_info.suite)
 
 
 class GenerateBurnInExecutor(BurnInExecutor):
@@ -313,60 +343,32 @@ class GenerateBurnInExecutor(BurnInExecutor):
             else:
                 raise
 
-    def create_generated_tasks(self, tests_by_task: Dict[str, TaskInfo]) -> Set[Task]:
-        """
-        Create generate.tasks configuration for the the given tests and tasks.
-
-        :param tests_by_task: Dictionary of tasks and test to generate configuration for.
-        :return: Shrub tasks containing the configuration for generating specified tasks.
-        """
-        tasks: Set[Task] = set()
-        for task in sorted(tests_by_task):
-            task_info = tests_by_task[task]
-            task_runtime_stats = self.get_task_runtime_history(task_info.display_task_name)
-            task_generator = TaskGenerator(self.generate_config, self.repeat_config, task_info,
-                                           task_runtime_stats)
-
-            for index, test_name in enumerate(task_info.tests):
-                tasks.add(task_generator.create_task(index, test_name))
-
-        return tasks
-
-    def get_existing_tasks(self) -> Optional[Set[ExistingTask]]:
+    def _get_existing_tasks(self) -> Optional[Set[ExistingTask]]:
         """Get any existing tasks that should be included in the generated display task."""
         if self.generate_config.include_gen_task:
             return {ExistingTask(BURN_IN_TESTS_GEN_TASK)}
         return None
 
-    def add_config_for_build_variant(self, build_variant: BuildVariant,
-                                     tests_by_task: Dict[str, TaskInfo]) -> None:
-        """
-        Add configuration for generating tasks to the given build variant.
+    def generate_tasks_for_variant(self, tests_by_task: Dict[str, TaskInfo], variant: BuildVariant):
+        """Add tasks to the passed in variant."""
+        tasks = set()
+        for task in sorted(tests_by_task):
+            task_info = tests_by_task[task]
+            task_history = self.get_task_runtime_history(task_info.display_task_name)
+            gen_suite = _tests_dict_to_generated_suites(task_info, task_history)
 
-        :param build_variant: Build variant to update.
-        :param tests_by_task: Tasks and tests to update.
-        """
-        tasks = self.create_generated_tasks(tests_by_task)
-        build_variant.display_task(BURN_IN_TESTS_TASK, tasks,
-                                   execution_existing_tasks=self.get_existing_tasks())
+            task_generator = BurnInGenTaskService(self.generate_config, self.repeat_config,
+                                                  task_history)
 
-    def create_generate_tasks_configuration(self, tests_by_task: Dict[str, TaskInfo]) -> str:
-        """
-        Create the configuration with the configuration to generate the burn_in tasks.
-
-        :param tests_by_task: Dictionary of tasks and test to generate.
-        :return: Configuration to use to create generated tasks.
-        """
-        build_variant = BuildVariant(self.generate_config.run_build_variant)
-        self.add_config_for_build_variant(build_variant, tests_by_task)
-
-        shrub_project = ShrubProject.empty()
-        shrub_project.add_build_variant(build_variant)
-
-        if not validate_task_generation_limit(shrub_project):
-            sys.exit(1)
-
-        return shrub_project.json()
+            params = BurnInGenTaskParams(
+                resmoke_args=task_info.resmoke_args,
+                require_multiversion_setup=task_info.require_multiversion_setup,
+                distro=task_info.distro,
+            )
+            new_tasks = task_generator.generate_tasks(gen_suite, params)
+            tasks = tasks.union(new_tasks)
+        variant.display_task(BURN_IN_TESTS_TASK, tasks,
+                             execution_existing_tasks=self._get_existing_tasks())
 
     def execute(self, tests_by_task: Dict[str, TaskInfo]) -> None:
         """
@@ -374,10 +376,18 @@ class GenerateBurnInExecutor(BurnInExecutor):
 
         :param tests_by_task: Dictionary of tasks to run with tests to run in each.
         """
-        json_text = self.create_generate_tasks_configuration(tests_by_task)
+
+        build_variant = BuildVariant(self.generate_config.run_build_variant)
+        self.generate_tasks_for_variant(tests_by_task, build_variant)
+
+        shrub_project = ShrubProject.empty()
+        shrub_project.add_build_variant(build_variant)
+        if not validate_task_generation_limit(shrub_project):
+            sys.exit(1)
+
         assert self.generate_tasks_file is not None
         if self.generate_tasks_file:
-            write_file(self.generate_tasks_file, json_text)
+            write_file(self.generate_tasks_file, shrub_project.json())
 
 
 # pylint: disable=too-many-arguments
@@ -437,12 +447,6 @@ def main(build_variant: str, run_build_variant: str, distro: str, project: str,
 
     burn_in_tests detects jstests that are new or changed since the last git command and then
     runs those tests in a loop to validate their reliability.
-
-    The `--origin-rev` argument allows users to specify which revision should be used as the last
-    git command to compare against to find changed files. If the `--origin-rev` argument is provided,
-    we find changed files by comparing your latest changes to this revision. If not provided, we
-    find changed test files by comparing your latest changes to HEAD. The revision provided must
-    be a revision that exists in the mongodb repository.
 
     The `--repeat-*` arguments allow configuration of how burn_in_tests repeats tests. Tests can
     either be repeated a specified number of times with the `--repeat-tests` option, or they can

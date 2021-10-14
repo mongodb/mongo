@@ -98,16 +98,16 @@ class FuzzerGenTaskService:
         sub_task_name = taskname.name_generated_task(params.task_name, task_index, params.num_tasks,
                                                      params.variant)
 
-        suite_arg = f"--suites={params.suite}"
         run_tests_vars = {
             "continue_on_failure": params.continue_on_failure,
-            "resmoke_args": f"{suite_arg} {params.get_resmoke_args()}",
+            "resmoke_args": params.get_resmoke_args(),
             "resmoke_jobs_max": params.resmoke_jobs_max,
             "should_shuffle": params.should_shuffle,
             "require_multiversion_setup": params.require_multiversion_setup,
             "timeout_secs": params.timeout_secs,
             "task": params.task_name,
             "gen_task_config_location": params.config_location,
+            "suite": params.suite,
         }  # yapf: disable
 
         timeout_info = TimeoutInfo.overridden(timeout=params.timeout_secs)

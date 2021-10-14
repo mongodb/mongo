@@ -37,7 +37,6 @@ from buildscripts.burn_in_tests import DEFAULT_REPO_LOCATIONS, create_task_list_
     TaskInfo
 from buildscripts.ciconfig.evergreen import (
     EvergreenProjectConfig,
-    ResmokeArgs,
     Task,
     parse_evergreen_file,
     Variant,
@@ -47,7 +46,6 @@ from buildscripts.patch_builds.selected_tests.selected_tests_service import Sele
 structlog.configure(logger_factory=LoggerFactory())
 LOGGER = structlog.getLogger(__name__)
 
-DEFAULT_TEST_SUITE_DIR = os.path.join("buildscripts", "resmokeconfig", "suites")
 TASK_ID_EXPANSION = "task_id"
 EVERGREEN_FILE = "etc/evergreen.yml"
 EVG_CONFIG_FILE = ".evergreen.yml"
@@ -86,9 +84,7 @@ EXCLUDE_TASK_LIST = [
 ]
 POSSIBLE_RUN_TASK_FUNCS = [
     "generate resmoke tasks",
-    "generate randomized multiversion tasks",
     "run tests",
-    "generate explicit multiversion tasks",
 ]
 
 
@@ -170,14 +166,7 @@ class TaskConfigService:
                 task_vars = task_def["vars"]
                 break
 
-        suite_name = ResmokeArgs.get_arg(task_vars["resmoke_args"], "suites")
-        if suite_name:
-            task_vars.update({"suite": suite_name})
-
-        # the suites argument will run all tests in a suite even when individual
-        # tests are specified in resmoke_args, so we remove it
-        resmoke_args_without_suites = ResmokeArgs.remove_arg(task_vars["resmoke_args"], "suites")
-        task_vars["resmoke_args"] = resmoke_args_without_suites
+        task_vars.update({"suite": task.get_suite_name()})
 
         task_name = task.name[:-4] if task.name.endswith("_gen") else task.name
         return {

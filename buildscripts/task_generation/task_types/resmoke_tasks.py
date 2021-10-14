@@ -1,5 +1,4 @@
 """Task generation for split resmoke tasks."""
-import os
 from typing import Set, Any, Dict, NamedTuple, Optional, List
 
 import inject
@@ -8,16 +7,15 @@ from shrub.v2 import Task, TaskDependency
 
 from buildscripts.patch_builds.task_generation import resmoke_commands
 from buildscripts.resmokelib.multiversionconstants import REQUIRES_FCV_TAG
-from buildscripts.task_generation.constants import ARCHIVE_DIST_TEST_DEBUG_TASK
+from buildscripts.task_generation.constants import ARCHIVE_DIST_TEST_DEBUG_TASK, EXCLUDES_TAGS_FILE_PATH, \
+    BACKPORT_REQUIRED_TAG
 from buildscripts.task_generation.suite_split import GeneratedSuite
 from buildscripts.task_generation.task_types.gentask_options import GenTaskOptions
 from buildscripts.task_generation.timeout import TimeoutEstimate
 
 LOGGER = structlog.getLogger(__name__)
 
-BACKPORT_REQUIRED_TAG = "backport_required_multiversion"
 EXCLUDE_TAGS = f"{REQUIRES_FCV_TAG},multiversion_incompatible,{BACKPORT_REQUIRED_TAG}"
-EXCLUDE_TAGS_FILE = "multiversion_exclude_tags.yml"
 
 
 def string_contains_any_of_args(string: str, args: List[str]) -> bool:
@@ -41,6 +39,7 @@ class ResmokeGenTaskParams(NamedTuple):
     resmoke_args: Arguments to pass to resmoke in generated tasks.
     resmoke_jobs_max: Max number of jobs that resmoke should execute in parallel.
     depends_on: List of tasks this task depends on.
+    config_location: S3 path to the generated config tarball. None if no generated config files.
     """
 
     use_large_distro: bool
@@ -49,23 +48,7 @@ class ResmokeGenTaskParams(NamedTuple):
     repeat_suites: int
     resmoke_args: str
     resmoke_jobs_max: Optional[int]
-    config_location: str
-
-    def generate_resmoke_args(self, suite_file: str, suite_name: str) -> str:
-        """
-        Generate the resmoke args for the given suite.
-
-        :param suite_file: File containing configuration for test suite.
-        :param suite_name: Name of suite being generated.
-        :return: arguments to pass to resmoke.
-        """
-        resmoke_args = (f"--suite={suite_file}.yml --originSuite={suite_name} "
-                        f" {self.resmoke_args}")
-        if self.repeat_suites and not string_contains_any_of_args(resmoke_args,
-                                                                  ["repeatSuites", "repeat"]):
-            resmoke_args += f" --repeatSuites={self.repeat_suites} "
-
-        return resmoke_args
+    config_location: Optional[str]
 
 
 class ResmokeGenTaskService:
@@ -132,7 +115,12 @@ class ResmokeGenTaskService:
         LOGGER.debug("Generating task running suite", sub_task_name=sub_task_name,
                      sub_suite_file=sub_suite_file)
 
-        sub_suite_file_path = self.gen_task_options.suite_location(sub_suite_file)
+        # Some splits don't generate new physical config files.
+        if params.config_location is not None:
+            sub_suite_file_path = self.gen_task_options.suite_location(sub_suite_file)
+        else:
+            sub_suite_file_path = None
+
         run_tests_vars = self._get_run_tests_vars(sub_suite_file_path=sub_suite_file_path,
                                                   suite_file=suite.suite_name,
                                                   task_name=suite.task_name, params=params)
@@ -146,25 +134,27 @@ class ResmokeGenTaskService:
 
         return Task(sub_task_name, commands, self._get_dependencies())
 
-    def generate_resmoke_args(self, sub_suite_file: str, original_suite: str, task_name: str,
+    @staticmethod
+    def generate_resmoke_args(original_suite: str, task_name: str,
                               params: ResmokeGenTaskParams) -> str:
         """
         Generate the resmoke args for the given suite.
 
-        :param sub_suite_file: File containing configuration for test suite.
         :param original_suite: Name of source suite of the generated suite files.
         :param task_name: Name of the task.
         :param params: task generation parameters.
 
         :return: arguments to pass to resmoke.
         """
-        resmoke_args = f"--suite={sub_suite_file} --originSuite={original_suite} {params.resmoke_args}"
+
+        resmoke_args = f"--originSuite={original_suite} {params.resmoke_args}"
+
         if params.repeat_suites and not string_contains_any_of_args(resmoke_args,
                                                                     ["repeatSuites", "repeat"]):
             resmoke_args += f" --repeatSuites={params.repeat_suites} "
 
         if params.require_multiversion_setup:
-            tag_file = self.gen_task_options.generated_file_location(EXCLUDE_TAGS_FILE)
+            tag_file = EXCLUDES_TAGS_FILE_PATH
             resmoke_args += f" --tagFile={tag_file}"
             resmoke_args += f" --excludeWithAnyTags={EXCLUDE_TAGS},{task_name}_{BACKPORT_REQUIRED_TAG} "
 
@@ -172,7 +162,7 @@ class ResmokeGenTaskService:
 
     def _get_run_tests_vars(
             self,
-            sub_suite_file_path: str,
+            sub_suite_file_path: Optional[str],
             suite_file: str,
             task_name: str,
             params: ResmokeGenTaskParams,
@@ -186,14 +176,16 @@ class ResmokeGenTaskService:
         :param params: Parameters describing how tasks should be generated.
         :return: Dictionary containing variables and value to pass to generated task.
         """
+        resmoke_args = self.generate_resmoke_args(original_suite=suite_file, task_name=task_name,
+                                                  params=params)
         variables = {
-            "resmoke_args":
-                self.generate_resmoke_args(sub_suite_file=sub_suite_file_path,
-                                           original_suite=suite_file, task_name=task_name,
-                                           params=params), "gen_task_config_location":
-                                               params.config_location, "require_multiversion_setup":
-                                                   params.require_multiversion_setup
+            "suite": sub_suite_file_path if sub_suite_file_path else suite_file,
+            "resmoke_args": resmoke_args,
+            "require_multiversion_setup": params.require_multiversion_setup
         }
+
+        if params.config_location is not None:
+            variables["gen_task_config_location"] = params.config_location
 
         if params.resmoke_jobs_max:
             variables["resmoke_jobs_max"] = params.resmoke_jobs_max

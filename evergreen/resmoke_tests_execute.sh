@@ -106,6 +106,12 @@ if [[ ${disable_unit_tests} = "false" && ! -f ${skip_tests} ]]; then
 
   path_value="$PATH:/data/multiversion"
 
+  # Set the suite name to be the task name by default; unless overridden with the `suite` expansion.
+  suite_name=${task_name}
+  if [[ -n ${suite} ]]; then
+    suite_name=${suite}
+  fi
+
   # The "resmoke_wrapper" expansion is used by the 'burn_in_tests' task to wrap the resmoke.py
   # invocation. It doesn't set any environment variables and should therefore come last in
   # this list of expansions.
@@ -123,6 +129,7 @@ if [[ ${disable_unit_tests} = "false" && ! -f ${skip_tests} ]]; then
     ${resmoke_args} \
     $extra_args \
     ${test_flags} \
+    --suites=${suite_name} \
     --log=buildlogger \
     --staggerJobs=on \
     --installDir=${install_dir} \

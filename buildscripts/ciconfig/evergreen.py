@@ -161,43 +161,45 @@ class Task(object):
 
         return self.name[:-4]
 
-    def get_vars_suite_name(self, command_vars):
-        """Return the command_vars task or suite value, suite value overrides the task value."""
-        if not isinstance(command_vars, dict):
-            raise TypeError("Must specify a dict")
+    def get_resmoke_command_vars(self):
+        """Get the vars for either 'generate resmoke tasks' or 'run tests', both eventually call resmoke.py."""
+        if self.is_run_tests_task:
+            return self.run_tests_command.get("vars")
+        elif self.is_generate_resmoke_task:
+            return self.generate_resmoke_tasks_command.get("vars")
 
-        suite_name = self.generated_task_name
-        if "suite" in command_vars:
-            suite_name = command_vars["suite"]
+        return None
+
+    def get_suite_name(self):
+        """Get the name of the resmoke.py suite; the `suite` expansion overrides the task name."""
+
+        if self.is_run_tests_task:
+            suite_name = self.name
+        elif self.is_generate_resmoke_task:
+            suite_name = self.generated_task_name
+        else:
+            raise ValueError(f"{self.name} task does not run a resmoke.py test suite")
+
+        command_vars = self.get_resmoke_command_vars()
+        if command_vars is not None:
+            suite_name = command_vars.get("suite", suite_name)
 
         return suite_name
 
     @property
     def resmoke_args(self):
         """Get the resmoke_args from 'run tests' function if defined, or None."""
-        if self.is_run_tests_task:
-            return self.run_tests_command.get("vars", {}).get("resmoke_args")
+        suite_name = self.get_suite_name()
+        command_vars = self.get_resmoke_command_vars()
 
-        if self.is_generate_resmoke_task:
-            command_vars = self.generate_resmoke_tasks_command.get("vars", {})
-            suite_name = self.get_vars_suite_name(command_vars)
-            return "--suites={suite_name} {resmoke_args}".format(
-                suite_name=suite_name, resmoke_args=command_vars.get("resmoke_args"))
-        return None
+        other_args = ""
+        if command_vars:
+            other_args = command_vars.get("resmoke_args", other_args)
 
-    @property
-    def resmoke_suite(self):
-        """Get the --suites option in the resmoke_args of 'run tests' if defined, or None.
+        if not suite_name and not other_args:
+            return None
 
-        Raise an exception if the --suites options contains more than one suite name.
-        """
-        args = self.resmoke_args
-        if args:
-            suites = ResmokeArgs.get_arg(args, "suites")
-            if suites and "," in suites:
-                raise RuntimeError("More than one resmoke suite discovered in {}".format(suites))
-            return suites
-        return None
+        return f"--suites={suite_name} {other_args}"
 
     @property
     def tags(self):
@@ -386,67 +388,3 @@ class VariantTask(Task):
         elif test_flags is None:
             return self.resmoke_args
         return "{} {}".format(resmoke_args, test_flags)
-
-
-class ResmokeArgs(object):
-    """ResmokeArgs class."""
-
-    @staticmethod
-    def _arg_regex(name):
-        """Return the regex for a resmoke arg."""
-        return re.compile(r"(?P<name_value>--{}[=\s](?P<value>([(\w+,\w+)\w]+)))".format(name))
-
-    @staticmethod
-    def _arg_regex_inclusive_trailing_whitespace(name):
-        """Return the regex for a resmoke arg, including the trailing whitespace if it exists."""
-        return re.compile(r"(?P<name_value>--{}[=\s](?P<value>([(\w+,\w+)\w]+))\s?)".format(name))
-
-    @staticmethod
-    def _get_first_match(resmoke_args, name, group_name=None, include_trailing_space=False):
-        """Return first matching occurrence and matching group_name, or None."""
-        regex = ResmokeArgs._arg_regex_inclusive_trailing_whitespace(
-            name) if include_trailing_space else ResmokeArgs._arg_regex(name)
-        matches = re.findall(regex, resmoke_args)
-        if not matches:
-            return None
-        if len(matches) > 1:
-            raise RuntimeError("More than one match for --{} discovered in {}".format(
-                name, resmoke_args))
-        return re.search(regex, resmoke_args).group(group_name)
-
-    @staticmethod
-    def get_arg(resmoke_args, name):
-        """Return the value from the first --'name' in the 'resmoke_args' string or None.
-
-        Raise an excpetion in the case there is more than one occurrence of '--name'.
-        """
-        return ResmokeArgs._get_first_match(resmoke_args, name, "value")
-
-    @staticmethod
-    def set_updated_arg(resmoke_args, name, value):
-        """Add or update the 'resmoke_args' string and set the 'value' from the first --'name'.
-
-        Raise an exception in the case there is more than one occurrence of '--name'.
-        """
-        name_value = ResmokeArgs._get_first_match(resmoke_args, name, "name_value")
-        if name_value:
-            new_name_value = "--{}={}".format(name, value)
-            return resmoke_args.replace(name_value, new_name_value)
-        return "{} --{}={}".format(resmoke_args, name, value)
-
-    @staticmethod
-    def remove_arg(resmoke_args: str, name: str):
-        """
-        Remove an arg from the 'resmoke_args' string.
-
-        Raise an exception in the case there is more than one occurrence of '--name'.
-
-        :param resmoke_args: The resmoke args being parsed.
-        :param name: The name of the arg to be removed.
-        :return: New resmoke args with the arg removed.
-        """
-        name_value = ResmokeArgs._get_first_match(resmoke_args, name, "name_value",
-                                                  include_trailing_space=True)
-        if name_value:
-            return resmoke_args.replace(name_value, "")
-        return resmoke_args

@@ -187,6 +187,8 @@ class LintRunner(object):
 
         logging.debug(' '.join(cmd))
 
+        no_lint_errors = True
+
         try:
             if linter.linter.needs_file_diff():
                 # Need a file diff
@@ -212,15 +214,15 @@ class LintRunner(object):
                         if count == 0:
                             print("ERROR: The files only differ in trailing whitespace? LF vs CRLF")
 
-                    return False
+                    no_lint_errors = False
             else:
                 subprocess.check_output(cmd).decode('utf-8')
 
         except subprocess.CalledProcessError as cpe:
             self._safe_print("CMD [%s] failed:\n%s" % (' '.join(cmd), cpe.output.decode('utf-8')))
-            return False
+            no_lint_errors = False
 
-        return True
+        return no_lint_errors
 
     def run(self, cmd):
         # type: (List[str]) -> bool

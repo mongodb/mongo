@@ -55,7 +55,6 @@ def build_mock_suite(n_sub_suites, include_runtimes=True):
         build_variant="build variant",
         task_name="task name",
         suite_name="suite name",
-        filename="suite file",
     )
 
 

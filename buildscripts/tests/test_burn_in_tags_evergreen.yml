@@ -46,11 +46,11 @@ tasks:
 - name: aggregation_multiversion_fuzzer_gen
   depends_on: []
   commands:
-    - func: "fake command"
+    - func: "generate resmoke tasks"
 - name: aggregation_expression_multiversion_fuzzer_gen
   depends_on: []
   commands:
-    - func: "fake command"
+    - func: "generate resmoke tasks"
 - name: aggregation
   depends_on:
   - name: compile

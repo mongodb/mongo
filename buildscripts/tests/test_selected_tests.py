@@ -44,8 +44,7 @@ def empty_build_variant(variant_name: str) -> Dict[str, Any]:
     }
 
 
-def configure_dependencies(evg_api, evg_expansions, evg_project_config, selected_test_client,
-                           test_suites_dir=under_test.DEFAULT_TEST_SUITE_DIR):
+def configure_dependencies(evg_api, evg_expansions, evg_project_config, selected_test_client):
     start_date = datetime.utcnow()
     end_date = start_date - timedelta(weeks=2)
 
@@ -236,7 +235,7 @@ class TestGetEvgTaskConfig(unittest.TestCase):
 
         self.assertEqual(evg_task_config["task_name"], "auth")
         self.assertEqual(evg_task_config["build_variant"], "variant")
-        self.assertIsNone(evg_task_config.get("suite"))
+        self.assertEqual(evg_task_config.get("suite"), "auth")
         self.assertEqual(
             evg_task_config["resmoke_args"],
             "--storageEngine=wiredTiger",
@@ -245,15 +244,14 @@ class TestGetEvgTaskConfig(unittest.TestCase):
     def test_task_is_not_a_generate_resmoke_task(self):
         build_variant_conf = MagicMock()
         build_variant_conf.name = "variant"
-        task = build_mock_evg_task("jsCore_auth", "run tests",
-                                   "--suites=core_auth --storageEngine=wiredTiger")
+        task = build_mock_evg_task("jsCore_auth", "run tests", "--storageEngine=wiredTiger")
 
         task_config_service = under_test.TaskConfigService()
         evg_task_config = task_config_service.get_evg_task_config(task, build_variant_conf)
 
         self.assertEqual(evg_task_config["task_name"], "jsCore_auth")
         self.assertEqual(evg_task_config["build_variant"], "variant")
-        self.assertEqual(evg_task_config["suite"], "core_auth")
+        self.assertEqual(evg_task_config["suite"], "jsCore_auth")
         self.assertEqual(
             evg_task_config["resmoke_args"],
             "--storageEngine=wiredTiger",
@@ -281,6 +279,8 @@ class TestGetTaskConfigsForTestMappings(unittest.TestCase):
                     resmoke_args="",
                     require_multiversion_setup=False,
                     distro="",
+                    suite="core_auth",
+                    build_variant="dummy_variant",
                 ),
             "auth_gen":
                 TaskInfo(
@@ -289,6 +289,8 @@ class TestGetTaskConfigsForTestMappings(unittest.TestCase):
                     resmoke_args="",
                     require_multiversion_setup=False,
                     distro="",
+                    suite="auth",
+                    build_variant="dummy_variant",
                 ),
         }
 
@@ -300,7 +302,7 @@ class TestGetTaskConfigsForTestMappings(unittest.TestCase):
         self.assertEqual(
             task_configs["jsCore_auth"]["selected_tests_to_run"],
             {"jstests/core/currentop_waiting_for_latch.js", "jstests/core/latch_analyzer.js"})
-        self.assertEqual(task_configs["auth_gen"]["suite"], "core_auth")
+        self.assertEqual(task_configs["auth_gen"]["suite"], "auth_gen")
         self.assertEqual(task_configs["auth_gen"]["selected_tests_to_run"],
                          {'jstests/auth/auth3.js'})
 
@@ -322,6 +324,8 @@ class TestGetTaskConfigsForTestMappings(unittest.TestCase):
                     resmoke_args="",
                     require_multiversion_setup=False,
                     distro="",
+                    suite="core",
+                    build_variant="dummy_variant",
                 ),
         }
 
@@ -345,6 +349,8 @@ class TestGetTaskConfigsForTestMappings(unittest.TestCase):
                     resmoke_args="",
                     require_multiversion_setup=False,
                     distro="",
+                    suite="core",
+                    build_variant="dummy_variant",
                 ),
         }
 

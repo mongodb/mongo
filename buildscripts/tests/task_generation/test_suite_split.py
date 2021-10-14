@@ -92,7 +92,7 @@ class TestGeneratedSuite(unittest.TestCase):
         mock_sub_suites = [build_mock_sub_suite(i, test_lists[i]) for i in range(n_sub_suites)]
         mock_suite = under_test.GeneratedSuite(sub_suites=mock_sub_suites,
                                                build_variant="build_variant", task_name="task_name",
-                                               suite_name="suite_name", filename="filename")
+                                               suite_name="suite_name")
 
         all_tests = mock_suite.get_test_list()
 
@@ -106,7 +106,7 @@ class TestGeneratedSuite(unittest.TestCase):
         mock_sub_suites = [build_mock_sub_suite(i, []) for i in range(n_sub_suites)]
         mock_suite = under_test.GeneratedSuite(sub_suites=mock_sub_suites,
                                                build_variant="build_variant", task_name=task_name,
-                                               suite_name="suite_name", filename="filename")
+                                               suite_name="suite_name")
 
         self.assertEqual(mock_suite.sub_suite_config_file(34), "task_name_34.yml")
         self.assertEqual(mock_suite.sub_suite_config_file(0), "task_name_00.yml")

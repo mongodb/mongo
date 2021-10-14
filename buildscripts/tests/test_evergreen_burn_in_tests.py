@@ -210,8 +210,7 @@ class TestGenerateTimeouts(unittest.TestCase):
         runtime_stats = [teststats_utils.TestRuntime(test_name="dir/test2.js", runtime=455.1)]
         test_name = "dir/test2.js"
 
-        task_generator = under_test.TaskGenerator(MagicMock(), repeat_config, MagicMock(),
-                                                  runtime_stats)
+        task_generator = under_test.BurnInGenTaskService(MagicMock(), repeat_config, runtime_stats)
         timeout_info = task_generator.generate_timeouts(test_name)
 
         self.assertEqual(timeout_info.exec_timeout, 1771)
@@ -222,8 +221,7 @@ class TestGenerateTimeouts(unittest.TestCase):
         runtime_stats = []
         test_name = "dir/new_test.js"
 
-        task_generator = under_test.TaskGenerator(MagicMock(), repeat_config, MagicMock(),
-                                                  runtime_stats)
+        task_generator = under_test.BurnInGenTaskService(MagicMock(), repeat_config, runtime_stats)
         timeout_info = task_generator.generate_timeouts(test_name)
 
         self.assertIsNone(timeout_info.cmd)
@@ -235,8 +233,7 @@ class TestGenerateTimeouts(unittest.TestCase):
         ]
         test_name = "dir/test_with_zero_runtime.js"
 
-        task_generator = under_test.TaskGenerator(MagicMock(), repeat_config, MagicMock(),
-                                                  runtime_stats)
+        task_generator = under_test.BurnInGenTaskService(MagicMock(), repeat_config, runtime_stats)
         timeout_info = task_generator.generate_timeouts(test_name)
 
         self.assertIsNone(timeout_info.cmd)
@@ -300,10 +297,10 @@ TESTS_BY_TASK = {
 
 def create_tests_by_task_mock(n_tasks, n_tests):
     return {
-        f"task_{i}_gen":
-        under_test.TaskInfo(display_task_name=f"task_{i}", resmoke_args=f"--suites=suite_{i}",
-                            tests=[f"jstests/tests_{j}" for j in range(n_tests)],
-                            require_multiversion_setup=False, distro=f"distro_{i}")
+        f"task_{i}_gen": under_test.TaskInfo(display_task_name=f"task_{i}", resmoke_args="", tests=[
+            f"jstests/tests_{j}" for j in range(n_tests)
+        ], require_multiversion_setup=False, distro=f"distro_{i}", build_variant="variant",
+                                             suite=f"suite_{i}")
         for i in range(n_tasks)
     }
 
@@ -317,7 +314,7 @@ class TestCreateGenerateTasksConfig(unittest.TestCase):
         mock_evg_api = MagicMock()
 
         executor = under_test.GenerateBurnInExecutor(gen_config, repeat_config, mock_evg_api)
-        executor.add_config_for_build_variant(build_variant, {})
+        executor.generate_tasks_for_variant({}, build_variant)
 
         evg_config_dict = build_variant.as_dict()
         self.assertEqual(0, len(evg_config_dict["tasks"]))
@@ -335,7 +332,7 @@ class TestCreateGenerateTasksConfig(unittest.TestCase):
         tests_by_task = create_tests_by_task_mock(n_tasks, n_tests)
 
         executor = under_test.GenerateBurnInExecutor(gen_config, repeat_config, mock_evg_api)
-        executor.add_config_for_build_variant(build_variant, tests_by_task)
+        executor.generate_tasks_for_variant(tests_by_task, build_variant)
 
         shrub_config = ShrubProject.empty().add_build_variant(build_variant)
         evg_config_dict = shrub_config.as_dict()
@@ -343,7 +340,7 @@ class TestCreateGenerateTasksConfig(unittest.TestCase):
         self.assertEqual(n_tasks * n_tests, len(tasks))
         cmd = tasks[0]["commands"]
         self.assertIn(resmoke_options, cmd[1]["vars"]["resmoke_args"])
-        self.assertIn("--suites=suite_0", cmd[1]["vars"]["resmoke_args"])
+        self.assertEqual("suite_0", cmd[1]["vars"]["suite"])
         self.assertIn("tests_0", cmd[1]["vars"]["resmoke_args"])
 
     @unittest.skipIf(sys.platform.startswith("win"), "not supported on windows")
@@ -357,7 +354,7 @@ class TestCreateGenerateTasksConfig(unittest.TestCase):
         mock_evg_api = MagicMock()
 
         executor = under_test.GenerateBurnInExecutor(gen_config, repeat_config, mock_evg_api)
-        executor.add_config_for_build_variant(build_variant, tests_by_task)
+        executor.generate_tasks_for_variant(tests_by_task, build_variant)
 
         evg_config_dict = build_variant.as_dict()
         self.assertEqual(n_tasks * n_tests, len(evg_config_dict["tasks"]))

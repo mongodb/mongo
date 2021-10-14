@@ -125,7 +125,6 @@ class GeneratedSuite(NamedTuple):
     build_variant: Name of build variant suite will run on.
     task_name: Name of task generating suite.
     suite_name: Name of suite.
-    filename: File name containing suite config.
     include_build_variant_in_name: Include the build variant as part of display task names.
     """
 
@@ -133,7 +132,6 @@ class GeneratedSuite(NamedTuple):
     build_variant: str
     task_name: str
     suite_name: str
-    filename: str
 
     def get_test_list(self) -> List[str]:
         """Get the list of tests that will be run by this suite."""
@@ -323,7 +321,6 @@ class SuiteSplitService:
             build_variant=params.build_variant,
             task_name=task_name,
             suite_name=params.suite_name,
-            filename=params.filename,
         )
 
     def filter_tests(self, tests_runtimes: List[TestRuntime],

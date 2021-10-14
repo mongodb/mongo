@@ -26,8 +26,7 @@ from buildscripts.patch_builds.change_data import generate_revision_map, \
 import buildscripts.resmokelib.parser
 from buildscripts.resmokelib.suitesconfig import create_test_membership_map, get_suites
 from buildscripts.resmokelib.utils import default_if_none, globstar
-from buildscripts.ciconfig.evergreen import parse_evergreen_file, ResmokeArgs, \
-    EvergreenProjectConfig, Variant, VariantTask
+from buildscripts.ciconfig.evergreen import parse_evergreen_file, EvergreenProjectConfig, Variant, VariantTask
 # pylint: enable=wrong-import-position
 
 structlog.configure(logger_factory=LoggerFactory())
@@ -207,22 +206,6 @@ def _get_task_name(task):
     return task.name
 
 
-def _set_resmoke_args(task):
-    """
-    Set the resmoke args to include the --suites option.
-
-    The suite name from "generate resmoke tasks" can be specified as a var or directly in the
-    resmoke_args.
-    """
-
-    resmoke_args = task.combined_resmoke_args
-    suite_name = ResmokeArgs.get_arg(resmoke_args, "suites")
-    if task.is_generate_resmoke_task:
-        suite_name = task.get_vars_suite_name(task.generate_resmoke_tasks_command["vars"])
-
-    return ResmokeArgs.set_updated_arg(resmoke_args, "suites", suite_name)
-
-
 def _distro_to_run_task_on(task: VariantTask, evg_proj_config: EvergreenProjectConfig,
                            build_variant: str) -> str:
     """
@@ -256,17 +239,21 @@ class TaskInfo(NamedTuple):
     Information about tests to run under a specific Task.
 
     display_task_name: Display name of task.
+    suite: Name of resmoke.pu suite that runs in this task.
     resmoke_args: Arguments to provide to resmoke on task invocation.
     tests: List of tests to run as part of task.
     require_multiversion_setup: Requires downloading Multiversion binaries.
     distro: Evergreen distro task runs on.
+    build_variant: Evergreen build variant the task runs on.
     """
 
     display_task_name: str
     require_multiversion_setup: bool
+    suite: str
     resmoke_args: str
     tests: List[str]
     distro: str
+    build_variant: str
 
     @classmethod
     def from_task(cls, task: VariantTask, tests_by_suite: Dict[str, List[str]],
@@ -280,11 +267,13 @@ class TaskInfo(NamedTuple):
         :param build_variant: Build variant task will be run on.
         :return: Dictionary of information needed to run task.
         """
+        suite = task.get_suite_name()
         return cls(
-            display_task_name=_get_task_name(task), resmoke_args=_set_resmoke_args(task),
-            tests=tests_by_suite[task.resmoke_suite],
-            require_multiversion_setup=task.require_multiversion_setup,
-            distro=_distro_to_run_task_on(task, evg_proj_config, build_variant))
+            display_task_name=_get_task_name(task), resmoke_args=task.resmoke_args, suite=suite,
+            tests=tests_by_suite[suite],
+            require_multiversion_setup=task.require_multiversion_setup(),
+            distro=_distro_to_run_task_on(task, evg_proj_config,
+                                          build_variant), build_variant=build_variant)
 
 
 def create_task_list(evergreen_conf: EvergreenProjectConfig, build_variant: str,
@@ -308,14 +297,14 @@ def create_task_list(evergreen_conf: EvergreenProjectConfig, build_variant: str,
     exclude_tasks_set = set(exclude_tasks)
     all_variant_tasks = {
         task.name: task
-        for task in evg_build_variant.tasks
-        if task.name not in exclude_tasks_set and task.combined_resmoke_args
+        for task in evg_build_variant.tasks if task.name not in exclude_tasks_set and (
+            task.is_run_tests_task or task.is_generate_resmoke_task)
     }
 
     # Return the list of tasks to run for the specified suite.
     task_list = {
         task_name: TaskInfo.from_task(task, tests_by_suite, evergreen_conf, build_variant)
-        for task_name, task in all_variant_tasks.items() if task.resmoke_suite in tests_by_suite
+        for task_name, task in all_variant_tasks.items() if task.get_suite_name() in tests_by_suite
     }
 
     log.debug("Found task list", task_list=task_list)

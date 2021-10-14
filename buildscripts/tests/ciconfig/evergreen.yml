@@ -104,6 +104,7 @@ tasks:
   commands:
     - func: "fetch source"
     - func: "run a task that passes"
+    - func: "run tests"
 
 - name: failing_test
   depends_on:
@@ -138,7 +139,7 @@ tasks:
     - func: "setup"
     - func: "run tests"
       vars:
-        resmoke_args: "--suites=somesuite --storageEngine=wiredTiger"
+        resmoke_args: "--storageEngine=wiredTiger"
 
 
 modules:
