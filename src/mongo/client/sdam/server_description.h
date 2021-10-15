@@ -103,9 +103,6 @@ public:
     const std::set<HostAndPort>& getHosts() const;
     const std::set<HostAndPort>& getPassives() const;
     const std::set<HostAndPort>& getArbiters() const;
-    // TODO(SERVER-59409): remove next 2 methods and keep only pair getter.
-    const boost::optional<int>& getSetVersion() const;
-    const boost::optional<OID>& getElectionId() const;
     const ElectionIdSetVersionPair getElectionIdSetVersionPair() const;
     const boost::optional<TopologyVersion>& getTopologyVersion() const;
     const boost::optional<TopologyDescriptionPtr> getTopologyDescription();

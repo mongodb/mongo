@@ -61,14 +61,14 @@
       "outcome": {
         "servers": {
           "a:27017": {
-            "type": "Unknown",
-            "setName": null,
+            "type": "RSPrimary",
+            "setName": "rs",
+            "setVersion": 2,
             "electionId": null
           },
           "b:27017": {
-            "type": "RSPrimary",
-            "setName": "rs",
-            "setVersion": 1,
+            "type": "Unknown",
+            "setName": null,
             "electionId": null
           }
         },
