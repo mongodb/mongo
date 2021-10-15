@@ -655,7 +655,8 @@ StatusWithMatchExpression parseAdditionalProperties(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     BSONElement additionalPropertiesElt,
     AllowedFeatureSet allowedFeatures,
-    bool ignoreUnknownKeywords) {
+    bool ignoreUnknownKeywords,
+    bool topLevelRequiredMissingID) {
     if (!additionalPropertiesElt) {
         // The absence of the 'additionalProperties' keyword is identical in meaning to the presence
         // of 'additionalProperties' with a value of true.
@@ -676,6 +677,12 @@ StatusWithMatchExpression parseAdditionalProperties(
         if (additionalPropertiesElt.boolean()) {
             return {std::make_unique<AlwaysTrueMatchExpression>(std::move(annotation))};
         } else {
+            if (topLevelRequiredMissingID) {
+                LOGV2_WARNING(3216000,
+                              "$jsonSchema validator does not allow '_id' field. This validator "
+                              "will reject all "
+                              "documents, consider adding '_id' to the allowed fields.");
+            }
             return {std::make_unique<AlwaysFalseMatchExpression>(std::move(annotation))};
         }
     }
@@ -706,7 +713,8 @@ StatusWithMatchExpression parseAllowedProperties(
     BSONElement additionalPropertiesElt,
     InternalSchemaTypeExpression* typeExpr,
     AllowedFeatureSet allowedFeatures,
-    bool ignoreUnknownKeywords) {
+    bool ignoreUnknownKeywords,
+    bool requiredMissingID) {
     // Collect the set of properties named by the 'properties' keyword.
     StringDataSet propertyNames;
     if (propertiesElt) {
@@ -723,8 +731,22 @@ StatusWithMatchExpression parseAllowedProperties(
         return patternProperties.getStatus();
     }
 
+    auto patternPropertiesVec = std::move(patternProperties.getValue());
+
+    // If one of the patterns in pattern properties matches '_id', no need to warn about a schema
+    // that can't match documents.
+    if (requiredMissingID) {
+        for (const auto& pattern : patternPropertiesVec) {
+            // for (int i = 0; i < patternPropertiesVec.size(); ++i) {
+            if (pattern.first.regex->FullMatch("_id")) {
+                requiredMissingID = false;
+                break;
+            }
+        }
+    }
+
     auto otherwiseExpr = parseAdditionalProperties(
-        expCtx, additionalPropertiesElt, allowedFeatures, ignoreUnknownKeywords);
+        expCtx, additionalPropertiesElt, allowedFeatures, ignoreUnknownKeywords, requiredMissingID);
     if (!otherwiseExpr.isOK()) {
         return otherwiseExpr.getStatus();
     }
@@ -744,7 +766,7 @@ StatusWithMatchExpression parseAllowedProperties(
     auto allowedPropertiesExpr = std::make_unique<InternalSchemaAllowedPropertiesMatchExpression>(
         std::move(propertyNames),
         kNamePlaceholder,
-        std::move(patternProperties.getValue()),
+        std::move(patternPropertiesVec),
         std::move(otherwiseWithPlaceholder),
         std::move(annotation));
 
@@ -1352,6 +1374,11 @@ Status translateObjectKeywords(StringMap<BSONElement>& keywordMap,
             keywordMap[JSONSchemaParser::kSchemaAdditionalPropertiesKeyword];
 
         if (patternPropertiesElt || additionalPropertiesElt) {
+            // If a top level 'required' field does not contain '_id' and 'additionalProperties' is
+            // false, no documents will be permitted. Calculate whether we need to warn the user
+            // later in parsing.
+            bool requiredMissingID = expCtx->isParsingCollectionValidator && path.empty() &&
+                !requiredProperties.contains("_id");
             auto allowedPropertiesExpr = parseAllowedProperties(expCtx,
                                                                 path,
                                                                 propertiesElt,
@@ -1359,7 +1386,8 @@ Status translateObjectKeywords(StringMap<BSONElement>& keywordMap,
                                                                 additionalPropertiesElt,
                                                                 typeExpr,
                                                                 allowedFeatures,
-                                                                ignoreUnknownKeywords);
+                                                                ignoreUnknownKeywords,
+                                                                requiredMissingID);
             if (!allowedPropertiesExpr.isOK()) {
                 return allowedPropertiesExpr.getStatus();
             }
