@@ -9,9 +9,11 @@ load("jstests/libs/namespace_utils.js");
 const includeNamespaces = TestData.includeNamespaces;
 const excludeNamespaces = TestData.excludeNamespaces;
 
-const conn0 = new Mongo(TestData.cluster0ConnectionString);
-const conn1 = new Mongo(TestData.cluster1ConnectionString);
+const conn0 = new Mongo(TestData.sourceConnectionString);
+const conn1 = new Mongo(TestData.destinationConnectionString);
 
+jsTestLog(`Source connection: ${TestData.sourceConnectionString}, destination connection: ${
+    TestData.destinationConnectionString}`);
 function checkCollection(conn0, conn1, ns, shouldCheckShardKey) {
     const coll0 = conn0.getCollection(ns);
     const coll1 = conn1.getCollection(ns);

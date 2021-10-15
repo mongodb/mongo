@@ -56,6 +56,9 @@ class ClusterToClusterFixture(interface.Fixture):  # pylint: disable=too-many-in
 
         self.both_cluster_options = parsed_options
 
+        # The cluster that starts off with the data.
+        self.source_cluster_index = 0
+
     def setup(self):
         """Set up the cluster to cluster fixture according to the options provided."""
 
@@ -118,7 +121,7 @@ class ClusterToClusterFixture(interface.Fixture):  # pylint: disable=too-many-in
         """Return the driver connection URL to the cluster that starts out owning the data."""
         if not self.clusters:
             raise ValueError("Must call setup() before calling get_driver_connection_url")
-        return self.clusters[0].get_driver_connection_url()
+        return self.clusters[self.source_cluster_index].get_driver_connection_url()
 
     def get_internal_connection_string(self):
         """Return the internal connection string to the cluster that starts out owning the data."""
@@ -137,3 +140,15 @@ class ClusterToClusterFixture(interface.Fixture):  # pylint: disable=too-many-in
         if not self.clusters:
             raise ValueError("Must call setup() before calling get_cluster1_connection_string")
         return self.clusters[1].get_internal_connection_string()
+
+    def get_cluster0_fixture(self):
+        """Return cluster0."""
+        return self.clusters[0]
+
+    def get_cluster1_fixture(self):
+        """Return cluster1."""
+        return self.clusters[1]
+
+    def reverse_replication_direction(self):
+        """Swap the source and destination clusters."""
+        self.source_cluster_index = 1 - self.source_cluster_index

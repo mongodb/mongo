@@ -7,6 +7,9 @@
 load("jstests/libs/cluster_to_cluster_util.js");
 load('jstests/libs/discover_topology.js');
 
+jsTestLog(`Source connection: ${TestData.sourceConnectionString}, destination connection: ${
+    TestData.destinationConnectionString}`);
+
 // Copy the collection from one cluster to another.
 function copyCollection(c0Conn, c1Conn, c0Topology, c1Topology, dbName, collInfo) {
     const collName = collInfo.name;
@@ -56,8 +59,8 @@ function copyCollection(c0Conn, c1Conn, c0Topology, c1Topology, dbName, collInfo
 
 // Create connections to both clusters, the connection string can represent a replica set
 // primary in case of a replicaSet fixture or a mongos in case of a sharded cluster.
-const c0Conn = new Mongo(TestData.cluster0ConnectionString);
-const c1Conn = new Mongo(TestData.cluster1ConnectionString);
+const c0Conn = new Mongo(TestData.sourceConnectionString);
+const c1Conn = new Mongo(TestData.destinationConnectionString);
 const c0Topology = DiscoverTopology.findConnectedNodes(c0Conn);
 const c1Topology = DiscoverTopology.findConnectedNodes(c1Conn);
 
