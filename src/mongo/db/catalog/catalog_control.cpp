@@ -47,6 +47,62 @@
 
 namespace mongo {
 namespace catalog {
+namespace {
+void reopenAllDatabasesAndReloadCollectionCatalog(
+    OperationContext* opCtx,
+    std::shared_ptr<const CollectionCatalog> catalog,
+    StorageEngine* storageEngine,
+    const MinVisibleTimestampMap& minVisibleTimestampMap,
+    Timestamp stableTimestamp) {
+    // Open all databases and repopulate the CollectionCatalog.
+    LOGV2(20276, "openCatalog: reopening all databases");
+    auto databaseHolder = DatabaseHolder::get(opCtx);
+    std::vector<std::string> databasesToOpen = storageEngine->listDatabases();
+    for (auto&& dbName : databasesToOpen) {
+        LOGV2_FOR_RECOVERY(
+            23992, 1, "openCatalog: dbholder reopening database", "db"_attr = dbName);
+        auto db = databaseHolder->openDb(opCtx, dbName);
+        invariant(db, str::stream() << "failed to reopen database " << dbName);
+        for (auto&& collNss : catalog->getAllCollectionNamesFromDb(opCtx, dbName)) {
+            // Note that the collection name already includes the database component.
+            auto collection = catalog->lookupCollectionByNamespaceForMetadataWrite(
+                opCtx, CollectionCatalog::LifetimeMode::kInplace, collNss);
+            invariant(collection,
+                      str::stream()
+                          << "failed to get valid collection pointer for namespace " << collNss);
+
+            if (minVisibleTimestampMap.count(collection->uuid()) > 0) {
+                // After rolling back to a stable timestamp T, the minimum visible timestamp for
+                // each collection must be reset to (at least) its value at T. Additionally, there
+                // cannot exist a minimum visible timestamp greater than lastApplied. This allows us
+                // to upper bound what the minimum visible timestamp can be coming out of rollback.
+                //
+                // Because we only save the latest minimum visible timestamp for each collection, we
+                // bound the minimum visible timestamp (where necessary) to the stable timestamp.
+                // The benefit of fine grained tracking is assumed to be low-value compared to the
+                // cost/effort.
+                auto minVisible = std::min(stableTimestamp,
+                                           minVisibleTimestampMap.find(collection->uuid())->second);
+                collection->setMinimumVisibleSnapshot(minVisible);
+            }
+
+            // If this is the oplog collection, re-establish the replication system's cached pointer
+            // to the oplog.
+            if (collNss.isOplog()) {
+                LOGV2(20277, "openCatalog: updating cached oplog pointer");
+                collection->establishOplogCollectionForLogging(opCtx);
+            }
+        }
+    }
+
+    // Opening CollectionCatalog: The collection catalog is now in sync with the storage engine
+    // catalog. Clear the pre-closing state.
+    CollectionCatalog::write(opCtx,
+                             [&](CollectionCatalog& catalog) { catalog.onOpenCatalog(opCtx); });
+    opCtx->getServiceContext()->incrementCatalogGeneration();
+    LOGV2(20278, "openCatalog: finished reloading collection catalog");
+}
+}  // namespace
 
 MinVisibleTimestampMap closeCatalog(OperationContext* opCtx) {
     invariant(opCtx->lockState()->isW());
@@ -179,53 +235,16 @@ void openCatalog(OperationContext* opCtx,
     IndexBuildsCoordinator::get(opCtx)->restartIndexBuildsForRecovery(
         opCtx, reconcileResult.indexBuildsToRestart, reconcileResult.indexBuildsToResume);
 
-    // Open all databases and repopulate the CollectionCatalog.
-    LOGV2(20276, "openCatalog: reopening all databases");
-    auto databaseHolder = DatabaseHolder::get(opCtx);
-    std::vector<std::string> databasesToOpen = storageEngine->listDatabases();
-    for (auto&& dbName : databasesToOpen) {
-        LOGV2_FOR_RECOVERY(
-            23992, 1, "openCatalog: dbholder reopening database", "db"_attr = dbName);
-        auto db = databaseHolder->openDb(opCtx, dbName);
-        invariant(db, str::stream() << "failed to reopen database " << dbName);
-        for (auto&& collNss : catalog->getAllCollectionNamesFromDb(opCtx, dbName)) {
-            // Note that the collection name already includes the database component.
-            auto collection = catalog->lookupCollectionByNamespaceForMetadataWrite(
-                opCtx, CollectionCatalog::LifetimeMode::kInplace, collNss);
-            invariant(collection,
-                      str::stream()
-                          << "failed to get valid collection pointer for namespace " << collNss);
+    reopenAllDatabasesAndReloadCollectionCatalog(
+        opCtx, catalog, storageEngine, minVisibleTimestampMap, stableTimestamp);
+}
 
-            if (minVisibleTimestampMap.count(collection->uuid()) > 0) {
-                // After rolling back to a stable timestamp T, the minimum visible timestamp for
-                // each collection must be reset to (at least) its value at T. Additionally, there
-                // cannot exist a minimum visible timestamp greater than lastApplied. This allows us
-                // to upper bound what the minimum visible timestamp can be coming out of rollback.
-                //
-                // Because we only save the latest minimum visible timestamp for each collection, we
-                // bound the minimum visible timestamp (where necessary) to the stable timestamp.
-                // The benefit of fine grained tracking is assumed to be low-value compared to the
-                // cost/effort.
-                auto minVisible = std::min(stableTimestamp,
-                                           minVisibleTimestampMap.find(collection->uuid())->second);
-                collection->setMinimumVisibleSnapshot(minVisible);
-            }
 
-            // If this is the oplog collection, re-establish the replication system's cached pointer
-            // to the oplog.
-            if (collNss.isOplog()) {
-                LOGV2(20277, "openCatalog: updating cached oplog pointer");
-                collection->establishOplogCollectionForLogging(opCtx);
-            }
-        }
-    }
-
-    // Opening CollectionCatalog: The collection catalog is now in sync with the storage engine
-    // catalog. Clear the pre-closing state.
-    CollectionCatalog::write(opCtx,
-                             [&](CollectionCatalog& catalog) { catalog.onOpenCatalog(opCtx); });
-    opCtx->getServiceContext()->incrementCatalogGeneration();
-    LOGV2(20278, "openCatalog: finished reloading collection catalog");
+void openCatalogAfterStorageChange(OperationContext* opCtx) {
+    invariant(opCtx->lockState()->isW());
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    auto catalog = CollectionCatalog::get(opCtx);
+    reopenAllDatabasesAndReloadCollectionCatalog(opCtx, catalog, storageEngine, {}, {});
 }
 
 }  // namespace catalog

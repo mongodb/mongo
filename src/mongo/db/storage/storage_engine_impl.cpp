@@ -98,7 +98,9 @@ StorageEngineImpl::StorageEngineImpl(OperationContext* opCtx,
     // If we are loading the catalog after an unclean shutdown, it's possible that there are
     // collections in the catalog that are unknown to the storage engine. We should attempt to
     // recover these orphaned idents.
-    invariant(!opCtx->lockState()->isLocked());
+    // Allowing locking in write mode as reinitializeStorageEngine will be called while holding the
+    // global lock in exclusive mode.
+    invariant(!opCtx->lockState()->isLocked() || opCtx->lockState()->isW());
     Lock::GlobalWrite globalLk(opCtx);
     loadCatalog(opCtx,
                 _options.lockFileCreatedByUncleanShutdown ? LastShutdownState::kUnclean

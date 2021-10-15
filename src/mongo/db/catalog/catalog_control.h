@@ -53,5 +53,13 @@ MinVisibleTimestampMap closeCatalog(OperationContext* opCtx);
 void openCatalog(OperationContext* opCtx,
                  const MinVisibleTimestampMap& catalogState,
                  Timestamp stableTimestamp);
+
+/**
+ * Restores the catalog and all in-memory state after a call to
+ * closeCatalog -> reinitializeStorageEngine -> startupRecovery.
+ *
+ * Must be called with the global lock acquired in exclusive mode.
+ */
+void openCatalogAfterStorageChange(OperationContext* opCtx);
 }  // namespace catalog
 }  // namespace mongo
