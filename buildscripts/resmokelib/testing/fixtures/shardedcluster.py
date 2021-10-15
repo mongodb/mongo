@@ -82,6 +82,19 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
         for shard in self.shards:
             shard.setup()
 
+    def refresh_logical_session_cache(self, target):
+        """Refresh logical session cache with no timeout."""
+        primary = (target.mongo_client()
+                   if self.num_rs_nodes_per_shard is None else target.get_primary().mongo_client())
+        try:
+            primary.admin.command({"refreshLogicalSessionCacheNow": 1})
+        except pymongo.errors.OperationFailure as err:
+            if err.code != self._WRITE_CONCERN_FAILED:
+                raise err
+            self.logger.info("Ignoring write concern timeout for refreshLogicalSessionCacheNow "
+                             "command and continuing to wait")
+            target.await_last_op_committed(target.AWAIT_REPL_TIMEOUT_FOREVER_MINS * 60)
+
     def await_ready(self):
         """Block until the fixture can be used for testing."""
         # Wait for the config server
@@ -137,13 +150,10 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
 
         # Ensure that the sessions collection gets auto-sharded by the config server
         if self.configsvr is not None:
-            primary = self.configsvr.get_primary().mongo_client()
-            primary.admin.command({"refreshLogicalSessionCacheNow": 1})
+            self.refresh_logical_session_cache(self.configsvr)
 
         for shard in self.shards:
-            primary = (shard.mongo_client() if self.num_rs_nodes_per_shard is None else
-                       shard.get_primary().mongo_client())
-            primary.admin.command({"refreshLogicalSessionCacheNow": 1})
+            self.refresh_logical_session_cache(shard)
 
     def _auth_to_db(self, client):
         """Authenticate client for the 'authenticationDatabase'."""
