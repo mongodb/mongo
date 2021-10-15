@@ -182,8 +182,12 @@ list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::create(
     // which will bind the value of the expression to the name in simplePartitionBy.
     if (partitionBy) {
         partitionBy = (*partitionBy)->optimize();
-        if (dynamic_cast<ExpressionConstant*>(partitionBy->get())) {
-            // partitionBy optimizes to a constant expression, equivalent to a single partition.
+        if (auto exprConst = dynamic_cast<ExpressionConstant*>(partitionBy->get())) {
+            uassert(ErrorCodes::TypeMismatch,
+                    "An expression used to partition cannot evaluate to value of type array",
+                    !exprConst->getValue().isArray());
+            // Partitioning by a constant, non-array expression is equivalent to not partitioning
+            // (putting everything in the same partition).
         } else if (auto exprFieldPath = dynamic_cast<ExpressionFieldPath*>(partitionBy->get());
                    exprFieldPath && !exprFieldPath->isVariableReference()) {
             // ExpressionFieldPath has "CURRENT" as an explicit first component,
