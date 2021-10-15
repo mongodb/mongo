@@ -348,7 +348,7 @@ TEST_F(TopologyStateMachineTestFixture, ShouldSaveNewMaxSetVersion) {
                                  .instance();
 
     stateMachine.onServerDescription(*topologyDescription, serverDescription);
-    ASSERT_EQUALS(100, topologyDescription->getMaxSetVersion());
+    ASSERT_EQUALS(100, topologyDescription->getMaxElectionIdSetVersionPair().setVersion);
 
     auto serverDescriptionEvenBiggerSetVersion = ServerDescriptionBuilder()
                                                      .withType(ServerType::kRSPrimary)
@@ -361,7 +361,7 @@ TEST_F(TopologyStateMachineTestFixture, ShouldSaveNewMaxSetVersion) {
                                                      .instance();
 
     stateMachine.onServerDescription(*topologyDescription, serverDescriptionEvenBiggerSetVersion);
-    ASSERT_EQUALS(200, topologyDescription->getMaxSetVersion());
+    ASSERT_EQUALS(200, topologyDescription->getMaxElectionIdSetVersionPair().setVersion);
 }
 
 TEST_F(TopologyStateMachineTestFixture, ShouldSaveNewMaxElectionId) {
@@ -380,7 +380,7 @@ TEST_F(TopologyStateMachineTestFixture, ShouldSaveNewMaxElectionId) {
                                  .instance();
 
     stateMachine.onServerDescription(*topologyDescription, serverDescription);
-    ASSERT_EQUALS(kOidOne, topologyDescription->getMaxElectionId());
+    ASSERT_EQUALS(kOidOne, topologyDescription->getMaxElectionIdSetVersionPair().electionId);
 
     auto serverDescriptionEvenBiggerElectionId = ServerDescriptionBuilder()
                                                      .withType(ServerType::kRSPrimary)
@@ -393,7 +393,7 @@ TEST_F(TopologyStateMachineTestFixture, ShouldSaveNewMaxElectionId) {
                                                      .instance();
 
     stateMachine.onServerDescription(*topologyDescription, serverDescriptionEvenBiggerElectionId);
-    ASSERT_EQUALS(kOidTwo, topologyDescription->getMaxElectionId());
+    ASSERT_EQUALS(kOidTwo, topologyDescription->getMaxElectionIdSetVersionPair().electionId);
 }
 
 // The following two tests (ShouldNotUpdateToplogyType, ShouldUpdateToCorrectToplogyType) assert
