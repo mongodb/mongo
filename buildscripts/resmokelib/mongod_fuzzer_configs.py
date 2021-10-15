@@ -34,6 +34,28 @@ def generate_eviction_configs(rng):
                                                                  close_scan_interval)
 
 
+def generate_table_configs(rng):
+    """Generate random configurations for wiredTigerCollectionConfigString parameter."""
+
+    # TODO(SERVER-60747): Add fuzzing for leaf_page_max
+
+    internal_page_max = rng.choice([4, 8, 12, 1024, 10 * 1024]) * 1024
+    leaf_value_max = rng.choice([1, 32, 128, 256]) * 1024 * 1024
+
+    memory_page_max_lower_bound = 16 * 1024  # leaf_page_max
+    # Assume WT cache size of 1GB as most MDB tests specify this as the cache size
+    memory_page_max_upper_bound = (rng.randint(256, 1024) * 1024 * 1024) / 10  # cache_size / 10
+    memory_page_max = rng.randint(memory_page_max_lower_bound, memory_page_max_upper_bound)
+
+    split_pct = rng.choice([50, 60, 75, 100])
+    prefix_compression = rng.choice(["true", "false"])
+    block_compressor = rng.choice(["none", "snappy", "zlib", "zstd"])
+
+    return "block_compressor={0},internal_page_max={1},leaf_value_max={2},memory_page_max={3},"\
+        "prefix_compression={4},split_pct={5}".format(block_compressor, internal_page_max, leaf_value_max,
+                                                      memory_page_max, prefix_compression, split_pct)
+
+
 def generate_flow_control_parameters(rng):
     """Generate parameters related to flow control and returns a dictionary."""
     configs = {}
@@ -78,4 +100,5 @@ def fuzz_set_parameters(seed, user_provided_params):
     for key, value in utils.load_yaml(user_provided_params).items():
         ret[key] = value
 
-    return utils.dump_yaml(ret), generate_eviction_configs(rng)
+    return utils.dump_yaml(ret), generate_eviction_configs(rng), generate_table_configs(rng), \
+        generate_table_configs(rng)
