@@ -122,7 +122,7 @@ public:
     using ComparisonRules = BSONComparatorInterfaceBase<BSONObj>::ComparisonRules;
     using ComparisonRulesSet = BSONComparatorInterfaceBase<BSONObj>::ComparisonRulesSet;
 
-    static const char kMinBSONLength = 5;
+    static constexpr char kMinBSONLength = 5;
 
     /** Construct an empty BSONObj -- that is, {}. */
     BSONObj() {

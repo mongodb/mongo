@@ -103,6 +103,16 @@ public:
     bool hasMoreOplog();
 
     /**
+     * Returns true if the majority committed oplog entries are drained and false otherwise.
+     */
+    bool inCatchupPhase();
+
+    /**
+     * Returns the estimated bytes of data left to transfer in _newWriteOpTimeList.
+     */
+    int64_t untransferredCatchUpDataSize();
+
+    /**
      * Attempts to fetch the next oplog entry. Returns true if it was able to fetch anything.
      */
     bool fetchNextOplog(OperationContext* opCtx);
@@ -251,6 +261,8 @@ private:
     // Protects _newWriteTsList, _lastFetchedNewWriteOplog, _state, _newOplogNotification
     Mutex _newOplogMutex = MONGO_MAKE_LATCH("SessionCatalogMigrationSource::_newOplogMutex");
 
+    // The average size of documents in config.transactions.
+    uint64_t _averageSessionDocSize;
 
     // Stores oplog opTime of new writes that are coming in.
     std::list<std::pair<repl::OpTime, EntryAtOpTimeType>> _newWriteOpTimeList;
