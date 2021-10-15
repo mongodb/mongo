@@ -45,12 +45,12 @@ namespace test_harness {
 class scoped_cursor {
     public:
     scoped_cursor() = default;
-    scoped_cursor(WT_SESSION *session, const char *uri, const char *cfg);
+    explicit scoped_cursor(WT_SESSION *session, const char *uri, const char *cfg);
 
     /* Moving is ok but copying is not. */
     scoped_cursor(scoped_cursor &&other);
 
-    virtual ~scoped_cursor();
+    ~scoped_cursor();
 
     scoped_cursor &operator=(scoped_cursor &&other);
     scoped_cursor(const scoped_cursor &) = delete;
@@ -72,7 +72,7 @@ class scoped_session {
     scoped_session() = default;
     explicit scoped_session(WT_CONNECTION *conn);
 
-    virtual ~scoped_session();
+    ~scoped_session();
 
     /* Moving is ok but copying is not. */
     scoped_session(scoped_session &&other);

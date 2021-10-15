@@ -45,7 +45,7 @@ typedef std::string key_value_t;
 /* A collection is made of mapped key value objects. */
 class collection {
     public:
-    collection(const uint64_t id, const uint64_t key_count, const std::string &name);
+    explicit collection(const uint64_t id, const uint64_t key_count, const std::string &name);
 
     /* Copies aren't allowed. */
     collection(const collection &) = delete;

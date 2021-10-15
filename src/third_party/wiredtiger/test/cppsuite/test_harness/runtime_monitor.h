@@ -48,12 +48,10 @@ namespace test_harness {
 class runtime_statistic {
     public:
     explicit runtime_statistic(configuration *config);
+    virtual ~runtime_statistic() = default;
 
     /* Check that the given statistic is within bounds. */
     virtual void check(scoped_cursor &cursor) = 0;
-
-    /* Suppress warning about destructor being non-virtual. */
-    virtual ~runtime_statistic() {}
 
     bool enabled() const;
 
@@ -64,16 +62,17 @@ class runtime_statistic {
 class cache_limit_statistic : public runtime_statistic {
     public:
     explicit cache_limit_statistic(configuration *config);
+    virtual ~cache_limit_statistic() = default;
 
     void check(scoped_cursor &cursor) override final;
 
     private:
-    int64_t limit;
+    int64_t _limit;
 };
 
 class db_size_statistic : public runtime_statistic {
     public:
-    db_size_statistic(configuration *config, database &database);
+    explicit db_size_statistic(configuration *config, database &database);
     virtual ~db_size_statistic() = default;
 
     /* Don't need the stat cursor for this. */
@@ -90,7 +89,6 @@ class db_size_statistic : public runtime_statistic {
 class postrun_statistic_check {
     public:
     explicit postrun_statistic_check(configuration *config);
-    virtual ~postrun_statistic_check() = default;
 
     void check(scoped_cursor &cursor) const;
 
@@ -119,7 +117,7 @@ class runtime_monitor : public component {
     static void get_stat(scoped_cursor &, int, int64_t *);
 
     public:
-    runtime_monitor(configuration *config, database &database);
+    explicit runtime_monitor(configuration *config, database &database);
     ~runtime_monitor();
 
     /* Delete the copy constructor and the assignment operator. */
