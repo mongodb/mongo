@@ -1,4 +1,6 @@
 // @tags: [requires_fast_memory]
+(function() {
+"use strict";
 
 var col = db.memoryTest;
 
@@ -16,7 +18,7 @@ var reduceNumLoops = codeCoverageVariant || inMemoryStorageEngine;
 // test creating many collections to make sure no internal cache goes OOM
 var loopNum = reduceNumLoops ? 100 : 10000;
 for (var i = 0; i < loopNum; ++i) {
-    name = "memoryTest" + i;
+    const name = "memoryTest" + i;
     if ((i % 1000) == 0)
         print("Processing " + name);
     for (var j = 0; j < 100; ++j) {
@@ -68,3 +70,4 @@ doWhereTest(10);
 doWhereTest(loopNum);
 doWhereTest(loopNum);
 doWhereTest(loopNum);
+})();

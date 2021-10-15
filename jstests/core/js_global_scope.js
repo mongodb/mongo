@@ -18,7 +18,6 @@ coll.drop();
 
 assert.commandWorked(coll.insert({_id: 0, a: 1}));
 
-// Note: important that this is sorted.
 const expectedGlobalVars = [
     "Array",
     "ArrayBuffer",
@@ -74,7 +73,6 @@ const expectedGlobalVars = [
     "Uint8ClampedArray",
     "WeakMap",
     "WeakSet",
-    "WebAssembly",
     "__lastres__",
     "_convertExceptionToReturnStatus",
     "assert",
@@ -114,6 +112,12 @@ const expectedGlobalVars = [
     "uneval",
     "version",
 ];
+
+if (buildInfo().buildEnvironment.target_arch !== 'aarch64') {
+    expectedGlobalVars.push("WebAssembly");
+}
+// Note: it is important that this is sorted to compare to sorted variable names below.
+expectedGlobalVars.sort();
 
 function getGlobalProps() {
     const global = function() {
