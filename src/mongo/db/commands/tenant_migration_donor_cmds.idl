@@ -44,7 +44,7 @@ enums:
         type: string
         values:
             kMultitenantMigrations: "multitenant migrations"
-            kSliceMerge: "slice merge"
+            kShardMerge: "shard merge"
 
 structs:
     DonorStartMigrationResponse:

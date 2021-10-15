@@ -4,14 +4,14 @@
 \* - Creative Commons Attribution-3.0 United States License
 \*   http://creativecommons.org/licenses/by/3.0/us/
 
------------------------------ MODULE SliceMerge -----------------------------
+----------------------------- MODULE ShardMerge -----------------------------
 \*
-\* A specification of serverless MongoDB's slice merge protocol.
+\* A specification of serverless MongoDB's shard merge protocol.
 \*
-\* To run the model-checker, first edit the constants in MCSliceMerge.cfg if desired,
+\* To run the model-checker, first edit the constants in MCShardMerge.cfg if desired,
 \* then:
 \*     cd src/mongo/db/repl/tla_plus
-\*     ./model-check.sh SliceMerge
+\*     ./model-check.sh ShardMerge
 \*
 
 EXTENDS Integers, FiniteSets, Sequences, TLC

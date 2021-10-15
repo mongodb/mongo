@@ -1,7 +1,7 @@
----- MODULE MCSliceMerge ----
-\* This module defines MCSliceMerge.tla constants/constraints for model-checking.
+---- MODULE MCShardMerge ----
+\* This module defines MCShardMerge.tla constants/constraints for model-checking.
 
-EXTENDS SliceMerge
+EXTENDS ShardMerge
 
 CONSTANT MaxRequests
 

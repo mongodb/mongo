@@ -6,26 +6,26 @@ var TenantMigrationUtil = (function() {
     const kCreateRstRetryIntervalMS = 100;
 
     /**
-     * Returns true if feature flag 'featureFlagSliceMerge' is enabled, false otherwise.
+     * Returns true if feature flag 'featureFlagShardMerge' is enabled, false otherwise.
      */
-    function isSliceMergeEnabled(db) {
+    function isShardMergeEnabled(db) {
         const admin = db.getSiblingDB("admin");
-        const flagDoc = admin.runCommand({getParameter: 1, featureFlagSliceMerge: 1});
+        const flagDoc = admin.runCommand({getParameter: 1, featureFlagShardMerge: 1});
         const fcvDoc = admin.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
-        return flagDoc.hasOwnProperty("featureFlagSliceMerge") &&
-            flagDoc.featureFlagSliceMerge.value &&
+        return flagDoc.hasOwnProperty("featureFlagShardMerge") &&
+            flagDoc.featureFlagShardMerge.value &&
             MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version,
-                                           flagDoc.featureFlagSliceMerge.fcv) >= 0;
+                                           flagDoc.featureFlagShardMerge.fcv) >= 0;
     }
 
     /**
-     * Construct a donorStartMigration command object with protocol: "slice merge" if the feature
+     * Construct a donorStartMigration command object with protocol: "shard merge" if the feature
      * flag is enabled.
      */
     function donorStartMigrationWithProtocol(cmd, db) {
         // If we don't pass "protocol", the server uses "multitenant migrations" by default.
-        if (isSliceMergeEnabled(db)) {
-            return Object.assign(Object.assign({}, cmd), {protocol: "slice merge"});
+        if (isShardMergeEnabled(db)) {
+            return Object.assign(Object.assign({}, cmd), {protocol: "shard merge"});
         }
 
         return cmd;
@@ -486,7 +486,7 @@ var TenantMigrationUtil = (function() {
 
     return {
         kExternalKeysNs,
-        isSliceMergeEnabled,
+        isShardMergeEnabled,
         donorStartMigrationWithProtocol,
         getExternalKeys,
         runMigrationAsync,

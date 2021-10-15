@@ -69,10 +69,10 @@ public:
             const auto& cmd = request();
 
             if (cmd.getProtocol().value_or(MigrationProtocolEnum::kMultitenantMigrations) ==
-                MigrationProtocolEnum::kSliceMerge) {
+                MigrationProtocolEnum::kShardMerge) {
                 uassert(5949300,
-                        "protocol \"slice merge\" not supported",
-                        repl::feature_flags::gSliceMerge.isEnabled(
+                        "protocol \"shard merge\" not supported",
+                        repl::feature_flags::gShardMerge.isEnabled(
                             serverGlobalParams.featureCompatibility));
             }
 

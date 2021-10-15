@@ -106,7 +106,7 @@ var authErrCode = 13;
 var commandNotSupportedCode = 115;
 var shard0name = "shard0000";
 const migrationCertificates = TenantMigrationUtil.makeMigrationCertificatesForTest();
-const isSliceMergeEnabled = TestData.setParameters.featureFlagSliceMerge;
+const isShardMergeEnabled = TestData.setParameters.featureFlagShardMerge;
 
 // useful shorthand when defining the tests below
 var roles_write =
@@ -3532,7 +3532,7 @@ var authCommandsLib = {
           testname: "donorStartMigration",
           command: {
               donorStartMigration: 1,
-              protocol: isSliceMergeEnabled ? "slice merge" : "multitenant migrations",
+              protocol: isShardMergeEnabled ? "shard merge" : "multitenant migrations",
               tenantId: "testTenantId",
               migrationId: UUID(),
               recipientConnectionString: "recipient-rs/localhost:1234",

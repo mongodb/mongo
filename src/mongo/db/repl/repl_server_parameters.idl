@@ -589,7 +589,7 @@ feature_flags:
         cpp_varname: feature_flags::gFileCopyBasedInitialSync
         default: false
 
-    featureFlagSliceMerge:
-        description: When enabled, multitenant migration uses the "slice merge" protocol.
-        cpp_varname: feature_flags::gSliceMerge
+    featureFlagShardMerge:
+        description: When enabled, multitenant migration uses the "shard merge" protocol.
+        cpp_varname: feature_flags::gShardMerge
         default: false
