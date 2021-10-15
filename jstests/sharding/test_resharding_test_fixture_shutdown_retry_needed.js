@@ -14,11 +14,7 @@
 
 load("jstests/sharding/libs/resharding_test_fixture.js");
 
-const reshardingTest = new ReshardingTest({
-    enableElections: true,
-    shouldSetMinVisibleToOldestOnStartup: true,
-});
-
+const reshardingTest = new ReshardingTest({enableElections: true});
 reshardingTest.setup();
 
 const donorShardNames = reshardingTest.donorShardNames;
