@@ -109,7 +109,10 @@ def load_authority_file(issuer):
 
 def set_subject(x509, cert):
     """Translate a subject dict to X509Name elements."""
-    if cert.get('Subject', None) is None:
+    if not cert.get('Subject'):
+        if cert.get('explicit_subject', False):
+            # do nothing if an empty subject is explicitly provided
+            return
         raise ValueError(cert['name'] + ' requires a Subject')
 
     if not cert.get('explicit_subject', False):
@@ -675,7 +678,10 @@ def process_cert(cert):
     if isinstance(append_certs, str):
         append_certs = [append_certs]
 
-    if cert.get('Subject'):
+    subject = cert.get('Subject');
+    explicit_empty_subject = cert.get('explicit_subject', False) and not subject;
+
+    if subject or explicit_empty_subject:
         create_cert(cert)
     elif append_certs:
         # Pure composing certificate. Start with a basic preamble.
