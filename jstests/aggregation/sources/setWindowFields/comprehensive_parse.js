@@ -10,6 +10,7 @@ for (let i = 0; i < nDocs; i++) {
     assert.commandWorked(coll.insert({
         a: i,
         date: currentDate,
+        array: [],
         partition: i % 2,
         partitionSeq: Math.trunc(i / 2),
     }));
@@ -74,7 +75,9 @@ const sortBys = {
 // The list of partition definitions to test.
 const partitionBys = {
     none: null,
-    field: '$partition'
+    field: '$partition',
+    dynamic_array: '$array',
+    static_array: {$const: []},
 };
 
 // Given an element from each of the lists above, construct a
@@ -104,6 +107,8 @@ function constructQuery(wf, window, sortBy, partitionBy) {
 // result.  The output should be 'SKIP', 'OK' or the expected integer
 // error code.
 function expectedResult(wfType, windowType, sortType, partitionType) {
+    // Static errors all come first.
+
     // Skip range windows over dates or that are over descending windows.
     if (windowType.endsWith('range')) {
         if (sortType.endsWith('date') || sortType.startsWith('desc')) {
@@ -124,15 +129,6 @@ function expectedResult(wfType, windowType, sortType, partitionType) {
             return ErrorCodes.FailedToParse;
         }
 
-        if (wfType == 'derivative_date' && !sortType.endsWith('date')) {
-            // "$derivative with unit expects the sortBy field to be a Date".
-            return 5624900;
-        }
-
-        if (sortType.endsWith('date') && wfType != 'derivative_date') {
-            // "$derivative where the sortBy is a Date requires a 'unit'.
-            return 5624901;
-        }
     } else if (wfType.startsWith('integral')) {
         // Integral requires a sort.
         if (sortType == 'none') {
@@ -144,15 +140,6 @@ function expectedResult(wfType, windowType, sortType, partitionType) {
             return ErrorCodes.FailedToParse;
         }
 
-        if (wfType == 'integral_date' && !sortType.endsWith('date')) {
-            // "$integral with unit expects the sortBy field to be a Date"
-            return 5423901;
-        }
-
-        if (sortType.endsWith('date') && wfType != 'integral_date') {
-            // $integral where the sortBy is a Date requires a 'unit'
-            return 5423902;
-        }
     } else if (wfType.startsWith('expMovingAvg')) {
         // $expMovingAvg doesn't accept a window.
         if (windowType != 'none') {
@@ -195,6 +182,44 @@ function expectedResult(wfType, windowType, sortType, partitionType) {
     if (windowType.endsWith('range') && (sortType == 'none' || sortType == 'multi')) {
         // 'Range-based window require sortBy a single field'.
         return 5339902;
+    }
+
+    if (partitionType === 'static_array') {
+        // When we parse $setWindowFields, we check whether partitionBy is a constant; if so we can
+        // drop the partitionBy clause.  However, if the constant value is an array, we want to
+        // throw an error to make it clear that partitioning by an array is not supported.
+        return ErrorCodes.TypeMismatch;
+    }
+
+    // Dynamic errors all come after this point.
+
+    if (partitionType === 'dynamic_array') {
+        // At runtime, we raise an error if partitionBy evaluates to an array. We chose not to
+        // support partitioning by an array because $sort (which has multikey semantics)
+        // doesn't partition arrays.
+        return ErrorCodes.TypeMismatch;
+    }
+
+    if (wfType.startsWith('derivative')) {
+        if (wfType == 'derivative_date' && !sortType.endsWith('date')) {
+            // "$derivative with unit expects the sortBy field to be a Date".
+            return 5624900;
+        }
+
+        if (sortType.endsWith('date') && wfType != 'derivative_date') {
+            // "$derivative where the sortBy is a Date requires a 'unit'.
+            return 5624901;
+        }
+    } else if (wfType.startsWith('integral')) {
+        if (wfType == 'integral_date' && !sortType.endsWith('date')) {
+            // "$integral with unit expects the sortBy field to be a Date"
+            return 5423901;
+        }
+
+        if (sortType.endsWith('date') && wfType != 'integral_date') {
+            // $integral where the sortBy is a Date requires a 'unit'
+            return 5423902;
+        }
     }
 
     return ErrorCodes.OK;
