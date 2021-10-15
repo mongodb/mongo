@@ -54,8 +54,6 @@ public:
 
     double getSeverity() const override;
 
-    Milliseconds getActiveFaultDuration() const override;
-
     Milliseconds getDuration() const override;
 
     void appendDescription(BSONObjBuilder* builder) const override;

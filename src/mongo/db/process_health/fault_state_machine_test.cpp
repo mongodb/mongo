@@ -30,6 +30,7 @@
 #include "mongo/db/process_health/fault_manager.h"
 
 #include "mongo/db/process_health/fault_manager_test_suite.h"
+#include "mongo/db/process_health/health_check_status.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
@@ -133,11 +134,16 @@ TEST_F(FaultManagerTest, StateTransitionsFromActiveFault) {
     }
 }
 
+
 // State transitions triggered by events.
 TEST_F(FaultManagerTest, EventsFromOk) {
     std::vector<std::pair<std::function<void()>, FaultState>> validTransitions{
         {[this] { manager().processFaultIsResolvedEventTest(); }, FaultState::kOk},
-        {[this] { manager().processFaultExistsEventTest(); }, FaultState::kTransientFault}};
+        {[this] {
+             manager().getOrCreateFaultFacetsContainerTest();
+             manager().processFaultExistsEventTest();
+         },
+         FaultState::kTransientFault}};
 
     for (auto& pair : validTransitions) {
         resetManager();
@@ -151,7 +157,11 @@ TEST_F(FaultManagerTest, EventsFromOk) {
 TEST_F(FaultManagerTest, EventsFromStartupCheck) {
     std::vector<std::pair<std::function<void()>, FaultState>> validTransitions{
         {[this] { manager().processFaultIsResolvedEventTest(); }, FaultState::kOk},
-        {[this] { manager().processFaultExistsEventTest(); }, FaultState::kTransientFault}};
+        {[this] {
+             manager().getOrCreateFaultFacetsContainerTest();
+             manager().processFaultExistsEventTest();
+         },
+         FaultState::kTransientFault}};
 
     for (auto& pair : validTransitions) {
         resetManager();
@@ -165,7 +175,11 @@ TEST_F(FaultManagerTest, EventsFromStartupCheck) {
 TEST_F(FaultManagerTest, EventsFromTransientFault) {
     std::vector<std::pair<std::function<void()>, FaultState>> validTransitions{
         {[this] { manager().processFaultIsResolvedEventTest(); }, FaultState::kOk},
-        {[this] { manager().processFaultExistsEventTest(); }, FaultState::kTransientFault}};
+        {[this] {
+             manager().getOrCreateFaultFacetsContainerTest();
+             manager().processFaultExistsEventTest();
+         },
+         FaultState::kTransientFault}};
 
     for (auto& pair : validTransitions) {
         resetManager();
@@ -180,7 +194,11 @@ TEST_F(FaultManagerTest, EventsFromActiveFault) {
     // No event can transition out of active fault.
     std::vector<std::pair<std::function<void()>, FaultState>> validTransitions{
         {[this] { manager().processFaultIsResolvedEventTest(); }, FaultState::kActiveFault},
-        {[this] { manager().processFaultExistsEventTest(); }, FaultState::kActiveFault}};
+        {[this] {
+             manager().getOrCreateFaultFacetsContainerTest();
+             manager().processFaultExistsEventTest();
+         },
+         FaultState::kActiveFault}};
 
     for (auto& pair : validTransitions) {
         resetManager();
