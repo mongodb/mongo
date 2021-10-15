@@ -512,11 +512,8 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                     }
                 }
 
-                _collectionEmpty = checkIfCollectionIsEmpty(opCtx, nss());
-
+                _createPolicy(opCtx);
                 _createCollectionAndIndexes(opCtx);
-
-                _createPolicyAndChunks(opCtx);
 
                 audit::logShardCollection(opCtx->getClient(),
                                           nss().ns(),
@@ -524,6 +521,7 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                                           _doc.getUnique().value_or(false));
 
                 if (_splitPolicy->isOptimized()) {
+                    _createChunks(opCtx);
                     // Block reads/writes from here on if we need to create
                     // the collection on other shards, this way we prevent
                     // reads/writes that should be redirected to another
@@ -548,10 +546,16 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                     _commit(opCtx);
                 }
 
+                // End of the critical section, from now on, read and writes are permitted.
                 RecoverableCriticalSectionService::get(opCtx)->releaseRecoverableCriticalSection(
                     opCtx, nss(), _critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
 
+                // Slow path. Create chunks (which might incur in an index scan) and commit must be
+                // done outside of the critical section to prevent writes from stalling in unsharded
+                // collections.
                 if (!_splitPolicy->isOptimized()) {
+                    _createChunks(opCtx);
+
                     _commit(opCtx);
                 }
 
@@ -723,8 +727,10 @@ void CreateCollectionCoordinator::_createCollectionAndIndexes(OperationContext* 
     _collectionUUID = *sharding_ddl_util::getCollectionUUID(opCtx, nss());
 }
 
-void CreateCollectionCoordinator::_createPolicyAndChunks(OperationContext* opCtx) {
-    LOGV2_DEBUG(5277904, 2, "Create collection _createChunks", "namespace"_attr = nss());
+void CreateCollectionCoordinator::_createPolicy(OperationContext* opCtx) {
+    LOGV2_DEBUG(6042001, 2, "Create collection _createPolicy", "namespace"_attr = nss());
+
+    _collectionEmpty = checkIfCollectionIsEmpty(opCtx, nss());
 
     _splitPolicy = InitialSplitPolicy::calculateOptimizationStrategy(
         opCtx,
@@ -735,6 +741,10 @@ void CreateCollectionCoordinator::_createPolicyAndChunks(OperationContext* opCtx
         getTagsAndValidate(opCtx, nss(), _shardKeyPattern->toBSON()),
         getNumShards(opCtx),
         *_collectionEmpty);
+}
+
+void CreateCollectionCoordinator::_createChunks(OperationContext* opCtx) {
+    LOGV2_DEBUG(5277904, 2, "Create collection _createChunks", "namespace"_attr = nss());
 
     _initialChunks = _splitPolicy->createFirstChunks(
         opCtx, *_shardKeyPattern, {*_collectionUUID, ShardingState::get(opCtx)->shardId()});
