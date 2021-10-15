@@ -119,7 +119,7 @@ assert(isConfigCommitted(primary));
 jsTestLog("Stepping down the primary.");
 // Step down the primary and then step it back up so that it writes a log entry in a newer term.
 // This new op won't become committed yet, though, since we have paused replication.
-assert.commandWorked(primary.adminCommand({replSetStepDown: 1, force: 1}));
+assert.commandWorked(primary.adminCommand({replSetStepDown: 5, force: 1}));
 assert.commandWorked(primary.adminCommand({replSetFreeze: 0}));  // end the stepdown period.
 
 jsTestLog("Stepping the primary back up.");
