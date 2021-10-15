@@ -4,6 +4,5 @@
 # by modifying their respective definitions in evergreen.yml.
 
 - featureFlagFryer
-- featureFlagSBEGroupPushdown
 - featureFlagMigrationRecipientCriticalSection
 - featureFlagNoChangeStreamEventsDueToOrphans
