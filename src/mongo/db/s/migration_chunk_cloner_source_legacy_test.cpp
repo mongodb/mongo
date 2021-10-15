@@ -75,6 +75,10 @@ protected:
     void setUp() override {
         ShardServerTestFixture::setUp();
 
+        auto opCtx = operationContext();
+        DBDirectClient client(opCtx);
+        client.createCollection(NamespaceString::kSessionTransactionsTableNamespace.ns());
+
         // TODO: SERVER-26919 set the flag on the mock repl coordinator just for the window where it
         // actually needs to bypass the op observer.
         replicationCoordinator()->alwaysAllowWrites(true);
