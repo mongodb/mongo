@@ -116,6 +116,12 @@ function runTest({shardKey, cmdObj, numProfilerEntries}) {
             filter["command.shardVersion.0"] = Timestamp(0, 0);
         }
 
+        // Filter out the profiler entries with $indexStats pipeline stage, as the
+        // PeriodicShardedIndexConsistencyChecker can issue an aggregate command with
+        // '[$indexStats: {}]' pipeline periodically. We don't want these entries to be accounted
+        // here.
+        filter["command.pipeline.0.$indexStats"] = {$exists: false};
+
         const shard0Entries = shard0DB.system.profile.find(filter).toArray();
         const shard1Entries = shard1DB.system.profile.find(filter).toArray();
         assert.eq(shard0Entries.length + shard1Entries.length,
