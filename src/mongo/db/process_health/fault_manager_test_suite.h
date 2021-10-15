@@ -56,7 +56,7 @@ class FaultManagerTestImpl : public FaultManager {
 public:
     FaultManagerTestImpl(ServiceContext* svcCtx,
                          std::shared_ptr<executor::TaskExecutor> taskExecutor)
-        : FaultManager(svcCtx, taskExecutor) {}
+        : FaultManager(svcCtx, taskExecutor, std::make_unique<FaultManagerConfig>()) {}
 
     void transitionStateTest(FaultState newState) {
         transitionToState(newState);
@@ -78,10 +78,18 @@ public:
         return processFaultIsResolvedEvent();
     }
 
+    FaultFacetsContainerPtr getOrCreateFaultFacetsContainerTest() {
+        return getOrCreateFaultFacetsContainer();
+    }
+
     FaultInternal& getFault() {
         FaultFacetsContainerPtr fault = getFaultFacetsContainer();
         invariant(fault);
         return *(static_cast<FaultInternal*>(fault.get()));
+    }
+
+    FaultManagerConfig* getConfig() {
+        return _config.get();
     }
 };
 
@@ -158,31 +166,47 @@ public:
         }
     }
 
-    void waitForFaultBeingResolved() {
+    static inline const Seconds kWaitTimeout{30};
+    static inline const Milliseconds kSleepTime{1};
+    void assertSoon(std::function<bool()> predicate, Milliseconds timeout = kWaitTimeout) {
         Timer t;
-        while (manager().currentFault() && t.elapsed() < Minutes(1)) {
-            sleepFor(Milliseconds(10));
+        while (t.elapsed() < timeout) {
+            if (predicate())
+                return;
+            sleepFor(kSleepTime);
         }
+        ASSERT(false);
+    }
+
+    static inline const Milliseconds kCheckTimeIncrement{100};
+    void assertSoonWithHealthCheck(std::function<bool()> predicate,
+                                   Milliseconds timeout = kWaitTimeout) {
+        auto predicate2 = [=]() {
+            if (predicate())
+                return true;
+            else {
+                advanceTime(kCheckTimeIncrement);
+                manager().healthCheckTest();
+                return false;
+            }
+        };
+        assertSoon(predicate2, timeout);
+    }
+
+    bool hasFault() {
+        return static_cast<bool>(manager().currentFault());
+    }
+
+    void waitForFaultBeingResolved() {
+        assertSoon([this]() { return !hasFault(); });
     }
 
     void waitForFaultBeingCreated() {
-        Timer t;
-        while (!manager().currentFault() && t.elapsed() < Minutes(1)) {
-            sleepFor(Milliseconds(10));
-        }
+        assertSoon([this]() { return hasFault(); });
     }
 
     void waitForTransitionIntoState(FaultState state) {
-        Timer t;
-        while (manager().getFaultState() != state ||
-               (state == FaultState::kOk && manager().currentFault())) {
-            advanceTime(Milliseconds(100));
-            manager().healthCheckTest();
-            sleepFor(Milliseconds(1));
-            if (t.elapsed() >= Minutes(1)) {
-                break;
-            }
-        };
+        assertSoonWithHealthCheck([=]() { return manager().getFaultState() == state; });
     }
 
 private:

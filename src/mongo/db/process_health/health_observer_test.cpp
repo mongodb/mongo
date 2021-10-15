@@ -118,9 +118,11 @@ TEST_F(FaultManagerTest, HealthCheckCreatesFacetThenIsGarbageCollectedAndStateTr
 
     // Resolve and it should be garbage collected.
     severity.store(0.0);
+
     waitForTransitionIntoState(FaultState::kOk);
 
-    ASSERT_FALSE(manager().currentFault());
+    assertSoonWithHealthCheck([this]() { return !hasFault(); });
+
     // State is transitioned.
     ASSERT_EQ(FaultState::kOk, manager().getFaultState());
     resetManager();  // Before atomic fields above go out of scope.
@@ -217,6 +219,36 @@ TEST_F(FaultManagerTest, InitialHealthCheckDoesNotRunIfFeatureFlagNotEnabled) {
     auto currentFault = manager().currentFault();
     ASSERT_TRUE(!currentFault);  // Is not created.
     ASSERT_TRUE(manager().getFaultState() == FaultState::kStartupCheck);
+}
+
+TEST_F(FaultManagerTest, TransitionsToActiveFaultAfterTimeout) {
+    registerMockHealthObserver(FaultFacetType::kMock1, [] { return 1.1; });
+    waitForTransitionIntoState(FaultState::kTransientFault);
+    ASSERT_TRUE(manager().getFaultState() == FaultState::kTransientFault);
+    advanceTime(manager().getConfig()->getActiveFaultDuration() + Milliseconds(1));
+    assertSoon([this]() { return manager().getFaultState() == FaultState::kActiveFault; });
+}
+
+TEST_F(FaultManagerTest, DoesNotTransitionToActiveFaultIfResolved) {
+    const auto activeFaultDuration = manager().getConfig()->getActiveFaultDuration();
+    const auto start = clockSource().now();
+
+    // Initially unhealthy; Transitions to healthy before the active fault timeout.
+    registerMockHealthObserver(FaultFacetType::kMock1, [=] {
+        auto now = clockSource().now();
+        auto elapsed = now - start;
+        auto quarterActiveFaultDuration =
+            Milliseconds(durationCount<Milliseconds>(activeFaultDuration) / 4);
+        if (elapsed < quarterActiveFaultDuration) {
+            return 1.1;
+        } else {
+            return 0.0;
+        }
+    });
+    waitForTransitionIntoState(FaultState::kTransientFault);
+    assertSoonWithHealthCheck([this]() { return manager().getFaultState() == FaultState::kOk; });
+    advanceTime(activeFaultDuration);
+    assertSoonWithHealthCheck([this]() { return manager().getFaultState() == FaultState::kOk; });
 }
 
 }  // namespace

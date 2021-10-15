@@ -26,65 +26,36 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#pragma once
 
-#include <memory>
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kProcessHealth
 
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/process_health/fault_facets_container.h"
-#include "mongo/util/duration.h"
-#include "mongo/util/uuid.h"
+#include "mongo/platform/basic.h"
+
+#include "mongo/db/process_health/fault_manager_config.h"
 
 namespace mongo {
 namespace process_health {
 
-/**
- * Detailed description of the current fault.
- * @see FaultManager for more details.
- */
-class Fault : public std::enable_shared_from_this<Fault> {
-    Fault(const Fault&) = delete;
-    Fault& operator=(const Fault&) = delete;
+StringBuilder& operator<<(StringBuilder& s, const FaultState& state) {
+    switch (state) {
+        case FaultState::kOk:
+            return s << "Ok"_sd;
+        case FaultState::kStartupCheck:
+            return s << "StartupCheck"_sd;
+        case FaultState::kTransientFault:
+            return s << "TransientFault"_sd;
+        case FaultState::kActiveFault:
+            return s << "ActiveFault"_sd;
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
 
-public:
-    Fault() = default;
-    virtual ~Fault() = default;
-
-    virtual UUID getId() const = 0;
-
-    /**
-     * The fault severity value is an aggregate severity calculated
-     * from all facets currently owned by this instance.
-     *
-     * @return Current fault severity. The expected values:
-     *         0: Ok
-     *         (0, 1.0): Transient fault condition
-     *         [1.0, Inf): Active fault condition
-     */
-    virtual double getSeverity() const = 0;
-
-    /**
-     * @return The lifetime of this fault from the moment it was created.
-     *         Invariant: getDuration() >= getActiveFaultDuration()
-     */
-    virtual Milliseconds getDuration() const = 0;
-
-    /**
-     * Describes the current fault.
-     */
-    virtual void appendDescription(BSONObjBuilder* builder) const = 0;
-};
-
-using FaultConstPtr = std::shared_ptr<const Fault>;
-
-/**
- * Internal Fault interface that has accessors to manage Facets this Fault owns.
- */
-class FaultInternal : public Fault, public FaultFacetsContainer {
-public:
-    ~FaultInternal() override = default;
-};
-
+std::ostream& operator<<(std::ostream& os, const FaultState& state) {
+    StringBuilder sb;
+    sb << state;
+    return os << sb.stringData();
+}
 
 }  // namespace process_health
 }  // namespace mongo

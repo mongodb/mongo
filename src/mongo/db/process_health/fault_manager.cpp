@@ -35,6 +35,7 @@
 
 #include "mongo/db/process_health/fault_facet_impl.h"
 #include "mongo/db/process_health/fault_impl.h"
+#include "mongo/db/process_health/fault_manager_config.h"
 #include "mongo/db/process_health/health_monitoring_gen.h"
 #include "mongo/db/process_health/health_observer_registration.h"
 #include "mongo/executor/network_interface_factory.h"
@@ -52,6 +53,7 @@ namespace {
 
 const auto sFaultManager = ServiceContext::declareDecoration<std::unique_ptr<FaultManager>>();
 
+
 ServiceContext::ConstructorActionRegisterer faultManagerRegisterer{
     "FaultManagerRegisterer", [](ServiceContext* svcCtx) {
         // construct task executor
@@ -61,11 +63,13 @@ ServiceContext::ConstructorActionRegisterer faultManagerRegisterer{
         auto taskExecutor =
             std::make_shared<executor::ThreadPoolTaskExecutor>(std::move(pool), networkInterface);
 
-        auto faultManager = std::make_unique<FaultManager>(svcCtx, taskExecutor);
+        auto faultManager = std::make_unique<FaultManager>(
+            svcCtx, taskExecutor, std::make_unique<FaultManagerConfig>());
         FaultManager::set(svcCtx, std::move(faultManager));
     }};
 
 }  // namespace
+
 
 static constexpr auto kPeriodicHealthCheckInterval{Milliseconds(50)};
 
@@ -79,9 +83,31 @@ void FaultManager::set(ServiceContext* svcCtx, std::unique_ptr<FaultManager> new
     faultManager = std::move(newFaultManager);
 }
 
+FaultManager::TransientFaultDeadline::TransientFaultDeadline(
+    FaultManager* faultManager,
+    std::shared_ptr<executor::TaskExecutor> executor,
+    Milliseconds timeout)
+    : cancelActiveFaultTransition(CancellationSource()),
+      activeFaultTransition(
+          executor->sleepFor(timeout, cancelActiveFaultTransition.token())
+              .thenRunOn(executor)
+              .then([faultManager]() { faultManager->transitionToState(FaultState::kActiveFault); })
+              .onError([](Status status) {
+                  LOGV2_WARNING(5937001,
+                                "The Fault Manager transient fault deadline was disabled.",
+                                "status"_attr = status);
+              })) {}
+
+FaultManager::TransientFaultDeadline::~TransientFaultDeadline() {
+    if (!cancelActiveFaultTransition.token().isCanceled()) {
+        cancelActiveFaultTransition.cancel();
+    }
+}
+
 FaultManager::FaultManager(ServiceContext* svcCtx,
-                           std::shared_ptr<executor::TaskExecutor> taskExecutor)
-    : _svcCtx(svcCtx), _taskExecutor(taskExecutor) {
+                           std::shared_ptr<executor::TaskExecutor> taskExecutor,
+                           std::unique_ptr<FaultManagerConfig> config)
+    : _config(std::move(config)), _svcCtx(svcCtx), _taskExecutor(taskExecutor) {
     invariant(_svcCtx);
     invariant(_svcCtx->getFastClockSource());
 }
@@ -200,19 +226,15 @@ void FaultManager::healthCheck() {
 }
 
 void FaultManager::updateWithCheckStatus(HealthCheckStatus&& checkStatus) {
-    auto container = getFaultFacetsContainer();
     if (HealthCheckStatus::isResolved(checkStatus.getSeverity())) {
+        auto container = getFaultFacetsContainer();
         if (container) {
             container->updateWithSuppliedFacet(checkStatus.getType(), nullptr);
         }
         return;
     }
 
-    if (!container) {
-        // Need to create container first.
-        container = getOrCreateFaultFacetsContainer();
-    }
-
+    auto container = getOrCreateFaultFacetsContainer();
     auto facet = container->getFaultFacet(checkStatus.getType());
     if (!facet) {
         const auto type = checkStatus.getType();
@@ -233,14 +255,32 @@ void FaultManager::checkForStateTransition() {
     }
 }
 
+bool FaultManager::hasCriticalFacet(const FaultInternal* fault) const {
+    invariant(fault);
+    const auto& facets = fault->getFacets();
+    for (const auto& facet : facets) {
+        auto facetType = facet->getType();
+        if (_config->getHealthObserverIntensity(facetType) == HealthObserverIntensity::kCritical)
+            return true;
+    }
+    return false;
+}
+
 void FaultManager::processFaultExistsEvent() {
     FaultState currentState = getFaultState();
 
     switch (currentState) {
         case FaultState::kStartupCheck:
-        case FaultState::kOk:
+        case FaultState::kOk: {
             transitionToState(FaultState::kTransientFault);
+            if (hasCriticalFacet(_fault.get())) {
+                // This will transition the FaultManager to ActiveFault state after the timeout
+                // occurs.
+                _transientFaultDeadline = std::make_unique<TransientFaultDeadline>(
+                    this, _taskExecutor, _config->getActiveFaultDuration());
+            }
             break;
+        }
         case FaultState::kTransientFault:
         case FaultState::kActiveFault:
             // NOP.
@@ -263,6 +303,8 @@ void FaultManager::processFaultIsResolvedEvent() {
             _initialHealthCheckCompletedPromise.emplaceValue();
             break;
         case FaultState::kTransientFault:
+            // Clear the transient fault deadline timer.
+            _transientFaultDeadline.reset();
             transitionToState(FaultState::kOk);
             break;
         case FaultState::kActiveFault:
@@ -276,7 +318,7 @@ void FaultManager::processFaultIsResolvedEvent() {
 
 void FaultManager::transitionToState(FaultState newState) {
     // Maps currentState to valid newStates
-    static stdx::unordered_map<FaultState, std::vector<FaultState>> validTransitions = {
+    static const stdx::unordered_map<FaultState, std::vector<FaultState>> validTransitions = {
         {FaultState::kStartupCheck, {FaultState::kOk, FaultState::kTransientFault}},
         {FaultState::kOk, {FaultState::kTransientFault}},
         {FaultState::kTransientFault, {FaultState::kOk, FaultState::kActiveFault}},
@@ -336,29 +378,6 @@ std::vector<HealthObserver*> FaultManager::getHealthObservers() {
                    std::back_inserter(result),
                    [](const std::unique_ptr<HealthObserver>& value) { return value.get(); });
     return result;
-}
-
-StringBuilder& operator<<(StringBuilder& s, const FaultState& state) {
-    switch (state) {
-        case FaultState::kOk:
-            return s << "Ok"_sd;
-        case FaultState::kStartupCheck:
-            return s << "StartupCheck"_sd;
-        case FaultState::kTransientFault:
-            return s << "TransientFault"_sd;
-        case FaultState::kActiveFault:
-            return s << "ActiveFault"_sd;
-        default:
-            const bool kStateIsValid = false;
-            invariant(kStateIsValid);
-            return s;
-    }
-}
-
-std::ostream& operator<<(std::ostream& os, const FaultState& state) {
-    StringBuilder sb;
-    sb << state;
-    return os << sb.stringData();
 }
 
 }  // namespace process_health

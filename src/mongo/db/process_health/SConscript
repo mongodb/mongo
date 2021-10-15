@@ -10,6 +10,7 @@ env.Library(
         'fault_facet_impl.cpp',
         'fault_impl.cpp',
         'fault_manager.cpp',
+	'fault_manager_config.cpp',
         'health_observer_base.cpp',
         'health_observer_registration.cpp',
     ],

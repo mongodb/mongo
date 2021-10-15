@@ -33,6 +33,7 @@
 #include "mongo/db/process_health/fault.h"
 #include "mongo/db/process_health/fault_facet.h"
 #include "mongo/db/process_health/fault_facet_container.h"
+#include "mongo/db/process_health/fault_manager_config.h"
 #include "mongo/db/process_health/health_observer.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/task_executor.h"
@@ -43,36 +44,14 @@ namespace mongo {
 namespace process_health {
 
 /**
- * Current fault state of the server in a simple actionable form.
- */
-enum class FaultState {
-    kOk = 0,
-
-    // The manager conducts startup checks, new connections should be refused.
-    kStartupCheck,
-
-    // The manager detected a fault, however the fault is either not severe
-    // enough or is not observed for sufficiently long period of time.
-    kTransientFault,
-
-    // The manager detected a severe fault, which made the server unusable.
-    kActiveFault
-};
-
-StringBuilder& operator<<(StringBuilder& s, const FaultState& state);
-
-std::ostream& operator<<(std::ostream& os, const FaultState& state);
-
-/**
  * FaultManager is a singleton constantly monitoring the health of the
  * system.
  *
- * It supports pluggable 'facets', which are responsible to check various
+ * It supports pluggable 'HealthObservers', which are responsible to check various
  * aspects of the server health. The aggregate outcome of all periodic checks
- * is accesible as FaultState, which should be used to gate access to the server.
+ * is accesible as FaultState.
  *
- * If an active fault state persists, FaultManager puts the server into quiesce
- * mode and shuts it down.
+ * If an active fault state persists, FaultManager will terminate the server process.
  */
 class FaultManager : protected FaultFacetsContainerFactory {
     FaultManager(const FaultManager&) = delete;
@@ -81,7 +60,8 @@ class FaultManager : protected FaultFacetsContainerFactory {
 public:
     // The taskExecutor provided should not be already started.
     explicit FaultManager(ServiceContext* svcCtx,
-                          std::shared_ptr<executor::TaskExecutor> taskExecutor);
+                          std::shared_ptr<executor::TaskExecutor> taskExecutor,
+                          std::unique_ptr<FaultManagerConfig> config);
     virtual ~FaultManager();
 
     // Start periodic health checks, invoke it once during server startup.
@@ -135,6 +115,11 @@ protected:
 
     void schedulePeriodicHealthCheckThread(bool immediately = false);
 
+    // TODO: move this into fault class; refactor to remove FaultInternal
+    bool hasCriticalFacet(const FaultInternal* fault) const;
+
+    std::unique_ptr<FaultManagerConfig> _config;
+
 private:
     // One time init.
     void _initHealthObserversIfNeeded();
@@ -143,6 +128,7 @@ private:
 
     mutable Mutex _mutex =
         MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(5), "FaultManager::_mutex");
+
     std::shared_ptr<FaultInternal> _fault;
     // We lazily init all health observers.
     AtomicWord<bool> _initializedAllHealthObservers{false};
@@ -152,10 +138,29 @@ private:
     boost::optional<executor::TaskExecutor::CallbackHandle> _periodicHealthCheckCbHandle;
     SharedPromise<void> _initialHealthCheckCompletedPromise;
 
-    // Protects the current state of fault manager.
+    // Protects the state below.
     mutable Mutex _stateMutex =
         MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "FaultManager::_stateMutex");
     FaultState _currentState = FaultState::kStartupCheck;
+
+    // Responsible for transitioning the state of FaultManager to ActiveFault after a
+    // timeout while in the TransientFault state. The timer is canceled when the instance is
+    // destroyed.
+    struct TransientFaultDeadline {
+        TransientFaultDeadline() = delete;
+        TransientFaultDeadline(FaultManager* faultManager,
+                               std::shared_ptr<executor::TaskExecutor> executor,
+                               Milliseconds timeout);
+        virtual ~TransientFaultDeadline();
+
+    protected:
+        // Cancel timer for transitioning to ActiveFault
+        CancellationSource cancelActiveFaultTransition;
+
+        // Fufilled when we should transition to ActiveFault
+        ExecutorFuture<void> activeFaultTransition;
+    };
+    std::unique_ptr<TransientFaultDeadline> _transientFaultDeadline;
 };
 
 }  // namespace process_health

@@ -33,14 +33,11 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/process_health/fault_manager_config.h"
 
 namespace mongo {
 namespace process_health {
 
-/**
- * All fault types we support in this package.
- */
-enum class FaultFacetType { kMock1 = 0, kMock2, kLdap };
 
 /**
  * Immutable class representing current status of an ongoing fault tracked by facet.

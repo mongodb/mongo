@@ -30,18 +30,11 @@
 
 #include "mongo/db/process_health/fault_facet.h"
 #include "mongo/db/process_health/fault_facets_container.h"
+#include "mongo/db/process_health/fault_manager_config.h"
 #include "mongo/executor/task_executor.h"
 
 namespace mongo {
 namespace process_health {
-
-enum class HealthObserverIntensity {
-    kCritical = 0,
-
-    kNonCritical,
-
-    kOff
-};
 
 /**
  * Interface to conduct periodic health checks.

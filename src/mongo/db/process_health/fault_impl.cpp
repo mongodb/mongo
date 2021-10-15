@@ -56,10 +56,6 @@ double FaultImpl::getSeverity() const {
     return severity;
 }
 
-Milliseconds FaultImpl::getActiveFaultDuration() const {
-    return Milliseconds(0);
-}
-
 Milliseconds FaultImpl::getDuration() const {
     return Milliseconds(_clockSource->now() - _startTime);
 }
