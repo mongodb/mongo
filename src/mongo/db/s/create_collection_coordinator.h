@@ -103,9 +103,14 @@ private:
     void _createCollectionAndIndexes(OperationContext* opCtx);
 
     /**
+     * Creates the appropiate split policy.
+     */
+    void _createPolicy(OperationContext* opCtx);
+
+    /**
      * Given the appropiate split policy, create the initial chunks.
      */
-    void _createPolicyAndChunks(OperationContext* opCtx);
+    void _createChunks(OperationContext* opCtx);
 
     /**
      * If the optimized path can be taken, ensure the collection is already created in all the
