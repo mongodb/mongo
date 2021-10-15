@@ -21,7 +21,7 @@ const timeField = 'time';
 const metaField = 'hostid';
 
 // Connections.
-const st = new ShardingTest({shards: 2, rs: {nodes: 2}});
+const st = new ShardingTest({shards: 2, rs: {nodes: 2}, other: {chunkSize: 1}});
 const mongos = st.s0;
 
 // Sanity checks.
@@ -65,7 +65,7 @@ function runTest(shardKey) {
 
     // Insert a large dataset so that the balancer is guranteed to split the chunks.
     let bulk = coll.initializeUnorderedBulkOp();
-    const numDocs = 50000;
+    const numDocs = 1000;
     const firstBatch = generateBatch(numDocs);
     for (let doc of firstBatch) {
         bulk.insert(doc);
