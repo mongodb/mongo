@@ -97,27 +97,27 @@ public:
 
 TEST_F(ElectionIdSetVersionPairTest, ExpectedOutcome) {
     std::vector<TestCase> tests = {
-        // At startup, both current fields are not set.
-        {kNullOid, kNullSet, kOidOne, 1, Compare::kNotComparable, Consistency::kConsistent},
+        // At startup, both current fields are not set. Field set > unset.
+        {kNullOid, kNullSet, kOidOne, 1, Compare::kLess, Consistency::kConsistent},
 
         {kOidOne, 1, kOidOne, 1, Compare::kEquals, Consistency::kConsistent},
 
         // One field is not set. This should never happen however added for better
         // coverage for malformed protocol.
-        {kNullOid, 1, kOidOne, 1, Compare::kNotComparable, Consistency::kConsistent},
-        {kOidOne, kNullSet, kOidOne, 1, Compare::kNotComparable, Consistency::kConsistent},
-        {kOidOne, 1, kNullOid, 1, Compare::kNotComparable, Consistency::kInconsistent},
-        {kOidOne, 1, kOidOne, kNullSet, Compare::kNotComparable, Consistency::kInconsistent},
+        {kNullOid, 1, kOidOne, 1, Compare::kLess, Consistency::kConsistent},
+        {kOidOne, kNullSet, kOidOne, 1, Compare::kLess, Consistency::kConsistent},
+        {kOidOne, 1, kNullOid, 1, Compare::kGreater, Consistency::kConsistent},
+        {kOidOne, 1, kOidOne, kNullSet, Compare::kGreater, Consistency::kConsistent},
 
         // Primary advanced one way or another. "Less" means current < incoming.
         {kOidOne, 1, kOidTwo, 1, Compare::kLess, Consistency::kConsistent},
         {kOidOne, 1, kOidOne, 2, Compare::kLess, Consistency::kConsistent},
 
         // Primary advanced but current state is incomplete.
-        {kNullOid, 1, kOidTwo, 1, Compare::kNotComparable, Consistency::kConsistent},
-        {kNullOid, 1, kOidOne, 2, Compare::kNotComparable, Consistency::kConsistent},
+        {kNullOid, 1, kOidTwo, 1, Compare::kLess, Consistency::kConsistent},
+        {kNullOid, 1, kOidOne, 2, Compare::kLess, Consistency::kConsistent},
         {kOidOne, kNullSet, kOidTwo, 1, Compare::kLess, Consistency::kConsistent},
-        {kOidOne, kNullSet, kOidOne, 2, Compare::kNotComparable, Consistency::kConsistent},
+        {kOidOne, kNullSet, kOidOne, 2, Compare::kLess, Consistency::kConsistent},
 
         // Primary went backwards one way or another.
         // Inconsistent because Set version went backwards without Term being changed (same
@@ -126,7 +126,7 @@ TEST_F(ElectionIdSetVersionPairTest, ExpectedOutcome) {
         {kOidTwo, 2, kOidOne, 2, Compare::kGreater, Consistency::kConsistent},
 
         // Primary went backwards with current state incomplete.
-        {kNullOid, 2, kOidTwo, 1, Compare::kNotComparable, Consistency::kConsistent},
+        {kNullOid, 2, kOidTwo, 1, Compare::kLess, Consistency::kConsistent},
         {kOidTwo, kNullSet, kOidOne, 1, Compare::kGreater, Consistency::kConsistent},
 
         // Stale primary case when Term went backwards but Set version advanced.
@@ -143,6 +143,50 @@ TEST_F(ElectionIdSetVersionPairTest, ExpectedOutcome) {
     for (const auto& t : tests) {
         test(t, testNum++);
     }
+}
+
+TEST_F(ElectionIdSetVersionPairTest, TestLessThanRelation) {
+    ElectionIdSetVersionPair hasNone{boost::none, boost::none};
+    ElectionIdSetVersionPair hasBoth{kOidOne, 1};
+    ElectionIdSetVersionPair hasBoth2{kOidOne, 2};
+    ElectionIdSetVersionPair noEid{boost::none, 1};
+    ElectionIdSetVersionPair noEid2{boost::none, 2};
+    ElectionIdSetVersionPair noSet{kOidOne, boost::none};
+    ElectionIdSetVersionPair noSet2{kOidTwo, boost::none};
+
+    ASSERT_TRUE(hasNone < noEid);
+    ASSERT(hasNone == hasNone);
+
+    ASSERT_TRUE(hasNone < noEid2);
+    ASSERT_TRUE(noEid < noEid2);
+    ASSERT(noEid == noEid);
+
+    ASSERT_TRUE(hasNone < noSet);
+    ASSERT_TRUE(noEid < noSet);
+    ASSERT_TRUE(noEid2 < noSet);
+    ASSERT(noEid2 == noEid2);
+
+    ASSERT_TRUE(hasNone < noSet2);
+    ASSERT_TRUE(noEid < noSet2);
+    ASSERT_TRUE(noEid2 < noSet2);
+    ASSERT_TRUE(noSet < noSet2);
+    ASSERT(noSet == noSet);
+
+    ASSERT_TRUE(hasNone < hasBoth);
+    ASSERT_TRUE(noEid < hasBoth);
+    ASSERT_TRUE(noEid2 < hasBoth);
+    ASSERT_TRUE(noSet < hasBoth);
+    ASSERT_TRUE(noSet2 < hasBoth);
+    ASSERT(noSet2 == noSet2);
+
+    ASSERT_TRUE(hasNone < hasBoth2);
+    ASSERT_TRUE(noEid < hasBoth2);
+    ASSERT_TRUE(noEid2 < hasBoth2);
+    ASSERT_TRUE(noSet < hasBoth2);
+    ASSERT_TRUE(noSet2 < hasBoth2);
+    ASSERT_TRUE(hasBoth < hasBoth2);
+    ASSERT(hasBoth == hasBoth);
+    ASSERT(hasBoth2 == hasBoth2);
 }
 
 }  // namespace

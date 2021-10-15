@@ -223,7 +223,7 @@ private:
                                       }
                                       return result;
                                   },
-                                  serverDescription->getSetVersion());
+                                  serverDescription->getElectionIdSetVersionPair().setVersion);
 
         } else if (fieldName == "electionId") {
             doValidateServerField(result,
@@ -236,7 +236,7 @@ private:
                                       }
                                       return result;
                                   },
-                                  serverDescription->getElectionId());
+                                  serverDescription->getElectionIdSetVersionPair().electionId);
 
         } else if (fieldName == "logicalSessionTimeoutMinutes") {
             doValidateServerField(result,
@@ -368,36 +368,36 @@ private:
         {
             constexpr auto fieldName = "maxSetVersion";
             if (bsonTopologyDescription.hasField(fieldName)) {
-                doValidateTopologyDescriptionField(result,
-                                                   fieldName,
-                                                   [&]() {
-                                                       boost::optional<int> ret;
-                                                       auto bsonField =
-                                                           bsonTopologyDescription[fieldName];
-                                                       if (!bsonField.isNull()) {
-                                                           ret = bsonField.numberInt();
-                                                       }
-                                                       return ret;
-                                                   },
-                                                   topologyDescription->getMaxSetVersion());
+                doValidateTopologyDescriptionField(
+                    result,
+                    fieldName,
+                    [&]() {
+                        boost::optional<int> ret;
+                        auto bsonField = bsonTopologyDescription[fieldName];
+                        if (!bsonField.isNull()) {
+                            ret = bsonField.numberInt();
+                        }
+                        return ret;
+                    },
+                    topologyDescription->getMaxElectionIdSetVersionPair().setVersion);
             }
         }
 
         {
             constexpr auto fieldName = "maxElectionId";
             if (bsonTopologyDescription.hasField(fieldName)) {
-                doValidateTopologyDescriptionField(result,
-                                                   fieldName,
-                                                   [&]() {
-                                                       boost::optional<OID> ret;
-                                                       auto bsonField =
-                                                           bsonTopologyDescription[fieldName];
-                                                       if (!bsonField.isNull()) {
-                                                           ret = bsonField.OID();
-                                                       }
-                                                       return ret;
-                                                   },
-                                                   topologyDescription->getMaxElectionId());
+                doValidateTopologyDescriptionField(
+                    result,
+                    fieldName,
+                    [&]() {
+                        boost::optional<OID> ret;
+                        auto bsonField = bsonTopologyDescription[fieldName];
+                        if (!bsonField.isNull()) {
+                            ret = bsonField.OID();
+                        }
+                        return ret;
+                    },
+                    topologyDescription->getMaxElectionIdSetVersionPair().electionId);
             }
         }
 

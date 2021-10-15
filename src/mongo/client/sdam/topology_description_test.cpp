@@ -79,7 +79,7 @@ protected:
 void TopologyDescriptionTestFixture::assertDefaultConfig(
     const TopologyDescription& topologyDescription) {
     ASSERT_EQUALS(boost::none, topologyDescription.getSetName());
-    ASSERT_EQUALS(boost::none, topologyDescription.getMaxElectionId());
+    ASSERT_EQUALS(boost::none, topologyDescription.getMaxElectionIdSetVersionPair().electionId);
 
     auto expectedDefaultServer = ServerDescription(HostAndPort("localhost:27017"));
     ASSERT_EQUALS(expectedDefaultServer, *topologyDescription.getServers().front());
