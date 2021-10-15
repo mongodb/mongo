@@ -210,7 +210,7 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
 
     WorkingSetID id = _workingSet->allocate();
     WorkingSetMember* member = _workingSet->get(id);
-    member->recordId = record->id;
+    member->recordId = std::move(record->id);
     member->resetDocument(opCtx()->recoveryUnit()->getSnapshotId(), record->data.releaseToBson());
     _workingSet->transitionToRecordIdAndObj(id);
 

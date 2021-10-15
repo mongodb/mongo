@@ -37,12 +37,39 @@
 namespace mongo {
 namespace {
 
+void BM_RecordIdCompareLong(benchmark::State& state) {
+    RecordId rid(1 << 31);
+    RecordId tmp(1);
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(rid > tmp);
+        benchmark::ClobberMemory();
+    }
+}
+
+void BM_RecordIdCompareSmallStr(benchmark::State& state) {
+    std::string str1(20, 'x');
+    RecordId rid1(str1.c_str(), str1.size());
+    RecordId rid2(str1.c_str(), str1.size());
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(rid1 > rid2);
+        benchmark::ClobberMemory();
+    }
+}
+
+void BM_RecordIdIsValidLong(benchmark::State& state) {
+    RecordId rid(1 << 31);
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(rid.isValid());
+        benchmark::ClobberMemory();
+    }
+}
+
 void BM_RecordIdCopyLong(benchmark::State& state) {
     RecordId rid(1 << 31);
     for (auto _ : state) {
         RecordId tmp;
-        benchmark::ClobberMemory();
         benchmark::DoNotOptimize(tmp = rid);
+        benchmark::ClobberMemory();
     }
 }
 
@@ -50,8 +77,8 @@ void BM_RecordIdCopyOID(benchmark::State& state) {
     RecordId rid = record_id_helpers::keyForOID(OID::gen());
     for (auto _ : state) {
         RecordId tmp;
-        benchmark::ClobberMemory();
         benchmark::DoNotOptimize(tmp = rid);
+        benchmark::ClobberMemory();
     }
 }
 
@@ -63,8 +90,8 @@ void BM_RecordIdCopyMedString(benchmark::State& state) {
     RecordId rid = RecordId(buf, bufLen);
     for (auto _ : state) {
         RecordId tmp;
-        benchmark::ClobberMemory();
         benchmark::DoNotOptimize(tmp = rid);
+        benchmark::ClobberMemory();
     }
 }
 
@@ -76,28 +103,28 @@ void BM_RecordIdCopyBigString(benchmark::State& state) {
     RecordId rid = RecordId(buf, bufLen);
     for (auto _ : state) {
         RecordId tmp;
-        benchmark::ClobberMemory();
         benchmark::DoNotOptimize(tmp = rid);
+        benchmark::ClobberMemory();
     }
 }
 
 void BM_RecordIdFormatLong(benchmark::State& state) {
     RecordId rid(1 << 31);
     for (auto _ : state) {
-        benchmark::ClobberMemory();
         benchmark::DoNotOptimize(rid.withFormat([](RecordId::Null) { return false; },
                                                 [](std::int64_t val) { return false; },
                                                 [](const char* str, int size) { return false; }));
+        benchmark::ClobberMemory();
     }
 }
 
 void BM_RecordIdFormatString(benchmark::State& state) {
     RecordId rid = record_id_helpers::keyForOID(OID::gen());
     for (auto _ : state) {
-        benchmark::ClobberMemory();
         benchmark::DoNotOptimize(rid.withFormat([](RecordId::Null) { return false; },
                                                 [](std::int64_t val) { return false; },
                                                 [](const char* str, int size) { return false; }));
+        benchmark::ClobberMemory();
     }
 }
 
@@ -105,6 +132,10 @@ BENCHMARK(BM_RecordIdCopyLong);
 BENCHMARK(BM_RecordIdCopyOID);
 BENCHMARK(BM_RecordIdCopyMedString);
 BENCHMARK(BM_RecordIdCopyBigString);
+
+BENCHMARK(BM_RecordIdCompareLong);
+BENCHMARK(BM_RecordIdCompareSmallStr);
+BENCHMARK(BM_RecordIdIsValidLong);
 
 BENCHMARK(BM_RecordIdFormatLong);
 BENCHMARK(BM_RecordIdFormatString);

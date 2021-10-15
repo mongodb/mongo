@@ -694,7 +694,8 @@ public:
         auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
         metricsCollector.incrementOneDocRead(value.size);
 
-        return {{id, {static_cast<const char*>(value.data), static_cast<int>(value.size)}}};
+        return {
+            {std::move(id), {static_cast<const char*>(value.data), static_cast<int>(value.size)}}};
     }
 
     void save() final {
@@ -2062,7 +2063,7 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
     metricsCollector.incrementOneDocRead(value.size);
 
     _lastReturnedId = id;
-    return {{id, {static_cast<const char*>(value.data), static_cast<int>(value.size)}}};
+    return {{std::move(id), {static_cast<const char*>(value.data), static_cast<int>(value.size)}}};
 }
 
 boost::optional<Record> WiredTigerRecordStoreCursorBase::seekExact(const RecordId& id) {
@@ -2218,13 +2219,11 @@ bool WiredTigerRecordStoreCursorBase::restore() {
 
     int cmp;
     int ret = wiredTigerPrepareConflictRetry(_opCtx, [&] { return c->search_near(c, &cmp); });
-    RecordId id;
     if (ret == WT_NOTFOUND) {
         _eof = true;
         return !_rs._isCapped;
     }
     invariantWTOK(ret);
-    id = getKey(c);
 
     if (cmp == 0)
         return true;  // Landed right where we left off.

@@ -119,14 +119,17 @@ public:
      */
     template <typename OnNull, typename OnLong, typename OnStr>
     auto withFormat(OnNull&& onNull, OnLong&& onLong, OnStr&& onStr) const {
-        switch (auto f = _format) {
+        switch (_format) {
             case Format::kNull:
                 return onNull(Null());
             case Format::kLong:
-                return onLong(getLong());
-            case Format::kSmallStr:
+                return onLong(_getLongNoCheck());
+            case Format::kSmallStr: {
+                auto str = _getSmallStrNoCheck();
+                return onStr(str.rawData(), str.size());
+            }
             case Format::kBigStr: {
-                auto str = getStr();
+                auto str = _getBigStrNoCheck();
                 return onStr(str.rawData(), str.size());
             }
             default:
@@ -155,9 +158,7 @@ public:
         }
         invariant(isLong(),
                   fmt::format("expected RecordID long format, got: {}", _formatToString(_format)));
-        int64_t val;
-        memcpy(&val, _buffer, sizeof(val));
-        return val;
+        return _getLongNoCheck();
     }
 
     /**
@@ -169,17 +170,9 @@ public:
             isStr(),
             fmt::format("expected RecordID string format, got: {}", _formatToString(_format)));
         if (_format == Format::kSmallStr) {
-            char size = _buffer[0];
-            invariant(size > 0);
-            invariant(size <= kSmallStrMaxSize);
-            return StringData(_buffer + 1, size);
+            return _getSmallStrNoCheck();
         } else if (_format == Format::kBigStr) {
-            // We use a ConstSharedBuffer that is only allocated once and assume the string size is
-            // just the originally allocated capacity.
-            size_t size = _sharedBuffer.capacity();
-            invariant(size > kSmallStrMaxSize);
-            invariant(size <= kBigStrMaxSize);
-            return StringData(_sharedBuffer.get(), size);
+            return _getBigStrNoCheck();
         }
         MONGO_UNREACHABLE;
     }
@@ -224,13 +217,19 @@ public:
                 if (rhs._format == Format::kNull) {
                     return 1;
                 }
-                return getLong() == rhs.getLong() ? 0 : (getLong() > rhs.getLong()) ? 1 : -1;
+                return _getLongNoCheck() == rhs.getLong()
+                    ? 0
+                    : (_getLongNoCheck() > rhs.getLong()) ? 1 : -1;
             case Format::kSmallStr:
+                if (rhs._format == Format::kNull) {
+                    return 1;
+                }
+                return _getSmallStrNoCheck().compare(rhs.getStr());
             case Format::kBigStr:
                 if (rhs._format == Format::kNull) {
                     return 1;
                 }
-                return getStr().compare(rhs.getStr());
+                return _getBigStrNoCheck().compare(rhs.getStr());
         }
         MONGO_UNREACHABLE;
     }
@@ -349,6 +348,28 @@ private:
                 return "bigStr";
         }
         MONGO_UNREACHABLE;
+    }
+
+    int64_t _getLongNoCheck() const {
+        int64_t val;
+        memcpy(&val, _buffer, sizeof(val));
+        return val;
+    }
+
+    StringData _getSmallStrNoCheck() const {
+        char size = _buffer[0];
+        invariant(size > 0);
+        invariant(size <= kSmallStrMaxSize);
+        return StringData(_buffer + 1, size);
+    }
+
+    StringData _getBigStrNoCheck() const {
+        // We use a ConstSharedBuffer that is only allocated once and assume the string size is
+        // just the originally allocated capacity.
+        size_t size = _sharedBuffer.capacity();
+        invariant(size > kSmallStrMaxSize);
+        invariant(size <= kBigStrMaxSize);
+        return StringData(_sharedBuffer.get(), size);
     }
 
     Format _format = Format::kNull;
