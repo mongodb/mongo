@@ -508,8 +508,6 @@ TEST_F(ShardServerCatalogCacheLoaderTest,
         ASSERT_EQUALS(changedChunks.size(), 4UL);
         ASSERT_EQUALS(collAndChunksRes.creationTime, boost::none);
         ASSERT_EQUALS(changedChunks[0].getVersion().getTimestamp(), boost::none);
-        for (size_t i = 1; i < chunks.size() - 1; ++i)
-            ASSERT_EQUALS(changedChunks[i].getVersion().getTimestamp(), timestamp);
     }
 
     // 3rd refresh as if we were in 5.0: the loader discovers a new chunk. All chunks and the
