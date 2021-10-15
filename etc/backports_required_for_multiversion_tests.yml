@@ -219,6 +219,8 @@ all:
     test_file: jstests/replsets/optime.js
   - ticket: SERVER-67492
     test_file: jstests/sharding/move_chunk_interrupt_postimage.js
+  - ticket: SERVER-58176
+    test_file: jstests/sharding/write_commands_read_concern_validation.js
 
 suites:
 
