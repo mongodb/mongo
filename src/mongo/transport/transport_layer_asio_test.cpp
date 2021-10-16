@@ -117,7 +117,12 @@ public:
         // Setting linger on to a zero-value timeout causes the socket to send an RST packet to the
         // recipient side when closing the connection.
         struct linger sl = {1, 0};
-        ASSERT_EQ(setsockopt(_s.rawFD(), SOL_SOCKET, SO_LINGER, &sl, sizeof(sl)), 0);
+#ifdef _WIN32
+        char* pval = reinterpret_cast<char*>(&sl);
+#else
+        void* pval = &sl;
+#endif
+        ASSERT(!setsockopt(_s.rawFD(), SOL_SOCKET, SO_LINGER, pval, sizeof(sl)));
         _s.close();
     }
 
