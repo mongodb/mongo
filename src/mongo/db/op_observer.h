@@ -191,7 +191,7 @@ public:
      */
     virtual void onInternalOpMessage(OperationContext* opCtx,
                                      const NamespaceString& nss,
-                                     boost::optional<UUID> uuid,
+                                     OptionalCollectionUUID uuid,
                                      const BSONObj& msgObj,
                                      boost::optional<BSONObj> o2MsgObj,
                                      boost::optional<repl::OpTime> preImageOpTime,
@@ -268,12 +268,12 @@ public:
      */
     virtual repl::OpTime onDropCollection(OperationContext* opCtx,
                                           const NamespaceString& collectionName,
-                                          OptionalCollectionUUID uuid,
+                                          const UUID& uuid,
                                           std::uint64_t numRecords,
                                           CollectionDropType dropType) = 0;
     virtual repl::OpTime onDropCollection(OperationContext* opCtx,
                                           const NamespaceString& collectionName,
-                                          OptionalCollectionUUID uuid,
+                                          const UUID& uuid,
                                           std::uint64_t numRecords,
                                           CollectionDropType dropType,
                                           bool markFromMigrate) {
@@ -292,7 +292,7 @@ public:
      */
     virtual void onDropIndex(OperationContext* opCtx,
                              const NamespaceString& nss,
-                             OptionalCollectionUUID uuid,
+                             const UUID& uuid,
                              const std::string& indexName,
                              const BSONObj& indexInfo) = 0;
 
@@ -307,15 +307,14 @@ public:
     virtual repl::OpTime preRenameCollection(OperationContext* opCtx,
                                              const NamespaceString& fromCollection,
                                              const NamespaceString& toCollection,
-                                             OptionalCollectionUUID uuid,
+                                             const UUID& uuid,
                                              OptionalCollectionUUID dropTargetUUID,
                                              std::uint64_t numRecords,
                                              bool stayTemp) = 0;
-
     virtual repl::OpTime preRenameCollection(OperationContext* opCtx,
                                              const NamespaceString& fromCollection,
                                              const NamespaceString& toCollection,
-                                             OptionalCollectionUUID uuid,
+                                             const UUID& uuid,
                                              OptionalCollectionUUID dropTargetUUID,
                                              std::uint64_t numRecords,
                                              bool stayTemp,
@@ -332,7 +331,7 @@ public:
     virtual void postRenameCollection(OperationContext* opCtx,
                                       const NamespaceString& fromCollection,
                                       const NamespaceString& toCollection,
-                                      OptionalCollectionUUID uuid,
+                                      const UUID& uuid,
                                       OptionalCollectionUUID dropTargetUUID,
                                       bool stayTemp) = 0;
     /**
@@ -343,14 +342,14 @@ public:
     virtual void onRenameCollection(OperationContext* opCtx,
                                     const NamespaceString& fromCollection,
                                     const NamespaceString& toCollection,
-                                    OptionalCollectionUUID uuid,
+                                    const UUID& uuid,
                                     OptionalCollectionUUID dropTargetUUID,
                                     std::uint64_t numRecords,
                                     bool stayTemp) = 0;
     virtual void onRenameCollection(OperationContext* opCtx,
                                     const NamespaceString& fromCollection,
                                     const NamespaceString& toCollection,
-                                    OptionalCollectionUUID uuid,
+                                    const UUID& uuid,
                                     OptionalCollectionUUID dropTargetUUID,
                                     std::uint64_t numRecords,
                                     bool stayTemp,
@@ -373,7 +372,7 @@ public:
                             const BSONObj& applyOpCmd) = 0;
     virtual void onEmptyCapped(OperationContext* opCtx,
                                const NamespaceString& collectionName,
-                               OptionalCollectionUUID uuid) = 0;
+                               const UUID& uuid) = 0;
 
     /**
      * The onUnpreparedTransactionCommit method is called on the commit of an unprepared

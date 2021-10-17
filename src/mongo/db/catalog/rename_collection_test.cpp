@@ -118,7 +118,7 @@ public:
     using OpObserver::onDropCollection;
     repl::OpTime onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName,
-                                  OptionalCollectionUUID uuid,
+                                  const UUID& uuid,
                                   std::uint64_t numRecords,
                                   CollectionDropType dropType) override;
 
@@ -126,7 +126,7 @@ public:
     void onRenameCollection(OperationContext* opCtx,
                             const NamespaceString& fromCollection,
                             const NamespaceString& toCollection,
-                            OptionalCollectionUUID uuid,
+                            const UUID& uuid,
                             OptionalCollectionUUID dropTargetUUID,
                             std::uint64_t numRecords,
                             bool stayTemp) override;
@@ -135,14 +135,14 @@ public:
     repl::OpTime preRenameCollection(OperationContext* opCtx,
                                      const NamespaceString& fromCollection,
                                      const NamespaceString& toCollection,
-                                     OptionalCollectionUUID uuid,
+                                     const UUID& uuid,
                                      OptionalCollectionUUID dropTargetUUID,
                                      std::uint64_t numRecords,
                                      bool stayTemp) override;
     void postRenameCollection(OperationContext* opCtx,
                               const NamespaceString& fromCollection,
                               const NamespaceString& toCollection,
-                              OptionalCollectionUUID uuid,
+                              const UUID& uuid,
                               OptionalCollectionUUID dropTargetUUID,
                               bool stayTemp) override;
     // Operations written to the oplog. These are operations for which
@@ -237,7 +237,7 @@ void OpObserverMock::onCreateCollection(OperationContext* opCtx,
 
 repl::OpTime OpObserverMock::onDropCollection(OperationContext* opCtx,
                                               const NamespaceString& collectionName,
-                                              OptionalCollectionUUID uuid,
+                                              const UUID& uuid,
                                               std::uint64_t numRecords,
                                               const CollectionDropType dropType) {
     _logOp(opCtx, collectionName, "drop");
@@ -255,7 +255,7 @@ repl::OpTime OpObserverMock::onDropCollection(OperationContext* opCtx,
 void OpObserverMock::onRenameCollection(OperationContext* opCtx,
                                         const NamespaceString& fromCollection,
                                         const NamespaceString& toCollection,
-                                        OptionalCollectionUUID uuid,
+                                        const UUID& uuid,
                                         OptionalCollectionUUID dropTargetUUID,
                                         std::uint64_t numRecords,
                                         bool stayTemp) {
@@ -270,7 +270,7 @@ void OpObserverMock::onRenameCollection(OperationContext* opCtx,
 void OpObserverMock::postRenameCollection(OperationContext* opCtx,
                                           const NamespaceString& fromCollection,
                                           const NamespaceString& toCollection,
-                                          OptionalCollectionUUID uuid,
+                                          const UUID& uuid,
                                           OptionalCollectionUUID dropTargetUUID,
                                           bool stayTemp) {
     OpObserverNoop::postRenameCollection(
@@ -282,7 +282,7 @@ void OpObserverMock::postRenameCollection(OperationContext* opCtx,
 repl::OpTime OpObserverMock::preRenameCollection(OperationContext* opCtx,
                                                  const NamespaceString& fromCollection,
                                                  const NamespaceString& toCollection,
-                                                 OptionalCollectionUUID uuid,
+                                                 const UUID& uuid,
                                                  OptionalCollectionUUID dropTargetUUID,
                                                  std::uint64_t numRecords,
                                                  bool stayTemp) {
@@ -292,6 +292,7 @@ repl::OpTime OpObserverMock::preRenameCollection(OperationContext* opCtx,
         opCtx, fromCollection, toCollection, uuid, dropTargetUUID, numRecords, stayTemp);
     return {};
 }
+
 void OpObserverMock::_logOp(OperationContext* opCtx,
                             const NamespaceString& nss,
                             const std::string& operationName) {

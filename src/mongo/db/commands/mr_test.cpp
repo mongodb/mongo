@@ -280,7 +280,7 @@ public:
     using OpObserver::onDropCollection;
     repl::OpTime onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName,
-                                  OptionalCollectionUUID uuid,
+                                  const UUID& uuid,
                                   std::uint64_t numRecords,
                                   CollectionDropType dropType) override;
 
@@ -339,7 +339,7 @@ void MapReduceOpObserver::onCreateCollection(OperationContext*,
 
 repl::OpTime MapReduceOpObserver::onDropCollection(OperationContext* opCtx,
                                                    const NamespaceString& collectionName,
-                                                   OptionalCollectionUUID uuid,
+                                                   const UUID& uuid,
                                                    std::uint64_t numRecords,
                                                    const CollectionDropType dropType) {
     // If the oplog is not disabled for this namespace, then we need to reserve an op time for the

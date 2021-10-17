@@ -124,7 +124,7 @@ public:
         Lock::DBLock dbLk(operationContext(), _nss.db(), MODE_IX);
         Lock::CollectionLock collLk(operationContext(), _nss, MODE_X);
 
-        std::string indexName = "idx" + std::to_string(numIndexesCreated);
+        std::string indexName = "idx" + std::to_string(_numIndexesCreated);
         // Make sure we have a valid IndexSpec for the type requested
         IndexSpec spec;
         spec.version(1).name(indexName).addKeys(keyPattern);
@@ -152,7 +152,7 @@ public:
             wuow.commit();
         }
 
-        ++numIndexesCreated;
+        ++_numIndexesCreated;
         return entry;
     }
 
@@ -202,8 +202,9 @@ private:
     }
 
     NamespaceString _nss;
-    size_t numIndexesCreated = 0;
-    // RecordId _catalogId;
+
+    size_t _numIndexesCreated = 0;
+
     OptionalCollectionUUID _collectionUUID;
 };
 

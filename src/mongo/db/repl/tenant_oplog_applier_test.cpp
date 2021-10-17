@@ -65,7 +65,7 @@ class TenantOplogApplierTestOpObserver : public OplogApplierImplOpObserver {
 public:
     void onInternalOpMessage(OperationContext* opCtx,
                              const NamespaceString& nss,
-                             const boost::optional<UUID> uuid,
+                             OptionalCollectionUUID uuid,
                              const BSONObj& msgObj,
                              const boost::optional<BSONObj> o2MsgObj,
                              const boost::optional<repl::OpTime> preImageOpTime,

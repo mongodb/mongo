@@ -135,7 +135,7 @@ void AuthOpObserver::onDropDatabase(OperationContext* opCtx, const std::string& 
 
 repl::OpTime AuthOpObserver::onDropCollection(OperationContext* opCtx,
                                               const NamespaceString& collectionName,
-                                              OptionalCollectionUUID uuid,
+                                              const UUID& uuid,
                                               std::uint64_t numRecords,
                                               const CollectionDropType dropType) {
     const auto cmdNss = collectionName.getCommandNS();
@@ -149,7 +149,7 @@ repl::OpTime AuthOpObserver::onDropCollection(OperationContext* opCtx,
 
 void AuthOpObserver::onDropIndex(OperationContext* opCtx,
                                  const NamespaceString& nss,
-                                 OptionalCollectionUUID uuid,
+                                 const UUID& uuid,
                                  const std::string& indexName,
                                  const BSONObj& indexInfo) {
     const auto cmdNss = nss.getCommandNS();
@@ -162,7 +162,7 @@ void AuthOpObserver::onDropIndex(OperationContext* opCtx,
 void AuthOpObserver::postRenameCollection(OperationContext* const opCtx,
                                           const NamespaceString& fromCollection,
                                           const NamespaceString& toCollection,
-                                          OptionalCollectionUUID uuid,
+                                          const UUID& uuid,
                                           OptionalCollectionUUID dropTargetUUID,
                                           bool stayTemp) {
     const auto cmdNss = fromCollection.getCommandNS();
@@ -184,7 +184,7 @@ void AuthOpObserver::postRenameCollection(OperationContext* const opCtx,
 void AuthOpObserver::onRenameCollection(OperationContext* const opCtx,
                                         const NamespaceString& fromCollection,
                                         const NamespaceString& toCollection,
-                                        OptionalCollectionUUID uuid,
+                                        const UUID& uuid,
                                         OptionalCollectionUUID dropTargetUUID,
                                         std::uint64_t numRecords,
                                         bool stayTemp) {
@@ -214,7 +214,7 @@ void AuthOpObserver::onApplyOps(OperationContext* opCtx,
 
 void AuthOpObserver::onEmptyCapped(OperationContext* opCtx,
                                    const NamespaceString& collectionName,
-                                   OptionalCollectionUUID uuid) {
+                                   const UUID& uuid) {
     const auto cmdNss = collectionName.getCommandNS();
     const auto cmdObj = BSON("emptycapped" << collectionName.coll());
 

@@ -585,7 +585,7 @@ void ShardServerOpObserver::onCreateCollection(OperationContext* opCtx,
 
 repl::OpTime ShardServerOpObserver::onDropCollection(OperationContext* opCtx,
                                                      const NamespaceString& collectionName,
-                                                     OptionalCollectionUUID uuid,
+                                                     const UUID& uuid,
                                                      std::uint64_t numRecords,
                                                      const CollectionDropType dropType) {
     if (collectionName == NamespaceString::kServerConfigurationNamespace) {
@@ -626,7 +626,7 @@ void ShardServerOpObserver::onAbortIndexBuildSinglePhase(OperationContext* opCtx
 
 void ShardServerOpObserver::onDropIndex(OperationContext* opCtx,
                                         const NamespaceString& nss,
-                                        OptionalCollectionUUID uuid,
+                                        const UUID& uuid,
                                         const std::string& indexName,
                                         const BSONObj& indexInfo) {
     abortOngoingMigrationIfNeeded(opCtx, nss);

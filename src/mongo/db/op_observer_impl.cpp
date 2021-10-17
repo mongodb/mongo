@@ -879,7 +879,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
 void OpObserverImpl::onInternalOpMessage(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    const boost::optional<UUID> uuid,
+    OptionalCollectionUUID uuid,
     const BSONObj& msgObj,
     const boost::optional<BSONObj> o2MsgObj,
     const boost::optional<repl::OpTime> preImageOpTime,
@@ -999,7 +999,7 @@ void OpObserverImpl::onDropDatabase(OperationContext* opCtx, const std::string& 
 
 repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
                                               const NamespaceString& collectionName,
-                                              OptionalCollectionUUID uuid,
+                                              const UUID& uuid,
                                               std::uint64_t numRecords,
                                               CollectionDropType dropType) {
     return onDropCollection(
@@ -1008,7 +1008,7 @@ repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
 
 repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
                                               const NamespaceString& collectionName,
-                                              OptionalCollectionUUID uuid,
+                                              const UUID& uuid,
                                               std::uint64_t numRecords,
                                               const CollectionDropType dropType,
                                               bool markFromMigrate) {
@@ -1059,7 +1059,7 @@ repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
 
 void OpObserverImpl::onDropIndex(OperationContext* opCtx,
                                  const NamespaceString& nss,
-                                 OptionalCollectionUUID uuid,
+                                 const UUID& uuid,
                                  const std::string& indexName,
                                  const BSONObj& indexInfo) {
     MutableOplogEntry oplogEntry;
@@ -1074,7 +1074,7 @@ void OpObserverImpl::onDropIndex(OperationContext* opCtx,
 repl::OpTime OpObserverImpl::preRenameCollection(OperationContext* const opCtx,
                                                  const NamespaceString& fromCollection,
                                                  const NamespaceString& toCollection,
-                                                 OptionalCollectionUUID uuid,
+                                                 const UUID& uuid,
                                                  OptionalCollectionUUID dropTargetUUID,
                                                  std::uint64_t numRecords,
                                                  bool stayTemp) {
@@ -1091,7 +1091,7 @@ repl::OpTime OpObserverImpl::preRenameCollection(OperationContext* const opCtx,
 repl::OpTime OpObserverImpl::preRenameCollection(OperationContext* const opCtx,
                                                  const NamespaceString& fromCollection,
                                                  const NamespaceString& toCollection,
-                                                 OptionalCollectionUUID uuid,
+                                                 const UUID& uuid,
                                                  OptionalCollectionUUID dropTargetUUID,
                                                  std::uint64_t numRecords,
                                                  bool stayTemp,
@@ -1120,7 +1120,7 @@ repl::OpTime OpObserverImpl::preRenameCollection(OperationContext* const opCtx,
 void OpObserverImpl::postRenameCollection(OperationContext* const opCtx,
                                           const NamespaceString& fromCollection,
                                           const NamespaceString& toCollection,
-                                          OptionalCollectionUUID uuid,
+                                          const UUID& uuid,
                                           OptionalCollectionUUID dropTargetUUID,
                                           bool stayTemp) {
     if (fromCollection.isSystemDotViews())
@@ -1132,7 +1132,7 @@ void OpObserverImpl::postRenameCollection(OperationContext* const opCtx,
 void OpObserverImpl::onRenameCollection(OperationContext* const opCtx,
                                         const NamespaceString& fromCollection,
                                         const NamespaceString& toCollection,
-                                        OptionalCollectionUUID uuid,
+                                        const UUID& uuid,
                                         OptionalCollectionUUID dropTargetUUID,
                                         std::uint64_t numRecords,
                                         bool stayTemp) {
@@ -1149,7 +1149,7 @@ void OpObserverImpl::onRenameCollection(OperationContext* const opCtx,
 void OpObserverImpl::onRenameCollection(OperationContext* const opCtx,
                                         const NamespaceString& fromCollection,
                                         const NamespaceString& toCollection,
-                                        OptionalCollectionUUID uuid,
+                                        const UUID& uuid,
                                         OptionalCollectionUUID dropTargetUUID,
                                         std::uint64_t numRecords,
                                         bool stayTemp,
@@ -1195,7 +1195,7 @@ void OpObserverImpl::onApplyOps(OperationContext* opCtx,
 
 void OpObserverImpl::onEmptyCapped(OperationContext* opCtx,
                                    const NamespaceString& collectionName,
-                                   OptionalCollectionUUID uuid) {
+                                   const UUID& uuid) {
     if (!collectionName.isSystemDotProfile()) {
         // Do not replicate system.profile modifications
         MutableOplogEntry oplogEntry;

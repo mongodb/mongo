@@ -103,7 +103,7 @@ void OplogApplierImplOpObserver::onCreateCollection(OperationContext* opCtx,
 void OplogApplierImplOpObserver::onRenameCollection(OperationContext* opCtx,
                                                     const NamespaceString& fromCollection,
                                                     const NamespaceString& toCollection,
-                                                    OptionalCollectionUUID uuid,
+                                                    const UUID& uuid,
                                                     OptionalCollectionUUID dropTargetUUID,
                                                     std::uint64_t numRecords,
                                                     bool stayTemp) {
@@ -127,7 +127,7 @@ void OplogApplierImplOpObserver::onCreateIndex(OperationContext* opCtx,
 
 void OplogApplierImplOpObserver::onDropIndex(OperationContext* opCtx,
                                              const NamespaceString& nss,
-                                             OptionalCollectionUUID uuid,
+                                             const UUID& uuid,
                                              const std::string& indexName,
                                              const BSONObj& idxDescriptor) {
     if (!onDropIndexFn) {

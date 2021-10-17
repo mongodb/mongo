@@ -174,7 +174,7 @@ Status renameTargetCollectionToTmp(OperationContext* opCtx,
 
 Status renameCollectionDirectly(OperationContext* opCtx,
                                 Database* db,
-                                OptionalCollectionUUID uuid,
+                                const UUID& uuid,
                                 NamespaceString source,
                                 NamespaceString target,
                                 RenameCollectionOptions options) {
@@ -207,7 +207,7 @@ Status renameCollectionDirectly(OperationContext* opCtx,
 
 Status renameCollectionAndDropTarget(OperationContext* opCtx,
                                      Database* db,
-                                     OptionalCollectionUUID uuid,
+                                     const UUID& uuid,
                                      NamespaceString source,
                                      NamespaceString target,
                                      const CollectionPtr& targetColl,

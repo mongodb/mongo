@@ -31,8 +31,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <memory>
-
 #include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/namespace_string.h"
@@ -59,10 +57,9 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+namespace mongo {
+namespace repl {
 namespace {
-
-using namespace mongo;
-using namespace mongo::repl;
 
 const auto& oplogNs = NamespaceString::kRsOplogNamespace;
 const NamespaceString testNs("a.a");
@@ -123,7 +120,7 @@ public:
     using OpObserver::onDropCollection;
     repl::OpTime onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName,
-                                  OptionalCollectionUUID uuid,
+                                  const UUID& uuid,
                                   std::uint64_t numRecords,
                                   const CollectionDropType dropType) override {
         // If the oplog is not disabled for this namespace, then we need to reserve an op time for
@@ -1631,3 +1628,5 @@ TEST_F(ReplicationRecoveryTest, RecoverySetsValidateFeaturesAsPrimaryToFalseWhil
 }
 
 }  // namespace
+}  // namespace repl
+}  // namespace mongo

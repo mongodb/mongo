@@ -158,7 +158,7 @@ public:
 
     void onInternalOpMessage(OperationContext* const opCtx,
                              const NamespaceString& nss,
-                             const boost::optional<UUID> uuid,
+                             OptionalCollectionUUID uuid,
                              const BSONObj& msgObj,
                              const boost::optional<BSONObj> o2MsgObj,
                              const boost::optional<repl::OpTime> preImageOpTime,
@@ -208,7 +208,7 @@ public:
 
     repl::OpTime onDropCollection(OperationContext* const opCtx,
                                   const NamespaceString& collectionName,
-                                  const OptionalCollectionUUID uuid,
+                                  const UUID& uuid,
                                   std::uint64_t numRecords,
                                   const CollectionDropType dropType) override {
         return onDropCollection(
@@ -217,7 +217,7 @@ public:
 
     repl::OpTime onDropCollection(OperationContext* const opCtx,
                                   const NamespaceString& collectionName,
-                                  const OptionalCollectionUUID uuid,
+                                  const UUID& uuid,
                                   std::uint64_t numRecords,
                                   const CollectionDropType dropType,
                                   bool markFromMigrate) override {
@@ -232,7 +232,7 @@ public:
 
     void onDropIndex(OperationContext* const opCtx,
                      const NamespaceString& nss,
-                     OptionalCollectionUUID uuid,
+                     const UUID& uuid,
                      const std::string& indexName,
                      const BSONObj& idxDescriptor) override {
         ReservedTimes times{opCtx};
@@ -243,7 +243,7 @@ public:
     void onRenameCollection(OperationContext* const opCtx,
                             const NamespaceString& fromCollection,
                             const NamespaceString& toCollection,
-                            OptionalCollectionUUID uuid,
+                            const UUID& uuid,
                             OptionalCollectionUUID dropTargetUUID,
                             std::uint64_t numRecords,
                             bool stayTemp) override {
@@ -260,7 +260,7 @@ public:
     void onRenameCollection(OperationContext* const opCtx,
                             const NamespaceString& fromCollection,
                             const NamespaceString& toCollection,
-                            OptionalCollectionUUID uuid,
+                            const UUID& uuid,
                             OptionalCollectionUUID dropTargetUUID,
                             std::uint64_t numRecords,
                             bool stayTemp,
@@ -300,7 +300,7 @@ public:
     repl::OpTime preRenameCollection(OperationContext* const opCtx,
                                      const NamespaceString& fromCollection,
                                      const NamespaceString& toCollection,
-                                     OptionalCollectionUUID uuid,
+                                     const UUID& uuid,
                                      OptionalCollectionUUID dropTargetUUID,
                                      std::uint64_t numRecords,
                                      bool stayTemp) override {
@@ -317,7 +317,7 @@ public:
     repl::OpTime preRenameCollection(OperationContext* const opCtx,
                                      const NamespaceString& fromCollection,
                                      const NamespaceString& toCollection,
-                                     OptionalCollectionUUID uuid,
+                                     const UUID& uuid,
                                      OptionalCollectionUUID dropTargetUUID,
                                      std::uint64_t numRecords,
                                      bool stayTemp,
@@ -340,7 +340,7 @@ public:
     void postRenameCollection(OperationContext* const opCtx,
                               const NamespaceString& fromCollection,
                               const NamespaceString& toCollection,
-                              OptionalCollectionUUID uuid,
+                              const UUID& uuid,
                               OptionalCollectionUUID dropTargetUUID,
                               bool stayTemp) override {
         ReservedTimes times{opCtx};
@@ -358,7 +358,7 @@ public:
 
     void onEmptyCapped(OperationContext* const opCtx,
                        const NamespaceString& collectionName,
-                       OptionalCollectionUUID uuid) {
+                       const UUID& uuid) {
         ReservedTimes times{opCtx};
         for (auto& o : _observers)
             o->onEmptyCapped(opCtx, collectionName, uuid);

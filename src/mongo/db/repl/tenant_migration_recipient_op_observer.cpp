@@ -168,7 +168,7 @@ void TenantMigrationRecipientOpObserver::onDelete(OperationContext* opCtx,
 repl::OpTime TenantMigrationRecipientOpObserver::onDropCollection(
     OperationContext* opCtx,
     const NamespaceString& collectionName,
-    OptionalCollectionUUID uuid,
+    const UUID& uuid,
     std::uint64_t numRecords,
     const CollectionDropType dropType) {
     if (collectionName == NamespaceString::kTenantMigrationRecipientsNamespace) {
