@@ -327,7 +327,7 @@ TEST_F(
     coordinator1->getDecision().get();
 
     coordinator2->cancelIfCommitNotYetStarted();
-    ASSERT_THROWS_CODE(coordinator2->getDecision().get(),
+    ASSERT_THROWS_CODE(coordinator2->onCompletion().get(),
                        AssertionException,
                        ErrorCodes::TransactionCoordinatorCanceled);
 }
@@ -360,7 +360,7 @@ TEST_F(TransactionCoordinatorCatalogTest,
     coordinator1->getDecision().get();
 
     coordinator2->cancelIfCommitNotYetStarted();
-    ASSERT_THROWS_CODE(coordinator2->getDecision().get(),
+    ASSERT_THROWS_CODE(coordinator2->onCompletion().get(),
                        AssertionException,
                        ErrorCodes::TransactionCoordinatorCanceled);
 }
