@@ -257,63 +257,6 @@ public:
             return recipientCmdThreadPoolLimits;
         }
 
-        /**
-         * This enum and its accompanying methods serve to provide a human-readable
-         * description of what the donor is currently doing, in the currentOp output.
-         * See "describeStage" for a summary of each stage.
-         */
-        enum DonorStage {
-            kUnstarted,
-            kEnteringAbortingIndexBuildsState,
-            kAbortingIndexBuilds,
-            kFetchingClusterTimeKeys,
-            kEnteringDataSyncState,
-            kWaitingForRecipientConsistency,
-            kEnteringBlockingState,
-            kWaitingForRecipientBlockTs,
-            kEnteringCommittedState,
-            kWaitingForDonorForgetMigration,
-            kWaitingForRecipientForgetMigration,
-            kMarkingMigrationGarbageCollectable,
-            kForgotten
-        };
-
-        static std::string describeStage(DonorStage ds) {
-            switch (ds) {
-                case DonorStage::kUnstarted:
-                    return "Migration not yet started.";
-                case DonorStage::kEnteringAbortingIndexBuildsState:
-                    return "Updating its state document to enter 'aborting index builds' state.";
-                case DonorStage::kAbortingIndexBuilds:
-                    return "Aborting index builds.";
-                case DonorStage::kFetchingClusterTimeKeys:
-                    return "Fetching cluster time key documents from recipient.";
-                case DonorStage::kEnteringDataSyncState:
-                    return "Updating its state document to enter 'data sync' state.";
-                case DonorStage::kWaitingForRecipientConsistency:
-                    return "Waiting for recipient to finish data sync and become consistent.";
-                case DonorStage::kEnteringBlockingState:
-                    return "Updating its state doc to enter 'blocking' state.";
-                case DonorStage::kWaitingForRecipientBlockTs:
-                    return "Waiting for receipient to reach the block timestamp.";
-                case DonorStage::kEnteringCommittedState:
-                    return "Updating its state document to enter 'committed' state.";
-                case DonorStage::kWaitingForDonorForgetMigration:
-                    return "Waiting to receive 'donorForgetMigration' command.";
-                case DonorStage::kWaitingForRecipientForgetMigration:
-                    return "Waiting for recipient to forget migration.";
-                case DonorStage::kMarkingMigrationGarbageCollectable:
-                    return "Marking migration as garbage-collectable.";
-                case DonorStage::kForgotten:
-                    return "Migration has been forgotten.";
-            }
-            MONGO_UNREACHABLE;
-        }
-
-        void _updateDonorStage(DonorStage ds) {
-            _donorStage = ds;
-        }
-
         /*
          * Initializes _abortMigrationSource and returns a token from it. The source will be
          * immediately canceled if an abort has already been requested.
@@ -377,9 +320,6 @@ public:
         // interrupting the instance, e.g. receiving donorAbortMigration. Initialized in
         // _initAbortMigrationSource().
         boost::optional<CancellationSource> _abortMigrationSource;
-
-        // A diagnostics-only field used to describe the donor's progress in currentOp.
-        DonorStage _donorStage = DonorStage::kUnstarted;
     };
 
 private:
