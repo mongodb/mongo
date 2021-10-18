@@ -5,6 +5,7 @@
  * featureFlagChangeStreamPreAndPostImages,
  * # Clustered index support is required for change stream pre-images collection.
  * featureFlagClusteredIndexes,
+ * disabled_due_to_server_60490,
  * ]
  */
 (function() {

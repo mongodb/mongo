@@ -8,6 +8,8 @@
  *	4. Verify the data consistency after the upgrade procedure
  *  5. Downgrade binaries and FCV of the cluster to an old version
  *	6. Verify the data consistency after the downgrade procedure
+ *
+ * @tags: [disabled_due_to_server_60490]
  */
 (function() {
 'use strict';

@@ -1,6 +1,7 @@
 //
 // Tests launching multi-version ShardingTest clusters.
 //
+// @tags: [disabled_due_to_server_60490]
 //
 
 load('./jstests/multiVersion/libs/verify_versions.js');
