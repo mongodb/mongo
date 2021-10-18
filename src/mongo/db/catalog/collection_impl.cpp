@@ -936,36 +936,9 @@ void CollectionImpl::_cappedDeleteAsNeeded(OperationContext* opCtx,
         return;
     }
 
-    bool useOldCappedDeleteBehaviour = serverGlobalParams.featureCompatibility.isLessThan(
-        multiversion::FeatureCompatibilityVersion::kFullyDowngradedTo_5_0);
-
-    if (!useOldCappedDeleteBehaviour && !opCtx->isEnforcingConstraints()) {
-        // With new capped delete behavior, secondaries only delete from capped collections via
-        // oplog application when there are explicit delete oplog entries.
-        return;
-    }
-
-    // If the collection does not need size adjustment, then we are in replication recovery and
-    // replaying operations we've already played. This may occur after rollback or after a shutdown.
-    // Any inserts beyond the stable timestamp have been undone, but any documents deleted from
-    // capped collections did not come back due to being performed in an un-timestamped side
-    // transaction. Additionally, the SizeStorer's information reflects the state of the collection
-    // before rollback/shutdown, post capped deletions.
-    //
-    // If we have a collection whose size we know accurately as of the stable timestamp, rather
-    // than as of the top of the oplog, then we must actually perform capped deletions because they
-    // have not previously been accounted for. The collection will be marked as needing size
-    // adjustment when entering this function.
-    //
-    // One edge case to consider is where we need to delete a document that we insert as part of
-    // replication recovery. If we don't mark the collection for size adjustment then we will not
-    // perform the capped deletions as expected. In that case, the collection is guaranteed to be
-    // empty at the stable timestamp and thus guaranteed to be marked for size adjustment.
-    //
-    // This is only applicable for the old capped delete behaviour.
-    if (useOldCappedDeleteBehaviour &&
-        !sizeRecoveryState(opCtx->getServiceContext())
-             .collectionNeedsSizeAdjustment(getSharedIdent()->getIdent())) {
+    if (!opCtx->isEnforcingConstraints()) {
+        // Secondaries only delete from capped collections via oplog application when there are
+        // explicit delete oplog entries.
         return;
     }
 
@@ -985,9 +958,8 @@ void CollectionImpl::_cappedDeleteAsNeeded(OperationContext* opCtx,
     }
 
     boost::optional<CappedDeleteSideTxn> cappedDeleteSideTxn;
-    if (useOldCappedDeleteBehaviour || !_shared->_needCappedLock) {
-        // In FCV < 5.0, all capped deletes are performed in a side transaction. Additionally, any
-        // capped deletes not performed under the capped lock need to commit the innermost
+    if (!_shared->_needCappedLock) {
+        // Any capped deletes not performed under the capped lock need to commit the innermost
         // WriteUnitOfWork while '_cappedFirstRecordMutex' is locked.
         cappedDeleteSideTxn.emplace(opCtx);
     }
@@ -1036,51 +1008,40 @@ void CollectionImpl::_cappedDeleteAsNeeded(OperationContext* opCtx,
         docsRemoved++;
         sizeSaved += record->data.size();
 
-        try {
-            BSONObj doc = record->data.toBson();
-            if (!useOldCappedDeleteBehaviour && ns().isReplicated()) {
-                // Only generate oplog entries on replicated collections in FCV >= 5.0.
-                OpObserver* opObserver = opCtx->getServiceContext()->getOpObserver();
-                opObserver->aboutToDelete(opCtx, ns(), doc);
+        BSONObj doc = record->data.toBson();
+        if (ns().isReplicated()) {
+            OpObserver* opObserver = opCtx->getServiceContext()->getOpObserver();
+            opObserver->aboutToDelete(opCtx, ns(), doc);
 
-                OpObserver::OplogDeleteEntryArgs args;
-                // Explicitly setting values despite them being the defaults.
-                args.deletedDoc = nullptr;
-                args.fromMigrate = false;
+            OpObserver::OplogDeleteEntryArgs args;
+            // Explicitly setting values despite them being the defaults.
+            args.deletedDoc = nullptr;
+            args.fromMigrate = false;
 
-                // If collection has change stream pre-/post-images enabled, pass the 'deletedDoc'
-                // for writing it in the pre-images collection.
-                if (isChangeStreamPreAndPostImagesEnabled()) {
-                    args.deletedDoc = &doc;
-                    args.changeStreamPreAndPostImagesEnabledForCollection = true;
-                }
-
-                // Reserves an optime for the deletion and sets the timestamp for future writes.
-                opObserver->onDelete(opCtx, ns(), uuid(), kUninitializedStmtId, args);
+            // If collection has change stream pre-/post-images enabled, pass the 'deletedDoc' for
+            // writing it in the pre-images collection.
+            if (isChangeStreamPreAndPostImagesEnabled()) {
+                args.deletedDoc = &doc;
+                args.changeStreamPreAndPostImagesEnabledForCollection = true;
             }
 
-            int64_t unusedKeysDeleted = 0;
-            _indexCatalog->unindexRecord(opCtx,
-                                         CollectionPtr(this, CollectionPtr::NoYieldTag{}),
-                                         doc,
-                                         record->id,
-                                         /*logIfError=*/false,
-                                         &unusedKeysDeleted);
-
-            // We're about to delete the record our cursor is positioned on, so advance the cursor.
-            RecordId toDelete = record->id;
-            record = cursor->next();
-
-            _shared->_recordStore->deleteRecord(opCtx, toDelete);
-        } catch (const WriteConflictException&) {
-            if (!useOldCappedDeleteBehaviour) {
-                throw;
-            }
-
-            invariant(cappedDeleteSideTxn);
-            LOGV2(22398, "Got write conflict removing capped records, ignoring");
-            return;
+            // Reserves an optime for the deletion and sets the timestamp for future writes.
+            opObserver->onDelete(opCtx, ns(), uuid(), kUninitializedStmtId, args);
         }
+
+        int64_t unusedKeysDeleted = 0;
+        _indexCatalog->unindexRecord(opCtx,
+                                     CollectionPtr(this, CollectionPtr::NoYieldTag{}),
+                                     doc,
+                                     record->id,
+                                     /*logIfError=*/false,
+                                     &unusedKeysDeleted);
+
+        // We're about to delete the record our cursor is positioned on, so advance the cursor.
+        RecordId toDelete = record->id;
+        record = cursor->next();
+
+        _shared->_recordStore->deleteRecord(opCtx, toDelete);
     }
 
     if (cappedDeleteSideTxn) {
