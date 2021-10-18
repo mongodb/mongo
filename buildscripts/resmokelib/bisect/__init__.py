@@ -12,6 +12,11 @@ from buildscripts.resmokelib.utils import evergreen_conn
 LOGGER = structlog.getLogger(__name__)
 
 _HELP = """
+Perform an evergreen-aware git-bisect to find the 'last passing version' and 'first failing version' 
+of mongo, with respect to a user provided shell script.
+"""
+
+_USAGE = """
 The 'bisect' command lets a user specify a '--branch', '--variant' & '--lookback' period on which to 
 perform a bisect. The user also provides a shell test '--script' which exits with status code 0 to
 indicate a successful test. The command performs the following steps:
@@ -20,12 +25,14 @@ indicate a successful test. The command performs the following steps:
 (2) Filter the versions for versions that Evergreen has binaries and artifacts for.
 (3) Find the 'middle' version. 
 (4) Setup a test environment.
-    - The 'binaries', 'artifacts' and 'links' will be downloaded to a new directory named 
-    'build' in the present working directory.
-    - The 'build' directory will also have a sub directory -- 'build/mongo_repo' 
-    containing the git repo for this version.
-    - Create a virtual environment called 'bisect_venv' and install packages for this version.
-(5) Activate 'bisect_venv' & run the user provided shell script from within the 'build' directory. 
+    - The 'binaries' & 'artifacts' will be downloaded to a new directory named 
+    'build/resmoke-bisect'.
+    - The 'build/resmoke-bisect' directory will also have a sub directory -- 
+    'build/resmoke-bisect/mongo_repo' containing the git repo for this version.
+    - Create a virtual environment at 'build/resmoke-bisect/bisect_venv' and 
+    install packages for this version.
+(5) Activate 'bisect_venv' & run the user provided shell script from within the 
+'build/resmoke-bisect' directory. 
 (6) Teardown the test environment.
 (7) Repeat steps (3)-(6) on the left half, if (5) failed, or right half, if (5) succeeded.
 
@@ -234,7 +241,7 @@ class BisectPlugin(PluginInterface):
             action="store",
             type=str,
             required=True,
-            help="The branch for which versions are being tested.",
+            help="The branch for which versions are being tested. [REQUIRED]",
         )
         parser.add_argument(
             "--variant",
@@ -242,7 +249,7 @@ class BisectPlugin(PluginInterface):
             action="store",
             type=str,
             required=True,
-            help="The variant for which versions are being tested.",
+            help="The variant for which versions are being tested. [REQUIRED]",
         )
         parser.add_argument(
             "--script",
@@ -250,7 +257,7 @@ class BisectPlugin(PluginInterface):
             action="store",
             type=str,
             required=True,
-            help="Location of the shell test script to run on the versions.",
+            help="Location of the shell test script to run on the versions. [REQUIRED]",
         )
         parser.add_argument(
             "--python-installation",
@@ -259,6 +266,7 @@ class BisectPlugin(PluginInterface):
             type=str,
             dest="python_installation",
             default="/opt/mongodbtoolchain/v3/bin/python3",
+            required=False,
             help="Location of a python installation to use for shell commands. If not specified, "
             "it will use '/opt/mongodbtoolchain/v3/bin/python3' -- assuming this is being run on "
             "an Evergreen host. If this is being run from within a virtual env you can use "
@@ -286,7 +294,7 @@ class BisectPlugin(PluginInterface):
 
         :param subparsers: argparse parser to add to.
         """
-        parser = subparsers.add_parser(_COMMAND, usage=_HELP)
+        parser = subparsers.add_parser(_COMMAND, usage=_USAGE, help=_HELP)
         self._add_args_to_parser(parser)
 
     def parse(self, subcommand, parser, parsed_args, **kwargs):
