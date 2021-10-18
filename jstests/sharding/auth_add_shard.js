@@ -70,8 +70,9 @@ for (var i = 0; i < 4; i++) {
 }
 
 // move a chunk
-assert.commandWorked(
-    admin.runCommand({moveChunk: "foo.bar", find: {_id: 1}, to: addShardRes.shardAdded}));
+// TODO (SERVER-60767): remove _waitForDelete param; removeShard() will sync on range deletion.
+assert.commandWorked(admin.runCommand(
+    {moveChunk: "foo.bar", find: {_id: 1}, to: addShardRes.shardAdded, _waitForDelete: true}));
 
 // verify the chunk was moved
 admin.runCommand({flushRouterConfig: 1});
