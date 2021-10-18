@@ -65,7 +65,8 @@ public:
                   StmtId stmtId,
                   const OplogDeleteEntryArgs& args) final;
 
-    void onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo) final;
+    void onReplicationRollback(OperationContext* opCtx,
+                               const RollbackObserverInfo& rbInfo) noexcept final;
 
     // Noop overrides.
 

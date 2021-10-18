@@ -172,7 +172,7 @@ public:
     void onTransactionAbort(OperationContext* opCtx,
                             boost::optional<OplogSlot> abortOplogEntryOpTime) override{};
     void onReplicationRollback(OperationContext* opCtx,
-                               const RollbackObserverInfo& rbInfo) override {}
+                               const RollbackObserverInfo& rbInfo) noexcept override {}
     void onMajorityCommitPointUpdate(ServiceContext* service,
                                      const repl::OpTime& newCommitPoint) override {}
 };

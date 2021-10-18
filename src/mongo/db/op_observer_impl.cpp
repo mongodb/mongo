@@ -1658,7 +1658,7 @@ void OpObserverImpl::onTransactionAbort(OperationContext* opCtx,
 }
 
 void OpObserverImpl::onReplicationRollback(OperationContext* opCtx,
-                                           const RollbackObserverInfo& rbInfo) {
+                                           const RollbackObserverInfo& rbInfo) noexcept {
     // Reset the key manager cache.
     auto validator = LogicalTimeValidator::get(opCtx);
     if (validator) {

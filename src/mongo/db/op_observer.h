@@ -479,7 +479,7 @@ public:
      * called when using any other rollback algorithm i.e "rollback via refetch".
      */
     virtual void onReplicationRollback(OperationContext* opCtx,
-                                       const RollbackObserverInfo& rbInfo) = 0;
+                                       const RollbackObserverInfo& rbInfo) noexcept = 0;
 
     /**
      * Called when the majority commit point is updated by replication.

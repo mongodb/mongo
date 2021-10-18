@@ -402,7 +402,7 @@ public:
     }
 
     void onReplicationRollback(OperationContext* opCtx,
-                               const RollbackObserverInfo& rbInfo) override {
+                               const RollbackObserverInfo& rbInfo) noexcept override {
         for (auto& o : _observers)
             o->onReplicationRollback(opCtx, rbInfo);
     }

@@ -642,7 +642,7 @@ void ShardServerOpObserver::onCollMod(OperationContext* opCtx,
 };
 
 void ShardServerOpObserver::onReplicationRollback(OperationContext* opCtx,
-                                                  const RollbackObserverInfo& rbInfo) {
+                                                  const RollbackObserverInfo& rbInfo) noexcept {
     if (rbInfo.rollbackNamespaces.find(NamespaceString::kCollectionCriticalSectionsNamespace) !=
         rbInfo.rollbackNamespaces.end()) {
         RecoverableCriticalSectionService::get(opCtx)->recoverRecoverableCriticalSections(opCtx);
