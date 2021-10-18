@@ -113,7 +113,10 @@ const expectedGlobalVars = [
     "version",
 ];
 
-if (buildInfo().buildEnvironment.target_arch !== 'aarch64') {
+const targetArch = buildInfo().buildEnvironment.target_arch;
+if (targetArch !== 'aarch64' && targetArch !== 'ppc64le') {
+    // WebAssembly is not supported on ARM and PPC platforms. It is not compiled in to the JS
+    // environment, so isn't expected in this output.
     expectedGlobalVars.push("WebAssembly");
 }
 // Note: it is important that this is sorted to compare to sorted variable names below.
