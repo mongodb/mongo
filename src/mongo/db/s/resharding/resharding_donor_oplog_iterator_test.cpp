@@ -503,5 +503,40 @@ TEST_F(ReshardingDonorOplogIterTest, BatchIncludesProgressMarkEntries) {
     ASSERT_TRUE(next.empty());
 }
 
+TEST_F(ReshardingDonorOplogIterTest, IgnoresProgressMarkEntriesAfterFinalOp) {
+    RAIIServerParameterControllerForTest controller{"reshardingOplogBatchLimitOperations", 100};
+
+    const auto oplog1 = makeInsertOplog(Timestamp(2, 4), BSON("x" << 1));
+    const auto progressMarkOplog1 = makeProgressMarkOplogEntry(Timestamp(15, 3));
+    const auto finalOplog = makeFinalOplog(Timestamp(43, 24));
+    // reshardProgressMark entries inserted after the reshardFinalOp entry should be ignored.
+    const auto progressMarkOplog2 = makeProgressMarkOplogEntry(Timestamp(65, 2));
+    const auto progressMarkOplog3 = makeProgressMarkOplogEntry(Timestamp(65, 3));
+    const auto progressMarkOplog4 = makeProgressMarkOplogEntry(Timestamp(65, 4));
+
+    DBDirectClient client(operationContext());
+    const auto ns = oplogNss().ns();
+    client.insert(ns, oplog1.toBSON());
+    client.insert(ns, progressMarkOplog1.toBSON());
+    client.insert(ns, finalOplog.toBSON());
+    client.insert(ns, progressMarkOplog2.toBSON());
+    client.insert(ns, progressMarkOplog3.toBSON());
+    client.insert(ns, progressMarkOplog4.toBSON());
+
+    ReshardingDonorOplogIterator iter(oplogNss(), kResumeFromBeginning, &onInsertAlwaysReady);
+    auto executor = makeTaskExecutorForIterator();
+    auto factory = makeCancelableOpCtx();
+    auto altClient = makeKillableClient();
+    AlternativeClientRegion acr(altClient);
+
+    auto next = getNextBatch(&iter, executor, factory);
+    ASSERT_EQ(next.size(), 2U);
+    ASSERT_BSONOBJ_EQ(getId(oplog1), getId(next[0]));
+    ASSERT_BSONOBJ_EQ(getId(progressMarkOplog1), getId(next[1]));
+
+    next = getNextBatch(&iter, executor, factory);
+    ASSERT_TRUE(next.empty());
+}
+
 }  // anonymous namespace
 }  // namespace mongo
