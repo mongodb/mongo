@@ -13,6 +13,10 @@
             "hosts": [
               "a:27017"
             ],
+            "setVersion": 1,
+            "electionId": {
+              "$oid": "000000000000000000000001"
+            },
             "minWireVersion": 0,
             "maxWireVersion": 6
           }
@@ -43,6 +47,10 @@
               "a:27017",
               "b:27017"
             ],
+            "setVersion": 1,
+            "electionId": {
+              "$oid": "000000000000000000000001"
+            },
             "minWireVersion": 0,
             "maxWireVersion": 6
           }
