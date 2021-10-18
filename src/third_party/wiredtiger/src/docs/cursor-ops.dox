@@ -108,10 +108,8 @@ record does not previously exist.
 The WT_SESSION::largest_key \c gets the largest key in a table regardless of
 visibility.
 
-It can only be called without a read timestamp, otherwise it returns an invalid
-argument error. Any following prev or next calls will behave as if they were
-invoked on an unpositioned cursor no matter the largest key call is successful
-or not.
+Any following prev or next calls will behave as if they were invoked on an
+unpositioned cursor no matter the largest key call is successful or not.
 
 @section cursor_error Cursor position after error
 
