@@ -338,6 +338,12 @@ public:
             _paddingInfo->cbAuthData = 0;
         }
 
+        // BCryptEncrypt may refuse to process GCM tags if no output buffer is provided.
+        uint8_t dummyOut;
+        if (!out) {
+            out = &dummyOut;
+        }
+
         auto remainder = _packer.getBlock();
         // if there is any data left over in the block buffer, we will encrypt it with padding
         ULONG len = 0;

@@ -35,6 +35,7 @@
 
 #include "mongo/crypto/block_packer.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/hex.h"
 
 namespace mongo {
 namespace crypto {
@@ -477,6 +478,152 @@ TEST(AES, GCMAdditionalAuthenticatedData) {
     GCMAdditionalAuthenticatedDataHelper(true);
     GCMAdditionalAuthenticatedDataHelper(false);
 }
+
+class AESGCMTestVectors : public unittest::Test {
+public:
+    class GCMTestVector {
+    public:
+        GCMTestVector(StringData key,
+                      StringData plaintext,
+                      StringData a,
+                      StringData iv,
+                      StringData ciphertext,
+                      StringData tag) {
+            this->key = hexblob::decode(key);
+            this->plaintext = hexblob::decode(plaintext);
+            this->a = hexblob::decode(a);
+            this->iv = hexblob::decode(iv);
+            this->ciphertext = hexblob::decode(ciphertext);
+            this->tag = hexblob::decode(tag);
+        }
+
+        std::string key;
+        std::string plaintext;
+        std::string a;
+        std::string iv;
+        std::string ciphertext;
+        std::string tag;
+    };
+
+    void evaluate(GCMTestVector test) {
+        constexpr auto mode = crypto::aesMode::gcm;
+
+        if (getSupportedSymmetricAlgorithms().count(getStringFromCipherMode(mode)) == 0) {
+            return;
+        }
+
+        SymmetricKey key = aesGeneratePredictableKey256(test.key, "testID");
+
+        // Validate encryption
+        auto encryptor = uassertStatusOK(crypto::SymmetricEncryptor::create(
+            key, mode, asUint8(test.iv.c_str()), test.iv.size()));
+
+        ASSERT_OK(encryptor->addAuthenticatedData(asUint8(test.a.c_str()), test.a.size()));
+
+        const size_t kBufferSize = test.plaintext.size();
+        {
+            std::vector<uint8_t> encryptionResult(kBufferSize);
+            auto cipherLen = uassertStatusOK(encryptor->update(asUint8(test.plaintext.c_str()),
+                                                               test.plaintext.size(),
+                                                               encryptionResult.data(),
+                                                               encryptionResult.size()));
+            cipherLen += uassertStatusOK(encryptor->finalize(encryptionResult.data() + cipherLen,
+                                                             encryptionResult.size() - cipherLen));
+
+            ASSERT_EQ(test.ciphertext.size(), cipherLen);
+            ASSERT_EQ(hexblob::encode(StringData(test.ciphertext.data(), test.ciphertext.size())),
+                      hexblob::encode(
+                          StringData(asChar(encryptionResult.data()), encryptionResult.size())));
+
+            std::array<std::uint8_t, 12> tag;
+            const auto taglen = uassertStatusOK(encryptor->finalizeTag(tag.data(), tag.size()));
+            ASSERT_EQ(tag.size(), taglen);
+            ASSERT_EQ(hexblob::encode(StringData(test.tag.data(), test.tag.size())).substr(0, 24),
+                      hexblob::encode(StringData(asChar(tag.data()), tag.size())));
+        }
+        {
+            // Validate decryption
+            auto decryptor = uassertStatusOK(crypto::SymmetricDecryptor::create(
+                key, mode, asUint8(test.iv.c_str()), test.iv.size()));
+            uassertStatusOK(decryptor->updateTag(asUint8(test.tag.data()), 12));
+
+            ASSERT_OK(decryptor->addAuthenticatedData(asUint8(test.a.c_str()), test.a.size()));
+            std::vector<uint8_t> decryptionResult(kBufferSize);
+            auto decipherLen = uassertStatusOK(decryptor->update(asUint8(test.ciphertext.c_str()),
+                                                                 test.ciphertext.size(),
+                                                                 decryptionResult.data(),
+                                                                 decryptionResult.size()));
+            decipherLen += uassertStatusOK(decryptor->finalize(
+                decryptionResult.data() + decipherLen, decryptionResult.size() - decipherLen));
+
+            ASSERT_EQ(test.plaintext.size(), decipherLen);
+            ASSERT_EQ(hexblob::encode(StringData(test.plaintext.data(), test.plaintext.size())),
+                      hexblob::encode(
+                          StringData(asChar(decryptionResult.data()), decryptionResult.size())));
+        }
+    }
+};
+
+/** Test vectors drawn from
+ *  https://csrc.nist.rip/groups/ST/toolkit/BCM/documents/proposedmodes/gcm/gcm-spec.pdf
+ */
+TEST_F(AESGCMTestVectors, TestCase13) {
+    evaluate(
+        GCMTestVector("00000000000000000000000000000000"
+                      "00000000000000000000000000000000"_sd,
+                      ""_sd,
+                      ""_sd,
+                      "000000000000000000000000"_sd,
+                      ""_sd,
+                      "530f8afbc74536b9a963b4f1c4cb738b"_sd));
+}
+
+TEST_F(AESGCMTestVectors, TestCase14) {
+    evaluate(
+        GCMTestVector("00000000000000000000000000000000"
+                      "00000000000000000000000000000000"_sd,
+                      "00000000000000000000000000000000"_sd,
+                      ""_sd,
+                      "000000000000000000000000"_sd,
+                      "cea7403d4d606b6e074ec5d3baf39d18"_sd,
+                      "d0d1c8a799996bf0265b98b5d48ab919"_sd));
+}
+
+TEST_F(AESGCMTestVectors, TestCase15) {
+    evaluate(
+        GCMTestVector("feffe9928665731c6d6a8f9467308308"
+                      "feffe9928665731c6d6a8f9467308308"_sd,
+                      "d9313225f88406e5a55909c5aff5269a"
+                      "86a7a9531534f7da2e4c303d8a318a72"
+                      "1c3c0c95956809532fcf0e2449a6b525"
+                      "b16aedf5aa0de657ba637b391aafd255"_sd,
+                      ""_sd,
+                      "cafebabefacedbaddecaf888"_sd,
+                      "522dc1f099567d07f47f37a32a84427d"
+                      "643a8cdcbfe5c0c97598a2bd2555d1aa"
+                      "8cb08e48590dbb3da7b08b1056828838"
+                      "c5f61e6393ba7a0abcc9f662898015ad"_sd,
+                      "b094dac5d93471bdec1a502270e3cc6c"_sd));
+}
+
+TEST_F(AESGCMTestVectors, TestCase16) {
+    evaluate(
+        GCMTestVector("feffe9928665731c6d6a8f9467308308"
+                      "feffe9928665731c6d6a8f9467308308"_sd,
+                      "d9313225f88406e5a55909c5aff5269a"
+                      "86a7a9531534f7da2e4c303d8a318a72"
+                      "1c3c0c95956809532fcf0e2449a6b525"
+                      "b16aedf5aa0de657ba637b39"_sd,
+                      "feedfacedeadbeeffeedfacedeadbeef"
+                      "abaddad2"_sd,
+                      "cafebabefacedbaddecaf888"_sd,
+                      "522dc1f099567d07f47f37a32a84427d"
+                      "643a8cdcbfe5c0c97598a2bd2555d1aa"
+                      "8cb08e48590dbb3da7b08b1056828838"
+                      "c5f61e6393ba7a0abcc9f662"_sd,
+                      "76fc6ece0f4e1768cddf8853bb2d551b"_sd));
+}
+
 
 }  // namespace crypto
 }  // namespace mongo
