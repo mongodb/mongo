@@ -66,10 +66,11 @@ TEST(MigrationTypeTest, ConvertFromMigrationInfo) {
     ASSERT_OK(chunkType.validate());
 
     MigrateInfo migrateInfo(kToShard,
+                            NamespaceString(kNs),
                             chunkType,
                             MoveChunkRequest::ForceJumbo::kDoNotForce,
                             MigrateInfo::chunksImbalance);
-    MigrationType migrationType(NamespaceString(kNs), migrateInfo, kWaitForDelete);
+    MigrationType migrationType(migrateInfo, kWaitForDelete);
 
     BSONObjBuilder builder;
     builder.append(MigrationType::ns(), kNs);

@@ -45,6 +45,7 @@ const ReadPreferenceSetting kPrimaryOnlyReadPreference{ReadPreference::PrimaryOn
 }  // namespace
 
 Status moveChunk(OperationContext* opCtx,
+                 const NamespaceString& nss,
                  const ChunkType& chunk,
                  const ShardId& newShardId,
                  int64_t maxChunkSizeBytes,
@@ -53,13 +54,18 @@ Status moveChunk(OperationContext* opCtx,
                  bool forceJumbo) {
     auto shardRegistry = Grid::get(opCtx)->shardRegistry();
     auto shard = shardRegistry->getConfigShard();
-    auto cmdResponseStatus = shard->runCommand(
-        opCtx,
-        kPrimaryOnlyReadPreference,
-        "admin",
-        BalanceChunkRequest::serializeToMoveCommandForConfig(
-            chunk, newShardId, maxChunkSizeBytes, secondaryThrottle, waitForDelete, forceJumbo),
-        Shard::RetryPolicy::kIdempotent);
+    auto cmdResponseStatus =
+        shard->runCommand(opCtx,
+                          kPrimaryOnlyReadPreference,
+                          "admin",
+                          BalanceChunkRequest::serializeToMoveCommandForConfig(nss,
+                                                                               chunk,
+                                                                               newShardId,
+                                                                               maxChunkSizeBytes,
+                                                                               secondaryThrottle,
+                                                                               waitForDelete,
+                                                                               forceJumbo),
+                          Shard::RetryPolicy::kIdempotent);
     if (!cmdResponseStatus.isOK()) {
         return cmdResponseStatus.getStatus();
     }
@@ -67,14 +73,14 @@ Status moveChunk(OperationContext* opCtx,
     return cmdResponseStatus.getValue().commandStatus;
 }
 
-Status rebalanceChunk(OperationContext* opCtx, const ChunkType& chunk) {
+Status rebalanceChunk(OperationContext* opCtx, const NamespaceString& nss, const ChunkType& chunk) {
     auto shardRegistry = Grid::get(opCtx)->shardRegistry();
     auto shard = shardRegistry->getConfigShard();
     auto cmdResponseStatus = shard->runCommandWithFixedRetryAttempts(
         opCtx,
         kPrimaryOnlyReadPreference,
         "admin",
-        BalanceChunkRequest::serializeToRebalanceCommandForConfig(chunk),
+        BalanceChunkRequest::serializeToRebalanceCommandForConfig(nss, chunk),
         Shard::RetryPolicy::kNotIdempotent);
     if (!cmdResponseStatus.isOK()) {
         return cmdResponseStatus.getStatus();

@@ -190,6 +190,7 @@ public:
         chunkType.setVersion(cm.getVersion());
 
         uassertStatusOK(configsvr_client::moveChunk(opCtx,
+                                                    nss,
                                                     chunkType,
                                                     to->getId(),
                                                     maxChunkSizeBytes,

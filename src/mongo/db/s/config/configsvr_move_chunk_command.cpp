@@ -94,17 +94,23 @@ public:
         repl::ReadConcernArgs::get(opCtx) =
             repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
-        auto request = uassertStatusOK(BalanceChunkRequest::parseFromConfigCommand(cmdObj));
+        auto request = uassertStatusOK(
+            BalanceChunkRequest::parseFromConfigCommand(cmdObj, false /* requireUUID */));
 
-        // pre v5.1 compatibility
-        if (request.getNss()) {
-            const auto collection = Grid::get(opCtx)->catalogClient()->getCollection(
-                opCtx, *request.getNss(), repl::ReadConcernLevel::kLocalReadConcern);
-            request.setCollectionUUID(collection.getUuid());
+        const auto& nss = request.getNss();
+
+        // In case of mixed binaries including v5.0, the collection UUID field may not be attached
+        // to the chunk.
+        if (!request.getChunk().hasCollectionUUID_UNSAFE()) {
+            // TODO (SERVER-60792): Remove the following logic after v6.0 branches out.
+            const auto& collection = Grid::get(opCtx)->catalogClient()->getCollection(
+                opCtx, nss, repl::ReadConcernLevel::kLocalReadConcern);
+            request.setCollectionUUID(collection.getUuid());  // Set collection UUID on chunk member
         }
 
         if (request.hasToShardId()) {
             uassertStatusOK(Balancer::get(opCtx)->moveSingleChunk(opCtx,
+                                                                  nss,
                                                                   request.getChunk(),
                                                                   request.getToShardId(),
                                                                   request.getMaxChunkSizeBytes(),
@@ -112,7 +118,8 @@ public:
                                                                   request.getWaitForDelete(),
                                                                   request.getForceJumbo()));
         } else {
-            uassertStatusOK(Balancer::get(opCtx)->rebalanceSingleChunk(opCtx, request.getChunk()));
+            uassertStatusOK(
+                Balancer::get(opCtx)->rebalanceSingleChunk(opCtx, nss, request.getChunk()));
         }
 
         return true;

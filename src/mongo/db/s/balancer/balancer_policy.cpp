@@ -392,6 +392,7 @@ MigrateInfo chooseRandomMigration(const ShardStatisticsVector& shardStats,
     const auto& chunks = distribution.getChunks(sourceShardId);
 
     return {destShardId,
+            distribution.nss(),
             chunks[getRandomIndex(chunks.size())],
             MoveChunkRequest::ForceJumbo::kDoNotForce,
             MigrateInfo::chunksImbalance};
@@ -457,8 +458,11 @@ vector<MigrateInfo> BalancerPolicy::balance(const ShardStatisticsVector& shardSt
                 }
 
                 invariant(to != stat.shardId);
-                migrations.emplace_back(
-                    to, chunk, MoveChunkRequest::ForceJumbo::kForceBalancer, MigrateInfo::drain);
+                migrations.emplace_back(to,
+                                        distribution.nss(),
+                                        chunk,
+                                        MoveChunkRequest::ForceJumbo::kForceBalancer,
+                                        MigrateInfo::drain);
                 invariant(usedShards->insert(stat.shardId).second);
                 invariant(usedShards->insert(to).second);
                 break;
@@ -518,6 +522,7 @@ vector<MigrateInfo> BalancerPolicy::balance(const ShardStatisticsVector& shardSt
 
                 invariant(to != stat.shardId);
                 migrations.emplace_back(to,
+                                        distribution.nss(),
                                         chunk,
                                         forceJumbo ? MoveChunkRequest::ForceJumbo::kForceBalancer
                                                    : MoveChunkRequest::ForceJumbo::kDoNotForce,
@@ -594,8 +599,11 @@ boost::optional<MigrateInfo> BalancerPolicy::balanceSingleChunk(
         return boost::optional<MigrateInfo>();
     }
 
-    return MigrateInfo(
-        newShardId, chunk, MoveChunkRequest::ForceJumbo::kDoNotForce, MigrateInfo::chunksImbalance);
+    return MigrateInfo(newShardId,
+                       distribution.nss(),
+                       chunk,
+                       MoveChunkRequest::ForceJumbo::kDoNotForce,
+                       MigrateInfo::chunksImbalance);
 }
 
 bool BalancerPolicy::_singleZoneBalance(const ShardStatisticsVector& shardStats,
@@ -667,7 +675,8 @@ bool BalancerPolicy::_singleZoneBalance(const ShardStatisticsVector& shardStats,
             continue;
         }
 
-        migrations->emplace_back(to, chunk, forceJumbo, MigrateInfo::chunksImbalance);
+        migrations->emplace_back(
+            to, distribution.nss(), chunk, forceJumbo, MigrateInfo::chunksImbalance);
         invariant(usedShards->insert(chunk.getShard()).second);
         invariant(usedShards->insert(to).second);
         return true;
@@ -696,10 +705,11 @@ string ZoneRange::toString() const {
 }
 
 MigrateInfo::MigrateInfo(const ShardId& a_to,
+                         const NamespaceString& a_nss,
                          const ChunkType& a_chunk,
                          const MoveChunkRequest::ForceJumbo a_forceJumbo,
                          MigrationReason a_reason)
-    : uuid(a_chunk.getCollectionUUID()) {
+    : nss(a_nss), uuid(a_chunk.getCollectionUUID()) {
     invariant(a_chunk.validate());
     invariant(a_to.isValid());
 
@@ -728,21 +738,7 @@ std::string MigrateInfo::getName() const {
     return buf.str();
 }
 
-StatusWith<NamespaceString> MigrateInfo::getNss(OperationContext* opCtx) const {
-    auto grid = Grid::get(opCtx);
-    invariant(grid != nullptr);
-    auto catalogClient = grid->catalogClient();
-    invariant(catalogClient != nullptr);
-    try {
-        const CollectionType collection =
-            catalogClient->getCollection(opCtx, uuid, repl::ReadConcernLevel::kLocalReadConcern);
-        return collection.getNss();
-    } catch (DBException const& e) {
-        return StatusWith<NamespaceString>(e.code(), e.reason());
-    }
-}
-
-BSONObj MigrateInfo::getMigrationTypeQuery(NamespaceString const& nss) const {
+BSONObj MigrateInfo::getMigrationTypeQuery() const {
     // Generates a query object for a single MigrationType based on the namespace and the lower
     // bound of the chunk being moved.
     return BSON(MigrationType::ns(nss.ns()) << MigrationType::min(minKey));

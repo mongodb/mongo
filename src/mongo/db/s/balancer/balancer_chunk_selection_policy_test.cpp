@@ -150,8 +150,8 @@ TEST_F(BalancerChunkSelectionTest, TagRangesOverlap) {
                 shardTargeterMock(opCtx.get(), kShardId0)->setFindHostReturnValue(kShardHost0);
                 shardTargeterMock(opCtx.get(), kShardId1)->setFindHostReturnValue(kShardHost1);
 
-                auto migrateInfoStatus =
-                    _chunkSelectionPolicy.get()->selectSpecificChunkToMove(opCtx.get(), chunk);
+                auto migrateInfoStatus = _chunkSelectionPolicy.get()->selectSpecificChunkToMove(
+                    opCtx.get(), kNamespace, chunk);
                 ASSERT_EQUALS(ErrorCodes::RangeOverlapConflict,
                               migrateInfoStatus.getStatus().code());
             });

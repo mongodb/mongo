@@ -410,6 +410,7 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
 
 StatusWith<boost::optional<MigrateInfo>>
 BalancerChunkSelectionPolicyImpl::selectSpecificChunkToMove(OperationContext* opCtx,
+                                                            const NamespaceString& nss,
                                                             const ChunkType& chunk) {
     auto shardStatsStatus = _clusterStats->getStats(opCtx);
     if (!shardStatsStatus.isOK()) {
@@ -417,11 +418,6 @@ BalancerChunkSelectionPolicyImpl::selectSpecificChunkToMove(OperationContext* op
     }
 
     const auto& shardStats = shardStatsStatus.getValue();
-
-    const CollectionType collection = Grid::get(opCtx)->catalogClient()->getCollection(
-        opCtx, chunk.getCollectionUUID(), repl::ReadConcernLevel::kLocalReadConcern);
-
-    const auto& nss = collection.getNss();
 
     auto routingInfoStatus =
         Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx, nss);

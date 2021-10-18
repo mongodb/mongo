@@ -101,6 +101,7 @@ ScopedMigrationRequest ScopedMigrationRequestTest::makeScopedMigrationRequest(
 }
 
 MigrateInfo ScopedMigrationRequestTest::makeMigrateInfo() {
+    const NamespaceString collNss{kNs};
     const auto collUuid = UUID::gen();
     const ChunkVersion kChunkVersion{1, 2, OID::gen(), Timestamp(1, 1)};
 
@@ -115,9 +116,10 @@ MigrateInfo ScopedMigrationRequestTest::makeMigrateInfo() {
     ASSERT_OK(chunkType.validate());
 
     // Initialize the sharded TO collection
-    setupCollection(NamespaceString(kNs), KeyPattern(BSON("_id" << 1)), {chunkType});
+    setupCollection(collNss, KeyPattern(BSON("_id" << 1)), {chunkType});
 
     return MigrateInfo(kToShard,
+                       collNss,
                        chunkType,
                        MoveChunkRequest::ForceJumbo::kDoNotForce,
                        MigrateInfo::chunksImbalance);

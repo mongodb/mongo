@@ -55,10 +55,8 @@ const BSONField<std::string> MigrationType::forceJumbo("forceJumbo");
 
 MigrationType::MigrationType() = default;
 
-MigrationType::MigrationType(const NamespaceString& nss,
-                             const MigrateInfo& info,
-                             bool waitForDelete)
-    : _nss(nss),
+MigrationType::MigrationType(const MigrateInfo& info, bool waitForDelete)
+    : _nss(info.nss),
       _min(info.minKey),
       _max(info.maxKey),
       _fromShard(info.from),
@@ -156,18 +154,16 @@ BSONObj MigrationType::toBSON() const {
     return builder.obj();
 }
 
-MigrateInfo MigrationType::toMigrateInfo(OperationContext* opCtx) const {
-    const CollectionType collection = Grid::get(opCtx)->catalogClient()->getCollection(
-        opCtx, _nss, repl::ReadConcernLevel::kLocalReadConcern);
-
+MigrateInfo MigrationType::toMigrateInfo(const UUID& uuid) const {
     ChunkType chunk;
     chunk.setShard(_fromShard);
-    chunk.setCollectionUUID(collection.getUuid());
+    chunk.setCollectionUUID(uuid);
     chunk.setMin(_min);
     chunk.setMax(_max);
     chunk.setVersion(_chunkVersion);
 
     return MigrateInfo(_toShard,
+                       _nss,
                        chunk,
                        MoveChunkRequest::parseForceJumbo(_forceJumbo),
                        MigrateInfo::chunksImbalance);

@@ -60,7 +60,7 @@ public:
      * The Balancer encapsulates migration information in MigrateInfo objects, so this facilitates
      * conversion to a config.migrations entry format.
      */
-    MigrationType(const NamespaceString& nss, const MigrateInfo& info, bool waitForDelete);
+    MigrationType(const MigrateInfo& info, bool waitForDelete);
 
     /**
      * Constructs a new MigrationType object from BSON. Expects all fields to be present, and errors
@@ -76,7 +76,7 @@ public:
     /**
      * Helper function for the Balancer that uses MigrateInfo objects to schedule migrations.
      */
-    MigrateInfo toMigrateInfo(OperationContext* opCtx) const;
+    MigrateInfo toMigrateInfo(const UUID& uuid) const;
 
     const NamespaceString& getNss() const {
         return _nss;

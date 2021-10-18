@@ -168,10 +168,6 @@ Status MigrationManager::executeManualMigration(
     _waitForRecovery();
 
     ScopedMigrationRequestsMap scopedMigrationRequests;
-    const auto nssStatus = migrateInfo.getNss(opCtx);
-    if (!nssStatus.isOK()) {
-        return nssStatus.getStatus();
-    }
 
     RemoteCommandResponse remoteCommandResponse = _schedule(opCtx,
                                                             migrateInfo,
@@ -182,7 +178,7 @@ Status MigrationManager::executeManualMigration(
                                                       ->get();
 
     auto swCM = Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(
-        opCtx, nssStatus.getValue());
+        opCtx, migrateInfo.nss);
     if (!swCM.isOK()) {
         return swCM.getStatus();
     }
@@ -343,12 +339,17 @@ void MigrationManager::finishRecovery(OperationContext* opCtx,
         }
 
         const auto& cm = swCM.getValue();
+        const auto uuid = cm.getUUID();
+        if (!uuid) {
+            // The collection has been dropped, so there is no need to recover the migration.
+            continue;
+        }
 
         int scheduledMigrations = 0;
 
         while (!migrateInfos.empty()) {
             auto migrationType = std::move(migrateInfos.front());
-            const auto migrationInfo = migrationType.toMigrateInfo(opCtx);
+            const auto migrationInfo = migrationType.toMigrateInfo(*uuid);
             auto waitForDelete = migrationType.getWaitForDelete();
             migrateInfos.pop_front();
 
@@ -444,10 +445,6 @@ std::shared_ptr<Notification<RemoteCommandResponse>> MigrationManager::_schedule
     bool waitForDelete,
     ScopedMigrationRequestsMap* scopedMigrationRequests) {
 
-    const CollectionType collection = Grid::get(opCtx)->catalogClient()->getCollection(
-        opCtx, migrateInfo.uuid, repl::ReadConcernLevel::kLocalReadConcern);
-    const NamespaceString& nss = collection.getNss();
-
     // Ensure we are not stopped in order to avoid doing the extra work
     {
         stdx::lock_guard<Latch> lock(_mutex);
@@ -475,7 +472,7 @@ std::shared_ptr<Notification<RemoteCommandResponse>> MigrationManager::_schedule
 
     BSONObjBuilder builder;
     MoveChunkRequest::appendAsCommand(&builder,
-                                      nss,
+                                      migrateInfo.nss,
                                       migrateInfo.version,
                                       migrateInfo.from,
                                       migrateInfo.to,
@@ -493,7 +490,7 @@ std::shared_ptr<Notification<RemoteCommandResponse>> MigrationManager::_schedule
                    "Migration cannot be executed because the balancer is not running"));
     }
 
-    Migration migration(nss, builder.obj());
+    Migration migration(migrateInfo.nss, builder.obj());
 
     auto retVal = migration.completionNotification;
 

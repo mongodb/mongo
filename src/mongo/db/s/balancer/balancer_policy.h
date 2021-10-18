@@ -57,17 +57,18 @@ struct MigrateInfo {
     enum MigrationReason { drain, zoneViolation, chunksImbalance };
 
     MigrateInfo(const ShardId& a_to,
+                const NamespaceString& a_nss,
                 const ChunkType& a_chunk,
                 MoveChunkRequest::ForceJumbo a_forceJumbo,
                 MigrationReason a_reason);
 
     std::string getName() const;
-    StatusWith<NamespaceString> getNss(OperationContext* opCtx) const;
 
-    BSONObj getMigrationTypeQuery(NamespaceString const& nss) const;
+    BSONObj getMigrationTypeQuery() const;
 
     std::string toString() const;
 
+    NamespaceString nss;
     UUID uuid;
     ShardId to;
     ShardId from;
