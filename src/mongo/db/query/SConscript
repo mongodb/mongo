@@ -60,6 +60,7 @@ env.Library(
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/db/bson/dotted_path_support",
+        "$BUILD_DIR/mongo/db/catalog/clustered_collection_options",
         '$BUILD_DIR/mongo/db/commands/server_status_core',
         "$BUILD_DIR/mongo/db/exec/projection_executor",
         "$BUILD_DIR/mongo/db/exec/sbe/query_sbe_plan_stats",

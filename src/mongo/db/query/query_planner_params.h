@@ -31,6 +31,7 @@
 
 #include <vector>
 
+#include "mongo/db/catalog/clustered_collection_options_gen.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/query_knobs_gen.h"
@@ -138,6 +139,10 @@ struct QueryPlannerParams {
     // plans via the MultiPlanStage, and the set of possible plans is very large for certain
     // index+query combinations.
     size_t maxIndexedSolutions;
+
+    // Specifies the clusteredIndex information necessary to utilize the cluster key in bounded
+    // collection scans and other query operations.
+    boost::optional<ClusteredCollectionInfo> clusteredInfo;
 
     // Set if we allow optimization which converts "_id" predicates into range collection scan using
     // minRecord and maxRecord.

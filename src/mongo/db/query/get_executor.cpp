@@ -357,6 +357,7 @@ void fillOutPlannerParams(OperationContext* opCtx,
     }
 
     if (collection->isClustered()) {
+        plannerParams->clusteredInfo = collection->getClusteredInfo();
         plannerParams->allowRIDRange = true;
     }
 }
