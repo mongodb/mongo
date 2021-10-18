@@ -250,9 +250,8 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
             _config.CONFIG_FUZZ_SEED = random.randrange(sys.maxsize)
         else:
             _config.CONFIG_FUZZ_SEED = int(_config.CONFIG_FUZZ_SEED)
-        _config.MONGOD_SET_PARAMETERS, _config.WT_ENGINE_CONFIG, _config.WT_COLL_CONFIG, \
-        _config.WT_INDEX_CONFIG = mongod_fuzzer_configs.fuzz_set_parameters(
-            _config.CONFIG_FUZZ_SEED, _config.MONGOD_SET_PARAMETERS)
+        _config.MONGOD_SET_PARAMETERS, _config.WT_ENGINE_CONFIG = mongod_fuzzer_configs \
+            .fuzz_set_parameters(_config.CONFIG_FUZZ_SEED, _config.MONGOD_SET_PARAMETERS)
 
     _config.MONGOS_EXECUTABLE = _expand_user(config.pop("mongos_executable"))
 
@@ -325,16 +324,12 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
     _config.ARCHIVE_LIMIT_MB = config.pop("archive_limit_mb")
     _config.ARCHIVE_LIMIT_TESTS = config.pop("archive_limit_tests")
 
-    # Wiredtiger options. Prevent fuzzed wt configs from being overwritten unless user specifies it.
+    # Wiredtiger options.
+    _config.WT_COLL_CONFIG = config.pop("wt_coll_config")
     wt_engine_config = config.pop("wt_engine_config")
-    if wt_engine_config:
+    if wt_engine_config:  # prevents fuzzed wt_engine_config from being overwritten unless user specifies it
         _config.WT_ENGINE_CONFIG = config.pop("wt_engine_config")
-    wt_coll_config = config.pop("wt_coll_config")
-    if wt_coll_config:
-        _config.WT_COLL_CONFIG = config.pop("wt_coll_config")
-    wt_index_config = config.pop("wt_index_config")
-    if wt_index_config:
-        _config.WT_INDEX_CONFIG = config.pop("wt_index_config")
+    _config.WT_INDEX_CONFIG = config.pop("wt_index_config")
 
     # Benchmark/Benchrun options.
     _config.BENCHMARK_FILTER = config.pop("benchmark_filter")
