@@ -33,9 +33,11 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/s/rename_collection_participant_service.h"
 #include "mongo/db/s/sharded_rename_collection_gen.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/transaction_participant.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/logv2/log.h"
 
@@ -97,6 +99,24 @@ public:
                                     << participantDocBSON << "`");
 
             renameCollectionParticipant->getBlockCRUDAndRenameCompletionFuture().get(opCtx);
+
+            // The txnParticipant will only be missing when the command was sent from a coordinator
+            // running an old 5.0.0 binary that didn't attach a sessionId & txnNumber.
+            // TODO SERVER-60773: Once 6.0 has branched out, txnParticipant must always exist. Add a
+            // uassert for that.
+            auto txnParticipant = TransactionParticipant::get(opCtx);
+            if (txnParticipant) {
+                // Since no write that generated a retryable write oplog entry with this sessionId
+                // and txnNumber happened, we need to make a dummy write so that the session gets
+                // durably persisted on the oplog. This must be the last operation done on this
+                // command.
+                DBDirectClient client(opCtx);
+                client.update(NamespaceString::kServerConfigurationNamespace.ns(),
+                              BSON("_id" << Request::kCommandName),
+                              BSON("$inc" << BSON("count" << 1)),
+                              true /* upsert */,
+                              false /* multi */);
+            }
         }
 
     private:
@@ -168,6 +188,24 @@ public:
                         "Provided UUID does not match",
                         optRenameCollectionParticipant.get()->sourceUUID() == req.getSourceUUID());
                 optRenameCollectionParticipant.get()->getUnblockCrudFuture().get(opCtx);
+            }
+
+            // The txnParticipant will only be missing when the command was sent from a coordinator
+            // running an old 5.0.0 binary that didn't attach a sessionId & txnNumber.
+            // TODO SERVER-60773: Once 6.0 has branched out, txnParticipant must always exist. Add a
+            // uassert for that.
+            auto txnParticipant = TransactionParticipant::get(opCtx);
+            if (txnParticipant) {
+                // Since no write that generated a retryable write oplog entry with this sessionId
+                // and txnNumber happened, we need to make a dummy write so that the session gets
+                // durably persisted on the oplog. This must be the last operation done on this
+                // command.
+                DBDirectClient client(opCtx);
+                client.update(NamespaceString::kServerConfigurationNamespace.ns(),
+                              BSON("_id" << Request::kCommandName),
+                              BSON("$inc" << BSON("count" << 1)),
+                              true /* upsert */,
+                              false /* multi */);
             }
         }
 

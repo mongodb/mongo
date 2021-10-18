@@ -34,9 +34,11 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/drop_collection_coordinator.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/transaction_participant.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 
@@ -83,6 +85,24 @@ public:
                             1,
                             "Namespace not found while trying to delete local collection",
                             "namespace"_attr = ns());
+            }
+
+            // The txnParticipant will only be missing when the command was sent from a coordinator
+            // running an old 5.0.0 binary that didn't attach a sessionId & txnNumber.
+            // TODO SERVER-60773: Once 6.0 has branched out, txnParticipant must always exist. Add a
+            // uassert for that.
+            auto txnParticipant = TransactionParticipant::get(opCtx);
+            if (txnParticipant) {
+                // Since no write that generated a retryable write oplog entry with this sessionId
+                // and txnNumber happened, we need to make a dummy write so that the session gets
+                // durably persisted on the oplog. This must be the last operation done on this
+                // command.
+                DBDirectClient client(opCtx);
+                client.update(NamespaceString::kServerConfigurationNamespace.ns(),
+                              BSON("_id" << Request::kCommandName),
+                              BSON("$inc" << BSON("count" << 1)),
+                              true /* upsert */,
+                              false /* multi */);
             }
         }
 
