@@ -26,6 +26,9 @@ cd "$venv_dir/bin"
 rm python python3
 ln -s "$python_loc" python3
 ln -s python3 python
+
+# Don't fail if `python3.*` binary doesn't exist
+set +o errexit
 python3_dot_locs=$(ls python3.*)
 for p in $python3_dot_locs; do
   rm "$p"
