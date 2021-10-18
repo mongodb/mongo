@@ -93,7 +93,7 @@ env.CppUnitTest(
         'sha1_block_test.cpp',
         'sha256_block_test.cpp',
         'sha512_block_test.cpp',
-        'symmetric_crypto_test.cpp',
+        'symmetric_crypto_test.cpp' if "tom" not in env["MONGO_CRYPTO"] else [],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
