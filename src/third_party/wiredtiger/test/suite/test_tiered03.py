@@ -79,6 +79,9 @@ class test_tiered03(wttest.WiredTigerTestCase):
 
     # Test sharing data between a primary and a secondary
     def test_sharing(self):
+        # FIXME: WT-8235 Enable the test once file containing transaction ids is supported.
+        self.skipTest('Sharing the checkpoint file containing transaction ids is not supported')
+
         ds = SimpleDataSet(self, self.uri, 10)
         ds.populate()
         ds.check()

@@ -1425,7 +1425,7 @@ __rollback_to_stable_btree_apply(
     WT_TXN_GLOBAL *txn_global;
     wt_timestamp_t max_durable_ts, newest_start_durable_ts, newest_stop_durable_ts;
     size_t addr_size;
-    uint64_t rollback_txnid;
+    uint64_t rollback_txnid, write_gen;
     uint32_t btree_id, handle_open_flags;
     char ts_string[2][WT_TS_INT_STRING_SIZE];
     bool dhandle_allocated, durable_ts_found, has_txn_updates_gt_than_ckpt_snap, perform_rts;
@@ -1436,8 +1436,9 @@ __rollback_to_stable_btree_apply(
         return (0);
 
     txn_global = &S2C(session)->txn_global;
-    rollback_txnid = 0;
     addr_size = 0;
+    rollback_txnid = 0;
+    write_gen = 0;
     dhandle_allocated = false;
 
     /* Find out the max durable timestamp of the object from checkpoint. */
@@ -1473,13 +1474,25 @@ __rollback_to_stable_btree_apply(
         if (ret == 0)
             addr_size = value.len;
         WT_RET_NOTFOUND_OK(ret);
+        ret = __wt_config_subgets(session, &cval, "write_gen", &value);
+        if (ret == 0)
+            write_gen = (uint64_t)value.val;
+        WT_RET_NOTFOUND_OK(ret);
     }
     max_durable_ts = WT_MAX(newest_start_durable_ts, newest_stop_durable_ts);
-    has_txn_updates_gt_than_ckpt_snap = WT_CHECK_RECOVERY_FLAG_TXNID(session, rollback_txnid);
 
-    /* Increment the inconsistent checkpoint stats counter. */
-    if (has_txn_updates_gt_than_ckpt_snap)
+    /*
+     * Perform rollback to stable when the newest written transaction of the btree is greater than
+     * or equal to the checkpoint snapshot. The snapshot comparison is valid only when the btree
+     * write generation number is greater than the last checkpoint connection base write generation
+     * to confirm that the btree is modified in the previous restart cycle.
+     */
+    if (WT_CHECK_RECOVERY_FLAG_TXNID(session, rollback_txnid) &&
+      (write_gen >= S2C(session)->last_ckpt_base_write_gen)) {
+        has_txn_updates_gt_than_ckpt_snap = true;
+        /* Increment the inconsistent checkpoint stats counter. */
         WT_STAT_CONN_DATA_INCR(session, txn_rts_inconsistent_ckpt);
+    }
 
     /*
      * The rollback to stable will skip the tables during recovery and shutdown in the following

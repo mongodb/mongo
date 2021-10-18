@@ -114,7 +114,3 @@ src/txn/txn_ckpt.c:775:19: warning: Although the value stored to 'logging' is us
     full = idle = logging = tracking = use_timestamp = false;
                   ^         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 1 warning generated.
-src/txn/txn_rollback_to_stable.c:1386:43: warning: Although the value stored to 'has_txn_updates_gt_than_ckpt_snap' is used in the enclosing expression, the value is never actually read from 'has_txn_updates_gt_than_ckpt_snap'
-    durable_ts_found = prepared_updates = has_txn_updates_gt_than_ckpt_snap = false;
-                                          ^                                   ~~~~~
-1 warning generated.
