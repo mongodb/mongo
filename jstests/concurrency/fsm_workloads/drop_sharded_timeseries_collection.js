@@ -4,6 +4,8 @@
  * @tags: [
  *   requires_sharding,
  *   does_not_support_stepdowns,
+ *   does_not_support_transactions,
+ *   requires_fcv_50,
  * ]
  */
 'use strict';
