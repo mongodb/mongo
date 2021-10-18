@@ -165,14 +165,11 @@ __wt_block_compact_page_skip(
     }
     __wt_spin_unlock(session, &block->live_lock);
 
-    if (WT_VERBOSE_ISSET(session, WT_VERB_COMPACT) ||
-      WT_VERBOSE_ISSET(session, WT_VERB_COMPACT_PROGRESS)) {
-        ++block->compact_pages_reviewed;
-        if (*skipp)
-            ++block->compact_pages_skipped;
-        else
-            ++block->compact_pages_written;
-    }
+    ++block->compact_pages_reviewed;
+    if (*skipp)
+        ++block->compact_pages_skipped;
+    else
+        ++block->compact_pages_written;
 
     return (0);
 }
