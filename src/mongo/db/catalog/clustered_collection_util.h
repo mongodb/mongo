@@ -42,10 +42,10 @@ namespace clustered_util {
 ClusteredCollectionInfo makeCanonicalClusteredInfoForLegacyFormat();
 
 /**
- * Constructs ClusteredCollectionInfo according to the 'indexSpec'. Stores the information is
- * provided in the non-legacy format.
+ * Constructs ClusteredCollectionInfo according to the 'indexSpec'. Constructs a 'name' by default
+ * if the field is not yet defined. Stores the information is provided in the non-legacy format.
  */
-ClusteredCollectionInfo makeCanonicalClusteredInfo(const ClusteredIndexSpec& indexSpec);
+ClusteredCollectionInfo makeCanonicalClusteredInfo(ClusteredIndexSpec indexSpec);
 
 boost::optional<ClusteredCollectionInfo> parseClusteredInfo(const BSONElement& elem);
 

@@ -36,6 +36,7 @@
 #include <boost/optional.hpp>
 #include <memory>
 
+#include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/coll_mod_index.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/index_catalog.h"
@@ -189,6 +190,27 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
             }
             if (!cmrIndex->indexHidden.eoo() && !cmrIndex->indexHidden.isBoolean()) {
                 return Status(ErrorCodes::InvalidOptions, "hidden field must be a boolean");
+            }
+            if (!cmrIndex->indexHidden.eoo() && coll->isClustered() &&
+                !nss.isTimeseriesBucketsCollection()) {
+                auto clusteredInfo = coll->getClusteredInfo();
+                tassert(6011801,
+                        "Collection isClustered() and getClusteredInfo() should be synced",
+                        clusteredInfo);
+
+                const auto& indexSpec = clusteredInfo->getIndexSpec();
+
+                tassert(6011802,
+                        "When not provided by the user, a default name should always be generated "
+                        "for the collection's clusteredIndex",
+                        indexSpec.getName());
+
+                if ((!indexName.empty() && indexName == StringData(indexSpec.getName().get())) ||
+                    keyPattern.woCompare(indexSpec.getKey()) == 0) {
+                    // The indexName or keyPattern match the collection's clusteredIndex.
+                    return Status(ErrorCodes::Error(6011800),
+                                  "The 'hidden' option is not supported for a clusteredIndex");
+                }
             }
             if (!indexName.empty()) {
                 cmrIndex->idx = coll->getIndexCatalog()->findIndexByName(opCtx, indexName);

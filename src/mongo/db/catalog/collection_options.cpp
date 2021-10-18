@@ -331,7 +331,7 @@ CollectionOptions CollectionOptions::fromCreateCommand(const CreateCommand& cmd)
                             clustered_util::makeCanonicalClusteredInfoForLegacyFormat();
                     }
                 },
-                [&](const ClusteredIndexSpec clusteredIndexSpec) {
+                [&](const ClusteredIndexSpec& clusteredIndexSpec) {
                     options.clusteredIndex =
                         clustered_util::makeCanonicalClusteredInfo(clusteredIndexSpec);
                 }},

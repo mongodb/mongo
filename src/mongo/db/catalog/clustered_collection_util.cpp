@@ -42,8 +42,11 @@ ClusteredCollectionInfo makeCanonicalClusteredInfoForLegacyFormat() {
     return ClusteredCollectionInfo(std::move(indexSpec), true);
 }
 
-ClusteredCollectionInfo makeCanonicalClusteredInfo(const ClusteredIndexSpec& indexSpec) {
-    return ClusteredCollectionInfo(indexSpec, false);
+ClusteredCollectionInfo makeCanonicalClusteredInfo(ClusteredIndexSpec indexSpec) {
+    if (!indexSpec.getName()) {
+        indexSpec.setName(kDefaultClusteredIndexName);
+    }
+    return ClusteredCollectionInfo(std::move(indexSpec), false);
 }
 
 boost::optional<ClusteredCollectionInfo> parseClusteredInfo(const BSONElement& elem) {
@@ -64,11 +67,7 @@ boost::optional<ClusteredCollectionInfo> parseClusteredInfo(const BSONElement& e
     }
 
     auto indexSpec = ClusteredIndexSpec::parse({"ClusteredUtil::parseClusteredInfo"}, elem.Obj());
-    if (!indexSpec.getName()) {
-        indexSpec.setName(kDefaultClusteredIndexName);
-    }
-
-    return makeCanonicalClusteredInfo(indexSpec);
+    return makeCanonicalClusteredInfo(std::move(indexSpec));
 }
 
 bool requiresLegacyFormat(const NamespaceString& nss) {
