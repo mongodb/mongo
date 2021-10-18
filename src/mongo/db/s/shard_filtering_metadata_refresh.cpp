@@ -409,11 +409,6 @@ SharedSemiFuture<void> recoverRefreshShardVersion(ServiceContext* serviceContext
                         csr->setFilteringMetadata_withLock(
                             opCtx, *currentMetadataToInstall, csrLock);
                     }
-                } else {
-                    // If currentMetadataToInstall is uninitialized, an error occurred in the
-                    // current spawned thread. Filtering metadata is cleared to force a new
-                    // recover/refresh.
-                    csr->clearFilteringMetadata(opCtx);
                 }
 
                 auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr);
