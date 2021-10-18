@@ -9491,6 +9491,14 @@ buildvariants:
   - name: .concurrency .large !.ubsan !.no_txns !.debug_only
     distros:
     - rhel80-medium
+  - name: config_fuzzer_concurrency
+  - name: config_fuzzer_concurrency_replication
+    distros:
+    - rhel80-large
+  - name: config_fuzzer_jsCore
+  - name: config_fuzzer_replica_sets_jscore_passthrough
+    distros:
+    - rhel80-large
   - name: disk_wiredtiger
   - name: .encrypt
   - name: idl_tests
