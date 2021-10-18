@@ -7,6 +7,8 @@
  *  requires_sharding,
  *  assumes_balancer_off,
  *  requires_non_retryable_writes,
+ *  does_not_support_transactions,
+ *  requires_fcv_51,
  * ]
  */
 'use strict';
