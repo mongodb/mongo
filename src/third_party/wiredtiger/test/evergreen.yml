@@ -313,11 +313,18 @@ functions:
           done
     - command: shell.exec
       params:
-        working_dir: "wiredtiger.github.com"
         shell: bash
         silent: true
         script: |
           set -o errexit
+
+          # We could have exited the previous command for the same reason.
+          if [[ "${branch_name}" != "develop" ]]; then
+            echo "We only run the documentation update task on the WiredTiger (develop) Evergreen project."
+            exit 0
+          fi
+
+          cd wiredtiger.github.com
           git push https://"${doc-update-github-token}"@github.com/wiredtiger/wiredtiger.github.com
 
   "make check directory":
