@@ -127,7 +127,7 @@ void moveChunk(OperationContext* opCtx, const NamespaceString& nss, const BSONOb
     chunkToMove.setMax(suggestedChunk.getMax());
     chunkToMove.setVersion(suggestedChunk.getLastmod());
 
-    uassertStatusOK(configsvr_client::rebalanceChunk(opCtx, chunkToMove));
+    uassertStatusOK(configsvr_client::rebalanceChunk(opCtx, nss, chunkToMove));
 }
 
 /**

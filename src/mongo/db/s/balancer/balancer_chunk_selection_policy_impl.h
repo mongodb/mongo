@@ -52,7 +52,7 @@ public:
                                                      const NamespaceString& ns) override;
 
     StatusWith<boost::optional<MigrateInfo>> selectSpecificChunkToMove(
-        OperationContext* opCtx, const ChunkType& chunk) override;
+        OperationContext* opCtx, const NamespaceString& nss, const ChunkType& chunk) override;
 
     Status checkMoveAllowed(OperationContext* opCtx,
                             const ChunkType& chunk,

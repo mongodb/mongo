@@ -146,7 +146,9 @@ public:
      * will actually move because it may already be at the best shard. An error will be returned if
      * the attempt to find a better shard or the actual migration fail for any reason.
      */
-    Status rebalanceSingleChunk(OperationContext* opCtx, const ChunkType& chunk);
+    Status rebalanceSingleChunk(OperationContext* opCtx,
+                                const NamespaceString& nss,
+                                const ChunkType& chunk);
 
     /**
      * Blocking call, which requests the balancer to move a single chunk to the specified location
@@ -157,6 +159,7 @@ public:
      *       move regardless. If should be used only for user-initiated moves.
      */
     Status moveSingleChunk(OperationContext* opCtx,
+                           const NamespaceString& nss,
                            const ChunkType& chunk,
                            const ShardId& newShardId,
                            uint64_t maxChunkSizeBytes,

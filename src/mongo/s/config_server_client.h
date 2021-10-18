@@ -48,6 +48,7 @@ namespace configsvr_client {
  * Requests the balancer to move the specified chunk off of its current shard to the new shard.
  */
 Status moveChunk(OperationContext* opCtx,
+                 const NamespaceString& nss,
                  const ChunkType& chunk,
                  const ShardId& newShardId,
                  int64_t maxChunkSizeBytes,
@@ -59,7 +60,7 @@ Status moveChunk(OperationContext* opCtx,
  * Requests the balancer to move the specified chunk off of its current shard to a shard, considered
  * more appropriate under the balancing policy which is currently in effect.
  */
-Status rebalanceChunk(OperationContext* opCtx, const ChunkType& chunk);
+Status rebalanceChunk(OperationContext* opCtx, const NamespaceString& nss, const ChunkType& chunk);
 
 }  // namespace configsvr_client
 }  // namespace mongo

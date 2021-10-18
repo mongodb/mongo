@@ -224,7 +224,10 @@ public:
      * Also does validation of the contents. Note that 'parseFromConfigBSONCommand' does not return
      * ErrorCodes::NoSuchKey if the '_id' field is missing while 'fromConfigBSON' does.
      */
-    static StatusWith<ChunkType> parseFromConfigBSONCommand(const BSONObj& source);
+    // TODO (SERVER-60792): Get rid of "requireUUID" once v6.0 branches out. Starting from v5.1, the
+    // collection UUID will always be present in the chunk.
+    static StatusWith<ChunkType> parseFromConfigBSONCommand(const BSONObj& source,
+                                                            bool requireUUID = true);
     static StatusWith<ChunkType> fromConfigBSON(const BSONObj& source,
                                                 const OID& epoch,
                                                 const Timestamp& timestamp);
@@ -257,6 +260,14 @@ public:
     /**
      * Getters and setters.
      */
+
+    // TODO (SERVER-60792): Get rid of this function once v6.0 branches out. Due to a missing
+    // addition of the UUID field in v5.0 BalanceChunkRequest, it can happen that the field is not
+    // set. Mark as "UNSAFE" to make it clear that this method is just intended to be used for this
+    // specific purpose.
+    bool hasCollectionUUID_UNSAFE() const {
+        return (bool)_collectionUUID;
+    }
 
     const CollectionUUID& getCollectionUUID() const {
         invariant(_collectionUUID);

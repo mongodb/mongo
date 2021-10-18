@@ -131,10 +131,12 @@ TEST_F(MigrationManagerTest, OneCollectionTwoMigrations) {
 
     // Going to request that these two chunks get migrated.
     const std::vector<MigrateInfo> migrationRequests{{kShardId1,
+                                                      collName,
                                                       chunk1,
                                                       MoveChunkRequest::ForceJumbo::kDoNotForce,
                                                       MigrateInfo::chunksImbalance},
                                                      {kShardId3,
+                                                      collName,
                                                       chunk2,
                                                       MoveChunkRequest::ForceJumbo::kDoNotForce,
                                                       MigrateInfo::chunksImbalance}};
@@ -199,18 +201,22 @@ TEST_F(MigrationManagerTest, TwoCollectionsTwoMigrationsEach) {
 
     // Going to request that these four chunks get migrated.
     const std::vector<MigrateInfo> migrationRequests{{kShardId1,
+                                                      collName1,
                                                       chunk1coll1,
                                                       MoveChunkRequest::ForceJumbo::kDoNotForce,
                                                       MigrateInfo::chunksImbalance},
                                                      {kShardId3,
+                                                      collName1,
                                                       chunk2coll1,
                                                       MoveChunkRequest::ForceJumbo::kDoNotForce,
                                                       MigrateInfo::chunksImbalance},
                                                      {kShardId1,
+                                                      collName2,
                                                       chunk1coll2,
                                                       MoveChunkRequest::ForceJumbo::kDoNotForce,
                                                       MigrateInfo::chunksImbalance},
                                                      {kShardId3,
+                                                      collName2,
                                                       chunk2coll2,
                                                       MoveChunkRequest::ForceJumbo::kDoNotForce,
                                                       MigrateInfo::chunksImbalance}};
@@ -269,10 +275,12 @@ TEST_F(MigrationManagerTest, SourceShardNotFound) {
 
     // Going to request that these two chunks get migrated.
     const std::vector<MigrateInfo> migrationRequests{{kShardId1,
+                                                      collName,
                                                       chunk1,
                                                       MoveChunkRequest::ForceJumbo::kDoNotForce,
                                                       MigrateInfo::chunksImbalance},
                                                      {kShardId3,
+                                                      collName,
                                                       chunk2,
                                                       MoveChunkRequest::ForceJumbo::kDoNotForce,
                                                       MigrateInfo::chunksImbalance}};
@@ -324,6 +332,7 @@ TEST_F(MigrationManagerTest, JumboChunkResponseBackwardsCompatibility) {
 
     // Going to request that this chunk gets migrated.
     const std::vector<MigrateInfo> migrationRequests{{kShardId1,
+                                                      collName,
                                                       chunk1,
                                                       MoveChunkRequest::ForceJumbo::kDoNotForce,
                                                       MigrateInfo::chunksImbalance}};
@@ -380,6 +389,7 @@ TEST_F(MigrationManagerTest, InterruptMigration) {
             ErrorCodes::BalancerInterrupted,
             _migrationManager->executeManualMigration(opCtx.get(),
                                                       {kShardId1,
+                                                       collName,
                                                        chunk,
                                                        MoveChunkRequest::ForceJumbo::kDoNotForce,
                                                        MigrateInfo::chunksImbalance},
@@ -410,6 +420,7 @@ TEST_F(MigrationManagerTest, InterruptMigration) {
     ASSERT_EQ(ErrorCodes::BalancerInterrupted,
               _migrationManager->executeManualMigration(operationContext(),
                                                         {kShardId1,
+                                                         collName,
                                                          chunk,
                                                          MoveChunkRequest::ForceJumbo::kDoNotForce,
                                                          MigrateInfo::chunksImbalance},
@@ -482,6 +493,7 @@ TEST_F(MigrationManagerTest, RestartMigrationManager) {
         ASSERT_OK(
             _migrationManager->executeManualMigration(opCtx.get(),
                                                       {kShardId1,
+                                                       collName,
                                                        chunk1,
                                                        MoveChunkRequest::ForceJumbo::kDoNotForce,
                                                        MigrateInfo::chunksImbalance},
@@ -636,10 +648,12 @@ TEST_F(MigrationManagerTest, RemoteCallErrorConversionToOperationFailed) {
 
     // Going to request that these two chunks get migrated.
     const std::vector<MigrateInfo> migrationRequests{{kShardId1,
+                                                      collName,
                                                       chunk1,
                                                       MoveChunkRequest::ForceJumbo::kDoNotForce,
                                                       MigrateInfo::chunksImbalance},
                                                      {kShardId3,
+                                                      collName,
                                                       chunk2,
                                                       MoveChunkRequest::ForceJumbo::kDoNotForce,
                                                       MigrateInfo::chunksImbalance}};

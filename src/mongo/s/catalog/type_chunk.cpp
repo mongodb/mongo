@@ -216,7 +216,8 @@ ChunkType::ChunkType(CollectionUUID collectionUUID,
       _version(std::move(version)),
       _shard(std::move(shardId)) {}
 
-StatusWith<ChunkType> ChunkType::parseFromConfigBSONCommand(const BSONObj& source) {
+StatusWith<ChunkType> ChunkType::parseFromConfigBSONCommand(const BSONObj& source,
+                                                            bool requireUUID) {
     ChunkType chunk;
 
     {
@@ -248,9 +249,8 @@ StatusWith<ChunkType> ChunkType::parseFromConfigBSONCommand(const BSONObj& sourc
         }
     }
 
-    // There must be at least uuid
-    if (!chunk._collectionUUID) {
-        return {ErrorCodes::FailedToParse, str::stream() << "There must be a uuid present"};
+    if (requireUUID && !chunk._collectionUUID) {
+        return {ErrorCodes::FailedToParse, str::stream() << "There must be a UUID present"};
     }
 
     {

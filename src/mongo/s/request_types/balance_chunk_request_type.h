@@ -52,13 +52,17 @@ public:
      * Parses the provided BSON content and if it is correct construct a request object with the
      * request parameters. If the '_id' field is missing in obj, ignore it.
      */
-    static StatusWith<BalanceChunkRequest> parseFromConfigCommand(const BSONObj& obj);
+    // TODO (SERVER-60792): Get rid of "requireUUID" once v6.0 branches out. Starting from v5.1, the
+    // collection UUID will always be present in the chunk.
+    static StatusWith<BalanceChunkRequest> parseFromConfigCommand(const BSONObj& obj,
+                                                                  bool requireUUID = true);
 
     /**
      * Produces a BSON object for the variant of the command, which requests the balancer to move a
      * chunk to a user-specified shard.
      */
     static BSONObj serializeToMoveCommandForConfig(
+        const NamespaceString& nss,
         const ChunkType& chunk,
         const ShardId& newShardId,
         int64_t maxChunkSizeBytes,
@@ -70,13 +74,16 @@ public:
      * Produces a BSON object for the variant of the command, which requests the balancer to pick a
      * better location for a chunk.
      */
-    static BSONObj serializeToRebalanceCommandForConfig(const ChunkType& chunk);
+    static BSONObj serializeToRebalanceCommandForConfig(const NamespaceString& nss,
+                                                        const ChunkType& chunk);
 
-    // an pre 5.1 mongos might send the namespace instead of the UUID
-    const boost::optional<NamespaceString>& getNss() const {
+
+    const NamespaceString& getNss() const {
         return _nss;
     }
 
+    // TODO (SERVER-60792): Get rid of setCollectionUUID() once v6.0 branches out. Starting from
+    // v5.1, the collection UUID will always be present in the chunk.
     void setCollectionUUID(UUID const& uuid) {
         _chunk.setCollectionUUID(uuid);
     }
@@ -112,8 +119,7 @@ public:
 private:
     BalanceChunkRequest(ChunkType chunk, MigrationSecondaryThrottleOptions secondaryThrottle);
 
-    // legacy code might send the namespace instead of UUID
-    boost::optional<NamespaceString> _nss;
+    NamespaceString _nss;
 
     // Complete description of the chunk to be manipulated
     ChunkType _chunk;

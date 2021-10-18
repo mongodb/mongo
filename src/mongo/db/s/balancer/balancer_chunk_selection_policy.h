@@ -116,7 +116,7 @@ public:
      * Otherwise returns migration information for where the chunk should be moved.
      */
     virtual StatusWith<boost::optional<MigrateInfo>> selectSpecificChunkToMove(
-        OperationContext* opCtx, const ChunkType& chunk) = 0;
+        OperationContext* opCtx, const NamespaceString& nss, const ChunkType& chunk) = 0;
 
     /**
      * Asks the chunk selection policy to validate that the specified chunk migration is allowed

@@ -260,8 +260,10 @@ Balancer::ScopedPauseBalancerRequest Balancer::requestPause() {
     return ScopedPauseBalancerRequest(this);
 }
 
-Status Balancer::rebalanceSingleChunk(OperationContext* opCtx, const ChunkType& chunk) {
-    auto migrateStatus = _chunkSelectionPolicy->selectSpecificChunkToMove(opCtx, chunk);
+Status Balancer::rebalanceSingleChunk(OperationContext* opCtx,
+                                      const NamespaceString& nss,
+                                      const ChunkType& chunk) {
+    auto migrateStatus = _chunkSelectionPolicy->selectSpecificChunkToMove(opCtx, nss, chunk);
     if (!migrateStatus.isOK()) {
         return migrateStatus.getStatus();
     }
@@ -290,6 +292,7 @@ Status Balancer::rebalanceSingleChunk(OperationContext* opCtx, const ChunkType& 
 }
 
 Status Balancer::moveSingleChunk(OperationContext* opCtx,
+                                 const NamespaceString& nss,
                                  const ChunkType& chunk,
                                  const ShardId& newShardId,
                                  uint64_t maxChunkSizeBytes,
@@ -304,6 +307,7 @@ Status Balancer::moveSingleChunk(OperationContext* opCtx,
     return _migrationManager.executeManualMigration(
         opCtx,
         MigrateInfo(newShardId,
+                    nss,
                     chunk,
                     forceJumbo ? MoveChunkRequest::ForceJumbo::kForceManual
                                : MoveChunkRequest::ForceJumbo::kDoNotForce,
