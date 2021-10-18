@@ -2980,6 +2980,22 @@ tasks:
       name: update_fuzzer
       require_multiversion: true
 
+## jstestfuzz standalone update time-series generational fuzzer ##
+- <<: *jstestfuzz_template
+  name: update_timeseries_fuzzer_gen
+  tags: ["updatefuzzer", "require_npm", "random_name", "multiversion"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      <<: *jstestfuzz_config_vars
+      num_files: 5
+      num_tasks: 5
+      jstestfuzz_vars: --diffTestingMode timeseries
+      npm_command: update-fuzzer
+      suite: generational_fuzzer
+      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+      name: update_timeseries_fuzzer
+
 ## jstestfuzz replication update generational fuzzer ##
 - <<: *jstestfuzz_template
   name: update_fuzzer_replication_gen
