@@ -10800,7 +10800,7 @@ buildvariants:
   modules:
   - enterprise
   run_on:
-  - suse12-test
+  - suse12-sp5-small
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     push_path: linux
@@ -10819,7 +10819,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - suse12-build
+    - suse12-sp5-large
   - name: build_variant_gen
   - name: .aggfuzzer .common
   - name: audit
@@ -10845,7 +10845,7 @@ buildvariants:
   display_name: SUSE 12
   cron: "0 0 * * *" # Every day starting at 00:00
   run_on:
-  - suse12-test
+  - suse12-sp5-small
   expansions:
     push_path: linux
     push_bucket: downloads.mongodb.org
@@ -10860,11 +10860,11 @@ buildvariants:
     packager_distro: suse12
     repo_edition: org
     scons_cache_scope: shared
-    large_distro_name: suse12-build
+    large_distro_name: suse12-sp5-large
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - suse12-build
+    - suse12-sp5-large
   - name: build_variant_gen
   - name: .aggfuzzer .common
   - name: aggregation
@@ -10874,7 +10874,7 @@ buildvariants:
   - name: .concurrency .common !.large
   - name: .concurrency .common .large
     distros:
-      - suse12-build
+      - suse12-sp5-large
   - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
   - name: free_monitoring
