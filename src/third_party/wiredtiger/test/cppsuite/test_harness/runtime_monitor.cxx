@@ -80,7 +80,7 @@ runtime_statistic::enabled() const
 /* cache_limit_statistic class implementation */
 cache_limit_statistic::cache_limit_statistic(configuration *config) : runtime_statistic(config)
 {
-    limit = config->get_int(LIMIT);
+    _limit = config->get_int(LIMIT);
 }
 
 void
@@ -98,9 +98,9 @@ cache_limit_statistic::check(scoped_cursor &cursor)
      * point conversion errors.
      */
     use_percent = ((cache_bytes_image + cache_bytes_other + 0.0) / cache_bytes_max) * 100;
-    if (use_percent > limit) {
+    if (use_percent > _limit) {
         const std::string error_string =
-          "runtime_monitor: Cache usage exceeded during test! Limit: " + std::to_string(limit) +
+          "runtime_monitor: Cache usage exceeded during test! Limit: " + std::to_string(_limit) +
           " usage: " + std::to_string(use_percent);
         testutil_die(-1, error_string.c_str());
     } else
