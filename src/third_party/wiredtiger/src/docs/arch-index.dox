@@ -86,14 +86,12 @@ schema -down-> meta
 schema -down-> btree
 cursor -down-> btree
 btree -down-> row
-btree -down-> column
 meta -up-> cursor
 ' The hidden arrow helps our boxes to line up in a better way.
 meta -[hidden]right-> btree
 cursor -[hidden]right-> txn
 txn -down-> snapshot
 row -down-> cache
-column -down-> cache
 cache -down-> history
 evict -down-> history
 history -up-> cursor
@@ -131,6 +129,7 @@ Hot backup uses a type of cursor to backup the database.
 The Block Manager manages the reading and writing of disk blocks.
 
 @subpage arch-btree
+
 A B-Tree is one type of underlying data source in a dhandle and is organized into pages.
 
 @subpage arch-cache
