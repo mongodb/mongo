@@ -79,3 +79,10 @@ feature_flags:
       description: "Feature flag for enabling use of the SBE plan cache"
       cpp_varname: gFeatureFlagSbePlanCache
       default: false
+
+    featureFlagFill:
+        description: >
+          When disabled, this flag does not allow $fill, $locf or the linear interpolation window function
+          to parse. It will be removed when PM-1935 is complete
+        cpp_varname: gFlagFill
+        default: false
