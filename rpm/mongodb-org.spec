@@ -266,6 +266,8 @@ mkdir -p $RPM_BUILD_ROOT%{_prefix}
 cp -rv bin $RPM_BUILD_ROOT%{_prefix}
 mkdir -p $RPM_BUILD_ROOT%{_mandir}/man1
 cp debian/mongo{,d,s}.1 $RPM_BUILD_ROOT%{_mandir}/man1/
+mkdir -p $RPM_BUILD_ROOT%{_mandir}/man5
+cp debian/mongodb-parameters.5 $RPM_BUILD_ROOT%{_mandir}/man5/
 mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}
 cp -v rpm/mongod.conf $RPM_BUILD_ROOT%{_sysconfdir}/mongod.conf
 mkdir -p $RPM_BUILD_ROOT%{_unitdir}
@@ -317,6 +319,7 @@ fi
 %config(noreplace) %{_sysconfdir}/mongod.conf
 %{_bindir}/mongod
 %{_mandir}/man1/mongod.1*
+%{_mandir}/man5/mongodb-parameters.5*
 %{_unitdir}/mongod.service
 %attr(0755,mongod,mongod) %dir %{_sharedstatedir}/mongo
 %attr(0755,mongod,mongod) %dir %{_localstatedir}/log/mongodb
