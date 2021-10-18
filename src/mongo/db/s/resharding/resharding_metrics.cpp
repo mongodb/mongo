@@ -35,9 +35,9 @@
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
+#include "mongo/util/aligned.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/integer_histogram.h"
-#include "mongo/util/with_alignment.h"
 
 namespace mongo {
 
@@ -134,9 +134,9 @@ public:
 
     BSONObj getObj() const noexcept {
         BSONObjBuilder b;
-        b.append("insert", _insert.loadRelaxed());
-        b.append("update", _update.loadRelaxed());
-        b.append("delete", _delete.loadRelaxed());
+        b.append("insert", _insert->loadRelaxed());
+        b.append("update", _update->loadRelaxed());
+        b.append("delete", _delete->loadRelaxed());
         return b.obj();
     }
 
@@ -144,16 +144,16 @@ private:
     // Increment member `counter` by n, resetting all counters if it was > 2^60.
     void _checkWrap(CacheAligned<AtomicWord<long long>> ReshardingOpCounters::*counter, int n) {
         static constexpr auto maxCount = 1LL << 60;
-        auto oldValue = (this->*counter).fetchAndAddRelaxed(n);
+        auto oldValue = (this->*counter)->fetchAndAddRelaxed(n);
         if (oldValue > maxCount - n) {
             LOGV2(5776000,
                   "ReshardingOpCounters exceeded maximum value, resetting all to 0",
-                  "insert"_attr = _insert.loadRelaxed(),
-                  "update"_attr = _update.loadRelaxed(),
-                  "delete"_attr = _delete.loadRelaxed());
-            _insert.store(0);
-            _update.store(0);
-            _delete.store(0);
+                  "insert"_attr = _insert->loadRelaxed(),
+                  "update"_attr = _update->loadRelaxed(),
+                  "delete"_attr = _delete->loadRelaxed());
+            _insert->store(0);
+            _update->store(0);
+            _delete->store(0);
         }
     }
 

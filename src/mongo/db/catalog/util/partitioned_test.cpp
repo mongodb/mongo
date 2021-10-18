@@ -201,7 +201,7 @@ TEST(PartitionedConcurrency, ModificationsFromAllShouldBeVisible) {
         all.insert(1);
         all.insert(2);
         for (auto&& partition : all) {
-            ASSERT_EQ(1UL, partition.size());
+            ASSERT_EQ(1UL, partition->size());
         }
     }
 

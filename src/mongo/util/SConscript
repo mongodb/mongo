@@ -622,6 +622,7 @@ icuEnv.CppUnitTest(
     target='util_test',
     source=[
         'alarm_test.cpp',
+        'aligned_test.cpp',
         'assert_util_test.cpp',
         'background_job_test.cpp',
         'background_thread_clock_source_test.cpp',

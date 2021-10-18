@@ -36,10 +36,10 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/basic.h"
 #include "mongo/rpc/message.h"
+#include "mongo/util/aligned.h"
 #include "mongo/util/concurrency/spin_lock.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/string_map.h"
-#include "mongo/util/with_alignment.h"
 
 namespace mongo {
 
@@ -114,37 +114,37 @@ public:
 
     // thse are used by snmp, and other things, do not remove
     const AtomicWord<long long>* getInsert() const {
-        return &_insert;
+        return &*_insert;
     }
     const AtomicWord<long long>* getQuery() const {
-        return &_query;
+        return &*_query;
     }
     const AtomicWord<long long>* getUpdate() const {
-        return &_update;
+        return &*_update;
     }
     const AtomicWord<long long>* getDelete() const {
-        return &_delete;
+        return &*_delete;
     }
     const AtomicWord<long long>* getGetMore() const {
-        return &_getmore;
+        return &*_getmore;
     }
     const AtomicWord<long long>* getCommand() const {
-        return &_command;
+        return &*_command;
     }
     const AtomicWord<long long>* getInsertOnExistingDoc() const {
-        return &_insertOnExistingDoc;
+        return &*_insertOnExistingDoc;
     }
     const AtomicWord<long long>* getUpdateOnMissingDoc() const {
-        return &_updateOnMissingDoc;
+        return &*_updateOnMissingDoc;
     }
     const AtomicWord<long long>* getDeleteWasEmpty() const {
-        return &_deleteWasEmpty;
+        return &*_deleteWasEmpty;
     }
     const AtomicWord<long long>* getDeleteFromMissingNamespace() const {
-        return &_deleteFromMissingNamespace;
+        return &*_deleteFromMissingNamespace;
     }
     const AtomicWord<long long>* getAcceptableErrorInCommand() const {
-        return &_acceptableErrorInCommand;
+        return &*_acceptableErrorInCommand;
     }
 
 private:
@@ -197,15 +197,15 @@ public:
     void acceptedTFOIngress();
 
     void setTFOKernelSetting(std::int64_t val) {
-        _tfo.kernelSetting = val;
+        _tfo->kernelSetting = val;
     }
 
     void setTFOServerSupport(bool val) {
-        _tfo.kernelSupportServer = val;
+        _tfo->kernelSupportServer = val;
     }
 
     void setTFOClientSupport(bool val) {
-        _tfo.kernelSupportClient = val;
+        _tfo->kernelSupportClient = val;
     }
 
     void append(BSONObjBuilder& b);

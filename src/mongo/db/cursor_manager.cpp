@@ -156,7 +156,7 @@ CursorManager::CursorManager(ClockSource* preciseClockSource)
 CursorManager::~CursorManager() {
     auto allPartitions = _cursorMap->lockAllPartitions();
     for (auto&& partition : allPartitions) {
-        for (auto&& cursor : partition) {
+        for (auto&& cursor : *partition) {
             // Callers must ensure that no cursors are in use.
             invariant(!cursor.second->_operationUsingCursor);
             cursor.second->dispose(nullptr);
@@ -290,7 +290,7 @@ void CursorManager::unpin(OperationContext* opCtx,
 void CursorManager::appendActiveSessions(LogicalSessionIdSet* lsids) const {
     auto allPartitions = _cursorMap->lockAllPartitions();
     for (auto&& partition : allPartitions) {
-        for (auto&& entry : partition) {
+        for (auto&& entry : *partition) {
             auto cursor = entry.second;
             if (auto id = cursor->getSessionId()) {
                 lsids->insert(id.value());
@@ -306,7 +306,7 @@ std::vector<GenericCursor> CursorManager::getIdleCursors(
 
     auto allPartitions = _cursorMap->lockAllPartitions();
     for (auto&& partition : allPartitions) {
-        for (auto&& entry : partition) {
+        for (auto&& entry : *partition) {
             auto cursor = entry.second;
 
             // Exclude cursors that this user does not own if auth is enabled.
@@ -331,7 +331,7 @@ stdx::unordered_set<CursorId> CursorManager::getCursorsForSession(LogicalSession
 
     auto allPartitions = _cursorMap->lockAllPartitions();
     for (auto&& partition : allPartitions) {
-        for (auto&& entry : partition) {
+        for (auto&& entry : *partition) {
             auto cursor = entry.second;
             if (cursor->getSessionId() == lsid) {
                 cursors.insert(cursor->cursorid());

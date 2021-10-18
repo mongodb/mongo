@@ -40,8 +40,8 @@
 #include <boost/align/aligned_allocator.hpp>
 
 #include "mongo/platform/mutex.h"
+#include "mongo/util/aligned.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/with_alignment.h"
 
 namespace mongo {
 
@@ -119,7 +119,7 @@ inline std::vector<stdx::unique_lock<stdx::mutex>> lockAllPartitions(T& mutexes)
     std::vector<stdx::unique_lock<stdx::mutex>> result;
     result.reserve(mutexes.size());
     std::transform(mutexes.begin(), mutexes.end(), std::back_inserter(result), [](auto&& mutex) {
-        return stdx::unique_lock<stdx::mutex>{mutex};
+        return stdx::unique_lock<stdx::mutex>{*mutex};
     });
     return result;
 }
@@ -200,7 +200,7 @@ public:
                 this->_partitionedContainer->_partitions.begin(),
                 this->_partitionedContainer->_partitions.end(),
                 std::size_t{0},
-                [](auto&& total, auto&& partition) { return total + partition.size(); });
+                [](auto&& total, auto&& partition) { return total + partition->size(); });
         }
 
         /**
@@ -209,7 +209,7 @@ public:
         bool empty() const {
             return std::all_of(this->_partitionedContainer->_partitions.begin(),
                                this->_partitionedContainer->_partitions.end(),
-                               [](auto&& partition) { return partition.empty(); });
+                               [](auto&& partition) { return partition->empty(); });
         }
 
         /**
@@ -217,7 +217,7 @@ public:
          */
         std::size_t count(const key_type& key) const {
             auto partitionId = KeyPartitioner()(key, nPartitions);
-            return this->_partitionedContainer->_partitions[partitionId].count(key);
+            return this->_partitionedContainer->_partitions[partitionId]->count(key);
         }
 
         /**
@@ -225,7 +225,7 @@ public:
          */
         void clear() {
             for (auto&& partition : this->_partitionedContainer->_partitions) {
-                partition.clear();
+                partition->clear();
             }
         }
 
@@ -235,7 +235,7 @@ public:
         void insert(value_type value) & {
             const auto partitionId =
                 KeyPartitioner()(partitioned_detail::getKey(value), nPartitions);
-            this->_partitionedContainer->_partitions[partitionId].insert(std::move(value));
+            this->_partitionedContainer->_partitions[partitionId]->insert(std::move(value));
         }
         void insert(value_type) && = delete;
 
@@ -244,7 +244,7 @@ public:
          */
         std::size_t erase(const key_type& key) & {
             const auto partitionId = KeyPartitioner()(key, nPartitions);
-            return this->_partitionedContainer->_partitions[partitionId].erase(key);
+            return this->_partitionedContainer->_partitions[partitionId]->erase(key);
         }
         void erase(const key_type&) && = delete;
 
@@ -266,7 +266,7 @@ public:
          * Returns a pointer to the structure in this partition.
          */
         AssociativeContainer* operator->() const& {
-            return &this->_partitioned->_partitions[_id];
+            return &*this->_partitioned->_partitions[_id];
         }
         void operator->() && = delete;
 
@@ -274,7 +274,7 @@ public:
          * Returns a reference to the structure in this partition.
          */
         AssociativeContainer& operator*() const& {
-            return this->_partitioned->_partitions[_id];
+            return *this->_partitioned->_partitions[_id];
         }
         void operator*() && = delete;
 
@@ -287,7 +287,7 @@ public:
          * use GuardedAssociativeContainer, or acquire them in ascending order.
          */
         OnePartition(Partitioned& partitioned, PartitionId partitionId)
-            : _partitionLock(partitioned._mutexes[partitionId]),
+            : _partitionLock(*partitioned._mutexes[partitionId]),
               _partitioned(&partitioned),
               _id(partitionId) {}
 
@@ -315,7 +315,7 @@ public:
         const auto all = partitioned_detail::lockAllPartitions(this->_mutexes);
         return std::all_of(this->_partitions.begin(),
                            this->_partitions.end(),
-                           [](auto&& partition) { return partition.empty(); });
+                           [](auto&& partition) { return partition->empty(); });
     }
 
     /**
@@ -328,7 +328,7 @@ public:
             this->_partitions.begin(),
             this->_partitions.end(),
             std::size_t{0},
-            [](auto&& total, auto&& partition) { return total + partition.size(); });
+            [](auto&& total, auto&& partition) { return total + partition->size(); });
     }
 
     /**
