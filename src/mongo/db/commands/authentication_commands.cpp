@@ -364,8 +364,10 @@ AuthenticateReply authCommand(OperationContext* opCtx,
 
         session->markSuccessful();
 
-        return AuthenticateReply(session->getUserName().toString(),
-                                 session->getDatabase().toString());
+        AuthenticateReply reply;
+        reply.setUser(session->getUserName());
+        reply.setDbname(session->getDatabase());
+        return reply;
 
     } catch (const AssertionException& ex) {
         if (!serverGlobalParams.quiet.load()) {

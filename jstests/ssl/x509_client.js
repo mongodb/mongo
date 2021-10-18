@@ -32,10 +32,18 @@ function authAndTest(mongo) {
            "authentication with valid user failed");
     assert(external.auth({mechanism: 'MONGODB-X509'}),
            "authentication with valid client cert and no user field failed");
-    assert(external.runCommand({authenticate: 1, mechanism: 'MONGODB-X509', user: CLIENT_USER}).ok,
-           "runCommand authentication with valid client cert and user field failed");
-    assert(external.runCommand({authenticate: 1, mechanism: 'MONGODB-X509'}).ok,
-           "runCommand authentication with valid client cert and no user field failed");
+
+    const withUserReply = assert.commandWorked(
+        external.runCommand({authenticate: 1, mechanism: 'MONGODB-X509', user: CLIENT_USER}),
+        "runCommand authentication with valid client cert and user field failed");
+    assert.eq(withUserReply.user, CLIENT_USER);
+    assert.eq(withUserReply.dbname, '$external');
+
+    const noUserReply = assert.commandWorked(
+        external.runCommand({authenticate: 1, mechanism: 'MONGODB-X509'}),
+        "runCommand authentication with valid client cert and no user field failed");
+    assert.eq(noUserReply.user, CLIENT_USER);
+    assert.eq(noUserReply.dbname, '$external');
 
     // Check that there's a "Successfully authenticated" message that includes the client IP
     const log =
