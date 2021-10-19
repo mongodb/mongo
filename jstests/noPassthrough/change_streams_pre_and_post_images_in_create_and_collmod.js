@@ -1,8 +1,14 @@
 /*
  * Tests that the 'changeStreamPreAndPostImages' option is settable via the collMod and create
  * commands. Also tests that this option cannot be set on collections in the 'local', 'admin',
- * 'config' databases as well as timeseries and view collections.
- * @tags: [requires_fcv_51, featureFlagChangeStreamPreAndPostImages]
+ * 'config' databases as well as timeseries and view collections. Verifies that the pre-images
+ * collection is clustered.
+ * @tags: [
+ * requires_fcv_51,
+ * featureFlagChangeStreamPreAndPostImages,
+ * # Clustered index support is required for change stream pre-images collection.
+ * featureFlagClusteredIndexes,
+ * ]
  */
 (function() {
 'use strict';
@@ -39,14 +45,32 @@ const localDB = primary.getDB("local");
 const configDB = primary.getDB("config");
 const testDB = primary.getDB(dbName);
 
-function assertPreimagesCollectionIsAbsent() {
-    const result = localDB.runCommand("listCollections", {filter: {name: preimagesCollName}});
+function findPreImagesCollectionDescriptions() {
+    return localDB.runCommand("listCollections", {filter: {name: preimagesCollName}});
+}
+
+function assertPreImagesCollectionIsAbsent() {
+    const result = findPreImagesCollectionDescriptions();
     assert.eq(result.cursor.firstBatch.length, 0);
 }
 
-function assertPreimagesCollectionExists() {
-    const result = localDB.runCommand("listCollections", {filter: {name: preimagesCollName}});
+function assertPreImagesCollectionExists() {
+    const result = findPreImagesCollectionDescriptions();
     assert.eq(result.cursor.firstBatch[0].name, preimagesCollName);
+}
+
+// Verifies that the pre-images collection is clustered by _id.
+function assertPreImagesCollectionIsClustered() {
+    const collectionInfos = findPreImagesCollectionDescriptions();
+    assert.eq(collectionInfos.cursor.firstBatch.length, 1, collectionInfos);
+    const preImagesCollectionDescription = collectionInfos.cursor.firstBatch[0];
+    assert(preImagesCollectionDescription.hasOwnProperty("options"),
+           preImagesCollectionDescription);
+    assert(preImagesCollectionDescription.options.hasOwnProperty("clusteredIndex"),
+           preImagesCollectionDescription);
+    const clusteredIndexDescription = preImagesCollectionDescription.options.clusteredIndex;
+    assert.eq(clusteredIndexDescription.unique, true, preImagesCollectionDescription);
+    assert.eq(clusteredIndexDescription.key, {_id: 1}, preImagesCollectionDescription);
 }
 
 // Check that we cannot set 'changeStreamPreAndPostImages' on the local, admin and config databases.
@@ -63,7 +87,7 @@ for (const db of [localDB, adminDB, configDB]) {
 
 // Drop the pre-images collection.
 assertDropCollection(localDB, preimagesCollName);
-assertPreimagesCollectionIsAbsent();
+assertPreImagesCollectionIsAbsent();
 
 // Drop all collections that are used during the test.
 for (const collectionToDelete
@@ -75,23 +99,24 @@ for (const collectionToDelete
 assert.commandWorked(
     testDB.runCommand({create: collName, changeStreamPreAndPostImages: {enabled: true}}));
 assertChangeStreamPreAndPostImagesCollectionOptionIsEnabled(testDB, collName);
-assertPreimagesCollectionExists();
+assertPreImagesCollectionExists();
+assertPreImagesCollectionIsClustered();
 
 // Drop the pre-images collection.
 assertDropCollection(localDB, preimagesCollName);
-assertPreimagesCollectionIsAbsent();
+assertPreImagesCollectionIsAbsent();
 
 assert.commandWorked(testDB.runCommand({create: collName2}));
 assert.commandWorked(
     testDB.runCommand({collMod: collName2, changeStreamPreAndPostImages: {enabled: true}}));
 assertChangeStreamPreAndPostImagesCollectionOptionIsEnabled(testDB, collName2);
-assertPreimagesCollectionExists();
+assertPreImagesCollectionExists();
 
 // Verify that setting collection options with 'collMod' command does not affect
 // 'changeStreamPreAndPostImages' option.
 assert.commandWorked(testDB.runCommand({"collMod": collName2, validationLevel: "off"}));
 assertChangeStreamPreAndPostImagesCollectionOptionIsEnabled(testDB, collName2);
-assertPreimagesCollectionExists();
+assertPreImagesCollectionExists();
 
 // Should successfully disable 'changeStreamPreAndPostImages' using the 'collMod' command.
 assert.commandWorked(
@@ -100,7 +125,7 @@ assertChangeStreamPreAndPostImagesCollectionOptionIsAbsent(testDB, collName2);
 
 // Should not remove the pre-images collection on disabling 'changeStreamPreAndPostImages'
 // option.
-assertPreimagesCollectionExists();
+assertPreImagesCollectionExists();
 
 // Both 'recordPreImages' and 'changeStreamPreAndPostImages' may not be enabled at the same
 // time.

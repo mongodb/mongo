@@ -3,6 +3,8 @@
 // @tags: [
 //  requires_fcv_51,
 //  featureFlagChangeStreamPreAndPostImages,
+//  # Clustered index support is required for change stream pre-images collection.
+//  featureFlagClusteredIndexes,
 //  assumes_against_mongod_not_mongos,
 //  change_stream_does_not_expect_txns,
 //  multiversion_incompatible,

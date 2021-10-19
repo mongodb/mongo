@@ -1,7 +1,11 @@
 /**
  * Verifies that it is possible to upgrade a replica set with collections with 'recordPreImages'
  * option to use 'changeStreamPreAndPostImages' option, and to do a corresponding downgrade.
- * @tags: [requires_fcv_51, featureFlagChangeStreamPreAndPostImages]
+ * @tags: [requires_fcv_51,
+ * featureFlagChangeStreamPreAndPostImages,
+ * # Clustered index support is required for change stream pre-images collection.
+ * featureFlagClusteredIndexes,
+ * ]
  */
 (function() {
 'use strict';
@@ -35,6 +39,16 @@ function runTest(downgradeVersion) {
     rst.upgradeSet({binVersion: "latest"});
     testDB = rst.getPrimary().getDB(jsTestName());
 
+    // Verify that an attempt to set 'changeStreamPreAndPostImages' option fails for the downgraded
+    // FCV version.
+    assert.commandFailedWithCode(
+        testDB.createCollection("anotherTestCollection",
+                                {"changeStreamPreAndPostImages": {enabled: false}}),
+        5846900);
+    assert.commandFailedWithCode(
+        testDB.runCommand({"collMod": collName, "changeStreamPreAndPostImages": {enabled: false}}),
+        5846901);
+
     // Set the FCV to the latest.
     testDB.adminCommand({setFeatureCompatibilityVersion: latestFCV});
 
@@ -62,47 +76,8 @@ function runTest(downgradeVersion) {
     // Downgrade the FCV.
     testDB.adminCommand({setFeatureCompatibilityVersion: downgradeFCV});
 
-    // Verify that an attempt to set 'changeStreamPreAndPostImages' option fails for the downgrade
-    // version.
-    assert.commandFailedWithCode(
-        testDB.createCollection(collName, {"changeStreamPreAndPostImages": {enabled: false}}),
-        5846900);
-    assert.commandFailedWithCode(
-        testDB.runCommand({"collMod": collName, "changeStreamPreAndPostImages": {enabled: false}}),
-        5846901);
-
-    // Downgrade the cluster.
-    rst.upgradeSet({binVersion: downgradeVersion});
-
-    // Reset the db reference.
-    testDB = rst.getPrimary().getDB(jsTestName());
-
-    // 'changeStreamPreAndPostImages' option must be absent and 'recordPreImages' should be set to
-    // true.
-    assertCollectionOptionIsEnabled(testDB, collName, "recordPreImages");
-    assertChangeStreamPreAndPostImagesCollectionOptionIsAbsent(testDB, collName);
-
-    // Upgrade the replica set.
-    rst.upgradeSet({binVersion: "latest"});
-    testDB = rst.getPrimary().getDB(jsTestName());
-
-    // Set the FCV to the latest.
-    testDB.adminCommand({setFeatureCompatibilityVersion: latestFCV});
-
-    // Enable pre-/post-images for the collection with "recordPreImages" enabled.
-    assert.commandWorked(
-        testDB.runCommand({"collMod": collName, "changeStreamPreAndPostImages": {enabled: true}}));
-
-    // 'changeStreamPreAndPostImages' option must be enabled and 'recordPreImages' option must be
-    // absent.
-    assertChangeStreamPreAndPostImagesCollectionOptionIsEnabled(testDB, collName);
-    assertCollectionOptionIsAbsent(testDB, collName, "recordPreImages");
-
-    // Downgrade the FCV.
-    testDB.adminCommand({setFeatureCompatibilityVersion: downgradeFCV});
-
-    // Downgrading the cluster should fail, since unsupported option 'changeStreamPreAndPostImages'
-    // is enabled for the collection.
+    // Downgrading the cluster should fail, since the pre-images collection is clustered which is
+    // not supported by the downgraded binary.
     try {
         rst.upgradeSet({binVersion: downgradeVersion});
         assert(false);

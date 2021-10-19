@@ -14,7 +14,11 @@ load("jstests/libs/change_stream_util.js");        // For isChangeStreamPreAndPo
 const testDB = db.getSiblingDB(jsTestName());
 const collName = "test";
 
-if (!isChangeStreamPreAndPostImagesEnabled(db)) {
+const clusteredIndexesEnabled =
+    assert.commandWorked(testDB.adminCommand({getParameter: 1, featureFlagClusteredIndexes: 1}))
+        .featureFlagClusteredIndexes.value;
+
+if (!(isChangeStreamPreAndPostImagesEnabled(db) && clusteredIndexesEnabled)) {
     const coll = assertDropAndRecreateCollection(testDB, collName);
 
     // If feature flag is off, creating changeStream with new fullDocument arguments should throw.
@@ -23,7 +27,7 @@ if (!isChangeStreamPreAndPostImagesEnabled(db)) {
     assert.throwsWithCode(() => coll.watch([], {fullDocument: 'required'}), ErrorCodes.BadValue);
 
     jsTestLog(
-        'Skipping test because featureFlagChangeStreamPreAndPostImages feature flag is not enabled');
+        'Skipping test because featureFlagChangeStreamPreAndPostImages or featureFlagClusteredIndexes feature flag is not enabled');
     return;
 }
 

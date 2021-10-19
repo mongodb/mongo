@@ -55,6 +55,10 @@ Status createCollection(OperationContext* opCtx,
                         const NamespaceString& ns,
                         const CreateCommand& cmd);
 
+/**
+ * Creates the change stream pre-images collection. The collection is clustered by the primary key,
+ * _id.
+ */
 void createChangeStreamPreImagesCollection(OperationContext* opCtx);
 
 /**

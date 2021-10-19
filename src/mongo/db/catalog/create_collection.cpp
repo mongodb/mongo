@@ -620,11 +620,22 @@ void createChangeStreamPreImagesCollection(OperationContext* opCtx) {
     uassert(5868501,
             "Failpoint failPreimagesCollectionCreation enabled. Throwing exception",
             !MONGO_unlikely(failPreimagesCollectionCreation.shouldFail()));
+    tassert(5882500,
+            "Failed to create the pre-images collection: clustered indexes feature is not enabled",
+            feature_flags::gClusteredIndexes.isEnabled(serverGlobalParams.featureCompatibility));
 
     const auto nss = NamespaceString::kChangeStreamPreImagesNamespace;
-    const auto status = _createCollection(opCtx, nss, CollectionOptions(), BSONObj());
+    CollectionOptions preImagesCollectionOptions;
+
+    // Make the collection clustered by _id.
+    auto preImagesCollectionKey = BSON("_id" << 1);
+    preImagesCollectionOptions.clusteredIndex.emplace(
+        ClusteredIndexSpec{preImagesCollectionKey, true /*unique*/}, false /*legacyFormat*/);
+    const auto status =
+        _createCollection(opCtx, nss, std::move(preImagesCollectionOptions), BSONObj());
     uassert(status.code(),
-            str::stream() << "Failed to create the pre-images collection: " << nss.coll(),
+            str::stream() << "Failed to create the pre-images collection: " << nss.coll()
+                          << causedBy(status.reason()),
             status.isOK() || status.code() == ErrorCodes::NamespaceExists);
 }
 
