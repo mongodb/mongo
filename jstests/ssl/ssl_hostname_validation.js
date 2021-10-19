@@ -6,8 +6,11 @@ var CN_CERT = "jstests/libs/localhostnameCN.pem";
 var SAN_CERT = "jstests/libs/localhostnameSAN.pem";
 var CLIENT_CERT = "jstests/libs/client.pem";
 var BAD_SAN_CERT = "jstests/libs/badSAN.pem";
+var NOSUBJ_CERT = "jstests/libs/server_no_subject.pem";
+var NOSUBJ_NOSAN_CERT = "jstests/libs/server_no_subject_no_SAN.pem";
 
 function testCombination(certPath, allowInvalidHost, allowInvalidCert, shouldSucceed) {
+    jsTestLog("Testing certificate: " + JSON.stringify(arguments));
     var mongod =
         MongoRunner.runMongod({sslMode: "requireSSL", sslPEMKeyFile: certPath, sslCAFile: CA_CERT});
 
@@ -74,6 +77,12 @@ testCombination(SERVER_CERT, true, true, true);
 
 // BAD_SAN_CERT has SAN=BadSAN.
 testCombination(BAD_SAN_CERT, false, false, false);
+
+// NOSUBJ_CERT has SAN=localhost but empty Subject
+testCombination(NOSUBJ_CERT, false, false, true);
+
+// NOSUBJ_NOSAN_CERT has neither Subject nor SANs
+testCombination(NOSUBJ_NOSAN_CERT, false, false, false);
 
 // Skip db hash check because replset cannot initiate.
 TestData.skipCheckDBHashes = true;
