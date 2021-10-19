@@ -27,10 +27,14 @@ st.ensurePrimaryShard(mongosDB.getName(), st.shard0.shardName);
 // Turn on the profiler and increase the query log level for both shards.
 assert.commandWorked(st.shard0.getDB(testName).setProfilingLevel(2));
 assert.commandWorked(st.shard1.getDB(testName).setProfilingLevel(2));
-assert.commandWorked(
-    st.shard0.adminCommand({setParameter: 1, logComponentVerbosity: {query: {verbosity: 3}}}));
-assert.commandWorked(
-    st.shard1.adminCommand({setParameter: 1, logComponentVerbosity: {query: {verbosity: 3}}}));
+assert.commandWorked(st.shard0.adminCommand({
+    setParameter: 1,
+    logComponentVerbosity: {query: {verbosity: 3}, replication: {heartbeats: 0}}
+}));
+assert.commandWorked(st.shard1.adminCommand({
+    setParameter: 1,
+    logComponentVerbosity: {query: {verbosity: 3}, replication: {heartbeats: 0}}
+}));
 
 const ordersColl = mongosDB.orders;
 const reviewsColl = mongosDB.reviews;
