@@ -225,6 +225,7 @@ protected:
             }
         }
         {
+            WriteUnitOfWork wunit(&_opCtx);
             if (!serverGlobalParams.enableMajorityReadConcern) {
                 if (ops.size() > 0) {
                     if (auto tsElem = ops.front()["ts"]) {
@@ -233,6 +234,11 @@ protected:
                     }
                 }
             }
+            auto lastApplied = repl::ReplicationCoordinator::get(_opCtx.getServiceContext())
+                                   ->getMyLastAppliedOpTime()
+                                   .getTimestamp();
+            auto nextTimestamp = std::max(lastApplied + 1, Timestamp(1, 1));
+            ASSERT_OK(_opCtx.recoveryUnit()->setTimestamp(nextTimestamp));
 
             OldClientContext ctx(&_opCtx, ns());
             for (vector<BSONObj>::iterator i = ops.begin(); i != ops.end(); ++i) {
@@ -245,6 +251,7 @@ protected:
                 uassertStatusOK(applyOperation_inlock(
                     &_opCtx, ctx.db(), &entry, false, getOplogApplicationMode(), dataIsConsistent));
             }
+            wunit.commit();
         }
     }
     // These deletes don't get logged.
@@ -287,8 +294,7 @@ protected:
         // less than or equal to the WT "all_durable" timestamp. Therefore, we use the next
         // timestamp of the lastApplied to be safe. In the case where there is no oplog entries in
         // the oplog collection, we will use a non-zero timestamp (Timestamp(1, 1)) for the insert.
-        auto nextTimestamp =
-            std::max(Timestamp(lastApplied.getSecs(), lastApplied.getInc() + 1), Timestamp(1, 1));
+        auto nextTimestamp = std::max(lastApplied + 1, Timestamp(1, 1));
         OpDebug* const nullOpDebug = nullptr;
         if (o.hasField("_id")) {
             repl::UnreplicatedWritesBlock uwb(&_opCtx);

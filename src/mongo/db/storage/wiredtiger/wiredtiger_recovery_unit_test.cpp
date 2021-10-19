@@ -81,7 +81,7 @@ public:
         std::string ident = ns;
         std::string uri = WiredTigerKVEngine::kTableUriPrefix + ns;
         StatusWith<std::string> result = WiredTigerRecordStore::generateCreateString(
-            kWiredTigerEngineName, ns, CollectionOptions(), "");
+            kWiredTigerEngineName, ns, ident, CollectionOptions(), "");
         ASSERT_TRUE(result.isOK());
         std::string config = result.getValue();
 
