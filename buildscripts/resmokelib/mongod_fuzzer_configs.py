@@ -10,7 +10,7 @@ def generate_eviction_configs(rng):
     eviction_target = rng.randint(50, 95)
     eviction_trigger = rng.randint(eviction_target + 1, 99)
     eviction_dirty_target = rng.randint(5, 50)
-    eviction_dirty_trigger = rng.randint(eviction_dirty_target, 75)
+    eviction_dirty_trigger = rng.randint(eviction_dirty_target + 1, 75)
 
     close_idle_time_secs = rng.randint(1, 100)
     close_handle_minimum = rng.randint(0, 1000)
