@@ -221,6 +221,32 @@ __bm_compact_end_readonly(WT_BM *bm, WT_SESSION_IMPL *session)
 }
 
 /*
+ * __bm_compact_page_rewrite --
+ *     Rewrite a page for compaction.
+ */
+static int
+__bm_compact_page_rewrite(
+  WT_BM *bm, WT_SESSION_IMPL *session, uint8_t *addr, size_t *addr_sizep, bool *writtenp)
+{
+    return (__wt_block_compact_page_rewrite(session, bm->block, addr, addr_sizep, writtenp));
+}
+
+/*
+ * __bm_compact_page_rewrite_readonly --
+ *     Rewrite a page for compaction; readonly version.
+ */
+static int
+__bm_compact_page_rewrite_readonly(
+  WT_BM *bm, WT_SESSION_IMPL *session, uint8_t *addr, size_t *addr_sizep, bool *writtenp)
+{
+    WT_UNUSED(addr);
+    WT_UNUSED(addr_sizep);
+    WT_UNUSED(writtenp);
+
+    return (__bm_readonly(bm, session));
+}
+
+/*
  * __bm_compact_page_skip --
  *     Return if a page is useful for compaction.
  */
@@ -244,6 +270,16 @@ __bm_compact_page_skip_readonly(
     WT_UNUSED(skipp);
 
     return (__bm_readonly(bm, session));
+}
+
+/*
+ * __bm_compact_progress --
+ *     Output compact progress message.
+ */
+static void
+__bm_compact_progress(WT_BM *bm, WT_SESSION_IMPL *session, u_int *msg_countp)
+{
+    __wt_block_compact_progress(session, bm->block, msg_countp);
 }
 
 /*
@@ -584,7 +620,9 @@ __bm_method_set(WT_BM *bm, bool readonly)
     bm->checkpoint_unload = __bm_checkpoint_unload;
     bm->close = __bm_close;
     bm->compact_end = __bm_compact_end;
+    bm->compact_page_rewrite = __bm_compact_page_rewrite;
     bm->compact_page_skip = __bm_compact_page_skip;
+    bm->compact_progress = __bm_compact_progress;
     bm->compact_skip = __bm_compact_skip;
     bm->compact_start = __bm_compact_start;
     bm->corrupt = __wt_bm_corrupt;
@@ -612,6 +650,7 @@ __bm_method_set(WT_BM *bm, bool readonly)
         bm->checkpoint_resolve = __bm_checkpoint_resolve_readonly;
         bm->checkpoint_start = __bm_checkpoint_start_readonly;
         bm->compact_end = __bm_compact_end_readonly;
+        bm->compact_page_rewrite = __bm_compact_page_rewrite_readonly;
         bm->compact_page_skip = __bm_compact_page_skip_readonly;
         bm->compact_skip = __bm_compact_skip_readonly;
         bm->compact_start = __bm_compact_start_readonly;

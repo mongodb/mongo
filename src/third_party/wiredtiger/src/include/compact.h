@@ -7,10 +7,9 @@
  */
 
 struct __wt_compact_state {
-    uint32_t lsm_count;      /* Number of LSM trees seen */
-    uint32_t file_count;     /* Number of files seen */
-    uint64_t max_time;       /* Configured timeout */
-    uint64_t prog_msg_count; /* Progress message count */
+    uint32_t lsm_count;  /* Number of LSM trees seen */
+    uint32_t file_count; /* Number of files seen */
+    uint64_t max_time;   /* Configured timeout */
 
     struct timespec begin; /* Starting time */
 };

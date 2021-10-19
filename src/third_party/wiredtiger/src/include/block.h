@@ -181,8 +181,10 @@ struct __wt_bm {
     int (*checkpoint_unload)(WT_BM *, WT_SESSION_IMPL *);
     int (*close)(WT_BM *, WT_SESSION_IMPL *);
     int (*compact_end)(WT_BM *, WT_SESSION_IMPL *);
+    int (*compact_page_rewrite)(WT_BM *, WT_SESSION_IMPL *, uint8_t *, size_t *, bool *);
     int (*compact_page_skip)(WT_BM *, WT_SESSION_IMPL *, const uint8_t *, size_t, bool *);
     int (*compact_skip)(WT_BM *, WT_SESSION_IMPL *, bool *);
+    void (*compact_progress)(WT_BM *, WT_SESSION_IMPL *, u_int *);
     int (*compact_start)(WT_BM *, WT_SESSION_IMPL *);
     int (*corrupt)(WT_BM *, WT_SESSION_IMPL *, const uint8_t *, size_t);
     int (*free)(WT_BM *, WT_SESSION_IMPL *, const uint8_t *, size_t);
@@ -276,10 +278,11 @@ struct __wt_block {
     WT_CKPT *final_ckpt; /* Final live checkpoint write */
 
     /* Compaction support */
-    int compact_pct_tenths;          /* Percent to compact */
-    uint64_t compact_pages_reviewed; /* Pages reviewed */
-    uint64_t compact_pages_skipped;  /* Pages skipped */
-    uint64_t compact_pages_written;  /* Pages rewritten */
+    int compact_pct_tenths;             /* Percent to compact */
+    uint64_t compact_blocks_moved;      /* Pages moved by the block manager */
+    uint64_t compact_cache_pages_dealt; /* Pages dealt with in cache */
+    uint64_t compact_pages_reviewed;    /* Pages reviewed */
+    uint64_t compact_pages_skipped;     /* Pages skipped */
 
     /* Salvage support */
     wt_off_t slvg_off; /* Salvage file offset */

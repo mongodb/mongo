@@ -33,6 +33,8 @@
 #define F_SET_ATOMIC(p, mask)                                                              \
     do {                                                                                   \
         uint8_t __orig;                                                                    \
+        if (F_ISSET_ATOMIC(p, mask))                                                       \
+            break;                                                                         \
         do {                                                                               \
             __orig = (p)->flags_atomic;                                                    \
         } while (!__wt_atomic_cas8(&(p)->flags_atomic, __orig, __orig | (uint8_t)(mask))); \
@@ -41,6 +43,8 @@
 #define F_CLR_ATOMIC(p, mask)                                                               \
     do {                                                                                    \
         uint8_t __orig;                                                                     \
+        if (!F_ISSET_ATOMIC(p, mask))                                                       \
+            break;                                                                          \
         do {                                                                                \
             __orig = (p)->flags_atomic;                                                     \
         } while (!__wt_atomic_cas8(&(p)->flags_atomic, __orig, __orig & ~(uint8_t)(mask))); \

@@ -129,6 +129,8 @@ extern int __wt_block_close(WT_SESSION_IMPL *session, WT_BLOCK *block)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_block_compact_end(WT_SESSION_IMPL *session, WT_BLOCK *block)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_block_compact_page_rewrite(WT_SESSION_IMPL *session, WT_BLOCK *block, uint8_t *addr,
+  size_t *addr_sizep, bool *skipp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_block_compact_page_skip(
   WT_SESSION_IMPL *session, WT_BLOCK *block, const uint8_t *addr, size_t addr_size, bool *skipp)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
@@ -397,8 +399,6 @@ extern int __wt_collator_config(WT_SESSION_IMPL *session, const char *uri, WT_CO
   WT_CONFIG_ITEM *metadata, WT_COLLATOR **collatorp, int *ownp)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_compact(WT_SESSION_IMPL *session) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern int __wt_compact_page_skip(WT_SESSION_IMPL *session, WT_REF *ref, void *context, bool *skipp)
-  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_compressor_config(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval,
   WT_COMPRESSOR **compressorp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_cond_auto_alloc(WT_SESSION_IMPL *session, const char *name, uint64_t min,
@@ -1686,6 +1686,8 @@ extern void __wt_abort(WT_SESSION_IMPL *session) WT_GCC_FUNC_DECL_ATTRIBUTE((nor
   WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("default")));
 extern void __wt_backup_destroy(WT_SESSION_IMPL *session);
 extern void __wt_block_ckpt_destroy(WT_SESSION_IMPL *session, WT_BLOCK_CKPT *ci);
+extern void __wt_block_compact_progress(
+  WT_SESSION_IMPL *session, WT_BLOCK *block, u_int *msg_countp);
 extern void __wt_block_configure_first_fit(WT_BLOCK *block, bool on);
 extern void __wt_block_ext_free(WT_SESSION_IMPL *session, WT_EXT *ext);
 extern void __wt_block_extlist_free(WT_SESSION_IMPL *session, WT_EXTLIST *el);
