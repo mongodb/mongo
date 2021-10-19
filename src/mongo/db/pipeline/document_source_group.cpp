@@ -489,12 +489,7 @@ intrusive_ptr<DocumentSource> DocumentSourceGroup::createFromBson(
     BSONObj groupObj(elem.Obj());
     BSONObjIterator groupIterator(groupObj);
     VariablesParseState vps = expCtx->variablesParseState;
-    // The 'needsMerge' behavior is not implemented for any accumulators and so $group can't be
-    // pushed down to SBE when 'needsMerge' behavior is requested from the mongos.
-    //
-    // TODO SERVER-59070 Set 'sbeGroupCompatible' to true after implementing 'needsMerge' behavior
-    // for all accumulators.
-    expCtx->sbeGroupCompatible = !expCtx->needsMerge;
+    expCtx->sbeGroupCompatible = true;
     while (groupIterator.more()) {
         BSONElement groupField(groupIterator.next());
         StringData pFieldName = groupField.fieldNameStringData();

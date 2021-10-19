@@ -20,6 +20,10 @@ const isLinux = getBuildInfo().buildEnvironment.target_os == "linux";
 const isDebugBuild = (db) => {
     return db.adminCommand('buildInfo').debug;
 };
+const isGroupPushdownEnabled = (db) => {
+    return assert.commandWorked(db.adminCommand({getParameter: 1, featureFlagSBEGroupPushdown: 1}))
+        .featureFlagSBEGroupPushdown.value;
+};
 
 const assertMetricsExist = (profilerEntry) => {
     let metrics = profilerEntry.operationMetrics;
@@ -1056,7 +1060,7 @@ const operations = [
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
             assert.eq(profileDoc.totalUnitsWritten, 0);
-            if (isDebugBuild(db)) {
+            if (isDebugBuild(db) && !isGroupPushdownEnabled(db)) {
                 // In debug builds we sort and spill for each of the first 20 documents. Once we
                 // reach that limit, we stop spilling as often. This 26 is the sum of 20 debug sorts
                 // and spills of documents in groups 0 through 3 plus 6 debug spills and sorts for

@@ -805,13 +805,15 @@ struct StageBuilderState {
                       const Variables& variables,
                       sbe::value::SlotIdGenerator* slotIdGenerator,
                       sbe::value::FrameIdGenerator* frameIdGenerator,
-                      sbe::value::SpoolIdGenerator* spoolIdGenerator)
+                      sbe::value::SpoolIdGenerator* spoolIdGenerator,
+                      bool needsMerge)
         : slotIdGenerator{slotIdGenerator},
           frameIdGenerator{frameIdGenerator},
           spoolIdGenerator{spoolIdGenerator},
           opCtx{opCtx},
           env{env},
-          variables{variables} {}
+          variables{variables},
+          needsMerge{needsMerge} {}
 
     StageBuilderState(const StageBuilderState& other) = delete;
 
@@ -838,6 +840,9 @@ struct StageBuilderState {
 
     const Variables& variables;
     stdx::unordered_map<Variables::Id, sbe::value::SlotId> globalVariables;
+    // When the mongos splits $group stage and sends it to shards, it adds 'needsMerge'/'fromMongs'
+    // flags to true so that shards can sends special partial aggregation results to the mongos.
+    bool needsMerge;
 };
 
 }  // namespace mongo::stage_builder

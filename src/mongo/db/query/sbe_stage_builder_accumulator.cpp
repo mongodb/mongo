@@ -212,11 +212,44 @@ std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> buildFinalizeSum(
             str::stream() << "Expected one input slot for finalization of sum, got: "
                           << sumSlots.size(),
             sumSlots.size() == 1);
-    auto sumFinalize =
-        sbe::makeE<sbe::EIf>(generateNullOrMissing(makeVariable(sumSlots[0])),
-                             makeConstant(sbe::value::TypeTags::NumberInt32, 0),
-                             makeFunction("doubleDoubleSumFinalize", makeVariable(sumSlots[0])));
-    return {std::move(sumFinalize), std::move(inputStage)};
+
+    if (state.needsMerge) {
+        // When to support the sharding behavior, the mongos splits $group into two separate $group
+        // stages one at the mongo-side side and the other at the shard-side, the shard-side $sum
+        // accumulator is responsible to return the partial sum which is mostly same format to the
+        // global sum but in the cases of overflowed 'NumberInt32'/'NumberInt64', return a
+        // sub-document {subTotal: val1, subTotalError: val2}. The builtin function for $sum
+        // ('builtinDoubleDoubleSumFinalize()') returns an 'Array' when there's an overflow. So,
+        // only when the return value is 'Array'-typed, we compose the sub-document.
+        auto sumFinalize = makeFunction("doubleDoubleMergeSumFinalize", makeVariable(sumSlots[0]));
+
+        auto partialSumFinalize = makeLocalBind(
+            state.frameIdGenerator,
+            [](sbe::EVariable input) {
+                return sbe::makeE<sbe::EIf>(
+                    makeFunction("isArray", input.clone()),
+                    makeFunction(
+                        "newObj",
+                        makeConstant("subTotal"_sd),
+                        makeFunction(
+                            "getElement",
+                            input.clone(),
+                            makeConstant(sbe::value::TypeTags::NumberInt32,
+                                         static_cast<int>(sbe::vm::AggPartialSumElems::kTotal))),
+                        makeConstant("subTotalError"_sd),
+                        makeFunction(
+                            "getElement",
+                            input.clone(),
+                            makeConstant(sbe::value::TypeTags::NumberInt32,
+                                         static_cast<int>(sbe::vm::AggPartialSumElems::kError)))),
+                    input.clone());
+            },
+            std::move(sumFinalize));
+        return {std::move(partialSumFinalize), std::move(inputStage)};
+    } else {
+        auto sumFinalize = makeFunction("doubleDoubleSumFinalize", makeVariable(sumSlots[0]));
+        return {std::move(sumFinalize), std::move(inputStage)};
+    }
 }
 
 std::pair<std::vector<std::unique_ptr<sbe::EExpression>>, EvalStage> buildAccumulatorAddToSet(

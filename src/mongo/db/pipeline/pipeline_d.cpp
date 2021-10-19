@@ -150,7 +150,6 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> extractSbeCompatibleGr
         auto groupStage = dynamic_cast<DocumentSourceGroup*>(itr->get());
         if (!(groupStage && groupStage->sbeCompatible()) || groupStage->doingMerge()) {
             // Only pushdown a prefix of group stages that are supported by sbe.
-            // TODO: SERVER-59070 remove the 'doingMerge' check when we support merging.
             break;
         }
         groupsForPushdown.push_back(std::make_unique<InnerPipelineStageImpl>(groupStage));

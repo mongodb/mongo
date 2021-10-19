@@ -201,10 +201,7 @@ assert(explain.stages[1].hasOwnProperty("$group"));
 // merge $group stage at the mongos-side which does the global aggregation and the other is a $group
 // stage at the shard-side which does the partial aggregation. The shard-side $group stage is
 // requested with 'needsMerge' and 'fromMongos' flags set to true from the mongos, which we should
-// block from being pushed down to SBE until we implement 'needsMerge' behavior for each
-// accumulator.
-//
-// TODO SERVER-59070 Remove the following test case after implementing 'needsMerge' behavior.
+// verify that is also pushed down and produces the correct results.
 explain = coll.runCommand({
     aggregate: coll.getName(),
     explain: true,
@@ -213,6 +210,60 @@ explain = coll.runCommand({
     fromMongos: true,
     cursor: {}
 });
-assert.eq(null, getAggPlanStage(explain, "GROUP"), explain);
-assert(explain.stages[1].hasOwnProperty("$group"));
+assert.neq(null, getAggPlanStage(explain, "GROUP"), explain);
+
+const originalClassicEngineStatus =
+    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: true}))
+        .was;
+
+const pipeline1 = [{$group: {_id: "$item", s: {$sum: "$quantity"}}}];
+const classicalRes1 = coll.runCommand({
+                              aggregate: coll.getName(),
+                              pipeline: pipeline1,
+                              needsMerge: true,
+                              fromMongos: true,
+                              cursor: {}
+                          })
+                          .cursor.firstBatch;
+
+// When there's overflow for 'NumberLong', the mongod sends back the partial sum as a doc with
+// 'subTotal' and 'subTotalError' fields. So, we need an overflow case to verify such behavior.
+const tcoll = db.group_pushdown1;
+assert.commandWorked(tcoll.insert([{a: NumberLong("9223372036854775807")}, {a: NumberLong("10")}]));
+const pipeline2 = [{$group: {_id: null, s: {$sum: "$a"}}}];
+const classicalRes2 = tcoll
+                          .runCommand({
+                              aggregate: tcoll.getName(),
+                              pipeline: pipeline2,
+                              needsMerge: true,
+                              fromMongos: true,
+                              cursor: {}
+                          })
+                          .cursor.firstBatch;
+
+assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: false}));
+
+const sbeRes1 = coll.runCommand({
+                        aggregate: coll.getName(),
+                        pipeline: pipeline1,
+                        needsMerge: true,
+                        fromMongos: true,
+                        cursor: {}
+                    })
+                    .cursor.firstBatch;
+assert.sameMembers(sbeRes1, classicalRes1);
+
+const sbeRes2 = tcoll
+                    .runCommand({
+                        aggregate: tcoll.getName(),
+                        pipeline: pipeline2,
+                        needsMerge: true,
+                        fromMongos: true,
+                        cursor: {}
+                    })
+                    .cursor.firstBatch;
+assert.docEq(sbeRes2, classicalRes2);
+
+assert.commandWorked(db.adminCommand(
+    {setParameter: 1, internalQueryForceClassicEngine: originalClassicEngineStatus}));
 })();
