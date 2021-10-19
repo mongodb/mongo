@@ -189,10 +189,17 @@ __wt_session_compact_check_timeout(WT_SESSION_IMPL *session)
         return (0);
 
     __wt_epoch(session, &end);
+
     ret =
       session->compact->max_time > WT_TIMEDIFF_SEC(end, session->compact->begin) ? 0 : ETIMEDOUT;
-    if (ret != 0)
+    if (ret != 0) {
         WT_STAT_CONN_INCR(session, session_table_compact_timeout);
+
+        __wt_verbose(session, WT_VERB_COMPACT,
+          "Compact has timed out! The operation has been running for %" PRIu64
+          " second(s). Configured timeout is %" PRIu64 " second(s).",
+          WT_TIMEDIFF_SEC(end, session->compact->begin), session->compact->max_time);
+    }
     return (ret);
 }
 
@@ -279,6 +286,10 @@ __compact_worker(WT_SESSION_IMPL *session)
                 }
                 ret = 0;
                 another_pass = true;
+
+                __wt_verbose(session, WT_VERB_COMPACT, "%s",
+                  "Data handle compaction failed with EBUSY but the cache is not stuck. "
+                  "Will give it another go.");
             }
         }
         if (!another_pass)
@@ -329,8 +340,11 @@ __wt_session_compact(WT_SESSION *wt_session, const char *uri, const char *config
     }
 
     /* In-memory ignores compaction operations. */
-    if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
+    if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY)) {
+        __wt_verbose(
+          session, WT_VERB_COMPACT, "%s", "Compact does not work for in-memory databases.");
         goto err;
+    }
 
     /*
      * Non-LSM object compaction requires checkpoints, which are impossible in transactional
