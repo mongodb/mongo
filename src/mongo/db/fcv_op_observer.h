@@ -65,9 +65,6 @@ public:
                   StmtId stmtId,
                   const OplogDeleteEntryArgs& args) final;
 
-    void onReplicationRollback(OperationContext* opCtx,
-                               const RollbackObserverInfo& rbInfo) noexcept final;
-
     // Noop overrides.
 
     void onCreateIndex(OperationContext* opCtx,
@@ -210,6 +207,8 @@ private:
      * document and on commit, updates the server parameter.
      */
     static void _onInsertOrUpdate(OperationContext* opCtx, const BSONObj& doc);
+
+    void _onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo) final;
 };
 
 }  // namespace mongo

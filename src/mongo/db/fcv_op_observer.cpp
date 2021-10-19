@@ -186,8 +186,8 @@ void FcvOpObserver::onDelete(OperationContext* opCtx,
     }
 }
 
-void FcvOpObserver::onReplicationRollback(OperationContext* opCtx,
-                                          const RollbackObserverInfo& rbInfo) noexcept {
+void FcvOpObserver::_onReplicationRollback(OperationContext* opCtx,
+                                           const RollbackObserverInfo& rbInfo) {
     // Ensures the in-memory and on-disk FCV states are consistent after a rollback.
     const auto query = BSON("_id" << multiversion::kParameterName);
     const auto swFcv = repl::StorageInterface::get(opCtx)->findById(

@@ -222,8 +222,8 @@ void AuthOpObserver::onEmptyCapped(OperationContext* opCtx,
         ->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);
 }
 
-void AuthOpObserver::onReplicationRollback(OperationContext* opCtx,
-                                           const RollbackObserverInfo& rbInfo) noexcept {
+void AuthOpObserver::_onReplicationRollback(OperationContext* opCtx,
+                                            const RollbackObserverInfo& rbInfo) {
     // Invalidate any in-memory auth data if necessary.
     const auto& rollbackNamespaces = rbInfo.rollbackNamespaces;
     if (rollbackNamespaces.count(AuthorizationManager::versionCollectionNamespace) == 1 ||

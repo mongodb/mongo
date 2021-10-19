@@ -212,8 +212,6 @@ public:
                               size_t numberOfPreImagesToWrite) final;
     void onTransactionAbort(OperationContext* opCtx,
                             boost::optional<OplogSlot> abortOplogEntryOpTime) final;
-    void onReplicationRollback(OperationContext* opCtx,
-                               const RollbackObserverInfo& rbInfo) noexcept final;
     void onMajorityCommitPointUpdate(ServiceContext* service,
                                      const repl::OpTime& newCommitPoint) final {}
 
@@ -255,6 +253,7 @@ private:
         OperationContext* opCtx,
         const std::vector<repl::ReplOperation>& stmts,
         const repl::OpTime& prepareOrCommitOptime) {}
+    void _onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo) final;
 };
 
 extern const OperationContext::Decoration<boost::optional<OpObserverImpl::DocumentKey>>

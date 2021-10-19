@@ -641,8 +641,8 @@ void ShardServerOpObserver::onCollMod(OperationContext* opCtx,
     abortOngoingMigrationIfNeeded(opCtx, nss);
 };
 
-void ShardServerOpObserver::onReplicationRollback(OperationContext* opCtx,
-                                                  const RollbackObserverInfo& rbInfo) noexcept {
+void ShardServerOpObserver::_onReplicationRollback(OperationContext* opCtx,
+                                                   const RollbackObserverInfo& rbInfo) {
     if (rbInfo.rollbackNamespaces.find(NamespaceString::kCollectionCriticalSectionsNamespace) !=
         rbInfo.rollbackNamespaces.end()) {
         RecoverableCriticalSectionService::get(opCtx)->recoverRecoverableCriticalSections(opCtx);

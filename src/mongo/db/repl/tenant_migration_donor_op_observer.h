@@ -194,11 +194,12 @@ public:
     void onTransactionAbort(OperationContext* opCtx,
                             boost::optional<OplogSlot> abortOplogEntryOpTime) final {}
 
-    void onReplicationRollback(OperationContext* opCtx,
-                               const RollbackObserverInfo& rbInfo) noexcept final{};
-
     void onMajorityCommitPointUpdate(ServiceContext* service,
                                      const repl::OpTime& newCommitPoint) final;
+
+private:
+    void _onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo) final {
+    }
 };
 
 }  // namespace repl

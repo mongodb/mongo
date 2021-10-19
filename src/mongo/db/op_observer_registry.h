@@ -401,12 +401,6 @@ public:
             o->onTransactionAbort(opCtx, abortOplogEntryOpTime);
     }
 
-    void onReplicationRollback(OperationContext* opCtx,
-                               const RollbackObserverInfo& rbInfo) noexcept override {
-        for (auto& o : _observers)
-            o->onReplicationRollback(opCtx, rbInfo);
-    }
-
     void onMajorityCommitPointUpdate(ServiceContext* service,
                                      const repl::OpTime& newCommitPoint) override {
         for (auto& o : _observers)
@@ -414,6 +408,12 @@ public:
     }
 
 private:
+    void _onReplicationRollback(OperationContext* opCtx,
+                                const RollbackObserverInfo& rbInfo) override {
+        for (auto& o : _observers)
+            o->onReplicationRollback(opCtx, rbInfo);
+    }
+
     static repl::OpTime _getOpTimeToReturn(const std::vector<repl::OpTime>& times) {
         if (times.empty()) {
             return repl::OpTime{};

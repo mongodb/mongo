@@ -1657,8 +1657,8 @@ void OpObserverImpl::onTransactionAbort(OperationContext* opCtx,
     logCommitOrAbortForPreparedTransaction(opCtx, &oplogEntry, DurableTxnStateEnum::kAborted);
 }
 
-void OpObserverImpl::onReplicationRollback(OperationContext* opCtx,
-                                           const RollbackObserverInfo& rbInfo) noexcept {
+void OpObserverImpl::_onReplicationRollback(OperationContext* opCtx,
+                                            const RollbackObserverInfo& rbInfo) {
     // Reset the key manager cache.
     auto validator = LogicalTimeValidator::get(opCtx);
     if (validator) {

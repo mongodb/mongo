@@ -195,9 +195,6 @@ public:
     void onTransactionAbort(OperationContext* opCtx,
                             boost::optional<OplogSlot> abortOplogEntryOpTime) final {}
 
-    void onReplicationRollback(OperationContext* opCtx,
-                               const RollbackObserverInfo& rbInfo) noexcept;
-
     void onMajorityCommitPointUpdate(ServiceContext* service,
                                      const repl::OpTime& newCommitPoint) final {}
 
@@ -205,6 +202,9 @@ public:
     static BSONObj getDocumentKey(OperationContext* opCtx,
                                   NamespaceString const& nss,
                                   BSONObj const& doc);
+
+private:
+    void _onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo);
 };
 
 }  // namespace mongo

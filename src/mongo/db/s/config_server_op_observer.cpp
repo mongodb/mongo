@@ -95,8 +95,8 @@ repl::OpTime ConfigServerOpObserver::onDropCollection(OperationContext* opCtx,
     return {};
 }
 
-void ConfigServerOpObserver::onReplicationRollback(OperationContext* opCtx,
-                                                   const RollbackObserverInfo& rbInfo) noexcept {
+void ConfigServerOpObserver::_onReplicationRollback(OperationContext* opCtx,
+                                                    const RollbackObserverInfo& rbInfo) {
     if (rbInfo.configServerConfigVersionRolledBack) {
         // Throw out any cached information related to the cluster ID.
         ShardingCatalogManager::get(opCtx)->discardCachedConfigDatabaseInitializationState();

@@ -477,9 +477,19 @@ public:
      *
      * This method is only applicable to the "rollback to a stable timestamp" algorithm, and is not
      * called when using any other rollback algorithm i.e "rollback via refetch".
+     *
+     * This function will call the private virtual '_onReplicationRollback' method. Any exceptions
+     * thrown indicates rollback failure that may have led us to some inconsistent on-disk or memory
+     * state, so we crash instead.
      */
-    virtual void onReplicationRollback(OperationContext* opCtx,
-                                       const RollbackObserverInfo& rbInfo) noexcept = 0;
+    void onReplicationRollback(OperationContext* opCtx,
+                               const RollbackObserverInfo& rbInfo) noexcept {
+        try {
+            _onReplicationRollback(opCtx, rbInfo);
+        } catch (const DBException& ex) {
+            fassert(6050902, ex.toStatus());
+        }
+    };
 
     /**
      * Called when the majority commit point is updated by replication.
@@ -492,6 +502,10 @@ public:
                                              const repl::OpTime& newCommitPoint) = 0;
 
     struct Times;
+
+private:
+    virtual void _onReplicationRollback(OperationContext* opCtx,
+                                        const RollbackObserverInfo& rbInfo) = 0;
 
 protected:
     class ReservedTimes;

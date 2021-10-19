@@ -197,13 +197,11 @@ public:
     void onTransactionAbort(OperationContext* opCtx,
                             boost::optional<OplogSlot> abortOplogEntryOpTime) override {}
 
-    void onReplicationRollback(OperationContext* opCtx,
-                               const RollbackObserverInfo& rbInfo) noexcept;
-
     void onMajorityCommitPointUpdate(ServiceContext* service,
                                      const repl::OpTime& newCommitPoint) override;
 
 private:
+    void _onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo);
     void _registerTopologyTimeTickPoint(Timestamp newTopologyTime);
     void _tickTopologyTimeIfNecessary(ServiceContext* service, Timestamp newCommitPointTime);
 
