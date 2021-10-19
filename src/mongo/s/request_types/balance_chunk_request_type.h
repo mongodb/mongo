@@ -78,7 +78,7 @@ public:
                                                         const ChunkType& chunk);
 
 
-    const NamespaceString getNss() const {
+    const NamespaceString& getNss() const {
         return _nss;
     }
 
