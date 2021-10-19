@@ -367,6 +367,18 @@ TEST(MatchExpressionParserTest, ExprParsesSuccessfullyWithinTopLevelAnd) {
             .getStatus());
 }
 
+TEST(MatchExpressionParserTest, ExprFailsToParseWithTopLevelNot) {
+    auto query = fromjson("{$not: {x: 1}}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(
+        query, expCtx, ExtensionsCallbackNoop(), MatchExpressionParser::AllowedFeatures::kExpr);
+    ASSERT_EQ(result.getStatus(), ErrorCodes::BadValue);
+    ASSERT_TRUE(
+        result.getStatus().reason() ==
+        "unknown top level operator: $not. If you are trying to negate an entire expression, "
+        "use $nor.");
+}
+
 TEST(MatchExpressionParserTest, ExprFailsToParseWithinElemMatch) {
     auto query = fromjson("{a: {$elemMatch: {$expr: {$eq: ['$foo', '$bar']}}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());

@@ -300,16 +300,19 @@ StatusWithMatchExpression parse(const BSONObj& obj,
             auto parseExpressionMatchFunction = retrievePathlessParser(name);
 
             if (!parseExpressionMatchFunction) {
-                const auto dotsAndDollarsHint =
-                    serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-                        serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
-                            multiversion::FeatureCompatibilityVersion::kFullyDowngradedTo_5_0)
-                    ? ". If you have a field name that starts with a '$' symbol, consider using "
-                      "$getField or $setField."
-                    : "";
+                std::string hint = "";
+                if (name == "not") {
+                    hint = ". If you are trying to negate an entire expression, use $nor.";
+                } else if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+                           serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
+                               multiversion::FeatureCompatibilityVersion::kFullyDowngradedTo_5_0)) {
+                    hint =
+                        ". If you have a field name that starts with a '$' symbol, consider using "
+                        "$getField or $setField.";
+                }
                 return {Status(ErrorCodes::BadValue,
                                str::stream() << "unknown top level operator: "
-                                             << e.fieldNameStringData() << dotsAndDollarsHint)};
+                                             << e.fieldNameStringData() << hint)};
             }
 
             auto parsedExpression = parseExpressionMatchFunction(
