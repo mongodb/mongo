@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2021-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -115,82 +115,6 @@ public:
     }
 
 } convertToCappedCmd;
-
-class SplitVectorCmd : public BasicCommand {
-public:
-    SplitVectorCmd() : BasicCommand("splitVector") {}
-
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kAlways;
-    }
-
-    std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
-        return CommandHelpers::parseNsFullyQualified(cmdObj);
-    }
-
-    bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
-    }
-
-    Status checkAuthForCommand(Client* client,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj) const override {
-        if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                ResourcePattern::forExactNamespace(NamespaceString(parseNs(dbname, cmdObj))),
-                ActionType::splitVector)) {
-            return Status(ErrorCodes::Unauthorized, "Unauthorized");
-        }
-        return Status::OK();
-    }
-
-    bool run(OperationContext* opCtx,
-             const std::string& dbName,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) override {
-        const NamespaceString nss(parseNs(dbName, cmdObj));
-        uassert(ErrorCodes::IllegalOperation,
-                "Performing splitVector across dbs isn't supported via mongos",
-                nss.db() == dbName);
-
-        const auto cm =
-            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
-        uassert(ErrorCodes::IllegalOperation,
-                str::stream() << "can't do command: " << getName() << " on sharded collection",
-                !cm.isSharded());
-
-        // Here, we first filter the command before appending an UNSHARDED shardVersion, because
-        // "shardVersion" is one of the fields that gets filtered out.
-        BSONObj filteredCmdObj(applyReadWriteConcern(
-            opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)));
-        BSONObj filteredCmdObjWithVersion(
-            appendShardVersion(filteredCmdObj, ChunkVersion::UNSHARDED()));
-
-        auto shard =
-            uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, cm.dbPrimary()));
-        auto commandResponse = uassertStatusOK(shard->runCommandWithFixedRetryAttempts(
-            opCtx,
-            ReadPreferenceSetting::get(opCtx),
-            dbName,
-            cm.dbPrimary() == ShardId::kConfigServerId ? filteredCmdObj : filteredCmdObjWithVersion,
-            Shard::RetryPolicy::kIdempotent));
-
-        uassert(ErrorCodes::IllegalOperation,
-                str::stream() << "can't do command: " << getName() << " on a sharded collection",
-                !ErrorCodes::isStaleShardVersionError(commandResponse.commandStatus.code()));
-
-        uassertStatusOK(commandResponse.commandStatus);
-
-        if (!commandResponse.writeConcernStatus.isOK()) {
-            appendWriteConcernErrorToCmdResponse(
-                cm.dbPrimary(), commandResponse.response["writeConcernError"], result);
-        }
-        result.appendElementsUnique(
-            CommandHelpers::filterCommandReplyForPassthrough(std::move(commandResponse.response)));
-
-        return true;
-    }
-
-} splitVectorCmd;
 
 }  // namespace
 }  // namespace mongo

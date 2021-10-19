@@ -6,8 +6,9 @@ Import("get_option")
 env = env.Clone()
 
 # These commands are linked both in MongoS and MongoD
+# This library is currently also linked into mongoqd
 env.Library(
-    target='shared_cluster_commands',
+    target='sharded_cluster_sharding_commands',
     source=[
         'flush_router_config_cmd.cpp',
         'get_shard_map_cmd.cpp',
@@ -18,26 +19,21 @@ env.Library(
     ]
 )
 
-# These commands are linked in MongoS only
+# These commands are linked in mongos and mongoqd
 env.Library(
     target='cluster_commands',
     source=[
-        'cluster_abort_transaction_cmd.cpp',
-        'cluster_add_shard_cmd.cpp',
-        'cluster_add_shard_to_zone_cmd.cpp',
-        'cluster_available_query_options_cmd.cpp',
-        'cluster_balancer_collection_status_cmd.cpp',
-        'cluster_build_info.cpp',
         'cluster_abort_reshard_collection_cmd.cpp',
+        'cluster_abort_transaction_cmd.cpp',
+        'cluster_available_query_options_cmd.cpp',
+        'cluster_build_info.cpp',
         'cluster_cleanup_reshard_collection_cmd.cpp',
-        'cluster_clear_jumbo_flag_cmd.cpp',
         'cluster_coll_stats_cmd.cpp',
         'cluster_collection_mod_cmd.cpp',
-        'cluster_commit_transaction_cmd.cpp',
         'cluster_commit_reshard_collection_cmd.cpp',
+        'cluster_commit_transaction_cmd.cpp',
         'cluster_compact_cmd.cpp',
-        'cluster_configure_collection_auto_split.cpp',
-        'cluster_control_balancer_cmd.cpp',
+        'cluster_convert_to_capped_cmd.cpp',
         'cluster_count_cmd.cpp',
         'cluster_create_cmd.cpp',
         'cluster_create_indexes_cmd.cpp',
@@ -68,21 +64,14 @@ env.Library(
         'cluster_list_collections_cmd.cpp',
         'cluster_list_databases_cmd.cpp',
         'cluster_list_indexes_cmd.cpp',
-        'cluster_list_shards_cmd.cpp',
         'cluster_map_reduce_agg.cpp',
         'cluster_map_reduce_cmd.cpp',
-        'cluster_merge_chunks_cmd.cpp',
-        'cluster_move_chunk_cmd.cpp',
-        'cluster_move_primary_cmd.cpp',
         'cluster_multicast_cmd.cpp',
         'cluster_netstat_cmd.cpp',
-        'cluster_passthrough_commands.cpp',
         'cluster_pipeline_cmd.cpp',
         'cluster_plan_cache_clear_cmd.cpp',
         'cluster_profile_cmd.cpp',
         'cluster_refine_collection_shard_key_cmd.cpp',
-        'cluster_remove_shard_cmd.cpp',
-        'cluster_remove_shard_from_zone_cmd.cpp',
         'cluster_rename_collection_cmd.cpp',
         'cluster_repl_set_get_status_cmd.cpp',
         'cluster_reshard_collection_cmd.cpp',
@@ -92,9 +81,6 @@ env.Library(
         'cluster_set_index_commit_quorum_cmd.cpp',
         'cluster_shard_collection_cmd.cpp',
         'cluster_shutdown_cmd.cpp',
-        'cluster_split_cmd.cpp',
-        'cluster_update_zone_key_range_cmd.cpp',
-        'cluster_user_management_commands.cpp',
         'cluster_validate_cmd.cpp',
         'cluster_validate_db_metadata_cmd.cpp',
         'cluster_whats_my_uri_cmd.cpp',
@@ -104,16 +90,11 @@ env.Library(
         's_read_write_concern_defaults_server_status.cpp',
         'strategy.cpp',
         'cluster_commands.idl',
+        'shard_collection.idl',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/api_parameters',
-        '$BUILD_DIR/mongo/db/audit',
-        '$BUILD_DIR/mongo/db/auth/address_restriction',
-        '$BUILD_DIR/mongo/db/auth/auth',
         '$BUILD_DIR/mongo/db/auth/auth_checks',
-        '$BUILD_DIR/mongo/db/auth/builtin_roles',
-        '$BUILD_DIR/mongo/db/auth/saslauth',
-        '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/db/commands/core',
         '$BUILD_DIR/mongo/db/commands/create_command',
         '$BUILD_DIR/mongo/db/commands/current_op_common',
@@ -134,8 +115,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/ftdc/ftdc_server',
         '$BUILD_DIR/mongo/db/index_commands_idl',
         '$BUILD_DIR/mongo/db/initialize_api_parameters',
-        '$BUILD_DIR/mongo/db/logical_session_cache_impl',
-        '$BUILD_DIR/mongo/db/pipeline/aggregation',
         '$BUILD_DIR/mongo/db/query/command_request_response',
         '$BUILD_DIR/mongo/db/query/cursor_response_idl',
         '$BUILD_DIR/mongo/db/query/map_reduce_output_format',
@@ -152,7 +131,6 @@ env.Library(
         '$BUILD_DIR/mongo/executor/async_multicaster',
         '$BUILD_DIR/mongo/executor/async_request_executor',
         '$BUILD_DIR/mongo/idl/server_parameter',
-        '$BUILD_DIR/mongo/rpc/client_metadata',
         '$BUILD_DIR/mongo/rpc/rewrite_state_change_errors',
         '$BUILD_DIR/mongo/s/load_balancer_support',
         '$BUILD_DIR/mongo/s/mongos_topology_coordinator',
@@ -160,10 +138,50 @@ env.Library(
         '$BUILD_DIR/mongo/s/query/cluster_client_cursor',
         '$BUILD_DIR/mongo/s/sharding_api',
         '$BUILD_DIR/mongo/s/sharding_router_api',
-        '$BUILD_DIR/mongo/s/vector_clock_mongos',
         '$BUILD_DIR/mongo/transport/message_compressor',
         '$BUILD_DIR/mongo/transport/transport_layer_common',
-        'shared_cluster_commands',
+    ]
+)
+
+# These commands are linked in MongoS only
+# This library is currently also linked into mongoqd
+env.Library(
+    target='sharded_cluster_commands',
+    source=[
+        'cluster_add_shard_cmd.cpp',
+        'cluster_add_shard_to_zone_cmd.cpp',
+        'cluster_balancer_collection_status_cmd.cpp',
+        'cluster_clear_jumbo_flag_cmd.cpp',
+        'cluster_configure_collection_auto_split.cpp',
+        'cluster_control_balancer_cmd.cpp',
+        'cluster_list_shards_cmd.cpp',
+        'cluster_merge_chunks_cmd.cpp',
+        'cluster_move_chunk_cmd.cpp',
+        'cluster_move_primary_cmd.cpp',
+        'cluster_remove_shard_cmd.cpp',
+        'cluster_remove_shard_from_zone_cmd.cpp',
+        'cluster_split_cmd.cpp',
+        'cluster_split_vector_cmd.cpp',
+        'cluster_update_zone_key_range_cmd.cpp',
+        'cluster_user_management_commands.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/audit',
+        '$BUILD_DIR/mongo/db/auth/address_restriction',
+        '$BUILD_DIR/mongo/db/auth/auth',
+        '$BUILD_DIR/mongo/db/auth/auth_checks',
+        '$BUILD_DIR/mongo/db/auth/builtin_roles',
+        '$BUILD_DIR/mongo/db/auth/saslauth',
+        '$BUILD_DIR/mongo/db/commands',
+        '$BUILD_DIR/mongo/db/commands/servers',
+        '$BUILD_DIR/mongo/idl/server_parameter',
+        '$BUILD_DIR/mongo/rpc/client_metadata',
+        '$BUILD_DIR/mongo/rpc/rewrite_state_change_errors',
+        '$BUILD_DIR/mongo/s/mongos_topology_coordinator',
+        '$BUILD_DIR/mongo/s/sharding_api',
+        '$BUILD_DIR/mongo/s/vector_clock_mongos',
+        '$BUILD_DIR/mongo/transport/transport_layer_common',
+        'cluster_commands',
     ]
 )
 
@@ -188,6 +206,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/read_write_concern_defaults_mock',
         '$BUILD_DIR/mongo/s/query/cluster_aggregate',
         '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
+        '$BUILD_DIR/mongo/s/vector_clock_mongos',
         'cluster_commands',
     ],
 )

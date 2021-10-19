@@ -39,7 +39,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/cluster_ddl.h"
-#include "mongo/s/commands/cluster_commands_gen.h"
+#include "mongo/s/commands/shard_collection_gen.h"
 
 namespace mongo {
 namespace {
