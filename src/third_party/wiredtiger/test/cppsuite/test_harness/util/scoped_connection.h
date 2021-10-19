@@ -26,8 +26,8 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef CONN_API_H
-#define CONN_API_H
+#ifndef SCOPED_CONNECTION_H
+#define SCOPED_CONNECTION_H
 
 /* Following definitions are required in order to use printing format specifiers in C++. */
 #ifndef __STDC_LIMIT_MACROS
@@ -37,47 +37,20 @@
 #define __STDC_FORMAT_MACROS
 #endif
 
-#include <mutex>
-
 extern "C" {
 #include "test_util.h"
-#include "wiredtiger.h"
 }
 
-#include "util/scoped_types.h"
+#include "../connection_manager.h"
 
 namespace test_harness {
-/*
- * Singleton class owning the database connection, provides access to sessions and any other
- * required connection API calls.
- */
-class connection_manager {
+
+class scoped_connection {
     public:
-    static connection_manager &instance();
-
-    public:
-    /* No copies of the singleton allowed. */
-    connection_manager(connection_manager const &) = delete;
-    connection_manager &operator=(connection_manager const &) = delete;
-
-    void close();
-    void create(const std::string &config, const std::string &home);
-    scoped_session create_session();
-
-    WT_CONNECTION *get_connection();
-
-    /*
-     * set_timestamp calls into the connection API in a thread safe manner to set global timestamps.
-     */
-    void set_timestamp(const std::string &config);
-
-    private:
-    connection_manager();
-
-    private:
-    WT_CONNECTION *_conn = nullptr;
-    std::mutex _conn_mutex;
+    explicit scoped_connection(
+      const std::string &db_conn_config, const std::string &home = DEFAULT_DIR);
+    ~scoped_connection();
 };
-} // namespace test_harness
 
+} // namespace test_harness
 #endif

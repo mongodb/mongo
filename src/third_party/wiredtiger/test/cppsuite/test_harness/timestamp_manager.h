@@ -50,7 +50,8 @@ class timestamp_manager : public component {
     static const std::string decimal_to_hex(uint64_t value);
 
     public:
-    timestamp_manager(configuration *config);
+    explicit timestamp_manager(configuration *config);
+    virtual ~timestamp_manager() = default;
 
     void load() override final;
     void do_work() override final;

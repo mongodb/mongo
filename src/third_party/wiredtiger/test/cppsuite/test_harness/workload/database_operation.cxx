@@ -287,7 +287,7 @@ database_operation::update_operation(thread_context *tc)
 
         /* Commit the current transaction if we're able to. */
         if (tc->transaction.can_commit())
-            tc->transaction.commit();
+            WT_IGNORE_RET(tc->transaction.commit());
     }
 
     /* Make sure the last operation is rolled back now the work is finished. */

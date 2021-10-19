@@ -135,11 +135,21 @@ __wt_compact(WT_SESSION_IMPL *session)
      * source if we make no progress, set a flag if the block layer thinks compaction is possible.
      */
     WT_RET(bm->compact_skip(bm, session, &skip));
-    if (skip)
+    if (skip) {
+        WT_STAT_CONN_INCR(session, session_table_compact_skipped);
+        WT_STAT_DATA_INCR(session, btree_compact_skipped);
         return (0);
+    }
 
     /* Walk the tree reviewing pages to see if they should be re-written. */
     for (i = 0;;) {
+
+        /* Track progress. */
+        WT_STAT_DATA_SET(session, btree_compact_pages_reviewed, bm->block->compact_pages_reviewed);
+        WT_STAT_DATA_SET(session, btree_compact_pages_skipped, bm->block->compact_pages_skipped);
+        WT_STAT_DATA_SET(
+          session, btree_compact_pages_write_selected, bm->block->compact_pages_written);
+
         /*
          * Periodically check if we've timed out or eviction is stuck. Quit if eviction is stuck,
          * we're making the problem worse.
@@ -196,7 +206,7 @@ __wt_compact(WT_SESSION_IMPL *session)
         __wt_page_modify_set(session, ref->page);
 
         session->compact_state = WT_COMPACT_SUCCESS;
-        WT_STAT_DATA_INCR(session, btree_compact_rewrite);
+        WT_STAT_DATA_INCR(session, btree_compact_pages_rewritten);
     }
 
 err:

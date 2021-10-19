@@ -58,9 +58,10 @@ enum class tracking_operation { CREATE_COLLECTION, DELETE_COLLECTION, DELETE_KEY
 /* Class used to track operations performed on collections */
 class workload_tracking : public component {
     public:
-    workload_tracking(configuration *_config, const std::string &operation_table_config,
+    explicit workload_tracking(configuration *_config, const std::string &operation_table_config,
       const std::string &operation_table_name, const std::string &schema_table_config,
       const std::string &schema_table_name, const bool use_compression, timestamp_manager &tsm);
+    virtual ~workload_tracking() = default;
 
     const std::string &get_schema_table_name() const;
     const std::string &get_operation_table_name() const;

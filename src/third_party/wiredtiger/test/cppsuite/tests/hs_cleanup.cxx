@@ -51,6 +51,8 @@ class hs_cleanup : public test {
           LOG_INFO, type_string(tc->type) + " thread {" + std::to_string(tc->id) + "} commencing.");
 
         const char *key_tmp;
+        const uint64_t MAX_ROLLBACKS = 100;
+        uint32_t rollback_retries = 0;
 
         collection &coll = tc->db.get_collection(tc->id);
 
@@ -93,11 +95,16 @@ class hs_cleanup : public test {
              */
             if (tc->update(cursor, coll.id, key_value_t(key_tmp))) {
                 if (tc->transaction.can_commit()) {
-                    tc->transaction.commit();
+                    if (tc->transaction.commit())
+                        rollback_retries = 0;
+                    else
+                        ++rollback_retries;
                 }
             } else {
                 tc->transaction.rollback();
+                ++rollback_retries;
             }
+            testutil_assert(rollback_retries < MAX_ROLLBACKS);
         }
         /* Ensure our last transaction is resolved. */
         if (tc->transaction.active())

@@ -282,6 +282,7 @@ config_lib(
     HAVE_LIBTCMALLOC
     "tcmalloc library exists."
     LIB "tcmalloc"
+    HEADER "gperftools/tcmalloc.h"
 )
 
 config_compile(

@@ -26,13 +26,13 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import fnmatch, os, shutil, threading, time
+import threading, time
 from helper import simulate_crash_restart
 from test_rollback_to_stable01 import test_rollback_to_stable_base
 from wiredtiger import stat
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
-from wtthread import checkpoint_thread, op_thread
+from wtthread import checkpoint_thread
 
 def mod_val(value, char, location, nbytes=1):
     return value[0:location] + char + value[location+nbytes:]
@@ -58,11 +58,11 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
     scenarios = make_scenarios(key_format_values, prepare_values)
 
     def conn_config(self):
-        config = 'cache_size=8MB,statistics=(all),statistics_log=(json,on_close,wait=1),log=(enabled=true),timing_stress_for_test=[history_store_checkpoint_delay]'
+        config = 'cache_size=25MB,statistics=(all),statistics_log=(json,on_close,wait=1),log=(enabled=true),timing_stress_for_test=[history_store_checkpoint_delay]'
         return config
 
     def test_rollback_to_stable(self):
-        nrows = 1500
+        nrows = 100
 
         # Create a table without logging.
         self.pr("create/populate table")
@@ -81,6 +81,10 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
         value_modR = mod_val(value_modQ, 'R', 1)
         value_modS = mod_val(value_modR, 'S', 2)
         value_modT = mod_val(value_modS, 'T', 3)
+        value_modW = mod_val(value_modT, 'W', 4)
+        value_modX = mod_val(value_modW, 'X', 5)
+        value_modY = mod_val(value_modX, 'Y', 6)
+        value_modZ = mod_val(value_modY, 'Z', 7)
 
         # Perform a combination of modifies and updates.
         self.pr("large updates and modifies")
@@ -109,18 +113,24 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
         try:
             self.pr("start checkpoint")
             ckpt.start()
+            # Sleep for sometime so that checkpoint starts.
+            time.sleep(2)
 
             # Perform several modifies in parallel with checkpoint.
             # Rollbacks may occur when checkpoint is running, so retry as needed.
             self.pr("modifies")
             self.retry_rollback('modify ds1, W', None,
                            lambda: self.large_modifies(uri, 'W', ds, 4, 1, nrows, self.prepare, 70))
+            self.evict_cursor(uri, nrows, value_modW)
             self.retry_rollback('modify ds1, X', None,
                            lambda: self.large_modifies(uri, 'X', ds, 5, 1, nrows, self.prepare, 80))
+            self.evict_cursor(uri, nrows, value_modX)
             self.retry_rollback('modify ds1, Y', None,
                            lambda: self.large_modifies(uri, 'Y', ds, 6, 1, nrows, self.prepare, 90))
+            self.evict_cursor(uri, nrows, value_modY)
             self.retry_rollback('modify ds1, Z', None,
                            lambda: self.large_modifies(uri, 'Z', ds, 7, 1, nrows, self.prepare, 100))
+            self.evict_cursor(uri, nrows, value_modZ)
         finally:
             done.set()
             ckpt.join()
@@ -163,7 +173,7 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
         self.ignoreStdoutPatternIfExists("oldest pinned transaction ID rolled back for eviction")
 
     def test_rollback_to_stable_same_ts(self):
-        nrows = 1500
+        nrows = 100
 
         # Create a table without logging.
         self.pr("create/populate table")
@@ -182,6 +192,10 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
         value_modR = mod_val(value_modQ, 'R', 1)
         value_modS = mod_val(value_modR, 'S', 2)
         value_modT = mod_val(value_modS, 'T', 3)
+        value_modW = mod_val(value_modT, 'W', 4)
+        value_modX = mod_val(value_modW, 'X', 5)
+        value_modY = mod_val(value_modX, 'Y', 6)
+        value_modZ = mod_val(value_modY, 'Z', 7)
 
         # Perform a combination of modifies and updates.
         self.pr("large updates and modifies")
@@ -210,18 +224,24 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
         try:
             self.pr("start checkpoint")
             ckpt.start()
+            # Sleep for sometime so that checkpoint starts.
+            time.sleep(2)
 
             # Perform several modifies in parallel with checkpoint.
             # Rollbacks may occur when checkpoint is running, so retry as needed.
             self.pr("modifies")
             self.retry_rollback('modify ds1, W', None,
                            lambda: self.large_modifies(uri, 'W', ds, 4, 1, nrows, self.prepare, 70))
+            self.evict_cursor(uri, nrows, value_modW)
             self.retry_rollback('modify ds1, X', None,
                            lambda: self.large_modifies(uri, 'X', ds, 5, 1, nrows, self.prepare, 80))
+            self.evict_cursor(uri, nrows, value_modX)
             self.retry_rollback('modify ds1, Y', None,
                            lambda: self.large_modifies(uri, 'Y', ds, 6, 1, nrows, self.prepare, 90))
+            self.evict_cursor(uri, nrows, value_modY)
             self.retry_rollback('modify ds1, Z', None,
                            lambda: self.large_modifies(uri, 'Z', ds, 7, 1, nrows, self.prepare, 100))
+            self.evict_cursor(uri, nrows, value_modZ)
         finally:
             done.set()
             ckpt.join()
@@ -262,7 +282,7 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
         self.ignoreStdoutPatternIfExists("oldest pinned transaction ID rolled back for eviction")
 
     def test_rollback_to_stable_same_ts_append(self):
-        nrows = 1500
+        nrows = 100
 
         # Create a table without logging.
         self.pr("create/populate table")
@@ -281,6 +301,10 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
         value_modR = append_val(value_modQ, 'R')
         value_modS = append_val(value_modR, 'S')
         value_modT = append_val(value_modS, 'T')
+        value_modW = append_val(value_modT, 'W')
+        value_modX = append_val(value_modW, 'X')
+        value_modY = append_val(value_modX, 'Y')
+        value_modZ = append_val(value_modY, 'Z')
 
         # Perform a combination of modifies and updates.
         self.pr("large updates and modifies")
@@ -309,6 +333,8 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
         try:
             self.pr("start checkpoint")
             ckpt.start()
+            # Sleep for sometime so that checkpoint starts.
+            time.sleep(2)
 
             # Perform several modifies in parallel with checkpoint.
             # Rollbacks may occur when checkpoint is running, so retry as needed.
@@ -316,11 +342,13 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
             self.retry_rollback('modify ds1, W', None,
                            lambda: self.large_modifies(uri, 'W', ds, len(value_modT), 1, nrows, self.prepare, 70))
             self.retry_rollback('modify ds1, X', None,
-                           lambda: self.large_modifies(uri, 'X', ds, len(value_modT) + 1, 1, nrows, self.prepare, 80))
+                           lambda: self.large_modifies(uri, 'X', ds, len(value_modW), 1, nrows, self.prepare, 80))
+            self.evict_cursor(uri, nrows, value_modX)
             self.retry_rollback('modify ds1, Y', None,
-                           lambda: self.large_modifies(uri, 'Y', ds, len(value_modT) + 2, 1, nrows, self.prepare, 90))
+                           lambda: self.large_modifies(uri, 'Y', ds, len(value_modX), 1, nrows, self.prepare, 90))
             self.retry_rollback('modify ds1, Z', None,
-                           lambda: self.large_modifies(uri, 'Z', ds, len(value_modT) + 3, 1, nrows, self.prepare, 100))
+                           lambda: self.large_modifies(uri, 'Z', ds, len(value_modY), 1, nrows, self.prepare, 100))
+            self.evict_cursor(uri, nrows, value_modZ)
         finally:
             done.set()
             ckpt.join()

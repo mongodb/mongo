@@ -154,6 +154,18 @@ class test_rollback_to_stable_base(wttest.WiredTigerTestCase):
         self.assertEqual(count, nrows)
         cursor.close()
 
+    def evict_cursor(self, uri, nrows, check_value):
+        # Configure debug behavior on a cursor to evict the page positioned on when the reset API is used.
+        evict_cursor = self.session.open_cursor(uri, None, "debug=(release_evict)")
+        self.session.begin_transaction("ignore_prepare=true")
+        for i in range (1, nrows + 1):
+            evict_cursor.set_key(i)
+            self.assertEqual(evict_cursor[i], check_value)
+            if i % 10 == 0:
+                evict_cursor.reset()
+        evict_cursor.close()
+        self.session.rollback_transaction()
+
 # Test that rollback to stable clears the remove operation.
 class test_rollback_to_stable01(test_rollback_to_stable_base):
     session_config = 'isolation=snapshot'
