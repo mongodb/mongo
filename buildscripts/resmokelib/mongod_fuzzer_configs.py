@@ -16,7 +16,7 @@ def generate_eviction_configs(rng):
     eviction_dirty_target = rng.choice(
         [rng.randint(5, 50), rng.randint(target_bytes_min, target_bytes_max)])
     trigger_max = 75 if eviction_dirty_target <= 50 else target_bytes_max
-    eviction_dirty_trigger = rng.randint(eviction_dirty_target, trigger_max)
+    eviction_dirty_trigger = rng.randint(eviction_dirty_target + 1, trigger_max)
 
     close_idle_time_secs = rng.randint(1, 100)
     close_handle_minimum = rng.randint(0, 1000)
