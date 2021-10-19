@@ -31,6 +31,7 @@
 #include "mongo/platform/basic.h"
 #include <benchmark/benchmark.h>
 
+#include "mongo/base/init.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_test_help.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
@@ -41,6 +42,11 @@ namespace mongo {
 namespace {
 
 const int kMaxPerfThreads = 16;  // max number of threads to use for lock perf
+
+MONGO_INITIALIZER_GENERAL(DConcurrencyTestServiceContext, ("DConcurrencyTestClientObserver"), ())
+(InitializerContext* context) {
+    setGlobalServiceContext(ServiceContext::make());
+}
 
 class LockerImplClientObserver : public ServiceContext::ClientObserver {
 public:
