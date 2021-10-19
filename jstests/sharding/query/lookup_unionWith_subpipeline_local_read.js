@@ -20,6 +20,7 @@ const st = new ShardingTest({name: jsTestName(), mongos: 1, shards: 2, rs: {node
 const dbName = jsTestName() + '_db';
 st.s0.setCausalConsistency(true);
 const mongosDB = st.s0.getDB(dbName);
+const replSets = [st.rs0, st.rs1];
 
 const local = mongosDB.local;
 const foreign = mongosDB.foreign;
@@ -28,18 +29,49 @@ assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()})
 st.ensurePrimaryShard(mongosDB.getName(), st.shard0.shardName);
 
 // Turn on the profiler and increase the query log level for both shards.
-for (let rs of [st.rs0, st.rs1]) {
+for (let rs of replSets) {
     const primary = rs.getPrimary();
     const secondary = rs.getSecondary();
     assert.commandWorked(primary.getDB(dbName).setProfilingLevel(2, -1));
-    assert.commandWorked(
-        primary.adminCommand({setParameter: 1, logComponentVerbosity: {query: {verbosity: 3}}}));
+    assert.commandWorked(primary.adminCommand({
+        setParameter: 1,
+        logComponentVerbosity: {query: {verbosity: 3}, replication: {heartbeats: 0}}
+    }));
     assert.commandWorked(secondary.getDB(dbName).setProfilingLevel(2, -1));
-    assert.commandWorked(
-        secondary.adminCommand({setParameter: 1, logComponentVerbosity: {query: {verbosity: 3}}}));
+    assert.commandWorked(secondary.adminCommand({
+        setParameter: 1,
+        logComponentVerbosity: {query: {verbosity: 3}, replication: {heartbeats: 0}}
+    }));
+}
+
+// Clear the logs on the primary nodes before starting a test to isolate relevant log lines.
+function clearLogs() {
+    for (let i = 0; i < replSets.length; i++) {
+        for (let node of [replSets[i].getPrimary(), replSets[i].getSecondary()]) {
+            assert.commandWorked(node.adminCommand({clearLog: "global"}));
+        }
+    }
+}
+
+// Returns true if the number of log lines on any primary exceeded the internal log buffer size.
+function logLinesExceededBufferSize() {
+    for (let i = 0; i < replSets.length; i++) {
+        for (let node of [replSets[i].getPrimary(), replSets[i].getSecondary()]) {
+            const log = assert.commandWorked(node.adminCommand({getLog: "global"}));
+            if (log.totalLinesWritten > 1024) {
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 function getLocalReadCount(node, foreignNs, comment) {
+    if (logLinesExceededBufferSize()) {
+        jsTestLog('Warning: total log lines written since start of test is more than internal ' +
+                  'buffer size. Some local read log lines may be missing!');
+    }
+
     const log = assert.commandWorked(node.adminCommand({getLog: "global"})).log;
 
     const countMatchingLogs =
@@ -59,7 +91,6 @@ function assertProfilerEntriesMatch(expected, comment, pipeline) {
     const stage = Object.keys(pipeline[0])[0];
     const foreignNs = pipeline[0][stage].from ? pipeline[0][stage].from : pipeline[0][stage].coll;
 
-    const replSets = [st.rs0, st.rs1];
     for (let i = 0; i < replSets.length; i++) {
         const node =
             expected.executeOnSecondaries ? replSets[i].getSecondary() : replSets[i].getPrimary();
@@ -119,6 +150,7 @@ function assertAggResultAndRouting(pipeline, expectedResults, opts, expected) {
     assert.commandWorked(
         foreign.insert([{_id: -1, b: 2}, {_id: 1, b: 1}], {writeConcern: {w: 'majority'}}));
 
+    clearLogs();
     const res = local.aggregate(pipeline, opts).toArray();
     assert(arrayEq(expectedResults, res), tojson(res));
 
@@ -530,6 +562,7 @@ const parallelScript = (pipeline, expectedRes, comment) =>
 }`;
 
 // Start a parallel shell to run the nested $lookup.
+clearLogs();
 let awaitShell = startParallelShell(
     parallelScript(pipeline, expectedRes, "lookup_foreign_becomes_sharded"), st.s.port);
 
@@ -564,6 +597,7 @@ assert.commandWorked(foreign.insert([{_id: -1, b: 2}, {_id: 1, b: 1}, {_id: 2, b
 failPoint = configureFailPoint(st.shard0, "waitAfterCommandFinishesExecution", data);
 
 // Start a parallel shell to run the nested $lookup.
+clearLogs();
 awaitShell =
     startParallelShell(parallelScript(pipeline, expectedRes, "lookup_primary_is_moved"), st.s.port);
 
