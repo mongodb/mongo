@@ -61,6 +61,12 @@ boost::optional<LogicalSessionId> getParentSessionId(const LogicalSessionId& ses
 LogicalSessionId castToParentSessionId(const LogicalSessionId& sessionId);
 
 /**
+ * Returns true if the session with the given session id is an internal session for internal
+ * transactions for retryable writes.
+ */
+bool isInternalSessionForRetryableWrite(const LogicalSessionId& sessionId);
+
+/**
  * Factory functions to generate logical session records.
  */
 LogicalSessionId makeLogicalSessionId(const LogicalSessionFromClient& lsid,

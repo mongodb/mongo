@@ -284,8 +284,10 @@ OpTime MutableOplogEntry::getOpTime() const {
 }
 
 size_t DurableOplogEntry::getDurableReplOperationSize(const DurableReplOperation& op) {
+    const auto stmtIds = variant_util::toVector<StmtId>(op.getStatementIds());
     return sizeof(op) + op.getNss().size() + op.getObject().objsize() +
-        (op.getObject2() ? op.getObject2()->objsize() : 0);
+        (op.getObject2() ? op.getObject2()->objsize() : 0) +
+        (sizeof(std::vector<StmtId>) + (sizeof(StmtId) * stmtIds.size()));
 }
 
 StatusWith<DurableOplogEntry> DurableOplogEntry::parse(const BSONObj& object) {

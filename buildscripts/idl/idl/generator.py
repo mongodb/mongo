@@ -1258,8 +1258,13 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             self._writer.write_line('++expectedFieldNumber;')
 
         if field.chained_struct_field:
-            self._writer.write_line('%s.%s(std::move(values));' % (_get_field_member_name(
-                field.chained_struct_field), _get_field_member_setter_name(field)))
+            if field.type.is_variant:
+                self._writer.write_line('%s.%s(%s(std::move(values)));' %
+                                        (_get_field_member_name(field.chained_struct_field),
+                                         _get_field_member_setter_name(field), field.type.cpp_type))
+            else:
+                self._writer.write_line('%s.%s(std::move(values));' % (_get_field_member_name(
+                    field.chained_struct_field), _get_field_member_setter_name(field)))
         else:
             self._writer.write_line('%s = std::move(values);' % (_get_field_member_name(field)))
 

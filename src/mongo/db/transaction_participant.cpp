@@ -1316,6 +1316,14 @@ void TransactionParticipant::Participant::addTransactionOperation(
     invariant(p().autoCommit && !*p().autoCommit && o().activeTxnNumber != kUninitializedTxnNumber);
     invariant(opCtx->lockState()->inAWriteUnitOfWork());
     p().transactionOperations.push_back(operation);
+    const auto stmtIds = operation.getStatementIds();
+    for (auto stmtId : stmtIds) {
+        auto [_, inserted] = p().transactionStmtIds.insert(stmtId);
+        uassert(5875600,
+                str::stream() << "Found two operations using the same stmtId of " << stmtId,
+                inserted);
+    }
+
     p().transactionOperationBytes +=
         repl::DurableOplogEntry::getDurableReplOperationSize(operation);
     if (!operation.getPreImage().isEmpty()) {
@@ -1357,6 +1365,7 @@ void TransactionParticipant::Participant::clearOperationsInMemory(OperationConte
     invariant(p().autoCommit);
     p().transactionOperationBytes = 0;
     p().transactionOperations.clear();
+    p().transactionStmtIds.clear();
     p().numberOfPreImagesToWrite = 0;
 }
 
@@ -2404,6 +2413,7 @@ void TransactionParticipant::Participant::_resetTransactionState(
 
     p().transactionOperationBytes = 0;
     p().transactionOperations.clear();
+    p().transactionStmtIds.clear();
     o(wl).prepareOpTime = repl::OpTime();
     o(wl).recoveryPrepareOpTime = repl::OpTime();
     p().autoCommit = boost::none;

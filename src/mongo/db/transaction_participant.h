@@ -1010,6 +1010,10 @@ private:
         // transaction.
         std::vector<repl::ReplOperation> transactionOperations;
 
+        // Holds stmtIds for operations which have been applied in the current multi-document
+        // transaction.
+        stdx::unordered_set<StmtId> transactionStmtIds;
+
         // Total size in bytes of all operations within the _transactionOperations vector.
         size_t transactionOperationBytes{0};
 

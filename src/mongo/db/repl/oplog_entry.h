@@ -41,6 +41,18 @@
 namespace mongo {
 namespace repl {
 
+namespace variant_util {
+template <typename T>
+std::vector<T> toVector(boost::optional<stdx::variant<T, std::vector<T>>> optVals) {
+    if (!optVals) {
+        return {};
+    }
+    return stdx::visit(visit_helper::Overloaded{[](T val) { return std::vector<T>{val}; },
+                                                [](const std::vector<T>& vals) { return vals; }},
+                       *optVals);
+}
+}  // namespace variant_util
+
 /**
  * The first oplog entry is a no-op with this message in its "msg" field.
  */
@@ -74,6 +86,25 @@ public:
 
     void setPreImage(BSONObj value) {
         _fullPreImage = std::move(value);
+    }
+
+    /**
+     * Sets the statement ids for this ReplOperation to 'stmtIds' if it does not contain any
+     * kUninitializedStmtId (i.e. placeholder statement id).
+     */
+    void setInitializedStatementIds(const std::vector<StmtId>& stmtIds) & {
+        if (std::count(stmtIds.begin(), stmtIds.end(), kUninitializedStmtId) > 0) {
+            return;
+        }
+        if (stmtIds.size() > 1) {
+            DurableReplOperation::setStatementIds({{stmtIds}});
+        } else if (stmtIds.size() == 1) {
+            DurableReplOperation::setStatementIds({{stmtIds.front()}});
+        }
+    }
+
+    std::vector<StmtId> getStatementIds() const {
+        return variant_util::toVector<StmtId>(DurableReplOperation::getStatementIds());
     }
 
 private:
@@ -123,22 +154,16 @@ public:
 
     void setStatementIds(const std::vector<StmtId>& stmtIds) & {
         if (stmtIds.empty()) {
-            OplogEntryBase::setStatementIds(boost::none);
+            getDurableReplOperation().setStatementIds(boost::none);
         } else if (stmtIds.size() == 1) {
-            OplogEntryBase::setStatementIds({{stmtIds.front()}});
+            getDurableReplOperation().setStatementIds({{stmtIds.front()}});
         } else {
-            OplogEntryBase::setStatementIds({{stmtIds}});
+            getDurableReplOperation().setStatementIds({{stmtIds}});
         }
     }
 
     std::vector<StmtId> getStatementIds() const {
-        if (!OplogEntryBase::getStatementIds()) {
-            return {};
-        }
-        return stdx::visit(
-            visit_helper::Overloaded{[](StmtId stmtId) { return std::vector<StmtId>{stmtId}; },
-                                     [](const std::vector<StmtId>& stmtIds) { return stmtIds; }},
-            *OplogEntryBase::getStatementIds());
+        return variant_util::toVector<StmtId>(OplogEntryBase::getStatementIds());
     }
 
     void setTxnNumber(boost::optional<std::int64_t> value) & {

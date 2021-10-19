@@ -89,6 +89,10 @@ LogicalSessionId castToParentSessionId(const LogicalSessionId& sessionId) {
     return sessionId;
 }
 
+bool isInternalSessionForRetryableWrite(const LogicalSessionId& sessionId) {
+    return sessionId.getTxnNumber().has_value();
+}
+
 LogicalSessionId makeLogicalSessionId(const LogicalSessionFromClient& fromClient,
                                       OperationContext* opCtx,
                                       std::initializer_list<Privilege> allowSpoof) {

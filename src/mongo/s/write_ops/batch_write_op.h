@@ -245,6 +245,7 @@ private:
 
     // Set to true if this write is part of a transaction.
     const bool _inTransaction{false};
+    const bool _isRetryableWrite{false};
 
     boost::optional<int> _nShardsOwningChunks;
 };

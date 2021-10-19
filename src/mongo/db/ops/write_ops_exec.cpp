@@ -572,8 +572,8 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
 
 template <typename T>
 StmtId getStmtIdForWriteOp(OperationContext* opCtx, const T& wholeOp, size_t opIndex) {
-    return opCtx->getTxnNumber() ? write_ops::getStmtIdForWriteAt(wholeOp, opIndex)
-                                 : kUninitializedStmtId;
+    return opCtx->isRetryableWrite() ? write_ops::getStmtIdForWriteAt(wholeOp, opIndex)
+                                     : kUninitializedStmtId;
 }
 
 SingleWriteResult makeWriteResultForInsertOrDeleteRetry() {

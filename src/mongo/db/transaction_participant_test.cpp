@@ -1369,7 +1369,7 @@ TEST_F(TxnParticipantTest, CannotContinueNonExistentTransaction) {
 
 // Tests that a transaction aborts if it becomes too large based on the server parameter
 // 'transactionLimitBytes'.
-TEST_F(TxnParticipantTest, TransactionExceedsSizeParameter) {
+TEST_F(TxnParticipantTest, TransactionExceedsSizeParameterObjectField) {
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
@@ -1390,6 +1390,34 @@ TEST_F(TxnParticipantTest, TransactionExceedsSizeParameter) {
     txnParticipant.addTransactionOperation(opCtx(), operation);
     txnParticipant.addTransactionOperation(opCtx(), operation);
     ASSERT_THROWS_CODE(txnParticipant.addTransactionOperation(opCtx(), operation),
+                       AssertionException,
+                       ErrorCodes::TransactionTooLarge);
+}
+
+TEST_F(TxnParticipantTest, TransactionExceedsSizeParameterStmtIdsField) {
+    auto sessionCheckout = checkOutSession();
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+
+    txnParticipant.unstashTransactionResources(opCtx(), "insert");
+    auto oldLimit = gTransactionSizeLimitBytes.load();
+    ON_BLOCK_EXIT([oldLimit] { gTransactionSizeLimitBytes.store(oldLimit); });
+
+    // Set a limit of 2.5 MB
+    gTransactionSizeLimitBytes.store(2 * 1024 * 1024 + 512 * 1024);
+
+    // Two 1MB operations should succeed; three 1MB operations should fail.
+    int stmtId = 0;
+    auto makeOperation = [&] {
+        std::vector<StmtId> stmtIds;
+        stmtIds.resize(1024 * 1024 / sizeof(StmtId));
+        std::generate(stmtIds.begin(), stmtIds.end(), [&stmtId] { return stmtId++; });
+        auto operation = repl::DurableOplogEntry::makeInsertOperation(kNss, _uuid, BSONObj());
+        operation.setInitializedStatementIds(stmtIds);
+        return operation;
+    };
+    txnParticipant.addTransactionOperation(opCtx(), makeOperation());
+    txnParticipant.addTransactionOperation(opCtx(), makeOperation());
+    ASSERT_THROWS_CODE(txnParticipant.addTransactionOperation(opCtx(), makeOperation()),
                        AssertionException,
                        ErrorCodes::TransactionTooLarge);
 }

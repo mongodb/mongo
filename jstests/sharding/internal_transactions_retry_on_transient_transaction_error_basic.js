@@ -46,6 +46,7 @@ function testCommitAfterRetry(db, lsid, txnNumber) {
         documents: [{x: 0}],
         lsid: lsid,
         txnNumber: txnNumber,
+        stmtId: NumberInt(0),
         startTransaction: true,
         autocommit: false,
     };
@@ -62,6 +63,7 @@ function testCommitAfterRetry(db, lsid, txnNumber) {
         documents: [{x: 1}],
         lsid: lsid,
         txnNumber: txnNumber,
+        stmtId: NumberInt(1),
         autocommit: false,
     };
     const insertRes0 = assert.commandFailedWithCode(

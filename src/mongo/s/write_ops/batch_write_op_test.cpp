@@ -1464,6 +1464,90 @@ TEST_F(BatchWriteOpTest, MultiOpTwoWCErrors) {
     ASSERT(clientResponse.isWriteConcernErrorSet());
 }
 
+TEST_F(BatchWriteOpTest, AttachingStmtIds) {
+    NamespaceString nss("foo.bar");
+    ShardEndpoint endpoint(ShardId("shard"), ChunkVersion::IGNORED(), boost::none);
+    auto targeter = initTargeterFullRange(nss, endpoint);
+
+    const std::vector<StmtId> stmtIds{1, 2, 3};
+    const std::vector<LogicalSessionId> lsids{
+        makeLogicalSessionIdForTest(),
+        makeLogicalSessionIdWithTxnUUIDForTest(),
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(),
+    };
+    const BatchedCommandRequest originalRequest([&] {
+        write_ops::InsertCommandRequest insertOp(nss);
+        insertOp.setDocuments({BSON("x" << 1), BSON("x" << 2), BSON("x" << 3)});
+        insertOp.getWriteCommandRequestBase().setStmtIds({stmtIds});
+        return insertOp;
+    }());
+
+    auto makeTargetedBatchedCommandRequest = [&] {
+        BatchWriteOp batchOp(_opCtx, originalRequest);
+
+        OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
+        std::map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
+        ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
+        ASSERT(!batchOp.isFinished());
+        ASSERT_EQUALS(targeted.size(), 1u);
+        assertEndpointsEqual(targeted.begin()->second->getEndpoint(), endpoint);
+
+        BatchedCommandRequest targetedRequest =
+            batchOp.buildBatchRequest(*targeted.begin()->second, targeter);
+        return targetedRequest;
+    };
+
+    {
+        // Verify that when the command is not running in a session, the targeted batched command
+        // request does not have stmtIds attached to it.
+        auto request = makeTargetedBatchedCommandRequest();
+        ASSERT_FALSE(request.getInsertRequest().getStmtIds());
+    }
+
+    {
+        // Verify that when the command is running in a session but not as retryable writes or in a
+        // retryable internal transaction, the targeted batched command request does not have
+        // stmtIds to it.
+        for (auto& lsid : lsids) {
+            _opCtx->setLogicalSessionId(lsid);
+            auto targetedRequest = makeTargetedBatchedCommandRequest();
+            ASSERT_FALSE(targetedRequest.getInsertRequest().getStmtIds());
+        }
+    }
+
+    {
+        // Verify that when the command is running in a session as retryable writes, the targeted
+        // batched command request has stmtIds attached to it.
+        _opCtx->setTxnNumber(0);
+        for (auto& lsid : lsids) {
+            _opCtx->setLogicalSessionId(lsid);
+            auto targetedRequest = makeTargetedBatchedCommandRequest();
+            auto requestStmtIds = targetedRequest.getInsertRequest().getStmtIds();
+            ASSERT(requestStmtIds);
+            ASSERT(*requestStmtIds == stmtIds);
+        }
+    }
+
+    {
+        // Verify that when the command is running in a transaction, the targeted batched command
+        // request has stmtIds attached to it if and only if the transaction is a retryable internal
+        // transaction.
+        _opCtx->setTxnNumber(0);
+        _opCtx->setInMultiDocumentTransaction();
+        for (auto& lsid : lsids) {
+            _opCtx->setLogicalSessionId(lsid);
+            auto request = makeTargetedBatchedCommandRequest();
+            auto requestStmtIds = request.getInsertRequest().getStmtIds();
+            if (isInternalSessionForRetryableWrite(lsid)) {
+                ASSERT(requestStmtIds);
+                ASSERT(*requestStmtIds == stmtIds);
+            } else {
+                ASSERT_FALSE(requestStmtIds);
+            }
+        }
+    }
+}
+
 //
 // Tests of batch size limit functionality
 //

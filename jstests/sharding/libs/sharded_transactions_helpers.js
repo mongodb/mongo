@@ -191,3 +191,11 @@ function flushRoutersAndRefreshShardMetadata(st, {ns, dbNames = []} = {}) {
         });
     });
 }
+
+function getOplogEntriesForTxn(rs, lsid, txnNumber) {
+    const filter = {txnNumber: NumberLong(txnNumber)};
+    for (let k in lsid) {
+        filter["lsid." + k] = lsid[k];
+    }
+    return rs.getPrimary().getCollection("local.oplog.rs").find(filter).sort({_id: 1}).toArray();
+}

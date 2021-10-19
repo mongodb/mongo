@@ -36,6 +36,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/logical_session_id.h"
+#include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/operation_id.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -449,6 +450,11 @@ public:
      */
     bool inMultiDocumentTransaction() const {
         return _inMultiDocumentTransaction;
+    }
+
+    bool isRetryableWrite() const {
+        return _txnNumber &&
+            (!_inMultiDocumentTransaction || isInternalSessionForRetryableWrite(*_lsid));
     }
 
     /**

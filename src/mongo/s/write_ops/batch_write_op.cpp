@@ -259,7 +259,8 @@ BatchWriteOp::BatchWriteOp(OperationContext* opCtx, const BatchedCommandRequest&
     : _opCtx(opCtx),
       _clientRequest(clientRequest),
       _batchTxnNum(_opCtx->getTxnNumber()),
-      _inTransaction(bool(TransactionRouter::get(opCtx))) {
+      _inTransaction(bool(TransactionRouter::get(opCtx))),
+      _isRetryableWrite(opCtx->isRetryableWrite()) {
     _writeOps.reserve(_clientRequest.sizeWriteOps());
 
     for (size_t i = 0; i < _clientRequest.sizeWriteOps(); ++i) {
@@ -467,7 +468,7 @@ BatchedCommandRequest BatchWriteOp::buildBatchRequest(const TargetedWriteBatch& 
     const auto batchType = _clientRequest.getBatchType();
 
     boost::optional<std::vector<int32_t>> stmtIdsForOp;
-    if (_batchTxnNum) {
+    if (_isRetryableWrite) {
         stmtIdsForOp.emplace();
     }
 
@@ -551,7 +552,7 @@ BatchedCommandRequest BatchWriteOp::buildBatchRequest(const TargetedWriteBatch& 
             wcb.setIsTimeseriesNamespace(true);
         }
 
-        if (_batchTxnNum) {
+        if (_isRetryableWrite) {
             wcb.setStmtIds(std::move(stmtIdsForOp));
         }
 

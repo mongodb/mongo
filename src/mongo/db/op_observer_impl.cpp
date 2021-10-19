@@ -543,8 +543,14 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
             return;
         }
 
+        const bool inRetryableInternalTransaction =
+            isInternalSessionForRetryableWrite(*opCtx->getLogicalSessionId());
+
         for (auto iter = first; iter != last; iter++) {
             auto operation = MutableOplogEntry::makeInsertOperation(nss, uuid, iter->doc);
+            if (inRetryableInternalTransaction) {
+                operation.setInitializedStatementIds(iter->stmtIds);
+            }
             operation.setDestinedRecipient(
                 shardingWriteRouter.getReshardingDestinedRecipient(iter->doc));
             txnParticipant.addTransactionOperation(opCtx, operation);
@@ -651,9 +657,14 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
 
     OpTimeBundle opTime;
     if (inMultiDocumentTransaction) {
+        const bool inRetryableInternalTransaction =
+            isInternalSessionForRetryableWrite(*opCtx->getLogicalSessionId());
+
         auto operation = MutableOplogEntry::makeUpdateOperation(
             args.nss, args.uuid, args.updateArgs.update, args.updateArgs.criteria);
-
+        if (inRetryableInternalTransaction) {
+            operation.setInitializedStatementIds(args.updateArgs.stmtIds);
+        }
         operation.setDestinedRecipient(
             shardingWriteRouter.getReshardingDestinedRecipient(args.updateArgs.updatedDoc));
 
@@ -665,7 +676,7 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
         txnParticipant.addTransactionOperation(opCtx, operation);
     } else {
         MutableOplogEntry oplogEntry;
-        oplogEntry.getDurableReplOperation().setDestinedRecipient(
+        oplogEntry.setDestinedRecipient(
             shardingWriteRouter.getReshardingDestinedRecipient(args.updateArgs.updatedDoc));
 
         if (opCtx->getTxnNumber() && args.updateArgs.storeImageInSideCollection) {
@@ -788,8 +799,15 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
         tassert(5868700,
                 "Attempted a retryable write within a multi-document transaction",
                 args.retryableWritePreImageRecordingType == RetryableOptions::kNotRetryable);
+
+        const bool inRetryableInternalTransaction =
+            isInternalSessionForRetryableWrite(*opCtx->getLogicalSessionId());
+
         auto operation =
             MutableOplogEntry::makeDeleteOperation(nss, uuid, documentKey.getShardKeyAndId());
+        if (inRetryableInternalTransaction) {
+            operation.setInitializedStatementIds({stmtId});
+        }
 
         if (args.preImageRecordingEnabledForCollection) {
             tassert(5868701,
@@ -1209,12 +1227,14 @@ void OpObserverImpl::onEmptyCapped(OperationContext* opCtx,
 
 namespace {
 // Accepts an empty BSON builder and appends the given transaction statements to an 'applyOps' array
-// field. Appends as many operations as possible until either the constructed object exceeds the
-// 16MB limit or the maximum number of transaction statements allowed in one entry.
+// field. Appends as many operations as possible to the array (and their corresponding statement
+// ids to 'stmtIdsWritten') until either the constructed object exceeds the 16MB limit or the
+// maximum number of transaction statements allowed in one entry.
 //
 // Returns an iterator to the first statement that wasn't packed into the applyOps object.
 std::vector<repl::ReplOperation>::iterator packTransactionStatementsForApplyOps(
     BSONObjBuilder* applyOpsBuilder,
+    std::vector<StmtId>* stmtIdsWritten,
     std::vector<repl::ReplOperation>::iterator stmtBegin,
     std::vector<repl::ReplOperation>::iterator stmtEnd) {
 
@@ -1234,6 +1254,8 @@ std::vector<repl::ReplOperation>::iterator packTransactionStatementsForApplyOps(
               BSONObjMaxUserSize)))
             break;
         opsArray.append(stmt.toBSON());
+        const auto stmtIds = stmt.getStatementIds();
+        stmtIdsWritten->insert(stmtIdsWritten->end(), stmtIds.begin(), stmtIds.end());
     }
     try {
         // BSONArrayBuilder will throw a BSONObjectTooLarge exception if we exceeded the max BSON
@@ -1264,7 +1286,12 @@ OpTimeBundle logApplyOpsForTransaction(OperationContext* opCtx,
                                        MutableOplogEntry* oplogEntry,
                                        boost::optional<DurableTxnStateEnum> txnState,
                                        boost::optional<repl::OpTime> startOpTime,
+                                       std::vector<StmtId> stmtIdsWritten,
                                        const bool updateTxnTable) {
+    if (!stmtIdsWritten.empty()) {
+        invariant(isInternalSessionForRetryableWrite(*opCtx->getLogicalSessionId()));
+    }
+
     const bool areInternalTransactionsEnabled =
         feature_flags::gFeatureFlagInternalTransactions.isEnabled(
             serverGlobalParams.featureCompatibility);
@@ -1291,7 +1318,7 @@ OpTimeBundle logApplyOpsForTransaction(OperationContext* opCtx,
             if (areInternalTransactionsEnabled) {
                 sessionTxnRecord.setTxnRetryCounter(txnRetryCounter);
             }
-            onWriteOpCompleted(opCtx, {}, sessionTxnRecord);
+            onWriteOpCompleted(opCtx, std::move(stmtIdsWritten), sessionTxnRecord);
         }
         return times;
     } catch (const AssertionException& e) {
@@ -1380,8 +1407,9 @@ int logOplogEntriesForTransaction(OperationContext* opCtx,
     while (stmtsIter != stmts->end()) {
 
         BSONObjBuilder applyOpsBuilder;
-        auto nextStmt =
-            packTransactionStatementsForApplyOps(&applyOpsBuilder, stmtsIter, stmts->end());
+        std::vector<StmtId> stmtIdsWritten;
+        auto nextStmt = packTransactionStatementsForApplyOps(
+            &applyOpsBuilder, &stmtIdsWritten, stmtsIter, stmts->end());
 
         // If we packed the last op, then the next oplog entry we log should be the implicit
         // commit or implicit prepare, i.e. we omit the 'partialTxn' field.
@@ -1441,8 +1469,8 @@ int logOplogEntriesForTransaction(OperationContext* opCtx,
         auto txnState = isPartialTxn
             ? DurableTxnStateEnum::kInProgress
             : (implicitPrepare ? DurableTxnStateEnum::kPrepared : DurableTxnStateEnum::kCommitted);
-        prevWriteOpTime =
-            logApplyOpsForTransaction(opCtx, &oplogEntry, txnState, startOpTime, updateTxnTable);
+        prevWriteOpTime = logApplyOpsForTransaction(
+            opCtx, &oplogEntry, txnState, startOpTime, std::move(stmtIdsWritten), updateTxnTable);
 
         hangAfterLoggingApplyOpsForTransaction.pauseWhileSet();
 
@@ -1623,6 +1651,7 @@ void OpObserverImpl::onTransactionPrepare(OperationContext* opCtx,
                                               &oplogEntry,
                                               DurableTxnStateEnum::kPrepared,
                                               oplogSlot,
+                                              {},
                                               true /* updateTxnTable */);
                 }
                 wuow.commit();
