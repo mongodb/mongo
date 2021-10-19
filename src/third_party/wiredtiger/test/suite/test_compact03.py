@@ -79,18 +79,6 @@ class test_compact03(wttest.WiredTigerTestCase):
     expectedTableSize = 20 # Mbytes
     nOverflowRecords = 5000
 
-    # Return stats that track the progress of compaction.
-    def getCompactProgressStats(self):
-        cstat = self.session.open_cursor(
-            'statistics:' + self.uri, None, 'statistics=(all)')
-        statDict = {}
-        statDict["pages_reviewed"] = cstat[stat.dsrc.btree_compact_pages_reviewed][2]
-        statDict["pages_skipped"] = cstat[stat.dsrc.btree_compact_pages_skipped][2]
-        statDict["pages_selected"] = cstat[stat.dsrc.btree_compact_pages_write_selected][2]
-        statDict["pages_rewritten"] = cstat[stat.dsrc.btree_compact_pages_rewritten][2]
-        cstat.close()
-        return statDict
-
     # Return the size of the file
     def getSize(self):
         # To allow this to work on systems without ftruncate,
@@ -158,12 +146,6 @@ class test_compact03(wttest.WiredTigerTestCase):
         sizeAfterCompact = self.getSize()
         self.pr('After deleting values and compactions ' + str(sizeAfterCompact // mb) + 'MB')
         self.assertGreater(sizeAfterCompact, (sizeWithOverflow // 10) * 9)
-
-        # Verify that we did indeed rewrote some pages but that didn't help with the file size.
-        statDict = self.getCompactProgressStats()
-        self.assertGreater(statDict["pages_reviewed"],0)
-        self.assertGreater(statDict["pages_selected"],0)
-        self.assertGreater(statDict["pages_rewritten"],0)
 
         # 9. Insert some normal values and expect that file size won't increase as free extents
         #    in the middle of the file will be used to write new data.
