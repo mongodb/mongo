@@ -1664,7 +1664,7 @@ buildvariants:
       mongodb_setup: initialsync-logkeeper
       infrastructure_provisioning: initialsync-logkeeper
       # EBS logkeeper snapshot with FCV set to 5.0
-      snapshotId: snap-0b91f3899d0b10008
+      snapshotId: snap-0cc5e61399e2e79f6
       platform: linux
       authentication: disabled
       storageEngine: wiredTiger
