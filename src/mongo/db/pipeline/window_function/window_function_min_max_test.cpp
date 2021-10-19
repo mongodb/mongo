@@ -80,6 +80,38 @@ TEST_F(WindowFunctionMinMaxTest, SmallWindow) {
     ASSERT_VALUE_EQ(max.getValue(), Value{8});
 }
 
+TEST_F(WindowFunctionMinMaxTest, NullsAndMissing) {
+    min.add(Value{2});
+
+    // Nulls should be ignored.
+    min.add(Value{BSONNULL});
+    ASSERT_VALUE_EQ(min.getValue(), Value{2});
+
+    // Missing values should be ignored.
+    min.add(Value());
+    ASSERT_VALUE_EQ(min.getValue(), Value{2});
+
+    // Removal of null/missing values is a no-op.
+    min.remove(Value{BSONNULL});
+    min.remove(Value());
+    ASSERT_VALUE_EQ(min.getValue(), Value{2});
+
+    max.add(Value{BSONNULL});
+    max.add(Value{8});
+
+    // Nulls should be ignored.
+    ASSERT_VALUE_EQ(max.getValue(), Value{8});
+
+    // Missing values should be ignored.
+    max.add(Value());
+    ASSERT_VALUE_EQ(max.getValue(), Value{8});
+
+    // Removal of null/missing values is a no-op.
+    max.remove(Value{BSONNULL});
+    max.remove(Value());
+    ASSERT_VALUE_EQ(max.getValue(), Value{8});
+}
+
 TEST_F(WindowFunctionMinMaxTest, Removal) {
     min.add(Value{5});
     min.add(Value{2});
