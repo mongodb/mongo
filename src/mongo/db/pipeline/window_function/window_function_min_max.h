@@ -37,12 +37,18 @@ namespace mongo {
 template <AccumulatorMinMax::Sense sense>
 class WindowFunctionMinMaxCommon : public WindowFunctionState {
 public:
-    void add(Value value) override {
+    void add(Value value) final {
+        // Ignore nullish values.
+        if (value.nullish())
+            return;
         _memUsageBytes += value.getApproximateSize();
         _values.insert(std::move(value));
     }
 
-    void remove(Value value) override {
+    void remove(Value value) final {
+        // Ignore nullish values.
+        if (value.nullish())
+            return;
         // std::multiset::insert is guaranteed to put the element after any equal elements
         // already in the container. So find() / erase() will remove the oldest equal element,
         // which is what we want, to satisfy "remove() undoes add() when called in FIFO order".
@@ -109,20 +115,6 @@ public:
     explicit WindowFunctionMinMaxN(ExpressionContext* const expCtx, long long n)
         : WindowFunctionMinMaxCommon<sense>(expCtx), _n(n) {
         _memUsageBytes = sizeof(*this);
-    }
-
-    void add(Value value) final {
-        // Ignore nullish values.
-        if (value.nullish())
-            return;
-        WindowFunctionMinMaxCommon<sense>::add(std::move(value));
-    }
-
-    void remove(Value value) final {
-        // Ignore nullish values.
-        if (value.nullish())
-            return;
-        WindowFunctionMinMaxCommon<sense>::remove(std::move(value));
     }
 
     Value getValue() const final {
