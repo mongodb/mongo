@@ -7,12 +7,21 @@
 "use strict";
 load("jstests/libs/fail_point_util.js");
 load('jstests/libs/parallelTester.js');
+load('jstests/noPassthrough/libs/index_build.js');
 
 const st = new ShardingTest({shards: 2, mongos: 1, rs: {nodes: 2}});
 const dbName = "testDB";
 const collName = "coll";
 const mongosDB = st.s0.getDB(dbName);
 const shard0 = st.shard0.rs.getPrimary();
+
+if (!(IndexBuildTest.supportsTwoPhaseIndexBuild(shard0) &&
+      IndexBuildTest.indexBuildCommitQuorumEnabled(shard0))) {
+    jsTestLog(
+        'Skipping test because two phase index build and index build commit quorum are not supported.');
+    st.stop();
+    return;
+}
 
 const generateCreateIndexThread = (host, dbName, collName) => {
     return new Thread(function(host, dbName, collName) {
