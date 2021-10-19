@@ -30,43 +30,37 @@
 
 #include <boost/optional.hpp>
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
-
 namespace mongo::sdam {
 
 // Comparable pair or ElectionId (term) and SetVersion.
 struct ElectionIdSetVersionPair {
-    const boost::optional<mongo::OID> electionId;
-    const boost::optional<int> setVersion;
+    boost::optional<mongo::OID> electionId;
+    boost::optional<int> setVersion;
 
     bool allDefined() const {
         return electionId && setVersion;
     }
 
-    bool allUndefined() const {
-        return !electionId && !setVersion;
+    bool anyDefined() const {
+        return electionId || setVersion;
     }
+
+    bool anyUndefined() const {
+        return !electionId || !setVersion;
+    }
+
+    BSONObj toBSON() const;
 };
 
-inline bool electionIdEqual(const ElectionIdSetVersionPair& p1,
-                            const ElectionIdSetVersionPair& p2) {
-    return p1.electionId && p2.electionId && (*p1.electionId).compare(*p2.electionId) == 0;
-}
-
 inline bool operator<(const ElectionIdSetVersionPair& p1, const ElectionIdSetVersionPair& p2) {
-    if (electionIdEqual(p1, p2)) {
-        if (p1.setVersion && p2.setVersion) {
-            return *p1.setVersion < *p2.setVersion;
-        }
-        return false;  // Cannot compare Set versions.
+    if (p1.anyUndefined() && p2.allDefined()) {
+        return true;
     }
 
-    if (p1.electionId && p2.electionId) {
-        return (*p1.electionId).compare(*p2.electionId) < 0;
-    }
-
-    // We know that election Ids are not comparable.
-    return false;
+    return (p1.electionId < p2.electionId) ||
+        ((p1.electionId == p2.electionId) && (p1.setVersion < p2.setVersion));
 }
 
 inline bool operator>(const ElectionIdSetVersionPair& p1, const ElectionIdSetVersionPair& p2) {
@@ -75,15 +69,7 @@ inline bool operator>(const ElectionIdSetVersionPair& p1, const ElectionIdSetVer
 
 // Equality operator is not equivalent to "!< && !>" because of grey area of undefined values.
 inline bool operator==(const ElectionIdSetVersionPair& p1, const ElectionIdSetVersionPair& p2) {
-    if (!electionIdEqual(p1, p2)) {
-        return false;
-    }
-
-    if (!p1.setVersion && !p2.setVersion) {
-        return true;
-    }
-
-    return p1.setVersion && p2.setVersion && *p1.setVersion == *p2.setVersion;
+    return ((p1.electionId == p2.electionId) && (p1.setVersion == p2.setVersion));
 }
 
 inline bool setVersionWentBackwards(const ElectionIdSetVersionPair& current,
@@ -91,35 +77,15 @@ inline bool setVersionWentBackwards(const ElectionIdSetVersionPair& current,
     return current.setVersion && incoming.setVersion && *current.setVersion > *incoming.setVersion;
 }
 
-/**
- * @return true if 'incoming' is RS primary and fields have consistent values.
- */
-inline bool isIncomingPrimaryConsistent(const ElectionIdSetVersionPair& current,
-                                        const ElectionIdSetVersionPair& incoming) {
-    // If coming from primary both election Id and Set version should be always set.
-    // This requirement is true for at least MDB >= 4.0.
-    if (!incoming.electionId || !incoming.setVersion) {
-        return false;
+inline BSONObj ElectionIdSetVersionPair::toBSON() const {
+    BSONObjBuilder bob;
+    if (electionId) {
+        bob.append("electionId", *electionId);
     }
-
-    if (current.allUndefined()) {
-        return true;  // Further check is not necessary.
+    if (setVersion) {
+        bob.append("setVersion", *setVersion);
     }
-
-    // Identical term means Set version should be equal or advance because no failover
-    // happened and Set version at the same primary cannot go backwards.
-    if (electionIdEqual(current, incoming)) {
-        return !current.setVersion || *current.setVersion <= *incoming.setVersion;
-    }
-
-    // If Set version goes backwards the term should advance, because it means
-    // failover happened. This is possible if the previous primary failed to replicate
-    // new Set version before failover. When it happens, we will rollback the Set version.
-    if (setVersionWentBackwards(current, incoming)) {
-        return !current.electionId || (*current.electionId).compare(*incoming.electionId) < 0;
-    }
-
-    return true;
+    return bob.obj();
 }
 
 }  // namespace mongo::sdam
