@@ -37,7 +37,7 @@ class example_test : public test_harness::test {
     example_test(const test_harness::test_args &args) : test(args) {}
 
     void
-    run()
+    run() override final
     {
         /* You can remove the call to the base class to fully customized your test. */
         test::run();

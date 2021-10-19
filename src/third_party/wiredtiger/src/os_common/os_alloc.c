@@ -14,7 +14,17 @@
  * to replace C run-time memory management functions with alternatives.
  */
 #ifdef HAVE_LIBTCMALLOC
+/*
+ * Include the TCMalloc header with the "-Wundef" diagnostic flag disabled. Compiling with strict
+ * (where the 'Wundef' diagnostic flag is enabled), generates compilation errors where the
+ * '__cplusplus' CPP macro is not defined. This being employed by the TCMalloc header to
+ * differentiate C & C++ compilation environments. We don't want to define '__cplusplus' when
+ * compiling C sources.
+ */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wundef"
 #include <gperftools/tcmalloc.h>
+#pragma GCC diagnostic pop
 
 #define calloc tc_calloc
 #define malloc tc_malloc

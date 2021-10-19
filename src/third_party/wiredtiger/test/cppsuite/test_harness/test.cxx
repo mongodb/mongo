@@ -119,8 +119,12 @@ test::run()
     /* Add the user supplied wiredtiger open config. */
     db_create_config += _args.wt_open_config;
 
-    /* Set up the test environment. */
-    connection_manager::instance().create(db_create_config);
+    /*
+     * Set up the test environment. A smart pointer is used here so that the connection can
+     * automatically be closed by the scoped_connection's destructor when the test finishes and the
+     * pointer goes out of scope.
+     */
+    _scoped_conn = std::make_shared<scoped_connection>(db_create_config);
 
     /* Initiate the load stage of each component. */
     for (const auto &it : _components)

@@ -1124,23 +1124,24 @@ __wt_cursor_largest_key(WT_CURSOR *cursor)
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
     bool ignore_tombstone;
+    bool visible_all;
 
     ignore_tombstone = F_ISSET(cursor, WT_CURSTD_IGNORE_TOMBSTONE);
+    visible_all = F_ISSET(cursor, WT_CURSTD_VISIBLE_ALL);
     CURSOR_API_CALL(cursor, session, largest_key, NULL);
-
-    if (F_ISSET(session->txn, WT_TXN_SHARED_TS_READ))
-        WT_ERR_MSG(session, EINVAL, "largest key cannot be called with a read timestamp");
 
     WT_ERR(__wt_scr_alloc(session, 0, &key));
 
     /* Reset the cursor to give up the cursor position. */
     WT_ERR(cursor->reset(cursor));
 
-    /* Ignore deletion */
+    /* Ignore deletion. */
     F_SET(cursor, WT_CURSTD_IGNORE_TOMBSTONE);
+    /* Ignore visibility. */
+    F_SET(cursor, WT_CURSTD_VISIBLE_ALL);
 
-    /* Call cursor prev with read uncommitted isolation level. */
-    WT_WITH_TXN_ISOLATION(session, WT_ISO_READ_UNCOMMITTED, ret = cursor->prev(cursor));
+    /* Call cursor prev to get the largest key. */
+    WT_ERR(cursor->prev(cursor));
     WT_ERR(ret);
 
     /* Copy the key as we will reset the cursor after that. */
@@ -1153,6 +1154,8 @@ __wt_cursor_largest_key(WT_CURSOR *cursor)
 err:
     if (!ignore_tombstone)
         F_CLR(cursor, WT_CURSTD_IGNORE_TOMBSTONE);
+    if (!visible_all)
+        F_CLR(cursor, WT_CURSTD_VISIBLE_ALL);
     __wt_scr_free(session, &key);
     if (ret != 0)
         WT_TRET(cursor->reset(cursor));

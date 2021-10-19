@@ -48,6 +48,7 @@ static const char conn_config[] = "create,cache_size=2GB,statistics=(all)";
 static const char table_config[] =
   "allocation_size=4KB,leaf_page_max=4KB,key_format=i,value_format=QQQS";
 static char data_str[1024] = "";
+static pthread_t thread_compact;
 
 /* Structures definition. */
 struct thread_data {
@@ -105,7 +106,7 @@ run_test(bool stress_test, const char *home, const char *uri)
     struct thread_data td;
     WT_CONNECTION *conn;
     WT_SESSION *session;
-    pthread_t thread_checkpoint, thread_compact;
+    pthread_t thread_checkpoint;
     uint64_t file_sz_after, file_sz_before;
 
     testutil_make_work_dir(home);
@@ -147,8 +148,8 @@ run_test(bool stress_test, const char *home, const char *uri)
         /* Create and initialize conditional variable. */
         testutil_check(__wt_cond_alloc((WT_SESSION_IMPL *)session, "compact operation", &td.cond));
 
+        /* The checkpoint thread will spawn the compact thread when it's ready. */
         testutil_check(pthread_create(&thread_checkpoint, NULL, thread_func_checkpoint, &td));
-        testutil_check(pthread_create(&thread_compact, NULL, thread_func_compact, &td));
     }
 
     /* Wait for the threads to finish the work. */
@@ -188,12 +189,6 @@ thread_func_compact(void *arg)
     testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
 
     if (td->cond != NULL) {
-        /*
-         * Make sure checkpoint thread is initialized and waiting for the signal. Sleep for one
-         * second.
-         */
-        __wt_sleep(1, 0);
-
         /* Wake up the checkpoint thread. */
         printf("Sending the signal!\n");
         __wt_cond_signal((WT_SESSION_IMPL *)session, td->cond);
@@ -237,6 +232,12 @@ thread_func_checkpoint(void *arg)
     __wt_random_init_seed((WT_SESSION_IMPL *)session, &rnd);
 
     if (td->cond != NULL) {
+        /*
+         * Spawn the compact thread here to make sure the both threads are ready for the synced
+         * start.
+         */
+        testutil_check(pthread_create(&thread_compact, NULL, thread_func_compact, td));
+
         printf("Waiting for the signal...\n");
         /*
          * Wait for the signal and time out after 20 seconds. wait_run_check is required because the

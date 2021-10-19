@@ -118,32 +118,47 @@ class test_cursor17(wttest.WiredTigerTestCase):
         session2 = self.setUpSessionOpen(self.conn)
         cursor2 = session2.open_cursor(self.type + self.tablename, None)
         session2.begin_transaction()
-        cursor2[101] = self.ds.value(101)
+        cursor2[200] = self.ds.value(200)
 
         cursor = self.session.open_cursor(self.type + self.tablename, None)
 
         # Verify the largest key.
         self.session.begin_transaction()
         self.assertEqual(cursor.largest_key(), 0)
-        self.assertEqual(cursor.get_key(), 101)
+        self.assertEqual(cursor.get_key(), 200)
         self.session.rollback_transaction()
 
         session2.rollback_transaction()
-
-    def test_read_timestamp(self):
+    
+    def test_invisible_timestamp(self):
         self.populate(100)
 
         cursor = self.session.open_cursor(self.type + self.tablename, None)
-        self.session.begin_transaction('read_timestamp=' + self.timestamp_str(5))
-        # Expect the largest key to throw.
-        with self.expectedStderrPattern("largest key cannot be called with a read timestamp"):
-            try:
-                cursor.largest_key()
-            except wiredtiger.WiredTigerError as e:
-                gotException = True
-                self.pr('got expected exception: ' + str(e))
-                self.assertTrue(str(e).find('nvalid argument') >= 0)
-        self.assertTrue(gotException, msg = 'expected exception')
+        self.session.begin_transaction()
+        cursor[200] = self.ds.value(200)
+        self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(10))
+
+        # Verify the largest key.
+        self.session.begin_transaction("read_timestamp=" + self.timestamp_str(5))
+        self.assertEqual(cursor.largest_key(), 0)
+        self.assertEqual(cursor.get_key(), 200)
+        self.session.rollback_transaction()
+    
+    def test_prepared_update(self):
+        self.populate(100)
+
+        session2 = self.setUpSessionOpen(self.conn)
+        cursor2 = session2.open_cursor(self.type + self.tablename, None)
+        session2.begin_transaction()
+        cursor2[200] = self.ds.value(200)
+        session2.prepare_transaction("prepare_timestamp=" + self.timestamp_str(10))
+
+        cursor = self.session.open_cursor(self.type + self.tablename, None)
+
+        # Verify the largest key.
+        self.session.begin_transaction("read_timestamp=" + self.timestamp_str(20))
+        self.assertEqual(cursor.largest_key(), 0)
+        self.assertEqual(cursor.get_key(), 200)
         self.session.rollback_transaction()
 
     def test_not_positioned(self):

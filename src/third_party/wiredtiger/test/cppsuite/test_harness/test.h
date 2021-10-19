@@ -39,6 +39,7 @@ extern "C" {
 #include "checkpoint_manager.h"
 #include "connection_manager.h"
 #include "runtime_monitor.h"
+#include "util/scoped_connection.h"
 #include "workload/database_operation.h"
 #include "workload_generator.h"
 
@@ -59,8 +60,8 @@ class test_args {
  */
 class test : public database_operation {
     public:
-    test(const test_args &args);
-    ~test();
+    explicit test(const test_args &args);
+    virtual ~test();
 
     /* Delete the copy constructor and the assignment operator. */
     test(const test &) = delete;
@@ -92,18 +93,8 @@ class test : public database_operation {
     timestamp_manager *_timestamp_manager = nullptr;
     workload_generator *_workload_generator = nullptr;
     workload_tracking *_workload_tracking = nullptr;
-    /*
-     * FIX-ME-Test-Framework: We can't put this code in the destructor of `test` since it will run
-     * before the destructors of each of our members (meaning that sessions will get closed after
-     * the connection gets closed). To work around this, we've added a member with a destructor that
-     * closes the connection.
-     */
-    struct connection_closer {
-        ~connection_closer()
-        {
-            connection_manager::instance().close();
-        }
-    } _connection_closer;
+
+    std::shared_ptr<scoped_connection> _scoped_conn;
     database _database;
 };
 } // namespace test_harness
