@@ -213,6 +213,14 @@ public:
         return _forceClassicEngine;
     }
 
+    void setSbeCompatible(bool sbeCompatible) {
+        _sbeCompatible = sbeCompatible;
+    }
+
+    bool isSbeCompatible() const {
+        return _sbeCompatible;
+    }
+
     void setExplain(bool explain) {
         _explain = explain;
     }
@@ -271,6 +279,9 @@ private:
 
     // Determines whether the classic engine must be used.
     bool _forceClassicEngine = false;
+
+    // True if this query can be executed by the SBE.
+    bool _sbeCompatible = false;
 };
 
 }  // namespace mongo

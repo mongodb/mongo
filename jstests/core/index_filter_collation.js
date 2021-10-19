@@ -14,6 +14,12 @@
 "use strict";
 
 load("jstests/libs/analyze_plan.js");  // For getPlanStages.
+load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
+
+if (checkSBEEnabled(db, ["featureFlagSbePlanCache"])) {
+    jsTest.log("Skipping test because SBE and SBE plan cache are both enabled.");
+    return;
+}
 
 const collName = "index_filter_collation";
 const coll = db[collName];

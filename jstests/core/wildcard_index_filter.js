@@ -12,6 +12,12 @@
 
 load("jstests/libs/analyze_plan.js");
 load("jstests/libs/fixture_helpers.js");  // For 'isMongos()'.
+load("jstests/libs/sbe_util.js");         // For checkSBEEnabled.
+
+if (checkSBEEnabled(db, ["featureFlagSbePlanCache"])) {
+    jsTest.log("Skipping test because SBE and SBE plan cache are both enabled.");
+    return;
+}
 
 const coll = db.wildcard_index_filter;
 

@@ -120,6 +120,7 @@ void testComputeSBEKey(BSONObj query,
     BSONObj collation;
     unique_ptr<CanonicalQuery> cq(
         canonicalize(query, sort, proj, collation, std::move(findCommand)));
+    cq->setSbeCompatible(true);
     auto key = makeKey(*cq);
     ASSERT_EQUALS(key.toString(), expectedStr);
 }

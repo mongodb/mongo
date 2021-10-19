@@ -19,6 +19,12 @@
 "use strict";
 
 load("jstests/libs/analyze_plan.js");  // For 'getPlanStages' and 'isCollscan'.
+load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
+
+if (checkSBEEnabled(db, ["featureFlagSbePlanCache"])) {
+    jsTest.log("Skipping test because SBE and SBE plan cache are both enabled.");
+    return;
+}
 
 const collName = 'hidden_indexes_remain_visible_in_index_filters';
 db[collName].drop();
