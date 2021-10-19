@@ -855,12 +855,7 @@ Status runAggregate(OperationContext* opCtx,
             ReadPreferenceSetting::get(opCtx),
             cmdObj,
             privileges);
-        if (expCtx->tailableMode == TailableModeEnum::kTailable) {
-            cursorParams.setTailable(true);
-        } else if (expCtx->tailableMode == TailableModeEnum::kTailableAndAwaitData) {
-            cursorParams.setTailable(true);
-            cursorParams.setAwaitData(true);
-        }
+        cursorParams.setTailableMode(expCtx->tailableMode);
 
         auto pin = CursorManager::get(opCtx)->registerCursor(opCtx, std::move(cursorParams));
 

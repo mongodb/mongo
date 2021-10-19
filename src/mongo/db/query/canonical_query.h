@@ -205,11 +205,6 @@ public:
         return _canHaveNoopMatchNodes;
     }
 
-    /**
-     * Return options as a bit vector.
-     */
-    int getOptions() const;
-
     bool getExplain() const {
         return _explain;
     }

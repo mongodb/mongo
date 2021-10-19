@@ -71,7 +71,15 @@ struct ClientCursorParams {
           writeConcernOptions(std::move(writeConcernOptions)),
           readConcernArgs(std::move(readConcernArgs)),
           readPreferenceSetting(std::move(readPreferenceSetting)),
-          queryOptions(exec->getCanonicalQuery() ? exec->getCanonicalQuery()->getOptions() : 0),
+          isNoTimeout(
+              exec->getCanonicalQuery()
+                  ? static_cast<bool>(
+                        exec->getCanonicalQuery()->getFindCommandRequest().getNoCursorTimeout())
+                  : false),
+          tailableMode(exec->getCanonicalQuery()
+                           ? query_request_helper::getTailableMode(
+                                 exec->getCanonicalQuery()->getFindCommandRequest())
+                           : TailableModeEnum::kNormal),
           originatingCommandObj(originatingCommandObj.getOwned()),
           originatingPrivileges(std::move(originatingPrivileges)) {
         while (authenticatedUsersIter.more()) {
@@ -79,18 +87,8 @@ struct ClientCursorParams {
         }
     }
 
-    void setTailable(bool tailable) {
-        if (tailable)
-            queryOptions |= QueryOption_CursorTailable;
-        else
-            queryOptions &= ~QueryOption_CursorTailable;
-    }
-
-    void setAwaitData(bool awaitData) {
-        if (awaitData)
-            queryOptions |= QueryOption_AwaitData;
-        else
-            queryOptions &= ~QueryOption_AwaitData;
+    void setTailableMode(TailableModeEnum newMode) {
+        tailableMode = newMode;
     }
 
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
@@ -100,7 +98,8 @@ struct ClientCursorParams {
     const WriteConcernOptions writeConcernOptions;
     const repl::ReadConcernArgs readConcernArgs;
     const ReadPreferenceSetting readPreferenceSetting;
-    int queryOptions = 0;
+    const bool isNoTimeout;
+    TailableModeEnum tailableMode;
     BSONObj originatingCommandObj;
     PrivilegeVector originatingPrivileges;
 };
@@ -170,21 +169,20 @@ public:
         return _exec.get();
     }
 
-    /**
-     * Returns the query options bitmask.  If you'd like to know if the cursor is tailable or
-     * awaitData, prefer using the specific methods isTailable() and isAwaitData() over using this
-     * method.
-     */
-    int queryOptions() const {
-        return _queryOptions;
-    }
-
     bool isTailable() const {
-        return _queryOptions & QueryOption_CursorTailable;
+        switch (_tailableMode) {
+            case TailableModeEnum::kNormal:
+                return false;
+            case TailableModeEnum::kTailable:
+            case TailableModeEnum::kTailableAndAwaitData:
+                return true;
+        }
+
+        MONGO_UNREACHABLE;
     }
 
     bool isAwaitData() const {
-        return _queryOptions & QueryOption_AwaitData;
+        return _tailableMode == TailableModeEnum::kTailableAndAwaitData;
     }
 
     /**
@@ -349,7 +347,7 @@ private:
     void dispose(OperationContext* opCtx);
 
     bool isNoTimeout() const {
-        return (_queryOptions & QueryOption_NoCursorTimeout);
+        return _isNoTimeout;
     }
 
     // The ID of the ClientCursor. A value of 0 is used to mean that no cursor id has been assigned.
@@ -392,8 +390,9 @@ private:
     // The privileges required for the _originatingCommand.
     const PrivilegeVector _originatingPrivileges;
 
-    // See the QueryOptions enum in dbclientinterface.h.
-    const int _queryOptions = 0;
+    const TailableModeEnum _tailableMode;
+
+    const bool _isNoTimeout;
 
     // Unused maxTime budget for this cursor.
     Microseconds _leftoverMaxTimeMicros = Microseconds::max();

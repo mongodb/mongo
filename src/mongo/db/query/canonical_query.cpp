@@ -475,23 +475,6 @@ Status CanonicalQuery::isValidNormalized(const MatchExpression* root) {
     return Status::OK();
 }
 
-int CanonicalQuery::getOptions() const {
-    int options = 0;
-    if (_findCommand->getTailable()) {
-        options |= QueryOption_CursorTailable;
-    }
-    if (_findCommand->getAwaitData()) {
-        options |= QueryOption_AwaitData;
-    }
-    if (_findCommand->getNoCursorTimeout()) {
-        options |= QueryOption_NoCursorTimeout;
-    }
-    if (_findCommand->getAllowPartialResults()) {
-        options |= QueryOption_PartialResults;
-    }
-    return options;
-}
-
 std::string CanonicalQuery::toString() const {
     str::stream ss;
     ss << "ns=" << _findCommand->getNamespaceOrUUID().nss().value_or(NamespaceString()).ns();
