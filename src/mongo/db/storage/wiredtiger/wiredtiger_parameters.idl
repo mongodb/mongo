@@ -170,7 +170,7 @@ server_parameters:
       set_at: startup
       cpp_vartype: 'std::int32_t'
       cpp_varname: gWiredTigerFileHandleCloseMinimum
-      default: 250
+      default: 2000
       validator:
         gte: 1
 
