@@ -403,13 +403,14 @@ OplogEntry makeOplogEntry(OpTypeEnum opType,
                           NamespaceString nss,
                           OptionalCollectionUUID uuid,
                           BSONObj o,
-                          boost::optional<BSONObj> o2) {
+                          boost::optional<BSONObj> o2,
+                          boost::optional<bool> fromMigrate) {
     return {DurableOplogEntry(OpTime(Timestamp(1, 1), 1),  // optime
                               boost::none,                 // hash
                               opType,                      // opType
                               nss,                         // namespace
                               uuid,                        // uuid
-                              boost::none,                 // fromMigrate
+                              fromMigrate,                 // fromMigrate
                               OplogEntry::kOplogVersion,   // version
                               o,                           // o
                               o2,                          // o2

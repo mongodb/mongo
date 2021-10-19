@@ -53,6 +53,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer_util.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/change_stream_pre_image_helpers.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/repl/image_collection_entry_gen.h"
@@ -309,23 +310,6 @@ void writeToImageCollection(OperationContext* opCtx,
     UpdateResult res = Helpers::upsert(
         opCtx, NamespaceString::kConfigImagesNamespace.toString(), imageEntry.toBSON());
     invariant(res.numDocsModified == 1 || !res.upsertedId.isEmpty());
-}
-
-// Inserts document pre-image 'preImage' into the change stream pre-images collection.
-void writeToChangeStreamPreImagesCollection(OperationContext* opCtx,
-                                            const ChangeStreamPreImage& preImage) {
-    const auto collectionNamespace = NamespaceString::kChangeStreamPreImagesNamespace;
-
-    // This lock acquisition can block on a stronger lock held by another operation modifying the
-    // pre-images collection. There are no known cases where an operation holding an exclusive lock
-    // on the pre-images collection also waits for oplog visibility.
-    repl::UnreplicatedWritesBlock unreplicated(opCtx);
-    AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
-    AutoGetCollection preimagesCollectionRaii(opCtx, collectionNamespace, LockMode::MODE_IX);
-    UpdateResult res = Helpers::upsert(opCtx, collectionNamespace.toString(), preImage.toBSON());
-    tassert(5868601,
-            "Failed to insert a new document into pre-images collection",
-            !res.existing && !res.upsertedId.isEmpty());
 }
 
 bool shouldTimestampIndexBuildSinglePhase(OperationContext* opCtx, const NamespaceString& nss) {

@@ -37,6 +37,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
@@ -50,6 +51,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/ops/write_ops.h"
+#include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
@@ -66,6 +68,7 @@
 #include "mongo/db/session_txn_record_gen.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/transaction_participant_gen.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -235,7 +238,7 @@ TEST_F(OplogApplierImplTestEnableSteadyStateConstraints,
 
 TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsInsertDocumentCollectionExists) {
     const NamespaceString nss("test.t");
-    createCollection(_opCtx.get(), nss, {});
+    repl::createCollection(_opCtx.get(), nss, {});
     auto op = makeOplogEntry(OpTypeEnum::kInsert, nss, {});
     _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, true);
 }
@@ -243,7 +246,7 @@ TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsInsertDocumentCollec
 TEST_F(OplogApplierImplTestDisableSteadyStateConstraints,
        applyOplogEntryOrGroupedInsertsDeleteDocumentDocMissing) {
     const NamespaceString nss("test.t");
-    createCollection(_opCtx.get(), nss, {});
+    repl::createCollection(_opCtx.get(), nss, {});
     auto op = makeOplogEntry(OpTypeEnum::kDelete, nss, {});
     int prevDeleteWasEmpty = replOpCounters.getDeleteWasEmpty()->load();
     _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, false);
@@ -260,7 +263,7 @@ TEST_F(OplogApplierImplTestDisableSteadyStateConstraints,
 TEST_F(OplogApplierImplTestEnableSteadyStateConstraints,
        applyOplogEntryOrGroupedInsertsDeleteDocumentDocMissing) {
     const NamespaceString nss("test.t");
-    createCollection(_opCtx.get(), nss, {});
+    repl::createCollection(_opCtx.get(), nss, {});
     auto op = makeOplogEntry(OpTypeEnum::kDelete, nss, {});
     ASSERT_THROWS(_applyOplogEntryOrGroupedInsertsWrapper(
                       _opCtx.get(), &op, OplogApplication::Mode::kSecondary),
@@ -387,6 +390,96 @@ TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsDeleteDocumentCollec
     NamespaceString otherNss(nss.getSisterNS("othername"));
     auto op = makeOplogEntry(OpTypeEnum::kDelete, otherNss, options.uuid);
     _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, true);
+}
+
+TEST_F(OplogApplierImplTest, applyOplogEntryToRecordChangeStreamPreImages) {
+    // Setup the pre-images collection.
+    RAIIServerParameterControllerForTest clusteredIndexes{"featureFlagClusteredIndexes", true};
+    RAIIServerParameterControllerForTest changeStreamPreAndPostImages{
+        "featureFlagChangeStreamPreAndPostImages", true};
+    createChangeStreamPreImagesCollection(_opCtx.get());
+
+    // Create the collection.
+    const NamespaceString nss("test.t");
+    CollectionOptions options;
+    options.uuid = kUuid;
+    options.changeStreamPreAndPostImagesOptions.setEnabled(true);
+    createCollection(_opCtx.get(), nss, options);
+
+    struct TestCase {
+        repl::OpTypeEnum opType;
+        OplogApplication::Mode applicationMode;
+        boost::optional<bool> fromMigrate;
+        bool shouldRecordPreImage;
+    };
+
+    // Generate test cases.
+    std::vector<TestCase> testCases;
+    auto generateTestCasesForOperations = [&](OplogApplication::Mode applicationMode,
+                                              boost::optional<bool> fromMigrate,
+                                              bool shouldRecordPreImage) {
+        for (auto&& opType : {repl::OpTypeEnum::kUpdate, repl::OpTypeEnum::kDelete}) {
+            testCases.push_back({opType, applicationMode, fromMigrate, shouldRecordPreImage});
+        }
+    };
+    generateTestCasesForOperations(OplogApplication::Mode::kSecondary, {}, true);
+    generateTestCasesForOperations(OplogApplication::Mode::kRecovering, {}, true);
+    generateTestCasesForOperations(OplogApplication::Mode::kInitialSync, {}, false);
+    const auto kFromMigrate{true};
+    generateTestCasesForOperations(OplogApplication::Mode::kSecondary, kFromMigrate, false);
+    generateTestCasesForOperations(OplogApplication::Mode::kRecovering, kFromMigrate, false);
+    generateTestCasesForOperations(OplogApplication::Mode::kInitialSync, kFromMigrate, false);
+
+    int docId{0};
+    for (auto&& testCase : testCases) {
+        auto document = BSON("_id" << docId);
+        auto&& documentId = document;
+
+        // Make sure the document to be modified exists.
+        ASSERT_OK(getStorageInterface()->insertDocument(_opCtx.get(), nss, {document}, 0));
+
+        // Make an oplog entry.
+        auto op = makeOplogEntry(testCase.opType,
+                                 nss,
+                                 options.uuid,
+                                 testCase.opType == repl::OpTypeEnum::kUpdate
+                                     ? BSON("$set" << BSON("a" << 1))
+                                     : documentId,
+                                 {documentId},
+                                 testCase.fromMigrate);
+
+        // Apply the oplog entry.
+        ASSERT_OK(
+            _applyOplogEntryOrGroupedInsertsWrapper(_opCtx.get(), &op, testCase.applicationMode));
+
+        // Load pre-image and cleanup the state.
+        ChangeStreamPreImageId preImageId{*(options.uuid), op.getOpTime().getTimestamp(), 0};
+        BSONObj preImageDocumentKey = BSON("_id" << preImageId.toBSON());
+        auto preImageLoadResult =
+            getStorageInterface()->deleteById(_opCtx.get(),
+                                              NamespaceString::kChangeStreamPreImagesNamespace,
+                                              preImageDocumentKey.firstElement());
+        std::string testDesc{
+            str::stream() << "TestCase: opType: " << OpType_serializer(testCase.opType)
+                          << " mode: " << OplogApplication::modeToString(testCase.applicationMode)
+                          << " fromMigrate: " << (testCase.fromMigrate.get_value_or(false))
+                          << " shouldRecordPreImage: " << testCase.shouldRecordPreImage};
+
+        // Check if pre-image was recorded.
+        if (testCase.shouldRecordPreImage) {
+            ASSERT_OK(preImageLoadResult) << testDesc;
+
+            // Verify that the pre-image document is correct.
+            const auto preImageDocument = ChangeStreamPreImage::parse(
+                IDLParserErrorContext{"test"}, preImageLoadResult.getValue());
+            ASSERT_BSONOBJ_EQ(preImageDocument.getPreImage(), document);
+            ASSERT_EQUALS(preImageDocument.getOperationTime(), op.getWallClockTime()) << testDesc;
+
+        } else {
+            ASSERT_FALSE(preImageLoadResult.isOK()) << testDesc;
+        }
+        ++docId;
+    }
 }
 
 TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsCommand) {
@@ -2462,7 +2555,7 @@ TEST_F(OplogApplierImplTest, LogSlowOpApplicationWhenSuccessful) {
 
     // We are inserting into an existing collection.
     const NamespaceString nss("test.t");
-    createCollection(_opCtx.get(), nss, {});
+    repl::createCollection(_opCtx.get(), nss, {});
     auto entry = makeOplogEntry(OpTypeEnum::kInsert, nss, {});
 
     startCapturingLogMessages();
@@ -2512,7 +2605,7 @@ TEST_F(OplogApplierImplTest, DoNotLogNonSlowOpApplicationWhenSuccessful) {
 
     // We are inserting into an existing collection.
     const NamespaceString nss("test.t");
-    createCollection(_opCtx.get(), nss, {});
+    repl::createCollection(_opCtx.get(), nss, {});
     auto entry = makeOplogEntry(OpTypeEnum::kInsert, nss, {});
 
     startCapturingLogMessages();

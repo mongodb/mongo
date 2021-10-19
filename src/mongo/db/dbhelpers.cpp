@@ -172,7 +172,7 @@ bool Helpers::findById(OperationContext* opCtx,
         *indexFound = 1;
 
     // A time-series buckets collection does not have an index on _id. However, the RecordId can be
-    // constructed using the _id field. So we can retrive the document by using the RecordId
+    // constructed using the _id field. So we can retrieve the document by using the RecordId
     // instead.
     if (isTimeseriesBucketNs) {
         Snapshotted<BSONObj> doc;

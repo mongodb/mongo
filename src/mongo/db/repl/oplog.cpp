@@ -75,6 +75,8 @@
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/delete_request_gen.h"
 #include "mongo/db/ops/update.h"
+#include "mongo/db/pipeline/change_stream_pre_image_helpers.h"
+#include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/dbcheck.h"
@@ -1049,6 +1051,18 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
      }}},
 };
 
+// Writes a change stream pre-image 'preImage' associated with oplog entry 'oplogEntry' and a write
+// operation to collection 'collection' with "applyOpsIndex" 0.
+void writeChangeStreamPreImage(OperationContext* opCtx,
+                               const CollectionPtr& collection,
+                               const mongo::repl::OplogEntry& oplogEntry,
+                               const BSONObj& preImage) {
+    ChangeStreamPreImageId preImageId{
+        collection->uuid(), oplogEntry.getTimestamp(), 0 /*applyOpsIndex*/};
+    ChangeStreamPreImage preImageDocument{
+        std::move(preImageId), oplogEntry.getWallClockTime(), preImage};
+    writeToChangeStreamPreImagesCollection(opCtx, preImageDocument);
+}
 }  // namespace
 
 constexpr StringData OplogApplication::kInitialSyncOplogApplicationMode;
@@ -1203,6 +1217,21 @@ Status applyOperation_inlock(OperationContext* opCtx,
     invariant(!assignOperationTimestamp || !op.getTimestamp().isNull(),
               str::stream() << "Oplog entry did not have 'ts' field when expected: "
                             << redact(opOrGroupedInserts.toBSON()));
+
+    auto shouldRecordChangeStreamPreImage = [&]() {
+        // Should record a change stream pre-image when:
+        // (1) the state of the collection is guaranteed to be consistent so it is possible to
+        // compute a correct pre-image,
+        // (2) and the oplog entry is not a result of chunk migration or collection resharding -
+        // such entries do not get reflected as change events and it is not possible to compute a
+        // correct pre-image for them.
+        return collection && collection->isChangeStreamPreAndPostImagesEnabled() &&
+            isDataConsistent &&
+            (mode == OplogApplication::Mode::kRecovering ||
+             mode == OplogApplication::Mode::kSecondary) &&
+            !op.getFromMigrate().get_value_or(false) &&
+            !requestNss.isTemporaryReshardingCollection();
+    };
 
     switch (opType) {
         case OpTypeEnum::kInsert: {
@@ -1439,6 +1468,16 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 }
             }
 
+            // Determine if a change stream pre-image has to be recorded for the oplog entry.
+            const bool recordChangeStreamPreImage = shouldRecordChangeStreamPreImage();
+            BSONObj changeStreamPreImage;
+            if (recordChangeStreamPreImage && !request.shouldReturnNewDocs()) {
+                // The new version of the document to be loaded was not requested - request
+                // returning of the document version before update to be used as change stream
+                // pre-image.
+                request.setReturnDocs(UpdateRequest::ReturnDocOption::RETURN_OLD);
+            }
+
             Timestamp timestamp;
             if (assignOperationTimestamp) {
                 timestamp = op.getTimestamp();
@@ -1479,6 +1518,24 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 WriteUnitOfWork wuow(opCtx);
                 if (timestamp != Timestamp::min()) {
                     uassertStatusOK(opCtx->recoveryUnit()->setTimestamp(timestamp));
+                }
+
+                if (recordChangeStreamPreImage && request.shouldReturnNewDocs()) {
+                    // Load the document version before update to be used as the change stream
+                    // pre-image since the update operation will load the new version of the
+                    // document.
+                    invariant(op.getObject2());
+                    auto&& documentId = *op.getObject2();
+
+                    // Assume that either an index on _id exists or the collection is clustered by
+                    // _id.
+                    const bool requireIndex{false};
+
+                    // TODO: SERVER-61480 use a more efficient implementation - bypass the find
+                    // component.
+                    auto documentFound = Helpers::findOne(
+                        opCtx, collection, documentId, changeStreamPreImage, requireIndex);
+                    invariant(documentFound);
                 }
 
                 UpdateResult ur = update(opCtx, db, request);
@@ -1564,6 +1621,17 @@ Status applyOperation_inlock(OperationContext* opCtx,
                         &upsertConfigImage);
                 }
 
+                if (recordChangeStreamPreImage) {
+                    if (!request.shouldReturnNewDocs()) {
+                        // A document version before update was loaded by the update operation.
+                        invariant(!ur.requestedDocImage.isEmpty());
+                        changeStreamPreImage = ur.requestedDocImage;
+                    }
+
+                    // Write a pre-image of a document for change streams.
+                    writeChangeStreamPreImage(opCtx, collection, op, changeStreamPreImage);
+                }
+
                 wuow.commit();
                 return Status::OK();
             });
@@ -1600,6 +1668,9 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 timestamp = op.getTimestamp();
             }
 
+            // Determine if a change stream pre-image has to be recorded for the oplog entry.
+            const bool recordChangeStreamPreImage = shouldRecordChangeStreamPreImage();
+
             const StringData ns = op.getNss().ns();
             bool upsertConfigImage = true;
             writeConflictRetry(opCtx, "applyOps_delete", ns, [&] {
@@ -1619,6 +1690,12 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     request.setReturnDeleted(true);
                 }
 
+                if (recordChangeStreamPreImage) {
+                    // Request loading of the document version before delete operation to be used as
+                    // change stream pre-image.
+                    request.setReturnDeleted(true);
+                }
+
                 DeleteResult result = deleteObject(opCtx, collection, request);
                 if (op.getNeedsRetryImage()) {
                     // Even if `result.nDeleted` is 0, we want to perform a write to the
@@ -1635,6 +1712,11 @@ Status applyOperation_inlock(OperationContext* opCtx,
                         result.requestedPreImage.value_or(BSONObj()),
                         getInvalidatingReason(mode, isDataConsistent),
                         &upsertConfigImage);
+                }
+
+                if (recordChangeStreamPreImage) {
+                    invariant(result.requestedPreImage);
+                    writeChangeStreamPreImage(opCtx, collection, op, *(result.requestedPreImage));
                 }
 
                 if (result.nDeleted == 0 && mode == OplogApplication::Mode::kSecondary) {

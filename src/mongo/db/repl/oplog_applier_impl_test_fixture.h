@@ -268,7 +268,8 @@ OplogEntry makeOplogEntry(OpTypeEnum opType,
                           NamespaceString nss,
                           OptionalCollectionUUID uuid,
                           BSONObj o,
-                          boost::optional<BSONObj> o2 = boost::none);
+                          boost::optional<BSONObj> o2 = boost::none,
+                          boost::optional<bool> fromMigrate = boost::none);
 
 OplogEntry makeOplogEntry(OpTypeEnum opType, NamespaceString nss, OptionalCollectionUUID uuid);
 

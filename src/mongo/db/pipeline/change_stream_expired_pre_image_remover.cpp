@@ -245,8 +245,6 @@ void deleteExpiredChangeStreamPreImages(Client* client) {
             NamespaceString::kChangeStreamPreImagesNamespace.ns(),
             [&] {
                 boost::optional<repl::UnreplicatedWritesBlock> unReplBlock;
-                // TODO SERVER-60238: write the tests for non-replicating deletes, when pre-image
-                // replication to secondaries is implemented.
                 if (!shouldReplicateDeletes) {
                     unReplBlock.emplace(opCtx.get());
                 }

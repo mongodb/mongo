@@ -465,6 +465,23 @@ env.Library(
     ]
 )
 
+env.Library(
+    target='change_stream_pre_image_helpers',
+    source=[
+        'change_stream_pre_image_helpers.cpp'
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/service_context',
+        'change_stream_preimage',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/catalog_raii',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager_defs',
+        '$BUILD_DIR/mongo/db/dbhelpers',
+        '$BUILD_DIR/mongo/db/namespace_string',
+    ]
+)
+
 env.CppUnitTest(
     target='db_pipeline_test',
     source=[

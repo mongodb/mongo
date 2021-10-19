@@ -14,8 +14,6 @@
  *   featureFlagClusteredIndexes,
  *   # TODO SERVER-58694: remove this tag.
  *   change_stream_does_not_expect_txns,
- *   # TODO SERVER-60238: remove this tag.
- *   assumes_read_preference_unchanged
  * ]
  */
 

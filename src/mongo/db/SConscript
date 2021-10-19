@@ -892,6 +892,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/commit_quorum_options',
         '$BUILD_DIR/mongo/db/catalog/import_collection_oplog_entry',
+        '$BUILD_DIR/mongo/db/pipeline/change_stream_pre_image_helpers',
         'dbhelpers',
         'internal_transactions_feature_flag',
         'repl/image_collection_entry',
