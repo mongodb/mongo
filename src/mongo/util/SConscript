@@ -220,6 +220,7 @@ env.Benchmark(
         'fail_point_bm.cpp',
     ],
     LIBDEPS=[
+        'fail_point',
     ],
 )
 
