@@ -12,6 +12,7 @@ from math import ceil
 import requests
 from mock import patch, MagicMock
 from shrub.v2 import BuildVariant, ShrubProject
+from evergreen.api import EvergreenApi
 
 import buildscripts.evergreen_burn_in_tests as under_test
 from buildscripts.ciconfig.evergreen import parse_evergreen_file
@@ -379,3 +380,29 @@ class TestCreateGenerateTasksFile(unittest.TestCase):
             executor.execute(tests_by_task)
 
         exit_mock.assert_called_once()
+
+
+class TestFindChangedTests(unittest.TestCase):
+    def test_manual_tests_should_be_specifiable_via_env_vars(self):
+        mock_evg_api = MagicMock(spec_set=EvergreenApi)
+        mock_repo = MagicMock()
+        mock_env = {
+            "BURN_IN_TESTS": "jstests/auth/auth1.js,jstests/core/where1.js",
+        }
+        change_detector = under_test.EvergreenFileChangeDetector("task_id", mock_evg_api, mock_env)
+
+        test_set = change_detector.find_changed_tests([mock_repo])
+
+        self.assertEqual(2, len(test_set))
+        self.assertIn("jstests/auth/auth1.js", test_set)
+        self.assertIn("jstests/core/where1.js", test_set)
+
+    def test_empty_env_should_not_add_extra_tests(self):
+        mock_evg_api = MagicMock(spec_set=EvergreenApi)
+        mock_repo = MagicMock()
+        mock_env = {}
+        change_detector = under_test.EvergreenFileChangeDetector("task_id", mock_evg_api, mock_env)
+
+        test_set = change_detector.find_changed_tests([mock_repo])
+
+        self.assertEqual(set(), test_set)

@@ -33,6 +33,7 @@ DEFAULT_PROJECT = "mongodb-mongo-master"
 DEFAULT_VARIANT = "enterprise-rhel-80-64-bit-dynamic-required"
 BURN_IN_TESTS_GEN_TASK = "burn_in_tests_gen"
 BURN_IN_TESTS_TASK = "burn_in_tests"
+BURN_IN_ENV_VAR = "BURN_IN_TESTS"
 AVG_TEST_RUNTIME_ANALYSIS_DAYS = 14
 AVG_TEST_SETUP_SEC = 4 * 60
 AVG_TEST_TIME_MULTIPLIER = 3
@@ -279,15 +280,17 @@ class BurnInGenTaskService:
 class EvergreenFileChangeDetector(FileChangeDetector):
     """A file changes detector for detecting test change in evergreen."""
 
-    def __init__(self, task_id: str, evg_api: EvergreenApi) -> None:
+    def __init__(self, task_id: str, evg_api: EvergreenApi, env_map: Dict[str, str]) -> None:
         """
         Create a new evergreen file change detector.
 
         :param task_id: Id of task being run under.
         :param evg_api: Evergreen API client.
+        :param env_map: Map of environment variables.
         """
         self.task_id = task_id
         self.evg_api = evg_api
+        self.env_map = env_map
 
     def create_revision_map(self, repos: List[Repo]) -> RevisionMap:
         """
@@ -297,6 +300,20 @@ class EvergreenFileChangeDetector(FileChangeDetector):
         :return: Map of repositories and revisions to diff against.
         """
         return generate_revision_map_from_manifest(repos, self.task_id, self.evg_api)
+
+    def find_changed_tests(self, repos: List[Repo]) -> Set[str]:
+        """
+        Find the list of tests that have changed.
+
+        :param repos: List of repos to check.
+        :return: Set of all test files that have changed.
+        """
+        tests_set = super().find_changed_tests(repos)
+        if BURN_IN_ENV_VAR in self.env_map:
+            # The burn in env var can be set to a list of tests the user has manually specified
+            # should be included. Add those to the already discovered tests.
+            tests_set.update(self.env_map[BURN_IN_ENV_VAR].split(","))
+        return tests_set
 
 
 def _tests_dict_to_generated_suites(task_info: TaskInfo, tests_runtimes: List[TestRuntime]):
@@ -417,7 +434,7 @@ def burn_in(task_id: str, build_variant: str, generate_config: GenerateConfig,
     :param repos: Git repos containing changes.
     :param generate_tasks_file: File to write generate tasks configuration to.
     """
-    change_detector = EvergreenFileChangeDetector(task_id, evg_api)
+    change_detector = EvergreenFileChangeDetector(task_id, evg_api, os.environ)
     executor = GenerateBurnInExecutor(generate_config, repeat_config, evg_api, generate_tasks_file)
 
     burn_in_orchestrator = BurnInOrchestrator(change_detector, executor, evg_conf)

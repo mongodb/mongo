@@ -145,7 +145,7 @@ def _generate_evg_tasks(evergreen_api: EvergreenApi, shrub_project: ShrubProject
     for build_variant, run_build_variant in build_variant_map.items():
         config_options = _get_config_options(task_expansions, build_variant, run_build_variant)
         task_id = task_expansions[TASK_ID_EXPANSION]
-        change_detector = EvergreenFileChangeDetector(task_id, evergreen_api)
+        change_detector = EvergreenFileChangeDetector(task_id, evergreen_api, os.environ)
         changed_tests = change_detector.find_changed_tests(repos)
         tests_by_task = create_tests_by_task(build_variant, evg_conf, changed_tests)
         if tests_by_task:

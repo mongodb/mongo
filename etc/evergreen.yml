@@ -91,6 +91,9 @@ parameters:
   - key: antithesis_image_tag
     description: "The docker tag to use when pushing images to Antithesis"
 
+  - key: burn_in_tests
+    description: "Comma separated list of jstests to include when running burn_in_tests"
+
 ## Some variables for convenience:
 variables:
 
@@ -2978,6 +2981,8 @@ tasks:
       binary: bash
       args:
         - "src/evergreen/burn_in_tests.sh"
+      env:
+        BURN_IN_TESTS: ${burn_in_tests}
   - command: archive.targz_pack
     params:
       target: src/burn_in_tests_gen.tgz
