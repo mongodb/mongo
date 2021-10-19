@@ -188,6 +188,16 @@ std::vector<repl::OplogEntry> ReshardingDonorOplogIterator::_fillBatch(Pipeline&
         }
 
         numBytes += obj.objsize();
+
+        // The ReshardingOplogFetcher may end up inserting no-op reshardProgressMark entries *after*
+        // the reshardFinalOp entry. This can happen when the ReshardingOplogFetcher resumes after
+        // a primary failover and it had already written the reshardFinalOp entry. We check each
+        // oplog entry for being the reshardFinalOp and halt filling the batch so that an empty
+        // batch is returned to ReshardingOplogApplier to signal all oplog entries from the donor
+        // shard were applied.
+        if (isFinalOplog(entry)) {
+            break;
+        }
     } while (numBytes < resharding::gReshardingOplogBatchLimitBytes.load() &&
              batch.size() < std::size_t(resharding::gReshardingOplogBatchLimitOperations.load()));
 
