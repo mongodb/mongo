@@ -102,7 +102,11 @@ function generateDoc(time, metaValue) {
 
     assert.commandWorked(coll.createIndex({[subField1]: 1}));
     assert.commandWorked(coll.createIndex({[subField2]: 1}));
-    let indexKeys = coll.getIndexes().map(x => x.key);
+
+    const listIndexesOutput = assert.commandWorked(coll.runCommand({listIndexes: coll.getName()}));
+    assert.eq(coll.getFullName(), listIndexesOutput.cursor.ns, listIndexesOutput);
+
+    let indexKeys = listIndexesOutput.cursor.firstBatch.map(x => x.key);
     assert.sameMembers([{[subField1]: 1}, {[subField2]: 1}, {[timeField]: 1}, {[metaField]: 1}],
                        indexKeys);
 
@@ -122,6 +126,10 @@ function generateDoc(time, metaValue) {
 
     // Verify that running the commands on the buckets collection should work.
     const bucketsColl = mongosDB.getCollection(`system.buckets.${collName}`);
+    const outputOnBucketsColl =
+        assert.commandWorked(bucketsColl.runCommand({listIndexes: bucketsColl.getName()}));
+    assert.eq(bucketsColl.getFullName(), outputOnBucketsColl.cursor.ns, outputOnBucketsColl);
+
     assert.commandWorked(bucketsColl.dropIndex({'meta.subField1': 1}));
     indexKeys = bucketsColl.getIndexes().map(x => x.key);
     assert.sameMembers([{'control.min.time': 1}], indexKeys);
