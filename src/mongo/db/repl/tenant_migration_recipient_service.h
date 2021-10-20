@@ -490,6 +490,70 @@ public:
          */
         void _setMigrationStatsOnCompletion(Status completionStatus) const;
 
+        /**
+         * This enum and its accompanying methods serve to provide a human-readable
+         * description of what the recipient is currently doing, in the currentOp output.
+         * See "describeStage" for a summary of each stage.
+         */
+        enum RecipientStage {
+            kUnstarted,
+            kInitializing,
+            kFetchingClusterTimeKeys,
+            kSavingOwnFCV,
+            kFetchingDonorFCV,
+            kGettingStartOpTimes,
+            kCreatingOplogBuffer,
+            kStartingOplogFetcher,
+            kStartingDataSync,
+            kWaitingForClone,
+            kFetchingCommittedTransactions,
+            kStartingOplogApplier,
+            kWaitingForForgetMigrationCmd,
+            kMarkingStateDocGarbageCollectable,
+            kForgotten
+        };
+
+        static std::string _describeStage(RecipientStage rs) {
+            switch (rs) {
+                case RecipientStage::kUnstarted:
+                    return "Not yet started.";
+                case RecipientStage::kInitializing:
+                    return "Initializing state document.";
+                case RecipientStage::kFetchingClusterTimeKeys:
+                    return "Fetching cluster time key documents from donor.";
+                case RecipientStage::kSavingOwnFCV:
+                    return "Checking FCV and saving it in the state document.";
+                case RecipientStage::kFetchingDonorFCV:
+                    return "Fetching donor FCV to compare with own FCV.";
+                case RecipientStage::kGettingStartOpTimes:
+                    return "Getting start optimes from donor.";
+                case RecipientStage::kCreatingOplogBuffer:
+                    return "Creating oplog buffer collection.";
+                case RecipientStage::kStartingOplogFetcher:
+                    return "Starting oplog fetcher.";
+                case RecipientStage::kStartingDataSync:
+                    return "Creating oplog applier and starting data clone.";
+                case RecipientStage::kWaitingForClone:
+                    return "Waiting for data clone to complete.";
+                case RecipientStage::kFetchingCommittedTransactions:
+                    return "Fetching committed transactions before startOpTime";
+                case RecipientStage::kStartingOplogApplier:
+                    return "Running oplog applier until data consistency is reached.";
+                case RecipientStage::kWaitingForForgetMigrationCmd:
+                    return "Waiting to receive a recipientForgetMigration command.";
+                case RecipientStage::kMarkingStateDocGarbageCollectable:
+                    return "Marking state doc as garbage collectable.";
+                case RecipientStage::kForgotten:
+                    return "Migration has been forgotten.";
+            }
+            MONGO_UNREACHABLE;
+        }
+
+        void _updateRecipientStage(RecipientStage rs) {
+            _recipientStage.store(rs);
+        }
+
+
         mutable Mutex _mutex = MONGO_MAKE_LATCH("TenantMigrationRecipientService::_mutex");
 
         // All member variables are labeled with one of the following codes indicating the
@@ -569,6 +633,9 @@ public:
         // Indicates that the oplog applier is being cleaned up due to restart of the future chain.
         // This is set to true when the oplog applier is started up again.
         bool _isRestartingOplogApplier = false;  // (M)
+
+        // A diagnostics-only field used to describe the recipient's progress in currentOp.
+        AtomicWord<RecipientStage> _recipientStage{RecipientStage::kUnstarted};  // (S)
     };
 
 private:
