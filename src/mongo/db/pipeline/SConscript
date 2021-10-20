@@ -173,6 +173,10 @@ env.Library(
         '$BUILD_DIR/mongo/util/summation',
         'expression_context',
         'field_path',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/exec/sort_executor',
+        '$BUILD_DIR/mongo/db/index/key_generator'
     ]
 )
 
