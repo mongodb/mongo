@@ -1,5 +1,5 @@
 set -e
-cd build/resmoke-bisect
-source bisect_venv/bin/activate
-bash "$1"
+source build/resmoke-bisect/bisect_venv/bin/activate
+cd build/resmoke-bisect/"$1"
+bash "$2"
 deactivate

@@ -25,14 +25,14 @@ indicate a successful test. The command performs the following steps:
 (2) Filter the versions for versions that Evergreen has binaries and artifacts for.
 (3) Find the 'middle' version. 
 (4) Setup a test environment.
-    - The 'binaries' & 'artifacts' will be downloaded to a new directory named 
-    'build/resmoke-bisect'.
-    - The 'build/resmoke-bisect' directory will also have a sub directory -- 
-    'build/resmoke-bisect/mongo_repo' containing the git repo for this version.
+    - The 'build/resmoke-bisect' directory will have a sub directory -- 
+    'build/resmoke-bisect/{version_id}' containing the git repo for this version.
+    - The 'binaries' & 'artifacts' will also be downloaded to the directory named 
+    'build/resmoke-bisect/{version_id}'.
     - Create a virtual environment at 'build/resmoke-bisect/bisect_venv' and 
     install packages for this version.
 (5) Activate 'bisect_venv' & run the user provided shell script from within the 
-'build/resmoke-bisect' directory. 
+'build/resmoke-bisect/{version_id}' directory. 
 (6) Teardown the test environment.
 (7) Repeat steps (3)-(6) on the left half, if (5) failed, or right half, if (5) succeeded.
 
@@ -132,14 +132,15 @@ class Bisect(Subcommand):  # pylint: disable=invalid-name
                 raise err
         LOGGER.info("Completed setup of test environment for bisect.", version=version)
 
-    def _run_user_script(self):
+    def _run_user_script(self, version):
         """Run the user script in a virtual environment."""
-        return subprocess.run(["bash", RUN_USER_SCRIPT_SH, self.script], check=False).returncode
+        return subprocess.run(["bash", RUN_USER_SCRIPT_SH, version, self.script],
+                              check=False).returncode
 
     def _test_version_with_script(self, version):
         """Test the given version with the user provided script."""
         self._setup_test_env(version)
-        success = self._run_user_script()
+        success = self._run_user_script(version)
         self._teardown_test_env(version)
         return success == 0
 
