@@ -374,10 +374,7 @@ public:
         opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(storageEngine->newRecoveryUnit()),
                                WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
     }
-    void onDestroyOperationContext(OperationContext* opCtx) {
-        StorageEngineChangeContext::get(opCtx->getServiceContext())
-            ->onDestroyOperationContext(opCtx);
-    }
+    void onDestroyOperationContext(OperationContext* opCtx) {}
 };
 
 ServiceContext::ConstructorActionRegisterer registerStorageClientObserverConstructor{

@@ -39,6 +39,7 @@
 #include "mongo/stdx/unordered_set.h"
 
 namespace mongo {
+
 class StorageEngineChangeContext {
 public:
     static StorageEngineChangeContext* get(ServiceContext* service);
@@ -79,10 +80,10 @@ public:
     }
 
     /**
-     * Notifies Storage Change Context that an operation context is being destroyed, so we can
-     * keep track of it if it belonged to a storage engine being changed.
+     * Called by the decorator's destructor to tell us that an opCtx with the old storage engine has
+     * been destroyed.
      */
-    void onDestroyOperationContext(OperationContext* opCtx);
+    void notifyOpCtxDestroyed() noexcept;
 
 private:
     // Spin lock for storage change.  Needs to be fast for lock_shared and unlock_shared,
@@ -106,7 +107,7 @@ private:
 
     // Keeps track of opCtxs associated with a storage engine that is being replaced.
     // Protected by _mutex
-    stdx::unordered_set<OperationId> _previousStorageOpIds;
+    int _numOpCtxtsToWaitFor = 0;
     stdx::condition_variable _allOldStorageOperationContextsReleased;
 
     SharedSpinLock _storageChangeSpinlock;

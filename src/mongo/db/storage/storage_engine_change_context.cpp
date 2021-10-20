@@ -50,6 +50,43 @@ StorageEngineChangeContext* StorageEngineChangeContext::get(ServiceContext* serv
     return &getStorageEngineChangeContext(service);
 }
 
+class StorageEngineChangeOperationContextDoneNotifier {
+public:
+    static const OperationContext::Decoration<StorageEngineChangeOperationContextDoneNotifier> get;
+
+    StorageEngineChangeOperationContextDoneNotifier() = default;
+    ~StorageEngineChangeOperationContextDoneNotifier();
+
+    /*
+     * The 'setNotifyWhenDone' method makes this decoration notify the
+     * StorageEngineChangeContext for the associated service context when it is destroyed.
+     * It must be called under the client lock for the decorated OperationContext.
+     */
+    void setNotifyWhenDone(ServiceContext* service);
+
+private:
+    ServiceContext* _service = nullptr;
+};
+
+/* static */
+const OperationContext::Decoration<StorageEngineChangeOperationContextDoneNotifier>
+    StorageEngineChangeOperationContextDoneNotifier::get =
+        OperationContext::declareDecoration<StorageEngineChangeOperationContextDoneNotifier>();
+
+StorageEngineChangeOperationContextDoneNotifier::
+    ~StorageEngineChangeOperationContextDoneNotifier() {
+    if (_service) {
+        auto* changeContext = StorageEngineChangeContext::get(_service);
+        changeContext->notifyOpCtxDestroyed();
+    }
+}
+
+void StorageEngineChangeOperationContextDoneNotifier::setNotifyWhenDone(ServiceContext* service) {
+    invariant(!_service);
+    invariant(service);
+    _service = service;
+}
+
 StorageEngineChangeContext::StorageChangeToken
 StorageEngineChangeContext::killOpsForStorageEngineChange(ServiceContext* service) {
     invariant(this == StorageEngineChangeContext::get(service));
@@ -70,8 +107,10 @@ StorageEngineChangeContext::killOpsForStorageEngineChange(ServiceContext* servic
                     opCtxToKill->recoveryUnit()->isNoop())
                     continue;
                 service->killOperation(lk, opCtxToKill, ErrorCodes::InterruptedDueToStorageChange);
-                killedOperationId = opCtxToKill->getOpID();
-                _previousStorageOpIds.insert(killedOperationId);
+                auto& doneNotifier =
+                    StorageEngineChangeOperationContextDoneNotifier::get(opCtxToKill);
+                doneNotifier.setNotifyWhenDone(service);
+                ++_numOpCtxtsToWaitFor;
             }
             LOGV2_DEBUG(5781190,
                         1,
@@ -81,7 +120,7 @@ StorageEngineChangeContext::killOpsForStorageEngineChange(ServiceContext* servic
     }
 
     // Wait for active operation contexts to be released.
-    _allOldStorageOperationContextsReleased.wait(lk, [&] { return _previousStorageOpIds.empty(); });
+    _allOldStorageOperationContextsReleased.wait(lk, [&] { return _numOpCtxtsToWaitFor == 0; });
     // Free the old storage engine.
     service->clearStorageEngine();
     return storageChangeLk;
@@ -96,24 +135,15 @@ void StorageEngineChangeContext::changeStorageEngine(ServiceContext* service,
     // created again.
 }
 
-void StorageEngineChangeContext::onDestroyOperationContext(OperationContext* opCtx) {
-    // If we're waiting for opCtxs to be destroyed, check if this is one of them.
-    stdx::lock_guard lk(_mutex);
-    auto iter = _previousStorageOpIds.find(opCtx->getOpID());
-    if (iter != _previousStorageOpIds.end()) {
-        // Without this, recovery unit will be released when opCtx is finally destroyed, which
-        // happens outside the _mutex and thus may not be synchronized with the removal of the
-        // storage engine.
-        {
-            stdx::lock_guard clientLock(*opCtx->getClient());
-            opCtx->setRecoveryUnit(std::make_unique<RecoveryUnitNoop>(),
-                                   WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
-        }
-        _previousStorageOpIds.erase(iter);
-        if (_previousStorageOpIds.empty()) {
-            _allOldStorageOperationContextsReleased.notify_one();
-        }
-    }
+void StorageEngineChangeContext::notifyOpCtxDestroyed() noexcept {
+    stdx::unique_lock lk(_mutex);
+    invariant(--_numOpCtxtsToWaitFor >= 0);
+    LOGV2_DEBUG(5781191,
+                1,
+                "An OpCtx with old storage was destroyed",
+                "numOpCtxtsToWaitFor"_attr = _numOpCtxtsToWaitFor);
+    if (_numOpCtxtsToWaitFor == 0)
+        _allOldStorageOperationContextsReleased.notify_one();
 }
 
 /**
