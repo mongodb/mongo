@@ -477,8 +477,6 @@ TEST(WiredTigerRecordStoreTest, OplogStones_UpdateRecord) {
         BSONObj changed2 = makeBSONObjWithSize(Timestamp(1, 2), 50, 'z');
 
         WriteUnitOfWork wuow(opCtx.get());
-        // Explicitly sets the timestamp to ensure ordered writes.
-        ASSERT_OK(opCtx->recoveryUnit()->setTimestamp(Timestamp(1, 3)));
         ASSERT_OK(
             rs->updateRecord(opCtx.get(), RecordId(1, 1), changed1.objdata(), changed1.objsize()));
         ASSERT_OK(

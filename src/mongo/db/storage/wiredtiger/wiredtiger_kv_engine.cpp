@@ -1354,7 +1354,7 @@ Status WiredTigerKVEngine::createRecordStore(OperationContext* opCtx,
     WiredTigerSession session(_conn);
 
     StatusWith<std::string> result =
-        WiredTigerRecordStore::generateCreateString(_canonicalName, ns, ident, options, _rsOptions);
+        WiredTigerRecordStore::generateCreateString(_canonicalName, ns, options, _rsOptions);
     if (!result.isOK()) {
         return result.getStatus();
     }
@@ -1608,7 +1608,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::makeTemporaryRecordStore(Operat
 
     CollectionOptions noOptions;
     StatusWith<std::string> swConfig = WiredTigerRecordStore::generateCreateString(
-        _canonicalName, "" /* internal table */, ident, noOptions, _rsOptions);
+        _canonicalName, "" /* internal table */, noOptions, _rsOptions);
     uassertStatusOK(swConfig.getStatus());
 
     std::string config = swConfig.getValue();

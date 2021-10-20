@@ -755,7 +755,6 @@ private:
 StatusWith<std::string> WiredTigerRecordStore::generateCreateString(
     const std::string& engineName,
     StringData ns,
-    StringData ident,
     const CollectionOptions& options,
     StringData extraStrings) {
     // Separate out a prefix and suffix in the default string. User configuration will
@@ -769,20 +768,6 @@ StatusWith<std::string> WiredTigerRecordStore::generateCreateString(
     // for workloads where updates increase the size of documents.
     ss << "split_pct=90,";
     ss << "leaf_value_max=64MB,";
-    if (  // TODO (SERVER-60719): Remove special handling for index build side tables.
-        !ident.startsWith("internal-") &&
-        // TODO (SERVER-60754): Remove special handling for setting multikey.
-        !ident.startsWith("_mdb_catalog") &&
-        // TODO (SERVER-60727): Remove special handling for 'local.system.replset'.
-        ns != "local.system.replset" &&
-        // TODO (SERVER-58410): Remove special handling for minValid.
-        ns != "local.replset.minvalid" &&
-        // TODO (SERVER-60753): Remove special handling for index build during recovery.
-        ns != "config.system.indexBuilds") {
-        ss << "write_timestamp_usage=ordered,";
-        ss << "assert=(write_timestamp=on),";
-        ss << "verbose=[write_timestamp],";
-    }
     ss << "checksum=on,";
     if (wiredTigerGlobalOptions.useCollectionPrefixCompression) {
         ss << "prefix_compression,";

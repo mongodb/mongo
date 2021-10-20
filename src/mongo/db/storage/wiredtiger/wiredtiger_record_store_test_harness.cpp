@@ -58,10 +58,9 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newNonCappedRecordStore(
     WiredTigerRecoveryUnit* ru = checked_cast<WiredTigerRecoveryUnit*>(_engine.newRecoveryUnit());
     OperationContextNoop opCtx(ru);
     std::string uri = WiredTigerKVEngine::kTableUriPrefix + ns;
-    StringData ident = ns;
 
-    StatusWith<std::string> result = WiredTigerRecordStore::generateCreateString(
-        kWiredTigerEngineName, ns, ident, collOptions, "");
+    StatusWith<std::string> result =
+        WiredTigerRecordStore::generateCreateString(kWiredTigerEngineName, ns, collOptions, "");
     ASSERT_TRUE(result.isOK());
     std::string config = result.getValue();
 
@@ -74,7 +73,7 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newNonCappedRecordStore(
 
     WiredTigerRecordStore::Params params;
     params.ns = ns;
-    params.ident = ident.toString();
+    params.ident = ns;
     params.engineName = kWiredTigerEngineName;
     params.isCapped = false;
     params.keyFormat = collOptions.clusteredIndex ? KeyFormat::String : KeyFormat::Long;
@@ -110,7 +109,7 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStoreNoInit(
 
     const std::string ns = NamespaceString::kRsOplogNamespace.toString();
     StatusWith<std::string> result =
-        WiredTigerRecordStore::generateCreateString(kWiredTigerEngineName, ns, ident, options, "");
+        WiredTigerRecordStore::generateCreateString(kWiredTigerEngineName, ns, options, "");
     ASSERT_TRUE(result.isOK());
     std::string config = result.getValue();
 
