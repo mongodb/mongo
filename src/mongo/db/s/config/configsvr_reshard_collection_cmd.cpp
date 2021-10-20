@@ -179,8 +179,7 @@ public:
                     return boost::none;
                 }
 
-                auto tempReshardingNss = constructTemporaryReshardingNss(
-                    nss.db(), getCollectionUUIDFromChunkManger(nss, cm));
+                auto tempReshardingNss = constructTemporaryReshardingNss(nss.db(), cm.getUUID());
 
 
                 if (auto zones = request().getZones()) {
@@ -194,7 +193,7 @@ public:
 
                 // Generate the resharding metadata for the ReshardingCoordinatorDocument.
                 auto reshardingUUID = UUID::gen();
-                auto existingUUID = getCollectionUUIDFromChunkManger(ns(), cm);
+                auto existingUUID = cm.getUUID();
                 auto commonMetadata = CommonReshardingMetadata(std::move(reshardingUUID),
                                                                ns(),
                                                                std::move(existingUUID),

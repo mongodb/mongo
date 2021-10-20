@@ -495,7 +495,7 @@ void ShardingCatalogManager::configureCollectionAutoSplit(
             const auto update = updateCmd.obj();
 
             const auto query = BSON(CollectionType::kNssFieldName
-                                    << nss.ns() << CollectionType::kUuidFieldName << *uuid);
+                                    << nss.ns() << CollectionType::kUuidFieldName << uuid);
             const auto res = writeToConfigDocumentInTxn(
                 opCtx,
                 CollectionType::ConfigNS,

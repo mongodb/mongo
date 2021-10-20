@@ -121,7 +121,7 @@ void moveChunk(OperationContext* opCtx, const NamespaceString& nss, const BSONOb
     const auto suggestedChunk = cm.findIntersectingChunkWithSimpleCollation(minKey);
 
     ChunkType chunkToMove;
-    chunkToMove.setCollectionUUID(*cm.getUUID());
+    chunkToMove.setCollectionUUID(cm.getUUID());
     chunkToMove.setShard(suggestedChunk.getShardId());
     chunkToMove.setMin(suggestedChunk.getMin());
     chunkToMove.setMax(suggestedChunk.getMax());

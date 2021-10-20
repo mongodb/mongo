@@ -125,7 +125,7 @@ protected:
 
         if (SimpleBSONObjComparator::kInstance.evaluate(chunkToSplit.getMin() < minKey)) {
             chunkVersion.incMajor();
-            splitChunks.emplace_back(*collMetadata.getUUID(),
+            splitChunks.emplace_back(collMetadata.getUUID(),
                                      ChunkRange(chunkToSplit.getMin(), minKey),
                                      chunkVersion,
                                      kOtherShard);
@@ -133,10 +133,10 @@ protected:
 
         chunkVersion.incMajor();
         splitChunks.emplace_back(
-            *collMetadata.getUUID(), ChunkRange(minKey, maxKey), chunkVersion, kThisShard);
+            collMetadata.getUUID(), ChunkRange(minKey, maxKey), chunkVersion, kThisShard);
 
         chunkVersion.incMajor();
-        splitChunks.emplace_back(*collMetadata.getUUID(),
+        splitChunks.emplace_back(collMetadata.getUUID(),
                                  ChunkRange(maxKey, chunkToSplit.getMax()),
                                  chunkVersion,
                                  kOtherShard);
@@ -171,8 +171,7 @@ protected:
             boost::none,
             boost::none,
             true,
-            {ChunkType(
-                *metadata.getUUID(), ChunkRange(minKey, maxKey), chunkVersion, kOtherShard)});
+            {ChunkType(metadata.getUUID(), ChunkRange(minKey, maxKey), chunkVersion, kOtherShard)});
 
         return CollectionMetadata(ChunkManager(cm->dbPrimary(),
                                                cm->dbVersion(),

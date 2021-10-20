@@ -727,7 +727,7 @@ CatalogCache::CollectionCache::LookupResult CatalogCache::CollectionCache::_look
             }();
 
             return RoutingTableHistory::makeNew(nss,
-                                                collectionAndChunks.uuid,
+                                                *collectionAndChunks.uuid,
                                                 KeyPattern(collectionAndChunks.shardKeyPattern),
                                                 std::move(defaultCollator),
                                                 collectionAndChunks.shardKeyIsUnique,

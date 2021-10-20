@@ -788,7 +788,7 @@ std::pair<BSONObj, boost::optional<UUID>> getCollationAndUUID(
         collectionIsNotSharded ? getUnshardedCollInfo(opCtx, cm->dbPrimary(), nss) : BSONObj();
 
     // Return the collection UUID if available, or boost::none otherwise.
-    const auto getUUID = [&]() -> auto {
+    const auto getUUID = [&]() -> boost::optional<UUID> {
         if (collectionIsSharded) {
             return cm->getUUID();
         } else {

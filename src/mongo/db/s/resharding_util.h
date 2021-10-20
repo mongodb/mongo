@@ -216,13 +216,6 @@ RecipientShardEntry makeRecipientShard(ShardId shardId,
                                        boost::optional<Status> abortReason = boost::none);
 
 /**
- * Gets the UUID for 'nss' from the 'cm'
- *
- * Note: throws if the collection does not have a UUID.
- */
-UUID getCollectionUUIDFromChunkManger(const NamespaceString& nss, const ChunkManager& cm);
-
-/**
  * Assembles the namespace string for the temporary resharding collection based on the source
  * namespace components.
  *

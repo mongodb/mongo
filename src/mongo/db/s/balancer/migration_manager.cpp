@@ -339,17 +339,11 @@ void MigrationManager::finishRecovery(OperationContext* opCtx,
         }
 
         const auto& cm = swCM.getValue();
-        const auto uuid = cm.getUUID();
-        if (!uuid) {
-            // The collection has been dropped, so there is no need to recover the migration.
-            continue;
-        }
-
         int scheduledMigrations = 0;
 
         while (!migrateInfos.empty()) {
             auto migrationType = std::move(migrateInfos.front());
-            const auto migrationInfo = migrationType.toMigrateInfo(*uuid);
+            const auto migrationInfo = migrationType.toMigrateInfo(cm.getUUID());
             auto waitForDelete = migrationType.getWaitForDelete();
             migrateInfos.pop_front();
 

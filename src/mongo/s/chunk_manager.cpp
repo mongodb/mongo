@@ -313,7 +313,7 @@ ShardVersionTargetingInfo::ShardVersionTargetingInfo(const OID& epoch, const Tim
 
 RoutingTableHistory::RoutingTableHistory(
     NamespaceString nss,
-    boost::optional<UUID> uuid,
+    UUID uuid,
     KeyPattern shardKeyPattern,
     std::unique_ptr<CollatorInterface> defaultCollator,
     bool unique,
@@ -323,8 +323,8 @@ RoutingTableHistory::RoutingTableHistory(
     bool allowMigrations,
     ChunkMap chunkMap)
     : _nss(std::move(nss)),
-      _uuid(uuid),
-      _shardKeyPattern(shardKeyPattern),
+      _uuid(std::move(uuid)),
+      _shardKeyPattern(std::move(shardKeyPattern)),
       _defaultCollator(std::move(defaultCollator)),
       _unique(unique),
       _timeseriesFields(std::move(timeseriesFields)),
@@ -407,8 +407,7 @@ void ChunkManager::getShardIdsForQuery(boost::intrusive_ptr<ExpressionContext> e
     auto findCommand = std::make_unique<FindCommandRequest>(_rt->optRt->nss());
     findCommand->setFilter(query.getOwned());
 
-    if (auto uuid = getUUID())
-        expCtx->uuid = uuid;
+    expCtx->uuid = getUUID();
 
     if (!collation.isEmpty()) {
         findCommand->setCollation(collation.getOwned());
@@ -765,7 +764,7 @@ std::string RoutingTableHistory::toString() const {
 
 RoutingTableHistory RoutingTableHistory::makeNew(
     NamespaceString nss,
-    boost::optional<UUID> uuid,
+    UUID uuid,
     KeyPattern shardKeyPattern,
     std::unique_ptr<CollatorInterface> defaultCollator,
     bool unique,
@@ -799,6 +798,7 @@ RoutingTableHistory RoutingTableHistory::makeUpdated(
     boost::optional<uint64_t> maxChunkSizeBytes,
     bool allowMigrations,
     const std::vector<ChunkType>& changedChunks) const {
+
     auto changedChunkInfos = flatten(changedChunks);
     auto chunkMap = _chunkMap.createMerged(changedChunkInfos);
 

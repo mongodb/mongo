@@ -68,7 +68,7 @@ RoutingTableHistory splitChunk(const RoutingTableHistory& rt,
     for (const auto& range : newChunkRanges) {
         // Chunks must be inserted ordered by version
         curVersion.incMajor();
-        newChunks.emplace_back(*rt.getUUID(), range, curVersion, kThisShard);
+        newChunks.emplace_back(rt.getUUID(), range, curVersion, kThisShard);
     }
 
     return rt.makeUpdated(

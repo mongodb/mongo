@@ -76,7 +76,7 @@ StatusWith<DistributionStatus> createCollectionDistributionStatus(
 
     chunkMgr.forEachChunk([&](const auto& chunkEntry) {
         ChunkType chunk;
-        chunk.setCollectionUUID(*chunkMgr.getUUID());
+        chunk.setCollectionUUID(chunkMgr.getUUID());
         chunk.setMin(chunkEntry.getMin());
         chunk.setMax(chunkEntry.getMax());
         chunk.setJumbo(chunkEntry.isJumbo());

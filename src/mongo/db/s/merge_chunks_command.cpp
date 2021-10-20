@@ -80,10 +80,8 @@ Shard::CommandResponse commitMergeOnConfigServer(OperationContext* opCtx,
                                                  const CollectionMetadata& metadata) {
     auto const shardingState = ShardingState::get(opCtx);
     const auto currentTime = VectorClock::get(opCtx)->getTime();
-    auto collUUID = metadata.getUUID();
-    invariant(collUUID);
 
-    ConfigSvrMergeChunks request{nss, shardingState->shardId(), *collUUID, chunkRange};
+    ConfigSvrMergeChunks request{nss, shardingState->shardId(), metadata.getUUID(), chunkRange};
     request.setValidAfter(currentTime.clusterTime().asTimestamp());
     request.setWriteConcern(ShardingCatalogClient::kMajorityWriteConcern.toBSON());
 

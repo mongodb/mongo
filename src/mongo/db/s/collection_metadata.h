@@ -151,7 +151,7 @@ public:
         return _cm->uuidMatches(uuid);
     }
 
-    boost::optional<UUID> getUUID() const {
+    const UUID& getUUID() const {
         return _cm->getUUID();
     }
 

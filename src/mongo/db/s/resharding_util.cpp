@@ -109,15 +109,6 @@ RecipientShardEntry makeRecipientShard(ShardId shardId,
     return RecipientShardEntry{std::move(shardId), std::move(recipientCtx)};
 }
 
-UUID getCollectionUUIDFromChunkManger(const NamespaceString& originalNss, const ChunkManager& cm) {
-    auto collectionUUID = cm.getUUID();
-    uassert(ErrorCodes::InvalidUUID,
-            "Cannot reshard collection {} due to missing UUID"_format(originalNss.ns()),
-            collectionUUID);
-
-    return collectionUUID.get();
-}
-
 NamespaceString constructTemporaryReshardingNss(StringData db, const UUID& sourceUuid) {
     return NamespaceString(db,
                            fmt::format("{}{}",

@@ -170,7 +170,7 @@ public:
      */
     static RoutingTableHistory makeNew(
         NamespaceString nss,
-        boost::optional<UUID>,
+        UUID uuid,
         KeyPattern shardKeyPattern,
         std::unique_ptr<CollatorInterface> defaultCollator,
         bool unique,
@@ -286,11 +286,11 @@ public:
 
     std::string toString() const;
 
-    bool uuidMatches(UUID uuid) const {
-        return _uuid && *_uuid == uuid;
+    bool uuidMatches(const UUID& uuid) const {
+        return _uuid == uuid;
     }
 
-    boost::optional<UUID> getUUID() const {
+    const UUID& getUUID() const {
         return _uuid;
     }
 
@@ -315,7 +315,7 @@ private:
     friend class ChunkManager;
 
     RoutingTableHistory(NamespaceString nss,
-                        boost::optional<UUID> uuid,
+                        UUID uuid,
                         KeyPattern shardKeyPattern,
                         std::unique_ptr<CollatorInterface> defaultCollator,
                         bool unique,
@@ -330,8 +330,8 @@ private:
     // Namespace to which this routing information corresponds
     NamespaceString _nss;
 
-    // The invariant UUID of the collection.  This is optional in 3.6, except in change streams.
-    boost::optional<UUID> _uuid;
+    // The UUID of the collection
+    UUID _uuid;
 
     // The key pattern used to shard the collection
     ShardKeyPattern _shardKeyPattern;
@@ -688,11 +688,11 @@ public:
         return _rt->optRt->compatibleWith(*other._rt->optRt, shard);
     }
 
-    bool uuidMatches(UUID uuid) const {
+    bool uuidMatches(const UUID& uuid) const {
         return _rt->optRt->uuidMatches(uuid);
     }
 
-    boost::optional<UUID> getUUID() const {
+    const UUID& getUUID() const {
         return _rt->optRt->getUUID();
     }
 

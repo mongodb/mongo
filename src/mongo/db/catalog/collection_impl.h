@@ -88,11 +88,11 @@ public:
 
     Status rename(OperationContext* opCtx, const NamespaceString& nss, bool stayTemp) final;
 
-    RecordId getCatalogId() const {
+    RecordId getCatalogId() const final {
         return _catalogId;
     }
 
-    UUID uuid() const {
+    UUID uuid() const final {
         return _uuid;
     }
 

@@ -117,7 +117,7 @@ MetadataManager::MetadataManager(ServiceContext* serviceContext,
                                  CollectionMetadata initialMetadata)
     : _serviceContext(serviceContext),
       _nss(std::move(nss)),
-      _collectionUuid(*initialMetadata.getChunkManager()->getUUID()),
+      _collectionUuid(initialMetadata.getChunkManager()->getUUID()),
       _executor(std::move(executor)) {
     _metadata.emplace_back(std::make_shared<CollectionMetadataTracker>(std::move(initialMetadata)));
 }
@@ -383,7 +383,7 @@ SharedSemiFuture<void> MetadataManager::_submitRangeForDeletion(
         removeDocumentsInRange(_executor,
                                std::move(waitForActiveQueriesToComplete),
                                _nss,
-                               *_metadata.back()->metadata->getChunkManager()->getUUID(),
+                               _metadata.back()->metadata->getChunkManager()->getUUID(),
                                _metadata.back()->metadata->getKeyPattern().getOwned(),
                                range,
                                std::move(migrationId),

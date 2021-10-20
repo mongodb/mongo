@@ -185,7 +185,7 @@ TEST_F(CollectionShardingRuntimeTest,
 
     ASSERT_EQ(csr.getNumMetadataManagerChanges_forTest(), 2);
     ASSERT(
-        csr.getCollectionDescription(opCtx).uuidMatches(*newMetadata.getChunkManager()->getUUID()));
+        csr.getCollectionDescription(opCtx).uuidMatches(newMetadata.getChunkManager()->getUUID()));
 }
 
 class CollectionShardingRuntimeTestWithMockedLoader : public ShardServerTestFixture {

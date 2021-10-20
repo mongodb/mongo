@@ -426,7 +426,7 @@ std::vector<NamespaceString> ReshardingDataReplication::ensureStashCollectionsEx
 
     for (const auto& donor : donorShards) {
         stashCollections.emplace_back(ReshardingOplogApplier::ensureStashCollectionExists(
-            opCtx, *sourceChunkMgr.getUUID(), donor.getShardId(), options));
+            opCtx, sourceChunkMgr.getUUID(), donor.getShardId(), options));
     }
 
     return stashCollections;
