@@ -85,7 +85,7 @@ var runCase = function(opts) {
 
         // Confirm number of chunks for this stage.
         var numChunks = getNumberChunks(coll.getFullName());
-        assert.gte(numChunks,
+        assert.lte(numChunks,
                    stage.expectedNumChunks,
                    'in ' + coll.getFullName() + ' expected ' + stage.expectedNumChunks +
                        ' chunks for stage ' + stageNum + ', but found ' + numChunks + '\nopts: ' +
@@ -160,7 +160,7 @@ runCase({
     docSize: 510 * 1024,
     stages: [
         {numDocsToInsert: 10, expectedNumChunks: 6},
-        {numDocsToInsert: 10, expectedNumChunks: 9},
+        {numDocsToInsert: 10, expectedNumChunks: 12},
     ],
 });
 
@@ -169,7 +169,7 @@ runCase({
     docSize: 514 * 1024,
     stages: [
         {numDocsToInsert: 10, expectedNumChunks: 10},
-        {numDocsToInsert: 10, expectedNumChunks: 10},
+        {numDocsToInsert: 10, expectedNumChunks: 20},
     ],
 });
 
