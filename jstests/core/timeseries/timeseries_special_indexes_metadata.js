@@ -97,9 +97,7 @@ TimeseriesTest.run((insert) => {
             assert.commandWorked(testdb.runCommand({listIndexes: timeseriescoll.getName()})).cursor;
 
         // Check the ns is OK.
-        // TODO SERVER-61039 This should be timeseriescoll.getFullName() in both cases.
-        const expectedNs = FixtureHelpers.isSharded(bucketscoll) ? bucketscoll.getFullName()
-                                                                 : timeseriescoll.getFullName();
+        const expectedNs = timeseriescoll.getFullName();
         assert.eq(expectedNs,
                   timeseriesListIndexesCursor.ns,
                   "Found unexpected namespace: " + tojson(timeseriesListIndexesCursor));

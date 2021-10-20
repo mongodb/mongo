@@ -92,12 +92,7 @@ TimeseriesTest.run((insert) => {
         // Note: call the listIndexes command directly, rather than use a helper, so that we can
         // inspect the result's namespace in addition to the result's index key pattern.
         let cursorDoc = assert.commandWorked(db.runCommand({listIndexes: coll.getName()})).cursor;
-        // TODO SERVER-61039 listIndexes should reply with coll.getFullName() in both cases.
-        if (FixtureHelpers.isSharded(bucketsColl)) {
-            assert.eq(bucketsColl.getFullName(), cursorDoc.ns, tojson(cursorDoc));
-        } else {
-            assert.eq(coll.getFullName(), cursorDoc.ns, tojson(cursorDoc));
-        }
+        assert.eq(coll.getFullName(), cursorDoc.ns, tojson(cursorDoc));
         assert.eq(1 + numExtraIndexes, cursorDoc.firstBatch.length, tojson(cursorDoc));
         assert.contains(keyForCreate, cursorDoc.firstBatch.map(ix => ix.key), tojson(cursorDoc));
 

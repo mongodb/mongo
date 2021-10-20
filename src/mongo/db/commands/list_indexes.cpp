@@ -92,7 +92,7 @@ IndexSpecsWithNamespaceString getIndexSpecsWithNamespaceString(OperationContext*
                 timeseries::createTimeseriesIndexesFromBucketsIndexes(
                     *timeseriesOptions,
                     listIndexesInLock(opCtx, coll, bucketsNss, cmd.getIncludeBuildUUIDs())),
-                *origNss);
+                bucketsNss.getTimeseriesViewNamespace());
         }
     }
 
