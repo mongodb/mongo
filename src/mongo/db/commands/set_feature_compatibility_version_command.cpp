@@ -489,10 +489,10 @@ private:
 
         _cancelTenantMigrations(opCtx);
 
-        // Secondary indexes on time-series measurements are only supported in 5.1 and up. If the
+        // Secondary indexes on time-series measurements are only supported in 5.2 and up. If the
         // user tries to downgrade the cluster to an earlier version, they must first remove all
         // incompatible secondary indexes on time-series measurements.
-        if (requestedVersion < multiversion::FeatureCompatibilityVersion::kVersion_5_1) {
+        if (requestedVersion < multiversion::FeatureCompatibilityVersion::kVersion_5_2) {
             for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
                 Lock::DBLock dbLock(opCtx, dbName, MODE_IS);
                 catalog::forEachCollectionFromDb(
