@@ -10,7 +10,7 @@ const collNamePrefix = 'geo_polygon3_';
 const numTests = 31;
 
 for (let n = 0; n < numTests; n++) {
-    let t = db.getCollection(collNamePrefix + n);
+    let t = db.getCollection(collNamePrefix + 'triangle_and_square_' + n);
     t.drop();
 
     let num = 0;
@@ -39,7 +39,8 @@ for (let n = 0; n < numTests; n++) {
               t.find({loc: {"$within": {"$polygon": boxBounds}}}).itcount(),
               "Big Bounding Box Test");
 
-    assert(t.drop());
+    t = db.getCollection(collNamePrefix + 'pacman_' + n);
+    t.drop();
 
     const pacman = [
         [0, 2],
