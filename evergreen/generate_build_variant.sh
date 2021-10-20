@@ -5,8 +5,6 @@ cd src
 
 set -o errexit
 
-cat ../expansions.yml
-
 activate_venv
 PATH=$PATH:$HOME:/ $python buildscripts/evergreen_gen_build_variant.py \
   --expansion-file ../expansions.yml \
