@@ -133,8 +133,8 @@ TEST_F(BalancerChunkSelectionTest, TagRangesOverlap) {
     setUpCollection(kNamespace, collUUID, version);
 
     // Set up one chunk for the collection in the metadata.
-    ChunkType chunk = setUpChunk(
-        kNamespace, collUUID, kKeyPattern.globalMin(), kKeyPattern.globalMax(), kShardId0, version);
+    ChunkType chunk =
+        setUpChunk(collUUID, kKeyPattern.globalMin(), kKeyPattern.globalMax(), kShardId0, version);
 
     auto assertRangeOverlapConflictWhenMoveChunk =
         [this, &chunk](const StringMap<ChunkRange>& tagChunkRanges) {
@@ -192,38 +192,37 @@ TEST_F(BalancerChunkSelectionTest, TagRangeMaxNotAlignedWithChunkMax) {
     // Set up the zone.
     setUpTags(kNamespace, {{"A", {kKeyPattern.globalMin(), BSON(kPattern << -10)}}});
 
-    auto assertErrorWhenMoveChunk = [this, &version, &collUUID](
-                                        const std::vector<ChunkRange>& chunkRanges) {
-        // Give shard0 all the chunks so the cluster is imbalanced.
-        for (const auto& chunkRange : chunkRanges) {
-            setUpChunk(
-                kNamespace, collUUID, chunkRange.getMin(), chunkRange.getMax(), kShardId0, version);
-            version.incMinor();
-        }
+    auto assertErrorWhenMoveChunk =
+        [this, &version, &collUUID](const std::vector<ChunkRange>& chunkRanges) {
+            // Give shard0 all the chunks so the cluster is imbalanced.
+            for (const auto& chunkRange : chunkRanges) {
+                setUpChunk(collUUID, chunkRange.getMin(), chunkRange.getMax(), kShardId0, version);
+                version.incMinor();
+            }
 
-        auto future = launchAsync([this] {
-            ThreadClient tc(getServiceContext());
-            auto opCtx = Client::getCurrent()->makeOperationContext();
+            auto future = launchAsync([this] {
+                ThreadClient tc(getServiceContext());
+                auto opCtx = Client::getCurrent()->makeOperationContext();
 
-            // Requests chunks to be relocated requires running commands on each shard to
-            // get shard statistics. Set up dummy hosts for the source shards.
-            shardTargeterMock(opCtx.get(), kShardId0)->setFindHostReturnValue(kShardHost0);
-            shardTargeterMock(opCtx.get(), kShardId1)->setFindHostReturnValue(kShardHost1);
+                // Requests chunks to be relocated requires running commands on each shard to
+                // get shard statistics. Set up dummy hosts for the source shards.
+                shardTargeterMock(opCtx.get(), kShardId0)->setFindHostReturnValue(kShardHost0);
+                shardTargeterMock(opCtx.get(), kShardId1)->setFindHostReturnValue(kShardHost1);
 
-            auto candidateChunksStatus =
-                _chunkSelectionPolicy.get()->selectChunksToMove(opCtx.get());
-            ASSERT_OK(candidateChunksStatus.getStatus());
+                auto candidateChunksStatus =
+                    _chunkSelectionPolicy.get()->selectChunksToMove(opCtx.get());
+                ASSERT_OK(candidateChunksStatus.getStatus());
 
-            // The balancer does not bubble up the IllegalOperation error, but it is expected
-            // to postpone the balancing work for the zones with the error until the chunks
-            // are split appropriately.
-            ASSERT_EQUALS(0U, candidateChunksStatus.getValue().size());
-        });
+                // The balancer does not bubble up the IllegalOperation error, but it is expected
+                // to postpone the balancing work for the zones with the error until the chunks
+                // are split appropriately.
+                ASSERT_EQUALS(0U, candidateChunksStatus.getValue().size());
+            });
 
-        expectGetStatsCommands(2);
-        future.default_timed_get();
-        removeAllChunks(kNamespace, collUUID);
-    };
+            expectGetStatsCommands(2);
+            future.default_timed_get();
+            removeAllChunks(kNamespace, collUUID);
+        };
 
     assertErrorWhenMoveChunk({{kKeyPattern.globalMin(), BSON(kPattern << -5)},
                               {BSON(kPattern << -5), kKeyPattern.globalMax()}});
@@ -259,8 +258,7 @@ TEST_F(BalancerChunkSelectionTest, ShardedTimeseriesCollectionsCanBeAutoSplitted
               });
 
     // Create just one chunk covering the whole space
-    setUpChunk(
-        kNamespace, collUUID, kKeyPattern.globalMin(), kKeyPattern.globalMax(), kShardId0, version);
+    setUpChunk(collUUID, kKeyPattern.globalMin(), kKeyPattern.globalMax(), kShardId0, version);
 
     auto future = launchAsync([this] {
         ThreadClient tc(getServiceContext());
@@ -298,7 +296,7 @@ TEST_F(BalancerChunkSelectionTest, ShardedTimeseriesCollectionsCanBeBalanced) {
     setUpCollection(kNamespace, collUUID, version, std::move(tsFields));
 
     auto addChunk = [&](const BSONObj& min, const BSONObj& max) {
-        setUpChunk(kNamespace, collUUID, min, max, kShardId0, version);
+        setUpChunk(collUUID, min, max, kShardId0, version);
         version.incMinor();
     };
 

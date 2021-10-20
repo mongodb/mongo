@@ -123,11 +123,11 @@ TEST_F(MigrationManagerTest, OneCollectionTwoMigrations) {
     setUpCollection(collName, collUUID, version);
 
     // Set up two chunks in the metadata.
-    ChunkType chunk1 = setUpChunk(
-        collName, collUUID, kKeyPattern.globalMin(), BSON(kPattern << 49), kShardId0, version);
+    ChunkType chunk1 =
+        setUpChunk(collUUID, kKeyPattern.globalMin(), BSON(kPattern << 49), kShardId0, version);
     version.incMinor();
-    ChunkType chunk2 = setUpChunk(
-        collName, collUUID, BSON(kPattern << 49), kKeyPattern.globalMax(), kShardId2, version);
+    ChunkType chunk2 =
+        setUpChunk(collUUID, BSON(kPattern << 49), kKeyPattern.globalMax(), kShardId2, version);
 
     // Going to request that these two chunks get migrated.
     const std::vector<MigrateInfo> migrationRequests{{kShardId1,
@@ -187,17 +187,17 @@ TEST_F(MigrationManagerTest, TwoCollectionsTwoMigrationsEach) {
     setUpCollection(collName2, collUUID2, version2);
 
     // Set up two chunks in the metadata for each collection.
-    ChunkType chunk1coll1 = setUpChunk(
-        collName1, collUUID1, kKeyPattern.globalMin(), BSON(kPattern << 49), kShardId0, version1);
+    ChunkType chunk1coll1 =
+        setUpChunk(collUUID1, kKeyPattern.globalMin(), BSON(kPattern << 49), kShardId0, version1);
     version1.incMinor();
-    ChunkType chunk2coll1 = setUpChunk(
-        collName1, collUUID1, BSON(kPattern << 49), kKeyPattern.globalMax(), kShardId2, version1);
+    ChunkType chunk2coll1 =
+        setUpChunk(collUUID1, BSON(kPattern << 49), kKeyPattern.globalMax(), kShardId2, version1);
 
-    ChunkType chunk1coll2 = setUpChunk(
-        collName2, collUUID2, kKeyPattern.globalMin(), BSON(kPattern << 49), kShardId0, version2);
+    ChunkType chunk1coll2 =
+        setUpChunk(collUUID2, kKeyPattern.globalMin(), BSON(kPattern << 49), kShardId0, version2);
     version2.incMinor();
-    ChunkType chunk2coll2 = setUpChunk(
-        collName2, collUUID2, BSON(kPattern << 49), kKeyPattern.globalMax(), kShardId2, version2);
+    ChunkType chunk2coll2 =
+        setUpChunk(collUUID2, BSON(kPattern << 49), kKeyPattern.globalMax(), kShardId2, version2);
 
     // Going to request that these four chunks get migrated.
     const std::vector<MigrateInfo> migrationRequests{{kShardId1,
@@ -267,11 +267,11 @@ TEST_F(MigrationManagerTest, SourceShardNotFound) {
     setUpCollection(collName, collUUID, version);
 
     // Set up two chunks in the metadata.
-    ChunkType chunk1 = setUpChunk(
-        collName, collUUID, kKeyPattern.globalMin(), BSON(kPattern << 49), kShardId0, version);
+    ChunkType chunk1 =
+        setUpChunk(collUUID, kKeyPattern.globalMin(), BSON(kPattern << 49), kShardId0, version);
     version.incMinor();
-    ChunkType chunk2 = setUpChunk(
-        collName, collUUID, BSON(kPattern << 49), kKeyPattern.globalMax(), kShardId2, version);
+    ChunkType chunk2 =
+        setUpChunk(collUUID, BSON(kPattern << 49), kKeyPattern.globalMax(), kShardId2, version);
 
     // Going to request that these two chunks get migrated.
     const std::vector<MigrateInfo> migrationRequests{{kShardId1,
@@ -327,8 +327,8 @@ TEST_F(MigrationManagerTest, JumboChunkResponseBackwardsCompatibility) {
     setUpCollection(collName, collUUID, version);
 
     // Set up a single chunk in the metadata.
-    ChunkType chunk1 = setUpChunk(
-        collName, collUUID, kKeyPattern.globalMin(), kKeyPattern.globalMax(), kShardId0, version);
+    ChunkType chunk1 =
+        setUpChunk(collUUID, kKeyPattern.globalMin(), kKeyPattern.globalMax(), kShardId0, version);
 
     // Going to request that this chunk gets migrated.
     const std::vector<MigrateInfo> migrationRequests{{kShardId1,
@@ -374,8 +374,8 @@ TEST_F(MigrationManagerTest, InterruptMigration) {
     setUpCollection(collName, collUUID, version);
 
     // Set up a single chunk in the metadata.
-    ChunkType chunk = setUpChunk(
-        collName, collUUID, kKeyPattern.globalMin(), kKeyPattern.globalMax(), kShardId0, version);
+    ChunkType chunk =
+        setUpChunk(collUUID, kKeyPattern.globalMin(), kKeyPattern.globalMax(), kShardId0, version);
 
     auto future = launchAsync([&] {
         ThreadClient tc("Test", getServiceContext());
@@ -473,8 +473,8 @@ TEST_F(MigrationManagerTest, RestartMigrationManager) {
     setUpCollection(collName, collUUID, version);
 
     // Set up a single chunk in the metadata.
-    ChunkType chunk1 = setUpChunk(
-        collName, collUUID, kKeyPattern.globalMin(), kKeyPattern.globalMax(), kShardId0, version);
+    ChunkType chunk1 =
+        setUpChunk(collUUID, kKeyPattern.globalMin(), kKeyPattern.globalMax(), kShardId0, version);
 
     // Go through the lifecycle of the migration manager
     _migrationManager->interruptAndDisableMigrations();
@@ -527,11 +527,11 @@ TEST_F(MigrationManagerTest, MigrationRecovery) {
 
     // Set up two chunks in the metadata and set up two fake active migrations by writing documents
     // to the config.migrations collection.
-    ChunkType chunk1 = setUpChunk(
-        collName, collUUID, kKeyPattern.globalMin(), BSON(kPattern << 49), kShardId0, version);
+    ChunkType chunk1 =
+        setUpChunk(collUUID, kKeyPattern.globalMin(), BSON(kPattern << 49), kShardId0, version);
     version.incMinor();
-    ChunkType chunk2 = setUpChunk(
-        collName, collUUID, BSON(kPattern << 49), kKeyPattern.globalMax(), kShardId2, version);
+    ChunkType chunk2 =
+        setUpChunk(collUUID, BSON(kPattern << 49), kKeyPattern.globalMax(), kShardId2, version);
 
     _migrationManager->interruptAndDisableMigrations();
     _migrationManager->drainActiveMigrations();
@@ -581,11 +581,11 @@ TEST_F(MigrationManagerTest, FailMigrationRecovery) {
     setUpCollection(collName, collUUID, version);
 
     // Set up two chunks in the metadata.
-    ChunkType chunk1 = setUpChunk(
-        collName, collUUID, kKeyPattern.globalMin(), BSON(kPattern << 49), kShardId0, version);
+    ChunkType chunk1 =
+        setUpChunk(collUUID, kKeyPattern.globalMin(), BSON(kPattern << 49), kShardId0, version);
     version.incMinor();
-    ChunkType chunk2 = setUpChunk(
-        collName, collUUID, BSON(kPattern << 49), kKeyPattern.globalMax(), kShardId2, version);
+    ChunkType chunk2 =
+        setUpChunk(collUUID, BSON(kPattern << 49), kKeyPattern.globalMax(), kShardId2, version);
 
     _migrationManager->interruptAndDisableMigrations();
     _migrationManager->drainActiveMigrations();
@@ -640,11 +640,11 @@ TEST_F(MigrationManagerTest, RemoteCallErrorConversionToOperationFailed) {
     setUpCollection(collName, collUUID, version);
 
     // Set up two chunks in the metadata.
-    ChunkType chunk1 = setUpChunk(
-        collName, collUUID, kKeyPattern.globalMin(), BSON(kPattern << 49), kShardId0, version);
+    ChunkType chunk1 =
+        setUpChunk(collUUID, kKeyPattern.globalMin(), BSON(kPattern << 49), kShardId0, version);
     version.incMinor();
-    ChunkType chunk2 = setUpChunk(
-        collName, collUUID, BSON(kPattern << 49), kKeyPattern.globalMax(), kShardId2, version);
+    ChunkType chunk2 =
+        setUpChunk(collUUID, BSON(kPattern << 49), kKeyPattern.globalMax(), kShardId2, version);
 
     // Going to request that these two chunks get migrated.
     const std::vector<MigrateInfo> migrationRequests{{kShardId1,

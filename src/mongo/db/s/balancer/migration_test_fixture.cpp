@@ -66,8 +66,7 @@ void MigrationTestFixture::setUpCollection(
         operationContext(), CollectionType::ConfigNS, coll.toBSON(), kMajorityWriteConcern));
 }
 
-ChunkType MigrationTestFixture::setUpChunk(const NamespaceString& collName,
-                                           const UUID& collUUID,
+ChunkType MigrationTestFixture::setUpChunk(const UUID& collUUID,
                                            const BSONObj& chunkMin,
                                            const BSONObj& chunkMax,
                                            const ShardId& shardId,

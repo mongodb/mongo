@@ -83,8 +83,7 @@ protected:
      * Inserts a document into the config.chunks collection so that the chunk defined by the
      * parameters exists. Returns a ChunkType defined by the parameters.
      */
-    ChunkType setUpChunk(const NamespaceString& collName,
-                         const UUID& collUUID,
+    ChunkType setUpChunk(const UUID& collUUID,
                          const BSONObj& chunkMin,
                          const BSONObj& chunkMax,
                          const ShardId& shardId,
