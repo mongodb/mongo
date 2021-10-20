@@ -171,6 +171,9 @@ all:
     test_file: jstests/sharding/query/pipeline_length_limit.js
   - ticket: SERVER-57321
     test_file: jstests/core/mod_special_values.js
+  - ticket: SERVER-59613
+    test_file: jstests/aggregation/range.js
+
 
 suites:
 
