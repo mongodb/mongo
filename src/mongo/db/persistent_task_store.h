@@ -173,24 +173,27 @@ private:
                  const WriteConcernOptions& writeConcern = WriteConcerns::kMajorityWriteConcern) {
         DBDirectClient dbClient(opCtx);
 
-        auto commandResponse = dbClient.runCommand([&] {
+        auto commandResponse = dbClient.update([&] {
             write_ops::UpdateCommandRequest updateOp(_storageNss);
             auto updateModification = write_ops::UpdateModification::parseFromClassicUpdate(update);
             write_ops::UpdateOpEntry updateEntry(filter, updateModification);
             updateEntry.setMulti(false);
             updateEntry.setUpsert(upsert);
             updateOp.setUpdates({updateEntry});
-
-            return updateOp.serialize({});
+            return updateOp;
         }());
 
-        const auto commandReply = commandResponse->getCommandReply();
-        uassertStatusOK(getStatusFromWriteCommandReply(commandReply));
+        auto writeErrors = commandResponse.getWriteErrors();
+        if (writeErrors) {
+            BSONObj firstWriteError = writeErrors->front();
+            uasserted(ErrorCodes::Error(firstWriteError.getIntField("code")),
+                      firstWriteError.getStringField("errmsg"));
+        }
 
         uassert(ErrorCodes::NoMatchingDocument,
                 "No matching document found for query {} on namespace {}"_format(
                     filter.toString(), _storageNss.toString()),
-                upsert || commandReply.getIntField("n") > 0);
+                upsert || commandResponse.getN() > 0);
 
         WriteConcernResult ignoreResult;
         auto latestOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();

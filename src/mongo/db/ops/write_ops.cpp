@@ -170,6 +170,11 @@ write_ops::InsertCommandRequest InsertOp::parseLegacy(const Message& msgRaw) {
     return op;
 }
 
+write_ops::InsertCommandReply InsertOp::parseResponse(const BSONObj& obj) {
+    uassertStatusOK(getStatusFromCommandResult(obj));
+    return write_ops::InsertCommandReply::parse(IDLParserErrorContext("insertReply"), obj);
+}
+
 void InsertOp::validate(const write_ops::InsertCommandRequest& insertOp) {
     const auto& docs = insertOp.getDocuments();
     checkOpCountForCommand(insertOp, docs.size());
@@ -204,6 +209,11 @@ write_ops::DeleteCommandRequest DeleteOp::parse(const OpMsgRequest& request) {
 
     checkOpCountForCommand(deleteOp, deleteOp.getDeletes().size());
     return deleteOp;
+}
+
+write_ops::DeleteCommandReply DeleteOp::parseResponse(const BSONObj& obj) {
+    uassertStatusOK(getStatusFromCommandResult(obj));
+    return write_ops::DeleteCommandReply::parse(IDLParserErrorContext("deleteReply"), obj);
 }
 
 void DeleteOp::validate(const DeleteCommandRequest& deleteOp) {

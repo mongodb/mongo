@@ -44,6 +44,7 @@ public:
      * call this method any more.
      */
     static write_ops::InsertCommandRequest parseLegacy(const Message& msg);
+    static write_ops::InsertCommandReply parseResponse(const BSONObj& obj);
     static void validate(const write_ops::InsertCommandRequest& insertOp);
 };
 
@@ -57,6 +58,7 @@ public:
 class DeleteOp {
 public:
     static write_ops::DeleteCommandRequest parse(const OpMsgRequest& request);
+    static write_ops::DeleteCommandReply parseResponse(const BSONObj& obj);
     static void validate(const write_ops::DeleteCommandRequest& deleteOp);
 };
 

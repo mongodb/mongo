@@ -170,6 +170,24 @@ write_ops::FindAndModifyCommandReply DBDirectClient::findAndModify(
     return FindAndModifyOp::parseResponse(response->getCommandReply());
 }
 
+write_ops::InsertCommandReply DBDirectClient::insert(
+    const write_ops::InsertCommandRequest& insert) {
+    auto response = runCommand(insert.serialize({}));
+    return InsertOp::parseResponse(response->getCommandReply());
+}
+
+write_ops::UpdateCommandReply DBDirectClient::update(
+    const write_ops::UpdateCommandRequest& update) {
+    auto response = runCommand(update.serialize({}));
+    return UpdateOp::parseResponse(response->getCommandReply());
+}
+
+write_ops::DeleteCommandReply DBDirectClient::remove(
+    const write_ops::DeleteCommandRequest& remove) {
+    auto response = runCommand(remove.serialize({}));
+    return DeleteOp::parseResponse(response->getCommandReply());
+}
+
 long long DBDirectClient::count(const NamespaceStringOrUUID nsOrUuid,
                                 const BSONObj& query,
                                 int options,

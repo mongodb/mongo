@@ -52,7 +52,10 @@ class DBDirectClient : public DBClientBase {
 public:
     DBDirectClient(OperationContext* opCtx);
 
+    using DBClientBase::insert;
     using DBClientBase::query;
+    using DBClientBase::remove;
+    using DBClientBase::update;
 
     std::unique_ptr<DBClientCursor> query(
         const NamespaceStringOrUUID& nsOrUuid,
@@ -67,6 +70,16 @@ public:
 
     write_ops::FindAndModifyCommandReply findAndModify(
         const write_ops::FindAndModifyCommandRequest& findAndModify);
+
+    /**
+     * insert, update, and remove only check the top level error status. The caller is responsible
+     * for checking the writeErrors element for errors during execution.
+     */
+    write_ops::InsertCommandReply insert(const write_ops::InsertCommandRequest& insert);
+
+    write_ops::UpdateCommandReply update(const write_ops::UpdateCommandRequest& update);
+
+    write_ops::DeleteCommandReply remove(const write_ops::DeleteCommandRequest& remove);
 
     bool isFailed() const override;
 

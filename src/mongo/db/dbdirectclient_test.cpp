@@ -28,19 +28,134 @@
  */
 
 #include "mongo/db/dbdirectclient.h"
-
-#include "mongo/db/client.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/service_context_d_test_fixture.h"
 
 namespace mongo {
+namespace {
+
+const NamespaceString kNs("a.b");
+
+class DBDirectClientTest : public ServiceContextMongoDTest {
+protected:
+    void setUp() override {
+        ServiceContextMongoDTest::setUp();
+        const auto service = getServiceContext();
+        auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(service);
+        ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
+
+        repl::ReplicationCoordinator::set(service, std::move(replCoord));
+        repl::createOplog(_opCtx);
+    }
+
+    ServiceContext::UniqueOperationContext _uniqueOpCtx{makeOperationContext()};
+    OperationContext* _opCtx{_uniqueOpCtx.get()};
+};
 
 // Test that DBDirectClient is prevented from auth
-TEST(DBDirectClient, NoAuth) {
-    OperationContext* ctx = nullptr;
-    DBDirectClient client(ctx);
+TEST_F(DBDirectClientTest, NoAuth) {
+    DBDirectClient client(_opCtx);
     BSONObj params;
 
     ASSERT_THROWS(client.auth(params), AssertionException);
 }
 
+TEST_F(DBDirectClientTest, InsertSingleDocumentSuccessful) {
+    DBDirectClient client(_opCtx);
+    write_ops::InsertCommandRequest insertOp(kNs);
+    insertOp.setDocuments({BSON("_id" << 1)});
+    auto insertReply = client.insert(insertOp);
+    ASSERT_EQ(insertReply.getN(), 1);
+    ASSERT_FALSE(insertReply.getWriteErrors());
+}
+
+TEST_F(DBDirectClientTest, InsertDuplicateDocumentDoesNotThrow) {
+    DBDirectClient client(_opCtx);
+    write_ops::InsertCommandRequest insertOp(kNs);
+    insertOp.setDocuments({BSON("_id" << 1), BSON("_id" << 1)});
+    auto insertReply = client.insert(insertOp);
+    ASSERT_EQ(insertReply.getN(), 1);
+    auto writeErrors = insertReply.getWriteErrors().get();
+    ASSERT_EQ(writeErrors.size(), 1);
+    ASSERT_EQ(writeErrors[0].getIntField("code"), ErrorCodes::DuplicateKey);
+}
+
+TEST_F(DBDirectClientTest, UpdateSingleDocumentSuccessfully) {
+    DBDirectClient client(_opCtx);
+    write_ops::UpdateCommandRequest updateOp(kNs);
+    updateOp.setUpdates({[&] {
+        write_ops::UpdateOpEntry entry;
+        entry.setQ(BSON("_id" << 1));
+        entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(BSON("x" << 1)));
+        entry.setUpsert(true);
+        return entry;
+    }()});
+    auto updateReply = client.update(updateOp);
+    // One upsert
+    ASSERT_EQ(updateReply.getN(), 1);
+    // No documents there initially
+    ASSERT_EQ(updateReply.getNModified(), 0);
+    ASSERT_FALSE(updateReply.getWriteErrors());
+}
+
+TEST_F(DBDirectClientTest, UpdateDuplicateImmutableFieldDoesNotThrow) {
+    DBDirectClient client(_opCtx);
+    write_ops::UpdateCommandRequest updateOp(kNs);
+    updateOp.setUpdates({[&] {
+        write_ops::UpdateOpEntry entry;
+        entry.setQ(BSON("_id" << 1));
+        entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(BSON("_id" << 2)));
+        entry.setUpsert(true);
+        return entry;
+    }()});
+    auto updateReply = client.update(updateOp);
+    ASSERT_EQ(updateReply.getN(), 0);
+    ASSERT_EQ(updateReply.getNModified(), 0);
+    auto writeErrors = updateReply.getWriteErrors().get();
+    ASSERT_EQ(writeErrors.size(), 1);
+    ASSERT_EQ(writeErrors[0].getIntField("code"), ErrorCodes::ImmutableField);
+}
+
+TEST_F(DBDirectClientTest, DeleteSingleDocumentSuccessful) {
+    DBDirectClient client(_opCtx);
+    // Insert document to delete
+    write_ops::InsertCommandRequest insertOp(kNs);
+    insertOp.setDocuments({BSON("_id" << 1)});
+    auto insertReply = client.insert(insertOp);
+    // Delete document
+    write_ops::DeleteCommandRequest deleteOp(kNs);
+    deleteOp.setDeletes({[&] {
+        write_ops::DeleteOpEntry entry;
+        entry.setQ(BSON("_id" << 1));
+        entry.setMulti(false);
+        return entry;
+    }()});
+    auto deleteReply = client.remove(deleteOp);
+    ASSERT_EQ(deleteReply.getN(), 1);
+    ASSERT_FALSE(deleteReply.getWriteErrors());
+}
+
+TEST_F(DBDirectClientTest, DeleteDocumentIncorrectHintDoesNotThrow) {
+    DBDirectClient client(_opCtx);
+    // Insert document to delete
+    write_ops::InsertCommandRequest insertOp(kNs);
+    insertOp.setDocuments({BSON("_id" << 1)});
+    auto insertReply = client.insert(insertOp);
+    // Delete document
+    write_ops::DeleteCommandRequest deleteOp(kNs);
+    deleteOp.setDeletes({[&] {
+        write_ops::DeleteOpEntry entry;
+        entry.setQ(BSON("_id" << 1));
+        entry.setMulti(false);
+        entry.setHint(BSON("xyz" << 1));
+        return entry;
+    }()});
+    auto deleteReply = client.remove(deleteOp);
+    ASSERT_EQ(deleteReply.getN(), 0);
+    auto writeErrors = deleteReply.getWriteErrors().get();
+    ASSERT_EQ(writeErrors.size(), 1);
+    ASSERT_EQ(writeErrors[0].getIntField("code"), ErrorCodes::BadValue);
+}
+
+}  // namespace
 }  // namespace mongo
