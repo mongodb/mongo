@@ -1228,8 +1228,8 @@ main(int argc, char *argv[])
     /*
      * Configure eviction to begin at 90% full, and run until the cache is only 75% dirty.
      */
-    error_check(
-      wiredtiger_open(home, NULL, "create,eviction_trigger=90,eviction_dirty_target=75", &conn));
+    error_check(wiredtiger_open(home, NULL,
+      "create,eviction_trigger=90,eviction_dirty_target=75,eviction_dirty_trigger=90", &conn));
     /*! [Eviction configuration] */
     error_check(conn->close(conn, NULL));
 
