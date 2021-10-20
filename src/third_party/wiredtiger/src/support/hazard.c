@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2019 MongoDB, Inc.
+ * Copyright (c) 2014-present MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -50,7 +50,7 @@ hazard_grow(WT_SESSION_IMPL *session)
      * pointer generation number, and schedule a future free of the old memory. Ignore any failure,
      * leak the memory.
      */
-    hazard_gen = __wt_gen_next(session, WT_GEN_HAZARD);
+    __wt_gen_next(session, WT_GEN_HAZARD, &hazard_gen);
     WT_IGNORE_RET(__wt_stash_add(session, WT_GEN_HAZARD, hazard_gen, ohazard, 0));
 
     return (0);

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2019 MongoDB, Inc.
+ * Copyright (c) 2014-present MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -65,12 +65,15 @@ struct __wt_data_handle {
     TAILQ_ENTRY(__wt_data_handle) q;
     TAILQ_ENTRY(__wt_data_handle) hashq;
 
-    const char *name;       /* Object name as a URI */
-    uint64_t name_hash;     /* Hash of name */
-    const char *checkpoint; /* Checkpoint name (or NULL) */
-    const char **cfg;       /* Configuration information */
-    const char *meta_base;  /* Base metadata configuration */
-
+    const char *name;        /* Object name as a URI */
+    uint64_t name_hash;      /* Hash of name */
+    const char *checkpoint;  /* Checkpoint name (or NULL) */
+    const char **cfg;        /* Configuration information */
+    const char *meta_base;   /* Base metadata configuration */
+    size_t meta_base_length; /* Base metadata length */
+#ifdef HAVE_DIAGNOSTIC
+    const char *orig_meta_base; /* Copy of the base metadata configuration */
+#endif
     /*
      * Sessions holding a connection's data handle will have a non-zero reference count; sessions
      * using a connection's data handle will have a non-zero in-use count. Instances of cached

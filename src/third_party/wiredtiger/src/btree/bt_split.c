@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2019 MongoDB, Inc.
+ * Copyright (c) 2014-present MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -37,14 +37,10 @@ typedef enum {
 static int
 __split_safe_free(WT_SESSION_IMPL *session, uint64_t split_gen, bool exclusive, void *p, size_t s)
 {
-    /* We should only call safe free if we aren't pinning the memory. */
-    WT_ASSERT(session, __wt_session_gen(session, WT_GEN_SPLIT) != split_gen);
-
     /*
-     * We have swapped something in a page: if we don't have exclusive access, check whether there
-     * are other threads in the same tree.
+     * We have swapped something in a page: it's only safe to free it if we have exclusive access.
      */
-    if (exclusive || !__wt_gen_active(session, WT_GEN_SPLIT, split_gen)) {
+    if (exclusive) {
         __wt_overwrite_and_free_len(session, p, s);
         return (0);
     }
@@ -270,6 +266,7 @@ __split_ref_move(WT_SESSION_IMPL *session, WT_PAGE *from_home, WT_REF **from_ref
         default:
             WT_ERR(__wt_illegal_value(session, unpack.raw));
         }
+        /* If the compare-and-swap is successful, clear addr to skip the free at the end. */
         if (__wt_atomic_cas_ptr(&ref->addr, ref_addr, addr))
             addr = NULL;
     }
@@ -291,7 +288,7 @@ err:
  *     Finalize the WT_REF move.
  */
 static void
-__split_ref_final(WT_SESSION_IMPL *session, WT_PAGE ***lockedp)
+__split_ref_final(WT_SESSION_IMPL *session, uint64_t split_gen, WT_PAGE ***lockedp)
 {
     WT_PAGE **locked;
     size_t i;
@@ -306,9 +303,18 @@ __split_ref_final(WT_SESSION_IMPL *session, WT_PAGE ***lockedp)
     /*
      * The moved child pages are locked to prevent them from splitting before the parent move
      * completes, unlock them as the final step.
+     *
+     * Once the split is live, newly created internal pages might be evicted and their WT_REF
+     * structures freed. If that happens before all threads exit the index of the page that
+     * previously "owned" the WT_REF, a thread might see a freed WT_REF. To ensure that doesn't
+     * happen, the created pages are set to the current split generation and so can't be evicted
+     * until all readers have left the old generation.
      */
-    for (i = 0; locked[i] != NULL; ++i)
+    for (i = 0; locked[i] != NULL; ++i) {
+        if (split_gen != 0 && WT_PAGE_IS_INTERNAL(locked[i]))
+            locked[i]->pg_intl_split_gen = split_gen;
         WT_PAGE_UNLOCK(session, locked[i]);
+    }
     __wt_free(session, locked);
 }
 
@@ -375,7 +381,7 @@ __split_ref_prepare(
     return (0);
 
 err:
-    __split_ref_final(session, &locked);
+    __split_ref_final(session, 0, &locked);
     return (ret);
 }
 
@@ -451,16 +457,6 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
         WT_ERR(__wt_calloc_one(session, alloc_refp));
     root_incr += children * sizeof(WT_REF);
 
-    /*
-     * Once the split is live, newly created internal pages might be evicted and their WT_REF
-     * structures freed. If that happens before all threads exit the index of the page that
-     * previously "owned" the WT_REF, a thread might see a freed WT_REF. To ensure that doesn't
-     * happen, the created pages are set to the current split generation and so can't be evicted
-     * until all readers have left the old generation.
-     */
-    split_gen = __wt_gen_next(session, WT_GEN_SPLIT);
-    WT_ASSERT(session, root->pg_intl_split_gen < split_gen);
-
     /* Allocate child pages, and connect them into the new page index. */
     for (root_refp = pindex->index, alloc_refp = alloc_index->index, i = 0; i < children; ++i) {
         slots = i == children - 1 ? remain : chunk;
@@ -486,7 +482,6 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
          * Initialize the child page. Block eviction in newly created pages and mark them dirty.
          */
         child->pg_intl_parent_ref = ref;
-        child->pg_intl_split_gen = split_gen;
         WT_ERR(__wt_page_modify_init(session, child));
         __wt_page_modify_set(session, child);
 
@@ -530,22 +525,17 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
     __wt_timing_stress(session, WT_TIMING_STRESS_SPLIT_2);
 
     /*
-     * Get a generation for this split, mark the root page.  This must be
-     * after the new index is swapped into place in order to know that no
-     * readers are looking at the old index.
+     * Mark the root page with the split generation.
      *
-     * Note: as the root page cannot currently be evicted, the root split
-     * generation isn't ever used. That said, it future proofs eviction
-     * and isn't expensive enough to special-case.
-     *
-     * Getting a new split generation implies a full barrier, no additional
-     * barrier is needed.
+     * Note: as the root page cannot currently be evicted, the root split generation isn't ever
+     * used. That said, it future proofs eviction and isn't expensive enough to special-case.
      */
-    split_gen = __wt_gen_next(session, WT_GEN_SPLIT);
+    WT_FULL_BARRIER();
+    split_gen = __wt_gen(session, WT_GEN_SPLIT);
     root->pg_intl_split_gen = split_gen;
 
     /* Finalize the WT_REF move. */
-    __split_ref_final(session, &locked);
+    __split_ref_final(session, split_gen, &locked);
 
 #ifdef HAVE_DIAGNOSTIC
     WT_WITH_PAGE_INDEX(session, ret = __split_verify_root(session, root));
@@ -573,8 +563,9 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
     __wt_cache_page_inmem_incr(session, root, root_incr);
     __wt_cache_page_inmem_decr(session, root, root_decr);
 
+    __wt_gen_next(session, WT_GEN_SPLIT, NULL);
 err:
-    __split_ref_final(session, &locked);
+    __split_ref_final(session, 0, &locked);
 
     switch (complete) {
     case WT_ERR_RETURN:
@@ -732,14 +723,12 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new, uint32_t
     __wt_timing_stress(session, WT_TIMING_STRESS_SPLIT_4);
 
     /*
-     * Get a generation for this split, mark the page.  This must be after
-     * the new index is swapped into place in order to know that no readers
-     * are looking at the old index.
-     *
-     * Getting a new split generation implies a full barrier, no additional
-     * barrier is needed.
+     * Get a generation for this split, mark the page. This must be after the new index is swapped
+     * into place in order to know that no readers with the new generation will look at the old
+     * index.
      */
-    split_gen = __wt_gen_next(session, WT_GEN_SPLIT);
+    WT_FULL_BARRIER();
+    split_gen = __wt_gen(session, WT_GEN_SPLIT);
     parent->pg_intl_split_gen = split_gen;
 
     /*
@@ -854,6 +843,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new, uint32_t
     __wt_cache_page_inmem_incr(session, parent, parent_incr);
     __wt_cache_page_inmem_decr(session, parent, parent_decr);
 
+    __wt_gen_next(session, WT_GEN_SPLIT, NULL);
 err:
     __wt_scr_free(session, &scr);
     /*
@@ -986,16 +976,6 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
         WT_ERR(__wt_calloc_one(session, alloc_refp));
     parent_incr += children * sizeof(WT_REF);
 
-    /*
-     * Once the split is live, newly created internal pages might be evicted and their WT_REF
-     * structures freed. If that happens before all threads exit the index of the page that
-     * previously "owned" the WT_REF, a thread might see a freed WT_REF. To ensure that doesn't
-     * happen, the created pages are set to the current split generation and so can't be evicted
-     * until all readers have left the old generation.
-     */
-    split_gen = __wt_gen_next(session, WT_GEN_SPLIT);
-    WT_ASSERT(session, page->pg_intl_split_gen < split_gen);
-
     /* Allocate child pages, and connect them into the new page index. */
     WT_ASSERT(session, page_refp == pindex->index + chunk);
     for (alloc_refp = alloc_index->index + 1, i = 1; i < children; ++i) {
@@ -1022,7 +1002,6 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
          * Initialize the child page. Block eviction in newly created pages and mark them dirty.
          */
         child->pg_intl_parent_ref = ref;
-        child->pg_intl_split_gen = split_gen;
         WT_ERR(__wt_page_modify_init(session, child));
         __wt_page_modify_set(session, child);
 
@@ -1069,18 +1048,16 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
     __wt_timing_stress(session, WT_TIMING_STRESS_SPLIT_6);
 
     /*
-     * Get a generation for this split, mark the parent page.  This must be
-     * after the new index is swapped into place in order to know that no
-     * readers are looking at the old index.
-     *
-     * Getting a new split generation implies a full barrier, no additional
-     * barrier is needed.
+     * Get a generation for this split, mark the parent page. This must be after the new index is
+     * swapped into place in order to know that no readers with the new generation will look at the
+     * old index.
      */
-    split_gen = __wt_gen_next(session, WT_GEN_SPLIT);
+    WT_FULL_BARRIER();
+    split_gen = __wt_gen(session, WT_GEN_SPLIT);
     page->pg_intl_split_gen = split_gen;
 
     /* Finalize the WT_REF move. */
-    __split_ref_final(session, &locked);
+    __split_ref_final(session, split_gen, &locked);
 
 #ifdef HAVE_DIAGNOSTIC
     WT_WITH_PAGE_INDEX(session, __split_verify_intl_key_order(session, parent));
@@ -1114,8 +1091,9 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
     __wt_cache_page_inmem_incr(session, page, page_incr);
     __wt_cache_page_inmem_decr(session, page, page_decr);
 
+    __wt_gen_next(session, WT_GEN_SPLIT, NULL);
 err:
-    __split_ref_final(session, &locked);
+    __split_ref_final(session, 0, &locked);
 
     switch (complete) {
     case WT_ERR_RETURN:

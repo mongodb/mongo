@@ -1,4 +1,4 @@
-#! /bin/sh
+#! /bin/bash
 
 t=__wt.$$
 trap 'rm -f $t' 0 1 2 3 13 15
@@ -8,7 +8,12 @@ test -n "$WT_RELEASE_BUILD" && exit 0
 
 # We require doxygen which may not be installed.
 type doxygen > /dev/null 2>&1 || {
-	echo 'skipped: doxygen not found'
+	echo "$0 skipped: doxygen not found"
+	exit 0
+}
+v=`(echo "1.8.17" && doxygen --version) | sort -V | head -1`
+test "$v" = "1.8.17" || {
+	echo "$0 skipped: unsupported version of doxygen"
 	exit 0
 }
 

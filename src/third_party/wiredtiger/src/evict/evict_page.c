@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2019 MongoDB, Inc.
+ * Copyright (c) 2014-present MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -154,6 +154,10 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t previous_state, uint3
      */
     if (inmem_split)
         goto done;
+
+    /* Check that we are not about to evict an internal page with an active split generation. */
+    if (WT_PAGE_IS_INTERNAL(ref->page) && !closing)
+        WT_ASSERT(session, !__wt_gen_active(session, WT_GEN_SPLIT, page->pg_intl_split_gen));
 
     /* Count evictions of internal pages during normal operation. */
     if (!closing && WT_PAGE_IS_INTERNAL(page)) {
@@ -698,18 +702,6 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags, bool
         WT_STAT_CONN_INCR(session, cache_eviction_fail_in_reconciliation);
 
     WT_RET(ret);
-
-    /*
-     * Give up on eviction during a checkpoint if the page splits.
-     *
-     * We get here if checkpoint reads a page with lookaside entries: if
-     * more of those entries are visible now than when the original
-     * eviction happened, the page could split.  In most workloads, this is
-     * very unlikely.  However, since checkpoint is partway through
-     * reconciling the parent page, a split can corrupt the checkpoint.
-     */
-    if (WT_SESSION_BTREE_SYNC(session) && page->modify->rec_result == WT_PM_REC_MULTIBLOCK)
-        return (__wt_set_return(session, EBUSY));
 
     /*
      * Success: assert that the page is clean or reconciliation was configured to save updates.

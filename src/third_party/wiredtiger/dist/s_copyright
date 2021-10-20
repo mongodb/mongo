@@ -55,7 +55,7 @@ fi
 
 trap 'rm -f $c1 $c2 $c3 $c4 $c5' 0 1 2 3 13 15
 
-year=`date +%Y`
+year='present'
 
 cat > $c1 <<ENDOFTEXT
  * Copyright (c) 2014-$year MongoDB, Inc.

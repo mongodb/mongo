@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2019 MongoDB, Inc.
+ * Copyright (c) 2014-present MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -38,6 +38,10 @@ __wt_ref_out(WT_SESSION_IMPL *session, WT_REF *ref)
      * hazard pointer, wait for it to be cleared.
      */
     WT_ASSERT(session, __wt_hazard_check_assert(session, ref, true));
+
+    WT_ASSERT(session, !WT_PAGE_IS_INTERNAL(ref->page) ||
+        F_ISSET(session->dhandle, WT_DHANDLE_DEAD | WT_DHANDLE_EXCLUSIVE) ||
+        !__wt_gen_active(session, WT_GEN_SPLIT, ref->page->pg_intl_split_gen));
 
     __wt_page_out(session, &ref->page);
 }

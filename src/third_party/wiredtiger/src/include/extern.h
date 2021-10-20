@@ -1424,7 +1424,7 @@ extern int __wt_unexpected_object_type(
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern void __wt_gen_init(WT_SESSION_IMPL *session);
 extern uint64_t __wt_gen(WT_SESSION_IMPL *session, int which);
-extern uint64_t __wt_gen_next(WT_SESSION_IMPL *session, int which);
+extern void __wt_gen_next(WT_SESSION_IMPL *session, int which, uint64_t *genp);
 extern uint64_t __wt_gen_next_drain(WT_SESSION_IMPL *session, int which);
 extern void __wt_gen_drain(WT_SESSION_IMPL *session, int which, uint64_t generation);
 extern bool __wt_gen_active(WT_SESSION_IMPL *session, int which, uint64_t generation)

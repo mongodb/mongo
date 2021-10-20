@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #
-# Public Domain 2034-2039 MongoDB, Inc.
-# Public Domain 2008-2034 WiredTiger, Inc.
+# Public Domain 2014-present MongoDB, Inc.
+# Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #

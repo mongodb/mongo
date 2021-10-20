@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2019 MongoDB, Inc.
+ * Copyright (c) 2014-present MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -815,7 +815,7 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
      * of the transaction table, or a thread evicting in a tree could
      * ignore the checkpoint's transaction.
      */
-    generation = __wt_gen_next(session, WT_GEN_CHECKPOINT);
+    __wt_gen_next(session, WT_GEN_CHECKPOINT, &generation);
     WT_STAT_CONN_SET(session, txn_checkpoint_generation, generation);
 
     /*

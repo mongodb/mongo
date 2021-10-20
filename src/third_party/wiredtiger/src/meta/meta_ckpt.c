@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2019 MongoDB, Inc.
+ * Copyright (c) 2014-present MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -104,10 +104,12 @@ __wt_meta_checkpoint_clear(WT_SESSION_IMPL *session, const char *fname)
 static int
 __ckpt_set(WT_SESSION_IMPL *session, const char *fname, const char *v, bool use_base)
 {
+    WT_DATA_HANDLE *dhandle;
     WT_DECL_ITEM(tmp);
     WT_DECL_RET;
+    size_t meta_base_length;
     char *config, *newcfg;
-    const char *cfg[3], *str;
+    const char *cfg[3], *meta_base, *str;
 
     /*
      * If the caller knows we're on a path like checkpoints where we have a valid checkpoint and
@@ -116,12 +118,35 @@ __ckpt_set(WT_SESSION_IMPL *session, const char *fname, const char *v, bool use_
      * use the slower path through configuration parsing functions.
      */
     config = newcfg = NULL;
+    dhandle = session->dhandle;
     str = v == NULL ? "checkpoint=(),checkpoint_lsn=" : v;
-    if (use_base && session->dhandle != NULL) {
+    if (use_base && dhandle != NULL) {
         WT_ERR(__wt_scr_alloc(session, 0, &tmp));
-        WT_ASSERT(session, strcmp(session->dhandle->name, fname) == 0);
+        WT_ASSERT(session, strcmp(dhandle->name, fname) == 0);
+
+        /* Check the metadata is not corrupted. */
+        meta_base = dhandle->meta_base;
+        meta_base_length = strlen(meta_base);
+        if (dhandle->meta_base_length != meta_base_length)
+            WT_PANIC_RET(session, WT_PANIC,
+              "Corrupted metadata. The original metadata length was %lu while the new one is %lu.",
+              dhandle->meta_base_length, meta_base_length);
+#ifdef HAVE_DIAGNOSTIC
+        if (!WT_STREQ(dhandle->orig_meta_base, meta_base))
+            WT_PANIC_RET(session, WT_PANIC,
+              "Corrupted metadata. The original metadata length was %lu while the new one is %lu. "
+              "The original metadata inserted was %s and the current "
+              "metadata is now %s.",
+              dhandle->meta_base_length, meta_base_length, dhandle->orig_meta_base, meta_base);
+#endif
+
         /* Concatenate the metadata base string with the checkpoint string. */
-        WT_ERR(__wt_buf_fmt(session, tmp, "%s,%s", session->dhandle->meta_base, str));
+        WT_ERR(__wt_buf_fmt(session, tmp, "%s,%s", meta_base, str));
+        /*
+         * Check the new metadata length is at least as long as the original metadata string with
+         * the checkpoint base stripped out.
+         */
+        WT_ASSERT(session, tmp->size >= dhandle->meta_base_length);
         WT_ERR(__wt_metadata_update(session, fname, tmp->mem));
     } else {
         /* Retrieve the metadata for this file. */
