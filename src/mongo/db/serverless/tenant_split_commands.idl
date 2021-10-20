@@ -91,3 +91,9 @@ commands:
       migrationId:
         description: "Unique identifier for the tenant split operation."
         type: uuid
+
+feature_flags:
+    featureFlagShardSplit:
+        description: When enabled, multitenant migration can use the shard split commands.
+        cpp_varname: feature_flags::gShardSplit
+        default: false
