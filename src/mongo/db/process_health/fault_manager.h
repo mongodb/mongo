@@ -79,6 +79,7 @@ class FaultManager : protected FaultFacetsContainerFactory {
     FaultManager& operator=(const FaultManager&) = delete;
 
 public:
+    // The taskExecutor provided should not be already started.
     explicit FaultManager(ServiceContext* svcCtx,
                           std::shared_ptr<executor::TaskExecutor> taskExecutor);
     virtual ~FaultManager();
@@ -141,7 +142,7 @@ private:
     ServiceContext* const _svcCtx;
 
     mutable Mutex _mutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(1), "FaultManager::_mutex");
+        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(5), "FaultManager::_mutex");
     std::shared_ptr<FaultInternal> _fault;
     // We lazily init all health observers.
     AtomicWord<bool> _initializedAllHealthObservers{false};
@@ -149,6 +150,7 @@ private:
     std::vector<std::unique_ptr<HealthObserver>> _observers;
     std::shared_ptr<executor::TaskExecutor> _taskExecutor;
     boost::optional<executor::TaskExecutor::CallbackHandle> _periodicHealthCheckCbHandle;
+    SharedPromise<void> _initialHealthCheckCompletedPromise;
 
     // Protects the current state of fault manager.
     mutable Mutex _stateMutex =
