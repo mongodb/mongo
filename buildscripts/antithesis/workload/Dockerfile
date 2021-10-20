@@ -15,8 +15,8 @@ RUN apt-get install -qy libcurl4 libgssapi-krb5-2 libldap-2.4-2 libwrap0 libsasl
 RUN add-apt-repository ppa:deadsnakes/ppa
 RUN apt-get update
 
-# python 3.9
-RUN DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true apt-get install -qy python3.9 python3.9-dev python3.9-venv
+# installs that need to be forced to be non-interactive: python 3.9 and git
+RUN DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true apt-get install -qy python3.9 python3.9-dev python3.9-venv git-all
 
 # -------------------
 # Everything above this line should be common image setup
