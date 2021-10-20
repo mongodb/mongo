@@ -130,6 +130,8 @@ MONGO_FAIL_POINT_DEFINE(omitConfigQuorumCheck);
 MONGO_FAIL_POINT_DEFINE(hangBeforeReconfigOnDrainComplete);
 // Will cause signal drain complete to hang after reconfig.
 MONGO_FAIL_POINT_DEFINE(hangAfterReconfigOnDrainComplete);
+// Hang after grabbing the RSTL but before we start rejecting writes.
+MONGO_FAIL_POINT_DEFINE(stepdownHangAfterGrabbingRSTL);
 
 // Number of times we tried to go live as a secondary.
 Counter64 attemptsToBecomeSecondary;
@@ -2538,6 +2540,8 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
     auto deadline = force ? stepDownUntil : waitUntil;
     AutoGetRstlForStepUpStepDown arsd(
         this, opCtx, ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepDown, deadline);
+
+    stepdownHangAfterGrabbingRSTL.pauseWhileSet();
 
     stdx::unique_lock<Latch> lk(_mutex);
 

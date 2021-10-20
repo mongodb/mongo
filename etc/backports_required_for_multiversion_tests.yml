@@ -173,6 +173,8 @@ all:
     test_file: jstests/core/mod_special_values.js
   - ticket: SERVER-59613
     test_file: jstests/aggregation/range.js
+  - ticket: SERVER-59108
+    test_file: jstests/replsets/stepdown_race_with_transaction.js
 
 
 suites:
