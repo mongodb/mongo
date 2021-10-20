@@ -59,7 +59,6 @@ ServiceContext::ConstructorActionRegisterer faultManagerRegisterer{
         auto pool = std::make_unique<executor::NetworkInterfaceThreadPool>(networkInterface.get());
         auto taskExecutor =
             std::make_shared<executor::ThreadPoolTaskExecutor>(std::move(pool), networkInterface);
-        taskExecutor->startup();
 
         auto faultManager = std::make_unique<FaultManager>(svcCtx, taskExecutor);
         FaultManager::set(svcCtx, std::move(faultManager));
@@ -117,16 +116,29 @@ FaultManager::~FaultManager() {
     if (_periodicHealthCheckCbHandle) {
         _taskExecutor->cancel(*_periodicHealthCheckCbHandle);
     }
+
     _taskExecutor->join();
+
+    if (!_initialHealthCheckCompletedPromise.getFuture().isReady()) {
+        _initialHealthCheckCompletedPromise.emplaceValue();
+    }
 }
 
 void FaultManager::startPeriodicHealthChecks() {
+    if (!feature_flags::gFeatureFlagHealthMonitoring.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        return;
+    }
+
+    _taskExecutor->startup();
     invariant(getFaultState() == FaultState::kStartupCheck);
     {
         auto lk = stdx::lock_guard(_mutex);
         invariant(!_periodicHealthCheckCbHandle);
     }
     schedulePeriodicHealthCheckThread(true /* immediately */);
+
+    _initialHealthCheckCompletedPromise.getFuture().get();
 }
 
 FaultState FaultManager::getFaultState() const {
@@ -260,6 +272,9 @@ void FaultManager::processFaultIsResolvedEvent() {
             // NOP.
             break;
         case FaultState::kStartupCheck:
+            transitionToState(FaultState::kOk);
+            _initialHealthCheckCompletedPromise.emplaceValue();
+            break;
         case FaultState::kTransientFault:
             transitionToState(FaultState::kOk);
             break;

@@ -59,6 +59,7 @@
 #include "mongo/db/logical_session_cache_impl.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/process_health/fault_manager.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_liaison_mongos.h"
@@ -747,6 +748,8 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     }
 
     PeriodicTask::startRunningPeriodicTasks();
+
+    process_health::FaultManager::get(serviceContext)->startPeriodicHealthChecks();
 
     SessionKiller::set(serviceContext,
                        std::make_shared<SessionKiller>(serviceContext, killSessionsRemote));

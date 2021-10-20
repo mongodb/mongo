@@ -514,6 +514,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/ftdc/ftdc_mongos',
         '$BUILD_DIR/mongo/db/log_process_details',
         '$BUILD_DIR/mongo/db/not_primary_error_tracker',
+        '$BUILD_DIR/mongo/db/process_health/fault_manager',
         '$BUILD_DIR/mongo/db/read_write_concern_defaults',
         '$BUILD_DIR/mongo/db/serverinit',
         '$BUILD_DIR/mongo/db/service_liaison_mongos',

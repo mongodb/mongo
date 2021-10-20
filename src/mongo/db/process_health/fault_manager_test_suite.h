@@ -62,10 +62,6 @@ public:
         transitionToState(newState);
     }
 
-    FaultState getFaultStateTest() {
-        return getFaultState();
-    }
-
     void healthCheckTest() {
         healthCheck();
     }
@@ -87,10 +83,6 @@ public:
         invariant(fault);
         return *(static_cast<FaultInternal*>(fault.get()));
     }
-
-    void schedulePeriodicHealthCheckThreadTest() {
-        schedulePeriodicHealthCheckThread();
-    }
 };
 
 /**
@@ -100,7 +92,14 @@ class FaultManagerTest : public unittest::Test {
 public:
     void setUp() override {
         RAIIServerParameterControllerForTest _controller{"featureFlagHealthMonitoring", true};
-        init();
+        HealthObserverRegistration::resetObserverFactoriesForTest();
+
+        _svcCtx = ServiceContext::make();
+        _svcCtx->setFastClockSource(std::make_unique<ClockSourceMock>());
+        _svcCtx->setTickSource(std::make_unique<TickSourceMock<Milliseconds>>());
+
+        resetManager();
+        _executor->startup();
     }
 
     void tearDown() override {
@@ -109,23 +108,15 @@ public:
         resetManager();
     }
 
-    void init() {
-        _svcCtx = ServiceContext::make();
-        _svcCtx->setFastClockSource(std::make_unique<ClockSourceMock>());
-        _svcCtx->setTickSource(std::make_unique<TickSourceMock<Milliseconds>>());
-        resetManager();
-    }
-
     void resetManager() {
         // Construct task executor
         auto network = std::make_unique<executor::NetworkInterfaceMock>();
         _net = network.get();
-        auto executor = makeSharedThreadPoolTestExecutor(std::move(network));
-        executor->startup();
+        _executor = makeSharedThreadPoolTestExecutor(std::move(network));
 
         invariant(_svcCtx->getFastClockSource());
         FaultManager::set(_svcCtx.get(),
-                          std::make_unique<FaultManagerTestImpl>(_svcCtx.get(), executor));
+                          std::make_unique<FaultManagerTestImpl>(_svcCtx.get(), _executor));
     }
 
     void registerMockHealthObserver(FaultFacetType mockType,
@@ -167,23 +158,37 @@ public:
         }
     }
 
+    void waitForFaultBeingResolved() {
+        Timer t;
+        while (manager().currentFault() && t.elapsed() < Minutes(1)) {
+            sleepFor(Milliseconds(10));
+        }
+    }
+
+    void waitForFaultBeingCreated() {
+        Timer t;
+        while (!manager().currentFault() && t.elapsed() < Minutes(1)) {
+            sleepFor(Milliseconds(10));
+        }
+    }
+
+    void waitForTransitionIntoState(FaultState state) {
+        Timer t;
+        while (manager().getFaultState() != state ||
+               (state == FaultState::kOk && manager().currentFault())) {
+            advanceTime(Milliseconds(100));
+            manager().healthCheckTest();
+            sleepFor(Milliseconds(1));
+            if (t.elapsed() >= Minutes(1)) {
+                break;
+            }
+        };
+    }
 
 private:
     ServiceContext::UniqueServiceContext _svcCtx;
     executor::NetworkInterfaceMock* _net;
-};
-
-class FaultManagerTestNoPeriodicThread : public FaultManagerTest {
-public:
-    void setUp() override {
-        init();
-    }
-
-    void startHealthCheckThread() {
-        RAIIServerParameterControllerForTest _controller{"featureFlagHealthMonitoring", true};
-        manager().schedulePeriodicHealthCheckThreadTest();
-        advanceTime(Milliseconds(60));
-    }
+    std::shared_ptr<executor::ThreadPoolTaskExecutor> _executor;
 };
 
 }  // namespace test
