@@ -2354,13 +2354,9 @@ public:
     static StatusWith<Value> apply(Value lhs, Value rhs);
 
     explicit ExpressionMultiply(ExpressionContext* const expCtx)
-        : ExpressionVariadic<ExpressionMultiply>(expCtx) {
-        expCtx->sbeCompatible = false;
-    }
+        : ExpressionVariadic<ExpressionMultiply>(expCtx) {}
     ExpressionMultiply(ExpressionContext* const expCtx, ExpressionVector&& children)
-        : ExpressionVariadic<ExpressionMultiply>(expCtx, std::move(children)) {
-        expCtx->sbeCompatible = false;
-    }
+        : ExpressionVariadic<ExpressionMultiply>(expCtx, std::move(children)) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
