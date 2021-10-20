@@ -259,6 +259,10 @@ private:
      */
     class ElementStorage {
     public:
+        /**
+         * "Writable" BSONElement. Provides access to a writable pointer for writing the value of
+         * the BSONElement. Users must write valid BSON data depending on the requested BSON type.
+         */
         class Element {
         public:
             Element(char* buffer, int nameSize, int valueSize);

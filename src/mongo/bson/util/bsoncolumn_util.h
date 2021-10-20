@@ -35,6 +35,15 @@
 namespace mongo::bsoncolumn {
 // Number of bytes for element count at the beginning of BSON Column binary
 static constexpr uint8_t kElementCountBytes = 4;
+static constexpr char kInterleavedStartControlByte = (char)0xF0;
+
+inline bool isLiteralControlByte(char control) {
+    return (control & 0xE0) == 0;
+}
+
+inline uint8_t numSimple8bBlocksForControlByte(char control) {
+    return (control & 0x0F) + 1;
+}
 
 bool usesDeltaOfDelta(BSONType type);
 bool uses128bit(BSONType type);

@@ -92,17 +92,10 @@ public:
 private:
     bool _traverse(StringData fieldName, const BSONObj& obj) {
         [[maybe_unused]] auto raii = _enterFunc(fieldName, obj);
-        for (const auto& elem : obj) {
-            bool result = true;
-            if (elem.type() == Object) {
-                result = _traverse(elem.fieldNameStringData(), elem.Obj());
-            } else {
-                result = _elemFunc(elem);
-            }
-            if (!result)
-                return false;
-        }
-        return true;
+        return std::all_of(obj.begin(), obj.end(), [this, &fieldName](auto&& elem) {
+            return elem.type() == Object ? _traverse(elem.fieldNameStringData(), elem.Obj())
+                                         : _elemFunc(elem);
+        });
     }
 
     EnterSubObjFunc _enterFunc;
@@ -149,7 +142,7 @@ const char* BSONColumn::ElementStorage::ContiguousBlock::done() {
 }
 
 char* BSONColumn::ElementStorage::allocate(int bytes) {
-    // If current block don't have enough capacity we need to allocate a new one
+    // If current block doesn't have enough capacity we need to allocate a new one.
     if (_capacity - _pos < bytes) {
         // Keep track of current block if it exists.
         if (_block) {
@@ -371,7 +364,7 @@ void BSONColumn::Iterator::_incrementRegular() {
 
     // Load new control byte
     if (_isInterleavedStart(*_control)) {
-        // Remember this position to speed up "random access" for futher access.
+        // Remember this position to speed up "random access" for further access.
         _column->_maxDecodingStartPos.setIfLarger(_index, _control);
 
         _initializeInterleaving();
@@ -384,7 +377,7 @@ void BSONColumn::Iterator::_incrementRegular() {
     auto prevControl = _control;
     _control += result.size;
     if (result.full) {
-        // Remember this position to speed up "random access" for futher access.
+        // Remember this position to speed up "random access" for further access.
         _column->_maxDecodingStartPos.setIfLarger(_index, prevControl);
     }
 }

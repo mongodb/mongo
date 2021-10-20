@@ -35,7 +35,9 @@
 #include "mongo/bson/util/simple8b.h"
 #include "mongo/platform/int128.h"
 
+#include <deque>
 #include <memory>
+#include <vector>
 
 namespace mongo {
 
@@ -46,7 +48,6 @@ class BSONColumnBuilder {
 public:
     BSONColumnBuilder(StringData fieldName);
     BSONColumnBuilder(StringData fieldName, BufBuilder&& builder);
-    BSONColumnBuilder(BSONColumnBuilder&&) = delete;
 
     /**
      * Appends a BSONElement to this BSONColumnBuilder.
@@ -92,52 +93,107 @@ public:
     BufBuilder detach();
 
 private:
-    BSONElement _previous() const;
+    /**
+     * State for encoding scalar BSONElement as BSONColumn using delta or delta-of-delta
+     * compression. When compressing Objects one Encoding state is used per sub-field within the
+     * object to compress.
+     */
+    struct EncodingState {
+        EncodingState(BufBuilder* bufBuilder,
+                      std::function<void(const char*, size_t)> controlBlockWriter);
+        EncodingState(EncodingState&& other);
+        EncodingState& operator=(EncodingState&& rhs);
 
-    void _storePrevious(BSONElement elem);
-    void _writeLiteralFromPrevious();
-    void _incrementSimple8bCount();
-    bool _objectIdDeltaPossible(BSONElement elem, BSONElement prev);
+        void append(BSONElement elem);
+        void skip();
+        void flush();
 
-    // Helper to append doubles to this Column builder. Returns true if append was successful and
-    // false if the value needs to be stored uncompressed.
-    bool _appendDouble(double value, double previous);
+        BSONElement _previous() const;
+        void _storePrevious(BSONElement elem);
+        void _writeLiteralFromPrevious();
+        void _initializeFromPrevious();
+        ptrdiff_t _incrementSimple8bCount();
 
-    // Tries to rescale current pending values + one additional value into a new Simple8bBuilder.
-    // Returns the new Simple8bBuilder if rescaling was possible and none otherwise.
-    boost::optional<Simple8bBuilder<uint64_t>> _tryRescalePending(int64_t encoded,
-                                                                  uint8_t newScaleIndex);
+        // Helper to append doubles to this Column builder. Returns true if append was successful
+        // and false if the value needs to be stored uncompressed.
+        bool _appendDouble(double value, double previous);
 
-    Simple8bWriteFn _createBufferWriter();
+        // Tries to rescale current pending values + one additional value into a new
+        // Simple8bBuilder. Returns the new Simple8bBuilder if rescaling was possible and none
+        // otherwise.
+        boost::optional<Simple8bBuilder<uint64_t>> _tryRescalePending(int64_t encoded,
+                                                                      uint8_t newScaleIndex);
 
-    // Storage for the previously appended BSONElement
-    std::unique_ptr<char[]> _prev;
-    int _prevSize = 0;
-    int _prevCapacity = 0;
-    // This is only used for types that use delta of delta.
-    int64_t _prevDelta = 0;
+        Simple8bWriteFn _createBufferWriter();
 
-    // Simple-8b builder for storing compressed deltas
-    Simple8bBuilder<uint64_t> _simple8bBuilder64;
-    Simple8bBuilder<uint128_t> _simple8bBuilder128;
+        // Storage for the previously appended BSONElement
+        std::unique_ptr<char[]> _prev;
+        int _prevSize = 0;
+        int _prevCapacity = 0;
+        // This is only used for types that use delta of delta.
+        int64_t _prevDelta = 0;
 
-    // Offset to last Simple-8b control byte
-    std::ptrdiff_t _controlByteOffset = 0;
+        // Simple-8b builder for storing compressed deltas
+        Simple8bBuilder<uint64_t> _simple8bBuilder64;
+        Simple8bBuilder<uint128_t> _simple8bBuilder128;
 
-    // Additional variables needed for previous state
-    int64_t _prevEncoded64 = 0;
-    int128_t _prevEncoded128 = 0;
-    double _lastValueInPrevBlock = 0;
-    uint8_t _scaleIndex;
+        // Chose whether to use 128 or 64 Simple-8b builder
+        bool _storeWith128 = false;
+
+        // Offset to last Simple-8b control byte
+        std::ptrdiff_t _controlByteOffset;
+
+        // Additional variables needed for previous state
+        int64_t _prevEncoded64 = 0;
+        int128_t _prevEncoded128 = 0;
+        double _lastValueInPrevBlock = 0;
+        uint8_t _scaleIndex;
+
+        BufBuilder* _bufBuilder;
+        std::function<void(const char*, size_t)> _controlBlockWriter;
+    };
+
+    // Append Object for sub-object compression when in mode kSubObjAppending
+    void _appendSubElements(const BSONObj& obj);
+
+    // Transition into kSubObjDeterminingReference mode
+    void _startDetermineSubObjReference(const BSONObj& obj);
+
+    // Transition from kSubObjDeterminingReference into kSubObjAppending
+    void _finishDetermineSubObjReference();
+
+    // Transition from kSubObjDeterminingReference or kSubObjAppending back into kRegular.
+    void _flushSubObjMode();
+
+    // Encoding state for kRegular mode
+    EncodingState _state;
+
+    // Intermediate BufBuilder and offsets to written control blocks for sub-object compression
+    std::deque<std::pair<BufBuilder, std::deque<std::pair<ptrdiff_t, size_t>>>> _subobjBuffers;
+
+    // Encoding states when in sub-object compression mode. There should be one encoding state per
+    // scalar field in '_referenceSubObj'.
+    std::deque<EncodingState> _subobjStates;
+
+    // Reference object that is used to match object hierarchy to encoding states. Appending objects
+    // for sub-object compression need to check their hierarchy against this object.
+    BSONObj _referenceSubObj;
+
+    // Buffered BSONObj when determining reference object. Will be compressed when this is complete
+    // and we transition into kSubObjAppending.
+    std::vector<BSONObj> _bufferedObjElements;
+
+    // Helper to flatten Object to compress to match _subobjStates
+    std::vector<BSONElement> _flattenedAppendedObj;
 
     // Buffer for the BSON Column binary
     BufBuilder _bufBuilder;
 
+    enum class Mode { kRegular, kSubObjDeterminingReference, kSubObjAppending };
+    Mode _mode = Mode::kRegular;
+
     uint32_t _elementCount = 0;
     std::string _fieldName;
-
-    // Chose whether to use 128 or 64 Simple-8b builder
-    bool _storeWith128 = false;
 };
 
 }  // namespace mongo
