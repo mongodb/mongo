@@ -454,10 +454,9 @@ TEST_F(TransactionCoordinatorServiceTest,
         operationContext(), _lsid, _txnNumberAndRetryCounter, kCommitDeadline);
 
     // Progress the transaction up until the point where one participant voted to abort and the
-    // coordinator has sent abort and is waiting for abort acks.
+    // coordinator has sent abort and is waiting for an abort ack.
     auto oldTxnCommitDecisionFuture = *coordinatorService->coordinateCommit(
-        operationContext(), _lsid, _txnNumberAndRetryCounter, kTwoShardIdSet);
-    assertPrepareSentAndRespondWithSuccess();
+        operationContext(), _lsid, _txnNumberAndRetryCounter, kOneShardIdSet);
     assertPrepareSentAndRespondWithNoSuchTransaction();
 
     // Create a coordinator with a higher transaction retry counter.
@@ -467,18 +466,14 @@ TEST_F(TransactionCoordinatorServiceTest,
     coordinatorService->createCoordinator(
         operationContext(), _lsid, newTxnNumberAndRetryCounter, kCommitDeadline);
 
+    // Finish aborting the original commit by sending an abort ack.
+    assertAbortSentAndRespondWithSuccess();
+
     auto newTxnCommitDecisionFuture = *coordinatorService->coordinateCommit(
-        operationContext(), _lsid, newTxnNumberAndRetryCounter, kTwoShardIdSet);
+        operationContext(), _lsid, newTxnNumberAndRetryCounter, kOneShardIdSet);
 
-    // Finish aborting the original commit by sending it abort acks from both participants.
-    assertAbortSentAndRespondWithSuccess();
-    assertAbortSentAndRespondWithSuccess();
-
-    // Simulate all participants acking prepare/voting to commit.
+    // Simulate acking prepare/voting to commit.
     assertPrepareSentAndRespondWithSuccess();
-    assertPrepareSentAndRespondWithSuccess();
-
-    assertCommitSentAndRespondWithSuccess();
     assertCommitSentAndRespondWithSuccess();
 
     ASSERT_THROWS_CODE(
