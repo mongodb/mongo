@@ -2,6 +2,10 @@
  * Shuts down the donor primary at two points in the critical section: while the node is executing
  * _configsvrEnsureChunkVersionIsGreaterThan and while the node is forcing a filtering metadata
  * refresh.
+ *
+ * @tags: [
+ *   does_not_support_stepdowns,
+ * ]
  */
 
 (function() {
