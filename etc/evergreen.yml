@@ -1791,11 +1791,13 @@ functions:
 
   ### Process & archive artifacts from hung processes ###
   "run hang analyzer":
-    command: subprocess.exec
-    params:
-      binary: bash
-      args:
-        - "./src/evergreen/hang_analyzer.sh"
+    - *f_expansions_write
+    - *configure_evergreen_api_credentials
+    - command: subprocess.exec
+      params:
+        binary: bash
+        args:
+          - "./src/evergreen/hang_analyzer.sh"
 
   "wait for resmoke to shutdown":
     command: subprocess.exec

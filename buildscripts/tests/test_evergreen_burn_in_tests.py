@@ -339,9 +339,9 @@ class TestCreateGenerateTasksConfig(unittest.TestCase):
         tasks = evg_config_dict["tasks"]
         self.assertEqual(n_tasks * n_tests, len(tasks))
         cmd = tasks[0]["commands"]
-        self.assertIn(resmoke_options, cmd[1]["vars"]["resmoke_args"])
-        self.assertEqual("suite_0", cmd[1]["vars"]["suite"])
-        self.assertIn("tests_0", cmd[1]["vars"]["resmoke_args"])
+        self.assertIn(resmoke_options, cmd[2]["vars"]["resmoke_args"])
+        self.assertEqual("suite_0", cmd[2]["vars"]["suite"])
+        self.assertIn("tests_0", cmd[2]["vars"]["resmoke_args"])
 
     @unittest.skipIf(sys.platform.startswith("win"), "not supported on windows")
     def test_n_task_m_test(self):

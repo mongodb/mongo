@@ -60,6 +60,10 @@ def get_evergreen_api(evergreen_config=None):
     else:
         possible_configs = _find_evergreen_yaml_candidates()
 
+    if not possible_configs:
+        LOGGER.error("Could not find .evergreen.yml", candidates=possible_configs)
+        raise RuntimeError("Could not find .evergreen.yml")
+
     last_ex = None
     for config in possible_configs:
         try:
@@ -69,8 +73,9 @@ def get_evergreen_api(evergreen_config=None):
             last_ex = ex
             continue
 
-    LOGGER.error("Most likely something is wrong with evergreen config file.",
-                 config_file_candidates=possible_configs)
+    LOGGER.error(
+        "Could not connect to Evergreen with any .evergreen.yml files available on this system",
+        config_file_candidates=possible_configs)
     raise last_ex
 
 

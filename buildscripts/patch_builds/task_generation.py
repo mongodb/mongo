@@ -41,7 +41,7 @@ def resmoke_commands(run_tests_fn_name: str, run_tests_vars: Dict[str, Any],
         FunctionCall("git get project no modules") if require_multiversion_setup else None,
         FunctionCall("add git tag") if require_multiversion_setup else None,
         FunctionCall("do setup"),
-        FunctionCall("configure evergreen api credentials") if require_multiversion_setup else None,
+        FunctionCall("configure evergreen api credentials"),
         FunctionCall("do multiversion setup") if require_multiversion_setup else None,
         FunctionCall(run_tests_fn_name, run_tests_vars),
     ]
