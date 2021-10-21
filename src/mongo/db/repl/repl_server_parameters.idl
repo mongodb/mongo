@@ -593,3 +593,8 @@ feature_flags:
         description: When enabled, multitenant migration uses the "shard merge" protocol.
         cpp_varname: feature_flags::gShardMerge
         default: false
+    
+    featureFlagShardSplit:
+        description: When enabled, multitenant migration can use the shard split commands.
+        cpp_varname: feature_flags::gShardSplit
+        default: false

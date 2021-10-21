@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/serverless/tenant_split_commands_gen.h"
 
 namespace mongo {
@@ -44,6 +45,10 @@ public:
         using InvocationBase::InvocationBase;
 
         Response typedRun(OperationContext* opCtx) {
+            uassert(6057900,
+                    "feature \"shard split\" not supported",
+                    repl::feature_flags::gShardSplit.isEnabled(
+                        serverGlobalParams.featureCompatibility));
             return Response(TenantSplitDonorStateEnum::kCommitted);
         }
 
@@ -88,6 +93,10 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
+            uassert(6057901,
+                    "feature \"shard split\" not supported",
+                    repl::feature_flags::gShardSplit.isEnabled(
+                        serverGlobalParams.featureCompatibility));
             return;
         }
 
@@ -132,6 +141,10 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
+            uassert(6057902,
+                    "feature \"shard split\" not supported",
+                    repl::feature_flags::gShardSplit.isEnabled(
+                        serverGlobalParams.featureCompatibility));
             return;
         }
 
