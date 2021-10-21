@@ -27,11 +27,9 @@ const rst = ReplSetTest({
             rsConfig: {priority: 2},
         },
         {
-            setParameter: {"failpoint.stopReplProducer": tojson({mode: "alwaysOn"})},
             rsConfig: {priority: 1},
         },
         {
-            setParameter: {"failpoint.stopReplProducer": tojson({mode: "alwaysOn"})},
             rsConfig: {priority: 0},
         },
     ],
@@ -54,20 +52,27 @@ const node2 = rst.nodes[2];
 const dbName = "testdb";
 const collName = "testcoll";
 
+// Make the first node the primary.
+rst.stepUp(node0, {awaitReplicationBeforeStepUp: false});
+
 const oldPrimary = rst.getPrimary();
 assert.eq(node0, oldPrimary);
 rst.awaitSecondaryNodes();
 rst.awaitNodesAgreeOnConfigVersion();
+rst.awaitReplication();
 
 const oldPrimaryDB = oldPrimary.getDB(dbName);
 const oldPrimaryColl = oldPrimaryDB.getCollection(collName);
+
+jsTestLog("Stopping replication");
+stopServerReplication(node1);
+stopServerReplication(node2);
 
 jsTestLog("Writing to old primary");
 assert.commandWorked(oldPrimaryColl.insert({"old1": 1}, {writeConcern: {w: 1}}));
 assert.commandWorked(oldPrimaryColl.insert({"old2": 2}, {writeConcern: {w: 1}}));
 
 jsTestLog("Disconnecting old primary");
-
 node0.disconnect(node1);
 node0.disconnect(node2);
 assert.commandWorked(oldPrimary.adminCommand({replSetStepDown: 10 * 60, force: true}));
@@ -78,21 +83,16 @@ jsTestLog("Electing new primary");
 restartServerReplication(node1);
 restartServerReplication(node2);
 
-assert.soonNoExcept(function() {
-    assert.commandWorked(node1.adminCommand({replSetStepUp: 1}));
-    return true;
-}, "stepping up node1", ReplSetTest.kDefaultTimeoutMS);
-
 const newPrimary = rst.getPrimary();
-assert.eq(node1, newPrimary);
+const lastNode = (newPrimary.host === node1.host) ? node2 : node1;
 
-jsTestLog("Writing to new primary");
+jsTestLog("Writing to new primary " + newPrimary.host);
 const newPrimaryDB = newPrimary.getDB(dbName);
 const newPrimaryColl = newPrimaryDB.getCollection(collName);
-assert.commandWorked(newPrimaryColl.insert({"new1": 1}));
-assert.commandWorked(newPrimaryColl.insert({"new2": 2}));
-rst.awaitReplication(undefined /* timeout */, undefined /*secondaryOpTimeType */, [node2]);
-rst.awaitLastOpCommitted(undefined /* timeout */, [node2]);
+assert.commandWorked(newPrimaryColl.insert({"new1": 1}, {writeConcern: {w: 1}}));
+assert.commandWorked(newPrimaryColl.insert({"new2": 2}, {writeConcern: {w: 1}}));
+rst.awaitReplication(undefined /* timeout */, undefined /* secondaryOpTimeType */, [lastNode]);
+rst.awaitLastOpCommitted(undefined /* timeout */, [lastNode]);
 
 jsTestLog("Reconnecting old primary");
 const lastRBID = assert.commandWorked(node0.adminCommand("replSetGetRBID")).rbid;
