@@ -420,7 +420,6 @@ void Simple8bBuilder<T>::flush() {
     _handleRleTermination();
     // Flush buffered values in _pendingValues.
     if (!_pendingValues.empty()) {
-        PendingValue lastPendingValue = _pendingValues.back();
         // always flush with the most recent valid selector. This value is the baseSelector if we
         // have not have a valid selector yet.
         do {
@@ -431,7 +430,7 @@ void Simple8bBuilder<T>::flush() {
         // There are no more words in _pendingValues and RLE is possible.
         // However the _rleCount is 0 because we have not read any of the values in the next word.
         _rleCount = 0;
-        _lastValueInPrevWord = lastPendingValue;
+        _lastValueInPrevWord = {};
     }
 }
 

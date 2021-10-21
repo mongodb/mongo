@@ -1120,6 +1120,42 @@ TEST(Simple8b, RleEightSelectorLarge) {
     testSimple8b(expectedInts, expectedBinary);
 }
 
+TEST(Simple8b, RleFlushResetsRle) {
+    BufBuilder buffer;
+    Simple8bBuilder<uint64_t> builder([&buffer](uint64_t simple8bBlock) {
+        buffer.appendNum(simple8bBlock);
+        return true;
+    });
+
+    // Write a single 1 and flush. Then we add 120 more 1s and check that this does not start RLE.
+    ASSERT_TRUE(builder.append(1));
+    builder.flush();
+
+    for (int i = 0; i < 120; ++i) {
+        ASSERT_TRUE(builder.append(1));
+    }
+    builder.flush();
+
+    auto size = buffer.len();
+    auto sharedBuffer = buffer.release();
+
+    std::vector<uint8_t> simple8bBlockOne1 = {0x1E, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+    std::vector<uint8_t> simple8bBlockThirty1s = {0x52, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55};
+
+    std::vector<uint8_t> expectedBinary;
+    expectedBinary.insert(expectedBinary.end(), simple8bBlockOne1.begin(), simple8bBlockOne1.end());
+    for (int i = 0; i < 4; ++i) {
+        expectedBinary.insert(
+            expectedBinary.end(), simple8bBlockThirty1s.begin(), simple8bBlockThirty1s.end());
+    }
+
+    ASSERT_EQ(size, expectedBinary.size());
+    ASSERT_EQ(memcmp(sharedBuffer.get(), expectedBinary.data(), size), 0);
+
+    Simple8b<uint64_t> s8b(sharedBuffer.get(), size);
+    assertValuesEqual(s8b, std::vector<boost::optional<uint64_t>>(121, 1));
+}
+
 TEST(Simple8b, EightSelectorLargeMax) {
     // Selector 8 value
     // 1111 + 124 zeros

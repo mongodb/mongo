@@ -139,6 +139,7 @@ private:
      * in the cpp file.
      */
     struct PendingValue {
+        PendingValue() = default;
         PendingValue(boost::optional<T> val,
                      std::array<uint8_t, kNumOfSelectorTypes> bitCount,
                      std::array<uint8_t, kNumOfSelectorTypes> trailingZerosCount);
@@ -151,7 +152,7 @@ private:
             return val.value();
         }
 
-        boost::optional<T> val;
+        boost::optional<T> val = T{0};
         std::array<uint8_t, kNumOfSelectorTypes> bitCount = {0, 0, 0, 0};
         // This is not the total number of trailing zeros, but the trailing zeros that will be
         // stored given the selector chosen.
@@ -255,7 +256,7 @@ private:
     // If RLE is ongoing, the number of consecutive repeats fo lastValueInPrevWord.
     uint32_t _rleCount = 0;
     // If RLE is ongoing, the last value in the previous Simple8b word.
-    PendingValue _lastValueInPrevWord = {boost::optional<T>(0), {0, 0, 0, 0}, {0, 0, 0, 0}};
+    PendingValue _lastValueInPrevWord;
 
     // These variables hold the max amount of bits for each value in _pendingValues. They are
     // updated whenever values are added or removed from _pendingValues to always reflect the max
