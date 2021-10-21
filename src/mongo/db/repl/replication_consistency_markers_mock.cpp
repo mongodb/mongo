@@ -69,7 +69,8 @@ OpTime ReplicationConsistencyMarkersMock::getMinValid(OperationContext* opCtx) c
 }
 
 void ReplicationConsistencyMarkersMock::setMinValid(OperationContext* opCtx,
-                                                    const OpTime& minValid) {
+                                                    const OpTime& minValid,
+                                                    bool alwaysAllowUntimestampedWrite) {
     stdx::lock_guard<Latch> lock(_minValidBoundariesMutex);
     _minValid = minValid;
 }

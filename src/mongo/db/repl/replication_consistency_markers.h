@@ -139,9 +139,16 @@ public:
 
     /**
      * Sets the minValid OpTime to 'minValid'. This can set minValid backwards, which is necessary
-     * in rollback when the OpTimes in the oplog may move backwards.
+     * in rollback when the OpTimes in the oplog may move backwards. We usually only call this
+     * function in rollback via refetch, so we need to check the storage engine's rollback method to
+     * enforce that via an invariant. However, there are exceptions where we need to set the
+     * minValid document outside of rollback with an untimestamped write. In that case, we can
+     * ignore the storage engine's rollback method by setting the 'alwaysAllowUntimestampedWrite'
+     * parameter to true.
      */
-    virtual void setMinValid(OperationContext* opCtx, const OpTime& minValid) = 0;
+    virtual void setMinValid(OperationContext* opCtx,
+                             const OpTime& minValid,
+                             bool alwaysAllowUntimestampedWrite = false) = 0;
 
     /**
      * Sets minValid only if it is not already higher than endOpTime.
