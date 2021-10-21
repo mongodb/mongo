@@ -473,6 +473,18 @@ tasks:
              exclude_filter: single_threaded,
              threads: "1 2 4 8",
              read_cmd: 'true'}
+  - name: big_collection
+    depends_on: *_compile
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: microbenchmarks
+          test_control_params: |
+            {include_filter_1: query,
+             include_filter_2: getmore,
+             exclude_filter: none,
+             threads: "1 2 4 8",
+             read_cmd: 'true'}
   - name: views-query
     depends_on: *_compile
     commands:
@@ -734,6 +746,7 @@ microbenchmark-buildvariants:
     - name: compile
       distros:
       - rhel62-large
+    - name: big_collection
     - name: genny_scale_InsertRemove
     - name: genny_execution_UserAcquisition
     - name: aggregation_read_commands
