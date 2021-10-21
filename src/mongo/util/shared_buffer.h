@@ -56,7 +56,7 @@ public:
     }
 
     static SharedBuffer allocate(size_t bytes) {
-        return takeOwnership(mongoMalloc(sizeof(Holder) + bytes), bytes);
+        return takeOwnership(mongoMalloc(kHolderSize + bytes), bytes);
     }
 
     /**
@@ -70,7 +70,7 @@ public:
     void realloc(size_t size) {
         invariant(!_holder || !_holder->isShared());
 
-        const size_t realSize = size + sizeof(Holder);
+        const size_t realSize = size + kHolderSize;
         void* newPtr = mongoRealloc(_holder.get(), realSize);
 
         // Get newPtr into _holder with a ref-count of 1 without touching the current pointee of
@@ -232,6 +232,9 @@ public:
         return std::move(_buffer);
     }
 
+    // The buffer holder size for 'ConstSharedBuffer' is the same as the one for 'SharedBuffer'
+    static constexpr size_t kHolderSize = SharedBuffer::kHolderSize;
+
 private:
     SharedBuffer _buffer;
 };
@@ -311,6 +314,9 @@ public:
         _data = nullptr;
         return ret + SharedBuffer::kHolderSize;
     }
+
+    // The buffer holder size for 'UniqueBuffer' is the same as the one for 'SharedBuffer'
+    static constexpr size_t kHolderSize = SharedBuffer::kHolderSize;
 
 private:
     friend class SharedBuffer;

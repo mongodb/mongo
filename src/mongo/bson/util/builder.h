@@ -124,6 +124,9 @@ public:
         return _buf.get();
     }
 
+    // The buffer holder size for 'SharedBufferAllocator' comes from 'SharedBuffer'
+    static constexpr size_t kBuffHolderSize = SharedBuffer::kHolderSize;
+
 private:
     SharedBuffer _buf;
 };
@@ -177,6 +180,10 @@ public:
         return _fragmentBuilder.get();
     }
 
+    // SharedBufferFragmentAllocator does not allocate any extra amount of memory for the buffer
+    // holder.
+    static constexpr size_t kBuffHolderSize = 0;
+
 private:
     SharedBufferFragmentBuilder& _fragmentBuilder;
 };
@@ -220,6 +227,9 @@ public:
     char* get() const {
         return _buf.get();
     }
+
+    // The buffer holder size for 'UniqueBufferAllocator' comes from 'UniqueBuffer'
+    static constexpr size_t kBuffHolderSize = UniqueBuffer::kHolderSize;
 
 private:
     UniqueBuffer _buf;
@@ -274,6 +284,9 @@ public:
     char* get() const {
         return static_cast<char*>(_ptr);
     }
+
+    // StackAllocator does not allocate any extra amount of memory for the buffer holder.
+    static constexpr size_t kBuffHolderSize = 0;
 
 private:
     char _buf[SZ];
@@ -458,11 +471,15 @@ protected:
         DataView(grow(sizeof(t))).write(tagLittleEndian(t));
     }
     /* "slow" portion of 'grow()'  */
-    void _growReallocate(size_t minSize) {
+    MONGO_COMPILER_NOINLINE void _growReallocate(size_t minSize) {
         // Going beyond the maximum buffer size is not likely.
         if (MONGO_unlikely(minSize > BufferMaxSize)) {
             growFailure(minSize);
         }
+
+        // We add 'BufferAllocator::kBuffHolderSize' to the requested reallocation size, as it will
+        // be required later in '_buf.realloc'.
+        minSize += BufferAllocator::kBuffHolderSize;
 
         // We find the next power of two greater than the requested size, as it's
         // commonly more friendly with the underlying (system) memory allocators.
@@ -482,10 +499,21 @@ protected:
             // additional header objects that wrap the maximum size of a BSON.
             reallocSize = kOpMsgReplyBSONBufferMaxSize;
         } else if (MONGO_unlikely(reallocSize < 64)) {
+            // The minimum allocation is 64 bytes.
             reallocSize = 64;
+        } else if (MONGO_unlikely(minSize > BufferMaxSize)) {
+            // If adding 'kBuffHolderSize' to 'minSize' pushes it beyond 'BufferMaxSize', then we'll
+            // allocate enough memory according to the 'BufferMaxSize'.
+            reallocSize = BufferMaxSize + BufferAllocator::kBuffHolderSize;
         }
 
-        _buf.realloc(reallocSize);
+        // As we've added 'BufferAllocator::kBuffHolderSize' to 'minSize' in the beginning, we
+        // subtract it here from 'reallocSize' to account for the same amount that will be added
+        // later in '_buf.realloc'. Without this, we will end up allocating an amount of memory,
+        // which is not a power of two and defeats the purpose of the above logic to find the
+        // next power of two for being friendly to the system memory allocators and avoid memory
+        // fragmentation.
+        _buf.realloc(reallocSize - BufferAllocator::kBuffHolderSize);
     }
 
     /*
