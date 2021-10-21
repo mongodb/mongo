@@ -237,11 +237,10 @@ public:
     /**
      * Number of elements stored in this BSONColumn
      *
-     * O(1) time complexity
+     * O(1) time complexity if BSONColumn is fully decompressed (iteration reached end).
+     * O(N) time complexity otherwise, will fully decompress BSONColumn.
      */
-    size_t size() const {
-        return _elementCount;
-    }
+    size_t size();
 
     /**
      * Field name that this BSONColumn represents.

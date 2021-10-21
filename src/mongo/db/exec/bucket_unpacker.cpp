@@ -205,7 +205,7 @@ void BucketUnpackerV1::extractSingleMeasurement(MutableDocument& measurement,
 // Unpacker for V2 compressed buckets
 class BucketUnpackerV2 : public BucketUnpacker::UnpackingImpl {
 public:
-    BucketUnpackerV2(const BSONElement& timeField);
+    BucketUnpackerV2(const BSONElement& timeField, int elementCount);
 
     void addField(const BSONElement& field) override;
     int measurementCount(const BSONElement& timeField) const override;
@@ -239,16 +239,24 @@ private:
     // Iterators used to unpack the columns of the above bucket that are populated during the reset
     // phase according to the provided 'Behavior' and 'BucketSpec'.
     std::vector<ColumnStore> _fieldColumns;
+
+    // Element count
+    int _elementCount;
 };
 
-BucketUnpackerV2::BucketUnpackerV2(const BSONElement& timeField) : _timeColumn(timeField) {}
+BucketUnpackerV2::BucketUnpackerV2(const BSONElement& timeField, int elementCount)
+    : _timeColumn(timeField), _elementCount(elementCount) {
+    if (_elementCount == -1) {
+        _elementCount = _timeColumn.column.size();
+    }
+}
 
 void BucketUnpackerV2::addField(const BSONElement& field) {
     _fieldColumns.emplace_back(field);
 }
 
 int BucketUnpackerV2::measurementCount(const BSONElement& timeField) const {
-    return _timeColumn.column.size();
+    return _elementCount;
 }
 
 bool BucketUnpackerV2::getNext(MutableDocument& measurement,
@@ -287,12 +295,17 @@ void BucketUnpackerV2::extractSingleMeasurement(MutableDocument& measurement,
                                                 const BSONElement& metaValue,
                                                 bool includeTimeField,
                                                 bool includeMetaField) {
+    if (includeTimeField) {
+        BSONElement val = _timeColumn.column[j];
+        uassert(6067500, "Bucket unexpectedly contained fewer values than count", !val.eoo());
+        measurement.addField(_timeColumn.column.name(), Value{val});
+    }
+
     if (includeMetaField && !metaValue.isNull()) {
         measurement.addField(*spec.metaField, Value{metaValue});
     }
 
     if (includeTimeField) {
-        measurement.addField(_timeColumn.column.name(), Value{_timeColumn.column[j]});
         for (auto& fieldColumn : _fieldColumns) {
             measurement.addField(fieldColumn.column.name(), Value{fieldColumn.column[j]});
         }
@@ -430,7 +443,12 @@ void BucketUnpacker::reset(BSONObj&& bucket) {
     if (version == 1) {
         _unpackingImpl = std::make_unique<BucketUnpackerV1>(timeFieldElem);
     } else if (version == 2) {
-        _unpackingImpl = std::make_unique<BucketUnpackerV2>(timeFieldElem);
+        auto countField = controlField.Obj()[timeseries::kBucketControlCountFieldName];
+        _unpackingImpl =
+            std::make_unique<BucketUnpackerV2>(timeFieldElem,
+                                               countField && isNumericBSONType(countField.type())
+                                                   ? static_cast<int>(countField.Number())
+                                                   : -1);
     } else {
         uasserted(5857900, "Invalid bucket version");
     }

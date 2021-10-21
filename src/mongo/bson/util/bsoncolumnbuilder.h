@@ -73,13 +73,6 @@ public:
     }
 
     /**
-     * Returns the number of BSONElements added or skipped so far.
-     */
-    size_t size() const {
-        return _elementCount;
-    }
-
-    /**
      * Finalizes the BSON Column and returns the BinData binary.
      *
      * The BSONColumnBuilder must remain in scope for the pointer to be valid.
@@ -192,7 +185,6 @@ private:
     enum class Mode { kRegular, kSubObjDeterminingReference, kSubObjAppending };
     Mode _mode = Mode::kRegular;
 
-    uint32_t _elementCount = 0;
     std::string _fieldName;
 };
 

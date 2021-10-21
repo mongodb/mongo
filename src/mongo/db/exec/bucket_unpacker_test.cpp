@@ -102,6 +102,32 @@ public:
         BSONObj obj = root.obj();
         return {obj, "time"_sd};
     }
+
+    // Modifies the 'control.count' field for a v2 compressed bucket. Zero delta removes the
+    // 'control.count' field, positive increases the count and negative delta decreases the count.
+    BSONObj modifyCompressedBucketElementCount(BSONObj compressedBucket, int delta) {
+        BSONObjBuilder root;
+        for (auto&& elem : compressedBucket) {
+            if (elem.fieldNameStringData() != "control"_sd) {
+                root.append(elem);
+                continue;
+            }
+
+            BSONObjBuilder controlBuilder(root.subobjStart("control"_sd));
+            for (auto&& controlElem : elem.Obj()) {
+                if (controlElem.fieldNameStringData() != "count"_sd) {
+                    controlBuilder.append(controlElem);
+                    continue;
+                }
+
+                if (delta != 0) {
+                    int count = controlElem.Number();
+                    controlBuilder.append("count"_sd, count + delta);
+                }
+            }
+        }
+        return root.obj();
+    }
 };
 
 TEST_F(BucketUnpackerTest, UnpackBasicIncludeAllMeasurementFields) {
@@ -726,5 +752,109 @@ TEST_F(BucketUnpackerTest, ComputeMeasurementCountInLargerIntervals) {
     testMeasurementCount(11111);
     testMeasurementCount(449998);
 }
+
+TEST_F(BucketUnpackerTest, TamperedCompressedCountLess) {
+    std::set<std::string> fields{
+        "_id", kUserDefinedMetaName.toString(), kUserDefinedTimeName.toString(), "a", "b"};
+
+    auto bucket = fromjson(
+        "{control: {'version': 1}, meta: {'m1': 999, 'm2': 9999}, data: {_id: {'0':1, '1':2}, "
+        "time: {'0':1, '1':2}, "
+        "a:{'0':1, '1':2}, b:{'1':1}}}");
+
+    auto compressedBucket = timeseries::compressBucket(bucket, "time"_sd);
+    // Reduce the count by one to be 1.
+    auto modifiedCompressedBucket = modifyCompressedBucketElementCount(*compressedBucket, -1);
+
+    auto unpacker = makeBucketUnpacker(std::move(fields),
+                                       BucketUnpacker::Behavior::kInclude,
+                                       std::move(modifiedCompressedBucket),
+                                       kUserDefinedMetaName.toString());
+
+    auto doc0 = Document{fromjson("{time: 1, myMeta: {m1: 999, m2: 9999}, _id: 1, a: 1}")};
+    auto doc1 = Document{fromjson("{time: 2, myMeta: {m1: 999, m2: 9999}, _id: 2, a :2, b: 1}")};
+
+    // 1 is reported when asking for numberOfMeasurements()
+    ASSERT_EQ(unpacker.numberOfMeasurements(), 1);
+    ASSERT_DOCUMENT_EQ(unpacker.extractSingleMeasurement(0), doc0);
+
+    // Iterating returns both documents
+    ASSERT_TRUE(unpacker.hasNext());
+    assertGetNext(unpacker, doc0);
+
+    ASSERT_TRUE(unpacker.hasNext());
+    assertGetNext(unpacker, doc1);
+    ASSERT_FALSE(unpacker.hasNext());
+}
+
+TEST_F(BucketUnpackerTest, TamperedCompressedCountMore) {
+    std::set<std::string> fields{
+        "_id", kUserDefinedMetaName.toString(), kUserDefinedTimeName.toString(), "a", "b"};
+
+    auto bucket = fromjson(
+        "{control: {'version': 1}, meta: {'m1': 999, 'm2': 9999}, data: {_id: {'0':1, '1':2}, "
+        "time: {'0':1, '1':2}, "
+        "a:{'0':1, '1':2}, b:{'1':1}}}");
+
+    auto compressedBucket = timeseries::compressBucket(bucket, "time"_sd);
+    // Increase the count by one to be 3.
+    auto modifiedCompressedBucket = modifyCompressedBucketElementCount(*compressedBucket, 1);
+
+    auto unpacker = makeBucketUnpacker(std::move(fields),
+                                       BucketUnpacker::Behavior::kInclude,
+                                       std::move(modifiedCompressedBucket),
+                                       kUserDefinedMetaName.toString());
+
+    auto doc0 = Document{fromjson("{time: 1, myMeta: {m1: 999, m2: 9999}, _id: 1, a: 1}")};
+    auto doc1 = Document{fromjson("{time: 2, myMeta: {m1: 999, m2: 9999}, _id: 2, a :2, b: 1}")};
+
+    ASSERT_EQ(unpacker.numberOfMeasurements(), 3);
+    ASSERT_DOCUMENT_EQ(unpacker.extractSingleMeasurement(0), doc0);
+    ASSERT_DOCUMENT_EQ(unpacker.extractSingleMeasurement(1), doc1);
+    ASSERT_THROWS_CODE(unpacker.extractSingleMeasurement(2), AssertionException, 6067500);
+
+    ASSERT_TRUE(unpacker.hasNext());
+    assertGetNext(unpacker, doc0);
+
+    ASSERT_TRUE(unpacker.hasNext());
+    assertGetNext(unpacker, doc1);
+    ASSERT_FALSE(unpacker.hasNext());
+}
+
+TEST_F(BucketUnpackerTest, TamperedCompressedCountMissing) {
+    std::set<std::string> fields{
+        "_id", kUserDefinedMetaName.toString(), kUserDefinedTimeName.toString(), "a", "b"};
+
+    auto bucket = fromjson(
+        "{control: {'version': 1}, meta: {'m1': 999, 'm2': 9999}, data: {_id: {'0':1, '1':2}, "
+        "time: {'0':1, '1':2}, "
+        "a:{'0':1, '1':2}, b:{'1':1}}}");
+
+    auto compressedBucket = timeseries::compressBucket(bucket, "time"_sd);
+    // Remove the count field
+    auto modifiedCompressedBucket = modifyCompressedBucketElementCount(*compressedBucket, 0);
+
+    auto unpacker = makeBucketUnpacker(std::move(fields),
+                                       BucketUnpacker::Behavior::kInclude,
+                                       std::move(modifiedCompressedBucket),
+                                       kUserDefinedMetaName.toString());
+
+    auto doc0 = Document{fromjson("{time: 1, myMeta: {m1: 999, m2: 9999}, _id: 1, a: 1}")};
+    auto doc1 = Document{fromjson("{time: 2, myMeta: {m1: 999, m2: 9999}, _id: 2, a :2, b: 1}")};
+
+    // Missing count field will make the unpacker measure the number of time fields for an accurate
+    // count
+    ASSERT_EQ(unpacker.numberOfMeasurements(), 2);
+    ASSERT_DOCUMENT_EQ(unpacker.extractSingleMeasurement(0), doc0);
+    ASSERT_DOCUMENT_EQ(unpacker.extractSingleMeasurement(1), doc1);
+
+    ASSERT_TRUE(unpacker.hasNext());
+    assertGetNext(unpacker, doc0);
+
+    ASSERT_TRUE(unpacker.hasNext());
+    assertGetNext(unpacker, doc1);
+    ASSERT_FALSE(unpacker.hasNext());
+}
+
 }  // namespace
 }  // namespace mongo

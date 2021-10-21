@@ -752,14 +752,14 @@ BSONColumn::BSONColumn(BSONElement bin) {
             "Invalid BSON type for column",
             bin.type() == BSONType::BinData && bin.binDataType() == BinDataType::Column);
     _binary = bin.binData(_size);
-    uassert(ErrorCodes::BadValue, "Invalid BSON Column encoding", _size > kElementCountBytes);
+    uassert(ErrorCodes::BadValue, "Invalid BSON Column encoding", _size > 0);
     _elementCount = ConstDataView(_binary).read<LittleEndian<uint32_t>>();
-    _maxDecodingStartPos._control = _binary + kElementCountBytes;
+    _maxDecodingStartPos._control = _binary;
     _name = bin.fieldNameStringData().toString();
 }
 
 BSONColumn::Iterator BSONColumn::begin() {
-    Iterator it{*this, _binary + kElementCountBytes, _binary + _size};
+    Iterator it{*this, _binary, _binary + _size};
     it._initialize(0);
     return it;
 }
@@ -794,6 +794,22 @@ BSONElement BSONColumn::operator[](size_t index) {
         return BSONElement();
 
     return *it;
+}
+
+size_t BSONColumn::size() {
+    if (_fullyDecompressed)
+        return _decompressed.size();
+
+    // We can begin iterating from last known literal
+    Iterator it{*this, _maxDecodingStartPos._control, _binary + _size};
+    it._initialize(_maxDecodingStartPos._index);
+
+    // Traverse until we reach end
+    for (auto e = end(); it != e; ++it) {
+    }
+
+    invariant(_fullyDecompressed);
+    return _decompressed.size();
 }
 
 void BSONColumn::DecodingStartPosition::setIfLarger(size_t index, const char* control) {

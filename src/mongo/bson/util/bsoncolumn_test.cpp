@@ -277,10 +277,6 @@ public:
                                              prev.Date().toMillisSinceEpoch());
     }
 
-    static void appendElementCount(BufBuilder& builder, uint32_t count) {
-        builder.appendNum(count);
-    }
-
     static void appendLiteral(BufBuilder& builder, BSONElement elem) {
         // BSON Type byte
         builder.appendChar(elem.type());
@@ -466,7 +462,6 @@ TEST_F(BSONColumnTest, BasicValue) {
     cb.append(elem);
 
     BufBuilder expected;
-    appendElementCount(expected, 2);
     appendLiteral(expected, elem);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlock64(expected, 0);
@@ -485,7 +480,6 @@ TEST_F(BSONColumnTest, BasicSkip) {
     cb.skip();
 
     BufBuilder expected;
-    appendElementCount(expected, 2);
     appendLiteral(expected, elem);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlock64(expected, boost::none);
@@ -502,7 +496,6 @@ TEST_F(BSONColumnTest, OnlySkip) {
     cb.skip();
 
     BufBuilder expected;
-    appendElementCount(expected, 1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlock64(expected, boost::none);
     appendEOO(expected);
@@ -520,7 +513,6 @@ TEST_F(BSONColumnTest, ValueAfterSkip) {
     cb.append(elem);
 
     BufBuilder expected;
-    appendElementCount(expected, 2);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlock64(expected, boost::none);
     appendLiteral(expected, elem);
@@ -542,7 +534,6 @@ TEST_F(BSONColumnTest, LargeDeltaIsLiteral) {
     cb.append(second);
 
     BufBuilder expected;
-    appendElementCount(expected, 2);
     appendLiteral(expected, first);
     appendLiteral(expected, second);
     appendEOO(expected);
@@ -564,7 +555,6 @@ TEST_F(BSONColumnTest, LargeDeltaIsLiteralAfterSimple8b) {
     cb.append(large);
 
     BufBuilder expected;
-    appendElementCount(expected, 4);
     appendLiteral(expected, zero);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlock64(expected, deltaInt64(zero, zero));
@@ -594,7 +584,6 @@ TEST_F(BSONColumnTest, OverBlockCount) {
     }
 
     BufBuilder expected;
-    appendElementCount(expected, elems.size());
     appendLiteral(expected, elems.front());
     appendSimple8bControl(expected, 0b1000, 0b1111);
 
@@ -622,7 +611,6 @@ TEST_F(BSONColumnTest, TypeChangeAfterLiteral) {
     cb.append(elemInt64);
 
     BufBuilder expected;
-    appendElementCount(expected, 2);
     appendLiteral(expected, elemInt32);
     appendLiteral(expected, elemInt64);
     appendEOO(expected);
@@ -643,7 +631,6 @@ TEST_F(BSONColumnTest, TypeChangeAfterSimple8b) {
     cb.append(elemInt64);
 
     BufBuilder expected;
-    appendElementCount(expected, 3);
     appendLiteral(expected, elemInt32);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlock64(expected, 0);
@@ -666,7 +653,6 @@ TEST_F(BSONColumnTest, Simple8bAfterTypeChange) {
     cb.append(elemInt64);
 
     BufBuilder expected;
-    appendElementCount(expected, 3);
     appendLiteral(expected, elemInt32);
     appendLiteral(expected, elemInt64);
     appendSimple8bControl(expected, 0b1000, 0b0000);
@@ -687,7 +673,6 @@ TEST_F(BSONColumnTest, BasicDouble) {
     cb.append(d2);
 
     BufBuilder expected;
-    appendElementCount(expected, 2);
     appendLiteral(expected, d1);
     appendSimple8bControl(expected, 0b1001, 0b0000);
     appendSimple8bBlock64(expected, deltaDouble(d2, d1, 1));
@@ -711,7 +696,6 @@ TEST_F(BSONColumnTest, DoubleSameScale) {
     }
 
     BufBuilder expected;
-    appendElementCount(expected, elems.size());
     appendLiteral(expected, elems.front());
     appendSimple8bControl(expected, 0b1001, 0b0000);
     appendSimple8bBlocks64(
@@ -732,7 +716,6 @@ TEST_F(BSONColumnTest, DoubleIncreaseScaleFromLiteral) {
     cb.append(d2);
 
     BufBuilder expected;
-    appendElementCount(expected, 2);
     appendLiteral(expected, d1);
     appendSimple8bControl(expected, 0b1010, 0b0000);
     appendSimple8bBlock64(expected, deltaDouble(d2, d1, 10));
@@ -753,7 +736,6 @@ TEST_F(BSONColumnTest, DoubleLiteralAndScaleAfterSkip) {
     cb.append(d2);
 
     BufBuilder expected;
-    appendElementCount(expected, 3);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlock64(expected, boost::none);
     appendLiteral(expected, d1);
@@ -777,7 +759,6 @@ TEST_F(BSONColumnTest, DoubleIncreaseScaleFromLiteralAfterSkip) {
     cb.append(d2);
 
     BufBuilder expected;
-    appendElementCount(expected, 4);
     appendLiteral(expected, d1);
     appendSimple8bControl(expected, 0b1010, 0b0000);
 
@@ -805,7 +786,6 @@ TEST_F(BSONColumnTest, DoubleIncreaseScaleFromDeltaWithRescale) {
     }
 
     BufBuilder expected;
-    appendElementCount(expected, elems.size());
     appendLiteral(expected, elems.front());
     appendSimple8bControl(expected, 0b1010, 0b0000);
     appendSimple8bBlocks64(
@@ -832,7 +812,6 @@ TEST_F(BSONColumnTest, DoubleIncreaseScaleFromDeltaNoRescale) {
     }
 
     BufBuilder expected;
-    appendElementCount(expected, elems.size());
     appendLiteral(expected, elems.front());
 
     auto deltaBegin = elems.begin() + 1;
@@ -864,7 +843,6 @@ TEST_F(BSONColumnTest, DoubleDecreaseScaleAfterBlock) {
     }
 
     BufBuilder expected;
-    appendElementCount(expected, elems.size());
     appendLiteral(expected, elems.front());
 
     auto deltaBegin = elems.begin() + 1;
@@ -901,7 +879,6 @@ TEST_F(BSONColumnTest, DoubleDecreaseScaleAfterBlockUsingSkip) {
     }
 
     BufBuilder expected;
-    appendElementCount(expected, elems.size());
     appendLiteral(expected, elems.front());
 
     auto deltaBegin = elems.begin() + 1;
@@ -934,7 +911,6 @@ TEST_F(BSONColumnTest, DoubleDecreaseScaleAfterBlockThenScaleBackUp) {
     }
 
     BufBuilder expected;
-    appendElementCount(expected, elems.size());
     appendLiteral(expected, elems.front());
     appendSimple8bControl(expected, 0b1101, 0b0001);
     appendSimple8bBlocks64(
@@ -965,7 +941,6 @@ TEST_F(BSONColumnTest, DoubleDecreaseScaleAfterBlockUsingSkipThenScaleBackUp) {
     }
 
     BufBuilder expected;
-    appendElementCount(expected, elems.size());
     appendLiteral(expected, elems.front());
     appendSimple8bControl(expected, 0b1101, 0b0001);
     appendSimple8bBlocks64(
@@ -990,7 +965,6 @@ TEST_F(BSONColumnTest, DoubleUnscalable) {
     }
 
     BufBuilder expected;
-    appendElementCount(expected, elems.size());
     appendLiteral(expected, elems.front());
 
     std::vector<boost::optional<uint64_t>> expectedVals;
@@ -1015,7 +989,6 @@ TEST_F(BSONColumnTest, DoubleSignalingNaN) {
     cb.append(nan);
 
     BufBuilder expected;
-    appendElementCount(expected, 2);
     appendLiteral(expected, elem);
 
     if (auto delta = deltaDoubleMemory(nan, elem); simple8bPossible(delta)) {
@@ -1042,7 +1015,6 @@ TEST_F(BSONColumnTest, DoubleQuietNaN) {
     cb.append(nan);
 
     BufBuilder expected;
-    appendElementCount(expected, 2);
     appendLiteral(expected, elem);
     if (auto delta = deltaDoubleMemory(nan, elem); simple8bPossible(delta)) {
         appendSimple8bControl(expected, 0b1000, 0b0000);
@@ -1067,7 +1039,6 @@ TEST_F(BSONColumnTest, DoubleInfinity) {
     cb.append(inf);
 
     BufBuilder expected;
-    appendElementCount(expected, 2);
     appendLiteral(expected, elem);
     if (auto delta = deltaDoubleMemory(inf, elem); simple8bPossible(delta)) {
         appendSimple8bControl(expected, 0b1000, 0b0000);
@@ -1092,7 +1063,6 @@ TEST_F(BSONColumnTest, DoubleDenorm) {
     cb.append(denorm);
 
     BufBuilder expected;
-    appendElementCount(expected, 2);
     appendLiteral(expected, elem);
     if (auto delta = deltaDoubleMemory(denorm, elem); simple8bPossible(delta)) {
         appendSimple8bControl(expected, 0b1000, 0b0000);
@@ -1121,7 +1091,6 @@ TEST_F(BSONColumnTest, DoubleIntegerOverflow) {
     cb.append(e2);
 
     BufBuilder expected;
-    appendElementCount(expected, 2);
     appendLiteral(expected, e1);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlock64(expected, deltaDoubleMemory(e2, e1));
@@ -1140,7 +1109,6 @@ TEST_F(BSONColumnTest, Decimal128Base) {
     cb.append(elemDec128);
 
     BufBuilder expected;
-    appendElementCount(expected, 1);
     appendLiteral(expected, elemDec128);
     appendEOO(expected);
 
@@ -1158,7 +1126,6 @@ TEST_F(BSONColumnTest, Decimal128Delta) {
     cb.append(elemDec128);
 
     BufBuilder expected;
-    appendElementCount(expected, 2);
     appendLiteral(expected, elemDec128);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlock128(expected, deltaDecimal128(elemDec128, elemDec128));
@@ -1178,7 +1145,6 @@ TEST_F(BSONColumnTest, DecimalNonZeroDelta) {
     cb.append(elemDec128Max);
 
     BufBuilder expected;
-    appendElementCount(expected, 2);
     appendLiteral(expected, elemDec128Zero);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlock128(expected, deltaDecimal128(elemDec128Max, elemDec128Zero));
@@ -1198,7 +1164,6 @@ TEST_F(BSONColumnTest, DecimalMaxMin) {
     cb.append(elemDec128Max);
 
     BufBuilder expected;
-    appendElementCount(expected, 2);
     appendLiteral(expected, elemDec128Zero);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlock128(expected, deltaDecimal128(elemDec128Max, elemDec128Zero));
@@ -1221,7 +1186,6 @@ TEST_F(BSONColumnTest, DecimalMultiElement) {
     cb.append(elemDec128One);
 
     BufBuilder expected;
-    appendElementCount(expected, 5);
     appendLiteral(expected, elemDec128Zero);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     std::vector<boost::optional<uint128_t>> valuesToAppend = {
@@ -1252,7 +1216,6 @@ TEST_F(BSONColumnTest, DecimalMultiElementSkips) {
     cb.append(elemDec128One);
 
     BufBuilder expected;
-    appendElementCount(expected, 7);
     appendLiteral(expected, elemDec128Zero);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     std::vector<boost::optional<uint128_t>> valuesToAppend = {
@@ -1291,7 +1254,6 @@ TEST_F(BSONColumnTest, BasicObjectId) {
     cb.append(third);
 
     BufBuilder expected;
-    appendElementCount(expected, 4);
     appendLiteral(expected, first);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     std::vector<boost::optional<uint64_t>> expectedDeltas{
@@ -1314,7 +1276,6 @@ TEST_F(BSONColumnTest, ObjectIdDifferentProcessUnique) {
     cb.append(second);
 
     BufBuilder expected;
-    appendElementCount(expected, 2);
     appendLiteral(expected, first);
     appendLiteral(expected, second);
     appendEOO(expected);
@@ -1339,7 +1300,6 @@ TEST_F(BSONColumnTest, ObjectIdAfterChangeBack) {
     cb.append(second);
 
     BufBuilder expected;
-    appendElementCount(expected, 5);
     appendLiteral(expected, first);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlock64(expected, deltaObjectId(second, first));
@@ -1368,7 +1328,6 @@ TEST_F(BSONColumnTest, Simple8bTimestamp) {
     cb.append(second);
 
     BufBuilder expected;
-    appendElementCount(expected, 3);
     appendLiteral(expected, first);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     std::vector<boost::optional<uint64_t>> expectedDeltaOfDeltas{
@@ -1393,7 +1352,6 @@ TEST_F(BSONColumnTest, Simple8bTimestampNegativeDeltaOfDelta) {
     cb.append(third);
 
     BufBuilder expected;
-    appendElementCount(expected, 3);
     appendLiteral(expected, first);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     std::vector<boost::optional<uint64_t>> expectedDeltaOfDeltas{
@@ -1420,7 +1378,6 @@ TEST_F(BSONColumnTest, Simple8bTimestampAfterChangeBack) {
     cb.append(second);
 
     BufBuilder expected;
-    appendElementCount(expected, 5);
     appendLiteral(expected, first);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlock64(expected, deltaOfDeltaTimestamp(second, first));
@@ -1448,7 +1405,6 @@ TEST_F(BSONColumnTest, LargeDeltaOfDeltaTimestamp) {
     cb.append(second);
 
     BufBuilder expected;
-    appendElementCount(expected, 2);
     appendLiteral(expected, first);
     appendLiteral(expected, second);
     appendEOO(expected);
@@ -1474,7 +1430,6 @@ TEST_F(BSONColumnTest, LargeDeltaOfDeltaIsLiteralAfterSimple8bTimestamp) {
     cb.append(semiLarge);
 
     BufBuilder expected;
-    appendElementCount(expected, 5);
     appendLiteral(expected, zero);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlock64(expected, deltaOfDeltaTimestamp(zero, zero));
@@ -1500,7 +1455,6 @@ TEST_F(BSONColumnTest, DateBasic) {
     cb.append(second);
 
     BufBuilder expected;
-    appendElementCount(expected, 3);
     appendLiteral(expected, first);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     std::vector<boost::optional<uint64_t>> expectedDeltaOfDeltas{deltaDate(second, first),
@@ -1524,7 +1478,6 @@ TEST_F(BSONColumnTest, DateAfterChangeBack) {
     cb.append(date);
 
     BufBuilder expected;
-    appendElementCount(expected, 3);
     appendLiteral(expected, elemInt32);
     appendLiteral(expected, date);
     appendSimple8bControl(expected, 0b1000, 0b0000);
@@ -1547,7 +1500,6 @@ TEST_F(BSONColumnTest, DateLargeDelta) {
     cb.append(second);
 
     BufBuilder expected;
-    appendElementCount(expected, 2);
     appendLiteral(expected, first);
     appendLiteral(expected, second);
     appendEOO(expected);
@@ -1568,7 +1520,6 @@ TEST_F(BSONColumnTest, BoolBasic) {
     cb.append(trueBson);
 
     BufBuilder expected;
-    appendElementCount(expected, 4);
     appendLiteral(expected, trueBson);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     std::vector<boost::optional<uint64_t>> expectedDeltaOfDeltas{deltaBool(trueBson, trueBson),
@@ -1593,7 +1544,6 @@ TEST_F(BSONColumnTest, BoolAfterChangeBack) {
     cb.append(trueBson);
 
     BufBuilder expected;
-    appendElementCount(expected, 3);
     appendLiteral(expected, elemInt32);
     appendLiteral(expected, trueBson);
     appendSimple8bControl(expected, 0b1000, 0b0000);
@@ -1614,7 +1564,6 @@ TEST_F(BSONColumnTest, UndefinedBasic) {
     cb.append(first);
 
     BufBuilder expected;
-    appendElementCount(expected, 2);
     appendLiteral(expected, first);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlock64(expected, kDeltaForBinaryEqualValues);
@@ -1636,7 +1585,6 @@ TEST_F(BSONColumnTest, UndefinedAfterChangeBack) {
     cb.append(undefined);
 
     BufBuilder expected;
-    appendElementCount(expected, 3);
     appendLiteral(expected, elemInt32);
     appendLiteral(expected, undefined);
     appendSimple8bControl(expected, 0b1000, 0b0000);
@@ -1657,7 +1605,6 @@ TEST_F(BSONColumnTest, NullBasic) {
     cb.append(first);
 
     BufBuilder expected;
-    appendElementCount(expected, 2);
     appendLiteral(expected, first);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlock64(expected, kDeltaForBinaryEqualValues);
@@ -1679,7 +1626,6 @@ TEST_F(BSONColumnTest, NullAfterChangeBack) {
     cb.append(null);
 
     BufBuilder expected;
-    appendElementCount(expected, 3);
     appendLiteral(expected, elemInt32);
     appendLiteral(expected, null);
     appendSimple8bControl(expected, 0b1000, 0b0000);
@@ -1702,7 +1648,6 @@ TEST_F(BSONColumnTest, RegexBasic) {
     cb.append(second);
 
     BufBuilder expected;
-    appendElementCount(expected, 3);
     appendLiteral(expected, first);
     appendLiteral(expected, second);
     appendSimple8bControl(expected, 0b1000, 0b0000);
@@ -1725,7 +1670,6 @@ TEST_F(BSONColumnTest, RegexAfterChangeBack) {
     cb.append(regex);
 
     BufBuilder expected;
-    appendElementCount(expected, 3);
     appendLiteral(expected, elemInt32);
     appendLiteral(expected, regex);
     appendSimple8bControl(expected, 0b1000, 0b0000);
@@ -1749,7 +1693,6 @@ TEST_F(BSONColumnTest, DBRefBasic) {
     cb.append(second);
 
     BufBuilder expected;
-    appendElementCount(expected, 3);
     appendLiteral(expected, first);
     appendLiteral(expected, second);
     appendSimple8bControl(expected, 0b1000, 0b0000);
@@ -1773,7 +1716,6 @@ TEST_F(BSONColumnTest, DBRefAfterChangeBack) {
     cb.append(dbRef);
 
     BufBuilder expected;
-    appendElementCount(expected, 3);
     appendLiteral(expected, elemInt32);
     appendLiteral(expected, dbRef);
     appendSimple8bControl(expected, 0b1000, 0b0000);
@@ -1796,7 +1738,6 @@ TEST_F(BSONColumnTest, CodeWScopeBasic) {
     cb.append(second);
 
     BufBuilder expected;
-    appendElementCount(expected, 3);
     appendLiteral(expected, first);
     appendLiteral(expected, second);
     appendSimple8bControl(expected, 0b1000, 0b0000);
@@ -1819,7 +1760,6 @@ TEST_F(BSONColumnTest, CodeWScopeAfterChangeBack) {
     cb.append(codeWScope);
 
     BufBuilder expected;
-    appendElementCount(expected, 3);
     appendLiteral(expected, elemInt32);
     appendLiteral(expected, codeWScope);
     appendSimple8bControl(expected, 0b1000, 0b0000);
@@ -1842,7 +1782,6 @@ TEST_F(BSONColumnTest, SymbolBasic) {
     cb.append(second);
 
     BufBuilder expected;
-    appendElementCount(expected, 3);
     appendLiteral(expected, first);
     appendLiteral(expected, second);
     appendSimple8bControl(expected, 0b1000, 0b0000);
@@ -1865,7 +1804,6 @@ TEST_F(BSONColumnTest, SymbolAfterChangeBack) {
     cb.append(symbol);
 
     BufBuilder expected;
-    appendElementCount(expected, 3);
     appendLiteral(expected, elemInt32);
     appendLiteral(expected, symbol);
     appendSimple8bControl(expected, 0b1000, 0b0000);
@@ -1886,7 +1824,6 @@ TEST_F(BSONColumnTest, BinDataBase) {
     cb.append(elemBinData);
 
     BufBuilder expected;
-    appendElementCount(expected, 1);
     appendLiteral(expected, elemBinData);
     appendEOO(expected);
 
@@ -1903,7 +1840,6 @@ TEST_F(BSONColumnTest, BinDataOdd) {
     cb.append(elemBinData);
 
     BufBuilder expected;
-    appendElementCount(expected, 1);
     appendLiteral(expected, elemBinData);
     appendEOO(expected);
 
@@ -1921,7 +1857,6 @@ TEST_F(BSONColumnTest, BinDataDelta) {
     cb.append(elemBinData);
 
     BufBuilder expected;
-    appendElementCount(expected, 2);
     appendLiteral(expected, elemBinData);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlock128(expected, deltaBinData(elemBinData, elemBinData));
@@ -1944,7 +1879,6 @@ TEST_F(BSONColumnTest, BinDataDeltaShouldFail) {
     cb.append(elemBinDataLong);
 
     BufBuilder expected;
-    appendElementCount(expected, 2);
     appendLiteral(expected, elemBinData);
     appendLiteral(expected, elemBinDataLong);
     appendEOO(expected);
@@ -1968,7 +1902,6 @@ TEST_F(BSONColumnTest, BinDataDeltaCheckSkips) {
     cb.append(elemBinData);
 
     BufBuilder expected;
-    appendElementCount(expected, 4);
     appendLiteral(expected, elemBinData);
     appendSimple8bControl(expected, 0b1000, 0b0001);
     std::vector<boost::optional<uint128_t>> expectedValues = {
@@ -1997,7 +1930,6 @@ TEST_F(BSONColumnTest, BinDataLargerThan16) {
     cb.append(elemBinDataLong);
 
     BufBuilder expected;
-    appendElementCount(expected, 2);
     appendLiteral(expected, elemBinData);
     appendLiteral(expected, elemBinDataLong);
     appendEOO(expected);
@@ -2021,7 +1953,6 @@ TEST_F(BSONColumnTest, BinDataEqualTo16) {
     cb.append(elemBinDataLong);
 
     BufBuilder expected;
-    appendElementCount(expected, 2);
     appendLiteral(expected, elemBinData);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlock128(expected, deltaBinData(elemBinDataLong, elemBinData));
@@ -2042,7 +1973,6 @@ TEST_F(BSONColumnTest, BinDataLargerThan16SameValue) {
     cb.append(elemBinData);
 
     BufBuilder expected;
-    appendElementCount(expected, 2);
     appendLiteral(expected, elemBinData);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlock128(expected, deltaBinData(elemBinData, elemBinData));
@@ -2059,7 +1989,6 @@ TEST_F(BSONColumnTest, StringBase) {
     cb.append(elem);
 
     BufBuilder expected;
-    appendElementCount(expected, 1);
     appendLiteral(expected, elem);
     appendEOO(expected);
 
@@ -2075,7 +2004,6 @@ TEST_F(BSONColumnTest, StringDeltaSame) {
     cb.append(elemString);
 
     BufBuilder expected;
-    appendElementCount(expected, 2);
     appendLiteral(expected, elemString);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlock128(expected, deltaString(elemString, elemString));
@@ -2094,7 +2022,6 @@ TEST_F(BSONColumnTest, StringDeltaDiff) {
     cb.append(elemString2);
 
     BufBuilder expected;
-    appendElementCount(expected, 2);
     appendLiteral(expected, elemString);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlock128(expected, deltaString(elemString2, elemString));
@@ -2115,7 +2042,6 @@ TEST_F(BSONColumnTest, StringDeltaLarge) {
     cb.append(elemString2);
 
     BufBuilder expected;
-    appendElementCount(expected, 2);
     appendLiteral(expected, elemString);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlock128(expected, deltaString(elemString2, elemString));
@@ -2138,7 +2064,6 @@ TEST_F(BSONColumnTest, StringDeltaAfterInvalid) {
     cb.append(elem2);
 
     BufBuilder expected;
-    appendElementCount(expected, 3);
     appendLiteral(expected, elem);
     appendLiteral(expected, elemInvalid);
     appendSimple8bControl(expected, 0b1000, 0b0000);
@@ -2175,7 +2100,6 @@ TEST_F(BSONColumnTest, StringMultiType) {
     cb.append(elemString2);
 
     BufBuilder expected;
-    appendElementCount(expected, 7);
     appendLiteral(expected, elemDec128Zero);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     std::vector<boost::optional<uint128_t>> valuesToAppend = {
@@ -2209,7 +2133,6 @@ TEST_F(BSONColumnTest, ObjectUncompressed) {
                                       createElementObj(BSON("x" << 1 << "y" << 3))};
 
     BufBuilder expected;
-    appendElementCount(expected, elems.size());
     for (auto elem : elems) {
         appendLiteral(expected, elem);
     }
@@ -2230,7 +2153,6 @@ TEST_F(BSONColumnTest, ObjectEqual) {
     std::vector<BSONElement> elems = {elemObj, elemObj};
 
     BufBuilder expected;
-    appendElementCount(expected, elems.size());
     appendLiteral(expected, elemObj);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlock64(expected, kDeltaForBinaryEqualValues);
@@ -2253,7 +2175,6 @@ TEST_F(BSONColumnTest, ArrayUncompressed) {
     }
 
     BufBuilder expected;
-    appendElementCount(expected, elems.size());
     for (auto elem : elems) {
         appendLiteral(expected, elem);
     }
@@ -2275,7 +2196,6 @@ TEST_F(BSONColumnTest, ArrayEqual) {
     }
 
     BufBuilder expected;
-    appendElementCount(expected, elems.size());
     appendLiteral(expected, elemObj);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlock64(expected, kDeltaForBinaryEqualValues);
@@ -2304,7 +2224,6 @@ TEST_F(BSONColumnTest, Interleaved) {
     }
 
     BufBuilder expected;
-    appendElementCount(expected, elems.size());
     appendInterleavedStart(expected, elems.front().Obj());
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(expected,
@@ -2348,7 +2267,6 @@ TEST_F(BSONColumnTest, InterleavedAfterNonInterleaved) {
     }
 
     BufBuilder expected;
-    appendElementCount(expected, elems.size());
     appendLiteral(expected, elems.front());
     appendInterleavedStart(expected, elems[1].Obj());
     appendSimple8bControl(expected, 0b1000, 0b0000);
@@ -2386,7 +2304,6 @@ TEST_F(BSONColumnTest, InterleavedLevels) {
     }
 
     BufBuilder expected;
-    appendElementCount(expected, elems.size());
     appendInterleavedStart(expected, elems.front().Obj());
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(expected,
@@ -2427,7 +2344,6 @@ TEST_F(BSONColumnTest, InterleavedDoubleDifferentScale) {
     }
 
     BufBuilder expected;
-    appendElementCount(expected, elems.size());
     appendInterleavedStart(expected, elems.front().Obj());
     appendSimple8bControl(expected, 0b1010, 0b0000);
     appendSimple8bBlocks64(expected,
@@ -2474,7 +2390,6 @@ TEST_F(BSONColumnTest, InterleavedMix64And128Bit) {
     }
 
     BufBuilder expected;
-    appendElementCount(expected, elems.size());
     appendInterleavedStart(expected, elems.front().Obj());
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(expected,
@@ -2516,7 +2431,6 @@ TEST_F(BSONColumnTest, InterleavedWithEmptySubObj) {
     }
 
     BufBuilder expected;
-    appendElementCount(expected, elems.size());
     appendInterleavedStart(expected, elems.front().Obj());
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(expected,
@@ -2548,7 +2462,6 @@ TEST_F(BSONColumnTest, InterleavedRemoveEmptySubObj) {
     }
 
     BufBuilder expected;
-    appendElementCount(expected, elems.size());
     appendInterleavedStart(expected, elems.front().Obj());
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
@@ -2584,7 +2497,6 @@ TEST_F(BSONColumnTest, InterleavedAddEmptySubObj) {
     }
 
     BufBuilder expected;
-    appendElementCount(expected, elems.size());
     appendInterleavedStart(expected, elems.front().Obj());
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
@@ -2618,7 +2530,6 @@ TEST_F(BSONColumnTest, InterleavedSchemaChange) {
     }
 
     BufBuilder expected;
-    appendElementCount(expected, elems.size());
     appendInterleavedStart(expected, elems.front().Obj());
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(expected,
@@ -2659,7 +2570,6 @@ TEST_F(BSONColumnTest, InterleavedObjectSchemaChange) {
     }
 
     BufBuilder expected;
-    appendElementCount(expected, elems.size());
     appendInterleavedStart(expected, elems.front().Obj());
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
@@ -2701,7 +2611,6 @@ TEST_F(BSONColumnTest, InterleavedObjectNameChange) {
     }
 
     BufBuilder expected;
-    appendElementCount(expected, elems.size());
     appendInterleavedStart(expected,
                            BSON("x" << 1 << "y" << BSON("z" << 2) << "y2" << BSON("z" << 3)));
     appendSimple8bControl(expected, 0b1000, 0b0000);
@@ -2738,7 +2647,6 @@ TEST_F(BSONColumnTest, InterleavedObjectEmptyObjChange) {
     }
 
     BufBuilder expected;
-    appendElementCount(expected, elems.size());
     appendInterleavedStart(expected, elems.front().Obj());
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
@@ -2781,7 +2689,6 @@ TEST_F(BSONColumnTest, ReenterInterleaved) {
     }
 
     BufBuilder expected;
-    appendElementCount(expected, elems.size());
     appendInterleavedStart(expected, elems.front().Obj());
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(
@@ -2837,7 +2744,6 @@ TEST_F(BSONColumnTest, InterleavedAlternatingMergeRight) {
     }
 
     BufBuilder expected;
-    appendElementCount(expected, elems.size());
     appendInterleavedStart(expected,
                            BSON("x" << elems[0].Obj().firstElement().Int() << "y"
                                     << elems[1].Obj().firstElement().Int() << "z"
@@ -2892,7 +2798,6 @@ TEST_F(BSONColumnTest, InterleavedAlternatingMergeLeftThenRight) {
     }
 
     BufBuilder expected;
-    appendElementCount(expected, elems.size());
     appendInterleavedStart(expected,
                            BSON("y" << elems[1].Obj().firstElement().Int() << "x"
                                     << elems[2].Obj().firstElement().Int() << "z"
@@ -2930,7 +2835,6 @@ TEST_F(BSONColumnTest, InterleavedIncompatibleMerge) {
     }
 
     BufBuilder expected;
-    appendElementCount(expected, elems.size());
     appendInterleavedStart(
         expected,
         BSON("x" << elems[0].Obj().firstElement().Int() << "y" << elems[1].Obj()["y"_sd].Int()));
@@ -2974,7 +2878,6 @@ TEST_F(BSONColumnTest, InterleavedIncompatibleAfterDeterminedReference) {
     }
 
     BufBuilder expected;
-    appendElementCount(expected, elems.size());
     appendInterleavedStart(expected, elems.front().Obj());
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlocks64(expected,
@@ -3014,7 +2917,6 @@ TEST_F(BSONColumnTest, ObjectEmpty) {
     }
 
     BufBuilder expected;
-    appendElementCount(expected, elems.size());
     appendLiteral(expected, elems.front());
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlock64(expected, kDeltaForBinaryEqualValues);
@@ -3039,7 +2941,6 @@ TEST_F(BSONColumnTest, ObjectEmptyAfterNonEmpty) {
     }
 
     BufBuilder expected;
-    appendElementCount(expected, elems.size());
     appendInterleavedStart(expected, elems.front().Obj());
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlock64(expected, kDeltaForBinaryEqualValues);
@@ -3056,7 +2957,6 @@ TEST_F(BSONColumnTest, InvalidControlByte) {
     auto elem = createElementInt32(0);
 
     BufBuilder expected;
-    appendElementCount(expected, 0);
     appendLiteral(expected, elem);
     appendSimple8bControl(expected, 0b0010, 0b0000);
     appendSimple8bBlock64(expected, deltaInt32(elem, elem));
@@ -3076,7 +2976,6 @@ TEST_F(BSONColumnTest, InvalidSize) {
     auto elem = createElementInt32(0);
 
     BufBuilder expected;
-    appendElementCount(expected, 0);
     appendLiteral(expected, elem);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlock64(expected, deltaInt32(elem, elem));
@@ -3097,7 +2996,6 @@ TEST_F(BSONColumnTest, InvalidDoubleScale) {
     auto d2 = createElementDouble(1.12);
 
     BufBuilder expected;
-    appendElementCount(expected, 0);
     appendLiteral(expected, d1);
     appendSimple8bControl(expected, 0b1001, 0b0000);
     appendSimple8bBlock64(expected, deltaDouble(d2, d1, 100));
@@ -3117,7 +3015,6 @@ TEST_F(BSONColumnTest, MissingEOO) {
     auto elem = createElementInt32(0);
 
     BufBuilder expected;
-    appendElementCount(expected, 0);
     appendLiteral(expected, elem);
 
     try {
@@ -3150,7 +3047,6 @@ TEST_F(BSONColumnTest, InvalidSimple8b) {
     auto elem = createElementInt32(0);
 
     BufBuilder expected;
-    appendElementCount(expected, 0);
     appendLiteral(expected, elem);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     uint64_t invalidSimple8b = 0;
@@ -3170,7 +3066,6 @@ TEST_F(BSONColumnTest, NoLiteralStart) {
     auto elem = createElementInt32(0);
 
     BufBuilder expected;
-    appendElementCount(expected, 0);
     appendLiteral(expected, elem);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     uint64_t invalidSimple8b = 0;
@@ -3187,7 +3082,6 @@ TEST_F(BSONColumnTest, AppendMinKey) {
     ASSERT_THROWS_CODE(cb.append(createElementMinKey()), DBException, ErrorCodes::InvalidBSONType);
 
     BufBuilder expected;
-    appendElementCount(expected, 0);
     appendEOO(expected);
 
     verifyBinary(cb.finalize(), expected);
@@ -3198,7 +3092,6 @@ TEST_F(BSONColumnTest, AppendMaxKey) {
     ASSERT_THROWS_CODE(cb.append(createElementMaxKey()), DBException, ErrorCodes::InvalidBSONType);
 
     BufBuilder expected;
-    appendElementCount(expected, 0);
     appendEOO(expected);
 
     verifyBinary(cb.finalize(), expected);
@@ -3217,7 +3110,6 @@ TEST_F(BSONColumnTest, AppendMinKeyInSubObj) {
         cb.append(createElementObj(obj.obj())), DBException, ErrorCodes::InvalidBSONType);
 
     BufBuilder expected;
-    appendElementCount(expected, 0);
     appendEOO(expected);
 
     verifyBinary(cb.finalize(), expected);

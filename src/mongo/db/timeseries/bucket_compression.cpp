@@ -54,36 +54,22 @@ boost::optional<BSONObj> compressBucket(const BSONObj& bucketDoc, StringData tim
     std::vector<std::pair<StringData, BSONObjIterator>>
         columns;  // Iterators to read data fields from uncompressed bucket
 
+    BSONElement controlElement;
+    std::vector<BSONElement> otherElements;
+
     // Read everything from the uncompressed bucket
     for (auto& elem : bucketDoc) {
-        // Control field is left as-is except for the version field.
+        // Record control element, we need to parse the uncompressed bucket before writing new
+        // control block.
         if (elem.fieldNameStringData() == kBucketControlFieldName) {
-            BSONObjBuilder control(builder.subobjStart(kBucketControlFieldName));
-
-            // Set right version, leave other control fields unchanged
-            bool versionSet = false;
-            for (const auto& controlField : elem.Obj()) {
-                if (controlField.fieldNameStringData() == kBucketControlVersionFieldName) {
-                    control.append(kBucketControlVersionFieldName,
-                                   kTimeseriesControlCompressedVersion);
-                    versionSet = true;
-                } else {
-                    control.append(controlField);
-                }
-            }
-
-            // Set version if it was missing from uncompressed bucket
-            if (!versionSet) {
-                control.append(kBucketControlVersionFieldName, kTimeseriesControlCompressedVersion);
-            }
-
+            controlElement = elem;
             continue;
         }
 
-        // Everything that's not under data or control is left as-is
+        // Everything that's not under data or control is left as-is, record elements so we can
+        // write later (we want control to be first).
         if (elem.fieldNameStringData() != kBucketDataFieldName) {
-            // Skip any updates to non-data fields.
-            builder.append(elem);
+            otherElements.push_back(elem);
             continue;
         }
 
@@ -158,6 +144,35 @@ boost::optional<BSONObj> compressBucket(const BSONObj& bucketDoc, StringData tim
               [](const Measurement& lhs, const Measurement& rhs) {
                   return lhs.timeField.timestamp() < rhs.timeField.timestamp();
               });
+
+    // Write control block
+    {
+        BSONObjBuilder control(builder.subobjStart(kBucketControlFieldName));
+
+        // Set right version, leave other control fields unchanged
+        bool versionSet = false;
+        for (const auto& controlField : controlElement.Obj()) {
+            if (controlField.fieldNameStringData() == kBucketControlVersionFieldName) {
+                control.append(kBucketControlVersionFieldName, kTimeseriesControlCompressedVersion);
+                versionSet = true;
+            } else {
+                control.append(controlField);
+            }
+        }
+
+        // Set version if it was missing from uncompressed bucket
+        if (!versionSet) {
+            control.append(kBucketControlVersionFieldName, kTimeseriesControlCompressedVersion);
+        }
+
+        // Set count
+        control.append(kBucketControlCountFieldName, static_cast<int32_t>(measurements.size()));
+    }
+
+    // Write non control or data elements that are left as-is.
+    for (auto&& elem : otherElements) {
+        builder.append(elem);
+    }
 
     // Last, compress elements and build compressed bucket
     {

@@ -257,11 +257,7 @@ BSONColumnBuilder::BSONColumnBuilder(StringData fieldName)
 
 BSONColumnBuilder::BSONColumnBuilder(StringData fieldName, BufBuilder&& builder)
     : _state(&_bufBuilder, nullptr), _bufBuilder(std::move(builder)), _fieldName(fieldName) {
-    // Leave space for element count at the beginning
-    static_assert(sizeof(_elementCount) == kElementCountBytes,
-                  "Element count for BSONColumn should be 4 bytes");
     _bufBuilder.reset();
-    _bufBuilder.skip(kElementCountBytes);
 }
 
 BSONColumnBuilder& BSONColumnBuilder::append(BSONElement elem) {
@@ -276,14 +272,12 @@ BSONColumnBuilder& BSONColumnBuilder::append(BSONElement elem) {
             _flushSubObjMode();
         }
         _state.append(elem);
-        ++_elementCount;
         return *this;
     }
 
 
     if (_mode == Mode::kRegular) {
         _startDetermineSubObjReference(elem.Obj());
-        ++_elementCount;
         return *this;
     }
 
@@ -310,7 +304,6 @@ BSONColumnBuilder& BSONColumnBuilder::append(BSONElement elem) {
                 _referenceSubObj = obj.getOwned();
                 _bufferedObjElements.push_back(_referenceSubObj);
                 _mode = Mode::kSubObjDeterminingReference;
-                ++_elementCount;
                 return *this;
             }
             _referenceSubObj = merged;
@@ -320,7 +313,6 @@ BSONColumnBuilder& BSONColumnBuilder::append(BSONElement elem) {
         // compression so use the currently built reference.
         if (numElements * 2 >= _bufferedObjElements.size()) {
             _bufferedObjElements.push_back(obj.getOwned());
-            ++_elementCount;
             return *this;
         }
 
@@ -329,13 +321,11 @@ BSONColumnBuilder& BSONColumnBuilder::append(BSONElement elem) {
 
     // Reference already determined for sub-object compression, try to add this new object.
     _appendSubElements(elem.Obj());
-    ++_elementCount;
     return *this;
 }
 
 
 BSONColumnBuilder& BSONColumnBuilder::skip() {
-    ++_elementCount;
     if (_mode == Mode::kRegular) {
         _state.skip();
     } else if (_mode == Mode::kSubObjDeterminingReference) {
@@ -358,9 +348,6 @@ BSONBinData BSONColumnBuilder::finalize() {
 
     // Write EOO at the end
     _bufBuilder.appendChar(EOO);
-
-    // Write element count at the beginning
-    DataView(_bufBuilder.buf()).write<LittleEndian<uint32_t>>(_elementCount);
 
     return {_bufBuilder.buf(), _bufBuilder.len(), BinDataType::Column};
 }
