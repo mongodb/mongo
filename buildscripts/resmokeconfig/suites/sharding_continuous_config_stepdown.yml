@@ -221,6 +221,9 @@ selector:
   # profiling/logging (on the configsvr primary), so cannot tolerate the configsvr primary changing.
   - jstests/sharding/read_write_concern_defaults_application.js
   - jstests/sharding/move_primary_with_writes.js
+  # Stepdown interval repeatedly coincides with config server primary giving up contacting an
+  # intentionally downed shard primary which prevents the test from making forward progress.
+  - jstests/sharding/migration_coordinator_shutdown_in_critical_section.js
 
 executor:
   config:
