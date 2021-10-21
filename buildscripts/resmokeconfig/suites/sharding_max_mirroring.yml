@@ -6,7 +6,6 @@ selector:
   - jstests/sharding/change_streams/*.js
   - jstests/sharding/query/*.js
   exclude_files:
-  - jstests/sharding/cursor_valid_after_shard_stepdown.js
   - jstests/sharding/query/mrShardedOutput.js
 
 executor:
