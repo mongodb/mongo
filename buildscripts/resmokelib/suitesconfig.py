@@ -320,7 +320,7 @@ class SuiteFinder(object):
         matrix_suite = MatrixSuiteConfig.get_config_obj(suite_path)
 
         if not (explicit_suite or matrix_suite):
-            raise errors.SuiteNotFound("Unknown suite 's'" % suite_path)
+            raise errors.SuiteNotFound("Unknown suite '%s'" % suite_path)
 
         if explicit_suite and matrix_suite:
             raise errors.DuplicateSuiteDefinition(
