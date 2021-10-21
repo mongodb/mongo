@@ -329,7 +329,7 @@ public:
         bool operator!=(const Iterator& rhs) const;
 
     private:
-        Iterator(const char* pos, const char* end);
+        Iterator(const char* pos, const char* end, const boost::optional<T>& previous);
 
         /**
          * Loads the current Simple8b block into the iterator
@@ -383,7 +383,7 @@ public:
     /**
      * Does not take ownership of buffer, must remain valid during the lifetime of this class.
      */
-    Simple8b(const char* buffer, int size);
+    Simple8b(const char* buffer, int size, boost::optional<T> previous = T{});
 
     /**
      * Forward iterators to read decompressed values
@@ -394,6 +394,8 @@ public:
 private:
     const char* _buffer;
     int _size;
+    // Previous value to be used in case the first block in the buffer is RLE.
+    boost::optional<T> _previous;
 };
 
 }  // namespace mongo

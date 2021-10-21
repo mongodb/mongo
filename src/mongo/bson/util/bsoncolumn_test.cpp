@@ -2953,6 +2953,63 @@ TEST_F(BSONColumnTest, ObjectEmptyAfterNonEmpty) {
     verifyDecompression(binData, elems);
 }
 
+TEST_F(BSONColumnTest, NonZeroRLEInFirstBlockAfterSimple8bBlocks) {
+    BSONColumnBuilder cb("test"_sd);
+
+    int64_t value = 1;
+
+    // Start with values that give large deltas so we write out 16 simple8b blocks and end with a
+    // non zero value that is equal to the deltas that will follow
+    std::vector<BSONElement> elems = {createElementInt64(0),      createElementInt64(0xFFFFFFFF),
+                                      createElementInt64(0),      createElementInt64(0xFFFFFFFF),
+                                      createElementInt64(0),      createElementInt64(0xFFFFFFFF),
+                                      createElementInt64(0),      createElementInt64(0xFFFFFFFF),
+                                      createElementInt64(0),      createElementInt64(0xFFFFFFFF),
+                                      createElementInt64(0),      createElementInt64(0xFFFFFFFF),
+                                      createElementInt64(0),      createElementInt64(0xFFFFFFFF),
+                                      createElementInt64(0),      createElementInt64(0xFFFF),
+                                      createElementInt64(0),      createElementInt64(0xFFFF),
+                                      createElementInt64(0),      createElementInt64(value++),
+                                      createElementInt64(value++)};
+
+    // Add 120 additional elements that all get a delta of 1, because the last block ended with the
+    // same value they can be encoded with RLE.
+    for (int i = 0; i < 120; ++i) {
+        elems.push_back(createElementInt64(value++));
+    }
+
+    for (auto elem : elems) {
+        cb.append(elem);
+    }
+
+    BufBuilder expected;
+    appendLiteral(expected, elems.front());
+    appendSimple8bControl(expected, 0b1000, 0b1111);
+
+    auto deltas = deltaInt64(elems.begin() + 1, elems.end(), elems.front());
+    int blockCount = 0;
+    Simple8bBuilder<uint64_t> s8bBuilder([&](uint64_t block) {
+        if (blockCount++ == 16) {
+            appendSimple8bControl(expected, 0b1000, 0b0000);
+        }
+        expected.appendNum(block);
+        return true;
+    });
+
+    for (auto delta : deltas) {
+        s8bBuilder.append(*delta);
+    }
+    s8bBuilder.flush();
+    appendEOO(expected);
+
+    // We should now have 16 regular Simple8b blocks and then a 17th using RLE at the end.
+    ASSERT_EQ(blockCount, 17);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
+}
+
 TEST_F(BSONColumnTest, InvalidControlByte) {
     auto elem = createElementInt32(0);
 

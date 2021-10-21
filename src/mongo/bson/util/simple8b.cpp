@@ -724,8 +724,10 @@ void Simple8bBuilder<T>::setWriteCallback(Simple8bWriteFn writer) {
 }
 
 template <typename T>
-Simple8b<T>::Iterator::Iterator(const char* pos, const char* end)
-    : _pos(pos), _end(end), _value(0), _rleRemaining(0), _shift(0) {
+Simple8b<T>::Iterator::Iterator(const char* pos,
+                                const char* end,
+                                const boost::optional<T>& previous)
+    : _pos(pos), _end(end), _value(previous), _rleRemaining(0), _shift(0) {
     if (pos != end) {
         _loadBlock();
     }
@@ -846,18 +848,19 @@ bool Simple8b<T>::Iterator::operator!=(const Simple8b::Iterator& rhs) const {
 }
 
 template <typename T>
-Simple8b<T>::Simple8b(const char* buffer, int size) : _buffer(buffer), _size(size) {
+Simple8b<T>::Simple8b(const char* buffer, int size, boost::optional<T> previous)
+    : _buffer(buffer), _size(size), _previous(previous) {
     invariant(size % sizeof(uint64_t) == 0);
 }
 
 template <typename T>
 typename Simple8b<T>::Iterator Simple8b<T>::begin() const {
-    return {_buffer, _buffer + _size};
+    return {_buffer, _buffer + _size, _previous};
 }
 
 template <typename T>
 typename Simple8b<T>::Iterator Simple8b<T>::end() const {
-    return {_buffer + _size, _buffer + _size};
+    return {_buffer + _size, _buffer + _size, boost::none};
 }
 
 template class Simple8b<uint64_t>;

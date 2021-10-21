@@ -597,10 +597,15 @@ BSONColumn::Iterator::DecodingState::_loadControl(BSONColumn& column,
     // value
     BSONElement deltaElem;
     if (!uses128bit(type)) {
-        _decoder64.emplace(buffer + 1, size);
+        // We can read the last known value from the decoder iterator even as it has reached end.
+        boost::optional<uint64_t> lastSimple8bValue = _decoder64 ? *_decoder64->pos : 0;
+        _decoder64.emplace(buffer + 1, size, lastSimple8bValue);
         deltaElem = _loadDelta(column, *_decoder64->pos, current);
     } else {
-        _decoder128.emplace(buffer + 1, size);
+        // We can read the last known value from the decoder iterator even as it has reached end.
+        boost::optional<uint128_t> lastSimple8bValue =
+            _decoder128 ? *_decoder128->pos : uint128_t(0);
+        _decoder128.emplace(buffer + 1, size, lastSimple8bValue);
         deltaElem = _loadDelta(column, *_decoder128->pos, current);
     }
 

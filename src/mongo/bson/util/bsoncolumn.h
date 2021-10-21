@@ -143,10 +143,12 @@ public:
         const char* _end;
 
         // Helper to create Simple8b decoding iterators for 64bit and 128bit value types.
+        // previousValue is used in case the first Simple8b block is RLE and this value will then be
+        // used for the RLE repeat.
         template <typename T>
         struct Decoder {
-            Decoder(const char* buf, size_t size)
-                : s8b(buf, size), pos(s8b.begin()), end(s8b.end()) {}
+            Decoder(const char* buf, size_t size, const boost::optional<T>& previousValue)
+                : s8b(buf, size, previousValue), pos(s8b.begin()), end(s8b.end()) {}
 
             Simple8b<T> s8b;
             typename Simple8b<T>::Iterator pos;
