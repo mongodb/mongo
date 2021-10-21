@@ -1131,6 +1131,21 @@ TEST(Simple8b, EightSelectorLargeMax) {
     testSimple8b(expectedInts, expectedBinary);
 }
 
+TEST(Simple8b, RLELargeCount) {
+    std::vector<boost::optional<uint64_t>> expectedInts(257 * 120, 0);
+
+    std::vector<uint8_t> RLEblock16Count = {0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+    std::vector<uint8_t> RLEblock1Count = {0x0F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+
+    std::vector<uint8_t> expectedBinary;
+    for (int i = 0; i < 16; ++i) {
+        expectedBinary.insert(expectedBinary.end(), RLEblock16Count.begin(), RLEblock16Count.end());
+    }
+    expectedBinary.insert(expectedBinary.end(), RLEblock1Count.begin(), RLEblock1Count.end());
+
+    testSimple8b(expectedInts, expectedBinary);
+}
+
 TEST(Simple8b, ValueTooLarge) {
     // This value needs 61 bits which it too large for Simple8b
     uint64_t value = 0x1FFFFFFFFFFFFFFF;

@@ -592,7 +592,7 @@ void Simple8bBuilder<T>::_appendRleEncoding() {
         _writeFn(rleEncoding);
     };
 
-    uint8_t count = _rleCount / kRleMultiplier;
+    uint32_t count = _rleCount / kRleMultiplier;
     // Check to make sure count is big enough for RLE encoding
     if (count >= 1) {
         while (count > kMaxRleCount) {
