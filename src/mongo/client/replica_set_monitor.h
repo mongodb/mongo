@@ -63,9 +63,8 @@ public:
     static std::shared_ptr<ReplicaSetMonitor> createIfNeeded(const MongoURI& uri);
 
     /**
-     * gets a cached Monitor per name. If the monitor is not found and createFromSeed is false,
-     * it will return none. If createFromSeed is true, it will try to look up the last known
-     * servers list for this set and will create a new monitor using that as the seed list.
+     * gets a cached Monitor per name. The getter method returns nullptr if there is no monitor
+     * registered for the particular replica set.
      */
     static std::shared_ptr<ReplicaSetMonitor> get(const std::string& name);
 
