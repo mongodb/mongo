@@ -162,6 +162,7 @@ public:
                     // Join the existing resharding operation to prevent generating a new resharding
                     // instance if the same command is issued consecutively due to client disconnect
                     // etc.
+                    opCtx->setAlwaysInterruptAtStepDownOrUp();
                     reshardCollectionJoinedExistingOperation.pauseWhileSet(opCtx);
                     existingInstance.get()->getCoordinatorDocWrittenFuture().get(opCtx);
                     return existingInstance;
