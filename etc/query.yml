@@ -352,7 +352,6 @@ variables:
   - enterprise-ubuntu2004-arm64
   - enterprise-ubuntu2004-64
   - enterprise-windows
-  - enterprise-windows-suggested
   - enterprise-windows-debug-unoptimized
   - enterprise-windows-inmem
   - enterprise-windows-required
@@ -375,7 +374,6 @@ variables:
   - enterprise-amazon2-arm64
   - enterprise-ubuntu1804-64
   - enterprise-windows
-  - enterprise-windows-suggested
   - enterprise-windows-required
 
 # List of all variants that use the packages.tgz
@@ -417,7 +415,7 @@ variables:
   - enterprise-ubuntu2004-arm64
   - enterprise-ubuntu2004-64
   - enterprise-windows
-  - enterprise-windows-suggested
+  - enterprise-windows-required
   - windows
 
 
