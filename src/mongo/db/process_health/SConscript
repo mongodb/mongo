@@ -7,6 +7,7 @@ env = env.Clone()
 env.Library(
     target='fault_manager',
     source=[
+        'fault_facet_impl.cpp',
         'fault_impl.cpp',
         'fault_manager.cpp',
         'health_observer_base.cpp',

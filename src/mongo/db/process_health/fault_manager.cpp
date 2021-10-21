@@ -33,6 +33,7 @@
 
 #include "mongo/db/process_health/fault_manager.h"
 
+#include "mongo/db/process_health/fault_facet_impl.h"
 #include "mongo/db/process_health/fault_impl.h"
 #include "mongo/db/process_health/health_monitoring_gen.h"
 #include "mongo/db/process_health/health_observer_registration.h"
@@ -207,23 +208,6 @@ void FaultManager::updateWithCheckStatus(HealthCheckStatus&& checkStatus) {
         return;
     }
 
-    // TODO(SERVER-60587): implement Facet properly.
-    class Impl : public FaultFacet {
-    public:
-        Impl(HealthCheckStatus status) : _status(status) {}
-
-        FaultFacetType getType() const override {
-            return _status.getType();
-        }
-
-        HealthCheckStatus getStatus() const override {
-            return _status;
-        }
-
-    private:
-        HealthCheckStatus _status;
-    };
-
     if (!container) {
         // Need to create container first.
         container = getOrCreateFaultFacetsContainer();
@@ -231,10 +215,13 @@ void FaultManager::updateWithCheckStatus(HealthCheckStatus&& checkStatus) {
 
     auto facet = container->getFaultFacet(checkStatus.getType());
     if (!facet) {
-        auto newFacet = FaultFacetPtr(new Impl(checkStatus));
-        container->updateWithSuppliedFacet(checkStatus.getType(), newFacet);
+        const auto type = checkStatus.getType();
+        auto newFacet =
+            new FaultFacetImpl(type, _svcCtx->getFastClockSource(), std::move(checkStatus));
+        container->updateWithSuppliedFacet(type, FaultFacetPtr(newFacet));
+    } else {
+        facet->update(std::move(checkStatus));
     }
-    // TODO(SERVER-60587): update facet with new check status.
 }
 
 void FaultManager::checkForStateTransition() {

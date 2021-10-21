@@ -26,57 +26,33 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#pragma once
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
-#include <functional>
-
-#include "mongo/db/process_health/fault_facet.h"
-
-#include "mongo/db/service_context.h"
-#include "mongo/logv2/log.h"
-#include "mongo/util/clock_source_mock.h"
-#include "mongo/util/timer.h"
+#include "mongo/db/process_health/fault_facet_impl.h"
 
 namespace mongo {
 namespace process_health {
 
-class FaultFacetMock : public FaultFacet {
-public:
-    // Testing callback to fill up mocked values.
-    using MockCallback = std::function<double()>;
+FaultFacetImpl::FaultFacetImpl(FaultFacetType type,
+                               ClockSource* clockSource,
+                               HealthCheckStatus status)
+    : _type(type), _clockSource(clockSource) {
+    update(status);
+}
 
-    FaultFacetMock(FaultFacetType mockType, ClockSource* clockSource, MockCallback callback)
-        : _mockType(mockType), _clockSource(clockSource), _callback(callback) {
-        invariant(mockType == FaultFacetType::kMock1 || mockType == FaultFacetType::kMock2);
-    }
+FaultFacetType FaultFacetImpl::getType() const {
+    return _type;
+}
 
-    ~FaultFacetMock() = default;
+HealthCheckStatus FaultFacetImpl::getStatus() const {
+    auto lk = stdx::lock_guard(_mutex);
+    return HealthCheckStatus(getType(), _severity, _description);
+}
 
-    FaultFacetType getType() const override {
-        return _mockType;
-    }
-
-    HealthCheckStatus getStatus() const override {
-        const double severity = _callback();
-
-        auto healthCheckStatus = HealthCheckStatus(_mockType, severity, "Mock facet");
-        LOGV2(5956702, "Mock fault facet status", "status"_attr = healthCheckStatus);
-
-        return healthCheckStatus;
-    }
-
-    void update(HealthCheckStatus status) override {
-        MONGO_UNREACHABLE;  // Don't use this in mock.
-    }
-
-private:
-    const FaultFacetType _mockType;
-    ClockSource* const _clockSource;
-    const Date_t _startTime = _clockSource->now();
-    const MockCallback _callback;
-};
+void FaultFacetImpl::update(HealthCheckStatus status) {
+    auto lk = stdx::lock_guard(_mutex);
+    _severity = status.getSeverity();
+    _description = status.getShortDescription().toString();
+}
 
 }  // namespace process_health
 }  // namespace mongo

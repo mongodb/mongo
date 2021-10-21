@@ -66,7 +66,7 @@ void HealthObserverBase::periodicCheck(FaultFacetsContainerFactory& factory,
     // Do the health check.
     taskExecutor->schedule([this, &factory](Status status) {
         periodicCheckImpl({})
-            .then([this, &factory](HealthCheckStatus checkStatus) {
+            .then([this, &factory](HealthCheckStatus&& checkStatus) mutable {
                 factory.updateWithCheckStatus(std::move(checkStatus));
             })
             .onCompletion([this](Status status) {
@@ -85,6 +85,26 @@ void HealthObserverBase::periodicCheck(FaultFacetsContainerFactory& factory,
 
 HealthObserverIntensity HealthObserverBase::getIntensity() {
     return _intensity;
+}
+
+HealthCheckStatus HealthObserverBase::makeHealthyStatus() const {
+    return HealthCheckStatus(getType());
+}
+
+HealthCheckStatus HealthObserverBase::makeSimpleFailedStatus(double severity,
+                                                             std::vector<Status>&& failures) const {
+    if (severity <= 0) {
+        LOGV2_WARNING(6007903,
+                      "Creating faulty health check status requires positive severity",
+                      "observerType"_attr = getType());
+    }
+    StringBuilder sb;
+    for (const auto& s : failures) {
+        sb.append(s.toString());
+        sb.append(" ");
+    }
+
+    return HealthCheckStatus(getType(), severity, sb.stringData());
 }
 
 }  // namespace process_health
