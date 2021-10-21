@@ -44,9 +44,6 @@ public:
         using InvocationBase::InvocationBase;
 
         Response typedRun(OperationContext* opCtx) {
-            uassert(6057900,
-                    "feature \"shard split\" not supported",
-                    feature_flags::gShardSplit.isEnabled(serverGlobalParams.featureCompatibility));
             return Response(TenantSplitDonorStateEnum::kCommitted);
         }
 
@@ -91,9 +88,6 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            uassert(6057901,
-                    "feature \"shard split\" not supported",
-                    feature_flags::gShardSplit.isEnabled(serverGlobalParams.featureCompatibility));
             return;
         }
 
@@ -138,9 +132,6 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            uassert(6057902,
-                    "feature \"shard split\" not supported",
-                    feature_flags::gShardSplit.isEnabled(serverGlobalParams.featureCompatibility));
             return;
         }
 

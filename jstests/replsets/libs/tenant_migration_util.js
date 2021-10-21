@@ -19,19 +19,6 @@ var TenantMigrationUtil = (function() {
     }
 
     /**
-     * Returns true if feature flag 'featureFlagShardSplit' is enabled, false otherwise.
-     */
-    function isShardSplitEnabled(db) {
-        const admin = db.getSiblingDB("admin");
-        const flagDoc = admin.runCommand({getParameter: 1, featureFlagShardSplit: 1});
-        const fcvDoc = admin.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
-        return flagDoc.hasOwnProperty("featureFlagShardSplit") &&
-            flagDoc.featureFlagShardSplit.value &&
-            MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version,
-                                           flagDoc.featureFlagShardSplit.fcv) >= 0;
-    }
-
-    /**
      * Construct a donorStartMigration command object with protocol: "shard merge" if the feature
      * flag is enabled.
      */
@@ -499,7 +486,6 @@ var TenantMigrationUtil = (function() {
 
     return {
         kExternalKeysNs,
-        isShardSplitEnabled,
         isShardMergeEnabled,
         donorStartMigrationWithProtocol,
         getExternalKeys,
