@@ -55,6 +55,7 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/s/catalog/sharding_catalog_client_mock.h"
 #include "mongo/s/catalog/type_shard.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -663,6 +664,75 @@ TEST_F(ReshardingOplogFetcherTest, RetriesOnRemoteInterruptionError) {
 
     auto moreToCome = fetcherJob.timed_get(Seconds(5));
     ASSERT_TRUE(moreToCome);
+}
+
+TEST_F(ReshardingOplogFetcherTest, ImmediatelyDoneWhenFinalOpHasAlreadyBeenFetched) {
+    const NamespaceString outputCollectionNss("dbtests.outputCollection");
+    const NamespaceString dataCollectionNss("dbtests.runFetchIteration");
+
+    create(outputCollectionNss);
+    create(dataCollectionNss);
+    _fetchTimestamp = repl::StorageInterface::get(_svcCtx)->getLatestOplogTimestamp(_opCtx);
+
+    const auto& collectionUUID = [&] {
+        AutoGetCollection dataColl(_opCtx, dataCollectionNss, LockMode::MODE_IX);
+        return dataColl->uuid();
+    }();
+
+    ReshardingOplogFetcher fetcher(makeFetcherEnv(),
+                                   _reshardingUUID,
+                                   collectionUUID,
+                                   ReshardingOplogFetcher::kFinalOpAlreadyFetched,
+                                   _donorShard,
+                                   _destinationShard,
+                                   outputCollectionNss);
+
+    auto factory = makeCancelableOpCtx();
+    auto future = fetcher.schedule(nullptr, CancellationToken::uncancelable(), factory);
+
+    ASSERT_TRUE(future.isReady());
+    ASSERT_OK(future.getNoThrow());
+}
+
+DEATH_TEST_REGEX_F(ReshardingOplogFetcherTest,
+                   CannotFetchMoreWhenFinalOpHasAlreadyBeenFetched,
+                   "Invariant failure.*_startAt != kFinalOpAlreadyFetched") {
+    const NamespaceString outputCollectionNss("dbtests.outputCollection");
+    const NamespaceString dataCollectionNss("dbtests.runFetchIteration");
+
+    create(outputCollectionNss);
+    create(dataCollectionNss);
+    _fetchTimestamp = repl::StorageInterface::get(_svcCtx)->getLatestOplogTimestamp(_opCtx);
+
+    const auto& collectionUUID = [&] {
+        AutoGetCollection dataColl(_opCtx, dataCollectionNss, LockMode::MODE_IX);
+        return dataColl->uuid();
+    }();
+
+    auto fetcherJob = launchAsync([&, this] {
+        ThreadClient tc("RunnerForFetcher", _svcCtx, nullptr);
+
+        // We intentionally do not call fetcher.useReadConcernForTest(false) for this test case.
+        ReshardingOplogFetcher fetcher(makeFetcherEnv(),
+                                       _reshardingUUID,
+                                       collectionUUID,
+                                       ReshardingOplogFetcher::kFinalOpAlreadyFetched,
+                                       _donorShard,
+                                       _destinationShard,
+                                       outputCollectionNss);
+        fetcher.setInitialBatchSizeForTest(2);
+
+        auto factory = makeCancelableOpCtx();
+        return fetcher.iterate(&cc(), factory);
+    });
+
+    // Calling onCommand() leads to a more helpful "Expected death, found life" error when the
+    // invariant failure isn't triggered.
+    onCommand([&](const executor::RemoteCommandRequest& request) -> StatusWith<BSONObj> {
+        return {ErrorCodes::InternalError, "this error should never be observed"};
+    });
+
+    (void)fetcherJob.timed_get(Seconds(5));
 }
 
 }  // namespace

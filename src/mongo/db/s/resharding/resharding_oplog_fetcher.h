@@ -70,6 +70,10 @@ public:
         ReshardingMetrics* _metrics;
     };
 
+    // Special value to use for startAt to indicate there are no more oplog entries needing to be
+    // fetched.
+    static const ReshardingDonorOplogId kFinalOpAlreadyFetched;
+
     ReshardingOplogFetcher(std::unique_ptr<Env> env,
                            UUID reshardingUUID,
                            UUID collUUID,

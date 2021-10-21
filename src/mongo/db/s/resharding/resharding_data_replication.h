@@ -178,6 +178,7 @@ public:
         const std::vector<DonorShardFetchTimestamp>& donorShards);
 
     static ReshardingDonorOplogId getOplogFetcherResumeId(OperationContext* opCtx,
+                                                          const UUID& reshardingUUID,
                                                           const NamespaceString& oplogBufferNss,
                                                           Timestamp minFetchTimestamp);
 

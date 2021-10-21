@@ -75,6 +75,9 @@ boost::intrusive_ptr<ExpressionContext> _makeExpressionContext(OperationContext*
 }
 }  // namespace
 
+const ReshardingDonorOplogId ReshardingOplogFetcher::kFinalOpAlreadyFetched{Timestamp::max(),
+                                                                            Timestamp::max()};
+
 ReshardingOplogFetcher::ReshardingOplogFetcher(std::unique_ptr<Env> env,
                                                UUID reshardingUUID,
                                                UUID collUUID,
@@ -133,6 +136,14 @@ ExecutorFuture<void> ReshardingOplogFetcher::schedule(
     std::shared_ptr<executor::TaskExecutor> executor,
     const CancellationToken& cancelToken,
     CancelableOperationContextFactory factory) {
+    if (_startAt == kFinalOpAlreadyFetched) {
+        LOGV2_INFO(6077400,
+                   "Resharding oplog fetcher resumed with no more work to do",
+                   "donorShard"_attr = _donorShard,
+                   "reshardingUUID"_attr = _reshardingUUID);
+        return ExecutorFuture(std::move(executor));
+    }
+
     return ExecutorFuture(executor)
         .then([this, executor, cancelToken, factory] {
             return _reschedule(std::move(executor), cancelToken, factory);
@@ -165,6 +176,10 @@ ExecutorFuture<void> ReshardingOplogFetcher::_reschedule(
         })
         .then([this, executor, cancelToken, factory](bool moreToCome) {
             if (!moreToCome) {
+                LOGV2_INFO(6077401,
+                           "Resharding oplog fetcher done fetching",
+                           "donorShard"_attr = _donorShard,
+                           "reshardingUUID"_attr = _reshardingUUID);
                 return ExecutorFuture(std::move(executor));
             }
 
@@ -259,6 +274,7 @@ AggregateCommandRequest ReshardingOplogFetcher::_makeAggregateCommandRequest(
         // concern to guarantee the postBatchResumeToken when the batch is empty is non-decreasing.
         // The ReshardingOplogFetcher depends on inserting documents in increasing _id order,
         // including for the synthetic no-op oplog entries generated from the postBatchResumeToken.
+        invariant(_startAt != kFinalOpAlreadyFetched);
         auto readConcernArgs = repl::ReadConcernArgs(
             boost::optional<LogicalTime>(_startAt.getClusterTime()),
             boost::optional<repl::ReadConcernLevel>(repl::ReadConcernLevel::kMajorityReadConcern));
