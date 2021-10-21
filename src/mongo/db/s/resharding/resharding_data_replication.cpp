@@ -122,7 +122,8 @@ std::vector<std::unique_ptr<ReshardingOplogFetcher>> ReshardingDataReplication::
         auto oplogBufferNss =
             getLocalOplogBufferNamespace(metadata.getSourceUUID(), donor.getShardId());
         auto minFetchTimestamp = *donor.getMinFetchTimestamp();
-        auto idToResumeFrom = getOplogFetcherResumeId(opCtx, oplogBufferNss, minFetchTimestamp);
+        auto idToResumeFrom = getOplogFetcherResumeId(
+            opCtx, metadata.getReshardingUUID(), oplogBufferNss, minFetchTimestamp);
         invariant((idToResumeFrom >= ReshardingDonorOplogId{minFetchTimestamp, minFetchTimestamp}));
 
         oplogFetchers.emplace_back(std::make_unique<ReshardingOplogFetcher>(
@@ -433,15 +434,25 @@ std::vector<NamespaceString> ReshardingDataReplication::ensureStashCollectionsEx
 }
 
 ReshardingDonorOplogId ReshardingDataReplication::getOplogFetcherResumeId(
-    OperationContext* opCtx, const NamespaceString& oplogBufferNss, Timestamp minFetchTimestamp) {
+    OperationContext* opCtx,
+    const UUID& reshardingUUID,
+    const NamespaceString& oplogBufferNss,
+    Timestamp minFetchTimestamp) {
     invariant(!opCtx->lockState()->isLocked());
 
     AutoGetCollection coll(opCtx, oplogBufferNss, MODE_IS);
     if (coll) {
-        auto highestOplogBufferId = resharding::data_copy::findHighestInsertedId(opCtx, *coll);
-        if (!highestOplogBufferId.missing()) {
+        auto highestOplogBufferId =
+            resharding::data_copy::findDocWithHighestInsertedId(opCtx, *coll);
+
+        if (highestOplogBufferId) {
+            auto oplogEntry = repl::OplogEntry{highestOplogBufferId->toBson()};
+            if (isFinalOplog(oplogEntry, reshardingUUID)) {
+                return ReshardingOplogFetcher::kFinalOpAlreadyFetched;
+            }
+
             return ReshardingDonorOplogId::parse({"getOplogFetcherResumeId"},
-                                                 highestOplogBufferId.getDocument().toBson());
+                                                 oplogEntry.get_id()->getDocument().toBson());
         }
     }
 

@@ -162,6 +162,21 @@ void ensureTemporaryReshardingCollectionRenamed(OperationContext* opCtx,
 }
 
 Value findHighestInsertedId(OperationContext* opCtx, const CollectionPtr& collection) {
+    auto doc = findDocWithHighestInsertedId(opCtx, collection);
+    if (!doc) {
+        return Value{};
+    }
+
+    auto value = (*doc)["_id"];
+    uassert(4929300,
+            "Missing _id field for document in temporary resharding collection",
+            !value.missing());
+
+    return value;
+}
+
+boost::optional<Document> findDocWithHighestInsertedId(OperationContext* opCtx,
+                                                       const CollectionPtr& collection) {
     auto findCommand = std::make_unique<FindCommandRequest>(collection->ns());
     findCommand->setLimit(1);
     findCommand->setSort(BSON("_id" << -1));
@@ -169,16 +184,11 @@ Value findHighestInsertedId(OperationContext* opCtx, const CollectionPtr& collec
     auto recordId =
         Helpers::findOne(opCtx, collection, std::move(findCommand), true /* requireIndex */);
     if (recordId.isNull()) {
-        return Value{};
+        return boost::none;
     }
 
     auto doc = collection->docFor(opCtx, recordId).value();
-    auto value = Value{doc["_id"]};
-    uassert(4929300,
-            "Missing _id field for document in temporary resharding collection",
-            !value.missing());
-
-    return value;
+    return Document{doc};
 }
 
 std::vector<InsertStatement> fillBatchForInsert(Pipeline& pipeline, int batchSizeLimitBytes) {

@@ -96,6 +96,14 @@ public:
                             boost::none /* clusterTime */);
     }
 
+    const NamespaceString& sourceNss() {
+        return _sourceNss;
+    }
+
+    const CollectionUUID& sourceUUID() {
+        return _sourceUUID;
+    }
+
 private:
     RoutingTableHistoryValueHandle makeStandaloneRoutingTableHistory(RoutingTableHistory rt) {
         const auto version = rt.getVersion();
@@ -147,7 +155,7 @@ TEST_F(ReshardingDataReplicationTest, GetOplogFetcherResumeId) {
     // The minFetchTimestamp value is used when the oplog buffer collection doesn't exist.
     ASSERT_BSONOBJ_BINARY_EQ(
         ReshardingDataReplication::getOplogFetcherResumeId(
-            opCtx.get(), oplogBufferNss, minFetchTimestamp)
+            opCtx.get(), reshardingUUID, oplogBufferNss, minFetchTimestamp)
             .toBSON(),
         (ReshardingDonorOplogId{minFetchTimestamp, minFetchTimestamp}.toBSON()));
 
@@ -155,21 +163,29 @@ TEST_F(ReshardingDataReplicationTest, GetOplogFetcherResumeId) {
     resharding::data_copy::ensureCollectionExists(opCtx.get(), oplogBufferNss, CollectionOptions{});
     ASSERT_BSONOBJ_BINARY_EQ(
         ReshardingDataReplication::getOplogFetcherResumeId(
-            opCtx.get(), oplogBufferNss, minFetchTimestamp)
+            opCtx.get(), reshardingUUID, oplogBufferNss, minFetchTimestamp)
             .toBSON(),
         (ReshardingDonorOplogId{minFetchTimestamp, minFetchTimestamp}.toBSON()));
 
     auto insertFn = [&](const ReshardingDonorOplogId& oplogId) {
+        repl::MutableOplogEntry oplogEntry;
+        oplogEntry.setNss({});
+        oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
+        oplogEntry.setObject({});
+        oplogEntry.setOpTime({{}, {}});
+        oplogEntry.setWallClockTime({});
+        oplogEntry.set_id(Value(oplogId.toBSON()));
+
         AutoGetCollection oplogBufferColl(opCtx.get(), oplogBufferNss, MODE_IX);
         WriteUnitOfWork wuow(opCtx.get());
         ASSERT_OK(oplogBufferColl->insertDocument(
-            opCtx.get(), InsertStatement{BSON("_id" << oplogId.toBSON())}, nullptr));
+            opCtx.get(), InsertStatement{oplogEntry.toBSON()}, nullptr));
         wuow.commit();
     };
 
     insertFn(oplogId2);
     ASSERT_BSONOBJ_BINARY_EQ(ReshardingDataReplication::getOplogFetcherResumeId(
-                                 opCtx.get(), oplogBufferNss, minFetchTimestamp)
+                                 opCtx.get(), reshardingUUID, oplogBufferNss, minFetchTimestamp)
                                  .toBSON(),
                              oplogId2.toBSON());
 
@@ -177,7 +193,7 @@ TEST_F(ReshardingDataReplicationTest, GetOplogFetcherResumeId) {
     insertFn(oplogId3);
     insertFn(oplogId1);
     ASSERT_BSONOBJ_BINARY_EQ(ReshardingDataReplication::getOplogFetcherResumeId(
-                                 opCtx.get(), oplogBufferNss, minFetchTimestamp)
+                                 opCtx.get(), reshardingUUID, oplogBufferNss, minFetchTimestamp)
                                  .toBSON(),
                              oplogId3.toBSON());
 }

@@ -34,6 +34,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/repl/oplog.h"
@@ -93,6 +94,12 @@ void ensureTemporaryReshardingCollectionRenamed(OperationContext* opCtx,
  * Returns the largest _id value in the collection.
  */
 Value findHighestInsertedId(OperationContext* opCtx, const CollectionPtr& collection);
+
+/**
+ * Returns the full document of the largest _id value in the collection.
+ */
+boost::optional<Document> findDocWithHighestInsertedId(OperationContext* opCtx,
+                                                       const CollectionPtr& collection);
 
 /**
  * Returns a batch of documents suitable for being inserted with insertBatch().
