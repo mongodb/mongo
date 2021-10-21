@@ -99,10 +99,7 @@ public:
 
     void appendConnectionStats(ConnectionPoolStats* stats) const override;
 
-    /**
-     * Drops all connections to the given host on the network interface.
-     */
-    void dropConnections(const HostAndPort& hostAndPort);
+    void dropConnections(const HostAndPort& hostAndPort) override;
 
     /**
      * Returns true if there are any tasks in any of _poolInProgressQueue, _networkInProgressQueue,

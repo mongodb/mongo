@@ -57,6 +57,7 @@ namespace executor {
  * - startup()
  * - appendDiagnosticBSON()
  * - appendConnectionStats()
+ * - dropConnections()
  *
  * And certain other methods only pass through this class to the underlying executor:
  * - makeEvent()

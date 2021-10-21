@@ -138,5 +138,9 @@ void TaskExecutorProxy::appendConnectionStats(executor::ConnectionPoolStats* sta
     _executor.load()->appendConnectionStats(stats);
 }
 
+void TaskExecutorProxy::dropConnections(const HostAndPort& hostAndPort) {
+    _executor.load()->dropConnections(hostAndPort);
+}
+
 }  // namespace unittest
 }  // namespace mongo

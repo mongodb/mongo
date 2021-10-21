@@ -36,6 +36,13 @@ namespace unittest {
 
 /**
  * Proxy for the executor::TaskExecutor interface used for testing.
+ *
+ * Note that the following calls will affect other proxies that share the underlying executor:
+ * - startup()
+ * - shutdown()
+ * - apperndDiagnosticBSON()
+ * - appendConnectionStats()
+ * - dropConnections()
  */
 class TaskExecutorProxy : public executor::TaskExecutor {
     TaskExecutorProxy(const TaskExecutorProxy&) = delete;
@@ -80,6 +87,7 @@ public:
     void wait(const CallbackHandle& cbHandle,
               Interruptible* interruptible = Interruptible::notInterruptible()) override;
     void appendConnectionStats(executor::ConnectionPoolStats* stats) const override;
+    void dropConnections(const HostAndPort& hostAndPort) override;
 
 private:
     // Not owned by us.

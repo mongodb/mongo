@@ -258,5 +258,9 @@ void ShardingTaskExecutor::appendConnectionStats(ConnectionPoolStats* stats) con
     _executor->appendConnectionStats(stats);
 }
 
+void ShardingTaskExecutor::dropConnections(const HostAndPort& hostAndPort) {
+    _executor->dropConnections(hostAndPort);
+}
+
 }  // namespace executor
 }  // namespace mongo
