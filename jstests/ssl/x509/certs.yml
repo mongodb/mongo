@@ -284,6 +284,30 @@ certs:
     subjectAltName:
       DNS: ['localhost', '127.0.0.1']
 
+- name: 'server_no_subject.pem'
+  description: Server certificate with empty Subject, but critical SAN.
+  explicit_subject: true
+  extensions:
+    basicConstraints: {CA: false}
+    subjectKeyIdentifier: hash
+    keyUsage: [digitalSignature, keyEncipherment]
+    extendedKeyUsage: [serverAuth, clientAuth]
+    authorityKeyIdentifier: issuer
+    subjectAltName:
+        critical: true
+        DNS: 'localhost'
+        IP: ['127.0.0.1', '::1']
+
+- name: 'server_no_subject_no_SAN.pem'
+  description: Server certificate with empty Subject, and no SANs.
+  explicit_subject: true
+  extensions:
+    basicConstraints: {CA: false}
+    subjectKeyIdentifier: hash
+    keyUsage: [digitalSignature, keyEncipherment]
+    extendedKeyUsage: [serverAuth, clientAuth]
+    authorityKeyIdentifier: issuer
+
 - name: 'server_SAN.pem'
   description: General purpose server certificate with good SANs.
   Subject: {CN: 'Kernel Client Peer Role'}

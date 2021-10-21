@@ -1541,6 +1541,10 @@ StatusWith<SSLX509Name> getCertificateSubjectName(PCCERT_CONTEXT cert) {
 
     PCERT_NAME_INFO nameInfo = reinterpret_cast<PCERT_NAME_INFO>(swBlob.getValue().data());
 
+    if (!nameInfo->cRDN) {
+        return SSLX509Name();
+    }
+
     std::vector<std::vector<SSLX509Name::Entry>> entries;
 
     // Iterate in reverse order
