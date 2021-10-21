@@ -1707,7 +1707,8 @@ void WiredTigerRecordStore::appendCustomStats(OperationContext* opCtx,
     }
 }
 
-void WiredTigerRecordStore::waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx) const {
+void WiredTigerRecordStore::waitForAllEarlierOplogWritesToBeVisibleImpl(
+    OperationContext* opCtx) const {
     // Make sure that callers do not hold an active snapshot so it will be able to see the oplog
     // entries it waited for afterwards.
     if (opCtx->recoveryUnit()->isActive()) {
@@ -1968,9 +1969,9 @@ void WiredTigerRecordStore::cappedTruncateAfter(OperationContext* opCtx,
     }
 }
 
-Status WiredTigerRecordStore::oplogDiskLocRegister(OperationContext* opCtx,
-                                                   const Timestamp& ts,
-                                                   bool orderedCommit) {
+Status WiredTigerRecordStore::oplogDiskLocRegisterImpl(OperationContext* opCtx,
+                                                       const Timestamp& ts,
+                                                       bool orderedCommit) {
     opCtx->recoveryUnit()->setOrderedCommit(orderedCommit);
 
     if (!orderedCommit) {

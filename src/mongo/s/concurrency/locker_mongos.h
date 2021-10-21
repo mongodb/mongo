@@ -202,6 +202,14 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    virtual bool hasReadTicket() const {
+        MONGO_UNREACHABLE;
+    }
+
+    virtual bool hasWriteTicket() const {
+        MONGO_UNREACHABLE;
+    }
+
     void dump() const override {
         MONGO_UNREACHABLE;
     }

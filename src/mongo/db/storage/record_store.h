@@ -501,11 +501,9 @@ public:
      * visibility management. Calls with `orderedCommit` true will not be concurrent with calls of
      * `orderedCommit` false.
      */
-    virtual Status oplogDiskLocRegister(OperationContext* opCtx,
-                                        const Timestamp& opTime,
-                                        bool orderedCommit) {
-        return Status::OK();
-    }
+    Status oplogDiskLocRegister(OperationContext* opCtx,
+                                const Timestamp& opTime,
+                                bool orderedCommit);
 
     /**
      * Waits for all writes that completed before this call to be visible to forward scans.
@@ -514,7 +512,7 @@ public:
      * It is only legal to call this on an oplog. It is illegal to call this inside a
      * WriteUnitOfWork.
      */
-    virtual void waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx) const = 0;
+    void waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx) const;
 
     /**
      * Called after a repair operation is run with the recomputed numRecords and dataSize.
@@ -583,6 +581,14 @@ public:
     }
 
 protected:
+    virtual Status oplogDiskLocRegisterImpl(OperationContext* opCtx,
+                                            const Timestamp& opTime,
+                                            bool orderedCommit) {
+        return Status::OK();
+    }
+
+    virtual void waitForAllEarlierOplogWritesToBeVisibleImpl(OperationContext* opCtx) const = 0;
+
     std::string _ns;
 };
 

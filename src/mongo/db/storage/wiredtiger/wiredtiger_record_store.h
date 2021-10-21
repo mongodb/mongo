@@ -193,16 +193,10 @@ public:
 
     virtual void cappedTruncateAfter(OperationContext* opCtx, RecordId end, bool inclusive);
 
-    virtual Status oplogDiskLocRegister(OperationContext* opCtx,
-                                        const Timestamp& opTime,
-                                        bool orderedCommit);
-
     virtual void updateStatsAfterRepair(OperationContext* opCtx,
                                         long long numRecords,
                                         long long dataSize);
 
-
-    void waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx) const override;
 
     Status updateOplogSize(long long newOplogSize) final;
 
@@ -275,6 +269,12 @@ protected:
     virtual RecordId getKey(WT_CURSOR* cursor) const = 0;
 
     virtual void setKey(WT_CURSOR* cursor, const CursorKey* key) const = 0;
+
+    Status oplogDiskLocRegisterImpl(OperationContext* opCtx,
+                                    const Timestamp& opTime,
+                                    bool orderedCommit) override;
+
+    void waitForAllEarlierOplogWritesToBeVisibleImpl(OperationContext* opCtx) const override;
 
 private:
     class RandomCursor;

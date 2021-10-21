@@ -88,10 +88,6 @@ public:
                                                      const char* damageSource,
                                                      const mutablebson::DamageVector& damages);
 
-    Status oplogDiskLocRegister(OperationContext* opCtx,
-                                const Timestamp& opTime,
-                                bool orderedCommit) override;
-
     std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* opCtx,
                                                     bool forward) const final;
 
@@ -104,11 +100,16 @@ public:
                                    BSONObjBuilder* result,
                                    double scale) const {}
 
-    void waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx) const override;
-
     virtual void updateStatsAfterRepair(OperationContext* opCtx,
                                         long long numRecords,
                                         long long dataSize);
+
+protected:
+    Status oplogDiskLocRegisterImpl(OperationContext* opCtx,
+                                    const Timestamp& opTime,
+                                    bool orderedCommit) override;
+
+    void waitForAllEarlierOplogWritesToBeVisibleImpl(OperationContext* opCtx) const override;
 
 private:
     friend class VisibilityManagerChange;

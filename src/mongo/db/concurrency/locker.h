@@ -438,6 +438,23 @@ public:
      */
     virtual void reacquireTicket(OperationContext* opCtx) = 0;
 
+    /**
+     * Returns true if a read ticket is held for the Locker.
+     */
+    virtual bool hasReadTicket() const = 0;
+
+    /**
+     * Returns true if a write ticket is held for the Locker.
+     */
+    virtual bool hasWriteTicket() const = 0;
+
+    /**
+     * Returns true if uninterruptible locks were requested for the Locker.
+     */
+    bool uninterruptibleLocksRequested() const {
+        return _uninterruptibleLocksRequested > 0;
+    }
+
     //
     // These methods are legacy from LockerImpl and will eventually go away or be converted to
     // calls into the Locker methods

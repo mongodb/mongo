@@ -106,8 +106,6 @@ public:
         return _data->records.size();
     }
 
-    void waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx) const override {}
-
     virtual void updateStatsAfterRepair(OperationContext* opCtx,
                                         long long numRecords,
                                         long long dataSize) {
@@ -131,6 +129,8 @@ protected:
 
     virtual const EphemeralForTestRecord* recordFor(WithLock, const RecordId& loc) const;
     virtual EphemeralForTestRecord* recordFor(WithLock, const RecordId& loc);
+    void waitForAllEarlierOplogWritesToBeVisibleImpl(OperationContext* opCtx) const override {}
+
 
 public:
     //

@@ -299,13 +299,13 @@ void RecordStore::updateStatsAfterRepair(OperationContext* opCtx,
     _dataSize.store(dataSize);
 }
 
-void RecordStore::waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx) const {
+void RecordStore::waitForAllEarlierOplogWritesToBeVisibleImpl(OperationContext* opCtx) const {
     _visibilityManager->waitForAllEarlierOplogWritesToBeVisible(opCtx);
 }
 
-Status RecordStore::oplogDiskLocRegister(OperationContext* opCtx,
-                                         const Timestamp& opTime,
-                                         bool orderedCommit) {
+Status RecordStore::oplogDiskLocRegisterImpl(OperationContext* opCtx,
+                                             const Timestamp& opTime,
+                                             bool orderedCommit) {
     if (!orderedCommit) {
         return opCtx->recoveryUnit()->setTimestamp(opTime);
     }

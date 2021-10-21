@@ -42,6 +42,7 @@
 #include "mongo/db/catalog/list_indexes.h"
 #include "mongo/db/catalog/local_oplog_info.h"
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
@@ -934,6 +935,8 @@ Status renameCollectionForApplyOps(OperationContext* opCtx,
                       str::stream() << "Cannot rename collection to the oplog");
     }
 
+    // Take global IX lock explicitly to avoid upgrading from IS later
+    Lock::GlobalLock globalLock(opCtx, MODE_IX);
     AutoGetCollectionForRead sourceColl(
         opCtx, sourceNss, AutoGetCollectionViewMode::kViewsPermitted);
 
