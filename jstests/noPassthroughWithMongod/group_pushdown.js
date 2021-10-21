@@ -79,11 +79,23 @@ assertResultsMatchWithAndWithoutPushdown(coll,
                                          [{_id: "a", c: 0}, {_id: "b", c: 0}, {_id: "c", c: 0}],
                                          1);
 
-// Two group stages both get pushed down.
+// Two group stages both get pushed down and the second $group stage refer to only a top-level field
+// which does not exist.
 assertResultsMatchWithAndWithoutPushdown(
     coll,
     [{$group: {_id: "$item", s: {$sum: "$price"}}}, {$group: {_id: "$quantity", c: {$count: {}}}}],
     [{_id: null, c: 3}],
+    2);
+
+// Two group stages both get pushed down and the second $group stage refers to only existing
+// top-level fields of the first $group.
+assertResultsMatchWithAndWithoutPushdown(
+    coll,
+    [
+        {$group: {_id: "$item", qsum: {$sum: "$quantity"}, msum: {$sum: "$price"}}},
+        {$group: {_id: "$_id", ss: {$sum: {$add: ["$qsum", "$msum"]}}}}
+    ],
+    [{_id: "a", ss: 22}, {_id: "b", ss: 41}, {_id: "c", ss: 15}],
     2);
 
 // Run a group with an unsupported accumultor and check that it doesn't get pushed down.

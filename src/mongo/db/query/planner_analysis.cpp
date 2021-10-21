@@ -565,7 +565,11 @@ void removeProjectSimpleBelowGroupRecursive(QuerySolutionNode* solnRoot) {
         auto groupNode = static_cast<GroupNode*>(solnRoot);
 
         auto projectNodeCandidate = groupNode->children[0];
-        if (projectNodeCandidate->getType() != StageType::STAGE_PROJECTION_SIMPLE) {
+        if (projectNodeCandidate->getType() == StageType::STAGE_GROUP) {
+            // Multiple $group stages may be pushed down. So, if the child is a GROUP, then recurse.
+            removeProjectSimpleBelowGroupRecursive(projectNodeCandidate);
+            return;
+        } else if (projectNodeCandidate->getType() != StageType::STAGE_PROJECTION_SIMPLE) {
             // There's no PROJECTION_SIMPLE sitting below root and we don't expect another pattern
             // in the sub-tree, so bail out of the recursion. If we ran into a case of a computed
             // projection, it would have type PROJECTION_DEFAULT.

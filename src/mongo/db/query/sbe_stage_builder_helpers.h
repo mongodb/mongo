@@ -38,6 +38,7 @@
 #include "mongo/db/exec/sbe/stages/filter.h"
 #include "mongo/db/exec/sbe/stages/makeobj.h"
 #include "mongo/db/exec/sbe/stages/project.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/query/sbe_stage_builder_eval_frame.h"
 #include "mongo/db/query/stage_types.h"
 
@@ -843,6 +844,9 @@ struct StageBuilderState {
     // When the mongos splits $group stage and sends it to shards, it adds 'needsMerge'/'fromMongs'
     // flags to true so that shards can sends special partial aggregation results to the mongos.
     bool needsMerge;
+    // This map is used to plumb through pre-generated field expressions ('sbe::EExpression')
+    // corresponding to 'ExpressionFieldPath' to 'generateExpression'.
+    stdx::unordered_map<const Expression*, std::unique_ptr<sbe::EExpression>> optimizedExprs;
 };
 
 }  // namespace mongo::stage_builder

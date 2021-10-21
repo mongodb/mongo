@@ -362,4 +362,158 @@ public:
 
 using ExpressionMutableVisitor = ExpressionVisitor<false>;
 using ExpressionConstVisitor = ExpressionVisitor<true>;
+
+/**
+ * This class provides null implementations for all visit methods so that a derived class can
+ * override visit method(s) only for interested 'Expression' types. For example, if one wants
+ * to visit only 'ExpressionFieldPath', one can override only void visit(const
+ * ExpressionFieldPath*).
+ *
+ * struct FieldPathVisitor : public SelectiveConstExpressionVisitorBase {
+ *     // To avoid overloaded-virtual warnings.
+ *     using public SelectiveConstExpressionVisitorBase::visit;
+ *
+ *     void visit(const ExpressionFieldPath* expr) final {
+ *         // logic for what to do with an ExpressionFieldPath.
+ *     }
+ * };
+ */
+struct SelectiveConstExpressionVisitorBase : public ExpressionConstVisitor {
+    void visit(const ExpressionConstant*) override {}
+    void visit(const ExpressionAbs*) override {}
+    void visit(const ExpressionAdd*) override {}
+    void visit(const ExpressionAllElementsTrue*) override {}
+    void visit(const ExpressionAnd*) override {}
+    void visit(const ExpressionAnyElementTrue*) override {}
+    void visit(const ExpressionArray*) override {}
+    void visit(const ExpressionArrayElemAt*) override {}
+    void visit(const ExpressionFirst*) override {}
+    void visit(const ExpressionLast*) override {}
+    void visit(const ExpressionObjectToArray*) override {}
+    void visit(const ExpressionArrayToObject*) override {}
+    void visit(const ExpressionBsonSize*) override {}
+    void visit(const ExpressionCeil*) override {}
+    void visit(const ExpressionCoerceToBool*) override {}
+    void visit(const ExpressionCompare*) override {}
+    void visit(const ExpressionConcat*) override {}
+    void visit(const ExpressionConcatArrays*) override {}
+    void visit(const ExpressionCond*) override {}
+    void visit(const ExpressionDateDiff*) override {}
+    void visit(const ExpressionDateFromString*) override {}
+    void visit(const ExpressionDateFromParts*) override {}
+    void visit(const ExpressionDateToParts*) override {}
+    void visit(const ExpressionDateToString*) override {}
+    void visit(const ExpressionDateTrunc*) override {}
+    void visit(const ExpressionDivide*) override {}
+    void visit(const ExpressionExp*) override {}
+    void visit(const ExpressionFieldPath*) override {}
+    void visit(const ExpressionFilter*) override {}
+    void visit(const ExpressionFloor*) override {}
+    void visit(const ExpressionIfNull*) override {}
+    void visit(const ExpressionIn*) override {}
+    void visit(const ExpressionIndexOfArray*) override {}
+    void visit(const ExpressionIndexOfBytes*) override {}
+    void visit(const ExpressionIndexOfCP*) override {}
+    void visit(const ExpressionIsNumber*) override {}
+    void visit(const ExpressionLet*) override {}
+    void visit(const ExpressionLn*) override {}
+    void visit(const ExpressionLog*) override {}
+    void visit(const ExpressionLog10*) override {}
+    void visit(const ExpressionMap*) override {}
+    void visit(const ExpressionMeta*) override {}
+    void visit(const ExpressionMod*) override {}
+    void visit(const ExpressionMultiply*) override {}
+    void visit(const ExpressionNot*) override {}
+    void visit(const ExpressionObject*) override {}
+    void visit(const ExpressionOr*) override {}
+    void visit(const ExpressionPow*) override {}
+    void visit(const ExpressionRange*) override {}
+    void visit(const ExpressionReduce*) override {}
+    void visit(const ExpressionReplaceOne*) override {}
+    void visit(const ExpressionReplaceAll*) override {}
+    void visit(const ExpressionSetDifference*) override {}
+    void visit(const ExpressionSetEquals*) override {}
+    void visit(const ExpressionSetIntersection*) override {}
+    void visit(const ExpressionSetIsSubset*) override {}
+    void visit(const ExpressionSetUnion*) override {}
+    void visit(const ExpressionSize*) override {}
+    void visit(const ExpressionReverseArray*) override {}
+    void visit(const ExpressionSlice*) override {}
+    void visit(const ExpressionIsArray*) override {}
+    void visit(const ExpressionRound*) override {}
+    void visit(const ExpressionSplit*) override {}
+    void visit(const ExpressionSqrt*) override {}
+    void visit(const ExpressionStrcasecmp*) override {}
+    void visit(const ExpressionSubstrBytes*) override {}
+    void visit(const ExpressionSubstrCP*) override {}
+    void visit(const ExpressionStrLenBytes*) override {}
+    void visit(const ExpressionBinarySize*) override {}
+    void visit(const ExpressionStrLenCP*) override {}
+    void visit(const ExpressionSubtract*) override {}
+    void visit(const ExpressionSwitch*) override {}
+    void visit(const ExpressionTestApiVersion*) override {}
+    void visit(const ExpressionToLower*) override {}
+    void visit(const ExpressionToUpper*) override {}
+    void visit(const ExpressionTrim*) override {}
+    void visit(const ExpressionTrunc*) override {}
+    void visit(const ExpressionType*) override {}
+    void visit(const ExpressionZip*) override {}
+    void visit(const ExpressionConvert*) override {}
+    void visit(const ExpressionRegexFind*) override {}
+    void visit(const ExpressionRegexFindAll*) override {}
+    void visit(const ExpressionRegexMatch*) override {}
+    void visit(const ExpressionCosine*) override {}
+    void visit(const ExpressionSine*) override {}
+    void visit(const ExpressionTangent*) override {}
+    void visit(const ExpressionArcCosine*) override {}
+    void visit(const ExpressionArcSine*) override {}
+    void visit(const ExpressionArcTangent*) override {}
+    void visit(const ExpressionArcTangent2*) override {}
+    void visit(const ExpressionHyperbolicArcTangent*) override {}
+    void visit(const ExpressionHyperbolicArcCosine*) override {}
+    void visit(const ExpressionHyperbolicArcSine*) override {}
+    void visit(const ExpressionHyperbolicTangent*) override {}
+    void visit(const ExpressionHyperbolicCosine*) override {}
+    void visit(const ExpressionHyperbolicSine*) override {}
+    void visit(const ExpressionDegreesToRadians*) override {}
+    void visit(const ExpressionRadiansToDegrees*) override {}
+    void visit(const ExpressionDayOfMonth*) override {}
+    void visit(const ExpressionDayOfWeek*) override {}
+    void visit(const ExpressionDayOfYear*) override {}
+    void visit(const ExpressionHour*) override {}
+    void visit(const ExpressionMillisecond*) override {}
+    void visit(const ExpressionMinute*) override {}
+    void visit(const ExpressionMonth*) override {}
+    void visit(const ExpressionSecond*) override {}
+    void visit(const ExpressionWeek*) override {}
+    void visit(const ExpressionIsoWeekYear*) override {}
+    void visit(const ExpressionIsoDayOfWeek*) override {}
+    void visit(const ExpressionIsoWeek*) override {}
+    void visit(const ExpressionYear*) override {}
+    void visit(const ExpressionFromAccumulator<AccumulatorAvg>*) override {}
+    void visit(const ExpressionFromAccumulator<AccumulatorMax>*) override {}
+    void visit(const ExpressionFromAccumulator<AccumulatorMin>*) override {}
+    void visit(const ExpressionFromAccumulatorN<AccumulatorFirstN>*) override {}
+    void visit(const ExpressionFromAccumulatorN<AccumulatorLastN>*) override {}
+    void visit(const ExpressionFromAccumulatorN<AccumulatorMaxN>*) override {}
+    void visit(const ExpressionFromAccumulatorN<AccumulatorMinN>*) override {}
+    void visit(const ExpressionFromAccumulator<AccumulatorStdDevPop>*) override {}
+    void visit(const ExpressionFromAccumulator<AccumulatorStdDevSamp>*) override {}
+    void visit(const ExpressionFromAccumulator<AccumulatorSum>*) override {}
+    void visit(const ExpressionFromAccumulator<AccumulatorMergeObjects>*) override {}
+    void visit(const ExpressionTests::Testable*) override {}
+    void visit(const ExpressionInternalJsEmit*) override {}
+    void visit(const ExpressionInternalFindSlice*) override {}
+    void visit(const ExpressionInternalFindPositional*) override {}
+    void visit(const ExpressionInternalFindElemMatch*) override {}
+    void visit(const ExpressionFunction*) override {}
+    void visit(const ExpressionRandom*) override {}
+    void visit(const ExpressionToHashedIndexKey*) override {}
+    void visit(const ExpressionDateAdd*) override {}
+    void visit(const ExpressionDateSubtract*) override {}
+    void visit(const ExpressionGetField*) override {}
+    void visit(const ExpressionSetField*) override {}
+    void visit(const ExpressionTsSecond*) override {}
+    void visit(const ExpressionTsIncrement*) override {}
+};
 }  // namespace mongo

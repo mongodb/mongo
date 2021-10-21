@@ -514,6 +514,23 @@ assertPipelineIfGroupPushdown(
             expectedStages: ["COLLSCAN", "PROJECTION_SIMPLE"],
         });
     });
+pipeline = [{$group: {_id: "$a", b: {$sum: "$b"}}}, {$group: {_id: "$c", x: {$sum: "$b"}}}];
+assertPipelineIfGroupPushdown(
+    function() {
+        const explain = coll.explain().aggregate(pipeline);
+        // Both $group must be pushed down.
+        assert.eq(getPlanStages(explain, "GROUP").length, 2);
+        // PROJECTION_SIMPLE must be optimized away.
+        assert.eq(getPlanStages(explain, "PROJECTION_SIMPLE").length, 0);
+        // At bottom, there must be a COLLSCAN.
+        assert.eq(getPlanStages(explain, "COLLSCAN").length, 1);
+    },
+    function() {
+        return assertPipelineUsesAggregation({
+            pipeline: pipeline,
+            expectedStages: ["COLLSCAN", "PROJECTION_SIMPLE"],
+        });
+    });
 
 function assertTransformByShape(expected, actual, message) {
     assert.eq(Object.keys(expected).sort(), Object.keys(actual).sort(), message);

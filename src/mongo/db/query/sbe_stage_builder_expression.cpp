@@ -48,6 +48,7 @@
 #include "mongo/db/pipeline/accumulator_multi.h"
 #include "mongo/db/pipeline/expression_visitor.h"
 #include "mongo/db/pipeline/expression_walker.h"
+#include "mongo/db/query/expression_walker.h"
 #include "mongo/db/query/projection_parser.h"
 #include "mongo/db/query/sbe_stage_builder_eval_frame.h"
 #include "mongo/util/str.h"
@@ -1778,6 +1779,12 @@ public:
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(expExpr)));
     }
     void visit(const ExpressionFieldPath* expr) final {
+        if (auto it = _context->state.optimizedExprs.find(expr);
+            it != _context->state.optimizedExprs.end()) {
+            _context->pushExpr(it->second->clone());
+            return;
+        }
+
         sbe::value::SlotId slotId;
 
         if (!Variables::isUserDefinedVariable(expr->getVariableId())) {
@@ -3632,31 +3639,6 @@ private:
     }
 
     ExpressionVisitorContext* _context;
-};  // namespace
-
-class ExpressionWalker final {
-public:
-    ExpressionWalker(ExpressionConstVisitor* preVisitor,
-                     ExpressionConstVisitor* inVisitor,
-                     ExpressionConstVisitor* postVisitor)
-        : _preVisitor{preVisitor}, _inVisitor{inVisitor}, _postVisitor{postVisitor} {}
-
-    void preVisit(const Expression* expr) {
-        expr->acceptVisitor(_preVisitor);
-    }
-
-    void inVisit(long long count, const Expression* expr) {
-        expr->acceptVisitor(_inVisitor);
-    }
-
-    void postVisit(const Expression* expr) {
-        expr->acceptVisitor(_postVisitor);
-    }
-
-private:
-    ExpressionConstVisitor* _preVisitor;
-    ExpressionConstVisitor* _inVisitor;
-    ExpressionConstVisitor* _postVisitor;
 };
 }  // namespace
 
