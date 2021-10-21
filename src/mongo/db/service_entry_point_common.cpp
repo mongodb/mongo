@@ -44,6 +44,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
+#include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/curop_metrics.h"
@@ -105,6 +106,8 @@ MONGO_FAIL_POINT_DEFINE(sleepMillisAfterCommandExecutionBegins);
 MONGO_FAIL_POINT_DEFINE(waitAfterCommandFinishesExecution);
 MONGO_FAIL_POINT_DEFINE(waitAfterNewStatementBlocksBehindPrepare);
 MONGO_FAIL_POINT_DEFINE(hangBeforeSessionCheckOut);
+MONGO_FAIL_POINT_DEFINE(hangBeforeSettingTxnInterruptFlag);
+MONGO_FAIL_POINT_DEFINE(hangAfterCheckingWritabilityForMultiDocumentTransactions);
 
 // Tracks the number of times a legacy unacknowledged write failed due to
 // not primary error resulted in network disconnection.
@@ -746,6 +749,8 @@ void execCommandDatabase(OperationContext* opCtx,
             // Kill this operation on step down even if it hasn't taken write locks yet, because it
             // could conflict with transactions from a new primary.
             if (inMultiDocumentTransaction) {
+                CurOpFailpointHelpers::waitWhileFailPointEnabled(
+                    &hangBeforeSettingTxnInterruptFlag, opCtx, "hangBeforeSettingTxnInterruptFlag");
                 opCtx->setAlwaysInterruptAtStepDownOrUp();
             }
 
@@ -786,6 +791,21 @@ void execCommandDatabase(OperationContext* opCtx,
                 uassert(ErrorCodes::NotPrimaryOrSecondary,
                         "node is in drain mode",
                         optedIn || alwaysAllowed);
+            }
+
+            // We acquire the RSTL which helps us here in two ways:
+            // 1) It forces us to wait out any outstanding stepdown attempts.
+            // 2) It guarantees that future RSTL holders will see the
+            // 'setAlwaysInterruptAtStepDownOrUp' flag we set above.
+            if (inMultiDocumentTransaction) {
+                CurOpFailpointHelpers::waitWhileFailPointEnabled(
+                    &hangAfterCheckingWritabilityForMultiDocumentTransactions,
+                    opCtx,
+                    "hangAfterCheckingWritabilityForMultiDocumentTransactions");
+                repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
+                uassert(ErrorCodes::NotWritablePrimary,
+                        "Cannot start a transaction in a non-primary state",
+                        replCoord->canAcceptWritesForDatabase(opCtx, dbname));
             }
         }
 

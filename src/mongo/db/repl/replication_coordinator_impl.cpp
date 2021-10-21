@@ -109,6 +109,8 @@ MONGO_FAIL_POINT_DEFINE(holdStableTimestampAtSpecificTimestamp);
 MONGO_FAIL_POINT_DEFINE(stepdownHangBeforeRSTLEnqueue);
 // Fail setMaintenanceMode with ErrorCodes::NotSecondary to simulate a concurrent election.
 MONGO_FAIL_POINT_DEFINE(setMaintenanceModeFailsWithNotSecondary);
+// Hang after grabbing the RSTL but before we start rejecting writes.
+MONGO_FAIL_POINT_DEFINE(stepdownHangAfterGrabbingRSTL);
 
 // Tracks the last state transition performed in this replca set.
 std::string lastStateTransition;
@@ -2071,6 +2073,9 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
     auto deadline = force ? stepDownUntil : waitUntil;
     AutoGetRstlForStepUpStepDown arsd(
         this, opCtx, ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepDown, deadline);
+
+    CurOpFailpointHelpers::waitWhileFailPointEnabled(
+        &stepdownHangAfterGrabbingRSTL, opCtx, "stepdownHangAfterGrabbingRSTL");
 
     stdx::unique_lock<Latch> lk(_mutex);
 
