@@ -43,7 +43,7 @@ namespace process_health {
 enum class FaultFacetType { kMock1 = 0, kMock2, kLdap };
 
 /**
- * The class representing current status of an ongoing fault tracked by facet.
+ * Immutable class representing current status of an ongoing fault tracked by facet.
  */
 class HealthCheckStatus {
 public:
@@ -54,27 +54,17 @@ public:
     // avoid rounding problems and be sure that severity of 1.0 is guaranteed to be an active fault.
     static constexpr double kActiveFaultSeverityEpsilon = 0.000001;
 
-    HealthCheckStatus(FaultFacetType type,
-                      double severity,
-                      StringData description,
-                      Milliseconds activeFaultDuration,
-                      Milliseconds duration)
-        : _type(type),
-          _severity(severity),
-          _description(description),
-          _activeFaultDuration(activeFaultDuration),
-          _duration(duration) {
-        uassert(5949601,
-                str::stream() << "Active fault duration " << _activeFaultDuration
-                              << " cannot be longer than duration " << _duration,
-                _duration >= _activeFaultDuration);
-    }
+    using Severity = double;
+
+    HealthCheckStatus(FaultFacetType type, Severity severity, StringData description)
+        : _type(type), _severity(severity), _description(description) {}
 
     // Constructs a resolved status (no fault detected).
-    HealthCheckStatus(FaultFacetType type) : _type(type), _severity(0), _description("resolved") {}
+    explicit HealthCheckStatus(FaultFacetType type)
+        : _type(type), _severity(0), _description("resolved"_sd) {}
 
     HealthCheckStatus(const HealthCheckStatus&) = default;
-    HealthCheckStatus& operator=(const HealthCheckStatus&) = default;
+    HealthCheckStatus& operator=(const HealthCheckStatus&) = delete;
 
     /**
      * @return FaultFacetType of this status.
@@ -86,31 +76,14 @@ public:
     /**
      * The fault severity value if any.
      *
-     * @return Current fault severity. The expected values:
-     *         0: Ok
-     *         (0, 1.0): Transient fault condition
-     *         [1.0, Inf): Active fault condition
+     * @return Current fault severity
      */
-    double getSeverity() const {
+    Severity getSeverity() const {
         return _severity;
     }
 
-    /**
-     * Gets the duration of an active fault, if any.
-     * This is the time from the moment the severity reached the 1.0 value
-     * and stayed on or above 1.0.
-     *
-     * Note: each time the severity drops below 1.0 the duration is reset.
-     */
-    Milliseconds getActiveFaultDuration() const {
-        return _activeFaultDuration;
-    }
-
-    /**
-     * @return duration of the fault facet or fault from the moment it was created.
-     */
-    Milliseconds getDuration() const {
-        return _duration;
+    StringData getShortDescription() const {
+        return _description;
     }
 
     void appendDescription(BSONObjBuilder* builder) const;
@@ -141,8 +114,6 @@ private:
     const FaultFacetType _type;
     const double _severity;
     const std::string _description;
-    const Milliseconds _activeFaultDuration;
-    const Milliseconds _duration;
 };
 
 inline StringBuilder& operator<<(StringBuilder& s, const FaultFacetType& type) {
@@ -167,8 +138,6 @@ inline void HealthCheckStatus::appendDescription(BSONObjBuilder* builder) const 
     builder->append("type", _type);
     builder->append("description", _description);
     builder->append("severity", _severity);
-    builder->append("activeFaultDuration", _activeFaultDuration.toString());
-    builder->append("duration", _duration.toString());
 }
 
 inline StringBuilder& operator<<(StringBuilder& s, const HealthCheckStatus& hcs) {

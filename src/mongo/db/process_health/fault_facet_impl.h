@@ -28,54 +28,40 @@
  */
 #pragma once
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
-#include <functional>
-
 #include "mongo/db/process_health/fault_facet.h"
 
-#include "mongo/db/service_context.h"
-#include "mongo/logv2/log.h"
-#include "mongo/util/clock_source_mock.h"
-#include "mongo/util/timer.h"
+#include "mongo/db/process_health/health_check_status.h"
+#include "mongo/db/process_health/health_observer.h"
+#include "mongo/util/clock_source.h"
 
 namespace mongo {
 namespace process_health {
 
-class FaultFacetMock : public FaultFacet {
+// Internal representation of the Facet.
+class FaultFacetImpl : public FaultFacet {
 public:
-    // Testing callback to fill up mocked values.
-    using MockCallback = std::function<double()>;
+    FaultFacetImpl(FaultFacetType type, ClockSource* clockSource, HealthCheckStatus status);
 
-    FaultFacetMock(FaultFacetType mockType, ClockSource* clockSource, MockCallback callback)
-        : _mockType(mockType), _clockSource(clockSource), _callback(callback) {
-        invariant(mockType == FaultFacetType::kMock1 || mockType == FaultFacetType::kMock2);
-    }
+    ~FaultFacetImpl() override = default;
 
-    ~FaultFacetMock() = default;
+    // Public interface methods.
 
-    FaultFacetType getType() const override {
-        return _mockType;
-    }
+    FaultFacetType getType() const override;
 
-    HealthCheckStatus getStatus() const override {
-        const double severity = _callback();
+    HealthCheckStatus getStatus() const override;
 
-        auto healthCheckStatus = HealthCheckStatus(_mockType, severity, "Mock facet");
-        LOGV2(5956702, "Mock fault facet status", "status"_attr = healthCheckStatus);
-
-        return healthCheckStatus;
-    }
-
-    void update(HealthCheckStatus status) override {
-        MONGO_UNREACHABLE;  // Don't use this in mock.
-    }
+    void update(HealthCheckStatus status) override;
 
 private:
-    const FaultFacetType _mockType;
+    const FaultFacetType _type;
     ClockSource* const _clockSource;
+
     const Date_t _startTime = _clockSource->now();
-    const MockCallback _callback;
+
+    mutable Mutex _mutex =
+        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(1), "FaultFacetImpl::_mutex");
+    double _severity = 0;
+    std::string _description;
 };
 
 }  // namespace process_health

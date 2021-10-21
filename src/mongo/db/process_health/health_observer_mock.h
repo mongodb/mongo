@@ -66,8 +66,7 @@ protected:
         if (HealthCheckStatus::isResolved(severity)) {
             completionPf.promise.emplaceValue(HealthCheckStatus(getType()));
         } else {
-            completionPf.promise.emplaceValue(
-                HealthCheckStatus(getType(), severity, "failed", Milliseconds(0), Milliseconds(0)));
+            completionPf.promise.emplaceValue(HealthCheckStatus(getType(), severity, "failed"));
         }
         return std::move(completionPf.future);
     }

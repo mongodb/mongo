@@ -100,6 +100,8 @@ TEST_F(FaultManagerTest, SeverityIsMaxFromAllFacetsSeverity) {
     manager().healthCheckTest();
     do {
         waitForFaultBeingCreated();
+        advanceTime(Milliseconds(100));
+        manager().healthCheckTest();
     } while (manager().getFault().getFacets().size() != 2);  // Race between two facets.
     auto currentFault = manager().currentFault();
 
@@ -121,6 +123,7 @@ TEST_F(FaultManagerTest, HealthCheckCreatesFacetThenIsGarbageCollectedAndStateTr
     ASSERT_FALSE(manager().currentFault());
     // State is transitioned.
     ASSERT_EQ(FaultState::kOk, manager().getFaultState());
+    resetManager();  // Before atomic fields above go out of scope.
 }
 
 TEST_F(FaultManagerTest, HealthCheckCreates2FacetsThenIsGarbageCollected) {
@@ -133,6 +136,8 @@ TEST_F(FaultManagerTest, HealthCheckCreates2FacetsThenIsGarbageCollected) {
 
     while (manager().getFault().getFacets().size() != 2) {
         sleepFor(Milliseconds(1));
+        advanceTime(Milliseconds(100));
+        manager().healthCheckTest();
     }
 
     // Resolve one facet and it should be garbage collected.
@@ -149,6 +154,7 @@ TEST_F(FaultManagerTest, HealthCheckCreates2FacetsThenIsGarbageCollected) {
     }
     ASSERT_FALSE(internalFault.getFaultFacet(FaultFacetType::kMock1));
     ASSERT_TRUE(internalFault.getFaultFacet(FaultFacetType::kMock2));
+    resetManager();  // Before atomic fields above go out of scope.
 }
 
 TEST_F(FaultManagerTest, HealthCheckWithOffFacetCreatesNoFault) {
@@ -178,6 +184,7 @@ TEST_F(FaultManagerTest, DoesNotRestartCheckBeforeIntervalExpired) {
     waitForFaultBeingCreated();
     currentFault = manager().currentFault();
     ASSERT_TRUE(currentFault);  // The fault was created.
+    resetManager();             // Before atomic fields above go out of scope.
 }
 
 TEST_F(FaultManagerTest, HealthCheckWithCriticalFacetCreatesFault) {

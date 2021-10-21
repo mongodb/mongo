@@ -79,6 +79,12 @@ protected:
 
     HealthObserverIntensity getIntensity() override;
 
+    // Helper method to create a status without errors.
+    HealthCheckStatus makeHealthyStatus() const;
+
+    // Make a generic error status.
+    HealthCheckStatus makeSimpleFailedStatus(double severity, std::vector<Status>&& failures) const;
+
     ClockSource* const _clockSource;
     TickSource* const _tickSource;
 

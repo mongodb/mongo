@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/process_health/fault_facet.h"
+#include "mongo/db/process_health/fault_facet_impl.h"
 #include "mongo/db/process_health/fault_facet_mock.h"
 #include "mongo/unittest/unittest.h"
 
@@ -36,7 +37,8 @@ namespace process_health {
 
 namespace {
 
-class FaultFacetTest : public unittest::Test {
+// Using the Mock facet.
+class FaultFacetTestWithMock : public unittest::Test {
 public:
     void startMock(FaultFacetMock::MockCallback callback) {
         _svcCtx = ServiceContext::make();
@@ -54,10 +56,62 @@ private:
     std::unique_ptr<FaultFacetMock> _facetMock;
 };
 
-TEST_F(FaultFacetTest, FacetWithFailure) {
+TEST_F(FaultFacetTestWithMock, FacetWithFailure) {
     startMock([] { return 0.5; });
     auto status = getStatus();
     ASSERT_APPROX_EQUAL(0.5, status.getSeverity(), 0.001);
+}
+
+// Using the FaultFacetImpl.
+class FaultFacetImplTest : public unittest::Test {
+public:
+    static inline const auto kNoFailures = HealthCheckStatus(FaultFacetType::kMock1, 0.0, "test");
+    static inline const auto kFailure = HealthCheckStatus(FaultFacetType::kMock1, 0.5, "test");
+
+    void setUp() {
+        _svcCtx = ServiceContext::make();
+        _svcCtx->setFastClockSource(std::make_unique<ClockSourceMock>());
+    }
+
+    void createWithStatus(HealthCheckStatus status) {
+        _facet = std::make_unique<FaultFacetImpl>(
+            FaultFacetType::kMock1, _svcCtx->getFastClockSource(), status);
+    }
+
+    void update(HealthCheckStatus status) {
+        _facet->update(status);
+    }
+
+    HealthCheckStatus getStatus() const {
+        return _facet->getStatus();
+    }
+
+    ClockSourceMock& clockSource() {
+        return *static_cast<ClockSourceMock*>(_svcCtx->getFastClockSource());
+    }
+
+    template <typename Duration>
+    void advanceTime(Duration d) {
+        clockSource().advance(d);
+    }
+
+private:
+    ServiceContext::UniqueServiceContext _svcCtx;
+    std::unique_ptr<FaultFacetImpl> _facet;
+};
+
+TEST_F(FaultFacetImplTest, Simple) {
+    createWithStatus(kFailure);
+    const auto status = getStatus();
+    ASSERT_GT(status.getSeverity(), 0);
+    ASSERT_EQ(status.getType(), FaultFacetType::kMock1);
+    ASSERT_EQ(status.getShortDescription(), "test"_sd);
+}
+
+TEST_F(FaultFacetImplTest, Update) {
+    createWithStatus(kFailure);
+    update(kNoFailures);
+    ASSERT_EQ(getStatus().getSeverity(), 0);
 }
 
 }  // namespace
