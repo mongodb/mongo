@@ -96,8 +96,8 @@ const shouldCheckShardKey =
 // Examine each collection.
 for (const [dbName, collInfos] of Object.entries(collsToCopyPerDB0)) {
     collInfos.forEach((item) => {
-        // Skip validating the collection if it is actually a view.
-        if (item.type == "view")
+        // Skip validating the collection if this is not of collection type.
+        if (item.type !== "collection")
             return;
 
         checkCollection(conn0, conn1, `${dbName}.${item.name}`, shouldCheckShardKey);
