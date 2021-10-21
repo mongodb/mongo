@@ -170,12 +170,12 @@ struct OpTimeBundle {
  */
 OpTimeBundle replLogUpdate(OperationContext* opCtx,
                            const OplogUpdateEntryArgs& args,
-                           MutableOplogEntry oplogEntry) {
-    oplogEntry.setNss(args.nss);
-    oplogEntry.setUuid(args.uuid);
+                           MutableOplogEntry* oplogEntry) {
+    oplogEntry->setNss(args.nss);
+    oplogEntry->setUuid(args.uuid);
 
     repl::OplogLink oplogLink;
-    repl::appendOplogEntryChainInfo(opCtx, &oplogEntry, &oplogLink, args.updateArgs.stmtIds);
+    repl::appendOplogEntryChainInfo(opCtx, oplogEntry, &oplogLink, args.updateArgs.stmtIds);
 
     OpTimeBundle opTimes;
     // We never want to store pre- or post- images when we're migrating oplog entries from another
@@ -183,11 +183,11 @@ OpTimeBundle replLogUpdate(OperationContext* opCtx,
     const auto& migrationRecipientInfo = repl::tenantMigrationRecipientInfo(opCtx);
     const auto storePreImageInOplogForRetryableWrite =
         (args.updateArgs.storeDocOption == CollectionUpdateArgs::StoreDocOption::PreImage &&
-         opCtx->getTxnNumber() && !oplogEntry.getNeedsRetryImage());
+         opCtx->getTxnNumber() && !oplogEntry->getNeedsRetryImage());
     if ((storePreImageInOplogForRetryableWrite ||
          args.updateArgs.preImageRecordingEnabledForCollection) &&
         !migrationRecipientInfo) {
-        MutableOplogEntry noopEntry = oplogEntry;
+        MutableOplogEntry noopEntry = *oplogEntry;
         invariant(args.updateArgs.preImageDoc);
         noopEntry.setOpType(repl::OpTypeEnum::kNoop);
         noopEntry.setObject(*args.updateArgs.preImageDoc);
@@ -199,8 +199,8 @@ OpTimeBundle replLogUpdate(OperationContext* opCtx,
 
     // This case handles storing the post image for retryable findAndModify's.
     if (args.updateArgs.storeDocOption == CollectionUpdateArgs::StoreDocOption::PostImage &&
-        opCtx->getTxnNumber() && !migrationRecipientInfo && !oplogEntry.getNeedsRetryImage()) {
-        MutableOplogEntry noopEntry = oplogEntry;
+        opCtx->getTxnNumber() && !migrationRecipientInfo && !oplogEntry->getNeedsRetryImage()) {
+        MutableOplogEntry noopEntry = *oplogEntry;
         noopEntry.setOpType(repl::OpTypeEnum::kNoop);
         noopEntry.setObject(args.updateArgs.updatedDoc);
         oplogLink.postImageOpTime = logOperation(opCtx, &noopEntry);
@@ -208,17 +208,17 @@ OpTimeBundle replLogUpdate(OperationContext* opCtx,
         opTimes.prePostImageOpTime = oplogLink.postImageOpTime;
     }
 
-    oplogEntry.setOpType(repl::OpTypeEnum::kUpdate);
-    oplogEntry.setObject(args.updateArgs.update);
-    oplogEntry.setObject2(args.updateArgs.criteria);
-    oplogEntry.setFromMigrateIfTrue(args.updateArgs.source == OperationSource::kFromMigrate);
+    oplogEntry->setOpType(repl::OpTypeEnum::kUpdate);
+    oplogEntry->setObject(args.updateArgs.update);
+    oplogEntry->setObject2(args.updateArgs.criteria);
+    oplogEntry->setFromMigrateIfTrue(args.updateArgs.source == OperationSource::kFromMigrate);
     // oplogLink could have been changed to include pre/postImageOpTime by the previous no-op write.
-    repl::appendOplogEntryChainInfo(opCtx, &oplogEntry, &oplogLink, args.updateArgs.stmtIds);
+    repl::appendOplogEntryChainInfo(opCtx, oplogEntry, &oplogLink, args.updateArgs.stmtIds);
     if (args.updateArgs.oplogSlot) {
-        oplogEntry.setOpTime(*args.updateArgs.oplogSlot);
+        oplogEntry->setOpTime(*args.updateArgs.oplogSlot);
     }
-    opTimes.writeOpTime = logOperation(opCtx, &oplogEntry);
-    opTimes.wallClockTime = oplogEntry.getWallClockTime();
+    opTimes.writeOpTime = logOperation(opCtx, oplogEntry);
+    opTimes.wallClockTime = oplogEntry->getWallClockTime();
     return opTimes;
 }
 
@@ -682,7 +682,7 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
             }
         }
 
-        opTime = replLogUpdate(opCtx, args, oplogEntry);
+        opTime = replLogUpdate(opCtx, args, &oplogEntry);
 
         if (oplogEntry.getNeedsRetryImage()) {
             // If the oplog entry has `needsRetryImage`, copy the image into image collection.
