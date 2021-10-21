@@ -44,8 +44,11 @@ const indexSpec = {
     a: 1
 };
 const indexName = "a_1";
-const createIndexCmd =
-    IndexBuildTest.startIndexBuild(primary, primaryColl.getFullName(), indexSpec);
+const createIndexCmd = IndexBuildTest.startIndexBuild(primary,
+                                                      primaryColl.getFullName(),
+                                                      indexSpec,
+                                                      {},
+                                                      [ErrorCodes.InterruptedDueToReplStateChange]);
 IndexBuildTest.waitForIndexBuildToStart(secondaryDB, collName, indexName);
 
 jsTest.log("Force checkpoints to move the durable timestamps forward.");
@@ -111,6 +114,5 @@ function restartStandalone(node) {
     MongoRunner.stopMongod(mongod);
 })();
 
-// TODO: SERVER-59688
-createIndexCmd({checkExitSuccess: false});
+createIndexCmd();
 })();
