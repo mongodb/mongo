@@ -145,10 +145,10 @@ BSONObj findExtremeKeyForShard(OperationContext* opCtx,
                                const NamespaceString& nss,
                                const ShardKeyPattern& shardKeyPattern,
                                bool doSplitAtLower) {
-    Query q;
+    FindCommandRequest findCmd{nss};
 
     if (doSplitAtLower) {
-        q.sort(shardKeyPattern.toBSON());
+        findCmd.setSort(shardKeyPattern.toBSON());
     } else {
         // need to invert shard key pattern to sort backwards
         BSONObjBuilder r;
@@ -160,7 +160,7 @@ BSONObj findExtremeKeyForShard(OperationContext* opCtx,
             r.append(e.fieldName(), -1 * e.number());
         }
 
-        q.sort(r.obj());
+        findCmd.setSort(r.obj());
     }
 
     DBDirectClient client(opCtx);
@@ -168,14 +168,12 @@ BSONObj findExtremeKeyForShard(OperationContext* opCtx,
     BSONObj end;
 
     if (doSplitAtLower) {
-        // Splitting close to the lower bound means that the split point will be the
-        // upper bound. Chunk range upper bounds are exclusive so skip a document to
-        // make the lower half of the split end up with a single document.
-        std::unique_ptr<DBClientCursor> cursor = client.query(nss,
-                                                              BSONObj{},
-                                                              q,
-                                                              1, /* limit */
-                                                              1 /* nToSkip */);
+        // Splitting close to the lower bound means that the split point will be the upper bound.
+        // Chunk range upper bounds are exclusive so skip a document to make the lower half of the
+        // split end up with a single document.
+        findCmd.setLimit(1);
+        findCmd.setSkip(1);
+        std::unique_ptr<DBClientCursor> cursor = client.find(std::move(findCmd));
 
         uassert(40618,
                 str::stream() << "failed to initialize cursor during auto split due to "
@@ -186,7 +184,7 @@ BSONObj findExtremeKeyForShard(OperationContext* opCtx,
             end = cursor->next().getOwned();
         }
     } else {
-        end = client.findOne(nss.ns(), BSONObj{}, q);
+        end = client.findOne(std::move(findCmd));
     }
 
     if (end.isEmpty()) {

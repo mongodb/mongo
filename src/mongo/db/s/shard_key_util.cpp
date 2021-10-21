@@ -227,7 +227,7 @@ void ValidationBehaviorsShardCollection::verifyCanCreateShardKeyIndex(
     uassert(ErrorCodes::InvalidOptions,
             "Please create an index that starts with the proposed shard key before "
             "sharding the collection",
-            _localClient->findOne(nss.ns(), BSONObj{}).isEmpty());
+            _localClient->findOne(nss, BSONObj{}).isEmpty());
 }
 
 void ValidationBehaviorsShardCollection::createShardKeyIndex(

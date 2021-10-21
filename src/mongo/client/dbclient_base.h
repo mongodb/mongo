@@ -510,21 +510,46 @@ public:
     }
 
     /**
-     *  Returns a single object that matches the query. if none do, then the object is empty.
-     *  Throws AssertionException.
-     *
-     * The 'querySettings' argument might contain a subset of query settings, such as sort, hint,
-     * etc. If the passed in 'querySettings' object also includes a filter (in its 'query'/'$query'
-     * field), the filter will be ignored. Pass in the desired filter's BSON as 'filter' instead.
-     * The other options parameters exist for historic reasons and will be eventually combined with
-     * 'querySettings' into a single 'QueryOptions' parameter.
+     * Issues a find command described by 'findRequest', and returns the resulting cursor.
      */
-    virtual BSONObj findOne(const std::string& ns,
-                            const BSONObj& filter,
-                            const Query& querySettings = Query(),
-                            const BSONObj* fieldsToReturn = nullptr,
-                            int queryOptions = 0,
-                            boost::optional<BSONObj> readConcernObj = boost::none);
+    virtual std::unique_ptr<DBClientCursor> find(FindCommandRequest findRequest,
+                                                 const ReadPreferenceSetting& readPref);
+
+    /**
+     * Identical to the 'find()' overload above, but uses a default value of "primary" for the read
+     * preference.
+     */
+    std::unique_ptr<DBClientCursor> find(FindCommandRequest findRequest) {
+        ReadPreferenceSetting defaultReadPref{};
+        return find(std::move(findRequest), defaultReadPref);
+    }
+
+    /**
+     * Issues a find command describe by 'findRequest', but augments the request to have a limit of
+     * 1. It is illegal for the given 'findRequest' to have a limit already set.
+     *
+     * Returns the document resulting from the query, or an empty document if the query has no
+     * results.
+     */
+    virtual BSONObj findOne(FindCommandRequest findRequest, const ReadPreferenceSetting& readPref);
+
+    /**
+     * Identical to the 'findOne()' overload above, but uses a default value of "primary" for the
+     * read preference.
+     */
+    BSONObj findOne(FindCommandRequest findRequest) {
+        ReadPreferenceSetting defaultReadPref{};
+        return findOne(std::move(findRequest), defaultReadPref);
+    }
+
+    /**
+     * Issues a find command against the given collection (passed in either by namespace or by UUID)
+     * with the given 'filter'. Also augments the find request to have a limit of 1.
+     *
+     * Returns the document resulting from the query, or an empty document if the query has no
+     * results.
+     */
+    virtual BSONObj findOne(const NamespaceStringOrUUID& nssOrUuid, BSONObj filter);
 
     /**
      * Returns a pair with a single object that matches the filter within the collection specified
@@ -541,26 +566,7 @@ public:
         boost::optional<BSONObj> readConcernObj = boost::none);
 
     /**
-     * Sends a query to the database.
-     *
-     *  'ns': Namespace to query, format is <dbname>.<collectname>[.<collectname>]*
-     *  'filter': Query to perform on the collection.
-     *  'querySettings': sort, hint, readPref, etc.
-     *  'limit': The maximum number of documents that the cursor should return. 0 = unlimited.
-     *  'nToSkip': Start with the nth item.
-     *  'fieldsToReturn': Optional template of which fields to select. If unspecified, returns all
-     *                    fields.
-     *  'queryOptions': See options enum at top of this file.
-     *
-     * Notes:
-     * The 'querySettings' argument might contain a subset of query settings, such as sort, hint,
-     * etc. If the passed in 'querySettings' object also includes a filter (in its 'query'/'$query'
-     * field), the filter will be ignored. Pass in the desired filter's BSON as 'filter' instead.
-     * The other options parameters exist for historic reasons and will be eventually combined with
-     * 'querySettings' into a single 'QueryOptions' parameter.
-     *
-     * Returns nullptr if error (connection failure).
-     * Throws AssertionException.
+     * Legacy find API. Do not add new callers! Use the 'find*()' methods above instead.
      */
     virtual std::unique_ptr<DBClientCursor> query(
         const NamespaceStringOrUUID& nsOrUuid,
@@ -572,28 +578,6 @@ public:
         int queryOptions = 0,
         int batchSize = 0,
         boost::optional<BSONObj> readConcernObj = boost::none);
-
-    /**
-     * Uses QueryOption_Exhaust, when available and specified in 'queryOptions'.
-     *
-     * Exhaust mode sends back all data queries as fast as possible, with no back-and-forth for
-     * getMore. If you are certain you will exhaust the query, it could be useful. If exhaust mode
-     * is not specified in 'queryOptions' or not available, this call transparently falls back to
-     * using ordinary getMores.
-     *
-     * Use the DBClientCursorBatchIterator version, below, if you want to do items in large
-     * blocks, perhaps to avoid granular locking and such.
-     *
-     * Notes:
-     * The version that takes a BSONObj cannot return the namespace queried when the query is done
-     * by UUID. If this is required, use the DBClientBatchIterator version.
-     *
-     * The 'querySettings' argument might contain a subset of query settings, such as sort, hint,
-     * etc. If the passed in 'querySettings' object also includes a filter (in its 'query'/'$query'
-     * field), the filter will be ignored. Pass in the desired filter's BSON as 'filter' instead.
-     * The other options parameters exist for historic reasons and will be eventually combined with
-     * 'querySettings' into a single 'QueryOptions' parameter.
-     */
     unsigned long long query(std::function<void(const BSONObj&)> f,
                              const NamespaceStringOrUUID& nsOrUuid,
                              const BSONObj& filter,
@@ -602,7 +586,6 @@ public:
                              int queryOptions = QueryOption_Exhaust,
                              int batchSize = 0,
                              boost::optional<BSONObj> readConcernObj = boost::none);
-
     virtual unsigned long long query(std::function<void(DBClientCursorBatchIterator&)> f,
                                      const NamespaceStringOrUUID& nsOrUuid,
                                      const BSONObj& filter,

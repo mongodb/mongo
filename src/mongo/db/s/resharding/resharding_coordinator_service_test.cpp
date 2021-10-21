@@ -225,8 +225,7 @@ public:
     ReshardingCoordinatorDocument getCoordinatorDoc(OperationContext* opCtx) {
         DBDirectClient client(opCtx);
 
-        auto doc =
-            client.findOne(NamespaceString::kConfigReshardingOperationsNamespace.ns(), BSONObj{});
+        auto doc = client.findOne(NamespaceString::kConfigReshardingOperationsNamespace, BSONObj{});
         IDLParserErrorContext errCtx("reshardingCoordFromTest");
         return ReshardingCoordinatorDocument::parse(errCtx, doc);
     }
@@ -879,7 +878,7 @@ TEST_F(ReshardingCoordinatorServiceTest, StepDownStepUpEachTransition) {
         // config.collections should not have the document with the old UUID.
         std::vector<ChunkType> foundCollections;
         auto collection =
-            client.findOne(CollectionType::ConfigNS.ns(),
+            client.findOne(CollectionType::ConfigNS,
                            BSON(CollectionType::kNssFieldName << doc.getSourceNss().ns()));
 
         ASSERT_EQUALS(collection.isEmpty(), false);
@@ -924,9 +923,8 @@ TEST_F(ReshardingCoordinatorServiceTest, ReshardingCoordinatorFailsIfMigrationNo
     // Check that reshardCollection keeps allowMigrations setting intact.
     {
         DBDirectClient client(opCtx);
-        CollectionType collDoc(
-            client.findOne(CollectionType::ConfigNS.ns(),
-                           BSON(CollectionType::kNssFieldName << _originalNss.ns())));
+        CollectionType collDoc(client.findOne(
+            CollectionType::ConfigNS, BSON(CollectionType::kNssFieldName << _originalNss.ns())));
         ASSERT_FALSE(collDoc.getAllowMigrations());
     }
 }

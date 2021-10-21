@@ -44,33 +44,17 @@ namespace mongo {
 
 namespace query_request_helper {
 namespace {
-
 /**
- * Initializes options based on the value of the 'options' bit vector.
- *
- * This contains flags such as tailable, exhaust, and noCursorTimeout.
+ * Add the meta projection to this object if needed.
  */
-void initFromInt(int options, FindCommandRequest* findCommand) {
-    bool tailable = (options & QueryOption_CursorTailable) != 0;
-    bool awaitData = (options & QueryOption_AwaitData) != 0;
-    if (awaitData) {
-        findCommand->setAwaitData(true);
-    }
-    if (tailable) {
-        findCommand->setTailable(true);
-    }
-
-    if ((options & QueryOption_NoCursorTimeout) != 0) {
-        findCommand->setNoCursorTimeout(true);
-    }
-    if ((options & QueryOption_PartialResults) != 0) {
-        findCommand->setAllowPartialResults(true);
+void addMetaProjection(FindCommandRequest* findCommand) {
+    if (findCommand->getShowRecordId()) {
+        addShowRecordIdMetaProj(findCommand);
     }
 }
 
-/**
- * Updates the projection object with a $meta projection for the showRecordId option.
- */
+}  // namespace
+
 void addShowRecordIdMetaProj(FindCommandRequest* findCommand) {
     if (findCommand->getProjection()["$recordId"]) {
         // There's already some projection on $recordId. Don't overwrite it.
@@ -84,136 +68,6 @@ void addShowRecordIdMetaProj(FindCommandRequest* findCommand) {
     findCommand->setProjection(projBob.obj());
 }
 
-/**
- * Add the meta projection to this object if needed.
- */
-void addMetaProjection(FindCommandRequest* findCommand) {
-    if (findCommand->getShowRecordId()) {
-        addShowRecordIdMetaProj(findCommand);
-    }
-}
-
-Status initFullQuery(const BSONObj& top, FindCommandRequest* findCommand) {
-    BSONObjIterator i(top);
-
-    while (i.more()) {
-        BSONElement e = i.next();
-        StringData name = e.fieldNameStringData();
-
-        if (name == "$orderby" || name == "orderby") {
-            if (Object == e.type()) {
-                findCommand->setSort(e.embeddedObject().getOwned());
-            } else if (Array == e.type()) {
-                findCommand->setSort(e.embeddedObject());
-
-                // TODO: Is this ever used?  I don't think so.
-                // Quote:
-                // This is for languages whose "objects" are not well ordered (JSON is well
-                // ordered).
-                // [ { a : ... } , { b : ... } ] -> { a : ..., b : ... }
-                // note: this is slow, but that is ok as order will have very few pieces
-                BSONObjBuilder b;
-                char p[2] = "0";
-
-                while (1) {
-                    BSONObj j = findCommand->getSort().getObjectField(p);
-                    if (j.isEmpty()) {
-                        break;
-                    }
-                    BSONElement e = j.firstElement();
-                    if (e.eoo()) {
-                        return Status(ErrorCodes::BadValue, "bad order array");
-                    }
-                    if (!e.isNumber()) {
-                        return Status(ErrorCodes::BadValue, "bad order array [2]");
-                    }
-                    b.append(e);
-                    (*p)++;
-                    if (!(*p <= '9')) {
-                        return Status(ErrorCodes::BadValue, "too many ordering elements");
-                    }
-                }
-
-                findCommand->setSort(b.obj());
-            } else {
-                return Status(ErrorCodes::BadValue, "sort must be object or array");
-            }
-        } else if (name.startsWith("$")) {
-            name = name.substr(1);  // chop first char
-            if (name == "min") {
-                if (!e.isABSONObj()) {
-                    return Status(ErrorCodes::BadValue, "$min must be a BSONObj");
-                }
-                findCommand->setMin(e.embeddedObject().getOwned());
-            } else if (name == "max") {
-                if (!e.isABSONObj()) {
-                    return Status(ErrorCodes::BadValue, "$max must be a BSONObj");
-                }
-                findCommand->setMax(e.embeddedObject().getOwned());
-            } else if (name == "hint") {
-                if (e.isABSONObj()) {
-                    findCommand->setHint(e.embeddedObject().getOwned());
-                } else if (String == e.type()) {
-                    findCommand->setHint(e.wrap());
-                } else {
-                    return Status(ErrorCodes::BadValue,
-                                  "$hint must be either a string or nested object");
-                }
-            } else if (name == "returnKey") {
-                // Won't throw.
-                if (e.trueValue()) {
-                    findCommand->setReturnKey(true);
-                }
-            } else if (name == "showDiskLoc") {
-                // Won't throw.
-                if (e.trueValue()) {
-                    findCommand->setShowRecordId(true);
-                    addShowRecordIdMetaProj(findCommand);
-                }
-            } else if (name == "maxTimeMS") {
-                StatusWith<int> maxTimeMS = parseMaxTimeMS(e);
-                if (!maxTimeMS.isOK()) {
-                    return maxTimeMS.getStatus();
-                }
-                findCommand->setMaxTimeMS(maxTimeMS.getValue());
-            }
-        }
-    }
-
-    return Status::OK();
-}
-
-Status initFindCommandRequest(int ntoskip,
-                              int queryOptions,
-                              const BSONObj& filter,
-                              const Query& querySettings,
-                              const BSONObj& proj,
-                              FindCommandRequest* findCommand) {
-    if (!proj.isEmpty()) {
-        findCommand->setProjection(proj.getOwned());
-    }
-    if (ntoskip) {
-        findCommand->setSkip(ntoskip);
-    }
-
-    // Initialize flags passed as 'queryOptions' bit vector.
-    initFromInt(queryOptions, findCommand);
-
-    findCommand->setFilter(filter.getOwned());
-    Status status = initFullQuery(querySettings.getFullSettingsDeprecated(), findCommand);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    // It's not possible to specify readConcern in a legacy query message, so initialize it to
-    // an empty readConcern object, ie. equivalent to `readConcern: {}`.  This ensures that
-    // mongos passes this empty readConcern to shards.
-    findCommand->setReadConcern(BSONObj());
-
-    return validateFindCommandRequest(*findCommand);
-}
-
-}  // namespace
 
 Status validateGetMoreCollectionName(StringData collectionName) {
     if (collectionName.empty()) {
@@ -378,27 +232,6 @@ void validateCursorResponse(const BSONObj& outputAsBson) {
     if (getTestCommandsEnabled()) {
         CursorInitialReply::parse(IDLParserErrorContext("CursorInitialReply"), outputAsBson);
     }
-}
-
-//
-// Old QueryRequest parsing code: SOON TO BE DEPRECATED.
-//
-
-StatusWith<std::unique_ptr<FindCommandRequest>> fromLegacyQuery(NamespaceStringOrUUID nssOrUuid,
-                                                                const BSONObj& filter,
-                                                                const Query& querySettings,
-                                                                const BSONObj& proj,
-                                                                int ntoskip,
-                                                                int queryOptions) {
-    auto findCommand = std::make_unique<FindCommandRequest>(std::move(nssOrUuid));
-
-    Status status = initFindCommandRequest(
-        ntoskip, queryOptions, filter, querySettings, proj, findCommand.get());
-    if (!status.isOK()) {
-        return status;
-    }
-
-    return std::move(findCommand);
 }
 
 StatusWith<BSONObj> asAggregationCommand(const FindCommandRequest& findCommand) {

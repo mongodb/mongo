@@ -583,13 +583,12 @@ OpTime TenantMigrationRecipientService::Instance::_getDonorMajorityOpTime(
     std::unique_ptr<mongo::DBClientConnection>& client) {
     auto oplogOpTimeFields =
         BSON(OplogEntry::kTimestampFieldName << 1 << OplogEntry::kTermFieldName << 1);
-    auto majorityOpTimeBson =
-        client->findOne(NamespaceString::kRsOplogNamespace.ns(),
-                        BSONObj{},
-                        Query().sort("$natural", -1),
-                        &oplogOpTimeFields,
-                        QueryOption_SecondaryOk,
-                        ReadConcernArgs(ReadConcernLevel::kMajorityReadConcern).toBSONInner());
+    FindCommandRequest findCmd{NamespaceString::kRsOplogNamespace};
+    findCmd.setSort(BSON("$natural" << -1));
+    findCmd.setProjection(oplogOpTimeFields);
+    findCmd.setReadConcern(ReadConcernArgs(ReadConcernLevel::kMajorityReadConcern).toBSONInner());
+    auto majorityOpTimeBson = client->findOne(
+        std::move(findCmd), ReadPreferenceSetting{ReadPreference::SecondaryPreferred});
     uassert(5272003, "Found no entries in the remote oplog", !majorityOpTimeBson.isEmpty());
 
     auto majorityOpTime = uassertStatusOK(OpTime::parseFromOplogEntry(majorityOpTimeBson));
@@ -878,13 +877,13 @@ void TenantMigrationRecipientService::Instance::_getStartOpTimesFromDonor(WithLo
     const auto preparedState = DurableTxnState_serializer(DurableTxnStateEnum::kPrepared);
     const auto inProgressState = DurableTxnState_serializer(DurableTxnStateEnum::kInProgress);
     auto transactionTableOpTimeFields = BSON(SessionTxnRecord::kStartOpTimeFieldName << 1);
+    FindCommandRequest findCmd{NamespaceString::kSessionTransactionsTableNamespace};
+    findCmd.setFilter(BSON("state" << BSON("$in" << BSON_ARRAY(preparedState << inProgressState))));
+    findCmd.setSort(BSON(SessionTxnRecord::kStartOpTimeFieldName.toString() << 1));
+    findCmd.setProjection(transactionTableOpTimeFields);
+    findCmd.setReadConcern(ReadConcernArgs(ReadConcernLevel::kMajorityReadConcern).toBSONInner());
     auto earliestOpenTransactionBson = _client->findOne(
-        NamespaceString::kSessionTransactionsTableNamespace.ns(),
-        BSON("state" << BSON("$in" << BSON_ARRAY(preparedState << inProgressState))),
-        Query().sort(SessionTxnRecord::kStartOpTimeFieldName.toString(), 1),
-        &transactionTableOpTimeFields,
-        QueryOption_SecondaryOk,
-        ReadConcernArgs(ReadConcernLevel::kMajorityReadConcern).toBSONInner());
+        std::move(findCmd), ReadPreferenceSetting{ReadPreference::SecondaryPreferred});
     LOGV2_DEBUG(4880602,
                 2,
                 "Transaction table entry for earliest transaction that was open at the read "
@@ -1923,13 +1922,11 @@ void TenantMigrationRecipientService::Instance::_compareRecipientAndDonorFCV() c
         return;
     }
 
-    auto donorFCVbson =
-        _client->findOne(NamespaceString::kServerConfigurationNamespace.ns(),
-                         BSON("_id" << multiversion::kParameterName),
-                         Query(),
-                         nullptr,
-                         QueryOption_SecondaryOk,
-                         ReadConcernArgs(ReadConcernLevel::kMajorityReadConcern).toBSONInner());
+    FindCommandRequest findCmd{NamespaceString::kServerConfigurationNamespace};
+    findCmd.setFilter(BSON("_id" << multiversion::kParameterName));
+    findCmd.setReadConcern(ReadConcernArgs(ReadConcernLevel::kMajorityReadConcern).toBSONInner());
+    auto donorFCVbson = _client->findOne(std::move(findCmd),
+                                         ReadPreferenceSetting{ReadPreference::SecondaryPreferred});
 
     uassert(5382302, "FCV on donor not set", !donorFCVbson.isEmpty());
 

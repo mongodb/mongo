@@ -348,9 +348,10 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::createCollectionStage() {
         // (createCollection/createIndex) don't get stamped with the fromTenantMigration field.
         ON_BLOCK_EXIT([&opCtx] { tenantMigrationRecipientInfo(opCtx.get()) = boost::none; });
 
-        auto fieldsToReturn = BSON("_id" << 1);
-        _lastDocId = client.findOne(
-            _existingNss->ns(), BSONObj{}, Query().sort(BSON("_id" << -1)), &fieldsToReturn);
+        FindCommandRequest findCmd{*_existingNss};
+        findCmd.setSort(BSON("_id" << -1));
+        findCmd.setProjection(BSON("_id" << 1));
+        _lastDocId = client.findOne(std::move(findCmd));
         if (!_lastDocId.isEmpty()) {
             // The collection is not empty. Skip creating indexes and resume cloning from the last
             // document.

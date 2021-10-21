@@ -200,7 +200,7 @@ boost::optional<ReshardingOplogApplierProgress> ReshardingOplogApplier::checkSto
     OperationContext* opCtx, const ReshardingSourceId& id) {
     DBDirectClient client(opCtx);
     auto doc = client.findOne(
-        NamespaceString::kReshardingApplierProgressNamespace.ns(),
+        NamespaceString::kReshardingApplierProgressNamespace,
         BSON(ReshardingOplogApplierProgress::kOplogSourceIdFieldName << id.toBSON()));
 
     if (doc.isEmpty()) {

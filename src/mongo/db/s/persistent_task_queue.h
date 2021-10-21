@@ -221,16 +221,19 @@ bool PersistentTaskQueue<T>::empty(OperationContext* opCtx) const {
 
 template <typename T>
 TaskId PersistentTaskQueue<T>::_loadLastId(DBDirectClient& client) {
-    auto fieldsToReturn = BSON("_id" << 1);
-    auto maxId = client.findOne(
-        _storageNss.toString(), BSONObj{}, Query().sort(BSON("_id" << -1)), &fieldsToReturn);
+    FindCommandRequest findCmd{_storageNss};
+    findCmd.setSort(BSON("_id" << -1));
+    findCmd.setProjection(BSON("_id" << 1));
+    auto maxId = client.findOne(std::move(findCmd));
     return maxId.getField("_id").Long();
 }
 
 template <typename T>
 typename boost::optional<typename BlockingTaskQueue<T>::Record>
 PersistentTaskQueue<T>::_loadNextRecord(DBDirectClient& client) {
-    auto bson = client.findOne(_storageNss.toString(), BSONObj{}, Query().sort("_id"));
+    FindCommandRequest findCmd{_storageNss};
+    findCmd.setSort(BSON("_id" << 1));
+    auto bson = client.findOne(std::move(findCmd));
 
     boost::optional<typename PersistentTaskQueue<T>::Record> result;
 

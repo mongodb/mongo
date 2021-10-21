@@ -35,6 +35,7 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/client/query.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/query/find_command_gen.h"
 #include "mongo/rpc/unique_message.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/spin_lock.h"
@@ -162,6 +163,14 @@ public:
     //
     rpc::UniqueReply runCommand(InstanceID id, const OpMsgRequest& request);
 
+    /**
+     * Finds documents from this mock server according to 'findRequest'.
+     */
+    mongo::BSONArray find(InstanceID id, const FindCommandRequest& findRequest);
+
+    /**
+     * Legacy query API: New callers should use 'find()' rather than this method.
+     */
     mongo::BSONArray query(InstanceID id,
                            const NamespaceStringOrUUID& nsOrUuid,
                            const BSONObj& filter,
@@ -234,6 +243,13 @@ private:
      */
     BSONObj project(projection_executor::ProjectionExecutor* projectionExecutor, const BSONObj& o);
 
+    /**
+     * Logic shared between 'find()' and 'query()'. This can go away when the legacy 'query()' API
+     * is removed.
+     */
+    mongo::BSONArray findImpl(InstanceID id,
+                              const NamespaceStringOrUUID& nsOrUuid,
+                              BSONObj projection);
 
     typedef stdx::unordered_map<std::string, std::shared_ptr<CircularBSONIterator>> CmdToReplyObj;
     typedef stdx::unordered_map<std::string, std::vector<BSONObj>> MockDataMgr;

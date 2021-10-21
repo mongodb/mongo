@@ -156,7 +156,7 @@ TEST_F(ShardingDDLUtilTest, ShardedRenameMetadata) {
     setupCollection(kToNss, KeyPattern(BSON("x" << 1)), originalToChunks);
 
     // Get FROM collection document and chunks
-    auto fromDoc = client.findOne(CollectionType::ConfigNS.ns(), fromCollQuery);
+    auto fromDoc = client.findOne(CollectionType::ConfigNS, fromCollQuery);
     CollectionType fromCollection(fromDoc);
     std::vector<BSONObj> fromChunks;
     findN(client,
@@ -172,10 +172,10 @@ TEST_F(ShardingDDLUtilTest, ShardedRenameMetadata) {
         opCtx, fromCollType, kToNss, ShardingCatalogClient::kMajorityWriteConcern);
 
     // Check that the FROM config.collections entry has been deleted
-    ASSERT(client.findOne(CollectionType::ConfigNS.ns(), fromCollQuery).isEmpty());
+    ASSERT(client.findOne(CollectionType::ConfigNS, fromCollQuery).isEmpty());
 
     // Get TO collection document and chunks
-    auto toDoc = client.findOne(CollectionType::ConfigNS.ns(), toCollQuery);
+    auto toDoc = client.findOne(CollectionType::ConfigNS, toCollQuery);
     CollectionType toCollection(toDoc);
     std::vector<BSONObj> toChunks;
     findN(client,

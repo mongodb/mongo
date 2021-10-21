@@ -278,13 +278,17 @@ public:
     }
     void run() {
         const char* ns = "unittests.querytests.BoundedKey";
+        NamespaceString namespaceStr{ns};
         insert(ns, BSON("a" << 1));
         BSONObjBuilder a;
         a.appendMaxKey("$lt");
         BSONObj limit = a.done();
-        ASSERT(!_client.findOne(ns, BSON("a" << limit)).isEmpty());
+        ASSERT(!_client.findOne(namespaceStr, BSON("a" << limit)).isEmpty());
         ASSERT_OK(dbtests::createIndex(&_opCtx, ns, BSON("a" << 1)));
-        ASSERT(!_client.findOne(ns, BSON("a" << limit), Query().hint(BSON("a" << 1))).isEmpty());
+        FindCommandRequest findCmd{namespaceStr};
+        findCmd.setFilter(BSON("a" << limit));
+        findCmd.setHint(BSON("a" << 1));
+        ASSERT(!_client.findOne(std::move(findCmd)).isEmpty());
     }
 };
 
@@ -298,11 +302,10 @@ public:
         insert(ns, BSON("a" << 1));
         insert(ns, BSON("a" << 2));
         insert(ns, BSON("a" << 3));
-        unique_ptr<DBClientCursor> cursor =
-            _client.query(NamespaceString(ns), BSONObj{}, Query(), 0, 0, nullptr, 0, 2);
+        FindCommandRequest findRequest{NamespaceString{ns}};
+        findRequest.setBatchSize(2);
+        std::unique_ptr<DBClientCursor> cursor = _client.find(findRequest);
         long long cursorId = cursor->getCursorId();
-        cursor->decouple();
-        cursor.reset();
 
         {
             // Check that a cursor has been registered with the global cursor manager, and has
@@ -312,9 +315,11 @@ public:
             ASSERT_EQUALS(std::uint64_t(2), pinnedCursor.getCursor()->nReturnedSoFar());
         }
 
-        cursor = _client.getMore(ns, cursorId);
-        ASSERT(cursor->more());
-        ASSERT_EQUALS(3, cursor->next().getIntField("a"));
+        int counter = 0;
+        while (cursor->more()) {
+            ASSERT_EQUALS(++counter, cursor->next().getIntField("a"));
+        }
+        ASSERT_EQ(counter, 3);
     }
 };
 
@@ -335,8 +340,9 @@ public:
         }
 
         // Create a cursor on the collection, with a batch size of 200.
-        unique_ptr<DBClientCursor> cursor =
-            _client.query(NamespaceString(ns), BSONObj{}, Query(), 0, 0, nullptr, 0, 200);
+        FindCommandRequest findRequest{NamespaceString{ns}};
+        findRequest.setBatchSize(200);
+        auto cursor = _client.find(std::move(findRequest));
 
         // Count 500 results, spanning a few batches of documents.
         for (int i = 0; i < 500; ++i) {
@@ -381,8 +387,9 @@ public:
         }
 
         // Create a cursor on the collection, with a batch size of 200.
-        unique_ptr<DBClientCursor> cursor =
-            _client.query(NamespaceString(ns), BSONObj{}, Query(), 0, 0, nullptr, 0, 200);
+        FindCommandRequest findRequest{NamespaceString{ns}};
+        findRequest.setBatchSize(200);
+        auto cursor = _client.find(std::move(findRequest));
         CursorId cursorId = cursor->getCursorId();
 
         // Count 500 results, spanning a few batches of documents.
@@ -423,23 +430,24 @@ public:
         _client.dropCollection(ns);
     }
 
-    void testLimit(int limit) {
-        ASSERT_EQUALS(_client.query(NamespaceString(ns), BSONObj{}, Query(), limit)->itcount(),
-                      limit);
+    void testLimit(int limit, int expectedCount) {
+        FindCommandRequest findRequest{NamespaceString{ns}};
+        findRequest.setLimit(limit);
+        ASSERT_EQUALS(_client.find(std::move(findRequest))->itcount(), expectedCount);
     }
+
     void run() {
-        for (int i = 0; i < 1000; i++)
+        const int collSize = 1000;
+        for (int i = 0; i < collSize; i++)
             insert(ns, BSON(GENOID << "i" << i));
 
-        ASSERT_EQUALS(_client.query(NamespaceString(ns), BSONObj{}, Query(), 1)->itcount(), 1);
-        ASSERT_EQUALS(_client.query(NamespaceString(ns), BSONObj{}, Query(), 10)->itcount(), 10);
-        ASSERT_EQUALS(_client.query(NamespaceString(ns), BSONObj{}, Query(), 101)->itcount(), 101);
-        ASSERT_EQUALS(_client.query(NamespaceString(ns), BSONObj{}, Query(), 999)->itcount(), 999);
-        ASSERT_EQUALS(_client.query(NamespaceString(ns), BSONObj{}, Query(), 1000)->itcount(),
-                      1000);
-        ASSERT_EQUALS(_client.query(NamespaceString(ns), BSONObj{}, Query(), 1001)->itcount(),
-                      1000);
-        ASSERT_EQUALS(_client.query(NamespaceString(ns), BSONObj{}, Query(), 0)->itcount(), 1000);
+        testLimit(1, 1);
+        testLimit(10, 10);
+        testLimit(101, 101);
+        testLimit(collSize - 1, collSize - 1);
+        testLimit(collSize, collSize);
+        testLimit(collSize + 1, collSize);
+        testLimit(collSize + 10, collSize);
     }
 };
 
@@ -850,11 +858,12 @@ public:
     }
     void run() {
         const char* ns = "unittests.querytests._UnderscoreNs";
-        ASSERT(_client.findOne(ns, BSONObj{}).isEmpty());
+        NamespaceString nss{ns};
+        ASSERT(_client.findOne(nss, BSONObj{}).isEmpty());
         auto response = _client.insertAcknowledged(ns, {BSON("a" << 1)});
         ASSERT_OK(getStatusFromWriteCommandReply(response));
         ASSERT_EQ(1, response["n"].Int());
-        ASSERT_EQUALS(1, _client.findOne(ns, BSONObj{}).getIntField("a"));
+        ASSERT_EQUALS(1, _client.findOne(nss, BSONObj{}).getIntField("a"));
     }
 };
 
@@ -865,10 +874,12 @@ public:
     }
     void run() {
         const char* ns = "unittests.querytests.EmptyFieldSpec";
+        NamespaceString nss{ns};
         _client.insert(ns, BSON("a" << 1));
-        ASSERT(!_client.findOne(ns, BSONObj{}).isEmpty());
-        BSONObj empty;
-        ASSERT(!_client.findOne(ns, BSONObj{}, Query(), &empty).isEmpty());
+        ASSERT(!_client.findOne(nss, BSONObj{}).isEmpty());
+        FindCommandRequest findCmd{nss};
+        findCmd.setProjection(BSONObj{});
+        ASSERT(!_client.findOne(std::move(findCmd)).isEmpty());
     }
 };
 
@@ -879,10 +890,11 @@ public:
     }
     void run() {
         const char* ns = "unittests.querytests.Ne";
+        NamespaceString nss{ns};
         _client.insert(ns, fromjson("{a:[1,2]}"));
-        ASSERT(_client.findOne(ns, fromjson("{a:{$ne:1}}")).isEmpty());
+        ASSERT(_client.findOne(nss, fromjson("{a:{$ne:1}}")).isEmpty());
         BSONObj spec = fromjson("{a:{$ne:1,$ne:2}}");
-        ASSERT(_client.findOne(ns, spec).isEmpty());
+        ASSERT(_client.findOne(nss, spec).isEmpty());
     }
 };
 
@@ -893,8 +905,9 @@ public:
     }
     void run() {
         const char* ns = "unittests.querytests.NestedNe";
+        NamespaceString nss{ns};
         _client.insert(ns, fromjson("{a:[{b:1},{b:2}]}"));
-        ASSERT(_client.findOne(ns, fromjson("{'a.b':{$ne:1}}")).isEmpty());
+        ASSERT(_client.findOne(nss, fromjson("{'a.b':{$ne:1}}")).isEmpty());
     }
 };
 
@@ -905,10 +918,11 @@ public:
     }
     void run() {
         const char* ns = "unittests.querytests.NumericEmbedded";
+        NamespaceString nss{ns};
         _client.insert(ns, BSON("a" << BSON("b" << 1)));
-        ASSERT(!_client.findOne(ns, BSON("a" << BSON("b" << 1.0))).isEmpty());
+        ASSERT(!_client.findOne(nss, BSON("a" << BSON("b" << 1.0))).isEmpty());
         ASSERT_OK(dbtests::createIndex(&_opCtx, ns, BSON("a" << 1)));
-        ASSERT(!_client.findOne(ns, BSON("a" << BSON("b" << 1.0))).isEmpty());
+        ASSERT(!_client.findOne(nss, BSON("a" << BSON("b" << 1.0))).isEmpty());
     }
 };
 
@@ -991,9 +1005,10 @@ public:
     }
     void run() {
         const char* ns = "unittests.querytests.SubobjectInArray";
+        NamespaceString nss{ns};
         _client.insert(ns, fromjson("{a:[{b:{c:1}}]}"));
-        ASSERT(!_client.findOne(ns, BSON("a.b.c" << 1)).isEmpty());
-        ASSERT(!_client.findOne(ns, fromjson("{'a.c':null}")).isEmpty());
+        ASSERT(!_client.findOne(nss, BSON("a.b.c" << 1)).isEmpty());
+        ASSERT(!_client.findOne(nss, fromjson("{'a.c':null}")).isEmpty());
     }
 };
 
@@ -1329,26 +1344,24 @@ public:
             b.append("z", 17);
             _client.insert(ns(), b.obj());
         }
-        ASSERT_EQUALS(17, _client.findOne(ns(), BSONObj{})["z"].number());
+        ASSERT_EQUALS(17, _client.findOne(nss(), BSONObj{})["z"].number());
         {
             BSONObjBuilder b;
             b.appendSymbol("x", "eliot");
-            ASSERT_EQUALS(17, _client.findOne(ns(), b.obj())["z"].number());
+            ASSERT_EQUALS(17, _client.findOne(nss(), b.obj())["z"].number());
         }
         ASSERT_EQUALS(17,
                       _client
-                          .findOne(ns(),
+                          .findOne(nss(),
                                    BSON("x"
-                                        << "eliot"),
-                                   Query())["z"]
+                                        << "eliot"))["z"]
                           .number());
         ASSERT_OK(dbtests::createIndex(&_opCtx, ns(), BSON("x" << 1)));
         ASSERT_EQUALS(17,
                       _client
-                          .findOne(ns(),
+                          .findOne(nss(),
                                    BSON("x"
-                                        << "eliot"),
-                                   Query())["z"]
+                                        << "eliot"))["z"]
                           .number());
     }
 };

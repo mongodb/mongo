@@ -61,10 +61,8 @@ boost::optional<repl::OplogEntry> forgeNoopEntryFromImageCollection(
 
     DBDirectClient client(opCtx);
     BSONObj imageObj =
-        client.findOne(NamespaceString::kConfigImagesNamespace.ns(),
-                       BSON("_id" << retryableFindAndModifyOplogEntry.getSessionId()->toBSON()),
-                       Query(),
-                       nullptr);
+        client.findOne(NamespaceString::kConfigImagesNamespace,
+                       BSON("_id" << retryableFindAndModifyOplogEntry.getSessionId()->toBSON()));
     if (imageObj.isEmpty()) {
         return boost::none;
     }
@@ -124,8 +122,7 @@ boost::optional<repl::OplogEntry> fetchPrePostImageOplog(OperationContext* opCtx
 
     auto opTime = opTimeToFetch.value();
     DBDirectClient client(opCtx);
-    auto oplogBSON =
-        client.findOne(NamespaceString::kRsOplogNamespace.ns(), opTime.asQuery(), Query(), nullptr);
+    auto oplogBSON = client.findOne(NamespaceString::kRsOplogNamespace, opTime.asQuery());
 
     return uassertStatusOK(repl::OplogEntry::parse(oplogBSON));
 }
@@ -437,8 +434,8 @@ bool SessionCatalogMigrationSource::_fetchNextNewWriteOplog(OperationContext* op
     }
 
     DBDirectClient client(opCtx);
-    const auto& newWriteOplogDoc = client.findOne(
-        NamespaceString::kRsOplogNamespace.ns(), nextOpTimeToFetch.asQuery(), Query(), nullptr);
+    const auto& newWriteOplogDoc =
+        client.findOne(NamespaceString::kRsOplogNamespace, nextOpTimeToFetch.asQuery());
 
     uassert(40620,
             str::stream() << "Unable to fetch oplog entry with opTime: "

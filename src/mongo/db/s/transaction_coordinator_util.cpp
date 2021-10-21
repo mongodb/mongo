@@ -168,7 +168,7 @@ repl::OpTime persistParticipantListBlocking(
         // exists. Note that this is best-effort: the document may have been deleted or manually
         // changed since the update above ran.
         const auto doc = client.findOne(
-            NamespaceString::kTransactionCoordinatorsNamespace.toString(),
+            NamespaceString::kTransactionCoordinatorsNamespace,
             BSON(TransactionCoordinatorDocument::kIdFieldName << sessionInfo.toBSON()));
         uasserted(51025,
                   str::stream() << "While attempting to write participant list "
@@ -400,7 +400,7 @@ repl::OpTime persistDecisionBlocking(OperationContext* opCtx,
         // exists. Note that this is best-effort: the document may have been deleted or manually
         // changed since the update above ran.
         const auto doc = client.findOne(
-            NamespaceString::kTransactionCoordinatorsNamespace.ns(),
+            NamespaceString::kTransactionCoordinatorsNamespace,
             BSON(TransactionCoordinatorDocument::kIdFieldName << sessionInfo.toBSON()));
         uasserted(51026,
                   str::stream() << "While attempting to write decision "
@@ -602,7 +602,7 @@ void deleteCoordinatorDocBlocking(OperationContext* opCtx,
         // exists. Note that this is best-effort: the document may have been deleted or manually
         // changed since the update above ran.
         const auto doc = client.findOne(
-            NamespaceString::kTransactionCoordinatorsNamespace.toString(),
+            NamespaceString::kTransactionCoordinatorsNamespace,
             BSON(TransactionCoordinatorDocument::kIdFieldName << sessionInfo.toBSON()));
         uasserted(51027,
                   str::stream() << "While attempting to delete document for " << lsid.getId() << ':'

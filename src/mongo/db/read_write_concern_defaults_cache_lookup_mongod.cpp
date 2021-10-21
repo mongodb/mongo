@@ -49,7 +49,7 @@ BSONObj getPersistedDefaultRWConcernDocument(OperationContext* opCtx) {
             !MONGO_unlikely(failRWCDefaultsLookup.shouldFail()));
 
     DBDirectClient client(opCtx);
-    return client.findOne(NamespaceString::kConfigSettingsNamespace.toString(),
+    return client.findOne(NamespaceString::kConfigSettingsNamespace,
                           BSON("_id" << ReadWriteConcernDefaults::kPersistedDocumentId));
 }
 

@@ -128,7 +128,7 @@ Status InitialSyncBaseCloner::checkInitialSyncIdIsUnchanged() {
     BSONObj initialSyncId;
     try {
         initialSyncId = getClient()->findOne(
-            ReplicationConsistencyMarkersImpl::kDefaultInitialSyncIdNamespace.toString(),
+            NamespaceString{ReplicationConsistencyMarkersImpl::kDefaultInitialSyncIdNamespace},
             BSONObj{});
     } catch (DBException& e) {
         if (ErrorCodes::isRetriableError(e)) {

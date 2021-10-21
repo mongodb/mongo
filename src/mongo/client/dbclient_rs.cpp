@@ -535,6 +535,59 @@ void DBClientReplicaSet::remove(const string& ns,
     checkPrimary()->remove(ns, filter, removeMany, writeConcernObj);
 }
 
+std::unique_ptr<DBClientCursor> DBClientReplicaSet::find(FindCommandRequest findRequest,
+                                                         const ReadPreferenceSetting& readPref) {
+    invariant(findRequest.getNamespaceOrUUID().nss());
+    const std::string nss = findRequest.getNamespaceOrUUID().nss()->ns();
+    if (_isSecondaryQuery(nss, findRequest.toBSON(BSONObj{}), readPref)) {
+        LOGV2_DEBUG(5951202,
+                    3,
+                    "dbclient_rs query using secondary or tagged node selection",
+                    "replicaSet"_attr = _getMonitor()->getName(),
+                    "readPref"_attr = readPref.toString(),
+                    "primary"_attr =
+                        (_primary.get() != nullptr ? _primary->getServerAddress() : "[not cached]"),
+                    "lastTagged"_attr = (_lastSecondaryOkConn.get() != nullptr
+                                             ? _lastSecondaryOkConn->getServerAddress()
+                                             : "[not cached]"));
+        std::string lastNodeErrMsg;
+
+        for (size_t retry = 0; retry < MAX_RETRY; retry++) {
+            try {
+                DBClientConnection* conn =
+                    selectNodeUsingTags(std::make_shared<ReadPreferenceSetting>(readPref));
+                if (!conn) {
+                    break;
+                }
+
+                std::unique_ptr<DBClientCursor> cursor = conn->find(findRequest, readPref);
+
+                return checkSecondaryQueryResult(std::move(cursor));
+            } catch (const DBException& ex) {
+                const Status status = ex.toStatus(str::stream() << "can't query replica set node "
+                                                                << _lastSecondaryOkHost);
+                lastNodeErrMsg = status.reason();
+                _invalidateLastSecondaryOkCache(status);
+            }
+        }
+
+        StringBuilder assertMsg;
+        assertMsg << "Failed to do query, no good nodes in " << _getMonitor()->getName();
+        if (!lastNodeErrMsg.empty()) {
+            assertMsg << ", last error: " << lastNodeErrMsg;
+        }
+
+        uasserted(5951203, assertMsg.str());
+    }
+
+    LOGV2_DEBUG(5951204,
+                3,
+                "dbclient_rs query to primary node",
+                "replicaSet"_attr = _getMonitor()->getName());
+
+    return checkPrimary()->find(std::move(findRequest), readPref);
+}
+
 unique_ptr<DBClientCursor> DBClientReplicaSet::query(const NamespaceStringOrUUID& nsOrUuid,
                                                      const BSONObj& filter,
                                                      const Query& querySettings,
@@ -615,67 +668,6 @@ unique_ptr<DBClientCursor> DBClientReplicaSet::query(const NamespaceStringOrUUID
                                  queryOptions,
                                  batchSize,
                                  readConcernObj);
-}
-
-BSONObj DBClientReplicaSet::findOne(const string& ns,
-                                    const BSONObj& filter,
-                                    const Query& querySettings,
-                                    const BSONObj* fieldsToReturn,
-                                    int queryOptions,
-                                    boost::optional<BSONObj> readConcernObj) {
-    shared_ptr<ReadPreferenceSetting> readPref(_extractReadPref(querySettings, queryOptions));
-    if (_isSecondaryQuery(ns, filter, *readPref)) {
-        LOGV2_DEBUG(20135,
-                    3,
-                    "dbclient_rs findOne using secondary or tagged node selection in {replicaSet}, "
-                    "read pref is {readPref} "
-                    "(primary : {primary}, lastTagged : {lastTagged})",
-                    "dbclient_rs findOne using secondary or tagged node selection",
-                    "replicaSet"_attr = _getMonitor()->getName(),
-                    "readPref"_attr = readPref->toString(),
-                    "primary"_attr =
-                        (_primary.get() != nullptr ? _primary->getServerAddress() : "[not cached]"),
-                    "secondaryHostNamme"_attr = (_lastSecondaryOkConn.get() != nullptr
-                                                     ? _lastSecondaryOkConn->getServerAddress()
-                                                     : "[not cached]"));
-
-        string lastNodeErrMsg;
-
-        for (size_t retry = 0; retry < MAX_RETRY; retry++) {
-            try {
-                DBClientConnection* conn = selectNodeUsingTags(readPref);
-
-                if (conn == nullptr) {
-                    break;
-                }
-
-                return conn->findOne(
-                    ns, filter, querySettings, fieldsToReturn, queryOptions, readConcernObj);
-            } catch (const DBException& ex) {
-                const Status status = ex.toStatus(str::stream() << "can't findone replica set node "
-                                                                << _lastSecondaryOkHost.toString());
-                lastNodeErrMsg = status.reason();
-                _invalidateLastSecondaryOkCache(status);
-            }
-        }
-
-        StringBuilder assertMsg;
-        assertMsg << "Failed to call findOne, no good nodes in " << _getMonitor()->getName();
-        if (!lastNodeErrMsg.empty()) {
-            assertMsg << ", last error: " << lastNodeErrMsg;
-        }
-
-        uasserted(16379, assertMsg.str());
-    }
-
-    LOGV2_DEBUG(20136,
-                3,
-                "dbclient_rs findOne to primary node in {replicaSet}",
-                "dbclient_rs findOne to primary node",
-                "replicaSet"_attr = _getMonitor()->getName());
-
-    return checkPrimary()->findOne(
-        ns, filter, querySettings, fieldsToReturn, queryOptions, readConcernObj);
 }
 
 void DBClientReplicaSet::killCursor(const NamespaceString& ns, long long cursorID) {

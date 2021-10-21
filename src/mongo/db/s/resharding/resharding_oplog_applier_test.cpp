@@ -413,10 +413,10 @@ TEST_F(ReshardingOplogApplierTest, ApplyBasicCrud) {
     ASSERT_OK(future.getNoThrow());
 
     DBDirectClient client(operationContext());
-    auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
+    auto doc = client.findOne(appliedToNs(), BSON("_id" << 1));
     ASSERT_BSONOBJ_EQ(BSONObj(), doc);
 
-    doc = client.findOne(appliedToNs().ns(), BSON("_id" << 2));
+    doc = client.findOne(appliedToNs(), BSON("_id" << 2));
     ASSERT_BSONOBJ_EQ(BSON("_id" << 2 << "x" << 1), doc);
 
     auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
@@ -489,7 +489,7 @@ TEST_F(ReshardingOplogApplierTest, InsertTypeOplogAppliedInMultipleBatches) {
     DBDirectClient client(operationContext());
 
     for (int x = 0; x < 19; x++) {
-        auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << x));
+        auto doc = client.findOne(appliedToNs(), BSON("_id" << x));
         ASSERT_BSONOBJ_EQ(BSON("_id" << x), doc);
     }
 
@@ -527,7 +527,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorDuringFirstBatchApply) {
     ASSERT_EQ(future.getNoThrow(), ErrorCodes::FailedToParse);
 
     DBDirectClient client(operationContext());
-    auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
+    auto doc = client.findOne(appliedToNs(), BSON("_id" << 1));
     ASSERT_BSONOBJ_EQ(BSON("_id" << 1), doc);
 
     auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
@@ -569,13 +569,13 @@ TEST_F(ReshardingOplogApplierTest, ErrorDuringSecondBatchApply) {
     ASSERT_EQ(future.getNoThrow(), ErrorCodes::FailedToParse);
 
     DBDirectClient client(operationContext());
-    auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
+    auto doc = client.findOne(appliedToNs(), BSON("_id" << 1));
     ASSERT_BSONOBJ_EQ(BSON("_id" << 1), doc);
 
-    doc = client.findOne(appliedToNs().ns(), BSON("_id" << 2));
+    doc = client.findOne(appliedToNs(), BSON("_id" << 2));
     ASSERT_BSONOBJ_EQ(BSON("_id" << 2), doc);
 
-    doc = client.findOne(appliedToNs().ns(), BSON("_id" << 3));
+    doc = client.findOne(appliedToNs(), BSON("_id" << 3));
     ASSERT_BSONOBJ_EQ(BSON("_id" << 3), doc);
 
     auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
@@ -610,7 +610,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstOplog) {
     ASSERT_EQ(future.getNoThrow(), ErrorCodes::InternalError);
 
     DBDirectClient client(operationContext());
-    auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
+    auto doc = client.findOne(appliedToNs(), BSON("_id" << 1));
     ASSERT_BSONOBJ_EQ(BSONObj(), doc);
 
     auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
@@ -646,7 +646,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstBatch) {
     ASSERT_EQ(future.getNoThrow(), ErrorCodes::InternalError);
 
     DBDirectClient client(operationContext());
-    auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
+    auto doc = client.findOne(appliedToNs(), BSON("_id" << 1));
     ASSERT_BSONOBJ_EQ(BSONObj(), doc);
 
     auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
@@ -686,13 +686,13 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingSecondBatch) {
     ASSERT_EQ(future.getNoThrow(), ErrorCodes::InternalError);
 
     DBDirectClient client(operationContext());
-    auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
+    auto doc = client.findOne(appliedToNs(), BSON("_id" << 1));
     ASSERT_BSONOBJ_EQ(BSON("_id" << 1), doc);
 
-    doc = client.findOne(appliedToNs().ns(), BSON("_id" << 2));
+    doc = client.findOne(appliedToNs(), BSON("_id" << 2));
     ASSERT_BSONOBJ_EQ(BSON("_id" << 2), doc);
 
-    doc = client.findOne(appliedToNs().ns(), BSON("_id" << 3));
+    doc = client.findOne(appliedToNs(), BSON("_id" << 3));
     ASSERT_BSONOBJ_EQ(BSONObj(), doc);
 
     auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
@@ -727,7 +727,7 @@ TEST_F(ReshardingOplogApplierTest, ExecutorIsShutDown) {
     ASSERT_EQ(future.getNoThrow(), ErrorCodes::ShutdownInProgress);
 
     DBDirectClient client(operationContext());
-    auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
+    auto doc = client.findOne(appliedToNs(), BSON("_id" << 1));
     ASSERT_BSONOBJ_EQ(BSONObj(), doc);
 
     auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
@@ -766,10 +766,10 @@ TEST_F(ReshardingOplogApplierTest, UnsupportedCommandOpsShouldError) {
     ASSERT_EQ(future.getNoThrow(), ErrorCodes::OplogOperationUnsupported);
 
     DBDirectClient client(operationContext());
-    auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
+    auto doc = client.findOne(appliedToNs(), BSON("_id" << 1));
     ASSERT_BSONOBJ_EQ(BSON("_id" << 1), doc);
 
-    doc = client.findOne(appliedToNs().ns(), BSON("_id" << 2));
+    doc = client.findOne(appliedToNs(), BSON("_id" << 2));
     ASSERT_BSONOBJ_EQ(BSONObj(), doc);
 
     auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());

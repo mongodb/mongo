@@ -2990,7 +2990,7 @@ TEST_F(OplogApplierImplTxnTableTest, MultiApplyUpdatesTheTransactionTable) {
 
     // The txnNum and optime of the only write were saved.
     auto resultSingleDoc =
-        client.findOne(NamespaceString::kSessionTransactionsTableNamespace.ns(),
+        client.findOne(NamespaceString::kSessionTransactionsTableNamespace,
                        BSON(SessionTxnRecord::kSessionIdFieldName << lsidSingle.toBSON()));
     ASSERT_TRUE(!resultSingleDoc.isEmpty());
 
@@ -3002,7 +3002,7 @@ TEST_F(OplogApplierImplTxnTableTest, MultiApplyUpdatesTheTransactionTable) {
 
     // The txnNum and optime of the write with the larger txnNum were saved.
     auto resultDiffTxnDoc =
-        client.findOne(NamespaceString::kSessionTransactionsTableNamespace.ns(),
+        client.findOne(NamespaceString::kSessionTransactionsTableNamespace,
                        BSON(SessionTxnRecord::kSessionIdFieldName << lsidDiffTxn.toBSON()));
     ASSERT_TRUE(!resultDiffTxnDoc.isEmpty());
 
@@ -3014,7 +3014,7 @@ TEST_F(OplogApplierImplTxnTableTest, MultiApplyUpdatesTheTransactionTable) {
 
     // The txnNum and optime of the write with the later optime were saved.
     auto resultSameTxnDoc =
-        client.findOne(NamespaceString::kSessionTransactionsTableNamespace.ns(),
+        client.findOne(NamespaceString::kSessionTransactionsTableNamespace,
                        BSON(SessionTxnRecord::kSessionIdFieldName << lsidSameTxn.toBSON()));
     ASSERT_TRUE(!resultSameTxnDoc.isEmpty());
 
@@ -3026,7 +3026,7 @@ TEST_F(OplogApplierImplTxnTableTest, MultiApplyUpdatesTheTransactionTable) {
 
     // There is no entry for the write with no txnNumber.
     auto resultNoTxn =
-        client.findOne(NamespaceString::kSessionTransactionsTableNamespace.ns(),
+        client.findOne(NamespaceString::kSessionTransactionsTableNamespace,
                        BSON(SessionTxnRecord::kSessionIdFieldName << lsidNoTxn.toBSON()));
     ASSERT_TRUE(resultNoTxn.isEmpty());
 }

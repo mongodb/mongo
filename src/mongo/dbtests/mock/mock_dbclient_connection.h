@@ -120,6 +120,9 @@ public:
     using DBClientBase::runCommandWithTarget;
     std::pair<rpc::UniqueReply, DBClientBase*> runCommandWithTarget(OpMsgRequest request) override;
 
+    std::unique_ptr<DBClientCursor> find(FindCommandRequest findRequest,
+                                         const ReadPreferenceSetting& readPref) override;
+
     std::unique_ptr<mongo::DBClientCursor> query(
         const NamespaceStringOrUUID& nsOrUuid,
         const BSONObj& filter = BSONObj{},
@@ -202,6 +205,11 @@ public:
 
 private:
     void checkConnection() override;
+
+    std::unique_ptr<DBClientCursor> bsonArrayToCursor(BSONArray results,
+                                                      int nToSkip,
+                                                      bool provideResumeToken,
+                                                      int batchSize);
 
     MockRemoteDBServer::InstanceID _remoteServerInstanceID;
     MockRemoteDBServer* const _remoteServer;

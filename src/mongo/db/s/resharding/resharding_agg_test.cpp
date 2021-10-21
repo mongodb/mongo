@@ -154,7 +154,7 @@ public:
         const Document& documentKey,
         boost::optional<BSONObj> readConcern) {
         DBDirectClient client(expCtx->opCtx);
-        auto result = client.findOne(nss.ns(), documentKey.toBson());
+        auto result = client.findOne(nss, documentKey.toBson());
         if (result.isEmpty()) {
             return boost::none;
         }

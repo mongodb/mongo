@@ -93,8 +93,70 @@ std::pair<rpc::UniqueReply, DBClientBase*> MockDBClientConnection::runCommandWit
         _failed.store(true);
         throw;
     }
-}  // namespace mongo
+}
 
+namespace {
+int nToSkipFromResumeAfter(const BSONObj& resumeAfter) {
+    if (resumeAfter.isEmpty()) {
+        return 0;
+    }
+
+    auto nElt = resumeAfter["n"];
+    if (!nElt || !nElt.isNumber()) {
+        return 0;
+    }
+
+    return nElt.numberInt();
+}
+}  // namespace
+
+std::unique_ptr<DBClientCursor> MockDBClientConnection::bsonArrayToCursor(BSONArray results,
+                                                                          int nToSkip,
+                                                                          bool provideResumeToken,
+                                                                          int batchSize) {
+    BSONArray resultsInCursor;
+
+    // Resume query.
+    if (nToSkip != 0) {
+        BSONObjIterator iter(results);
+        BSONArrayBuilder builder;
+        auto numExamined = 0;
+
+        while (iter.more()) {
+            numExamined++;
+
+            if (numExamined < nToSkip + 1) {
+                iter.next();
+                continue;
+            }
+
+            builder.append(iter.next().Obj());
+        }
+        resultsInCursor = BSONArray(builder.obj());
+    } else {
+        // Yield all results instead (default).
+        resultsInCursor = BSONArray(results.copy());
+    }
+
+    return std::make_unique<DBClientMockCursor>(
+        this, resultsInCursor, provideResumeToken, batchSize);
+}
+
+std::unique_ptr<DBClientCursor> MockDBClientConnection::find(
+    FindCommandRequest findRequest, const ReadPreferenceSetting& readPref) {
+    checkConnection();
+    try {
+        int nToSkip = nToSkipFromResumeAfter(findRequest.getResumeAfter());
+        bool provideResumeToken = findRequest.getRequestResumeToken();
+        int batchSize = findRequest.getBatchSize().value_or(0);
+        BSONArray results = _remoteServer->find(_remoteServerInstanceID, findRequest);
+        return bsonArrayToCursor(std::move(results), nToSkip, provideResumeToken, batchSize);
+    } catch (const DBException&) {
+        _failed.store(true);
+        throw;
+    }
+    return nullptr;
+}
 
 std::unique_ptr<mongo::DBClientCursor> MockDBClientConnection::query(
     const NamespaceStringOrUUID& nsOrUuid,
@@ -127,9 +189,7 @@ std::unique_ptr<mongo::DBClientCursor> MockDBClientConnection::query(
         auto nToSkip = 0;
         BSONObj querySettingsAsBSON = querySettings.getFullSettingsDeprecated();
         if (querySettingsAsBSON.hasField("$_resumeAfter")) {
-            if (querySettingsAsBSON["$_resumeAfter"].Obj().hasField("n")) {
-                nToSkip = querySettingsAsBSON["$_resumeAfter"]["n"].numberInt();
-            }
+            nToSkip = nToSkipFromResumeAfter(querySettingsAsBSON.getField("$_resumeAfter").Obj());
         }
 
         bool provideResumeToken = false;
@@ -137,39 +197,14 @@ std::unique_ptr<mongo::DBClientCursor> MockDBClientConnection::query(
             provideResumeToken = true;
         }
 
-        // Resume query.
-        if (nToSkip != 0) {
-            BSONObjIterator iter(result);
-            BSONArrayBuilder builder;
-            auto numExamined = 0;
 
-            while (iter.more()) {
-                numExamined++;
-
-                if (numExamined < nToSkip + 1) {
-                    iter.next();
-                    continue;
-                }
-
-                builder.append(iter.next().Obj());
-            }
-            resultsInCursor = BSONArray(builder.obj());
-        } else {
-            // Yield all results instead (default).
-            resultsInCursor = BSONArray(result.copy());
-        }
-
-        std::unique_ptr<mongo::DBClientCursor> cursor;
-        cursor.reset(new DBClientMockCursor(
-            this, BSONArray(resultsInCursor), provideResumeToken, batchSize));
-        return cursor;
+        return bsonArrayToCursor(std::move(result), nToSkip, provideResumeToken, batchSize);
     } catch (const mongo::DBException&) {
         _failed.store(true);
         throw;
     }
 
-    std::unique_ptr<mongo::DBClientCursor> nullPtr;
-    return nullPtr;
+    return nullptr;
 }
 
 mongo::ConnectionString::ConnectionType MockDBClientConnection::type() const {

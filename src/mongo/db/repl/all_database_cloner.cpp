@@ -132,7 +132,8 @@ BaseCloner::AfterStageBehavior AllDatabaseCloner::getInitialSyncIdStage() {
     if (wireVersion < WireVersion::RESUMABLE_INITIAL_SYNC)
         return kContinueNormally;
     auto initialSyncId = getClient()->findOne(
-        ReplicationConsistencyMarkersImpl::kDefaultInitialSyncIdNamespace.toString(), BSONObj{});
+        NamespaceString{ReplicationConsistencyMarkersImpl::kDefaultInitialSyncIdNamespace},
+        BSONObj{});
     uassert(ErrorCodes::InitialSyncFailure,
             "Cannot retrieve sync source initial sync ID",
             !initialSyncId.isEmpty());

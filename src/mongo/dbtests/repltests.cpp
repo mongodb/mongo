@@ -178,7 +178,7 @@ protected:
         return "local.oplog.rs";
     }
     BSONObj one(const BSONObj& query = BSONObj()) const {
-        return _client.findOne(ns(), query);
+        return _client.findOne(nss(), query);
     }
     void checkOne(const BSONObj& o) const {
         check(o, one(o));
@@ -375,10 +375,10 @@ public:
         b.append("a", 1);
         b.appendTimestamp("t");
         _client.insert(ns(), b.done());
-        date_ = _client.findOne(ns(), BSON("a" << 1)).getField("t").date();
+        date_ = _client.findOne(nss(), BSON("a" << 1)).getField("t").date();
     }
     void check() const {
-        BSONObj o = _client.findOne(ns(), BSON("a" << 1));
+        BSONObj o = _client.findOne(nss(), BSON("a" << 1));
         ASSERT(Date_t{} != o.getField("t").date());
         ASSERT_EQUALS(date_, o.getField("t").date());
     }
@@ -466,10 +466,10 @@ public:
         b.append("_id", 1);
         b.appendTimestamp("t");
         _client.update(ns(), BSON("_id" << 1), b.done());
-        date_ = _client.findOne(ns(), BSON("_id" << 1)).getField("t").date();
+        date_ = _client.findOne(nss(), BSON("_id" << 1)).getField("t").date();
     }
     void check() const {
-        BSONObj o = _client.findOne(ns(), BSON("_id" << 1));
+        BSONObj o = _client.findOne(nss(), BSON("_id" << 1));
         ASSERT(Date_t{} != o.getField("t").date());
         ASSERT_EQUALS(date_, o.getField("t").date());
     }
@@ -494,8 +494,8 @@ public:
     }
     void check() const {
         ASSERT_EQUALS(2, count());
-        ASSERT(!_client.findOne(ns(), q_).isEmpty());
-        ASSERT(!_client.findOne(ns(), u_).isEmpty());
+        ASSERT(!_client.findOne(nss(), q_).isEmpty());
+        ASSERT(!_client.findOne(nss(), u_).isEmpty());
     }
     void reset() const {
         deleteAll(ns());
@@ -518,8 +518,8 @@ public:
     }
     void check() const {
         ASSERT_EQUALS(2, count());
-        ASSERT(!_client.findOne(ns(), q_).isEmpty());
-        ASSERT(!_client.findOne(ns(), u_).isEmpty());
+        ASSERT(!_client.findOne(nss(), q_).isEmpty());
+        ASSERT(!_client.findOne(nss(), u_).isEmpty());
     }
     void reset() const {
         deleteAll(ns());
@@ -731,7 +731,7 @@ public:
     }
     void check() const {
         ASSERT_EQUALS(2, count());
-        ASSERT(!_client.findOne(ns(), ou_).isEmpty());
+        ASSERT(!_client.findOne(nss(), ou_).isEmpty());
     }
     void reset() const {
         deleteAll(ns());
@@ -751,7 +751,7 @@ public:
     }
     void check() const {
         ASSERT_EQUALS(1, count());
-        ASSERT(!_client.findOne(ns(), ou_).isEmpty());
+        ASSERT(!_client.findOne(nss(), ou_).isEmpty());
     }
     void reset() const {
         deleteAll(ns());

@@ -237,7 +237,7 @@ protected:
     void readReshardingCoordinatorDocAndAssertMatchesExpected(
         OperationContext* opCtx, ReshardingCoordinatorDocument expectedCoordinatorDoc) {
         DBDirectClient client(opCtx);
-        auto doc = client.findOne(NamespaceString::kConfigReshardingOperationsNamespace.ns(),
+        auto doc = client.findOne(NamespaceString::kConfigReshardingOperationsNamespace,
                                   BSON("ns" << expectedCoordinatorDoc.getSourceNss().ns()));
 
         auto coordinatorDoc = ReshardingCoordinatorDocument::parse(
@@ -320,7 +320,7 @@ protected:
         const ReshardingCoordinatorDocument& expectedCoordinatorDoc) {
         DBDirectClient client(opCtx);
         CollectionType onDiskEntry(
-            client.findOne(CollectionType::ConfigNS.ns(), BSON("_id" << _originalNss.ns())));
+            client.findOne(CollectionType::ConfigNS, BSON("_id" << _originalNss.ns())));
 
         ASSERT_EQUALS(onDiskEntry.getAllowMigrations(), expectedCollType.getAllowMigrations());
 
@@ -379,7 +379,7 @@ protected:
     void assertTemporaryCollectionCatalogEntryMatchesExpected(
         OperationContext* opCtx, boost::optional<CollectionType> expectedCollType) {
         DBDirectClient client(opCtx);
-        auto doc = client.findOne(CollectionType::ConfigNS.ns(), BSON("_id" << _tempNss.ns()));
+        auto doc = client.findOne(CollectionType::ConfigNS, BSON("_id" << _tempNss.ns()));
         if (!expectedCollType) {
             ASSERT(doc.isEmpty());
             return;
@@ -618,10 +618,10 @@ protected:
 
         // Check that chunks and tags under the temp namespace have been removed
         DBDirectClient client(opCtx);
-        auto chunkDoc = client.findOne(ChunkType::ConfigNS.ns(), BSON("ns" << _tempNss.ns()));
+        auto chunkDoc = client.findOne(ChunkType::ConfigNS, BSON("ns" << _tempNss.ns()));
         ASSERT(chunkDoc.isEmpty());
 
-        auto tagDoc = client.findOne(TagsType::ConfigNS.ns(), BSON("ns" << _tempNss.ns()));
+        auto tagDoc = client.findOne(TagsType::ConfigNS, BSON("ns" << _tempNss.ns()));
         ASSERT(tagDoc.isEmpty());
     }
 
@@ -647,7 +647,7 @@ protected:
 
         // Check that the entry is removed from config.reshardingOperations
         DBDirectClient client(opCtx);
-        auto doc = client.findOne(NamespaceString::kConfigReshardingOperationsNamespace.ns(),
+        auto doc = client.findOne(NamespaceString::kConfigReshardingOperationsNamespace,
                                   BSON("ns" << expectedCoordinatorDoc.getSourceNss().ns()));
         ASSERT(doc.isEmpty());
 

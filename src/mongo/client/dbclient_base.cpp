@@ -564,32 +564,6 @@ bool DBClientBase::exists(const string& ns) {
     return !results.empty();
 }
 
-BSONObj DBClientBase::findOne(const string& ns,
-                              const BSONObj& filter,
-                              const Query& querySettings,
-                              const BSONObj* fieldsToReturn,
-                              int queryOptions,
-                              boost::optional<BSONObj> readConcernObj) {
-    unique_ptr<DBClientCursor> c = this->query(NamespaceString(ns),
-                                               filter,
-                                               querySettings,
-                                               1 /*limit*/,
-                                               0 /*nToSkip*/,
-                                               fieldsToReturn,
-                                               queryOptions,
-                                               0 /* batchSize */,
-                                               readConcernObj);
-
-    // query() throws on network error so OK to uassert with numeric code here.
-    uassert(10276,
-            str::stream() << "DBClientBase::findN: transport error: " << getServerAddress()
-                          << " ns: " << ns << " filter: " << filter.toString()
-                          << " query settings: " << querySettings.getFullSettingsDeprecated(),
-            c.get());
-
-    return c->more() ? c->nextSafe() : BSONObj();
-}
-
 std::pair<BSONObj, NamespaceString> DBClientBase::findOneByUUID(
     const std::string& db,
     UUID uuid,
@@ -654,6 +628,34 @@ unique_ptr<DBClientCursor> DBClientBase::query(const NamespaceStringOrUUID& nsOr
     if (c->init())
         return c;
     return nullptr;
+}
+
+std::unique_ptr<DBClientCursor> DBClientBase::find(FindCommandRequest findRequest,
+                                                   const ReadPreferenceSetting& readPref) {
+    auto cursor = std::make_unique<DBClientCursor>(this, std::move(findRequest), readPref);
+    if (cursor->init()) {
+        return cursor;
+    }
+    return nullptr;
+}
+
+BSONObj DBClientBase::findOne(FindCommandRequest findRequest,
+                              const ReadPreferenceSetting& readPref) {
+    tassert(5951200,
+            "caller cannot provide a limit when calling DBClientBase::findOne()",
+            !findRequest.getLimit());
+    findRequest.setLimit(1);
+    auto cursor = this->find(std::move(findRequest), readPref);
+
+    uassert(5951201, "DBClientBase::findOne() could not produce cursor", cursor);
+
+    return cursor->more() ? cursor->nextSafe() : BSONObj{};
+}
+
+BSONObj DBClientBase::findOne(const NamespaceStringOrUUID& nssOrUuid, BSONObj filter) {
+    FindCommandRequest findRequest{nssOrUuid};
+    findRequest.setFilter(std::move(filter));
+    return findOne(std::move(findRequest));
 }
 
 unique_ptr<DBClientCursor> DBClientBase::getMore(const string& ns, long long cursorId) {

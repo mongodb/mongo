@@ -1548,64 +1548,6 @@ TEST(QueryRequestTest, ConvertToFindWithAllowDiskUseFalseSucceeds) {
     ASSERT_FALSE(findCmd[FindCommandRequest::kAllowDiskUseFieldName].booleanSafe());
 }
 
-TEST(QueryRequestTest, ParseFromLegacyQuery) {
-    const auto kSkip = 1;
-    const NamespaceString nss("test.testns");
-
-    unique_ptr<FindCommandRequest> findCommand(assertGet(query_request_helper::fromLegacyQuery(
-        nss,
-        fromjson("{query: 1}") /*filter*/,
-        Query().sort(BSON("sort" << 1)).hint(BSON("hint" << 1)),
-        BSON("proj" << 1),
-        kSkip,
-        QueryOption_Exhaust)));
-
-    ASSERT_EQ(*findCommand->getNamespaceOrUUID().nss(), nss);
-    ASSERT_BSONOBJ_EQ(findCommand->getFilter(), fromjson("{query: 1}"));
-    ASSERT_BSONOBJ_EQ(findCommand->getProjection(), fromjson("{proj: 1}"));
-    ASSERT_BSONOBJ_EQ(findCommand->getSort(), fromjson("{sort: 1}"));
-    ASSERT_BSONOBJ_EQ(findCommand->getHint(), fromjson("{hint: 1}"));
-    ASSERT_EQ(findCommand->getSkip(), boost::optional<int64_t>(kSkip));
-    ASSERT_FALSE(findCommand->getNtoreturn());
-    ASSERT_EQ(findCommand->getSingleBatch(), false);
-    ASSERT_EQ(findCommand->getNoCursorTimeout(), false);
-    ASSERT_EQ(findCommand->getTailable(), false);
-    ASSERT_EQ(findCommand->getAllowPartialResults(), false);
-}
-
-TEST(QueryRequestTest, ParseFromLegacyQueryOplogReplayFlagAllowed) {
-    const NamespaceString nss("test.testns");
-    const BSONObj projectionObj{};
-    const auto nToSkip = 0;
-
-    // Test that parsing succeeds even if the oplog replay bit is set in the OP_QUERY message. This
-    // flag may be set by old clients.
-    auto options = QueryOption_OplogReplay_DEPRECATED;
-    unique_ptr<FindCommandRequest> findCommand(assertGet(query_request_helper::fromLegacyQuery(
-        nss, fromjson("{query: 1}"), Query().sort("sort", 1), projectionObj, nToSkip, options)));
-
-    // Verify that if we reserialize the find command, the 'oplogReplay' field
-    // does not appear.
-    BSONObjBuilder bob;
-    findCommand->serialize(BSONObj(), &bob);
-    auto reserialized = bob.obj();
-
-    ASSERT_BSONOBJ_EQ(reserialized,
-                      BSON("find"
-                           << "testns"
-                           << "filter" << BSON("query" << 1) << "sort" << BSON("sort" << 1)
-                           << "readConcern" << BSONObj{}));
-}
-
-TEST(QueryRequestTest, ParseFromLegacyQueryUnwrapped) {
-    const NamespaceString nss("test.testns");
-    unique_ptr<FindCommandRequest> findCommand(assertGet(query_request_helper::fromLegacyQuery(
-        nss, fromjson("{foo: 1}"), Query(), BSONObj(), 0, QueryOption_Exhaust)));
-
-    ASSERT_EQ(*findCommand->getNamespaceOrUUID().nss(), nss);
-    ASSERT_BSONOBJ_EQ(findCommand->getFilter(), fromjson("{foo: 1}"));
-}
-
 TEST(QueryRequestHelperTest, ValidateResponseMissingFields) {
     BSONObjBuilder builder;
     ASSERT_THROWS_CODE(

@@ -88,6 +88,9 @@ public:
 
     // ----------- simple functions --------------
 
+    std::unique_ptr<DBClientCursor> find(FindCommandRequest findRequest,
+                                         const ReadPreferenceSetting& readPref) override;
+
     /** throws userassertion "no primary found" */
     std::unique_ptr<DBClientCursor> query(
         const NamespaceStringOrUUID& nsOrUuid,
@@ -99,14 +102,6 @@ public:
         int queryOptions = 0,
         int batchSize = 0,
         boost::optional<BSONObj> readConcernObj = boost::none) override;
-
-    /** throws userassertion "no primary found" */
-    BSONObj findOne(const std::string& ns,
-                    const BSONObj& filter,
-                    const Query& querySettings,
-                    const BSONObj* fieldsToReturn = nullptr,
-                    int queryOptions = 0,
-                    boost::optional<BSONObj> readConcernObj = boost::none) override;
 
     void insert(const std::string& ns,
                 BSONObj obj,

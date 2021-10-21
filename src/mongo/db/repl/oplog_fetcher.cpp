@@ -1042,10 +1042,11 @@ Status OplogFetcher::_checkTooStaleToSyncFromSource(const OpTime lastFetched,
     BSONObj remoteFirstOplogEntry;
     try {
         // Query for the first oplog entry in the sync source's oplog.
-        auto query = Query().sort(BSON("$natural" << 1));
+        FindCommandRequest findRequest{_nss};
+        findRequest.setSort(BSON("$natural" << 1));
         // Since this function is called after the first batch, the exhaust stream has not been
         // started yet. As a result, using the same connection is safe.
-        remoteFirstOplogEntry = _conn->findOne(_nss.ns(), BSONObj{}, query);
+        remoteFirstOplogEntry = _conn->findOne(std::move(findRequest));
     } catch (DBException& e) {
         // If an error occurs with the query, throw an error.
         return Status(ErrorCodes::TooStaleToSyncFromSource, e.reason());

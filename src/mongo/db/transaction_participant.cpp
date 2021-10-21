@@ -154,7 +154,7 @@ ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
         // field has been set, bumping the global lock acquisition to an IX. That upconvert would
         // require a flow control ticket to be obtained.
         FlowControl::Bypass flowControlBypass(opCtx);
-        auto result = client.findOne(NamespaceString::kSessionTransactionsTableNamespace.ns(),
+        auto result = client.findOne(NamespaceString::kSessionTransactionsTableNamespace,
                                      BSON(SessionTxnRecord::kSessionIdFieldName << lsid.toBSON()));
         if (result.isEmpty()) {
             return boost::none;

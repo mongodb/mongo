@@ -53,10 +53,10 @@ DBClientMockCursor::DBClientMockCursor(mongo::DBClientBase* client,
 }
 
 bool DBClientMockCursor::more() {
-    if (_batchSize && batch.pos == _batchSize) {
+    if (_batchSize && _batch.pos == _batchSize) {
         _fillNextBatch();
     }
-    return batch.pos < batch.objs.size();
+    return _batch.pos < _batch.objs.size();
 }
 
 void DBClientMockCursor::_fillNextBatch() {
@@ -71,15 +71,15 @@ void DBClientMockCursor::_fillNextBatch() {
     });
 
     int leftInBatch = _batchSize;
-    batch.objs.clear();
+    _batch.objs.clear();
     while (_iter.more() && (!_batchSize || leftInBatch--)) {
-        batch.objs.emplace_back(_iter.next().Obj().getOwned());
+        _batch.objs.emplace_back(_iter.next().Obj().getOwned());
     }
-    batch.pos = 0;
+    _batch.pos = 0;
 
     // Store a mock resume token, if applicable.
-    if (!batch.objs.empty()) {
-        auto lastId = batch.objs.back()["_id"].numberInt();
+    if (!_batch.objs.empty()) {
+        auto lastId = _batch.objs.back()["_id"].numberInt();
         _postBatchResumeToken = BSON("n" << lastId);
     }
 }

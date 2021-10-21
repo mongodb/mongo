@@ -195,16 +195,9 @@ BSONObj MockRemoteDBServer::project(projection_executor::ProjectionExecutor* pro
     return projectedDoc.toBson().getOwned();
 }
 
-mongo::BSONArray MockRemoteDBServer::query(MockRemoteDBServer::InstanceID id,
-                                           const NamespaceStringOrUUID& nsOrUuid,
-                                           const BSONObj& filter,
-                                           const Query& querySettings,
-                                           int limit,
-                                           int nToSkip,
-                                           const BSONObj* fieldsToReturn,
-                                           int queryOptions,
-                                           int batchSize,
-                                           boost::optional<BSONObj> readConcernObj) {
+mongo::BSONArray MockRemoteDBServer::findImpl(InstanceID id,
+                                              const NamespaceStringOrUUID& nsOrUuid,
+                                              BSONObj projection) {
     checkIfUp(id);
 
     if (_delayMilliSec > 0) {
@@ -214,8 +207,8 @@ mongo::BSONArray MockRemoteDBServer::query(MockRemoteDBServer::InstanceID id,
     checkIfUp(id);
 
     std::unique_ptr<projection_executor::ProjectionExecutor> projectionExecutor;
-    if (fieldsToReturn) {
-        projectionExecutor = createProjectionExecutor(*fieldsToReturn);
+    if (!projection.isEmpty()) {
+        projectionExecutor = createProjectionExecutor(projection);
     }
     scoped_spinlock sLock(_lock);
     _queryCount++;
@@ -228,6 +221,25 @@ mongo::BSONArray MockRemoteDBServer::query(MockRemoteDBServer::InstanceID id,
     }
 
     return BSONArray(result.obj());
+}
+
+mongo::BSONArray MockRemoteDBServer::find(MockRemoteDBServer::InstanceID id,
+                                          const FindCommandRequest& findRequest) {
+    return findImpl(id, findRequest.getNamespaceOrUUID(), findRequest.getProjection());
+}
+
+mongo::BSONArray MockRemoteDBServer::query(MockRemoteDBServer::InstanceID id,
+                                           const NamespaceStringOrUUID& nsOrUuid,
+                                           const BSONObj& filter,
+                                           const Query& querySettings,
+                                           int limit,
+                                           int nToSkip,
+                                           const BSONObj* fieldsToReturn,
+                                           int queryOptions,
+                                           int batchSize,
+                                           boost::optional<BSONObj> readConcernObj) {
+    BSONObj projection = fieldsToReturn ? *fieldsToReturn : BSONObj{};
+    return findImpl(id, nsOrUuid, std::move(projection));
 }
 
 mongo::ConnectionString::ConnectionType MockRemoteDBServer::type() const {

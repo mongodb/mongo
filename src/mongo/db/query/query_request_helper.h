@@ -144,19 +144,10 @@ TailableModeEnum getTailableMode(const FindCommandRequest& findCommand);
  */
 void validateCursorResponse(const BSONObj& outputAsBson);
 
-//
-// Old parsing code: SOON TO BE DEPRECATED.
-//
-
 /**
- * Parse the provided legacy query object and parameters to construct a FindCommandRequest.
+ * Updates the projection object with a $meta projection for the showRecordId option.
  */
-StatusWith<std::unique_ptr<FindCommandRequest>> fromLegacyQuery(NamespaceStringOrUUID nsOrUuid,
-                                                                const BSONObj& filter,
-                                                                const Query& querySettings,
-                                                                const BSONObj& proj,
-                                                                int ntoskip,
-                                                                int queryOptions);
+void addShowRecordIdMetaProj(FindCommandRequest* findCommand);
 
 }  // namespace query_request_helper
 }  // namespace mongo

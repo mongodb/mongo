@@ -66,22 +66,19 @@ int RollbackSourceImpl::getRollbackId() const {
 }
 
 BSONObj RollbackSourceImpl::getLastOperation() const {
-    return _getConnection()->findOne(_collectionName,
-                                     BSONObj{},
-                                     Query().sort(BSON("$natural" << -1)),
-                                     nullptr,
-                                     QueryOption_SecondaryOk,
-                                     ReadConcernArgs::kImplicitDefault);
+    FindCommandRequest findCmd{NamespaceString{_collectionName}};
+    findCmd.setSort(BSON("$natural" << -1));
+    findCmd.setReadConcern(ReadConcernArgs::kImplicitDefault);
+    return _getConnection()->findOne(std::move(findCmd),
+                                     ReadPreferenceSetting{ReadPreference::SecondaryPreferred});
 }
 
 BSONObj RollbackSourceImpl::findOne(const NamespaceString& nss, const BSONObj& filter) const {
+    FindCommandRequest findCmd{nss};
+    findCmd.setFilter(filter);
+    findCmd.setReadConcern(ReadConcernArgs::kImplicitDefault);
     return _getConnection()
-        ->findOne(nss.toString(),
-                  filter,
-                  Query(),
-                  nullptr,
-                  QueryOption_SecondaryOk,
-                  ReadConcernArgs::kImplicitDefault)
+        ->findOne(std::move(findCmd), ReadPreferenceSetting{ReadPreference::SecondaryPreferred})
         .getOwned();
 }
 

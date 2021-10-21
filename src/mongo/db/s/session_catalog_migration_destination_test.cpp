@@ -163,7 +163,7 @@ public:
 
     repl::OplogEntry getOplog(OperationContext* opCtx, const repl::OpTime& opTime) {
         DBDirectClient client(opCtx);
-        auto oplogBSON = client.findOne(NamespaceString::kRsOplogNamespace.ns(), opTime.asQuery());
+        auto oplogBSON = client.findOne(NamespaceString::kRsOplogNamespace, opTime.asQuery());
 
         ASSERT_FALSE(oplogBSON.isEmpty());
         auto parseStatus = repl::OplogEntry::parse(oplogBSON);
@@ -1998,7 +1998,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, MigratingKnownStmtWhileOplogTrunc
     {
         // Confirm that oplog is indeed empty.
         DBDirectClient client(opCtx);
-        auto result = client.findOne(NamespaceString::kRsOplogNamespace.ns(), BSONObj{});
+        auto result = client.findOne(NamespaceString::kRsOplogNamespace, BSONObj{});
         ASSERT_TRUE(result.isEmpty());
     }
 
