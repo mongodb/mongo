@@ -327,7 +327,7 @@ testutil_is_flag_set(const char *flag)
      */
     flag_being_set = res[0] != '0';
 
-    free((void *)res);
+    __wt_free(NULL, res);
 
     return (flag_being_set);
 }

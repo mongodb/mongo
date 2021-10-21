@@ -3182,18 +3182,20 @@ buildvariants:
       --enable-strict
       --enable-diagnostic
       --disable-static
+      --enable-tcmalloc
       --prefix=$(pwd)/LOCAL_INSTALL
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH make
     test_env_vars:
+      top_dir=$(git rev-parse --show-toplevel)
+      top_builddir=$top_dir/build_posix
       ASAN_OPTIONS="detect_leaks=1:abort_on_error=1:disable_coredump=0"
+      LSAN_OPTIONS="print_suppressions=0:suppressions=$top_dir/test/evergreen/asan_leaks.supp"
       ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer
       TESTUTIL_BYPASS_ASAN=1
       LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libeatmydata.so 
       PATH=/opt/mongodbtoolchain/v3/bin:$PATH
-      top_dir=$(git rev-parse --show-toplevel)
-      top_builddir=$top_dir/build_posix
-      LD_LIBRARY_PATH=$top_builddir/.libs
+      LD_LIBRARY_PATH=$top_builddir/.libs:$top_dir/TCMALLOC_LIB/lib
   tasks:
     - name: ".pull_request !.windows_only !.pull_request_compilers !.python"
     - name: examples-c-test

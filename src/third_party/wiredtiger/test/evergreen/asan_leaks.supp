@@ -1,0 +1,3 @@
+# TCMalloc intentionally leaks newed objects. More information can be found in
+# https://github.com/gperftools/gperftools/issues/758.
+leak:InitModule
