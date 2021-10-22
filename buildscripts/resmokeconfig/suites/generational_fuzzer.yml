@@ -15,3 +15,5 @@ executor:
           clusterType: 'standalone'
           traceExceptions: false
           internalQueryAppendIdToSetWindowFieldsSort: true
+          # Reduce the number of docs generated from $densify to avoid the 30min timeout.
+          internalQueryMaxAllowedDensifyDocs: 1000
