@@ -237,6 +237,15 @@ public:
         std::abort();
     }
 
+    boost::optional<bool> getTimeseriesBucketsMayHaveMixedSchemaData() const {
+        std::abort();
+    }
+
+    void setTimeseriesBucketsMayHaveMixedSchemaData(OperationContext* opCtx,
+                                                    boost::optional<bool> setting) {
+        std::abort();
+    }
+
     bool isClustered() const {
         std::abort();
     }

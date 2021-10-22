@@ -632,6 +632,18 @@ Status _collModInternal(OperationContext* opCtx,
                 opCtx, coll.getWritableCollection(), desc);
         }
 
+        // TODO SERVER-60911: When kLatest is 5.3, only check when upgrading from kLastLTS (5.0).
+        // TODO SERVER-60912: When kLastLTS is 6.0, remove this FCV-gated upgrade code.
+        if (coll->getTimeseriesOptions() && !coll->getTimeseriesBucketsMayHaveMixedSchemaData() &&
+            serverGlobalParams.featureCompatibility.isFCVUpgradingToOrAlreadyLatest()) {
+            // While upgrading the FCV to 5.2+, collMod is called as part of the upgrade process to
+            // add the 'timeseriesBucketsMayHaveMixedSchemaData=true' catalog entry flag for
+            // time-series collections that are missing the flag. This indicates that the
+            // time-series collection existed in earlier server versions and may have mixed-schema
+            // data.
+            coll.getWritableCollection()->setTimeseriesBucketsMayHaveMixedSchemaData(opCtx, true);
+        }
+
         // Only observe non-view collMods, as view operations are observed as operations on the
         // system.views collection.
         auto* const opObserver = opCtx->getServiceContext()->getOpObserver();

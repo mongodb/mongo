@@ -76,6 +76,8 @@
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/db/ttl_collection_cache.h"
 #include "mongo/db/update/update_driver.h"
@@ -1339,6 +1341,26 @@ bool CollectionImpl::isTemporary() const {
     return _metadata->options.temp;
 }
 
+boost::optional<bool> CollectionImpl::getTimeseriesBucketsMayHaveMixedSchemaData() const {
+    return _metadata->timeseriesBucketsMayHaveMixedSchemaData;
+}
+
+void CollectionImpl::setTimeseriesBucketsMayHaveMixedSchemaData(OperationContext* opCtx,
+                                                                boost::optional<bool> setting) {
+    uassert(6057500, "This is not a time-series collection", _metadata->options.timeseries);
+
+    // TODO SERVER-60911: When kLatest is 5.3, only check when upgrading from kLastLTS (5.0).
+    // TODO SERVER-60912: When kLastLTS is 6.0, remove this FCV-gated upgrade code.
+    uassert(
+        6057501,
+        "Cannot set the 'timeseriesBucketsMayHaveMixedSchemaData' catalog entry flag if FCV < 5.2",
+        serverGlobalParams.featureCompatibility.isFCVUpgradingToOrAlreadyLatest());
+
+    _writeMetadata(opCtx, [&](BSONCollectionCatalogEntry::MetaData& md) {
+        md.timeseriesBucketsMayHaveMixedSchemaData = setting;
+    });
+}
+
 bool CollectionImpl::isClustered() const {
     return getClusteredInfo().is_initialized();
 }
@@ -1875,6 +1897,20 @@ Status CollectionImpl::prepareForIndexBuild(OperationContext* opCtx,
     invariant(-1 == _metadata->findIndexOffset(imd.nameStringData()),
               str::stream() << "index " << imd.nameStringData()
                             << " is already in current metadata: " << _metadata->toBSON());
+
+    if (getTimeseriesOptions() && feature_flags::gTimeseriesMetricIndexes.isEnabledAndIgnoreFCV() &&
+        timeseries::doesBucketsIndexIncludeKeyOnMeasurement(*getTimeseriesOptions(),
+                                                            spec->infoObj())) {
+        invariant(_metadata->timeseriesBucketsMayHaveMixedSchemaData);
+        if (*_metadata->timeseriesBucketsMayHaveMixedSchemaData) {
+            LOGV2(6057502,
+                  "Detected that this time-series collection may have mixed-schema data. "
+                  "Attempting to build the index.",
+                  logAttrs(ns()),
+                  logAttrs(uuid()),
+                  "spec"_attr = spec->infoObj());
+        }
+    }
 
     _writeMetadata(opCtx,
                    [indexMetaData = std::move(imd)](BSONCollectionCatalogEntry::MetaData& md) {

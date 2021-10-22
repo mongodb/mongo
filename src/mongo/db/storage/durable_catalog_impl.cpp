@@ -371,14 +371,15 @@ StatusWith<DurableCatalog::Entry> DurableCatalogImpl::_addEntry(OperationContext
         BSONCollectionCatalogEntry::MetaData md;
         md.ns = nss.ns();
         md.options = options;
-        // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
-        // TODO SERVER-60693: use the 5.2 FCV constant.
+
+        // TODO SERVER-60911: When kLatest is 5.3, only check when upgrading from kLastLTS (5.0).
+        // TODO SERVER-60912: When kLastLTS is 6.0, remove this FCV-gated upgrade code.
         if (options.timeseries &&
-            serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
-                multiversion::GenericFCV::kLatest)) {
-            // Newly created catalog entries for time-series collections in FCV 5.2+ will have this
-            // flag set to false by default as mixed-schema data is only possible in versions 5.1
-            // and earlier.
+            serverGlobalParams.featureCompatibility.isFCVUpgradingToOrAlreadyLatest()) {
+            // When the server has begun upgrading FCV to 5.2, all newly created catalog entries for
+            // time-series collections will have this flag set to false by default as mixed-schema
+            // data is only possible in versions 5.1 and earlier. We do not have to wait for FCV to
+            // be fully upgraded to 5.2 to start this process.
             md.timeseriesBucketsMayHaveMixedSchemaData = false;
         }
         b.append("md", md.toBSON());

@@ -526,6 +526,22 @@ public:
     virtual bool isTemporary() const = 0;
 
     /**
+     * Returns true if the time-series collection may have mixed-schema data.
+     *
+     * If FCV < 5.2 or if this is not a time-series collection, returns boost::none.
+     */
+    virtual boost::optional<bool> getTimeseriesBucketsMayHaveMixedSchemaData() const = 0;
+
+    /**
+     * Sets the 'timeseriesBucketsMayHaveMixedSchemaData' catalog entry flag to 'setting' for this
+     * collection.
+     *
+     * Throws if FCV < 5.2 or if this is not a time-series collection.
+     */
+    virtual void setTimeseriesBucketsMayHaveMixedSchemaData(OperationContext* opCtx,
+                                                            boost::optional<bool> setting) = 0;
+
+    /**
      * Returns true if this collection is clustered on _id values. That is, its RecordIds are _id
      * values and has no separate _id index.
      */

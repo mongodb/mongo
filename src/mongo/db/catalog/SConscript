@@ -353,6 +353,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/storage/storage_engine_impl',
         '$BUILD_DIR/mongo/db/storage/storage_util',
         '$BUILD_DIR/mongo/db/system_index',
+        '$BUILD_DIR/mongo/db/timeseries/timeseries_conversion_util',
         '$BUILD_DIR/mongo/db/transaction',
         '$BUILD_DIR/mongo/db/ttl_collection_cache',
         '$BUILD_DIR/mongo/db/vector_clock',

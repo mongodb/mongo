@@ -2,6 +2,12 @@
  * Tests that the cluster cannot be downgraded when there are secondary indexes on time-series
  * measurements present. Additionally, this verifies that only indexes that are incompatible for
  * downgrade have the "originalSpec" field present on the buckets index definition.
+ *
+ * TODO SERVER-60576: Re-enable this test. Downgrading FCV does not remove the
+ * 'timeseriesBucketsMayHaveMixedSchemaData' catalog entry flag. When upgrading, an invariant will
+ * be triggered as the catalog entry flag is expected to be removed on downgrade.
+ *
+ * @tags: [__TEMPORARILY_DISABLED__]
  */
 (function() {
 "use strict";

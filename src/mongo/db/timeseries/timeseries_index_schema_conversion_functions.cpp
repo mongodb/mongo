@@ -395,4 +395,38 @@ bool isBucketsIndexSpecCompatibleForDowngrade(const TimeseriesOptions& timeserie
                /*timeseriesMetricIndexesFeatureFlagEnabled=*/false) != boost::none;
 }
 
+bool doesBucketsIndexIncludeKeyOnMeasurement(const TimeseriesOptions& timeseriesOptions,
+                                             const BSONObj& bucketsIndex) {
+    if (!bucketsIndex.hasField(kKeyFieldName)) {
+        return false;
+    }
+
+    auto timeField = timeseriesOptions.getTimeField();
+    auto metaField = timeseriesOptions.getMetaField();
+
+    const std::string controlMinTimeField = str::stream()
+        << timeseries::kControlMinFieldNamePrefix << timeField;
+    const std::string controlMaxTimeField = str::stream()
+        << timeseries::kControlMaxFieldNamePrefix << timeField;
+
+    const BSONObj keyObj = bucketsIndex.getField(kKeyFieldName).Obj();
+    for (const auto& elem : keyObj) {
+        if (elem.fieldNameStringData() == controlMinTimeField ||
+            elem.fieldNameStringData() == controlMaxTimeField) {
+            continue;
+        }
+
+        if (metaField) {
+            if (elem.fieldNameStringData() == timeseries::kBucketMetaFieldName ||
+                elem.fieldNameStringData().startsWith(timeseries::kBucketMetaFieldName + ".")) {
+                continue;
+            }
+        }
+
+        return true;
+    }
+
+    return false;
+}
+
 }  // namespace mongo::timeseries

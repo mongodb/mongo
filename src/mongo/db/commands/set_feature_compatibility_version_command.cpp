@@ -397,6 +397,51 @@ private:
             Lock::GlobalLock lk(opCtx, MODE_S);
         }
 
+        // TODO SERVER-60911: When kLatest is 5.3, only check when upgrading from kLastLTS (5.0).
+        // TODO SERVER-60912: When kLastLTS is 6.0, remove this FCV-gated upgrade code.
+        if (serverGlobalParams.featureCompatibility.isFCVUpgradingToOrAlreadyLatest()) {
+            for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
+                Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
+                catalog::forEachCollectionFromDb(
+                    opCtx,
+                    dbName,
+                    MODE_X,
+                    [&](const CollectionPtr& collection) {
+                        if (collection->getTimeseriesBucketsMayHaveMixedSchemaData()) {
+                            // The catalog entry flag has already been added. This can happen if the
+                            // upgrade process was interrupted and is being run again. The catalog
+                            // entry flag must be set to true, in this case. The upgrade process
+                            // cannot be aborted at this point so we don't have to worry about
+                            // unsetting the catalog entry flag.
+                            invariant(*collection->getTimeseriesBucketsMayHaveMixedSchemaData());
+                            return true;
+                        }
+
+                        BSONObjBuilder unusedBuilder;
+                        Status status = collMod(opCtx,
+                                                collection->ns(),
+                                                BSON("collMod" << collection->ns().coll()),
+                                                &unusedBuilder);
+
+                        if (!status.isOK()) {
+                            LOGV2_FATAL(
+                                6057503,
+                                "Failed to add catalog entry during upgrade",
+                                "error"_attr = status,
+                                "timeseriesBucketsMayHaveMixedSchemaData"_attr =
+                                    collection->getTimeseriesBucketsMayHaveMixedSchemaData(),
+                                logAttrs(collection->ns()),
+                                logAttrs(collection->uuid()));
+                        }
+
+                        return true;
+                    },
+                    [&](const CollectionPtr& collection) {
+                        return collection->getTimeseriesOptions() != boost::none;
+                    });
+            }
+        }
+
         uassert(ErrorCodes::Error(549180),
                 "Failing upgrade due to 'failUpgrading' failpoint set",
                 !failUpgrading.shouldFail());

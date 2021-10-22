@@ -76,4 +76,12 @@ std::list<BSONObj> createTimeseriesIndexesFromBucketsIndexes(
 bool isBucketsIndexSpecCompatibleForDowngrade(const TimeseriesOptions& timeseriesOptions,
                                               const BSONObj& bucketsIndex);
 
+/**
+ * Returns true if 'bucketsIndex' contains a key on a measurement field, excluding the time field.
+ * This is helpful to detect if the 'bucketsIndex' contains a key on a field that was allowed to
+ * have mixed-schema data in MongoDB versions < 5.2.
+ */
+bool doesBucketsIndexIncludeKeyOnMeasurement(const TimeseriesOptions& timeseriesOptions,
+                                             const BSONObj& bucketsIndex);
+
 }  // namespace mongo::timeseries

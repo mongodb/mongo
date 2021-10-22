@@ -203,6 +203,15 @@ struct ServerGlobalParams {
                 version != multiversion::GenericFCV::kLastLTS;
         }
 
+        bool isFCVUpgradingToOrAlreadyLatest() const {
+            auto currentVersion = getVersion();
+
+            // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
+            return currentVersion == multiversion::GenericFCV::kUpgradingFromLastLTSToLatest ||
+                isGreaterThanOrEqualTo(
+                       multiversion::GenericFCV::kUpgradingFromLastContinuousToLatest);
+        }
+
         void reset() {
             _version.store(FCV::kUnsetDefaultLastLTSBehavior);
         }

@@ -321,6 +321,10 @@ public:
 
     bool isTemporary() const final;
 
+    boost::optional<bool> getTimeseriesBucketsMayHaveMixedSchemaData() const final;
+    void setTimeseriesBucketsMayHaveMixedSchemaData(OperationContext* opCtx,
+                                                    boost::optional<bool> setting) final;
+
     /**
      * isClustered() relies on the object returned from getClusteredInfo(). If
      * ClusteredCollectionInfo exists, the collection is clustered.
