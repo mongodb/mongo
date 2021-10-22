@@ -36,6 +36,7 @@ env.Library(
         'active_migrations_registry.cpp',
         'active_move_primaries_registry.cpp',
         'active_shard_collection_registry.cpp',
+        'auto_split_vector.cpp',
         'chunk_move_write_concern_options.cpp',
         'chunk_splitter.cpp',
         'collection_critical_section_document.idl',
@@ -294,6 +295,7 @@ env.Library(
     target='sharding_commands_d',
     source=[
         'add_shard_cmd.cpp',
+        'auto_split_vector_command.cpp',
         'check_sharding_index_command.cpp',
         'cleanup_orphaned_cmd.cpp',
         'clone_catalog_data_command.cpp',
@@ -472,6 +474,7 @@ env.CppUnitTest(
         'active_migrations_registry_test.cpp',
         'active_move_primaries_registry_test.cpp',
         'active_shard_collection_registry_test.cpp',
+        'auto_split_vector_test.cpp',
         'balancer/balance_stats_test.cpp',
         'chunk_split_state_driver_test.cpp',
         'collection_metadata_filtering_test.cpp',

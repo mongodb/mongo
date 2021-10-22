@@ -143,7 +143,7 @@ public:
 
 /**
  * Split point building strategy to be used when no optimizations are available. We send a
- * splitVector command to the primary shard in order to calculate the appropriate split points.
+ * autoSplitVector command to the primary shard in order to calculate the appropriate split points.
  */
 class UnoptimizedSplitPolicy : public InitialSplitPolicy {
 public:

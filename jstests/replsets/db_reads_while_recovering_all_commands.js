@@ -105,6 +105,7 @@ const allCommands = {
     appendOplogNote: {skip: isPrimaryOnly},
     applyOps: {skip: isPrimaryOnly},
     authenticate: {skip: isNotAUserDataRead},
+    autoSplitVector: {skip: isNotAUserDataRead},
     availableQueryOptions: {skip: isNotAUserDataRead},
     buildInfo: {skip: isNotAUserDataRead},
     captrunc: {skip: isPrimaryOnly},

@@ -38,11 +38,11 @@
 #include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/s/auto_split_vector.h"
 #include "mongo/db/s/chunk_split_state_driver.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/split_chunk.h"
-#include "mongo/db/s/split_vector.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/balancer_configuration.h"
@@ -336,15 +336,12 @@ void ChunkSplitter::_runAutosplit(std::shared_ptr<ChunkSplitStateDriver> chunkSp
                     "maxChunkSizeBytes"_attr = maxChunkSizeBytes);
 
         chunkSplitStateDriver->prepareSplit();
-        auto splitPoints = splitVector(opCtx.get(),
-                                       nss,
-                                       shardKeyPattern.toBSON(),
-                                       chunk.getMin(),
-                                       chunk.getMax(),
-                                       false,
-                                       boost::none,
-                                       boost::none,
-                                       maxChunkSizeBytes);
+        auto splitPoints = autoSplitVector(opCtx.get(),
+                                           nss,
+                                           shardKeyPattern.toBSON(),
+                                           chunk.getMin(),
+                                           chunk.getMax(),
+                                           maxChunkSizeBytes);
 
         if (splitPoints.empty()) {
             LOGV2_DEBUG(21907,
@@ -354,8 +351,8 @@ void ChunkSplitter::_runAutosplit(std::shared_ptr<ChunkSplitStateDriver> chunkSp
                         "ChunkSplitter attempted split but not enough split points were found for "
                         "chunk",
                         "chunk"_attr = redact(chunk.toString()));
-            // Reset our size estimate that we had prior to splitVector to 0, while still counting
-            // the bytes that have been written in parallel to this split task
+            // Reset our size estimate that we had prior to autoSplitVector to 0, while still
+            // counting the bytes that have been written in parallel to this split task
             chunkSplitStateDriver->abandonPrepare();
             return;
         }

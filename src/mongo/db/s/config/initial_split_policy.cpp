@@ -377,7 +377,7 @@ InitialSplitPolicy::ShardCollectionConfig UnoptimizedSplitPolicy::createFirstChu
     std::vector<ShardId> shardIds{params.primaryShardId};
 
     // Refresh the balancer settings to ensure the chunk size setting, which is sent as part of
-    // the splitVector command and affects the number of chunks returned, has been loaded.
+    // the autoSplitVector command and affects the number of chunks returned, has been loaded.
     const auto balancerConfig = Grid::get(opCtx)->getBalancerConfiguration();
     uassertStatusOK(balancerConfig->refreshAndCheck(opCtx));
     const auto shardSelectedSplitPoints = uassertStatusOK(

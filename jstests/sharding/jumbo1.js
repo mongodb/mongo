@@ -5,8 +5,7 @@ load("jstests/sharding/libs/find_chunks_util.js");
 
 var s = new ShardingTest({shards: 2, other: {chunkSize: 1}});
 
-assert.commandWorked(s.s.adminCommand({enablesharding: "test"}));
-s.ensurePrimaryShard('test', s.shard1.shardName);
+assert.commandWorked(s.s.adminCommand({enablesharding: "test", primaryShard: s.shard1.shardName}));
 assert.commandWorked(
     s.s.adminCommand({addShardToZone: s.shard0.shardName, zone: 'finalDestination'}));
 
@@ -18,12 +17,12 @@ assert.commandWorked(s.s.adminCommand(
 
 var db = s.getDB("test");
 
-const big = 'X'.repeat(10000);
+const big = 'X'.repeat(1024 * 1024);  // 1MB
 
-// Create sufficient documents to create a jumbo chunk, and use the same shard key in all of
+// Insert 3MB of documents to create a jumbo chunk, and use the same shard key in all of
 // them so that the chunk cannot be split.
 var bulk = db.foo.initializeUnorderedBulkOp();
-for (var i = 0; i < 200; i++) {
+for (var i = 0; i < 3; i++) {
     bulk.insert({x: 0, big: big});
 }
 
