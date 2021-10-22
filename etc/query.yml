@@ -1970,7 +1970,6 @@ tasks:
           - "compile_expansions.yml"
           - "all_feature_flags.txt"  # Must correspond to the definition in buildscripts/idl/lib.py.
           - "jstests/**"
-          - "library_dependency_graph.json"
           - "patch_files.txt"
           - "evergreen/**"
           - "src/mongo/client/sdam/json_tests/sdam_tests/**"
