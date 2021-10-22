@@ -16,12 +16,6 @@
 "use strict";
 
 load("jstests/libs/analyze_plan.js");
-load("jstests/core/timeseries/libs/timeseries.js");
-
-if (!TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo())) {
-    jsTestLog("Skipping test because the time-series collection feature flag is disabled");
-    return;
-}
 
 const coll = db.timeseries_internal_bucket_geo_within;
 coll.drop();

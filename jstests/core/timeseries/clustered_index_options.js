@@ -10,13 +10,6 @@
 (function() {
 "use strict";
 
-load("jstests/core/timeseries/libs/timeseries.js");  // For 'TimeseriesTest'.
-
-if (!TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo())) {
-    jsTestLog("Skipping test because the time-series collection feature flag is disabled");
-    return;
-}
-
 const testDB = db.getSiblingDB(jsTestName());
 const tsColl = testDB.clustered_index_options;
 const tsCollName = tsColl.getName();

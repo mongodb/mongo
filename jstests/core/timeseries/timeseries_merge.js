@@ -13,11 +13,6 @@
 
 load("jstests/core/timeseries/libs/timeseries_agg_helpers.js");
 
-if (!TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo())) {
-    jsTestLog("Skipping test because the time-series collection feature flag is disabled");
-    return;
-}
-
 const testDB = TimeseriesAggTests.getTestDb();
 assert.commandWorked(testDB.dropDatabase());
 const numHosts = 10;

@@ -6,8 +6,7 @@
 (function() {
 "use strict";
 
-load("jstests/libs/fixture_helpers.js");             // For FixtureHelpers.
-load("jstests/core/timeseries/libs/timeseries.js");  // For TimeseriesTest.
+load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
 
 const dbName = jsTestName();
 
@@ -125,11 +124,6 @@ assert.commandWorked(testDB.runCommand({drop: validatorCollName}));
 // collection if time-series collection feature flag is enabled.
 //
 (function maybeValidateWithTimeseriesCollection() {
-    if (!TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo())) {
-        jsTestLog("Cannot validate metadata with timeseries collection, feature flag is disabled");
-        return;
-    }
-
     const coll = "timeseriesCollectionMetaDataValidation";
     assert.commandWorked(
         testDB.createCollection(coll, {timeseries: {timeField: "time", metaField: "meta"}}));
