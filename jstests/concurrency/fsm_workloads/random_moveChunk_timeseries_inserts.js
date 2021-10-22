@@ -101,8 +101,7 @@ var $config = extendWorkload($config, function($config, $super) {
     };
 
     $config.states.init = function init(db, collName, connCache) {
-        if (TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo()) &&
-            TimeseriesTest.shardedtimeseriesCollectionsEnabled(db.getMongo())) {
+        if (TimeseriesTest.shardedtimeseriesCollectionsEnabled(db.getMongo())) {
             this.featureFlagDisabled = false;
         }
     };
@@ -157,8 +156,7 @@ var $config = extendWorkload($config, function($config, $super) {
     };
 
     $config.setup = function setup(db, collName, cluster) {
-        if (TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo()) &&
-            TimeseriesTest.shardedtimeseriesCollectionsEnabled(db.getMongo())) {
+        if (TimeseriesTest.shardedtimeseriesCollectionsEnabled(db.getMongo())) {
             this.featureFlagDisabled = false;
         } else {
             return;

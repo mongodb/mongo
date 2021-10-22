@@ -32,8 +32,7 @@ var $config = (function() {
         // Check that necessary feature flags are enabled on each of the mongods.
         let isEnabled = true;
         cluster.executeOnMongodNodes(function(db) {
-            if (!TimeseriesTest.timeseriesCollectionsEnabled(db) ||
-                !TimeseriesTest.shardedtimeseriesCollectionsEnabled(db)) {
+            if (!TimeseriesTest.shardedtimeseriesCollectionsEnabled(db)) {
                 isEnabled = false;
             }
         });

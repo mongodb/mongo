@@ -15,8 +15,6 @@
  * ]
  */
 
-load("jstests/core/timeseries/libs/timeseries.js");
-
 var $config = (function() {
     // Hardcode time-series collection information so that the threads can all obtain it and run on
     // the same fields and indexes.
@@ -46,9 +44,7 @@ var $config = (function() {
     // Support for time-series collections may or may not be turned on in the server. This value
     // will be initialized during the 'init' state so that the rest of the states can opt to do
     // nothing when disabled, since testing an inactive feature is pointless.
-    let data = {
-        supportsTimeseriesCollections: false,
-    };
+    let data = {};
 
     function getCollectionName(collName) {
         return "find_cmd_with_indexes_timeseries_" + collName;
@@ -74,25 +70,12 @@ var $config = (function() {
     }
 
     const states = {
-        /**
-         * Figures out whether the server supports time-series collections and sets
-         * 'supportsTimeseriesCollections' accordingly.
-         */
-        init: function init(db, collName) {
-            if (!TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo())) {
-                return;
-            }
-            this.supportsTimeseriesCollections = true;
-        },
+        init: function init(db, collName) {},
 
         /**
          * Creates an index 'timeIndexSpec' on the time-series collection.
          */
         createTimeIndex: function createTimeIndex(db, collName) {
-            if (!this.supportsTimeseriesCollections) {
-                return;
-            }
-
             const coll = db.getCollection(getCollectionName(collName));
             const createIndexRes = coll.createIndex(timeIndexSpec);
             processCreateIndex(createIndexRes, timeIndexSpec);
@@ -102,10 +85,6 @@ var $config = (function() {
          * Drops the index 'timeIndexSpec' on the time-series collection.
          */
         dropTimeIndex: function dropTimeIndex(db, collName) {
-            if (!this.supportsTimeseriesCollections) {
-                return;
-            }
-
             const coll = db.getCollection(getCollectionName(collName));
             const dropIndexRes = coll.dropIndex(timeIndexSpec);
             processDropIndex(dropIndexRes, timeIndexSpec);
@@ -115,10 +94,6 @@ var $config = (function() {
          * Creates an index 'metaIndexSpec' on the time-series collection.
          */
         createMetaIndex: function createMetaIndex(db, collName) {
-            if (!this.supportsTimeseriesCollections) {
-                return;
-            }
-
             const coll = db.getCollection(getCollectionName(collName));
             const createIndexRes = coll.createIndex(metaIndexSpec);
             processCreateIndex(createIndexRes, metaIndexSpec);
@@ -128,10 +103,6 @@ var $config = (function() {
          * Drops the index 'metaIndexSpec' on the time-series collection.
          */
         dropMetaIndex: function dropMetaIndex(db, collName) {
-            if (!this.supportsTimeseriesCollections) {
-                return;
-            }
-
             const coll = db.getCollection(getCollectionName(collName));
             const dropIndexRes = coll.dropIndex(metaIndexSpec);
             processDropIndex(dropIndexRes, metaIndexSpec);
@@ -142,10 +113,6 @@ var $config = (function() {
          * query will either provoke a collection scan or use the time field index (if present).
          */
         queryTimeAll: function queryTimeAll(db, collName) {
-            if (!this.supportsTimeseriesCollections) {
-                return;
-            }
-
             const coll = db.getCollection(getCollectionName(collName));
             try {
                 const queryDocs = coll.find({[timeFieldName]: {$lte: docTimes[9]}}).toArray();
@@ -166,10 +133,6 @@ var $config = (function() {
          * either provoke a collection scan or use the time field index (if present).
          */
         queryTimeSubset: function queryTimeSubset(db, collName) {
-            if (!this.supportsTimeseriesCollections) {
-                return;
-            }
-
             const coll = db.getCollection(getCollectionName(collName));
             try {
                 const queryDocs = coll.find({[timeFieldName]: {$lte: docTimes[4]}}).toArray();
@@ -190,10 +153,6 @@ var $config = (function() {
          * scan the collection or use the meta field index (if present).
          */
         queryMetaAll: function queryMetaAll(db, collName) {
-            if (!this.supportsTimeseriesCollections) {
-                return;
-            }
-
             const coll = db.getCollection(getCollectionName(collName));
             try {
                 const queryDocs = coll.find({[metaIndexKey]: {$gte: 0}}).toArray();
@@ -215,10 +174,6 @@ var $config = (function() {
          * either scan the collection or use the meta field index (if present).
          */
         queryMetaSubset: function queryMetaSubset(db, collName) {
-            if (!this.supportsTimeseriesCollections) {
-                return;
-            }
-
             const coll = db.getCollection(getCollectionName(collName));
             try {
                 const queryDocs = coll.find({[metaIndexKey]: {$gt: 4}}).toArray();
@@ -240,11 +195,6 @@ var $config = (function() {
      * Creates a time-series collection and pre-populates it with 'numDocs' documents.
      */
     function setup(db, collName, cluster) {
-        if (!TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo())) {
-            jsTestLog("Skipping test because the time-series collection feature flag is disabled");
-            return;
-        }
-
         // Create the collection.
         assertAlways.commandWorked(db.createCollection(getCollectionName(collName), {
             timeseries: {

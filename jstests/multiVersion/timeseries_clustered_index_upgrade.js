@@ -9,7 +9,6 @@
 (function() {
 'use strict';
 load('jstests/multiVersion/libs/multi_rs.js');
-load('jstests/core/timeseries/libs/timeseries.js');
 const tsCollName = 'tsColl';
 const bucketsCollName = 'system.buckets.' + tsCollName;
 
@@ -38,12 +37,6 @@ const rst = new ReplSetTest({nodes: nodes});
 
 rst.startSet();
 rst.initiate();
-
-if (!TimeseriesTest.timeseriesCollectionsEnabled(rst.getPrimary())) {
-    jsTestLog('Skipping test because the time-series collection feature flag is disabled');
-    rest.stopSet();
-    return;
-}
 
 let testDB = getTestDB(rst);
 

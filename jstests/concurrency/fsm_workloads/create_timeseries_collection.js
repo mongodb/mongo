@@ -1,7 +1,5 @@
 "use strict";
 
-load("jstests/core/timeseries/libs/timeseries.js");
-
 /**
  * Repeatedly creates a time-series collection, inserts data and drops it.
  *
@@ -11,7 +9,7 @@ load("jstests/core/timeseries/libs/timeseries.js");
  * ]
  */
 var $config = (function() {
-    var data = {prefix: "create_timeseries_collection", supportsTimeseriesCollections: false};
+    var data = {prefix: "create_timeseries_collection"};
 
     var states = (function() {
         function getCollectionName(prefix, collName, tid) {
@@ -20,20 +18,9 @@ var $config = (function() {
 
         function init(db, collName) {
             this.num = 0;
-
-            if (TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo())) {
-                this.supportsTimeseriesCollections = true;
-                return;
-            }
-
-            jsTestLog("Skipping test because the time-series collection feature flag is disabled");
         }
 
         function create(db, collName) {
-            if (!this.supportsTimeseriesCollections) {
-                return;
-            }
-
             collName = getCollectionName(this.prefix, collName, this.tid);
 
             const timeFieldName = "time";
@@ -42,10 +29,6 @@ var $config = (function() {
         }
 
         function insert(db, collName) {
-            if (!this.supportsTimeseriesCollections) {
-                return;
-            }
-
             collName = getCollectionName(this.prefix, collName, this.tid);
 
             const coll = db.getCollection(collName);
@@ -57,10 +40,6 @@ var $config = (function() {
         }
 
         function drop(db, collName) {
-            if (!this.supportsTimeseriesCollections) {
-                return;
-            }
-
             collName = getCollectionName(this.prefix, collName, this.tid);
             assertAlways(db.getCollection(collName).drop(), "failed to drop " + collName);
         }

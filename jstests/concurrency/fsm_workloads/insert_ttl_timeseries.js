@@ -13,12 +13,8 @@
  * ]
  */
 
-load("jstests/core/timeseries/libs/timeseries.js");
-
 var $config = (function() {
     const initData = {
-        supportsTimeseriesCollections: false,
-
         getCollectionName: function(collName) {
             return "insert_ttl_timeseries_" + collName;
         },
@@ -44,11 +40,6 @@ var $config = (function() {
 
     const states = {
         init: function init(db, collName) {
-            if (!TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo())) {
-                return;
-            }
-            this.supportsTimeseriesCollections = true;
-
             const coll = this.getCollection(db, collName);
             const res = coll.insert({
                 [metaFieldName]: this.tid,
@@ -63,10 +54,6 @@ var $config = (function() {
          * Insert a single measurement for the current thread id.
          */
         insertOne: function insertOne(db, collName) {
-            if (!this.supportsTimeseriesCollections) {
-                return;
-            }
-
             const coll = this.getCollection(db, collName);
             const res = coll.insert({
                 [metaFieldName]: this.tid,
@@ -82,10 +69,6 @@ var $config = (function() {
          * same bucket.
          */
         insertManyOrdered: function insertManyOrdered(db, collName) {
-            if (!this.supportsTimeseriesCollections) {
-                return;
-            }
-
             const coll = this.getCollection(db, collName);
             const docs = [];
             for (let i = 0; i < batchSize; i++) {
@@ -105,10 +88,6 @@ var $config = (function() {
          * the same bucket.
          */
         insertManyUnordered: function insertManyUnordered(db, collName) {
-            if (!this.supportsTimeseriesCollections) {
-                return;
-            }
-
             const coll = this.getCollection(db, collName);
             const docs = [];
             for (let i = 0; i < batchSize; i++) {
@@ -129,10 +108,6 @@ var $config = (function() {
          * several different buckets.
          */
         insertManyRandTid: function insertManyRandTid(db, collName) {
-            if (!this.supportsTimeseriesCollections) {
-                return;
-            }
-
             const coll = this.getCollection(db, collName);
             const docs = [];
             for (let i = 0; i < batchSize; i++) {
@@ -152,10 +127,6 @@ var $config = (function() {
          * different buckets.
          */
         insertManyOld: function insertManyOld(db, collName) {
-            if (!this.supportsTimeseriesCollections) {
-                return;
-            }
-
             const coll = this.getCollection(db, collName);
             const docs = [];
             const start = getTime();
@@ -174,11 +145,6 @@ var $config = (function() {
     };
 
     function setup(db, collName, cluster) {
-        if (!TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo())) {
-            jsTestLog("Skipping test because the time-series collection feature flag is disabled");
-            return;
-        }
-
         collName = this.getCollectionName(collName);
         assertAlways.commandWorked(db.createCollection(collName, {
             timeseries: {
@@ -190,10 +156,6 @@ var $config = (function() {
     }
 
     function teardown(db, collName, cluster) {
-        if (!TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo())) {
-            return;
-        }
-
         // Default TTL monitor period
         const ttlMonitorSleepSecs = 60;
 
