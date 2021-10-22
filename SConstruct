@@ -3482,13 +3482,6 @@ if split_dwarf.exists(env):
 # compilation database entries for the configure tests, which is weird.
 env.Tool("compilation_db")
 
-# If we can, load the dagger tool for build dependency graph introspection.
-# Dagger is only supported on Linux and OSX (not Windows or Solaris).
-should_dagger = ( mongo_platform.is_running_os('osx') or mongo_platform.is_running_os('linux')  ) and "dagger" in COMMAND_LINE_TARGETS
-
-if should_dagger:
-    env.Tool("dagger")
-
 incremental_link = Tool('incremental_link')
 if incremental_link.exists(env):
     incremental_link(env)
@@ -3741,12 +3734,6 @@ env.SConscript(
 )
 
 all = env.Alias('all', ['core', 'tools', 'dbtest', 'unittests', 'integration_tests', 'benchmarks'])
-
-# run the Dagger tool if it's installed
-if should_dagger:
-    dependencyDb = env.Alias("dagger", env.Dagger('library_dependency_graph.json'))
-    # Require everything to be built before trying to extract build dependency information
-    env.Requires(dependencyDb, all)
 
 # We don't want installing files to cause them to flow into the cache,
 # since presumably we can re-install them from the origin if needed.
