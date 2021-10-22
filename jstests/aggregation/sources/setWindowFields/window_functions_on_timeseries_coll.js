@@ -17,14 +17,6 @@
 load("jstests/aggregation/extras/utils.js");  // For arrayEq.
 load("jstests/libs/analyze_plan.js");         // For getAggPlanStage().
 
-const timeseriesEnabled =
-    assert.commandWorked(db.adminCommand({getParameter: 1, featureFlagTimeseriesCollection: 1}))
-        .featureFlagTimeseriesCollection.value;
-if (!timeseriesEnabled) {
-    jsTestLog("Skipping test because the time-series collection feature flag is disabled");
-    return;
-}
-
 const coll = db.window_functions_on_timeseries_coll;
 
 coll.drop();
