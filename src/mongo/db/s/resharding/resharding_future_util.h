@@ -127,6 +127,7 @@ public:
                 Status status = _getStatus(statusOrStatusWith);
 
                 if (status.isA<ErrorCategory::RetriableError>() ||
+                    status == ErrorCodes::FailedToSatisfyReadPreference ||
                     status.isA<ErrorCategory::CursorInvalidatedError>() ||
                     status == ErrorCodes::Interrupted ||
                     status.isA<ErrorCategory::CancellationError>() ||
