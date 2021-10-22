@@ -25,6 +25,15 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
         rs: {nodes: 3, setParameter: {periodicNoopIntervalSecs: 1, writePeriodicNoops: true}}
     });
 
+    const verbosityFn = function(conn) {
+        assert.commandWorked(
+            conn.adminCommand({setParameter: 1, logComponentVerbosity: {network: {verbosity: 2}}}));
+
+    };
+    st.rs0.nodes.forEach(verbosityFn);
+    st.rs1.nodes.forEach(verbosityFn);
+    verbosityFn(st.s);
+
     const sDB = st.s.getDB("test");
     const kCollName = "change_stream_failover";
 
