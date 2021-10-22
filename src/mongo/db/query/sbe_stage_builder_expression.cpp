@@ -73,9 +73,9 @@ struct ExpressionVisitorContext {
 
     ExpressionVisitorContext(StageBuilderState& state,
                              EvalStage inputStage,
-                             sbe::value::SlotId rootSlot,
+                             boost::optional<sbe::value::SlotId> optionalRootSlot,
                              PlanNodeId planNodeId)
-        : state(state), rootSlot(rootSlot), planNodeId(planNodeId) {
+        : state(state), optionalRootSlot(optionalRootSlot), planNodeId(planNodeId) {
         evalStack.emplaceFrame(std::move(inputStage));
     }
 
@@ -130,7 +130,7 @@ struct ExpressionVisitorContext {
 
     EvalStack<> evalStack;
 
-    sbe::value::SlotId rootSlot;
+    boost::optional<sbe::value::SlotId> optionalRootSlot;
 
     // The lexical environment for the expression being traversed. A variable reference takes the
     // form "$$variable_name" in MQL's concrete syntax and gets transformed into a numeric
@@ -1785,11 +1785,13 @@ public:
             return;
         }
 
+        tassert(6075901, "Must have a valid root slot", _context->optionalRootSlot.has_value());
+
         sbe::value::SlotId slotId;
 
         if (!Variables::isUserDefinedVariable(expr->getVariableId())) {
             if (expr->getVariableId() == Variables::kRootId) {
-                slotId = _context->rootSlot;
+                slotId = *(_context->optionalRootSlot);
             } else if (expr->getVariableId() == Variables::kRemoveId) {
                 // For the field paths that begin with "$$REMOVE", we always produce Nothing,
                 // so no traversal is necessary.
@@ -1826,7 +1828,7 @@ public:
         }
 
         // Dereference a dotted path, which may contain arrays requiring implicit traversal.
-        const bool expectsDocumentInputOnly = slotId == _context->rootSlot;
+        const bool expectsDocumentInputOnly = slotId == *(_context->optionalRootSlot);
         auto [outputSlot, stage] = generateTraverse(_context->extractCurrentEvalStage(),
                                                     slotId,
                                                     expectsDocumentInputOnly,
@@ -3683,9 +3685,9 @@ std::unique_ptr<sbe::EExpression> generateCoerceToBoolExpression(sbe::EVariable 
 EvalExprStagePair generateExpression(StageBuilderState& state,
                                      Expression* expr,
                                      EvalStage stage,
-                                     sbe::value::SlotId rootSlot,
+                                     boost::optional<sbe::value::SlotId> optionalRootSlot,
                                      PlanNodeId planNodeId) {
-    ExpressionVisitorContext context(state, std::move(stage), rootSlot, planNodeId);
+    ExpressionVisitorContext context(state, std::move(stage), optionalRootSlot, planNodeId);
 
     ExpressionPreVisitor preVisitor{&context};
     ExpressionInVisitor inVisitor{&context};

@@ -46,7 +46,7 @@ std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> buildArgument(
     StageBuilderState& state,
     const AccumulationStatement& acc,
     EvalStage stage,
-    sbe::value::SlotId inputVar,
+    boost::optional<sbe::value::SlotId> optionalRootSlot,
     PlanNodeId planNodeId);
 
 /**

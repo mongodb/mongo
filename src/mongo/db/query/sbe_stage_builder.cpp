@@ -2064,14 +2064,14 @@ const size_t kGroupBySlots = 1;
 std::pair<sbe::value::SlotId, EvalStage> generateGroupByKey(
     StageBuilderState& state,
     Expression* idExpr,
+    boost::optional<sbe::value::SlotId> optionalRootSlot,
     EvalStage childEvalStage,
     PlanNodeId nodeId,
     sbe::value::SlotIdGenerator* slotIdGenerator) {
     // TODO SERVER-59951: make object form of the '_id' group-by expression work to handle multiple
     // group-by keys.
-    auto rootSlot = childEvalStage.outSlots[0];
     auto [groupByEvalExpr, groupByEvalStage] = stage_builder::generateExpression(
-        state, idExpr, std::move(childEvalStage), rootSlot, nodeId);
+        state, idExpr, std::move(childEvalStage), optionalRootSlot, nodeId);
 
     if (auto isConstIdExpr = dynamic_cast<ExpressionConstant*>(idExpr) != nullptr; isConstIdExpr) {
         return projectEvalExpr(
@@ -2090,13 +2090,13 @@ std::tuple<sbe::value::SlotVector, EvalStage> generateAccumulator(
     StageBuilderState& state,
     const AccumulationStatement& accStmt,
     EvalStage childEvalStage,
-    sbe::value::SlotId rootSlot,
+    boost::optional<sbe::value::SlotId> optionalRootSlot,
     PlanNodeId nodeId,
     sbe::value::SlotIdGenerator* slotIdGenerator,
     sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>>& accSlotToExprMap) {
     // Input fields may need field traversal which ends up being a complex tree.
-    auto [argExpr, accArgEvalStage] =
-        stage_builder::buildArgument(state, accStmt, std::move(childEvalStage), rootSlot, nodeId);
+    auto [argExpr, accArgEvalStage] = stage_builder::buildArgument(
+        state, accStmt, std::move(childEvalStage), optionalRootSlot, nodeId);
 
     // One accumulator may be translated to multiple accumulator expressions. For example, The
     // $avg will have two accumulators expressions, a sum(..) and a count which is implemented
@@ -2216,10 +2216,10 @@ bool checkAllFieldPaths(const StringMap<boost::intrusive_ptr<Expression>>& idExp
         }
     };
 
-    // Gathers and optimizes top-level fields from the group-by expression.
+    // Checks field paths from the group-by expression.
     walkAndActOnFieldPaths(idExpr.at("_id").get(), checkFieldPath);
 
-    // Gathers and optimizes top-level fields from the accumulators.
+    // Checks field paths from the accumulator expressions.
     for (auto&& accStmt : accStmts) {
         walkAndActOnFieldPaths(accStmt.expr.argument.get(), checkFieldPath);
     }
@@ -2319,17 +2319,15 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     // Builds the child and gets the child result slot.
     auto [childStage, childOutputs] = build(childNode, childReqs);
-    auto childResult = childOutputs.getIfExists(kResult);
-    auto childResultSlots = sbe::value::SlotVector{};
-    if (childResult) {
-        childResultSlots.emplace_back(*childResult);
-    }
-    EvalStage childEvalStage{std::move(childStage), std::move(childResultSlots)};
+    auto optionalChildResult = childOutputs.getIfExists(kResult);
+    EvalStage childEvalStage{std::move(childStage),
+                             optionalChildResult ? sbe::value::SlotVector{*optionalChildResult}
+                                                 : sbe::value::SlotVector{}};
     _shouldProduceRecordIdSlot = false;
     // We can optimize field paths only when we successfully avoid unnecessary materialization.
-    auto canOptimizeFieldPaths = !childResult.has_value();
+    auto canOptimizeFieldPaths = !optionalChildResult.has_value();
 
-    tassert(6075000,
+    tassert(6075900,
             "Expected no optimized expressions but got: {}"_format(_state.optimizedExprs.size()),
             _state.optimizedExprs.empty());
 
@@ -2338,8 +2336,12 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     }
     // Translates the group-by expression and wraps it with 'fillEmpty(..., null)' because the
     // missing field value for _id should be mapped to 'Null'.
-    auto [groupBySlot, groupByEvalStage] = generateGroupByKey(
-        _state, idExpr.at("_id").get(), std::move(childEvalStage), nodeId, &_slotIdGenerator);
+    auto [groupBySlot, groupByEvalStage] = generateGroupByKey(_state,
+                                                              idExpr.at("_id").get(),
+                                                              optionalChildResult,
+                                                              std::move(childEvalStage),
+                                                              nodeId,
+                                                              &_slotIdGenerator);
 
     // Translates accumulators which are executed inside the group stage and gets slots for
     // accumulators.
@@ -2351,14 +2353,13 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             optimizeFieldPaths(_state, accStmt.expr.argument.get(), childOutputs);
         }
 
-        auto [aggSlots, tempEvalStage] =
-            generateAccumulator(_state,
-                                accStmt,
-                                std::move(accProjEvalStage),
-                                childResult.has_value() ? *childResult : -1,
-                                nodeId,
-                                &_slotIdGenerator,
-                                accSlotToExprMap);
+        auto [aggSlots, tempEvalStage] = generateAccumulator(_state,
+                                                             accStmt,
+                                                             std::move(accProjEvalStage),
+                                                             optionalChildResult,
+                                                             nodeId,
+                                                             &_slotIdGenerator,
+                                                             accSlotToExprMap);
         aggSlotsVec.emplace_back(std::move(aggSlots));
         accProjEvalStage = std::move(tempEvalStage);
     }

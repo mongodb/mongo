@@ -345,10 +345,10 @@ std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> buildArgument(
     StageBuilderState& state,
     const AccumulationStatement& acc,
     EvalStage stage,
-    sbe::value::SlotId inputVar,
+    boost::optional<sbe::value::SlotId> optionalRootSlot,
     PlanNodeId planNodeId) {
-    auto [argExpr, outStage] =
-        generateExpression(state, acc.expr.argument.get(), std::move(stage), inputVar, planNodeId);
+    auto [argExpr, outStage] = generateExpression(
+        state, acc.expr.argument.get(), std::move(stage), optionalRootSlot, planNodeId);
     return {argExpr.extractExpr(), std::move(outStage)};
 }
 

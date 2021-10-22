@@ -45,7 +45,7 @@ namespace mongo::stage_builder {
 EvalExprStagePair generateExpression(StageBuilderState& state,
                                      Expression* expr,
                                      EvalStage stage,
-                                     sbe::value::SlotId inputVar,
+                                     boost::optional<sbe::value::SlotId> optionalRootSlot,
                                      PlanNodeId planNodeId);
 
 /**
