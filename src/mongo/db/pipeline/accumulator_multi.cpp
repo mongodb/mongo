@@ -488,16 +488,6 @@ AccumulatorTopBottomN<sense, single>::AccumulatorTopBottomN(ExpressionContext* c
             (StringBuilder() << AccumulatorN::kFieldNameSortFields << "." << sortOrder).str();
         part.fieldPath.reset(FieldPath(newFieldName));
 
-        // TODO SERVER-60781 will change AccumulatorTopBottomN so it has different behavior
-        // Invert sort spec if $topN/top.
-        if constexpr (sense == TopBottomSense::kTop) {
-            // $topN usually flips sort pattern by making ascending false. for the case of textScore
-            // based sorting, there is no way to sort by least relevent in a normal mongodb sort
-            // specification so topN still returns the same order as bottomN (most relevent first).
-            if (!part.expression) {
-                part.isAscending = !part.isAscending;
-            }
-        }
         if (part.expression) {
             // $meta based sorting is handled earlier in the sortFields expression. See comment in
             // parseAccumulatorTopBottomNSortBy().
@@ -552,12 +542,8 @@ std::pair<SortPattern, BSONArray> parseAccumulatorTopBottomNSortBy(ExpressionCon
     SortPattern sortPattern(sortBy, expCtx);
     BSONArrayBuilder sortFieldsExpBab;
     BSONObjIterator sortByBoi(sortBy);
-    int sortOrder = 0;
     for (const auto& part : sortPattern) {
         const auto fieldName = sortByBoi.next().fieldNameStringData();
-        const auto newFieldName =
-            (StringBuilder() << AccumulatorN::kFieldNameSortFields << "." << sortOrder).str();
-
         if (part.expression) {
             // In a scenario where we are sorting by metadata (for example if sortBy is
             // {text: {$meta: "textScore"}}) we cant use ["$text"] as the sortFields expression
@@ -569,7 +555,6 @@ std::pair<SortPattern, BSONArray> parseAccumulatorTopBottomNSortBy(ExpressionCon
         } else {
             sortFieldsExpBab.append((StringBuilder() << "$" << fieldName).str());
         }
-        sortOrder++;
     }
     return {sortPattern, sortFieldsExpBab.arr()};
 }
@@ -626,12 +611,20 @@ void AccumulatorTopBottomN<sense, single>::processValue(const Value& val) {
 
     // Only compare if we have 'n' elements.
     if (static_cast<long long>(_map->size()) == *_n) {
-        // Get an iterator to the element we want to compare against.
-        auto cmpElem = std::prev(_map->end());
+        // Get an iterator to the element we want to compare against. In particular, $top will
+        // insert items less than the max, and $bottom will insert greater than the min.
+        auto [cmpElem, cmp] = [&]() {
+            if constexpr (sense == TopBottomSense::kTop) {
+                auto elem = std::prev(_map->end());
+                auto res = (*_sortKeyComparator)(elem->first, keyOutPair.first);
+                return std::make_pair(elem, res);
+            } else {
+                auto elem = _map->begin();
+                auto res = (*_sortKeyComparator)(keyOutPair.first, elem->first);
+                return std::make_pair(elem, res);
+            }
+        }();
 
-        // TODO SERVER-60781 will change AccumulatorTopBottomN so it has different behavior. $topN
-        // will insert items greater than the min and $bottomN will insert items less than the max.
-        auto cmp = (*_sortKeyComparator)(cmpElem->first, keyOutPair.first);
         // When the sort key produces a tie we keep the first value seen.
         if (cmp > 0) {
             _memUsageBytes -= cmpElem->first.getApproximateSize() +

@@ -606,11 +606,12 @@ TEST(Accumulators, TopBottomNRespectsCollation) {
                                                          << BSON_ARRAY(a)));
     };
 
-    OperationsType cases{{{mkdoc(Value("abc"_sd)), mkdoc(Value("cba"_sd)), mkdoc(Value("cca"_sd))},
-                          Value(std::vector<Value>{Value("cba"_sd), Value("cca"_sd)})}};
+    OperationsType bottomCasesAscending{
+        {{mkdoc(Value("abc"_sd)), mkdoc(Value("cba"_sd)), mkdoc(Value("cca"_sd))},
+         Value(std::vector<Value>{Value("cca"_sd), Value("abc"_sd)})}};
 
     assertExpectedResults(expCtx.get(),
-                          cases,
+                          bottomCasesAscending,
                           [&](ExpressionContext* const expCtx) -> intrusive_ptr<AccumulatorState> {
                               auto acc =
                                   AccumulatorTopBottomN<TopBottomSense::kBottom, false>::create(
@@ -618,8 +619,37 @@ TEST(Accumulators, TopBottomNRespectsCollation) {
                               acc->startNewGroup(n);
                               return acc;
                           });
+
+    OperationsType bottomCasesDescending{
+        {{mkdoc(Value("abc"_sd)), mkdoc(Value("cba"_sd)), mkdoc(Value("cca"_sd))},
+         Value(std::vector<Value>{Value("cca"_sd), Value("cba"_sd)})}};
     assertExpectedResults(expCtx.get(),
-                          cases,
+                          bottomCasesDescending,
+                          [&](ExpressionContext* const expCtx) -> intrusive_ptr<AccumulatorState> {
+                              auto acc =
+                                  AccumulatorTopBottomN<TopBottomSense::kBottom, false>::create(
+                                      expCtx, BSON("a" << -1));
+                              acc->startNewGroup(n);
+                              return acc;
+                          });
+
+    OperationsType topCasesAscending{
+        {{mkdoc(Value("abc"_sd)), mkdoc(Value("cba"_sd)), mkdoc(Value("cca"_sd))},
+         Value(std::vector<Value>{Value("cba"_sd), Value("cca"_sd)})}};
+    assertExpectedResults(expCtx.get(),
+                          topCasesAscending,
+                          [&](ExpressionContext* const expCtx) -> intrusive_ptr<AccumulatorState> {
+                              auto acc = AccumulatorTopBottomN<TopBottomSense::kTop, false>::create(
+                                  expCtx, BSON("a" << 1));
+                              acc->startNewGroup(n);
+                              return acc;
+                          });
+
+    OperationsType topCasesDescending{
+        {{mkdoc(Value("abc"_sd)), mkdoc(Value("cba"_sd)), mkdoc(Value("cca"_sd))},
+         Value(std::vector<Value>{Value("abc"_sd), Value("cca"_sd)})}};
+    assertExpectedResults(expCtx.get(),
+                          topCasesDescending,
                           [&](ExpressionContext* const expCtx) -> intrusive_ptr<AccumulatorState> {
                               auto acc = AccumulatorTopBottomN<TopBottomSense::kTop, false>::create(
                                   expCtx, BSON("a" << -1));
@@ -628,7 +658,7 @@ TEST(Accumulators, TopBottomNRespectsCollation) {
                           });
 }
 
-TEST(Accumulators, TopBottomNAscending) {
+TEST(Accumulators, TopNDescendingBottomNAscending) {
     RAIIServerParameterControllerForTest controller("featureFlagExactTopNAccumulator", true);
     auto expCtx = make_intrusive<ExpressionContextForTest>();
     const auto n3 = Value(3);
@@ -644,15 +674,15 @@ TEST(Accumulators, TopBottomNAscending) {
     OperationsType cases{
         // Basic tests.
         {{mkdoc(Value(3)), mkdoc(Value(4)), mkdoc(Value(5)), mkdoc(Value(100))},
-         {Value(std::vector<Value>{Value(3), Value(4), Value(5)})}},
+         {Value(std::vector<Value>{Value(4), Value(5), Value(100)})}},
         {{mkdoc(Value(10)), mkdoc(Value(8)), mkdoc(Value(9)), mkdoc(Value(7)), mkdoc(Value(1))},
-         {Value(std::vector<Value>{Value(1), Value(7), Value(8)})}},
+         {Value(std::vector<Value>{Value(8), Value(9), Value(10)})}},
         {{mkdoc(Value(11.32)),
           mkdoc(Value(91.0)),
           mkdoc(Value(2)),
           mkdoc(Value(701)),
           mkdoc(Value(101))},
-         {Value(std::vector<Value>{Value(2), Value(11.32), Value(91.0)})}},
+         {Value(std::vector<Value>{Value(91.0), Value(101), Value(701)})}},
 
         // 3 or fewer values results in those values being returned.
         {{mkdoc(Value(10)), mkdoc(Value(8)), mkdoc(Value(9))},
@@ -661,87 +691,113 @@ TEST(Accumulators, TopBottomNAscending) {
 
         // Ties are broken arbitrarily.
         {{mkdoc(Value(10)),
-          mkdoc(Value(10)),
           mkdoc(Value(1)),
-          mkdoc(Value(10)),
+          mkdoc(Value(1)),
+          mkdoc(Value(1)),
           mkdoc(Value(1)),
           mkdoc(Value(10))},
-         {Value(std::vector<Value>{Value(1), Value(1), Value(10)})}},
+         {Value(std::vector<Value>{Value(1), Value(10), Value(10)})}},
 
         // Null/missing cases (missing and null both are NOT ignored).
-        {{mkdoc(Value(100)),
-          mkdoc(Value(BSONNULL)),
-          mkdoc(Value()),
-          mkdoc(Value(4)),
-          mkdoc(Value(3))},
+        {{mkdoc(Value(BSONNULL)), mkdoc(Value()), mkdoc(Value(BSONNULL)), mkdoc(Value(3))},
+         {Value(std::vector<Value>{Value(), Value(BSONNULL), Value(3)})}},
+
+        {{mkdoc(Value()), mkdoc(Value(BSONNULL)), mkdoc(Value()), mkdoc(Value(3))},
          {Value(std::vector<Value>{Value(BSONNULL), Value(), Value(3)})}},
-        {{mkdoc(Value(100)),
-          mkdoc(Value()),
-          mkdoc(Value(BSONNULL)),
-          mkdoc(Value()),
-          mkdoc(Value(3))},
-         {Value(std::vector<Value>{Value(), Value(BSONNULL), Value()})}},
 
         // Output values different than sortBy.
-        {{mkdoc2(5, Value(7)), mkdoc2(4, Value(2)), mkdoc2(3, Value(3))},
+        {{mkdoc2(5, Value(7)), mkdoc2(4, Value(2)), mkdoc2(3, Value(3)), mkdoc2(1, Value(3))},
          {Value(std::vector<Value>{Value(3), Value(2), Value(7)})}},
         {{mkdoc2(5, Value(BSONNULL)), mkdoc2(4, Value()), mkdoc2(3, Value(3))},
-         {Value(std::vector<Value>{Value(3), Value(), Value(BSONNULL)})}},
+         {Value(std::vector<Value>{Value(3), Value(), Value(BSONNULL)})}}};
 
-        // One 1 encountered once map is full.
-        {{mkdoc2(1, Value(1)),
-          mkdoc2(10, Value(3)),
-          mkdoc2(10, Value(4)),
-          mkdoc2(1, Value(2)),
-          mkdoc2(10, Value(5))},
-         {Value(std::vector<Value>{Value(1), Value(2), Value(3)})}},
-
-        // All 1s encountered before map is full.
+    OperationsType bottomSpecificCases = {
+        // All 10s encountered once map is full.
         {{mkdoc2(1, Value(1)),
           mkdoc2(1, Value(2)),
           mkdoc2(10, Value(3)),
           mkdoc2(10, Value(4)),
           mkdoc2(10, Value(5))},
-         {Value(std::vector<Value>{Value(1), Value(2), Value(3)})}},
+         {Value(std::vector<Value>{Value(3), Value(4), Value(5)})}},
 
-        // All 1s encountered when the map is full.
+        // All 10s encountered before map is full.
+        {{mkdoc2(10, Value(1)),
+          mkdoc2(10, Value(2)),
+          mkdoc2(1, Value(3)),
+          mkdoc2(1, Value(4)),
+          mkdoc2(1, Value(5))},
+         {Value(std::vector<Value>{Value(3), Value(1), Value(2)})}},
+
+        // All 10s encountered when the map is full.
         {{mkdoc2(10, Value(3)),
           mkdoc2(10, Value(4)),
           mkdoc2(10, Value(5)),
           mkdoc2(1, Value(1)),
           mkdoc2(1, Value(2))},
-         {Value(std::vector<Value>{Value(1), Value(2), Value(3)})}}};
+         {Value(std::vector<Value>{Value(3), Value(4), Value(5)})}}};
+
     try {
-        assertExpectedResults(
-            expCtx.get(),
-            cases,
-            [&](ExpressionContext* const expCtx) -> intrusive_ptr<AccumulatorState> {
-                auto acc = AccumulatorTopBottomN<TopBottomSense::kBottom, false>::create(
-                    expCtx, BSON("a" << 1));
-                acc->startNewGroup(n3);
-                return acc;
-            });
+        auto accumInit = [&](ExpressionContext* const expCtx) -> intrusive_ptr<AccumulatorState> {
+            auto acc = AccumulatorTopBottomN<TopBottomSense::kBottom, false>::create(
+                expCtx, BSON("a" << 1));
+            acc->startNewGroup(n3);
+            return acc;
+        };
+        assertExpectedResults(expCtx.get(), cases, accumInit);
+        assertExpectedResults(expCtx.get(), bottomSpecificCases, accumInit);
+
     } catch (...) {
         LOGV2(5788006, "bottom3 a: 1");
         throw;
     }
+
+    // topN descending will return same results, but in reverse order.
+    for (auto& [input, expected] : cases) {
+        tassert(6078100, "expected should be an array", expected.isArray());
+        auto arr = expected.getArray();
+        std::reverse(std::begin(arr), std::end(arr));
+        expected = Value(arr);
+    }
+
+    OperationsType topSpecificCases = {// All 10s encountered once map is full.
+                                       {{mkdoc2(1, Value(1)),
+                                         mkdoc2(1, Value(2)),
+                                         mkdoc2(10, Value(3)),
+                                         mkdoc2(10, Value(4)),
+                                         mkdoc2(10, Value(5))},
+                                        {Value(std::vector<Value>{Value(3), Value(4), Value(5)})}},
+
+                                       // All 10s encountered before map is full.
+                                       {{mkdoc2(10, Value(1)),
+                                         mkdoc2(10, Value(2)),
+                                         mkdoc2(1, Value(3)),
+                                         mkdoc2(1, Value(4)),
+                                         mkdoc2(1, Value(5))},
+                                        {Value(std::vector<Value>{Value(1), Value(2), Value(3)})}},
+
+                                       // All 10s encountered when the map is full.
+                                       {{mkdoc2(10, Value(3)),
+                                         mkdoc2(10, Value(4)),
+                                         mkdoc2(10, Value(5)),
+                                         mkdoc2(1, Value(1)),
+                                         mkdoc2(1, Value(2))},
+                                        {Value(std::vector<Value>{Value(3), Value(4), Value(5)})}}};
     try {
-        assertExpectedResults(
-            expCtx.get(),
-            cases,
-            [&](ExpressionContext* const expCtx) -> intrusive_ptr<AccumulatorState> {
-                auto acc = AccumulatorTopBottomN<TopBottomSense::kTop, false>::create(
-                    expCtx, BSON("a" << -1));
-                acc->startNewGroup(n3);
-                return acc;
-            });
+        auto accInit = [&](ExpressionContext* const expCtx) -> intrusive_ptr<AccumulatorState> {
+            auto acc =
+                AccumulatorTopBottomN<TopBottomSense::kTop, false>::create(expCtx, BSON("a" << -1));
+            acc->startNewGroup(n3);
+            return acc;
+        };
+        assertExpectedResults(expCtx.get(), cases, accInit);
+        assertExpectedResults(expCtx.get(), topSpecificCases, accInit);
     } catch (...) {
         LOGV2(5788007, "top3 a: -1");
         throw;
     }
 }
 
-TEST(Accumulators, TopBottomNDescending) {
+TEST(Accumulators, TopNAscendingBottomNDescending) {
     RAIIServerParameterControllerForTest controller("featureFlagExactTopNAccumulator", true);
     auto expCtx = make_intrusive<ExpressionContextForTest>();
     const auto n3 = Value(3);
@@ -757,15 +813,15 @@ TEST(Accumulators, TopBottomNDescending) {
     OperationsType cases{
         // Basic tests.
         {{mkdoc(Value(3)), mkdoc(Value(4)), mkdoc(Value(5)), mkdoc(Value(100))},
-         {Value(std::vector<Value>{Value(100), Value(5), Value(4)})}},
+         {Value(std::vector<Value>{Value(5), Value(4), Value(3)})}},
         {{mkdoc(Value(10)), mkdoc(Value(8)), mkdoc(Value(9)), mkdoc(Value(7)), mkdoc(Value(1))},
-         {Value(std::vector<Value>{Value(10), Value(9), Value(8)})}},
+         {Value(std::vector<Value>{Value(8), Value(7), Value(1)})}},
         {{mkdoc(Value(11.32)),
           mkdoc(Value(91.0)),
           mkdoc(Value(2)),
           mkdoc(Value(701)),
           mkdoc(Value(101))},
-         {Value(std::vector<Value>{Value(701), Value(101), Value(91.0)})}},
+         {Value(std::vector<Value>{Value(91.0), Value(11.32), Value(2)})}},
 
         // 3 or fewer values results in those values being returned.
         {{mkdoc(Value(10)), mkdoc(Value(8)), mkdoc(Value(9))},
@@ -779,80 +835,135 @@ TEST(Accumulators, TopBottomNDescending) {
           mkdoc(Value(10)),
           mkdoc(Value(1)),
           mkdoc(Value(10))},
-         {Value(std::vector<Value>{Value(10), Value(10), Value(10)})}},
+         {Value(std::vector<Value>{Value(10), Value(1), Value(1)})}},
 
         // Null/missing cases (missing and null both are NOT ignored).
         {{mkdoc(Value(100)),
           mkdoc(Value(BSONNULL)),
           mkdoc(Value()),
-          mkdoc(Value()),
+          mkdoc(Value(BSONNULL)),
           mkdoc(Value())},
-         {Value(std::vector<Value>{Value(100), Value(BSONNULL), Value()})}},
+         {Value(std::vector<Value>{Value(BSONNULL), Value(), Value(BSONNULL)})}},
         {{mkdoc(Value(100)),
           mkdoc(Value()),
           mkdoc(Value(BSONNULL)),
           mkdoc(Value()),
           mkdoc(Value())},
-         {Value(std::vector<Value>{Value(100), Value(), Value(BSONNULL)})}},
+         {Value(std::vector<Value>{Value(), Value(BSONNULL), Value()})}},
 
         // Output values different than sortBy.
-        {{mkdoc2(5, Value(7)), mkdoc2(4, Value(2)), mkdoc2(3, Value(3))},
+        {{mkdoc2(5, Value(7)), mkdoc2(6, Value(5)), mkdoc2(4, Value(2)), mkdoc2(3, Value(3))},
          {Value(std::vector<Value>{Value(7), Value(2), Value(3)})}},
         {{mkdoc2(5, Value(BSONNULL)), mkdoc2(4, Value()), mkdoc2(3, Value(3))},
-         {Value(std::vector<Value>{Value(BSONNULL), Value(), Value(3)})}},
+         {Value(std::vector<Value>{Value(BSONNULL), Value(), Value(3)})}}};
 
-        // One 10 incountered once map is full.
-        {{mkdoc2(10, Value(1)),
-          mkdoc2(1, Value(3)),
-          mkdoc2(1, Value(4)),
-          mkdoc2(10, Value(2)),
-          mkdoc2(1, Value(5))},
-         {Value(std::vector<Value>{Value(1), Value(2), Value(3)})}},
+    OperationsType bottomSpecificCases = {
+        // One 1 encountered once map is full.
+        {{mkdoc2(1, Value(1)),
+          mkdoc2(10, Value(3)),
+          mkdoc2(10, Value(4)),
+          mkdoc2(1, Value(2)),
+          mkdoc2(10, Value(5))},
+         {Value(std::vector<Value>{Value(4), Value(1), Value(2)})}},
 
-        // All 10s encountered before map is full.
-        {{mkdoc2(10, Value(1)),
-          mkdoc2(10, Value(2)),
-          mkdoc2(1, Value(3)),
-          mkdoc2(1, Value(4)),
-          mkdoc2(1, Value(5))},
-         {Value(std::vector<Value>{Value(1), Value(2), Value(3)})}},
+        // All 1s encountered before map is full.
+        {{mkdoc2(1, Value(1)),
+          mkdoc2(1, Value(2)),
+          mkdoc2(10, Value(3)),
+          mkdoc2(10, Value(4)),
+          mkdoc2(10, Value(5))},
+         {Value(std::vector<Value>{Value(3), Value(1), Value(2)})}},
 
-        // All 10s encountered when the map is full.
-        {{mkdoc2(1, Value(3)),
-          mkdoc2(1, Value(4)),
-          mkdoc2(1, Value(5)),
-          mkdoc2(10, Value(1)),
-          mkdoc2(10, Value(2))},
-         {Value(std::vector<Value>{Value(1), Value(2), Value(3)})}}
-
-    };
+        // All 1s encountered when the map is full.
+        {{mkdoc2(10, Value(3)),
+          mkdoc2(10, Value(4)),
+          mkdoc2(10, Value(5)),
+          mkdoc2(1, Value(1)),
+          mkdoc2(1, Value(2))},
+         {Value(std::vector<Value>{Value(5), Value(1), Value(2)})}}};
 
     try {
-        assertExpectedResults(
-            expCtx.get(),
-            cases,
-            [&](ExpressionContext* const expCtx) -> intrusive_ptr<AccumulatorState> {
-                auto acc = AccumulatorTopBottomN<TopBottomSense::kBottom, false>::create(
-                    expCtx, BSON("a" << -1));
-                acc->startNewGroup(n3);
-                return acc;
-            });
+        auto accInit = [&](ExpressionContext* const expCtx) -> intrusive_ptr<AccumulatorState> {
+            auto acc = AccumulatorTopBottomN<TopBottomSense::kBottom, false>::create(
+                expCtx, BSON("a" << -1));
+            acc->startNewGroup(n3);
+            return acc;
+        };
+        assertExpectedResults(expCtx.get(), cases, accInit);
+        assertExpectedResults(expCtx.get(), bottomSpecificCases, accInit);
     } catch (...) {
         LOGV2(5788008, "bottom3 a: -1");
         throw;
     }
+
+    // topN ascending will return same results, but in reverse order.
+    for (auto& [input, expected] : cases) {
+        tassert(6078101, "expected should be an array", expected.isArray());
+        auto arr = expected.getArray();
+        std::reverse(std::begin(arr), std::end(arr));
+        expected = Value(arr);
+    }
+
+    OperationsType topSpecifcCases{// One 10 encountered once map is full.
+                                   {{mkdoc2(1, Value(1)),
+                                     mkdoc2(10, Value(3)),
+                                     mkdoc2(10, Value(4)),
+                                     mkdoc2(1, Value(2)),
+                                     mkdoc2(10, Value(5))},
+                                    {Value(std::vector<Value>{Value(1), Value(2), Value(3)})}},
+
+                                   // All 10s encountered before map is full.
+                                   {{mkdoc2(1, Value(1)),
+                                     mkdoc2(1, Value(2)),
+                                     mkdoc2(10, Value(3)),
+                                     mkdoc2(10, Value(4)),
+                                     mkdoc2(10, Value(5))},
+                                    {Value(std::vector<Value>{Value(1), Value(2), Value(3)})}},
+
+                                   // All 10s encountered when the map is full.
+                                   {{mkdoc2(1, Value(3)),
+                                     mkdoc2(1, Value(4)),
+                                     mkdoc2(1, Value(5)),
+                                     mkdoc2(10, Value(1)),
+                                     mkdoc2(10, Value(2))},
+                                    {Value(std::vector<Value>{Value(3), Value(4), Value(5)})}}};
+
     try {
+        auto accInit = [&](ExpressionContext* const expCtx) -> intrusive_ptr<AccumulatorState> {
+            auto acc =
+                AccumulatorTopBottomN<TopBottomSense::kTop, false>::create(expCtx, BSON("a" << 1));
+            acc->startNewGroup(n3);
+            return acc;
+        };
+        assertExpectedResults(expCtx.get(), cases, accInit);
+        assertExpectedResults(expCtx.get(), topSpecifcCases, accInit);
+    } catch (...) {
+        LOGV2(5788009, "top3 a: 1");
+        throw;
+    }
+}
+
+// Utility to test the single counterparts of the topN/bottomN accumulators.
+template <TopBottomSense s>
+void testSingle(OperationsType cases, ExpressionContext* const expCtx, const BSONObj& sortPattern) {
+    // Unpack for single versions.
+    for (auto& [input, expected] : cases) {
+        expected = Value(expected.getArray()[0]);
+    }
+    try {
+        // n = 1 single = true should return 1 non array value.
         assertExpectedResults(
-            expCtx.get(),
-            cases,
-            [&](ExpressionContext* const expCtx) -> intrusive_ptr<AccumulatorState> {
-                auto acc = AccumulatorTopBottomN<TopBottomSense::kTop, false>::create(
-                    expCtx, BSON("a" << 1));
-                acc->startNewGroup(n3);
+            expCtx, cases, [&](ExpressionContext* const expCtx) -> intrusive_ptr<AccumulatorState> {
+                auto acc = AccumulatorTopBottomN<s, true>::create(expCtx, sortPattern);
+                acc->startNewGroup(Value(1));
                 return acc;
             });
     } catch (...) {
-        LOGV2(5788009, "top3 a: 1");
+        if constexpr (s == kTop) {
+            LOGV2(5788013, "top single", "sortPattern"_attr = sortPattern);
+        } else {
+            LOGV2(5788016, "bottom single", "sortPattern"_attr = sortPattern);
+        }
         throw;
     }
 }
@@ -866,25 +977,26 @@ TEST(Accumulators, TopBottomSingle) {
                                                          << BSON_ARRAY(a)));
     };
 
-    OperationsType cases{
-        {{mkdoc(Value(3)), mkdoc(Value(4))}, {Value(std::vector<Value>{Value(3)})}},
-        {{mkdoc(Value(4)), mkdoc(Value(3))}, {Value(std::vector<Value>{Value(3)})}},
-        {{mkdoc(Value(BSONNULL)), mkdoc(Value(4))}, {Value(std::vector<Value>{Value(BSONNULL)})}},
+    const BSONObj ascSort = BSON("a" << 1);
+    const BSONObj descSort = BSON("a" << -1);
 
-        // Missing should be returned as missing here, it gets promoted to null in serialization so
-        // the shell actually gets null instead of missing.
-        {{mkdoc(Value()), mkdoc(Value(4))}, {Value(std::vector<Value>{Value()})}},
-        {{mkdoc(Value(BSONUndefined)), mkdoc(Value(4))},
-         {Value(std::vector<Value>{Value(BSONUndefined)})}}};
+    // When n = 1, bottomN over ascending sort is the same as topN over descending sort.
+    OperationsType bottomAscTopDescCases{
+        {{mkdoc(Value(3)), mkdoc(Value(4))}, {Value(std::vector<Value>{Value(4)})}},
+        {{mkdoc(Value(4)), mkdoc(Value(3))}, {Value(std::vector<Value>{Value(4)})}},
+        {{mkdoc(Value(BSONNULL)), mkdoc(Value(4))}, {Value(std::vector<Value>{Value(4)})}},
+
+        {{mkdoc(Value()), mkdoc(Value(4))}, {Value(std::vector<Value>{Value(4)})}},
+        {{mkdoc(Value(BSONUndefined)), mkdoc(Value(4))}, {Value(std::vector<Value>{Value(4)})}}};
 
     // n = 1 single = false should return a 1 elem array.
     try {
         assertExpectedResults(
             expCtx.get(),
-            cases,
+            bottomAscTopDescCases,
             [&](ExpressionContext* const expCtx) -> intrusive_ptr<AccumulatorState> {
-                auto acc = AccumulatorTopBottomN<TopBottomSense::kBottom, false>::create(
-                    expCtx, BSON("a" << 1));
+                auto acc =
+                    AccumulatorTopBottomN<TopBottomSense::kBottom, false>::create(expCtx, ascSort);
                 acc->startNewGroup(n);
                 return acc;
             });
@@ -892,10 +1004,12 @@ TEST(Accumulators, TopBottomSingle) {
         LOGV2(5788010, "bottom1 a: 1");
         throw;
     }
+    testSingle<TopBottomSense::kBottom>(bottomAscTopDescCases, expCtx.get(), ascSort);
+
     try {
         assertExpectedResults(
             expCtx.get(),
-            cases,
+            bottomAscTopDescCases,
             [&](ExpressionContext* const expCtx) -> intrusive_ptr<AccumulatorState> {
                 auto acc = AccumulatorTopBottomN<TopBottomSense::kTop, false>::create(
                     expCtx, BSON("a" << -1));
@@ -906,39 +1020,51 @@ TEST(Accumulators, TopBottomSingle) {
         LOGV2(5788011, "top1 a: -1");
         throw;
     }
-    // Unpack for single versions.
-    for (auto& [input, expected] : cases) {
-        expected = Value(expected.getArray()[0]);
-    }
-    // n = 1 single = true should return 1 non array value.
+    testSingle<TopBottomSense::kTop>(bottomAscTopDescCases, expCtx.get(), descSort);
+
+    // When n = 1, bottomN over descending sort is the same as topN over ascending sort.
+    OperationsType bottomDescTopAscCases{
+        {{mkdoc(Value(3)), mkdoc(Value(4))}, {Value(std::vector<Value>{Value(3)})}},
+        {{mkdoc(Value(4)), mkdoc(Value(3))}, {Value(std::vector<Value>{Value(3)})}},
+        {{mkdoc(Value(BSONNULL)), mkdoc(Value(4))}, {Value(std::vector<Value>{Value(BSONNULL)})}},
+
+        {{mkdoc(Value()), mkdoc(Value(4))}, {Value(std::vector<Value>{Value()})}},
+        {{mkdoc(Value(BSONUndefined)), mkdoc(Value(4))},
+         {Value(std::vector<Value>{Value(BSONUndefined)})}}};
+
+    // n = 1 single = false should return a 1 elem array.
     try {
         assertExpectedResults(
             expCtx.get(),
-            cases,
+            bottomDescTopAscCases,
             [&](ExpressionContext* const expCtx) -> intrusive_ptr<AccumulatorState> {
-                auto acc = AccumulatorTopBottomN<TopBottomSense::kBottom, true>::create(
-                    expCtx, BSON("a" << 1));
-                acc->startNewGroup(n);
-                return acc;
-            });
-    } catch (...) {
-        LOGV2(5788012, "bottom a: 1");
-        throw;
-    }
-    try {
-        assertExpectedResults(
-            expCtx.get(),
-            cases,
-            [&](ExpressionContext* const expCtx) -> intrusive_ptr<AccumulatorState> {
-                auto acc = AccumulatorTopBottomN<TopBottomSense::kTop, true>::create(
+                auto acc = AccumulatorTopBottomN<TopBottomSense::kBottom, false>::create(
                     expCtx, BSON("a" << -1));
                 acc->startNewGroup(n);
                 return acc;
             });
     } catch (...) {
-        LOGV2(5788013, "top a: -1");
+        LOGV2(5788012, "bottom1 a: -1");
         throw;
     }
+    testSingle<TopBottomSense::kBottom>(bottomDescTopAscCases, expCtx.get(), descSort);
+
+    // n = 1 single = false should return a 1 elem array.
+    try {
+        assertExpectedResults(
+            expCtx.get(),
+            bottomDescTopAscCases,
+            [&](ExpressionContext* const expCtx) -> intrusive_ptr<AccumulatorState> {
+                auto acc = AccumulatorTopBottomN<TopBottomSense::kTop, false>::create(
+                    expCtx, BSON("a" << 1));
+                acc->startNewGroup(n);
+                return acc;
+            });
+    } catch (...) {
+        LOGV2(6078102, "top a: 1");
+        throw;
+    }
+    testSingle<TopBottomSense::kTop>(bottomDescTopAscCases, expCtx.get(), ascSort);
 }
 
 TEST(Accumulators, Rank) {

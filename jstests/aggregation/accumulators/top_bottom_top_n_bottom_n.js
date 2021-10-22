@@ -34,13 +34,16 @@ const associateName = (i, state) => ["Jim", "Pam", "Dwight", "Phyllis"][i % 4] +
 let docs = [];
 const n = 4;
 const states = [{state: "CA", sales: 10}, {state: "NY", sales: 7}, {state: "TX", sales: 4}];
-let expectedBottomNResults = [];
-let expectedTopNResults = [];
+let expectedBottomNAscResults = [];
+let expectedTopNAscResults = [];
+let expectedBottomNDescResults = [];
+let expectedTopNDescResults = [];
+
 for (const stateDoc of states) {
     const state = stateDoc["state"];
     const sales = stateDoc["sales"];
-    let bottomArr = [];
-    let topArr = [];
+    let lowSales = [];
+    let highSales = [];
     for (let i = 1; i <= sales; ++i) {
         const amount = i * 100;
         const associate = associateName(i, state);
@@ -48,47 +51,48 @@ for (const stateDoc of states) {
 
         // Record the lowest/highest 'n' values.
         if (i < n + 1) {
-            bottomArr.push(associate);
+            lowSales.push(associate);
         }
         if (sales - n < i) {
-            topArr.push(associate);
+            highSales.push(associate);
         }
     }
-    expectedBottomNResults.push({_id: state, bottomAssociates: bottomArr});
 
-    // Reverse 'topArr' results since $topN outputs results in descending order.
-    expectedTopNResults.push({_id: state, topAssociates: topArr.reverse()});
+    // The lowest values will be present in the output for topN ascending and bottomN descending.
+    expectedTopNAscResults.push({_id: state, associates: lowSales});
+    expectedBottomNDescResults.push({_id: state, associates: lowSales.slice().reverse()});
+
+    // The highest values will be present in the output for bottomN ascending and topN descending.
+    expectedBottomNAscResults.push({_id: state, associates: highSales});
+    expectedTopNDescResults.push({_id: state, associates: highSales.slice().reverse()});
 }
 
 assert.commandWorked(coll.insert(docs));
 
+/**
+ * Helper that verifies that 'op' and 'sortSpec' produce 'expectedResults'.
+ */
+function assertExpected(op, sortSpec, expectedResults) {
+    const actual =
+        coll.aggregate([
+                {
+                    $group: {
+                        _id: "$state",
+                        associates: {[op]: {output: "$associate", n: n, sortBy: sortSpec}}
+                    }
+                },
+                {$sort: {_id: 1}}
+            ])
+            .toArray();
+    assert.eq(expectedResults, actual);
+}
+
 // Note that the output documents are sorted by '_id' so that we can compare actual groups against
 // expected groups (we cannot perform unordered comparison because order matters for $topN/bottomN).
-const actualBottomNResults =
-    coll.aggregate([
-            {
-                $group: {
-                    _id: "$state",
-                    bottomAssociates: {$bottomN: {output: "$associate", n: n, sortBy: {sales: 1}}}
-                }
-            },
-            {$sort: {_id: 1}}
-        ])
-        .toArray();
-assert.eq(expectedBottomNResults, actualBottomNResults);
-
-const actualTopNResults =
-    coll.aggregate([
-            {
-                $group: {
-                    _id: "$state",
-                    topAssociates: {$topN: {output: "$associate", n: n, sortBy: {sales: 1}}}
-                }
-            },
-            {$sort: {_id: 1}}
-        ])
-        .toArray();
-assert.eq(expectedTopNResults, actualTopNResults);
+assertExpected("$bottomN", {sales: 1}, expectedBottomNAscResults);
+assertExpected("$topN", {sales: 1}, expectedTopNAscResults);
+assertExpected("$bottomN", {sales: -1}, expectedBottomNDescResults);
+assertExpected("$topN", {sales: -1}, expectedTopNDescResults);
 
 // Verify that we can dynamically compute 'n' based on the group key for $group.
 const groupKeyNExpr = {
@@ -182,12 +186,12 @@ rejectInvalidSpec("$bottom", {}, 5788002);
 
 // Sort on embedded field.
 assert(coll.drop());
-assert.commandWorked(coll.insertMany([1, 2, 3, 4].map((i) => ({a: {b: i}}))));
+assert.commandWorked(coll.insertMany([4, 2, 3, 1].map((i) => ({a: {b: i}}))));
 const embeddedResult =
     coll.aggregate(
             {$group: {_id: "", result: {$bottomN: {n: 3, output: "$a.b", sortBy: {"a.b": 1}}}}})
         .toArray();
-assert.eq([1, 2, 3], embeddedResult[0].result);
+assert.eq([2, 3, 4], embeddedResult[0].result);
 
 // Compound Sorting.
 coll.drop();
@@ -247,9 +251,9 @@ const testOperatorText = (op) => {
     assert.eq(opNResult.length, 1);
     assert.eq(sortStageResult, opNResult[0]["result"]);
 };
+
+// Note that $topN and $bottomN will return the same results because $meta sort always returns the
+// most relevant results first.
 testOperatorText("$bottomN");
-// $topN usually flips sort pattern by making ascending false. There is no way to sort by least
-// relevent in a normal mongodb search specification so topN still returns the same order as bottomN
-// (most relevent first).
 testOperatorText("$topN");
 })();
