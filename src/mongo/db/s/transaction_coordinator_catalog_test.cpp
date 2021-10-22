@@ -157,7 +157,7 @@ TEST_F(TransactionCoordinatorCatalogTest,
               *txnNumberAndRetryCounter2.getTxnRetryCounter());
 
     assertCommandSentAndRespondWith("abortTransaction", kOk, boost::none);
-    ASSERT_THROWS_CODE(coordinator1InCatalog->getDecision().get(),
+    ASSERT_THROWS_CODE(coordinator1InCatalog->onCompletion().get(),
                        AssertionException,
                        ErrorCodes::NoSuchTransaction);
 }
@@ -224,7 +224,7 @@ TEST_F(TransactionCoordinatorCatalogTest,
               *txnNumberAndRetryCounter2.getTxnRetryCounter());
 
     assertCommandSentAndRespondWith("abortTransaction", kOk, boost::none);
-    ASSERT_THROWS_CODE(coordinator1InCatalog->getDecision().get(),
+    ASSERT_THROWS_CODE(coordinator1InCatalog->onCompletion().get(),
                        AssertionException,
                        ErrorCodes::NoSuchTransaction);
 }
@@ -294,7 +294,7 @@ TEST_F(
               *txnNumberAndRetryCounter2.getTxnRetryCounter());
 
     assertCommandSentAndRespondWith("abortTransaction", kOk, boost::none);
-    ASSERT_THROWS_CODE(coordinator1InCatalog->getDecision().get(),
+    ASSERT_THROWS_CODE(coordinator1InCatalog->onCompletion().get(),
                        AssertionException,
                        ErrorCodes::NoSuchTransaction);
 }
@@ -324,7 +324,7 @@ TEST_F(
 
     assertCommandSentAndRespondWith("prepareTransaction", kPrepareOk, boost::none);
     assertCommandSentAndRespondWith("commitTransaction", kOk, boost::none);
-    coordinator1->getDecision().get();
+    coordinator1->onCompletion().get();
 
     coordinator2->cancelIfCommitNotYetStarted();
     ASSERT_THROWS_CODE(coordinator2->onCompletion().get(),
@@ -357,7 +357,7 @@ TEST_F(TransactionCoordinatorCatalogTest,
                        6032301);
 
     assertCommandSentAndRespondWith("commitTransaction", kOk, boost::none);
-    coordinator1->getDecision().get();
+    coordinator1->onCompletion().get();
 
     coordinator2->cancelIfCommitNotYetStarted();
     ASSERT_THROWS_CODE(coordinator2->onCompletion().get(),
