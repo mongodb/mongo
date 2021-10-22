@@ -4982,13 +4982,6 @@ if split_dwarf.exists(env):
 if get_option('ninja') == 'disabled':
     env.Tool("compilation_db")
 
-# If we can, load the dagger tool for build dependency graph introspection.
-# Dagger is only supported on Linux and OSX (not Windows or Solaris).
-should_dagger = ( mongo_platform.is_running_os('osx') or mongo_platform.is_running_os('linux')  ) and "dagger" in COMMAND_LINE_TARGETS
-
-if should_dagger:
-    env.Tool("dagger")
-
 incremental_link = Tool('incremental_link')
 if incremental_link.exists(env):
     incremental_link(env)
@@ -5357,12 +5350,6 @@ env.SConscript(
         'env',
     ],
 )
-
-# run the Dagger tool if it's installed
-if should_dagger:
-    dagger = env.Dagger('library_dependency_graph.json')
-    env.Depends(dagger, env.Alias("install-all"))
-    dependencyDb = env.Alias("dagger", dagger)
 
 # Declare the cache prune target
 cachePrune = env.Command(
