@@ -87,7 +87,11 @@ var $config = (function() {
                 // Ignore Interrupted errors, which come when a moveChunk is interrupted by a
                 // concurrent index operation, and DuplicateKey errors, which come when multiple
                 // moveChunks attempt to write to the config.migrations collection at once.
-                const acceptableCodes = [ErrorCodes.Interrupted, ErrorCodes.DuplicateKey];
+                const acceptableCodes = [
+                    ErrorCodes.Interrupted,
+                    ErrorCodes.DuplicateKey,
+                    ErrorCodes.BackgroundOperationInProgressForNamespace
+                ];
                 if (e.code && acceptableCodes.includes(e.code) ||
                     // Indexes may be transiently inconsistent across shards, which can lead a
                     // concurrent migration to abort if the recipient's collection is non-empty.
