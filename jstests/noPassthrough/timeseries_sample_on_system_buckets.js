@@ -4,19 +4,11 @@
 (function() {
 "use strict";
 
-load("jstests/core/timeseries/libs/timeseries.js");
-
 const conn = MongoRunner.runMongod();
 
 const dbName = jsTestName();
 const testDB = conn.getDB(dbName);
 assert.commandWorked(testDB.dropDatabase());
-
-if (!TimeseriesTest.timeseriesCollectionsEnabled(testDB.getMongo())) {
-    jsTestLog("Skipping test because the time-series collection feature flag is disabled");
-    MongoRunner.stopMongod(conn);
-    return;
-}
 
 // Prepares a timeseries collection.
 assert.commandWorked(

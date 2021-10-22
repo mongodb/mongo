@@ -11,7 +11,6 @@
 "use strict";
 
 load("jstests/libs/fixture_helpers.js");  // For isReplSet().
-load("jstests/core/timeseries/libs/timeseries.js");
 
 const dbName = jsTestName();
 const collName = 'coll';
@@ -1271,9 +1270,6 @@ const operations = [
     resetProfileColl,
     {
         name: 'createTimeseries',
-        skipTest: (db) => {
-            return !TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo());
-        },
         command: (db) => {
             assert.commandWorked(
                 db.createCollection('ts', {timeseries: {timeField: 't', metaField: 'host'}}));
@@ -1298,9 +1294,6 @@ const operations = [
     },
     {
         name: 'insertTimeseriesNewBucketOrdered',
-        skipTest: (db) => {
-            return !TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo());
-        },
         command: (db) => {
             // Inserts a document that creates a new bucket.
             assert.commandWorked(db.ts.insert({t: new Date(), host: 0}, {ordered: true}));
@@ -1323,9 +1316,6 @@ const operations = [
     },
     {
         name: 'insertTimeseriesNewBucketUnordered',
-        skipTest: (db) => {
-            return !TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo());
-        },
         command: (db) => {
             // Inserts a document that creates a new bucket.
             assert.commandWorked(db.ts.insert({t: new Date(), host: 1}, {ordered: false}));
@@ -1348,9 +1338,6 @@ const operations = [
     resetProfileColl,
     {
         name: 'timeseriesUpdateBucketOrdered',
-        skipTest: (db) => {
-            return !TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo());
-        },
         command: (db) => {
             // Inserts a document by updating an existing bucket.
             assert.commandWorked(db.ts.insert({t: new Date(), host: 0}, {ordered: true}));
@@ -1373,9 +1360,6 @@ const operations = [
     },
     {
         name: 'timeseriesUpdateBucketUnordered',
-        skipTest: (db) => {
-            return !TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo());
-        },
         command: (db) => {
             // Inserts a document by updating an existing bucket.
             assert.commandWorked(db.ts.insert({t: new Date(), host: 1}, {ordered: false}));
@@ -1397,9 +1381,6 @@ const operations = [
     },
     {
         name: 'timeseriesQuery',
-        skipTest: (db) => {
-            return !TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo());
-        },
         command: (db) => {
             assert.eq(4, db.ts.find().itcount());
         },

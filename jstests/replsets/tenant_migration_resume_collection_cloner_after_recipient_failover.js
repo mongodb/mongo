@@ -14,7 +14,6 @@
 "use strict";
 
 const tenantMigrationFailoverTest = function(isTimeSeries, createCollFn, docs) {
-    load("jstests/core/timeseries/libs/timeseries.js");
     load("jstests/libs/fail_point_util.js");
     load("jstests/libs/uuid_util.js");  // for 'extractUUIDFromObject'
     load("jstests/replsets/libs/tenant_migration_test.js");
@@ -41,13 +40,6 @@ const tenantMigrationFailoverTest = function(isTimeSeries, createCollFn, docs) {
     const tenantMigrationTest =
         new TenantMigrationTest({name: jsTestName(), recipientRst: recipientRst});
     const donorPrimary = tenantMigrationTest.getDonorPrimary();
-
-    if (isTimeSeries && !TimeseriesTest.timeseriesCollectionsEnabled(donorPrimary)) {
-        jsTestLog("Skipping test because the time-series collection feature flag is disabled");
-        tenantMigrationTest.stop();
-        recipientRst.stopSet();
-        return;
-    }
 
     const tenantId = "testTenantId";
     const dbName = tenantMigrationTest.tenantDB(tenantId, "testDB");

@@ -23,12 +23,6 @@ const timeseries = {
     metaField: 'hostId',
 };
 
-if (!TimeseriesTest.timeseriesCollectionsEnabled(st.shard0)) {
-    jsTestLog("Skipping test because the time-series collection feature flag is disabled");
-    st.stop();
-    return;
-}
-
 if (TimeseriesTest.shardedtimeseriesCollectionsEnabled(st.shard0)) {
     function validateBucketsCollectionSharded({collName, shardKey}) {
         const configColls = st.s.getDB('config').collections;

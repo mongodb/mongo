@@ -14,7 +14,6 @@
 "use strict";
 
 load("jstests/noPassthrough/libs/index_build.js");
-load("jstests/core/timeseries/libs/timeseries.js");
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
@@ -22,13 +21,6 @@ rst.initiate();
 
 const dbName = "test";
 const db = rst.getPrimary().getDB(dbName);
-
-if (!TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo())) {
-    jsTestLog("Skipping test because the time-series collection feature flag is disabled");
-    rst.stopSet();
-    return;
-}
-
 const coll = db.timeseries_resumable_index_build;
 coll.drop();
 

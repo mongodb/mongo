@@ -24,12 +24,6 @@ const st = new ShardingTest({shards: 2, rs: {nodes: 2}});
 const mongos = st.s0;
 
 // Sanity checks.
-if (!TimeseriesTest.timeseriesCollectionsEnabled(st.shard0)) {
-    jsTestLog("Skipping test because the time-series collection feature flag is disabled");
-    st.stop();
-    return;
-}
-
 if (!TimeseriesTest.shardedtimeseriesCollectionsEnabled(st.shard0)) {
     jsTestLog("Skipping test because the sharded time-series collection feature flag is disabled");
     st.stop();

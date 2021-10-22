@@ -22,11 +22,6 @@ const db = mongos.getDB(dbName);
 // Tests that sharded time-series collection can be queried (invoking $_internalUnpackBucket stage)
 // from an external client with 'apiStrict'.
 (function testInternalUnpackBucketAllowance() {
-    if (!TimeseriesTest.timeseriesCollectionsEnabled(st.shard0)) {
-        jsTestLog("Skipping test because the time-series collection feature flag is disabled");
-        return;
-    }
-
     if (!TimeseriesTest.shardedtimeseriesCollectionsEnabled(st.shard0)) {
         jsTestLog(
             "Skipping test because the sharded time-series collection feature flag is disabled");

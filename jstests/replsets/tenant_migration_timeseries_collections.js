@@ -13,18 +13,12 @@
 (function() {
 "use strict";
 
-load("jstests/core/timeseries/libs/timeseries.js");
 load("jstests/libs/uuid_util.js");
 load("jstests/replsets/libs/tenant_migration_test.js");
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 
 const donorPrimary = tenantMigrationTest.getDonorPrimary();
-if (!TimeseriesTest.timeseriesCollectionsEnabled(donorPrimary)) {
-    jsTestLog("Skipping test because the time-series collection feature flag is disabled");
-    tenantMigrationTest.stop();
-    return;
-}
 
 const tenantId = "testTenantId";
 const tsDB = tenantMigrationTest.tenantDB(tenantId, "tsDB");

@@ -8,7 +8,6 @@
 (function() {
 "use strict";
 
-load("jstests/core/timeseries/libs/timeseries.js");
 load("jstests/libs/analyze_plan.js");
 
 let conn = MongoRunner.runMongod({setParameter: {timeseriesBucketMaxCount: 100}});
@@ -24,12 +23,6 @@ if (jsTest.options().storageEngine && jsTest.options().storageEngine !== "wiredT
 const dbName = jsTestName();
 let testDB = conn.getDB(dbName);
 assert.commandWorked(testDB.dropDatabase());
-
-if (!TimeseriesTest.timeseriesCollectionsEnabled(testDB.getMongo())) {
-    jsTestLog("Skipping test because the time-series collection feature flag is disabled");
-    MongoRunner.stopMongod(conn);
-    return;
-}
 
 const nBuckets = 40;
 

@@ -29,12 +29,6 @@ const dateTime = ISODate("2021-07-12T16:00:00Z");
 // Checks for feature flags.
 //
 
-if (!TimeseriesTest.timeseriesCollectionsEnabled(st.shard0)) {
-    jsTestLog("Skipping test because the time-series collection feature flag is disabled");
-    st.stop();
-    return;
-}
-
 if (!TimeseriesTest.shardedtimeseriesCollectionsEnabled(st.shard0)) {
     jsTestLog("Skipping test because the sharded time-series collection feature flag is disabled");
     st.stop();

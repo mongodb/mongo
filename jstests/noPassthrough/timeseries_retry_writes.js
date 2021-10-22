@@ -7,8 +7,6 @@
 (function() {
 'use strict';
 
-load('jstests/core/timeseries/libs/timeseries.js');
-
 const rst = new ReplSetTest({
     nodes: [
         {},
@@ -25,11 +23,6 @@ const nodes = rst.startSet();
 rst.initiate();
 
 const primary = rst.getPrimary();
-if (!TimeseriesTest.timeseriesCollectionsEnabled(primary)) {
-    jsTestLog('Skipping test because the time-series collection feature flag is disabled');
-    rst.stopSet();
-    return;
-}
 
 const timeFieldName = 'time';
 let collCount = 0;

@@ -24,12 +24,6 @@ assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard0.shard
 const primaryShard = st.getPrimaryShard(dbName);
 const otherShard = st.getOther(primaryShard);
 
-if (!TimeseriesTest.timeseriesCollectionsEnabled(primaryShard)) {
-    jsTestLog("Skipping test because the time-series collection feature flag is disabled");
-    st.stop();
-    return;
-}
-
 if (!TimeseriesTest.shardedtimeseriesCollectionsEnabled(primaryShard)) {
     jsTestLog("Skipping test because the sharded time-series collection feature flag is disabled");
     st.stop();

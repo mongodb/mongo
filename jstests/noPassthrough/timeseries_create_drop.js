@@ -12,18 +12,11 @@
 (function() {
 "use strict";
 
-load("jstests/core/timeseries/libs/timeseries.js");
-
 const rst = new ReplSetTest({nodes: 2});
 rst.startSet();
 rst.initiateWithHighElectionTimeout();
 const primary = rst.getPrimary();
 const primaryDb = primary.getDB('test');
-if (!TimeseriesTest.timeseriesCollectionsEnabled(primaryDb.getMongo())) {
-    jsTestLog("Skipping test because the time-series collection feature flag is disabled");
-    return;
-}
-
 const coll = primaryDb.timeseries_create_drop;
 const viewName = coll.getName();
 const viewNs = coll.getFullName();

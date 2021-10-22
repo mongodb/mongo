@@ -6,10 +6,9 @@
 (function() {
 "use strict";
 
-load("jstests/core/timeseries/libs/timeseries.js");  // For TimeseriesTest.
-load("jstests/libs/fixture_helpers.js");             // For FixtureHelpers.
-load("jstests/libs/change_stream_util.js");          // For ChangeStreamTest and
-                                                     // assert[Valid|Invalid]ChangeStreamNss.
+load("jstests/libs/fixture_helpers.js");     // For FixtureHelpers.
+load("jstests/libs/change_stream_util.js");  // For ChangeStreamTest and
+                                             // assert[Valid|Invalid]ChangeStreamNss.
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
@@ -19,12 +18,6 @@ const timeFieldName = "time";
 const metaFieldName = "tags";
 const testDB = rst.getPrimary().getDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());
-
-if (!TimeseriesTest.timeseriesCollectionsEnabled(testDB.getMongo())) {
-    jsTestLog("Skipping test because the time-series collection feature flag is disabled");
-    MongoRunner.stopMongod(conn);
-    return;
-}
 
 const tsColl = testDB.getCollection("ts_point_data");
 tsColl.drop();

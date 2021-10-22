@@ -14,12 +14,6 @@ load('jstests/libs/fail_point_util.js');
 const conn = MongoRunner.runMongod();
 
 function runTest(conn, failPointConn, shardColl) {
-    if (!TimeseriesTest.timeseriesCollectionsEnabled(conn)) {
-        jsTestLog('Skipping test because the time-series collection feature flag is disabled');
-        MongoRunner.stopMongod(conn);
-        return;
-    }
-
     const testDB = conn.getDB(jsTestName());
 
     const coll = testDB.getCollection('t');

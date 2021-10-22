@@ -4,21 +4,14 @@
 (function() {
 "use strict";
 
-load("jstests/core/timeseries/libs/timeseries.js");
-
 const measurementsPerBucket = 10;
 const nBuckets = 10;
 const conn =
     MongoRunner.runMongod({setParameter: {timeseriesBucketMaxCount: measurementsPerBucket}});
+
 const testDB = conn.getDB(jsTestName());
-
-if (!TimeseriesTest.timeseriesCollectionsEnabled(testDB.getMongo())) {
-    jsTestLog("Skipping test because the time-series collection feature flag is disabled");
-    MongoRunner.stopMongod(conn);
-    return;
-}
-
 assert.commandWorked(testDB.dropDatabase());
+
 const tsColl = testDB.getCollection("tsColl");
 assert.commandWorked(testDB.createCollection(
     tsColl.getName(), {timeseries: {timeField: "start", metaField: "meta"}}));

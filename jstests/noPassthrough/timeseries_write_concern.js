@@ -9,7 +9,6 @@
 (function() {
 'use strict';
 
-load('jstests/core/timeseries/libs/timeseries.js');
 load("jstests/libs/parallel_shell_helpers.js");
 load("jstests/libs/write_concern_util.js");
 
@@ -18,12 +17,6 @@ replTest.startSet();
 replTest.initiate();
 
 const primary = replTest.getPrimary();
-
-if (!TimeseriesTest.timeseriesCollectionsEnabled(primary)) {
-    jsTestLog('Skipping test because the time-series collection feature flag is disabled');
-    replTest.stopSet();
-    return;
-}
 
 const dbName = jsTestName();
 const testDB = primary.getDB(dbName);

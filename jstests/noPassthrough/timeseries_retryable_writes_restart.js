@@ -10,20 +10,12 @@
 (function() {
 "use strict";
 
-load("jstests/core/timeseries/libs/timeseries.js");
-
 function testRetryableRestart(ordered) {
     const replTest = new ReplSetTest({nodes: 1});
     replTest.startSet();
     replTest.initiate();
 
     const primary = replTest.getPrimary();
-
-    if (!TimeseriesTest.timeseriesCollectionsEnabled(primary)) {
-        jsTestLog("Skipping test because the time-series collection feature flag is disabled");
-        replTest.stopSet();
-        return;
-    }
 
     const testDB = primary.startSession({retryWrites: true}).getDatabase("test");
     const coll = testDB[jsTestName()];

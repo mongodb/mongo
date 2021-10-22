@@ -3,17 +3,11 @@
  * receive concurrent writes.
  */
 load("jstests/noPassthrough/libs/index_build.js");
-load('jstests/core/timeseries/libs/timeseries.js');
 
 (function() {
 "use strict";
 
 const conn = MongoRunner.runMongod();
-if (!TimeseriesTest.timeseriesCollectionsEnabled(conn)) {
-    jsTestLog('Skipping test because the time-series collection feature flag is disabled');
-    MongoRunner.stopMongod(conn);
-    return;
-}
 
 const dbName = jsTestName();
 const collName = 'ts';

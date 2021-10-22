@@ -9,17 +9,9 @@
 (function() {
 'use strict';
 
-load('jstests/core/timeseries/libs/timeseries.js');
-
 const replTest = new ReplSetTest({nodes: 2});
 replTest.startSet();
 replTest.initiate();
-
-if (!TimeseriesTest.timeseriesCollectionsEnabled(replTest.getPrimary())) {
-    jsTestLog('Skipping test because the time-series collection feature flag is disabled');
-    replTest.stopSet();
-    return;
-}
 
 const dbName = 'test';
 const numColls = 3;
