@@ -1913,6 +1913,11 @@ var ShardingTest = function(params) {
         throw e;
     }
 
+    // Ensure that the sessions collection exists so jstests can run things with
+    // logical sessions and test them. We do this by forcing an immediate cache refresh
+    // on the config server, which auto-shards the collection for the cluster.
+    this.configRS.getPrimary().getDB("admin").runCommand({refreshLogicalSessionCacheNow: 1});
+
     // Ensure that all CSRS nodes are up to date. This is strictly needed for tests that use
     // multiple mongoses. In those cases, the first mongos initializes the contents of the 'config'
     // database, but without waiting for those writes to replicate to all the config servers then
@@ -1925,11 +1930,6 @@ var ShardingTest = function(params) {
         jsTest.authenticateNodes(this._configServers);
         jsTest.authenticateNodes(this._mongos);
     }
-
-    // Ensure that the sessions collection exists so jstests can run things with
-    // logical sessions and test them. We do this by forcing an immediate cache refresh
-    // on the config server, which auto-shards the collection for the cluster.
-    this.configRS.getPrimary().getDB("admin").runCommand({refreshLogicalSessionCacheNow: 1});
 
     // Flushes the routing table cache on connection 'conn'. If 'keyFileLocal' is defined,
     // authenticates the keyfile user.
