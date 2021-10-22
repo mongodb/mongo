@@ -74,3 +74,7 @@ structs:
             whenToClean:
                 type: CleanWhen
                 description: "Enumeration that defines when to cleanup the range."
+            timestamp:
+                type: timestamp
+                description: "The timestamp the task was created."
+                optional: true

@@ -30,6 +30,7 @@
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/logical_clock.h"
 #include "mongo/db/s/catalog_cache_loader_mock.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/collection_sharding_state.h"
@@ -69,7 +70,8 @@ void addRangeToReceivingChunks(OperationContext* opCtx,
 }
 
 template <typename ShardKey>
-RangeDeletionTask createDeletionTask(const NamespaceString& nss,
+RangeDeletionTask createDeletionTask(OperationContext* opCtx,
+                                     const NamespaceString& nss,
                                      const UUID& uuid,
                                      ShardKey min,
                                      ShardKey max,
@@ -81,6 +83,8 @@ RangeDeletionTask createDeletionTask(const NamespaceString& nss,
                                   donorShard,
                                   ChunkRange{BSON("_id" << min), BSON("_id" << max)},
                                   CleanWhenEnum::kNow);
+    const auto clusterTime = LogicalClock::get(opCtx)->getClusterTime();
+    task.setTimestamp(clusterTime.asTimestamp());
 
     if (pending)
         task.setPending(true);
@@ -109,9 +113,9 @@ TEST_F(MigrationUtilsTest, TestOverlappingRangeQueryWithIntegerShardKey) {
 
     PersistentTaskStore<RangeDeletionTask> store(opCtx, NamespaceString::kRangeDeletionNamespace);
 
-    store.add(opCtx, createDeletionTask(NamespaceString{"one"}, uuid, 0, 10));
-    store.add(opCtx, createDeletionTask(NamespaceString{"two"}, uuid, 10, 20));
-    store.add(opCtx, createDeletionTask(NamespaceString{"three"}, uuid, 40, 50));
+    store.add(opCtx, createDeletionTask(opCtx, NamespaceString{"one"}, uuid, 0, 10));
+    store.add(opCtx, createDeletionTask(opCtx, NamespaceString{"two"}, uuid, 10, 20));
+    store.add(opCtx, createDeletionTask(opCtx, NamespaceString{"three"}, uuid, 40, 50));
 
     ASSERT_EQ(store.count(opCtx), 3);
 
@@ -167,12 +171,21 @@ TEST_F(MigrationUtilsTest, TestOverlappingRangeQueryWithCompoundShardKeyWhereFir
     PersistentTaskStore<RangeDeletionTask> store(opCtx, NamespaceString::kRangeDeletionNamespace);
 
     auto deletionTasks = {
-        createDeletionTask(
-            NamespaceString{"one"}, uuid, BSON("a" << 0 << "b" << 0), BSON("a" << 0 << "b" << 10)),
-        createDeletionTask(
-            NamespaceString{"two"}, uuid, BSON("a" << 0 << "b" << 10), BSON("a" << 0 << "b" << 20)),
-        createDeletionTask(
-            NamespaceString{"one"}, uuid, BSON("a" << 0 << "b" << 40), BSON("a" << 0 << "b" << 50)),
+        createDeletionTask(opCtx,
+                           NamespaceString{"one"},
+                           uuid,
+                           BSON("a" << 0 << "b" << 0),
+                           BSON("a" << 0 << "b" << 10)),
+        createDeletionTask(opCtx,
+                           NamespaceString{"two"},
+                           uuid,
+                           BSON("a" << 0 << "b" << 10),
+                           BSON("a" << 0 << "b" << 20)),
+        createDeletionTask(opCtx,
+                           NamespaceString{"one"},
+                           uuid,
+                           BSON("a" << 0 << "b" << 40),
+                           BSON("a" << 0 << "b" << 50)),
     };
 
     for (auto&& task : deletionTasks) {
@@ -242,12 +255,21 @@ TEST_F(MigrationUtilsTest,
     PersistentTaskStore<RangeDeletionTask> store(opCtx, NamespaceString::kRangeDeletionNamespace);
 
     auto deletionTasks = {
-        createDeletionTask(
-            NamespaceString{"one"}, uuid, BSON("a" << 0 << "b" << 0), BSON("a" << 10 << "b" << 0)),
-        createDeletionTask(
-            NamespaceString{"two"}, uuid, BSON("a" << 10 << "b" << 0), BSON("a" << 20 << "b" << 0)),
-        createDeletionTask(
-            NamespaceString{"one"}, uuid, BSON("a" << 40 << "b" << 0), BSON("a" << 50 << "b" << 0)),
+        createDeletionTask(opCtx,
+                           NamespaceString{"one"},
+                           uuid,
+                           BSON("a" << 0 << "b" << 0),
+                           BSON("a" << 10 << "b" << 0)),
+        createDeletionTask(opCtx,
+                           NamespaceString{"two"},
+                           uuid,
+                           BSON("a" << 10 << "b" << 0),
+                           BSON("a" << 20 << "b" << 0)),
+        createDeletionTask(opCtx,
+                           NamespaceString{"one"},
+                           uuid,
+                           BSON("a" << 40 << "b" << 0),
+                           BSON("a" << 50 << "b" << 0)),
     };
 
     for (auto&& task : deletionTasks) {
@@ -315,9 +337,9 @@ TEST_F(MigrationUtilsTest, TestInvalidUUID) {
 
     PersistentTaskStore<RangeDeletionTask> store(opCtx, NamespaceString::kRangeDeletionNamespace);
 
-    store.add(opCtx, createDeletionTask(NamespaceString{"one"}, uuid, 0, 10));
-    store.add(opCtx, createDeletionTask(NamespaceString{"two"}, uuid, 10, 20));
-    store.add(opCtx, createDeletionTask(NamespaceString{"three"}, uuid, 40, 50));
+    store.add(opCtx, createDeletionTask(opCtx, NamespaceString{"one"}, uuid, 0, 10));
+    store.add(opCtx, createDeletionTask(opCtx, NamespaceString{"two"}, uuid, 10, 20));
+    store.add(opCtx, createDeletionTask(opCtx, NamespaceString{"three"}, uuid, 40, 50));
 
     ASSERT_EQ(store.count(opCtx), 3);
 
@@ -471,7 +493,7 @@ TEST_F(SubmitRangeDeletionTaskTest,
        FailsAndDeletesTaskIfFilteringMetadataIsUnknownEvenAfterRefresh) {
     auto opCtx = operationContext();
 
-    auto deletionTask = createDeletionTask(kNss, kDefaultUUID, 0, 10, _myShardName);
+    auto deletionTask = createDeletionTask(opCtx, kNss, kDefaultUUID, 0, 10, _myShardName);
 
     PersistentTaskStore<RangeDeletionTask> store(opCtx, NamespaceString::kRangeDeletionNamespace);
     store.add(opCtx, deletionTask);
@@ -496,7 +518,7 @@ TEST_F(SubmitRangeDeletionTaskTest,
 TEST_F(SubmitRangeDeletionTaskTest, FailsAndDeletesTaskIfNamespaceIsUnshardedEvenAfterRefresh) {
     auto opCtx = operationContext();
 
-    auto deletionTask = createDeletionTask(kNss, kDefaultUUID, 0, 10, _myShardName);
+    auto deletionTask = createDeletionTask(opCtx, kNss, kDefaultUUID, 0, 10, _myShardName);
 
     PersistentTaskStore<RangeDeletionTask> store(opCtx, NamespaceString::kRangeDeletionNamespace);
     store.add(opCtx, deletionTask);
@@ -523,7 +545,7 @@ TEST_F(SubmitRangeDeletionTaskTest,
        FailsAndDeletesTaskIfNamespaceIsUnshardedBeforeAndAfterRefresh) {
     auto opCtx = operationContext();
 
-    auto deletionTask = createDeletionTask(kNss, kDefaultUUID, 0, 10, _myShardName);
+    auto deletionTask = createDeletionTask(opCtx, kNss, kDefaultUUID, 0, 10, _myShardName);
 
     PersistentTaskStore<RangeDeletionTask> store(opCtx, NamespaceString::kRangeDeletionNamespace);
     store.add(opCtx, deletionTask);
@@ -551,7 +573,7 @@ TEST_F(SubmitRangeDeletionTaskTest, SucceedsIfFilteringMetadataUUIDMatchesTaskUU
     auto opCtx = operationContext();
 
     auto collectionUUID = createCollectionAndGetUUID(kNss);
-    auto deletionTask = createDeletionTask(kNss, collectionUUID, 0, 10, _myShardName);
+    auto deletionTask = createDeletionTask(opCtx, kNss, collectionUUID, 0, 10, _myShardName);
 
     PersistentTaskStore<RangeDeletionTask> store(opCtx, NamespaceString::kRangeDeletionNamespace);
     store.add(opCtx, deletionTask);
@@ -578,7 +600,7 @@ TEST_F(
     auto opCtx = operationContext();
 
     auto collectionUUID = createCollectionAndGetUUID(kNss);
-    auto deletionTask = createDeletionTask(kNss, collectionUUID, 0, 10, _myShardName);
+    auto deletionTask = createDeletionTask(opCtx, kNss, collectionUUID, 0, 10, _myShardName);
 
     PersistentTaskStore<RangeDeletionTask> store(opCtx, NamespaceString::kRangeDeletionNamespace);
     store.add(opCtx, deletionTask);
@@ -610,7 +632,7 @@ TEST_F(SubmitRangeDeletionTaskTest,
     forceShardFilteringMetadataRefresh(opCtx, kNss, true);
 
     auto collectionUUID = createCollectionAndGetUUID(kNss);
-    auto deletionTask = createDeletionTask(kNss, collectionUUID, 0, 10, _myShardName);
+    auto deletionTask = createDeletionTask(opCtx, kNss, collectionUUID, 0, 10, _myShardName);
 
     PersistentTaskStore<RangeDeletionTask> store(opCtx, NamespaceString::kRangeDeletionNamespace);
     store.add(opCtx, deletionTask);
@@ -646,7 +668,7 @@ TEST_F(SubmitRangeDeletionTaskTest,
     forceShardFilteringMetadataRefresh(opCtx, kNss, true);
 
     auto collectionUUID = createCollectionAndGetUUID(kNss);
-    auto deletionTask = createDeletionTask(kNss, collectionUUID, 0, 10, _myShardName);
+    auto deletionTask = createDeletionTask(opCtx, kNss, collectionUUID, 0, 10, _myShardName);
 
     PersistentTaskStore<RangeDeletionTask> store(opCtx, NamespaceString::kRangeDeletionNamespace);
     store.add(opCtx, deletionTask);
@@ -669,7 +691,7 @@ TEST_F(SubmitRangeDeletionTaskTest,
        FailsAndDeletesTaskIfFilteringMetadataUUIDDifferentFromTaskUUIDEvenAfterRefresh) {
     auto opCtx = operationContext();
 
-    auto deletionTask = createDeletionTask(kNss, kDefaultUUID, 0, 10, _myShardName);
+    auto deletionTask = createDeletionTask(opCtx, kNss, kDefaultUUID, 0, 10, _myShardName);
 
     PersistentTaskStore<RangeDeletionTask> store(opCtx, NamespaceString::kRangeDeletionNamespace);
     store.add(opCtx, deletionTask);

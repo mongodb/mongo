@@ -43,6 +43,7 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_session_cache.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/write_ops.h"
@@ -507,6 +508,8 @@ void submitOrphanRanges(OperationContext* opCtx, const NamespaceString& nss, con
                                    ShardId(kRangeDeletionTaskShardIdForFCVUpgrade),
                                    range,
                                    CleanWhenEnum::kDelayed);
+            const auto clusterTime = LogicalClock::get(opCtx)->getClusterTime();
+            task.setTimestamp(clusterTime.asTimestamp());
             deletions.emplace_back(task);
 
             if (deletions.size() % 1000 == 0) {

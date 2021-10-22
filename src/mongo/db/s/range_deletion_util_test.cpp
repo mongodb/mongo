@@ -31,6 +31,7 @@
 
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/logical_clock.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/metadata_manager.h"
 #include "mongo/db/s/migration_util.h"
@@ -428,6 +429,8 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeWaitsForReplicationAfterDeletingS
     const ChunkRange range(BSON(kShardKey << 0), BSON(kShardKey << 10));
     RangeDeletionTask t(
         UUID::gen(), kNss, uuid(), ShardId("donor"), range, CleanWhenEnum::kDelayed);
+    const auto clusterTime = LogicalClock::get(operationContext())->getClusterTime();
+    t.setTimestamp(clusterTime.asTimestamp());
     store.add(operationContext(), t);
     // Document should be in the store.
     ASSERT_EQUALS(countDocsInConfigRangeDeletions(store, operationContext()), 1);
@@ -485,6 +488,8 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeWaitsForReplicationOnlyOnceAfterS
     const ChunkRange range(BSON(kShardKey << 0), BSON(kShardKey << 10));
     RangeDeletionTask t(
         UUID::gen(), kNss, uuid(), ShardId("donor"), range, CleanWhenEnum::kDelayed);
+    const auto clusterTime = LogicalClock::get(operationContext())->getClusterTime();
+    t.setTimestamp(clusterTime.asTimestamp());
     store.add(operationContext(), t);
     // Document should be in the store.
     ASSERT_EQUALS(countDocsInConfigRangeDeletions(store, operationContext()), 1);
@@ -536,6 +541,8 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeDoesNotWaitForReplicationIfErrorD
     const ChunkRange range(BSON(kShardKey << 0), BSON(kShardKey << 10));
     RangeDeletionTask t(
         UUID::gen(), kNss, uuid(), ShardId("donor"), range, CleanWhenEnum::kDelayed);
+    const auto clusterTime = LogicalClock::get(operationContext())->getClusterTime();
+    t.setTimestamp(clusterTime.asTimestamp());
     store.add(operationContext(), t);
     // Document should be in the store.
     ASSERT_EQUALS(countDocsInConfigRangeDeletions(store, operationContext()), 1);
@@ -588,6 +595,8 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeRetriesOnWriteConflictException) 
                                                  NamespaceString::kRangeDeletionNamespace);
     RangeDeletionTask t(
         UUID::gen(), kNss, uuid(), ShardId("donor"), range, CleanWhenEnum::kDelayed);
+    const auto clusterTime = LogicalClock::get(operationContext())->getClusterTime();
+    t.setTimestamp(clusterTime.asTimestamp());
     store.add(operationContext(), t);
     // Document should be in the store.
     ASSERT_EQUALS(countDocsInConfigRangeDeletions(store, operationContext()), 1);
@@ -627,6 +636,8 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeRetriesOnUnexpectedError) {
                                                  NamespaceString::kRangeDeletionNamespace);
     RangeDeletionTask t(
         UUID::gen(), kNss, uuid(), ShardId("donor"), range, CleanWhenEnum::kDelayed);
+    const auto clusterTime = LogicalClock::get(operationContext())->getClusterTime();
+    t.setTimestamp(clusterTime.asTimestamp());
     store.add(operationContext(), t);
     // Document should be in the store.
     ASSERT_EQUALS(countDocsInConfigRangeDeletions(store, operationContext()), 1);
@@ -749,6 +760,8 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeRemovesRangeDeletionTaskOnSuccess
 
     RangeDeletionTask t(
         UUID::gen(), kNss, uuid(), ShardId("donor"), range, CleanWhenEnum::kDelayed);
+    const auto clusterTime = LogicalClock::get(operationContext())->getClusterTime();
+    t.setTimestamp(clusterTime.asTimestamp());
     store.add(operationContext(), t);
     // Document should be in the store.
     ASSERT_EQUALS(countDocsInConfigRangeDeletions(store, operationContext()), 1);
@@ -787,6 +800,8 @@ TEST_F(RangeDeleterTest,
 
     RangeDeletionTask t(
         UUID::gen(), kNss, fakeUuid, ShardId("donor"), range, CleanWhenEnum::kDelayed);
+    const auto clusterTime = LogicalClock::get(operationContext())->getClusterTime();
+    t.setTimestamp(clusterTime.asTimestamp());
     store.add(operationContext(), t);
     // Document should be in the store.
     ASSERT_EQUALS(countDocsInConfigRangeDeletions(store, operationContext()), 1);
@@ -826,6 +841,8 @@ TEST_F(RangeDeleterTest,
 
     RangeDeletionTask t(
         UUID::gen(), kNss, uuid(), ShardId("donor"), range, CleanWhenEnum::kDelayed);
+    const auto clusterTime = LogicalClock::get(operationContext())->getClusterTime();
+    t.setTimestamp(clusterTime.asTimestamp());
     store.add(operationContext(), t);
     // Document should be in the store.
     ASSERT_EQUALS(countDocsInConfigRangeDeletions(store, operationContext()), 1);

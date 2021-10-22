@@ -43,6 +43,7 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
@@ -1065,6 +1066,8 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
                                                     range,
                                                     CleanWhenEnum::kNow);
             recipientDeletionTask.setPending(true);
+            const auto clusterTime = LogicalClock::get(outerOpCtx)->getClusterTime();
+            recipientDeletionTask.setTimestamp(clusterTime.asTimestamp());
 
             // It is illegal to wait for write concern with a session checked out, so persist the
             // range deletion task with an immediately satsifiable write concern and then wait for
