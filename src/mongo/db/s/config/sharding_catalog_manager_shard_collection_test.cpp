@@ -66,13 +66,15 @@ class ShardCollectionTestBase : public ConfigServerTestFixture {
 protected:
     void expectSplitVector(const HostAndPort& shardHost,
                            const ShardKeyPattern& keyPattern,
-                           const BSONObj& splitPoints) {
+                           const BSONArray& splitPoints) {
         onCommand([&](const RemoteCommandRequest& request) {
             ASSERT_EQUALS(shardHost, request.target);
             string cmdName = request.cmdObj.firstElement().fieldName();
-            ASSERT_EQUALS("splitVector", cmdName);
-            ASSERT_EQUALS(kNamespace.ns(),
-                          request.cmdObj["splitVector"].String());  // splitVector uses full ns
+            ASSERT_EQUALS("autoSplitVector", cmdName);
+            // autoSplitVector concatenates the collection name to the command's db
+            const auto receivedNs =
+                request.dbname + '.' + request.cmdObj["autoSplitVector"].String();
+            ASSERT_EQUALS(kNamespace.ns(), receivedNs);
 
             ASSERT_BSONOBJ_EQ(keyPattern.toBSON(), request.cmdObj["keyPattern"].Obj());
             ASSERT_BSONOBJ_EQ(keyPattern.getKeyPattern().globalMin(), request.cmdObj["min"].Obj());
