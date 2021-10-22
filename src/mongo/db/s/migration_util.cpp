@@ -350,7 +350,6 @@ bool deletionTaskUuidMatchesFilteringMetadataUuid(
 ExecutorFuture<void> cleanUpRange(ServiceContext* serviceContext,
                                   const std::shared_ptr<executor::ThreadPoolTaskExecutor>& executor,
                                   const RangeDeletionTask& deletionTask) {
-
     return AsyncTry([=]() mutable {
                ThreadClient tc(kRangeDeletionThreadName, serviceContext);
                {
@@ -361,33 +360,45 @@ ExecutorFuture<void> cleanUpRange(ServiceContext* serviceContext,
                auto opCtx = uniqueOpCtx.get();
                opCtx->setAlwaysInterruptAtStepDownOrUp();
 
-               AutoGetCollection autoColl(opCtx, deletionTask.getNss(), MODE_IS);
-               auto csr = CollectionShardingRuntime::get(opCtx, deletionTask.getNss());
-               // Keep the collection metadata from changing for the rest of this scope.
-               auto csrLock = CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
-               auto optCollDescr = csr->getCurrentMetadataIfKnown();
-               uassert(
-                   ErrorCodes::RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist,
-                   str::stream()
-                       << "Even after forced refresh, filtering metadata for namespace in "
-                          "deletion task "
-                       << (optCollDescr
-                               ? (optCollDescr->isSharded()
-                                      ? " has UUID that does not match UUID of the deletion task"
-                                      : " is unsharded")
-                               : " is not known"),
-                   deletionTaskUuidMatchesFilteringMetadataUuid(opCtx, optCollDescr, deletionTask));
+               const NamespaceString& nss = deletionTask.getNss();
 
-               LOGV2(22026,
-                     "Submitting range deletion task",
-                     "deletionTask"_attr = redact(deletionTask.toBSON()),
-                     "migrationId"_attr = deletionTask.getId());
+               while (true) {
+                   {
+                       // Holding the locks while enqueueing the task protects against possible
+                       // concurrent cleanups of the filtering metadata, that be serialized
+                       AutoGetCollection autoColl(opCtx, nss, MODE_IS);
+                       auto csr = CollectionShardingRuntime::get(opCtx, nss);
+                       auto csrLock = CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
+                       auto optCollDescr = csr->getCurrentMetadataIfKnown();
 
-               const auto whenToClean = deletionTask.getWhenToClean() == CleanWhenEnum::kNow
-                   ? CollectionShardingRuntime::kNow
-                   : CollectionShardingRuntime::kDelayed;
+                       if (optCollDescr) {
+                           uassert(ErrorCodes::
+                                       RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist,
+                                   str::stream() << "Filtering metadata for " << nss
+                                                 << (optCollDescr->isSharded()
+                                                         ? " has UUID that does not match UUID of "
+                                                           "the deletion task"
+                                                         : " is unsharded"),
+                                   deletionTaskUuidMatchesFilteringMetadataUuid(
+                                       opCtx, optCollDescr, deletionTask));
 
-               return csr->cleanUpRange(deletionTask.getRange(), deletionTask.getId(), whenToClean);
+                           LOGV2(22026,
+                                 "Submitting range deletion task",
+                                 "deletionTask"_attr = redact(deletionTask.toBSON()),
+                                 "migrationId"_attr = deletionTask.getId());
+
+                           const auto whenToClean =
+                               deletionTask.getWhenToClean() == CleanWhenEnum::kNow
+                               ? CollectionShardingRuntime::kNow
+                               : CollectionShardingRuntime::kDelayed;
+
+                           return csr->cleanUpRange(
+                               deletionTask.getRange(), deletionTask.getId(), whenToClean);
+                       }
+                   }
+
+                   refreshFilteringMetadataUntilSuccess(opCtx, nss);
+               }
            })
         .until([](Status status) mutable {
             // Resubmit the range for deletion on a RangeOverlapConflict error.
@@ -408,8 +419,6 @@ ExecutorFuture<void> submitRangeDeletionTask(OperationContext* opCtx,
                 stdx::lock_guard<Client> lk(*tc.get());
                 tc->setSystemOperationKillableByStepdown(lk);
             }
-            auto uniqueOpCtx = tc->makeOperationContext();
-            auto opCtx = uniqueOpCtx.get();
 
             uassert(
                 ErrorCodes::ResumableRangeDeleterDisabled,
@@ -417,36 +426,6 @@ ExecutorFuture<void> submitRangeDeletionTask(OperationContext* opCtx,
                     << "Not submitting range deletion task " << redact(deletionTask.toBSON())
                     << " because the disableResumableRangeDeleter server parameter is set to true",
                 !disableResumableRangeDeleter.load());
-
-            // Make sure the collection metadata is up-to-date before submitting.
-            boost::optional<CollectionMetadata> optCollDescr;
-            {
-                AutoGetCollection autoColl(opCtx, deletionTask.getNss(), MODE_IS);
-                auto csr = CollectionShardingRuntime::get(opCtx, deletionTask.getNss());
-                optCollDescr = csr->getCurrentMetadataIfKnown();
-            }
-
-            if (!deletionTaskUuidMatchesFilteringMetadataUuid(opCtx, optCollDescr, deletionTask)) {
-
-                // If the collection's filtering metadata is not known, is unsharded, or its
-                // UUID does not match the UUID of the deletion task, force a filtering metadata
-                // refresh, because this node may have just stepped up and therefore may have a
-                // stale cache.
-                LOGV2(22024,
-                      "Filtering metadata for this range deletion task may be outdated; "
-                      "forcing refresh",
-                      "deletionTask"_attr = redact(deletionTask.toBSON()),
-                      "error"_attr =
-                          (optCollDescr ? (optCollDescr->isSharded()
-                                               ? "Collection has UUID that does not match "
-                                                 "UUID of the deletion task"
-                                               : "Collection is unsharded")
-                                        : "Collection's sharding state is not known"),
-                      "namespace"_attr = deletionTask.getNss(),
-                      "migrationId"_attr = deletionTask.getId());
-
-                refreshFilteringMetadataUntilSuccess(opCtx, deletionTask.getNss());
-            }
 
             return AsyncTry([=]() {
                        return cleanUpRange(serviceContext, executor, deletionTask)
