@@ -33,6 +33,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/migration_coordinator_document_gen.h"
+#include "mongo/db/s/migration_recipient_recovery_document_gen.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -233,5 +234,25 @@ ExecutorFuture<void> launchReleaseCriticalSectionOnRecipientFuture(
     const ShardId& recipientShardId,
     const NamespaceString& nss,
     const MigrationSessionId& sessionId);
+
+/**
+ * Writes the migration recipient recovery document to config.migrationRecipients and waits for
+ * majority write concern.
+ */
+void persistMigrationRecipientRecoveryDocument(
+    OperationContext* opCtx, const MigrationRecipientRecoveryDocument& migrationRecipientDoc);
+
+/**
+ * Deletes the migration recipient recovery document from config.migrationRecipients and waits for
+ * majority write concern.
+ */
+void deleteMigrationRecipientRecoveryDocument(OperationContext* opCtx, const UUID& migrationId);
+
+/**
+ * If there was any ongoing receiveChunk that requires recovery (i.e that has reached the critical
+ * section stage), restores the MigrationDestinationManager state.
+ */
+void resumeMigrationRecipientsOnStepUp(OperationContext* opCtx);
+
 }  // namespace migrationutil
 }  // namespace mongo

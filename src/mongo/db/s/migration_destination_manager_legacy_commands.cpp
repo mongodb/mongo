@@ -320,7 +320,7 @@ public:
 
 
     bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
+        return true;
     }
 
     void addRequiredPrivileges(const std::string& dbname,
@@ -336,6 +336,11 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         opCtx->setAlwaysInterruptAtStepDownOrUp();
+
+        uassert(ErrorCodes::InvalidOptions,
+                str::stream() << getName() << " must be called with majority writeConcern, got "
+                              << opCtx->getWriteConcern().wMode,
+                opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
 
         const auto sessionId = uassertStatusOK(MigrationSessionId::extractFromBSON(cmdObj));
 

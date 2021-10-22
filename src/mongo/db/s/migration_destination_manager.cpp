@@ -73,6 +73,7 @@
 #include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
@@ -275,6 +276,16 @@ BSONObj criticalSectionReason(const MigrationSessionId& sessionId) {
     return builder.obj();
 }
 
+bool migrationRecipientRecoveryDocumentExists(OperationContext* opCtx,
+                                              const MigrationSessionId& sessionId) {
+    PersistentTaskStore<MigrationRecipientRecoveryDocument> store(
+        NamespaceString::kMigrationRecipientsNamespace);
+
+    BSONObjBuilder bob;
+    sessionId.append(&bob);
+    return store.count(opCtx, bob.obj()) > 0;
+}
+
 // Enabling / disabling these fail points pauses / resumes MigrateStatus::_go(), the thread which
 // receives a chunk migration from the donor.
 MONGO_FAIL_POINT_DEFINE(migrateThreadHangAtStep1);
@@ -459,6 +470,46 @@ Status MigrationDestinationManager::start(OperationContext* opCtx,
     ShardingStatistics::get(opCtx).countRecipientMoveChunkStarted.addAndFetch(1);
 
     _migrateThreadHandle = stdx::thread([this]() { _migrateThread(); });
+
+    return Status::OK();
+}
+
+Status MigrationDestinationManager::restoreRecoveredMigrationState(
+    OperationContext* opCtx,
+    ScopedReceiveChunk scopedReceiveChunk,
+    const MigrationRecipientRecoveryDocument& recoveryDoc) {
+    invariant(!isActive());
+
+    _scopedReceiveChunk = std::move(scopedReceiveChunk);
+    _nss = recoveryDoc.getNss();
+    _migrationId = recoveryDoc.getId();
+    _sessionId = recoveryDoc.getMigrationSessionId();
+    _min = recoveryDoc.getRange().getMin();
+    _max = recoveryDoc.getRange().getMax();
+    _lsid = recoveryDoc.getLsid();
+    _txnNumber = recoveryDoc.getTxnNumber();
+    _state = COMMIT_START;
+
+    LOGV2(6064500, "Recovering migration recipient", "sessionId"_attr = *_sessionId);
+
+    RecoverableCriticalSectionService::get(opCtx)->acquireRecoverableCriticalSectionBlockWrites(
+        opCtx, _nss, criticalSectionReason(*_sessionId), ShardingCatalogClient::kLocalWriteConcern);
+
+    LOGV2_DEBUG(6064501,
+                2,
+                "Reacquired migration recipient critical section",
+                "sessionId"_attr = *_sessionId);
+
+    _state = ENTERED_CRIT_SEC;
+
+    if (_migrateThreadHandle.joinable()) {
+        _migrateThreadHandle.join();
+    }
+
+    _migrateThreadHandle =
+        stdx::thread([this]() { _migrateThread(true /* skipToCritSecTaken */); });
+
+    LOGV2(6064503, "Recovered migration recipient", "sessionId"_attr = *_sessionId);
 
     return Status::OK();
 }
@@ -659,6 +710,18 @@ Status MigrationDestinationManager::exitCriticalSection(OperationContext* opCtx,
                     "Request to exit recipient critical section does not match current session",
                     "requested"_attr = sessionId,
                     "current"_attr = _sessionId);
+
+        if (migrationRecipientRecoveryDocumentExists(opCtx, sessionId)) {
+            // This node may have stepped down and interrupted the migrateThread, which reset
+            // _sessionId. But the critical section may not have been released so it will be
+            // recovered by the new primary.
+            return {ErrorCodes::CommandFailed,
+                    "Recipient migration recovery document still exists"};
+        }
+
+        // Ensure the command's wait for writeConcern will until the recovery document is deleted.
+        repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+
         return Status::OK();
     }
 
@@ -679,6 +742,11 @@ Status MigrationDestinationManager::exitCriticalSection(OperationContext* opCtx,
     if (_state != DONE) {
         return {ErrorCodes::CommandFailed, "exitCriticalSection failed"};
     }
+
+    dassert(
+        !migrationRecipientRecoveryDocumentExists(opCtx, sessionId),
+        str::stream() << "Recipient migration recovery document should not exist exist. SessionId: "
+                      << sessionId.toString());
 
     LOGV2_DEBUG(
         5899105, 2, "Succeeded releasing recipient critical section", "requested"_attr = sessionId);
@@ -960,7 +1028,7 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(
     }
 }
 
-void MigrationDestinationManager::_migrateThread() {
+void MigrationDestinationManager::_migrateThread(bool skipToCritSecTaken) {
     Client::initThread("migrateThread");
     auto client = Client::getCurrent();
     {
@@ -995,7 +1063,7 @@ void MigrationDestinationManager::_migrateThread() {
                                        boost::none /* autocommit */,
                                        boost::none /* startTransaction */,
                                        boost::none /* txnRetryCounter */);
-        _migrateDriver(opCtx);
+        _migrateDriver(opCtx, skipToCritSecTaken);
     } catch (...) {
         _setStateFail(str::stream() << "migrate failed: " << redact(exceptionToStatus()));
     }
@@ -1006,541 +1074,550 @@ void MigrationDestinationManager::_migrateThread() {
     _isActiveCV.notify_all();
 }
 
-void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
+void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
+                                                 bool skipToCritSecTaken) {
     invariant(isActive());
     invariant(_sessionId);
     invariant(_scopedReceiveChunk);
     invariant(!_min.isEmpty());
     invariant(!_max.isEmpty());
 
-    LOGV2(22000,
-          "Starting receiving end of migration of chunk {chunkMin} -> {chunkMax} for collection "
-          "{namespace} from {fromShard} at epoch {epoch} with session id {sessionId}",
-          "Starting receiving end of chunk migration",
-          "chunkMin"_attr = redact(_min),
-          "chunkMax"_attr = redact(_max),
-          "namespace"_attr = _nss.ns(),
-          "fromShard"_attr = _fromShard,
-          "epoch"_attr = _epoch,
-          "sessionId"_attr = *_sessionId,
-          "migrationId"_attr = _migrationId->toBSON());
+    boost::optional<MoveTimingHelper> timing;
 
-    MoveTimingHelper timing(
-        outerOpCtx, "to", _nss.ns(), _min, _max, 7 /* steps */, &_errmsg, _toShard, _fromShard);
+    if (!skipToCritSecTaken) {
+        timing.emplace(
+            outerOpCtx, "to", _nss.ns(), _min, _max, 7 /* steps */, &_errmsg, _toShard, _fromShard);
 
-    const auto initialState = getState();
+        LOGV2(
+            22000,
+            "Starting receiving end of migration of chunk {chunkMin} -> {chunkMax} for collection "
+            "{namespace} from {fromShard} at epoch {epoch} with session id {sessionId}",
+            "Starting receiving end of chunk migration",
+            "chunkMin"_attr = redact(_min),
+            "chunkMax"_attr = redact(_max),
+            "namespace"_attr = _nss.ns(),
+            "fromShard"_attr = _fromShard,
+            "epoch"_attr = _epoch,
+            "sessionId"_attr = *_sessionId,
+            "migrationId"_attr = _migrationId->toBSON());
 
-    if (initialState == ABORT) {
-        LOGV2_ERROR(22013,
-                    "Migration abort requested before the migration started",
-                    "migrationId"_attr = _migrationId->toBSON());
-        return;
-    }
+        const auto initialState = getState();
 
-    invariant(initialState == READY);
-
-    auto donorCollectionOptionsAndIndexes = [&]() -> CollectionOptionsAndIndexes {
-        auto [collOptions, uuid] =
-            getCollectionOptions(outerOpCtx, _nss, _fromShard, boost::none, boost::none);
-        auto [indexes, idIndex] =
-            getCollectionIndexes(outerOpCtx, _nss, _fromShard, boost::none, boost::none);
-        return {uuid, indexes, idIndex, collOptions};
-    }();
-
-    auto fromShard =
-        uassertStatusOK(Grid::get(outerOpCtx)->shardRegistry()->getShard(outerOpCtx, _fromShard));
-
-    const ChunkRange range(_min, _max);
-
-    // 1. Ensure any data which might have been left orphaned in the range being moved has been
-    // deleted.
-    const auto rangeDeletionWaitDeadline =
-        outerOpCtx->getServiceContext()->getFastClockSource()->now() +
-        Milliseconds(receiveChunkWaitForRangeDeleterTimeoutMS.load());
-
-    while (migrationutil::checkForConflictingDeletions(
-        outerOpCtx, range, donorCollectionOptionsAndIndexes.uuid)) {
-        uassert(ErrorCodes::ResumableRangeDeleterDisabled,
-                "Failing migration because the disableResumableRangeDeleter server "
-                "parameter is set to true on the recipient shard, which contains range "
-                "deletion tasks overlapping the incoming range.",
-                !disableResumableRangeDeleter.load());
-
-        LOGV2(22001,
-              "Migration paused because the requested range {range} for {namespace} "
-              "overlaps with a range already scheduled for deletion",
-              "Migration paused because the requested range overlaps with a range already "
-              "scheduled for deletion",
-              "namespace"_attr = _nss.ns(),
-              "range"_attr = redact(range.toString()),
-              "migrationId"_attr = _migrationId->toBSON());
-
-        auto status = CollectionShardingRuntime::waitForClean(outerOpCtx,
-                                                              _nss,
-                                                              donorCollectionOptionsAndIndexes.uuid,
-                                                              range,
-                                                              rangeDeletionWaitDeadline);
-
-        if (!status.isOK()) {
-            _setStateFail(redact(status.toString()));
+        if (initialState == ABORT) {
+            LOGV2_ERROR(22013,
+                        "Migration abort requested before the migration started",
+                        "migrationId"_attr = _migrationId->toBSON());
             return;
         }
 
-        uassert(ErrorCodes::ExceededTimeLimit,
-                "Exceeded deadline waiting for overlapping range deletion to finish",
-                outerOpCtx->getServiceContext()->getFastClockSource()->now() <
-                    rangeDeletionWaitDeadline);
+        invariant(initialState == READY);
 
-        // If the filtering metadata was cleared while the range deletion task was ongoing, then
-        // 'waitForClean' would return immediately even though there really is an ongoing range
-        // deletion task. For that case, we loop again until there is no conflicting task in
-        // config.rangeDeletions
-        outerOpCtx->sleepFor(Milliseconds(1000));
-    }
+        auto donorCollectionOptionsAndIndexes = [&]() -> CollectionOptionsAndIndexes {
+            auto [collOptions, uuid] =
+                getCollectionOptions(outerOpCtx, _nss, _fromShard, boost::none, boost::none);
+            auto [indexes, idIndex] =
+                getCollectionIndexes(outerOpCtx, _nss, _fromShard, boost::none, boost::none);
+            return {uuid, indexes, idIndex, collOptions};
+        }();
 
-    timing.done(1);
-    migrateThreadHangAtStep1.pauseWhileSet();
+        auto fromShard = uassertStatusOK(
+            Grid::get(outerOpCtx)->shardRegistry()->getShard(outerOpCtx, _fromShard));
+
+        const ChunkRange range(_min, _max);
+
+        // 1. Ensure any data which might have been left orphaned in the range being moved has been
+        // deleted.
+        const auto rangeDeletionWaitDeadline =
+            outerOpCtx->getServiceContext()->getFastClockSource()->now() +
+            Milliseconds(receiveChunkWaitForRangeDeleterTimeoutMS.load());
+
+        while (migrationutil::checkForConflictingDeletions(
+            outerOpCtx, range, donorCollectionOptionsAndIndexes.uuid)) {
+            uassert(ErrorCodes::ResumableRangeDeleterDisabled,
+                    "Failing migration because the disableResumableRangeDeleter server "
+                    "parameter is set to true on the recipient shard, which contains range "
+                    "deletion tasks overlapping the incoming range.",
+                    !disableResumableRangeDeleter.load());
+
+            LOGV2(22001,
+                  "Migration paused because the requested range {range} for {namespace} "
+                  "overlaps with a range already scheduled for deletion",
+                  "Migration paused because the requested range overlaps with a range already "
+                  "scheduled for deletion",
+                  "namespace"_attr = _nss.ns(),
+                  "range"_attr = redact(range.toString()),
+                  "migrationId"_attr = _migrationId->toBSON());
+
+            auto status =
+                CollectionShardingRuntime::waitForClean(outerOpCtx,
+                                                        _nss,
+                                                        donorCollectionOptionsAndIndexes.uuid,
+                                                        range,
+                                                        rangeDeletionWaitDeadline);
+
+            if (!status.isOK()) {
+                _setStateFail(redact(status.toString()));
+                return;
+            }
+
+            uassert(ErrorCodes::ExceededTimeLimit,
+                    "Exceeded deadline waiting for overlapping range deletion to finish",
+                    outerOpCtx->getServiceContext()->getFastClockSource()->now() <
+                        rangeDeletionWaitDeadline);
+
+            // If the filtering metadata was cleared while the range deletion task was ongoing, then
+            // 'waitForClean' would return immediately even though there really is an ongoing range
+            // deletion task. For that case, we loop again until there is no conflicting task in
+            // config.rangeDeletions
+            outerOpCtx->sleepFor(Milliseconds(1000));
+        }
+
+        timing->done(1);
+        migrateThreadHangAtStep1.pauseWhileSet();
 
 
-    // 2. Create the parent collection and its indexes, if needed.
-    // The conventional usage of retryable writes is to assign statement id's to all of
-    // the writes done as part of the data copying so that _recvChunkStart is
-    // conceptually a retryable write batch. However, we are using an alternate approach to do those
-    // writes under an AlternativeClientRegion because 1) threading the
-    // statement id's through to all the places where they are needed would make this code more
-    // complex, and 2) some of the operations, like creating the collection or building indexes, are
-    // not currently supported in retryable writes.
-    outerOpCtx->setAlwaysInterruptAtStepDownOrUp();
-    {
+        // 2. Create the parent collection and its indexes, if needed.
+        // The conventional usage of retryable writes is to assign statement id's to all of
+        // the writes done as part of the data copying so that _recvChunkStart is
+        // conceptually a retryable write batch. However, we are using an alternate approach to do
+        // those writes under an AlternativeClientRegion because 1) threading the statement id's
+        // through to all the places where they are needed would make this code more complex, and 2)
+        // some of the operations, like creating the collection or building indexes, are not
+        // currently supported in retryable writes.
+        outerOpCtx->setAlwaysInterruptAtStepDownOrUp();
+        {
+            auto newClient = outerOpCtx->getServiceContext()->makeClient("MigrationCoordinator");
+            {
+                stdx::lock_guard<Client> lk(*newClient.get());
+                newClient->setSystemOperationKillableByStepdown(lk);
+            }
+
+            AlternativeClientRegion acr(newClient);
+            auto executor =
+                Grid::get(outerOpCtx->getServiceContext())->getExecutorPool()->getFixedExecutor();
+            auto altOpCtx = CancelableOperationContext(
+                cc().makeOperationContext(), outerOpCtx->getCancellationToken(), executor);
+
+            _dropLocalIndexesIfNecessary(altOpCtx.get(), _nss, donorCollectionOptionsAndIndexes);
+            cloneCollectionIndexesAndOptions(
+                altOpCtx.get(), _nss, donorCollectionOptionsAndIndexes);
+
+            timing->done(2);
+            migrateThreadHangAtStep2.pauseWhileSet();
+        }
+
+        {
+            // 3. Insert a pending range deletion task for the incoming range.
+            RangeDeletionTask recipientDeletionTask(*_migrationId,
+                                                    _nss,
+                                                    donorCollectionOptionsAndIndexes.uuid,
+                                                    _fromShard,
+                                                    range,
+                                                    CleanWhenEnum::kNow);
+            recipientDeletionTask.setPending(true);
+            const auto currentTime = VectorClock::get(outerOpCtx)->getTime();
+            recipientDeletionTask.setTimestamp(currentTime.clusterTime().asTimestamp());
+
+            // It is illegal to wait for write concern with a session checked out, so persist the
+            // range deletion task with an immediately satsifiable write concern and then wait for
+            // majority after yielding the session.
+            migrationutil::persistRangeDeletionTaskLocally(
+                outerOpCtx, recipientDeletionTask, WriteConcernOptions());
+
+            runWithoutSession(outerOpCtx, [&] {
+                WriteConcernResult ignoreResult;
+                auto latestOpTime =
+                    repl::ReplClientInfo::forClient(outerOpCtx->getClient()).getLastOp();
+                uassertStatusOK(waitForWriteConcern(
+                    outerOpCtx, latestOpTime, WriteConcerns::kMajorityWriteConcern, &ignoreResult));
+            });
+
+            timing->done(3);
+            migrateThreadHangAtStep3.pauseWhileSet();
+        }
+
         auto newClient = outerOpCtx->getServiceContext()->makeClient("MigrationCoordinator");
         {
             stdx::lock_guard<Client> lk(*newClient.get());
             newClient->setSystemOperationKillableByStepdown(lk);
         }
-
         AlternativeClientRegion acr(newClient);
         auto executor =
             Grid::get(outerOpCtx->getServiceContext())->getExecutorPool()->getFixedExecutor();
-        auto altOpCtx = CancelableOperationContext(
+        auto newOpCtxPtr = CancelableOperationContext(
             cc().makeOperationContext(), outerOpCtx->getCancellationToken(), executor);
+        auto opCtx = newOpCtxPtr.get();
+        repl::OpTime lastOpApplied;
+        {
+            // 4. Initial bulk clone
+            _setState(CLONE);
 
-        _dropLocalIndexesIfNecessary(altOpCtx.get(), _nss, donorCollectionOptionsAndIndexes);
-        cloneCollectionIndexesAndOptions(altOpCtx.get(), _nss, donorCollectionOptionsAndIndexes);
+            _sessionMigration->start(opCtx->getServiceContext());
 
-        timing.done(2);
-        migrateThreadHangAtStep2.pauseWhileSet();
-    }
+            const BSONObj migrateCloneRequest = createMigrateCloneRequest(_nss, *_sessionId);
 
-    {
-        // 3. Insert a pending range deletion task for the incoming range.
-        RangeDeletionTask recipientDeletionTask(*_migrationId,
-                                                _nss,
-                                                donorCollectionOptionsAndIndexes.uuid,
-                                                _fromShard,
-                                                range,
-                                                CleanWhenEnum::kNow);
-        recipientDeletionTask.setPending(true);
-        const auto currentTime = VectorClock::get(outerOpCtx)->getTime();
-        recipientDeletionTask.setTimestamp(currentTime.clusterTime().asTimestamp());
+            _chunkMarkedPending = true;  // no lock needed, only the migrate thread looks.
 
-        // It is illegal to wait for write concern with a session checked out, so persist the range
-        // deletion task with an immediately satsifiable write concern and then wait for majority
-        // after yielding the session.
-        migrationutil::persistRangeDeletionTaskLocally(
-            outerOpCtx, recipientDeletionTask, WriteConcernOptions());
-
-        runWithoutSession(outerOpCtx, [&] {
-            WriteConcernResult ignoreResult;
-            auto latestOpTime =
-                repl::ReplClientInfo::forClient(outerOpCtx->getClient()).getLastOp();
-            uassertStatusOK(waitForWriteConcern(
-                outerOpCtx, latestOpTime, WriteConcerns::kMajorityWriteConcern, &ignoreResult));
-        });
-
-        timing.done(3);
-        migrateThreadHangAtStep3.pauseWhileSet();
-    }
-
-    auto newClient = outerOpCtx->getServiceContext()->makeClient("MigrationCoordinator");
-    {
-        stdx::lock_guard<Client> lk(*newClient.get());
-        newClient->setSystemOperationKillableByStepdown(lk);
-    }
-    AlternativeClientRegion acr(newClient);
-    auto executor =
-        Grid::get(outerOpCtx->getServiceContext())->getExecutorPool()->getFixedExecutor();
-    auto newOpCtxPtr = CancelableOperationContext(
-        cc().makeOperationContext(), outerOpCtx->getCancellationToken(), executor);
-    auto opCtx = newOpCtxPtr.get();
-    repl::OpTime lastOpApplied;
-    {
-        // 4. Initial bulk clone
-        _setState(CLONE);
-
-        _sessionMigration->start(opCtx->getServiceContext());
-
-        const BSONObj migrateCloneRequest = createMigrateCloneRequest(_nss, *_sessionId);
-
-        _chunkMarkedPending = true;  // no lock needed, only the migrate thread looks.
-
-        auto assertNotAborted = [&](OperationContext* opCtx) {
-            opCtx->checkForInterrupt();
-            outerOpCtx->checkForInterrupt();
-            uassert(50748, "Migration aborted while copying documents", getState() != ABORT);
-        };
-
-        auto insertBatchFn = [&](OperationContext* opCtx, BSONObj nextBatch) {
-            auto arr = nextBatch["objects"].Obj();
-            if (arr.isEmpty()) {
-                return false;
-            }
-            auto it = arr.begin();
-            while (it != arr.end()) {
-                int batchNumCloned = 0;
-                int batchClonedBytes = 0;
-                const int batchMaxCloned = migrateCloneInsertionBatchSize.load();
-
-                assertNotAborted(opCtx);
-
-                write_ops::InsertCommandRequest insertOp(_nss);
-                insertOp.getWriteCommandRequestBase().setOrdered(true);
-                insertOp.setDocuments([&] {
-                    std::vector<BSONObj> toInsert;
-                    while (it != arr.end() &&
-                           (batchMaxCloned <= 0 || batchNumCloned < batchMaxCloned)) {
-                        const auto& doc = *it;
-                        BSONObj docToClone = doc.Obj();
-                        toInsert.push_back(docToClone);
-                        batchNumCloned++;
-                        batchClonedBytes += docToClone.objsize();
-                        ++it;
-                    }
-                    return toInsert;
-                }());
-
-                const auto reply =
-                    write_ops_exec::performInserts(opCtx, insertOp, OperationSource::kFromMigrate);
-
-                for (unsigned long i = 0; i < reply.results.size(); ++i) {
-                    uassertStatusOKWithContext(
-                        reply.results[i],
-                        str::stream() << "Insert of " << insertOp.getDocuments()[i] << " failed.");
-                }
-
-                {
-                    stdx::lock_guard<Latch> statsLock(_mutex);
-                    _numCloned += batchNumCloned;
-                    ShardingStatistics::get(opCtx).countDocsClonedOnRecipient.addAndFetch(
-                        batchNumCloned);
-                    _clonedBytes += batchClonedBytes;
-                }
-                if (_writeConcern.needToWaitForOtherNodes()) {
-                    runWithoutSession(outerOpCtx, [&] {
-                        repl::ReplicationCoordinator::StatusAndDuration replStatus =
-                            repl::ReplicationCoordinator::get(opCtx)->awaitReplication(
-                                opCtx,
-                                repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp(),
-                                _writeConcern);
-                        if (replStatus.status.code() == ErrorCodes::WriteConcernFailed) {
-                            LOGV2_WARNING(
-                                22011,
-                                "secondaryThrottle on, but doc insert timed out; continuing",
-                                "migrationId"_attr = _migrationId->toBSON());
-                        } else {
-                            uassertStatusOK(replStatus.status);
-                        }
-                    });
-                }
-
-                sleepmillis(migrateCloneInsertionBatchDelayMS.load());
-            }
-            return true;
-        };
-
-        auto fetchBatchFn = [&](OperationContext* opCtx, BSONObj* nextBatch) {
-            auto commandResponse = uassertStatusOKWithContext(
-                fromShard->runCommand(opCtx,
-                                      ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                      "admin",
-                                      migrateCloneRequest,
-                                      Shard::RetryPolicy::kNoRetry),
-                "_migrateClone failed: ");
-
-            uassertStatusOKWithContext(Shard::CommandResponse::getEffectiveStatus(commandResponse),
-                                       "_migrateClone failed: ");
-
-            *nextBatch = commandResponse.response;
-            return nextBatch->getField("objects").Obj().isEmpty();
-        };
-
-        // If running on a replicated system, we'll need to flush the docs we cloned to the
-        // secondaries
-        lastOpApplied = fetchAndApplyBatch(opCtx, insertBatchFn, fetchBatchFn);
-
-        timing.done(4);
-        migrateThreadHangAtStep4.pauseWhileSet();
-
-        if (MONGO_unlikely(failMigrationOnRecipient.shouldFail())) {
-            _setStateFail(str::stream() << "failing migration after cloning " << _numCloned
-                                        << " docs due to failMigrationOnRecipient failpoint");
-            return;
-        }
-    }
-
-    const BSONObj xferModsRequest = createTransferModsRequest(_nss, *_sessionId);
-
-    {
-        // 5. Do bulk of mods
-        _setState(CATCHUP);
-
-        auto fetchBatchFn = [&](OperationContext* opCtx, BSONObj* nextBatch) {
-            auto commandResponse = uassertStatusOKWithContext(
-                fromShard->runCommand(opCtx,
-                                      ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                      "admin",
-                                      xferModsRequest,
-                                      Shard::RetryPolicy::kNoRetry),
-                "_transferMods failed: ");
-
-            uassertStatusOKWithContext(Shard::CommandResponse::getEffectiveStatus(commandResponse),
-                                       "_transferMods failed: ");
-
-            *nextBatch = commandResponse.response;
-            return nextBatch->getField("size").number() == 0;
-        };
-
-        auto applyModsFn = [&](OperationContext* opCtx, BSONObj nextBatch) {
-            if (nextBatch["size"].number() == 0) {
-                // There are no more pending modifications to be applied. End the catchup phase
-                return false;
-            }
-
-            if (!_applyMigrateOp(opCtx, nextBatch)) {
-                return true;
-            }
-
-            const int maxIterations = 3600 * 50;
-
-            int i;
-            for (i = 0; i < maxIterations; i++) {
+            auto assertNotAborted = [&](OperationContext* opCtx) {
                 opCtx->checkForInterrupt();
                 outerOpCtx->checkForInterrupt();
+                uassert(50748, "Migration aborted while copying documents", getState() != ABORT);
+            };
 
-                uassert(ErrorCodes::CommandFailed,
+            auto insertBatchFn = [&](OperationContext* opCtx, BSONObj nextBatch) {
+                auto arr = nextBatch["objects"].Obj();
+                if (arr.isEmpty()) {
+                    return false;
+                }
+                auto it = arr.begin();
+                while (it != arr.end()) {
+                    int batchNumCloned = 0;
+                    int batchClonedBytes = 0;
+                    const int batchMaxCloned = migrateCloneInsertionBatchSize.load();
+
+                    assertNotAborted(opCtx);
+
+                    write_ops::InsertCommandRequest insertOp(_nss);
+                    insertOp.getWriteCommandRequestBase().setOrdered(true);
+                    insertOp.setDocuments([&] {
+                        std::vector<BSONObj> toInsert;
+                        while (it != arr.end() &&
+                               (batchMaxCloned <= 0 || batchNumCloned < batchMaxCloned)) {
+                            const auto& doc = *it;
+                            BSONObj docToClone = doc.Obj();
+                            toInsert.push_back(docToClone);
+                            batchNumCloned++;
+                            batchClonedBytes += docToClone.objsize();
+                            ++it;
+                        }
+                        return toInsert;
+                    }());
+
+                    const auto reply = write_ops_exec::performInserts(
+                        opCtx, insertOp, OperationSource::kFromMigrate);
+
+                    for (unsigned long i = 0; i < reply.results.size(); ++i) {
+                        uassertStatusOKWithContext(reply.results[i],
+                                                   str::stream()
+                                                       << "Insert of " << insertOp.getDocuments()[i]
+                                                       << " failed.");
+                    }
+
+                    {
+                        stdx::lock_guard<Latch> statsLock(_mutex);
+                        _numCloned += batchNumCloned;
+                        ShardingStatistics::get(opCtx).countDocsClonedOnRecipient.addAndFetch(
+                            batchNumCloned);
+                        _clonedBytes += batchClonedBytes;
+                    }
+                    if (_writeConcern.needToWaitForOtherNodes()) {
+                        runWithoutSession(outerOpCtx, [&] {
+                            repl::ReplicationCoordinator::StatusAndDuration replStatus =
+                                repl::ReplicationCoordinator::get(opCtx)->awaitReplication(
+                                    opCtx,
+                                    repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp(),
+                                    _writeConcern);
+                            if (replStatus.status.code() == ErrorCodes::WriteConcernFailed) {
+                                LOGV2_WARNING(
+                                    22011,
+                                    "secondaryThrottle on, but doc insert timed out; continuing",
+                                    "migrationId"_attr = _migrationId->toBSON());
+                            } else {
+                                uassertStatusOK(replStatus.status);
+                            }
+                        });
+                    }
+
+                    sleepmillis(migrateCloneInsertionBatchDelayMS.load());
+                }
+                return true;
+            };
+
+            auto fetchBatchFn = [&](OperationContext* opCtx, BSONObj* nextBatch) {
+                auto commandResponse = uassertStatusOKWithContext(
+                    fromShard->runCommand(opCtx,
+                                          ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                          "admin",
+                                          migrateCloneRequest,
+                                          Shard::RetryPolicy::kNoRetry),
+                    "_migrateClone failed: ");
+
+                uassertStatusOKWithContext(
+                    Shard::CommandResponse::getEffectiveStatus(commandResponse),
+                    "_migrateClone failed: ");
+
+                *nextBatch = commandResponse.response;
+                return nextBatch->getField("objects").Obj().isEmpty();
+            };
+
+            // If running on a replicated system, we'll need to flush the docs we cloned to the
+            // secondaries
+            lastOpApplied = fetchAndApplyBatch(opCtx, insertBatchFn, fetchBatchFn);
+
+            timing->done(4);
+            migrateThreadHangAtStep4.pauseWhileSet();
+
+            if (MONGO_unlikely(failMigrationOnRecipient.shouldFail())) {
+                _setStateFail(str::stream() << "failing migration after cloning " << _numCloned
+                                            << " docs due to failMigrationOnRecipient failpoint");
+                return;
+            }
+        }
+
+        const BSONObj xferModsRequest = createTransferModsRequest(_nss, *_sessionId);
+
+        {
+            // 5. Do bulk of mods
+            _setState(CATCHUP);
+
+            auto fetchBatchFn = [&](OperationContext* opCtx, BSONObj* nextBatch) {
+                auto commandResponse = uassertStatusOKWithContext(
+                    fromShard->runCommand(opCtx,
+                                          ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                          "admin",
+                                          xferModsRequest,
+                                          Shard::RetryPolicy::kNoRetry),
+                    "_transferMods failed: ");
+
+                uassertStatusOKWithContext(
+                    Shard::CommandResponse::getEffectiveStatus(commandResponse),
+                    "_transferMods failed: ");
+
+                *nextBatch = commandResponse.response;
+                return nextBatch->getField("size").number() == 0;
+            };
+
+            auto applyModsFn = [&](OperationContext* opCtx, BSONObj nextBatch) {
+                if (nextBatch["size"].number() == 0) {
+                    // There are no more pending modifications to be applied. End the catchup phase
+                    return false;
+                }
+
+                if (!_applyMigrateOp(opCtx, nextBatch)) {
+                    return true;
+                }
+
+                const int maxIterations = 3600 * 50;
+
+                int i;
+                for (i = 0; i < maxIterations; i++) {
+                    opCtx->checkForInterrupt();
+                    outerOpCtx->checkForInterrupt();
+
+                    uassert(
+                        ErrorCodes::CommandFailed,
                         str::stream()
                             << "Migration aborted while waiting for replication at catch up stage, "
                             << _migrationId->toBSON(),
                         getState() != ABORT);
 
-                if (runWithoutSession(outerOpCtx, [&] {
-                        return opReplicatedEnough(opCtx, lastOpApplied, _writeConcern);
-                    })) {
-                    return true;
+                    if (runWithoutSession(outerOpCtx, [&] {
+                            return opReplicatedEnough(opCtx, lastOpApplied, _writeConcern);
+                        })) {
+                        return true;
+                    }
+
+                    if (i > 100) {
+                        LOGV2(22003,
+                              "secondaries having hard time keeping up with migrate",
+                              "migrationId"_attr = _migrationId->toBSON());
+                    }
+
+                    sleepmillis(20);
                 }
 
-                if (i > 100) {
-                    LOGV2(22003,
-                          "secondaries having hard time keeping up with migrate",
+                uassert(ErrorCodes::CommandFailed,
+                        "Secondary can't keep up with migrate",
+                        i != maxIterations);
+
+                return true;
+            };
+
+            auto updatedTime = fetchAndApplyBatch(opCtx, applyModsFn, fetchBatchFn);
+            lastOpApplied = (updatedTime == repl::OpTime()) ? lastOpApplied : updatedTime;
+
+            timing->done(5);
+            migrateThreadHangAtStep5.pauseWhileSet();
+        }
+
+        {
+            // Pause to wait for replication. This will prevent us from going into critical section
+            // until we're ready.
+
+            LOGV2(22004,
+                  "Waiting for replication to catch up before entering critical section",
+                  "migrationId"_attr = _migrationId->toBSON());
+            LOGV2_DEBUG_OPTIONS(4817411,
+                                2,
+                                {logv2::LogComponent::kShardMigrationPerf},
+                                "Starting majority commit wait on recipient",
+                                "migrationId"_attr = _migrationId->toBSON());
+
+            runWithoutSession(outerOpCtx, [&] {
+                auto awaitReplicationResult =
+                    repl::ReplicationCoordinator::get(opCtx)->awaitReplication(
+                        opCtx, lastOpApplied, _writeConcern);
+                uassertStatusOKWithContext(awaitReplicationResult.status,
+                                           awaitReplicationResult.status.codeString());
+            });
+
+            LOGV2(22005,
+                  "Chunk data replicated successfully.",
+                  "migrationId"_attr = _migrationId->toBSON());
+            LOGV2_DEBUG_OPTIONS(4817412,
+                                2,
+                                {logv2::LogComponent::kShardMigrationPerf},
+                                "Finished majority commit wait on recipient",
+                                "migrationId"_attr = _migrationId->toBSON());
+        }
+
+        {
+            // 6. Wait for commit
+            _setState(STEADY);
+
+            bool transferAfterCommit = false;
+            while (getState() == STEADY || getState() == COMMIT_START) {
+                opCtx->checkForInterrupt();
+                outerOpCtx->checkForInterrupt();
+
+                // Make sure we do at least one transfer after recv'ing the commit message. If we
+                // aren't sure that at least one transfer happens *after* our state changes to
+                // COMMIT_START, there could be mods still on the FROM shard that got logged
+                // *after* our _transferMods but *before* the critical section.
+                if (getState() == COMMIT_START) {
+                    transferAfterCommit = true;
+                }
+
+                auto res = uassertStatusOKWithContext(
+                    fromShard->runCommand(opCtx,
+                                          ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                          "admin",
+                                          xferModsRequest,
+                                          Shard::RetryPolicy::kNoRetry),
+                    "_transferMods failed in STEADY STATE: ");
+
+                uassertStatusOKWithContext(Shard::CommandResponse::getEffectiveStatus(res),
+                                           "_transferMods failed in STEADY STATE: ");
+
+                auto mods = res.response;
+
+                if (mods["size"].number() > 0 && _applyMigrateOp(opCtx, mods)) {
+                    lastOpApplied = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+                    continue;
+                }
+
+                if (getState() == ABORT) {
+                    LOGV2(22006,
+                          "Migration aborted while transferring mods",
                           "migrationId"_attr = _migrationId->toBSON());
+                    return;
                 }
 
-                sleepmillis(20);
+                // We know we're finished when:
+                // 1) The from side has told us that it has locked writes (COMMIT_START)
+                // 2) We've checked at least one more time for un-transmitted mods
+                if (getState() == COMMIT_START && transferAfterCommit == true) {
+                    if (runWithoutSession(outerOpCtx, [&] {
+                            return _flushPendingWrites(opCtx, lastOpApplied);
+                        })) {
+                        break;
+                    }
+                }
+
+                // Only sleep if we aren't committing
+                if (getState() == STEADY)
+                    sleepmillis(10);
             }
 
-            uassert(ErrorCodes::CommandFailed,
-                    "Secondary can't keep up with migrate",
-                    i != maxIterations);
-
-            return true;
-        };
-
-        auto updatedTime = fetchAndApplyBatch(opCtx, applyModsFn, fetchBatchFn);
-        lastOpApplied = (updatedTime == repl::OpTime()) ? lastOpApplied : updatedTime;
-
-        timing.done(5);
-        migrateThreadHangAtStep5.pauseWhileSet();
-    }
-
-    {
-        // Pause to wait for replication. This will prevent us from going into critical section
-        // until we're ready.
-
-        LOGV2(22004,
-              "Waiting for replication to catch up before entering critical section",
-              "migrationId"_attr = _migrationId->toBSON());
-        LOGV2_DEBUG_OPTIONS(4817411,
-                            2,
-                            {logv2::LogComponent::kShardMigrationPerf},
-                            "Starting majority commit wait on recipient",
-                            "migrationId"_attr = _migrationId->toBSON());
-
-        runWithoutSession(outerOpCtx, [&] {
-            auto awaitReplicationResult =
-                repl::ReplicationCoordinator::get(opCtx)->awaitReplication(
-                    opCtx, lastOpApplied, _writeConcern);
-            uassertStatusOKWithContext(awaitReplicationResult.status,
-                                       awaitReplicationResult.status.codeString());
-        });
-
-        LOGV2(22005,
-              "Chunk data replicated successfully.",
-              "migrationId"_attr = _migrationId->toBSON());
-        LOGV2_DEBUG_OPTIONS(4817412,
-                            2,
-                            {logv2::LogComponent::kShardMigrationPerf},
-                            "Finished majority commit wait on recipient",
-                            "migrationId"_attr = _migrationId->toBSON());
-    }
-
-    {
-        // 6. Wait for commit
-        _setState(STEADY);
-
-        bool transferAfterCommit = false;
-        while (getState() == STEADY || getState() == COMMIT_START) {
-            opCtx->checkForInterrupt();
-            outerOpCtx->checkForInterrupt();
-
-            // Make sure we do at least one transfer after recv'ing the commit message. If we
-            // aren't sure that at least one transfer happens *after* our state changes to
-            // COMMIT_START, there could be mods still on the FROM shard that got logged
-            // *after* our _transferMods but *before* the critical section.
-            if (getState() == COMMIT_START) {
-                transferAfterCommit = true;
-            }
-
-            auto res = uassertStatusOKWithContext(
-                fromShard->runCommand(opCtx,
-                                      ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                      "admin",
-                                      xferModsRequest,
-                                      Shard::RetryPolicy::kNoRetry),
-                "_transferMods failed in STEADY STATE: ");
-
-            uassertStatusOKWithContext(Shard::CommandResponse::getEffectiveStatus(res),
-                                       "_transferMods failed in STEADY STATE: ");
-
-            auto mods = res.response;
-
-            if (mods["size"].number() > 0 && _applyMigrateOp(opCtx, mods)) {
-                lastOpApplied = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
-                continue;
-            }
-
-            if (getState() == ABORT) {
-                LOGV2(22006,
-                      "Migration aborted while transferring mods",
-                      "migrationId"_attr = _migrationId->toBSON());
+            if (getState() == FAIL) {
+                _setStateFail("timed out waiting for commit");
                 return;
             }
 
-            // We know we're finished when:
-            // 1) The from side has told us that it has locked writes (COMMIT_START)
-            // 2) We've checked at least one more time for un-transmitted mods
-            if (getState() == COMMIT_START && transferAfterCommit == true) {
-                if (runWithoutSession(outerOpCtx,
-                                      [&] { return _flushPendingWrites(opCtx, lastOpApplied); })) {
-                    break;
-                }
-            }
-
-            // Only sleep if we aren't committing
-            if (getState() == STEADY)
-                sleepmillis(10);
+            timing->done(6);
+            migrateThreadHangAtStep6.pauseWhileSet();
         }
 
-        if (getState() == FAIL) {
-            _setStateFail("timed out waiting for commit");
+        runWithoutSession(outerOpCtx, [&] { _sessionMigration->join(); });
+        if (_sessionMigration->getState() ==
+            SessionCatalogMigrationDestination::State::ErrorOccurred) {
+            _setStateFail(redact(_sessionMigration->getErrMsg()));
             return;
         }
 
-        timing.done(6);
-        migrateThreadHangAtStep6.pauseWhileSet();
-    }
+        if (feature_flags::gFeatureFlagMigrationRecipientCriticalSection.isEnabled(
+                serverGlobalParams.featureCompatibility)) {
+            const auto critSecReason = criticalSectionReason(*_sessionId);
 
-    runWithoutSession(outerOpCtx, [&] { _sessionMigration->join(); });
-    if (_sessionMigration->getState() == SessionCatalogMigrationDestination::State::ErrorOccurred) {
-        _setStateFail(redact(_sessionMigration->getErrMsg()));
-        return;
+            runWithoutSession(outerOpCtx, [&] {
+                // Persist the migration recipient recovery document so that in case of failover,
+                // the new primary will resume the MigrationDestinationManager and retake the
+                // critical section.
+                migrationutil::persistMigrationRecipientRecoveryDocument(
+                    opCtx,
+                    {*_migrationId, _nss, *_sessionId, range, _fromShard, _lsid, _txnNumber});
+
+                LOGV2_DEBUG(5899113,
+                            2,
+                            "Persisted migration recipient recovery document",
+                            "sessionId"_attr = _sessionId);
+
+                // Enter critical section
+                RecoverableCriticalSectionService::get(opCtx)
+                    ->acquireRecoverableCriticalSectionBlockWrites(
+                        opCtx, _nss, critSecReason, ShardingCatalogClient::kLocalWriteConcern);
+
+                LOGV2(5899114, "Entered migration recipient critical section", "nss"_attr = _nss);
+            });
+
+            if (getState() == FAIL) {
+                _setStateFail("timed out waiting for critical section acquisition");
+
+                runWithoutSession(outerOpCtx, [&] {
+                    RecoverableCriticalSectionService::get(opCtx)
+                        ->releaseRecoverableCriticalSection(
+                            opCtx,
+                            _nss,
+                            critSecReason,
+                            ShardingCatalogClient::kMajorityWriteConcern);
+
+                    // Delete the recovery document
+                    migrationutil::deleteMigrationRecipientRecoveryDocument(opCtx, *_migrationId);
+                });
+
+                return;
+            }
+
+            _setState(ENTERED_CRIT_SEC);
+        }
     }
 
     if (feature_flags::gFeatureFlagMigrationRecipientCriticalSection.isEnabled(
             serverGlobalParams.featureCompatibility)) {
-        const auto critSecReason = criticalSectionReason(*_sessionId);
-
-        // Enter critical section
-        runWithoutSession(outerOpCtx, [&] {
-            RecoverableCriticalSectionService::get(opCtx)
-                ->acquireRecoverableCriticalSectionBlockWrites(
-                    opCtx, _nss, critSecReason, ShardingCatalogClient::kLocalWriteConcern);
-        });
-
-        LOGV2_DEBUG(5899107, 2, "Acquired migration recipient critical section", "nss"_attr = _nss);
-
-        if (getState() == FAIL) {
-            _setStateFail("timed out waiting for critical section acquisition");
-
-            runWithoutSession(outerOpCtx, [&] {
-                RecoverableCriticalSectionService::get(opCtx)->releaseRecoverableCriticalSection(
-                    opCtx, _nss, critSecReason, ShardingCatalogClient::kLocalWriteConcern);
-            });
-
-            return;
-        }
-
-        _setState(ENTERED_CRIT_SEC);
-
+        outerOpCtx->setAlwaysInterruptAtStepDownOrUp();
+        auto newClient = outerOpCtx->getServiceContext()->makeClient("MigrationCoordinator");
         {
-            runWithoutSession(outerOpCtx, [&] {
-                stdx::unique_lock<Latch> lock(_mutex);
-                opCtx->waitForConditionOrInterrupt(
-                    _stateChangedCV, lock, [&]() { return _state == EXIT_CRIT_SEC; });
-            });
+            stdx::lock_guard<Client> lk(*newClient.get());
+            newClient->setSystemOperationKillableByStepdown(lk);
         }
+        AlternativeClientRegion acr(newClient);
+        auto executor =
+            Grid::get(outerOpCtx->getServiceContext())->getExecutorPool()->getFixedExecutor();
+        auto newOpCtxPtr = CancelableOperationContext(
+            cc().makeOperationContext(), outerOpCtx->getCancellationToken(), executor);
+        auto opCtx = newOpCtxPtr.get();
 
-        // Refresh the filtering metadata
-        runWithoutSession(outerOpCtx, [&] {
-            LOGV2_DEBUG(
-                5899111, 2, "Refreshing filtering metadata before exiting critical section");
-
-            try {
-                if (MONGO_unlikely(migrationRecipientFailPostCommitRefresh.shouldFail())) {
-                    uasserted(ErrorCodes::InternalError,
-                              "skipShardFilteringMetadataRefresh failpoint");
-                }
-
-                forceShardFilteringMetadataRefresh(opCtx, _nss);
-            } catch (const DBException& ex) {
-                LOGV2_DEBUG(5899103,
-                            2,
-                            "Post-migration commit refresh failed on recipient",
-                            "migrationId"_attr = _migrationId,
-                            "error"_attr = redact(ex));
-
-                UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-                AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
-                CollectionShardingRuntime::get(opCtx, _nss)->clearFilteringMetadata(opCtx);
-            }
-        });
-
-        LOGV2_DEBUG(5899110, 2, "Exiting critical section");
-
-        // Release CS
-        runWithoutSession(outerOpCtx, [&] {
-            RecoverableCriticalSectionService::get(opCtx)->releaseRecoverableCriticalSection(
-                opCtx,
-                _nss,
-                BSON("recvChunk" << 1 << "sessionId" << _sessionId->toString()),
-                ShardingCatalogClient::kMajorityWriteConcern);
-        });
-
-        LOGV2_DEBUG(5899108, 2, "Released migration recipient critical section", "nss"_attr = _nss);
+        // Wait until signaled to exit the critical section and then release it.
+        runWithoutSession(outerOpCtx,
+                          [&] { awaitCriticalSectionReleaseSignalAndCompleteMigration(opCtx); });
     }
 
     _setState(DONE);
 
-    timing.done(7);
-    migrateThreadHangAtStep7.pauseWhileSet();
+    if (timing) {
+        timing->done(7);
+        migrateThreadHangAtStep7.pauseWhileSet();
+    }
 }
 
 bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx, const BSONObj& xfer) {
@@ -1675,6 +1752,57 @@ bool MigrationDestinationManager::_flushPendingWrites(OperationContext* opCtx,
           "migrationId"_attr = _migrationId->toBSON());
 
     return true;
+}
+
+void MigrationDestinationManager::awaitCriticalSectionReleaseSignalAndCompleteMigration(
+    OperationContext* opCtx) {
+    // Wait until the migrate thread is signaled to release the critical section
+    LOGV2_DEBUG(5899111, 3, "Waiting for release critical section signal");
+    {
+        stdx::unique_lock<Latch> lock(_mutex);
+        opCtx->waitForConditionOrInterrupt(
+            _stateChangedCV, lock, [&]() { return _state == EXIT_CRIT_SEC; });
+    }
+
+    // Refresh the filtering metadata
+    LOGV2_DEBUG(5899112, 3, "Refreshing filtering metadata before exiting critical section");
+
+    try {
+        if (MONGO_unlikely(migrationRecipientFailPostCommitRefresh.shouldFail())) {
+            uasserted(ErrorCodes::InternalError, "skipShardFilteringMetadataRefresh failpoint");
+        }
+
+        forceShardFilteringMetadataRefresh(opCtx, _nss);
+    } catch (const DBException& ex) {
+        LOGV2_DEBUG(5899103,
+                    2,
+                    "Post-migration commit refresh failed on recipient",
+                    "migrationId"_attr = _migrationId,
+                    "error"_attr = redact(ex));
+
+        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+        AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
+        CollectionShardingRuntime::get(opCtx, _nss)->clearFilteringMetadata(opCtx);
+    }
+
+    // Release the critical section
+    LOGV2_DEBUG(5899110, 3, "Exiting critical section");
+    const auto critSecReason = criticalSectionReason(*_sessionId);
+
+    RecoverableCriticalSectionService::get(opCtx)->releaseRecoverableCriticalSection(
+        opCtx, _nss, critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
+
+    LOGV2(5899108, "Exited migration recipient critical section", "nss"_attr = _nss);
+
+    // Wait for the updates to the catalog cache to be written to disk before removing the
+    // recovery document. This ensures that on case of stepdown, the new primary will know of a
+    // shardVersion inclusive of the migration. NOTE: We rely on the
+    // deleteMigrationRecipientRecoveryDocument call below to wait for the CatalogCache on-disk
+    // persistence to be majority committed.
+    CatalogCacheLoader::get(opCtx).waitForCollectionFlush(opCtx, _nss);
+
+    // Delete the recovery document
+    migrationutil::deleteMigrationRecipientRecoveryDocument(opCtx, *_migrationId);
 }
 
 }  // namespace mongo

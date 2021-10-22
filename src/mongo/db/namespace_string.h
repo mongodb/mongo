@@ -124,6 +124,9 @@ public:
     // Namespace for storing the persisted state of migration coordinators.
     static const NamespaceString kMigrationCoordinatorsNamespace;
 
+    // Namespace for storing the persisted state of migration recipients.
+    static const NamespaceString kMigrationRecipientsNamespace;
+
     // Namespace for storing the persisted state of tenant migration donors.
     static const NamespaceString kTenantMigrationDonorsNamespace;
 

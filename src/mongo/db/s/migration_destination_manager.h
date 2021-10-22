@@ -38,6 +38,7 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/active_migrations_registry.h"
+#include "mongo/db/s/migration_recipient_recovery_document_gen.h"
 #include "mongo/db/s/migration_session_id.h"
 #include "mongo/db/s/session_catalog_migration_destination.h"
 #include "mongo/platform/mutex.h"
@@ -124,6 +125,13 @@ public:
                  const WriteConcernOptions& writeConcern);
 
     /**
+     * Restores the MigrationDestinationManager state for a migration recovered on step-up.
+     */
+    Status restoreRecoveredMigrationState(OperationContext* opCtx,
+                                          ScopedReceiveChunk scopedReceiveChunk,
+                                          const MigrationRecipientRecoveryDocument& recoveryDoc);
+
+    /**
      * Clones documents from a donor shard.
      */
     static repl::OpTime fetchAndApplyBatch(
@@ -203,9 +211,9 @@ private:
     /**
      * Thread which drives the migration apply process on the recipient side.
      */
-    void _migrateThread();
+    void _migrateThread(bool skipToCritSecTaken = false);
 
-    void _migrateDriver(OperationContext* opCtx);
+    void _migrateDriver(OperationContext* opCtx, bool skipToCritSecTaken = false);
 
     bool _applyMigrateOp(OperationContext* opCtx, const BSONObj& xfer);
 
@@ -239,6 +247,12 @@ private:
      * that the migration "_sessionId" is initialized.
      */
     bool _isActive(WithLock) const;
+
+    /**
+     * Waits for _state to transition to EXIT_CRIT_SEC. Then, it performs a filtering metadata
+     * refresh, releases the critical section and finally deletes the recovery document.
+     */
+    void awaitCriticalSectionReleaseSignalAndCompleteMigration(OperationContext* opCtx);
 
     // Mutex to guard all fields
     mutable Mutex _mutex = MONGO_MAKE_LATCH("MigrationDestinationManager::_mutex");

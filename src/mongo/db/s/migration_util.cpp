@@ -58,7 +58,6 @@
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_statistics.h"
-#include "mongo/db/s/sharding_util.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/db/write_concern.h"
@@ -70,6 +69,7 @@
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/pm2423_feature_flags_gen.h"
 #include "mongo/s/request_types/ensure_chunk_version_is_greater_than_gen.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/exit.h"
@@ -1077,7 +1077,8 @@ ExecutorFuture<void> launchReleaseCriticalSectionOnRecipientFuture(
     const NamespaceString& nss,
     const MigrationSessionId& sessionId) {
     const auto serviceContext = opCtx->getServiceContext();
-    auto executor = getMigrationUtilExecutor(serviceContext);
+    auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+
     return ExecutorFuture<void>(executor).then([=] {
         ThreadClient tc("releaseRecipientCritSec", serviceContext);
         {
@@ -1087,18 +1088,27 @@ ExecutorFuture<void> launchReleaseCriticalSectionOnRecipientFuture(
         auto uniqueOpCtx = tc->makeOperationContext();
         auto opCtx = uniqueOpCtx.get();
 
+        const auto recipientShard =
+            uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, recipientShardId));
+
+        BSONObjBuilder builder;
+        builder.append("_recvChunkReleaseCritSec", nss.ns());
+        sessionId.append(&builder);
+        const auto commandObj = CommandHelpers::appendMajorityWriteConcern(builder.obj());
+
         retryIdempotentWorkAsPrimaryUntilSuccessOrStepdown(
             opCtx,
             "release migration critical section on recipient",
             [&](OperationContext* newOpCtx) {
-                auto executor = Grid::get(newOpCtx)->getExecutorPool()->getFixedExecutor();
                 try {
-                    BSONObjBuilder builder;
-                    builder.append("_recvChunkReleaseCritSec", nss.ns());
-                    sessionId.append(&builder);
+                    const auto response = recipientShard->runCommandWithFixedRetryAttempts(
+                        newOpCtx,
+                        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                        NamespaceString::kAdminDb.toString(),
+                        commandObj,
+                        Shard::RetryPolicy::kIdempotent);
 
-                    sharding_util::sendCommandToShards(
-                        newOpCtx, "admin"_sd, builder.obj(), {recipientShardId}, executor);
+                    uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(response));
                 } catch (const ExceptionFor<ErrorCodes::ShardNotFound>& exShardNotFound) {
                     LOGV2(5899106,
                           "Failed to release critical section on recipient",
@@ -1109,5 +1119,83 @@ ExecutorFuture<void> launchReleaseCriticalSectionOnRecipientFuture(
             });
     });
 }
+
+void persistMigrationRecipientRecoveryDocument(
+    OperationContext* opCtx, const MigrationRecipientRecoveryDocument& migrationRecipientDoc) {
+    PersistentTaskStore<MigrationRecipientRecoveryDocument> store(
+        NamespaceString::kMigrationRecipientsNamespace);
+    try {
+        store.add(opCtx, migrationRecipientDoc, WriteConcerns::kMajorityWriteConcern);
+    } catch (const ExceptionFor<ErrorCodes::DuplicateKey>&) {
+        // Convert a DuplicateKey error to an anonymous error.
+        uasserted(6064502,
+                  str::stream()
+                      << "While attempting to write migration recipient information for migration "
+                      << ", found document with the same migration id. Attempted migration: "
+                      << migrationRecipientDoc.toBSON());
+    }
+}
+
+void deleteMigrationRecipientRecoveryDocument(OperationContext* opCtx, const UUID& migrationId) {
+    // Before deleting the migration recipient recovery document, ensure that in the case of a
+    // crash, the node will start-up from a configTime that is inclusive of the migration that was
+    // committed during the critical section.
+    VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
+
+    PersistentTaskStore<MigrationRecipientRecoveryDocument> store(
+        NamespaceString::kMigrationRecipientsNamespace);
+    store.remove(opCtx,
+                 BSON(MigrationRecipientRecoveryDocument::kIdFieldName << migrationId),
+                 ShardingCatalogClient::kMajorityWriteConcern);
+}
+
+void resumeMigrationRecipientsOnStepUp(OperationContext* opCtx) {
+    if (!feature_flags::gFeatureFlagMigrationRecipientCriticalSection.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        return;
+    }
+
+    LOGV2_DEBUG(6064504, 2, "Starting migration recipient step-up recovery");
+
+    unsigned long long ongoingMigrationRecipientsCount = 0;
+
+    PersistentTaskStore<MigrationRecipientRecoveryDocument> store(
+        NamespaceString::kMigrationRecipientsNamespace);
+
+    store.forEach(
+        opCtx,
+        BSONObj{},
+        [&opCtx, &ongoingMigrationRecipientsCount](const MigrationRecipientRecoveryDocument& doc) {
+            invariant(ongoingMigrationRecipientsCount == 0,
+                      str::stream()
+                          << "Upon step-up a second migration recipient recovery document was found"
+                          << redact(doc.toBSON()));
+            ongoingMigrationRecipientsCount++;
+            LOGV2_DEBUG(5899102,
+                        3,
+                        "Found ongoing migration recipient critical section on step-up",
+                        "migrationRecipientCoordinatorDoc"_attr = redact(doc.toBSON()));
+
+            const auto& nss = doc.getNss();
+
+            // Register this receiveChunk on the ActiveMigrationsRegistry before completing step-up
+            // to prevent a new migration from starting while a receiveChunk was ongoing.
+            auto scopedReceiveChunk(
+                uassertStatusOK(ActiveMigrationsRegistry::get(opCtx).registerReceiveChunk(
+                    opCtx, nss, doc.getRange(), doc.getDonorShardId())));
+
+            const auto mdm = MigrationDestinationManager::get(opCtx);
+            uassertStatusOK(
+                mdm->restoreRecoveredMigrationState(opCtx, std::move(scopedReceiveChunk), doc));
+
+            return true;
+        });
+
+    LOGV2_DEBUG(6064505,
+                2,
+                "Finished migration recipient step-up recovery",
+                "ongoingRecipientCritSecCount"_attr = ongoingMigrationRecipientsCount);
+}
+
 }  // namespace migrationutil
 }  // namespace mongo

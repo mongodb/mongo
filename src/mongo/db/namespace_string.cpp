@@ -69,6 +69,9 @@ const NamespaceString NamespaceString::kTransactionCoordinatorsNamespace(
 const NamespaceString NamespaceString::kMigrationCoordinatorsNamespace(NamespaceString::kConfigDb,
                                                                        "migrationCoordinators");
 
+const NamespaceString NamespaceString::kMigrationRecipientsNamespace(NamespaceString::kConfigDb,
+                                                                     "migrationRecipients");
+
 const NamespaceString NamespaceString::kTenantMigrationDonorsNamespace(NamespaceString::kConfigDb,
                                                                        "tenantMigrationDonors");
 

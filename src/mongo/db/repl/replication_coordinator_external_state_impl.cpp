@@ -937,6 +937,7 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
         // refreshes which should use the recovered configOpTime.
         migrationutil::resubmitRangeDeletionsOnStepUp(_service);
         migrationutil::resumeMigrationCoordinationsOnStepUp(opCtx);
+        migrationutil::resumeMigrationRecipientsOnStepUp(opCtx);
 
         const bool scheduleAsyncRefresh = true;
         resharding::clearFilteringMetadata(opCtx, scheduleAsyncRefresh);

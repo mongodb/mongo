@@ -47,6 +47,7 @@ env.Library(
         'migration_chunk_cloner_source_legacy.cpp',
         'migration_chunk_cloner_source.cpp',
         'migration_coordinator_document.idl',
+        'migration_recipient_recovery_document.idl',
         'migration_coordinator.cpp',
         'migration_destination_manager.cpp',
         'migration_session_id.cpp',
