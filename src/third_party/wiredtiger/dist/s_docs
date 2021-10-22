@@ -63,19 +63,6 @@ glossarychk()
 
 structurechk()
 {
-	# @page names should match the source file name
-	(cd ../src/docs &&
-	grep @page *.dox |
-	sed 's/\([^:]*\)\.dox:.*@page \([^ ]*\) .*/\1 \2/g' |
-	sed 's/-/_/g' | awk '{ if ($1 != $2) { print $1 " != " $2; } }') > $t
-	test -s $t && {
-		echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
-		echo "@page references don't match source file names"
-		sed -e 's/^/	/' < $t
-		echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
-		e=1
-	}
-
 	# sections are a global name space for doxygen, and must be uniquely
 	# named or you can get the wrong results.  For example, if you have
 	# "@section foo ABC" and "@section foo DEF", they will both appear as

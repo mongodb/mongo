@@ -1,9 +1,17 @@
 /* WiredTiger-specific styling. */ 
+html {
+    font-size: small;
+}
+
+/* Set a max page width for readability on large monitors. */
+div.contents {
+    max-width: 960px;
+}
+
 body, table, div, p, dl {
-	font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+	font-family: "Calibri","Helvetica Neue", Helvetica, Arial, sans-serif;
 	color: #373737;
-	font-size: 13px;
-	line-height: 1.3;
+	line-height: 1.5;
 }
 
 h1 {
@@ -12,6 +20,35 @@ h1 {
 
 h2 {
 	font-size: 110%;
+}
+
+/* Architecture guide TOC styling. */
+div.arch_toc ul, ol {
+    line-height: 1.2;
+}
+
+div.arch_toc li {
+    margin-top: 5px;
+    margin-bottom: 5px;
+}
+
+div.arch_toc ul li:first-child {
+    margin-top:0;
+}
+
+div.arch_toc li li {
+    margin-top: 0px;
+    margin-bottom: 0px;
+    line-height: 1.2;
+}
+
+div.arch_toc li li a {
+    font-weight: normal !important;
+}
+
+div.arch_toc h1 {
+    font-weight: bold;
+    font-size: 110%;
 }
 
 /* @group Link Styling */
@@ -30,6 +67,8 @@ div.arch_diagram {
     display: block;
     background: #FFFFFF;
     background: radial-gradient(#FFDDAA,#FFFFFF);
+    margin-top: 2em;
+    margin-bottom: 2em;
 }
 
 /* match just one image */
