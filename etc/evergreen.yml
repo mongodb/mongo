@@ -3848,7 +3848,6 @@ tasks:
           - "bypass_compile_expansions.yml"
           - "compile_expansions.yml"
           - "jstests/**"
-          - "library_dependency_graph.json"
           - "patch_files.txt"
           - "pytests/**"
           - "src/mongo/client/sdam/json_tests/sdam_tests/**"
@@ -3978,17 +3977,6 @@ tasks:
         task_compile_flags: >-
           --detect-odr-violations
           --separate-debug
-    - command: s3.put
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        local_file: src/library_dependency_graph.json
-        remote_file: ${project}/${build_variant}/${revision}/library_dependency_graph.${build_id}.json
-        bucket: mciuploads
-        permissions: public-read
-        content_type: application/json
-        display_name: Library Dependency Graph (library_dependency_graph.json)
-        build_variants: [enterprise-rhel-70-64-bit-kitchen-sink] # This must be the Dagger variant
 
 ## clang_tidy - run clang_tidy
 - name: clang_tidy
@@ -10998,21 +10986,6 @@ buildvariants:
   - name: .publish
     distros:
     - rhel80-small
-
-# This variant is to intentionally test uncommon features nightly
-- <<: *enterprise-rhel-70-64-bit-template
-  name: enterprise-rhel-70-64-bit-kitchen-sink
-  display_name: "~ Enterprise RHEL 7.0 (Dagger)"
-  batchtime: 1440 # 1 day
-  expansions:
-    <<: *enterprise-rhel-70-64-bit-expansions-template
-    compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    additional_compile_targets: dagger # If this moves to another variant, update the compile_all task
-  tasks:
-  - name: compile_all_run_unittests_TG
-    distros:
-    - rhel70
-  - name: jsCore
 
 - <<: *enterprise-rhel-70-64-bit-template
   name: hot_backups-rhel-70-64-bit
