@@ -162,13 +162,10 @@ Status repairDatabase(OperationContext* opCtx, StorageEngine* engine, const std:
 
         // Restore oplog Collection pointer cache.
         repl::acquireOplogCollectionForLogging(opCtx);
-    } catch (const ExceptionFor<ErrorCodes::MustDowngrade>&) {
-        // openDb can throw an exception with a MustDowngrade status if a collection does not
-        // have a UUID.
-        throw;
     } catch (...) {
         LOGV2_FATAL_CONTINUE(
-            21031, "Unexpected exception encountered while reopening database after repair.");
+            21031,
+            "Unexpected exception encountered while reacquiring oplog collection after repair.");
         std::terminate();  // Logs additional info about the specific error.
     }
 
